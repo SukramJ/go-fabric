@@ -136,42 +136,54 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleIcaccsrRequest registers fn for the IcaccsrRequest command; nil removes the handler;
+// HandleIcaccsrRequest registers fn for the IcaccsrRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleIcaccsrRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleIcaccsrRequest(fn func(ctx context.Context, req IcaccsrRequestRequest) (IcaccsrResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdIcaccsrRequest, fn)
 }
 
-// HandleAddIcac registers fn for the AddIcac command; nil removes the handler;
+// HandleAddIcac registers fn for the AddIcac command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddIcac is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddIcac(fn func(ctx context.Context, req AddIcacRequest) (IcacResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddIcac, fn)
 }
 
-// HandleOpenJointCommissioningWindow registers fn for the OpenJointCommissioningWindow command; nil removes the handler;
+// HandleOpenJointCommissioningWindow registers fn for the OpenJointCommissioningWindow command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleOpenJointCommissioningWindow is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleOpenJointCommissioningWindow(fn func(ctx context.Context, req OpenJointCommissioningWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdOpenJointCommissioningWindow, fn)
 }
 
-// HandleTransferAnchorRequest registers fn for the TransferAnchorRequest command; nil removes the handler;
+// HandleTransferAnchorRequest registers fn for the TransferAnchorRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleTransferAnchorRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleTransferAnchorRequest(fn func(ctx context.Context, req TransferAnchorRequestRequest) (TransferAnchorResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdTransferAnchorRequest, fn)
 }
 
-// HandleTransferAnchorComplete registers fn for the TransferAnchorComplete command; nil removes the handler;
+// HandleTransferAnchorComplete registers fn for the TransferAnchorComplete command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleTransferAnchorComplete is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleTransferAnchorComplete(fn func(ctx context.Context, req TransferAnchorCompleteRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdTransferAnchorComplete, fn)
 }
 
-// HandleAnnounceJointFabricAdministrator registers fn for the AnnounceJointFabricAdministrator command; nil removes the handler;
+// HandleAnnounceJointFabricAdministrator registers fn for the AnnounceJointFabricAdministrator command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAnnounceJointFabricAdministrator is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAnnounceJointFabricAdministrator(fn func(ctx context.Context, req AnnounceJointFabricAdministratorRequest) (struct{}, error)) error {

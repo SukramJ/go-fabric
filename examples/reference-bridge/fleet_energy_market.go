@@ -800,7 +800,7 @@ func (r *fakeReadings) snapshot(t measurementTarget, now uint32) {
 		return
 	}
 	if ep, ok := t.dev.EndpointNumber(); ok {
-		if err := t.energy.EmitCumulativeEnergyMeasured(ep, eemdef.CumulativeEnergyMeasuredEvent{EnergyImported: &imported}); err != nil {
+		if err := t.energy.EmitCumulativeEnergyMeasured(ep, eemdef.CumulativeEnergyMeasuredEvent{EnergyImported: &imported}); err != nil { //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
 			slog.Warn("meter.fakereadings", slog.String("event", "CumulativeEnergyMeasured"), slog.Any("err", err))
 		}
 	}

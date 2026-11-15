@@ -599,7 +599,7 @@ func (c *AmbientContext) mutate(fn func(st *acState, events *[]event) error) err
 	}
 	for _, e := range events {
 		if c.Emits(e.id) {
-			_ = c.srv.Emit(endpoint, e.id, e.data)
+			_ = c.srv.Emit(endpoint, e.id, e.data) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		}
 	}
 	return nil

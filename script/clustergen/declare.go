@@ -448,6 +448,10 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	if len(c.Features) > 0 {
 		w.p("\t// Features is the FeatureMap selection; zero is the device type's.")
 		w.p("\tFeatures Feature")
+		w.p("\t// NoFeatures selects no feature: FeatureMap 0, also where the")
+		w.p("\t// device type's default selection enables one. Set beside a")
+		w.p("\t// non-zero Features it is refused when the device is built.")
+		w.p("\tNoFeatures bool")
 	}
 	if len(cmds) > 0 {
 		w.p("\t// Commands are optional commands the server accepts beyond the")
@@ -457,7 +461,7 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	}
 	if len(g.hullEvents()) > 0 {
 		w.p("\t// Events are optional events the server emits beyond the ones the")
-		w.p("\t// selection mandates (Server.Emit<Event>).")
+		w.p("\t// selection mandates (Server.Record<Event>).")
 		w.p("\tEvents []uint32")
 	}
 	w.p("\t// OnWrite vetoes a controller's write before it is stored")
@@ -505,7 +509,7 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	w.p("\t\tdecl.Attach = d.attach")
 	w.p("\t}")
 	if len(c.Features) > 0 {
-		w.p("\tdecl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0")
+		w.p("\tdecl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures")
 	}
 	if len(cmds) > 0 {
 		w.p("\tdecl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)")
@@ -520,6 +524,13 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 		w.p("\tif d.%s != nil {", hc.method)
 		w.p("\t\tdecl.Elements.Commands = append(decl.Elements.Commands, %s)", hc.cmdID)
 		w.p("\t\tdecl.Attach = d.attach")
+		w.p("\t}")
+	}
+	if len(c.Features) > 0 {
+		w.p("\tif d.NoFeatures && d.Features != 0 {")
+		w.p("\t\tdecl.Attach = func(contract.ClusterServer) error {")
+		w.p("\t\t\treturn errors.New(Name + \": Declare sets both NoFeatures and Features\")")
+		w.p("\t\t}")
 		w.p("\t}")
 	}
 	w.p("\treturn decl")

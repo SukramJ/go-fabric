@@ -58,7 +58,7 @@ func NewHeldBooleanState(cfg HeldBooleanStateConfig) (*HeldBooleanState, error) 
 			}
 			v, _ := srv.Value(bsdef.AttrStateValue)
 			on, _ := v.(bool)
-			_ = srv.Emit(uint16(s.endpoint.Load()), bsdef.EventStateChange, bsdef.StateChangeEvent{StateValue: on}) //nolint:gosec // an endpoint number
+			_ = srv.Emit(uint16(s.endpoint.Load()), bsdef.EventStateChange, bsdef.StateChangeEvent{StateValue: on}) //nolint:gosec,staticcheck // an endpoint number; R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		})
 	}
 	return s, nil

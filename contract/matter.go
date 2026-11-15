@@ -992,7 +992,10 @@ type EventEmitter interface {
 // EventReceiver is implemented by cluster servers that emit
 // events. The bridge calls SetMatterEventEmitter at endpoint-assembly
 // time so the cluster can fire events at any later moment without
-// holding a reference to the bridge.
+// holding a reference to the bridge, and withdraws it with
+// SetMatterEventEmitter(nil) when the server leaves the served topology —
+// a reassembly that drops its endpoint or replaces it — so an event the
+// server emits afterwards reaches no event log.
 type EventReceiver interface {
 	SetMatterEventEmitter(emitter EventEmitter)
 }

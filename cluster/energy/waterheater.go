@@ -267,7 +267,7 @@ func (s *WaterHeaterManagementServer) transitionLocked(origin contract.Origin, s
 	if err := s.srv.SetAttributesFrom(origin, map[uint32]any{whm.AttrBoostState: state}); err != nil {
 		return fmt.Errorf("energy: BoostState: %w", err)
 	}
-	if err := s.srv.Emit(s.endpoint, eventID, data); err != nil {
+	if err := s.srv.Emit(s.endpoint, eventID, data); err != nil { //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		return fmt.Errorf("energy: %w", err)
 	}
 	return nil

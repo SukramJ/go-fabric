@@ -163,14 +163,14 @@ func (a *Actions) eventEndpoint() uint16 {
 // EmitStateChanged emits StateChanged for actionID with the InvokeID the
 // command carried (Matter: 0 when it carried none).
 func (a *Actions) EmitStateChanged(actionID uint16, invokeID uint32, state actionsdef.ActionStateEnum) error {
-	return a.Emit(a.eventEndpoint(), actionsdef.EventStateChanged, actionsdef.StateChangedEvent{
+	return a.Emit(a.eventEndpoint(), actionsdef.EventStateChanged, actionsdef.StateChangedEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		ActionId: actionID, InvokeId: invokeID, NewState: state,
 	})
 }
 
 // EmitActionFailed emits ActionFailed for actionID.
 func (a *Actions) EmitActionFailed(actionID uint16, invokeID uint32, state actionsdef.ActionStateEnum, cause actionsdef.ActionErrorEnum) error {
-	return a.Emit(a.eventEndpoint(), actionsdef.EventActionFailed, actionsdef.ActionFailedEvent{
+	return a.Emit(a.eventEndpoint(), actionsdef.EventActionFailed, actionsdef.ActionFailedEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		ActionId: actionID, InvokeId: invokeID, NewState: state, Error: cause,
 	})
 }

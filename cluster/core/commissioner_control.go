@@ -348,7 +348,7 @@ func (c *CommissionerControl) approve(request CommissioningApprovalRequest) {
 	endpoint := c.endpoint
 	c.mu.Unlock()
 	c.log.Info("matter.commissioner_control.approval_result", slog.Uint64("request_id", request.RequestID), slog.Int("status", int(status)))
-	if err := c.Emit(endpoint, commctrldef.EventCommissioningRequestResult, commctrldef.CommissioningRequestResultEvent{
+	if err := c.Emit(endpoint, commctrldef.EventCommissioningRequestResult, commctrldef.CommissioningRequestResultEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		RequestId: request.RequestID, ClientNodeId: request.ClientNodeID, StatusCode: status, FabricIndex: request.FabricIndex,
 	}); err != nil {
 		c.log.Warn("matter.commissioner_control.event_failed", slog.Any("err", err))

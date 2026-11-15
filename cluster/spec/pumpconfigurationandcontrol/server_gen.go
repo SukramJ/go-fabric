@@ -319,106 +319,412 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
+// RecordSupplyVoltageLow records the SupplyVoltageLow event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSupplyVoltageLow(data SupplyVoltageLowEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSupplyVoltageLow, data)
+}
+
 // EmitSupplyVoltageLow emits the SupplyVoltageLow event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSupplyVoltageLow, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSupplyVoltageLow(endpoint uint16, data SupplyVoltageLowEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSupplyVoltageLow, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSupplyVoltageLow, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSupplyVoltageHigh records the SupplyVoltageHigh event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSupplyVoltageHigh(data SupplyVoltageHighEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSupplyVoltageHigh, data)
 }
 
 // EmitSupplyVoltageHigh emits the SupplyVoltageHigh event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSupplyVoltageHigh, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSupplyVoltageHigh(endpoint uint16, data SupplyVoltageHighEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSupplyVoltageHigh, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSupplyVoltageHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordPowerMissingPhase records the PowerMissingPhase event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordPowerMissingPhase(data PowerMissingPhaseEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventPowerMissingPhase, data)
 }
 
 // EmitPowerMissingPhase emits the PowerMissingPhase event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordPowerMissingPhase, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitPowerMissingPhase(endpoint uint16, data PowerMissingPhaseEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventPowerMissingPhase, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventPowerMissingPhase, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSystemPressureLow records the SystemPressureLow event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSystemPressureLow(data SystemPressureLowEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSystemPressureLow, data)
 }
 
 // EmitSystemPressureLow emits the SystemPressureLow event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSystemPressureLow, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSystemPressureLow(endpoint uint16, data SystemPressureLowEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSystemPressureLow, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSystemPressureLow, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSystemPressureHigh records the SystemPressureHigh event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSystemPressureHigh(data SystemPressureHighEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSystemPressureHigh, data)
 }
 
 // EmitSystemPressureHigh emits the SystemPressureHigh event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSystemPressureHigh, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSystemPressureHigh(endpoint uint16, data SystemPressureHighEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSystemPressureHigh, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSystemPressureHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordDryRunning records the DryRunning event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordDryRunning(data DryRunningEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventDryRunning, data)
 }
 
 // EmitDryRunning emits the DryRunning event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordDryRunning, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitDryRunning(endpoint uint16, data DryRunningEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventDryRunning, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventDryRunning, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordMotorTemperatureHigh records the MotorTemperatureHigh event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMotorTemperatureHigh(data MotorTemperatureHighEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMotorTemperatureHigh, data)
 }
 
 // EmitMotorTemperatureHigh emits the MotorTemperatureHigh event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMotorTemperatureHigh, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMotorTemperatureHigh(endpoint uint16, data MotorTemperatureHighEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMotorTemperatureHigh, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMotorTemperatureHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordPumpMotorFatalFailure records the PumpMotorFatalFailure event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordPumpMotorFatalFailure(data PumpMotorFatalFailureEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventPumpMotorFatalFailure, data)
 }
 
 // EmitPumpMotorFatalFailure emits the PumpMotorFatalFailure event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordPumpMotorFatalFailure, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitPumpMotorFatalFailure(endpoint uint16, data PumpMotorFatalFailureEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventPumpMotorFatalFailure, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventPumpMotorFatalFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordElectronicTemperatureHigh records the ElectronicTemperatureHigh event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordElectronicTemperatureHigh(data ElectronicTemperatureHighEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventElectronicTemperatureHigh, data)
 }
 
 // EmitElectronicTemperatureHigh emits the ElectronicTemperatureHigh event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordElectronicTemperatureHigh, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitElectronicTemperatureHigh(endpoint uint16, data ElectronicTemperatureHighEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicTemperatureHigh, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicTemperatureHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordPumpBlocked records the PumpBlocked event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordPumpBlocked(data PumpBlockedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventPumpBlocked, data)
 }
 
 // EmitPumpBlocked emits the PumpBlocked event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordPumpBlocked, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitPumpBlocked(endpoint uint16, data PumpBlockedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventPumpBlocked, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventPumpBlocked, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSensorFailure records the SensorFailure event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSensorFailure(data SensorFailureEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSensorFailure, data)
 }
 
 // EmitSensorFailure emits the SensorFailure event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSensorFailure, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSensorFailure(endpoint uint16, data SensorFailureEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFailure, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordElectronicNonFatalFailure records the ElectronicNonFatalFailure event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordElectronicNonFatalFailure(data ElectronicNonFatalFailureEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventElectronicNonFatalFailure, data)
 }
 
 // EmitElectronicNonFatalFailure emits the ElectronicNonFatalFailure event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordElectronicNonFatalFailure, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitElectronicNonFatalFailure(endpoint uint16, data ElectronicNonFatalFailureEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicNonFatalFailure, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicNonFatalFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordElectronicFatalFailure records the ElectronicFatalFailure event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordElectronicFatalFailure(data ElectronicFatalFailureEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventElectronicFatalFailure, data)
 }
 
 // EmitElectronicFatalFailure emits the ElectronicFatalFailure event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordElectronicFatalFailure, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitElectronicFatalFailure(endpoint uint16, data ElectronicFatalFailureEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicFatalFailure, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicFatalFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordGeneralFault records the GeneralFault event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordGeneralFault(data GeneralFaultEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventGeneralFault, data)
 }
 
 // EmitGeneralFault emits the GeneralFault event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordGeneralFault, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitGeneralFault(endpoint uint16, data GeneralFaultEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventGeneralFault, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventGeneralFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLeakage records the Leakage event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLeakage(data LeakageEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLeakage, data)
 }
 
 // EmitLeakage emits the Leakage event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLeakage, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLeakage(endpoint uint16, data LeakageEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLeakage, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLeakage, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordAirDetection records the AirDetection event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordAirDetection(data AirDetectionEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventAirDetection, data)
 }
 
 // EmitAirDetection emits the AirDetection event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordAirDetection, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitAirDetection(endpoint uint16, data AirDetectionEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventAirDetection, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventAirDetection, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordTurbineOperation records the TurbineOperation event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordTurbineOperation(data TurbineOperationEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventTurbineOperation, data)
 }
 
 // EmitTurbineOperation emits the TurbineOperation event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordTurbineOperation, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitTurbineOperation(endpoint uint16, data TurbineOperationEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventTurbineOperation, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventTurbineOperation, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // ControlModeSetter is a StateSource that takes a controller's
@@ -464,8 +770,12 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -489,8 +799,13 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
+	}
 	return decl
 }
 

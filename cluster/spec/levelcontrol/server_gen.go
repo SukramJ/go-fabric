@@ -240,63 +240,81 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleMoveToLevel registers fn for the MoveToLevel command; nil removes the handler;
+// HandleMoveToLevel registers fn for the MoveToLevel command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToLevel is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToLevel(fn func(ctx context.Context, req MoveToLevelRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToLevel, fn)
 }
 
-// HandleMove registers fn for the Move command; nil removes the handler;
+// HandleMove registers fn for the Move command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMove is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMove(fn func(ctx context.Context, req MoveRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMove, fn)
 }
 
-// HandleStep registers fn for the Step command; nil removes the handler;
+// HandleStep registers fn for the Step command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStep is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStep, fn)
 }
 
-// HandleStop registers fn for the Stop command; nil removes the handler;
+// HandleStop registers fn for the Stop command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
-// HandleMoveToLevelWithOnOff registers fn for the MoveToLevelWithOnOff command; nil removes the handler;
+// HandleMoveToLevelWithOnOff registers fn for the MoveToLevelWithOnOff command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToLevelWithOnOff is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToLevelWithOnOff(fn func(ctx context.Context, req MoveToLevelWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToLevelWithOnOff, fn)
 }
 
-// HandleMoveWithOnOff registers fn for the MoveWithOnOff command; nil removes the handler;
+// HandleMoveWithOnOff registers fn for the MoveWithOnOff command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveWithOnOff is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveWithOnOff(fn func(ctx context.Context, req MoveWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveWithOnOff, fn)
 }
 
-// HandleStepWithOnOff registers fn for the StepWithOnOff command; nil removes the handler;
+// HandleStepWithOnOff registers fn for the StepWithOnOff command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStepWithOnOff is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepWithOnOff(fn func(ctx context.Context, req StepWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepWithOnOff, fn)
 }
 
-// HandleStopWithOnOff registers fn for the StopWithOnOff command; nil removes the handler;
+// HandleStopWithOnOff registers fn for the StopWithOnOff command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStopWithOnOff is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopWithOnOff(fn func(ctx context.Context, req StopWithOnOffRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopWithOnOff, fn)
 }
 
-// HandleMoveToClosestFrequency registers fn for the MoveToClosestFrequency command; nil removes the handler;
+// HandleMoveToClosestFrequency registers fn for the MoveToClosestFrequency command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToClosestFrequency is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToClosestFrequency(fn func(ctx context.Context, req MoveToClosestFrequencyRequest) (struct{}, error)) error {
@@ -413,6 +431,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -476,7 +498,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Transitions = d.Transitions
 	if d.HandleMoveToLevel != nil {
@@ -514,6 +536,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleMoveToClosestFrequency != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdMoveToClosestFrequency)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

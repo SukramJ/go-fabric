@@ -175,49 +175,127 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleStop registers fn for the Stop command; nil removes the handler;
+// HandleStop registers fn for the Stop command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
-// HandleMoveTo registers fn for the MoveTo command; nil removes the handler;
+// HandleMoveTo registers fn for the MoveTo command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveTo is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveTo(fn func(ctx context.Context, req MoveToRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveTo, fn)
 }
 
-// HandleCalibrate registers fn for the Calibrate command; nil removes the handler;
+// HandleCalibrate registers fn for the Calibrate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCalibrate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCalibrate(fn func(ctx context.Context, req CalibrateRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCalibrate, fn)
 }
 
+// RecordOperationalError records the OperationalError event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordOperationalError(data OperationalErrorEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventOperationalError, data)
+}
+
 // EmitOperationalError emits the OperationalError event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordOperationalError, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitOperationalError(endpoint uint16, data OperationalErrorEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventOperationalError, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventOperationalError, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordMovementCompleted records the MovementCompleted event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMovementCompleted(data MovementCompletedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMovementCompleted, data)
 }
 
 // EmitMovementCompleted emits the MovementCompleted event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMovementCompleted, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMovementCompleted(endpoint uint16, data MovementCompletedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMovementCompleted, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMovementCompleted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordEngageStateChanged records the EngageStateChanged event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordEngageStateChanged(data EngageStateChangedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventEngageStateChanged, data)
 }
 
 // EmitEngageStateChanged emits the EngageStateChanged event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordEngageStateChanged, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitEngageStateChanged(endpoint uint16, data EngageStateChangedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventEngageStateChanged, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventEngageStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSecureStateChanged records the SecureStateChanged event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSecureStateChanged(data SecureStateChangedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSecureStateChanged, data)
 }
 
 // EmitSecureStateChanged emits the SecureStateChanged event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSecureStateChanged, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSecureStateChanged(endpoint uint16, data SecureStateChangedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSecureStateChanged, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSecureStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Mover drives the closure after the kit's checks: MoveTo to a
@@ -292,12 +370,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -330,7 +412,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleStop != nil {
@@ -344,6 +426,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleCalibrate != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdCalibrate)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

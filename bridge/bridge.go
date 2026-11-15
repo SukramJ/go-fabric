@@ -1638,13 +1638,9 @@ func (b *Bridge) SetOnEvent(fn func(im.EventRecord)) {
 }
 
 // matterEndpointReceiver is the optional capability a cluster server
-// implements to learn the endpoint id it lives on. Required for any
-// cluster that emits events (the event payload carries the endpoint
-// id as the routing key for subscribers). Today: BasicInformation,
-// GeneralDiagnostics, AccessControl, BridgedDeviceBasicInformation.
-type matterEndpointReceiver interface {
-	SetEndpoint(uint16)
-}
+// implements to learn the endpoint id it lives on
+// ([contract.EndpointReceiver]).
+type matterEndpointReceiver = contract.EndpointReceiver
 
 // matterSwitchSubscribable is the model-side surface of a press
 // source (the per-channel [generic.ButtonGroup], or a lone Button /
@@ -2391,12 +2387,16 @@ func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, t
 	}
 }
 
-// reconcileQuiescers brings the quiescing servers of the topologies in
-// touched in line with the topology the bridge serves now — none once
-// Stop ended the run: a server it does not carry is quiesced, and one it
-// carries that takes events is given its endpoint again (SetEndpoint),
-// which re-arms a server a quiesce stopped (cluster/energy EvseServer,
-// cluster/thermo ThermostatServer) and stamps the number it serves at.
+// reconcileQuiescers brings the quiescing and the event-emitting servers
+// of the topologies in touched in line with the topology the bridge
+// serves now — none once Stop ended the run. A server it does not carry
+// is quiesced ([contract.ClusterQuiescer]) and loses its event emitter
+// (SetMatterEventEmitter(nil), [contract.EventReceiver]), so an event it
+// emits afterwards reaches no event log. One it carries that takes events
+// gets the emitter back, and a quiescing one its endpoint again
+// (SetEndpoint), which re-arms a server a quiesce stopped (cluster/energy
+// EvseServer, cluster/thermo ThermostatServer) and stamps the number it
+// serves at.
 //
 // Reassembles are not serialised and each SetEndpoints the servers of its
 // topology before it swaps it in, so a quiesce or a re-arm decided from
@@ -2411,35 +2411,38 @@ func (b *Bridge) reconcileQuiescers(touched ...*endpoint.Topology) {
 		b.mu.RLock()
 		served, gen := b.servedTopology, b.servedGen
 		b.mu.RUnlock()
-		at := map[contract.ClusterQuiescer]uint16{}
-		if served != nil {
-			for _, ep := range served.Endpoints {
-				if ep == nil {
-					continue
-				}
-				for _, srv := range endpoint.ClusterServers(ep) {
-					if q, ok := srv.(contract.ClusterQuiescer); ok && reflect.TypeOf(q).Comparable() {
-						at[q] = ep.ID
-					}
-				}
-			}
+		at := map[contract.ClusterServer]uint16{}
+		for _, srv := range reconciled(served) {
+			at[srv.server] = srv.endpoint
 		}
-		done := map[contract.ClusterQuiescer]bool{}
+		done := map[contract.ClusterServer]bool{}
 		for _, topo := range touched {
-			for _, q := range quiescers(topo) {
-				if done[q] {
+			for _, r := range reconciled(topo) {
+				srv := r.server
+				if done[srv] {
 					continue
 				}
-				done[q] = true
-				id, serves := at[q]
+				done[srv] = true
+				id, serves := at[srv]
+				recv, receives := srv.(contract.EventReceiver)
+				q, quiesces := srv.(contract.ClusterQuiescer)
 				if !serves {
-					q.MatterQuiesce()
+					if quiesces {
+						q.MatterQuiesce()
+					}
+					if receives {
+						recv.SetMatterEventEmitter(nil)
+					}
 					continue
 				}
-				if _, ok := q.(contract.EventReceiver); !ok {
+				if !receives {
 					continue
 				}
-				if r, ok := q.(matterEndpointReceiver); ok {
+				recv.SetMatterEventEmitter(b)
+				if !quiesces {
+					continue
+				}
+				if r, ok := srv.(matterEndpointReceiver); ok {
 					r.SetEndpoint(id)
 				}
 			}
@@ -2453,22 +2456,44 @@ func (b *Bridge) reconcileQuiescers(touched ...*endpoint.Topology) {
 	}
 }
 
-// quiescers lists the servers of topo that implement
-// [contract.ClusterQuiescer] and can be told apart (a comparable dynamic
-// type — every pointer server).
-func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
+// reconciledServer is one server [Bridge.reconcileQuiescers] keeps in
+// line, with the endpoint it is on.
+type reconciledServer struct {
+	server   contract.ClusterServer
+	endpoint uint16
+}
+
+// reconciled lists the servers of topo that implement
+// [contract.ClusterQuiescer] or [contract.EventReceiver] and can be told
+// apart (a comparable dynamic type — every pointer server).
+func reconciled(topo *endpoint.Topology) []reconciledServer {
 	if topo == nil {
 		return nil
 	}
-	var out []contract.ClusterQuiescer
+	var out []reconciledServer
 	for _, ep := range topo.Endpoints {
 		if ep == nil {
 			continue
 		}
 		for _, srv := range endpoint.ClusterServers(ep) {
-			if q, ok := srv.(contract.ClusterQuiescer); ok && reflect.TypeOf(q).Comparable() {
-				out = append(out, q)
+			_, quiesces := srv.(contract.ClusterQuiescer)
+			_, receives := srv.(contract.EventReceiver)
+			if (quiesces || receives) && srv != nil && reflect.TypeOf(srv).Comparable() {
+				out = append(out, reconciledServer{srv, ep.ID})
 			}
+		}
+	}
+	return out
+}
+
+// quiescers lists the servers of topo that implement
+// [contract.ClusterQuiescer] and can be told apart (a comparable dynamic
+// type — every pointer server).
+func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
+	var out []contract.ClusterQuiescer
+	for _, r := range reconciled(topo) {
+		if q, ok := r.server.(contract.ClusterQuiescer); ok {
+			out = append(out, q)
 		}
 	}
 	return out

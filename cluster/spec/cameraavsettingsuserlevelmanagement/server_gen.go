@@ -202,49 +202,63 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleMptzSetPosition registers fn for the MptzSetPosition command; nil removes the handler;
+// HandleMptzSetPosition registers fn for the MptzSetPosition command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMptzSetPosition is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMptzSetPosition(fn func(ctx context.Context, req MptzSetPositionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMptzSetPosition, fn)
 }
 
-// HandleMptzRelativeMove registers fn for the MptzRelativeMove command; nil removes the handler;
+// HandleMptzRelativeMove registers fn for the MptzRelativeMove command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMptzRelativeMove is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMptzRelativeMove(fn func(ctx context.Context, req MptzRelativeMoveRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMptzRelativeMove, fn)
 }
 
-// HandleMptzMoveToPreset registers fn for the MptzMoveToPreset command; nil removes the handler;
+// HandleMptzMoveToPreset registers fn for the MptzMoveToPreset command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMptzMoveToPreset is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMptzMoveToPreset(fn func(ctx context.Context, req MptzMoveToPresetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMptzMoveToPreset, fn)
 }
 
-// HandleMptzSavePreset registers fn for the MptzSavePreset command; nil removes the handler;
+// HandleMptzSavePreset registers fn for the MptzSavePreset command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMptzSavePreset is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMptzSavePreset(fn func(ctx context.Context, req MptzSavePresetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMptzSavePreset, fn)
 }
 
-// HandleMptzRemovePreset registers fn for the MptzRemovePreset command; nil removes the handler;
+// HandleMptzRemovePreset registers fn for the MptzRemovePreset command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMptzRemovePreset is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMptzRemovePreset(fn func(ctx context.Context, req MptzRemovePresetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMptzRemovePreset, fn)
 }
 
-// HandleDptzSetViewport registers fn for the DptzSetViewport command; nil removes the handler;
+// HandleDptzSetViewport registers fn for the DptzSetViewport command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleDptzSetViewport is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDptzSetViewport(fn func(ctx context.Context, req DptzSetViewportRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDptzSetViewport, fn)
 }
 
-// HandleDptzRelativeMove registers fn for the DptzRelativeMove command; nil removes the handler;
+// HandleDptzRelativeMove registers fn for the DptzRelativeMove command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleDptzRelativeMove is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDptzRelativeMove(fn func(ctx context.Context, req DptzRelativeMoveRequest) (struct{}, error)) error {
@@ -324,6 +338,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -373,7 +391,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleMptzSetPosition != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdMptzSetPosition)
@@ -402,6 +420,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleDptzRelativeMove != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdDptzRelativeMove)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

@@ -137,7 +137,7 @@ func (s *GridConditionsServer) SetCurrentConditions(c *GridConditions) error {
 	if err := s.srv.Set(egc.AttrCurrentConditions, stored); err != nil {
 		return err
 	}
-	return s.srv.Emit(s.endpoint, egc.EventCurrentConditionsChanged, event)
+	return s.srv.Emit(s.endpoint, egc.EventCurrentConditionsChanged, event) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // SetForecastConditions records ForecastConditions, FORE only

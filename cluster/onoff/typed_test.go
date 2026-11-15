@@ -84,7 +84,7 @@ func TestTypedOnOffServer(t *testing.T) {
 
 	em := &nopEmitter{}
 	srv.SetMatterEventEmitter(em)
-	if err := spec.EmitOn(srv, 1, 0x00, nil); !errors.Is(err, spec.ErrNotEmitted) || em.n != 0 {
+	if err := spec.EmitOn(srv, 1, 0x00, nil); !errors.Is(err, spec.ErrNotEmitted) || em.n != 0 { //nolint:staticcheck // the deprecated emit under test
 		t.Errorf("Emit: %v, emitted %d", err, em.n)
 	}
 

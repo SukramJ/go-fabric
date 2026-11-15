@@ -59,7 +59,7 @@ func TestTypedCommodityPriceServer(t *testing.T) {
 	if _, err := srv.MatterInvoke(context.Background(), cp.CmdGetDetailedPriceRequest, cp.GetDetailedPriceRequestRequest{}); err != nil || called != 1 {
 		t.Errorf("host handler: %v, called %d", err, called)
 	}
-	if err := s.EmitPriceChange(3, cp.PriceChangeEvent{CurrentPrice: spec.NullOf[cp.CommodityPriceStruct]()}); err != nil {
+	if err := s.EmitPriceChange(3, cp.PriceChangeEvent{CurrentPrice: spec.NullOf[cp.CommodityPriceStruct]()}); err != nil { //nolint:staticcheck // the deprecated emit under test
 		t.Fatal(err)
 	}
 	if evs := em.take(); len(evs) != 1 || evs[0].endpoint != 3 {

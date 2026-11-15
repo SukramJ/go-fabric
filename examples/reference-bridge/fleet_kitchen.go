@@ -126,7 +126,7 @@ func opCycleOn(name string, dev **device.Device, srv **opdef.Server) opCycle {
 			return (*srv).Set(opdef.Patch{OperationalState: &st})
 		},
 		complete: func() error {
-			return (*srv).EmitOperationCompletion(endpointOf(*dev), opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)})
+			return (*srv).EmitOperationCompletion(endpointOf(*dev), opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
 		},
 	}}
 }
@@ -316,7 +316,7 @@ func (c *demoOvenCavity) cycle() cycle {
 			c.mu.Lock()
 			dev := c.dev
 			c.mu.Unlock()
-			return c.server().EmitOperationCompletion(endpointOf(dev), ovendef.OperationCompletionEvent{CompletionErrorCode: uint8(ovendef.ErrorStateNoError)})
+			return c.server().EmitOperationCompletion(endpointOf(dev), ovendef.OperationCompletionEvent{CompletionErrorCode: uint8(ovendef.ErrorStateNoError)}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
 		},
 	}
 }
@@ -504,7 +504,7 @@ func (m *demoMicrowave) HandleOperationalCommand(_ context.Context, cmd uint32) 
 		stopped := opdef.OperationalStateStopped
 		err = ops.Set(opdef.Patch{OperationalState: &stopped, Null: []uint32{opdef.AttrCountdownTime}})
 		if err == nil && running {
-			err = ops.EmitOperationCompletion(endpointOf(m.oven().Device), opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)})
+			err = ops.EmitOperationCompletion(endpointOf(m.oven().Device), opdef.OperationCompletionEvent{CompletionErrorCode: uint8(opdef.ErrorStateNoError)}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
 		}
 	default:
 		return opdef.ErrorStateStruct{ErrorStateId: opdef.ErrorStateCommandInvalidInState}, nil

@@ -130,28 +130,36 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleOffer registers fn for the Offer command; nil removes the handler;
+// HandleOffer registers fn for the Offer command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleOffer is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleOffer(fn func(ctx context.Context, req OfferRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdOffer, fn)
 }
 
-// HandleAnswer registers fn for the Answer command; nil removes the handler;
+// HandleAnswer registers fn for the Answer command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAnswer is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAnswer(fn func(ctx context.Context, req AnswerRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAnswer, fn)
 }
 
-// HandleIceCandidates registers fn for the IceCandidates command; nil removes the handler;
+// HandleIceCandidates registers fn for the IceCandidates command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleIceCandidates is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleIceCandidates(fn func(ctx context.Context, req IceCandidatesRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdIceCandidates, fn)
 }
 
-// HandleEnd registers fn for the End command; nil removes the handler;
+// HandleEnd registers fn for the End command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnd is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnd(fn func(ctx context.Context, req EndRequest) (struct{}, error)) error {

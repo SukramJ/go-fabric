@@ -154,63 +154,81 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleProvisionRootCertificate registers fn for the ProvisionRootCertificate command; nil removes the handler;
+// HandleProvisionRootCertificate registers fn for the ProvisionRootCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleProvisionRootCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleProvisionRootCertificate(fn func(ctx context.Context, req ProvisionRootCertificateRequest) (ProvisionRootCertificateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdProvisionRootCertificate, fn)
 }
 
-// HandleFindRootCertificate registers fn for the FindRootCertificate command; nil removes the handler;
+// HandleFindRootCertificate registers fn for the FindRootCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleFindRootCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleFindRootCertificate(fn func(ctx context.Context, req FindRootCertificateRequest) (FindRootCertificateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdFindRootCertificate, fn)
 }
 
-// HandleLookupRootCertificate registers fn for the LookupRootCertificate command; nil removes the handler;
+// HandleLookupRootCertificate registers fn for the LookupRootCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleLookupRootCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLookupRootCertificate(fn func(ctx context.Context, req LookupRootCertificateRequest) (LookupRootCertificateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLookupRootCertificate, fn)
 }
 
-// HandleRemoveRootCertificate registers fn for the RemoveRootCertificate command; nil removes the handler;
+// HandleRemoveRootCertificate registers fn for the RemoveRootCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveRootCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveRootCertificate(fn func(ctx context.Context, req RemoveRootCertificateRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveRootCertificate, fn)
 }
 
-// HandleClientCsr registers fn for the ClientCsr command; nil removes the handler;
+// HandleClientCsr registers fn for the ClientCsr command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClientCsr is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClientCsr(fn func(ctx context.Context, req ClientCsrRequest) (ClientCsrResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClientCsr, fn)
 }
 
-// HandleProvisionClientCertificate registers fn for the ProvisionClientCertificate command; nil removes the handler;
+// HandleProvisionClientCertificate registers fn for the ProvisionClientCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleProvisionClientCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleProvisionClientCertificate(fn func(ctx context.Context, req ProvisionClientCertificateRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdProvisionClientCertificate, fn)
 }
 
-// HandleFindClientCertificate registers fn for the FindClientCertificate command; nil removes the handler;
+// HandleFindClientCertificate registers fn for the FindClientCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleFindClientCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleFindClientCertificate(fn func(ctx context.Context, req FindClientCertificateRequest) (FindClientCertificateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdFindClientCertificate, fn)
 }
 
-// HandleLookupClientCertificate registers fn for the LookupClientCertificate command; nil removes the handler;
+// HandleLookupClientCertificate registers fn for the LookupClientCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleLookupClientCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLookupClientCertificate(fn func(ctx context.Context, req LookupClientCertificateRequest) (LookupClientCertificateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLookupClientCertificate, fn)
 }
 
-// HandleRemoveClientCertificate registers fn for the RemoveClientCertificate command; nil removes the handler;
+// HandleRemoveClientCertificate registers fn for the RemoveClientCertificate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveClientCertificate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveClientCertificate(fn func(ctx context.Context, req RemoveClientCertificateRequest) (struct{}, error)) error {

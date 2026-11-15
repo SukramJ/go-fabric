@@ -35,6 +35,9 @@ var (
 	// ErrMissingHandler: a command the conformance makes mandatory for
 	// the feature selection has no handler in [ServerConfig.Handlers].
 	ErrMissingHandler = errors.New("spec: mandatory command has no handler")
+	// ErrNotMounted: an event emitted before the server knows the
+	// endpoint it is mounted on ([Server.SetEndpoint], [Server.EmitEvent]).
+	ErrNotMounted = errors.New("spec: the server does not know its endpoint yet")
 )
 
 // Source is the optional read port for attributes the device owns: a
@@ -44,9 +47,11 @@ type Source interface {
 }
 
 // Sink is the optional write port: told about every controller write that
-// passed the definition's checks and changes the value the server holds,
-// before the server stores it; an error refuses the write and leaves the
-// stored value as it was. A write of the held value reaches no Sink and
+// passed the definition's checks, the [ServerConfig.WriteRule] and the
+// host's veto and changes the value the server holds, before the server
+// stores it; an error refuses the write and leaves the stored value as it
+// was, and answers the write with the IM status it carries, FAILURE when
+// it carries none. A write of the held value reaches no Sink and
 // answers unchanged (matter.js observes no field whose value is equal,
 // Datasource.ts:1406-1407 and :1479 at db021da0).
 //
@@ -155,7 +160,8 @@ type Server struct {
 	// set once at construction, never replaced.
 	rule func(ctx context.Context, attrID uint32, value any) error
 
-	// mu guards beforeWrite, emitter, handlers and values.
+	// mu guards beforeWrite, emitter, endpoint, mounted, handlers and
+	// values.
 	mu          sync.Mutex
 	beforeWrite func(ctx context.Context, attrID uint32, value any) error
 	values      map[uint32]any
@@ -170,6 +176,10 @@ type Server struct {
 	// ([Server.unimplementedLocked]), a stub or not.
 	stubs   []uint32
 	emitter contract.EventEmitter
+	// endpoint is the endpoint the server is mounted on, known once
+	// mounted ([Server.SetEndpoint]).
+	endpoint uint16
+	mounted  bool
 
 	// quiet holds the report throttle of every served quieter attribute,
 	// by id; set at construction, read-only after.
@@ -190,6 +200,7 @@ var (
 	_ contract.TimedCommander                 = (*Server)(nil)
 	_ contract.AttributeChangeNotifier        = (*Server)(nil)
 	_ contract.EventReceiver                  = (*Server)(nil)
+	_ contract.EndpointReceiver               = (*Server)(nil)
 	_ contract.AttributeReportNotifier        = (*Server)(nil)
 	_ contract.ClusterQuiescer                = (*Server)(nil)
 )
@@ -607,11 +618,15 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 
 // Handle implements [CommandRegistrar]: fn handles the request command
 // cmdID, replacing the handler construction was given
-// ([ServerConfig.Handlers]) or implementing an unimplemented stub; nil
-// restores the handler construction was given (none for a stub). A
-// command the instance does not accept is refused with [ErrNotAccepted].
-// A mandatory command's handler belongs in [ServerConfig.Handlers]:
-// construction refuses a server without it ([ErrMissingHandler]).
+// ([ServerConfig.Handlers]) or implementing a command without one; nil
+// restores the handler construction was given (none for a command that
+// had none). A command the instance does not accept is refused with
+// [ErrNotAccepted]. A mandatory command's handler belongs in
+// [ServerConfig.Handlers]: construction refuses a server without it
+// ([ErrMissingHandler]). A handler for a command that had none belongs
+// before the server is mounted: it changes AcceptedCommandList and
+// GeneratedCommandList, and a change made later advances no data version
+// and reaches no subscriber.
 func (s *Server) Handle(cmdID uint32, fn CommandHandler) error {
 	if !s.Instance.Accepts(cmdID) {
 		return fmt.Errorf("%w: %s command 0x%02X", ErrNotAccepted, s.def.Name, cmdID)
@@ -732,16 +747,53 @@ func (s *Server) dispatch(ctx context.Context, cmdID uint32, fields any) (any, e
 	return resp, nil
 }
 
-// SetMatterEventEmitter implements [contract.EventReceiver].
+// SetMatterEventEmitter implements [contract.EventReceiver]; nil withdraws
+// the emitter, and an event emitted after it is dropped.
 func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter
 	s.mu.Unlock()
 }
 
+// SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
+// server is mounted on, which [Server.EmitEvent] emits on. The bridge
+// calls it when it mounts the server.
+func (s *Server) SetEndpoint(endpoint uint16) {
+	s.mu.Lock()
+	s.endpoint, s.mounted = endpoint, true
+	s.mu.Unlock()
+}
+
+// EmitEvent emits eventID with data on the endpoint the server is mounted
+// on, with the priority the definition gives it. An event outside
+// EventList is an error ([ErrNotEmitted]), and so is one before the
+// server knows its endpoint ([ErrNotMounted]) — it is never emitted on
+// endpoint 0 in its place. Without an emitter — before mounting, or after
+// the bridge withdrew it from a server that left the topology — the event
+// is dropped.
+func (s *Server) EmitEvent(eventID uint32, data any) error {
+	if !s.Emits(eventID) {
+		return fmt.Errorf("%w: %s event 0x%02X", ErrNotEmitted, s.def.Name, eventID)
+	}
+	s.mu.Lock()
+	emitter, endpoint, mounted := s.emitter, s.endpoint, s.mounted
+	s.mu.Unlock()
+	if !mounted {
+		return fmt.Errorf("%w: %s event 0x%02X", ErrNotMounted, s.def.Name, eventID)
+	}
+	if emitter != nil {
+		emitter.MatterEmitEvent(endpoint, s.def.ID, eventID, data, s.EventPriority(eventID))
+	}
+	return nil
+}
+
 // Emit emits eventID on endpoint with the priority the definition gives
 // it. An event outside EventList is an error ([ErrNotEmitted]); without
 // an emitter the event is dropped.
+//
+// Deprecated: use [Server.EmitEvent], which emits on the endpoint the
+// server is mounted on instead of one its caller names. Removable in the
+// next minor release.
 func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
 	if !s.Emits(eventID) {
 		return fmt.Errorf("%w: %s event 0x%02X", ErrNotEmitted, s.def.Name, eventID)

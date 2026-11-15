@@ -210,128 +210,196 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleUpdatePin registers fn for the UpdatePin command; nil removes the handler;
+// HandleUpdatePin registers fn for the UpdatePin command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdatePin is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdatePin(fn func(ctx context.Context, req UpdatePinRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdatePin, fn)
 }
 
-// HandleResetPin registers fn for the ResetPin command; nil removes the handler;
+// HandleResetPin registers fn for the ResetPin command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleResetPin is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResetPin(fn func(ctx context.Context, req ResetPinRequest) (ResetPinResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResetPin, fn)
 }
 
-// HandleEnable registers fn for the Enable command; nil removes the handler;
+// HandleEnable registers fn for the Enable command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnable is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnable(fn func(ctx context.Context, req EnableRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnable, fn)
 }
 
-// HandleDisable registers fn for the Disable command; nil removes the handler;
+// HandleDisable registers fn for the Disable command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleDisable is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisable(fn func(ctx context.Context, req DisableRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisable, fn)
 }
 
-// HandleAddBonusTime registers fn for the AddBonusTime command; nil removes the handler;
+// HandleAddBonusTime registers fn for the AddBonusTime command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddBonusTime is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddBonusTime(fn func(ctx context.Context, req AddBonusTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddBonusTime, fn)
 }
 
-// HandleSetScreenDailyTime registers fn for the SetScreenDailyTime command; nil removes the handler;
+// HandleSetScreenDailyTime registers fn for the SetScreenDailyTime command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetScreenDailyTime is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetScreenDailyTime(fn func(ctx context.Context, req SetScreenDailyTimeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetScreenDailyTime, fn)
 }
 
-// HandleBlockUnratedContent registers fn for the BlockUnratedContent command; nil removes the handler;
+// HandleBlockUnratedContent registers fn for the BlockUnratedContent command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleBlockUnratedContent is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleBlockUnratedContent(fn func(ctx context.Context, req BlockUnratedContentRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdBlockUnratedContent, fn)
 }
 
-// HandleUnblockUnratedContent registers fn for the UnblockUnratedContent command; nil removes the handler;
+// HandleUnblockUnratedContent registers fn for the UnblockUnratedContent command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUnblockUnratedContent is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnblockUnratedContent(fn func(ctx context.Context, req UnblockUnratedContentRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnblockUnratedContent, fn)
 }
 
-// HandleSetOnDemandRatingThreshold registers fn for the SetOnDemandRatingThreshold command; nil removes the handler;
+// HandleSetOnDemandRatingThreshold registers fn for the SetOnDemandRatingThreshold command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetOnDemandRatingThreshold is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetOnDemandRatingThreshold(fn func(ctx context.Context, req SetOnDemandRatingThresholdRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetOnDemandRatingThreshold, fn)
 }
 
-// HandleSetScheduledContentRatingThreshold registers fn for the SetScheduledContentRatingThreshold command; nil removes the handler;
+// HandleSetScheduledContentRatingThreshold registers fn for the SetScheduledContentRatingThreshold command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetScheduledContentRatingThreshold is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetScheduledContentRatingThreshold(fn func(ctx context.Context, req SetScheduledContentRatingThresholdRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetScheduledContentRatingThreshold, fn)
 }
 
-// HandleAddBlockChannels registers fn for the AddBlockChannels command; nil removes the handler;
+// HandleAddBlockChannels registers fn for the AddBlockChannels command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddBlockChannels is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddBlockChannels(fn func(ctx context.Context, req AddBlockChannelsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddBlockChannels, fn)
 }
 
-// HandleRemoveBlockChannels registers fn for the RemoveBlockChannels command; nil removes the handler;
+// HandleRemoveBlockChannels registers fn for the RemoveBlockChannels command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveBlockChannels is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveBlockChannels(fn func(ctx context.Context, req RemoveBlockChannelsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveBlockChannels, fn)
 }
 
-// HandleAddBlockApplications registers fn for the AddBlockApplications command; nil removes the handler;
+// HandleAddBlockApplications registers fn for the AddBlockApplications command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddBlockApplications is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddBlockApplications(fn func(ctx context.Context, req AddBlockApplicationsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddBlockApplications, fn)
 }
 
-// HandleRemoveBlockApplications registers fn for the RemoveBlockApplications command; nil removes the handler;
+// HandleRemoveBlockApplications registers fn for the RemoveBlockApplications command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveBlockApplications is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveBlockApplications(fn func(ctx context.Context, req RemoveBlockApplicationsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveBlockApplications, fn)
 }
 
-// HandleSetBlockContentTimeWindow registers fn for the SetBlockContentTimeWindow command; nil removes the handler;
+// HandleSetBlockContentTimeWindow registers fn for the SetBlockContentTimeWindow command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetBlockContentTimeWindow is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetBlockContentTimeWindow(fn func(ctx context.Context, req SetBlockContentTimeWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetBlockContentTimeWindow, fn)
 }
 
-// HandleRemoveBlockContentTimeWindow registers fn for the RemoveBlockContentTimeWindow command; nil removes the handler;
+// HandleRemoveBlockContentTimeWindow registers fn for the RemoveBlockContentTimeWindow command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveBlockContentTimeWindow is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveBlockContentTimeWindow(fn func(ctx context.Context, req RemoveBlockContentTimeWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveBlockContentTimeWindow, fn)
 }
 
+// RecordRemainingScreenTimeExpired records the RemainingScreenTimeExpired event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordRemainingScreenTimeExpired(data RemainingScreenTimeExpiredEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventRemainingScreenTimeExpired, data)
+}
+
 // EmitRemainingScreenTimeExpired emits the RemainingScreenTimeExpired event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordRemainingScreenTimeExpired, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitRemainingScreenTimeExpired(endpoint uint16, data RemainingScreenTimeExpiredEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventRemainingScreenTimeExpired, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventRemainingScreenTimeExpired, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordEnteringBlockContentTimeWindow records the EnteringBlockContentTimeWindow event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordEnteringBlockContentTimeWindow(data EnteringBlockContentTimeWindowEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventEnteringBlockContentTimeWindow, data)
 }
 
 // EmitEnteringBlockContentTimeWindow emits the EnteringBlockContentTimeWindow event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordEnteringBlockContentTimeWindow, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitEnteringBlockContentTimeWindow(endpoint uint16, data EnteringBlockContentTimeWindowEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventEnteringBlockContentTimeWindow, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventEnteringBlockContentTimeWindow, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // ContentControlPIN is a ContentControl that takes UpdatePin and
@@ -415,12 +483,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -492,7 +564,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleUpdatePin != nil {
@@ -558,6 +630,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleRemoveBlockContentTimeWindow != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdRemoveBlockContentTimeWindow)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

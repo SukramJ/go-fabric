@@ -231,28 +231,36 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleArmFailSafe registers fn for the ArmFailSafe command; nil removes the handler;
+// HandleArmFailSafe registers fn for the ArmFailSafe command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleArmFailSafe is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleArmFailSafe(fn func(ctx context.Context, req ArmFailSafeRequest) (ArmFailSafeResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdArmFailSafe, fn)
 }
 
-// HandleSetRegulatoryConfig registers fn for the SetRegulatoryConfig command; nil removes the handler;
+// HandleSetRegulatoryConfig registers fn for the SetRegulatoryConfig command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetRegulatoryConfig is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetRegulatoryConfig(fn func(ctx context.Context, req SetRegulatoryConfigRequest) (SetRegulatoryConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetRegulatoryConfig, fn)
 }
 
-// HandleCommissioningComplete registers fn for the CommissioningComplete command; nil removes the handler;
+// HandleCommissioningComplete registers fn for the CommissioningComplete command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCommissioningComplete is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCommissioningComplete(fn func(ctx context.Context, req CommissioningCompleteRequest) (CommissioningCompleteResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCommissioningComplete, fn)
 }
 
-// HandleSetTcAcknowledgements registers fn for the SetTcAcknowledgements command; nil removes the handler;
+// HandleSetTcAcknowledgements registers fn for the SetTcAcknowledgements command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTcAcknowledgements is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTcAcknowledgements(fn func(ctx context.Context, req SetTcAcknowledgementsRequest) (SetTcAcknowledgementsResponse, error)) error {
@@ -270,6 +278,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -306,7 +318,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleArmFailSafe != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdArmFailSafe)
@@ -323,6 +335,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleSetTcAcknowledgements != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSetTcAcknowledgements)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

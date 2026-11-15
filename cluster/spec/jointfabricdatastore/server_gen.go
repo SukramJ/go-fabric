@@ -234,140 +234,180 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleAddKeySet registers fn for the AddKeySet command; nil removes the handler;
+// HandleAddKeySet registers fn for the AddKeySet command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddKeySet is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddKeySet(fn func(ctx context.Context, req AddKeySetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddKeySet, fn)
 }
 
-// HandleUpdateKeySet registers fn for the UpdateKeySet command; nil removes the handler;
+// HandleUpdateKeySet registers fn for the UpdateKeySet command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdateKeySet is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdateKeySet(fn func(ctx context.Context, req UpdateKeySetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdateKeySet, fn)
 }
 
-// HandleRemoveKeySet registers fn for the RemoveKeySet command; nil removes the handler;
+// HandleRemoveKeySet registers fn for the RemoveKeySet command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveKeySet is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveKeySet(fn func(ctx context.Context, req RemoveKeySetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveKeySet, fn)
 }
 
-// HandleAddGroup registers fn for the AddGroup command; nil removes the handler;
+// HandleAddGroup registers fn for the AddGroup command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddGroup is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddGroup(fn func(ctx context.Context, req AddGroupRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddGroup, fn)
 }
 
-// HandleUpdateGroup registers fn for the UpdateGroup command; nil removes the handler;
+// HandleUpdateGroup registers fn for the UpdateGroup command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdateGroup is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdateGroup(fn func(ctx context.Context, req UpdateGroupRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdateGroup, fn)
 }
 
-// HandleRemoveGroup registers fn for the RemoveGroup command; nil removes the handler;
+// HandleRemoveGroup registers fn for the RemoveGroup command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveGroup is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveGroup(fn func(ctx context.Context, req RemoveGroupRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveGroup, fn)
 }
 
-// HandleAddAdmin registers fn for the AddAdmin command; nil removes the handler;
+// HandleAddAdmin registers fn for the AddAdmin command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddAdmin is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddAdmin(fn func(ctx context.Context, req AddAdminRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddAdmin, fn)
 }
 
-// HandleUpdateAdmin registers fn for the UpdateAdmin command; nil removes the handler;
+// HandleUpdateAdmin registers fn for the UpdateAdmin command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdateAdmin is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdateAdmin(fn func(ctx context.Context, req UpdateAdminRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdateAdmin, fn)
 }
 
-// HandleRemoveAdmin registers fn for the RemoveAdmin command; nil removes the handler;
+// HandleRemoveAdmin registers fn for the RemoveAdmin command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveAdmin is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveAdmin(fn func(ctx context.Context, req RemoveAdminRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveAdmin, fn)
 }
 
-// HandleAddPendingNode registers fn for the AddPendingNode command; nil removes the handler;
+// HandleAddPendingNode registers fn for the AddPendingNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddPendingNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddPendingNode(fn func(ctx context.Context, req AddPendingNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddPendingNode, fn)
 }
 
-// HandleRefreshNode registers fn for the RefreshNode command; nil removes the handler;
+// HandleRefreshNode registers fn for the RefreshNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRefreshNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRefreshNode(fn func(ctx context.Context, req RefreshNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRefreshNode, fn)
 }
 
-// HandleUpdateNode registers fn for the UpdateNode command; nil removes the handler;
+// HandleUpdateNode registers fn for the UpdateNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdateNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdateNode(fn func(ctx context.Context, req UpdateNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdateNode, fn)
 }
 
-// HandleRemoveNode registers fn for the RemoveNode command; nil removes the handler;
+// HandleRemoveNode registers fn for the RemoveNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveNode(fn func(ctx context.Context, req RemoveNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveNode, fn)
 }
 
-// HandleUpdateEndpointForNode registers fn for the UpdateEndpointForNode command; nil removes the handler;
+// HandleUpdateEndpointForNode registers fn for the UpdateEndpointForNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUpdateEndpointForNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUpdateEndpointForNode(fn func(ctx context.Context, req UpdateEndpointForNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUpdateEndpointForNode, fn)
 }
 
-// HandleAddGroupIdToEndpointForNode registers fn for the AddGroupIdToEndpointForNode command; nil removes the handler;
+// HandleAddGroupIdToEndpointForNode registers fn for the AddGroupIdToEndpointForNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddGroupIdToEndpointForNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddGroupIdToEndpointForNode(fn func(ctx context.Context, req AddGroupIdToEndpointForNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddGroupIdToEndpointForNode, fn)
 }
 
-// HandleRemoveGroupIdFromEndpointForNode registers fn for the RemoveGroupIdFromEndpointForNode command; nil removes the handler;
+// HandleRemoveGroupIdFromEndpointForNode registers fn for the RemoveGroupIdFromEndpointForNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveGroupIdFromEndpointForNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveGroupIdFromEndpointForNode(fn func(ctx context.Context, req RemoveGroupIdFromEndpointForNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveGroupIdFromEndpointForNode, fn)
 }
 
-// HandleAddBindingToEndpointForNode registers fn for the AddBindingToEndpointForNode command; nil removes the handler;
+// HandleAddBindingToEndpointForNode registers fn for the AddBindingToEndpointForNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddBindingToEndpointForNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddBindingToEndpointForNode(fn func(ctx context.Context, req AddBindingToEndpointForNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddBindingToEndpointForNode, fn)
 }
 
-// HandleRemoveBindingFromEndpointForNode registers fn for the RemoveBindingFromEndpointForNode command; nil removes the handler;
+// HandleRemoveBindingFromEndpointForNode registers fn for the RemoveBindingFromEndpointForNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveBindingFromEndpointForNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveBindingFromEndpointForNode(fn func(ctx context.Context, req RemoveBindingFromEndpointForNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveBindingFromEndpointForNode, fn)
 }
 
-// HandleAddAclToNode registers fn for the AddAclToNode command; nil removes the handler;
+// HandleAddAclToNode registers fn for the AddAclToNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddAclToNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddAclToNode(fn func(ctx context.Context, req AddAclToNodeRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddAclToNode, fn)
 }
 
-// HandleRemoveAclFromNode registers fn for the RemoveAclFromNode command; nil removes the handler;
+// HandleRemoveAclFromNode registers fn for the RemoveAclFromNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveAclFromNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveAclFromNode(fn func(ctx context.Context, req RemoveAclFromNodeRequest) (struct{}, error)) error {

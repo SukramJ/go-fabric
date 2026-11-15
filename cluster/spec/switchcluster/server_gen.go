@@ -147,46 +147,172 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
+// RecordSwitchLatched records the SwitchLatched event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSwitchLatched(data SwitchLatchedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSwitchLatched, data)
+}
+
 // EmitSwitchLatched emits the SwitchLatched event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSwitchLatched, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSwitchLatched(endpoint uint16, data SwitchLatchedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSwitchLatched, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSwitchLatched, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordInitialPress records the InitialPress event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordInitialPress(data InitialPressEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventInitialPress, data)
 }
 
 // EmitInitialPress emits the InitialPress event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordInitialPress, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitInitialPress(endpoint uint16, data InitialPressEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventInitialPress, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventInitialPress, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLongPress records the LongPress event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLongPress(data LongPressEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLongPress, data)
 }
 
 // EmitLongPress emits the LongPress event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLongPress, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLongPress(endpoint uint16, data LongPressEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLongPress, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLongPress, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordShortRelease records the ShortRelease event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordShortRelease(data ShortReleaseEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventShortRelease, data)
 }
 
 // EmitShortRelease emits the ShortRelease event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordShortRelease, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitShortRelease(endpoint uint16, data ShortReleaseEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventShortRelease, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventShortRelease, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLongRelease records the LongRelease event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLongRelease(data LongReleaseEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLongRelease, data)
 }
 
 // EmitLongRelease emits the LongRelease event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLongRelease, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLongRelease(endpoint uint16, data LongReleaseEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLongRelease, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLongRelease, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordMultiPressOngoing records the MultiPressOngoing event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMultiPressOngoing(data MultiPressOngoingEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMultiPressOngoing, data)
 }
 
 // EmitMultiPressOngoing emits the MultiPressOngoing event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMultiPressOngoing, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMultiPressOngoing(endpoint uint16, data MultiPressOngoingEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressOngoing, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressOngoing, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordMultiPressComplete records the MultiPressComplete event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMultiPressComplete(data MultiPressCompleteEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMultiPressComplete, data)
 }
 
 // EmitMultiPressComplete emits the MultiPressComplete event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMultiPressComplete, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMultiPressComplete(endpoint uint16, data MultiPressCompleteEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressComplete, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressComplete, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Host is the Switch kit server's host methods: the ones Set, Get and
@@ -235,8 +361,12 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -258,8 +388,13 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
+	}
 	return decl
 }
 

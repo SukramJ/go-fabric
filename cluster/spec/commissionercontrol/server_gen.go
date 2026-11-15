@@ -130,24 +130,46 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleRequestCommissioningApproval registers fn for the RequestCommissioningApproval command; nil removes the handler;
+// HandleRequestCommissioningApproval registers fn for the RequestCommissioningApproval command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRequestCommissioningApproval is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRequestCommissioningApproval(fn func(ctx context.Context, req RequestCommissioningApprovalRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRequestCommissioningApproval, fn)
 }
 
-// HandleCommissionNode registers fn for the CommissionNode command; nil removes the handler;
+// HandleCommissionNode registers fn for the CommissionNode command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCommissionNode is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCommissionNode(fn func(ctx context.Context, req CommissionNodeRequest) (ReverseOpenCommissioningWindowResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCommissionNode, fn)
 }
 
+// RecordCommissioningRequestResult records the CommissioningRequestResult event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordCommissioningRequestResult(data CommissioningRequestResultEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventCommissioningRequestResult, data)
+}
+
 // EmitCommissioningRequestResult emits the CommissioningRequestResult event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordCommissioningRequestResult, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitCommissioningRequestResult(endpoint uint16, data CommissioningRequestResultEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventCommissioningRequestResult, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventCommissioningRequestResult, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Declare is the declaration of the CommissionerControl cluster on a device:
@@ -164,7 +186,7 @@ type Declare struct {
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.

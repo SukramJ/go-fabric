@@ -458,70 +458,90 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleAudioStreamAllocate registers fn for the AudioStreamAllocate command; nil removes the handler;
+// HandleAudioStreamAllocate registers fn for the AudioStreamAllocate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAudioStreamAllocate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAudioStreamAllocate(fn func(ctx context.Context, req AudioStreamAllocateRequest) (AudioStreamAllocateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAudioStreamAllocate, fn)
 }
 
-// HandleAudioStreamDeallocate registers fn for the AudioStreamDeallocate command; nil removes the handler;
+// HandleAudioStreamDeallocate registers fn for the AudioStreamDeallocate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAudioStreamDeallocate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAudioStreamDeallocate(fn func(ctx context.Context, req AudioStreamDeallocateRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAudioStreamDeallocate, fn)
 }
 
-// HandleVideoStreamAllocate registers fn for the VideoStreamAllocate command; nil removes the handler;
+// HandleVideoStreamAllocate registers fn for the VideoStreamAllocate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleVideoStreamAllocate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleVideoStreamAllocate(fn func(ctx context.Context, req VideoStreamAllocateRequest) (VideoStreamAllocateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdVideoStreamAllocate, fn)
 }
 
-// HandleVideoStreamModify registers fn for the VideoStreamModify command; nil removes the handler;
+// HandleVideoStreamModify registers fn for the VideoStreamModify command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleVideoStreamModify is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleVideoStreamModify(fn func(ctx context.Context, req VideoStreamModifyRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdVideoStreamModify, fn)
 }
 
-// HandleVideoStreamDeallocate registers fn for the VideoStreamDeallocate command; nil removes the handler;
+// HandleVideoStreamDeallocate registers fn for the VideoStreamDeallocate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleVideoStreamDeallocate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleVideoStreamDeallocate(fn func(ctx context.Context, req VideoStreamDeallocateRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdVideoStreamDeallocate, fn)
 }
 
-// HandleSnapshotStreamAllocate registers fn for the SnapshotStreamAllocate command; nil removes the handler;
+// HandleSnapshotStreamAllocate registers fn for the SnapshotStreamAllocate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSnapshotStreamAllocate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSnapshotStreamAllocate(fn func(ctx context.Context, req SnapshotStreamAllocateRequest) (SnapshotStreamAllocateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSnapshotStreamAllocate, fn)
 }
 
-// HandleSnapshotStreamModify registers fn for the SnapshotStreamModify command; nil removes the handler;
+// HandleSnapshotStreamModify registers fn for the SnapshotStreamModify command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSnapshotStreamModify is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSnapshotStreamModify(fn func(ctx context.Context, req SnapshotStreamModifyRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSnapshotStreamModify, fn)
 }
 
-// HandleSnapshotStreamDeallocate registers fn for the SnapshotStreamDeallocate command; nil removes the handler;
+// HandleSnapshotStreamDeallocate registers fn for the SnapshotStreamDeallocate command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSnapshotStreamDeallocate is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSnapshotStreamDeallocate(fn func(ctx context.Context, req SnapshotStreamDeallocateRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSnapshotStreamDeallocate, fn)
 }
 
-// HandleSetStreamPriorities registers fn for the SetStreamPriorities command; nil removes the handler;
+// HandleSetStreamPriorities registers fn for the SetStreamPriorities command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetStreamPriorities is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetStreamPriorities(fn func(ctx context.Context, req SetStreamPrioritiesRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetStreamPriorities, fn)
 }
 
-// HandleCaptureSnapshot registers fn for the CaptureSnapshot command; nil removes the handler;
+// HandleCaptureSnapshot registers fn for the CaptureSnapshot command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCaptureSnapshot is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCaptureSnapshot(fn func(ctx context.Context, req CaptureSnapshotRequest) (CaptureSnapshotResponse, error)) error {
@@ -639,6 +659,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -701,7 +725,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleAudioStreamAllocate != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdAudioStreamAllocate)
@@ -742,6 +766,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleCaptureSnapshot != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdCaptureSnapshot)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

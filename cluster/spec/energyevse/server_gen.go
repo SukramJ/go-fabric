@@ -311,89 +311,211 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleDisable registers fn for the Disable command; nil removes the handler;
+// HandleDisable registers fn for the Disable command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleDisable is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisable(fn func(ctx context.Context, req DisableRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisable, fn)
 }
 
-// HandleEnableCharging registers fn for the EnableCharging command; nil removes the handler;
+// HandleEnableCharging registers fn for the EnableCharging command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableCharging is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableCharging(fn func(ctx context.Context, req EnableChargingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableCharging, fn)
 }
 
-// HandleEnableDischarging registers fn for the EnableDischarging command; nil removes the handler;
+// HandleEnableDischarging registers fn for the EnableDischarging command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableDischarging is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableDischarging(fn func(ctx context.Context, req EnableDischargingRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableDischarging, fn)
 }
 
-// HandleStartDiagnostics registers fn for the StartDiagnostics command; nil removes the handler;
+// HandleStartDiagnostics registers fn for the StartDiagnostics command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStartDiagnostics is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartDiagnostics(fn func(ctx context.Context, req StartDiagnosticsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartDiagnostics, fn)
 }
 
-// HandleSetTargets registers fn for the SetTargets command; nil removes the handler;
+// HandleSetTargets registers fn for the SetTargets command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetTargets is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetTargets(fn func(ctx context.Context, req SetTargetsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetTargets, fn)
 }
 
-// HandleGetTargets registers fn for the GetTargets command; nil removes the handler;
+// HandleGetTargets registers fn for the GetTargets command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetTargets is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetTargets(fn func(ctx context.Context, req GetTargetsRequest) (GetTargetsResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetTargets, fn)
 }
 
-// HandleClearTargets registers fn for the ClearTargets command; nil removes the handler;
+// HandleClearTargets registers fn for the ClearTargets command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClearTargets is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearTargets(fn func(ctx context.Context, req ClearTargetsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearTargets, fn)
 }
 
+// RecordEvConnected records the EvConnected event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordEvConnected(data EvConnectedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventEvConnected, data)
+}
+
 // EmitEvConnected emits the EvConnected event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordEvConnected, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitEvConnected(endpoint uint16, data EvConnectedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventEvConnected, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventEvConnected, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordEvNotDetected records the EvNotDetected event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordEvNotDetected(data EvNotDetectedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventEvNotDetected, data)
 }
 
 // EmitEvNotDetected emits the EvNotDetected event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordEvNotDetected, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitEvNotDetected(endpoint uint16, data EvNotDetectedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventEvNotDetected, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventEvNotDetected, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordEnergyTransferStarted records the EnergyTransferStarted event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordEnergyTransferStarted(data EnergyTransferStartedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventEnergyTransferStarted, data)
 }
 
 // EmitEnergyTransferStarted emits the EnergyTransferStarted event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordEnergyTransferStarted, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitEnergyTransferStarted(endpoint uint16, data EnergyTransferStartedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStarted, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStarted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordEnergyTransferStopped records the EnergyTransferStopped event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordEnergyTransferStopped(data EnergyTransferStoppedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventEnergyTransferStopped, data)
 }
 
 // EmitEnergyTransferStopped emits the EnergyTransferStopped event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordEnergyTransferStopped, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitEnergyTransferStopped(endpoint uint16, data EnergyTransferStoppedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStopped, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStopped, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordFault records the Fault event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordFault(data FaultEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventFault, data)
 }
 
 // EmitFault emits the Fault event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordFault, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitFault(endpoint uint16, data FaultEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventFault, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordRfid records the Rfid event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordRfid(data RfidEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventRfid, data)
 }
 
 // EmitRfid emits the Rfid event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordRfid, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitRfid(endpoint uint16, data RfidEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventRfid, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventRfid, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Host is the EnergyEvse kit server's host methods: the ones Set, Get and
@@ -466,12 +588,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -514,7 +640,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleDisable != nil {
@@ -544,6 +670,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleClearTargets != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearTargets)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

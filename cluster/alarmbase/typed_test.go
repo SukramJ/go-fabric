@@ -71,7 +71,7 @@ func TestTypedAlarmBaseServer(t *testing.T) {
 		t.Errorf("handed back: %v, State %v", err, s.Get().State)
 	}
 
-	if err := s.EmitNotify(7, dwa.NotifyEvent{Active: 0x1}); err != nil {
+	if err := s.EmitNotify(7, dwa.NotifyEvent{Active: 0x1}); err != nil { //nolint:staticcheck // the deprecated emit under test
 		t.Fatal(err)
 	}
 	if last := em.events[len(em.events)-1]; last.endpoint != 7 || last.event != dwa.EventNotify {

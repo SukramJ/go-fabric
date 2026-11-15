@@ -314,41 +314,133 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleKeepActive registers fn for the KeepActive command; nil removes the handler;
+// HandleKeepActive registers fn for the KeepActive command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleKeepActive is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleKeepActive(fn func(ctx context.Context, req KeepActiveRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdKeepActive, fn)
 }
 
+// RecordStartUp records the StartUp event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordStartUp(data StartUpEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventStartUp, data)
+}
+
 // EmitStartUp emits the StartUp event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordStartUp, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitStartUp(endpoint uint16, data StartUpEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventStartUp, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventStartUp, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordShutDown records the ShutDown event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordShutDown(data ShutDownEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventShutDown, data)
 }
 
 // EmitShutDown emits the ShutDown event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordShutDown, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitShutDown(endpoint uint16, data ShutDownEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventShutDown, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventShutDown, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLeave records the Leave event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLeave(data LeaveEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLeave, data)
 }
 
 // EmitLeave emits the Leave event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLeave, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLeave(endpoint uint16, data LeaveEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLeave, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLeave, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordReachableChanged records the ReachableChanged event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordReachableChanged(data ReachableChangedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventReachableChanged, data)
 }
 
 // EmitReachableChanged emits the ReachableChanged event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordReachableChanged, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitReachableChanged(endpoint uint16, data ReachableChangedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventReachableChanged, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventReachableChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordActiveChanged records the ActiveChanged event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordActiveChanged(data ActiveChangedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventActiveChanged, data)
 }
 
 // EmitActiveChanged emits the ActiveChanged event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordActiveChanged, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitActiveChanged(endpoint uint16, data ActiveChangedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventActiveChanged, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventActiveChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Declare is the declaration of the BridgedDeviceBasicInformation cluster on a device:
@@ -362,12 +454,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -392,12 +488,17 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleKeepActive != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdKeepActive)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

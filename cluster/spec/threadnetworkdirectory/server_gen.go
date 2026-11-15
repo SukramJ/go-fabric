@@ -151,21 +151,27 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleAddNetwork registers fn for the AddNetwork command; nil removes the handler;
+// HandleAddNetwork registers fn for the AddNetwork command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddNetwork is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddNetwork(fn func(ctx context.Context, req AddNetworkRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddNetwork, fn)
 }
 
-// HandleRemoveNetwork registers fn for the RemoveNetwork command; nil removes the handler;
+// HandleRemoveNetwork registers fn for the RemoveNetwork command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveNetwork is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveNetwork(fn func(ctx context.Context, req RemoveNetworkRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveNetwork, fn)
 }
 
-// HandleGetOperationalDataset registers fn for the GetOperationalDataset command; nil removes the handler;
+// HandleGetOperationalDataset registers fn for the GetOperationalDataset command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetOperationalDataset is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetOperationalDataset(fn func(ctx context.Context, req GetOperationalDatasetRequest) (OperationalDatasetResponse, error)) error {

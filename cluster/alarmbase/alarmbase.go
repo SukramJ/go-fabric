@@ -440,7 +440,7 @@ func (s *Server) setState(origin contract.Origin, state uint32, ignoreLatch bool
 	s.mu.Unlock()
 	// Notify: became active, became inactive, the new State, the Mask
 	// (AlarmBaseCluster.cpp:75-80).
-	return s.srv.Emit(endpoint, EventNotify, s.v.notify(state&^current, current&^state, state, mask))
+	return s.srv.Emit(endpoint, EventNotify, s.v.notify(state&^current, current&^state, state, mask)) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // handleReset is chip's HandleReset (AlarmBaseCluster.cpp:162-175).

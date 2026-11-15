@@ -65,7 +65,7 @@ func TestTypedBooleanStateConfiguration(t *testing.T) {
 		t.Errorf("host SuppressAlarm: %v, %v", err, seen)
 	}
 
-	if err := s.EmitSensorFault(7, def.SensorFaultEvent{SensorFault: 1}); err != nil {
+	if err := s.EmitSensorFault(7, def.SensorFaultEvent{SensorFault: 1}); err != nil { //nolint:staticcheck // the deprecated emit under test
 		t.Fatal(err)
 	}
 	if evs := em.take(); len(evs) != 1 || evs[0].id != def.EventSensorFault {

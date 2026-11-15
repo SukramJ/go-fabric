@@ -248,7 +248,7 @@ func (c *Chime) playChimeSound(ctx context.Context, fields any) (any, error) {
 		return nil, portError("PlayChimeSound", err)
 	}
 	if c.Emits(chimedef.EventChimeStartedPlaying) { // :283-287
-		_ = c.srv.Emit(endpoint, chimedef.EventChimeStartedPlaying, chimedef.ChimeStartedPlayingEvent{ChimeId: id})
+		_ = c.srv.Emit(endpoint, chimedef.EventChimeStartedPlaying, chimedef.ChimeStartedPlayingEvent{ChimeId: id}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 	}
 	return nil, nil
 }

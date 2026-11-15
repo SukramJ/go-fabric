@@ -550,7 +550,7 @@ func (s *Server) SetSensorFault(fault SensorFault) {
 	endpoint := s.endpoint
 	s.mu.Unlock()
 	if s.Emits(def.EventSensorFault) {
-		_ = s.srv.Emit(endpoint, def.EventSensorFault, def.SensorFaultEvent{SensorFault: fault})
+		_ = s.srv.Emit(endpoint, def.EventSensorFault, def.SensorFaultEvent{SensorFault: fault}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 	}
 	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrSensorFault: fault})
 }
@@ -568,7 +568,7 @@ func (s *Server) alarmsStateChanged() {
 	}
 	endpoint := s.endpoint
 	s.mu.Unlock()
-	_ = s.srv.Emit(endpoint, def.EventAlarmsStateChanged, ev)
+	_ = s.srv.Emit(endpoint, def.EventAlarmsStateChanged, ev) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // The host methods the typed server's Host returns (brief CK-2).

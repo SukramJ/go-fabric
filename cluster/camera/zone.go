@@ -598,7 +598,7 @@ func (z *Zones) ZoneTriggered(zoneID uint16, reason ZoneTriggeredReason) error {
 	z.mu.Lock()
 	endpoint := z.endpoint
 	z.mu.Unlock()
-	return z.srv.Emit(endpoint, zmdef.EventZoneTriggered, zmdef.ZoneTriggeredEvent{Zone: zoneID, Reason: reason})
+	return z.srv.Emit(endpoint, zmdef.EventZoneTriggered, zmdef.ZoneTriggeredEvent{Zone: zoneID, Reason: reason}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // ZoneStopped emits the ZoneStopped event the host reports for a zone.
@@ -607,7 +607,7 @@ func (z *Zones) ZoneStopped(zoneID uint16, reason ZoneStoppedReason) error {
 	z.mu.Lock()
 	endpoint := z.endpoint
 	z.mu.Unlock()
-	return z.srv.Emit(endpoint, zmdef.EventZoneStopped, zmdef.ZoneStoppedEvent{Zone: zoneID, Reason: reason})
+	return z.srv.Emit(endpoint, zmdef.EventZoneStopped, zmdef.ZoneStoppedEvent{Zone: zoneID, Reason: reason}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -649,4 +649,5 @@ func (z *Zones) SetEndpoint(endpoint uint16) {
 	z.mu.Lock()
 	z.endpoint = endpoint
 	z.mu.Unlock()
+	z.SelfHeld.SetEndpoint(endpoint) // the store's EmitEvent, the typed Record<Event>
 }

@@ -121,21 +121,27 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleQueryImage registers fn for the QueryImage command; nil removes the handler;
+// HandleQueryImage registers fn for the QueryImage command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleQueryImage is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleQueryImage(fn func(ctx context.Context, req QueryImageRequest) (QueryImageResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdQueryImage, fn)
 }
 
-// HandleApplyUpdateRequest registers fn for the ApplyUpdateRequest command; nil removes the handler;
+// HandleApplyUpdateRequest registers fn for the ApplyUpdateRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleApplyUpdateRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleApplyUpdateRequest(fn func(ctx context.Context, req ApplyUpdateRequestRequest) (ApplyUpdateResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdApplyUpdateRequest, fn)
 }
 
-// HandleNotifyUpdateApplied registers fn for the NotifyUpdateApplied command; nil removes the handler;
+// HandleNotifyUpdateApplied registers fn for the NotifyUpdateApplied command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleNotifyUpdateApplied is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleNotifyUpdateApplied(fn func(ctx context.Context, req NotifyUpdateAppliedRequest) (struct{}, error)) error {

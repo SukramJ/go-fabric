@@ -42,14 +42,14 @@ func TestTypedPumpServer(t *testing.T) {
 
 	rec := &recorder{}
 	srv.SetMatterEventEmitter(rec)
-	if err := s.EmitDryRunning(srv.Endpoint(), pumpdef.DryRunningEvent{}); err != nil {
+	if err := s.EmitDryRunning(srv.Endpoint(), pumpdef.DryRunningEvent{}); err != nil { //nolint:staticcheck // the deprecated emit under test
 		t.Fatal(err)
 	}
 	if len(rec.events) != 1 || rec.events[0].endpoint != 3 || rec.events[0].event != pump.EventDryRunning ||
 		rec.events[0].data != (clusterwire.FieldlessEvent{}) || rec.events[0].priority != contract.EventPriorityCritical {
 		t.Errorf("emitted %+v", rec.events)
 	}
-	if err := s.EmitPumpBlocked(3, pumpdef.PumpBlockedEvent{}); !errors.Is(err, spec.ErrNotEmitted) || !errors.Is(err, pump.ErrEventUndeclared) {
+	if err := s.EmitPumpBlocked(3, pumpdef.PumpBlockedEvent{}); !errors.Is(err, spec.ErrNotEmitted) || !errors.Is(err, pump.ErrEventUndeclared) { //nolint:staticcheck // the deprecated emit under test
 		t.Errorf("an undeclared event: %v", err)
 	}
 

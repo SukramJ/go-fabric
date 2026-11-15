@@ -138,14 +138,18 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleSelectOutput registers fn for the SelectOutput command; nil removes the handler;
+// HandleSelectOutput registers fn for the SelectOutput command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSelectOutput is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSelectOutput(fn func(ctx context.Context, req SelectOutputRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSelectOutput, fn)
 }
 
-// HandleRenameOutput registers fn for the RenameOutput command; nil removes the handler;
+// HandleRenameOutput registers fn for the RenameOutput command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRenameOutput is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRenameOutput(fn func(ctx context.Context, req RenameOutputRequest) (struct{}, error)) error {
@@ -176,6 +180,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -208,7 +216,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleSelectOutput != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSelectOutput)
@@ -217,6 +225,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleRenameOutput != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdRenameOutput)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

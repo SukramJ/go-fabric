@@ -163,14 +163,14 @@ func (w *WiFiNetworkDiagnostics) eventEndpoint() uint16 {
 // OnDisconnectionDetected emits Disconnection (event 0x00, info) with the
 // 802.11 reason code — connectedhomeip's OnDisconnectionDetected (:84-92).
 func (w *WiFiNetworkDiagnostics) OnDisconnectionDetected(reasonCode uint16) error {
-	return w.Emit(w.eventEndpoint(), wifidiagdef.EventDisconnection, wifidiagdef.DisconnectionEvent{ReasonCode: reasonCode})
+	return w.Emit(w.eventEndpoint(), wifidiagdef.EventDisconnection, wifidiagdef.DisconnectionEvent{ReasonCode: reasonCode}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // OnAssociationFailureDetected emits AssociationFailure (event 0x01, info)
 // with the cause and the 802.11 status code — connectedhomeip's
 // OnAssociationFailureDetected (:94-102).
 func (w *WiFiNetworkDiagnostics) OnAssociationFailureDetected(cause wifidiagdef.AssociationFailureCauseEnum, status uint16) error {
-	return w.Emit(w.eventEndpoint(), wifidiagdef.EventAssociationFailure, wifidiagdef.AssociationFailureEvent{
+	return w.Emit(w.eventEndpoint(), wifidiagdef.EventAssociationFailure, wifidiagdef.AssociationFailureEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		AssociationFailureCause: cause, Status: status,
 	})
 }
@@ -178,7 +178,7 @@ func (w *WiFiNetworkDiagnostics) OnAssociationFailureDetected(cause wifidiagdef.
 // OnConnectionStatusChanged emits ConnectionStatus (event 0x02, info) —
 // connectedhomeip's OnConnectionStatusChanged (:104-112).
 func (w *WiFiNetworkDiagnostics) OnConnectionStatusChanged(status wifidiagdef.ConnectionStatusEnum) error {
-	return w.Emit(w.eventEndpoint(), wifidiagdef.EventConnectionStatus, wifidiagdef.ConnectionStatusEvent{ConnectionStatus: status})
+	return w.Emit(w.eventEndpoint(), wifidiagdef.EventConnectionStatus, wifidiagdef.ConnectionStatusEvent{ConnectionStatus: status}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // wifiSource answers the served attributes from the host, in the stored

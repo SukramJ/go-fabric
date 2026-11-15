@@ -134,56 +134,72 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleAddScene registers fn for the AddScene command; nil removes the handler;
+// HandleAddScene registers fn for the AddScene command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddScene is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddScene(fn func(ctx context.Context, req AddSceneRequest) (AddSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddScene, fn)
 }
 
-// HandleViewScene registers fn for the ViewScene command; nil removes the handler;
+// HandleViewScene registers fn for the ViewScene command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleViewScene is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleViewScene(fn func(ctx context.Context, req ViewSceneRequest) (ViewSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdViewScene, fn)
 }
 
-// HandleRemoveScene registers fn for the RemoveScene command; nil removes the handler;
+// HandleRemoveScene registers fn for the RemoveScene command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveScene is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveScene(fn func(ctx context.Context, req RemoveSceneRequest) (RemoveSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveScene, fn)
 }
 
-// HandleRemoveAllScenes registers fn for the RemoveAllScenes command; nil removes the handler;
+// HandleRemoveAllScenes registers fn for the RemoveAllScenes command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveAllScenes is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveAllScenes(fn func(ctx context.Context, req RemoveAllScenesRequest) (RemoveAllScenesResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveAllScenes, fn)
 }
 
-// HandleStoreScene registers fn for the StoreScene command; nil removes the handler;
+// HandleStoreScene registers fn for the StoreScene command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStoreScene is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStoreScene(fn func(ctx context.Context, req StoreSceneRequest) (StoreSceneResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStoreScene, fn)
 }
 
-// HandleRecallScene registers fn for the RecallScene command; nil removes the handler;
+// HandleRecallScene registers fn for the RecallScene command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRecallScene is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRecallScene(fn func(ctx context.Context, req RecallSceneRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRecallScene, fn)
 }
 
-// HandleGetSceneMembership registers fn for the GetSceneMembership command; nil removes the handler;
+// HandleGetSceneMembership registers fn for the GetSceneMembership command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetSceneMembership is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetSceneMembership(fn func(ctx context.Context, req GetSceneMembershipRequest) (GetSceneMembershipResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetSceneMembership, fn)
 }
 
-// HandleCopyScene registers fn for the CopyScene command; nil removes the handler;
+// HandleCopyScene registers fn for the CopyScene command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCopyScene is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCopyScene(fn func(ctx context.Context, req CopySceneRequest) (CopySceneResponse, error)) error {
@@ -201,6 +217,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -249,7 +269,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleAddScene != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddScene)
@@ -282,6 +302,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleCopyScene != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdCopyScene)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

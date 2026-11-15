@@ -170,30 +170,70 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleBoost registers fn for the Boost command; nil removes the handler;
+// HandleBoost registers fn for the Boost command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleBoost is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleBoost(fn func(ctx context.Context, req BoostRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdBoost, fn)
 }
 
-// HandleCancelBoost registers fn for the CancelBoost command; nil removes the handler;
+// HandleCancelBoost registers fn for the CancelBoost command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelBoost is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelBoost(fn func(ctx context.Context, req CancelBoostRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelBoost, fn)
 }
 
+// RecordBoostStarted records the BoostStarted event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordBoostStarted(data BoostStartedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventBoostStarted, data)
+}
+
 // EmitBoostStarted emits the BoostStarted event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordBoostStarted, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitBoostStarted(endpoint uint16, data BoostStartedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventBoostStarted, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventBoostStarted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordBoostEnded records the BoostEnded event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordBoostEnded(data BoostEndedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventBoostEnded, data)
 }
 
 // EmitBoostEnded emits the BoostEnded event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordBoostEnded, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitBoostEnded(endpoint uint16, data BoostEndedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventBoostEnded, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventBoostEnded, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Booster starts and cancels a boost the kit's server admitted;
@@ -214,12 +254,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -249,7 +293,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleBoost != nil {
@@ -259,6 +303,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleCancelBoost != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdCancelBoost)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

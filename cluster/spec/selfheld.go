@@ -188,8 +188,17 @@ func (h *SelfHeld) Handle(cmdID uint32, fn CommandHandler) error {
 
 // Emit implements [EventEmitting] ([Server.Emit]).
 func (h *SelfHeld) Emit(endpoint uint16, eventID uint32, data any) error {
-	return h.srv.Emit(endpoint, eventID, data)
+	return h.srv.Emit(endpoint, eventID, data) //nolint:staticcheck // EventEmitting's implementation for the deprecated EmitOn
 }
+
+// EmitEvent emits eventID with data on the endpoint the store is mounted
+// on ([Server.EmitEvent]).
+func (h *SelfHeld) EmitEvent(eventID uint32, data any) error { return h.srv.EmitEvent(eventID, data) }
+
+// SetEndpoint implements [contract.EndpointReceiver] by handing the
+// endpoint to the store; a server with a SetEndpoint of its own calls it
+// from there.
+func (h *SelfHeld) SetEndpoint(endpoint uint16) { h.srv.SetEndpoint(endpoint) }
 
 // SetBeforeWrite implements [BeforeWriteSetter] ([Server.SetBeforeWrite]):
 // the host's veto; the store's [ServerConfig.WriteRule] stays.

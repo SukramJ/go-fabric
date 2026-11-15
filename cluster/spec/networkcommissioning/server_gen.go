@@ -215,42 +215,54 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleScanNetworks registers fn for the ScanNetworks command; nil removes the handler;
+// HandleScanNetworks registers fn for the ScanNetworks command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleScanNetworks is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleScanNetworks(fn func(ctx context.Context, req ScanNetworksRequest) (ScanNetworksResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdScanNetworks, fn)
 }
 
-// HandleAddOrUpdateWiFiNetwork registers fn for the AddOrUpdateWiFiNetwork command; nil removes the handler;
+// HandleAddOrUpdateWiFiNetwork registers fn for the AddOrUpdateWiFiNetwork command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddOrUpdateWiFiNetwork is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddOrUpdateWiFiNetwork(fn func(ctx context.Context, req AddOrUpdateWiFiNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddOrUpdateWiFiNetwork, fn)
 }
 
-// HandleAddOrUpdateThreadNetwork registers fn for the AddOrUpdateThreadNetwork command; nil removes the handler;
+// HandleAddOrUpdateThreadNetwork registers fn for the AddOrUpdateThreadNetwork command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddOrUpdateThreadNetwork is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddOrUpdateThreadNetwork(fn func(ctx context.Context, req AddOrUpdateThreadNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddOrUpdateThreadNetwork, fn)
 }
 
-// HandleRemoveNetwork registers fn for the RemoveNetwork command; nil removes the handler;
+// HandleRemoveNetwork registers fn for the RemoveNetwork command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveNetwork is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveNetwork(fn func(ctx context.Context, req RemoveNetworkRequest) (NetworkConfigResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveNetwork, fn)
 }
 
-// HandleConnectNetwork registers fn for the ConnectNetwork command; nil removes the handler;
+// HandleConnectNetwork registers fn for the ConnectNetwork command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleConnectNetwork is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleConnectNetwork(fn func(ctx context.Context, req ConnectNetworkRequest) (ConnectNetworkResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdConnectNetwork, fn)
 }
 
-// HandleReorderNetwork registers fn for the ReorderNetwork command; nil removes the handler;
+// HandleReorderNetwork registers fn for the ReorderNetwork command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleReorderNetwork is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleReorderNetwork(fn func(ctx context.Context, req ReorderNetworkRequest) (NetworkConfigResponse, error)) error {
@@ -268,6 +280,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -310,7 +326,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleScanNetworks != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdScanNetworks)
@@ -335,6 +351,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleReorderNetwork != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdReorderNetwork)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

@@ -831,7 +831,7 @@ func (s *Server) deliver(endpoint uint16, observe func(changeKind, uint8, uint8)
 	switch d.kind {
 	case changeEvent:
 		// An event outside EventList is dropped (#queueEvent :225).
-		_ = s.Emit(endpoint, d.event, d.payload)
+		_ = s.Emit(endpoint, d.event, d.payload) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		return
 	case changeCurrentPosition:
 		// Validated on input: the store's own check cannot fail.

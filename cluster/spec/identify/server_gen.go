@@ -138,14 +138,18 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleIdentify registers fn for the Identify command; nil removes the handler;
+// HandleIdentify registers fn for the Identify command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleIdentify is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleIdentify(fn func(ctx context.Context, req IdentifyRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdIdentify, fn)
 }
 
-// HandleTriggerEffect registers fn for the TriggerEffect command; nil removes the handler;
+// HandleTriggerEffect registers fn for the TriggerEffect command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleTriggerEffect is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleTriggerEffect(fn func(ctx context.Context, req TriggerEffectRequest) (struct{}, error)) error {

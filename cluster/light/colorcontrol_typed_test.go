@@ -125,7 +125,7 @@ func TestColorControlTypedEmitAndOnWrite(t *testing.T) {
 	ctx := context.Background()
 	s := typedColorControl(t)
 	// ColorControl defines no event.
-	if err := spec.EmitOn(s.Underlying(), 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
+	if err := spec.EmitOn(s.Underlying(), 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) { //nolint:staticcheck // the deprecated emit under test
 		t.Errorf("an event of a cluster without events: %v", err)
 	}
 	refusal := errors.New("the lamp stays as it is")

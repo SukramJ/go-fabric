@@ -615,94 +615,271 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleSetpointRaiseLower registers fn for the SetpointRaiseLower command; nil removes the handler;
+// HandleSetpointRaiseLower registers fn for the SetpointRaiseLower command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetpointRaiseLower is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetpointRaiseLower(fn func(ctx context.Context, req SetpointRaiseLowerRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetpointRaiseLower, fn)
 }
 
-// HandleSetActiveScheduleRequest registers fn for the SetActiveScheduleRequest command; nil removes the handler;
+// HandleSetActiveScheduleRequest registers fn for the SetActiveScheduleRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetActiveScheduleRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetActiveScheduleRequest(fn func(ctx context.Context, req SetActiveScheduleRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetActiveScheduleRequest, fn)
 }
 
-// HandleSetActivePresetRequest registers fn for the SetActivePresetRequest command; nil removes the handler;
+// HandleSetActivePresetRequest registers fn for the SetActivePresetRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetActivePresetRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetActivePresetRequest(fn func(ctx context.Context, req SetActivePresetRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetActivePresetRequest, fn)
 }
 
-// HandleAddThermostatSuggestion registers fn for the AddThermostatSuggestion command; nil removes the handler;
+// HandleAddThermostatSuggestion registers fn for the AddThermostatSuggestion command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddThermostatSuggestion is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddThermostatSuggestion(fn func(ctx context.Context, req AddThermostatSuggestionRequest) (AddThermostatSuggestionResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddThermostatSuggestion, fn)
 }
 
-// HandleRemoveThermostatSuggestion registers fn for the RemoveThermostatSuggestion command; nil removes the handler;
+// HandleRemoveThermostatSuggestion registers fn for the RemoveThermostatSuggestion command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveThermostatSuggestion is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveThermostatSuggestion(fn func(ctx context.Context, req RemoveThermostatSuggestionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveThermostatSuggestion, fn)
 }
 
-// HandleAtomicRequest registers fn for the AtomicRequest command; nil removes the handler;
+// HandleAtomicRequest registers fn for the AtomicRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAtomicRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAtomicRequest(fn func(ctx context.Context, req AtomicRequestRequest) (AtomicResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAtomicRequest, fn)
 }
 
+// RecordSystemModeChange records the SystemModeChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSystemModeChange(data SystemModeChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSystemModeChange, data)
+}
+
 // EmitSystemModeChange emits the SystemModeChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSystemModeChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSystemModeChange(endpoint uint16, data SystemModeChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSystemModeChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSystemModeChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLocalTemperatureChange records the LocalTemperatureChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLocalTemperatureChange(data LocalTemperatureChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLocalTemperatureChange, data)
 }
 
 // EmitLocalTemperatureChange emits the LocalTemperatureChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLocalTemperatureChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLocalTemperatureChange(endpoint uint16, data LocalTemperatureChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLocalTemperatureChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLocalTemperatureChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordOccupancyChange records the OccupancyChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordOccupancyChange(data OccupancyChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventOccupancyChange, data)
 }
 
 // EmitOccupancyChange emits the OccupancyChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordOccupancyChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitOccupancyChange(endpoint uint16, data OccupancyChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventOccupancyChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventOccupancyChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSetpointChange records the SetpointChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSetpointChange(data SetpointChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSetpointChange, data)
 }
 
 // EmitSetpointChange emits the SetpointChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSetpointChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSetpointChange(endpoint uint16, data SetpointChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSetpointChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSetpointChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordRunningStateChange records the RunningStateChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordRunningStateChange(data RunningStateChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventRunningStateChange, data)
 }
 
 // EmitRunningStateChange emits the RunningStateChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordRunningStateChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitRunningStateChange(endpoint uint16, data RunningStateChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventRunningStateChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventRunningStateChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordRunningModeChange records the RunningModeChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordRunningModeChange(data RunningModeChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventRunningModeChange, data)
 }
 
 // EmitRunningModeChange emits the RunningModeChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordRunningModeChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitRunningModeChange(endpoint uint16, data RunningModeChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventRunningModeChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventRunningModeChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordActiveScheduleChange records the ActiveScheduleChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordActiveScheduleChange(data ActiveScheduleChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventActiveScheduleChange, data)
 }
 
 // EmitActiveScheduleChange emits the ActiveScheduleChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordActiveScheduleChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitActiveScheduleChange(endpoint uint16, data ActiveScheduleChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventActiveScheduleChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventActiveScheduleChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordActivePresetChange records the ActivePresetChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordActivePresetChange(data ActivePresetChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventActivePresetChange, data)
 }
 
 // EmitActivePresetChange emits the ActivePresetChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordActivePresetChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitActivePresetChange(endpoint uint16, data ActivePresetChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventActivePresetChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventActivePresetChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// Host is the Thermostat kit server's host methods: the ones Set, Get and
+// the typed handlers do not reach (cluster/thermo ThermostatServer).
+type Host interface {
+	// SetMeasuredTemperature records the temperature the host measured,
+	// in 0.01 °C, nil for none: LocalTemperatureCalibration applies to a
+	// non-null value before it is served as LocalTemperature, which stays
+	// null with LocalTemperatureNotExposed.
+	SetMeasuredTemperature(t *int16)
+	// SetOccupied records the occupancy the host measured (OCC): the
+	// Occupancy attribute follows, and so do the setpoints in effect.
+	SetOccupied(occupied bool)
+}
+
+// Host returns the mounted server's host methods when it implements
+// Host — the kit's server does; nil for a server that does not, as the
+// generated one and a host's own (Declare.HostServer) normally do not.
+func (s *Server) Host() Host {
+	h, _ := s.Underlying().(Host)
+	return h
 }
 
 // SetpointChange is one setpoint a Sink's setpoint change moves with
@@ -754,12 +931,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -805,7 +986,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleSetpointRaiseLower != nil {
@@ -831,6 +1012,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleAtomicRequest != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdAtomicRequest)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

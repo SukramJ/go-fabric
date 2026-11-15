@@ -133,36 +133,94 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandlePresentMessagesRequest registers fn for the PresentMessagesRequest command; nil removes the handler;
+// HandlePresentMessagesRequest registers fn for the PresentMessagesRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandlePresentMessagesRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePresentMessagesRequest(fn func(ctx context.Context, req PresentMessagesRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPresentMessagesRequest, fn)
 }
 
-// HandleCancelMessagesRequest registers fn for the CancelMessagesRequest command; nil removes the handler;
+// HandleCancelMessagesRequest registers fn for the CancelMessagesRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelMessagesRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelMessagesRequest(fn func(ctx context.Context, req CancelMessagesRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdCancelMessagesRequest, fn)
 }
 
+// RecordMessageQueued records the MessageQueued event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMessageQueued(data MessageQueuedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMessageQueued, data)
+}
+
 // EmitMessageQueued emits the MessageQueued event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMessageQueued, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMessageQueued(endpoint uint16, data MessageQueuedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMessageQueued, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMessageQueued, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordMessagePresented records the MessagePresented event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMessagePresented(data MessagePresentedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMessagePresented, data)
 }
 
 // EmitMessagePresented emits the MessagePresented event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMessagePresented, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMessagePresented(endpoint uint16, data MessagePresentedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMessagePresented, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMessagePresented, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordMessageComplete records the MessageComplete event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMessageComplete(data MessageCompleteEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMessageComplete, data)
 }
 
 // EmitMessageComplete emits the MessageComplete event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMessageComplete, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMessageComplete(endpoint uint16, data MessageCompleteEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMessageComplete, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMessageComplete, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Declare is the declaration of the Messages cluster on a device:
@@ -176,12 +234,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -209,7 +271,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandlePresentMessagesRequest != nil {
@@ -219,6 +281,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleCancelMessagesRequest != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdCancelMessagesRequest)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

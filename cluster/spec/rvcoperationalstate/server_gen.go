@@ -175,51 +175,97 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandlePause registers fn for the Pause command; nil removes the handler;
+// HandlePause registers fn for the Pause command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandlePause is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePause(fn func(ctx context.Context, req PauseRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPause, fn)
 }
 
-// HandleStop registers fn for the Stop command; nil removes the handler;
+// HandleStop registers fn for the Stop command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStop is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStop(fn func(ctx context.Context, req StopRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStop, fn)
 }
 
-// HandleStart registers fn for the Start command; nil removes the handler;
+// HandleStart registers fn for the Start command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStart is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStart(fn func(ctx context.Context, req StartRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStart, fn)
 }
 
-// HandleResume registers fn for the Resume command; nil removes the handler;
+// HandleResume registers fn for the Resume command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleResume is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResume(fn func(ctx context.Context, req ResumeRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResume, fn)
 }
 
-// HandleGoHome registers fn for the GoHome command; nil removes the handler;
+// HandleGoHome registers fn for the GoHome command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGoHome is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGoHome(fn func(ctx context.Context, req GoHomeRequest) (OperationalCommandResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGoHome, fn)
 }
 
+// RecordOperationalError records the OperationalError event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordOperationalError(data OperationalErrorEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventOperationalError, data)
+}
+
 // EmitOperationalError emits the OperationalError event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordOperationalError, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitOperationalError(endpoint uint16, data OperationalErrorEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventOperationalError, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventOperationalError, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordOperationCompletion records the OperationCompletion event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordOperationCompletion(data OperationCompletionEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventOperationCompletion, data)
 }
 
 // EmitOperationCompletion emits the OperationCompletion event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordOperationCompletion, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitOperationCompletion(endpoint uint16, data OperationCompletionEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventOperationCompletion, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventOperationCompletion, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // CommandHandler performs a command the kit's server accepted and
@@ -245,7 +291,7 @@ type Declare struct {
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.

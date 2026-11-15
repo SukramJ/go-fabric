@@ -121,7 +121,9 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleContentAppMessage registers fn for the ContentAppMessage command; nil removes the handler;
+// HandleContentAppMessage registers fn for the ContentAppMessage command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleContentAppMessage is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleContentAppMessage(fn func(ctx context.Context, req ContentAppMessageRequest) (ContentAppMessageResponse, error)) error {

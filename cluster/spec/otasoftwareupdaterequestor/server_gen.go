@@ -154,29 +154,85 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleAnnounceOtaProvider registers fn for the AnnounceOtaProvider command; nil removes the handler;
+// HandleAnnounceOtaProvider registers fn for the AnnounceOtaProvider command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAnnounceOtaProvider is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAnnounceOtaProvider(fn func(ctx context.Context, req AnnounceOtaProviderRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAnnounceOtaProvider, fn)
 }
 
+// RecordStateTransition records the StateTransition event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordStateTransition(data StateTransitionEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventStateTransition, data)
+}
+
 // EmitStateTransition emits the StateTransition event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordStateTransition, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitStateTransition(endpoint uint16, data StateTransitionEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventStateTransition, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventStateTransition, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordVersionApplied records the VersionApplied event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordVersionApplied(data VersionAppliedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventVersionApplied, data)
 }
 
 // EmitVersionApplied emits the VersionApplied event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordVersionApplied, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitVersionApplied(endpoint uint16, data VersionAppliedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventVersionApplied, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventVersionApplied, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordDownloadError records the DownloadError event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordDownloadError(data DownloadErrorEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventDownloadError, data)
 }
 
 // EmitDownloadError emits the DownloadError event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordDownloadError, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitDownloadError(endpoint uint16, data DownloadErrorEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventDownloadError, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventDownloadError, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Declare is the declaration of the OtaSoftwareUpdateRequestor cluster on a device:
@@ -193,7 +249,7 @@ type Declare struct {
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.

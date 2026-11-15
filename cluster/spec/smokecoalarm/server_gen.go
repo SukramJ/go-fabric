@@ -234,77 +234,277 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleSelfTestRequest registers fn for the SelfTestRequest command; nil removes the handler;
+// HandleSelfTestRequest registers fn for the SelfTestRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSelfTestRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSelfTestRequest(fn func(ctx context.Context, req SelfTestRequestRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSelfTestRequest, fn)
 }
 
+// RecordSmokeAlarm records the SmokeAlarm event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSmokeAlarm(data SmokeAlarmEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSmokeAlarm, data)
+}
+
 // EmitSmokeAlarm emits the SmokeAlarm event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSmokeAlarm, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSmokeAlarm(endpoint uint16, data SmokeAlarmEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSmokeAlarm, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSmokeAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordCoAlarm records the CoAlarm event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordCoAlarm(data CoAlarmEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventCoAlarm, data)
 }
 
 // EmitCoAlarm emits the CoAlarm event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordCoAlarm, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitCoAlarm(endpoint uint16, data CoAlarmEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventCoAlarm, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventCoAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLowBattery records the LowBattery event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLowBattery(data LowBatteryEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLowBattery, data)
 }
 
 // EmitLowBattery emits the LowBattery event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLowBattery, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLowBattery(endpoint uint16, data LowBatteryEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLowBattery, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLowBattery, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordHardwareFault records the HardwareFault event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordHardwareFault(data HardwareFaultEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventHardwareFault, data)
 }
 
 // EmitHardwareFault emits the HardwareFault event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordHardwareFault, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitHardwareFault(endpoint uint16, data HardwareFaultEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventHardwareFault, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventHardwareFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordEndOfService records the EndOfService event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordEndOfService(data EndOfServiceEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventEndOfService, data)
 }
 
 // EmitEndOfService emits the EndOfService event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordEndOfService, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitEndOfService(endpoint uint16, data EndOfServiceEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventEndOfService, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventEndOfService, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSelfTestComplete records the SelfTestComplete event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSelfTestComplete(data SelfTestCompleteEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSelfTestComplete, data)
 }
 
 // EmitSelfTestComplete emits the SelfTestComplete event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSelfTestComplete, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSelfTestComplete(endpoint uint16, data SelfTestCompleteEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSelfTestComplete, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSelfTestComplete, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordAlarmMuted records the AlarmMuted event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordAlarmMuted(data AlarmMutedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventAlarmMuted, data)
 }
 
 // EmitAlarmMuted emits the AlarmMuted event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordAlarmMuted, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitAlarmMuted(endpoint uint16, data AlarmMutedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventAlarmMuted, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventAlarmMuted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordMuteEnded records the MuteEnded event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordMuteEnded(data MuteEndedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventMuteEnded, data)
 }
 
 // EmitMuteEnded emits the MuteEnded event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordMuteEnded, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitMuteEnded(endpoint uint16, data MuteEndedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventMuteEnded, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventMuteEnded, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordInterconnectSmokeAlarm records the InterconnectSmokeAlarm event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordInterconnectSmokeAlarm(data InterconnectSmokeAlarmEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventInterconnectSmokeAlarm, data)
 }
 
 // EmitInterconnectSmokeAlarm emits the InterconnectSmokeAlarm event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordInterconnectSmokeAlarm, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitInterconnectSmokeAlarm(endpoint uint16, data InterconnectSmokeAlarmEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventInterconnectSmokeAlarm, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventInterconnectSmokeAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordInterconnectCoAlarm records the InterconnectCoAlarm event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordInterconnectCoAlarm(data InterconnectCoAlarmEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventInterconnectCoAlarm, data)
 }
 
 // EmitInterconnectCoAlarm emits the InterconnectCoAlarm event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordInterconnectCoAlarm, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitInterconnectCoAlarm(endpoint uint16, data InterconnectCoAlarmEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventInterconnectCoAlarm, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventInterconnectCoAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordAllClear records the AllClear event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordAllClear(data AllClearEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventAllClear, data)
 }
 
 // EmitAllClear emits the AllClear event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordAllClear, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitAllClear(endpoint uint16, data AllClearEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventAllClear, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventAllClear, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Host is the SmokeCoAlarm kit server's host methods: the ones Set, Get and
@@ -362,12 +562,16 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -394,12 +598,17 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleSelfTestRequest != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdSelfTestRequest)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

@@ -283,7 +283,7 @@ func (o *Occupancy) emitOccupancyChanged() {
 	o.mu.Lock()
 	endpoint := o.endpoint
 	o.mu.Unlock()
-	_ = o.srv.Emit(endpoint, occdef.EventOccupancyChanged, occdef.OccupancyChangedEvent{Occupancy: bitmap})
+	_ = o.srv.Emit(endpoint, occdef.EventOccupancyChanged, occdef.OccupancyChangedEvent{Occupancy: bitmap}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 }
 
 // occSource answers the deprecated delay attributes with HoldTime

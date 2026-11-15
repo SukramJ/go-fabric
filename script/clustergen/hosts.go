@@ -66,6 +66,19 @@ var hosts = map[string]hostDecl{
 			"SetSensorFault(fault SensorFaultBitmap)",
 		},
 	},
+	"Thermostat": {
+		server: "cluster/thermo ThermostatServer",
+		methods: []string{
+			"// SetMeasuredTemperature records the temperature the host measured,",
+			"// in 0.01 °C, nil for none: LocalTemperatureCalibration applies to a",
+			"// non-null value before it is served as LocalTemperature, which stays",
+			"// null with LocalTemperatureNotExposed.",
+			"SetMeasuredTemperature(t *int16)",
+			"// SetOccupied records the occupancy the host measured (OCC): the",
+			"// Occupancy attribute follows, and so do the setpoints in effect.",
+			"SetOccupied(occupied bool)",
+		},
+	},
 	"CameraAvSettingsUserLevelManagement": {
 		server: "cluster/camera AvSettings",
 		methods: []string{

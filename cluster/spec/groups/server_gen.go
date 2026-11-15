@@ -130,42 +130,54 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleAddGroup registers fn for the AddGroup command; nil removes the handler;
+// HandleAddGroup registers fn for the AddGroup command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddGroup is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddGroup(fn func(ctx context.Context, req AddGroupRequest) (AddGroupResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddGroup, fn)
 }
 
-// HandleViewGroup registers fn for the ViewGroup command; nil removes the handler;
+// HandleViewGroup registers fn for the ViewGroup command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleViewGroup is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleViewGroup(fn func(ctx context.Context, req ViewGroupRequest) (ViewGroupResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdViewGroup, fn)
 }
 
-// HandleGetGroupMembership registers fn for the GetGroupMembership command; nil removes the handler;
+// HandleGetGroupMembership registers fn for the GetGroupMembership command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetGroupMembership is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetGroupMembership(fn func(ctx context.Context, req GetGroupMembershipRequest) (GetGroupMembershipResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetGroupMembership, fn)
 }
 
-// HandleRemoveGroup registers fn for the RemoveGroup command; nil removes the handler;
+// HandleRemoveGroup registers fn for the RemoveGroup command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveGroup is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveGroup(fn func(ctx context.Context, req RemoveGroupRequest) (RemoveGroupResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveGroup, fn)
 }
 
-// HandleRemoveAllGroups registers fn for the RemoveAllGroups command; nil removes the handler;
+// HandleRemoveAllGroups registers fn for the RemoveAllGroups command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveAllGroups is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveAllGroups(fn func(ctx context.Context, req RemoveAllGroupsRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRemoveAllGroups, fn)
 }
 
-// HandleAddGroupIfIdentifying registers fn for the AddGroupIfIdentifying command; nil removes the handler;
+// HandleAddGroupIfIdentifying registers fn for the AddGroupIfIdentifying command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddGroupIfIdentifying is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddGroupIfIdentifying(fn func(ctx context.Context, req AddGroupIfIdentifyingRequest) (struct{}, error)) error {
@@ -183,6 +195,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -225,7 +241,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleAddGroup != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddGroup)
@@ -250,6 +266,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleAddGroupIfIdentifying != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdAddGroupIfIdentifying)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

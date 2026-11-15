@@ -12,7 +12,8 @@ import (
 // The typed server ("the hull", concept v6 A.3 step 1): server_gen.go
 // beside each definition declares State, Patch and Server, a typed view of
 // any contract.ClusterServer of the cluster (brief BT and its addendum) that
-// adds no behavior, with Emit<Event> per event. The runtime half is
+// adds no behavior, with Record<Event> per event (and the deprecated
+// Emit<Event>, which takes the endpoint from its caller). The runtime half is
 // cluster/spec/typed.go and cluster/spec/wrapper.go.
 //
 // Server.Set takes a Patch: the fields set, the others left. Mirrors
@@ -250,7 +251,9 @@ func (g *generator) server() ([]byte, error) {
 	w.p("}")
 	for _, hc := range cmds {
 		w.p("")
-		w.p("// %s registers fn for the %s command; nil removes the handler;", hc.method, strings.TrimPrefix(hc.cmdID, "Cmd"))
+		w.p("// %s registers fn for the %s command (spec.CommandRegistrar); nil", hc.method, strings.TrimPrefix(hc.cmdID, "Cmd"))
+		w.p("// hands the command back to the server — the generated server restores")
+		w.p("// the handler it was built with, a self-held one its own logic;")
 		w.p("// spec.ErrNoHandlers for a server that takes none. Declare.%s is", hc.method)
 		w.p("// the handler at construction; this setter changes it at run time.")
 		w.p("func (s *Server) %s(fn func(ctx context.Context, req %s) (%s, error)) error {", hc.method, hc.request, hc.response)
@@ -258,11 +261,30 @@ func (g *generator) server() ([]byte, error) {
 		w.p("}")
 	}
 	for _, he := range events {
+		name := strings.TrimPrefix(he.eventID, "Event")
 		w.p("")
-		w.p("// %s emits the %s event on endpoint through the server's Emit;", he.method, strings.TrimPrefix(he.eventID, "Event"))
+		w.p("// %s records the %s event on the endpoint the server is mounted", he.record, name)
+		w.p("// on, through its EmitEvent (spec.Server.EmitEvent):")
+		w.p("// spec.ErrNotMounted before the server knows its endpoint,")
+		w.p("// spec.ErrNoEvents for a server without EmitEvent.")
+		w.p("func (s *Server) %s(data %s) error {", he.record, he.payload)
+		w.p("\tem, ok := s.Underlying().(interface {")
+		w.p("\t\tEmitEvent(eventID uint32, data any) error")
+		w.p("\t})")
+		w.p("\tif !ok {")
+		w.p("\t\treturn spec.ErrNoEvents")
+		w.p("\t}")
+		w.p("\treturn em.EmitEvent(%s, data)", he.eventID)
+		w.p("}")
+		w.p("")
+		w.p("// %s emits the %s event on endpoint through the server's Emit;", he.method, name)
 		w.p("// spec.ErrNoEvents for a server without one.")
+		w.p("//")
+		w.p("// Deprecated: use %s, which emits on the endpoint the server is", he.record)
+		w.p("// mounted on instead of one its caller names. Removable in the next")
+		w.p("// minor release.")
 		w.p("func (s *Server) %s(endpoint uint16, data %s) error {", he.method, he.payload)
-		w.p("\treturn spec.EmitOn(s.Underlying(), endpoint, %s, data)", he.eventID)
+		w.p("\treturn spec.EmitOn(s.Underlying(), endpoint, %s, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour", he.eventID)
 		w.p("}")
 	}
 	g.hostInterface(w)
@@ -448,9 +470,10 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 	w.p("}")
 }
 
-// hullEvent is one event's typed emitter.
+// hullEvent is one event's typed emitter: method the deprecated
+// Emit<Event>, record its replacement Record<Event>.
 type hullEvent struct {
-	method, eventID, payload string
+	method, record, eventID, payload string
 }
 
 // hullEvents are the definition's events with their payload types (the
@@ -459,7 +482,8 @@ func (g *generator) hullEvents() []hullEvent {
 	var out []hullEvent
 	for _, p := range g.payloads {
 		if p.event != nil {
-			out = append(out, hullEvent{method: "Emit" + exportName(p.event.Name), eventID: "Event" + exportName(p.event.Name), payload: p.goName})
+			n := exportName(p.event.Name)
+			out = append(out, hullEvent{method: "Emit" + n, record: "Record" + n, eventID: "Event" + n, payload: p.goName})
 		}
 	}
 	return out

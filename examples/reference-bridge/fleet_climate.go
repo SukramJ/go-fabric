@@ -476,9 +476,9 @@ func (p *demoPump) reportEvent(event uint32) error {
 	srv := dev.PumpConfigurationAndControl()
 	switch event {
 	case pumpdef.EventDryRunning:
-		return srv.EmitDryRunning(endpoint, pumpdef.DryRunningEvent{})
+		return srv.EmitDryRunning(endpoint, pumpdef.DryRunningEvent{}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
 	case pumpdef.EventPumpBlocked:
-		return srv.EmitPumpBlocked(endpoint, pumpdef.PumpBlockedEvent{})
+		return srv.EmitPumpBlocked(endpoint, pumpdef.PumpBlockedEvent{}) //nolint:staticcheck // R2-P5-apispec-07 follow-up: the reference host moves to Record<Event>
 	default:
 		return errors.New("the pump declares no such event")
 	}

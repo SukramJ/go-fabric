@@ -543,133 +543,171 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleMoveToHue registers fn for the MoveToHue command; nil removes the handler;
+// HandleMoveToHue registers fn for the MoveToHue command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToHue is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToHue(fn func(ctx context.Context, req MoveToHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToHue, fn)
 }
 
-// HandleMoveHue registers fn for the MoveHue command; nil removes the handler;
+// HandleMoveHue registers fn for the MoveHue command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveHue is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveHue(fn func(ctx context.Context, req MoveHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveHue, fn)
 }
 
-// HandleStepHue registers fn for the StepHue command; nil removes the handler;
+// HandleStepHue registers fn for the StepHue command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStepHue is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepHue(fn func(ctx context.Context, req StepHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepHue, fn)
 }
 
-// HandleMoveToSaturation registers fn for the MoveToSaturation command; nil removes the handler;
+// HandleMoveToSaturation registers fn for the MoveToSaturation command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToSaturation is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToSaturation(fn func(ctx context.Context, req MoveToSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToSaturation, fn)
 }
 
-// HandleMoveSaturation registers fn for the MoveSaturation command; nil removes the handler;
+// HandleMoveSaturation registers fn for the MoveSaturation command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveSaturation is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveSaturation(fn func(ctx context.Context, req MoveSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveSaturation, fn)
 }
 
-// HandleStepSaturation registers fn for the StepSaturation command; nil removes the handler;
+// HandleStepSaturation registers fn for the StepSaturation command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStepSaturation is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepSaturation(fn func(ctx context.Context, req StepSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepSaturation, fn)
 }
 
-// HandleMoveToHueAndSaturation registers fn for the MoveToHueAndSaturation command; nil removes the handler;
+// HandleMoveToHueAndSaturation registers fn for the MoveToHueAndSaturation command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToHueAndSaturation is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToHueAndSaturation(fn func(ctx context.Context, req MoveToHueAndSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToHueAndSaturation, fn)
 }
 
-// HandleMoveToColor registers fn for the MoveToColor command; nil removes the handler;
+// HandleMoveToColor registers fn for the MoveToColor command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToColor is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToColor(fn func(ctx context.Context, req MoveToColorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToColor, fn)
 }
 
-// HandleMoveColor registers fn for the MoveColor command; nil removes the handler;
+// HandleMoveColor registers fn for the MoveColor command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveColor is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveColor(fn func(ctx context.Context, req MoveColorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveColor, fn)
 }
 
-// HandleStepColor registers fn for the StepColor command; nil removes the handler;
+// HandleStepColor registers fn for the StepColor command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStepColor is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepColor(fn func(ctx context.Context, req StepColorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStepColor, fn)
 }
 
-// HandleMoveToColorTemperature registers fn for the MoveToColorTemperature command; nil removes the handler;
+// HandleMoveToColorTemperature registers fn for the MoveToColorTemperature command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveToColorTemperature is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveToColorTemperature(fn func(ctx context.Context, req MoveToColorTemperatureRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveToColorTemperature, fn)
 }
 
-// HandleEnhancedMoveToHue registers fn for the EnhancedMoveToHue command; nil removes the handler;
+// HandleEnhancedMoveToHue registers fn for the EnhancedMoveToHue command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedMoveToHue is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedMoveToHue(fn func(ctx context.Context, req EnhancedMoveToHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveToHue, fn)
 }
 
-// HandleEnhancedMoveHue registers fn for the EnhancedMoveHue command; nil removes the handler;
+// HandleEnhancedMoveHue registers fn for the EnhancedMoveHue command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedMoveHue is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedMoveHue(fn func(ctx context.Context, req EnhancedMoveHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveHue, fn)
 }
 
-// HandleEnhancedStepHue registers fn for the EnhancedStepHue command; nil removes the handler;
+// HandleEnhancedStepHue registers fn for the EnhancedStepHue command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedStepHue is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedStepHue(fn func(ctx context.Context, req EnhancedStepHueRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedStepHue, fn)
 }
 
-// HandleEnhancedMoveToHueAndSaturation registers fn for the EnhancedMoveToHueAndSaturation command; nil removes the handler;
+// HandleEnhancedMoveToHueAndSaturation registers fn for the EnhancedMoveToHueAndSaturation command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnhancedMoveToHueAndSaturation is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnhancedMoveToHueAndSaturation(fn func(ctx context.Context, req EnhancedMoveToHueAndSaturationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnhancedMoveToHueAndSaturation, fn)
 }
 
-// HandleColorLoopSet registers fn for the ColorLoopSet command; nil removes the handler;
+// HandleColorLoopSet registers fn for the ColorLoopSet command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleColorLoopSet is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleColorLoopSet(fn func(ctx context.Context, req ColorLoopSetRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdColorLoopSet, fn)
 }
 
-// HandleStopMoveStep registers fn for the StopMoveStep command; nil removes the handler;
+// HandleStopMoveStep registers fn for the StopMoveStep command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStopMoveStep is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopMoveStep(fn func(ctx context.Context, req StopMoveStepRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopMoveStep, fn)
 }
 
-// HandleMoveColorTemperature registers fn for the MoveColorTemperature command; nil removes the handler;
+// HandleMoveColorTemperature registers fn for the MoveColorTemperature command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleMoveColorTemperature is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleMoveColorTemperature(fn func(ctx context.Context, req MoveColorTemperatureRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdMoveColorTemperature, fn)
 }
 
-// HandleStepColorTemperature registers fn for the StepColorTemperature command; nil removes the handler;
+// HandleStepColorTemperature registers fn for the StepColorTemperature command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStepColorTemperature is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStepColorTemperature(fn func(ctx context.Context, req StepColorTemperatureRequest) (struct{}, error)) error {
@@ -714,6 +752,10 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
@@ -802,7 +844,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Transitions = d.Transitions
 	if d.HandleMoveToHue != nil {
@@ -880,6 +922,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleStepColorTemperature != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdStepColorTemperature)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

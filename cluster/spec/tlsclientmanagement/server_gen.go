@@ -138,21 +138,27 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleProvisionEndpoint registers fn for the ProvisionEndpoint command; nil removes the handler;
+// HandleProvisionEndpoint registers fn for the ProvisionEndpoint command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleProvisionEndpoint is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleProvisionEndpoint(fn func(ctx context.Context, req ProvisionEndpointRequest) (ProvisionEndpointResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdProvisionEndpoint, fn)
 }
 
-// HandleFindEndpoint registers fn for the FindEndpoint command; nil removes the handler;
+// HandleFindEndpoint registers fn for the FindEndpoint command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleFindEndpoint is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleFindEndpoint(fn func(ctx context.Context, req FindEndpointRequest) (FindEndpointResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdFindEndpoint, fn)
 }
 
-// HandleRemoveEndpoint registers fn for the RemoveEndpoint command; nil removes the handler;
+// HandleRemoveEndpoint registers fn for the RemoveEndpoint command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRemoveEndpoint is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRemoveEndpoint(fn func(ctx context.Context, req RemoveEndpointRequest) (struct{}, error)) error {

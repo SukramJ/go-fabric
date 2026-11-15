@@ -950,7 +950,7 @@ func (p *PushTransport) TransportStarted(connectionID uint16, triggerType padef.
 	p.mu.Lock()
 	endpoint := p.endpoint
 	p.mu.Unlock()
-	return p.srv.Emit(endpoint, padef.EventPushTransportBegin, padef.PushTransportBeginEvent{
+	return p.srv.Emit(endpoint, padef.EventPushTransportBegin, padef.PushTransportBeginEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		ConnectionId: connectionID, TriggerType: triggerType, ActivationReason: activationReason,
 		ContainerType: &container, CmafSessionNumber: number,
 	})
@@ -967,7 +967,7 @@ func (p *PushTransport) TransportStopped(connectionID uint16) error {
 	p.mu.Lock()
 	endpoint := p.endpoint
 	p.mu.Unlock()
-	return p.srv.Emit(endpoint, padef.EventPushTransportEnd, padef.PushTransportEndEvent{
+	return p.srv.Emit(endpoint, padef.EventPushTransportEnd, padef.PushTransportEndEvent{ //nolint:staticcheck // R2-P5-apispec-07 follow-up: moves to EmitEvent once the server hands its endpoint to its store
 		ConnectionId: connectionID, ContainerType: &container, CmafSessionNumber: number,
 	})
 }

@@ -138,17 +138,37 @@ func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32)
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleNavigateTarget registers fn for the NavigateTarget command; nil removes the handler;
+// HandleNavigateTarget registers fn for the NavigateTarget command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleNavigateTarget is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleNavigateTarget(fn func(ctx context.Context, req NavigateTargetRequest) (NavigateTargetResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdNavigateTarget, fn)
 }
 
+// RecordTargetUpdated records the TargetUpdated event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordTargetUpdated(data TargetUpdatedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventTargetUpdated, data)
+}
+
 // EmitTargetUpdated emits the TargetUpdated event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordTargetUpdated, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitTargetUpdated(endpoint uint16, data TargetUpdatedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventTargetUpdated, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventTargetUpdated, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Targets carries out NavigateTarget, answered by
@@ -172,7 +192,7 @@ type Declare struct {
 	// (through its port), a Handle field below handles one in its place.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
