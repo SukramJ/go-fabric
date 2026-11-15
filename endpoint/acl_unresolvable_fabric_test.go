@@ -37,7 +37,10 @@ func (emptyACLLister) ListACL(context.Context, uint8) ([]store.ACLEntry, error) 
 func TestUnresolvableFabricIsDenied(t *testing.T) {
 	t.Parallel()
 
-	d := endpoint.NewTopologyDispatcher(nil)
+	// A dispatcher over a real topology: NewTopologyDispatcher(nil) is nil,
+	// SetACLLister on it does nothing, and CheckACL then denies every
+	// non-PASE call whatever the fabric (R2-P5-tmut-06).
+	d := endpoint.NewTopologyDispatcher(&endpoint.Topology{})
 	d.SetACLLister(emptyACLLister{})
 
 	got := d.CheckACL(context.Background(), endpoint.FabricIndexUnresolvable, 1, nil, 1, 0x0006, 1)
@@ -79,7 +82,11 @@ func TestPASEStillPassesTheAccessCheck(t *testing.T) {
 func TestFabricZeroWithoutPASEIsDenied(t *testing.T) {
 	t.Parallel()
 
-	d := endpoint.NewTopologyDispatcher(nil)
+	// A dispatcher over a real topology, so the ACL source below is the
+	// one CheckACL consults: on NewTopologyDispatcher(nil) every non-PASE
+	// call is denied for want of a dispatcher, and the fabric-0 guard this
+	// test is named for held nothing (R2-P5-tmut-06).
+	d := endpoint.NewTopologyDispatcher(&endpoint.Topology{})
 	d.SetACLLister(emptyACLLister{})
 	if got := d.CheckACL(context.Background(), 0, 1, nil, 1, 0x0006, 1); got != im.StatusUnsupportedAccess {
 		t.Fatalf("CheckACL(fabric 0, not PASE) = %v, want UnsupportedAccess", got)
@@ -87,6 +94,11 @@ func TestFabricZeroWithoutPASEIsDenied(t *testing.T) {
 	// An all-granting ACL grants on a fabric, never on a missing or an
 	// unnamed one.
 	d.SetACLLister(endpoint.UnenforcedACL{})
+	// Positive control on the same dispatcher: a real fabric is granted,
+	// so the denials below come from the fabric guard and nothing else.
+	if got := d.CheckACL(context.Background(), 1, 1, nil, 1, 0x0006, 1); got != im.StatusSuccess {
+		t.Fatalf("UnenforcedACL CheckACL(fabric 1) = %v, want Success — the control does not reach the ACL", got)
+	}
 	for _, fabric := range []uint8{0, endpoint.FabricIndexUnresolvable} {
 		if got := d.CheckACL(context.Background(), fabric, 1, nil, 1, 0x0006, 1); got != im.StatusUnsupportedAccess {
 			t.Errorf("UnenforcedACL CheckACL(fabric %d, not PASE) = %v, want UnsupportedAccess", fabric, got)

@@ -21,7 +21,10 @@ const privAdminister5 uint8 = 5
 // node-id 0. matter.js grants Administer off the session's auth mode
 // instead: packages/protocol/src/interaction/FabricAccessControl.ts:189-191.
 func TestCheckACL_AdoptedPASESessionKeepsAdminister(t *testing.T) {
-	d := NewTopologyDispatcher(nil)
+	// Over a real topology: NewTopologyDispatcher(nil) is nil, ignores the
+	// lister, and denies every CASE call — the negative control below then
+	// held nothing (R2-P5-tmut-06).
+	d := NewTopologyDispatcher(&Topology{})
 	// The post-AddNOC ACL table: one CASE ACE for a real admin subject.
 	d.SetACLLister(fakeACLLister{entries: []store.ACLEntry{
 		caseEntryWithSubjects(2, store.PrivilegeAdminister, []uint64{0x1122334455667788}, nil),
@@ -30,6 +33,12 @@ func TestCheckACL_AdoptedPASESessionKeepsAdminister(t *testing.T) {
 	paseCtx := im.WithAuthModePASE(context.Background())
 	if got := d.CheckACL(paseCtx, 2, 0, nil, 0, 0x001F, privAdminister5); !got.IsSuccess() {
 		t.Fatalf("CheckACL(adopted PASE, fabric 2) = %v, want Success", got)
+	}
+
+	// Positive control: the admin subject itself over CASE is granted, so
+	// the table is the one CheckACL evaluates.
+	if got := d.CheckACL(context.Background(), 2, 0x1122334455667788, nil, 0, 0x001F, privAdminister5); !got.IsSuccess() {
+		t.Fatalf("CheckACL(CASE, admin subject, fabric 2) = %v, want Success", got)
 	}
 
 	// Negative control: the same fabric and the same node-id 0, but a CASE
