@@ -197,3 +197,73 @@ func TestWorkflowGateVerdict(t *testing.T) {
 		})
 	}
 }
+
+// TestWorkflowFilterVerdict runs the `changes` job's filter step against a
+// scratch repository. git diff reports a rename by its new path alone, so
+// a Go file moved to a Markdown name counted as documentation only and
+// the suites stayed off (DR5a-ci-10).
+func TestWorkflowFilterVerdict(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not found")
+	}
+	script := runBlockAfter(t, chiptoolWorkflow(t), "- id: filter")
+	dir := t.TempDir()
+	git := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	commit := func(msg string) string {
+		t.Helper()
+		git("add", "-A")
+		git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", msg)
+		return git("rev-parse", "HEAD")
+	}
+	write := func(name, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(name)), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("init", "-q")
+	write("bridge/x.go", "package bridge\n\n// A file long enough for git to see its move as a rename.\nconst x = 1\n")
+	write("docs/index.md", "# docs\n")
+	base := commit("base")
+	write("docs/index.md", "# docs, edited\n")
+	docsOnly := commit("docs only")
+	git("mv", "bridge/x.go", "docs/x.md")
+	renamed := commit("a Go file renamed into docs/")
+
+	for _, tc := range []struct {
+		name       string
+		base, head string
+		want       string
+	}{
+		{"documentation only", base, docsOnly, "code=false"},
+		{"a Go file renamed to a Markdown name", docsOnly, renamed, "code=true"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "output")
+			s := "cd \"" + dir + "\"\n" + script
+			if got := runStepScript(t, s, []string{"EVENT=pull_request", "BASE=" + tc.base, "HEAD=" + tc.head, "GITHUB_OUTPUT=" + out}); got != 0 {
+				t.Fatalf("the filter step exited %d", got)
+			}
+			raw, err := os.ReadFile(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.TrimSpace(string(raw)); got != tc.want {
+				t.Errorf("GITHUB_OUTPUT %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

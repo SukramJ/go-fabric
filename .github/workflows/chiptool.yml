@@ -179,7 +179,10 @@ jobs:
             echo "not a pull request -- the event's own condition decides"
             exit 0
           fi
-          changed=$(git diff --name-only "$BASE" "$HEAD")
+          # --no-renames: a rename is its old path and its new one, so a
+          # Go file moved to a Markdown name is not documentation only
+          # (TestWorkflowFilterVerdict).
+          changed=$(git diff --no-renames --name-only "$BASE" "$HEAD")
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
           # Documentation only: the documentation trees, Markdown anywhere,
           # the site's configuration, the .github files that are not
