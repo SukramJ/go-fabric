@@ -13,6 +13,7 @@ import (
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
+	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
@@ -40,6 +41,7 @@ func init() {
 		caseAPPLAUNCHER371, caseAPPLAUNCHER381, caseAPPLAUNCHER391,
 		caseAUDIOOUTPUT73, caseAUDIOOUTPUT74,
 		caseCHANNEL54, caseCHANNEL55, caseCHANNEL56,
+		caseCONTENTLAUNCHER104, caseCONTENTLAUNCHER106,
 	} {
 		registerGoCert(c)
 	}
@@ -295,6 +297,41 @@ func caseCHANNEL56() goCertCase {
 				return err
 			}
 			return th.mediaACurrentChannel(n, ep, last.MajorNumber, last.MinorNumber, "SkipChannel -1")
+		}},
+	)
+}
+
+// --- ContentLauncher -------------------------------------------------------
+
+// caseCONTENTLAUNCHER104 mirrors TC-CONTENTLAUNCHER-10.4: LaunchContent
+// searching ParameterEnum Channel "PBS" with AutoPlay TRUE (:15-20, :31),
+// which needs the ContentSearch feature.
+func caseCONTENTLAUNCHER104() goCertCase {
+	return mediaACase("TC-CONTENTLAUNCHER-10.4", 24, "CONTENTLAUNCHER.C", "CONTENTLAUNCHER.S", dtCastingVideoPlayer,
+		mediaAStep{n: "1", line: 28, title: "DUT sends LaunchContent command to TH", pics: "CONTENTLAUNCHER.C.C00.Tx", need: "CONTENTLAUNCHER.S.F00", send: func(th *goTH, n *client.Node, ep uint16) error {
+			req := launchdef.LaunchContentRequest{
+				Search:   launchdef.ContentSearchStruct{ParameterList: []launchdef.ParameterStruct{{Type: launchdef.ParameterChannel, Value: "PBS"}}},
+				AutoPlay: true,
+			}
+			_, err := th.mediaAInvoke(n, ep, launchdef.ClusterID, launchdef.CmdLaunchContent, "LaunchContent", req, true, client.InvokeOptions{})
+			return err
+		}},
+	)
+}
+
+// caseCONTENTLAUNCHER106 mirrors TC-CONTENTLAUNCHER-10.6: LaunchURL with
+// an https URL, a DisplayString and a BrandingInformation (:15-23), which
+// needs the URLPlayback feature.
+func caseCONTENTLAUNCHER106() goCertCase {
+	return mediaACase("TC-CONTENTLAUNCHER-10.6", 27, "CONTENTLAUNCHER.C", "CONTENTLAUNCHER.S", dtCastingVideoPlayer,
+		mediaAStep{n: "1", line: 31, title: "DUT sends LaunchURL command to TH", pics: "CONTENTLAUNCHER.C.C01.Tx", need: "CONTENTLAUNCHER.S.F01", send: func(th *goTH, n *client.Node, ep uint16) error {
+			req := launchdef.LaunchUrlRequest{
+				ContentUrl:          "https://csa-iot.org/content",
+				DisplayString:       ptr("Example content"),
+				BrandingInformation: &launchdef.BrandingInformationStruct{ProviderName: "provider"},
+			}
+			_, err := th.mediaAInvoke(n, ep, launchdef.ClusterID, launchdef.CmdLaunchUrl, "LaunchURL", req, true, client.InvokeOptions{})
+			return err
 		}},
 	)
 }
