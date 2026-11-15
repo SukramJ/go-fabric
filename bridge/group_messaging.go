@@ -353,7 +353,20 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 		// the group's fabric, as the unicast write stamps it (review II,
 		// R2-P4-imwrite-02).
 		gctx = im.WithLocalNodeID(gctx, msg.LocalNodeID)
-		status = im.HandleGroupWriteRequest(gctx, dispatcher, req)
+		// A group write is a write: a host's notifications of the
+		// endpoints it reaches are held with it, and the attributes its
+		// commits name are reported to subscribers as a unicast write's
+		// are — matter.js writes a group path through the same commit
+		// (AttributeWriteResponse.ts:278-296, :326-361 → :433-435 at
+		// db021da0; Datasource.ts:1456-1457, :1319 →
+		// BehaviorBacking.ts:434-437 → ProtocolService.ts:120-130).
+		var outcome im.GroupWriteOutcome
+		b.holdWrite(writeScopeOf(req), func() []im.WriteResult {
+			outcome = im.HandleGroupWrite(gctx, dispatcher, req)
+			return outcome.Results
+		})
+		b.reportWrittenAttributes(outcome.Results)
+		status = outcome.Status
 	default:
 		return nil
 	}

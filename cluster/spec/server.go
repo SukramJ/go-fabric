@@ -192,6 +192,23 @@ type Server struct {
 	// quiet holds the report throttle of every served quieter attribute,
 	// by id; set at construction, read-only after.
 	quiet map[uint32]*quietAttr
+
+	// commit, guarded by mu, collects while a controller's write runs its
+	// host veto and Sink the attributes a Set made meanwhile changed: they
+	// are the write's commit ([writeCommit]).
+	commit *writeCommit
+}
+
+// writeCommit is the change list of one controller write: the attributes
+// a Set changed while the write's veto and Sink ran. Its store advances
+// no version on its own; the write's commit advances it once, as
+// matter.js advances a datasource's version once per transaction for
+// every field it noted (Datasource.ts:1456-1457, :1476-1484 at db021da0)
+// and hands the whole list on (:1319). A Set another goroutine makes
+// while the write runs is folded into the commit too: the server cannot
+// tell it from one its Sink makes.
+type writeCommit struct {
+	changed []uint32
 }
 
 // Compile-time assertions.
@@ -391,12 +408,12 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 }
 
 // MatterWriteCommit implements [contract.ChangeNamingWriter]: the write of
-// [Server.MatterWrite], and the attributes its store changed — attrID when
-// the stored value moved, none for a write of the value the server holds
-// (matter.js Datasource.ts:1476-1484 at db021da0: a name is noted only
-// when its value differs). The server's write stores only the written
-// attribute; one that moves another reports that change itself
-// ([Server.Set]).
+// [Server.MatterWrite], and the attributes it changed — attrID when the
+// stored value moved, and every attribute a [Server.Set] changed while the
+// write's veto and Sink ran (a sibling the Sink moves); none for a write
+// of the value the server holds (matter.js Datasource.ts:1476-1484 at
+// db021da0: a name is noted only when its value differs). The version
+// advances once for the whole list ([writeCommit]).
 func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any) ([]uint32, error) {
 	v, err := s.ValidateWrite(attrID, value, s.peers)
 	if err != nil {
@@ -432,20 +449,52 @@ func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any
 	if s.holds(attrID, v) {
 		return []uint32{}, nil
 	}
+	// The veto and the Sink run inside the write's commit: an attribute
+	// a Set changes meanwhile — a sibling the Sink moves — is named by
+	// the write and advances the version with it, once.
+	c := &writeCommit{}
 	s.mu.Lock()
 	veto := s.beforeWrite
+	outer := s.commit
+	s.commit = c
 	s.mu.Unlock()
-	if veto != nil {
-		if err := veto(ctx, attrID, v); err != nil {
-			return nil, err
+	err = func() error {
+		if veto != nil {
+			if err := veto(ctx, attrID, v); err != nil {
+				return err
+			}
 		}
-	}
-	if s.sink != nil {
-		if err := s.sink.MatterWriteAttribute(ctx, attrID, v); err != nil {
-			return nil, err
+		if s.sink != nil {
+			return s.sink.MatterWriteAttribute(ctx, attrID, v)
 		}
+		return nil
+	}()
+	s.mu.Lock()
+	s.commit = outer
+	s.mu.Unlock()
+	if err != nil {
+		// The write is refused; what a Set changed meanwhile stays
+		// changed and advances the version once.
+		s.settleCommit(c.changed, outer)
+		return nil, err
 	}
-	return s.store(contract.OriginControllerWrite, map[uint32]any{attrID: v}), nil
+	return s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, c.changed), nil
+}
+
+// settleCommit advances the version once for changed — the list of a
+// write that stored nothing of its own — unless an outer write's commit
+// takes it.
+func (s *Server) settleCommit(changed []uint32, outer *writeCommit) {
+	if len(changed) == 0 {
+		return
+	}
+	if outer != nil {
+		s.mu.Lock()
+		outer.changed = append(outer.changed, changed...)
+		s.mu.Unlock()
+		return
+	}
+	s.tracker().Bump()
 }
 
 // holds reports whether the server holds v for attrID: its stored value
@@ -600,13 +649,26 @@ func defaultOf(t Type, d any) (any, bool) {
 }
 
 // store keeps values and reports the ones that changed, from origin; it
-// returns the ids of those that changed, sorted, empty when none did. Any change advances the data version once,
+// returns the ids of those that changed, sorted, empty when none did
+// ([Server.storeWith] without an earlier list).
+func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
+	return s.storeWith(origin, values, nil)
+}
+
+// storeWith is store for a commit whose list already holds earlier, the
+// attributes a Set inside a controller's write changed: the version
+// advances once for the union, and the union is returned, sorted, each
+// once. Inside an open commit ([writeCommit]) it advances nothing and adds
+// its changes to that commit. A changes-omitted attribute ("C") is told to
+// the change listeners and not to the report listeners: matter.js leaves
+// the suppressed names out of the broadcast (ServerBehaviorBacking.ts:163-168
+// at db021da0). Any change advances the data version once,
 // now — a quieter attribute's too, as matter.js advances the version at
 // the commit for every noted property (Datasource.ts:1446-1457 at
 // db021da0). A change of a quieter attribute goes to the change listeners
 // at once and to the report listeners when its throttle emits
 // ([Server.quietReport]); every other change is reported at once.
-func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
+func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32) []uint32 {
 	type quietChange struct {
 		qa              *quietAttr
 		wasNull, isNull bool
@@ -628,27 +690,42 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
 			qa.null, qa.origin, qa.computed = v == nil, origin, false
 			continue
 		}
+		if a := s.def.Attribute(id); a != nil && a.Quality.ChangesOmitted {
+			continue
+		}
 		plain = append(plain, id)
 	}
+	open := s.commit
+	if open != nil {
+		open.changed = append(append(open.changed, changed...), earlier...)
+	}
 	s.mu.Unlock()
+	all := slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(changed), earlier...))))
+	if all == nil {
+		all = []uint32{}
+	}
+	if len(all) > 0 && open == nil {
+		s.tracker().Bump()
+	}
 	if len(changed) == 0 {
-		return []uint32{}
+		return all
 	}
 	slices.Sort(changed)
 	slices.Sort(plain)
-	s.tracker().Bump()
-	if len(quiets) == 0 {
+	if len(plain) == len(changed) {
 		s.AttributeChanges.NotifyFrom(origin, changed...)
-		return changed
+		return all
 	}
 	s.AttributeChanges.ChangedFrom(origin, changed...)
-	s.AttributeChanges.ReportFrom(origin, plain...)
+	if len(plain) > 0 {
+		s.AttributeChanges.ReportFrom(origin, plain...)
+	}
 	for _, id := range changed {
 		if c, ok := quiets[id]; ok {
 			c.qa.q.Changed(c.wasNull, c.isNull)
 		}
 	}
-	return changed
+	return all
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command

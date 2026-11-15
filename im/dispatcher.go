@@ -271,7 +271,8 @@ type WriteResult struct {
 // written cluster's attributes the write changed, on the endpoint and
 // cluster of [WriteResult.Path]. The written attribute is among them only
 // when its value moved; another attribute the write moved with it is
-// named too. An empty Changed is a write that changed nothing: no
+// named when the server names it (contract.ChangeNamingWriter) —
+// spec.Server names a sibling its Sink set inside the write. An empty Changed is a write that changed nothing: no
 // DataVersion advance and no report. It is matter.js's per-commit change
 // list (packages/node/src/behavior/state/managed/Datasource.ts:1476-1484
 // at db021da0, a name noted only when its value differs; :1319, the list

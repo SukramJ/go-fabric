@@ -1520,7 +1520,8 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 				// waiting for an ack") — the same rule a reply's chunks
 				// honour ([Bridge.replyChunkLeg]). matter.js gets it for
 				// free: its MessageExchange piggybacks the pending ack on
-				// the next send (packages/protocol/src/protocol/MessageExchange.ts:679 send).
+				// the next send (packages/protocol/src/protocol/MessageExchange.ts:711-716
+				// at db021da0, where #send takes the pending ack).
 				target = b.piggybackOwedAck(target, ourRole)
 			}
 			return b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
@@ -2486,6 +2487,9 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 		ep.BumpDataVersionOf(clusterID)
 	}
 	for _, attr := range attrIDs {
+		if changesOmittedAttribute(clusterID, attr) {
+			continue
+		}
 		mgr.OnAttributeChanged(im.ConcreteAttributePath{
 			Endpoint: ep.ID, Cluster: clusterID, Attribute: attr,
 			HasEndpoint: true, HasCluster: true, HasAttribute: true,
@@ -2694,6 +2698,20 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 			}
 		}
 	}))
+}
+
+// changesOmittedAttribute reports whether the attribute's definition gives
+// it the changes-omitted quality ("C"): its change advances the version
+// and is reported to no subscriber, as matter.js leaves the suppressed
+// names out of the broadcast (ServerBehaviorBacking.ts:163-168 at
+// db021da0). A cluster no definition is registered for has none.
+func changesOmittedAttribute(clusterID, attrID uint32) bool {
+	def := spec.Lookup(clusterID)
+	if def == nil {
+		return false
+	}
+	a := def.Attribute(attrID)
+	return a != nil && a.Quality.ChangesOmitted
 }
 
 // quieterAttribute reports whether the attribute's definition gives it the

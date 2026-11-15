@@ -94,3 +94,40 @@ func TestWriteCommitNamesTheChangedAttribute(t *testing.T) {
 		t.Errorf("a refused write: %v, %v; want an error and no names", got, err)
 	}
 }
+
+// siblingSink moves Condition when LastChangedTime is written, through
+// the server's Set, from inside the write.
+type siblingSink struct{ srv *spec.Server }
+
+func (k *siblingSink) MatterWriteAttribute(_ context.Context, attrID uint32, _ any) error {
+	if attrID != hepa.AttrLastChangedTime {
+		return nil
+	}
+	v, _ := k.srv.MatterRead(hepa.AttrCondition)
+	c, _ := v.(uint8)
+	return k.srv.Set(hepa.AttrCondition, c+1)
+}
+
+// TestWriteCommitNamesTheSiblingItsSinkMoves (review II, Fable read
+// 5b-write F1): a sibling the Sink sets inside a controller's write is
+// part of the write's commit — named beside the written attribute — and
+// the server's version advances once for the write, not once per Set.
+// matter.js advances a datasource's version once per transaction for every
+// field it noted (Datasource.ts:1456-1457, :1476-1484 at db021da0).
+func TestWriteCommitNamesTheSiblingItsSinkMoves(t *testing.T) {
+	t.Parallel()
+	sk := &siblingSink{}
+	srv := hepaServer(t, spec.ServerConfig{Sink: sk})
+	sk.srv = srv
+	v0 := srv.MatterDataVersion()
+	got, err := srv.MatterWriteCommit(context.Background(), hepa.AttrLastChangedTime, uint64(1000))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []uint32{hepa.AttrCondition, hepa.AttrLastChangedTime}; !slices.Equal(got, want) {
+		t.Errorf("the write named %v, want %v", got, want)
+	}
+	if d := srv.MatterDataVersion() - v0; d != 1 {
+		t.Errorf("the version advanced %d times for one write, want once", d)
+	}
+}

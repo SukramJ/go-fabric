@@ -437,3 +437,96 @@ func TestRootNotifierInsideAWriteAdvancesOnce(t *testing.T) {
 		}
 	}
 }
+
+// TestHostChangeInsideARootWriteAdvancesOnce: on the root, where a
+// generated server's own tracker is the DataVersion the wire carries, a
+// Sink that moves a sibling inside a controller's write is part of the
+// write's commit: the server names both attributes in the write's result,
+// its version advances once per write, and each attribute is reported
+// once (review II, Fable read 5b-write F1). matter.js advances a
+// datasource's version once per transaction for every field it noted and
+// hands the list on (Datasource.ts:1456-1457, :1476-1484, :1319 at
+// db021da0).
+func TestHostChangeInsideARootWriteAdvancesOnce(t *testing.T) {
+	t.Parallel()
+	sink := &conditionSink{}
+	srv, err := spec.NewServer(hepadef.Definition, spec.Options{
+		Features:   uint32(hepadef.FeatureCondition),
+		Attributes: []uint32{hepadef.AttrLastChangedTime},
+	}, spec.ServerConfig{Sink: sink, Initial: map[uint32]any{hepadef.AttrCondition: uint8(40)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sink.srv = srv
+	sh := newSecureHarnessWith(t, func(*store.Store, uint8) (Snapshotter, []contract.ClusterServer) {
+		asm, err := endpointpkg.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
+		if err != nil {
+			t.Fatalf("endpoint.New: %v", err)
+		}
+		return func(ctx context.Context) (*endpointpkg.Topology, error) {
+			return asm.Assemble(ctx, []endpointpkg.Snapshot{{Scope: "app"}})
+		}, []contract.ClusterServer{srv}
+	})
+	sh.allowAll()
+	h := &appHarness{secureHarness: sh, endpoints: map[uint16]uint16{}}
+	w := watchCluster(t, h, 0, hepadef.ClusterID)
+	version := srv.MatterDataVersion()
+	for i, v := range []uint64{1000, 2000} {
+		if st := h.writeAttribute(0, hepadef.ClusterID, hepadef.AttrLastChangedTime, uintValue(v)); st != 0 {
+			t.Fatalf("write %d: status 0x%02X", i+1, st)
+		}
+		w.now = w.now.Add(time.Minute)
+		w.mgr.Tick(context.Background(), w.now)
+		now := srv.MatterDataVersion()
+		advanced := now - version
+		version = now
+		reports := map[uint32]int{}
+		w.spy.mu.Lock()
+		for _, call := range w.spy.calls {
+			for _, p := range call {
+				reports[p.Attribute]++
+			}
+		}
+		w.spy.calls = nil
+		w.spy.mu.Unlock()
+		if advanced != 1 || reports[hepadef.AttrLastChangedTime] != 1 || reports[hepadef.AttrCondition] != 1 {
+			t.Errorf("write %d: the server's DataVersion advanced %d, LastChangedTime reported %d times, Condition %d; want 1, 1, 1",
+				i+1, advanced, reports[hepadef.AttrLastChangedTime], reports[hepadef.AttrCondition])
+		}
+	}
+}
+
+// TestWrittenChangesOmittedAttributeIsNotReported (review II, Fable read
+// 5b-write F6): a write whose commit names a changes-omitted attribute
+// ("C", GroupKeyManagement.GroupKeyMap) marks it for no subscriber; a
+// plain attribute in the same results is marked. matter.js filters the
+// suppressed names out before broadcastChanges
+// (ServerBehaviorBacking.ts:163-168 at db021da0).
+func TestWrittenChangesOmittedAttributeIsNotReported(t *testing.T) {
+	t.Parallel()
+	ep := &endpointpkg.Endpoint{ID: 7, DeviceType: 0x010A, SourceKey: endpointpkg.StringKey("c"), Scope: "s", DeviceAddress: "d"}
+	b := newReachabilityBridge(t, ep)
+	spy := &reachAttrReporterSpy{}
+	mgr := subscription.NewManager(subscription.Config{}, spy.report, nil)
+	at := func(cluster, attr uint32) im.ConcreteAttributePath {
+		return im.ConcreteAttributePath{Endpoint: 0, Cluster: cluster, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	}
+	groupKeyMap, nodeLabel := at(0x003F, 0x0000), at(0x0028, 0x0005)
+	if _, err := mgr.Subscribe(subscription.SubscribeArgs{
+		PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
+		AttributePaths: []im.ConcreteAttributePath{groupKeyMap, nodeLabel},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b.AttachSubscriptionManager(mgr)
+	b.reportWrittenAttributes([]im.WriteResult{
+		{Path: groupKeyMap, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{0x0000}}},
+		{Path: nodeLabel, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{0x0005}}},
+	})
+	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
+	spy.mu.Lock()
+	defer spy.mu.Unlock()
+	if len(spy.calls) != 1 || len(spy.calls[0]) != 1 || spy.calls[0][0] != nodeLabel {
+		t.Fatalf("reported %+v, want NodeLabel alone", spy.calls)
+	}
+}

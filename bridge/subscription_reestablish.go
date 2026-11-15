@@ -189,6 +189,12 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 				slog.Int("subscription_id", int(rec.SubscriptionID)))
 			continue
 		}
+		// A stopped bridge sends no first chunk of another record: the
+		// re-establishment lives as long as the bridge (its handler
+		// context, which Stop cancels), not as long as ctx.
+		if b.handlerContext().Err() != nil {
+			return ok
+		}
 		err := b.establishFormerSubscription(ctx, rec, link)
 		if err == nil {
 			ok = append(ok, rec.SubscriptionID)
@@ -204,6 +210,9 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 			// Report sends do not declare peer loss, so nothing else would
 			// stop this loop from spending a full MRP window on each of the
 			// peer's remaining subscriptions.
+			return ok
+		case errors.Is(err, errChunkWaitAborted):
+			// The bridge stopped while a chunk's answer was awaited.
 			return ok
 		case errors.As(err, &rejected) && rejected.status == im.StatusInvalidSubscription:
 			// The peer dropped its state for us; another of its

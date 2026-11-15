@@ -304,16 +304,25 @@ func (t *writeHoldTable) end(s writeScope, rec writeRecord) map[uint16]*heldWrit
 }
 
 // applyWriteHeld applies req through d with the notifications of the
-// endpoints it names held for its duration ([writeHoldTable]), and settles
-// them when it ends — after a panic too, so no hold outlives its write.
-// The record the hold is settled against is read from the outcome's
-// results ([im.WriteResult.Commit]); a write that panicked settles with
-// an empty one.
+// endpoints it names held for its duration ([Bridge.holdWrite]).
 func (b *Bridge) applyWriteHeld(ctx context.Context, d im.Dispatcher, req im.WriteRequest) (out im.WriteOutcome) {
-	scope := writeScopeOf(req)
+	b.holdWrite(writeScopeOf(req), func() []im.WriteResult {
+		out = im.HandleWrite(ctx, d, req)
+		return out.Results
+	})
+	return out
+}
+
+// holdWrite runs a write with the notifications of the endpoints scope
+// names held for its duration ([writeHoldTable]), and settles them when it
+// ends against the record of the results run returns
+// ([im.WriteResult.Commit]) — after a panic too, with an empty record, so
+// no hold outlives its write.
+func (b *Bridge) holdWrite(scope writeScope, run func() []im.WriteResult) {
 	b.writeHolds.begin(scope)
-	defer func() { b.settleWrite(scope, recordOf(out.Results)) }()
-	return im.HandleWrite(ctx, d, req)
+	var results []im.WriteResult
+	defer func() { b.settleWrite(scope, recordOf(results)) }()
+	results = run()
 }
 
 // settleWrite ends the hold of a write and settles what it held, judged by
@@ -357,7 +366,7 @@ func (b *Bridge) settleWrite(scope writeScope, rec writeRecord) {
 				hp.ep.BumpDataVersionOf(hp.path.Cluster)
 				advanced[hp.path.Cluster] = struct{}{}
 			}
-			if !hp.advanceOnly {
+			if !hp.advanceOnly && !changesOmittedAttribute(hp.path.Cluster, hp.path.Attribute) {
 				marks = append(marks, hp)
 			}
 		}

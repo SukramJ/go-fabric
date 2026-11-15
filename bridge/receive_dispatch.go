@@ -948,10 +948,12 @@ func (b *Bridge) reportWrittenAttributes(results []im.WriteResult) {
 		return
 	}
 	rec := recordOf(results)
-	for _, p := range rec.changed {
-		mgr.OnAttributeChanged(p)
-	}
-	for _, p := range rec.unjudged {
+	for _, p := range slices.Concat(rec.changed, rec.unjudged) {
+		// A changes-omitted attribute ("C") advanced the version and is
+		// reported to no subscriber ([changesOmittedAttribute]).
+		if changesOmittedAttribute(p.Cluster, p.Attribute) {
+			continue
+		}
 		mgr.OnAttributeChanged(p)
 	}
 }
