@@ -657,4 +657,118 @@ func TestGitHubNamedURLsConnectToPublicDestinationsOnly(t *testing.T) {
 	}
 }
 
+// TestGuardJudgesTheHostAsSent: a host is judged in the form it reaches a
+// proxy or a dial. Behind a proxy, a host the transport maps to localhost
+// or to a refused address (fullwidth digits, ideographic full stops,
+// fullwidth letters: net/http maps the host to ASCII before a CONNECT,
+// canonicalAddr, net/http/transport.go:3219-3225 at go1.27.4) and an IPv4
+// address in a legacy spelling a resolver or proxy reads (decimal, hex,
+// octal, short forms, a trailing dot) are refused before the proxy is
+// asked — as the first URL and as a redirect hop; a URL whose host stays a
+// name reaches the proxy as one. A SOCKS proxy is not handed a host
+// outside ASCII.
+func TestGuardJudgesTheHostAsSent(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var asked []string
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		asked = append(asked, r.Method+" "+r.RequestURI)
+		mu.Unlock()
+		if r.URL.Path == "/hop" {
+			http.Redirect(w, r, r.URL.Query().Get("to"), http.StatusFound)
+			return
+		}
+		if r.Method == http.MethodConnect {
+			http.Error(w, "no tunnel in this test", http.StatusBadGateway)
+			return
+		}
+		_, _ = w.Write([]byte("crl"))
+	}))
+	t.Cleanup(proxy.Close)
+	proxyURL, err := url.Parse(proxy.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(asked)
+	}
+	s := &CertificateStore{opts: CertificateOptions{Client: &Client{guard: newGuardedClient(guardConfig{
+		resolver: stubResolver(nil),
+		proxy:    func(*http.Request) (*url.URL, error) { return proxyURL, nil },
+	})}}}
+	refused := []string{
+		"http://2130706433/x", "https://2130706433/x", "http://0x7f000001/x", "http://0x7f.0.0.1/x", "http://0177.0.0.1/x",
+		"http://010.0.0.1/x", "http://127.1/x", "http://10.1/x", "http://127.0.0.1./x", "http://0XA9.0XFE.0.1/x",
+		"https://１２７.０.０.１/x", "https://127。0。0。1/x", "https://１０．０．０．１/x", "https://ｌｏｃａｌｈｏｓｔ/x", "https://ＬＯＣＡＬＨＯＳＴ/x",
+	}
+	for _, u := range refused {
+		before := len(seen())
+		if _, err := s.downloadCRL(t.Context(), u, 0); !errors.Is(err, errDestination) {
+			t.Errorf("%s: err %v; want it refused", u, err)
+		}
+		if got := seen()[before:]; len(got) != 0 {
+			t.Errorf("%s: the proxy was asked %v; want nothing handed over", u, got)
+		}
+	}
+	for _, to := range []string{"https://１０.０.０.１/x", "http://0x0a000001/x", "http://169.254.169.254./x", "https://ｌｏｃａｌｈｏｓｔ/x"} {
+		before := len(seen())
+		if _, err := s.downloadCRL(t.Context(), "http://crl.example/hop?to="+url.QueryEscape(to), 0); !errors.Is(err, errDestination) {
+			t.Errorf("a redirect to %s: err %v; want the hop refused", to, err)
+		}
+		if got := seen()[before:]; len(got) != 1 {
+			t.Errorf("a redirect to %s: the proxy was asked %v; want only the first request", to, got)
+		}
+	}
+	// Names stay names: a public-looking name, an all-numeric label that is
+	// no IPv4 spelling, and a host outside ASCII that the plain-http request
+	// line carries as punycode.
+	for _, u := range []string{"http://crl.example/x", "http://999.0.0.1/x", "http://1.2.3.4.5/x", "http://08.0.0.1/x"} {
+		if _, err := s.downloadCRL(t.Context(), u, 0); err != nil {
+			t.Errorf("%s: err %v; want it handed to the proxy as a name", u, err)
+		}
+	}
+	before := len(seen())
+	_, _ = s.downloadCRL(t.Context(), "http://１２７.０.０.１/x", 0)
+	for _, line := range seen()[before:] {
+		if host := strings.Fields(line)[1]; strings.Contains(host, "127.0.0.1") {
+			t.Errorf("the plain-http request line %q names the mapped address", line)
+		}
+	}
+
+	socks := &CertificateStore{opts: CertificateOptions{Client: &Client{guard: newGuardedClient(guardConfig{
+		resolver: stubResolver(nil),
+		proxy:    func(*http.Request) (*url.URL, error) { return url.Parse("socks5://" + proxyURL.Host) },
+	})}}}
+	if _, err := socks.downloadCRL(t.Context(), "http://ｃｒｌ.example/x", 0); !errors.Is(err, errDestination) {
+		t.Errorf("a host outside ASCII through a SOCKS proxy: err %v; want it refused", err)
+	}
+}
+
+// TestIPv4Legacy: the inet_aton-style spellings and what they are (a
+// leading 0 read as octal; read as decimal where octal is off); names
+// and malformed forms are no address.
+func TestIPv4Legacy(t *testing.T) {
+	t.Parallel()
+	for host, want := range map[string]string{
+		"2130706433": "127.0.0.1", "0x7f000001": "127.0.0.1", "0x7f.0.0.1": "127.0.0.1", "0177.0.0.1": "127.0.0.1",
+		"127.1": "127.0.0.1", "10.1": "10.0.0.1", "010.0.0.1": "8.0.0.1", "192.168.257": "192.168.1.1", "0x": "0.0.0.0",
+		"1.2.3.4": "1.2.3.4", "0": "0.0.0.0",
+	} {
+		if a, ok := ipv4Legacy(host, true); !ok || a.String() != want {
+			t.Errorf("ipv4Legacy(%q) = %v, %v; want %s", host, a, ok, want)
+		}
+	}
+	if a, ok := ipv4Legacy("010.0.0.1", false); !ok || a.String() != "10.0.0.1" {
+		t.Errorf("ipv4Legacy(010.0.0.1) read as decimal = %v, %v; want 10.0.0.1", a, ok)
+	}
+	for _, host := range []string{"crl.example", "999.0.0.1", "1.2.3.4.5", "08.0.0.1", "0x1g", "4294967296", "1.16777216", "", "127..1", "+1", "0x-1", "1_0"} {
+		if a, ok := ipv4Legacy(host, true); ok {
+			t.Errorf("ipv4Legacy(%q) = %v; want no address", host, a)
+		}
+	}
+}
+
 func discardLog() *log.Logger { return log.New(io.Discard, "", 0) }

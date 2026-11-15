@@ -18,7 +18,11 @@ import (
 // GitHubConfig names the development-certificate repository — matter.js
 // DclGithubConfig (DclConfig.ts:34-53).
 type GitHubConfig struct {
-	// APIURL is the GitHub API; empty is https://api.github.com.
+	// APIURL is the GitHub API; empty is https://api.github.com. It is
+	// the host's choice, so its request and the redirects it answers go
+	// through the ledger client's HTTP client ([Client].HTTPClient or
+	// http.DefaultClient), not through the guarded client of the URLs its
+	// answers name.
 	APIURL string
 	// Owner, Repo and Branch name the repository.
 	Owner, Repo, Branch string

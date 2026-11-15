@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -113,8 +114,12 @@ type Client struct {
 	// net/http reads them) stays in use. A URL — the first one or a
 	// redirect hop — whose host is localhost or an IP address of the
 	// refused classes is refused before it is handed to the proxy or
-	// dialled. A host name sent through the proxy is the proxy's to
-	// resolve and connect to; the guard dials only the proxy.
+	// dialled: the host as net/http sends it (mapped to ASCII for a
+	// CONNECT), lower-cased, a trailing dot dropped, an IPv4 address in
+	// any inet_aton-style spelling (decimal, octal, hexadecimal, short
+	// forms) included. A SOCKS proxy is not handed a host outside ASCII.
+	// A host name sent through the proxy is the proxy's to resolve and
+	// connect to; the guard dials only the proxy.
 	AllowPrivateDestinations bool
 	// Timeout bounds each request; 0 is [DefaultTimeout].
 	Timeout time.Duration
@@ -225,28 +230,117 @@ func (g *destinationGuard) control(_, address string, _ syscall.RawConn) error {
 }
 
 // refusedHost reports an error when u's host is localhost or an IP
-// address the guard refuses — the check a URL passes before the
-// transport hands it to a proxy or dials it, and again on each redirect.
+// address the guard refuses (refusedHostPort) — the check a URL passes
+// before the transport hands it to a proxy or dials it, and again on
+// each redirect. A host with characters outside ASCII is judged as the
+// transport sends it, in connectTarget (through a proxy) or control
+// (dialled).
 func (g *destinationGuard) refusedHost(u *url.URL) error {
-	host := u.Hostname()
-	if strings.EqualFold(strings.TrimSuffix(host, "."), "localhost") {
-		return fmt.Errorf("%w: %s names localhost (Client.AllowPrivateDestinations admits it)", errDestination, u.Redacted())
-	}
-	a, perr := netip.ParseAddr(host)
-	if perr != nil {
-		return nil //nolint:nilerr // a host name: the dial checks it, or the proxy resolves it
-	}
 	port := u.Port()
 	if port == "" {
 		port = map[string]string{"http": "80", "https": "443"}[strings.ToLower(u.Scheme)]
 	}
-	if p, perr := strconv.ParseUint(port, 10, 16); perr == nil && g.admit != nil && g.admit(netip.AddrPortFrom(a, uint16(p))) {
-		return nil
+	return g.refusedHostPort(u.Hostname(), port)
+}
+
+// refusedHostPort reports an error when host — lower-cased, a trailing
+// dot dropped — is localhost or an IPv4 or IPv6 address the guard
+// refuses, an IPv4 address in any spelling an inet_aton-style parser
+// accepts included (ipv4Legacy). A part with a leading 0 is read both as
+// octal, as inet_aton reads it, and as decimal, as a parser that knows no
+// octal reads it; either reading in a refused class refuses the host. Any
+// other host is a name: the dial checks the address it resolves to, or
+// the proxy resolves it.
+func (g *destinationGuard) refusedHostPort(host, port string) error {
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if host == "localhost" {
+		return fmt.Errorf("%w: %s names localhost (Client.AllowPrivateDestinations admits it)", errDestination, host)
 	}
-	if !publicDestination(a) {
-		return fmt.Errorf("%w: %s is not a public address (Client.AllowPrivateDestinations admits it)", errDestination, a)
+	var readings []netip.Addr
+	if a, err := netip.ParseAddr(host); err == nil {
+		readings = append(readings, a)
+	} else {
+		if a, ok := ipv4Legacy(host, true); ok {
+			readings = append(readings, a)
+		}
+		if a, ok := ipv4Legacy(host, false); ok {
+			readings = append(readings, a)
+		}
+	}
+	p, perr := strconv.ParseUint(port, 10, 16)
+	for _, a := range readings {
+		if perr == nil && g.admit != nil && g.admit(netip.AddrPortFrom(a, uint16(p))) {
+			continue
+		}
+		if !publicDestination(a) {
+			return fmt.Errorf("%w: %s (%s) is not a public address (Client.AllowPrivateDestinations admits it)", errDestination, host, a)
+		}
 	}
 	return nil
+}
+
+// ipv4Legacy parses host as an IPv4 address in the spellings an
+// inet_aton-style parser (a resolver, a proxy) accepts: one to four
+// dot-separated parts, each decimal, octal with a leading 0 (decimal
+// instead when octal is false) or hexadecimal with a leading 0x, the last
+// part filling the bytes the parts before it leave (127.1 is 127.0.0.1,
+// 2130706433 is the whole address).
+func ipv4Legacy(host string, octal bool) (netip.Addr, bool) {
+	parts := strings.Split(host, ".")
+	if len(parts) > 4 {
+		return netip.Addr{}, false
+	}
+	vals := make([]uint64, len(parts))
+	for k, p := range parts {
+		base, digits := 10, p
+		switch {
+		case strings.HasPrefix(p, "0x"):
+			base, digits = 16, p[2:]
+			if digits == "" {
+				digits = "0"
+			}
+		case octal && len(p) > 1 && p[0] == '0':
+			base, digits = 8, p[1:]
+		}
+		if digits == "" || strings.ContainsAny(digits, "+-_") {
+			return netip.Addr{}, false
+		}
+		v, err := strconv.ParseUint(digits, base, 32)
+		if err != nil {
+			return netip.Addr{}, false
+		}
+		vals[k] = v
+	}
+	last := len(vals) - 1
+	var n uint64
+	for k := range last {
+		if vals[k] > 0xff {
+			return netip.Addr{}, false
+		}
+		n |= vals[k] << (24 - 8*k)
+	}
+	if vals[last] >= 1<<(8*(4-last)) {
+		return netip.Addr{}, false
+	}
+	n |= vals[last]
+	var b [4]byte
+	binary.BigEndian.PutUint32(b[:], uint32(n)) //nolint:gosec // n < 1<<32: each part bounded above
+	return netip.AddrFrom4(b), true
+}
+
+// connectTarget is the transport's GetProxyConnectHeader: it sees the
+// target of a CONNECT as the transport writes it — the host mapped to
+// ASCII as net/http maps it (canonicalAddr) — before the proxy is asked,
+// and refuses it as refusedHostPort does.
+func (g *destinationGuard) connectTarget(_ context.Context, _ *url.URL, target string) (http.Header, error) {
+	host, port, err := net.SplitHostPort(target)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s: %w", errDestination, target, err)
+	}
+	if err := g.refusedHostPort(host, port); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 // checkRedirect is the guarded client's redirect policy: a hop to a
@@ -266,12 +360,17 @@ func (g *destinationGuard) checkRedirect(req *http.Request, via []*http.Request)
 // proxyFor is the transport's Proxy: it refuses a URL whose host the
 // guard refuses (refusedHost), then returns the proxy the environment
 // names for req and records its dial address, so that the dial to it is
-// not checked.
+// not checked. A SOCKS proxy is handed the target with no hook between
+// the transport's mapping and the hand-over, so through one a host with
+// characters outside ASCII is refused.
 func (g *destinationGuard) proxyFor(req *http.Request) (*url.URL, error) {
 	if err := g.refusedHost(req.URL); err != nil {
 		return nil, err
 	}
 	p, err := g.proxy(req)
+	if p != nil && strings.HasPrefix(strings.ToLower(p.Scheme), "socks") && !isASCII(req.URL.Hostname()) {
+		return nil, fmt.Errorf("%w: %s through a SOCKS proxy: a host outside ASCII is not judged before the hand-over", errDestination, req.URL.Redacted())
+	}
 	if p != nil {
 		port := p.Port()
 		if port == "" {
@@ -293,7 +392,8 @@ func newGuardedClient(cfg guardConfig) *http.Client {
 	guarded := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver, Control: g.control}
 	direct := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver}
 	return &http.Client{CheckRedirect: g.checkRedirect, Transport: &http.Transport{
-		Proxy: g.proxyFor,
+		Proxy:                 g.proxyFor,
+		GetProxyConnectHeader: g.connectTarget,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if _, ok := g.proxies.Load(addr); ok {
 				return direct.DialContext(ctx, network, addr)
@@ -307,6 +407,16 @@ func newGuardedClient(cfg guardConfig) *http.Client {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}}
+}
+
+// isASCII reports whether s has only ASCII characters.
+func isASCII(s string) bool {
+	for k := range len(s) {
+		if s[k] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 // sharedGuard is the module's guarded client, one for the process so

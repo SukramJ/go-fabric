@@ -940,8 +940,9 @@ refused when it is dialled, for the URL and each redirect hop
 record is downloaded through the ledger's `TestClient`, so that client's
 `HTTPClient` and switch apply). The environment's proxy stays in use: a URL
 or redirect hop whose host is `localhost` or an IP address of those classes
-is refused before it is handed to the proxy, and a host name sent through
-the proxy is the proxy's to resolve and connect to. A ledger image must
+is refused before it is handed to the proxy (the host as net/http sends it,
+an IPv4 address in any inet_aton-style spelling included), and a host name
+sent through the proxy is the proxy's to resolve and connect to. A ledger image must
 also be bound to the record's whole-file checksum: `DownloadUpdate` refuses
 a record without one — production or test-net ledger — with
 `softwareupdate.ErrOTA` and the warning `dcl.ota.no_checksum` before it
