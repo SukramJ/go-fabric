@@ -1712,13 +1712,23 @@ func idleSince(e *Entry, cutoff time.Time) bool {
 // packages/protocol/src/session/case/CaseServer.ts:210
 // `this.#sessions.saveResumptionRecord(cx.resumptionRecord)`.
 func (m *Manager) PersistResumption(ctx context.Context, fabricIndex uint8, peerNodeID uint64, resumptionID, sharedSecret []byte, peerCATs []uint32) error {
-	return m.store.UpsertResumption(ctx, store.ResumptionRecord{
+	return m.PersistResumptionRecord(ctx, store.ResumptionRecord{
 		FabricIndex:  fabricIndex,
 		PeerNodeID:   peerNodeID,
 		ResumptionID: resumptionID,
 		SharedSecret: sharedSecret,
 		CASEAuthTags: peerCATs,
 	})
+}
+
+// PersistResumptionRecord stores rec as [Manager.PersistResumption] does,
+// with the peer's session parameters of the session the record resumes
+// (rec.SessionParameters, zero = absent): the one record per peer a CASE
+// client resumes from too (client/handshake.StoreResumption). matter.js's
+// responder saves them with the record (CaseServer.ts:339 at db021da0,
+// `sessionParameters: secureSession.parameters`).
+func (m *Manager) PersistResumptionRecord(ctx context.Context, rec store.ResumptionRecord) error {
+	return m.store.UpsertResumption(ctx, rec)
 }
 
 // LookupResumption finds the resumption record by id only.

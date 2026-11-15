@@ -618,7 +618,14 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 				if onOpened != nil {
 					onOpened(entry.SessionID)
 				}
-				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
+				rec := store.ResumptionRecord{
+					FabricIndex: fabricIndex, PeerNodeID: res.PeerNodeID, ResumptionID: res.ResumptionID,
+					SharedSecret: res.SharedSecret, CASEAuthTags: res.PeerCATs,
+				}
+				if p := res.PeerSessionParams; p != nil {
+					rec.SessionParameters = *p
+				}
+				if err := sessions.PersistResumptionRecord(ctx, rec); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.Any("err", err))
 				}
 				return nil
@@ -867,7 +874,14 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		// carried) with the session's shared secret.
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
-				if err := sessions.PersistResumption(context.Background(), fabricIndex, peerNodeID, id, secret, peerCATs); err != nil {
+				// With the initiator's session parameters, as a CASE client
+				// that resumes from the same record keeps them (review II,
+				// Fable P-5).
+				params, _ := resp.PeerSessionParameters()
+				if err := sessions.PersistResumptionRecord(context.Background(), store.ResumptionRecord{
+					FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
+					CASEAuthTags: peerCATs, SessionParameters: params,
+				}); err != nil {
 					logger.Warn("case.resumption.persist_failed", slog.Any("err", err))
 				}
 			}

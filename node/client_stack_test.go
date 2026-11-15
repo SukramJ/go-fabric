@@ -108,6 +108,16 @@ func TestClientStackStatesTheNodesSessionParameters(t *testing.T) {
 	if !found {
 		t.Fatal("b holds no session a opened")
 	}
+	// b's responder keeps a's parameters in its resumption record, the one
+	// record per peer a CASE client resumes from too (review II, Fable P-5;
+	// matter.js CaseServer.ts:339 at db021da0).
+	rec, err := cp.b.Node().Store().GetResumptionByPeer(parityCtx(t), cp.bFabric.FabricIndex, cp.aFabric.NodeID)
+	if err != nil {
+		t.Fatalf("b's resumption record of a: %v", err)
+	}
+	if p := rec.SessionParameters; p.SessionIdleInterval != 900 || p.SessionActiveInterval != 350 || p.SessionActiveThreshold != 5000 {
+		t.Errorf("b's record of a holds %+v, want a's 900/350/5000", p)
+	}
 }
 
 // TestClientStackLargeMessageOverTCP: with the TCP client role a
