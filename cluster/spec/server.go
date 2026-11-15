@@ -22,9 +22,11 @@ import (
 // Server errors; each error [NewServer], [Server.Set] or [Server.Emit]
 // returns wraps one of these (or one of [New]'s).
 var (
-	// ErrFabricScoped: the definition has a fabric-scoped attribute
-	// (access "F"). Its per-fabric reads are contract.FabricScopedReader's,
-	// which the generated server does not implement.
+	// ErrFabricScoped: the selection serves a fabric-scoped attribute
+	// (access "F"), whose value is one list per fabric; the generated
+	// server holds one value per attribute. Scoping a read is not the
+	// server's part: the dispatcher scopes every fabric-scoped attribute
+	// of the model, whatever the server returns.
 	ErrFabricScoped = errors.New("spec: fabric-scoped attributes are not supported by the generated server")
 	// ErrNotServed: a value for an attribute the instance does not serve.
 	ErrNotServed = errors.New("spec: attribute not served")
@@ -72,7 +74,10 @@ type CommandHandler func(ctx context.Context, fields any) (any, error)
 // the feature selection.
 type ServerConfig struct {
 	// DataVersion is an optional host-owned tracker; the server keeps its
-	// own otherwise.
+	// own otherwise. The wire carries this version for a server on the
+	// root endpoint or the Aggregator only; on every other endpoint the
+	// endpoint keeps the cluster's version, which a change the server
+	// reports advances, and this tracker is read by no one but the host.
 	DataVersion *cluster.DataVersionTracker
 	// Source optionally answers reads ahead of the stored values.
 	Source Source
@@ -209,7 +214,9 @@ var (
 // cfg.Initial; a served attribute cfg.Initial leaves out starts at the
 // definition's default, and is absent when the definition states none.
 // A selection that serves a fabric-scoped attribute is refused
-// ([ErrFabricScoped]); an unserved one does not matter.
+// ([ErrFabricScoped]) — the server holds one value per attribute, not one
+// per fabric — and an unserved one does not matter; the dispatcher scopes
+// every fabric-scoped attribute of the model, whatever a server returns.
 func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	inst, err := New(def, opts)
 	if err != nil {
@@ -315,7 +322,9 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 	return &s.embedded
 }
 
-// MatterDataVersion implements [contract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion]: the
+// server's own version ([ServerConfig.DataVersion]), the wire's on the
+// root endpoint and the Aggregator only.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterRead implements [contract.ClusterServer]: FeatureMap and
@@ -445,7 +454,10 @@ func (s *Server) holds(attrID uint32, v any) bool {
 // Set records a change the device made to attrID. The value is checked
 // against the attribute's type and constraint — not its access: the
 // device may change what a controller may not write. A change bumps the
-// data version and is notified; an equal value changes nothing.
+// data version and is notified; an equal value changes nothing. For an
+// attribute the [Source] answers, the Source wins on read: Set stores and
+// reports a value no read shows — report such an attribute with
+// [Server.MarkChanged] instead.
 func (s *Server) Set(attrID uint32, value any) error {
 	return s.SetAttributes(map[uint32]any{attrID: value})
 }
