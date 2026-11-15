@@ -112,8 +112,10 @@ func TestControllerRetriesAnAutoAssignedPortTakenForTCP(t *testing.T) {
 			t.Fatalf("New with the first auto-assigned port taken for TCP: %v (TCP binds %q)", err, ports.attempts())
 		}
 		t.Cleanup(func() { _ = c.Close(context.Background()) })
-		if got := ports.attempts(); len(got) != 2 {
-			t.Fatalf("TCP binds %q, want two: the taken port and the next pair's", got)
+		// Two binds, or more when the next pair's port was taken for TCP
+		// too — as it was in 1 of 600 runs under four test processes.
+		if got := ports.attempts(); len(got) < 2 {
+			t.Fatalf("TCP binds %q, want the taken port's and the next pair's", got)
 		}
 		if c.TCPAddr().Port != c.Addr().Port {
 			t.Fatalf("TCP on %v beside UDP on %v, want one port", c.TCPAddr(), c.Addr())
