@@ -31,6 +31,11 @@ env:
   # the Makefile's versions.
   ACTIONLINT_VERSION: "v1.7.12"
   ZIZMOR_VERSION: "1.32.0"
+  # The SHA-256 of zizmor's manylinux_2_28_x86_64 wheel at ZIZMOR_VERSION
+  # (PyPI's digest, the wheel pip picks on ubuntu-latest); zizmor has no
+  # dependencies, so pip --require-hashes installs exactly this file. A
+  # bump of ZIZMOR_VERSION bumps this with it.
+  ZIZMOR_SHA256: "84a6acb975accc13408786a2bd274b572537ca19c933ebbc13e78f3988562071"
 
 jobs:
   build:
@@ -402,7 +407,8 @@ jobs:
           set -euo pipefail
           go install "github.com/rhysd/actionlint/cmd/actionlint@$ACTIONLINT_VERSION"
           python3 -m venv "$RUNNER_TEMP/zizmor"
-          "$RUNNER_TEMP/zizmor/bin/pip" install --quiet "zizmor==$ZIZMOR_VERSION"
+          printf 'zizmor==%s --hash=sha256:%s\n' "$ZIZMOR_VERSION" "$ZIZMOR_SHA256" >"$RUNNER_TEMP/zizmor-requirements.txt"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --quiet --require-hashes --only-binary :all: -r "$RUNNER_TEMP/zizmor-requirements.txt"
       - name: workflow lint
         run: make workflow-lint ZIZMOR="$RUNNER_TEMP/zizmor/bin/zizmor"
 
