@@ -557,6 +557,16 @@ func (e *Entry) LastPeerActivity() time.Time {
 	return wallAsNow(e.clock, e.lastPeerActivity, e.lastPeerActivityMono)
 }
 
+// LastPeerActivityMonotonic is [Entry.LastPeerActivity] on the clock's
+// monotonic reading ([clock.MonotonicOf]) — the reading
+// [Manager.NewestSessionForPeer] orders by, which a wall-clock step does
+// not move; false for an entry that never carried a peer.
+func (e *Entry) LastPeerActivityMonotonic() (time.Duration, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.lastPeerActivityMono, !e.lastPeerActivity.IsZero()
+}
+
 // CreatedAt returns when the session was installed with its keys; the
 // zero time for a pre-allocated placeholder.
 func (e *Entry) CreatedAt() time.Time {

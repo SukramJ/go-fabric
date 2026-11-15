@@ -50,12 +50,13 @@ func TestLivePeerSessionNewestByPeerActivity(t *testing.T) {
 	if !ok || s.link.sessionID != olderSID {
 		t.Fatalf("LivePeerSession = %+v, %v; want %#x", s, ok, olderSID)
 	}
-	if s.Transport() != "udp" {
-		t.Errorf("Transport = %q, want udp", s.Transport())
+	if s.transport() != "udp" {
+		t.Errorf("Transport = %q, want udp", s.transport())
 	}
-	// Both read the stamp on the wall clock as it reads now.
-	if got, want := s.LastActivity(), older.LastPeerActivity(); got.IsZero() || got.Sub(want).Abs() > time.Millisecond/2 {
-		t.Errorf("LastActivity = %v, want the session's %v", got, want)
+	got, ok := s.LastActivityMonotonic()
+	want, _ := older.LastPeerActivityMonotonic()
+	if !ok || got != want {
+		t.Errorf("LastActivityMonotonic = %v, %v; want the session's %v", got, ok, want)
 	}
 
 	// A Large Message requirement: no TCP session, none — and no handshake
@@ -68,7 +69,7 @@ func TestLivePeerSessionNewestByPeerActivity(t *testing.T) {
 	// one last.
 	dev.br.sessionPeerAddrs.Store(newerSID, dev.br.routeFor(&fakeConn{}))
 	s, ok = dev.br.LivePeerSession(resumeFabricIndex, resumeCtrlNode, PeerSessionRequirement{LargeMessage: true})
-	if !ok || s.link.sessionID != newerSID || s.Transport() != "tcp" {
+	if !ok || s.link.sessionID != newerSID || s.transport() != "tcp" {
 		t.Fatalf("Large Message session = %+v, %v; want %#x over tcp", s, ok, newerSID)
 	}
 	if _, ok := dev.br.LivePeerSession(resumeFabricIndex+1, resumeCtrlNode, PeerSessionRequirement{}); ok {

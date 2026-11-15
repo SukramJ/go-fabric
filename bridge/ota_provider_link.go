@@ -167,30 +167,32 @@ type peerActivityReader interface {
 	Get(sessionID uint16) (*operational.Entry, error)
 }
 
-// LastActivity is when the peer last sent on the session
-// (operational.Entry.LastPeerActivity), the order [Bridge.LivePeerSession]
-// selects by; the zero time when the session is gone or the registry does
-// not keep it.
-func (s *PeerSession) LastActivity() time.Time {
+// LastActivityMonotonic is when the peer last sent on the session, on the
+// clock's monotonic reading (operational.Entry.LastPeerActivityMonotonic):
+// the order [Bridge.LivePeerSession] selects by, comparable with another
+// stack's reading on the same clock as a wall time is not across a
+// wall-clock step. False when the session is gone or the registry does not
+// keep it.
+func (s *PeerSession) LastActivityMonotonic() (time.Duration, bool) {
 	s.b.mu.RLock()
 	reg := s.b.sessionRegistry
 	s.b.mu.RUnlock()
 	r, ok := reg.(peerActivityReader)
 	if !ok {
-		return time.Time{}
+		return 0, false
 	}
 	e, err := r.Get(s.link.sessionID)
 	if err != nil || e == nil {
-		return time.Time{}
+		return 0, false
 	}
-	return e.LastPeerActivity()
+	return e.LastPeerActivityMonotonic()
 }
 
-// Transport is the network of the session's route as [net.Addr.Network]
+// transport is the network of the session's route as [net.Addr.Network]
 // names it: "udp" for a session over the bridge's UDP socket, "tcp" for one
 // bound to a TCP connection — the one transport that carries Large
 // Messages.
-func (s *PeerSession) Transport() string {
+func (s *PeerSession) transport() string {
 	if s.link.addr == nil {
 		return ""
 	}

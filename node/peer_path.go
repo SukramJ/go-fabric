@@ -93,7 +93,16 @@ func (s *peerPathSession) serverSession(req bridge.PeerSessionRequirement) *brid
 	} else {
 		cl = pr.NewestSession()
 	}
-	if cl != nil && !srv.LastActivity().After(cl.ActiveTimestamp()) {
+	if cl == nil {
+		return srv
+	}
+	// Both stacks stamp the peer's last message on the node's clock's
+	// monotonic reading, which a wall-clock step does not move: the
+	// readings compare across the stacks as each stack compares its own
+	// (review II, Fable P-2).
+	clMono, clHeard := cl.ActiveMonotonic()
+	srvMono, srvHeard := srv.LastActivityMonotonic()
+	if !srvHeard || (clHeard && srvMono <= clMono) {
 		return nil
 	}
 	return srv

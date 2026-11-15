@@ -147,7 +147,7 @@ note `peer`, Shape 2).
   route, the client stack's server from the session's transport.
 - `secure/operational`: `Entry.LastPeerActivity`,
   `Manager.NewestSessionForPeer`. `bridge`: `PeerSessionRequirement`,
-  `LivePeerSession`, `PeerSession.LastActivity` and `.Transport`.
+  `LivePeerSession`, `PeerSession.LastActivityMonotonic`.
   `client/exchange`: `BDXExchange`. `client/handshake`: `StoreResumption`.
   `cluster/camera`: `ErrNoLargeMessageTransport`.
 - A node and a controller restarted resume with a peer from the store's
