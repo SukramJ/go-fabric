@@ -39,9 +39,16 @@ func TestUnresolvableFabricIsDenied(t *testing.T) {
 
 	// A dispatcher over a real topology: NewTopologyDispatcher(nil) is nil,
 	// SetACLLister on it does nothing, and CheckACL then denies every
-	// non-PASE call whatever the fabric (R2-P5-tmut-06).
+	// non-PASE call whatever the fabric (R2-P5-tmut-06). The ACL source
+	// grants every fabric, so the denial below comes from the guard on the
+	// unresolvable index and nothing else: an empty ACL would deny it on
+	// its own (R2-P5 DR5a-ci-07).
 	d := endpoint.NewTopologyDispatcher(&endpoint.Topology{})
-	d.SetACLLister(emptyACLLister{})
+	d.SetACLLister(endpoint.UnenforcedACL{})
+	// Positive control: the same call on a real fabric is granted.
+	if got := d.CheckACL(context.Background(), 1, 1, nil, 1, 0x0006, 1); got != im.StatusSuccess {
+		t.Fatalf("CheckACL(fabric 1) = %v, want Success — the control does not reach the ACL source", got)
+	}
 
 	got := d.CheckACL(context.Background(), endpoint.FabricIndexUnresolvable, 1, nil, 1, 0x0006, 1)
 	if got.IsSuccess() {
