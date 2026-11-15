@@ -10419,10 +10419,10 @@
     },
     {
       "package": "cluster/core",
-      "identifier": "TestDropFabricWaitsForAnExtensionWrite",
+      "identifier": "TestDropFabricClearsTheExtensionUnderTheWriteMutex",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/access_control_drop_fabric_internal_test.go",
-      "line": 18
+      "line": 40
     },
     {
       "package": "cluster/core",
