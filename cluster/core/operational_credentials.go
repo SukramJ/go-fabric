@@ -286,8 +286,8 @@ func InvokeSessionFromContext(ctx context.Context) any {
 	return ctx.Value(invokeSessionKeyCtxKey{})
 }
 
-// invokeSessionBinding is what a CSR binds to and AddNOC / UpdateNOC compare
-// with: the session's identity when stamped ([WithInvokeSession]), else its
+// invokeSessionBinding is what a CSR binds to and AddNOC compares with
+// (UpdateNOC checks the fabric only): the session's identity when stamped ([WithInvokeSession]), else its
 // bridge id when one is stamped ([WithInvokeSessionID]), else nil.
 func invokeSessionBinding(ctx context.Context) any {
 	if key := InvokeSessionFromContext(ctx); key != nil {
