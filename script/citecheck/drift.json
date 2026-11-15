@@ -172,7 +172,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 842,
+    "line": 862,
     "citation": "ExchangeManager.ts:480-486",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "at": "db021da0",
@@ -182,7 +182,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1764,
+    "line": 1760,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -191,7 +191,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1766,
+    "line": 1762,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -200,7 +200,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1803,
+    "line": 1799,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -209,7 +209,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1826,
+    "line": 1822,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -469,7 +469,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2057,
+    "line": 2065,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -478,7 +478,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2201,
+    "line": 2209,
     "citation": "ExchangeManager.ts:696-713",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#deleteSession",
@@ -1517,7 +1517,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 312,
+    "line": 319,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1526,7 +1526,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 435,
+    "line": 442,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1535,7 +1535,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1759,
+    "line": 1768,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1928,7 +1928,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1162,
+    "line": 1202,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1938,7 +1938,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1455,
+    "line": 1495,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1947,7 +1947,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1594,
+    "line": 1634,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1957,7 +1957,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1770,
+    "line": 1810,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -1993,7 +1993,7 @@
   },
   {
     "file": "contract/matter.go",
-    "line": 845,
+    "line": 882,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -2454,7 +2454,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 650,
+    "line": 672,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -2463,7 +2463,7 @@
   },
   {
     "file": "device/type.go",
-    "line": 62,
+    "line": 71,
     "citation": "RequirementGenerator.ts:188",
     "resolved": "support/codegen/src/endpoints/RequirementGenerator.ts",
     "identifier": "mandatory",
@@ -2472,7 +2472,7 @@
   },
   {
     "file": "device/type.go",
-    "line": 156,
+    "line": 196,
     "citation": "packages/node/src/node/client/ClientStructure.ts:871",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "#node",
@@ -2911,7 +2911,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 89,
+    "line": 94,
     "citation": "OtaSoftwareUpdateRequestorServer.ts:255-280",
     "resolved": "packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts",
     "at": "db021da0",
@@ -2921,7 +2921,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 273,
+    "line": 276,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2930,7 +2930,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 352,
+    "line": 367,
     "citation": "GeneralDiagnosticsServer.ts:168-182",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "TimeSynchronizationBehavior",
@@ -2948,7 +2948,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1521,
+    "line": 1568,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
@@ -2958,7 +2958,7 @@
   },
   {
     "file": "node/node_test.go",
-    "line": 818,
+    "line": 821,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
