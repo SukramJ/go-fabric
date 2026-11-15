@@ -87,6 +87,40 @@ func TestPASEMessagesThatStartNoHandshakeBuildNoAdapter(t *testing.T) {
 	}
 }
 
+// TestPASEContinuationsThatStartNoHandshakeAreDroppedOnTheSingleton: with
+// one adapter wired through AttachPaseHandler and no provider, a Pake1 or
+// Pake3 on an exchange no PBKDFParamRequest began is acknowledged and no
+// more, as on the provider path: the adapter is not handed it, no
+// StatusReport, no counted PASE failure (review II, N5-rw2-1). With another
+// exchange's handshake holding the claim, a Pake1 stays unanswered and
+// uncounted as well (the in-progress gate of dispatchPase).
+func TestPASEContinuationsThatStartNoHandshakeAreDroppedOnTheSingleton(t *testing.T) {
+	t.Parallel()
+	r := newUnsecuredRig(t)
+	var made atomic.Int32
+	factory := newVerifierFactory(t, &made)
+	a := NewPaseAdapterWithFactory(factory)
+	r.b.AttachPaseHandler(a)
+	peer := newPipelinePeer(t, r.b, 0xBAD0BAD0)
+	_ = peer.send(mrp.SCOpcodePake1, 0x4000, []byte{0x15, 0x18}, nil)
+	_ = peer.send(mrp.SCOpcodePake3, 0x4001, []byte{0x15, 0x18}, nil)
+	requireAcknowledgedOnly(t, r.b, 0x4000, "a Pake1 without a PBKDFParamRequest")
+	requireAcknowledgedOnly(t, r.b, 0x4001, "a Pake3 without a PBKDFParamRequest")
+	if got := r.b.paseFailures.Load(); got != 0 {
+		t.Fatalf("PASE failures = %d, want 0: no pairing began", got)
+	}
+	if got := made.Load(); got != 0 {
+		t.Fatalf("verifiers made = %d, want 0: the adapter ran a Pake1 no PBKDFParamRequest began", got)
+	}
+	// Another exchange's handshake holds the claim.
+	r.b.claimPaseInFlight(HandshakeKey{InitiatorNodeID: 0x0B0B, ExchangeID: 0x4100})
+	_ = peer.send(mrp.SCOpcodePake1, 0x4002, []byte{0x15, 0x18}, nil)
+	requireAcknowledgedOnly(t, r.b, 0x4002, "a Pake1 beside another exchange's handshake")
+	if got := r.b.paseFailures.Load(); got != 0 {
+		t.Fatalf("PASE failures = %d, want 0: the Pake1 began no pairing", got)
+	}
+}
+
 // releaseRecorder records the session ids an adapter returns.
 type releaseRecorder struct {
 	mu  sync.Mutex

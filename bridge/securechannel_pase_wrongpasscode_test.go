@@ -191,6 +191,7 @@ func TestDispatchSecureChannel_WrongPasscodePake3_StatusReportUsesInvalidParamet
 	a := NewPaseAdapterWithFactory(newVerifierFactory(t, nil))
 	primePaseAdapterToPake1(t, a)
 	b.AttachPaseHandler(a)
+	beginPase(t, b, scKey(7))
 
 	// The bridge ships its StatusReport to `src` (our peer socket).
 	_ = b.dispatchSecureChannel(src, scHdr(), scProto(mrp.SCOpcodePake3, 7, false, 0), spake2.EncodePake3(wrongConfirmationTag()))

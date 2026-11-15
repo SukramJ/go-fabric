@@ -129,9 +129,10 @@ func TestUnsecuredWindowEndsWithItsHandshake(t *testing.T) {
 	r.b.AttachPaseHandler(newPaseAdapterWithVerifier(t))
 	peer := newPipelinePeer(t, r.b, 0xC0FFEE)
 	const exchange = uint16(0x0202)
-	// A Pake1 without a PBKDFParamRequest before it: the handshake answers
-	// with a failure report, which waits for its acknowledgement — the
-	// window lives with it.
+	// A Pake1 of a begun handshake whose PBKDFParamRequest the adapter did
+	// not see: the handshake answers with a failure report, which waits for
+	// its acknowledgement — the window lives with it.
+	beginPase(t, r.b, HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: exchange})
 	_ = peer.send(mrp.SCOpcodePake1, exchange, []byte{0x15, 0x18}, nil)
 	if n := r.b.unsecuredWindows.len(); n != 1 {
 		t.Fatalf("%d unsecured windows while the failure report waits for its acknowledgement, want 1", n)
@@ -160,8 +161,10 @@ func TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource(t *testing.T) {
 		exchange     = uint16(0x0202)
 		pake1Counter = 4242
 	)
-	// A Pake1 without a PBKDFParamRequest before it: the failure report
-	// waits for its acknowledgement, so the handshake's exchange is live.
+	// A Pake1 of a begun handshake whose PBKDFParamRequest the adapter did
+	// not see: the failure report waits for its acknowledgement, so the
+	// handshake's exchange is live.
+	beginPase(t, r.b, HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: exchange})
 	_ = sendAtCounter(peer, pake1Counter, mrp.SCOpcodePake1, exchange, []byte{0x15, 0x18}, nil)
 	failures := r.b.paseFailures.Load()
 	if !r.b.unsecuredExchangeLive(HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: exchange}) {

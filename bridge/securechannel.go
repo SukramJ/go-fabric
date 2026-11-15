@@ -326,18 +326,19 @@ func (b *Bridge) resolveCaseContinuation(key HandshakeKey) (h CaseHandler, provi
 }
 
 // resolvePaseContinuation is [Bridge.resolvePaseHandler] for a Pake1 or
-// Pake3: with a provider wired, a handshake that does not hold the
-// single-active-PASE claim — no PBKDFParamRequest began it — has no
-// handler — begun is false — and the provider is not asked. matter.js
-// routes only a PbkdfParamRequest that opens an exchange to its PASE server
-// (SecureChannelProtocol.ts:129 at db021da0).
+// Pake3: a handshake that does not hold the single-active-PASE claim — no
+// PBKDFParamRequest began it — has no handler — begun is false — whatever
+// the wiring: the provider is not asked, and the singleton handler of
+// [Bridge.AttachPaseHandler] is not handed a message of a handshake it does
+// not run (review II, N5-rw2-1). matter.js routes only a PbkdfParamRequest
+// that opens an exchange to its PASE server (SecureChannelProtocol.ts:129
+// at db021da0).
 func (b *Bridge) resolvePaseContinuation(key HandshakeKey) (h PaseHandler, begun bool) {
 	b.mu.RLock()
 	begun = !b.paseInFlightSince.IsZero() && b.paseInFlight == key &&
 		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
-	provider := b.paseProvider
 	b.mu.RUnlock()
-	if provider != nil && !begun {
+	if !begun {
 		return nil, false
 	}
 	return b.resolvePaseHandler(key), true

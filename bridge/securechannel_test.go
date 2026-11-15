@@ -119,13 +119,26 @@ func scKey(exchangeID uint16) HandshakeKey {
 	return HandshakeKey{InitiatorNodeID: 0x5A5A, ExchangeID: exchangeID}
 }
 
+// beginPase stands in for the PBKDFParamRequest that begins the handshake
+// key names: it takes the single-active-PASE claim, so the router hands a
+// Pake1 or Pake3 of key to the PASE handler ([Bridge.resolvePaseContinuation])
+// instead of dropping it.
+func beginPase(t *testing.T, b *Bridge, key HandshakeKey) {
+	t.Helper()
+	if !b.claimPaseInFlight(key) {
+		t.Fatalf("the PASE claim for %+v is held by another handshake", key)
+	}
+}
+
 // ─── Default-noop cases (4) ───────────────────────────────────────────────────
 
-// TestDispatchSC_Pake1MissingHandler verifies that Pake1 on a fresh bridge
-// (no handler wired) returns ErrPaseHandlerMissing.
+// TestDispatchSC_Pake1MissingHandler verifies that Pake1 of a begun
+// handshake on a fresh bridge (no handler wired) returns
+// ErrPaseHandlerMissing.
 func TestDispatchSC_Pake1MissingHandler(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
+	beginPase(t, b, scKey(1))
 	proto := scProto(mrp.SCOpcodePake1, 1, false, 0)
 	err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, nil)
 	if !errors.Is(err, ErrPaseHandlerMissing) {
@@ -181,6 +194,7 @@ func TestDispatchSC_Pake1InvokesHandler(t *testing.T) {
 		pake1Resp:     []byte{0xAA, 0xBB},
 	}
 	b.AttachPaseHandler(h)
+	beginPase(t, b, scKey(7))
 	proto := scProto(mrp.SCOpcodePake1, 7, false, 0)
 	err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, []byte{0x01})
 	if err != nil {
@@ -198,6 +212,7 @@ func TestDispatchSC_Pake3NoReplyOnNilPayload(t *testing.T) {
 	b := newStartedBridge(t)
 	h := &recordingPaseHandler{} // zero value: (0, nil, nil) for all methods
 	b.AttachPaseHandler(h)
+	beginPase(t, b, scKey(7))
 	proto := scProto(mrp.SCOpcodePake3, 7, false, 0)
 	err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, []byte{0x02})
 	if err != nil {
@@ -350,6 +365,7 @@ func TestDispatchSC_PaseHandlerErrorPropagates(t *testing.T) {
 	sentinel := errors.New("boom")
 	h := &recordingPaseHandler{pake1Err: sentinel}
 	b.AttachPaseHandler(h)
+	beginPase(t, b, scKey(1))
 	proto := scProto(mrp.SCOpcodePake1, 1, false, 0)
 	err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, nil)
 	if !errors.Is(err, sentinel) {
@@ -424,6 +440,7 @@ func TestAttachPaseHandler_NilReverts(t *testing.T) {
 	b := newStartedBridge(t)
 	b.AttachPaseHandler(&recordingPaseHandler{})
 	b.AttachPaseHandler(nil)
+	beginPase(t, b, scKey(1))
 	proto := scProto(mrp.SCOpcodePake1, 1, false, 0)
 	err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), proto, nil)
 	if !errors.Is(err, ErrPaseHandlerMissing) {

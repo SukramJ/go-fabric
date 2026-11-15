@@ -288,6 +288,7 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 			t.Fatalf("handlePase: %v", err)
 		}
 		hdr, proto = r.request(mrp.SCOpcodePake3, 0x5006)
+		beginPase(t, r.b, handshakeKeyOf(hdr, 0x5006))
 		// No PASE handler is wired, so Pake3 is answered by nothing: the
 		// unacknowledged Pake2 is all there was.
 		if err := r.b.dispatchPase(r.peer.LocalAddr(), hdr, proto, nil); !errors.Is(err, ErrPaseHandlerMissing) {
