@@ -73,11 +73,11 @@ func boolField(el tlv.Element) (bool, error) {
 // (bridge.replyDecodeError). Mirrors matter.js at db021da0:
 // packages/types/src/tlv/TlvBoolean.ts:22-24 throws UnexpectedDataError for
 // any element that is not a boolean, TlvObject.ts:222 decodes every known
-// field through it, and InteractionMessenger.handleRequest answers an error
-// that carries no status with Status.Failure
-// (packages/protocol/src/interaction/InteractionMessenger.ts:425-460;
-// UnexpectedDataError is a plain MatterError,
-// packages/general/src/MatterError.ts:188). The fields:
+// field through it, and InteractionMessenger.handleRequest
+// (packages/protocol/src/interaction/InteractionMessenger.ts:344) answers
+// an error that carries no status with Status.Failure (:425-460). The
+// thrown error is a plain MatterError (packages/general/src/MatterError.ts:188).
+// The fields:
 // TlvReadRequest.ts:30, TlvSubscribeRequest.ts:21, :39,
 // TlvInvokeRequest.ts:19, :22, TlvWriteRequest.ts:18, :21, :25 (under
 // packages/types/src/protocol/messages/), TlvAttributePath.ts:21 and

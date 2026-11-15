@@ -203,9 +203,10 @@ func decodeSingleOctet(payload []byte, wantTag uint8, msgName string) ([]byte, e
 }
 
 // uint16Member returns el's value when el is an unsigned integer of at
-// most 0xFFFF, [ErrWireMalformed] otherwise: matter.js's TlvUInt16 refuses
-// an element of another type (packages/types/src/tlv/TlvNumber.ts:124-131
-// at db021da0) and a value above its maximum (:155) instead of masking it.
+// most 0xFFFF, [ErrWireMalformed] otherwise: matter.js's TlvUInt16
+// (packages/types/src/tlv/TlvNumber.ts:277 at db021da0) refuses an element
+// of another type (:124-131) and a value above its maximum (:155) instead
+// of masking it.
 func uint16Member(el tlv.Element, name string) (uint16, error) {
 	if !isUnsignedInt(el.Type) || el.Uint > 0xFFFF {
 		return 0, fmt.Errorf("%w: %s not a UInt16", ErrWireMalformed, name)

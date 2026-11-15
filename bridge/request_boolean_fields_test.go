@@ -86,9 +86,9 @@ func booleanFieldPayload(t *testing.T, opcode uint8, bad string) []byte {
 // another TLV type is answered with a StatusResponse FAILURE and not
 // processed — a TimedRequest of another type no longer runs the request as
 // untimed. Mirrors matter.js at db021da0: TlvBoolean.ts:22-24 throws
-// UnexpectedDataError, InteractionMessenger.handleRequest decodes each
-// request inside its try (packages/protocol/src/interaction/InteractionMessenger.ts:360,
-// :377, :389, :395) and answers an error that carries no status with
+// UnexpectedDataError, InteractionMessenger.handleRequest
+// (packages/protocol/src/interaction/InteractionMessenger.ts:344) decodes
+// each request inside its try (:360, :377, :389, :395) and answers an error that carries no status with
 // Status.Failure (:425-460), as SuppressResponseTest.ts:395 asserts for
 // SuppressResponse. The well-formed request is the control: it passes the
 // decode and is answered with its own response or its handler's status.

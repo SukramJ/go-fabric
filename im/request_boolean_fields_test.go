@@ -116,9 +116,9 @@ func decodeBooleanFieldRequest(msg string, data []byte) error {
 // names no status, so the bridge answers it FAILURE, never reads it as
 // false. Mirrors matter.js at db021da0: TlvBoolean.ts:22-24 throws
 // UnexpectedDataError for a non-boolean element, and
-// InteractionMessenger.handleRequest answers an error that carries no
-// status with Status.Failure
-// (packages/protocol/src/interaction/InteractionMessenger.ts:425-460), as
+// InteractionMessenger.handleRequest
+// (packages/protocol/src/interaction/InteractionMessenger.ts:344) answers
+// an error that carries no status with Status.Failure (:425-460), as
 // SuppressResponseTest.ts:395 asserts for SuppressResponse. The
 // well-formed request of each message decodes (the control).
 func TestRequestBooleanFieldOfAnotherTypeFailsTheDecode(t *testing.T) {

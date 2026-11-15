@@ -69,7 +69,7 @@ func pbkdfRequestWith(t *testing.T, overrides ...pbkdfRequestField) []byte {
 // 0xFFFF fails its bound (TlvNumber.ts:155); SecureChannelMessenger.decode
 // rethrows it as UnexpectedDataError
 // (packages/protocol/src/securechannel/SecureChannelMessenger.ts:123-137),
-// read inside handlePairingRequest (PaseServer.ts:143,
+// read inside handlePairingRequest (PaseServer.ts:122, the read :143;
 // PaseMessenger.ts:37), whose throw is counted and answered
 // (PaseServer.ts:90-104). Before this check the request without
 // PasscodeID and HasPBKDFParameters was answered with a
