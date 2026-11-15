@@ -112,8 +112,9 @@ var tcpListen = tcp.Listen
 // runs the controller as a ServerNode, whose runtime it is,
 // ServerNode.ts:130-132): the TCP transport listens on the UDP
 // interface's port, and when that port is taken for TCP and was
-// auto-assigned both sockets are closed and the pair is tried again, up
-// to maxPortAssignmentRetries times. A socket the host gave is not
+// auto-assigned the UDP socket is closed and the pair is bound again
+// (matter.js closes its UDP interfaces, :224-227; the TCP listener that
+// failed was never open), up to maxPortAssignmentRetries times. A socket the host gave is not
 // replaced: its port is the host's choice, as a configured one is.
 func (c *Controller) bindTransports(listen string, given *udp.Listener) (udpListener *udp.Listener, tcpListener *tcp.Listener, err error) {
 	attempts := 1
@@ -150,7 +151,8 @@ func (c *Controller) bindTransports(listen string, given *udp.Listener) (udpList
 }
 
 // autoAssignedPort reports whether listen leaves the port to the OS
-// (ServerNetworkRuntime.ts:165, a port of 0 or none).
+// (ServerNetworkRuntime.ts:165, a port of 0). A listen without a port is
+// not auto-assigned here: it fails SplitHostPort.
 func autoAssignedPort(listen string) bool {
 	_, port, err := net.SplitHostPort(listen)
 	return err == nil && port == "0"

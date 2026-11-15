@@ -89,8 +89,8 @@ func booleanFieldPayload(t *testing.T, opcode uint8, bad string) []byte {
 // UnexpectedDataError, InteractionMessenger.handleRequest
 // (packages/protocol/src/interaction/InteractionMessenger.ts:344) decodes
 // each request inside its try (:360, :377, :389, :395) and answers an error that carries no status with
-// Status.Failure (:425-460), as SuppressResponseTest.ts:395 asserts for
-// SuppressResponse. The well-formed request is the control: it passes the
+// Status.Failure (:425-460), as SuppressResponseTest.ts:395 asserts for a
+// statusless error. The well-formed request is the control: it passes the
 // decode and is answered with its own response or its handler's status.
 func TestRequestBooleanFieldOfAnotherTypeAnsweredFailure(t *testing.T) {
 	t.Parallel()
