@@ -144,14 +144,12 @@ kernel modules and stay weekly, outside that gate.
   module's own where matter.js leaves the code to CHIP's PICS file), evaluated
   as stated. matter.js proves its DUT controller by the TH device's log; here
   each step names its evidence instead: the DUT controller's return value or
-  error, a state read on the daemon, or a line of the daemon's log. Two
-  cases are not ports of the pin's version: TC-DD-3.12 and TC-DD-3.13 are
-  the cases as they stood at matter.js `862ad75f`. At the pin both start
-  their TH without a commissioning window (`--custom-flow 1`) and open it by
-  a user action on the app pipe (`userIntentCommissioningStart`), then
-  commission; the reference daemon has neither the flag nor the command, so
-  the two rows below measure the earlier version, in which the TH is
-  commissionable from its start. A case
+  error, a state read on the daemon, or a line of the daemon's log.
+  TC-DD-3.12 and TC-DD-3.13 are ports of the pin's version: both start the
+  daemon with `--custom-flow 1`, hold it to not having advertised in
+  commissioning mode on every leg, and on the IP leg open its window by the
+  app pipe's `UserIntentCommissioningStart` before the discriminator check
+  and the commissioning. A case
   passed in this role counts as passed in its family — the page states the
   module in both roles since ADR 0020 — and is listed under "Controller role"
   below; a case no family of the harness image lists is listed there and
@@ -736,8 +734,8 @@ case counts as passed in its family; one no family of the harness image lists is
 | DD/1.9 | 2 | 0 | Go controller as DUT, after matter.js `TC-DD-1.9.test.ts` |
 | DD/2.2 | 1 | 7 | Go controller as DUT, after matter.js `TC-DD-2.2.test.ts` |
 | DD/3.11 | 6 | 4 | Go controller as DUT, after matter.js `TC-DD-3.11.test.ts` |
-| DD/3.12 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.12.test.ts` |
-| DD/3.13 | 8 | 5 | Go controller as DUT, after matter.js `TC-DD-3.13.test.ts` |
+| DD/3.12 | 7 | 5 | Go controller as DUT, after matter.js `TC-DD-3.12.test.ts` |
+| DD/3.13 | 7 | 5 | Go controller as DUT, after matter.js `TC-DD-3.13.test.ts` |
 | DD/3.14 | 10 | 2 | Go controller as DUT, after matter.js `TC-DD-3.14.test.ts` |
 | DD/3.15 | 4 | 0 | Go controller as DUT, after matter.js `TC-DD-3.15.test.ts` |
 | DD/3.16 | 11 | 0 | Go controller as DUT, after matter.js `TC-DD-3.16.test.ts` |
