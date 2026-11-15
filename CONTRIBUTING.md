@@ -55,7 +55,11 @@ Prerequisites:
   rather than on the diff. Bumping one is its own change, with whatever the
   new release finds fixed or justified in the same commit.
 
-`make help` lists the targets; `make ci` runs what the pipeline runs.
+`make help` lists the targets; `make ci` runs what the pipeline runs
+offline, `make ci-net` the two guards that read a clone at a pinned commit
+(`cite-check`, `chipdm-check`). `TestMakeCIRunsWhatCIRuns`
+(`script/requiredchecks`) holds both to `ci.yml`; `test-32bit` (a Linux host)
+and `workflow-lint` (zizmor) stay outside them.
 
 ## The chip-tool suite
 
@@ -131,4 +135,8 @@ merge to `main` is still immediately consumable by anyone who runs
 `go get github.com/SukramJ/go-fabric@main`, so treat `main` accordingly. A
 release is a commit that turns `## [Unreleased]` into a dated
 `## [x.y.z]` section, followed by the `vx.y.z` tag on that commit; the
-release workflow refuses a tag without its CHANGELOG section.
+release workflow refuses a tag without its CHANGELOG section, and a tag
+whose commit is not on `main` or has no successful run of the `ci` workflow
+(`script/release-provenance.sh`). A nested module's tag (`ble/bluez/vX.Y.Z`)
+gets no GitHub release; the workflow checks that the module builds against
+the versions it requires (`script/nested-release-check.sh`).

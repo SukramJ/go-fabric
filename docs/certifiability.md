@@ -24,10 +24,15 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
 
 In CI (`.github/workflows/chiptool.yml`) the nightly run covers every family.
 A release pull request (head branch `release/*`) runs that same full set —
-every family group, the chip-tool suite, the control leg, the BLE-Wi-Fi
-leg and the BLE cases leg — and its required check `chip certification cases against the
-reference daemon` stays red until all of them have passed, so no release is
-tagged over a family only the nightly run would have shown; the virtual
+every family group, the chip-tool suite, the Go-TH groups (`gocert-cadmin`,
+`gocert-dd`, `gocert-rest`), the control leg, the BLE-Wi-Fi leg and the BLE
+cases leg — and, beyond it, the nested modules' release shape (`make
+nested-release-check`: each nested module built against the go-fabric version
+its go.mod requires, its replace dropped; a module out of shape fails a nested
+release, `release/nested-*`, and is a warning on a root release). Its required
+check `chip certification cases against the reference daemon` stays red until
+all of them have run and passed, so no release is tagged over a family only
+the nightly run would have shown; the virtual
 Bluetooth and OTBR legs (`ble-virtual.yml`, `otbr-virtual.yml`) need runner
 kernel modules and stay weekly, outside that gate.
 
@@ -91,7 +96,9 @@ kernel modules and stay weekly, outside that gate.
   matter.js at the commit the schema snapshot pins
   (`parity/schema.json` `matter.sourceCommit`) and fails if the leg skips.
 - **The Go controller as TH** (`make chiptool-gocert`, part of
-  `make chiptool-test`, `GOFABRIC_GOCERT=IDM,SC` narrows): matter.js automates
+  `make chiptool-test`, `GOFABRIC_GOCERT=IDM,SC` narrows, `-CADMIN` leaves a
+  family out, an entry that names no registered case fails; CI runs it in
+  three groups by family, the `gocert` job): matter.js automates
   its certification cases in `support/chip-testing/test/cert/TC-*.test.ts`, and
   in most of them its own controller is the DUT and a device app the TH. Those
   are the controller halves of the CHIP test plans, which CHIP's harness runs

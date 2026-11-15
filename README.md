@@ -268,7 +268,8 @@ the changelog, it does not ship.
 
 A release pull request (head branch `release/*`) is also the gate of the
 certification run: it runs every chip-tool job and certification family the
-nightly run does, and cannot merge with one of them red
+nightly run does, checks that the nested modules build against the versions
+they require, and cannot merge with one of them red
 ([Certifiability](https://github.com/SukramJ/go-fabric/blob/main/docs/certifiability.md#how-the-status-is-produced)).
 
 A guard holds the rule: `make apidiff` compares every public package with
