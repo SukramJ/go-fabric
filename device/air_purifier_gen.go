@@ -22,10 +22,9 @@ const (
 )
 
 // AirPurifierType returns the AirPurifier device type, matter.js's packages/node/src/devices/air-purifier.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#airpurifier. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func AirPurifierType() *Type { return &typeAirPurifier }
+// its cluster requirements are listed in docs/reference/device-types.md#airpurifier. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func AirPurifierType() *Type { return typeAirPurifier.clone() }
 
 // typeAirPurifier holds [AirPurifierType]'s cluster requirements.
 var typeAirPurifier = Type{

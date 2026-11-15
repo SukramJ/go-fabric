@@ -21,10 +21,9 @@ const (
 )
 
 // MicrowaveOvenType returns the MicrowaveOven device type, matter.js's packages/node/src/devices/microwave-oven.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#microwaveoven. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func MicrowaveOvenType() *Type { return &typeMicrowaveOven }
+// its cluster requirements are listed in docs/reference/device-types.md#microwaveoven. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func MicrowaveOvenType() *Type { return typeMicrowaveOven.clone() }
 
 // typeMicrowaveOven holds [MicrowaveOvenType]'s cluster requirements.
 var typeMicrowaveOven = Type{

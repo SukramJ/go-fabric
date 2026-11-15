@@ -22,10 +22,9 @@ const (
 )
 
 // TemperatureControlledCabinetType returns the TemperatureControlledCabinet device type, matter.js's packages/node/src/devices/temperature-controlled-cabinet.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#temperaturecontrolledcabinet. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func TemperatureControlledCabinetType() *Type { return &typeTemperatureControlledCabinet }
+// its cluster requirements are listed in docs/reference/device-types.md#temperaturecontrolledcabinet. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func TemperatureControlledCabinetType() *Type { return typeTemperatureControlledCabinet.clone() }
 
 // typeTemperatureControlledCabinet holds [TemperatureControlledCabinetType]'s cluster requirements.
 var typeTemperatureControlledCabinet = Type{

@@ -145,6 +145,9 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: no device type", ErrConfiguration)
 	}
+	// The device keeps a copy: a later change of the Type the host passed
+	// in changes nothing here (R2-P5-apidev-03).
+	t = t.clone()
 	if opts.StableKey == nil {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
 	}
@@ -164,8 +167,14 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 			return nil, fmt.Errorf("%s: %w", t.Name, err)
 		}
 	}
-	clk := &deviceClock{}
-	s.clock = clk
+	s.clock = &deviceClock{}
+	return buildDevice(t, opts, s)
+}
+
+// buildDevice is New's construction once the declarations are collected; t is
+// the device's own copy.
+func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
+	clk, _ := s.clock.(*deviceClock)
 	// The Base device type's optional clusters (FixedLabel, UserLabel)
 	// are the type's too when a declaration names them (base.go); eff is
 	// the type the servers are built from, t stays the device's type.
@@ -226,6 +235,7 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	for id := range s.servers {
 		d.hosted[id] = true
 	}
+
 	d.ports = maps.Clone(s.ports)
 	if d.identify, err = newIdentifyHandlers(s); err != nil {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
@@ -612,8 +622,9 @@ func featureNames(r *ClusterRequirement, mask uint32) []string {
 	return out
 }
 
-// Type returns the device's type.
-func (d *Device) Type() *Type { return d.typ }
+// Type returns the device's type, a copy: modifying it changes neither
+// the device nor the registry ([Type]).
+func (d *Device) Type() *Type { return d.typ.clone() }
 
 // Server returns the device's server for clusterID, or nil when it mounts
 // none — a cluster served from a [Measurement] source included, whose

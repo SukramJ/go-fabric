@@ -450,9 +450,9 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	fmt.Fprintf(&w, "// %s device type identity: 0x%04X, revision %d.\n", dt.Name, *dt.ID, dt.Revision)
 	fmt.Fprintf(&w, "const (\n\t%sID schema.DeviceTypeID = 0x%04X\n\t%sRevision uint16 = %d\n)\n\n", n, *dt.ID, n, dt.Revision)
 	fmt.Fprintf(&w, "// %sType returns the %s device type, matter.js's %s;\n", n, dt.Name, matterjsPath(dt))
-	fmt.Fprintf(&w, "// its cluster requirements are listed in %s. It is the registry's\n", referenceLink(dt.Name))
-	w.WriteString("// value, the one [Lookup] and [FromSpec] return: a caller reads it and\n// does not modify it.\n")
-	fmt.Fprintf(&w, "func %sType() *Type { return &%s }\n\n", n, typeVar(n))
+	fmt.Fprintf(&w, "// its cluster requirements are listed in %s. It is a copy of the\n", referenceLink(dt.Name))
+	w.WriteString("// registry's value, as [Lookup]'s: modifying it changes nothing else.\n")
+	fmt.Fprintf(&w, "func %sType() *Type { return %s.clone() }\n\n", n, typeVar(n))
 	fmt.Fprintf(&w, "// %s holds [%sType]'s cluster requirements.\n", typeVar(n), n)
 	fmt.Fprintf(&w, "var %s = Type{\n", typeVar(n))
 	fmt.Fprintf(&w, "\tID: %sID, Name: %q, Revision: %sRevision,\n", n, dt.Name, n)
@@ -462,6 +462,13 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	}
 	if len(dt.Effective.Conditions) > 0 {
 		fmt.Fprintf(&w, "\tConditions: []string{%s},\n", quoteList(dt.Effective.Conditions))
+	}
+	if len(m.components) > 0 {
+		ids := make([]string, len(m.components))
+		for i, c := range m.components {
+			ids[i] = exportName(c) + "ID"
+		}
+		fmt.Fprintf(&w, "\tcomponents: []schema.DeviceTypeID{%s},\n", strings.Join(ids, ", "))
 	}
 	for _, side := range []struct {
 		field string
@@ -489,6 +496,14 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 	fmt.Fprintf(&w, "// New%s returns a %s device: its mandatory server clusters and the\n", n, dt.Name)
 	w.WriteString("// optional ones declared, each with its default server or the host's —\n")
 	fmt.Fprintf(&w, "// [FromSpec] with Type %sID (see [New]).\n", n)
+	if dt.Name == "RootNode" {
+		// The root endpoint is the node's ([node.Node.Root]): the
+		// constructor cannot build, its root clusters have no committed
+		// definitions (review II, R2-P5-apidev-16).
+		w.WriteString("//\n// Deprecated: the root endpoint is the node's (node.Node.Root), not a\n")
+		w.WriteString("// device: NewRootNode always refuses, its root clusters have no\n")
+		w.WriteString("// committed definitions. RootNodeType stays for [Lookup]. Removable in\n// the next minor release.\n")
+	}
 	fmt.Fprintf(&w, "func New%s(opts Options, decls ...Declaration) (*%s, error) {\n", n, n)
 	fmt.Fprintf(&w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif d == nil {\n\t\treturn nil, err\n\t}\n\t// A device the specification level withheld comes with its error ([New]).\n\treturn &%s{d}, err\n}\n", n, n)
 
@@ -551,7 +566,7 @@ func writeComposite(w *bytes.Buffer, n, name string, components []string, import
 	}
 	fmt.Fprintf(w, "\tif %s {\n", strings.Join(conds, " || "))
 	fmt.Fprintf(w, "\t\treturn nil, fmt.Errorf(\"%%w: %s needs its components %s\", ErrComposition)\n\t}\n", name, strings.Join(components, " and "))
-	fmt.Fprintf(w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif d == nil {\n\t\treturn nil, err\n\t}\n\tif err != nil {\n\t\t// Withheld by the specification level ([New]): no parts.\n\t\treturn &%s{Device: d}, err\n\t}\n", n, n)
+	fmt.Fprintf(w, "\td, err := newOfSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif d == nil {\n\t\treturn nil, err\n\t}\n\tif err != nil {\n\t\t// Withheld by the specification level ([New]): no parts.\n\t\treturn &%s{Device: d}, err\n\t}\n", n, n)
 	fmt.Fprintf(w, "\tfor _, p := range []*Device{%s} {\n\t\tif err := d.AddPart(p); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t}\n", strings.Join(parts, ", "))
 	fmt.Fprintf(w, "\treturn &%s{Device: d, %s}, nil\n}\n", n, strings.Join(kv, ", "))
 	for i, c := range components {
@@ -578,7 +593,7 @@ func writeCompositeTest(w *bytes.Buffer, n, name string, components []string) {
 	args := strings.Join(vars, ", ")
 	fmt.Fprintf(w, "\t\tif _, err := New%s(Options{}, %s); err == nil {\n\t\t\tt.Error(\"%s: constructed without a StableKey\")\n\t\t}\n", n, args, name)
 	fmt.Fprintf(w, "\t\td, err := New%s(testOptions(%q), %s, testWith(t, %q)...)\n\t\tif err != nil {\n\t\t\tt.Fatalf(\"%s: %%v\", err)\n\t\t}\n", n, name, args, name, name)
-	fmt.Fprintf(w, "\t\tif d.Type() != %sType() {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
+	fmt.Fprintf(w, "\t\tif d.Type().ID != %sID {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
 	fmt.Fprintf(w, "\t\tif parts := d.Parts(); len(parts) != %d", len(components))
 	for i, v := range vars {
 		fmt.Fprintf(w, " || parts[%d] != %s.Device", i, v)
@@ -763,7 +778,7 @@ func (g *generator) generateTest(names []string) (*output, error) {
 		}
 		fmt.Fprintf(&w, "\tif _, err := New%s(Options{}); err == nil {\n\t\tt.Error(\"%s: constructed without a StableKey\")\n\t}\n", n, name)
 		fmt.Fprintf(&w, "\tif d, err := New%s(testOptions(%q), testWith(t, %q)...); err == nil {\n", n, name, name)
-		fmt.Fprintf(&w, "\t\tif d.Type() != %sType() {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
+		fmt.Fprintf(&w, "\t\tif d.Type().ID != %sID {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
 		for _, cr := range m.servers {
 			if _, ok := g.accessor(cr); !ok {
 				continue

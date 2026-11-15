@@ -21,10 +21,9 @@ const (
 )
 
 // RoboticVacuumCleanerType returns the RoboticVacuumCleaner device type, matter.js's packages/node/src/devices/robotic-vacuum-cleaner.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#roboticvacuumcleaner. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func RoboticVacuumCleanerType() *Type { return &typeRoboticVacuumCleaner }
+// its cluster requirements are listed in docs/reference/device-types.md#roboticvacuumcleaner. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func RoboticVacuumCleanerType() *Type { return typeRoboticVacuumCleaner.clone() }
 
 // typeRoboticVacuumCleaner holds [RoboticVacuumCleanerType]'s cluster requirements.
 var typeRoboticVacuumCleaner = Type{

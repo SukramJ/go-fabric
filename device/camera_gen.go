@@ -24,10 +24,9 @@ const (
 )
 
 // CameraType returns the Camera device type, matter.js's packages/node/src/devices/camera.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#camera. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func CameraType() *Type { return &typeCamera }
+// its cluster requirements are listed in docs/reference/device-types.md#camera. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func CameraType() *Type { return typeCamera.clone() }
 
 // typeCamera holds [CameraType]'s cluster requirements.
 var typeCamera = Type{

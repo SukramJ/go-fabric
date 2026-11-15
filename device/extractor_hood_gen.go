@@ -20,10 +20,9 @@ const (
 )
 
 // ExtractorHoodType returns the ExtractorHood device type, matter.js's packages/node/src/devices/extractor-hood.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#extractorhood. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func ExtractorHoodType() *Type { return &typeExtractorHood }
+// its cluster requirements are listed in docs/reference/device-types.md#extractorhood. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func ExtractorHoodType() *Type { return typeExtractorHood.clone() }
 
 // typeExtractorHood holds [ExtractorHoodType]'s cluster requirements.
 var typeExtractorHood = Type{

@@ -35,10 +35,9 @@ const (
 )
 
 // RootNodeType returns the RootNode device type, matter.js's packages/node/src/endpoints/root.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#rootnode. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func RootNodeType() *Type { return &typeRootNode }
+// its cluster requirements are listed in docs/reference/device-types.md#rootnode. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func RootNodeType() *Type { return typeRootNode.clone() }
 
 // typeRootNode holds [RootNodeType]'s cluster requirements.
 var typeRootNode = Type{
@@ -152,6 +151,11 @@ type RootNode struct{ *Device }
 // NewRootNode returns a RootNode device: its mandatory server clusters and the
 // optional ones declared, each with its default server or the host's —
 // [FromSpec] with Type RootNodeID (see [New]).
+//
+// Deprecated: the root endpoint is the node's (node.Node.Root), not a
+// device: NewRootNode always refuses, its root clusters have no
+// committed definitions. RootNodeType stays for [Lookup]. Removable in
+// the next minor release.
 func NewRootNode(opts Options, decls ...Declaration) (*RootNode, error) {
 	d, err := FromSpec(Spec{Type: RootNodeID, Options: opts, Declarations: decls})
 	if d == nil {

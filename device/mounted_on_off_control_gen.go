@@ -21,10 +21,9 @@ const (
 )
 
 // MountedOnOffControlType returns the MountedOnOffControl device type, matter.js's packages/node/src/devices/mounted-on-off-control.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#mountedonoffcontrol. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func MountedOnOffControlType() *Type { return &typeMountedOnOffControl }
+// its cluster requirements are listed in docs/reference/device-types.md#mountedonoffcontrol. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func MountedOnOffControlType() *Type { return typeMountedOnOffControl.clone() }
 
 // typeMountedOnOffControl holds [MountedOnOffControlType]'s cluster requirements.
 var typeMountedOnOffControl = Type{

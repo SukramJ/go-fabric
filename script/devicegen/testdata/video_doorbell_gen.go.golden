@@ -17,15 +17,15 @@ const (
 )
 
 // VideoDoorbellType returns the VideoDoorbell device type, matter.js's packages/node/src/devices/video-doorbell.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#videodoorbell. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func VideoDoorbellType() *Type { return &typeVideoDoorbell }
+// its cluster requirements are listed in docs/reference/device-types.md#videodoorbell. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func VideoDoorbellType() *Type { return typeVideoDoorbell.clone() }
 
 // typeVideoDoorbell holds [VideoDoorbellType]'s cluster requirements.
 var typeVideoDoorbell = Type{
 	ID: VideoDoorbellID, Name: "VideoDoorbell", Revision: VideoDoorbellRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
+	components: []schema.DeviceTypeID{CameraID, DoorbellID},
 }
 
 // VideoDoorbell is an endpoint of the VideoDoorbell device type, a composite: its
@@ -44,7 +44,7 @@ func NewVideoDoorbell(opts Options, camera *Camera, doorbell *Doorbell, decls ..
 	if camera == nil || doorbell == nil {
 		return nil, fmt.Errorf("%w: VideoDoorbell needs its components Camera and Doorbell", ErrComposition)
 	}
-	d, err := FromSpec(Spec{Type: VideoDoorbellID, Options: opts, Declarations: decls})
+	d, err := newOfSpec(Spec{Type: VideoDoorbellID, Options: opts, Declarations: decls})
 	if d == nil {
 		return nil, err
 	}

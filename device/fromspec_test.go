@@ -19,7 +19,7 @@ import (
 // endpoint Spec's client clusters and opt-ins.
 func sameDevice(t *testing.T, name string, a, b *Device) {
 	t.Helper()
-	if a.Type() != b.Type() {
+	if a.Type().ID != b.Type().ID {
 		t.Errorf("%s: types %s and %s", name, a.Type().Name, b.Type().Name)
 		return
 	}

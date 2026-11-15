@@ -20,10 +20,9 @@ const (
 )
 
 // FanType returns the Fan device type, matter.js's packages/node/src/devices/fan.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#fan. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func FanType() *Type { return &typeFan }
+// its cluster requirements are listed in docs/reference/device-types.md#fan. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func FanType() *Type { return typeFan.clone() }
 
 // typeFan holds [FanType]'s cluster requirements.
 var typeFan = Type{

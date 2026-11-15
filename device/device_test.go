@@ -367,7 +367,7 @@ func TestSpec(t *testing.T) {
 // TestTypeLookups covers the registry and the requirement lookups.
 func TestTypeLookups(t *testing.T) {
 	t.Parallel()
-	if ty, ok := Lookup(uint32(DimmableLightID)); !ok || ty != DimmableLightType() {
+	if ty, ok := Lookup(uint32(DimmableLightID)); !ok || ty.ID != DimmableLightID {
 		t.Error("Lookup(uint32(DimmableLight))")
 	}
 	if _, ok := Lookup(uint32(0xFFFF)); ok {

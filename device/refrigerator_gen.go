@@ -20,10 +20,9 @@ const (
 )
 
 // RefrigeratorType returns the Refrigerator device type, matter.js's packages/node/src/devices/refrigerator.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#refrigerator. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func RefrigeratorType() *Type { return &typeRefrigerator }
+// its cluster requirements are listed in docs/reference/device-types.md#refrigerator. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func RefrigeratorType() *Type { return typeRefrigerator.clone() }
 
 // typeRefrigerator holds [RefrigeratorType]'s cluster requirements.
 var typeRefrigerator = Type{

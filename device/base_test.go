@@ -54,7 +54,7 @@ func TestBaseOptionalOnEveryType(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if d.Type() != ty {
+			if d.Type().ID != ty.ID {
 				t.Error("the device's type is not the type it was built from")
 			}
 			if _, listed := ty.Server(fixedlabeldef.ClusterID); listed {

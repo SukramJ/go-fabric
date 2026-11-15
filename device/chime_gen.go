@@ -18,10 +18,9 @@ const (
 )
 
 // ChimeType returns the Chime device type, matter.js's packages/node/src/devices/chime.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#chime. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func ChimeType() *Type { return &typeChime }
+// its cluster requirements are listed in docs/reference/device-types.md#chime. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func ChimeType() *Type { return typeChime.clone() }
 
 // typeChime holds [ChimeType]'s cluster requirements.
 var typeChime = Type{

@@ -21,10 +21,9 @@ const (
 )
 
 // BridgedNodeType returns the BridgedNode device type, matter.js's packages/node/src/endpoints/bridged-node.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#bridgednode. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func BridgedNodeType() *Type { return &typeBridgedNode }
+// its cluster requirements are listed in docs/reference/device-types.md#bridgednode. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func BridgedNodeType() *Type { return typeBridgedNode.clone() }
 
 // typeBridgedNode holds [BridgedNodeType]'s cluster requirements.
 var typeBridgedNode = Type{
