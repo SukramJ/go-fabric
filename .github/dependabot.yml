@@ -1,8 +1,9 @@
 version: 2
 updates:
-  # The module's own Go dependencies. Four direct requires (filippo.io/nistec,
-  # github.com/miekg/dns, golang.org/x/net, modernc.org/sqlite) plus their
-  # transitive set — see go.mod.
+  # The module's own Go dependencies. Five direct requires (filippo.io/nistec,
+  # github.com/miekg/dns, golang.org/x/net, golang.org/x/tools,
+  # modernc.org/sqlite) plus their transitive set and the apidiff tool's
+  # module — see go.mod.
   #
   # Two of them are load-bearing for the licence position recorded in
   # THIRD-PARTY-NOTICES.md, so a major bump gets its own PR rather than
@@ -98,6 +99,45 @@ updates:
       default-days: 7
     commit-message:
       prefix: "ci"
+    # Minor and patch bumps in one group; a major bump comes as a pull
+    # request of its own, which the auto-merge workflow does not queue
+    # (review II, R2-P5-sup-08).
     groups:
       github-actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # The certification harness image's build inputs
+  # (internal/chiptool/image/Dockerfile): the ubuntu base its CHIP build
+  # stages start from, pinned by digest (R2-P5-sup-07). Dependabot proposes
+  # a new digest of the same tag; a new Ubuntu release is matter.js's
+  # Dockerfile's decision first, so version updates are ignored. A merged
+  # bump changes nothing until the image is rebuilt (chip-image.yml) and
+  # its digest pinned in the Makefile — deliberately, like every image bump.
+  - package-ecosystem: docker
+    directory: "/internal/chiptool/image"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+    ignore:
+      - dependency-name: "ubuntu"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+  # The documentation site's build (docs/requirements.txt, pages.yml). Its
+  # header asks for versions released at least two weeks before they are
+  # pinned: the cooldown.
+  - package-ecosystem: pip
+    directory: "/docs"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "docs(deps)"
+
+  # script/ble-virtual (package.json, package-lock.json) has no entry on
+  # purpose: its four direct requires are one matter.js prerelease build,
+  # pinned deliberately for the ble-virtual leg, and moved by hand.
