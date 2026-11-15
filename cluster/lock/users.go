@@ -165,6 +165,8 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 			Credentials:             []store.DoorLockCredentialRef{},
 			CreatorFabricIndex:      fabricIndex,
 			LastModifiedFabricIndex: fabricIndex,
+			CreatedThroughMatter:    true,
+			ModifiedThroughMatter:   true,
 		}
 		if !req.UserName.Null {
 			user.UserName = req.UserName.Value
@@ -219,7 +221,7 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 		if !req.CredentialRule.Null {
 			existing.CredentialRule = uint8(req.CredentialRule.Value)
 		}
-		existing.LastModifiedFabricIndex = fabricIndex
+		existing.LastModifiedFabricIndex, existing.ModifiedThroughMatter = fabricIndex, true
 		s.dirty = true
 		s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeModify, &userIndex, &userIndex)
 	default:
@@ -272,9 +274,23 @@ func (s *DoorLockServer) getUserLocked(req lockdef.GetUserRequest) (any, error) 
 		creds = append(creds, lockdef.CredentialStruct{CredentialType: lockdef.CredentialTypeEnum(c.Type), CredentialIndex: c.Index})
 	}
 	resp.Credentials = spec.ValueOf(creds)
-	resp.CreatorFabricIndex = spec.ValueOf(user.CreatorFabricIndex)
-	resp.LastModifiedFabricIndex = spec.ValueOf(user.LastModifiedFabricIndex)
+	resp.CreatorFabricIndex = fabricThroughMatter(user.CreatedThroughMatter, user.CreatorFabricIndex)
+	resp.LastModifiedFabricIndex = fabricThroughMatter(user.ModifiedThroughMatter, user.LastModifiedFabricIndex)
 	return resp, nil
+}
+
+// fabricThroughMatter is a record's creator or last-modifier fabric as
+// GetUser and GetCredentialStatus answer it (R2-P5-port-08): the index
+// when a Matter command made the creation or the change, null for a record
+// the host seeded (DoorLockConfig.Initial), which no fabric made.
+// connectedhomeip sets both only for a record made through Matter IM
+// (src/app/clusters/door-lock-server/CodegenIntegration.cpp:570-578,
+// :967-974 at 6170af84).
+func fabricThroughMatter(throughMatter bool, fabricIndex uint8) spec.Nullable[uint8] {
+	if !throughMatter {
+		return spec.NullOf[uint8]()
+	}
+	return spec.ValueOf(fabricIndex)
 }
 
 func (s *DoorLockServer) handleClearUser(ctx context.Context, fields any) (any, error) {

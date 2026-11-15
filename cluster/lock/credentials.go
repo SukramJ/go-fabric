@@ -161,6 +161,8 @@ func (s *DoorLockServer) addCredentialCaseLocked(ctx context.Context, req lockde
 			Credentials:             []store.DoorLockCredentialRef{ref},
 			CreatorFabricIndex:      fabricIndex,
 			LastModifiedFabricIndex: fabricIndex,
+			CreatedThroughMatter:    true,
+			ModifiedThroughMatter:   true,
 		}
 		if !req.UserStatus.Null {
 			user.UserStatus = uint8(req.UserStatus.Value)
@@ -182,7 +184,7 @@ func (s *DoorLockServer) addCredentialCaseLocked(ctx context.Context, req lockde
 			return respond(resourceExhausted, nil)
 		}
 		user.Credentials = append(user.Credentials, ref)
-		user.LastModifiedFabricIndex = fabricIndex
+		user.LastModifiedFabricIndex, user.ModifiedThroughMatter = fabricIndex, true
 		s.dirty = true
 	}
 	s.emitLockUserChangeLocked(ctx, credentialTypeToLockDataType(req.Credential.CredentialType), lockdef.DataOperationTypeAdd, &owner, &credIndex)
@@ -219,8 +221,8 @@ func (s *DoorLockServer) getCredentialStatusLocked(req lockdef.GetCredentialStat
 	}
 	resp.CredentialExists = true
 	resp.UserIndex = nullable(s.ownerOf(credType, index))
-	resp.CreatorFabricIndex = spec.ValueOf(cred.CreatorFabricIndex)
-	resp.LastModifiedFabricIndex = spec.ValueOf(cred.LastModifiedFabricIndex)
+	resp.CreatorFabricIndex = fabricThroughMatter(cred.CreatedThroughMatter, cred.CreatorFabricIndex)
+	resp.LastModifiedFabricIndex = fabricThroughMatter(cred.ModifiedThroughMatter, cred.LastModifiedFabricIndex)
 	return resp
 }
 
@@ -453,6 +455,7 @@ func (s *DoorLockServer) addCredentialLocked(credType uint8, index uint16, data 
 	}
 	s.data.Credentials = append(s.data.Credentials, store.DoorLockCredential{
 		Type: credType, Index: index, Data: enc, CreatorFabricIndex: fabricIndex, LastModifiedFabricIndex: fabricIndex,
+		CreatedThroughMatter: true, ModifiedThroughMatter: true,
 	})
 	s.dirty = true
 	return nil
@@ -465,7 +468,7 @@ func (s *DoorLockServer) updateCredentialDataLocked(credType uint8, index uint16
 		return spec.Errorf(im.StatusFailure, "lock: encrypt the credential: %v", err)
 	}
 	if c := s.findCredential(credType, index); c != nil {
-		c.Data, c.LastModifiedFabricIndex = enc, fabricIndex
+		c.Data, c.LastModifiedFabricIndex, c.ModifiedThroughMatter = enc, fabricIndex, true
 		s.dirty = true
 	}
 	return nil

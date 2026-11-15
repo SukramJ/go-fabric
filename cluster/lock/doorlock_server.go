@@ -288,7 +288,10 @@ type DoorLockConfig struct {
 	// Initial holds the users, credentials and schedules a lock starts
 	// with when its AuthStore holds none for it, or without an AuthStore:
 	// matter.js's state given at endpoint creation. Credential data is in
-	// clear here; the server encrypts it.
+	// clear here; the server encrypts it. A seeded record keeps
+	// CreatedThroughMatter and ModifiedThroughMatter false, so GetUser and
+	// GetCredentialStatus answer its fabric indexes null until a Matter
+	// command changes it.
 	Initial store.DoorLockAuth
 	// Auth persists the records; nil keeps them in memory. AuthKey names
 	// this lock's records in it.
