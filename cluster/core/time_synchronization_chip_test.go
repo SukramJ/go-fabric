@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -93,6 +94,32 @@ func (s *tsSettings) SetSettings(_ context.Context, values map[string]string) er
 	}
 	for k, v := range values {
 		s.m[k] = v
+	}
+	return nil
+}
+
+func (s *tsSettings) DeleteSettings(_ context.Context, keys ...string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fail {
+		return errors.New("storage full")
+	}
+	for _, k := range keys {
+		delete(s.m, k)
+	}
+	return nil
+}
+
+func (s *tsSettings) DeleteSettingsWithPrefix(_ context.Context, prefix string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fail {
+		return errors.New("storage full")
+	}
+	for k := range s.m {
+		if strings.HasPrefix(k, prefix) {
+			delete(s.m, k)
+		}
 	}
 	return nil
 }

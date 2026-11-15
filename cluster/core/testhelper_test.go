@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
+	"slices"
 	"sync"
 	"testing"
 
@@ -36,6 +37,8 @@ type fakeStore struct {
 	gcast     map[[2]uint64]mstore.GroupcastGroup  // key: [fabric, group-id]
 	prior     map[uint8]fakePrior                  // key: fabric of a pending UpdateNOC
 	settings  map[string]string
+	owed      []mstore.OwedFabricEvent
+	owedID    uint64
 }
 
 // fakePrior is what a pending UpdateNOC replaced (store.Fabrics
@@ -157,6 +160,10 @@ func (f *fakeStore) RollbackFabric(ctx context.Context, fabricIndex uint8) (msto
 	if !ok {
 		f.mu.Unlock()
 		return mstore.FabricCommitted, mstore.ErrFabricNotFound
+	}
+	if r.Pending != mstore.FabricCommitted {
+		f.owedID++
+		f.owed = append(f.owed, mstore.OwedFabricEvent{ID: f.owedID, Kind: r.Pending, Fabric: r})
 	}
 	switch r.Pending {
 	case mstore.FabricCommitted:
@@ -393,6 +400,55 @@ func (f *fakeStore) RemoveGroupKeySet(_ context.Context, fabricIndex uint8, grou
 		if k[0] == uint64(fabricIndex) && m.GroupKeySetID == groupKeySetID {
 			delete(f.groupMaps, k)
 		}
+	}
+	return nil
+}
+
+// OwedFabricEvents and AckOwedFabricEvent hold the events RollbackFabric
+// records, as store.Fabrics describes.
+func (f *fakeStore) OwedFabricEvents(context.Context) ([]mstore.OwedFabricEvent, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return slices.Clone(f.owed), nil
+}
+
+func (f *fakeStore) AckOwedFabricEvent(_ context.Context, id uint64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.owed = slices.DeleteFunc(f.owed, func(ev mstore.OwedFabricEvent) bool { return ev.ID == id })
+	return nil
+}
+
+// UpdateFabricVendorVerification writes both parts under the one lock.
+func (f *fakeStore) UpdateFabricVendorVerification(_ context.Context, fabricIndex uint8, u mstore.FabricVendorUpdate) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.fabrics[fabricIndex]
+	if !ok {
+		return mstore.ErrFabricNotFound
+	}
+	if u.VendorID != nil {
+		r.VendorID = *u.VendorID
+	}
+	if u.SetVIDData {
+		r.VIDVerificationStatement, r.VVSC = noneIfEmpty(u.Statement), noneIfEmpty(u.VVSC)
+	}
+	f.fabrics[fabricIndex] = r
+	return nil
+}
+
+// ReplaceGroupKeyMappings swaps the fabric's map under the one lock.
+func (f *fakeStore) ReplaceGroupKeyMappings(_ context.Context, fabricIndex uint8, mappings []mstore.GroupKeyMapping) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k := range f.groupMaps {
+		if k[0] == uint64(fabricIndex) {
+			delete(f.groupMaps, k)
+		}
+	}
+	for _, m := range mappings {
+		m.FabricIndex = fabricIndex
+		f.groupMaps[gmKey(fabricIndex, m.GroupID)] = m
 	}
 	return nil
 }

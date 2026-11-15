@@ -190,6 +190,32 @@ ON CONFLICT(fabric_index, group_id) DO UPDATE SET
 	return nil
 }
 
+// ReplaceGroupKeyMappings implements [GroupKeys] in one transaction: the
+// fabric's rows are deleted and mappings inserted in input order; a
+// duplicate GroupID fails the primary key, an unknown fabric the foreign
+// key, and either rolls the whole write back.
+func (s *Store) ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, mappings []GroupKeyMapping) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: replace group key mappings: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM matter_group_key_map WHERE fabric_index = ?`, fabricIndex); err != nil {
+		return fmt.Errorf("store: replace group key mappings: delete: %w", err)
+	}
+	for i, m := range mappings {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id) VALUES (?, ?, ?)`,
+			fabricIndex, m.GroupID, m.GroupKeySetID); err != nil {
+			return fmt.Errorf("store: replace group key mappings: insert %d (group %d): %w", i, m.GroupID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: replace group key mappings: commit: %w", err)
+	}
+	return nil
+}
+
 // RemoveGroupKeyMapping deletes a (fabric, group_id) binding.
 func (s *Store) RemoveGroupKeyMapping(ctx context.Context, fabricIndex uint8, groupID uint16) error {
 	if _, err := s.db.ExecContext(ctx, `

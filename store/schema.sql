@@ -188,6 +188,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS matter_acl_position
 -- Sigma1 with the resumption-id field populated, skipping the full
 -- handshake.
 --
+-- The session_* and following columns (migration v9) are the peer's
+-- session parameters a CASE client resumes with
+-- (store.ResumptionRecord.SessionParameters); 0 is absent, and a record
+-- the responder wrote carries none. One record per peer serves both roles.
+--
 -- case_authenticated_tags carries the CATs from the initiator's NOC
 -- subject as JSON (e.g. [1099511627777]); NULL and '[]' both mean
 -- "no CATs". They must survive across restarts so a resumed session
@@ -200,6 +205,15 @@ CREATE TABLE IF NOT EXISTS matter_resumption (
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_used_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     case_authenticated_tags BLOB NOT NULL DEFAULT '[]',
+    session_idle_interval INTEGER NOT NULL DEFAULT 0 CHECK(session_idle_interval BETWEEN 0 AND 4294967295),
+    session_active_interval INTEGER NOT NULL DEFAULT 0 CHECK(session_active_interval BETWEEN 0 AND 4294967295),
+    session_active_threshold INTEGER NOT NULL DEFAULT 0 CHECK(session_active_threshold BETWEEN 0 AND 65535),
+    data_model_revision INTEGER NOT NULL DEFAULT 0 CHECK(data_model_revision BETWEEN 0 AND 65535),
+    interaction_model_revision INTEGER NOT NULL DEFAULT 0 CHECK(interaction_model_revision BETWEEN 0 AND 65535),
+    specification_version INTEGER NOT NULL DEFAULT 0 CHECK(specification_version BETWEEN 0 AND 4294967295),
+    max_paths_per_invoke INTEGER NOT NULL DEFAULT 0 CHECK(max_paths_per_invoke BETWEEN 0 AND 65535),
+    supported_transports INTEGER NOT NULL DEFAULT 0 CHECK(supported_transports BETWEEN 0 AND 65535),
+    max_tcp_message_size INTEGER NOT NULL DEFAULT 0 CHECK(max_tcp_message_size BETWEEN 0 AND 4294967295),
     PRIMARY KEY(fabric_index, peer_node_id),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
@@ -392,4 +406,23 @@ CREATE TABLE IF NOT EXISTS matter_icd_registrations (
     client_type         INTEGER  NOT NULL CHECK(client_type BETWEEN 0 AND 255),
     PRIMARY KEY(fabric_index, position),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
+);
+
+-- matter_owed_fabric_events keeps the fabric hooks a rollback owes
+-- (store.OwedFabricEvent): RollbackFabric records one in its own
+-- transaction — kind 1 for a removed fabric (an uncommitted AddNOC), 2 for
+-- a reverted one (an uncommitted UpdateNOC) — with the fabric's identity as
+-- the row held it before the rollback, and the node removes it once the
+-- hook ran (AckOwedFabricEvent). No foreign key: the fabric of a kind-1
+-- event is gone. New in review II, decision 109 (migration v9).
+CREATE TABLE IF NOT EXISTS matter_owed_fabric_events (
+    id                  INTEGER  PRIMARY KEY AUTOINCREMENT,
+    kind                INTEGER  NOT NULL CHECK(kind BETWEEN 1 AND 2),
+    fabric_index        INTEGER  NOT NULL CHECK(fabric_index BETWEEN 1 AND 254),
+    fabric_id           BLOB     NOT NULL,
+    node_id             BLOB     NOT NULL,
+    root_public_key     BLOB     NOT NULL,
+    compressed_id       BLOB     NOT NULL,
+    vendor_id           INTEGER  NOT NULL CHECK(vendor_id BETWEEN 0 AND 65535),
+    label               TEXT     NOT NULL DEFAULT ''
 );

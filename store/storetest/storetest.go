@@ -63,6 +63,8 @@ var cases = []testCase{
 	{"fabrics/duplicate-root-and-id", fabricsDuplicate},
 	{"fabrics/pending-add", fabricsPendingAdd},
 	{"fabrics/vid-verification", fabricsVIDVerification},
+	{"fabrics/vendor-verification", fabricsVendorVerificationCase},
+	{"fabrics/rollback-owes-event", fabricsRollbackOwesEventCase},
 	{"fabrics/commit", fabricsCommit},
 	{"fabrics/rollback-pending-add", fabricsRollbackPendingAdd},
 	{"fabrics/update-rollback", fabricsUpdateRollback},
@@ -77,12 +79,16 @@ var cases = []testCase{
 	{"acl", aclCase},
 	{"group-keys", groupKeysCase},
 	{"group-keys/ordering", groupKeysOrdering},
+	{"group-keys/replace-mappings", groupKeysReplaceMappingsCase},
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
+	{"resumption/session-parameters", resumptionSessionParametersCase},
 	{"server-subscriptions", serverSubscriptionsCase},
 	{"server-subscriptions/save-order", serverSubscriptionsSaveOrder},
 	{"settings", settingsCase},
 	{"settings/set-settings", setSettingsCase},
+	{"settings/delete", settingsDeleteCase},
+	{"settings/delete-prefix", settingsDeletePrefixCase},
 	{"ota", otaCase},
 	{"thermostat-presets", presetsCase},
 	{"door-locks", doorLocksCase},
@@ -1114,6 +1120,25 @@ func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 	subs[0][0] = 'Y'
 	if again, _ := p.LoadServerSubscriptions(ctx); string(again[0]) != "sub" {
 		t.Fatal("mutating a read subscription payload changed the store")
+	}
+
+	res := resumptionRec(idx, 7, 1)
+	res.CASEAuthTags = []uint32{0x00010001}
+	must(t, p.UpsertResumption(ctx, res))
+	res.ResumptionID[0] ^= 0xFF
+	res.SharedSecret[0] ^= 0xFF
+	res.CASEAuthTags[0] = 9
+	gotRes, err := p.GetResumptionByPeer(ctx, idx, 7)
+	must(t, err)
+	if want := resumptionRec(idx, 7, 1); !bytes.Equal(gotRes.ResumptionID, want.ResumptionID) || !bytes.Equal(gotRes.SharedSecret, want.SharedSecret) || gotRes.CASEAuthTags[0] != 0x00010001 {
+		t.Fatal("mutating a written ResumptionRecord changed the store")
+	}
+	gotRes.ResumptionID[0] ^= 0xFF
+	gotRes.SharedSecret[0] ^= 0xFF
+	gotRes.CASEAuthTags[0] = 9
+	if again, _ := p.GetResumptionByPeer(ctx, idx, 7); !bytes.Equal(again.ResumptionID, resumptionRec(idx, 7, 1).ResumptionID) ||
+		!bytes.Equal(again.SharedSecret, resumptionRec(idx, 7, 1).SharedSecret) || again.CASEAuthTags[0] != 0x00010001 {
+		t.Fatal("mutating a read ResumptionRecord changed the store")
 	}
 
 	presets := []byte{1}

@@ -32,6 +32,7 @@ var erasedTables = []string{
 	"matter_doorlock_credentials",
 	"matter_doorlock_schedules",
 	"matter_icd_registrations",
+	"matter_owed_fabric_events",
 }
 
 // ErrScrubIncomplete is the error of an [Store.Erase] whose deletes

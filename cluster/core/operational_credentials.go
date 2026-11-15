@@ -277,11 +277,14 @@ type StoreFacade interface {
 	// RemoveGroupKeysByFabric erases all group-key-set rows for the
 	// given fabric.
 	RemoveGroupKeysByFabric(ctx context.Context, fabricIndex uint8) error
-	// UpdateFabricVendorID and UpdateFabricVIDVerification are
-	// SetVIDVerificationStatement's writes; the VID verification data is
+	// UpdateFabricVendorVerification is SetVIDVerificationStatement's one
+	// write of the vendor id and the VID verification data; the data is
 	// part of the fabric row ([store.FabricRecord].VIDVerificationStatement,
 	// .VVSC), so it leaves with the row and a pending UpdateNOC's rollback
-	// drops what its window wrote.
+	// drops what its window wrote. UpdateFabricVendorID and
+	// UpdateFabricVIDVerification restore what an UpdateNOC of a release
+	// before v8 replaced (operational_credentials_pending.go).
+	UpdateFabricVendorVerification(ctx context.Context, fabricIndex uint8, u store.FabricVendorUpdate) error
 	UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, vendorID uint16) error
 	UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error
 	// UpdateFabricCredentials, CommitFabric and RollbackFabric move a
@@ -292,6 +295,12 @@ type StoreFacade interface {
 	UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, c store.FabricCredentials) error
 	CommitFabric(ctx context.Context, fabricIndex uint8) error
 	RollbackFabric(ctx context.Context, fabricIndex uint8) (store.FabricPending, error)
+	// OwedFabricEvents and AckOwedFabricEvent acknowledge the hook a
+	// RollbackFabric owes once it ran ([store.OwedFabricEvent]): a rollback
+	// at run time reports its consequences itself and acknowledges them
+	// after; one at construction is the node's to report at its start.
+	OwedFabricEvents(ctx context.Context) ([]store.OwedFabricEvent, error)
+	AckOwedFabricEvent(ctx context.Context, id uint64) error
 	// GetSetting and SetSettings serve a start after an upgrade only: a
 	// release before the row carried its commit state kept it under two
 	// settings keys, which a start rolls back and clears once
@@ -853,6 +862,7 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, updated []store.FabricRecord) {
 	for i := range updated {
 		o.reportUpdateRolledBack(ctx, &updated[i])
+		o.ackOwedFabricEvents(ctx, store.FabricPendingUpdate, updated[i].FabricIndex)
 	}
 	for i := range added {
 		f := &added[i]
@@ -874,6 +884,30 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 		o.mu.RUnlock()
 		if hook != nil {
 			hook(ctx, f.FabricIndex)
+		}
+		o.ackOwedFabricEvents(ctx, store.FabricPendingAdd, f.FabricIndex)
+	}
+}
+
+// ackOwedFabricEvents acknowledges the owed events of kind the store holds
+// for fabricIndex ([store.Fabrics.AckOwedFabricEvent]): the consequences
+// of that rollback ran. It runs after them, so a crash before it leaves
+// the event owed and the node's next start runs them again — at least
+// once. A failed read or acknowledgement is logged and leaves the event
+// owed.
+func (o *OperationalCredentials) ackOwedFabricEvents(ctx context.Context, kind store.FabricPending, fabricIndex uint8) {
+	ctx = context.WithoutCancel(ctx)
+	owed, err := o.store.OwedFabricEvents(ctx)
+	if err != nil {
+		o.logger().Warn("matter.opcreds.owed_fabric_event.list_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+		return
+	}
+	for _, ev := range owed {
+		if ev.Kind != kind || ev.Fabric.FabricIndex != fabricIndex {
+			continue
+		}
+		if err := o.store.AckOwedFabricEvent(ctx, ev.ID); err != nil {
+			o.logger().Warn("matter.opcreds.owed_fabric_event.ack_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 		}
 	}
 }
@@ -2952,10 +2986,18 @@ func EncodeECDHFromPrivate(priv *ecdsa.PrivateKey) (*ecdh.PrivateKey, error) {
 // OperationalCredentialsCluster.cpp::HandleAddNOC (fabric table revert,
 // group keys, ACL entries). A rollback that fails is logged: the row stays
 // pending, and the fail-safe's end or the next start rolls it back
-// (review II, R2-P2-comm-05).
+// (review II, R2-P2-comm-05). The fabric was not announced yet, so the
+// removal the rollback records as owed is acknowledged at once; a crash
+// between the two leaves it owed, and the next start reports the removal
+// of a fabric no hook announced.
 func (o *OperationalCredentials) rollbackFailedAddNOC(ctx context.Context, fabricIndex uint8) {
-	if _, err := o.store.RollbackFabric(context.WithoutCancel(ctx), fabricIndex); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
+	was, err := o.store.RollbackFabric(context.WithoutCancel(ctx), fabricIndex)
+	if err != nil && !errors.Is(err, store.ErrFabricNotFound) {
 		o.logger().Error("matter.opcreds.addnoc.rollback_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+		return
+	}
+	if was == store.FabricPendingAdd {
+		o.ackOwedFabricEvents(ctx, store.FabricPendingAdd, fabricIndex)
 	}
 }
 

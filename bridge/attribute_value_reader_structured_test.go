@@ -183,6 +183,10 @@ func (fakeGroupStore) SetGroupKeyMapping(context.Context, matterstore.GroupKeyMa
 
 func (fakeGroupStore) RemoveGroupKeyMapping(context.Context, uint8, uint16) error { return nil }
 
+func (fakeGroupStore) ReplaceGroupKeyMappings(context.Context, uint8, []matterstore.GroupKeyMapping) error {
+	return nil
+}
+
 func (fakeGroupStore) ListGroupKeyMappings(context.Context, uint8) ([]matterstore.GroupKeyMapping, error) {
 	return nil, nil
 }

@@ -114,11 +114,11 @@ func TestMigrationsMatchApply(t *testing.T) {
 func TestMigrationsPin(t *testing.T) {
 	t.Parallel()
 	ms := store.Migrations()
-	if len(ms) != 8 {
-		t.Fatalf("len(Migrations()) = %d, want 8", len(ms))
+	if len(ms) != 9 {
+		t.Fatalf("len(Migrations()) = %d, want 9", len(ms))
 	}
-	if last := ms[len(ms)-1].Version; last != "v8" {
-		t.Errorf("last migration = %s, want v8", last)
+	if last := ms[len(ms)-1].Version; last != "v9" {
+		t.Errorf("last migration = %s, want v9", last)
 	}
 	seen := map[string]bool{}
 	for _, m := range ms {
@@ -134,7 +134,7 @@ func TestMigrationsPin(t *testing.T) {
 // it: record the new value in the CHANGELOG entry of that change.
 func TestSchemaFingerprintRelease(t *testing.T) {
 	t.Parallel()
-	const want = "dbf27c133dac78346ac538dfb586d205594450d68c9edcc497d4f2f3dead5460"
+	const want = "63c92351ef072e5dfa0f84f84b2ad8190cfb196b335e5c662a2cc3ff1f70b030"
 	if got := fingerprint(t, openTestDB(t)); got != want {
 		t.Errorf("SchemaFingerprint after Apply = %s, want %s", got, want)
 	}
@@ -207,8 +207,8 @@ func TestSchemaTablesAreTheSchemas(t *testing.T) {
 		tables = append(tables, n)
 	}
 	_ = rows.Close()
-	if len(tables) != 19 {
-		t.Errorf("Apply created %d matter_* tables, want 19: %v", len(tables), tables)
+	if len(tables) != 20 {
+		t.Errorf("Apply created %d matter_* tables, want 20: %v", len(tables), tables)
 	}
 	for _, table := range tables {
 		other := openTestDB(t)
@@ -303,5 +303,68 @@ func TestApplyUpgradesEveryStep(t *testing.T) {
 		if got := fingerprint(t, db); got != want {
 			t.Errorf("Apply on a database at %s: fingerprint %s, want %s", m.Version, got, want)
 		}
+	}
+}
+
+// TestMigrationV9KeepsResumptionRows: a resumption record stored on a v8
+// database reads back after Apply with no session parameters (0 is
+// absent), and an owed fabric event can be recorded; v9's Down keeps the
+// record, drops its session parameters and the owed events with their
+// table.
+func TestMigrationV9KeepsResumptionRows(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openEmptyDB(t)
+	applyUp(t, db, "v8")
+	const fabric = `INSERT INTO matter_fabrics (fabric_index, fabric_id, node_id, root_public_key, vendor_id, compressed_id, pending)
+VALUES (1, X'0000000000000001', X'0000000000000002', X'04', 65521, X'0102030405060708', 1)`
+	if _, err := db.ExecContext(ctx, fabric); err != nil {
+		t.Fatal(err)
+	}
+	id, secret := strings.Repeat("ab", 16), strings.Repeat("cd", 32)
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_resumption (fabric_index, peer_node_id, resumption_id, shared_secret)
+VALUES (1, X'0000000000000005', X'`+id+`', X'`+secret+`')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	s := store.New(db)
+	rec, err := s.GetResumptionByPeer(ctx, 1, 5)
+	if err != nil {
+		t.Fatalf("the v8 record after Apply: %v", err)
+	}
+	if rec.SessionParameters != (store.ResumptionRecord{}).SessionParameters {
+		t.Errorf("the v8 record's session parameters = %+v, want none", rec.SessionParameters)
+	}
+	if was, err := s.RollbackFabric(ctx, 1); err != nil || was != store.FabricPendingAdd {
+		t.Fatalf("RollbackFabric = %v, %v", was, err)
+	}
+	if owed, err := s.OwedFabricEvents(ctx); err != nil || len(owed) != 1 {
+		t.Fatalf("OwedFabricEvents = %+v, %v; want the rollback's", owed, err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_fabrics (fabric_index, fabric_id, node_id, root_public_key, vendor_id, compressed_id)
+VALUES (2, X'0000000000000003', X'0000000000000002', X'04', 65521, X'0102030405060708')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertResumption(ctx, store.ResumptionRecord{
+		FabricIndex: 2, PeerNodeID: 6,
+		ResumptionID: []byte(strings.Repeat("r", 16)), SharedSecret: []byte(strings.Repeat("s", 32)),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	m := store.Migrations()[8]
+	if m.Version != "v9" {
+		t.Fatalf("step 9 is %s", m.Version)
+	}
+	if _, err := db.ExecContext(ctx, m.Down); err != nil {
+		t.Fatalf("v9 down: %v", err)
+	}
+	var rows int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_resumption WHERE fabric_index = 2`).Scan(&rows); err != nil || rows != 1 {
+		t.Errorf("resumption rows after v9 down = %d, %v; want 1", rows, err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_schema WHERE name = 'matter_owed_fabric_events'`).Scan(&rows); err != nil || rows != 0 {
+		t.Errorf("matter_owed_fabric_events after v9 down: %d, %v; want gone", rows, err)
 	}
 }

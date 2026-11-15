@@ -531,6 +531,23 @@ func (m *memGroupKeys) RemoveGroupKeyMapping(_ context.Context, f uint8, group u
 	return nil
 }
 
+func (m *memGroupKeys) ReplaceGroupKeyMappings(_ context.Context, f uint8, mappings []store.GroupKeyMapping) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	kept := m.maps[:0]
+	for _, h := range m.maps {
+		if h.FabricIndex != f {
+			kept = append(kept, h)
+		}
+	}
+	for _, g := range mappings {
+		g.FabricIndex = f
+		kept = append(kept, g)
+	}
+	m.maps = kept
+	return nil
+}
+
 func (m *memGroupKeys) ListGroupKeyMappings(_ context.Context, f uint8) ([]store.GroupKeyMapping, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

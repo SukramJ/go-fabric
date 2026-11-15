@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 )
 
 // Setting keys for persisted writable cluster attributes. Matter
@@ -96,11 +97,66 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value`, k, values[k]); err != ni
 }
 
 // DeleteSetting removes key; a key that is not there is no error.
+//
+// Deprecated: use [Store.DeleteSettings], which every [Settings] backend
+// implements. Removable in the next minor release.
 func (s *Store) DeleteSetting(ctx context.Context, key string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, key); err != nil {
 		return fmt.Errorf("store: delete setting %q: %w", key, err)
 	}
 	return nil
+}
+
+// DeleteSettings implements [Settings]: every key is deleted in one
+// transaction, so a failure on any key keeps all of them.
+func (s *Store) DeleteSettings(ctx context.Context, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: delete settings: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, k := range keys {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, k); err != nil {
+			return fmt.Errorf("store: delete settings: %q: %w", k, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: delete settings: commit: %w", err)
+	}
+	return nil
+}
+
+// DeleteSettingsWithPrefix implements [Settings] in one statement: the
+// keys from prefix up to, not including, prefix with its final "." raised
+// to "/" — exactly the keys that begin with prefix under the BINARY
+// collation the key column compares with.
+func (s *Store) DeleteSettingsWithPrefix(ctx context.Context, prefix string) error {
+	if err := checkSettingsPrefix(prefix); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key >= ? AND key < ?`,
+		prefix, settingsPrefixEnd(prefix)); err != nil {
+		return fmt.Errorf("store: delete settings with prefix %q: %w", prefix, err)
+	}
+	return nil
+}
+
+// checkSettingsPrefix refuses a prefix [Settings.DeleteSettingsWithPrefix]
+// does not accept: one that does not end in ".", the empty one included.
+func checkSettingsPrefix(prefix string) error {
+	if !strings.HasSuffix(prefix, ".") {
+		return fmt.Errorf(`store: delete settings with prefix %q: a prefix must end in "."`, prefix)
+	}
+	return nil
+}
+
+// settingsPrefixEnd is the first key after every key that begins with
+// prefix, which ends in ".": the prefix with that dot raised to "/".
+func settingsPrefixEnd(prefix string) string {
+	return prefix[:len(prefix)-1] + "/"
 }
 
 // GetMetadataCounter returns the persisted integer counter for key

@@ -75,6 +75,9 @@ type GroupStoreFacade interface {
 	RemoveGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeySetID uint16) error
 	SetGroupKeyMapping(ctx context.Context, m store.GroupKeyMapping) error
 	RemoveGroupKeyMapping(ctx context.Context, fabricIndex uint8, groupID uint16) error
+	// ReplaceGroupKeyMappings is a GroupKeyMap write's one store write: the
+	// fabric's whole map, atomic.
+	ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, mappings []store.GroupKeyMapping) error
 	ListGroupKeyMappings(ctx context.Context, fabricIndex uint8) ([]store.GroupKeyMapping, error)
 }
 
@@ -616,22 +619,14 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	if sameGroupKeyMap(existing, list) {
 		return false, nil
 	}
+	// The whole map in one write (store.GroupKeys ReplaceGroupKeyMappings):
+	// a refused write keeps the map held before it, under its DataVersion.
+	mappings := make([]store.GroupKeyMapping, 0, len(list))
 	for _, m := range list {
-		if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{
-			FabricIndex:   fabric,
-			GroupID:       m.GroupID,
-			GroupKeySetID: m.GroupKeySetID,
-		}); err != nil {
-			return false, fmt.Errorf("core: GroupKeyMap write: %w", err)
-		}
+		mappings = append(mappings, store.GroupKeyMapping{FabricIndex: fabric, GroupID: m.GroupID, GroupKeySetID: m.GroupKeySetID})
 	}
-	for _, prev := range existing {
-		if slices.ContainsFunc(list, func(m GroupKeyMapStruct) bool { return m.GroupID == prev.GroupID }) {
-			continue
-		}
-		if err := g.store.RemoveGroupKeyMapping(ctx, fabric, prev.GroupID); err != nil {
-			return false, fmt.Errorf("core: GroupKeyMap write: remove dropped binding %d: %w", prev.GroupID, err)
-		}
+	if err := g.store.ReplaceGroupKeyMappings(ctx, fabric, mappings); err != nil {
+		return false, fmt.Errorf("core: GroupKeyMap write: %w", err)
 	}
 	// A GroupKeyMap that changed advances DataVersion so DataVersionFilter
 	// evaluation detects the cluster changed; one written as it was held

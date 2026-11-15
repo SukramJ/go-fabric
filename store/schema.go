@@ -90,6 +90,10 @@ func Apply(ctx context.Context, db *sql.DB) error {
 //     vid_statement and vvsc columns and are deleted, in one transaction
 //     ([moveVIDSettings]). Once moved there is no key left, so the step
 //     finds nothing to do on the next boot.
+//   - matter_resumption gains the session-parameter columns of migration
+//     v9, each one it lacks, with v9's statements, in one transaction; the
+//     schema's CREATE TABLE IF NOT EXISTS creates v9's
+//     matter_owed_fabric_events.
 func Upgrade(ctx context.Context, db *sql.DB) error {
 	if err := dropGroupKeyMapKeySetForeignKey(ctx, db); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
@@ -97,25 +101,30 @@ func Upgrade(ctx context.Context, db *sql.DB) error {
 	if err := sealClearICDKeys(ctx, db); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
-	if err := addFabricPendingColumns(ctx, db); err != nil {
+	if err := addMigrationColumns(ctx, db, "v8"); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	if err := moveVIDSettings(ctx, db); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
+	if err := addMigrationColumns(ctx, db, "v9"); err != nil {
+		return fmt.Errorf("store: upgrade: %w", err)
+	}
 	return nil
 }
 
-// addFabricPendingColumns adds each column of migration v8 that its
-// table does not have yet, with v8's own statement, so the table text is
-// the one [Migrations] produces. It decides per column: a database from an
+// addMigrationColumns adds each column the migration version adds (v8:
+// the fabric pending mark, the VID verification data and the prior
+// values; v9: the resumption record's session parameters) that its table
+// does not have yet, with the migration's own statement, so the table text
+// is the one [Migrations] produces. It decides per column: a database from an
 // earlier release may lack one of the two tables, which the schema's
 // CREATE TABLE IF NOT EXISTS then creates with the columns already in it.
 // The statements run in one transaction, so a failure adds none of them;
 // a table that does not exist is left alone.
-func addFabricPendingColumns(ctx context.Context, db *sql.DB) error {
+func addMigrationColumns(ctx context.Context, db *sql.DB, version string) error {
 	var due []string
-	for _, m := range addColumnRE.FindAllStringSubmatch(mustMigrationFile("v8.up.sql"), -1) {
+	for _, m := range addColumnRE.FindAllStringSubmatch(mustMigrationFile(version+".up.sql"), -1) {
 		var tables, columns int
 		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, m[2]).Scan(&tables); err != nil {
 			return fmt.Errorf("inspect %s: %w", m[2], err)
@@ -135,16 +144,16 @@ func addFabricPendingColumns(ctx context.Context, db *sql.DB) error {
 	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("add the fabric pending columns: %w", err)
+		return fmt.Errorf("add the %s columns: %w", version, err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, stmt := range due {
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("add the fabric pending columns: %w", err)
+			return fmt.Errorf("add the %s columns: %w", version, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("add the fabric pending columns: %w", err)
+		return fmt.Errorf("add the %s columns: %w", version, err)
 	}
 	return nil
 }
