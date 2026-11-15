@@ -165,11 +165,11 @@ func TestCheckFailsAStaleFloor(t *testing.T) {
 }
 
 // TestCheckFailsAZeroFloorThatMeasuresCoverage: a zero floor — an entry
-// for a package with no statements or only a main — is held to the same
-// slack: a package that measures more than staleFloorSlack points has
-// gained tested code and needs a real floor, so the check fails and names
-// the floor to set. One that measures 0.0% (only main, as the reference
-// controller) or reports no statements passes (review II, R2-P1-misc-05).
+// for a package with no statements or only a main — is held without slack:
+// a package that measures anything has gained tested code and needs a real
+// floor, so the check fails and names the floor to set. One that measures
+// 0.0% (only main, as the reference controller) or reports no statements
+// and is marked unmeasurable passes (review II, R2-P1-misc-05).
 func TestCheckFailsAZeroFloorThatMeasuresCoverage(t *testing.T) {
 	t.Parallel()
 	res := check(
@@ -182,12 +182,36 @@ func TestCheckFailsAZeroFloorThatMeasuresCoverage(t *testing.T) {
 		[]packageFloor{
 			{pkg: "grown", min: 0, why: "declaration-only seam"},
 			{pkg: "mainonly", min: 0, why: "only main"},
-			{pkg: "seam", min: 0, why: "declaration-only seam"},
+			{pkg: "seam", min: 0, unmeasurable: true, why: "declaration-only seam"},
 			{pkg: "slight", min: 0, why: "only main"},
 		},
 	)
-	if len(res.problems) != 1 || !strings.Contains(res.problems[0], "grown is") || !strings.Contains(res.problems[0], "41.0") {
-		t.Fatalf("problems = %v, want one for grown suggesting 41.0%%", res.problems)
+	if len(res.problems) != 2 || !strings.Contains(res.problems[0], "grown is") || !strings.Contains(res.problems[0], "41.0") ||
+		!strings.Contains(res.problems[1], "slight is") || !strings.Contains(res.problems[1], "2.0") {
+		t.Fatalf("problems = %v, want grown suggesting 41.0%% and slight suggesting 2.0%%", res.problems)
+	}
+}
+
+// TestCheckHoldsTheUnmeasurableMark: a package marked unmeasurable that
+// starts to measure fails, and so does one that reports no statements
+// without the mark (review II, R2-P1-misc-05).
+func TestCheckHoldsTheUnmeasurableMark(t *testing.T) {
+	t.Parallel()
+	res := check(
+		[]measurement{
+			{pkg: "gained", pct: 0, measurable: true},
+			{pkg: "unmarked", note: "no test files"},
+			{pkg: "seam", note: "no statements"},
+		},
+		[]packageFloor{
+			{pkg: "gained", min: 0, unmeasurable: true, why: "declaration-only seam"},
+			{pkg: "unmarked", min: 0, why: "declaration-only seam"},
+			{pkg: "seam", min: 0, unmeasurable: true, why: "declaration-only seam"},
+		},
+	)
+	if len(res.problems) != 2 || !strings.Contains(res.problems[0], "gained is marked unmeasurable") ||
+		!strings.Contains(res.problems[1], "unmarked reports") {
+		t.Fatalf("problems = %v, want one for gained and one for unmarked", res.problems)
 	}
 }
 
@@ -215,6 +239,9 @@ func TestFloorsTableIsWellFormed(t *testing.T) {
 		}
 		if f.spread > 0 && strings.TrimSpace(f.why) == "" {
 			t.Errorf("%s: a spread needs a why — say what makes the measurement vary", f.pkg)
+		}
+		if f.unmeasurable && f.min != 0 {
+			t.Errorf("%s: an unmeasurable package carries a floor of %.1f%%", f.pkg, f.min)
 		}
 		if f.min == 0 && strings.TrimSpace(f.why) == "" {
 			t.Errorf("%s: a zero floor needs a why — say what makes the package unmeasurable", f.pkg)
