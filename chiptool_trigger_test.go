@@ -17,36 +17,42 @@ import (
 // recently it started only on a label — which is a thing a human has to
 // remember, on a module where nearly every change can move commissioning.
 //
-// Its `changes` job now decides from the diff. That decision is a list of
-// patterns inside a YAML shell step, where nothing type-checks it and a
-// pattern that stops matching produces no error: the job simply reports "no
-// Go code touched" forever and the commissioner stops running. The failure
-// mode is silence, which is why it is worth a test.
+// Its `changes` job now decides from the diff. That decision is a pattern
+// inside a YAML shell step, where nothing type-checks it and a pattern that
+// matches wrongly produces no error: the job simply reports "documentation
+// only" forever and the commissioner stops running. The failure mode is
+// silence, which is why it is worth a test.
 //
-// This reads the patterns out of the workflow rather than restating them. A
+// The rule is inverted since review II, phase 5a (R2-P5-sup-03): the suites
+// start unless every changed path is documentation (`docs_only`). A list of
+// what starts them had missed the Makefile and every file the daemon embeds.
+//
+// This reads the pattern out of the workflow rather than restating it. A
 // copy here would pass while the workflow said something else, which is the
 // specific way a guard like this goes quietly wrong.
 const chiptoolWorkflowPath = ".github/workflows/chiptool.yml"
 
-func chiptoolTriggerPatterns(t *testing.T) []string {
+// chiptoolTrigger reports whether a pull request changing only path starts
+// the suites: path is not documentation by the workflow's docs_only pattern.
+func chiptoolTrigger(t *testing.T) func(path string) bool {
 	t.Helper()
 
 	raw, err := os.ReadFile(chiptoolWorkflowPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", chiptoolWorkflowPath, err)
 	}
-	found := regexp.MustCompile(`-e '([^']+)'`).FindAllStringSubmatch(string(raw), -1)
-	if len(found) == 0 {
-		t.Fatalf("%s carries no `-e '<pattern>'` arguments. Either the changes job lost its "+
+	m := regexp.MustCompile(`(?m)^ +docs_only='([^']+)'$`).FindSubmatch(raw)
+	if m == nil {
+		t.Fatalf("%s carries no `docs_only='<pattern>'`. Either the changes job lost its "+
 			"filter or it was rewritten in a shape this guard cannot read — both are reasons to "+
-			"look, because a filter matching nothing silently stops running the commissioner suite",
-			chiptoolWorkflowPath)
+			"look, because a filter that misreads code as documentation silently stops running "+
+			"the commissioner suite", chiptoolWorkflowPath)
 	}
-	out := make([]string, 0, len(found))
-	for _, m := range found {
-		out = append(out, m[1])
+	docsOnly, err := regexp.Compile(string(m[1]))
+	if err != nil {
+		t.Fatalf("%s: docs_only is no pattern this guard can read: %v", chiptoolWorkflowPath, err)
 	}
-	return out
+	return func(path string) bool { return !docsOnly.MatchString(path) }
 }
 
 // TestChiptoolTriggerClassifiesChangedFiles pins both directions. The quiet
@@ -55,16 +61,7 @@ func chiptoolTriggerPatterns(t *testing.T) []string {
 // gets it disabled — the same end state as not having it.
 func TestChiptoolTriggerClassifiesChangedFiles(t *testing.T) {
 	t.Parallel()
-	pats := chiptoolTriggerPatterns(t)
-
-	matches := func(path string) bool {
-		for _, p := range pats {
-			if regexp.MustCompile(p).MatchString(path) {
-				return true
-			}
-		}
-		return false
-	}
+	matches := chiptoolTrigger(t)
 
 	for _, tc := range []struct {
 		path string
@@ -80,11 +77,17 @@ func TestChiptoolTriggerClassifiesChangedFiles(t *testing.T) {
 		{"go.mod", true, "a dependency bump can move wire behaviour"},
 		{"go.sum", true, "same reason as go.mod"},
 		{".github/workflows/chiptool.yml", true, "the workflow itself, so a change to it is tested by it"},
+		{"Makefile", true, "the harness image's digest, the timeouts and the skip lists"},
+		{"store/migrations/0001_init.sql", true, "embedded into the daemon"},
+		{"parity/schema.json", true, "embedded into the daemon"},
+		{"controller/dcl/snapshot/data/SOURCE", true, "embedded trust roots"},
 
 		{"README.md", false, "documentation cannot move commissioning"},
 		{"CHANGELOG.md", false, "same"},
 		{"notes/audits/matter-threat-model.md", false, "the notes tree is not built"},
 		{"CONTRIBUTING.md", false, "same"},
+		{"docs/guides/operations.md", false, "the documentation site"},
+		{"mkdocs.yml", false, "the site's configuration"},
 	} {
 		if got := matches(tc.path); got != tc.want {
 			verb := "did not match"
@@ -103,16 +106,7 @@ func TestChiptoolTriggerClassifiesChangedFiles(t *testing.T) {
 // remembering to extend a list here.
 func TestChiptoolTriggerCoversEveryBuiltDirectory(t *testing.T) {
 	t.Parallel()
-	pats := chiptoolTriggerPatterns(t)
-
-	matches := func(path string) bool {
-		for _, p := range pats {
-			if regexp.MustCompile(p).MatchString(path) {
-				return true
-			}
-		}
-		return false
-	}
+	matches := chiptoolTrigger(t)
 
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -123,8 +117,8 @@ func TestChiptoolTriggerCoversEveryBuiltDirectory(t *testing.T) {
 			continue
 		}
 		switch e.Name() {
-		case "notes", "parity", "testdata":
-			continue // carried, not built
+		case "notes", "docs":
+			continue // documentation, not built
 		}
 		probe := e.Name() + "/probe.go"
 		if !matches(probe) {
