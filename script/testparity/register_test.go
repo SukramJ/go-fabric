@@ -154,9 +154,13 @@ const testparityPlannedRatchet = 2
 // eight cases on the testing events of a rejected message (cluster/core,
 // bridge) and SecureSessionTest.ts's eleven of "GroupKeyMap check" and the
 // round trip without privacy (groups) ported: 920 missing.
+// Review II, phase 5a (R2-P5-tassert-09): ConstructionValidationTest.ts's
+// strict node over BLE without NetworkCommissioning (endpoint) and
+// ProtocolServiceTest.ts's request constraint violation (node) ported:
+// 918 missing.
 const (
 	testparityPortedRatchet  = 162
-	testparityMissingRatchet = 920
+	testparityMissingRatchet = 918
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -138,17 +139,17 @@ var testClusterDef = &spec.Cluster{
 				{ID: 0, Name: "Enable", Type: spec.Type{Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 1, Name: "Value", Type: spec.Type{Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10", Max: &spec.Bound{Int: 10}}},
 			},
+			// The decoder clustergen emits for these fields: a Go
+			// definition holds a request field's bound in its decoder
+			// (spec.DecodeUintIn), where matter.js builds it into the
+			// request TLV schema of the model (review II, R2-P5-tassert-09).
 			Decode: func(n spec.Node) (any, error) {
 				var req testRequest
-				for _, c := range n.Children {
-					switch c.El.Tag.Number {
-					case 0:
-						req.Enable = c.El.Bool
-					case 1:
-						req.Value = uint8(c.El.Uint) //nolint:gosec // a uint8 field
-					}
-				}
-				return req, nil
+				err := spec.DecodeFields(n, "TestRequest",
+					spec.Bind(0, "Enable", true, &req.Enable, spec.DecodeBool),
+					spec.Bind(1, "Value", true, &req.Value, spec.DecodeUintIn[uint8](8, 0, 10)),
+				)
+				return req, err
 			},
 		},
 		{
@@ -457,7 +458,23 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 		})
 
 		t.Run("rejects request with constraint violation", func(t *testing.T) {
-			t.Skip("ProtocolServiceTest.ts:574: matter.js refuses through the request TLV schema it builds for an ad-hoc cluster (CommandInvokeResponse.ts:484-487, TlvOfModel bounds); a Go server leaves a request field's constraint to its handler, as the ported servers answer one with the status matter.js's behavior answers")
+			// ProtocolServiceTest.ts:574-606: value 99 against "max 10" is
+			// answered CONSTRAINT_ERROR, not with a command response; the
+			// handler never runs.
+			var ran atomic.Bool
+			p, ep := testDevice(t, func(req testRequest) testResponse {
+				ran.Store(true)
+				v := req.Value
+				return testResponse{Result: &v}
+			})
+			res, err := fabrictest.Invoke(parityCtx(t), p, client.CommandAt(ep, testClusterID, 1), testRequestFields{Enable: true, Value: 99})
+			var se *interaction.StatusError
+			if !errors.As(err, &se) || se.Status != im.StatusConstraintError {
+				t.Fatalf("invoke = %+v, %v; want CONSTRAINT_ERROR", res, err)
+			}
+			if ran.Load() {
+				t.Fatal("the handler ran on a request outside its bound")
+			}
 		})
 
 		t.Run("rejects response missing required field per qualified conformance", func(t *testing.T) {

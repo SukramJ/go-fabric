@@ -4162,10 +4162,9 @@
       ],
       "missing": [
         "shares one state reference between local reads without a transaction",
-        "requires a transaction to read cluster state for a remote subject",
-        "rejects request with constraint violation"
+        "requires a transaction to read cluster state for a remote subject"
       ],
-      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.Server.checkResponse) (node/protocol_service_parity_matterjs_test.go); the transaction model has no Go subject, and a Go server leaves a request field's constraint to its handler where matter.js's ad-hoc request TLV schema refuses it.",
+      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.Server.checkResponse), and its request held to the bound its decoder states as clustergen emits it (CONSTRAINT_ERROR before the handler runs) (node/protocol_service_parity_matterjs_test.go); the transaction model has no Go subject.",
       "snapshotSha": "87df1e9a341a4b7e9ea9320fac2faccd0e64a34f"
     },
     {
@@ -4261,10 +4260,9 @@
         "judges no endpoint under construction below a sibling whose duplicate status changes",
         "reads nothing of a sibling whose behaviors are still initializing",
         "never judges a peer's endpoints",
-        "never refuses a peer's misplaced singleton",
-        "refuses a strict node that commissions over BLE without NetworkCommissioning"
+        "never refuses a peer's misplaced singleton"
       ],
-      "reason": "Each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree judged as one reassembly (endpoint/construction_validation_parity_matterjs_test.go): what is logged, refused and recorded, the strict refusal of an addition, the singleton refusal of the first misplacing endpoint, the unimplemented mandatory command (ViolationUnimplemented) in strict, warn and off; the whole-node cases (a strict node, an unknown mode, default configuration) run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). Crashed endpoints, construction phases, peers and BLE have no Go subject, and the counts of validations and passes are not ported (whole-tree pass, ADR 0016).",
+      "reason": "Each case ports as a verdict of endpoint.DeviceTypeValidator over a fake tree judged as one reassembly (endpoint/construction_validation_parity_matterjs_test.go): what is logged, refused and recorded, the strict refusal of an addition, the singleton refusal of the first misplacing endpoint, the unimplemented mandatory command (ViolationUnimplemented) in strict, warn and off; the whole-node cases (a strict node, an unknown mode, default configuration) run on fabrictest (node/devicetype_validation_parity_matterjs_test.go). A node that commissions over BLE is judged with the node conditions it asserts (no CustomNetworkConfig). Crashed endpoints, construction phases and peers have no Go subject, and the counts of validations and passes are not ported (whole-tree pass, ADR 0016).",
       "snapshotSha": "945b895c82bab2343b9c27d8ea03b9f8bc2b1b59"
     },
     {

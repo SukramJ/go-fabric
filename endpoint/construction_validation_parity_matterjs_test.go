@@ -36,7 +36,6 @@ import (
 
 const (
 	skipPhases = "the phases of a construction have no Go subject: a snapshot holds an endpoint whole or not at all, so no endpoint is judged while it or its owner is still constructing"
-	skipBLE    = "BLE commissioning has no Go subject on the device side (ADR 0024)"
 )
 
 // fakeSubject adapts a fake endpoint to [DeviceTypeSubject] for what the
@@ -256,7 +255,25 @@ func TestConstructionValidationParityMatterJS(t *testing.T) {
 		t.Run("never judges a peer's endpoints", func(t *testing.T) { t.Skip(skipPeer) })
 		t.Run("never refuses a peer's misplaced singleton", func(t *testing.T) { t.Skip(skipPeer) })
 		t.Run("constructs a strict node in default configuration", func(t *testing.T) { t.Skip(skipNode) })
-		t.Run("refuses a strict node that commissions over BLE without NetworkCommissioning", func(t *testing.T) { t.Skip(skipBLE) })
+		t.Run("refuses a strict node that commissions over BLE without NetworkCommissioning", func(t *testing.T) {
+			// ConstructionValidationTest.ts:579-593 (withBle): a node that
+			// commissions over BLE has no CustomNetworkConfig
+			// (assembledNodeConditions), so the strict pass refuses a root
+			// without NetworkCommissioning, and the first violation is
+			// RootNode's NetworkCommissioning (review II, R2-P5-tassert-09).
+			f, root := nodeTree()
+			f.node = assembledNodeConditions(true)(0)
+			s := newService(t, DeviceTypeValidationStrict, deviceTypeLookups(), f)
+			_, err := s.pass()
+			var refusal *DeviceTypeConformanceError
+			if !errors.As(err, &refusal) || len(refusal.Violations) == 0 {
+				t.Fatalf("pass = %v, want a refusal", err)
+			}
+			v := refusal.Violations[0]
+			if v.Endpoint != root.id || v.DeviceType != "RootNode" || v.Kind != ViolationMissing || v.Requirement != "NetworkCommissioning" {
+				t.Fatalf("first violation = %+v (%v), want RootNode's missing NetworkCommissioning on the root", v, err)
+			}
+		})
 
 		t.Run("of a cluster server whose mandatory command throws unimplemented", func(t *testing.T) {
 			// The generated server with SetTemperature left unimplemented:
