@@ -125,8 +125,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
-		min: 54,
-		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
+		min: 57,
+		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9; review II 5b (the blob streamer and the attested-identity line): 57.9. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/controller/topology", min: 95},
@@ -332,8 +332,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/attestation",
-		min: 84,
-		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %); phase 32: 84.8 with the product-id tests",
+		min: 83,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %); phase 32: 84.8 with the product-id tests; review II 5b (R2-P5-port-12): 83.2, the fully covered id parser moved to internal/attestids (100 %), no test or uncovered statement changed",
 	},
 	{
 		pkg:    "github.com/SukramJ/go-fabric/secure/channel",
