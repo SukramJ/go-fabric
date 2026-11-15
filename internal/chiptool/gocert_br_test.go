@@ -31,9 +31,9 @@ import (
 // support/chip-testing/src/BridgeTestInstance.ts). The DUT is commissioned
 // with its default subscription, as matter.js's cert controller commissions
 // with its sustained wildcard subscription (InProcessControllerAdapter.ts:
-// 2745-2782), and every "the DUT took in" claim reads the controller's own
+// 2919-2956), and every "the DUT took in" claim reads the controller's own
 // image of the node — client.Node.Endpoints and Cluster.Value, matter.js's
-// clientEndpoints and clientAttribute (:1630-1665) — taken before any read,
+// clientEndpoints and clientAttribute (:1770-1805) — taken before any read,
 // because a read feeds that image too (TC-BR-4.test.ts:214-220).
 //
 // matter.js names the TH's endpoints by chip's bridge-app numbers
@@ -46,7 +46,7 @@ import (
 //
 // matter.js also checks the TH's log for each read's AttributePathIB and
 // the On command's CommandDataIB (expectAttributePathIB, tc-support.ts:973;
-// expectCommandInvoke :1199; LOG_TIMEOUT 15 s :64); the daemon logs both at
+// expectCommandInvoke :1213; LOG_TIMEOUT 15 s :64); the daemon logs both at
 // debug level (bridge's matter.rx.im.read_path and matter.rx.im.invoke), so
 // the same checks run on its log.
 
@@ -196,7 +196,7 @@ func (r *brRun) discover(th *goTH) error {
 // --- the DUT's image (clientEndpoints / clientAttribute) --------------------
 
 // heldEndpoints are the endpoint numbers the DUT holds for the TH
-// (clientEndpoints, InProcessControllerAdapter.ts:1630-1649).
+// (clientEndpoints, InProcessControllerAdapter.ts:1770-1789).
 func heldEndpoints(n *client.Node) []uint16 {
 	eps := n.Endpoints()
 	out := make([]uint16, 0, len(eps))
@@ -207,7 +207,7 @@ func heldEndpoints(n *client.Node) []uint16 {
 }
 
 // held is the DUT's own value of an attribute (clientAttribute,
-// :1651-1665): false where it holds no such endpoint or value.
+// :1791-1805): false where it holds no such endpoint or value.
 func held(n *client.Node, ep uint16, cluster, attr uint32) (spec.Node, bool) {
 	e := n.Endpoint(ep)
 	if e == nil {
@@ -217,14 +217,14 @@ func held(n *client.Node, ep uint16, cluster, attr uint32) (spec.Node, bool) {
 }
 
 // heldDeviceTypes are the device types of the DUT's DeviceTypeList for ep
-// (clientEndpoints' deviceTypes, :1637, :1641-1643).
+// (clientEndpoints' deviceTypes, :1777, :1781-1783).
 func heldDeviceTypes(n *client.Node, ep uint16) []uint64 {
 	v, _ := held(n, ep, descriptor.ClusterID, descriptor.AttrDeviceTypeList)
 	return deviceTypesOf(v)
 }
 
-// heldParts is the DUT's PartsList for ep (clientEndpoints' parts, :1638,
-// :1644).
+// heldParts is the DUT's PartsList for ep (clientEndpoints' parts, :1778,
+// :1784).
 func heldParts(n *client.Node, ep uint16) []uint64 {
 	v, _ := held(n, ep, descriptor.ClusterID, descriptor.AttrPartsList)
 	return partsOf(v)

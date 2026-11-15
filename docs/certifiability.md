@@ -109,8 +109,9 @@ kernel modules and stay weekly, outside that gate.
   mirrored: the reference daemon is the DUT, the module's own controller
   performs the TS file's controller actions, and the TS file's TH-side
   expectations are what the daemon has to satisfy. Each case cites its TS
-  file and the line of every step; a step's PICS is the TS's mirrored onto the
-  server side (`ACT.C.C00.Tx` → `ACT.S.C00.Rsp`) and evaluated against the
+  file and the line of every step, as they stand at the snapshot's pin (the
+  two exceptions are named under the DUT role); a step's PICS is the TS's
+  mirrored onto the server side (`ACT.C.C00.Tx` → `ACT.S.C00.Rsp`) and evaluated against the
   daemon's own PICS, and a step whose PICS is false is recorded skipped with
   the expression. The leg needs the daemon and the host's multicast, not the
   harness image; its cases appear below as passed, with their step counts and
@@ -129,7 +130,14 @@ kernel modules and stay weekly, outside that gate.
   module's own where matter.js leaves the code to CHIP's PICS file), evaluated
   as stated. matter.js proves its DUT controller by the TH device's log; here
   each step names its evidence instead: the DUT controller's return value or
-  error, a state read on the daemon, or a line of the daemon's log. A case
+  error, a state read on the daemon, or a line of the daemon's log. Two
+  cases are not ports of the pin's version: TC-DD-3.12 and TC-DD-3.13 are
+  the cases as they stood at matter.js `862ad75f`. At the pin both start
+  their TH without a commissioning window (`--custom-flow 1`) and open it by
+  a user action on the app pipe (`userIntentCommissioningStart`), then
+  commission; the reference daemon has neither the flag nor the command, so
+  the two rows below measure the earlier version, in which the TH is
+  commissionable from its start. A case
   passed in this role counts as passed in its family — the page states the
   module in both roles since ADR 0020 — and is listed under "Controller role"
   below; a case no family of the harness image lists is listed there and

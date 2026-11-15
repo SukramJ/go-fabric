@@ -16,7 +16,7 @@ import (
 
 // The onboarding payloads the DD cases hand the DUT, built field by field
 // as matter.js's harness builds them (support/chip-testing/test/cert/
-// tc-dd-support.ts at 862ad75f): the negative cases need values the
+// tc-dd-support.ts at db021da0): the negative cases need values the
 // module's own encoders refuse to write — a reserved version, a trivial
 // passcode, a product id of 0 — so the bits and digits are laid out here,
 // not encoded through secure/setup, and read back without judging them.
@@ -74,7 +74,7 @@ func base38Encode(b []byte) string {
 }
 
 // qrBits are the offset and width of § 5.1.3.1 Table 59's fields in the
-// payload's fixed 11 bytes (tc-dd-support.ts:456-462).
+// payload's fixed 11 bytes (tc-dd-support.ts:503-509).
 var qrBits = map[string][2]int{
 	"version": {0, 3}, "vendorId": {3, 16}, "productId": {19, 16}, "flowType": {35, 2},
 	"discoveryCapabilities": {37, 8}, "discriminator": {45, 12}, "passcode": {57, 27},
@@ -84,7 +84,7 @@ var qrBits = map[string][2]int{
 var qrFieldOrder = []string{"prefix", "version", "vendorId", "productId", "flowType", "discoveryCapabilities", "discriminator", "passcode", "tlv"}
 
 // qrPayloadFields reads every field of a QR payload, valid or not
-// (tc-dd-support.ts:601-621 qrPayloadFields), as decimal strings; tlv is
+// (tc-dd-support.ts:648-668 qrPayloadFields), as decimal strings; tlv is
 // the bytes after the fixed structure in hex.
 func qrPayloadFields(payload string) (map[string]string, error) {
 	i := strings.IndexByte(payload, ':')
@@ -111,7 +111,7 @@ func qrPayloadFields(payload string) (map[string]string, error) {
 }
 
 // qrPayloadWith is the payload with fields substituted bit by bit, the TLV
-// data that follows carried through (tc-dd-support.ts:513-544
+// data that follows carried through (tc-dd-support.ts:560-591
 // qrPayloadWith): it writes what matter.js's own encoder refuses.
 func qrPayloadWith(payload string, fields map[string]int) (string, error) {
 	if !strings.HasPrefix(payload, "MT:") {
@@ -142,7 +142,7 @@ func qrPayloadWith(payload string, fields map[string]int) (string, error) {
 	return "MT:" + base38Encode(data), nil
 }
 
-// checkGeneratedPayload is tc-dd-support.ts:641-672: the payload carries
+// checkGeneratedPayload is tc-dd-support.ts:688-719: the payload carries
 // the stated fields, and every other one of unchangedFrom's ("" states
 // none).
 func checkGeneratedPayload(payload string, stated map[string]string, unchangedFrom string) (string, error) {
@@ -165,11 +165,11 @@ func checkGeneratedPayload(payload string, stated map[string]string, unchangedFr
 }
 
 // manualDigitsOrder is the order the evidence names a manual code's parts
-// in (tc-dd-support.ts:1583-1610 ManualPairingCodeDigits).
+// in (tc-dd-support.ts:1904-1931 ManualPairingCodeDigits).
 var manualDigitsOrder = []string{"length", "futureFormat", "vidPidPresent", "shortDiscriminator", "passcode", "vendorId", "productId", "checkDigit", "checkDigitCorrect"}
 
 // manualParts are the parts § 5.1.4.1 Table 62 packs into a manual code
-// (tc-dd-support.ts:1521-1543 ManualPairingCodeParts).
+// (tc-dd-support.ts:1842-1864 ManualPairingCodeParts).
 type manualParts struct {
 	futureFormat, vidPidPresent bool
 	discriminator               int
@@ -181,7 +181,7 @@ type manualParts struct {
 func intp(v int) *int { return &v }
 
 // manualPairingCode lays the parts out as digits, whatever the
-// specification makes of them (tc-dd-support.ts:1553-1576).
+// specification makes of them (tc-dd-support.ts:1874-1897).
 func manualPairingCode(p manualParts) (string, error) {
 	switch {
 	case p.discriminator < 0 || p.discriminator > 0xfff:
@@ -196,7 +196,7 @@ func manualPairingCode(p manualParts) (string, error) {
 		chunk1 |= 1 << 2
 	}
 	if p.futureFormat {
-		chunk1 = 8 // FUTURE_FORMAT_DIGIT (:1515)
+		chunk1 = 8 // FUTURE_FORMAT_DIGIT (:1836)
 	}
 	digits := fmt.Sprintf("%d%05d%04d", chunk1, (p.discriminator&0x300)<<6|p.passcode&0x3fff, p.passcode>>14)
 	if p.vendorID != nil {
@@ -209,7 +209,7 @@ func manualPairingCode(p manualParts) (string, error) {
 }
 
 // manualPairingCodeDigits reads a manual code back without judging it
-// (tc-dd-support.ts:1613-1634).
+// (tc-dd-support.ts:1934-1955).
 func manualPairingCodeDigits(code string) (map[string]string, error) {
 	var sb strings.Builder
 	for _, r := range code {
@@ -241,7 +241,7 @@ func manualPairingCodeDigits(code string) (map[string]string, error) {
 	return f, nil
 }
 
-// checkGeneratedManualCode is tc-dd-support.ts:1657-1687: the code
+// checkGeneratedManualCode is tc-dd-support.ts:1978-2008: the code
 // carries a correct check digit unless stated otherwise, every part of
 // unchangedFrom but its check digit, the stated parts, and differs from
 // differsFrom ("" for none of the two).
@@ -272,7 +272,7 @@ func checkGeneratedManualCode(code string, stated map[string]string, unchangedFr
 }
 
 // mismatches names each field want states that got does not carry
-// (tc-dd-support.ts:559-567 statedMismatches).
+// (tc-dd-support.ts:606-614 statedMismatches).
 func mismatches(got, want map[string]string, order []string) []string {
 	var wrong []string
 	for _, k := range order {

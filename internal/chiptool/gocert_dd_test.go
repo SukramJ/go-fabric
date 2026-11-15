@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -38,8 +39,8 @@ func init() {
 	}
 }
 
-// The DD budgets (support/chip-testing/test/cert/tc-dd-support.ts:78-79,
-// :873, :884).
+// The DD budgets (support/chip-testing/test/cert/tc-dd-support.ts:85-86,
+// :927, :938).
 const (
 	ddCommissioningLogTimeout = 30 * time.Second
 	ddMDNSTimeout             = 30 * time.Second
@@ -73,7 +74,7 @@ func (d *ddRun) setup(th *goTH) error {
 }
 
 // discriminatorHonored is recordDiscriminatorHonored
-// (tc-dd-support.ts:931-958), read mirrored: a code naming a discriminator
+// (tc-dd-support.ts:986-1013), read mirrored: a code naming a discriminator
 // no device advertises commissions nothing — the daemon answers to its own
 // discriminator only — and the daemon stays commissionable.
 func (d *ddRun) discriminatorHonored(devices ...*bridgeProcess) func(th *goTH) error {
@@ -82,7 +83,7 @@ func (d *ddRun) discriminatorHonored(devices ...*bridgeProcess) func(th *goTH) e
 			return err
 		}
 		dev := th.dut
-		// absentDiscriminator (tc-dd-support.ts:895-905): the device's
+		// absentDiscriminator (tc-dd-support.ts:949-959): the device's
 		// discriminator with every bit flipped, which no device of the run
 		// may advertise.
 		absent := dev.info.discriminator ^ 0xFFF
@@ -99,8 +100,9 @@ func (d *ddRun) discriminatorHonored(devices ...*bridgeProcess) func(th *goTH) e
 			_ = d.ctrl.Registry().Decommission(th.ctx, n)
 			return fmt.Errorf("a code naming discriminator %d commissioned a device", absent)
 		}
+		// The probe is recordCommissionable (tc-dd-support.ts:991).
 		for _, b := range append([]*bridgeProcess{dev}, devices...) {
-			if _, err := th.commissionable(d.names, b.info.discriminator, b.info.port, ddMDNSTimeout); err != nil {
+			if _, err := th.commissionableOf(d.names, b); err != nil {
 				return fmt.Errorf("after the refused code: %w", err)
 			}
 		}
@@ -109,23 +111,69 @@ func (d *ddRun) discriminatorHonored(devices ...*bridgeProcess) func(th *goTH) e
 	}
 }
 
-// commissionableStep is recordCommissionable (tc-dd-support.ts:1108-1114).
+// reCommissionablePublished is the daemon naming the DNS-SD instance it
+// publishes its commissionable record under (bridge/bridge.go
+// matter.mdns.commissioning_published) — the line matter.js reads its own
+// TH's instance from (COMMISSIONABLE_INSTANCE, tc-dd-support.ts:1163-1166).
+var reCommissionablePublished = regexp.MustCompile(`msg=matter\.mdns\.commissioning_published .*?instance=([0-9A-Fa-f]+)`)
+
+// commissionableInstances is thCommissionableInstanceNames
+// (tc-dd-support.ts:1180-1212): every instance name the device's own log
+// says it has published its commissionable record under, since its start
+// — a device may publish again under another name, and a resolver may
+// still hold the earlier one. It waits up to COMMISSIONING_LOG_TIMEOUT for
+// the first; matter.js waits that long for the device to decide what it
+// advertises (ADVERTISING_DECIDED :245-249) and INSTANCE_NAME_DELAY more
+// (:1169) for the name, which the daemon states on one line. Empty where
+// the log names none, and the caller then matches by discriminator.
+func commissionableInstances(th *goTH, dev *bridgeProcess) []string {
+	read := func() []string {
+		var out []string
+		for _, m := range reCommissionablePublished.FindAllStringSubmatch(dev.snapshotStderr(), -1) {
+			if !slices.Contains(out, m[1]) {
+				out = append(out, m[1])
+			}
+		}
+		return out
+	}
+	waitFor(th.ctx, ddCommissioningLogTimeout, func() bool { return len(read()) > 0 })
+	return read()
+}
+
+// commissionableOf is commissionableCheck (tc-dd-support.ts:1218-1221):
+// the device is discoverable as commissionable, and only its own instance
+// counts — a record under a name its log does not state is another
+// device's, or one an earlier device left for the same discriminator.
+func (th *goTH) commissionableOf(names *discovery.Names, dev *bridgeProcess) (*discovery.Device, error) {
+	instances := commissionableInstances(th, dev)
+	found, err := th.commissionableAmong(names, dev.info.discriminator, dev.info.port, ddMDNSTimeout, instances)
+	if err != nil {
+		return nil, err
+	}
+	if len(instances) == 0 {
+		th.note("the device's log names no commissionable instance; %s was matched by discriminator %d", found.InstanceID, dev.info.discriminator)
+	}
+	return found, nil
+}
+
+// commissionableStep is recordCommissionable (tc-dd-support.ts:1227-1233),
+// which is commissionableCheck recorded.
 func (d *ddRun) commissionableStep(b func(th *goTH) *bridgeProcess) func(th *goTH) error {
 	return func(th *goTH) error {
 		if err := d.setup(th); err != nil {
 			return err
 		}
 		dev := b(th)
-		found, err := th.commissionable(d.names, dev.info.discriminator, dev.info.port, ddMDNSTimeout)
+		found, err := th.commissionableOf(d.names, dev)
 		if err != nil {
 			return err
 		}
-		th.note("commissionable record %s for discriminator %d", found.InstanceID, dev.info.discriminator)
+		th.note("commissionable record %s for discriminator %d, the instance the device's log names", found.InstanceID, dev.info.discriminator)
 		return nil
 	}
 }
 
-// parseStep is recordParse (tc-dd-support.ts:264-312), read mirrored: the
+// parseStep is recordParse (tc-dd-support.ts:311-359), read mirrored: the
 // QR code the device prints decodes to its own discriminator and passcode.
 func parseStep(b func(th *goTH) *bridgeProcess) func(th *goTH) error {
 	return func(th *goTH) error {
@@ -142,7 +190,7 @@ func parseStep(b func(th *goTH) *bridgeProcess) func(th *goTH) error {
 	}
 }
 
-// commissionByQR is commissionByQr (tc-dd-support.ts:1458): the device is
+// commissionByQR is commissionByQr (tc-dd-support.ts:1779): the device is
 // commissioned from its QR code and advertises its operational record.
 func (d *ddRun) commissionByQR(b func(th *goTH) *bridgeProcess) func(th *goTH) error {
 	return func(th *goTH) error {
@@ -188,7 +236,8 @@ func (d *ddRun) interacts(b func(th *goTH) *bridgeProcess) func(th *goTH) error 
 func dutDevice(th *goTH) *bridgeProcess { return th.dut }
 
 // caseDD318 mirrors TC-DD-3.18: two devices commissioned in turn from
-// their QR codes, both reachable after.
+// their QR codes, both reachable after. Steps 1.a and 1.b hold each TH to
+// its own instance (commissionableCheck, TC-DD-3.18.test.ts:130, :142).
 func caseDD318() goCertCase {
 	d := &ddRun{}
 	var th2 *bridgeProcess
@@ -199,24 +248,24 @@ func caseDD318() goCertCase {
 		return th2
 	}
 	return goCertCase{
-		tc: "TC-DD-3.18", line: 98, pics: ddPICS,
+		tc: "TC-DD-3.18", line: 97, pics: ddPICS,
 		steps: []goStep{
-			{n: "0", line: 104, title: "the commissioner uses the discriminator the code names", run: func(th *goTH) error {
+			{n: "0", line: 103, title: "the commissioner uses the discriminator the code names", run: func(th *goTH) error {
 				return d.discriminatorHonored(second(th))(th)
 			}},
-			{n: "1.a", line: 114, title: "TH1 in commissioning mode", run: func(th *goTH) error {
+			{n: "1.a", line: 113, title: "TH1 in commissioning mode", run: func(th *goTH) error {
 				if th.dut.info.discriminator == second(th).info.discriminator {
 					return errors.New("the two THs advertise the same discriminator")
 				}
 				return d.commissionableStep(dutDevice)(th)
 			}},
-			{n: "1.b", line: 138, title: "TH2 in commissioning mode", run: d.commissionableStep(second)},
-			{n: "2.a", line: 147, pics: "MCORE.DD.SCAN_QR_CODE", title: "scan TH1's QR code", run: parseStep(dutDevice)},
-			{n: "2.b", line: 160, title: "commission TH1 from its QR code", run: d.commissionByQR(dutDevice)},
-			{n: "3.a", line: 184, pics: "MCORE.DD.SCAN_QR_CODE", title: "scan TH2's QR code", run: parseStep(second)},
-			{n: "3.b", line: 197, title: "commission TH2 from its QR code", run: d.commissionByQR(second)},
-			{n: "4.a", line: 220, title: "the commissioner can still interact with TH1", run: d.interacts(dutDevice)},
-			{n: "4.b", line: 226, title: "the commissioner can still interact with TH2", run: d.interacts(second)},
+			{n: "1.b", line: 137, title: "TH2 in commissioning mode", run: d.commissionableStep(second)},
+			{n: "2.a", line: 146, pics: "MCORE.DD.SCAN_QR_CODE", title: "scan TH1's QR code", run: parseStep(dutDevice)},
+			{n: "2.b", line: 159, title: "commission TH1 from its QR code", run: d.commissionByQR(dutDevice)},
+			{n: "3.a", line: 183, pics: "MCORE.DD.SCAN_QR_CODE", title: "scan TH2's QR code", run: parseStep(second)},
+			{n: "3.b", line: 196, title: "commission TH2 from its QR code", run: d.commissionByQR(second)},
+			{n: "4.a", line: 219, title: "the commissioner can still interact with TH1", run: d.interacts(dutDevice)},
+			{n: "4.b", line: 225, title: "the commissioner can still interact with TH2", run: d.interacts(second)},
 		},
 	}
 }
@@ -233,7 +282,7 @@ func caseDD320() goCertCase {
 			{n: "1", line: 53, title: "TH in commissioning mode", run: d.commissionableStep(dutDevice)},
 			{n: "2.a", line: 59, pics: "MCORE.DD.SCAN_QR_CODE", title: "scan TH's QR code", run: parseStep(dutDevice)},
 			{n: "2.b", line: 71, title: "commission TH from its QR code", run: d.commissionByQR(dutDevice)},
-			// recordUnpair (tc-dd-support.ts:1301-1331): the fabric removal,
+			// recordUnpair (tc-dd-support.ts:1621-1651): the fabric removal,
 			// and the device ending the fabric's presence — its operational
 			// record withdrawn, as its log reports.
 			{n: "3", line: 85, title: "unpair the TH", run: func(th *goTH) error {
@@ -263,7 +312,7 @@ func caseDD320() goCertCase {
 				th.note("removed fabric %d; the TH withdrew %s", fi, inst)
 				return nil
 			}},
-			// recordBackInCommissioningMode (tc-dd-support.ts:1358-1412): the
+			// recordBackInCommissioningMode (tc-dd-support.ts:1679-1733): the
 			// device without a fabric opens its window again and advertises.
 			{n: "4", line: 93, title: "the TH back in commissioning mode", run: func(th *goTH) error {
 				if !waitFor(th.ctx, ddCommissioningLogTimeout, func() bool {

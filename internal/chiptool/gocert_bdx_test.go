@@ -35,7 +35,7 @@ type bdxRun struct {
 }
 
 // precondition is every BDX case's step 0: commission the requestor and
-// serve it one update (serveOtaTransfer, tc-bdx-support.ts:117-224).
+// serve it one update (serveOtaTransfer, tc-bdx-support.ts:117-222).
 func (b *bdxRun) precondition(th *goTH) error {
 	if err := b.r.precondition(th); err != nil {
 		return err

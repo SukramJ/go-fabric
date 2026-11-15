@@ -37,6 +37,9 @@ import (
 // whose DUT is a cluster client (or a commissioner), read mirrored onto the
 // reference daemon's servers.
 
+// cadminSupport is the support file TC-CADMIN-1.17's steps are defined in.
+const cadminSupport = "tc-cadmin-support.ts"
+
 func init() {
 	for _, c := range []func() goCertCase{caseCADMIN117, caseACT32, caseG32, caseLVL81, caseS31, caseSWTCH32} {
 		registerGoCert(c)
@@ -44,7 +47,7 @@ func init() {
 }
 
 // readFabrics reads OperationalCredentials.Fabrics unfiltered
-// (tc-cadmin-support.ts:471-478) and returns the fabric indices.
+// (tc-cadmin-support.ts:471-482) and returns the fabric indices.
 func (th *goTH) readFabrics(n *client.Node) ([]uint8, error) {
 	ctx, cancel := context.WithTimeout(th.ctx, time.Minute)
 	defer cancel()
@@ -71,6 +74,13 @@ func (th *goTH) readFabrics(n *client.Node) ([]uint8, error) {
 // caseCADMIN117 mirrors TC-CADMIN-1.17: three controllers commission the
 // daemon through enhanced commissioning windows; one fabric is removed and
 // the daemon refuses it, keeps the others' records and admits it again.
+//
+// At the pin the case file only registers the case
+// (TC-CADMIN-1.17.test.ts:9, fabricRemovalCase(…, "enhanced")); its steps
+// are fabricRemovalCase's (tc-cadmin-support.ts:685-1002, certTest( at
+// :717), which TC-CADMIN-1.18 shares with a basic window. "enhanced" is
+// METHODS.enhanced (:307): the window PICS CADMIN.C.C00.Tx and no
+// controller capability.
 func caseCADMIN117() goCertCase {
 	type role struct {
 		ctrl *gocontroller.Controller
@@ -86,7 +96,7 @@ func caseCADMIN117() goCertCase {
 	open := func(th *goTH) error {
 		ctx, cancel := context.WithTimeout(th.ctx, time.Minute)
 		defer cancel()
-		w, err := cr[0].node.OpenCommissioningWindow(ctx, 180*time.Second, client.WindowOptions{}) // CW_DURATION_SECONDS (:20)
+		w, err := cr[0].node.OpenCommissioningWindow(ctx, 180*time.Second, client.WindowOptions{}) // CW_DURATION_SECONDS (tc-cadmin-support.ts:82), enhanced (openWindowChecked :381-383)
 		if err != nil {
 			return err
 		}
@@ -127,9 +137,9 @@ func caseCADMIN117() goCertCase {
 		}
 	}
 	return goCertCase{
-		tc: "TC-CADMIN-1.17", line: 156, pics: []string{"CADMIN.C", "CADMIN.C.C00.Tx"},
+		tc: "TC-CADMIN-1.17", line: 9, pics: []string{"CADMIN.C", "CADMIN.C.C00.Tx"},
 		steps: []goStep{
-			{n: "1", line: 162, title: "DUT_CR1 commissions TH_CE", pics: "CADMIN.C", run: func(th *goTH) error {
+			{n: "1", line: 724, file: cadminSupport, title: "DUT_CR1 commissions TH_CE", pics: "CADMIN.C", run: func(th *goTH) error {
 				var err error
 				if names, err = th.names(); err != nil {
 					return err
@@ -142,11 +152,11 @@ func caseCADMIN117() goCertCase {
 				th.note("commissioned by DUT_CR1 as %s", cr[0].inst)
 				return nil
 			}},
-			{n: "2", line: 179, title: "DUT_CR1 opens a commissioning window on TH_CE", pics: "CADMIN.C.C00.Tx", run: open},
-			{n: "3", line: 185, title: "TH_CR2 commissions TH_CE", pics: "CADMIN.C", run: join(1)},
-			{n: "4", line: 200, title: "DUT_CR1 opens a commissioning window on TH_CE", pics: "CADMIN.C.C00.Tx", run: open},
-			{n: "5", line: 206, title: "TH_CR3 commissions TH_CE", pics: "CADMIN.C", run: join(2)},
-			{n: "6", line: 221, title: "DUT_CR1 reads the list of Fabrics", pics: "OPCREDS.C.A0001", run: func(th *goTH) error {
+			{n: "2", line: 741, file: cadminSupport, title: "DUT_CR1 opens a commissioning window on TH_CE", pics: "CADMIN.C.C00.Tx", run: open},
+			{n: "3", line: 745, file: cadminSupport, title: "TH_CR2 commissions TH_CE", pics: "CADMIN.C", run: join(1)},
+			{n: "4", line: 749, file: cadminSupport, title: "DUT_CR1 opens a commissioning window on TH_CE", pics: "CADMIN.C.C00.Tx", run: open},
+			{n: "5", line: 753, file: cadminSupport, title: "TH_CR3 commissions TH_CE", pics: "CADMIN.C", run: join(2)},
+			{n: "6", line: 757, file: cadminSupport, title: "DUT_CR1 reads the list of Fabrics", pics: "OPCREDS.C.A0001", run: func(th *goTH) error {
 				fabrics, err := th.readFabrics(cr[0].node)
 				if err != nil {
 					return err
@@ -162,7 +172,7 @@ func caseCADMIN117() goCertCase {
 				th.note("Fabrics lists %v; TH_CR2 holds index %d", fabrics, cr2Index)
 				return nil
 			}},
-			{n: "7", line: 249, title: "DUT_CR1 sends RemoveFabric for TH_CR2's fabric", pics: "OPCREDS.C.C0a.Tx", run: func(th *goTH) error {
+			{n: "7", line: 785, file: cadminSupport, title: "DUT_CR1 sends RemoveFabric for TH_CR2's fabric", pics: "OPCREDS.C.C0a.Tx", run: func(th *goTH) error {
 				if cr2Index != 2 { // EXPECTED_CR2_FABRIC_INDEX (tc-cadmin-support.ts:645)
 					return fmt.Errorf("TH_CR2's fabric index is %d, the plan assumes 2 for a dut→th_cr2→th_cr3 order", cr2Index)
 				}
@@ -177,9 +187,9 @@ func caseCADMIN117() goCertCase {
 				th.note("RemoveFabric %d: NOCResponse StatusCode OK", cr2Index)
 				return nil
 			}},
-			{n: "8", line: 328, title: "TH_CR2 writes and reads NodeLabel", pics: "BINFO.C.A0005", run: func(th *goTH) error {
+			{n: "8", line: 861, file: cadminSupport, title: "TH_CR2 writes and reads NodeLabel", pics: "BINFO.C.A0005", run: func(th *goTH) error {
 				p := attrPath(0, basicinfo.ClusterID, basicinfo.AttrNodeLabel)
-				ctx, cancel := context.WithTimeout(th.ctx, 60*time.Second) // POST_REMOVAL_TIMEOUT (:27)
+				ctx, cancel := context.WithTimeout(th.ctx, 60*time.Second) // POST_REMOVAL_TIMEOUT (tc-cadmin-support.ts:654)
 				defer cancel()
 				st, werr := cr[1].node.Write(ctx, []client.WriteRequest{{Path: p, Value: spec.String("post-removal")}}, client.WriteOptions{})
 				if werr == nil && st.Err() == nil {
@@ -192,7 +202,7 @@ func caseCADMIN117() goCertCase {
 				th.note("TH_CR2's write (%v) and read (%v) both refused", firstLine(werr, st.Err()), firstLine(rerr, nil))
 				return nil
 			}},
-			{n: "9", line: 369, title: "DUT_CR1 reads the list of Fabrics", pics: "OPCREDS.C.A0001", run: func(th *goTH) error {
+			{n: "9", line: 901, file: cadminSupport, title: "DUT_CR1 reads the list of Fabrics", pics: "OPCREDS.C.A0001", run: func(th *goTH) error {
 				fabrics, err := th.readFabrics(cr[0].node)
 				if err != nil {
 					return err
@@ -203,7 +213,7 @@ func caseCADMIN117() goCertCase {
 				th.note("Fabrics lists %v", fabrics)
 				return nil
 			}},
-			{n: "10", line: 398, title: "TH_CE discoverable with 2 operational records", run: func(th *goTH) error {
+			{n: "10", line: 931, file: cadminSupport, title: "TH_CE discoverable with 2 operational records", run: func(th *goTH) error {
 				for _, i := range []int{0, 2} {
 					if err := th.awaitOperational(names, cr[i].inst, true, 30*time.Second); err != nil {
 						return err
@@ -215,9 +225,9 @@ func caseCADMIN117() goCertCase {
 				th.note("%s and %s advertised, %s withdrawn", cr[0].inst, cr[2].inst, cr[1].inst)
 				return nil
 			}},
-			{n: "11", line: 441, title: "DUT_CR1 opens a commissioning window on TH_CE", pics: "CADMIN.C.C00.Tx", run: open},
-			{n: "12", line: 451, title: "TH_CR2 commissions TH_CE", pics: "CADMIN.C", run: join(1)},
-			{n: "13", line: 466, title: "TH_CR2 reads the list of Fabrics", pics: "OPCREDS.C.A0001", run: func(th *goTH) error {
+			{n: "11", line: 974, file: cadminSupport, title: "DUT_CR1 opens a commissioning window on TH_CE", pics: "CADMIN.C.C00.Tx", run: open},
+			{n: "12", line: 975, file: cadminSupport, title: "TH_CR2 commissions TH_CE", pics: "CADMIN.C", run: join(1)},
+			{n: "13", line: 979, file: cadminSupport, title: "TH_CR2 reads the list of Fabrics", pics: "OPCREDS.C.A0001", run: func(th *goTH) error {
 				fabrics, err := th.readFabrics(cr[1].node)
 				if err != nil {
 					return err
@@ -644,7 +654,7 @@ const (
 // caseSWTCH32 mirrors TC-SWTCH-3.2: the TH observes the daemon's momentary
 // switch by reads and events while the switch is operated through the
 // app pipe — matter.js's backchannel (packages/testing/src/device/
-// backchannel.ts:10-26) is the daemon's --app-pipe here.
+// backchannel.ts:10-28) is the daemon's --app-pipe here.
 func caseSWTCH32() goCertCase {
 	var (
 		n  *client.Node

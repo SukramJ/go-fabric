@@ -58,9 +58,9 @@ const (
 // committed slices (generated from the default composition) cannot state:
 // matter.js's declarations for its cert light switch, a binding client
 // that sends OnOff On and Off (LIGHT_SWITCH_PICS,
-// support/chip-testing/src/cert/index.ts:324-331), and GRPKEY.C, which
+// support/chip-testing/src/cert/index.ts:331-338), and GRPKEY.C, which
 // TC-BIND-2.3 gates on and matter.js takes from CHIP's shared PICS file
-// (:320-323; ci-pics-values:655 at 6170af84 answers 1): the switch has no
+// (:327-330; ci-pics-values:655 at 6170af84 answers 1): the switch has no
 // GroupKeyManagement client of its own, TH1 provisions it.
 var bindDeclare = map[string]string{
 	"BIND.C": "1", "OO.C": "1", "OO.C.C00.Tx": "1", "OO.C.C01.Tx": "1",
