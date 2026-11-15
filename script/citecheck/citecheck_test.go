@@ -89,7 +89,7 @@ import (
 // its citation holds: the sentence names a word the cited range does not
 // carry — the construct of a neighbouring citation, the function the range
 // lies in, or a model name the source writes in another case.
-const citecheckDriftRatchet = 406
+const citecheckDriftRatchet = 386
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

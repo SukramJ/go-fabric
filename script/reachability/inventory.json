@@ -1959,7 +1959,7 @@
       "identifier": "TestCommissioningCompleteThroughTheBridgeClosesThePASESessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_commissioning_complete_test.go",
-      "line": 96
+      "line": 101
     },
     {
       "package": "bridge",
@@ -35377,7 +35377,7 @@
       "identifier": "TestMatterJSCertCasesCountOnlyRegisteredPorts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/matterjs_cert_cases_test.go",
-      "line": 377
+      "line": 304
     },
     {
       "package": "internal/chiptool",
