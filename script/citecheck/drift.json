@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/ackpump_test.go",
-    "line": 533,
+    "line": 534,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -451,7 +451,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 338,
+    "line": 340,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "vendorId",
@@ -460,7 +460,7 @@
   },
   {
     "file": "bridge/receive_test.go",
-    "line": 636,
+    "line": 638,
     "citation": "InteractionServer.ts:431-436",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -608,7 +608,7 @@
   },
   {
     "file": "bridge/subscribe_report_chunking_test.go",
-    "line": 271,
+    "line": 273,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -617,7 +617,7 @@
   },
   {
     "file": "bridge/subscribe_report_routing_test.go",
-    "line": 73,
+    "line": 106,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:823",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "initiateExchange",
@@ -2446,7 +2446,7 @@
   },
   {
     "file": "controller/dcl/revocation_test.go",
-    "line": 360,
+    "line": 373,
     "citation": "DclCertificateService.ts:1849-1874",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "identifier": "nextUpdate",
@@ -2940,7 +2940,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 261,
+    "line": 266,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2949,7 +2949,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 340,
+    "line": 345,
     "citation": "GeneralDiagnosticsServer.ts:168-182",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "TimeSynchronizationBehavior",
@@ -2967,7 +2967,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1483,
+    "line": 1492,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
