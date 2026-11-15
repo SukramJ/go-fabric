@@ -2347,7 +2347,9 @@ func runUnsubscribers(unsubs []func()) {
 // own advances that itself, so nothing is advanced twice — and then marks
 // the attributes dirty so subscribers get a report. A fire while a command
 // runs against the cluster does neither: the command advances the version
-// once when it ends (invokeCommitTable). Mirrors the reactive state
+// once when it ends (invokeCommitTable); a fire while a controller's write
+// is applied to the root is held and settled when the write ends
+// (writeHoldTable). Mirrors the reactive state
 // matter.js keeps for root behaviors. The caller holds no bridge lock.
 func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
 	root := topology.FindByID(0)
@@ -2372,6 +2374,12 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 			// A command running against the cluster advances the
 			// version once when it ends (invokeCommitTable).
 			if b.invokeCommits.hold(root.ID, clusterID, attrs) {
+				return
+			}
+			// A controller's write being applied to the root settles
+			// them when it ends (writeHoldTable): one commit, one
+			// advance (review II, R2-P5-write-03).
+			if len(paths) > 0 && len(b.writeHolds.holdPaths(root, mgr, paths)) == 0 {
 				return
 			}
 			// The version first, so the report carries the post-change
@@ -2457,13 +2465,16 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 // held there. A controller's write is one commit with one advance, the
 // dispatcher's (endpoint/dispatcher.go WriteAuthorized), so the change the
 // write itself reports does not advance it again (matter.js
-// Datasource.ts:1446-1457 at db021da0, advanceVersion once per commit).
+// Datasource.ts:1446-1457 at db021da0, advanceVersion once per commit),
+// and a change with another origin made while a write to the endpoint is
+// applied is held and settled against the write's record when it ends
+// ([Bridge.holdWritten]).
 func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change, advance bool) {
 	attrIDs := change.Attributes
 	if len(attrIDs) == 0 {
 		return
 	}
-	if change.Origin != contract.OriginControllerWrite && b.invokeCommits.hold(ep.ID, clusterID, attrIDs) {
+	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || advance && b.holdWritten(mgr, ep, clusterID, attrIDs)) {
 		if hook := b.onAttributeChange.Load(); hook != nil {
 			(*hook)(ep.ID, clusterID, change)
 		}
@@ -2481,6 +2492,19 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 	if hook := b.onAttributeChange.Load(); hook != nil {
 		(*hook)(ep.ID, clusterID, change)
 	}
+}
+
+// holdWritten holds a change of attrs of cluster on ep while a
+// controller's write to ep is applied ([writeHoldTable]): the write's end
+// settles it against the write's record, so a change the host made from
+// inside the write — reported with its own origin — is not advanced and
+// reported beside the write's commit (review II, R2-P5-write-03).
+func (b *Bridge) holdWritten(mgr *subscription.Manager, ep *endpointpkg.Endpoint, cluster uint32, attrs []uint32) bool {
+	paths := make([]im.ConcreteAttributePath, len(attrs))
+	for i, a := range attrs {
+		paths[i] = attributeOf(ep.ID, cluster, a)
+	}
+	return len(b.writeHolds.holdPaths(ep, mgr, paths)) == 0
 }
 
 // quieterChanged advances the DataVersion of a cluster whose server
@@ -2515,6 +2539,12 @@ func (b *Bridge) quieterChanged(ep *endpointpkg.Endpoint, clusterID uint32, chan
 		return
 	}
 	if settle != nil && !settle(change.Attributes) {
+		return
+	}
+	// A controller's write being applied to the endpoint settles the
+	// advance when it ends (writeHoldTable); the report waits for the
+	// throttle as before.
+	if b.writeHolds.holdAdvance(ep, clusterID, change.Attributes) {
 		return
 	}
 	ep.BumpDataVersionOf(clusterID)

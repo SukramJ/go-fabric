@@ -12,11 +12,14 @@ import (
 	core "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // TestWrittenAttributeReachesASubscriber pins that a successful write is
@@ -292,4 +295,145 @@ func TestWriteReportsTheAttributesItsCommitNames(t *testing.T) {
 	}
 	// The sibling: one more write, counted on OffWaitTime.
 	w.expect("OffWaitTime, moved by the OnTime write", write, onoff.AttrOffWaitTime, 1, 1)
+}
+
+// conditionSink is a host's write port that moves Condition when
+// LastChangedTime is written, reporting it with the host's origin from
+// inside the controller's write.
+type conditionSink struct{ srv *spec.Server }
+
+func (s *conditionSink) MatterWriteAttribute(_ context.Context, attrID uint32, _ any) error {
+	if attrID != hepadef.AttrLastChangedTime {
+		return nil
+	}
+	v, _ := s.srv.MatterRead(hepadef.AttrCondition)
+	c, _ := v.(uint8)
+	return s.srv.Set(hepadef.AttrCondition, c+1)
+}
+
+// TestHostChangeInsideAWriteAdvancesOnce: a host that moves a sibling
+// attribute from inside a controller's write, and reports it with its own
+// origin through the server's change notifier, is held with the write: the
+// cluster's DataVersion advances once — the write's commit — and the
+// written attribute and the sibling are each reported once (review II,
+// R2-P5-write-03, F-db021da0-45). matter.js advances a datasource's
+// version once per commit (Datasource.ts:1456-1457 at db021da0).
+func TestHostChangeInsideAWriteAdvancesOnce(t *testing.T) {
+	t.Parallel()
+	sink := &conditionSink{}
+	srv, err := spec.NewServer(hepadef.Definition, spec.Options{
+		Features:   uint32(hepadef.FeatureCondition),
+		Attributes: []uint32{hepadef.AttrLastChangedTime},
+	}, spec.ServerConfig{Sink: sink, Initial: map[uint32]any{hepadef.AttrCondition: uint8(40)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sink.srv = srv
+	h := newAppHarness(t, appDevice{deviceType: 0x002D, servers: []contract.ClusterServer{srv}})
+	epID := h.endpoints[0x002D]
+	w := watchCluster(t, h, epID, hepadef.ClusterID)
+	for i, v := range []uint64{1000, 2000} {
+		if st := h.writeAttribute(epID, hepadef.ClusterID, hepadef.AttrLastChangedTime, uintValue(v)); st != 0 {
+			t.Fatalf("write %d: status 0x%02X", i+1, st)
+		}
+		w.now = w.now.Add(time.Minute)
+		w.mgr.Tick(context.Background(), w.now)
+		now := w.ep.ClusterDataVersion(hepadef.ClusterID)
+		advanced := now - w.version
+		w.version = now
+		reports := map[uint32]int{}
+		w.spy.mu.Lock()
+		for _, call := range w.spy.calls {
+			for _, p := range call {
+				reports[p.Attribute]++
+			}
+		}
+		w.spy.calls = nil
+		w.spy.mu.Unlock()
+		if advanced != 1 || reports[hepadef.AttrLastChangedTime] != 1 || reports[hepadef.AttrCondition] != 1 {
+			t.Errorf("write %d: DataVersion advanced %d, LastChangedTime reported %d times, Condition %d; want 1, 1, 1",
+				i+1, advanced, reports[hepadef.AttrLastChangedTime], reports[hepadef.AttrCondition])
+		}
+	}
+}
+
+// rootNotifyingServer is a host's root server of a manufacturer cluster
+// whose write of attribute 0 moves attribute 1 and fires its change
+// notifier (contract.ChangeNotifier) from inside the write.
+type rootNotifyingServer struct {
+	hostNotifier
+	mu   sync.Mutex
+	vals [2]uint16
+}
+
+const rootNotifyingCluster = uint32(0xFFF1FC03)
+
+func (*rootNotifyingServer) MatterClusterID() uint32 { return rootNotifyingCluster }
+
+func (s *rootNotifyingServer) MatterRead(attrID uint32) (any, bool) {
+	if attrID > 1 {
+		return nil, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.vals[attrID], true
+}
+func (*rootNotifyingServer) MatterAttributes() []uint32 { return []uint32{0, 1} }
+func (*rootNotifyingServer) MatterReportable() []uint32 { return []uint32{0, 1} }
+
+func (s *rootNotifyingServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	v, _ := value.(uint64)
+	s.mu.Lock()
+	s.vals[0] = uint16(v)
+	s.vals[1]++
+	s.mu.Unlock()
+	s.fire()
+	return nil
+}
+
+func (*rootNotifyingServer) MatterInvoke(context.Context, uint32, any) (any, error) {
+	return nil, nil
+}
+
+// TestRootNotifierInsideAWriteAdvancesOnce: a host's root server whose
+// change notifier fires from inside a controller's write is held with the
+// write: the cluster's DataVersion advances once and each attribute is
+// reported once (review II, R2-P5-write-03, F-db021da0-45).
+func TestRootNotifierInsideAWriteAdvancesOnce(t *testing.T) {
+	t.Parallel()
+	srv := &rootNotifyingServer{}
+	sh := newSecureHarnessWith(t, func(*store.Store, uint8) (Snapshotter, []contract.ClusterServer) {
+		asm, err := endpointpkg.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
+		if err != nil {
+			t.Fatalf("endpoint.New: %v", err)
+		}
+		return func(ctx context.Context) (*endpointpkg.Topology, error) {
+			return asm.Assemble(ctx, []endpointpkg.Snapshot{{Scope: "app"}})
+		}, []contract.ClusterServer{srv}
+	})
+	sh.allowAll()
+	h := &appHarness{secureHarness: sh, endpoints: map[uint16]uint16{}}
+	w := watchCluster(t, h, 0, rootNotifyingCluster)
+	for i, v := range []uint64{5, 6} {
+		if st := h.writeAttribute(0, rootNotifyingCluster, 0, uintValue(v)); st != 0 {
+			t.Fatalf("write %d: status 0x%02X", i+1, st)
+		}
+		w.now = w.now.Add(time.Minute)
+		w.mgr.Tick(context.Background(), w.now)
+		now := w.ep.ClusterDataVersion(rootNotifyingCluster)
+		advanced := now - w.version
+		w.version = now
+		reports := map[uint32]int{}
+		w.spy.mu.Lock()
+		for _, call := range w.spy.calls {
+			for _, p := range call {
+				reports[p.Attribute]++
+			}
+		}
+		w.spy.calls = nil
+		w.spy.mu.Unlock()
+		if advanced != 1 || reports[0] != 1 || reports[1] != 1 {
+			t.Errorf("write %d: DataVersion advanced %d, attribute 0 reported %d times, 1 %d; want 1, 1, 1", i+1, advanced, reports[0], reports[1])
+		}
+	}
 }

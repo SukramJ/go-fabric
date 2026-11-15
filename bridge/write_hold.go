@@ -138,6 +138,10 @@ type heldPath struct {
 	ep   *endpointpkg.Endpoint
 	mgr  *subscription.Manager
 	path im.ConcreteAttributePath
+	// advanceOnly is a change whose report goes out on its own (a
+	// quieter attribute's, by its throttle): the hold settles its
+	// cluster's version and marks nothing.
+	advanceOnly bool
 }
 
 // writeScope is the endpoints one write message names.
@@ -213,6 +217,25 @@ func (t *writeHoldTable) holdPaths(ep *endpointpkg.Endpoint, mgr *subscription.M
 		h.paths = append(h.paths, heldPath{ep: ep, mgr: mgr, path: p})
 	}
 	return nil
+}
+
+// holdAdvance holds the version advance of a change of attrs of cluster
+// on ep, whose report goes out on its own, while a write to ep is applied
+// and reports true; false when none is.
+func (t *writeHoldTable) holdAdvance(ep *endpointpkg.Endpoint, cluster uint32, attrs []uint32) bool {
+	if len(attrs) == 0 {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.holding(ep.ID) {
+		return false
+	}
+	h := t.entry(ep.ID)
+	for _, a := range attrs {
+		h.paths = append(h.paths, heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true})
+	}
+	return true
 }
 
 // holdQuiet leaves qp's check to the end of the write applied to
@@ -331,10 +354,12 @@ func (b *Bridge) settleWrite(scope writeScope, rec writeRecord) {
 				continue
 			}
 			if _, done := advanced[hp.path.Cluster]; !done {
-				hp.ep.BumpClusterDataVersion(hp.path.Cluster)
+				hp.ep.BumpDataVersionOf(hp.path.Cluster)
 				advanced[hp.path.Cluster] = struct{}{}
 			}
-			marks = append(marks, hp)
+			if !hp.advanceOnly {
+				marks = append(marks, hp)
+			}
 		}
 		for _, hp := range marks {
 			hp.mgr.OnAttributeChanged(hp.path)
