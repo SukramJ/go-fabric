@@ -72,6 +72,17 @@ func VerifyFieldMaps() error {
 	return errors.Join(errs...)
 }
 
+// DefinitionFormer is implemented by a hand-written Go type that carries a
+// definition struct but cannot say, field by field, whether an optional
+// field is present — a zero value stands for an absent one. The
+// definition's checks read DefinitionForm, a value whose Go fields say so
+// (the generated struct, a nil pointer for an absent field), in place of
+// the type's own fields; without it a field left out would be judged as
+// present with the value 0.
+type DefinitionFormer interface {
+	DefinitionForm() any
+}
+
 // mappedField returns the Go field of the struct value rv that holds the
 // definition field name: through the type's [MapFields] declaration when
 // it has one, else by the generated name; ok is false when rv's type

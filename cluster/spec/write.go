@@ -438,6 +438,9 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 // (createConformanceValidator) and conformance-compiler.ts:87-220
 // (astToFunction) at 862ad75f.
 func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScope) error {
+	if d, ok := value.(DefinitionFormer); ok {
+		value = d.DefinitionForm()
+	}
 	rv := reflect.ValueOf(value)
 	if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 		rv = rv.Elem()

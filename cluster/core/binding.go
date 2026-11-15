@@ -294,6 +294,12 @@ func (t TargetStruct) Def() bindingdef.TargetStruct {
 	return d
 }
 
+// DefinitionForm implements [spec.DefinitionFormer]: the definition's
+// checks read the generated form ([TargetStruct.Def]), in which a field
+// the entry lacks is nil — the entry's own zero Node, Group, Endpoint or
+// Cluster would be judged as a field written with the value 0.
+func (t TargetStruct) DefinitionForm() any { return t.Def() }
+
 // TargetFromDef returns the entry of a generated TargetStruct, the
 // presence flags set for a zero Endpoint or Cluster.
 func TargetFromDef(t bindingdef.TargetStruct) TargetStruct {
