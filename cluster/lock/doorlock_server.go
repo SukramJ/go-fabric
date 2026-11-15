@@ -978,7 +978,7 @@ func (s *DoorLockServer) moveHardware(ctx context.Context, op LockOperation) err
 func (s *DoorLockServer) setActuated(locked bool) error {
 	if s.src != nil {
 		s.tracker.Bump()
-		s.NotifyFrom(contract.OriginCommand, lockdef.AttrLockState)
+		s.AttributeChanges.NotifyFrom(contract.OriginCommand, lockdef.AttrLockState)
 		return nil
 	}
 	state := lockdef.LockStateUnlocked

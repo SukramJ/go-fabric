@@ -34,14 +34,14 @@ func TestRefusedRequestNeverReachesTheHostHandler(t *testing.T) {
 		CredentialRule: spec.NullOf[lockdef.CredentialRuleEnum](),
 	}
 	holiday := lockdef.SetHolidayScheduleRequest{HolidayIndex: 1, OperatingMode: lockdef.OperatingModeEnum(42)}
-	clear := setUser // OperationType outside the constraint's "add, modify"
-	clear.OperationType, clear.UserType = lockdef.DataOperationTypeClear, spec.NullOf[lockdef.UserTypeEnum]()
+	clearOp := setUser // OperationType outside the constraint's "add, modify"
+	clearOp.OperationType, clearOp.UserType = lockdef.DataOperationTypeClear, spec.NullOf[lockdef.UserTypeEnum]()
 	for name, c := range map[string]struct {
 		cmd uint32
 		req any
 	}{
 		"SetUser UserType 99":         {lockdef.CmdSetUser, setUser},
-		"SetUser OperationType clear": {lockdef.CmdSetUser, clear},
+		"SetUser OperationType clear": {lockdef.CmdSetUser, clearOp},
 		"SetHolidaySchedule mode 42":  {lockdef.CmdSetHolidaySchedule, holiday},
 	} {
 		if _, st := invokeStatus(t, srv, withPairFabric(), c.cmd, c.req); st != im.StatusInvalidCommand {

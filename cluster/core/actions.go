@@ -185,7 +185,7 @@ func (a *Actions) EndpointListsChanged() { a.changed(actionsdef.AttrEndpointList
 
 func (a *Actions) changed(attrID uint32) {
 	a.dv.Bump()
-	a.Notify(attrID)
+	a.AttributeChanges.Notify(attrID)
 }
 
 // invoke validates one command as DECODE_AND_VALIDATE does (:152-161) and

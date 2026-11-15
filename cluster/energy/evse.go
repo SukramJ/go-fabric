@@ -394,7 +394,7 @@ func (s *EvseServer) forceLocked(attrID uint32, v any) {
 	_ = s.srv.Set(attrID, v)
 	if now, _ := s.srv.Value(attrID); now == old {
 		s.version.Bump()
-		s.srv.Notify(attrID)
+		s.srv.AttributeChanges.Notify(attrID)
 	}
 }
 
