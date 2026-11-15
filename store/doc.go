@@ -64,8 +64,9 @@
 // of a copy of the database; it gives no integrity or rollback protection —
 // an older sealed value of the same row, written back, opens. [NewSealed]
 // names the columns and the settings (the JointFabricDatastore record
-// under jointfabric.datastore: among them) and seals a clear database on
-// the way in; [AESGCMSealer] is the stdlib sealer. The key's provisioning
+// under jointfabric.datastore: among them), fails with [ErrUnseal] when
+// its sealer does not open a sealed value the database holds, and seals a
+// clear database on the way in; [AESGCMSealer] is the stdlib sealer. The key's provisioning
 // and rotation are the host's.
 //
 // # Store errors

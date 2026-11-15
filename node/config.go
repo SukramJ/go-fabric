@@ -678,9 +678,10 @@ type Store struct {
 	// the store with store.NewSealed, which seals the clear rows it finds
 	// and scrubs the file; New returns its error. The key must live
 	// outside the database (docs/security.md, "Sealing at rest"). Every
-	// later start needs the same sealer: without one a sealed secret
-	// reads as store.ErrNoSealer, under another key as store.ErrUnseal —
-	// at the first read of a sealed secret, not at New. It excludes
+	// later start needs the same sealer: under another key New fails
+	// with an error that wraps store.ErrUnseal (NewSealed opens one
+	// sealed value first); a store without one reads a sealed secret as
+	// store.ErrNoSealer. It excludes
 	// Credentials (an override is sealed by the host that built it).
 	Sealer store.Sealer
 }

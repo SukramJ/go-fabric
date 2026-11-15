@@ -143,8 +143,11 @@ the schema, opens its credential store with `store.NewSealed` and `New`
 returns its error. A host that builds the store itself applies the schema
 (`store.Apply`), calls `store.NewSealed` and hands the store over as
 `node.Store{DB: db, Credentials: sealed}` (then without `Sealer`). A wrong
-key is not seen at `New`: it is `store.ErrUnseal` at the first read of a
-sealed secret, and no sealer `store.ErrNoSealer`. Provisioning and rotating
+key fails `store.NewSealed`, and with it `New`, with `store.ErrUnseal`:
+before it seals anything, `NewSealed` opens one sealed value the database
+already holds (the first sealed identity, else another sealed row or
+setting); a database with no sealed value yet opens. A store without the
+sealer reads a sealed secret as `store.ErrNoSealer`. Provisioning and rotating
 the key are the host's; the module rotates nothing. The controller's store — its CA key, its node
 records — is not sealed.
 

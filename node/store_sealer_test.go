@@ -5,6 +5,7 @@ package node_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,8 @@ import (
 // TestStoreSealerSealsTheBuiltStore (seal round 2): with Store.Sealer the
 // node opens its credential store with store.NewSealed — a secret it writes
 // is sealed in the file, so a store without the sealer reads it as
-// store.ErrNoSealer — and Validate refuses a Sealer beside a Credentials
+// store.ErrNoSealer; New under another key fails with store.ErrUnseal;
+// and Validate refuses a Sealer beside a Credentials
 // override.
 func TestStoreSealerSealsTheBuiltStore(t *testing.T) {
 	t.Parallel()
@@ -39,6 +41,24 @@ func TestStoreSealerSealsTheBuiltStore(t *testing.T) {
 	}
 	if v, ok, err := n.Store().GetSetting(ctx, sealedKey); err != nil || !ok || v != "[]" {
 		t.Errorf("the node reads its own secret: %q %v %v", v, ok, err)
+	}
+
+	// Under another key New fails: NewSealed opens the sealed setting
+	// first (seal round 3).
+	if err := n.Stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	other, err := store.NewAESGCMSealer(bytes.Repeat([]byte{8}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrong := minimalConfig(db)
+	wrong.Store.Sealer = other
+	if m, err := node.New(ctx, wrong); !errors.Is(err, store.ErrUnseal) {
+		if m != nil {
+			_ = m.Stop(context.Background())
+		}
+		t.Errorf("New under another key: %v, want an error wrapping store.ErrUnseal", err)
 	}
 
 	bad := minimalConfig(nil)

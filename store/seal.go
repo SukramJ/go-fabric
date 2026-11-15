@@ -115,8 +115,12 @@ func (a *AESGCMSealer) Open(sealed, aad []byte) ([]byte, error) {
 // same row, written back, opens — there is no tamper or rollback
 // detection.
 //
-// db must carry schema v10 ([Apply] or [Migrations]). Before NewSealed
-// returns it seals every row it finds in clear — a database a Store
+// db must carry schema v10 ([Apply] or [Migrations]). NewSealed first
+// opens one sealed value the database already holds (the first sealed
+// identity, else another sealed row or setting): a sealer under another
+// key — or that value changed outside the store — fails NewSealed with
+// [ErrUnseal] before anything is written; a database with no sealed value
+// opens. Before NewSealed returns it seals every row it finds in clear — a database a Store
 // without a sealer wrote — in one transaction, so a failure (a value that
 // does not open, a Seal error) leaves the database as it was; then it
 // rewrites the file and empties the -wal ([Scrub]), so the clear values do
@@ -360,6 +364,11 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 			return fmt.Errorf("store: NewSealed: %s has no seal mark: the database needs schema v10 (store.Apply or store.Migrations)", table)
 		}
 	}
+	// The key check before the sealing: a wrong key must not seal the
+	// clear rows beside values it does not open.
+	if err := s.openOneSealed(ctx); err != nil {
+		return err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("store: NewSealed: begin tx: %w", err)
@@ -416,6 +425,64 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 	}
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
 		return fmt.Errorf("store: NewSealed: %w", err)
+	}
+	return nil
+}
+
+// sealedProbes are the secret columns [Store.openOneSealed] tries, in
+// order, with the key columns of their aad: the identity's private key
+// first, then the other sealed tables'.
+var sealedProbes = []struct {
+	table, column string
+	keys          []string
+}{
+	{identityTable, "private_key", []string{"fabric_index"}},
+	{"matter_group_keys", "epoch_key_0", []string{"fabric_index", "group_key_set_id"}},
+	{"matter_resumption", "shared_secret", []string{"fabric_index", "peer_node_id"}},
+	{doorLockCredentialTable, "credential_data", []string{"endpoint_key", "credential_type", "credential_index"}},
+	{"matter_icd_registrations", "icd_key", []string{"fabric_index", "check_in_node_id", "monitored_subject"}},
+}
+
+// openOneSealed is [NewSealed]'s key check: it opens one sealed value the
+// database already holds — the first sealed identity's private key, else
+// the first sealed value of the other sealed tables, else the first sealed
+// setting — so a sealer under another key, or a value changed outside the
+// store, fails NewSealed with [ErrUnseal] instead of the first read later.
+// A database with no sealed value passes. The key parts are read as the
+// driver returns them, as sealTable seals them.
+func (s *Store) openOneSealed(ctx context.Context) error {
+	for _, p := range sealedProbes {
+		cols := strings.Join(p.keys, ", ")
+		key := make([]any, len(p.keys))
+		dest := make([]any, 0, len(key)+1)
+		for i := range key {
+			dest = append(dest, &key[i])
+		}
+		var val []byte
+		dest = append(dest, &val)
+		err := s.db.QueryRowContext(ctx, `SELECT `+cols+`, `+p.column+` FROM `+p.table+ //nolint:gosec // the package's constants
+			` WHERE sealed = 1 AND `+p.column+` IS NOT NULL ORDER BY `+cols+` LIMIT 1`).Scan(dest...)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("store: NewSealed: read a sealed %s value: %w", p.table, err)
+		}
+		if _, err := s.openColumn(val, true, p.table, p.column, key...); err != nil {
+			return fmt.Errorf("store: NewSealed: the sealer does not open the database's sealed values: %w", err)
+		}
+		return nil
+	}
+	var key, val string
+	err := s.db.QueryRowContext(ctx, `SELECT key, value FROM matter_settings WHERE sealed = 1 ORDER BY key LIMIT 1`).Scan(&key, &val)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("store: NewSealed: read a sealed setting: %w", err)
+	}
+	if _, err := s.openSetting(key, val, true); err != nil {
+		return fmt.Errorf("store: NewSealed: the sealer does not open the database's sealed values: %w", err)
 	}
 	return nil
 }

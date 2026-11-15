@@ -238,10 +238,11 @@ func TestSealedStoreWrongKeyOrNoSealer(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := writeSecrets(t, s)
-	other, err := store.NewSealed(ctx, db, testSealer(t, 2))
-	if err != nil {
-		t.Fatalf("NewSealed under another key on a sealed database: %v", err)
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 2)); !errors.Is(err, store.ErrUnseal) {
+		t.Fatalf("NewSealed under another key on a sealed database: %v, want ErrUnseal", err)
 	}
+	// Each read under another key, past NewSealed's check.
+	other := store.SealedWithoutCheck(db, testSealer(t, 2))
 	for name, c := range map[string]struct {
 		st   *store.Store
 		want error
@@ -905,5 +906,73 @@ func TestNewSealedClassifiesAClearICDRowUnderASealedKey(t *testing.T) {
 	_, err := store.NewSealed(ctx, db, testSealer(t, 7))
 	if !errors.Is(err, store.ErrUnseal) || errors.Is(err, store.ErrNoSealer) {
 		t.Errorf("NewSealed over a flipped ICD row = %v; want ErrUnseal only", err)
+	}
+}
+
+// TestNewSealedChecksTheKey (seal round 3): NewSealed opens one sealed
+// value before it seals anything, so a sealer under another key fails it
+// with ErrUnseal whichever sealed value the database holds — the first
+// identity, another sealed row, a sealed setting — and leaves a clear row
+// it would have sealed as it was. A database with no sealed value opens
+// under any key.
+func TestNewSealedChecksTheKey(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	if _, err := store.NewSealed(ctx, openTestDB(t), testSealer(t, 2)); err != nil {
+		t.Errorf("NewSealed on an empty database: %v", err)
+	}
+	for name, write := range map[string]func(*store.Store) error{
+		"identity": func(s *store.Store) error {
+			idx, err := s.AddFabric(ctx, newFabricRecord(0, 7))
+			if err != nil {
+				return err
+			}
+			return s.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: idx, NOC: []byte{1}, PrivateKey: randomSecret(32), IPK: randomSecret(16)})
+		},
+		"group key set": func(s *store.Store) error {
+			idx, err := s.AddFabric(ctx, newFabricRecord(0, 7))
+			if err != nil {
+				return err
+			}
+			return s.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: idx, GroupKeySetID: 1, EpochKey0: randomSecret(16), EpochStart0: 1})
+		},
+		"door lock credential": func(s *store.Store) error {
+			return s.SaveDoorLockAuth(ctx, "lock", store.DoorLockAuth{Credentials: []store.DoorLockCredential{{Type: 1, Index: 1, Data: randomSecret(24)}}})
+		},
+		"setting": func(s *store.Store) error { return s.SetSetting(ctx, "netcomm.wifi.networks", "[]") },
+	} {
+		db := openTestDB(t)
+		s, err := store.NewSealed(ctx, db, testSealer(t, 1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := write(s); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if _, err := store.NewSealed(ctx, db, testSealer(t, 2)); !errors.Is(err, store.ErrUnseal) {
+			t.Errorf("%s: NewSealed under another key = %v, want ErrUnseal", name, err)
+		}
+		if _, err := store.NewSealed(ctx, db, testSealer(t, 1)); err != nil {
+			t.Errorf("%s: NewSealed under the key = %v", name, err)
+		}
+	}
+
+	// A clear secret beside a sealed one: the wrong key seals nothing.
+	db := openTestDB(t)
+	s, err := store.NewSealed(ctx, db, testSealer(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSetting(ctx, store.SettingICDKey, "k"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.New(db).SetSetting(ctx, "netcomm.wifi.networks", "[]"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 2)); !errors.Is(err, store.ErrUnseal) {
+		t.Fatalf("NewSealed under another key = %v, want ErrUnseal", err)
+	}
+	if v, ok, err := store.New(db).GetSetting(ctx, "netcomm.wifi.networks"); err != nil || !ok || v != "[]" {
+		t.Errorf("the clear row after a refused NewSealed: %q %v %v; want it clear and unchanged", v, ok, err)
 	}
 }
