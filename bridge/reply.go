@@ -133,7 +133,7 @@ func (b *Bridge) flushSessionAtRollover(localSessionID uint16) {
 }
 
 // sendReply is a thin wrapper around [Bridge.sendReplyOpts] that
-// keeps the v1.1 best-effort default (NeedsAck=false, no MRP
+// keeps the best-effort default (NeedsAck=false, no MRP
 // tracking). Use [Bridge.sendReplyReliable] when an IM response
 // must survive a single packet drop — see that method's docstring
 // for the obligation contract.
@@ -155,7 +155,7 @@ func (b *Bridge) sendReply(
 // Caller contract: the reply must idempotently encode the same
 // IM-level result on every retransmit (fresh attribute reads, fresh
 // timestamps, etc. are NOT allowed) — otherwise the peer might
-// observe two divergent successes for the same exchange. v1.1 IM
+// observe two divergent successes for the same exchange. IM
 // responses (status / write-response / invoke-response) are pure
 // outcome reports and meet the contract trivially.
 //
@@ -395,9 +395,9 @@ func unicastReplyHeader(requestHdr *message.Header) message.Header {
 
 // EncodeReportData serialises rd into the TLV bytes that ride as the
 // IM ReportData payload. Uses [defaultAttributeValueWriter] for
-// every attribute value — clusters that need richer value shapes
-// (structs, lists) need a richer writer; the v1.1 measurement +
-// custom-DP cluster set sticks to scalars.
+// every attribute value, which writes each value by its Go type: the
+// scalars and strings, the raw TLV of a list a cluster encodes itself,
+// and the struct values it names.
 func EncodeReportData(rd im.ReportData) ([]byte, error) {
 	enc := tlv.NewEncoder()
 	rd.MarshalTLV(enc, defaultAttributeValueWriter)
@@ -885,9 +885,9 @@ func EncodeWriteResponse(wr im.WriteResponse) ([]byte, error) {
 
 // EncodeInvokeResponse serialises ir into the TLV bytes that ride as
 // the IM InvokeResponse payload. Uses [defaultCommandFieldsWriter]
-// for response payloads — currently emits an empty struct for
-// non-status responses (covers the v1.1 cluster set, which surfaces
-// status-only commands).
+// for response payloads: each response type it names is written field
+// by field, and any other value as the empty struct of a status-only
+// command.
 func EncodeInvokeResponse(ir im.InvokeResponse) ([]byte, error) {
 	enc := tlv.NewEncoder()
 	ir.MarshalTLV(enc, defaultCommandFieldsWriter)
@@ -899,10 +899,10 @@ func EncodeInvokeResponse(ir im.InvokeResponse) ([]byte, error) {
 }
 
 // EncodeStatusResponse serialises sr into the TLV bytes that ride
-// as the IM StatusResponse payload. The bridge emits this in
-// response to a TimedRequest (always Success in v1.1) and could in
-// principle reply with one for any IM-action error condition (today
-// errors are embedded into the dedicated response shapes).
+// as the IM StatusResponse payload. The bridge emits this in reply
+// to a TimedRequest and wherever it answers an interaction with a status
+// alone: a request that does not decode, invalid paths, a batch beyond
+// its bound, a Subscribe it cannot establish.
 func EncodeStatusResponse(sr im.StatusResponse) ([]byte, error) {
 	enc := tlv.NewEncoder()
 	sr.MarshalTLV(enc)

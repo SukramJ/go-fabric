@@ -356,8 +356,10 @@ func (d *TopologyDispatcher) Write(ctx context.Context, path im.ConcreteAttribut
 // SetOnPersistentWrite).
 type WritePersister interface {
 	// PersistWrite runs for a write every gate of the dispatcher passed,
-	// before srv sees it. It returns a nil done for an attribute it does
-	// not keep. Otherwise it has stored value and returns done, which the
+	// before srv sees it. A nil done means the write is not stored — an
+	// attribute it does not keep, or a server no longer in its key's
+	// place — and the dispatcher applies the write without settlement.
+	// Otherwise it has stored value and returns done, which the
 	// dispatcher calls with whether srv applied the write: false puts the
 	// stored value back as it stood. An error refuses the write with
 	// FAILURE; srv never sees it. Between PersistWrite and done no other

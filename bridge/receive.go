@@ -36,8 +36,8 @@ var (
 	// silently drops these.
 	ErrUnknownProtocol = errors.New("bridge: unknown protocol id")
 	// ErrUnsupportedOpcode is logged when an IM datagram carries an
-	// opcode the bridge does not service (responses, or future opcodes
-	// outside the v1.1 surface).
+	// opcode the bridge does not service (responses, or opcodes it does
+	// not serve).
 	ErrUnsupportedOpcode = errors.New("bridge: unsupported IM opcode")
 	// ErrSessionMissing is logged when an encrypted datagram references
 	// a SessionID that the operational session manager does not know.
@@ -66,8 +66,8 @@ type SessionLookup interface {
 
 // noopSessionLookup is the default when the bridge starts without a
 // session manager — every Lookup misses, so encrypted datagrams are
-// dropped with [ErrSessionMissing]. Sufficient for the v1.1 GA
-// listener-only smoke (no commissioner can complete CASE without the
+// dropped with [ErrSessionMissing]. Sufficient for a listener-only
+// smoke test (no commissioner can complete CASE without the
 // operational manager).
 type noopSessionLookup struct{}
 
