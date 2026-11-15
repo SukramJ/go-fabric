@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8752,
+  "entry_points": 8776,
   "entry_packages": [
     ".",
     "bdx",
@@ -289,9 +289,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18518,
+    "total_exported": 18531,
     "reachable": 12492,
-    "whitelisted": 6026,
+    "whitelisted": 6039,
     "unreachable": 0
   },
   "by_package": [],
@@ -4733,7 +4733,7 @@
       "identifier": "TestPASEFailuresShareOneBudgetAcrossTransports",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_budget_transports_test.go",
-      "line": 67
+      "line": 73
     },
     {
       "package": "bridge",
@@ -30378,6 +30378,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestCheckGroupACLIgnoresCASEEntries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/dispatcher_group_test.go",
+      "line": 120
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestClusterDataVersion_WithVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -30690,6 +30697,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/fabric_scoped_read_failure_test.go",
       "line": 315
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestForgetFabricScenesReachesEveryTable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/forget_fabric_scenes_test.go",
+      "line": 55
     },
     {
       "package": "endpoint",
@@ -34410,6 +34424,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestRequestDecodersRefuseWrongTypes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/request_decoder_strictness_test.go",
+      "line": 105
+    },
+    {
+      "package": "im",
       "identifier": "TestRequestsWithoutInteractionModelRevision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/imrevision_absent_parity_matterjs_test.go",
@@ -34645,6 +34666,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/volatile_event_store_parity_matterjs_test.go",
       "line": 96
+    },
+    {
+      "package": "im",
+      "identifier": "TestWildcardInvokeSkipsTimedCommandWithoutTimedRequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_wildcard_timed_test.go",
+      "line": 62
     },
     {
       "package": "im",
@@ -35208,6 +35236,13 @@
     },
     {
       "package": "internal/chiptool",
+      "identifier": "TestMakefileImagesPinnedByDigest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/image_pin_test.go",
+      "line": 38
+    },
+    {
+      "package": "internal/chiptool",
       "identifier": "TestMatterJSCertCasesCountOnlyRegisteredPorts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/matterjs_cert_cases_test.go",
@@ -35236,6 +35271,13 @@
     },
     {
       "package": "internal/chiptool",
+      "identifier": "TestSelectGoCert",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/gocert_select_test.go",
+      "line": 60
+    },
+    {
+      "package": "internal/chiptool",
       "identifier": "TestServedClustersHaveAFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/surface_families_test.go",
@@ -35247,6 +35289,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/prefixes_test.go",
       "line": 79
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestWorkflowCodeFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/gocert_select_test.go",
+      "line": 161
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestWorkflowGoCertGroups",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/gocert_select_test.go",
+      "line": 97
     },
     {
       "package": "internal/chiptool",
@@ -38505,6 +38561,20 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestInitiatorRejectsSigma2WithForeignTranscriptSignature",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_negative_test.go",
+      "line": 24
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestInitiatorSigma2ResumeOutOfOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_negative_test.go",
+      "line": 96
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestInitiator_SessionKeys_BeforeComplete",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_accessor_test.go",
@@ -38774,14 +38844,14 @@
       "identifier": "TestResponderSigma3FailureEndsHandshakeUntilNewSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/responder_sigma3_test.go",
-      "line": 140
+      "line": 145
     },
     {
       "package": "secure/sigma",
       "identifier": "TestResponderSigma3SignatureFailureCommitsNoPeerIdentity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/responder_sigma3_test.go",
-      "line": 90
+      "line": 95
     },
     {
       "package": "secure/sigma",
@@ -38978,6 +39048,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_tlv_test.go",
       "line": 166
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestSigmaDecodersRefuseWrongFieldLengths",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/decoder_lengths_test.go",
+      "line": 67
     },
     {
       "package": "secure/sigma",
@@ -39405,6 +39482,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/spake2_test.go",
       "line": 245
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "TestNewVerifierContextIterationBounds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/verifier_context_bounds_test.go",
+      "line": 16
     },
     {
       "package": "secure/spake2",
@@ -41571,6 +41655,13 @@
     },
     {
       "package": "transport/message",
+      "identifier": "TestHeaderAADKeepsReservedWireBits",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/nonce_flags_test.go",
+      "line": 46
+    },
+    {
+      "package": "transport/message",
       "identifier": "TestHeaderExtensionThenProtocolHeader",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
@@ -41749,7 +41840,7 @@
       "identifier": "TestNonceSecurityFlagsKeepsReservedWireBits",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/nonce_flags_test.go",
-      "line": 15
+      "line": 18
     },
     {
       "package": "transport/message",
