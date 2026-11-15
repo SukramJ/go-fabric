@@ -8,8 +8,10 @@ package chiptool
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
 	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
@@ -38,9 +40,8 @@ import (
 
 func init() {
 	for _, c := range []func() goCertCase{
-		caseAPPLAUNCHER371, caseAPPLAUNCHER381, caseAPPLAUNCHER391,
-		caseAUDIOOUTPUT73, caseAUDIOOUTPUT74,
-		caseCHANNEL54, caseCHANNEL55, caseCHANNEL56,
+		caseALOGIN122, caseAPPLAUNCHER371, caseAPPLAUNCHER381, caseAPPLAUNCHER391,
+		caseAUDIOOUTPUT73, caseAUDIOOUTPUT74, caseCHANNEL54, caseCHANNEL55, caseCHANNEL56,
 		caseCONTENTLAUNCHER104, caseCONTENTLAUNCHER106,
 	} {
 		registerGoCert(c)
@@ -132,6 +133,40 @@ func (th *goTH) mediaAInvoke(n *client.Node, ep uint16, cluster, cmd uint32, nam
 		th.note("%s on endpoint %d: Success", name, ep)
 	}
 	return r, nil
+}
+
+// --- AccountLogin ----------------------------------------------------------
+
+// mediaALoginTimed is the content app target's options: every
+// AccountLogin command is timed, with a 2 s timeout
+// (TC-ALOGIN-12.2.test.ts:17-21).
+var mediaALoginTimed = client.InvokeOptions{Timed: true, TimedTimeout: 2 * time.Second}
+
+// mediaATempAccountID is TEMP_ACCOUNT_IDENTIFIER (TC-ALOGIN-12.2.test.ts:24).
+const mediaATempAccountID = "TempAccountId123"
+
+// caseALOGIN122 mirrors TC-ALOGIN-12.2: GetSetupPIN, Login and Logout,
+// timed, to the content app.
+func caseALOGIN122() goCertCase {
+	return mediaACase("TC-ALOGIN-12.2", 28, "ALOGIN.C", "ALOGIN.S", dtContentApp,
+		mediaAStep{n: "1", line: 32, title: "DUT sends GetSetupPIN command to TH", send: func(th *goTH, n *client.Node, ep uint16) error {
+			_, err := th.mediaAInvoke(n, ep, logindef.ClusterID, logindef.CmdGetSetupPin, "GetSetupPIN",
+				logindef.GetSetupPinRequest{TempAccountIdentifier: mediaATempAccountID}, false, mediaALoginTimed)
+			return err
+		}},
+		// The Setup PIN is CHIP_TV_SETUP_PIN (TC-ALOGIN-12.2.test.ts:51,
+		// TestAccountLoginServer.ts:12), the PIN chip's tv-app answers and
+		// accepts on its content app endpoint (AccountLoginManager.h:35).
+		mediaAStep{n: "2", line: 44, title: "DUT sends Login command to TH", send: func(th *goTH, n *client.Node, ep uint16) error {
+			_, err := th.mediaAInvoke(n, ep, logindef.ClusterID, logindef.CmdLogin, "Login",
+				logindef.LoginRequest{TempAccountIdentifier: mediaATempAccountID, SetupPin: "tempPin123"}, false, mediaALoginTimed)
+			return err
+		}},
+		mediaAStep{n: "3", line: 56, title: "DUT sends Logout command to TH", send: func(th *goTH, n *client.Node, ep uint16) error {
+			_, err := th.mediaAInvoke(n, ep, logindef.ClusterID, logindef.CmdLogout, "Logout", logindef.LogoutRequest{}, false, mediaALoginTimed)
+			return err
+		}},
+	)
 }
 
 // --- ApplicationLauncher ---------------------------------------------------
