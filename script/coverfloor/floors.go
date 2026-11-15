@@ -47,11 +47,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/binding", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
-	{
-		pkg: "github.com/SukramJ/go-fabric/bridge",
-		min: 83,
-		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (84.9 % to 83.6 %)",
-	},
+	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/clock", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/clock/clocktest", min: 99, why: "phase 32: 99.3 with the wall-step and monotonic cases; what is left is Resolve's first select"},
