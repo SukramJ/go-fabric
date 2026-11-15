@@ -214,6 +214,7 @@ becomes permissible in:
 | `cluster/spec.Server.Emit`, `cluster/spec.EmitOn`, `<cluster>def.Server.Emit<Event>` | `Server.EmitEvent`, `<cluster>def.Server.Record<Event>`: the event goes out on the endpoint the server is mounted on (`spec.ErrNotMounted` before) | `v0.23.0` |
 | `cluster/wire.ScenesManagement` | `cluster/core.ScenesManagement` (`core.NewScenesManagement`) | `v0.23.0` |
 | `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, the `Schedules*` constants | the Thermostat server's schedules (`cluster/thermo`, `docs/guides/thermostat.md`) | `v0.23.0` |
+| `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` | none to call: a node reaches its OTA provider and its camera's requestor over its own peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session without a handshake | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

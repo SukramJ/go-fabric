@@ -42,6 +42,21 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Removed in the next release: `Bridge.ConnectPeer` and `Bridge.ConnectOtaProvider`
+
+A node reaches the peers its device-side servers talk to — the OTA
+requestor's provider, the camera's WebRTC requestor — over its own peer
+path ([ADR 0032](../adr/0032-the-device-sides-peer-path.md)): a live session
+of either of its stacks that carries the command (TCP for a Large Message
+command), else one its client stack establishes. The node wires it; a host
+calls nothing.
+
+| Symbol | Route |
+| --- | --- |
+| `Bridge.ConnectPeer(ctx, fabricIndex, nodeID)` | inside a node: nothing, the node attaches its peer path to every `camera.Provider`; a live session without a handshake: `Bridge.LivePeerSession(fabricIndex, nodeID, bridge.PeerSessionRequirement{LargeMessage: …})` |
+| `Bridge.ConnectOtaProvider(ctx, fabricIndex, nodeID)` | inside a node: nothing, the OTA requestor uses the peer path; a bridge run without a node attaches its own `core.OtaProviderConnector` |
+| a camera signal over UDP | refused before sending with `camera.ErrNoLargeMessageTransport`: give the node the TCP client role (`Network.TCP.Outgoing`) |
+
 ## Removed in the next release: `fabrictest.UseWiFiCommissioning`
 
 Wi-Fi commissioning is part of the facade since milestone 7 (wave 28b):
