@@ -11,6 +11,7 @@ package node_test
 // resumption record per peer (R2-P5-port-06, F-db021da0-19).
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -205,7 +206,7 @@ func TestResumedSessionKeepsTheRecordsParameters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(rec.ResumptionID) == string(first.ResumptionID) {
+	if bytes.Equal(rec.ResumptionID, first.ResumptionID) {
 		t.Error("the resumption id was not renewed")
 	}
 	if rec.SessionParameters != first.SessionParameters {
