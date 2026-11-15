@@ -902,7 +902,8 @@ func (o *OperationalCredentials) ackOwedFabricEvents(ctx context.Context, kind s
 		o.logger().Warn("matter.opcreds.owed_fabric_event.list_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 		return
 	}
-	for _, ev := range owed {
+	for i := range owed {
+		ev := &owed[i]
 		if ev.Kind != kind || ev.Fabric.FabricIndex != fabricIndex {
 			continue
 		}

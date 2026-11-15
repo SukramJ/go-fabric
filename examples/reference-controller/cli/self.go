@@ -60,7 +60,7 @@ func migrateSelfRecord(ctx context.Context, st *store.Store) error {
 	if err := st.SetSetting(ctx, ownNodeKey, old); err != nil {
 		return err
 	}
-	return st.DeleteSetting(ctx, selfKey)
+	return st.DeleteSettings(ctx, selfKey)
 }
 
 // ownNodeKey is controller.New's settings key of the former own node.

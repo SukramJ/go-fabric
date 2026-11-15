@@ -1122,24 +1122,7 @@ func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 		t.Fatal("mutating a read subscription payload changed the store")
 	}
 
-	res := resumptionRec(idx, 7, 1)
-	res.CASEAuthTags = []uint32{0x00010001}
-	must(t, p.UpsertResumption(ctx, res))
-	res.ResumptionID[0] ^= 0xFF
-	res.SharedSecret[0] ^= 0xFF
-	res.CASEAuthTags[0] = 9
-	gotRes, err := p.GetResumptionByPeer(ctx, idx, 7)
-	must(t, err)
-	if want := resumptionRec(idx, 7, 1); !bytes.Equal(gotRes.ResumptionID, want.ResumptionID) || !bytes.Equal(gotRes.SharedSecret, want.SharedSecret) || gotRes.CASEAuthTags[0] != 0x00010001 {
-		t.Fatal("mutating a written ResumptionRecord changed the store")
-	}
-	gotRes.ResumptionID[0] ^= 0xFF
-	gotRes.SharedSecret[0] ^= 0xFF
-	gotRes.CASEAuthTags[0] = 9
-	if again, _ := p.GetResumptionByPeer(ctx, idx, 7); !bytes.Equal(again.ResumptionID, resumptionRec(idx, 7, 1).ResumptionID) ||
-		!bytes.Equal(again.SharedSecret, resumptionRec(idx, 7, 1).SharedSecret) || again.CASEAuthTags[0] != 0x00010001 {
-		t.Fatal("mutating a read ResumptionRecord changed the store")
-	}
+	copiesResumption(ctx, t, p, idx)
 
 	presets := []byte{1}
 	must(t, p.SaveThermostatPresets(ctx, "t", presets, nil))
@@ -1160,6 +1143,29 @@ func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, err)
 	if *got2.Users[0].UserUniqueID != 5 || got2.Users[0].Credentials[0].Index != 1 || got2.Credentials[0].Data[0] != 7 {
 		t.Fatal("mutating written door-lock records changed the store")
+	}
+}
+
+// copiesResumption: a resumption record written and read is copied both
+// ways — its id, its secret and its CATs (review II, port unit).
+func copiesResumption(ctx context.Context, t *testing.T, p store.Port, idx uint8) {
+	res := resumptionRec(idx, 7, 1)
+	res.CASEAuthTags = []uint32{0x00010001}
+	must(t, p.UpsertResumption(ctx, res))
+	res.ResumptionID[0] ^= 0xFF
+	res.SharedSecret[0] ^= 0xFF
+	res.CASEAuthTags[0] = 9
+	gotRes, err := p.GetResumptionByPeer(ctx, idx, 7)
+	must(t, err)
+	if want := resumptionRec(idx, 7, 1); !bytes.Equal(gotRes.ResumptionID, want.ResumptionID) || !bytes.Equal(gotRes.SharedSecret, want.SharedSecret) || gotRes.CASEAuthTags[0] != 0x00010001 {
+		t.Fatal("mutating a written ResumptionRecord changed the store")
+	}
+	gotRes.ResumptionID[0] ^= 0xFF
+	gotRes.SharedSecret[0] ^= 0xFF
+	gotRes.CASEAuthTags[0] = 9
+	if again, _ := p.GetResumptionByPeer(ctx, idx, 7); !bytes.Equal(again.ResumptionID, resumptionRec(idx, 7, 1).ResumptionID) ||
+		!bytes.Equal(again.SharedSecret, resumptionRec(idx, 7, 1).SharedSecret) || again.CASEAuthTags[0] != 0x00010001 {
+		t.Fatal("mutating a read ResumptionRecord changed the store")
 	}
 }
 

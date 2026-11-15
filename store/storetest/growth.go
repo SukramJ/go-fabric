@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
+//nolint:thelper // each case is a test body that Run runs as a subtest, not a helper: its failures belong to its own lines
 package storetest
 
 import (

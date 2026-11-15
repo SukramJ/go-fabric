@@ -410,9 +410,9 @@ func (s *Store) OwedFabricEvents(context.Context) ([]store.OwedFabricEvent, erro
 		return nil, nil
 	}
 	out := make([]store.OwedFabricEvent, len(s.owed))
-	for i, ev := range s.owed {
-		ev.Fabric.RootPublicKey = bytes.Clone(ev.Fabric.RootPublicKey)
-		out[i] = ev
+	for i := range s.owed {
+		out[i] = s.owed[i]
+		out[i].Fabric.RootPublicKey = bytes.Clone(s.owed[i].Fabric.RootPublicKey)
 	}
 	return out, nil
 }

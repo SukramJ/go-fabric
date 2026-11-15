@@ -531,7 +531,7 @@ type readCountingStore struct {
 	read     []string
 }
 
-func (s *readCountingStore) GetSetting(ctx context.Context, key string) (string, bool, error) {
+func (s *readCountingStore) GetSetting(ctx context.Context, key string) (value string, found bool, err error) {
 	if s.counting.Load() {
 		s.mu.Lock()
 		s.read = append(s.read, key)

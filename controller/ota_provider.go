@@ -272,7 +272,7 @@ func (c *Controller) retireOwnNode(ctx context.Context, st *store.Store, log *sl
 			}
 		}
 	}
-	if err := st.DeleteSetting(ctx, ownNodeKey); err != nil {
+	if err := st.DeleteSettings(ctx, ownNodeKey); err != nil {
 		return err
 	}
 	log.Info("controller.ota.own_node.retired", slog.String("node", fmt.Sprintf("%016X", rec.NodeID)))
