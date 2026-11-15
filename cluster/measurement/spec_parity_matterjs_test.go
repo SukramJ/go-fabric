@@ -4,6 +4,7 @@
 package measurement
 
 import (
+	"context"
 	"slices"
 	"testing"
 
@@ -104,7 +105,31 @@ func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			spectest.CheckServer(t, tc.srv, tc.def, tc.features)
+			writeChangesNothing(t, tc.srv)
 		})
+	}
+}
+
+// writeChangesNothing holds MatterWriteChanged of a server that stores no
+// written value: every listed attribute, and one the cluster does not
+// define, answers unchanged with the refusal MatterWrite gives.
+func writeChangesNothing(t *testing.T, srv contract.ClusterServer) {
+	t.Helper()
+	w, ok := srv.(contract.ChangeReportingWriter)
+	if !ok {
+		t.Fatalf("%T does not give the write verdict (contract.ChangeReportingWriter)", srv)
+	}
+	lister, ok := srv.(contract.ClusterAttributeLister)
+	if !ok {
+		t.Fatalf("%T lists no attributes", srv)
+	}
+	ctx := context.Background()
+	for _, id := range append(lister.MatterAttributes(), 0x7FF0) {
+		changed, err := w.MatterWriteChanged(ctx, id, uint64(0))
+		werr := srv.MatterWrite(ctx, id, uint64(0))
+		if changed || err == nil || werr == nil || err.Error() != werr.Error() || spec.StatusOf(err) != spec.StatusOf(werr) {
+			t.Errorf("attribute 0x%04X: MatterWriteChanged = %v, %v; want unchanged and MatterWrite's refusal %v", id, changed, err, werr)
+		}
 	}
 }
 

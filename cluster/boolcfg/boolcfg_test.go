@@ -496,3 +496,58 @@ func TestDelegateStatusPassesThrough(t *testing.T) {
 		t.Errorf("EnableDisableAlarm refused with a host status answered %v, want BUSY", err)
 	}
 }
+
+// TestCurrentSensitivityLevelWriteVerdict: MatterWriteChanged answers a
+// new level changed — the delegate is told once and a read returns it —
+// the same level again unchanged without a delegate call, and a level the
+// definition refuses, a delegate's refusal and a read-only attribute with
+// MatterWrite's status, unchanged.
+func TestCurrentSensitivityLevelWriteVerdict(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &delegate{}
+	srv, _ := newServer(t, full(d))
+	changed, err := srv.MatterWriteChanged(ctx, def.AttrCurrentSensitivityLevel, uint64(2))
+	if !changed || err != nil || !slices.Equal(d.calls, []string{"level"}) {
+		t.Fatalf("write 2: changed %v, %v, delegate %v; want changed, one call", changed, err, d.calls)
+	}
+	if v := read(t, srv, def.AttrCurrentSensitivityLevel); v != uint8(2) {
+		t.Errorf("CurrentSensitivityLevel = %v after the write, want 2", v)
+	}
+	changed, err = srv.MatterWriteChanged(ctx, def.AttrCurrentSensitivityLevel, uint64(2))
+	if changed || err != nil || len(d.calls) != 1 {
+		t.Errorf("write 2 again: changed %v, %v, delegate %v; want unchanged without a call", changed, err, d.calls)
+	}
+	changed, err = srv.MatterWriteChanged(ctx, def.AttrCurrentSensitivityLevel, uint64(3))
+	if changed || status(t, err) != im.StatusConstraintError || status(t, srv.MatterWrite(ctx, def.AttrCurrentSensitivityLevel, uint64(3))) != im.StatusConstraintError {
+		t.Errorf("write 3 of 3 levels: changed %v, %v; want unchanged and CONSTRAINT_ERROR as MatterWrite", changed, err)
+	}
+	d.refuse = true
+	changed, err = srv.MatterWriteChanged(ctx, def.AttrCurrentSensitivityLevel, uint64(0))
+	if changed || status(t, err) != im.StatusFailure {
+		t.Errorf("refused write: changed %v, %v; want unchanged and FAILURE", changed, err)
+	}
+	if v := read(t, srv, def.AttrCurrentSensitivityLevel); v != uint8(2) {
+		t.Errorf("a refused write changed the level to %v", v)
+	}
+	changed, err = srv.MatterWriteChanged(ctx, def.AttrAlarmsActive, uint64(0))
+	if changed || status(t, err) != im.StatusUnsupportedWrite || status(t, srv.MatterWrite(ctx, def.AttrAlarmsActive, uint64(0))) != im.StatusUnsupportedWrite {
+		t.Errorf("AlarmsActive write: changed %v, %v; want unchanged and UNSUPPORTED_WRITE as MatterWrite", changed, err)
+	}
+}
+
+// TestSensitivitySinkSkipsTheHeldLevel: the Sink handed the level the
+// server holds succeeds without a delegate call (chip .cpp:325: no change
+// is a success without one); another level is the delegate's to accept.
+func TestSensitivitySinkSkipsTheHeldLevel(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &delegate{}
+	srv, _ := newServer(t, full(d)) // CurrentSensitivityLevel starts at the default 1
+	if err := boolcfg.WriteSensitivityThroughSink(ctx, srv, 1); err != nil || len(d.calls) != 0 {
+		t.Errorf("the held level: %v, delegate %v; want success without a call", err, d.calls)
+	}
+	if err := boolcfg.WriteSensitivityThroughSink(ctx, srv, 2); err != nil || !slices.Equal(d.calls, []string{"level"}) || srv.State().CurrentSensitivityLevel != 2 {
+		t.Errorf("level 2: %v, delegate %v, state %+v; want one call and level 2", err, d.calls, srv.State())
+	}
+}

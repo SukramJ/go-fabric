@@ -317,6 +317,9 @@ func TestInvokeRefusals(t *testing.T) {
 	if err := full.MatterWrite(ctx, sa.AttrSelectedAreas, []uint32{}); spec.StatusOf(err) != im.StatusUnsupportedWrite {
 		t.Errorf("a write to SelectedAreas: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
+	if changed, err := full.MatterWriteChanged(ctx, sa.AttrSelectedAreas, []uint32{}); changed || spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Errorf("MatterWriteChanged of SelectedAreas: %v, %v; want unchanged and %v", changed, err, im.StatusUnsupportedWrite)
+	}
 }
 
 // TestSetters holds every host setter to the reactor it mirrors.

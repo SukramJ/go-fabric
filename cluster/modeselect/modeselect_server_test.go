@@ -245,7 +245,8 @@ func TestUnknownCommandIsUnsupportedCommand(t *testing.T) {
 // TestMatterWriteRefusesEveryAttribute pins the access column: the four
 // implemented attributes are "R V" and report UnsupportedWrite, while
 // the two writable ones this server does not implement report
-// UnsupportedAttribute — absent, not read-only.
+// UnsupportedAttribute — absent, not read-only. MatterWriteChanged answers
+// each with the same status, unchanged: the server stores no written value.
 func TestMatterWriteRefusesEveryAttribute(t *testing.T) {
 	t.Parallel()
 
@@ -274,6 +275,10 @@ func TestMatterWriteRefusesEveryAttribute(t *testing.T) {
 			}
 			if got := sc.MatterStatusCode(); got != tc.want {
 				t.Errorf("MatterStatusCode() = %v, want %v", got, tc.want)
+			}
+			changed, err := srv.MatterWriteChanged(context.Background(), tc.attrID, uint8(1))
+			if !errors.As(err, &sc) || sc.MatterStatusCode() != tc.want || changed {
+				t.Errorf("MatterWriteChanged = %v, %v; want unchanged and %v", changed, err, tc.want)
 			}
 		})
 	}
