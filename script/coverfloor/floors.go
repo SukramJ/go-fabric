@@ -213,6 +213,7 @@ var floors = []packageFloor{
 	// go BELOW the observed minimum, not at the typical measurement -- a
 	// gate that fails on a good day teaches people to re-run it.
 	{pkg: "github.com/SukramJ/go-fabric/im/subscription", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/internal/attestids", min: 99},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/bridgeseam",
 		min:          0,
