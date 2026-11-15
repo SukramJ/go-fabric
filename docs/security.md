@@ -118,16 +118,21 @@ before the upgrade — backups, snapshots, the blocks of the truncated
 `-wal` — keep the clear values, as for the factory reset above. A second call
 writes nothing.
 
-After that the store is strict: it writes no secret in clear, and a secret
-row it reads without the seal mark — a mark edited in the file, a clear row
+After that, while the store is open, it is strict: it writes no secret in
+clear, and a secret row it reads without the seal mark — a mark edited in the file, a clear row
 planted or written by a store without the sealer — is refused with
 `store.ErrUnseal`, never read as the secret; so is a value under another key
-or moved to another row. A store without the sealer reads a sealed value as
+or moved to another row. A later `NewSealed` adopts every clear row it finds
+and seals it — it cannot tell an edited or planted row from one a store
+without the sealer wrote. A store without the sealer reads a sealed value as
 `store.ErrNoSealer` and refuses a write that would leave a sealed identity
 half clear. Every store of the database needs the sealer; a concurrent
 writer without it on the same database is not supported. A secret of the
-wrong length is refused on read, with or without a sealer (the resumption
-secret, the IPK, the epoch keys). Migration v10's `Down` refuses a database
+wrong length is refused on write and on read, in both stores, with or without
+a sealer (the resumption secret 32 bytes, the IPK 16, the epoch keys 16, a
+non-empty private key; an empty optional epoch key is stored as absent); a
+key set row of the wrong length left by an earlier release is left out of
+`ListGroupKeySets`, so the fabric's other key sets stay usable. Migration v10's `Down` refuses a database
 that holds a sealed row.
 
 Wiring: apply the schema (`store.Apply`), build the store with
