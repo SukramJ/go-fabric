@@ -44,7 +44,9 @@ var ErrStopped = errors.New("node: stopped")
 
 // ErrNotStarted is returned by a call that needs the running node's
 // assembled topology before [Node.Start] assembled it
-// ([Aggregator.IncreaseConfigurationVersions]).
+// ([Aggregator.IncreaseConfigurationVersions]), and by
+// [Node.OpenOwnWindow], [Node.OpenBasicWindow] and [Node.CloseWindow]
+// before Start completed: a window needs the node's socket.
 var ErrNotStarted = errors.New("node: not started")
 
 // operationalTimeInterval is how often the operational time is persisted
@@ -440,6 +442,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		deviceType:      &commissionableDeviceType{topology: n.br.Topology},
 		responderParams: n.sec.responderParams, life: n.life,
 		ble: cfg.Network.BLE != nil, clk: clock.Or(n.cfg.Clock),
+		onDemand: cm.WindowOnDemand,
 	}
 	wireCommissioningWindow(n.windowLife, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: windowLife, not New's ctx
 
@@ -585,8 +588,10 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 		RotatingID: mdns.GenerateRotatingID(
 			mdns.DeriveUniqueIDFromIdentity(pd.VendorID, pd.ProductID, bi.SerialNumber, bi.NodeLabel), 0,
 		),
-		CommissioningMode: 1, // §4.3.1.4 CM=1: standard commissioning window
-		DeviceTypeID:      uint32(pd.DeviceType),
+		CommissioningMode:  1, // §4.3.1.4 CM=1: standard commissioning window
+		DeviceTypeID:       uint32(pd.DeviceType),
+		Hints:              n.cfg.Commissioning.PairingHints,
+		PairingInstruction: n.cfg.Commissioning.PairingInstruction,
 	}, nil
 }
 
@@ -1086,8 +1091,19 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // work (bridge.Bridge.Start), so a failed Start leaves no goroutine, no
 // socket and no open window behind. A host that gives up calls Stop;
 // [Node.Run] does.
+//
+// Start waits for a Stop or [Node.FactoryReset] in progress until ctx
+// ends, and then returns an error wrapping ctx.Err() without starting.
+//
+// An uncommissioned node's own window closes after 48 h and nothing
+// reopens it: the node is then not commissionable until the host calls
+// [Node.OpenOwnWindow] or restarts it; [Observers].OnWindowTransition
+// reports the close. With [Commissioning].WindowOnDemand Start opens no
+// window at all.
 func (n *Node) Start(ctx context.Context) error {
-	n.lifecycle <- struct{}{}
+	if err := n.enterLifecycle(ctx); err != nil {
+		return err
+	}
 	defer n.leaveLifecycle()
 	switch {
 	case n.stopped || n.stopBegun:
@@ -1222,8 +1238,12 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// commissioned node, not a new one: advertising it as commissionable
 	// would invite a stranger onto a bridge its owners still administer.
 	// A store that cannot list its fabrics fails closed the same way.
+	// With Commissioning.WindowOnDemand the host opens it
+	// (CommissioningServer.ts:266-273 at db021da0, `enabled: false`).
 	switch {
 	case err != nil:
+	case stored == 0 && n.window.onDemand:
+		n.logger.Info("commissioning.window_on_demand", slog.String("hint", "the node has no fabric and opens no window until the host calls OpenOwnWindow"))
 	case stored == 0:
 		if err := n.br.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
 			n.logger.Warn("commissioning.own_window", slog.Any("err", err))
@@ -1258,8 +1278,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	return n.stopLocked(ctx)
 }
 
-// enterLifecycle takes the lifecycle slot, waiting for a Start or
-// FactoryReset in progress until ctx ends. A free slot is taken whatever
+// enterLifecycle takes the lifecycle slot, waiting for a Start, Stop or
+// FactoryReset in progress until ctx ends (Start, Stop and FactoryReset
+// all take it here, review II R2-P5-apinode-04). A free slot is taken whatever
 // ctx's state, so a Stop with a context already done still stops an idle
 // node. The shape of bridge.Bridge.enterLifecycle (review II,
 // R2-P2-stop-08).
@@ -1273,7 +1294,7 @@ func (n *Node) enterLifecycle(ctx context.Context) error {
 	case n.lifecycle <- struct{}{}:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("node: waiting for a start in progress: %w", ctx.Err())
+		return fmt.Errorf("node: waiting for a start, stop or factory reset in progress: %w", ctx.Err())
 	}
 }
 
@@ -1417,12 +1438,19 @@ func newCallbackQueue(clk clock.Clock) *serialqueue.Queue {
 
 // Run starts the node, waits for ctx to end and stops it — matter.js
 // Node.run (Node.ts:183-186). A Start that fails is followed by Stop, so
-// Run releases what New opened either way.
+// Run releases what New opened either way. Either Stop is bounded by 5 s;
+// one that does not finish in time leaves the node as [Node.Stop]
+// describes, and Run returns its error.
 func (n *Node) Run(ctx context.Context) error {
 	if err := n.Start(ctx); err != nil {
-		return errors.Join(err, n.Stop(context.WithoutCancel(ctx)))
+		return errors.Join(err, n.boundedStop(ctx))
 	}
 	<-ctx.Done()
+	return n.boundedStop(ctx)
+}
+
+// boundedStop is Run's Stop: detached from ctx, bounded by stopTimeout.
+func (n *Node) boundedStop(ctx context.Context) error {
 	stopCtx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), n.cfg.Clock, stopTimeout)
 	defer cancel()
 	return n.Stop(stopCtx)
@@ -1479,7 +1507,8 @@ func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 // RevokeCommissioning does: the PASE sessions close, the fail-safe armed
 // over PASE expires and an open window is revoked, whether or not a window
 // is still open; controllers already paired keep working. nil lifts the block and, on a node without a
-// fabric, reopens its own window at once. A host that cannot serve the
+// fabric, reopens its own window at once (not with
+// [Commissioning].WindowOnDemand, which leaves that to the host). A host that cannot serve the
 // attestation chain it was configured with calls it before [Node.Start].
 // See [bridge.CommissioningWindow.SetBlocked]; matter.js has no
 // counterpart (BD-Matter-CommissioningBlocked).

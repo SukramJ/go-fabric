@@ -24,8 +24,13 @@ type SetupPayload struct {
 	Passcode uint32
 	// VendorID and ProductID are the node's ([Config].ProductDescription).
 	VendorID, ProductID uint16
+	// Flow is the commissioning flow both codes state
+	// ([Commissioning].Flow).
+	Flow CommissioningFlow
 	// QR is the QR code payload ("MT:…"), Manual the manual pairing code;
-	// both encoded from Discriminator and Passcode.
+	// both encoded from Discriminator and Passcode, and for a Flow other
+	// than [FlowStandard] the manual code is the long form with VendorID
+	// and ProductID.
 	QR, Manual string
 }
 
@@ -42,7 +47,7 @@ type SetupPayload struct {
 // 405-414, :417-450 at 862ad75f).
 func (n *Node) SetupPayload() (SetupPayload, error) {
 	cm, pd := n.cfg.Commissioning, n.cfg.ProductDescription
-	qr, manual, err := pairingCodes(pd, cm.Discriminator, cm.Passcode, n.cfg.Network.BLE != nil)
+	qr, manual, err := pairingCodes(pd, cm.Discriminator, cm.Passcode, n.cfg.Network.BLE != nil, cm.Flow)
 	if err != nil {
 		return SetupPayload{}, err
 	}
@@ -51,6 +56,7 @@ func (n *Node) SetupPayload() (SetupPayload, error) {
 		Passcode:      cm.Passcode,
 		VendorID:      pd.VendorID,
 		ProductID:     pd.ProductID,
+		Flow:          cm.Flow,
 		QR:            qr,
 		Manual:        manual,
 	}, nil

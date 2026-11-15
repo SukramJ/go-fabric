@@ -47,7 +47,10 @@ type Config struct {
 	// Network mirrors matter.js `network` (NetworkServer.ts:202-222).
 	Network Network
 	// Commissioning mirrors matter.js `commissioning`
-	// (CommissioningServer.ts:400-410).
+	// (CommissioningServer.ts:409-419 at db021da0). An uncommissioned
+	// node's own window closes after 48 h and nothing reopens it: the node
+	// is then not commissionable until the host calls [Node.OpenOwnWindow]
+	// ([Observers].OnWindowTransition reports the close).
 	Commissioning Commissioning
 	// ProductDescription mirrors matter.js `productDescription`
 	// (ProductDescriptionServer.ts:70-90): the identity the commissionable
@@ -61,7 +64,7 @@ type Config struct {
 	Store Store
 	// Advertiser publishes the node over DNS-SD. nil is the node's own:
 	// the module's mDNS responder (mdns.NewResponder), configured by
-	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Disabled. [Node.Stop]
+	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Off. [Node.Stop]
 	// closes it, the host's as the node's.
 	Advertiser Advertiser
 	// DeviceTypeValidation is the bridge's device-type judgement mode
@@ -102,8 +105,8 @@ type Config struct {
 	// OTAProvider serves OTA images: the OTA Software Update Provider on an
 	// endpoint of device type OtaProvider beside the Aggregator, its images
 	// over BDX (ADR 0021). nil, or no ImageSource, mounts none. With
-	// Topology set the node builds the provider ([Node.OTAProvider]) and
-	// the host mounts it.
+	// [Config].Snapshotter set the node builds the provider
+	// ([Node.OTAProvider]) and the host mounts it.
 	OTAProvider *OTAProviderConfig
 	// WebRTCRequestor is the node's part of the WebRtcTransportRequestor
 	// servers its topology mounts (camera.Requestor, the default of
@@ -431,9 +434,10 @@ func (c *Config) rootDeviceConditions() []string {
 	return out
 }
 
-// Commissioning is matter.js `commissioning` (CommissioningServer.ts:
-// 370-380: passcode, discriminator) plus the SPAKE2+ PBKDF parameters the
-// daemon configures (main.go:91-92 at b4ea1f96^).
+// Commissioning is matter.js `commissioning` (the State of
+// CommissioningServer.ts:409-419 at db021da0: passcode, discriminator)
+// plus the SPAKE2+ PBKDF parameters the daemon configures (main.go:91-92
+// at b4ea1f96^).
 type Commissioning struct {
 	// Passcode is the setup passcode; it must pass setup.IsValidSetupPIN.
 	Passcode uint32
@@ -479,7 +483,57 @@ type Commissioning struct {
 	// tentative one with the fail-safe and resets it with the last fabric.
 	// The row is served behind [Config].Surface's Extensions (ADR 0030).
 	TermsAndConditions *TermsAndConditions
+	// WindowOnDemand leaves the node's own commissioning window to the
+	// host: the node opens none by itself — not at [Node.Start] while it
+	// has no fabric, not after its last fabric is removed, not when a
+	// [Node.OpenBasicWindow] window closes and not when
+	// [Node.SetCommissioningBlocked] lifts. Until the host calls
+	// [Node.OpenOwnWindow] (or [Node.OpenBasicWindow]) the node accepts
+	// no PASE and publishes no commissionable record, over DNS-SD or BLE;
+	// a commissioned node is unaffected. It is the start of a User-Intent
+	// product (a button opens the window). The zero value opens the
+	// window as before. Mirrors matter.js `commissioning.enabled: false`
+	// (packages/node/src/behavior/system/commissioning/
+	// CommissioningServer.ts:266-273, the field :410 at db021da0).
+	WindowOnDemand bool
+	// Flow is the commissioning flow the onboarding payload states
+	// ([FlowStandard], [FlowUserIntent], [FlowCustom]): the QR code's
+	// flow field and, for a flow other than Standard, the long manual
+	// code with the vendor and product id ([Node.SetupPayload],
+	// [Node.PairingCodesFor]). It states the flow only; whether the node
+	// opens its window by itself is WindowOnDemand. Mirrors matter.js
+	// `commissioning.flowType` (CommissioningServer.ts:415, the QR code
+	// :438, the manual code :446-454 at db021da0).
+	Flow CommissioningFlow
+	// PairingHints is the commissionable record's pairing hint (the `PH`
+	// key): how a user puts the device into commissioning mode, every
+	// bit of [mdns.PairingHints]. Zero sends powerCycle | deviceManual
+	// ([mdns.PairingHintsDefault]). A commissioner built on
+	// connectedhomeip reads bits 0 to 15 only (see [mdns.PairingHints]).
+	PairingHints mdns.PairingHints
+	// PairingInstruction is the record's `PI` key, the number or text a
+	// hint that needs one refers to. A hint and an instruction that do
+	// not belong together fail [Config.Validate] with
+	// [mdns.ErrInvalidService]: at most one hint that needs an
+	// instruction, that hint with an instruction, an instruction only
+	// with such a hint ([mdns.CommissionableServiceConfig.Validate]).
+	PairingInstruction string
 }
+
+// CommissioningFlow is the commissioning flow an onboarding payload
+// states ([Commissioning].Flow): the QR code's two-bit flow field.
+type CommissioningFlow uint8
+
+const (
+	// FlowStandard: the device is commissionable when powered.
+	FlowStandard CommissioningFlow = iota
+	// FlowUserIntent: the user acts on the device (a button) before it
+	// is commissionable — commonly with [Commissioning].WindowOnDemand.
+	FlowUserIntent
+	// FlowCustom: the vendor's own steps, looked up by vendor and product
+	// id.
+	FlowCustom
+)
 
 // locationCapability is the LocationCapability the root's
 // GeneralCommissioning serves: Indoor with IndoorOnly, IndoorOutdoor for the
@@ -763,6 +817,12 @@ func (c *Config) Validate() error {
 	}
 	if cm.IndoorOnly && cm.LocationCapability != mattercore.RegulatoryIndoor {
 		errs = append(errs, fmt.Errorf("node: Commissioning.IndoorOnly excludes LocationCapability %d", cm.LocationCapability))
+	}
+	if err := (mdns.CommissionableServiceConfig{Hints: cm.PairingHints, PairingInstruction: cm.PairingInstruction}).Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("node: Commissioning.PairingHints and PairingInstruction: %w", err))
+	}
+	if cm.Flow > FlowCustom {
+		errs = append(errs, fmt.Errorf("node: Commissioning.Flow %d is not a flow; it must be one of FlowStandard, FlowUserIntent, FlowCustom", cm.Flow))
 	}
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
 		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))

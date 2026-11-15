@@ -100,7 +100,7 @@ type EndpointState interface {
 
 // NewEndpointState returns the facade's [EndpointState] over st's settings
 // table — the keys the node uses, so a host may build it before [New] (for
-// the assembler its Topology runs) over a store the node later opens. st
+// the assembler its [Config].Snapshotter runs) over a store the node later opens. st
 // must hold the store schema (store.Apply); a nil logger is
 // slog.Default(). A refused save is logged and returned.
 func NewEndpointState(st store.Settings, logger *slog.Logger) EndpointState {

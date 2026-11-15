@@ -582,14 +582,19 @@ type CommissionableServiceConfig struct {
 	// DeviceName is the operator-visible name (`DN` TXT key, max 32
 	// utf-8 bytes).
 	DeviceName string
-	// PairingHint / PairingInstruction follow Matter §4.3.1.6 (`PH`
-	// / `PI`). PairingHint defaults to
-	// [PairingHintDefault] (powerCycle | deviceManual = 0x21) when
-	// zero, matching matter.js
-	// CommissionableMdnsAdvertisement.ts:81 at db021da0
-	// (DEFAULT_PAIRING_HINT, MdnsConsts.ts:15). A hint
-	// and an instruction that do not belong together fail
-	// [CommissionableServiceConfig.Validate].
+	// Hints and PairingInstruction follow Matter §4.3.1.6 (`PH` / `PI`).
+	// Hints is the full pairing hint bitmap ([PairingHints]); zero sends
+	// [PairingHintsDefault] (powerCycle | deviceManual = 0x21), matching
+	// matter.js CommissionableMdnsAdvertisement.ts:81 at db021da0
+	// (DEFAULT_PAIRING_HINT, MdnsConsts.ts:15). A hint and an instruction
+	// that do not belong together, and Hints set beside the deprecated
+	// PairingHint, fail [CommissionableServiceConfig.Validate].
+	Hints PairingHints
+	// PairingHint is the pairing hint's low 16 bits.
+	//
+	// Deprecated: use Hints, which carries every bit of the bitmap
+	// (bits 16 to 22 do not fit here); removable in the next minor
+	// release. It keeps its meaning while Hints is zero.
 	PairingHint        uint16
 	PairingInstruction string
 	// RotatingID is the optional Rotating Device Identifier (Matter
@@ -625,6 +630,49 @@ type CommissionableServiceConfig struct {
 	Logger *slog.Logger
 }
 
+// PairingHints is the pairing hint bitmap of the commissionable record's
+// `PH` key (Matter §4.3.1.6): bits 0 to 22, each one a way to put the
+// device into commissioning mode. matter.js models all 23 bits
+// (packages/protocol/src/advertisement/PairingHintBitmap.ts, the last
+// at :145 at db021da0); connectedhomeip keeps the hint in 16 bits
+// (src/lib/dnssd/Types.h:240 at 6170af84), so a commissioner built on
+// chip reads bits 0 to 15 only.
+type PairingHints uint32
+
+// The pairing hints, one bit each, in the order of the bitmap. The
+// customInstruction hint and the hints that state a number or a light
+// need [CommissionableServiceConfig].PairingInstruction, and at most one
+// of them may be set ([CommissionableServiceConfig.Validate]).
+const (
+	PairingHintPowerCycle PairingHints = 1 << iota
+	PairingHintDeviceManufacturerURL
+	PairingHintAdministrator
+	PairingHintSettingsMenuOnNode
+	PairingHintCustomInstruction
+	PairingHintDeviceManual
+	PairingHintPressResetButton
+	PairingHintPressResetButtonWithApplicationOfPower
+	PairingHintPressResetButtonForNumberOfSeconds
+	PairingHintPressResetButtonUntilLightBlinks
+	PairingHintPressResetButtonForNumberOfSecondsWithApplicationOfPower
+	PairingHintPressResetButtonUntilLightBlinksWithApplicationOfPower
+	PairingHintPressResetButtonNumberOfTimes
+	PairingHintPressSetupButton
+	PairingHintPressSetupButtonWithApplicationOfPower
+	PairingHintPressSetupButtonForNumberOfSeconds
+	PairingHintPressSetupButtonUntilLightBlinks
+	PairingHintPressSetupButtonForNumberOfSecondsWithApplicationOfPower
+	PairingHintPressSetupButtonUntilLightBlinksWithApplicationOfPower
+	PairingHintPressSetupButtonNumberOfTimes
+	PairingHintPressAndReleaseSetupButtonNumberOfTimes
+	PairingHintPressButtonForNumberOfSecondsWithIndication
+	PairingHintPowerCycleUntilIndication
+)
+
+// PairingHintsDefault is the hint sent when none is given:
+// powerCycle | deviceManual (0x21), as [PairingHintDefault].
+const PairingHintsDefault = PairingHintPowerCycle | PairingHintDeviceManual
+
 // PairingHintDefault is the bitmask go-fabric emits for PH when the
 // caller leaves PairingHint zero. Mirrors matter.js
 // packages/protocol/src/mdns/MdnsConsts.ts:15-18 DEFAULT_PAIRING_HINT:
@@ -651,8 +699,8 @@ const PairingHintDefault uint16 = 0x21
 // pressSetupButtonForNumberOfSecondsWithApplicationOfPower 17,
 // pressSetupButtonUntilLightBlinksWithApplicationOfPower 18,
 // pressSetupButtonNumberOfTimes 19.
-// [CommissionableServiceConfig.PairingHint] is 16 bits wide, so bits 16
-// to 19 cannot be set there today; the mask names them all the same.
+// Bits 16 to 19 are reachable through [CommissionableServiceConfig].Hints
+// only; the deprecated 16-bit PairingHint cannot carry them.
 const pairingHintsRequiringInstruction uint32 = 1<<4 | 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 |
 	1<<15 | 1<<16 | 1<<17 | 1<<18 | 1<<19
 
@@ -663,17 +711,22 @@ const pairingHintsRequiringInstruction uint32 = 1<<4 | 1<<8 | 1<<9 | 1<<10 | 1<<
 // :106-135 at db021da0 (#validatePairingInstructions, called from the
 // constructor at :40): at most one hint that requires an instruction;
 // such a hint needs the instruction; an instruction needs such a hint,
-// and a hint at all. PairingHint 0 is "no hint given" (the default
+// and a hint at all. A zero hint is "no hint given" (the default
 // goes out), so matter.js's first refusal — a hint object with every
-// flag false — has no form here.
+// flag false — has no form here. Hints and the deprecated PairingHint
+// both set is refused too: one of them would be dropped.
 func (c CommissionableServiceConfig) Validate() error {
-	if c.PairingHint == 0 {
+	if c.Hints != 0 && c.PairingHint != 0 {
+		return fmt.Errorf("%w: Hints and the deprecated PairingHint are both set; set Hints only", ErrInvalidService)
+	}
+	hints := c.pairingHints()
+	if hints == 0 {
 		if c.PairingInstruction != "" {
 			return fmt.Errorf("%w: pairing instructions provided but no pairing hint set", ErrInvalidService)
 		}
 		return nil
 	}
-	needsInstruction := bits.OnesCount32(uint32(c.PairingHint) & pairingHintsRequiringInstruction)
+	needsInstruction := bits.OnesCount32(uint32(hints) & pairingHintsRequiringInstruction)
 	switch {
 	case needsInstruction > 1:
 		return fmt.Errorf("%w: only one pairing hint requiring instructions can be set, but got %d", ErrInvalidService, needsInstruction)
@@ -683,6 +736,15 @@ func (c CommissionableServiceConfig) Validate() error {
 		return fmt.Errorf("%w: pairing instructions provided but no pairing hint requiring instructions set", ErrInvalidService)
 	}
 	return nil
+}
+
+// pairingHints is the hint the config states: Hints, else the deprecated
+// PairingHint, zero when neither is set.
+func (c CommissionableServiceConfig) pairingHints() PairingHints {
+	if c.Hints != 0 {
+		return c.Hints
+	}
+	return PairingHints(c.PairingHint)
 }
 
 // defaultCommissionableSII is the Session Idle Interval in milliseconds
@@ -814,10 +876,10 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 	// CommissionableMdnsAdvertisement.ts:90 at db021da0 —
 	// DEFAULT_PAIRING_HINT (:81)
 	// (powerCycle=true, deviceManual=true → 0x21) used when the
-	// caller leaves PairingHint zero.
-	ph := cfg.PairingHint
+	// caller leaves the hint zero.
+	ph := cfg.pairingHints()
 	if ph == 0 {
-		ph = PairingHintDefault
+		ph = PairingHintsDefault
 	}
 	txt = append(txt, TXTRecord{Key: "PH", Value: strconv.FormatUint(uint64(ph), 10)})
 	if cfg.PairingInstruction != "" {

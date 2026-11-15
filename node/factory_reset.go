@@ -52,14 +52,18 @@ import (
 // the node is not stopped and keeps its store, and a later FactoryReset
 // finishes the reset.
 //
-// FactoryReset is serialised with Start and Stop. Mirrors matter.js
+// FactoryReset is serialised with Start and Stop: it waits for one in
+// progress until ctx ends, and then returns an error wrapping ctx.Err()
+// without resetting anything. Mirrors matter.js
 // ServerNode.erase / eraseWithMutex (packages/node/src/node/ServerNode.ts:
 // 159-200: go offline, reset, erase the storage, come back online if the
 // node was) and resetStorage (:242-256, peers first, then the sessions,
 // fabrics, occurrences, credentials and the node store); the node that
 // comes back is a new one here (BD-Matter-FactoryResetEndsTheNode).
 func (n *Node) FactoryReset(ctx context.Context) error {
-	n.lifecycle <- struct{}{}
+	if err := n.enterLifecycle(ctx); err != nil {
+		return err
+	}
 	defer n.leaveLifecycle()
 	var errs []error
 	if !n.stopped {

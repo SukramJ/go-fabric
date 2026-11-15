@@ -2818,12 +2818,21 @@ func (b *Bridge) operationalInstanceFor(fabricIndex uint8) (string, bool) {
 // daemon's setup payload — the bridge itself does not know about
 // passcodes.
 type CommissioningAdvertisement struct {
-	Discriminator      uint16
-	VendorID           uint16
-	ProductID          uint16
-	NodeLabel          string
-	CommissioningMode  uint8
-	DeviceTypeID       uint32
+	Discriminator     uint16
+	VendorID          uint16
+	ProductID         uint16
+	NodeLabel         string
+	CommissioningMode uint8
+	DeviceTypeID      uint32
+	// Hints is the record's pairing hint bitmap (`PH`,
+	// [mdns.CommissionableServiceConfig].Hints); zero sends the default.
+	Hints mdns.PairingHints
+	// PairingHint is the pairing hint's low 16 bits.
+	//
+	// Deprecated: use Hints, which carries every bit of the bitmap;
+	// removable in the next minor release. It keeps its meaning while
+	// Hints is zero; both set fail AnnounceCommissioning with
+	// [mdns.ErrInvalidService].
 	PairingHint        uint16
 	PairingInstruction string
 	InstanceID         [8]byte
@@ -2863,6 +2872,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		CommissioningMode:  params.CommissioningMode,
 		DeviceTypeID:       params.DeviceTypeID,
 		DeviceName:         params.NodeLabel,
+		Hints:              params.Hints,
 		PairingHint:        params.PairingHint,
 		PairingInstruction: params.PairingInstruction,
 		RotatingID:         params.RotatingID,
