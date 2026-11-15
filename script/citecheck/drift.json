@@ -19,7 +19,7 @@
   },
   {
     "file": "bdx/outbound.go",
-    "line": 59,
+    "line": 62,
     "citation": "OutboundFlow.ts:93-110",
     "resolved": "packages/protocol/src/bdx/flow/OutboundFlow.ts",
     "identifier": "readDataChunk",
@@ -1423,7 +1423,7 @@
   },
   {
     "file": "cluster/core/group_key_management.go",
-    "line": 708,
+    "line": 703,
     "citation": "GroupKeyManagementServer.ts:96",
     "resolved": "packages/node/src/behaviors/group-key-management/GroupKeyManagementServer.ts",
     "at": "db021da0",
@@ -1433,7 +1433,7 @@
   },
   {
     "file": "cluster/core/group_key_management_failure_test.go",
-    "line": 121,
+    "line": 130,
     "citation": "packages/model/src/standard/elements/group-key-management.element.ts:58",
     "resolved": "packages/model/src/standard/elements/group-key-management.element.ts",
     "identifier": "GroupKeyMap",
@@ -1536,7 +1536,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 377,
+    "line": 386,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1545,7 +1545,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1675,
+    "line": 1710,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1582,7 +1582,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 640,
+    "line": 641,
     "citation": "SoftwareUpdateManager.ts:1219-1232",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "NotifyUpdateApplied",
@@ -1600,7 +1600,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 395,
+    "line": 536,
     "citation": "ScenesManagementServer.ts:77-80",
     "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
     "identifier": "OnOff",
@@ -1609,7 +1609,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 406,
+    "line": 547,
     "citation": "OnOffServer.ts:114-117",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -2247,7 +2247,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 138,
+    "line": 153,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -2256,7 +2256,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 462,
+    "line": 492,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -2265,7 +2265,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 486,
+    "line": 516,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -2274,7 +2274,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 695,
+    "line": 725,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",
@@ -2520,7 +2520,7 @@
   },
   {
     "file": "endpoint/materialize.go",
-    "line": 554,
+    "line": 555,
     "citation": "OnOffServer.ts:97-122",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -2529,7 +2529,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 804,
+    "line": 817,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -2940,7 +2940,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 266,
+    "line": 273,
     "citation": "NetworkServer.ts:202-222",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "identifier": "network",
@@ -2949,7 +2949,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 345,
+    "line": 352,
     "citation": "GeneralDiagnosticsServer.ts:168-182",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "identifier": "TimeSynchronizationBehavior",
@@ -2967,7 +2967,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1492,
+    "line": 1515,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
@@ -3439,7 +3439,7 @@
   },
   {
     "file": "store/fabric.go",
-    "line": 292,
+    "line": 328,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
