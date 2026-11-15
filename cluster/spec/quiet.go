@@ -15,10 +15,13 @@ import (
 // [Server] serves.
 type quietAttr struct {
 	q *cluster.Quieter
-	// origin is the origin of the change the throttle reports next, and
-	// null whether the last value it saw was null; both under Server.mu.
-	origin contract.Origin
-	null   bool
+	// origin is the origin of the change the throttle reports next, null
+	// whether the last value it saw was null, and computed whether that
+	// change is a Source-computed one ([Server.MarkQuietChanged]), whose
+	// version advance waits for the emit; all under Server.mu.
+	origin   contract.Origin
+	null     bool
+	computed bool
 }
 
 // initQuiet gives every served quieter attribute its throttle, over clk
@@ -38,17 +41,25 @@ func (s *Server) initQuiet(clk clock.Clock) {
 	}
 }
 
-// quietReport is a throttle's emit: the data version advances and the
-// report listeners — the wire's — learn of the change. Mirrors matter.js
+// quietReport is a throttle's emit: the report listeners — the wire's —
+// learn of the change, and for a Source-computed change
+// ([Server.MarkQuietChanged]) the data version advances now; a stored
+// change advanced it when it was stored ([Server.store]). Mirrors matter.js
 // packages/node/src/behavior/internal/ServerBehaviorBacking.ts:230-262 at
-// db021da0: a quieter property's change is not broadcast at the commit;
-// on the quiet event's emit the datasource's version advances (:259) and
-// the property is broadcast.
+// db021da0: a quieter property's change is not broadcast at the commit
+// (:163-168, :242) but on the quiet event's emit (:258-261), where
+// advanceVersionFor (:259) advances the version for a dynamic property
+// only (behavior/state/managed/Datasource.ts:679-688, :705-713); a stored
+// property's change advanced it at the commit, whatever its quality
+// (Datasource.ts:1446-1457).
 func (s *Server) quietReport(attrID uint32, qa *quietAttr) {
 	s.mu.Lock()
-	origin := qa.origin
+	origin, computed := qa.origin, qa.computed
+	qa.computed = false
 	s.mu.Unlock()
-	s.tracker().Bump()
+	if computed {
+		s.tracker().Bump()
+	}
 	s.AttributeChanges.ReportFrom(origin, attrID)
 }
 
@@ -57,7 +68,8 @@ func (s *Server) quietReport(attrID uint32, qa *quietAttr) {
 // as [Server.MarkChanged] reports any other: the change listeners learn of
 // it at once, the report listeners and the data version when the
 // attribute's throttle emits ([Attribute.QuietInterval]), as the host's
-// ([contract.OriginHostSet]). An attribute the server does not serve is
+// ([contract.OriginHostSet]) — matter.js advances a dynamic (computed)
+// property's version on the quiet emit (Datasource.ts:679-688). An attribute the server does not serve is
 // refused ([ErrNotServed]), one without the Q quality too
 // ([ErrNotReportable]: [Server.MarkChanged] reports it).
 func (s *Server) MarkQuietChanged(attrID uint32) error {
@@ -71,7 +83,7 @@ func (s *Server) MarkQuietChanged(attrID uint32) error {
 	v, _ := s.MatterRead(attrID)
 	s.mu.Lock()
 	wasNull := qa.null
-	qa.null, qa.origin = v == nil, contract.OriginHostSet
+	qa.null, qa.origin, qa.computed = v == nil, contract.OriginHostSet, true
 	s.mu.Unlock()
 	s.AttributeChanges.ChangedFrom(contract.OriginHostSet, attrID)
 	qa.q.Changed(wasNull, v == nil)

@@ -18,11 +18,13 @@ import (
 // BatPercentRemaining is quieter with a ten-second interval
 // (PowerSourceServer.ts:25-34 at db021da0, the definition's QuietInterval).
 // Its first change is reported at once; three more inside the interval
-// reach the change listeners at once and the wire once, with one data
-// version advance, when the interval has passed — matter.js advances the
-// version and broadcasts a quieter property on the quiet emit
-// (ServerBehaviorBacking.ts:230-262, :259). MarkQuietChanged takes the
-// same throttle, and MatterQuiesce drops a held report (R2-P5-apispec-03,
+// reach the change listeners at once and the wire once, when the interval
+// has passed. Each stored change advances the DataVersion at the change —
+// matter.js advances it at the commit for every noted property
+// (Datasource.ts:1446-1457) and on the quiet emit only for a dynamic one
+// (ServerBehaviorBacking.ts:259 → Datasource.ts:679-688) — so the emit adds
+// none; a Source-computed change (MarkQuietChanged) advances it at the
+// emit. MatterQuiesce drops a held report (R2-P5-apispec-03,
 // F-db021da0-22).
 func TestQuieterAttributeReportsThroughItsThrottleParityMatterJS(t *testing.T) {
 	t.Parallel()
@@ -52,12 +54,12 @@ func TestQuieterAttributeReportsThroughItsThrottleParityMatterJS(t *testing.T) {
 	set(198)
 	set(196)
 	set(194)
-	if changes != 4 || reports != 1 || srv.MatterDataVersion() != v0+1 {
-		t.Fatalf("inside the interval: %d changes, %d reports, version +%d; want 4, 1, +1", changes, reports, srv.MatterDataVersion()-v0)
+	if changes != 4 || reports != 1 || srv.MatterDataVersion() != v0+4 {
+		t.Fatalf("inside the interval: %d changes, %d reports, version +%d; want 4, 1, +4 (one per stored change)", changes, reports, srv.MatterDataVersion()-v0)
 	}
 	clk.Advance(9 * time.Second)
-	if reports != 2 || srv.MatterDataVersion() != v0+2 {
-		t.Fatalf("after the interval: %d reports, version +%d; want 2, +2", reports, srv.MatterDataVersion()-v0)
+	if reports != 2 || srv.MatterDataVersion() != v0+4 {
+		t.Fatalf("after the interval: %d reports, version +%d; want 2, +4 (the emit adds none)", reports, srv.MatterDataVersion()-v0)
 	}
 	if err := srv.MarkChanged(powersource.AttrBatPercentRemaining); !errors.Is(err, spec.ErrNotReportable) {
 		t.Errorf("MarkChanged of a quieter attribute: %v", err)
@@ -66,13 +68,19 @@ func TestQuieterAttributeReportsThroughItsThrottleParityMatterJS(t *testing.T) {
 	if err := srv.MarkQuietChanged(powersource.AttrBatPercentRemaining); err != nil {
 		t.Fatal(err)
 	}
-	if changes != 5 || reports != 2 {
-		t.Fatalf("MarkQuietChanged inside the interval: %d changes, %d reports; want 5, 2", changes, reports)
+	if changes != 5 || reports != 2 || srv.MatterDataVersion() != v0+4 {
+		t.Fatalf("MarkQuietChanged inside the interval: %d changes, %d reports, version +%d; want 5, 2, +4", changes, reports, srv.MatterDataVersion()-v0)
 	}
+	clk.Advance(10 * time.Second)
+	if reports != 3 || srv.MatterDataVersion() != v0+5 {
+		t.Fatalf("MarkQuietChanged's emit: %d reports, version +%d; want 3, +5 (a computed change advances at the emit)", reports, srv.MatterDataVersion()-v0)
+	}
+	clk.Advance(time.Second)
+	set(190)
 	srv.MatterQuiesce()
 	clk.Advance(time.Minute)
-	if reports != 2 || srv.MatterDataVersion() != v0+2 {
-		t.Errorf("after MatterQuiesce: %d reports, version +%d; want the held report dropped", reports, srv.MatterDataVersion()-v0)
+	if reports != 3 || srv.MatterDataVersion() != v0+6 {
+		t.Errorf("after MatterQuiesce: %d reports, version +%d; want the held report dropped, the change's advance kept", reports, srv.MatterDataVersion()-v0)
 	}
 	if err := srv.MarkQuietChanged(powersource.AttrBatChargeLevel); !errors.Is(err, spec.ErrNotReportable) {
 		t.Errorf("MarkQuietChanged of an attribute without Q: %v", err)

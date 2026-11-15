@@ -91,6 +91,9 @@ type ServerConfig struct {
 	// the write and answers it with the IM status it carries, FAILURE when
 	// it carries none. [Server.SetBeforeWrite] and the typed server's
 	// OnWrite never replace it: a host cannot remove a server's own rule.
+	// It is the shape of a schema validator; a rule ported from a matter.js
+	// `$Changing` reactor, which a held value never reaches, belongs behind
+	// the comparison — in the veto ([ServerConfig.BeforeWrite]).
 	WriteRule func(ctx context.Context, attrID uint32, value any) error
 	// BeforeWrite optionally vetoes a controller write — the host's veto:
 	// called by [Server.MatterWrite] after the definition's checks, the
@@ -103,11 +106,10 @@ type ServerConfig struct {
 	// typed server exposes as OnWrite. Also set after construction with
 	// [Server.SetBeforeWrite], which replaces it.
 	//
-	// Deprecated: as the place of a server's own rule. A rule set here is
-	// the host's veto, which the host's OnWrite replaces and a write of the
-	// held value skips; a cluster author's rule is
-	// [ServerConfig.WriteRule]. That use is removable in the next minor
-	// release; BeforeWrite as the host's veto at construction stays.
+	// Deprecated: a server's own rule is [ServerConfig.WriteRule], which
+	// no host veto replaces; the host's veto is [Server.SetBeforeWrite] (the
+	// typed server's OnWrite), set after construction. Removable in the next
+	// minor release.
 	BeforeWrite func(ctx context.Context, attrID uint32, value any) error
 	// Initial holds the values the server starts with, checked as
 	// [Server.Set] checks a value.
@@ -578,10 +580,12 @@ func defaultOf(t Type, d any) (any, bool) {
 }
 
 // store keeps values and reports the ones that changed, from origin; it
-// returns whether any changed. A change of a quieter attribute goes to the
-// change listeners at once and to the report listeners — with the data
-// version's advance — when its throttle emits ([Server.quietReport]);
-// every other change advances the version once and is reported at once.
+// returns whether any changed. Any change advances the data version once,
+// now — a quieter attribute's too, as matter.js advances the version at
+// the commit for every noted property (Datasource.ts:1446-1457 at
+// db021da0). A change of a quieter attribute goes to the change listeners
+// at once and to the report listeners when its throttle emits
+// ([Server.quietReport]); every other change is reported at once.
 func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 	type quietChange struct {
 		qa              *quietAttr
@@ -601,7 +605,7 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 		changed = append(changed, id)
 		if qa := s.quiet[id]; qa != nil {
 			quiets[id] = quietChange{qa, !ok || old == nil, v == nil}
-			qa.null, qa.origin = v == nil, origin
+			qa.null, qa.origin, qa.computed = v == nil, origin, false
 			continue
 		}
 		plain = append(plain, id)
@@ -612,9 +616,7 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
 	}
 	slices.Sort(changed)
 	slices.Sort(plain)
-	if len(plain) > 0 {
-		s.tracker().Bump()
-	}
+	s.tracker().Bump()
 	if len(quiets) == 0 {
 		s.AttributeChanges.NotifyFrom(origin, changed...)
 		return true
@@ -664,7 +666,9 @@ func (s *Server) Handles(cmdID uint32) bool {
 // handler — a mandatory stub ([ServerConfig.Unimplemented]) or an
 // optional command nobody implemented: either stays out of the command
 // lists until [Server.Handle] registers it, as matter.js lists the
-// commands a behavior implements.
+// commands a behavior implements
+// (packages/node/src/behavior/cluster/ValidatedElements.ts:341-343,
+// behavior/internal/ServerBehaviorBacking.ts:122-136 at db021da0).
 func (s *Server) unimplementedLocked(cmdID uint32) bool { return s.handlers[cmdID] == nil }
 
 // UnimplementedMandatoryCommands returns the request commands the
@@ -726,12 +730,12 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 
 // MatterInvoke implements [contract.ClusterServer]: an accepted command
 // goes to its handler; one not accepted, or accepted without a handler,
-// is UNSUPPORTED_COMMAND. Before the handler the request is held to the
-// definition ([Instance.CheckRequest]): its types and constraints refuse
-// it, and the model's further checks refuse it where the command states a
-// refusal ([RequestCheck]), else they are logged and the handler runs —
-// for a generated definition the decoder has held the types and
-// constraints already, before the server ran (decision 64). A response
+// is UNSUPPORTED_COMMAND. The request's types and constraints are the
+// decoder's to refuse, before the server runs (decision 64). Before the
+// handler the request is held to the definition again
+// ([Instance.CheckRequest]): a misfit is refused only where the command
+// states a refusal ([RequestCheck.Refusal]), else it is logged and the
+// handler runs. A response
 // that breaks its fields' types, constraints or conformance — a field
 // mandatory by the request's ("TestRequest.Enable") left out — is FAILURE
 // ([Instance.checkResponse]).

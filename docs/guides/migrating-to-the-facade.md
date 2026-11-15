@@ -310,6 +310,7 @@ migrations applies step `v9`.
 | Before | Now |
 | --- | --- |
 | a server's own write rule in `spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule`: it runs on every write, before the comparison with the held value, and no `SetBeforeWrite` / `OnWrite` replaces it |
+| a host veto in `spec.ServerConfig.BeforeWrite` at construction | `srv.SetBeforeWrite(fn)` (the typed `OnWrite`) after construction |
 | a host veto (`OnWrite`, `SetBeforeWrite`) that heard a write of the held value | not called for it: the veto runs behind the comparison, a write of the held value changes nothing |
 | `srv.Notify(ids…)`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` on a `*spec.Server` | `srv.Set(id, v)` for a value the server holds; `srv.MarkChanged(ids…)` for one the host's `Source` answers, `srv.MarkQuietChanged(id)` for a quieter one |
 | `srv.Emit(endpoint, eventID, data)`, `spec.EmitOn(srv, endpoint, …)` | `srv.EmitEvent(eventID, data)`; the bridge tells the server its endpoint (`contract.EndpointReceiver`), `spec.ErrNotMounted` before it does |

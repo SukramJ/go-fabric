@@ -35,7 +35,7 @@ import (
 // definition's checks, the server's own rule and the comparison with the
 // held value, and before the store, an error refusing the write; a write
 // of the held value never reaches it.
-// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1172-1195
+// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1185-1222
 // (preCommit, which emits `$Changing` with the new and old value before a
 // change commits; only for a returned change, :1209-1212, and a deep-equal
 // value is none, :1406-1408, at db021da0) and

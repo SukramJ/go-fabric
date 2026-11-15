@@ -209,7 +209,7 @@ becomes permissible in:
 | `endpoint.Config.OnNodeLabelWritten`, `endpoint.Config.Scenes`, `endpoint.ScenesStore` | `endpoint.Config.Persistence` (`endpoint.Persistence`), whose saves and loads report the store's error | `v0.23.0` |
 | `node.EndpointPersistence`, `node.Config.EndpointPersistence`, `node.NewEndpointPersistence` | `node.EndpointState`, `node.Config.EndpointState`, `node.NewEndpointState` | `v0.23.0` |
 | `node.Node.Persistence` | `Node.EndpointState`, which returns the new port | `v0.23.0` |
-| `cluster/spec.ServerConfig.BeforeWrite` as the place of a server's own write rule | `ServerConfig.WriteRule`, which `SetBeforeWrite` and the typed `OnWrite` never replace; `BeforeWrite` stays the host's veto | `v0.23.0` |
+| `cluster/spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule` for a server's own rule (no host veto replaces it); `Server.SetBeforeWrite` / the typed `OnWrite` for the host's veto | `v0.23.0` |
 | `cluster/spec.Server.Notify`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` | `Server.Set` for a held value, `Server.MarkChanged` (or `MarkQuietChanged` for a quieter attribute) for one the host computes on read | `v0.23.0` |
 | `cluster/spec.Server.Emit`, `cluster/spec.EmitOn`, `<cluster>def.Server.Emit<Event>` | `Server.EmitEvent`, `<cluster>def.Server.Record<Event>`: the event goes out on the endpoint the server is mounted on (`spec.ErrNotMounted` before) | `v0.23.0` |
 | `cluster/wire.ScenesManagement` | `cluster/core.ScenesManagement` (`core.NewScenesManagement`) | `v0.23.0` |
