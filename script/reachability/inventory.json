@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8928,
+  "entry_points": 8975,
   "entry_packages": [
     ".",
     "bdx",
@@ -290,9 +290,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18643,
-    "reachable": 12528,
-    "whitelisted": 6115,
+    "total_exported": 18724,
+    "reachable": 12592,
+    "whitelisted": 6132,
     "unreachable": 0
   },
   "by_package": [],
@@ -3639,6 +3639,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFabricRemovalDropsFabricScopedState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_scoped_state_removal_test.go",
+      "line": 50
+    },
+    {
+      "package": "bridge",
       "identifier": "TestFabricRemoveFromSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_parity_matterjs_test.go",
@@ -6548,6 +6555,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_test.go",
       "line": 409
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStartBLERegistersBeforeItAdvertises",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_register_test.go",
+      "line": 39
     },
     {
       "package": "bridge",
@@ -10618,6 +10632,27 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestFacadeSlotsRunBeforeTheHosts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/facade_seam_internal_test.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestFailSafeExpiryDisconnectsAfterAFailedRejoin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_capabilities_test.go",
+      "line": 146
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestFailSafeExpiryDisconnectsWithoutACommittedNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_capabilities_test.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestFailSafeExpiryLeavesNoUncommittedNetworkJoined",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_rejoin_test.go",
@@ -11395,6 +11430,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestUnreadableStoredNetworksAreNeverOverwritten",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_unseal_test.go",
+      "line": 44
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestWiFiInterfaceEnabledDataVersionAdvancesOnlyOnAChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_test.go",
@@ -11413,6 +11455,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_test.go",
       "line": 219
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiLinkWatcherMovesTheNetworkState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_capabilities_test.go",
+      "line": 73
     },
     {
       "package": "cluster/core",
@@ -24859,14 +24908,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 994
+      "line": 1022
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 990
+      "line": 1018
     },
     {
       "package": "controller",
@@ -25629,7 +25678,7 @@
       "identifier": "TestDeviceIOImageParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/device_fabrictest_internal_test.go",
-      "line": 368
+      "line": 380
     },
     {
       "package": "controller/camera",
@@ -25686,6 +25735,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
       "line": 465
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestFirstCloseBoundedByContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/close_inflight_internal_test.go",
+      "line": 106
     },
     {
       "package": "controller/camera",
@@ -25818,7 +25874,7 @@
       "identifier": "TestProviderDeviceParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/device_fabrictest_internal_test.go",
-      "line": 225
+      "line": 237
     },
     {
       "package": "controller/camera",
@@ -25832,7 +25888,7 @@
       "identifier": "TestProviderReOfferAnsweredDuringCloseAddsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/close_inflight_internal_test.go",
-      "line": 107
+      "line": 140
     },
     {
       "package": "controller/camera",
@@ -29581,6 +29637,13 @@
     },
     {
       "package": "device",
+      "identifier": "InitialFor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/export_test.go",
+      "line": 8
+    },
+    {
+      "package": "device",
       "identifier": "SemanticTag",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
@@ -29707,10 +29770,17 @@
     },
     {
       "package": "device",
+      "identifier": "TestBareDevicesServeTheDefaultSelection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/default_selection_internal_test.go",
+      "line": 37
+    },
+    {
+      "package": "device",
       "identifier": "TestBaseOptionalConformsAndRefuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 80
+      "line": 81
     },
     {
       "package": "device",
@@ -29738,7 +29808,7 @@
       "identifier": "TestBridgedPowerSourceServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 107
+      "line": 108
     },
     {
       "package": "device",
@@ -29927,7 +29997,14 @@
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 297
+      "line": 306
+    },
+    {
+      "package": "device",
+      "identifier": "TestExcludesZero",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_internal_test.go",
+      "line": 70
     },
     {
       "package": "device",
@@ -30012,6 +30089,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/hostserver_test.go",
       "line": 89
+    },
+    {
+      "package": "device",
+      "identifier": "TestInitialRequirementNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_internal_test.go",
+      "line": 99
     },
     {
       "package": "device",
@@ -30207,7 +30291,21 @@
       "identifier": "TestRefusalsWrapTheirSentinel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 353
+      "line": 367
+    },
+    {
+      "package": "device",
+      "identifier": "TestRefusedAtInitKinds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_internal_test.go",
+      "line": 20
+    },
+    {
+      "package": "device",
+      "identifier": "TestRefusedStructsOfTheSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_snapshot_internal_test.go",
+      "line": 188
     },
     {
       "package": "device",
@@ -30270,7 +30368,7 @@
       "identifier": "TestStandardDeviceTypeCorpusParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/standard_device_type_corpus_parity_matterjs_test.go",
-      "line": 149
+      "line": 153
     },
     {
       "package": "device",
@@ -31908,7 +32006,7 @@
       "identifier": "FakeStore",
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "endpoint/endpointtest/endpointtest.go",
-      "line": 66
+      "line": 67
     },
     {
       "package": "examples/host-view",
@@ -36444,28 +36542,28 @@
       "identifier": "ActionRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 109
+      "line": 117
     },
     {
       "package": "node",
       "identifier": "Actions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 98
+      "line": 106
     },
     {
       "package": "node",
       "identifier": "ActionsConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 101
+      "line": 109
     },
     {
       "package": "node",
       "identifier": "ActionsHost",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 105
+      "line": 113
     },
     {
       "package": "node",
@@ -36479,7 +36577,7 @@
       "identifier": "AttestationChain",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 202
+      "line": 225
     },
     {
       "package": "node",
@@ -36493,28 +36591,28 @@
       "identifier": "BDXResponder",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 218
+      "line": 241
     },
     {
       "package": "node",
       "identifier": "BasicInformationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 135
+      "line": 143
     },
     {
       "package": "node",
       "identifier": "CapabilityMinimaStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 190
+      "line": 213
     },
     {
       "package": "node",
       "identifier": "CommissionerControlServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 221
+      "line": 244
     },
     {
       "package": "node",
@@ -36528,7 +36626,7 @@
       "identifier": "CommissioningApprover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 184
+      "line": 207
     },
     {
       "package": "node",
@@ -36542,28 +36640,28 @@
       "identifier": "DCLOTAVersions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 83
+      "line": 91
     },
     {
       "package": "node",
       "identifier": "DCLSoftwareVersion",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 87
+      "line": 95
     },
     {
       "package": "node",
       "identifier": "DeviceTypeValidationMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 196
+      "line": 219
     },
     {
       "package": "node",
       "identifier": "DiagnosticEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 64
+      "line": 65
     },
     {
       "package": "node",
@@ -36577,21 +36675,21 @@
       "identifier": "DiscoveryNames",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 224
+      "line": 247
     },
     {
       "package": "node",
       "identifier": "EcosystemDirectory",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 116
+      "line": 124
     },
     {
       "package": "node",
       "identifier": "EcosystemInformation",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 121
+      "line": 129
     },
     {
       "package": "node",
@@ -36626,7 +36724,7 @@
       "identifier": "GeneralDiagnosticsFeatures",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 193
+      "line": 216
     },
     {
       "package": "node",
@@ -36668,21 +36766,21 @@
       "identifier": "NTPClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 141
+      "line": 164
     },
     {
       "package": "node",
       "identifier": "OTAApplier",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 165
+      "line": 188
     },
     {
       "package": "node",
       "identifier": "OTAApplyPolicy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 156
+      "line": 179
     },
     {
       "package": "node",
@@ -36696,21 +36794,21 @@
       "identifier": "OTAConsent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 150
+      "line": 173
     },
     {
       "package": "node",
       "identifier": "OTAConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 153
+      "line": 176
     },
     {
       "package": "node",
       "identifier": "OTADownloadProtocol",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 168
+      "line": 191
     },
     {
       "package": "node",
@@ -36724,7 +36822,7 @@
       "identifier": "OTAHTTPClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 171
+      "line": 194
     },
     {
       "package": "node",
@@ -36752,42 +36850,42 @@
       "identifier": "OTAImageSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 147
+      "line": 170
     },
     {
       "package": "node",
       "identifier": "OTAPeer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 159
+      "line": 182
     },
     {
       "package": "node",
       "identifier": "OTAProviderServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 215
+      "line": 238
     },
     {
       "package": "node",
       "identifier": "OTARequestorServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 138
+      "line": 146
     },
     {
       "package": "node",
       "identifier": "OTAUpdateStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 162
+      "line": 185
     },
     {
       "package": "node",
       "identifier": "Occupancy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/inspect.go",
-      "line": 71
+      "line": 77
     },
     {
       "package": "node",
@@ -36822,7 +36920,7 @@
       "identifier": "PowerSourceConfigurationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 144
+      "line": 152
     },
     {
       "package": "node",
@@ -36840,73 +36938,80 @@
     },
     {
       "package": "node",
+      "identifier": "ReopenPending",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 66
+    },
+    {
+      "package": "node",
       "identifier": "ReverseCommissioner",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 187
+      "line": 210
     },
     {
       "package": "node",
       "identifier": "SemanticTag",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 56
+      "line": 57
     },
     {
       "package": "node",
       "identifier": "SessionDiagnostics",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/inspect.go",
-      "line": 63
+      "line": 69
     },
     {
       "package": "node",
       "identifier": "SessionInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/inspect.go",
-      "line": 67
+      "line": 73
     },
     {
       "package": "node",
       "identifier": "SessionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 47
+      "line": 48
     },
     {
       "package": "node",
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 212
+      "line": 235
     },
     {
       "package": "node",
       "identifier": "Snapshotter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "node",
       "identifier": "SubscriptionInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 60
+      "line": 61
     },
     {
       "package": "node",
       "identifier": "SubscriptionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "node",
       "identifier": "TCPConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 42
+      "line": 43
     },
     {
       "package": "node",
@@ -37088,7 +37193,7 @@
       "identifier": "TestLateHandlerKeeperDoesNotRaceStop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_keepers_internal_test.go",
-      "line": 133
+      "line": 132
     },
     {
       "package": "node",
@@ -37186,7 +37291,7 @@
       "identifier": "TestReopenPendingAtStopArmsNoWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_keepers_internal_test.go",
-      "line": 78
+      "line": 77
     },
     {
       "package": "node",
@@ -37253,10 +37358,17 @@
     },
     {
       "package": "node",
+      "identifier": "TestStartAndFactoryResetBoundedByContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/lifecycle_bound_internal_test.go",
+      "line": 17
+    },
+    {
+      "package": "node",
       "identifier": "TestStopEndsAReopenWaitingOnTheLifetime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_keepers_internal_test.go",
-      "line": 183
+      "line": 182
     },
     {
       "package": "node",
@@ -37312,42 +37424,42 @@
       "identifier": "TimePeerReader",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 144
+      "line": 167
     },
     {
       "package": "node",
       "identifier": "TimeSynchronizationConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 138
+      "line": 161
     },
     {
       "package": "node",
       "identifier": "Topology",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 38
+      "line": 39
     },
     {
       "package": "node",
       "identifier": "WiFiNetworkDiagnosticsServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 141
+      "line": 149
     },
     {
       "package": "node",
       "identifier": "WiFiReporter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 181
+      "line": 204
     },
     {
       "package": "node",
       "identifier": "WindowStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 199
+      "line": 222
     },
     {
       "package": "node",
@@ -40211,6 +40323,13 @@
       "reason": "the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself",
       "file": "store/port.go",
       "line": 323
+    },
+    {
+      "package": "store",
+      "identifier": "SealedWithoutCheck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "store/export_test.go",
+      "line": 11
     },
     {
       "package": "store",
