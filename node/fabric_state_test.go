@@ -5,6 +5,7 @@ package node_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -17,6 +18,8 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // scopedOnOff is an OnOff server that holds state for the fabrics in held
@@ -26,6 +29,9 @@ type scopedOnOff struct {
 	mu      sync.Mutex
 	held    []uint8
 	dropped []uint8
+	// refuseDrops refuses that many drops, keeping the state, as a server
+	// whose store refused the removal does.
+	refuseDrops int
 }
 
 var _ contract.FabricScopedState = (*scopedOnOff)(nil)
@@ -33,6 +39,10 @@ var _ contract.FabricScopedState = (*scopedOnOff)(nil)
 func (s *scopedOnOff) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.refuseDrops > 0 {
+		s.refuseDrops--
+		return errors.New("test: drop refused")
+	}
 	s.dropped = append(s.dropped, fabricIndex)
 	s.held = slices.DeleteFunc(s.held, func(f uint8) bool { return f == fabricIndex })
 	return nil
@@ -231,14 +241,80 @@ func TestRemoveFabricReachesTheAggregatorsServers(t *testing.T) {
 	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 	cfg.AggregatorServers = []contract.ClusterServer{agg}
 	n, c, _ := commissioned(t, cfg)
-	if got := agg.drops(); !slices.Equal(got, []uint8{stale}) {
-		t.Fatalf("drops at start %v, want [%d]", got, stale)
-	}
 	fi := c.FabricIndex()
+	// The start's reconcile, then the commissioned fabric's add, which
+	// clears its index before announcing it (R2-P5-port-13).
+	if got := agg.drops(); !slices.Equal(got, []uint8{stale, fi}) {
+		t.Fatalf("drops at start and add %v, want [%d %d]", got, stale, fi)
+	}
 	if err := n.RemoveFabric(ctx, fi); err != nil {
 		t.Fatalf("RemoveFabric: %v", err)
 	}
-	if got := agg.drops(); !slices.Equal(got, []uint8{stale, fi}) {
-		t.Errorf("drops after RemoveFabric(%d) %v, want [%d %d]", fi, got, stale, fi)
+	if got := agg.drops(); !slices.Equal(got, []uint8{stale, fi, fi}) {
+		t.Errorf("drops after RemoveFabric(%d) %v, want [%d %d %d]", fi, got, stale, fi, fi)
+	}
+}
+
+// TestReusedFabricIndexStartsWithoutTheRemovedFabricsState pins review II
+// R2-P5-port-13: a fabric index handed out again does not inherit state a
+// server kept for the removed fabric of that index — here a drop the
+// server refused at the removal — because the node drops every server's
+// state for the index before it announces the new fabric.
+func TestReusedFabricIndexStartsWithoutTheRemovedFabricsState(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+	path := filepath.Join(t.TempDir(), "node.db")
+	db := openDB(t, path)
+	n := newNode(t, minimalConfig(db))
+	p := newScopedPlug(t, "plug:reused")
+	if err := n.Aggregator().Add(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), commissionerOptions())
+	if _, err := c.Commission(ctx); err != nil {
+		t.Fatalf("Commission: %v", err)
+	}
+	fi := c.FabricIndex()
+	p.srv.mu.Lock()
+	p.srv.held = []uint8{fi}
+	p.srv.refuseDrops = 1
+	p.srv.mu.Unlock()
+	if err := n.RemoveFabric(ctx, fi); err != nil {
+		t.Fatalf("RemoveFabric: %v", err)
+	}
+	if held := p.srv.MatterHeldFabrics(); !slices.Equal(held, []uint8{fi}) {
+		t.Fatalf("held after the refused drop %v, want [%d]", held, fi)
+	}
+	// The counter hands out the removed fabric's index again.
+	if err := store.New(db).SetMetadataCounter(ctx, "next_fabric_index", uint64(fi)); err != nil {
+		t.Fatal(err)
+	}
+	var (
+		mu      sync.Mutex
+		atAdded [][]uint8
+	)
+	n.Observe(node.Observers{OnFabricAdded: func(info node.FabricInfo) {
+		mu.Lock()
+		atAdded = append(atAdded, p.srv.MatterHeldFabrics())
+		mu.Unlock()
+	}})
+	waitLive(t, "the window to reopen", func() bool { return n.Window().Open })
+	opts := commissionerOptions()
+	opts.FabricID, opts.Seed = testFabricID+1, 8
+	again := bridgetest.Dial(t, n.Bridge().LocalAddr(), opts)
+	if _, err := again.Commission(ctx); err != nil {
+		t.Fatalf("Commission again: %v", err)
+	}
+	if again.FabricIndex() != fi {
+		t.Fatalf("the second fabric took index %d, want the reused %d", again.FabricIndex(), fi)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(atAdded) != 1 || slices.Contains(atAdded[0], fi) {
+		t.Fatalf("held when the reused index was announced %v; want the removed fabric's state gone", atAdded)
 	}
 }

@@ -57,7 +57,13 @@ func (n *Node) fabricStateServers(ts ...*endpoint.Topology) []contract.FabricSco
 // what it holds for fabricIndex (matter.js limitNodeDataToAllowedFabrics
 // on fabrics.events.deleting, node/server/ServerEnvironment.ts:188-196 at
 // db021da0). An endpoint absent now is reconciled when it joins
-// ([Node.reconcileFabricState]).
+// ([Node.reconcileFabricState]), and every server present when a fabric
+// is added drops what it holds for the new fabric's index before the
+// fabric is announced (observedFabricInstalled), so an index handed out
+// again starts clean. The residual: an endpoint absent at the removal and
+// still absent when its index is handed out again keeps the removed
+// fabric's state, since the reconcile it runs when it joins finds the
+// index held by the table.
 //
 // It walks the topology the node observed last and the one the bridge
 // serves: they differ while a snapshot the bridge goes on to refuse has

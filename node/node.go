@@ -812,6 +812,12 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 // observedFabricInstalled is the facade's fabricInstalled, then the
 // host's OnFabricAdded with what the AddNOC hook carries.
 func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte) {
+	// An index handed out again (the counter wrapped, or an explicit
+	// index) starts without what a server still holds for the removed
+	// fabric of that index: no controller wrote for the new fabric yet,
+	// so whatever is held for the index is the old one's (review II,
+	// R2-P5-port-13).
+	n.dropFabricState(ctx, fabricIndex)
 	n.fabricInstalled(ctx, fabricIndex, fabricID, nodeID, rootPublicKey)
 	n.setAnnounced(fabricIndex, true)
 	obs := n.observerList()
@@ -908,7 +914,7 @@ func (n *Node) setAnnounced(fabricIndex uint8, known bool) bool {
 // R2-P2-comm-03. A removed fabric whose index the table holds again — its
 // event outlived a refused acknowledgement and the index was handed out
 // anew — is acknowledged without running anything: the new fabric's add
-// dropped what the node held for the index (fabricInstalledAt).
+// dropped what the node held for the index (observedFabricInstalled).
 //
 // For a reverted fabric — an UpdateNOC that no CommissioningComplete
 // committed — the node runs what the rollback at run time runs through
