@@ -122,3 +122,17 @@ parity; Ahead rows for bounds matter.js lacks and chip has.
 | 88 | Who writes the parity registers (`by_design.md`, the findings register, an ADR) | **Fable reads both sides at the pin and gives the verdict as a fact note, Opus writes the entry, Fable reads the text against its note**: every reference statement still comes from Fable |
 | 89 | Who reviews | **Opus the code — correctness, concurrency, error paths, tests; Fable, bounded, the behaviour against the references, the security paths and every finding of high or medium severity** — for a review phase's own units as for a wave's pull request |
 | 90 | How citations are checked | **A script and Opus check every range; Fable reads every citation that is the reason for behaviour, every doubtful one and a sample of the rest** |
+
+## 2026-11-15, phase 5
+
+Wizard round 1 at the start of phase 5; the briefs and the phase plan were written by Fable, every option taken was the recommended one.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 91 | Phase 5's cut and budget | **Variant A, two halves, two PRs** (≈24–27 M): 5a tests, docs, supply chain, daemon; 5b API cut, port extensions, peer path, generated redaction, wave H. Deferred to phase 6: bridge mutation survivors, ADR/history claim checks, 20–30 low/note carried rows; API reviewers read the exported surface only; one rework round |
+| 92 | Phases for the ten rows without one | **As plan.md §4**: phase 5 for F-db021da0-20, -22, -23, -27, -39, -45, -46, -47; phase 6 for -28 and -38 |
+| 93 | Commissioning Proxy cluster (0x0455) | **A roadmap note tied to the Matter 1.7 lift**; no work in Review II |
+| 94 | The two TCP payload differences (BD-Matter-TCP-ExchangePayloadSize) | **Both closed as matter.js** (Session.ts:237-239, MessageChannel.ts:86-92 at db021da0); the entry is retired |
+| 95 | Reports overlap (BD-Matter-Subscription-ReportsOverlap, F-db021da0-36) | **Adopt matter.js's hold in phase 5 (wave H)**: one report in flight per subscription, delivered = StatusResponse; F-36 pulled forward from phase 6 |
+| 96 | TC-DD-3.12 / 3.13 | **A public `node` option** (an uncommissioned node does not open its window at start; the host opens it) **+ `--custom-flow` and a pipe command in the daemon**; both cases re-ported at the pin; the option's form is the API review's (apinode), the DD part after wave A2 |
+| 97 | PBKDFParamRequest with no window open | **StatusReport Failure/InvalidParam as matter.js** (SecureChannelProtocol.ts:129-137) for the state "window closed" only; an unattached PASE port stays the fail-closed noop |
