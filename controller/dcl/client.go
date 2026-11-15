@@ -100,12 +100,17 @@ type Client struct {
 	// IPv6 address as its IPv4 address) is refused when it is dialled —
 	// for the URL itself and for every redirect hop, after the name is
 	// resolved. A lab whose ledger names hosts on the local network sets
-	// it.
+	// it. The switch that counts is the one of the client whose download
+	// it is: softwareupdate.Images downloads a test-net record through
+	// [OTAVersions].TestClient, every other ledger-named URL through the
+	// client it was asked with.
 	//
-	// The guard checks the address it connects to. Under a proxy the
-	// environment names (HTTPS_PROXY, HTTP_PROXY, honoured as net/http
-	// honours them), that is the proxy's, which the guard admits; the
-	// destination behind the proxy is then not checked by it.
+	// The environment's proxy (HTTPS_PROXY, HTTP_PROXY, NO_PROXY, as
+	// net/http reads them) stays in use. A URL — the first one or a
+	// redirect hop — whose host is localhost or an IP address of the
+	// refused classes is refused before it is handed to the proxy or
+	// dialled. A host name sent through the proxy is the proxy's to
+	// resolve and connect to; the guard dials only the proxy.
 	AllowPrivateDestinations bool
 	// Timeout bounds each request; 0 is [DefaultTimeout].
 	Timeout time.Duration
@@ -188,8 +193,10 @@ type guardConfig struct {
 	tls *tls.Config
 }
 
-// destinationGuard refuses, at the dial, an address that is not public;
-// a dial to a proxy its transport was handed is not checked.
+// destinationGuard refuses, at the dial, an address that is not public,
+// and before the hand-over to a proxy or the dial, a URL whose host is
+// localhost or such an address; a dial to a proxy its transport was
+// handed is not checked.
 type destinationGuard struct {
 	admit   func(netip.AddrPort) bool
 	proxy   func(*http.Request) (*url.URL, error)
@@ -213,10 +220,53 @@ func (g *destinationGuard) control(_, address string, _ syscall.RawConn) error {
 	return nil
 }
 
-// proxyFor is the transport's Proxy: the proxy the environment names for
-// req, whose dial address it records so that the dial to it is not
-// checked.
+// refusedHost reports an error when u's host is localhost or an IP
+// address the guard refuses — the check a URL passes before the
+// transport hands it to a proxy or dials it, and again on each redirect.
+func (g *destinationGuard) refusedHost(u *url.URL) error {
+	host := u.Hostname()
+	if strings.EqualFold(strings.TrimSuffix(host, "."), "localhost") {
+		return fmt.Errorf("%w: %s names localhost (Client.AllowPrivateDestinations admits it)", errDestination, u.Redacted())
+	}
+	a, err := netip.ParseAddr(host)
+	if err != nil {
+		return nil
+	}
+	port := u.Port()
+	if port == "" {
+		port = map[string]string{"http": "80", "https": "443"}[strings.ToLower(u.Scheme)]
+	}
+	if p, perr := strconv.ParseUint(port, 10, 16); perr == nil && g.admit != nil && g.admit(netip.AddrPortFrom(a, uint16(p))) {
+		return nil
+	}
+	if !publicDestination(a) {
+		return fmt.Errorf("%w: %s is not a public address (Client.AllowPrivateDestinations admits it)", errDestination, a)
+	}
+	return nil
+}
+
+// checkRedirect is the guarded client's redirect policy: a hop to a
+// refused host is refused, and net/http's default limit of ten applies
+// (downloadClient defers to a client's own policy and adds its limit
+// only without one).
+func (g *destinationGuard) checkRedirect(req *http.Request, via []*http.Request) error {
+	if err := g.refusedHost(req.URL); err != nil {
+		return err
+	}
+	if len(via) >= 10 {
+		return errors.New("dcl: stopped after 10 redirects")
+	}
+	return nil
+}
+
+// proxyFor is the transport's Proxy: it refuses a URL whose host the
+// guard refuses (refusedHost), then returns the proxy the environment
+// names for req and records its dial address, so that the dial to it is
+// not checked.
 func (g *destinationGuard) proxyFor(req *http.Request) (*url.URL, error) {
+	if err := g.refusedHost(req.URL); err != nil {
+		return nil, err
+	}
 	p, err := g.proxy(req)
 	if p != nil {
 		port := p.Port()
@@ -238,7 +288,7 @@ func newGuardedClient(cfg guardConfig) *http.Client {
 	}
 	guarded := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver, Control: g.control}
 	direct := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver}
-	return &http.Client{Transport: &http.Transport{
+	return &http.Client{CheckRedirect: g.checkRedirect, Transport: &http.Transport{
 		Proxy: g.proxyFor,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if _, ok := g.proxies.Load(addr); ok {
@@ -264,8 +314,9 @@ var sharedGuard = sync.OnceValue(func() *http.Client { return newGuardedClient(g
 // bytes of a URL the ledger named https come over https (review II,
 // R2-P3-net-06). hc's own redirect policy applies besides; without one,
 // net/http's default (ten redirects, src/net/http/client.go:845-850 at
-// go1.27.4). matter.js follows fetch's redirects
-// (packages/protocol/src/dcl/DclOtaUpdateService.ts:690-693 at db021da0).
+// go1.27.4). matter.js passes its fetch no redirect option
+// (packages/protocol/src/dcl/DclOtaUpdateService.ts:690-693 at db021da0),
+// so redirects are the platform fetch's default.
 func downloadClient(hc *http.Client) *http.Client {
 	c := *hc
 	own := hc.CheckRedirect

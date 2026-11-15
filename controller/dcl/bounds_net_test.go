@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -537,15 +538,23 @@ func TestCRLDownloadConnectsToPublicDestinationsOnly(t *testing.T) {
 	}
 }
 
-// TestGuardAdmitsTheProxyItIsHanded: under a proxy (from the environment
-// in production; a test seam here) the guard dials the proxy, which it
-// admits, and the destination is the proxy's to reach — the documented
-// limit of a check at the dial (Client.AllowPrivateDestinations).
-func TestGuardAdmitsTheProxyItIsHanded(t *testing.T) {
+// TestGuardBehindAProxy: under a proxy (from the environment in
+// production; a test seam here) the guard dials the proxy, and a host
+// name is the proxy's to resolve; a URL whose host is localhost or an IP
+// address of a refused class is refused before the hand-over — the first
+// URL and a redirect hop alike.
+func TestGuardBehindAProxy(t *testing.T) {
 	t.Parallel()
-	var asked atomic.Value
+	var mu sync.Mutex
+	var asked []string
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		asked.Store(r.URL.String())
+		mu.Lock()
+		asked = append(asked, r.URL.String())
+		mu.Unlock()
+		if r.URL.Path == "/hop" {
+			http.Redirect(w, r, "http://10.0.0.1/x.crl", http.StatusFound)
+			return
+		}
 		_, _ = w.Write([]byte("crl"))
 	}))
 	t.Cleanup(proxy.Close)
@@ -553,13 +562,37 @@ func TestGuardAdmitsTheProxyItIsHanded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	seen := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(asked)
+	}
 	s := &CertificateStore{opts: CertificateOptions{Client: &Client{guard: newGuardedClient(guardConfig{
 		resolver: stubResolver(nil),
 		proxy:    func(*http.Request) (*url.URL, error) { return proxyURL, nil },
 	})}}}
 	body, err := s.downloadCRL(t.Context(), "http://crl.example/x.crl", 0)
-	if err != nil || string(body) != "crl" || asked.Load() != "http://crl.example/x.crl" {
-		t.Fatalf("through a loopback proxy: %q, err %v, the proxy was asked for %v; want the CRL through the proxy", body, err, asked.Load())
+	if err != nil || string(body) != "crl" || !slices.Equal(seen(), []string{"http://crl.example/x.crl"}) {
+		t.Fatalf("a host name through a loopback proxy: %q, err %v, the proxy was asked for %v; want the CRL through the proxy", body, err, seen())
+	}
+	for _, u := range []string{
+		"http://127.0.0.1:8080/x.crl", "http://[::1]/x.crl", "http://10.0.0.1/x.crl", "http://[fd00::1]/x.crl",
+		"http://[::ffff:192.168.0.1]/x.crl", "http://169.254.169.254/x.crl", "http://[fe80::1%25eth0]/x.crl",
+		"http://224.0.0.1/x.crl", "http://0.0.0.0/x.crl", "http://[::]/x.crl", "http://localhost/x.crl", "http://LOCALHOST./x.crl",
+		"https://localhost:8443/x.crl",
+	} {
+		if _, err := s.downloadCRL(t.Context(), u, 0); !errors.Is(err, errDestination) {
+			t.Fatalf("%s through the proxy: err %v; want it refused before the hand-over", u, err)
+		}
+	}
+	if got := seen(); len(got) != 1 {
+		t.Fatalf("the proxy was asked for %v; want no refused URL handed over", got)
+	}
+	if _, err := s.downloadCRL(t.Context(), "http://crl.example/hop", 0); !errors.Is(err, errDestination) {
+		t.Fatalf("a redirect to a private literal through the proxy: err %v; want the hop refused", err)
+	}
+	if got := seen(); len(got) != 2 || got[1] != "http://crl.example/hop" {
+		t.Fatalf("the proxy was asked for %v; want the hop not handed over", got)
 	}
 }
 

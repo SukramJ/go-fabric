@@ -357,13 +357,19 @@ func (s *CertificateStore) processRevocationPoint(ctx context.Context, p Revocat
 // the vendor's statement and must not raise the bound.
 const maxCRLSize = 1 << 20
 
-// downloadCRL fetches dataUrl (:1524-1534): a client error is a rejection,
-// a server error, request timeout or rate limit transient. The body is
-// read up to the point's DataFileSize plus one byte — a longer body then
-// fails processRevocationPoint's size check — and, without a
-// DataFileSize, up to maxCRLSize, past which it is a rejection. matter.js
-// reads the whole body (DclCertificateService.ts:1543-1552, fetch +
-// arrayBuffer) and rejects a size mismatch afterwards (:1559); the bound
+// downloadCRL fetches dataUrl (DclCertificateService.ts:1639-1647 at
+// db021da0): a client error is a rejection, a server error, request
+// timeout or rate limit transient. The point's URL may be http or https:
+// matter.js fetches it without a scheme check (:1639-1641), and the
+// schema text it carries reads "All URLs SHALL use either the http or
+// https scheme" (packages/types/src/dcl/device-attestation-revocation.ts:98-101
+// at db021da0); either way the destination is guarded
+// ([Client].AllowPrivateDestinations) and the CRL is authenticated by its
+// signature. The body is read up to the point's DataFileSize plus one
+// byte — a longer body then fails processRevocationPoint's size check —
+// and, without a DataFileSize, up to maxCRLSize, past which it is a
+// rejection. matter.js reads the whole body (:1639-1648, fetch +
+// arrayBuffer) and rejects a size mismatch afterwards (:1651-1657); the bound
 // keeps that verdict without buffering what a hostile CRL host sends past
 // it.
 func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string, dataFileSize uint64) ([]byte, error) {
