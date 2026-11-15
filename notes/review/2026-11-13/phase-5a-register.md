@@ -428,7 +428,7 @@ The 162 findings, by their first disposition:
 | fixed | 97 | 18 | 5 | 18 | 138 |
 | fixed in part | 2 | 0 | 0 | 1 | 3 |
 | struck | 5 | 1 | 0 | 2 | 8 |
-| open: an owner question | 0 | 1 | 0 | 0 | 1 |
+| decided by the owner (98–104) | 0 | 1 | 0 | 0 | 1 |
 | open: phase 5b | 0 | 1 | 0 | 2 | 3 |
 | open: phase 6 | 2 | 0 | 0 | 4 | 6 |
 | held back | 0 | 0 | 0 | 3 | 3 |
@@ -446,10 +446,12 @@ What earlier phases handed to phase 5a: 33 rows — 13 fixed, 2 fixed in part, 1
 struck, 5 closed before this phase, 4 open: phase 5b, 5 open: phase 6, 3 held
 back.
 
-The 39 noticed items: 13 fixed, 2 struck, 6 open: an owner question, 4 open:
-phase 5b, 13 open: phase 6, 1 held back.
+The 39 noticed items: 13 fixed, 2 struck, 6 decided by the owner at the end of
+5a (decisions 98 to 104, two of them done in `04756ba3`), 4 open: phase 5b, 13
+open: phase 6, 1 held back.
 
-Unread: 10 rows, all phase 6. The owner's decisions: 7 rows (91 to 97).
+Unread: 10 rows, all phase 6. The owner's decisions: 7 rows (91 to 97), and
+the seven of the wizard at the end of 5a (98 to 104) in `decisions.md`.
 
 **Held back: 4 rows of this phase** — 3 of the Fable reads (5a-2 F2, 5a-3 F2,
 5a-4 F2), one item read three times, and 1 noticed item (N5-rw2-1), all for
