@@ -258,7 +258,9 @@ jobs:
       needs.changes.outputs.full == 'true' ||
       needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    # Above CHIPTOOL_TIMEOUT (Makefile, 90 minutes), which bounds the test
+    # binary: the Go-TH leg holds 104 cases since 2026-11-15.
+    timeout-minutes: 110
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
