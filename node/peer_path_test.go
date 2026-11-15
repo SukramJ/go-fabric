@@ -42,7 +42,7 @@ type cameraPeers struct {
 // newCameraPeers builds the pair: camTCP and ctlTCP are the devices' TCP
 // roles (nil for none); the requestor runs a client stack
 // ([node.Config].Client) to open sessions to the camera itself.
-func newCameraPeers(t *testing.T, ctx context.Context, camTCP, ctlTCP *node.TCPConfig) *cameraPeers {
+func newCameraPeers(ctx context.Context, t *testing.T, camTCP, ctlTCP *node.TCPConfig) *cameraPeers {
 	t.Helper()
 	holdSite(t)
 	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Logger: slog.New(slog.DiscardHandler)})
@@ -99,7 +99,7 @@ func newCameraPeers(t *testing.T, ctx context.Context, camTCP, ctlTCP *node.TCPC
 
 // requestorOpens has the requestor open a session to the camera over the
 // transport t from its own client stack.
-func (cp *cameraPeers) requestorOpens(t *testing.T, ctx context.Context, tr exchange.Transport) {
+func (cp *cameraPeers) requestorOpens(ctx context.Context, t *testing.T, tr exchange.Transport) {
 	t.Helper()
 	err := cp.site.Run(ctx, func(ctx context.Context) error {
 		pr, err := cp.ctl.Node().Peers().For(handshake.PeerAddress{FabricIndex: cp.ctlFabric.FabricIndex, NodeID: cp.camFabric.NodeID})
@@ -144,8 +144,8 @@ var bothTCPRoles = &node.TCPConfig{Incoming: true, Outgoing: true}
 // b).
 func TestPeerPathEstablishesTCPBesideAUDPSession(t *testing.T) {
 	ctx := parityCtx(t)
-	cp := newCameraPeers(t, ctx, bothTCPRoles, bothTCPRoles)
-	cp.requestorOpens(t, ctx, exchange.TransportUDP)
+	cp := newCameraPeers(ctx, t, bothTCPRoles, bothTCPRoles)
+	cp.requestorOpens(ctx, t, exchange.TransportUDP)
 	if err := cp.site.Run(ctx, func(ctx context.Context) error { return cp.prov.Answer(ctx, 1, "v=0 answer") }); err != nil {
 		t.Fatalf("Answer: %v", err)
 	}
@@ -163,8 +163,8 @@ func TestPeerPathEstablishesTCPBesideAUDPSession(t *testing.T) {
 // reaches the requestor (case c).
 func TestPeerPathWithoutTCPRefusesTheSignal(t *testing.T) {
 	ctx := parityCtx(t)
-	cp := newCameraPeers(t, ctx, nil, bothTCPRoles)
-	cp.requestorOpens(t, ctx, exchange.TransportUDP)
+	cp := newCameraPeers(ctx, t, nil, bothTCPRoles)
+	cp.requestorOpens(ctx, t, exchange.TransportUDP)
 	err := cp.site.Run(ctx, func(ctx context.Context) error { return cp.prov.Answer(ctx, 1, "v=0 answer") })
 	if !errors.Is(err, camera.ErrNoLargeMessageTransport) {
 		t.Fatalf("Answer without TCP: %v, want ErrNoLargeMessageTransport", err)
@@ -180,7 +180,7 @@ func TestPeerPathWithoutTCPRefusesTheSignal(t *testing.T) {
 // R2-P5-peer-04).
 func TestPeerPathConcurrentSignalsShareOneHandshake(t *testing.T) {
 	ctx := parityCtx(t)
-	cp := newCameraPeers(t, ctx, bothTCPRoles, bothTCPRoles)
+	cp := newCameraPeers(ctx, t, bothTCPRoles, bothTCPRoles)
 	candidates := []camera.ProviderICECandidate{{Candidate: "candidate:1 1 udp 1 192.0.2.1 5000 typ host"}}
 	err := cp.site.Run(ctx, func(ctx context.Context) error {
 		var wg sync.WaitGroup
