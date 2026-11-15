@@ -15,8 +15,10 @@ import (
 // TestDeclareSelectsNoFeatureParityMatterJS ports "drops all features
 // when invoked with no features" (matter.js
 // packages/node/test/behavior/cluster/ClusterBehaviorFeaturesTest.ts:56-62
-// at db021da0): a typed Declare with NoFeatures serves FeatureMap 0, also
-// for BooleanState, whose default selection enables ChangeEvent; NoFeatures
+// at db021da0).
+//
+// In Go: a typed Declare with NoFeatures selects none, also for
+// BooleanState, whose default selection enables ChangeEvent; NoFeatures
 // beside a non-zero Features is refused at New (R2-P5-apidev-04,
 // N4-dec2b-2).
 func TestDeclareSelectsNoFeatureParityMatterJS(t *testing.T) {

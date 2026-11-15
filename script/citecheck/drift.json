@@ -182,7 +182,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1764,
+    "line": 1760,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -191,7 +191,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1766,
+    "line": 1762,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -200,7 +200,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1803,
+    "line": 1799,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -209,7 +209,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1826,
+    "line": 1822,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -1672,7 +1672,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 892,
+    "line": 900,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1909,7 +1909,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 259,
+    "line": 260,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-603",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1919,7 +1919,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 310,
+    "line": 311,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "SetpointRaiseLower",
@@ -1928,7 +1928,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1145,
+    "line": 1162,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1938,7 +1938,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1438,
+    "line": 1455,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1947,7 +1947,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1577,
+    "line": 1594,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "0ceb202d",
@@ -1957,7 +1957,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1753,
+    "line": 1770,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -2093,7 +2093,7 @@
   },
   {
     "file": "controller/client/client_event_notification_parity_matterjs_test.go",
-    "line": 43,
+    "line": 42,
     "citation": "ClientEventNotificationTest.ts:264-287",
     "resolved": "packages/node/test/node/ClientEventNotificationTest.ts",
     "identifier": "switchPair",
