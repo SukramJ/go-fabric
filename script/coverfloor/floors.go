@@ -304,6 +304,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/fabricscopecheck", min: 0, unmeasurable: true, why: "doc and test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/slogkeys", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/refusalcheck", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
+	{pkg: "github.com/SukramJ/go-fabric/script/quiescecheck", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/testquality", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/requiredchecks", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/sqlitedsn", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
