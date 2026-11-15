@@ -20,6 +20,8 @@ func TestStartAndFactoryResetBoundedByContext(t *testing.T) {
 	n.lifecycle <- struct{}{} // a Stop in progress holds the slot
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
+	bound, cancelBound := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelBound()
 	for name, call := range map[string]func(context.Context) error{
 		"Start":        n.Start,
 		"FactoryReset": n.FactoryReset,
@@ -31,7 +33,7 @@ func TestStartAndFactoryResetBoundedByContext(t *testing.T) {
 			if !errors.Is(err, context.DeadlineExceeded) {
 				t.Errorf("%s while the slot is held: %v, want the context's error", name, err)
 			}
-		case <-time.After(10 * time.Second):
+		case <-bound.Done():
 			t.Fatalf("%s blocked on the held lifecycle slot past its context", name)
 		}
 	}

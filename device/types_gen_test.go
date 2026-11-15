@@ -19,7 +19,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Aggregator: constructed without a StableKey")
 	}
 	if d, err := NewAggregator(testOptions("Aggregator"), testWith(t, "Aggregator")...); err == nil {
-		if d.Type().ID != AggregatorID {
+		if d.Type().ID != AggregatorType().ID {
 			t.Errorf("Aggregator: type %v", d.Type().Name)
 		}
 		if s, srv := d.Actions(), d.Server(0x0025); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
@@ -42,7 +42,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("AirPurifier: constructed without a StableKey")
 	}
 	if d, err := NewAirPurifier(testOptions("AirPurifier"), testWith(t, "AirPurifier")...); err == nil {
-		if d.Type().ID != AirPurifierID {
+		if d.Type().ID != AirPurifierType().ID {
 			t.Errorf("AirPurifier: type %v", d.Type().Name)
 		}
 		if s := d.FanControl(); s == nil || s.Underlying() != d.Server(0x0202) {
@@ -71,7 +71,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("AirQualitySensor: constructed without a StableKey")
 	}
 	if d, err := NewAirQualitySensor(testOptions("AirQualitySensor"), testWith(t, "AirQualitySensor")...); err == nil {
-		if d.Type().ID != AirQualitySensorID {
+		if d.Type().ID != AirQualitySensorType().ID {
 			t.Errorf("AirQualitySensor: type %v", d.Type().Name)
 		}
 		if s := d.AirQuality(); s == nil || s.Underlying() != d.Server(0x005B) {
@@ -127,7 +127,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("AudioDoorbell: constructed without a StableKey")
 	}
 	if d, err := NewAudioDoorbell(testOptions("AudioDoorbell"), testWith(t, "AudioDoorbell")...); err == nil {
-		if d.Type().ID != AudioDoorbellID {
+		if d.Type().ID != AudioDoorbellType().ID {
 			t.Errorf("AudioDoorbell: type %v", d.Type().Name)
 		}
 		if s := d.Switch(); s == nil || s.Underlying() != d.Server(0x003B) {
@@ -162,7 +162,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("BasicVideoPlayer: constructed without a StableKey")
 	}
 	if d, err := NewBasicVideoPlayer(testOptions("BasicVideoPlayer"), testWith(t, "BasicVideoPlayer")...); err == nil {
-		if d.Type().ID != BasicVideoPlayerID {
+		if d.Type().ID != BasicVideoPlayerType().ID {
 			t.Errorf("BasicVideoPlayer: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -212,7 +212,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("BatteryStorage: constructed without a StableKey")
 	}
 	if d, err := NewBatteryStorage(testOptions("BatteryStorage"), testWith(t, "BatteryStorage")...); err == nil {
-		if d.Type().ID != BatteryStorageID {
+		if d.Type().ID != BatteryStorageType().ID {
 			t.Errorf("BatteryStorage: type %v", d.Type().Name)
 		}
 		if s, err := FromSpec(Spec{Type: BatteryStorageID, Options: testOptions("BatteryStorage"), Declarations: testWith(t, "BatteryStorage")}); err != nil {
@@ -229,7 +229,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("BridgedNode: constructed without a StableKey")
 	}
 	if d, err := NewBridgedNode(testOptions("BridgedNode"), testWith(t, "BridgedNode")...); err == nil {
-		if d.Type().ID != BridgedNodeID {
+		if d.Type().ID != BridgedNodeType().ID {
 			t.Errorf("BridgedNode: type %v", d.Type().Name)
 		}
 		if s, srv := d.PowerSourceConfiguration(), d.Server(0x002E); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
@@ -258,7 +258,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Camera: constructed without a StableKey")
 	}
 	if d, err := NewCamera(testOptions("Camera"), testWith(t, "Camera")...); err == nil {
-		if d.Type().ID != CameraID {
+		if d.Type().ID != CameraType().ID {
 			t.Errorf("Camera: type %v", d.Type().Name)
 		}
 		if s := d.CameraAvStreamManagement(); s == nil || s.Underlying() != d.Server(0x0551) {
@@ -296,7 +296,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("CameraController: constructed without a StableKey")
 	}
 	if d, err := NewCameraController(testOptions("CameraController"), testWith(t, "CameraController")...); err == nil {
-		if d.Type().ID != CameraControllerID {
+		if d.Type().ID != CameraControllerType().ID {
 			t.Errorf("CameraController: type %v", d.Type().Name)
 		}
 		if s := d.WebRtcTransportRequestor(); s == nil || s.Underlying() != d.Server(0x0554) {
@@ -316,7 +316,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("CastingVideoClient: constructed without a StableKey")
 	}
 	if d, err := NewCastingVideoClient(testOptions("CastingVideoClient"), testWith(t, "CastingVideoClient")...); err == nil {
-		if d.Type().ID != CastingVideoClientID {
+		if d.Type().ID != CastingVideoClientType().ID {
 			t.Errorf("CastingVideoClient: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -339,7 +339,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("CastingVideoPlayer: constructed without a StableKey")
 	}
 	if d, err := NewCastingVideoPlayer(testOptions("CastingVideoPlayer"), testWith(t, "CastingVideoPlayer")...); err == nil {
-		if d.Type().ID != CastingVideoPlayerID {
+		if d.Type().ID != CastingVideoPlayerType().ID {
 			t.Errorf("CastingVideoPlayer: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -398,7 +398,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Chime: constructed without a StableKey")
 	}
 	if d, err := NewChime(testOptions("Chime"), testWith(t, "Chime")...); err == nil {
-		if d.Type().ID != ChimeID {
+		if d.Type().ID != ChimeType().ID {
 			t.Errorf("Chime: type %v", d.Type().Name)
 		}
 		if s := d.Chime(); s == nil || s.Underlying() != d.Server(0x0556) {
@@ -418,7 +418,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Closure: constructed without a StableKey")
 	}
 	if d, err := NewClosure(testOptions("Closure"), testWith(t, "Closure")...); err == nil {
-		if d.Type().ID != ClosureID {
+		if d.Type().ID != ClosureType().ID {
 			t.Errorf("Closure: type %v", d.Type().Name)
 		}
 		if s := d.ClosureControl(); s == nil || s.Underlying() != d.Server(0x0104) {
@@ -438,7 +438,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ClosureController: constructed without a StableKey")
 	}
 	if d, err := NewClosureController(testOptions("ClosureController"), testWith(t, "ClosureController")...); err == nil {
-		if d.Type().ID != ClosureControllerID {
+		if d.Type().ID != ClosureControllerType().ID {
 			t.Errorf("ClosureController: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -458,7 +458,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ClosurePanel: constructed without a StableKey")
 	}
 	if d, err := NewClosurePanel(testOptions("ClosurePanel"), testWith(t, "ClosurePanel")...); err == nil {
-		if d.Type().ID != ClosurePanelID {
+		if d.Type().ID != ClosurePanelType().ID {
 			t.Errorf("ClosurePanel: type %v", d.Type().Name)
 		}
 		if s := d.ClosureDimension(); s == nil || s.Underlying() != d.Server(0x0105) {
@@ -478,7 +478,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ColorDimmerSwitch: constructed without a StableKey")
 	}
 	if d, err := NewColorDimmerSwitch(testOptions("ColorDimmerSwitch"), testWith(t, "ColorDimmerSwitch")...); err == nil {
-		if d.Type().ID != ColorDimmerSwitchID {
+		if d.Type().ID != ColorDimmerSwitchType().ID {
 			t.Errorf("ColorDimmerSwitch: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -498,7 +498,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ColorTemperatureLight: constructed without a StableKey")
 	}
 	if d, err := NewColorTemperatureLight(testOptions("ColorTemperatureLight"), testWith(t, "ColorTemperatureLight")...); err == nil {
-		if d.Type().ID != ColorTemperatureLightID {
+		if d.Type().ID != ColorTemperatureLightType().ID {
 			t.Errorf("ColorTemperatureLight: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -524,7 +524,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ContactSensor: constructed without a StableKey")
 	}
 	if d, err := NewContactSensor(testOptions("ContactSensor"), testWith(t, "ContactSensor")...); err == nil {
-		if d.Type().ID != ContactSensorID {
+		if d.Type().ID != ContactSensorType().ID {
 			t.Errorf("ContactSensor: type %v", d.Type().Name)
 		}
 		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
@@ -547,7 +547,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ContentApp: constructed without a StableKey")
 	}
 	if d, err := NewContentApp(testOptions("ContentApp"), testWith(t, "ContentApp")...); err == nil {
-		if d.Type().ID != ContentAppID {
+		if d.Type().ID != ContentAppType().ID {
 			t.Errorf("ContentApp: type %v", d.Type().Name)
 		}
 		if s := d.KeypadInput(); s == nil || s.Underlying() != d.Server(0x0509) {
@@ -588,7 +588,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ControlBridge: constructed without a StableKey")
 	}
 	if d, err := NewControlBridge(testOptions("ControlBridge"), testWith(t, "ControlBridge")...); err == nil {
-		if d.Type().ID != ControlBridgeID {
+		if d.Type().ID != ControlBridgeType().ID {
 			t.Errorf("ControlBridge: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -608,7 +608,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("CookSurface: constructed without a StableKey")
 	}
 	if d, err := NewCookSurface(testOptions("CookSurface"), testWith(t, "CookSurface")...); err == nil {
-		if d.Type().ID != CookSurfaceID {
+		if d.Type().ID != CookSurfaceType().ID {
 			t.Errorf("CookSurface: type %v", d.Type().Name)
 		}
 		if s, srv := d.OnOff(), d.Server(0x0006); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
@@ -634,7 +634,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Cooktop: constructed without a StableKey")
 	}
 	if d, err := NewCooktop(testOptions("Cooktop"), testWith(t, "Cooktop")...); err == nil {
-		if d.Type().ID != CooktopID {
+		if d.Type().ID != CooktopType().ID {
 			t.Errorf("Cooktop: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -654,7 +654,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("DeviceEnergyManagement: constructed without a StableKey")
 	}
 	if d, err := NewDeviceEnergyManagement(testOptions("DeviceEnergyManagement"), testWith(t, "DeviceEnergyManagement")...); err == nil {
-		if d.Type().ID != DeviceEnergyManagementID {
+		if d.Type().ID != DeviceEnergyManagementType().ID {
 			t.Errorf("DeviceEnergyManagement: type %v", d.Type().Name)
 		}
 		if s := d.DeviceEnergyManagement(); s == nil || s.Underlying() != d.Server(0x0098) {
@@ -677,7 +677,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("DimmableLight: constructed without a StableKey")
 	}
 	if d, err := NewDimmableLight(testOptions("DimmableLight"), testWith(t, "DimmableLight")...); err == nil {
-		if d.Type().ID != DimmableLightID {
+		if d.Type().ID != DimmableLightType().ID {
 			t.Errorf("DimmableLight: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -700,7 +700,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("DimmablePlugInUnit: constructed without a StableKey")
 	}
 	if d, err := NewDimmablePlugInUnit(testOptions("DimmablePlugInUnit"), testWith(t, "DimmablePlugInUnit")...); err == nil {
-		if d.Type().ID != DimmablePlugInUnitID {
+		if d.Type().ID != DimmablePlugInUnitType().ID {
 			t.Errorf("DimmablePlugInUnit: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -723,7 +723,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("DimmerSwitch: constructed without a StableKey")
 	}
 	if d, err := NewDimmerSwitch(testOptions("DimmerSwitch"), testWith(t, "DimmerSwitch")...); err == nil {
-		if d.Type().ID != DimmerSwitchID {
+		if d.Type().ID != DimmerSwitchType().ID {
 			t.Errorf("DimmerSwitch: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -743,7 +743,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Dishwasher: constructed without a StableKey")
 	}
 	if d, err := NewDishwasher(testOptions("Dishwasher"), testWith(t, "Dishwasher")...); err == nil {
-		if d.Type().ID != DishwasherID {
+		if d.Type().ID != DishwasherType().ID {
 			t.Errorf("Dishwasher: type %v", d.Type().Name)
 		}
 		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
@@ -775,7 +775,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("DoorLock: constructed without a StableKey")
 	}
 	if d, err := NewDoorLock(testOptions("DoorLock"), testWith(t, "DoorLock")...); err == nil {
-		if d.Type().ID != DoorLockID {
+		if d.Type().ID != DoorLockType().ID {
 			t.Errorf("DoorLock: type %v", d.Type().Name)
 		}
 		if s := d.DoorLock(); s == nil || s.Underlying() != d.Server(0x0101) {
@@ -795,7 +795,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("DoorLockController: constructed without a StableKey")
 	}
 	if d, err := NewDoorLockController(testOptions("DoorLockController"), testWith(t, "DoorLockController")...); err == nil {
-		if d.Type().ID != DoorLockControllerID {
+		if d.Type().ID != DoorLockControllerType().ID {
 			t.Errorf("DoorLockController: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -815,7 +815,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Doorbell: constructed without a StableKey")
 	}
 	if d, err := NewDoorbell(testOptions("Doorbell"), testWith(t, "Doorbell")...); err == nil {
-		if d.Type().ID != DoorbellID {
+		if d.Type().ID != DoorbellType().ID {
 			t.Errorf("Doorbell: type %v", d.Type().Name)
 		}
 		if s := d.Switch(); s == nil || s.Underlying() != d.Server(0x003B) {
@@ -838,7 +838,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ElectricalEnergyTariff: constructed without a StableKey")
 	}
 	if d, err := NewElectricalEnergyTariff(testOptions("ElectricalEnergyTariff"), testWith(t, "ElectricalEnergyTariff")...); err == nil {
-		if d.Type().ID != ElectricalEnergyTariffID {
+		if d.Type().ID != ElectricalEnergyTariffType().ID {
 			t.Errorf("ElectricalEnergyTariff: type %v", d.Type().Name)
 		}
 		if s, srv := d.CommodityPrice(), d.Server(0x0095); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
@@ -864,7 +864,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ElectricalMeter: constructed without a StableKey")
 	}
 	if d, err := NewElectricalMeter(testOptions("ElectricalMeter"), testWith(t, "ElectricalMeter")...); err == nil {
-		if d.Type().ID != ElectricalMeterID {
+		if d.Type().ID != ElectricalMeterType().ID {
 			t.Errorf("ElectricalMeter: type %v", d.Type().Name)
 		}
 		if s := d.ElectricalPowerMeasurement(); s == nil || s.Underlying() != d.Server(0x0090) {
@@ -890,7 +890,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ElectricalSensor: constructed without a StableKey")
 	}
 	if d, err := NewElectricalSensor(testOptions("ElectricalSensor"), testWith(t, "ElectricalSensor")...); err == nil {
-		if d.Type().ID != ElectricalSensorID {
+		if d.Type().ID != ElectricalSensorType().ID {
 			t.Errorf("ElectricalSensor: type %v", d.Type().Name)
 		}
 		if s := d.PowerTopology(); s == nil || s.Underlying() != d.Server(0x009C) {
@@ -916,7 +916,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ElectricalUtilityMeter: constructed without a StableKey")
 	}
 	if d, err := NewElectricalUtilityMeter(testOptions("ElectricalUtilityMeter"), testWith(t, "ElectricalUtilityMeter")...); err == nil {
-		if d.Type().ID != ElectricalUtilityMeterID {
+		if d.Type().ID != ElectricalUtilityMeterType().ID {
 			t.Errorf("ElectricalUtilityMeter: type %v", d.Type().Name)
 		}
 		if s := d.MeterIdentification(); s == nil || s.Underlying() != d.Server(0x0B06) {
@@ -936,7 +936,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("EnergyEvse: constructed without a StableKey")
 	}
 	if d, err := NewEnergyEvse(testOptions("EnergyEvse"), testWith(t, "EnergyEvse")...); err == nil {
-		if d.Type().ID != EnergyEvseID {
+		if d.Type().ID != EnergyEvseType().ID {
 			t.Errorf("EnergyEvse: type %v", d.Type().Name)
 		}
 		if s := d.EnergyEvse(); s == nil || s.Underlying() != d.Server(0x0099) {
@@ -962,7 +962,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ExtendedColorLight: constructed without a StableKey")
 	}
 	if d, err := NewExtendedColorLight(testOptions("ExtendedColorLight"), testWith(t, "ExtendedColorLight")...); err == nil {
-		if d.Type().ID != ExtendedColorLightID {
+		if d.Type().ID != ExtendedColorLightType().ID {
 			t.Errorf("ExtendedColorLight: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -988,7 +988,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ExtractorHood: constructed without a StableKey")
 	}
 	if d, err := NewExtractorHood(testOptions("ExtractorHood"), testWith(t, "ExtractorHood")...); err == nil {
-		if d.Type().ID != ExtractorHoodID {
+		if d.Type().ID != ExtractorHoodType().ID {
 			t.Errorf("ExtractorHood: type %v", d.Type().Name)
 		}
 		if s := d.FanControl(); s == nil || s.Underlying() != d.Server(0x0202) {
@@ -1014,7 +1014,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Fan: constructed without a StableKey")
 	}
 	if d, err := NewFan(testOptions("Fan"), testWith(t, "Fan")...); err == nil {
-		if d.Type().ID != FanID {
+		if d.Type().ID != FanType().ID {
 			t.Errorf("Fan: type %v", d.Type().Name)
 		}
 		if s := d.FanControl(); s == nil || s.Underlying() != d.Server(0x0202) {
@@ -1052,7 +1052,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FloodlightCamera: %v", err)
 		}
-		if d.Type().ID != FloodlightCameraID {
+		if d.Type().ID != FloodlightCameraType().ID {
 			t.Errorf("FloodlightCamera: type %v", d.Type().Name)
 		}
 		if parts := d.Parts(); len(parts) != 2 || parts[0] != onOffLight.Device || parts[1] != camera.Device {
@@ -1069,7 +1069,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("FlowSensor: constructed without a StableKey")
 	}
 	if d, err := NewFlowSensor(testOptions("FlowSensor"), testWith(t, "FlowSensor")...); err == nil {
-		if d.Type().ID != FlowSensorID {
+		if d.Type().ID != FlowSensorType().ID {
 			t.Errorf("FlowSensor: type %v", d.Type().Name)
 		}
 		if s := d.FlowMeasurement(); s == nil || s.Underlying() != d.Server(0x0404) {
@@ -1089,7 +1089,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("GenericSwitch: constructed without a StableKey")
 	}
 	if d, err := NewGenericSwitch(testOptions("GenericSwitch"), testWith(t, "GenericSwitch")...); err == nil {
-		if d.Type().ID != GenericSwitchID {
+		if d.Type().ID != GenericSwitchType().ID {
 			t.Errorf("GenericSwitch: type %v", d.Type().Name)
 		}
 		if s := d.Switch(); s == nil || s.Underlying() != d.Server(0x003B) {
@@ -1109,7 +1109,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("HeatPump: constructed without a StableKey")
 	}
 	if d, err := NewHeatPump(testOptions("HeatPump"), testWith(t, "HeatPump")...); err == nil {
-		if d.Type().ID != HeatPumpID {
+		if d.Type().ID != HeatPumpType().ID {
 			t.Errorf("HeatPump: type %v", d.Type().Name)
 		}
 		if s, err := FromSpec(Spec{Type: HeatPumpID, Options: testOptions("HeatPump"), Declarations: testWith(t, "HeatPump")}); err != nil {
@@ -1126,7 +1126,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("HumiditySensor: constructed without a StableKey")
 	}
 	if d, err := NewHumiditySensor(testOptions("HumiditySensor"), testWith(t, "HumiditySensor")...); err == nil {
-		if d.Type().ID != HumiditySensorID {
+		if d.Type().ID != HumiditySensorType().ID {
 			t.Errorf("HumiditySensor: type %v", d.Type().Name)
 		}
 		if s := d.RelativeHumidityMeasurement(); s == nil || s.Underlying() != d.Server(0x0405) {
@@ -1146,7 +1146,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Intercom: constructed without a StableKey")
 	}
 	if d, err := NewIntercom(testOptions("Intercom"), testWith(t, "Intercom")...); err == nil {
-		if d.Type().ID != IntercomID {
+		if d.Type().ID != IntercomType().ID {
 			t.Errorf("Intercom: type %v", d.Type().Name)
 		}
 		if s := d.CameraAvStreamManagement(); s == nil || s.Underlying() != d.Server(0x0551) {
@@ -1175,7 +1175,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("IrrigationSystem: constructed without a StableKey")
 	}
 	if d, err := NewIrrigationSystem(testOptions("IrrigationSystem"), testWith(t, "IrrigationSystem")...); err == nil {
-		if d.Type().ID != IrrigationSystemID {
+		if d.Type().ID != IrrigationSystemType().ID {
 			t.Errorf("IrrigationSystem: type %v", d.Type().Name)
 		}
 		if s, srv := d.OperationalState(), d.Server(0x0060); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
@@ -1198,7 +1198,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("JointFabricAdministrator: constructed without a StableKey")
 	}
 	if d, err := NewJointFabricAdministrator(testOptions("JointFabricAdministrator"), testWith(t, "JointFabricAdministrator")...); err == nil {
-		if d.Type().ID != JointFabricAdministratorID {
+		if d.Type().ID != JointFabricAdministratorType().ID {
 			t.Errorf("JointFabricAdministrator: type %v", d.Type().Name)
 		}
 		if s := d.JointFabricDatastore(); s == nil || s.Underlying() != d.Server(0x0752) {
@@ -1221,7 +1221,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("LaundryDryer: constructed without a StableKey")
 	}
 	if d, err := NewLaundryDryer(testOptions("LaundryDryer"), testWith(t, "LaundryDryer")...); err == nil {
-		if d.Type().ID != LaundryDryerID {
+		if d.Type().ID != LaundryDryerType().ID {
 			t.Errorf("LaundryDryer: type %v", d.Type().Name)
 		}
 		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
@@ -1253,7 +1253,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("LaundryWasher: constructed without a StableKey")
 	}
 	if d, err := NewLaundryWasher(testOptions("LaundryWasher"), testWith(t, "LaundryWasher")...); err == nil {
-		if d.Type().ID != LaundryWasherID {
+		if d.Type().ID != LaundryWasherType().ID {
 			t.Errorf("LaundryWasher: type %v", d.Type().Name)
 		}
 		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
@@ -1285,7 +1285,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("LightSensor: constructed without a StableKey")
 	}
 	if d, err := NewLightSensor(testOptions("LightSensor"), testWith(t, "LightSensor")...); err == nil {
-		if d.Type().ID != LightSensorID {
+		if d.Type().ID != LightSensorType().ID {
 			t.Errorf("LightSensor: type %v", d.Type().Name)
 		}
 		if s := d.IlluminanceMeasurement(); s == nil || s.Underlying() != d.Server(0x0400) {
@@ -1305,7 +1305,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("MeterReferencePoint: constructed without a StableKey")
 	}
 	if d, err := NewMeterReferencePoint(testOptions("MeterReferencePoint"), testWith(t, "MeterReferencePoint")...); err == nil {
-		if d.Type().ID != MeterReferencePointID {
+		if d.Type().ID != MeterReferencePointType().ID {
 			t.Errorf("MeterReferencePoint: type %v", d.Type().Name)
 		}
 		if s, err := FromSpec(Spec{Type: MeterReferencePointID, Options: testOptions("MeterReferencePoint"), Declarations: testWith(t, "MeterReferencePoint")}); err != nil {
@@ -1322,7 +1322,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("MicrowaveOven: constructed without a StableKey")
 	}
 	if d, err := NewMicrowaveOven(testOptions("MicrowaveOven"), testWith(t, "MicrowaveOven")...); err == nil {
-		if d.Type().ID != MicrowaveOvenID {
+		if d.Type().ID != MicrowaveOvenType().ID {
 			t.Errorf("MicrowaveOven: type %v", d.Type().Name)
 		}
 		if s := d.OperationalState(); s == nil || s.Underlying() != d.Server(0x0060) {
@@ -1351,7 +1351,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ModeSelect: constructed without a StableKey")
 	}
 	if d, err := NewModeSelect(testOptions("ModeSelect"), testWith(t, "ModeSelect")...); err == nil {
-		if d.Type().ID != ModeSelectID {
+		if d.Type().ID != ModeSelectType().ID {
 			t.Errorf("ModeSelect: type %v", d.Type().Name)
 		}
 		if s := d.ModeSelect(); s == nil || s.Underlying() != d.Server(0x0050) {
@@ -1371,7 +1371,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("MountedDimmableLoadControl: constructed without a StableKey")
 	}
 	if d, err := NewMountedDimmableLoadControl(testOptions("MountedDimmableLoadControl"), testWith(t, "MountedDimmableLoadControl")...); err == nil {
-		if d.Type().ID != MountedDimmableLoadControlID {
+		if d.Type().ID != MountedDimmableLoadControlType().ID {
 			t.Errorf("MountedDimmableLoadControl: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -1394,7 +1394,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("MountedOnOffControl: constructed without a StableKey")
 	}
 	if d, err := NewMountedOnOffControl(testOptions("MountedOnOffControl"), testWith(t, "MountedOnOffControl")...); err == nil {
-		if d.Type().ID != MountedOnOffControlID {
+		if d.Type().ID != MountedOnOffControlType().ID {
 			t.Errorf("MountedOnOffControl: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -1417,7 +1417,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("NetworkInfrastructureManager: constructed without a StableKey")
 	}
 	if d, err := NewNetworkInfrastructureManager(testOptions("NetworkInfrastructureManager"), testWith(t, "NetworkInfrastructureManager")...); err == nil {
-		if d.Type().ID != NetworkInfrastructureManagerID {
+		if d.Type().ID != NetworkInfrastructureManagerType().ID {
 			t.Errorf("NetworkInfrastructureManager: type %v", d.Type().Name)
 		}
 		if s := d.ThreadNetworkDiagnostics(); s == nil || s.Underlying() != d.Server(0x0035) {
@@ -1446,7 +1446,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("OccupancySensor: constructed without a StableKey")
 	}
 	if d, err := NewOccupancySensor(testOptions("OccupancySensor"), testWith(t, "OccupancySensor")...); err == nil {
-		if d.Type().ID != OccupancySensorID {
+		if d.Type().ID != OccupancySensorType().ID {
 			t.Errorf("OccupancySensor: type %v", d.Type().Name)
 		}
 		if s := d.OccupancySensing(); s == nil || s.Underlying() != d.Server(0x0406) {
@@ -1469,7 +1469,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("OnOffLight: constructed without a StableKey")
 	}
 	if d, err := NewOnOffLight(testOptions("OnOffLight"), testWith(t, "OnOffLight")...); err == nil {
-		if d.Type().ID != OnOffLightID {
+		if d.Type().ID != OnOffLightType().ID {
 			t.Errorf("OnOffLight: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -1492,7 +1492,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("OnOffLightSwitch: constructed without a StableKey")
 	}
 	if d, err := NewOnOffLightSwitch(testOptions("OnOffLightSwitch"), testWith(t, "OnOffLightSwitch")...); err == nil {
-		if d.Type().ID != OnOffLightSwitchID {
+		if d.Type().ID != OnOffLightSwitchType().ID {
 			t.Errorf("OnOffLightSwitch: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -1512,7 +1512,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("OnOffPlugInUnit: constructed without a StableKey")
 	}
 	if d, err := NewOnOffPlugInUnit(testOptions("OnOffPlugInUnit"), testWith(t, "OnOffPlugInUnit")...); err == nil {
-		if d.Type().ID != OnOffPlugInUnitID {
+		if d.Type().ID != OnOffPlugInUnitType().ID {
 			t.Errorf("OnOffPlugInUnit: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -1535,7 +1535,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("OnOffSensor: constructed without a StableKey")
 	}
 	if d, err := NewOnOffSensor(testOptions("OnOffSensor"), testWith(t, "OnOffSensor")...); err == nil {
-		if d.Type().ID != OnOffSensorID {
+		if d.Type().ID != OnOffSensorType().ID {
 			t.Errorf("OnOffSensor: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -1555,7 +1555,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("OtaProvider: constructed without a StableKey")
 	}
 	if d, err := NewOtaProvider(testOptions("OtaProvider"), testWith(t, "OtaProvider")...); err == nil {
-		if d.Type().ID != OtaProviderID {
+		if d.Type().ID != OtaProviderType().ID {
 			t.Errorf("OtaProvider: type %v", d.Type().Name)
 		}
 		if s := d.OtaSoftwareUpdateProvider(); s == nil || s.Underlying() != d.Server(0x0029) {
@@ -1575,7 +1575,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("OtaRequestor: constructed without a StableKey")
 	}
 	if d, err := NewOtaRequestor(testOptions("OtaRequestor"), testWith(t, "OtaRequestor")...); err == nil {
-		if d.Type().ID != OtaRequestorID {
+		if d.Type().ID != OtaRequestorType().ID {
 			t.Errorf("OtaRequestor: type %v", d.Type().Name)
 		}
 		if s := d.OtaSoftwareUpdateRequestor(); s == nil || s.Underlying() != d.Server(0x002A) {
@@ -1595,7 +1595,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Oven: constructed without a StableKey")
 	}
 	if d, err := NewOven(testOptions("Oven"), testWith(t, "Oven")...); err == nil {
-		if d.Type().ID != OvenID {
+		if d.Type().ID != OvenType().ID {
 			t.Errorf("Oven: type %v", d.Type().Name)
 		}
 		if s, err := FromSpec(Spec{Type: OvenID, Options: testOptions("Oven"), Declarations: testWith(t, "Oven")}); err != nil {
@@ -1612,7 +1612,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("PowerSource: constructed without a StableKey")
 	}
 	if d, err := NewPowerSource(testOptions("PowerSource"), testWith(t, "PowerSource")...); err == nil {
-		if d.Type().ID != PowerSourceID {
+		if d.Type().ID != PowerSourceType().ID {
 			t.Errorf("PowerSource: type %v", d.Type().Name)
 		}
 		if s := d.PowerSource(); s == nil || s.Underlying() != d.Server(0x002F) {
@@ -1632,7 +1632,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("PressureSensor: constructed without a StableKey")
 	}
 	if d, err := NewPressureSensor(testOptions("PressureSensor"), testWith(t, "PressureSensor")...); err == nil {
-		if d.Type().ID != PressureSensorID {
+		if d.Type().ID != PressureSensorType().ID {
 			t.Errorf("PressureSensor: type %v", d.Type().Name)
 		}
 		if s := d.PressureMeasurement(); s == nil || s.Underlying() != d.Server(0x0403) {
@@ -1652,7 +1652,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Pump: constructed without a StableKey")
 	}
 	if d, err := NewPump(testOptions("Pump"), testWith(t, "Pump")...); err == nil {
-		if d.Type().ID != PumpID {
+		if d.Type().ID != PumpType().ID {
 			t.Errorf("Pump: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -1687,7 +1687,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("PumpController: constructed without a StableKey")
 	}
 	if d, err := NewPumpController(testOptions("PumpController"), testWith(t, "PumpController")...); err == nil {
-		if d.Type().ID != PumpControllerID {
+		if d.Type().ID != PumpControllerType().ID {
 			t.Errorf("PumpController: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -1707,7 +1707,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("RainSensor: constructed without a StableKey")
 	}
 	if d, err := NewRainSensor(testOptions("RainSensor"), testWith(t, "RainSensor")...); err == nil {
-		if d.Type().ID != RainSensorID {
+		if d.Type().ID != RainSensorType().ID {
 			t.Errorf("RainSensor: type %v", d.Type().Name)
 		}
 		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
@@ -1730,7 +1730,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Refrigerator: constructed without a StableKey")
 	}
 	if d, err := NewRefrigerator(testOptions("Refrigerator"), testWith(t, "Refrigerator")...); err == nil {
-		if d.Type().ID != RefrigeratorID {
+		if d.Type().ID != RefrigeratorType().ID {
 			t.Errorf("Refrigerator: type %v", d.Type().Name)
 		}
 		if s, srv := d.RefrigeratorAndTemperatureControlledCabinetMode(), d.Server(0x0052); (s == nil) != (srv == nil) || s != nil && s.Underlying() != srv {
@@ -1756,7 +1756,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("RoboticVacuumCleaner: constructed without a StableKey")
 	}
 	if d, err := NewRoboticVacuumCleaner(testOptions("RoboticVacuumCleaner"), testWith(t, "RoboticVacuumCleaner")...); err == nil {
-		if d.Type().ID != RoboticVacuumCleanerID {
+		if d.Type().ID != RoboticVacuumCleanerType().ID {
 			t.Errorf("RoboticVacuumCleaner: type %v", d.Type().Name)
 		}
 		if s := d.RvcRunMode(); s == nil || s.Underlying() != d.Server(0x0054) {
@@ -1785,7 +1785,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("RoomAirConditioner: constructed without a StableKey")
 	}
 	if d, err := NewRoomAirConditioner(testOptions("RoomAirConditioner"), testWith(t, "RoomAirConditioner")...); err == nil {
-		if d.Type().ID != RoomAirConditionerID {
+		if d.Type().ID != RoomAirConditionerType().ID {
 			t.Errorf("RoomAirConditioner: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -1826,7 +1826,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("RootNode: constructed without a StableKey")
 	}
 	if d, err := NewRootNode(testOptions("RootNode"), testWith(t, "RootNode")...); err == nil {
-		if d.Type().ID != RootNodeID {
+		if d.Type().ID != RootNodeType().ID {
 			t.Errorf("RootNode: type %v", d.Type().Name)
 		}
 		if s := d.BasicInformation(); s == nil || s.Underlying() != d.Server(0x0028) {
@@ -1900,7 +1900,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("SecondaryNetworkInterface: constructed without a StableKey")
 	}
 	if d, err := NewSecondaryNetworkInterface(testOptions("SecondaryNetworkInterface"), testWith(t, "SecondaryNetworkInterface")...); err == nil {
-		if d.Type().ID != SecondaryNetworkInterfaceID {
+		if d.Type().ID != SecondaryNetworkInterfaceType().ID {
 			t.Errorf("SecondaryNetworkInterface: type %v", d.Type().Name)
 		}
 		if s := d.NetworkCommissioning(); s == nil || s.Underlying() != d.Server(0x0031) {
@@ -1929,7 +1929,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("SmokeCoAlarm: constructed without a StableKey")
 	}
 	if d, err := NewSmokeCoAlarm(testOptions("SmokeCoAlarm"), testWith(t, "SmokeCoAlarm")...); err == nil {
-		if d.Type().ID != SmokeCoAlarmID {
+		if d.Type().ID != SmokeCoAlarmType().ID {
 			t.Errorf("SmokeCoAlarm: type %v", d.Type().Name)
 		}
 		if s := d.SmokeCoAlarm(); s == nil || s.Underlying() != d.Server(0x005C) {
@@ -1958,7 +1958,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("SnapshotCamera: constructed without a StableKey")
 	}
 	if d, err := NewSnapshotCamera(testOptions("SnapshotCamera"), testWith(t, "SnapshotCamera")...); err == nil {
-		if d.Type().ID != SnapshotCameraID {
+		if d.Type().ID != SnapshotCameraType().ID {
 			t.Errorf("SnapshotCamera: type %v", d.Type().Name)
 		}
 		if s := d.CameraAvStreamManagement(); s == nil || s.Underlying() != d.Server(0x0551) {
@@ -1987,7 +1987,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("SoilSensor: constructed without a StableKey")
 	}
 	if d, err := NewSoilSensor(testOptions("SoilSensor"), testWith(t, "SoilSensor")...); err == nil {
-		if d.Type().ID != SoilSensorID {
+		if d.Type().ID != SoilSensorType().ID {
 			t.Errorf("SoilSensor: type %v", d.Type().Name)
 		}
 		if s := d.SoilMeasurement(); s == nil || s.Underlying() != d.Server(0x0430) {
@@ -2010,7 +2010,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("SolarPower: constructed without a StableKey")
 	}
 	if d, err := NewSolarPower(testOptions("SolarPower"), testWith(t, "SolarPower")...); err == nil {
-		if d.Type().ID != SolarPowerID {
+		if d.Type().ID != SolarPowerType().ID {
 			t.Errorf("SolarPower: type %v", d.Type().Name)
 		}
 		if s, err := FromSpec(Spec{Type: SolarPowerID, Options: testOptions("SolarPower"), Declarations: testWith(t, "SolarPower")}); err != nil {
@@ -2027,7 +2027,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Speaker: constructed without a StableKey")
 	}
 	if d, err := NewSpeaker(testOptions("Speaker"), testWith(t, "Speaker")...); err == nil {
-		if d.Type().ID != SpeakerID {
+		if d.Type().ID != SpeakerType().ID {
 			t.Errorf("Speaker: type %v", d.Type().Name)
 		}
 		if s := d.OnOff(); s == nil || s.Underlying() != d.Server(0x0006) {
@@ -2050,7 +2050,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("TemperatureControlledCabinet: constructed without a StableKey")
 	}
 	if d, err := NewTemperatureControlledCabinet(testOptions("TemperatureControlledCabinet"), testWith(t, "TemperatureControlledCabinet")...); err == nil {
-		if d.Type().ID != TemperatureControlledCabinetID {
+		if d.Type().ID != TemperatureControlledCabinetType().ID {
 			t.Errorf("TemperatureControlledCabinet: type %v", d.Type().Name)
 		}
 		if s := d.TemperatureControl(); s == nil || s.Underlying() != d.Server(0x0056) {
@@ -2085,7 +2085,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("TemperatureSensor: constructed without a StableKey")
 	}
 	if d, err := NewTemperatureSensor(testOptions("TemperatureSensor"), testWith(t, "TemperatureSensor")...); err == nil {
-		if d.Type().ID != TemperatureSensorID {
+		if d.Type().ID != TemperatureSensorType().ID {
 			t.Errorf("TemperatureSensor: type %v", d.Type().Name)
 		}
 		if s := d.TemperatureMeasurement(); s == nil || s.Underlying() != d.Server(0x0402) {
@@ -2108,7 +2108,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("Thermostat: constructed without a StableKey")
 	}
 	if d, err := NewThermostat(testOptions("Thermostat"), testWith(t, "Thermostat")...); err == nil {
-		if d.Type().ID != ThermostatID {
+		if d.Type().ID != ThermostatType().ID {
 			t.Errorf("Thermostat: type %v", d.Type().Name)
 		}
 		if s := d.Thermostat(); s == nil || s.Underlying() != d.Server(0x0201) {
@@ -2134,7 +2134,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ThermostatController: constructed without a StableKey")
 	}
 	if d, err := NewThermostatController(testOptions("ThermostatController"), testWith(t, "ThermostatController")...); err == nil {
-		if d.Type().ID != ThermostatControllerID {
+		if d.Type().ID != ThermostatControllerType().ID {
 			t.Errorf("ThermostatController: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -2154,7 +2154,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("ThreadBorderRouter: constructed without a StableKey")
 	}
 	if d, err := NewThreadBorderRouter(testOptions("ThreadBorderRouter"), testWith(t, "ThreadBorderRouter")...); err == nil {
-		if d.Type().ID != ThreadBorderRouterID {
+		if d.Type().ID != ThreadBorderRouterType().ID {
 			t.Errorf("ThreadBorderRouter: type %v", d.Type().Name)
 		}
 		if s := d.ThreadNetworkDiagnostics(); s == nil || s.Underlying() != d.Server(0x0035) {
@@ -2195,7 +2195,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("VideoDoorbell: %v", err)
 		}
-		if d.Type().ID != VideoDoorbellID {
+		if d.Type().ID != VideoDoorbellType().ID {
 			t.Errorf("VideoDoorbell: type %v", d.Type().Name)
 		}
 		if parts := d.Parts(); len(parts) != 2 || parts[0] != camera.Device || parts[1] != doorbell.Device {
@@ -2212,7 +2212,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("VideoRemoteControl: constructed without a StableKey")
 	}
 	if d, err := NewVideoRemoteControl(testOptions("VideoRemoteControl"), testWith(t, "VideoRemoteControl")...); err == nil {
-		if d.Type().ID != VideoRemoteControlID {
+		if d.Type().ID != VideoRemoteControlType().ID {
 			t.Errorf("VideoRemoteControl: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {
@@ -2232,7 +2232,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("WaterFreezeDetector: constructed without a StableKey")
 	}
 	if d, err := NewWaterFreezeDetector(testOptions("WaterFreezeDetector"), testWith(t, "WaterFreezeDetector")...); err == nil {
-		if d.Type().ID != WaterFreezeDetectorID {
+		if d.Type().ID != WaterFreezeDetectorType().ID {
 			t.Errorf("WaterFreezeDetector: type %v", d.Type().Name)
 		}
 		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
@@ -2255,7 +2255,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("WaterHeater: constructed without a StableKey")
 	}
 	if d, err := NewWaterHeater(testOptions("WaterHeater"), testWith(t, "WaterHeater")...); err == nil {
-		if d.Type().ID != WaterHeaterID {
+		if d.Type().ID != WaterHeaterType().ID {
 			t.Errorf("WaterHeater: type %v", d.Type().Name)
 		}
 		if s := d.WaterHeaterManagement(); s == nil || s.Underlying() != d.Server(0x0094) {
@@ -2281,7 +2281,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("WaterLeakDetector: constructed without a StableKey")
 	}
 	if d, err := NewWaterLeakDetector(testOptions("WaterLeakDetector"), testWith(t, "WaterLeakDetector")...); err == nil {
-		if d.Type().ID != WaterLeakDetectorID {
+		if d.Type().ID != WaterLeakDetectorType().ID {
 			t.Errorf("WaterLeakDetector: type %v", d.Type().Name)
 		}
 		if s := d.BooleanState(); s == nil || s.Underlying() != d.Server(0x0045) {
@@ -2304,7 +2304,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("WaterValve: constructed without a StableKey")
 	}
 	if d, err := NewWaterValve(testOptions("WaterValve"), testWith(t, "WaterValve")...); err == nil {
-		if d.Type().ID != WaterValveID {
+		if d.Type().ID != WaterValveType().ID {
 			t.Errorf("WaterValve: type %v", d.Type().Name)
 		}
 		if s := d.ValveConfigurationAndControl(); s == nil || s.Underlying() != d.Server(0x0081) {
@@ -2327,7 +2327,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("WindowCovering: constructed without a StableKey")
 	}
 	if d, err := NewWindowCovering(testOptions("WindowCovering"), testWith(t, "WindowCovering")...); err == nil {
-		if d.Type().ID != WindowCoveringID {
+		if d.Type().ID != WindowCoveringType().ID {
 			t.Errorf("WindowCovering: type %v", d.Type().Name)
 		}
 		if s := d.WindowCovering(); s == nil || s.Underlying() != d.Server(0x0102) {
@@ -2347,7 +2347,7 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		t.Error("WindowCoveringController: constructed without a StableKey")
 	}
 	if d, err := NewWindowCoveringController(testOptions("WindowCoveringController"), testWith(t, "WindowCoveringController")...); err == nil {
-		if d.Type().ID != WindowCoveringControllerID {
+		if d.Type().ID != WindowCoveringControllerType().ID {
 			t.Errorf("WindowCoveringController: type %v", d.Type().Name)
 		}
 		if s := d.Binding(); s == nil || s.Underlying() != d.Server(0x001E) {

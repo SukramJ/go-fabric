@@ -593,7 +593,7 @@ func writeCompositeTest(w *bytes.Buffer, n, name string, components []string) {
 	args := strings.Join(vars, ", ")
 	fmt.Fprintf(w, "\t\tif _, err := New%s(Options{}, %s); err == nil {\n\t\t\tt.Error(\"%s: constructed without a StableKey\")\n\t\t}\n", n, args, name)
 	fmt.Fprintf(w, "\t\td, err := New%s(testOptions(%q), %s, testWith(t, %q)...)\n\t\tif err != nil {\n\t\t\tt.Fatalf(\"%s: %%v\", err)\n\t\t}\n", n, name, args, name, name)
-	fmt.Fprintf(w, "\t\tif d.Type().ID != %sID {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
+	fmt.Fprintf(w, "\t\tif d.Type().ID != %sType().ID {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
 	fmt.Fprintf(w, "\t\tif parts := d.Parts(); len(parts) != %d", len(components))
 	for i, v := range vars {
 		fmt.Fprintf(w, " || parts[%d] != %s.Device", i, v)
@@ -778,7 +778,7 @@ func (g *generator) generateTest(names []string) (*output, error) {
 		}
 		fmt.Fprintf(&w, "\tif _, err := New%s(Options{}); err == nil {\n\t\tt.Error(\"%s: constructed without a StableKey\")\n\t}\n", n, name)
 		fmt.Fprintf(&w, "\tif d, err := New%s(testOptions(%q), testWith(t, %q)...); err == nil {\n", n, name, name)
-		fmt.Fprintf(&w, "\t\tif d.Type().ID != %sID {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
+		fmt.Fprintf(&w, "\t\tif d.Type().ID != %sType().ID {\n\t\t\tt.Errorf(\"%s: type %%v\", d.Type().Name)\n\t\t}\n", n, name)
 		for _, cr := range m.servers {
 			if _, ok := g.accessor(cr); !ok {
 				continue

@@ -61,7 +61,7 @@ func awaitDisconnect(t *testing.T, d *capableDriver) {
 	t.Helper()
 	select {
 	case <-d.disconnected:
-	case <-time.After(5 * time.Second):
+	case <-t.Context().Done():
 		t.Fatal("no DisconnectNetwork asked of the driver")
 	}
 }

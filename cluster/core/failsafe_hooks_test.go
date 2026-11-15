@@ -6,7 +6,7 @@ package core_test
 import (
 	"context"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 )
@@ -30,11 +30,7 @@ func rollbackInFlight(t *testing.T, gc *core.GeneralCommissioning, closed []uint
 		defer close(done)
 		gc.ExpireFailSafe(context.Background())
 	}()
-	select {
-	case <-entered:
-	case <-time.After(5 * time.Second):
-		t.Fatal("the session closer never ran")
-	}
+	<-entered
 	return release, done
 }
 
@@ -55,24 +51,32 @@ func TestArmOnPaseSessionAfterTheRollbacksClose(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			gc := newGencomm(t, core.GeneralCommissioningConfig{})
-			release, done := rollbackInFlight(t, gc, []uint16{5})
-			armed := make(chan error, 1)
-			go func() { armed <- c.arm(context.Background(), gc) }()
-			select {
-			case err := <-armed:
-				t.Fatalf("the arm returned (%v) while the rollback was in flight", err)
-			case <-time.After(50 * time.Millisecond):
-			}
-			close(release)
-			<-done
-			err := <-armed
-			if (err != nil) != c.refused {
-				t.Fatalf("arm = %v, want refused %v", err, c.refused)
-			}
-			if gc.FailSafeArmed() == c.refused {
-				t.Errorf("fail-safe armed %v after the arm, want %v", gc.FailSafeArmed(), !c.refused)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				gc := newGencomm(t, core.GeneralCommissioningConfig{})
+				release, done := rollbackInFlight(t, gc, []uint16{5})
+				armed := make(chan error, 1)
+				go func() { armed <- c.arm(context.Background(), gc) }()
+				// The arm waits for the rollback in flight.
+				synctest.Wait()
+				select {
+				case err := <-armed:
+					t.Fatalf("the arm returned (%v) while the rollback was in flight", err)
+				default:
+				}
+				close(release)
+				<-done
+				err := <-armed
+				if (err != nil) != c.refused {
+					t.Fatalf("arm = %v, want refused %v", err, c.refused)
+				}
+				if gc.FailSafeArmed() == c.refused {
+					t.Errorf("fail-safe armed %v after the arm, want %v", gc.FailSafeArmed(), !c.refused)
+				}
+				// The armed fail-safe's watch ends with it.
+				gc.SetFailSafeSessionCloser(nil)
+				gc.ExpireFailSafe(context.Background())
+				synctest.Wait()
+			})
 		})
 	}
 }

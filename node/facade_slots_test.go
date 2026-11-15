@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/mdns"
@@ -60,19 +59,12 @@ func TestHostHooksAddToTheFacades(t *testing.T) {
 	if fabrics, err := n.FabricInfos(ctx); err != nil || len(fabrics) != 0 {
 		t.Fatalf("fabrics after RemoveFabric: %+v (%v)", fabrics, err)
 	}
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	waitLive(t, "the facade's complete and removed, each before the host's, and the host's transition", func() bool {
 		mu.Lock()
 		got := append([]string(nil), events...)
 		mu.Unlock()
-		if before(got, "facade complete", "host complete") && before(got, "facade removed", "host removed") && contains(got, "host transition") {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("hook events %v: want the facade's complete and removed, each before the host's, and the host's transition", got)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return before(got, "facade complete", "host complete") && before(got, "facade removed", "host removed") && contains(got, "host transition")
+	})
 }
 
 func contains(s []string, e string) bool {
