@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/modeselect"
+	"github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -34,7 +35,7 @@ import (
 // (goCertCase.at).
 
 func init() {
-	for _, c := range []func() goCertCase{caseMOD22} {
+	for _, c := range []func() goCertCase{caseMOD22, caseTSTAT32} {
 		registerGoCert(c)
 	}
 }
@@ -118,6 +119,39 @@ func caseMOD22() goCertCase {
 				th.note("ChangeToMode NewMode=%d: Success", newMode)
 				return nil
 			}},
+		},
+	}
+}
+
+// caseTSTAT32 mirrors TC-TSTAT-3.2: SetpointRaiseLower up and down by
+// 1 °C in Heat mode.
+func caseTSTAT32() goCertCase {
+	var n *client.Node
+	// MODE_HEAT and AMOUNT (:17-21).
+	const (
+		modeHeat = thermostat.SetpointRaiseLowerModeHeat
+		amount   = 10
+	)
+	raiseLower := func(a int8) func(th *goTH) error {
+		return func(th *goTH) error {
+			if _, err := commandSucceeds(th, n, thermostat.ClusterID, thermostat.CmdSetpointRaiseLower,
+				thermostat.SetpointRaiseLowerRequest{Mode: modeHeat, Amount: a}, -1); err != nil {
+				return err
+			}
+			th.note("SetpointRaiseLower Mode=%d Amount=%d: Success", modeHeat, a)
+			return nil
+		}
+	}
+	return goCertCase{
+		tc: "TC-TSTAT-3.2", line: 49, pics: []string{"TSTAT.C"}, at: "TSTAT.S",
+		steps: []goStep{
+			{n: "0", line: 50, title: "commission DUT to TH", run: func(th *goTH) error {
+				var err error
+				_, n, err = th.commission("dut")
+				return err
+			}},
+			{n: "1", line: 53, title: "DUT raises the setpoint with SetpointRaiseLower", pics: "TSTAT.C.C00.Tx", run: raiseLower(amount)},
+			{n: "2", line: 66, title: "DUT lowers the setpoint with SetpointRaiseLower", pics: "TSTAT.C.C00.Tx", run: raiseLower(-amount)},
 		},
 	}
 }
