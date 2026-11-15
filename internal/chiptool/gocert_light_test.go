@@ -13,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
@@ -34,7 +35,7 @@ import (
 // log is not matched.
 
 func init() {
-	for _, c := range []func() goCertCase{caseCC34, caseCC45, caseCC54, caseCC64, caseCC75, caseCC94} {
+	for _, c := range []func() goCertCase{caseCC34, caseCC45, caseCC54, caseCC64, caseCC75, caseCC94, caseI32} {
 		registerGoCert(c)
 	}
 }
@@ -373,6 +374,49 @@ func caseCC94() goCertCase {
 					got = append(got, describeNode(v))
 				}
 				th.note("EnhancedCurrentHue at 5 s intervals: %s", strings.Join(got, ", "))
+				return nil
+			}},
+		},
+	}
+}
+
+// caseI32 mirrors TC-I-3.2: Identify and TriggerEffect.
+func caseI32() goCertCase {
+	var n *client.Node
+	const (
+		identifyTime = 60 // IDENTIFY_TIME (TC-I-3.2.test.ts:20)
+		stopIdentify = 0  // STOP_IDENTIFY (:21)
+	)
+	ident := func(t uint16) func(th *goTH) error {
+		return func(th *goTH) error {
+			if _, err := th.invoke(n, cmdPath(th.ep, identify.ClusterID, identify.CmdIdentify), identify.IdentifyRequest{IdentifyTime: t}, false, client.InvokeOptions{}); err != nil {
+				return err
+			}
+			th.note("Identify IdentifyTime=%d on endpoint %d: Success", t, th.ep)
+			return nil
+		}
+	}
+	return goCertCase{
+		// The on/off light at endpoint 1 (:16-17).
+		tc: "TC-I-3.2", line: 55, pics: []string{"I.C"}, at: "I.S & OO.S",
+		steps: []goStep{
+			{n: "0", line: 56, title: "the DUT commissions the TH", run: func(th *goTH) error {
+				var err error
+				if _, n, err = th.commission("dut"); err != nil {
+					return err
+				}
+				th.note("commissioned; the steps run on endpoint %d", th.ep)
+				return nil
+			}},
+			{n: "1", line: 59, title: "Identify with IdentifyTime 0x003C", pics: "I.C.C00.Tx", run: ident(identifyTime)},
+			{n: "2", line: 71, title: "Identify with IdentifyTime 0 (Stop)", pics: "I.C.C00.Tx", run: ident(stopIdentify)},
+			{n: "3", line: 82, title: "TriggerEffect Breathe, variant 0", pics: "I.C.C40.Tx", run: func(th *goTH) error {
+				// EFFECT_IDENTIFIER_BREATHE, EFFECT_VARIANT_DEFAULT (:24-25).
+				req := identify.TriggerEffectRequest{EffectIdentifier: identify.EffectIdentifierBreathe, EffectVariant: identify.EffectVariantDefault}
+				if _, err := th.invoke(n, cmdPath(th.ep, identify.ClusterID, identify.CmdTriggerEffect), req, false, client.InvokeOptions{}); err != nil {
+					return err
+				}
+				th.note("TriggerEffect Breathe/Default on endpoint %d: Success", th.ep)
 				return nil
 			}},
 		},
