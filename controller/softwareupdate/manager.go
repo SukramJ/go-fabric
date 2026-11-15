@@ -717,14 +717,39 @@ func (m *Manager) QueuedUpdates() []PendingUpdate {
 	return out
 }
 
-// validatePeerDetails is #validatePeerDetails (:360-379).
+// validatePeerDetails is #validatePeerDetails (:360-379). Beside it, a
+// query whose ids are not the node's attested ones is logged
+// ([Manager.noteAttestedIdentity]); the answer does not depend on it.
 func (m *Manager) validatePeerDetails(p Peer, version uint32, vid, pid uint16) bool {
 	n := m.nodeAt(p)
 	if n == nil {
 		return false
 	}
+	m.noteAttestedIdentity(p, n.Record(), vid, pid)
 	st, ok := basicInformation(n)
 	return ok && st.SoftwareVersion == version && st.VendorId == vid && st.ProductId == pid
+}
+
+// noteAttestedIdentity logs, as one Warn line, a QueryImage whose vendor
+// and product id differ from the ids the node's attestation validated when
+// it was commissioned (client.Record.AttestedVendorID/AttestedProductID,
+// review II decision 105). A query the manager answers carries the node's
+// BasicInformation ids, so the line means the node reports another
+// identity than the one its Certification Declaration was checked
+// against. Nothing is refused on it. A node whose attested ids are
+// unknown is not judged. A white-label product is not flagged for its
+// DAC's ids: the attested ids are its BasicInformation ones, which the
+// declaration lists. A product id the same declaration also lists, other
+// than the attested one, is flagged: the declaration's product list is not
+// kept.
+func (m *Manager) noteAttestedIdentity(p Peer, rec client.Record, vid, pid uint16) {
+	av, ap := rec.AttestedVendorID, rec.AttestedProductID
+	if av == nil || ap == nil || (*av == vid && *ap == pid) {
+		return
+	}
+	m.log.Warn("ota.manager.attested_identity_mismatch", slog.String("node", peerString(p)),
+		slog.Int("attested_vendor_id", int(*av)), slog.Int("attested_product_id", int(*ap)),
+		slog.Int("vendor_id", int(vid)), slog.Int("product_id", int(pid)))
 }
 
 // UpdateExistsFor is the stored update the querying node gets —

@@ -296,6 +296,14 @@ provider (`cluster/core.NewOTAProvider`) on a tree of its own.
 `ProviderEndpoint`) must be the one the host serves, or the announcements
 point nowhere.
 
+**Identity.** A QueryImage whose vendor and product id are not the ids the
+node's attestation validated when it was commissioned
+(`client.Record.AttestedVendorID`/`AttestedProductID`) is logged as one
+Warn line, `ota.manager.attested_identity_mismatch`, and answered as any
+other query: nothing is refused on it. A node commissioned before the record
+kept these ids, or one whose failed attestation the policy accepted, is not
+judged.
+
 *Source: `controller/ota.go`, `controller/ota_provider.go`, `controller/softwareupdate/manager.go`, `controller/softwareupdate/provider.go`.*
 
 ## `controller/topology`

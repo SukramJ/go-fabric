@@ -224,6 +224,7 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 		rec.PeerAddress = &a
 		rec.CommissionedAt = now
 		rec.FabricIndexOnPeer = res.FabricIndexOnPeer
+		rec.AttestedVendorID, rec.AttestedProductID = res.AttestedVendorID, res.AttestedProductID
 		rec.applyPeer(d)
 	})
 	r.bindPeer(n, p)
@@ -385,6 +386,7 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 		rec.PeerAddress = nil
 		rec.CommissionedAt = time.Time{}
 		rec.FabricIndexOnPeer = 0
+		rec.AttestedVendorID, rec.AttestedProductID = nil, nil
 		rec.ReportedSessionParameters = nil
 		rec.TCPUnsupported = false
 	})

@@ -177,8 +177,11 @@ type flow struct {
 	armStarted      bool
 	defaultFailSafe time.Duration
 	// abortDisarm is abortDisarmTimeout; a test shortens it.
-	abortDisarm    time.Duration
-	dacKey         *ecdsa.PublicKey
+	abortDisarm time.Duration
+	dacKey      *ecdsa.PublicKey
+	// attested is the BasicInformation vendor and product id attestation
+	// validated, nil while it has not ([Result.AttestedVendorID]).
+	attested       *[2]uint16
 	lastBreadcrumb uint64
 	data           collectedData
 }
@@ -1154,6 +1157,10 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	} else {
 		findings = result.Findings
 		f.dacKey = result.DACPublicKey
+		// Validate returned no error: the Certification Declaration names
+		// this vendor and product (decision 105). A failure the policy
+		// accepts leaves the pair unattested.
+		f.attested = &[2]uint16{f.data.vendorID, f.data.productID}
 	}
 
 	if len(findings) > 0 {
