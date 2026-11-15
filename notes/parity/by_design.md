@@ -1080,32 +1080,31 @@ documented here; out-of-scope items (bridge/) are deferred.
 | L4-D04 | MED | By-design (already `L6-PFAD-4`) | Wildcard-endpoint Invoke rejects with `UnsupportedEndpoint`; no cluster requires it today. |
 | L4-D05 | MED | **Fixed** (2026-05-12) | `timedDeadlines` now keyed by `struct{sessionID, exchangeID uint16}` (`bridge/bridge.go::timedKey`). Regression test: `TestTimedRequest_SessionScopeIsolation`. |
 | L4-D06 | LOW | Fixed (regression test added) | CommandRef absent from response when not in request. Guard via `HasCommandRef` is correct; regression test added to `im_test.go`. |
-| L10-D05 | MED | By-design (chip alignment) | `SuppressResponse` not set on ongoing subscription ReportData; follows chip pattern; Apple Home expects IM:StatusResponse. See entry below. |
-| L10-D06 | MED | **Fixed** (2026-05-12) | KeepSubscriptions=false PASE path now calls `m.CloseSession(sessionID)` instead of skipping (`bridge/subscribe.go`). Regression test: `TestCloseSession_ClosesMatchingSessionSubscription`. |
+| L10-D05 | MED | Parity (no divergence; corrected 2026-11-15, review II, R2-P4-imread-13) | `SuppressResponse` is not set on an ongoing subscription report, with data or as a keep-alive — as matter.js and connectedhomeip. See entry below. |
+| L10-D06 | MED | Superseded (2026-11-13, review II, F-db021da0-12) | The fix of 2026-05-12 (a KeepSubscriptions=false SubscribeRequest on a PASE session closed that session's subscriptions) was taken back: on a session without a fabric such a request tears down no subscription (`bridge/subscribe_dispatch.go`; `bridge:TestKeepSubscriptionsFalseTearsDownOnlyWithAFabric` and the closed findings row F-db021da0-12 have the matter.js lines). |
 | L10-D07 | MED | Fixed (code comment) | `snapshot()` concurrency safety documented in `subscription/manager.go`. No bug; comment added for future readers. |
 | L10-D08 | LOW | **Fixed** (2026-05-12) | Send-failure path in `reportSubscription` now calls `m.Close(sub.ID)` so the manager evicts the dead subscription. Regression test: `TestReport_PeerUnreachable_ClosesSubscriptionWithoutMRP`. |
 
-#### L10-D05 detail — SuppressResponse not set on ongoing subscription ReportData (chip alignment)
+#### L10-D05 detail — SuppressResponse not set on ongoing subscription ReportData (parity, no divergence)
 
-**matter.js ref:** `packages/protocol/src/interaction/InteractionMessenger.ts:679`
-— `suppressResponse: dataReport.moreChunkedMessages ? false : dataReport.suppressResponse`;
-`ServerSubscription#sendUpdateMessage` sets `suppressResponse: true` for
-non-chunked single-chunk ongoing reports so the subscriber ACKs via MRP
-standalone ACK.
+This entry recorded a deliberate divergence from matter.js until review II
+(phase 4, R2-P4-imread-13): it said matter.js sends an ongoing report with
+`suppressResponse: true`. At the pin it does not.
 
-**chip ref:** `src/app/ReadHandler.cpp:340`
-— `responseExpected = IsType(Subscribe) || aMoreChunks`; for ongoing
-non-chunked reports `IsType(Subscribe)=true` forces `responseExpected=true`,
-meaning chip always expects an IM:StatusResponse on subscription reports.
+**matter.js ref:** `packages/node/src/node/server/ServerSubscription.ts:921-936`
+at `db021da0` — a report with data is sent with `suppressResponse: false`
+(:928, "Non-empty data reports always need to send response"), and so is the
+keep-alive (:909-920, :914).
 
-**go-fabric:** Follows chip (`SuppressResponse=false` zero value).
+**chip ref:** `src/app/reporting/Engine.cpp:835-841` at `6170af84` — the
+report builder sets SuppressResponse only for a Read, never for a
+subscription's report.
 
-**Rationale:** Apple Home uses the chip pattern in practice (ongoing
-reports receive IM:StatusResponse, not bare MRP ACK — empirically
-verified 2026-05-11 via tcpdump). Switching to matter.js's
-`suppressResponse=true` behaviour could break Apple Home's ReadClient
-flow. Alignment with chip is safer. Revisit if testing shows a specific
-commissioner uses matter.js's path.
+**go-fabric:** the same: a report with data and a keep-alive both go out
+with SuppressResponse false, and the peer's StatusResponse is read (the
+keep-alive since review II, phase 4; the closed findings row "Keep-alive
+reports suppress the response"). What still differs is when an update counts
+as delivered — F-db021da0-36.
 
 **File:** `bridge/subscribe.go:reportSubscription`.
 
