@@ -92,6 +92,9 @@ func TestLabelReconciliation(t *testing.T) {
 		// The label the peer reports is ours: nothing.
 		_ = n.Stop(context.Background())
 		sr.subscribe(t, n, sr.opCredsImage("ours"), 35)
+		// The going-live alive may still start the label reconciliation: the
+		// bubble settles first (see client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		sr.noInvoke(t)
 	})

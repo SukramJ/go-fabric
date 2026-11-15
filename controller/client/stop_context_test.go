@@ -53,6 +53,9 @@ func TestStopReturnsWithItsContextWhileAHookBlocks(t *testing.T) {
 		n := sr.reg.Get("peer1")
 		const id = 0x54
 		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), id)
+		// The going-live alive may still start the label reconciliation: the
+		// bubble settles first (see client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		armed.Store(true)
 

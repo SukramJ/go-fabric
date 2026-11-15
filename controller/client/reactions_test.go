@@ -124,6 +124,9 @@ func TestReactionLeave(t *testing.T) {
 		sr.subscribe(t, n, reports, 33)
 		sr.pushEvents(t, 33, leaveEvent(10, 5), leaveEvent(11, 4))
 		waitUntil(t, "the events", func() bool { sr.hooks.mu.Lock(); defer sr.hooks.mu.Unlock(); return len(sr.hooks.events) == 2 })
+		// The going-live alive may still start the label reconciliation: the
+		// bubble settles first (see client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		if sr.reg.Size() != 1 || !n.IsCommissioned() {
 			t.Fatal("a foreign leave deleted the node")
@@ -192,6 +195,9 @@ func TestReactionStartUp(t *testing.T) {
 		sr.sendOn(t, ch, 0x0102, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7101, ProtocolID: im.InteractionModelProtocolID},
 			dataReport(t, 33, nil, eventReport(uint64(basicinfo.EventStartUp), 40)))
 		waitUntil(t, "the old session's loss", sr.session.IsPeerLost)
+		// The going-live alive may still start the label reconciliation: the
+		// bubble settles first (see client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		if b.IsPeerLost() || b.IsClosed() {
 			t.Fatal("the newest session was lost")
@@ -214,6 +220,9 @@ func TestReactionShutDown(t *testing.T) {
 		b, _ := sr.secondSession(t)
 		sr.pushEvents(t, 33, eventReport(uint64(basicinfo.EventShutDown), 41))
 		waitUntil(t, "the sessions' loss", func() bool { return sr.session.IsPeerLost() && b.IsPeerLost() })
+		// The going-live alive may still start the label reconciliation: the
+		// bubble settles first (see client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		if len(sr.subs.Active()) != 1 || sr.reg.Size() != 1 {
 			t.Fatal("the shutdown closed the subscription or the node")

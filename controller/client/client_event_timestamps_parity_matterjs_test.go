@@ -71,6 +71,9 @@ func TestClientEventNotificationResolvedTimestampsParity(t *testing.T) {
 			defer sr.hooks.mu.Unlock()
 			return len(sr.hooks.data) == 3
 		})
+		// The going-live alive may still start the label reconciliation: the
+		// bubble settles first (see client.WaitRegistry).
+		synctest.Wait()
 		client.WaitRegistry(sr.reg)
 		sr.hooks.mu.Lock()
 		defer sr.hooks.mu.Unlock()
