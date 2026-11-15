@@ -130,6 +130,15 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 // so the two agree. The default subscription a started node held has
 // ended, as after an establishment that failed; the same call again
 // makes the change and establishes the new one.
+//
+// The same holds for the initial read of a newly commissioned node, which
+// runs before the held subscription ends: when it fails, the error is
+// returned and the request is not replaced — the settings, stored ones
+// included, name the previous request, the held subscription stands and
+// the cache keeps its filter. Every error therefore means "not
+// replaced". matter.js runs the same steps in the same order as a state
+// reaction with no caller to tell (NetworkClient.ts:118-128, :131-162 at
+// db021da0); the uniform error contract is this method's own.
 func (n *Node) SetDefaultSubscription(ctx context.Context, o *SubscribeOptions) error {
 	n.subSync.Lock()
 	defer n.subSync.Unlock()
@@ -143,22 +152,25 @@ func (n *Node) SetDefaultSubscription(ctx context.Context, o *SubscribeOptions) 
 	n.saveSettingsLocked()
 	started := n.started && !n.closing
 	n.mu.Unlock()
-	if started {
-		off := false
-		if err := n.syncAutoSubscribeLocked(ctx, &off); err != nil {
-			return err
-		}
-	}
-	if err := n.adoptDefaultFabricFilter(ctx); err != nil {
-		// The adoption did not begin: the request whose filter the cache
-		// still has is the node's again, so a later start or change adopts
-		// from a state that agrees with itself.
+	// notReplaced puts the previous request back: the one whose filter the
+	// cache still has is the node's again, so a later start or change
+	// adopts from a state that agrees with itself.
+	notReplaced := func(err error) error {
 		n.mu.Lock()
 		n.settings.defaultSubscription = before
 		n.saveSettingsLocked()
 		n.mu.Unlock()
 		n.recompute()
 		return err
+	}
+	if started {
+		off := false
+		if err := n.syncAutoSubscribeLocked(ctx, &off); err != nil {
+			return notReplaced(err)
+		}
+	}
+	if err := n.adoptDefaultFabricFilter(ctx); err != nil {
+		return notReplaced(err)
 	}
 	if !started {
 		return nil
