@@ -147,7 +147,7 @@ kernel modules and stay weekly, outside that gate.
   error, a state read on the daemon, or a line of the daemon's log.
   TC-DD-3.12 and TC-DD-3.13 are ports of the pin's version: both start the
   daemon with `--custom-flow 1`, hold it to not having advertised in
-  commissioning mode on every leg, and on the IP leg open its window by the
+  commissioning mode on every leg that runs, and on the IP leg open its window by the
   app pipe's `UserIntentCommissioningStart` before the discriminator check
   and the commissioning. A case
   passed in this role counts as passed in its family — the page states the
