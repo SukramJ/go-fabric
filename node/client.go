@@ -160,7 +160,7 @@ func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 // clientServerConfig serves the node's endpoint tree on a client stack's
 // sessions with the bridge's gates: the bridge's dispatcher of the moment
 // (its ACL, privilege, existence and timed sources; nil before Start, a
-// request then answers Failure), the bridge's element qualities and
+// request then answers Failure), the bridge's codec, element qualities and
 // MaxPathsPerInvoke, and a request context built from the session as the
 // bridge builds it for one of its own — fabric, subject with CATs and our
 // node id (the server's own stamps; a client-stack session is CASE, never
@@ -180,10 +180,18 @@ func (n *Node) clientServerConfig() interaction.ServerConfig {
 	if maxPaths == 0 {
 		maxPaths = im.DefaultMaxPathsPerInvoke
 	}
+	codec := n.br.Codec()
 	return interaction.ServerConfig{
 		Dispatch:          n.br.Dispatcher,
 		Qualities:         n.br.ElementQualities(),
 		MaxPathsPerInvoke: maxPaths,
+		// The bridge's codec: the hand-written servers take their own
+		// request types, which the generated codec does not produce
+		// (review II, wave B round 4).
+		FieldsReader: codec.FieldsReader,
+		FieldsWriter: codec.FieldsWriter,
+		ValueReader:  codec.ValueReader,
+		ValueWriter:  codec.ValueWriter,
 		RequestContext: func(ctx context.Context, s *exchange.Session) context.Context {
 			// The session's identity, which no bridge session shares: the
 			// CSR of a fail-safe binds to it (review II, Fable R2-1).

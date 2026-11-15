@@ -61,6 +61,12 @@ var (
 type SessionLookup interface {
 	// Lookup returns the session for sessionID. The second return is
 	// false when no session is registered.
+	//
+	// It returns the same *channel.Session for a session's whole life: the
+	// pointer is the session's identity to the clusters
+	// (core.WithInvokeSession) — a CSRRequest binds to it and AddNOC must
+	// come on it — so a fresh object per call would leave a CSR that its
+	// own session cannot consume (review II, Fable R3-1b).
 	Lookup(sessionID uint16) (*channel.Session, bool)
 }
 
