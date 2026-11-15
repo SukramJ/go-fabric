@@ -169,3 +169,46 @@ func TestClientStackResumesAcrossARestart(t *testing.T) {
 		t.Fatal("after the restart the node ran a full CASE, want a resumption")
 	}
 }
+
+// TestResumedSessionKeepsTheRecordsParameters: a resumed session renews the
+// record's id and keeps its session parameters — those of the full
+// handshake — whatever the resuming Sigma1 states (review II, Fable P-5a;
+// matter.js re-saves the old record with the new id, CaseServer.ts:213,
+// :219 at db021da0).
+func TestResumedSessionKeepsTheRecordsParameters(t *testing.T) {
+	site := quietSite(t)
+	idle := 900 * time.Millisecond
+	cp := newClientPair(t, site, func(cfg *node.Config) {
+		cfg.Sessions = &node.SessionIntervals{Idle: idle}
+	}, nil)
+	if _, err := cp.connect(t, peer.ConnectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	ctx := parityCtx(t)
+	first, err := cp.b.Node().Store().GetResumptionByPeer(ctx, cp.bFabric.FabricIndex, cp.aFabric.NodeID)
+	if err != nil || first.SessionParameters.SessionIdleInterval != 900 {
+		t.Fatalf("b's record after the full handshake: %+v, %v", first.SessionParameters, err)
+	}
+	// a restarts stating other intervals and resumes.
+	idle = 1200 * time.Millisecond
+	if err := site.Run(ctx, cp.a.Restart); err != nil {
+		t.Fatal(err)
+	}
+	again, err := cp.connect(t, peer.ConnectOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !again.Resumed() {
+		t.Fatal("the second session did not resume")
+	}
+	rec, err := cp.b.Node().Store().GetResumptionByPeer(ctx, cp.bFabric.FabricIndex, cp.aFabric.NodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(rec.ResumptionID) == string(first.ResumptionID) {
+		t.Error("the resumption id was not renewed")
+	}
+	if rec.SessionParameters != first.SessionParameters {
+		t.Errorf("the resumed session rewrote the record's parameters: %+v, want %+v", rec.SessionParameters, first.SessionParameters)
+	}
+}

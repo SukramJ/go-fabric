@@ -876,8 +876,16 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
 				// With the initiator's session parameters, as a CASE client
 				// that resumes from the same record keeps them (review II,
-				// Fable P-5).
+				// Fable P-5). A resumed session keeps the parameters of the
+				// record it resumed from, the id alone renewed — matter.js
+				// re-saves the old record with the new id (CaseServer.ts:213,
+				// :219 at db021da0; Fable P-5a).
 				params, _ := resp.PeerSessionParameters()
+				if info := resp.ResumeInfo(); info.Resumed {
+					if prev, err := sessions.LookupResumption(context.Background(), info.PresentedResumptionID); err == nil {
+						params = prev.SessionParameters
+					}
+				}
 				if err := sessions.PersistResumptionRecord(context.Background(), store.ResumptionRecord{
 					FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
 					CASEAuthTags: peerCATs, SessionParameters: params,

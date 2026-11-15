@@ -1709,7 +1709,7 @@ func idleSince(e *Entry, cutoff time.Time) bool {
 // every resumed session. Wired in daemon.go (matter init) and called
 // from both CASE-onEstablished paths after every successful
 // OpenFromSigmaWithID. Mirrors matter.js
-// packages/protocol/src/session/case/CaseServer.ts:210
+// packages/protocol/src/session/case/CaseServer.ts:219
 // `this.#sessions.saveResumptionRecord(cx.resumptionRecord)`.
 func (m *Manager) PersistResumption(ctx context.Context, fabricIndex uint8, peerNodeID uint64, resumptionID, sharedSecret []byte, peerCATs []uint32) error {
 	return m.PersistResumptionRecord(ctx, store.ResumptionRecord{
