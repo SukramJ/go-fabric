@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8852,
+  "entry_points": 8872,
   "entry_packages": [
     ".",
     "bdx",
@@ -290,8 +290,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18603,
-    "reachable": 12507,
+    "total_exported": 18609,
+    "reachable": 12513,
     "whitelisted": 6096,
     "unreachable": 0
   },
@@ -40077,7 +40077,7 @@
       "identifier": "Eraser",
       "reason": "the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself",
       "file": "store/port.go",
-      "line": 320
+      "line": 323
     },
     {
       "package": "store",
