@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
+	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
@@ -36,6 +37,7 @@ import (
 func init() {
 	for _, c := range []func() goCertCase{
 		caseAPPLAUNCHER371, caseAPPLAUNCHER381, caseAPPLAUNCHER391,
+		caseAUDIOOUTPUT73, caseAUDIOOUTPUT74,
 	} {
 		registerGoCert(c)
 	}
@@ -157,4 +159,64 @@ func caseAPPLAUNCHER381() goCertCase {
 func caseAPPLAUNCHER391() goCertCase {
 	return mediaALauncherCase("TC-APPLAUNCHER-3.9.1", launcherdef.CmdHideApp, "HideApp",
 		launcherdef.HideAppRequest{Application: mediaAKnownApplication()}, "APPLAUNCHER.C.C02.Tx")
+}
+
+// --- AudioOutput -----------------------------------------------------------
+
+// caseAUDIOOUTPUT73 mirrors TC-AUDIOOUTPUT-7.3: SelectOutput to output 2,
+// "An output both THs seed, and not the one they start on" (:15-16).
+func caseAUDIOOUTPUT73() goCertCase {
+	const index = 2 // INDEX (:16)
+	return mediaACase("TC-AUDIOOUTPUT-7.3", 20, "AUDIOOUTPUT.C", "AUDIOOUTPUT.S", dtCastingVideoPlayer,
+		mediaAStep{n: "1", line: 24, title: "DUT sends SelectOutput command to TH", pics: "AUDIOOUTPUT.C.C00.Tx", send: func(th *goTH, n *client.Node, ep uint16) error {
+			if _, err := th.mediaAInvoke(n, ep, outputdef.ClusterID, outputdef.CmdSelectOutput, "SelectOutput",
+				outputdef.SelectOutputRequest{Index: index}, false, client.InvokeOptions{}); err != nil {
+				return err
+			}
+			v, err := th.readValue(n, attrPath(ep, outputdef.ClusterID, outputdef.AttrCurrentOutput))
+			if err != nil {
+				return err
+			}
+			if !isUnsigned(v) || v.El.Uint != index {
+				return fmt.Errorf("CurrentOutput reads %s after SelectOutput %d", describeNode(v), index)
+			}
+			th.note("CurrentOutput %d", index)
+			return nil
+		}},
+	)
+}
+
+// caseAUDIOOUTPUT74 mirrors TC-AUDIOOUTPUT-7.4: RenameOutput of output 1
+// to "Kitchen Speakers" (:15-17), which needs the NameUpdates feature.
+func caseAUDIOOUTPUT74() goCertCase {
+	const (
+		index = 1                  // INDEX (:16)
+		name  = "Kitchen Speakers" // NAME (:17)
+	)
+	return mediaACase("TC-AUDIOOUTPUT-7.4", 21, "AUDIOOUTPUT.C", "AUDIOOUTPUT.S", dtCastingVideoPlayer,
+		mediaAStep{n: "1", line: 25, title: "DUT sends RenameOutput command to TH", pics: "AUDIOOUTPUT.C.C01.Tx", need: "AUDIOOUTPUT.S.F00", send: func(th *goTH, n *client.Node, ep uint16) error {
+			if _, err := th.mediaAInvoke(n, ep, outputdef.ClusterID, outputdef.CmdRenameOutput, "RenameOutput",
+				outputdef.RenameOutputRequest{Index: index, Name: name}, false, client.InvokeOptions{}); err != nil {
+				return err
+			}
+			v, err := th.readValue(n, attrPath(ep, outputdef.ClusterID, outputdef.AttrOutputList))
+			if err != nil {
+				return err
+			}
+			for _, c := range v.Children {
+				var o outputdef.OutputInfoStruct
+				if err := o.DecodeTLV(c); err != nil {
+					return err
+				}
+				if o.Index == index {
+					if o.Name != name {
+						return fmt.Errorf("OutputList entry %d is named %q after RenameOutput %q", index, o.Name, name)
+					}
+					th.note("OutputList entry %d named %q", index, name)
+					return nil
+				}
+			}
+			return fmt.Errorf("OutputList %s has no entry %d", describeNode(v), index)
+		}},
+	)
 }
