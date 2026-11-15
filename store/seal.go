@@ -441,7 +441,7 @@ WHERE sealed = 0`)
 	var aead cipher.AEAD
 	for _, r := range plain {
 		if len(r.node) != 8 || len(r.subject) != 8 {
-			return 0, fmt.Errorf("node id of %d, subject of %d bytes", len(r.node), len(r.subject))
+			return 0, fmt.Errorf("store: icd registration: node id of %d, subject of %d bytes", len(r.node), len(r.subject))
 		}
 		key := r.key
 		if len(key) != icdKeySize {
@@ -451,7 +451,7 @@ WHERE sealed = 0`)
 				}
 			}
 			if key, err = openICDKey(aead, key, icdAAD(r.fabric, binary.BigEndian.Uint64(r.node), binary.BigEndian.Uint64(r.subject))); err != nil {
-				return 0, fmt.Errorf("fabric %d position %d: %w", r.fabric, r.position, err)
+				return 0, fmt.Errorf("store: icd registration of fabric %d at %d: %w", r.fabric, r.position, err)
 			}
 		}
 		sealed, err := s.sealColumn(key, "matter_icd_registrations", "icd_key", r.fabric, r.node, r.subject)
