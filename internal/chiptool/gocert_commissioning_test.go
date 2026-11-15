@@ -20,6 +20,8 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	admincomm "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
+	"github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
+	"github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	gocontroller "github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
@@ -46,7 +48,7 @@ import (
 
 func init() {
 	for _, c := range []func() goCertCase{
-		caseCADMIN11, caseCADMIN12, caseCADMIN17, caseCADMIN18, caseCADMIN118,
+		caseCADMIN11, caseCADMIN12, caseCADMIN17, caseCADMIN18, caseCADMIN118, caseCNET420,
 	} {
 		registerGoCert(c)
 	}
@@ -1229,4 +1231,110 @@ func postRemovalRefusal(err error) error {
 		return nil
 	}
 	return fmt.Errorf("neither a status the removal explains nor a failure to reach the TH within %s: %w", postRemovalTimeout, err)
+}
+
+// --- TC-CNET-4.20 -------------------------------------------------------------
+
+// The Wi-Fi network TC-CNET-4.20 adds (tc-cnet-support.ts:25-26).
+var (
+	cnetWiFiSSID        = []byte("matter-th-ap")
+	cnetWiFiCredentials = []byte("matter-th-passphrase")
+)
+
+// cnetDeclare are the NetworkCommissioning codes of the daemon with
+// --wifi-sim, the CNETWIFI row's composition, as its generated slice states
+// them (testdata/pics-wifi-sim/ep0.txt:510-536); the committed default
+// slices describe the Ethernet composition.
+var cnetDeclare = map[string]string{
+	"CNET.S":         "1",
+	"CNET.S.F00":     "1",
+	"CNET.S.F02":     "0",
+	"CNET.S.C00.Rsp": "1",
+	"CNET.S.C02.Rsp": "1",
+	"CNET.S.C04.Rsp": "1",
+	"CNET.S.C06.Rsp": "1",
+	"CNET.S.C08.Rsp": "1",
+}
+
+// caseCNET420 mirrors TC-CNET-4.20 (cnetClientCase, tc-cnet-support.ts:
+// 133-225): the Go TH sends the Network Commissioning commands to the
+// daemon with --wifi-sim, whose simulated driver knows the case's network
+// (--wifi-sim-ssid, examples/reference-bridge/wifisim.go); each answers
+// NetworkingStatus Success, ArmFailSafe ErrorCode OK.
+func caseCNET420() goCertCase {
+	var node *client.Node
+	var ctrl *gocontroller.Controller
+	bc := func(step uint64) *uint64 { return &step } // each step's number as Breadcrumb (:68-69)
+	send := func(cmd uint32, name string, fields spec.Encodable) func(th *goTH) error {
+		return func(th *goTH) error {
+			from := mark(th)
+			// sendNetworkCommand (:71-91): the answer's NetworkingStatus (tag 0)
+			// is Success.
+			if _, err := th.invoke(node, cmdPath(0, networkcommissioning.ClusterID, cmd), fields, true, client.InvokeOptions{}); err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+			if _, err := awaitTHLine(th, from, certLogTimeout, "msg=matter.rx.im.invoke ", fmt.Sprintf(`req_paths="ep=0 cl=0x0031 cmd=0x%X"`, cmd)); err != nil {
+				return fmt.Errorf("TH received %s: %w", name, err)
+			}
+			th.note("%s NetworkingStatus=0; the TH received it", name)
+			return nil
+		}
+	}
+	return goCertCase{
+		tc: "TC-CNET-4.20", line: 9, pics: []string{"CNET.C.F00"},
+		daemonArgs: []string{"--wifi-sim", "--wifi-sim-ssid", string(cnetWiFiSSID) + ":" + string(cnetWiFiCredentials)},
+		declare:    cnetDeclare,
+		finalize: func(th *goTH) {
+			// The cleanup's CommissioningComplete, then decommissionAll
+			// (:212-224).
+			if node != nil {
+				_, _ = th.invoke(node, cmdPath(0, generalcommissioning.ClusterID, generalcommissioning.CmdCommissioningComplete), nil, false, client.InvokeOptions{})
+				_ = ctrl.Registry().Decommission(th.ctx, node)
+			}
+		},
+		steps: []goStep{
+			{n: "0", line: 144, file: "tc-cnet-support.ts", title: "Preconditions: the DUT commissions the TH", run: func(th *goTH) error {
+				from := mark(th)
+				var err error
+				if ctrl, node, err = th.commission("dut"); err != nil {
+					return err
+				}
+				if _, err := awaitTHLine(th, from, ddCommissioningLogTimeout, logCommissioned); err != nil {
+					return err
+				}
+				th.note("commissioned; the TH logged its CommissioningComplete answered")
+				return nil
+			}},
+			{
+				n: "1", line: 147, file: "tc-cnet-support.ts", title: "DUT sends the ScanNetwork command to the TH", pics: "CNET.C.C00.Tx",
+				run: send(networkcommissioning.CmdScanNetworks, "scanNetworks", networkcommissioning.ScanNetworksRequest{Breadcrumb: bc(1)}),
+			},
+			{n: "2", line: 153, file: "tc-cnet-support.ts", title: "DUT sends the ArmFailSafe command to the TH", run: func(th *goTH) error {
+				// FAIL_SAFE_SECONDS 60 (:22), Breadcrumb 2; ErrorCode (tag 0) OK.
+				if _, err := th.invoke(node, cmdPath(0, generalcommissioning.ClusterID, generalcommissioning.CmdArmFailSafe),
+					generalcommissioning.ArmFailSafeRequest{ExpiryLengthSeconds: 60, Breadcrumb: 2}, true, client.InvokeOptions{}); err != nil {
+					return fmt.Errorf("armFailSafe: %w", err)
+				}
+				th.note("armFailSafe ErrorCode=0")
+				return nil
+			}},
+			{
+				n: "3", line: 186, file: "tc-cnet-support.ts", title: "DUT sends the AddOrUpdateWiFiNetwork command to the TH", pics: "CNET.C.C02.Tx",
+				run: send(networkcommissioning.CmdAddOrUpdateWiFiNetwork, "addOrUpdateWiFiNetwork",
+					networkcommissioning.AddOrUpdateWiFiNetworkRequest{Ssid: cnetWiFiSSID, Credentials: cnetWiFiCredentials, Breadcrumb: bc(3)}),
+			},
+			{
+				n: "4", line: 192, file: "tc-cnet-support.ts", title: "DUT sends the ConnectNetwork command to the TH", pics: "CNET.C.C06.Tx",
+				run: send(networkcommissioning.CmdConnectNetwork, "connectNetwork", networkcommissioning.ConnectNetworkRequest{NetworkId: cnetWiFiSSID, Breadcrumb: bc(4)}),
+			},
+			{
+				n: "5", line: 198, file: "tc-cnet-support.ts", title: "DUT sends the ReorderNetwork command to the TH", pics: "CNET.C.C08.Tx",
+				run: send(networkcommissioning.CmdReorderNetwork, "reorderNetwork", networkcommissioning.ReorderNetworkRequest{NetworkId: cnetWiFiSSID, NetworkIndex: 0, Breadcrumb: bc(5)}),
+			},
+			{
+				n: "6", line: 206, file: "tc-cnet-support.ts", title: "DUT sends the RemoveNetwork command to the TH", pics: "CNET.C.C04.Tx",
+				run: send(networkcommissioning.CmdRemoveNetwork, "removeNetwork", networkcommissioning.RemoveNetworkRequest{NetworkId: cnetWiFiSSID, Breadcrumb: bc(6)}),
+			},
+		},
+	}
 }
