@@ -14,40 +14,9 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
-// validateSetCredential is the request validation matter.js runs before
-// setCredential, remapped to INVALID_COMMAND (DoorLockServer.ts:1494-1511):
-// the enum constraints and UserIndex "1 to numberOfTotalUsersSupported".
-func (s *DoorLockServer) validateSetCredential(req lockdef.SetCredentialRequest) error {
-	if err := s.checkEnum("OperationType", lockdef.DataOperationTypeEnumDef, uint64(req.OperationType), dataOperationAddModify...); err != nil {
-		return err
-	}
-	if err := s.checkEnum("CredentialType", lockdef.CredentialTypeEnumDef, uint64(req.Credential.CredentialType)); err != nil {
-		return err
-	}
-	if !req.UserIndex.Null {
-		if maxUsers, _ := s.uint16Attr(lockdef.AttrNumberOfTotalUsersSupported); req.UserIndex.Value > maxUsers {
-			return spec.Errorf(im.StatusInvalidCommand, "lock: UserIndex %d is outside 1 to %d", req.UserIndex.Value, maxUsers)
-		}
-	}
-	if !req.UserStatus.Null {
-		if err := s.checkEnum("UserStatus", lockdef.UserStatusEnumDef, uint64(req.UserStatus.Value), requestUserStatuses...); err != nil {
-			return err
-		}
-	}
-	if !req.UserType.Null {
-		if err := s.checkEnum("UserType", lockdef.UserTypeEnumDef, uint64(req.UserType.Value), setCredentialUserTypes...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *DoorLockServer) handleSetCredential(ctx context.Context, fields any) (any, error) {
 	req, err := requestAs[lockdef.SetCredentialRequest](fields)
 	if err != nil {
-		return nil, err
-	}
-	if err := s.validateSetCredential(req); err != nil {
 		return nil, err
 	}
 	s.op.Lock()

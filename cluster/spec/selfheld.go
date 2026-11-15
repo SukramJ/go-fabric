@@ -203,15 +203,20 @@ func (h *SelfHeld) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	h.srv.SetMatterEventEmitter(emitter)
 }
 
-// InvokeHeld is a self-held server's MatterInvoke: the host's handler of
-// cmdID when one is registered ([SelfHeld.Handle]), the store's — the
-// server's own logic — otherwise. It is a function rather than a method so
-// that embedding [SelfHeld] promotes no second invoke onto the server.
+// InvokeHeld is a self-held server's MatterInvoke: the request is held to
+// the definition first, as [Server.MatterInvoke] holds it, then the
+// host's handler of cmdID runs when one is registered ([SelfHeld.Handle]),
+// the store's — the server's own logic — otherwise. It is a function
+// rather than a method so that embedding [SelfHeld] promotes no second
+// invoke onto the server.
 func InvokeHeld(ctx context.Context, h *SelfHeld, cmdID uint32, fields any) (any, error) {
+	if err := h.srv.admitRequest(ctx, cmdID, fields, h.srv.peers); err != nil {
+		return nil, err
+	}
 	if resp, handled, err := h.host.invoke(ctx, cmdID, fields, h.srv.peers); handled {
 		return resp, err
 	}
-	return h.srv.MatterInvoke(ctx, cmdID, fields)
+	return h.srv.dispatch(ctx, cmdID, fields)
 }
 
 // RequestOf returns a decoded request payload as the generated request

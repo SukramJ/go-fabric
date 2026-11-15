@@ -657,13 +657,24 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 
 // MatterInvoke implements [contract.ClusterServer]: an accepted command
 // goes to its handler; one not accepted, or accepted without a handler,
-// is UNSUPPORTED_COMMAND. A response that breaks its fields' types,
-// constraints or conformance — a field mandatory by the request's
-// ("TestRequest.Enable") left out — is FAILURE ([Instance.checkResponse]).
-// The request is the handler's to judge: the module's servers answer a
-// request field outside its constraint with the status matter.js's
-// behavior answers.
+// is UNSUPPORTED_COMMAND. Before the handler the request is held to the
+// definition ([Instance.CheckRequest]): its types and constraints refuse
+// it, and the model's further checks refuse it where the command states a
+// refusal ([RequestCheck]), else they are logged and the handler runs —
+// for a generated definition the decoder has held the types and
+// constraints already, before the server ran (decision 64). A response
+// that breaks its fields' types, constraints or conformance — a field
+// mandatory by the request's ("TestRequest.Enable") left out — is FAILURE
+// ([Instance.checkResponse]).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if err := s.admitRequest(ctx, cmdID, fields, s.peers); err != nil {
+		return nil, err
+	}
+	return s.dispatch(ctx, cmdID, fields)
+}
+
+// dispatch runs the handler of an admitted request ([Server.MatterInvoke]).
+func (s *Server) dispatch(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	s.mu.Lock()
 	fn := s.handlers[cmdID]
 	s.mu.Unlock()

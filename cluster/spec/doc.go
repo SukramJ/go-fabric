@@ -14,7 +14,10 @@
 // checked (ValueValidator), how a payload is encoded (TlvOfModel). Here the
 // generated half lives in one package per cluster under cluster/spec/
 // (written by script/clustergen from parity/schema.json, never by hand), and
-// this package is the matter.js machinery those definitions plug into:
+// this package is the machinery those definitions plug into. A definition
+// written by hand — a vendor cluster — is a supported input too: its
+// requests are held to it before any handler ([Instance.CheckRequest]),
+// as a generated one's are ([Register]):
 //
 //   - [Cluster] and its parts: ids, typed enum / bitmap / struct metadata,
 //     the conformance of every element as matter.js's AST, access, quality

@@ -264,8 +264,10 @@ func TestDoorLockServerParity(t *testing.T) {
 		f := createLock(t, nil)
 		// matter.js calls the local agent, whose request skips the command's
 		// constraint and the state's enum validation refuses the user (:800).
-		// The Go server validates the field itself, so the port asks over the
-		// wire and the local call alike: INVALID_COMMAND naming the value.
+		// The Go server's request gate validates the field before any
+		// handler (spec.Instance.CheckRequest, the command's stated refusal),
+		// so the port asks over the wire and the local call alike:
+		// INVALID_COMMAND naming the value.
 		req := addPin(1, "1234", noUser)
 		req.UserType = spec.ValueOf(lockdef.UserTypeEnum(99))
 		se := f.refused(lockdef.CmdSetCredential, req)
