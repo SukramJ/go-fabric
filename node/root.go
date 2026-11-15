@@ -235,32 +235,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	opCreds := r.OperationalCredentials
 
-	// The fail-safe hooks between the two clusters (wiring.go:184-200 at b4ea1f96^).
-	// A fresh fail-safe context starts before its arm is recorded, so an
-	// arm from a fabric whose earlier rollback it lands arms nothing
-	// (review II, R2-P2-dr-noc-04).
 	without := cfg.withoutFailSafeHooks
-	if !without.has(failSafeHookStarting) {
-		generalCom.SetOnFailSafeStarting(opCreds.PrepareFreshFailSafe)
-	}
-	// CommissioningComplete commits the fabric row the fail-safe's NOC
-	// command wrote, as its last store write (owner decision 36); a Wi-Fi
-	// node stores its network list before it (below).
-	if !without.has(failSafeHookCommit) {
-		generalCom.SetFailSafeCommit(opCreds.CommitFailSafe)
-	}
-	// The topology's fail-safe participants revert after the root's own
-	// rollback (failsafe.go).
-	participants := d.onFailSafeExpired
-	expired := func(ctx context.Context, fi uint8) {
-		if !without.has(failSafeHookExpiry) {
-			opCreds.OnFailSafeExpiry(ctx, fi)
-		}
-		if participants != nil {
-			participants(ctx, fi)
-		}
-	}
-	generalCom.SetOnFailSafeExpired(expired)
+	expired := wireFailSafeHooks(generalCom, opCreds, d.onFailSafeExpired, without)
 
 	deviceTypes := []mattercore.DeviceTypeStruct{{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeRootNode))}}
 	if cfg.OTA != nil {
@@ -765,6 +741,35 @@ func newGeneralCommissioning(ctx context.Context, d rootDeps) (*mattercore.Gener
 		d.logger.Warn("node.terms.restore", slog.Any("err", err))
 	}
 	return gc, nil
+}
+
+// wireFailSafeHooks wires the fail-safe hooks between the two clusters
+// (wiring.go:184-200 at b4ea1f96^) but those without names, and returns
+// the expiry handler it installed, which a Wi-Fi node extends. A fresh
+// fail-safe context starts before its arm is recorded, so an arm from a
+// fabric whose earlier rollback it lands arms nothing (review II,
+// R2-P2-dr-noc-04). CommissioningComplete commits the fabric row the
+// fail-safe's NOC command wrote, as its last store write (owner decision
+// 36); a Wi-Fi node stores its network list before it (buildRoot). The
+// topology's fail-safe participants revert after the root's own rollback
+// (failsafe.go).
+func wireFailSafeHooks(generalCom *mattercore.GeneralCommissioning, opCreds *mattercore.OperationalCredentials, participants func(ctx context.Context, fabricIndex uint8), without failSafeHooks) func(ctx context.Context, fabricIndex uint8) {
+	if !without.has(failSafeHookStarting) {
+		generalCom.SetOnFailSafeStarting(opCreds.PrepareFreshFailSafe)
+	}
+	if !without.has(failSafeHookCommit) {
+		generalCom.SetFailSafeCommit(opCreds.CommitFailSafe)
+	}
+	expired := func(ctx context.Context, fi uint8) {
+		if !without.has(failSafeHookExpiry) {
+			opCreds.OnFailSafeExpiry(ctx, fi)
+		}
+		if participants != nil {
+			participants(ctx, fi)
+		}
+	}
+	generalCom.SetOnFailSafeExpired(expired)
+	return expired
 }
 
 // failSafeHooks names fail-safe hooks between GeneralCommissioning and
