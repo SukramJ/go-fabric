@@ -536,7 +536,11 @@ func (n *Node) openStores(ctx context.Context) error {
 			return fmt.Errorf("node: apply endpoint schema: %w", err)
 		}
 		if n.st == nil {
-			n.st = store.New(sc.DB)
+			st, err := openCredentials(ctx, sc)
+			if err != nil {
+				return err
+			}
+			n.st = st
 			n.builtCredentials = true
 		}
 		if sc.Endpoints == nil {
@@ -545,6 +549,19 @@ func (n *Node) openStores(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// openCredentials builds the credential store on sc.DB, sealed with
+// sc.Sealer when one is set (store.NewSealed; the schema is applied).
+func openCredentials(ctx context.Context, sc Store) (*store.Store, error) {
+	if sc.Sealer == nil {
+		return store.New(sc.DB), nil
+	}
+	st, err := store.NewSealed(ctx, sc.DB, sc.Sealer)
+	if err != nil {
+		return nil, fmt.Errorf("node: open the sealed store: %w", err)
+	}
+	return st, nil
 }
 
 // abandon releases what a New that failed had begun: the node's

@@ -138,10 +138,14 @@ key set row of the wrong length left by an earlier release is left out of
 `ListGroupKeySets`, so the fabric's other key sets stay usable. Migration v10's `Down` refuses a database
 that holds a sealed row.
 
-Wiring: apply the schema (`store.Apply`), build the store with
-`store.NewSealed`, and hand it to the node as `node.Store{DB: db,
-Credentials: sealed}`. Provisioning and rotating the key are the host's;
-the module rotates nothing. The controller's store — its CA key, its node
+Wiring: set `node.Store.Sealer` beside `Path` or `DB` — the node applies
+the schema, opens its credential store with `store.NewSealed` and `New`
+returns its error. A host that builds the store itself applies the schema
+(`store.Apply`), calls `store.NewSealed` and hands the store over as
+`node.Store{DB: db, Credentials: sealed}` (then without `Sealer`). A wrong
+key is not seen at `New`: it is `store.ErrUnseal` at the first read of a
+sealed secret, and no sealer `store.ErrNoSealer`. Provisioning and rotating
+the key are the host's; the module rotates nothing. The controller's store — its CA key, its node
 records — is not sealed.
 
 *Source: `store/seal.go` (`Sealer`, `AESGCMSealer`, `NewSealed`;

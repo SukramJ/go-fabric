@@ -673,6 +673,16 @@ type Store struct {
 	// the file they live in: on the host's own database the deleted bytes
 	// may stay in it until the host runs [store.Scrub] on that file.
 	Endpoints endpoint.Store
+	// Sealer seals the secrets of the credential store the node builds on
+	// DB or Path (opt-in): New applies the schema (store.Apply) and opens
+	// the store with store.NewSealed, which seals the clear rows it finds
+	// and scrubs the file; New returns its error. The key must live
+	// outside the database (docs/security.md, "Sealing at rest"). Every
+	// later start needs the same sealer: without one a sealed secret
+	// reads as store.ErrNoSealer, under another key as store.ErrUnseal —
+	// at the first read of a sealed secret, not at New. It excludes
+	// Credentials (an override is sealed by the host that built it).
+	Sealer store.Sealer
 }
 
 // Attestation is the device attestation material.
@@ -843,6 +853,8 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("node: Store takes Path or DB, not both"))
 	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
 		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
+	case c.Store.Sealer != nil && (c.Store.Credentials != nil || (c.Store.Path == "" && c.Store.DB == nil)):
+		errs = append(errs, errors.New("node: Store.Sealer seals the store the node builds on Path or DB; it excludes Credentials"))
 	}
 	// A mode that is none of warn, strict and off fails the node's
 	// construction. Mirrors matter.js
