@@ -116,26 +116,36 @@ func TestParityMatterJS_Spake2_Vectors(t *testing.T) {
 	t.Parallel()
 	vecs := loadMatterJSVectors(t)
 
+	cases := map[string]func(*testing.T, matterJSVector){
+		"ietf_draft01_compute_X":                   testComputeX,
+		"ietf_draft01_compute_Y":                   testComputeY,
+		"ietf_draft01_shared_secret_and_verifiers": testSharedSecretAndVerifiers,
+		"pase_leading_zero_w0_pbkdf":               testPBKDF,
+		"pase_successful_process_pbkdf":            testPBKDF,
+		"pase_successful_process_verifier":         testComputeYAndVerifier,
+	}
+	// Every vector names a case and every case has its vector: a renamed
+	// label or an emptied file fails here instead of dropping a security
+	// parity case unseen (review II, R2-P5-tassert-01).
+	ran := map[string]bool{}
 	for _, v := range vecs {
+		run, ok := cases[v.Label]
+		if !ok {
+			t.Fatalf("vector %q has no case in this test", v.Label)
+		}
+		if ran[v.Label] {
+			t.Fatalf("vector %q appears twice", v.Label)
+		}
+		ran[v.Label] = true
 		t.Run(v.Label, func(t *testing.T) {
 			t.Parallel()
-			switch v.Label {
-			case "ietf_draft01_compute_X":
-				testComputeX(t, v)
-			case "ietf_draft01_compute_Y":
-				testComputeY(t, v)
-			case "ietf_draft01_shared_secret_and_verifiers":
-				testSharedSecretAndVerifiers(t, v)
-			case "pase_leading_zero_w0_pbkdf":
-				testPBKDF(t, v)
-			case "pase_successful_process_pbkdf":
-				testPBKDF(t, v)
-			case "pase_successful_process_verifier":
-				testComputeYAndVerifier(t, v)
-			default:
-				t.Skipf("unknown vector label %q", v.Label)
-			}
+			run(t, v)
 		})
+	}
+	for label := range cases {
+		if !ran[label] {
+			t.Errorf("case %q has no vector in testdata/matterjs-vectors.json", label)
+		}
 	}
 }
 
