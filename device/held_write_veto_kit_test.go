@@ -5,7 +5,7 @@ package device_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"reflect"
 	"testing"
@@ -72,7 +72,7 @@ func TestHeldValueWriteReachesNoVetoInTheKit(t *testing.T) {
 					continue
 				}
 				calls := 0
-				setter.SetBeforeWrite(func(context.Context, uint32, any) error { calls++; return fmt.Errorf("veto") })
+				setter.SetBeforeWrite(func(context.Context, uint32, any) error { calls++; return errors.New("veto") })
 				_ = srv.MatterWrite(context.Background(), id, w)
 				setter.SetBeforeWrite(nil)
 				checked++
