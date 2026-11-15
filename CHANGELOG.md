@@ -175,6 +175,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `thermo.ThermostatServer.SetMeasuredTemperature`, `ThermostatServer.MatterDropFabric`, `MatterHeldFabrics`. (review II).
 - `contract.FabricScopeDeclarer` and `contract.FabricScope`: a server of a cluster outside the schema snapshot declares its lists' fabric scope; `spec.Instance` declares its definition's (review II, owner decision 113).
 - `schema.AttributeFabricScope`, `schema.EventReadScope`, `schema.ClusterEventScope`; `im.FabricScope`, `im.ReadResult.FabricScope`, `im.AttributeReport.FabricScope`, `im.MaskFabricScoped` (review II, owner decision 110).
+- `examples/reference-bridge`: `--custom-flow N` (0..2) sets the commissioning flow; with 1 (User Intent) the daemon opens no window at start, and the app pipe's `UserIntentCommissioningStart` opens it; TC-DD-3.12 and TC-DD-3.13 are ported at the pin (review II, owner decision 96).
 
 ### Changed
 
