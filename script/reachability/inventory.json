@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8785,
+  "entry_points": 8792,
   "entry_packages": [
     ".",
     "bdx",
@@ -289,9 +289,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18543,
+    "total_exported": 18547,
     "reachable": 12492,
-    "whitelisted": 6051,
+    "whitelisted": 6055,
     "unreachable": 0
   },
   "by_package": [],
@@ -4993,6 +4993,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
       "line": 601
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPaseRefusalEndsTheTranscript",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_transcript_after_refusal_test.go",
+      "line": 25
     },
     {
       "package": "bridge",
@@ -35341,10 +35348,31 @@
     },
     {
       "package": "internal/chiptool",
+      "identifier": "TestWorkflowFilterVerdict",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/workflow_verdict_test.go",
+      "line": 217
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestWorkflowGateVerdict",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/workflow_verdict_test.go",
+      "line": 166
+    },
+    {
+      "package": "internal/chiptool",
       "identifier": "TestWorkflowGoCertGroups",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/gocert_select_test.go",
       "line": 97
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestWorkflowGoCertStepVerdict",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/workflow_verdict_test.go",
+      "line": 114
     },
     {
       "package": "internal/chiptool",
