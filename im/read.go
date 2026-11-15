@@ -179,7 +179,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 			}
 			req.EventFilters = filters
 		case tagReadReqFabricFiltered:
-			if req.FabricFiltered, err = boolField(el); err != nil {
+			if req.FabricFiltered, err = requestBoolField(el, "FabricFiltered"); err != nil {
 				return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 			}
 			hasFabricFiltered = true
@@ -291,10 +291,12 @@ func readAttributePathField(dec *tlv.Decoder, el tlv.Element, p *ConcreteAttribu
 		// TlvUInt32, TlvAttributePath.ts:28.
 		p.WildcardFilterConfigurationVersion, err = uint32Field(el)
 		p.HasWildcardFilterConfigurationVersion = true
+	case tagAttrPathEnableTagCompression:
+		// An encoder-side optimisation a receiver may ignore (§A.7), but
+		// typed: TlvOptionalField(0, TlvBoolean), TlvAttributePath.ts:21.
+		_, err = requestBoolField(el, "EnableTagCompression")
 	default:
-		// EnableTagCompression and unknown tags: an encoder-side
-		// optimisation a receiver may ignore (§A.7), and forward
-		// compatibility.
+		// Unknown tags: forward compatibility.
 		err = skipField(dec, el)
 	}
 	return err

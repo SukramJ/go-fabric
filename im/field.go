@@ -67,6 +67,29 @@ func boolField(el tlv.Element) (bool, error) {
 	return el.Bool, nil
 }
 
+// requestBoolField returns el's value when el is a boolean. A request
+// field of another TLV type fails the decode with a plain error, which
+// carries no status, so the bridge answers it FAILURE
+// (bridge.replyDecodeError). Mirrors matter.js at db021da0:
+// packages/types/src/tlv/TlvBoolean.ts:22-24 throws UnexpectedDataError for
+// any element that is not a boolean, TlvObject.ts:222 decodes every known
+// field through it, and InteractionMessenger.handleRequest answers an error
+// that carries no status with Status.Failure
+// (packages/protocol/src/interaction/InteractionMessenger.ts:425-460;
+// UnexpectedDataError is a plain MatterError,
+// packages/general/src/MatterError.ts:188). The fields:
+// TlvReadRequest.ts:30, TlvSubscribeRequest.ts:21, :39,
+// TlvInvokeRequest.ts:19, :22, TlvWriteRequest.ts:18, :21, :25 (under
+// packages/types/src/protocol/messages/), TlvAttributePath.ts:21 and
+// TlvEventPath.ts:22 (under packages/types/src/protocol/types/). The
+// response decoders keep [boolField].
+func requestBoolField(el tlv.Element, name string) (bool, error) {
+	if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
+		return false, fmt.Errorf("%s (tag %d) not a boolean: TLV type 0x%02X", name, fieldTag(el), uint8(el.Type))
+	}
+	return el.Bool, nil
+}
+
 // uintField returns el's value when el is an unsigned integer of at most
 // maxValue. A path or header integer is never masked into range: an
 // out-of-range value would become a different, valid path.
