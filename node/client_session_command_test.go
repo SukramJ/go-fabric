@@ -24,7 +24,7 @@ import (
 // the device's server-stack sessions with the controller and has the
 // device open a session to the controller from its client stack: the
 // controller's commands then arrive on the session the device opened.
-func controllerOnClientSession(t *testing.T) (*fabrictest.Pair, handshake.PeerAddress) {
+func controllerOnClientSession(t *testing.T) (p *fabrictest.Pair, ctlAddr handshake.PeerAddress) {
 	t.Helper()
 	ctx := parityCtx(t)
 	site := tcpSite(t)
@@ -32,11 +32,11 @@ func controllerOnClientSession(t *testing.T) (*fabrictest.Pair, handshake.PeerAd
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{light}, Configure: func(cfg *node.Config) {
+	p = site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{light}, Configure: func(cfg *node.Config) {
 		cfg.Client = &node.ClientConfig{}
 	}}})
 	fabric := oneFabric(t, p.Device)
-	ctlAddr := handshake.PeerAddress{FabricIndex: fabric.FabricIndex, NodeID: p.Controller.Fabric().RootNodeID}
+	ctlAddr = handshake.PeerAddress{FabricIndex: fabric.FabricIndex, NodeID: p.Controller.Fabric().RootNodeID}
 	if err := site.Run(ctx, func(ctx context.Context) error {
 		p.Device.Node().Sessions().CloseAllGraceful(time.Now().Add(time.Second))
 		pr, err := p.Device.Node().Peers().For(ctlAddr)
