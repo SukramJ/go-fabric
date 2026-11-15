@@ -6,6 +6,7 @@ package spec
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -303,6 +304,13 @@ type Attribute struct {
 	// written value, as [Field.Relaxed] for a field: the server judges it,
 	// the definition holds it to its type's width only.
 	Relaxed string
+	// QuietInterval is the minimum time between two reports of a quieter
+	// ("Q") attribute — written by script/clustergen from its table, one
+	// second unless the cluster's server sets another; zero for an
+	// attribute without the quality. [Server] throttles the attribute's
+	// reports with it ([cluster.Quieter]), and a self-held server reads the
+	// same number.
+	QuietInterval time.Duration
 	// Decode decodes a value of the attribute into the generated type —
 	// for an attribute whose value is a struct (the struct) or a list of
 	// structs (a [List]), TLV null nil for a nullable one; nil for any

@@ -14,6 +14,8 @@
 package rvcoperationalstate
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -396,12 +398,13 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrCountdownTime, Name: "CountdownTime",
-			Type:        spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
-			Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "max 259200", Max: &spec.Bound{Int: 259200}},
-			Default:     spec.NullDefault{},
+			Type:          spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
+			Conformance:   spec.Conformance{Text: "O", Op: spec.ConfOptional},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "max 259200", Max: &spec.Bound{Int: 259200}},
+			Default:       spec.NullDefault{},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrOperationalStateList, Name: "OperationalStateList",

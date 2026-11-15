@@ -14,6 +14,8 @@
 package deviceenergymanagement
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -944,19 +946,21 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrPowerAdjustmentCapability, Name: "PowerAdjustmentCapability",
-			Type:        spec.Type{Name: "PowerAdjustCapabilityStruct", Kind: spec.KindStruct, Struct: PowerAdjustCapabilityStructDef},
-			Conformance: spec.Conformance{Text: "PA", Op: spec.ConfName, Name: "PA"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Decode:      decodeAttrPowerAdjustmentCapability,
+			Type:          spec.Type{Name: "PowerAdjustCapabilityStruct", Kind: spec.KindStruct, Struct: PowerAdjustCapabilityStructDef},
+			Conformance:   spec.Conformance{Text: "PA", Op: spec.ConfName, Name: "PA"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: time.Second,
+			Decode:        decodeAttrPowerAdjustmentCapability,
 		},
 		{
 			ID: AttrForecast, Name: "Forecast",
-			Type:        spec.Type{Name: "ForecastStruct", Kind: spec.KindStruct, Struct: ForecastStructDef},
-			Conformance: spec.Conformance{Text: "PFR | SFR", Op: spec.ConfOr, Args: []spec.Conformance{{Op: spec.ConfName, Name: "PFR"}, {Op: spec.ConfName, Name: "SFR"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Decode:      decodeAttrForecast,
+			Type:          spec.Type{Name: "ForecastStruct", Kind: spec.KindStruct, Struct: ForecastStructDef},
+			Conformance:   spec.Conformance{Text: "PFR | SFR", Op: spec.ConfOr, Args: []spec.Conformance{{Op: spec.ConfName, Name: "PFR"}, {Op: spec.ConfName, Name: "SFR"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: time.Second,
+			Decode:        decodeAttrForecast,
 		},
 		{
 			ID: AttrOptOutState, Name: "OptOutState",

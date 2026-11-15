@@ -176,6 +176,9 @@ func generate(snap *snapshot, name string) (out *output, err error) {
 	if err := g.relax(); err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
 	}
+	if err := g.checkQuiet(); err != nil {
+		return nil, fmt.Errorf("%s: %w", c.Name, err)
+	}
 	src, err := g.source()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
@@ -568,12 +571,22 @@ func (g *generator) source() ([]byte, error) {
 	w.p("// bridge decodes the cluster's request payloads.")
 	w.p("package %s", g.pkg)
 	w.p("")
-	if g.encodes() {
+	switch {
+	case g.quieter():
+		w.p("import (")
+		w.p("\t\"time\"")
+		w.p("")
+		w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
+		if g.encodes() {
+			w.p("\t\"github.com/SukramJ/go-fabric/tlv\"")
+		}
+		w.p(")")
+	case g.encodes():
 		w.p("import (")
 		w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 		w.p("\t\"github.com/SukramJ/go-fabric/tlv\"")
 		w.p(")")
-	} else {
+	default:
 		w.p("import \"github.com/SukramJ/go-fabric/cluster/spec\"")
 	}
 	w.p("")
@@ -1336,6 +1349,9 @@ func (g *generator) writeAttribute(w *writer, a *element) {
 	}
 	if r := g.attrRelaxed[a.ID]; r != "" {
 		w.p("\t\t\tRelaxed: %q,", r)
+	}
+	if d := g.quietInterval(a); d > 0 {
+		w.p("\t\t\tQuietInterval: %s,", durationLiteral(d))
 	}
 	if g.attrDecoder(a) != "" {
 		w.p("\t\t\tDecode: decodeAttr%s,", exportName(a.Name))

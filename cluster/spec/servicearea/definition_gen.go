@@ -14,6 +14,8 @@
 package servicearea
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -483,11 +485,12 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrEstimatedEndTime, Name: "EstimatedEndTime",
-			Type:        spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32},
-			Conformance: spec.Conformance{Text: "[CurrentArea]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "CurrentArea"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Default:     spec.NullDefault{},
+			Type:          spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32},
+			Conformance:   spec.Conformance{Text: "[CurrentArea]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "CurrentArea"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			Default:       spec.NullDefault{},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrProgress, Name: "Progress",

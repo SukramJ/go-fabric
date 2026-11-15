@@ -1403,8 +1403,13 @@ func (s *EvseServer) Close() {
 // so the server neither disables the supply nor tells its host or emits
 // an event afterwards. The server stays usable: the next EnableCharging or
 // EnableDischarging arms the timer again, and so does the
-// [EvseServer.SetEndpoint] of a reassembly that puts the server back.
-func (s *EvseServer) MatterQuiesce() { s.Close() }
+// [EvseServer.SetEndpoint] of a reassembly that puts the server back. The
+// store's quieter attributes drop a held report as well
+// ([spec.Server.MatterQuiesce]).
+func (s *EvseServer) MatterQuiesce() {
+	s.Close()
+	s.srv.MatterQuiesce()
+}
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *EvseServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
@@ -1417,6 +1422,13 @@ func (s *EvseServer) MatterDataVersion() uint32 { return s.srv.MatterDataVersion
 // OnAttributeChange implements [contract.AttributeChangeNotifier].
 func (s *EvseServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
 	return s.srv.OnAttributeChange(cb)
+}
+
+// OnAttributeReport implements [contract.AttributeReportNotifier]: the
+// changes that go on the wire, a quieter attribute's (SessionDuration,
+// SessionEnergyCharged, SessionEnergyDischarged) by its throttle.
+func (s *EvseServer) OnAttributeReport(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeReport(cb)
 }
 
 // MatterRead resolves an attribute.

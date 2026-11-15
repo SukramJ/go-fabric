@@ -14,6 +14,8 @@
 package closurecontrol
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -465,12 +467,13 @@ var Definition = &spec.Cluster{
 	Attributes: []spec.Attribute{
 		{
 			ID: AttrCountdownTime, Name: "CountdownTime",
-			Type:        spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
-			Conformance: spec.Conformance{Text: "[PS & !IS]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "PS"}, {Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IS"}}}}}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "max 259200", Max: &spec.Bound{Int: 259200}},
-			Default:     spec.NullDefault{},
+			Type:          spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
+			Conformance:   spec.Conformance{Text: "[PS & !IS]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "PS"}, {Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IS"}}}}}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "max 259200", Max: &spec.Bound{Int: 259200}},
+			Default:       spec.NullDefault{},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrMainState, Name: "MainState",

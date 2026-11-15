@@ -13,6 +13,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -109,6 +110,9 @@ type ServerConfig struct {
 	// until [Server.Handle] registers one: the lists name the commands the
 	// server implements.
 	Handlers map[uint32]CommandHandler
+	// Clock is the time source of the quieter attributes' report throttles
+	// ([Attribute.QuietInterval]); nil is [clock.System].
+	Clock clock.Clock
 	// Unimplemented marks every accepted command Handlers leaves out as
 	// the generated behavior's unimplemented one (matter.js
 	// Behavior.unimplemented): construction does not fail on a mandatory
@@ -166,6 +170,10 @@ type Server struct {
 	// ([Server.unimplementedLocked]), a stub or not.
 	stubs   []uint32
 	emitter contract.EventEmitter
+
+	// quiet holds the report throttle of every served quieter attribute,
+	// by id; set at construction, read-only after.
+	quiet map[uint32]*quietAttr
 }
 
 // Compile-time assertions.
@@ -182,6 +190,8 @@ var (
 	_ contract.TimedCommander                 = (*Server)(nil)
 	_ contract.AttributeChangeNotifier        = (*Server)(nil)
 	_ contract.EventReceiver                  = (*Server)(nil)
+	_ contract.AttributeReportNotifier        = (*Server)(nil)
+	_ contract.ClusterQuiescer                = (*Server)(nil)
 )
 
 // NewServer binds def to opts as [New] does and returns a server holding
@@ -210,6 +220,7 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 		rule:        cfg.WriteRule,
 		beforeWrite: cfg.BeforeWrite,
 	}
+	s.initQuiet(cfg.Clock)
 	// A command the conformance requires is fatal at construction when it
 	// has no implementation. Mirrors matter.js
 	// packages/node/src/behavior/cluster/ValidatedElements.ts:331-333,357-370
@@ -543,24 +554,54 @@ func defaultOf(t Type, d any) (any, bool) {
 }
 
 // store keeps values and reports the ones that changed, from origin; it
-// returns whether any changed.
+// returns whether any changed. A change of a quieter attribute goes to the
+// change listeners at once and to the report listeners — with the data
+// version's advance — when its throttle emits ([Server.quietReport]);
+// every other change advances the version once and is reported at once.
 func (s *Server) store(origin contract.Origin, values map[uint32]any) bool {
-	var changed []uint32
+	type quietChange struct {
+		qa              *quietAttr
+		wasNull, isNull bool
+	}
+	var (
+		changed, plain []uint32
+		quiets         = map[uint32]quietChange{}
+	)
 	s.mu.Lock()
 	for id, v := range values {
-		if old, ok := s.values[id]; ok && reflect.DeepEqual(old, v) {
+		old, ok := s.values[id]
+		if ok && reflect.DeepEqual(old, v) {
 			continue
 		}
 		s.values[id] = v
 		changed = append(changed, id)
+		if qa := s.quiet[id]; qa != nil {
+			quiets[id] = quietChange{qa, !ok || old == nil, v == nil}
+			qa.null, qa.origin = v == nil, origin
+			continue
+		}
+		plain = append(plain, id)
 	}
 	s.mu.Unlock()
 	if len(changed) == 0 {
 		return false
 	}
 	slices.Sort(changed)
-	s.tracker().Bump()
-	s.NotifyFrom(origin, changed...)
+	slices.Sort(plain)
+	if len(plain) > 0 {
+		s.tracker().Bump()
+	}
+	if len(quiets) == 0 {
+		s.AttributeChanges.NotifyFrom(origin, changed...)
+		return true
+	}
+	s.AttributeChanges.ChangedFrom(origin, changed...)
+	s.AttributeChanges.ReportFrom(origin, plain...)
+	for _, id := range changed {
+		if c, ok := quiets[id]; ok {
+			c.qa.q.Changed(c.wasNull, c.isNull)
+		}
+	}
 	return true
 }
 

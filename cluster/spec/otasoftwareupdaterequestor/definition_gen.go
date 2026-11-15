@@ -14,6 +14,8 @@
 package otasoftwareupdaterequestor
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -323,12 +325,13 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrUpdateStateProgress, Name: "UpdateStateProgress",
-			Type:        spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
-			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "0 to 100", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 100}},
-			Default:     spec.NullDefault{},
+			Type:          spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
+			Conformance:   spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "0 to 100", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 100}},
+			Default:       spec.NullDefault{},
+			QuietInterval: time.Second,
 		},
 	},
 	Commands: []spec.Command{

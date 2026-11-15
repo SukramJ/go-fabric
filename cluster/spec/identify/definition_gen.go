@@ -14,6 +14,8 @@
 package identify
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -166,10 +168,11 @@ var Definition = &spec.Cluster{
 	Attributes: []spec.Attribute{
 		{
 			ID: AttrIdentifyTime, Name: "IdentifyTime",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
-			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
-			Quality:     spec.Quality{Quieter: true},
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			Access:        spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
+			Quality:       spec.Quality{Quieter: true},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrIdentifyType, Name: "IdentifyType",

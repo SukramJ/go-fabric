@@ -14,6 +14,8 @@
 package colorcontrol
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -1011,44 +1013,49 @@ var Definition = &spec.Cluster{
 	Attributes: []spec.Attribute{
 		{
 			ID: AttrCurrentHue, Name: "CurrentHue",
-			Type:        spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
-			Conformance: spec.Conformance{Text: "HS", Op: spec.ConfName, Name: "HS"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{NonVolatile: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}},
+			Type:          spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
+			Conformance:   spec.Conformance{Text: "HS", Op: spec.ConfName, Name: "HS"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{NonVolatile: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrCurrentSaturation, Name: "CurrentSaturation",
-			Type:        spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
-			Conformance: spec.Conformance{Text: "HS", Op: spec.ConfName, Name: "HS"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}},
+			Type:          spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
+			Conformance:   spec.Conformance{Text: "HS", Op: spec.ConfName, Name: "HS"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrRemainingTime, Name: "RemainingTime",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Quieter: true},
-			Constraint:  spec.Constraint{Text: "0 to 65535", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65535}},
-			Default:     float64(0),
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "O", Op: spec.ConfOptional},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Quieter: true},
+			Constraint:    spec.Constraint{Text: "0 to 65535", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65535}},
+			Default:       float64(0),
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrCurrentX, Name: "CurrentX",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "XY", Op: spec.ConfName, Name: "XY"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "max 65279", Max: &spec.Bound{Int: 65279}},
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "XY", Op: spec.ConfName, Name: "XY"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "max 65279", Max: &spec.Bound{Int: 65279}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrCurrentY, Name: "CurrentY",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "XY", Op: spec.ConfName, Name: "XY"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "max 65279", Max: &spec.Bound{Int: 65279}},
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "XY", Op: spec.ConfName, Name: "XY"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "max 65279", Max: &spec.Bound{Int: 65279}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrDriftCompensation, Name: "DriftCompensation",
@@ -1065,11 +1072,12 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrColorTemperatureMireds, Name: "ColorTemperatureMireds",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "CT", Op: spec.ConfName, Name: "CT"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "colorTempPhysicalMinMireds to colorTempPhysicalMaxMireds", Min: &spec.Bound{Ref: "colorTempPhysicalMinMireds"}, Max: &spec.Bound{Ref: "colorTempPhysicalMaxMireds"}},
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "CT", Op: spec.ConfName, Name: "CT"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "colorTempPhysicalMinMireds to colorTempPhysicalMaxMireds", Min: &spec.Bound{Ref: "colorTempPhysicalMinMireds"}, Max: &spec.Bound{Ref: "colorTempPhysicalMaxMireds"}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrColorMode, Name: "ColorMode",
@@ -1310,10 +1318,11 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrEnhancedCurrentHue, Name: "EnhancedCurrentHue",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "EHUE", Op: spec.ConfName, Name: "EHUE"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "EHUE", Op: spec.ConfName, Name: "EHUE"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{NonVolatile: true, Scene: true, Quieter: true},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrEnhancedColorMode, Name: "EnhancedColorMode",

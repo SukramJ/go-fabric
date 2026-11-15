@@ -253,6 +253,8 @@ var (
 	_ contract.ClusterEventLister            = (*DeviceEnergyManagementServer)(nil)
 	_ contract.ClusterCommandInvokePrivilege = (*DeviceEnergyManagementServer)(nil)
 	_ contract.AttributeChangeNotifier       = (*DeviceEnergyManagementServer)(nil)
+	_ contract.AttributeReportNotifier       = (*DeviceEnergyManagementServer)(nil)
+	_ contract.ClusterQuiescer               = (*DeviceEnergyManagementServer)(nil)
 	_ contract.EventReceiver                 = (*DeviceEnergyManagementServer)(nil)
 )
 
@@ -1124,6 +1126,16 @@ func (s *DeviceEnergyManagementServer) MatterDataVersion() uint32 {
 func (s *DeviceEnergyManagementServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
 	return s.srv.OnAttributeChange(cb)
 }
+
+// OnAttributeReport implements [contract.AttributeReportNotifier]: the
+// changes that go on the wire, a quieter attribute's by its throttle.
+func (s *DeviceEnergyManagementServer) OnAttributeReport(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeReport(cb)
+}
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: a quieter
+// attribute's held report is dropped ([spec.Server.MatterQuiesce]).
+func (s *DeviceEnergyManagementServer) MatterQuiesce() { s.srv.MatterQuiesce() }
 
 // MatterRead resolves an attribute.
 func (s *DeviceEnergyManagementServer) MatterRead(attrID uint32) (any, bool) {
