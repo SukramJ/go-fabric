@@ -160,14 +160,18 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - `VendorID` and `ProductID` are set;
 - a store is given — `Store.Path`, `Store.DB`, or both `Store.Credentials`
   and `Store.Endpoints` (see below) — and not both `Store.Path` and `Store.DB`;
-- `Attestation.Files` is not combined with `Chain` or the CD, and
+- `Attestation.Provider` is not combined with `Files`, `Chain` or the CD,
+  `Attestation.Files` is not combined with `Chain` or the CD, and
   `BlockCommissioningOnError` comes with `Files`;
+- `BootReason` is a BootReasonEnum value;
 - `Health.Interval` is not negative;
 - `SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location (zero is IndoorOutdoor,
   matter.js's default), and `IndoorOnly` comes with no other value;
-- `Network.WiFi` comes with its `Reporter`;
+- `Network.WiFi`, when set, has its `Driver`, its `Reporter` or both;
+- `Network.TCP.MaxInboundConnections` is not negative;
+- every name in `Network.MDNS.Interfaces` is non-empty and named once;
 - `OTA.Dir` is set when `OTA` is;
 - `TLS.CertificatePort` is set when `TLS` is;
 - `DeviceTypeValidation` is one of warn, strict and off;
@@ -208,7 +212,7 @@ Defaults worth knowing:
 | `Locales` | `en-US` alone |
 | `Logger` | `slog.Default()` |
 | `Client` | nil runs no client stack; set, the node opens its client socket and peers for its Binding entries |
-| `Network.WiFi` | nil mounts no WiFiNetworkDiagnostics; set, its `Reporter` (required) serves it |
+| `Network.WiFi` | nil is an Ethernet-attached node, with no Wi-Fi cluster; set, its `Driver` mounts NetworkCommissioning with the Wi-Fi feature and its `Reporter` serves WiFiNetworkDiagnostics — one of the two is required |
 | `Faults` | nil serves no fault list; set (`contract.FaultSource`), the root GeneralDiagnostics serves ActiveHardwareFaults, ActiveRadioFaults and ActiveNetworkFaults from it and emits HardwareFaultChange, RadioFaultChange and NetworkFaultChange with the current and the previous list each time the source notifies a change of a list, as matter.js's `registerHardwareFault` and `clearHardwareFault` do; a value listed twice is served once |
 | `Sessions` | the Matter MRP intervals (500 ms idle, 300 ms active, 4000 ms active threshold); set, the PASE and CASE session parameters and the operational record carry the node's own (`node.SessionIntervals`, whole milliseconds, the threshold at most 65535 ms); `Node.SessionParameters` returns what the node reports ([Limits](../guides/limits.md#transport-and-reliability)) |
 | `Limits.BDXAdditionalMrpDelay` | no margin; set, the exchange of every inbound BDX transfer (an OTA requestor's download) adds it to the peer's MRP base interval, as matter.js's `bdxAdditionalMrpDelay` does |
@@ -265,8 +269,9 @@ Occupancy emits OccupancyChanged when the selection has OccupancyEvent,
 and a declaration that serves HoldTime gets chip's hold timer — a cleared
 Occupancy holds for HoldTime. A
 TemperatureSensor therefore answers MeasuredValue null until you set a
-reading. An enum, a string or a struct has no fallback in matter.js either
-and stays yours to state (the test `TestEveryListedAttributeHasAValue`
+reading. An enum or a string has no fallback in matter.js either, and a
+struct only an empty placeholder (`SelectDefaultValue.ts:19`, `:167-171`);
+all three stay yours to state (the test `TestEveryListedAttributeHasAValue`
 names them).
 The endpoint assembler mounts Descriptor, Identify,
 BridgedDeviceBasicInformation, Groups and ScenesManagement; the device
@@ -288,8 +293,9 @@ promptly ([Host ports](../guides/ports.md), `IdentifyHandler`).
   restart. The quickstart's test checks this.
 - `Name` becomes the bridged device's NodeLabel. `Vendor` is its
   manufacturer.
-- `Reachable` is a probe for the device's reachability; nil means always
-  reachable.
+- `DeviceAddress` and `ChannelAddress` are your own addresses of the
+  physical device and of this function of it, carried through verbatim.
+- `Logger` receives the device kit's diagnostics; nil is `slog.Default()`.
 - `Conditions` are the device-type conditions you state for the endpoint.
 - `DeviceTypes` lists further device types in the endpoint's Descriptor
   DeviceTypeList, after the device's own and before Bridged Node, each
@@ -303,6 +309,10 @@ promptly ([Host ports](../guides/ports.md), `IdentifyHandler`).
   device. Without tags the Descriptor serves no TagList and its FeatureMap
   no TAGLIST bit — the default, because Apple Home rejects a Descriptor
   that serves it.
+- `Surface` are the surface policies the device is composed under; a node
+  refuses a device composed under policies other than its own.
+
+A device starts reachable; `Device.SetReachable(ctx, ok)` reports a change.
 
 Declarations passed after `Options` change what the device serves. A
 cluster is declared with `<cluster>def.Declare` of its generated package
@@ -384,7 +394,7 @@ VideoDoorbell and FloodlightCamera are composites: their requirements are
 device types only (a Camera and a Doorbell; an OnOffLight and a Camera).
 matter.js generates them with no behaviours of their own and counts a
 component on an endpoint below the composite, never on the composite's
-endpoint itself (`DeviceTypeConformance.ts:596-613` at `862ad75f`). Their
+endpoint itself (`DeviceTypeConformance.ts:596-613` at `db021da0`). Their
 constructors take the components and add them as parts:
 
 ```go
@@ -448,8 +458,9 @@ and ServerList its Descriptor serves.
 the configured passcode and discriminator. When `Start` loads no fabric from
 the store, it opens the node's own commissioning window. A commissioned node opens
 a window only when a controller asks for one through
-AdministratorCommissioning, or when you call `Node.OpenBasicWindow` with
-fresh credentials.
+AdministratorCommissioning, when you call `Node.OpenBasicWindow` with
+fresh credentials, or when you call `Node.OpenOwnWindow` with the
+configured ones (a timeout of 0 is 15 minutes once the node has a fabric).
 
 `Node.SetCommissioningBlocked(ctx, err)` refuses every new commissioning
 while `err` is non-nil and ends one under way (its PASE sessions close, the
@@ -560,11 +571,13 @@ begins. To restart, build a new node on the same store. The bridge under
 it is single-run in the same way: `bridge.Bridge.Start` after `Stop`
 returns `bridge.ErrStopped`.
 
-`New` already starts the subscription engine and the session reapers. Call
-`Stop` on every node that `New` returned, including one you never started.
+`New` opens the store (and, with `Config.Client`, the client socket) and
+starts no goroutine of its own; the subscription engine and the session
+reapers start in `Start`. Call `Stop` on every node that `New` returned,
+including one you never started: it releases what `New` opened.
 The quickstart does this on its error paths.
 
-*Source: `node/node.go` (`ErrStopped`), `node/node.go` (`Node.Stop`, `Node.Run`), `node/node.go` (the `Node` struct), `bridge/bridge.go:1695-1710`.*
+*Source: `node/node.go` (`ErrStopped`), `node/node.go` (`Node.Stop`, `Node.Run`), `node/node.go` (the `Node` struct, `New`), `bridge/bridge.go` (`Bridge.Stop`).*
 
 ## What the reference daemon adds
 
@@ -584,9 +597,11 @@ of which is something a product would also decide:
   each built from its clusters' declarations (`<cluster>def.Declare`): the
   initial state, the features, and the ports the simulated device
   implements — a valve's `StateSource`, a washer's `CommandHandler`, a
-  lock's `AuthStore` on the node's store. The one cluster still mounted
-  as a `HostServer` is the charger's EnergyEvse, whose delegate is not a
-  declared port yet. The blind's position is persisted in the settings
+  lock's `AuthStore` on the node's store. Three clusters are still
+  mounted as a `HostServer`: the charger's EnergyEvse, whose delegate is
+  not a declared port yet, EcosystemInformation
+  (`node.NewEcosystemInformation`) and, with `--media-messages`,
+  Messages. The blind's position is persisted in the settings
   table.
 - **Testing-only flags** for certification runs: the app pipe, the
   TestEventTrigger key, the OTA provider and its ledger check, the

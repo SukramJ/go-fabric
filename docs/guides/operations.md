@@ -355,8 +355,10 @@ lists them all. The three an operator meets first:
 - **PASE failures per commissioning window: 20**, then a lockout of
   15 minutes, doubling up to 4 hours: a pairing code typed wrong twenty
   times closes the window for a while.
-- **Subscriptions per fabric: 16**; a controller asking for more is
-  answered `ResourceExhausted`.
+- **Subscriptions per fabric: 16**; a controller asking for more takes
+  the place of the fabric's oldest subscription, unless its subject may
+  read none of the requested paths, which is answered `InvalidAction`
+  ([Limits](limits.md#interaction-model)).
 
 ## A failed pairing
 
@@ -377,7 +379,13 @@ failed.
 
 ## Factory reset
 
-The node has no reset call of its own. What a reset is:
+`Node.FactoryReset(ctx)` is the node's reset call: it removes every
+fabric as RemoveFabric does, with each controller's Leave event,
+stops the node and erases its store and endpoint records, scrubbing the
+erased bytes from the file ([Files](#files),
+[Security model](../security.md#what-the-store-holds-in-clear)). The host
+then builds a new node on the same store, which starts uncommissioned.
+Two lesser steps reach part of it:
 
 - **Removing the fabrics** — `Node.RemoveFabric(ctx, index)` for each
   fabric, as a controller's RemoveFabric command does: the fabric's rows,
@@ -393,9 +401,9 @@ The node has no reset call of its own. What a reset is:
   keep a dead entry until they are told to forget it.
 
 The host's own state — its configuration, its devices — is untouched by
-either.
+any of the three.
 
-*Source: [`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`RemoveFabric`), the
+*Source: [`node/factory_reset.go`](https://github.com/SukramJ/go-fabric/blob/main/node/factory_reset.go) (`FactoryReset`), [`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`RemoveFabric`), the
 [persistence guide](persistence.md#what-survives-a-restart).*
 
 ## Upgrading
