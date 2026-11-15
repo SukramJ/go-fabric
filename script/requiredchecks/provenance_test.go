@@ -16,12 +16,33 @@ import (
 // provenanceScript is the release workflow's tag check.
 var provenanceScript = filepath.Join(repoRoot, "script", "release-provenance.sh")
 
+// requiredOutsideCI are the required checks no job of ci.yml carries, with
+// the workflow whose job does. release-provenance.sh reads ci.yml's runs
+// only, so it does not check these on a tag; a required check that leaves
+// ci.yml must be named here, or TestProvenanceRequiredCI fails instead of
+// the release check dropping it without a word (review II, RR5a-01).
+var requiredOutsideCI = map[string]string{
+	"codeql (go)": "codeql.yml",
+	"chip-tool commissions the reference daemon":               "chiptool.yml",
+	"chip certification cases against the reference daemon":    "chiptool.yml",
+	"chip-tool control leg (CHIP app, no go-fabric)":           "chiptool.yml",
+	"chip-tool commissions over BLE onto Wi-Fi (chip's mocks)": "chiptool.yml",
+}
+
+// releaseRequiresCI are the checks the release relies on a ci run for:
+// the race detector runs nowhere else on the tagged commit
+// (release-provenance.sh's header, release.yml).
+var releaseRequiresCI = []string{"test (linux, race)"}
+
 // TestProvenanceRequiredCI: the checks release-provenance.sh requires of a
 // ci run are exactly the contexts of required.txt that are jobs of ci.yml,
 // read by the same parser as the rest of this package. A job ci.yml runs
 // but the protection does not require is not among them, so a pending
 // guard cannot block a release before it blocks a merge (review II,
-// DR5a-ci-04).
+// DR5a-ci-04). Every other context of required.txt is a job of the
+// workflow [requiredOutsideCI] names for it, and the checks of
+// [releaseRequiresCI] are in the list, so a required check that moves out
+// of ci.yml cannot drop out of the release check unseen (RR5a-01).
 func TestProvenanceRequiredCI(t *testing.T) {
 	bash := lookBash(t)
 	out, err := exec.Command(bash, provenanceScript, "--required-ci").Output() //nolint:gosec // the repository's own script
@@ -31,11 +52,13 @@ func TestProvenanceRequiredCI(t *testing.T) {
 	got := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 
 	var ciJobs []string
+	jobsOf := map[string][]string{}
 	for _, wf := range loadWorkflows(t) {
+		for _, j := range wf.jobs {
+			jobsOf[wf.file] = append(jobsOf[wf.file], j.key())
+		}
 		if wf.file == "ci.yml" {
-			for _, j := range wf.jobs {
-				ciJobs = append(ciJobs, j.key())
-			}
+			ciJobs = jobsOf[wf.file]
 		}
 	}
 	if len(ciJobs) == 0 {
@@ -53,6 +76,30 @@ func TestProvenanceRequiredCI(t *testing.T) {
 	for _, j := range ciJobs {
 		if !slices.Contains(want, j) && slices.Contains(got, j) {
 			t.Errorf("release-provenance.sh requires %q, which is not a required check", j)
+		}
+	}
+	for _, c := range releaseRequiresCI {
+		if !slices.Contains(got, c) {
+			t.Errorf("release-provenance.sh does not require %q of a ci run, which the release relies on", c)
+		}
+	}
+	required := readRequired(t)
+	for _, ctx := range required {
+		wf, outside := requiredOutsideCI[ctx]
+		switch {
+		case slices.Contains(got, ctx) && outside:
+			t.Errorf("required check %q is a job of ci.yml and in requiredOutsideCI: remove the row", ctx)
+		case slices.Contains(got, ctx):
+		case !outside:
+			t.Errorf("required check %q is no job of ci.yml, so release-provenance.sh does not check it on a tag; "+
+				"name its workflow in requiredOutsideCI, or move the job back", ctx)
+		case !slices.Contains(jobsOf[wf], ctx):
+			t.Errorf("requiredOutsideCI names %s for %q, which has no such job", wf, ctx)
+		}
+	}
+	for ctx := range requiredOutsideCI {
+		if !slices.Contains(required, ctx) {
+			t.Errorf("requiredOutsideCI names %q, which is not in required.txt: remove the row", ctx)
 		}
 	}
 }
@@ -154,6 +201,12 @@ func TestProvenanceVerdict(t *testing.T) {
 			}
 			if got != tc.want {
 				t.Errorf("exit %d, want %d:\n%s", got, tc.want, out)
+			}
+			// The required checks it does not read are named (RR5a-01).
+			for ctx := range requiredOutsideCI {
+				if !strings.Contains(string(out), ctx) {
+					t.Errorf("the output does not name %q, a required check outside ci.yml:\n%s", ctx, out)
+				}
 			}
 		})
 	}

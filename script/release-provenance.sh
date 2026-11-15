@@ -14,7 +14,9 @@
 #     `test (linux, race)`). The required checks are the branch
 #     protection's copy, script/requiredchecks/required.txt, read from the
 #     checkout this script is in (the tag's, in release.yml), intersected
-#     with ci.yml's job names there. A ci job that is not a required check
+#     with ci.yml's job names there; the required checks of other
+#     workflows are named in one line and not checked here
+#     (TestProvenanceRequiredCI holds that list). A ci job that is not a required check
 #     (a guard still pending its promotion) does not block a release, as it
 #     does not block a merge (review II, DR5a-ci-04). A merge whose push
 #     run was cancelled by the next merge, or a merge that started none (a
@@ -66,6 +68,15 @@ for tool in git gh; do
 	command -v "$tool" >/dev/null || { echo "release-provenance: $tool not found"; exit 2; }
 done
 required=$(required_ci) || exit 2
+# The required checks no ci.yml job carries are not checked here: say so,
+# so a check that left ci.yml is seen rather than dropped
+# (TestProvenanceRequiredCI names each with its workflow; RR5a-01).
+outside=""
+while IFS= read -r ctx || [ -n "$ctx" ]; do
+	[ -n "$ctx" ] || continue
+	printf '%s\n' "$required" | grep -Fxq -- "$ctx" || outside="$outside${outside:+, }$ctx"
+done <"$root/script/requiredchecks/required.txt"
+[ -z "$outside" ] || echo "release-provenance: required checks outside ci.yml, not checked on the tag here: $outside"
 
 commit=$(git rev-parse --verify -q "refs/tags/$tag^{commit}") || {
 	echo "release-provenance: no tag $tag in this clone"
