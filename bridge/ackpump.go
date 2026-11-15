@@ -601,6 +601,8 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 	if listener == nil {
 		return
 	}
+	// A retransmission repeats a message its first send let through, and
+	// MRP does not run over a connection (routeUsesMRP).
 	results := outbound.Tick(now, func(dest net.Addr, datagram []byte) error {
 		return sendVia(listener, dest, datagram)
 	})
@@ -813,7 +815,7 @@ func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation, target exchangeReplyTa
 		datagram = append(hdr.Marshal(), enc.Ciphertext...)
 	}
 
-	if err := sendVia(listener, target.src, datagram); err != nil {
+	if err := b.sendRouted(listener, target.src, target.sessionID, datagram); err != nil {
 		b.logger.Warn("matter.tx.ack_pump.send",
 			slog.Int("exchange_id", int(obl.ExchangeID)),
 			slog.String("src", target.src.String()),

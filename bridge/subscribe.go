@@ -1743,7 +1743,7 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	if track {
 		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, b.clk().Now())
 	}
-	if err := sendVia(listener, dest, datagram); err != nil {
+	if err := b.sendRouted(listener, dest, target.sessionID, datagram); err != nil {
 		if track {
 			tracker.Untrack(target.sessionID, counter)
 		}

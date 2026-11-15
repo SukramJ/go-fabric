@@ -537,7 +537,7 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	if tracker != nil {
 		tracker.TrackWithMargin(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load()))
 	}
-	if err := sendVia(listener, dest, datagram); err != nil {
+	if err := e.b.sendRouted(listener, dest, e.sessionID, datagram); err != nil {
 		if tracker != nil {
 			tracker.Untrack(e.sessionID, hdr.MessageCounter)
 		}
@@ -583,47 +583,20 @@ func (e *initiatedSecureExchange) MaxPayloadSize() int {
 	return e.b.invokeMaxPayloadSize(e.route(), e.sessionID)
 }
 
-// routeMaxPayloadSize is the largest payload one message on route carries:
-// over a TCP connection the connection's largest message less the message
-// overhead, otherwise [exchangeMaxPayloadSize] — matter.js
-// MessageExchange.maxPayloadSize (packages/protocol/src/protocol/MessageExchange.ts:465-469
-// at db021da0).
-func routeMaxPayloadSize(route net.Addr) int {
-	if r, ok := route.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
-		if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
-			if n := m.MaxMessageSize() - matterMessageOverhead; n > exchangeMaxPayloadSize {
-				return n
-			}
-		}
-	}
-	return exchangeMaxPayloadSize
-}
-
 // invokeMaxPayloadSize is the largest payload one message of a request's
 // exchange carries, for the invoke context ([im.WithMaxPayloadSize]) and
 // for an exchange of the session this node opens or answers on
-// ([initiatedSecureExchange.MaxPayloadSize]): as
-// [routeMaxPayloadSize], over TCP also bounded by the MaxTcpMessageSize the
-// session's peer stated — matter.js MessageChannel.maxPayloadSize, the
-// channel's maximum and over TCP `Math.min(channelMax,
-// this.session.peerMaxTcpMessageSize)`
-// (packages/protocol/src/protocol/MessageChannel.ts:86-92 at db021da0),
-// less MATTER_MESSAGE_OVERHEAD (MessageExchange.ts:465-469); never below
-// the UDP bound, as [Bridge.chunkLimitsFor].
+// ([initiatedSecureExchange.MaxPayloadSize]): the route's message limit
+// ([Bridge.connMessageLimit] — over TCP the connection's maximum bounded
+// by the peer's, matter.js MessageChannel.maxPayloadSize) less
+// MATTER_MESSAGE_OVERHEAD (packages/protocol/src/protocol/MessageExchange.ts:465-469
+// at db021da0), and [exchangeMaxPayloadSize] over UDP; never below that.
 func (b *Bridge) invokeMaxPayloadSize(route net.Addr, sessionID uint16) int {
-	n := routeMaxPayloadSize(route)
-	if n == exchangeMaxPayloadSize {
-		return n
+	size, ok := b.connMessageLimit(route, sessionID)
+	if !ok {
+		return exchangeMaxPayloadSize
 	}
-	b.mu.RLock()
-	lookup := b.sessions
-	b.mu.RUnlock()
-	if res, ok := lookup.(SessionTransportResolver); ok {
-		if _, peerMax, known := res.TransportParametersFor(sessionID); known && peerMax > 0 && int(peerMax)-matterMessageOverhead < n {
-			n = max(int(peerMax)-matterMessageOverhead, exchangeMaxPayloadSize)
-		}
-	}
-	return n
+	return max(size-matterMessageOverhead, exchangeMaxPayloadSize)
 }
 
 // Close implements [bdx.Exchange]: the exchange stops receiving, and an

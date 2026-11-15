@@ -16,9 +16,11 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
+	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -288,7 +290,7 @@ func (b *Bridge) sendReplyTimed(
 		if needsAck {
 			tracker.trackUnsecured(counter, handshakeKeyOf(requestHdr, requestProto.ExchangeID), datagram, src, b.clk().Now(), peer)
 		}
-		if err := sendVia(listener, src, datagram); err != nil {
+		if err := b.sendRouted(listener, src, 0, datagram); err != nil {
 			if needsAck {
 				tracker.Untrack(requestHdr.SessionID, counter)
 			}
@@ -329,7 +331,7 @@ func (b *Bridge) sendReplyTimed(
 	if needsAck {
 		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())
 	}
-	if err := sendVia(listener, src, datagram); err != nil {
+	if err := b.sendRouted(listener, src, requestHdr.SessionID, datagram); err != nil {
 		if needsAck {
 			tracker.Untrack(requestHdr.SessionID, counter)
 		}
@@ -436,13 +438,11 @@ const reportChunkHardCap = udp.MaxDatagramSize - 200
 
 // chunkLimits are the per-message budget and the hard ceiling for the
 // chunkers, for one route: the UDP constants, or over a reliable
-// connection the connection's frame size bounded by the peer's stated
-// MaxTcpMessageSize — matter.js keeps `maxTcpMessageSize` on the Session
-// (Session.ts:87, :119), bounds a message over TCP by it
-// (MessageChannel.ts:86-92) and refuses a larger one (:106-112; the TCP
-// channel its own limit, TcpChannel.ts:116-120) at db021da0. The 200-byte
-// margin is the headers' and the AES-CCM tag's, as for
-// [reportChunkHardCap].
+// connection the message limit of [Bridge.connMessageLimit] less a
+// 200-byte margin for the headers and the AES-CCM tag, as for
+// [reportChunkHardCap]: matter.js sizes report chunks by the exchange's
+// maxPayloadSize, the channel's less MATTER_MESSAGE_OVERHEAD
+// (MessageExchange.ts:465-468 at db021da0).
 type chunkLimits struct {
 	budget, hardCap int
 }
@@ -458,27 +458,78 @@ type SessionTransportResolver interface {
 }
 
 // chunkLimitsFor picks the chunk limits for a reply to sessionID over dst.
+// Over a connection both stay within its message limit: a limit above the
+// UDP hard cap is the budget and the cap, a smaller one caps the UDP
+// budget and is the hard cap.
 func (b *Bridge) chunkLimitsFor(dst net.Addr, sessionID uint16) chunkLimits {
-	r, ok := dst.(*connRoute)
-	if !ok || r == nil || r.conn == nil || !r.conn.Reliable() {
+	size, ok := b.connMessageLimit(dst, sessionID)
+	if !ok {
 		return udpChunkLimits
 	}
-	size := 0
-	if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
-		size = m.MaxMessageSize()
+	n := size - 200
+	if n > reportChunkHardCap {
+		return chunkLimits{budget: n, hardCap: n}
 	}
-	b.mu.Lock()
+	return chunkLimits{budget: min(reportChunkPayloadBudget, n), hardCap: n}
+}
+
+// maxUDPMessageSize is matter.js MAX_UDP_MESSAGE_SIZE, 1280 - 48
+// (packages/general/src/net/udp/UdpSocket.ts:12 at db021da0): the floor
+// of a peer's TCP message limit.
+const maxUDPMessageSize = 1280 - 48
+
+// connMessageLimit is the largest Matter message — headers and MIC
+// included — one send on route may carry for sessionID; ok is false for a
+// UDP route and for a connection that names no maximum of its own, whose
+// replies keep the UDP limits. Over TCP it is the connection's maximum
+// bounded by the peer's: matter.js MessageChannel.maxPayloadSize takes
+// Math.min(channelMax, session.peerMaxTcpMessageSize) on TCP and the
+// channel's maximum otherwise (packages/protocol/src/protocol/MessageChannel.ts:86-92),
+// and peerMaxTcpMessageSize is max(maxTcpMessageSize ?? 64000,
+// MAX_UDP_MESSAGE_SIZE) (packages/protocol/src/session/Session.ts:237-239,
+// SessionParameters.ts:187) at db021da0. The peer's size is the one its
+// session states ([SessionTransportResolver]); a session that states none
+// takes the 64000 fallback.
+func (b *Bridge) connMessageLimit(route net.Addr, sessionID uint16) (int, bool) {
+	r, ok := route.(*connRoute)
+	if !ok || r == nil || r.conn == nil || !r.conn.Reliable() {
+		return 0, false
+	}
+	m, ok := r.conn.(interface{ MaxMessageSize() int })
+	if !ok || m.MaxMessageSize() <= 0 {
+		return 0, false
+	}
+	channelMax := m.MaxMessageSize()
+	if r.conn.Remote().Network() != "tcp" {
+		return channelMax, true
+	}
+	peer := int(sessionparams.DefaultMaxTCPMessageSize)
+	b.mu.RLock()
 	lookup := b.sessions
-	b.mu.Unlock()
+	b.mu.RUnlock()
 	if res, ok := lookup.(SessionTransportResolver); ok {
-		if _, peerMax, known := res.TransportParametersFor(sessionID); known && peerMax > 0 && (size == 0 || int(peerMax) < size) {
-			size = int(peerMax)
+		if _, stated, known := res.TransportParametersFor(sessionID); known && stated > 0 {
+			peer = int(stated)
 		}
 	}
-	if size <= reportChunkHardCap+200 {
-		return udpChunkLimits
+	return min(channelMax, max(peer, maxUDPMessageSize)), true
+}
+
+// sendRouted is [sendVia] for a message of the bridge on the session
+// sessionID names (this node's id for it; 0 for the unsecured session):
+// over TCP a message above the route's limit for that session
+// ([Bridge.connMessageLimit]) is refused before the write, with
+// [tcp.ErrMessageTooLarge] — the sender splits by the limit, it is never
+// cut. matter.js MessageChannel.send throws MessageTooLargeError for an
+// encoded message above maxPayloadSize on a TCP channel, before the write
+// (packages/protocol/src/protocol/MessageChannel.ts:104-112 at db021da0).
+func (b *Bridge) sendRouted(listener *udp.Listener, dst net.Addr, sessionID uint16, datagram []byte) error {
+	if r, ok := dst.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Remote().Network() == "tcp" {
+		if limit, ok := b.connMessageLimit(dst, sessionID); ok && len(datagram) > limit {
+			return fmt.Errorf("%w: %d bytes exceed the limit of %d for session %d", tcp.ErrMessageTooLarge, len(datagram), limit, sessionID)
+		}
 	}
-	return chunkLimits{budget: size - 200, hardCap: size - 200}
+	return sendVia(listener, dst, datagram)
 }
 
 // chunkReportData splits rd into per-datagram chunks whose encoded

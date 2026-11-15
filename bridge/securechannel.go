@@ -2345,7 +2345,7 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 		return
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
-	if err := sendVia(listener, dst, datagram); err != nil {
+	if err := b.sendRouted(listener, dst, sessionID, datagram); err != nil {
 		b.logger.Debug("matter.tx.sc.close_session.send",
 			slog.Int("session_id", int(sessionID)),
 			slog.Any("err", err))
