@@ -171,6 +171,9 @@ type GroupKeys interface {
 	// GetGroupKeySet returns [ErrGroupKeySetNotFound] for a missing set.
 	GetGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeySetID uint16) (GroupKeySet, error)
 	// ListGroupKeySets returns the fabric's sets by GroupKeySetID ascending.
+	// A stored set whose epoch key has a refused length is left out — key
+	// set 0 included — and nothing is logged; GetGroupKeySet of its id
+	// returns the error, and an upsert of the id replaces it.
 	ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]GroupKeySet, error)
 	// RemoveGroupKeySet removes the set and the key-map entries naming it.
 	RemoveGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeySetID uint16) error

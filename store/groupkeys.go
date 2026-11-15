@@ -351,6 +351,16 @@ func (s *Store) scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 		if err != nil {
 			return GroupKeySet{}, err
 		}
+		if i > 0 && plain != nil && len(plain) == 0 {
+			// An empty optional slot an earlier release stored is read
+			// as absent, as a write now stores it.
+			plain = nil
+			if i == 1 {
+				rec.EpochStart1 = 0
+			} else {
+				rec.EpochStart2 = 0
+			}
+		}
 		if plain != nil && len(plain) != epochKeySize {
 			return GroupKeySet{}, fmt.Errorf("%w: %s length=%d (want %d)", errMalformedKey, groupEpochKeyColumns[i], len(plain), epochKeySize)
 		}
