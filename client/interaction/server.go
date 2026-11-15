@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/reportchunk"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -199,10 +200,13 @@ func (s *server) requestContext(ctx context.Context, x *exchange.Exchange, fabri
 
 // read is InteractionServer.handleReadRequest (InteractionServer.ts:335-390):
 // the paths validated (a wildcard cluster is InvalidAction, :133), the
-// report assembled and sent as sendDataReport sends it
-// (InteractionMessenger.ts:470-510): in chunks of the session's payload
-// size, every chunk but the last answered by the peer's StatusResponse.
-// The served endpoints log no events, so an event request reports none.
+// report generated and sent as sendDataReport sends it
+// (InteractionMessenger.ts:470-510): chunk by chunk in the session's
+// payload size, every chunk but the last answered by the peer's
+// StatusResponse before the next is generated — the reports pulled from
+// [im.NewReadReports] through the chunker the device side uses
+// ([reportchunk.Chunker]; review II, decision 44, R2-P5-write-08). The
+// served endpoints log no events, so an event request reports none.
 func (s *server) read(ctx context.Context, x *exchange.Exchange, req im.ReadRequest) im.StatusCode {
 	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
 		return status
@@ -212,72 +216,31 @@ func (s *server) read(ctx context.Context, x *exchange.Exchange, req im.ReadRequ
 		return im.StatusFailure
 	}
 	rctx := s.requestContext(ctx, x, req.FabricFiltered)
-	report := im.HandleReadRequest(rctx, d, req)
-	report.SuppressResponse = true
-	chunks := s.chunkReport(report, x.Session().MaxPayloadSize())
-	for i, chunk := range chunks {
-		last := i == len(chunks)-1
-		chunk.MoreChunkedMessages = !last
-		chunk.SuppressResponse = last
-		enc := tlv.NewEncoder()
-		chunk.MarshalTLV(enc, s.cfg.ValueWriter)
-		body, err := enc.Bytes()
+	budget := x.Session().MaxPayloadSize()
+	write := reportchunk.Writer(s.cfg.ValueWriter)
+	chunker := reportchunk.New(im.ReportData{SuppressResponse: true}, budget, budget, write, reportchunk.Reads(im.NewReadReports(rctx, d, req)), nil)
+	for {
+		chunk, ok, err := chunker.Next()
+		if err == nil && !ok {
+			return im.StatusSuccess
+		}
+		var body []byte
+		if err == nil {
+			body, err = reportchunk.Encode(chunk, write)
+		}
 		if err != nil {
 			s.log.Debug("matter.controller.interaction.server.report_encode", slog.Any("err", err))
 			return im.StatusFailure
 		}
+		last := !chunk.MoreChunkedMessages
 		if err := x.Send(ctx, im.OpcodeReportData, body, exchange.SendOptions{ExpectAckOnly: last}); err != nil {
 			s.log.Debug("matter.controller.interaction.server.report_send", slog.Any("err", err))
 			return im.StatusSuccess
 		}
-		if !last && !s.awaitChunkStatus(ctx, x) {
+		if last || !s.awaitChunkStatus(ctx, x) {
 			return im.StatusSuccess
 		}
 	}
-	return im.StatusSuccess
-}
-
-// chunkReport splits a report whose encoding exceeds budget into reports
-// that fit, one attribute or event report at a time; a single report
-// above the budget becomes a ResourceExhausted status for its path, as
-// the bridge caps an oversized report (bridge/reply.go chunkReportData).
-func (s *server) chunkReport(rd im.ReportData, budget int) []im.ReportData {
-	size := func(r im.ReportData) int {
-		enc := tlv.NewEncoder()
-		r.MarshalTLV(enc, s.cfg.ValueWriter)
-		b, _ := enc.Bytes()
-		return len(b)
-	}
-	if size(rd) <= budget {
-		return []im.ReportData{rd}
-	}
-	var chunks []im.ReportData
-	cur := im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID}
-	for _, rep := range rd.Reports {
-		one := im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID, Reports: []im.AttributeReport{rep}, MoreChunkedMessages: true}
-		if size(one) > budget {
-			rep = im.AttributeReport{Path: rep.Path, IsStatus: true, Status: im.StatusIB{Status: im.StatusResourceExhausted}}
-		}
-		trial := cur
-		trial.Reports = append(append([]im.AttributeReport(nil), cur.Reports...), rep)
-		trial.MoreChunkedMessages = true
-		if size(trial) > budget && (len(cur.Reports) > 0 || len(cur.EventReports) > 0) {
-			chunks = append(chunks, cur)
-			cur = im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID}
-		}
-		cur.Reports = append(cur.Reports, rep)
-	}
-	for _, ev := range rd.EventReports {
-		trial := cur
-		trial.EventReports = append(append([]im.EventReport(nil), cur.EventReports...), ev)
-		trial.MoreChunkedMessages = true
-		if size(trial) > budget && (len(cur.Reports) > 0 || len(cur.EventReports) > 0) {
-			chunks = append(chunks, cur)
-			cur = im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID}
-		}
-		cur.EventReports = append(cur.EventReports, ev)
-	}
-	return append(chunks, cur)
 }
 
 // awaitChunkStatus reads the StatusResponse a peer owes for a chunk that

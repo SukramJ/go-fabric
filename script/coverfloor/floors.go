@@ -250,6 +250,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/internal/forward", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/inflight", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/netwatch", min: 92},
+	{pkg: "github.com/SukramJ/go-fabric/internal/reportchunk", min: 84},
 	{pkg: "github.com/SukramJ/go-fabric/internal/serialqueue", min: 97},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/deviceseam",

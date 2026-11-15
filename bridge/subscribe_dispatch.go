@@ -667,7 +667,7 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 	// AND the per-datagram budget. The chunker splits on
 	// per-attribute boundaries; each chunk except the last carries
 	// MoreChunkedMessages=true (Matter §10.6.6).
-	chunk, have, err := chunker.next()
+	chunk, have, err := chunker.Next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_initial_report", src, err)
 		return err
@@ -749,7 +749,7 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 			slog.Int("chunk", i),
 			slog.Int("bytes", len(body)),
 			slog.Bool("more", chunk.MoreChunkedMessages))
-		if chunk, have, err = chunker.next(); err != nil {
+		if chunk, have, err = chunker.Next(); err != nil {
 			debugReplyError(b.logger, "chunk_initial_report", src, err)
 			return err
 		}

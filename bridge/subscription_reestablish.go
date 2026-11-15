@@ -324,7 +324,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 // chunk after the first piggybacks the acknowledgement of the peer's
 // previous StatusResponse.
 func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) error {
-	chunk, have, err := chunker.next()
+	chunk, have, err := chunker.Next()
 	if err != nil {
 		return err
 	}
@@ -359,7 +359,7 @@ func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) err
 			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
 			return fmt.Errorf("%w: chunk %d unanswered after %s", errPeerGone, i, timeout)
 		}
-		if chunk, have, err = chunker.next(); err != nil {
+		if chunk, have, err = chunker.Next(); err != nil {
 			return err
 		}
 	}

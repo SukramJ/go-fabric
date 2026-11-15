@@ -284,7 +284,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// A plain Read's response suppresses the answer to its last chunk
 	// (see [im.HandleReadRequest]).
 	chunker := newReportChunker(im.ReportData{SuppressResponse: true}, limits.budget, limits.hardCap, attributes, events)
-	chunk, have, err := chunker.next()
+	chunk, have, err := chunker.Next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_report", src, err)
 		return err
@@ -304,7 +304,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 			return err
 		}
 		chunks++
-		if chunk, have, err = chunker.next(); err != nil {
+		if chunk, have, err = chunker.Next(); err != nil {
 			debugReplyError(b.logger, "chunk_report", src, err)
 			return err
 		}
