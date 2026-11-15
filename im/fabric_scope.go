@@ -36,17 +36,19 @@ type FabricScope struct {
 // MaskFabricScoped returns element — one anonymous TLV element, a
 // fabric-scoped list attribute's value as the value writer encodes it — as
 // the reader scope describes receives it. ok is false when the value cannot
-// be scoped: it is no list, an entry is no struct, or an entry carries no
-// FabricIndex (or index 0); the path then answers a status instead of data.
+// be scoped: it is no list, an entry is no struct, or an entry names no
+// valid owner — no FabricIndex, or one outside 1 to 254 (0 is no fabric,
+// above 254 an index the node could not resolve); the path then answers a
+// status instead of data.
 // A null value is returned unchanged. The function is cluster-blind: it
 // reads the FabricIndex field (tag 0xFE) of each entry and nothing else of
 // its meaning.
 //
 // For each entry, owned by the fabric its FabricIndex names:
 //
-//   - an entry without a FabricIndex refuses the whole value;
-//   - an entry another fabric owns — every entry, for a session without a
-//     fabric — is dropped when the request is fabric-filtered or the
+//   - an entry without a valid FabricIndex refuses the whole value;
+//   - an entry another fabric owns — every entry, for a session without an
+//     accessing fabric ([HasAccessingFabric]) — is dropped when the request is fabric-filtered or the
 //     attribute is fabric-sensitive, and otherwise kept without the fields
 //     scope.Fields names;
 //   - the reader's own entry is kept as it is.
@@ -66,10 +68,19 @@ type FabricScope struct {
 // packages/protocol/src/interaction/InteractionMessenger.ts:579-582,
 // :866). An entry without a FabricIndex is the one place it departs:
 // matter.js's FabricFilteredListProxyHandler shows such an entry to every
-// fabric (ListManager.ts:480-481), connectedhomeip's list encoder refuses
-// it with CHIP_ERROR_INVALID_FABRIC_INDEX
-// (src/app/AttributeValueEncoder.h:100 at 6170af84), and so does this
-// function — the mask rests on every entry naming its owner.
+// fabric (ListManager.ts:480-481); connectedhomeip's list encoder refuses
+// it with CHIP_ERROR_INVALID_FABRIC_INDEX when its index is
+// kUndefinedFabricIndex, 0 (src/app/AttributeValueEncoder.h:100,
+// src/lib/core/DataModelTypes.h:69 at 6170af84), and the report engine
+// answers the path with that error's status (src/app/reporting/Engine.cpp:487-498,
+// with no test of an expanded path), which is FAILURE
+// (src/protocols/interaction_model/StatusCode.cpp:41-63, :62;
+// CHIP_ERROR_INVALID_FABRIC_INDEX is CHIP_CORE_ERROR(0x71),
+// src/lib/core/CHIPError.h:1335) — on a concrete and a wildcard read, a
+// priming and a change report alike. So does this function's caller: the
+// status rides a wildcard read, a re-established subscription's priming
+// report and a change report too, where the bridge otherwise leaves
+// failing paths out. The mask rests on every entry naming its owner.
 func MaskFabricScoped(element []byte, scope FabricScope) (masked []byte, ok bool) {
 	dec := tlv.NewDecoder(element)
 	open, err := dec.Next()
@@ -168,10 +179,10 @@ func maskEntry(dec *tlv.Decoder, buf []byte, begin int, scope FabricScope) (entr
 		fields = append(fields, span)
 	}
 	whole := buf[begin:dec.Pos()]
-	if !hasOwner || owner == 0 {
+	if !hasOwner || owner > 0xFF || !HasAccessingFabric(uint8(owner)) {
 		return nil, false, false
 	}
-	if scope.Fabric != 0 && owner == uint64(scope.Fabric) {
+	if HasAccessingFabric(scope.Fabric) && owner == uint64(scope.Fabric) {
 		return whole, true, true
 	}
 	if scope.Filtered || scope.Sensitive {

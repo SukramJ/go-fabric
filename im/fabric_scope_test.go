@@ -113,7 +113,7 @@ func TestMaskFabricScopedFiltersAndMasksByTheEntrysOwner(t *testing.T) {
 }
 
 // TestMaskFabricScopedRefusesWhatItCannotScope: an entry without a
-// FabricIndex, or with index 0, refuses the whole value — whoever reads,
+// FabricIndex, or with one outside 1 to 254, refuses the whole value — whoever reads,
 // filtered or not; so do a value that is no list, an entry that is no
 // struct, a FabricIndex that is no unsigned integer and trailing bytes. A
 // null value passes unchanged.
@@ -123,6 +123,8 @@ func TestMaskFabricScopedRefusesWhatItCannotScope(t *testing.T) {
 		for name, in := range map[string][]byte{
 			"no index":     encodeEntries(t, tlv.TypeArray, scopeEntry{indexOf(1)}, scopeEntry{}),
 			"index 0":      encodeEntries(t, tlv.TypeArray, scopeEntry{indexOf(1)}, scopeEntry{indexOf(0)}),
+			"index 255":    encodeEntries(t, tlv.TypeArray, scopeEntry{indexOf(1)}, scopeEntry{indexOf(255)}),
+			"index 0x100":  encodeEntries(t, tlv.TypeArray, scopeEntry{indexOf(1)}, scopeEntry{indexOf(0x100)}),
 			"no list":      {byte(tlv.TypeUnsignedInt1), 5},
 			"no struct":    {byte(tlv.TypeArray), byte(tlv.TypeUnsignedInt1), 5, byte(tlv.TypeEndContainer)},
 			"signed index": {byte(tlv.TypeArray), byte(tlv.TypeStructure), 0x20, 0xFE, 1, byte(tlv.TypeEndContainer), byte(tlv.TypeEndContainer)},
@@ -133,6 +135,12 @@ func TestMaskFabricScopedRefusesWhatItCannotScope(t *testing.T) {
 				t.Errorf("%s, scope %+v: scoped to % X, want a refusal", name, scope, got)
 			}
 		}
+	}
+	// A reader whose fabric could not be resolved (255) owns no entry:
+	// an entry of fabric 1 is masked for it, not served whole.
+	in := encodeEntries(t, tlv.TypeArray, scopeEntry{indexOf(1)})
+	if got, ok := MaskFabricScoped(in, FabricScope{Fabric: 255, Fields: []uint32{1}}); !ok || !bytes.Equal(got, listOf(tlv.TypeArray, entryWithout(1, 1))) {
+		t.Errorf("unresolved reader: %v % X", ok, got)
 	}
 	null := []byte{byte(tlv.TypeNull)}
 	if got, ok := MaskFabricScoped(null, FabricScope{Fabric: 1}); !ok || !bytes.Equal(got, null) {

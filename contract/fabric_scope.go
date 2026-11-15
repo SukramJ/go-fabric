@@ -14,7 +14,8 @@ package contract
 //   - an unfiltered request of any other scoped attribute reads every
 //     entry, and an entry another fabric owns — every entry, for a session
 //     without a fabric — without the fields Fields names;
-//   - an entry without a FabricIndex fails the attribute's path.
+//   - an entry without a valid FabricIndex (1 to 254) fails the
+//     attribute's path.
 type FabricScope struct {
 	// Sensitive marks an attribute whose own access is fabric-sensitive
 	// ("S" in the cluster's schema).
@@ -32,7 +33,8 @@ type FabricScope struct {
 //
 // For a cluster of the snapshot the snapshot's scope table is the whole
 // answer and the declarer is not asked: a server cannot narrow or drop the
-// scope the model states. The scope applies whatever the server returns,
+// scope the model states — nor declare one for a manufacturer-specific
+// attribute it adds to such a cluster, which is not scoped. The scope applies whatever the server returns,
 // from [ClusterServer.MatterRead] or [FabricScopedReader.MatterReadFiltered];
 // a server returns every fabric's entries whole and leaves the scoping to
 // the dispatcher.
