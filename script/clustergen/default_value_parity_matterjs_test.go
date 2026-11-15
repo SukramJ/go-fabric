@@ -35,7 +35,9 @@ func TestDefaultValueParityMatterJS(t *testing.T) {
 // default of its own gets the one its fields state — OperationalState's
 // OperationalError starts as {errorStateId: 0}
 // (operational-state.element.ts:110-111 at db021da0) — and only a
-// mandatory, non-nullable field with a scalar default enters it.
+// mandatory, non-nullable field with a scalar default enters it — this
+// generator's narrowing of matter.js's rule (DefaultValue.ts:153-179 at
+// db021da0 takes every conformant child with a default).
 func TestStructDefaultFromItsFields(t *testing.T) {
 	t.Parallel()
 	mk := func(name string, k kind, mandatory, nullable bool, def string) *fieldInfo {
