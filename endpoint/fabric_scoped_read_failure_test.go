@@ -128,7 +128,7 @@ func twoFabricStore(t *testing.T) *store.Store {
 			t.Fatal(err)
 		}
 		if err := st.UpsertIdentity(ctx, store.IdentityRecord{
-			FabricIndex: f, NOC: []byte{0x15, byte(f), 0x18}, PrivateKey: make([]byte, 32), IPK: make([]byte, 16),
+			FabricIndex: f, NOC: []byte{0x15, f, 0x18}, PrivateKey: make([]byte, 32), IPK: make([]byte, 16),
 		}); err != nil {
 			t.Fatal(err)
 		}

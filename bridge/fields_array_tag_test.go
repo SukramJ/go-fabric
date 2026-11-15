@@ -28,7 +28,7 @@ func TestCommandFieldsWithATaggedArrayElementAreInvalidCommand(t *testing.T) {
 	// holding a two-octet unsigned integer under context tag 0x30, then a
 	// field 2 and the structure's end.
 	payload := []byte("\x15%\x00\x01\x016\x01%000\x18$\x020\x18")
-	for cmd := uint32(0); cmd < 6; cmd++ {
+	for cmd := range uint32(6) {
 		dec := tlv.NewDecoder(payload)
 		open, err := dec.Next()
 		if err != nil {
