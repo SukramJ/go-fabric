@@ -52,6 +52,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"reflect"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -1015,6 +1016,17 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	return err
 }
 
+// answers reports whether the server reads stored — a written value in its
+// stored form — for attrID: the comparison in front of the host's veto.
+func (s *ThermostatServer) answers(attrID uint32, stored any) bool {
+	cur, ok := s.MatterRead(attrID)
+	if !ok || cur == nil || stored == nil {
+		return ok && cur == nil && stored == nil
+	}
+	c, ok := spec.Convert(cur, reflect.TypeOf(stored))
+	return ok && reflect.DeepEqual(c.Interface(), stored)
+}
+
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
 // write of [ThermostatServer.MatterWrite], changed when it moved an
 // attribute — the comparisons that decide the change report. A staged
@@ -1024,8 +1036,13 @@ func (s *ThermostatServer) MatterWriteChanged(ctx context.Context, attrID uint32
 	if err != nil {
 		return false, err
 	}
-	if err := s.veto.Check(ctx, attrID, storedWrite(attrID, v)); err != nil {
-		return false, err
+	// The host's veto hears a change only: a write of the value the server
+	// answers reaches no veto ([spec.WriteVeto.Check]); the write goes on
+	// as before and changes nothing.
+	if stored := storedWrite(attrID, v); !s.answers(attrID, stored) {
+		if err := s.veto.Check(ctx, attrID, stored); err != nil {
+			return false, err
+		}
 	}
 	// Presets and Schedules are staged in their atomic write; the
 	// attribute changes when the write commits, through its command.

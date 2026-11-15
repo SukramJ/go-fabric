@@ -497,9 +497,9 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (st
 	if err != nil {
 		return false, err
 	}
-	if err := s.veto.Check(ctx, attrID, storedForm(v)); err != nil {
-		return false, err
-	}
+	// The host's veto hears a change only: each case below compares with
+	// the held value first ([spec.WriteVeto.Check]).
+	veto := func() error { return s.veto.Check(ctx, attrID, storedForm(v)) }
 	n, isNum := v.(uint64) // per ValidateWrite: nil only for a nullable null
 	switch attrID {
 	case AttrPercentSetting:
@@ -509,6 +509,9 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (st
 		if held := s.src.FanState().PercentSetting; held != nil && uint64(*held) == n {
 			return false, nil
 		}
+		if err := veto(); err != nil {
+			return false, err
+		}
 		return true, s.apply(ctx, "PercentSetting write", s.percentSettings(uint8(n))) //nolint:gosec // ≤ 100 per ValidateWrite
 	case AttrSpeedSetting:
 		if !isNum {
@@ -517,15 +520,21 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (st
 		if held := s.src.FanState().SpeedSetting; held != nil && uint64(*held) == n {
 			return false, nil
 		}
+		if err := veto(); err != nil {
+			return false, err
+		}
 		return true, s.apply(ctx, "SpeedSetting write", s.speedSettings(uint8(n))) //nolint:gosec // ≤ SpeedMax per ValidateWrite
 	case AttrRockSetting:
-		return s.writeRockSetting(ctx, RockBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
+		return s.writeRockSetting(ctx, RockBitmap(n), veto) //nolint:gosec // a map8 per ValidateWrite
 	case AttrWindSetting:
-		return s.writeWindSetting(ctx, WindBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
+		return s.writeWindSetting(ctx, WindBitmap(n), veto) //nolint:gosec // a map8 per ValidateWrite
 	default: // AttrAirflowDirection, the last writable attribute
 		dir := AirflowDirection(n) //nolint:gosec // an enum8 per ValidateWrite
 		if s.src.FanState().AirflowDirection == dir {
 			return false, nil
+		}
+		if err := veto(); err != nil {
+			return false, err
 		}
 		setter, _ := s.src.(airflowSetter) // guaranteed by NewServer
 		if err := setter.SetAirflowDirection(ctx, dir); err != nil {
@@ -660,11 +669,11 @@ func (s *Server) writeFanMode(ctx context.Context, value any) (stored bool, err 
 	if err != nil {
 		return false, err
 	}
-	if err := s.veto.Check(ctx, AttrFanMode, m); err != nil {
-		return false, err
-	}
 	if s.src.FanState().FanMode == m {
 		return false, nil
+	}
+	if err := s.veto.Check(ctx, AttrFanMode, m); err != nil {
+		return false, err
 	}
 	return true, s.apply(ctx, "FanMode write", s.fanModeSettings(m))
 }
@@ -677,12 +686,15 @@ func (s *Server) writeFanMode(ctx context.Context, value any) (stored bool, err 
 // host does that.
 // The RockSetting the host holds, written again, reaches no setter
 // (stored false).
-func (s *Server) writeRockSetting(ctx context.Context, rock RockBitmap) (stored bool, err error) {
+func (s *Server) writeRockSetting(ctx context.Context, rock RockBitmap, veto func() error) (stored bool, err error) {
 	if rock&^s.cfg.RockSupport != 0 {
 		return false, statusError{im.StatusConstraintError, fmt.Sprintf("fan: RockSetting 0x%02X outside RockSupport 0x%02X", rock, s.cfg.RockSupport)}
 	}
 	if s.src.FanState().RockSetting == rock {
 		return false, nil
+	}
+	if err := veto(); err != nil {
+		return false, err
 	}
 	setter, _ := s.src.(rockSetter) // guaranteed by NewServer
 	if err := setter.SetRockSetting(ctx, rock); err != nil {
@@ -692,12 +704,15 @@ func (s *Server) writeRockSetting(ctx context.Context, rock RockBitmap) (stored 
 }
 
 // writeWindSetting is writeRockSetting for WindSetting (resource :186-188).
-func (s *Server) writeWindSetting(ctx context.Context, wind WindBitmap) (stored bool, err error) {
+func (s *Server) writeWindSetting(ctx context.Context, wind WindBitmap, veto func() error) (stored bool, err error) {
 	if wind&^s.cfg.WindSupport != 0 {
 		return false, statusError{im.StatusConstraintError, fmt.Sprintf("fan: WindSetting 0x%02X outside WindSupport 0x%02X", wind, s.cfg.WindSupport)}
 	}
 	if s.src.FanState().WindSetting == wind {
 		return false, nil
+	}
+	if err := veto(); err != nil {
+		return false, err
 	}
 	setter, _ := s.src.(windSetter) // guaranteed by NewServer
 	if err := setter.SetWindSetting(ctx, wind); err != nil {

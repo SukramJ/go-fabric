@@ -552,11 +552,13 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	if err != nil {
 		return false, err
 	}
-	if err := s.veto.Check(ctx, attrID, storedForm(attrID, v)); err != nil {
-		return false, err
-	}
+	// The held value reaches no veto: the host's veto hears a change only
+	// ([spec.WriteVeto.Check]).
 	if heldEquals(s.src.PumpState(), attrID, v) {
 		return false, nil
+	}
+	if err := s.veto.Check(ctx, attrID, storedForm(attrID, v)); err != nil {
+		return false, err
 	}
 	n, _ := v.(uint64) // an enum8 or a counter per ValidateWrite; nil for null
 	switch attrID {
