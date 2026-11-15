@@ -206,9 +206,9 @@ type Node struct {
 	// only once the bridge stopped too, so a Stop whose bridge stop gave
 	// up is resumed by the next one (review II, R2-P1-dr-req-01).
 	stopBegun bool
-	// rolledBackReported: Start ran the removal consequences of the
-	// fabrics construction rolled back (reportRolledBackFabrics); a Start
-	// after a failed one does not run them again. Under lifecycle.
+	// rolledBackReported: Start ran the fabric hooks the store owes
+	// (deliverOwedFabricEvents); a Start after a failed one does not run
+	// them again. Under lifecycle.
 	rolledBackReported bool
 
 	// announcedMu guards announced: the fabrics the host may know of —
@@ -395,11 +395,6 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}); err != nil {
 		return nil, err
 	}
-	// The root's construction rolled back an uncommitted UpdateNOC and
-	// committed the row back: the next process finds nothing to roll back,
-	// so the store-side consequence runs here, not at Start, which a host
-	// whose own start-up fails never reaches (review II, R2-P2-rr-dev-09).
-	n.removeRolledBackUpdateResumptions(ctx)
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
 	n.bootReason = n.root.bootReason
 	n.setNetworkInterfaceRules()
@@ -889,61 +884,85 @@ func (n *Node) setAnnounced(fabricIndex uint8, known bool) bool {
 	return was
 }
 
-// reportRolledBackFabrics runs, once, the consequences of every rollback
-// OperationalCredentials made at construction — for a rolled-back
-// UpdateNOC those of its rollback at run time (below), and the removal
-// consequences of every fabric it removed: an AddNOC
-// of the previous run that no CommissioningComplete committed before the
-// node went down. That run announced the fabric (OnFabricAdded) and the
+// deliverOwedFabricEvents runs, once, the fabric hooks the store owes
+// (store.Fabrics.OwedFabricEvents) and acknowledges each after its hooks
+// ran, so a process that ends between the two runs them again at its next
+// start: at least once. An event is owed by every rollback
+// (store.Fabrics.RollbackFabric records it in the rollback's own write):
+// the ones OperationalCredentials made at construction, of a row the
+// previous run left pending, and a run-time rollback whose process ended
+// before its hooks ran — a run-time rollback that reached its hooks
+// acknowledged its event itself.
+//
+// For a removed fabric — an AddNOC that no CommissioningComplete committed
+// — the node runs its fabric-removed fan-out and the host's
+// OnFabricRemoved with the identity the row carried, before it serves:
+// the run that added it announced it (OnFabricAdded), and the
 // commissioner may have written fabric-scoped state for it outside the
 // rows its removal cascades — a binding, a trusted time source, an
-// Extension entry — so the node runs its fabric-removed fan-out and the
-// host's OnFabricRemoved for it, with the identity the row carried, before
-// it serves. connectedhomeip does the same after its start-up rollback:
-// FabricTable::Init remembers the deleted index
+// Extension entry. connectedhomeip does the same after its start-up
+// rollback: FabricTable::Init remembers the deleted index
 // (src/credentials/FabricTable.cpp:1129-1140) and Server::Init schedules
 // the fail-safe cleanup for it once everything is initialised
 // (src/app/server/Server.cpp:662-685 at 6170af84). Review II,
-// R2-P2-comm-03. The lifecycle slot is held.
-func (n *Node) reportRolledBackFabrics(ctx context.Context) {
+// R2-P2-comm-03. A removed fabric whose index the table holds again — its
+// event outlived a refused acknowledgement and the index was handed out
+// anew — is acknowledged without running anything: the new fabric's add
+// dropped what the node held for the index (fabricInstalledAt).
+//
+// For a reverted fabric — an UpdateNOC that no CommissioningComplete
+// committed — the node runs what the rollback at run time runs through
+// the OnFabricUpdated hook (observedFabricUpdated): the client stack's
+// sessions of the fabric close and the host hears the fabric reverted
+// (review II, R2-P2-dr-noc-05); the resumption records made under the
+// uncommitted identity went with the rollback's write. The CASE identity
+// and the operational record are not moved here: nothing is announced
+// and no session exists before the bridge starts, and Start loads and
+// announces the identity as the store holds it again.
+//
+// A fabric removed for the pending marker of a release before schema v8
+// is OperationalCredentials' in-memory record
+// (core.OperationalCredentials.RolledBackFabrics, owed no event); its
+// removal runs here too. The lifecycle slot is held.
+func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 	if n.rolledBackReported {
 		return
 	}
 	n.rolledBackReported = true
+	owed, err := n.st.OwedFabricEvents(ctx)
+	if err != nil {
+		n.logger.Warn("fabric.owed_events.list_failed", slog.Any("err", err))
+	}
+	removed := map[uint8]bool{}
+	for _, ev := range owed {
+		idx := ev.Fabric.FabricIndex
+		switch ev.Kind {
+		case store.FabricPendingAdd:
+			removed[idx] = true
+			if _, err := n.st.GetFabric(ctx, idx); err == nil {
+				n.logger.Warn("fabric.owed_removal.superseded", slog.Int("fabric_index", int(idx)))
+				break
+			}
+			n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(idx)))
+			n.fabricRemovedWith(ctx, fabricInfoOf(ev.Fabric))
+		case store.FabricPendingUpdate:
+			n.logger.Warn("fabric.update_rolled_back_at_start", slog.Int("fabric_index", int(idx)))
+			n.closeClientFabricSessions(ctx, idx)
+			n.notifyFabricUpdated(ctx, idx)
+		default:
+			n.logger.Warn("fabric.owed_event.unknown_kind", slog.Int("fabric_index", int(idx)), slog.String("kind", ev.Kind.String()))
+		}
+		if err := n.st.AckOwedFabricEvent(ctx, ev.ID); err != nil {
+			n.logger.Warn("fabric.owed_event.ack_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+		}
+	}
 	recs := n.root.OperationalCredentials.RolledBackFabrics()
 	for i := range recs {
+		if removed[recs[i].FabricIndex] {
+			continue
+		}
 		n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(recs[i].FabricIndex)))
 		n.fabricRemovedWith(ctx, fabricInfoOf(recs[i]))
-	}
-	// A rolled-back UpdateNOC runs what its rollback at run time runs
-	// through the OnFabricUpdated hook (observedFabricUpdated): the
-	// fabric's resumption records made under the uncommitted identity go —
-	// in New already (removeRolledBackUpdateResumptions) — with the client
-	// stack's records, and the host hears the fabric reverted (review II,
-	// R2-P2-dr-noc-05). The CASE identity and the operational record are
-	// not moved here: nothing is announced and no session exists before
-	// the bridge starts, and Start loads and announces the identity as the
-	// store holds it again.
-	updates := n.root.OperationalCredentials.RolledBackUpdates()
-	for i := range updates {
-		idx := updates[i].FabricIndex
-		n.logger.Warn("fabric.update_rolled_back_at_start", slog.Int("fabric_index", int(idx)))
-		n.closeClientFabricSessions(ctx, idx)
-		n.notifyFabricUpdated(ctx, idx)
-	}
-}
-
-// removeRolledBackUpdateResumptions removes the resumption records of each
-// fabric whose UpdateNOC the root's construction rolled back: those made
-// under the uncommitted identity are the rollback's store-side
-// consequence, which no later process could run.
-func (n *Node) removeRolledBackUpdateResumptions(ctx context.Context) {
-	updates := n.root.OperationalCredentials.RolledBackUpdates()
-	for i := range updates {
-		idx := updates[i].FabricIndex
-		if err := n.st.RemoveResumptionsByFabric(ctx, idx); err != nil {
-			n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
-		}
 	}
 }
 
@@ -1093,9 +1112,9 @@ func (n *Node) startLocked(ctx context.Context) error {
 	if err := attachPartsListProviders(n.br); err != nil {
 		return err
 	}
-	// The fabrics construction rolled back go before anything is served
-	// (R2-P2-comm-03).
-	n.reportRolledBackFabrics(ctx)
+	// The fabric hooks the store owes run before anything is served
+	// (R2-P2-comm-03, R2-P5-port-18).
+	n.deliverOwedFabricEvents(ctx)
 	// The bridge's start is the last step that can fail; it leaves
 	// nothing bound or published when it does (bridge.Bridge.Start).
 	if err := n.br.Start(ctx); err != nil {
