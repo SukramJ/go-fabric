@@ -16,11 +16,11 @@ func TestConnectTargetRefusesAnUnmappedHost(t *testing.T) {
 	t.Parallel()
 	g := &destinationGuard{}
 	for _, target := range []string{
-		"127.0.0.1‍:443",
-		"10.0.0.1‌:443",
-		"１２７.０.０.１‍:443",
-		"ｌｏｃａｌｈｏｓｔ‍:443",
-		"169.254.169.254‍:443",
+		"127.0.0.1\u200d:443",
+		"10.0.0.1\u200c:443",
+		"\uff11\uff12\uff17.\uff10.\uff10.\uff11\u200d:443",
+		"\uff4c\uff4f\uff43\uff41\uff4c\uff48\uff4f\uff53\uff54\u200d:443",
+		"169.254.169.254\u200d:443",
 	} {
 		if _, err := g.connectTarget(context.Background(), nil, target); !errors.Is(err, errDestination) {
 			t.Errorf("connectTarget(%q) = %v, want errDestination", target, err)
