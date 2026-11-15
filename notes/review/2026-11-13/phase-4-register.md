@@ -111,7 +111,7 @@ subject's among them.
 | R2-P4-imread-10 | low | fixed `9d8c4603` | `im/subscription/subscription.go` — a change report lists its paths in the priming report's order; one function orders a cluster's attributes. Owner decision 62 |
 | R2-P4-imread-11 | low | fixed `bcfdfe61` | `im/subscription/manager.go` — a subscription is granted a MaxInterval of at least 2 s and reports no faster |
 | R2-P4-imread-12 | low | fixed `c2ecdc6b`, `dc11f3d5`, corrected by R2-P4-dr-im-03 `be3a0843`; by_design `BD-Matter-AttributeOrder-ModelOrder` for what owner decision 83 leaves | `endpoint/dispatcher.go` — the snapshot carries each cluster's attribute order as matter.js serves it — attributeOrder from matter.js's Scope.membersOf, schema.AttributeOrder; a cluster's attributes are reported in matter.js's order — Read, priming and change reports alike. Owner decision 62; the snapshot's hash moved with the extract. `F-db021da0-16` is closed with it. Reported PLAUSIBLE |
-| R2-P4-imread-13 | note | phase 4: not done — `L10-D05` and its detail stand as they were | `notes/parity/by_design.md` — the row and the detail of `L10-D05` did not change on the branch (`git diff 9abb2e9e..308a8183`, no line of either), and no fix note or list of the coordinator names the finding. The keep-alive they speak of is fixed (`8e35331f`), so the entry now misstates both sides. See "Not placed, not verified" |
+| R2-P4-imread-13 | note | fixed `736fec1c` (after the tip this register counts from) | `notes/parity/by_design.md` — `L10-D05` and its detail say that a subscription's report, with data or as a keep-alive, asks for the peer's StatusResponse in matter.js and connectedhomeip as here: no divergence; what still differs is when an update counts as delivered (F-db021da0-36) |
 | R2-P4-imwrite-01 | medium (high) | phase 5: `F-db021da0-29`, with the peer path's move onto `client/` (owner decision 76) | `im/invoke.go`, `bridge/ota_provider_link.go` — the gate came with `9f15e9e8` and `46c950f4` and left with `9d47f6f7`: a command with the Large Message quality runs over the transport its request arrived on, and this node sends one over the session it holds. With the gate a camera's signals between two nodes of this module no longer arrived, because the bridge's peer sender opens no TCP connection. A parity gap, public; `9fe486d9` bounds an exchange over TCP by what the peer stated |
 | R2-P4-imwrite-02 | low (medium) | fixed `3f12d831`, `4a61bb83` | `im/write.go` — a write path naming another node is not written — UNSUPPORTED_NODE on a concrete path, dropped on a wildcard or group path; a write that ends at a data element is answered with its StatusResponse on the client's own server too, and a group write's path naming another node writes nothing |
 | R2-P4-imwrite-03 | low | fixed `0127adc2` | `im/invoke.go` — an invoke at a path that does not exist answers the existence status before the fabric-scope and timed gates |
@@ -317,7 +317,7 @@ each struck.
 | F-db021da0-17 | imread, cert | imread: not looked at; cert: no longer true | fixed `80a87309` for the restart half, which is struck (R2-P4-cert-11); the zero state stays an open findings row that names no phase. D-ctr-6 and N-ctr-3 of phase 2 |
 | owner decision 53 (`BD-Matter-SubscriptionEndsWithoutReadablePath`, the subscription quota) | imread | imread: open as recorded | parity: a recorded divergence, present as its `by_design` entry records it; no change; not derived again against connectedhomeip |
 | the findings row "Keep-alive reports suppress the response" | imread | imread: open as recorded | fixed `8e35331f`: the keep-alive asks for a StatusResponse, and an error status ends the subscription; the row is closed (`a388e28f`). What matter.js counts as delivered is `F-db021da0-36`, phase 6 |
-| `L10-D05` detail (phase 0's register) | imread | imread: open as recorded | phase 4: not done — R2-P4-imread-13 |
+| `L10-D05` detail (phase 0's register) | imread | imread: open as recorded | fixed `736fec1c` — R2-P4-imread-13 |
 | F-db021da0-3 | imread, cert | imread, cert: open as recorded | open: the findings row stands. `d169f125` mirrors what follows several failed reports, which the row says was not read; the row's text did not change on the branch (the fix note and the coordinator's list ask for it to be read again) |
 | F-db021da0-4 | imread, cert | imread, cert: open as recorded | open: the findings row stands, not changed on this branch |
 | F-db021da0-8 | imread, cert | imread, cert: open as recorded | open: the findings row stands, not changed on this branch |
@@ -498,7 +498,7 @@ ids are this register's (`N4-<group>-<n>`, the group being the fix note's).
 | N4-bdnotes-1 | the re-read of `by_design`; the coordinator's list | the client role's CASE resumption records live in memory, where matter.js persists the initiator's | phase 5: `F-db021da0-19`, the port extensions | `client/peer` |
 | N4-bdnotes-2 | the re-read of `by_design`; the coordinator's list | `BD-Matter-GroupReceptionUnbounded`: the design owner decision 22 asked for was never done | phase 6: the entry says so (read at `308a8183`) | `groups/` |
 | N4-notes-1 | the coordinator's list | `docs/matterjs-comparison.md` has 20 relative links that leave `docs/`, as at the base | phase 5: docs — counted at `308a8183`; how the strict build passes with them was not looked at | `docs/matterjs-comparison.md` |
-| N4-notes-2 | this file | `L10-D06`, the row beside `L10-D05`, records as a fix that a KeepSubscriptions=false request on a PASE session closes the session's subscriptions — what `0591dff3` removed | phase 4: not done — seen while reading for R2-P4-imread-13, by the register editor; the row was not compared further | `notes/parity/by_design.md` |
+| N4-notes-2 | this file | `L10-D06`, the row beside `L10-D05`, records as a fix that a KeepSubscriptions=false request on a PASE session closes the session's subscriptions — what `0591dff3` removed | fixed `736fec1c`: the row says its fix of 2026-05-12 was taken back with F-db021da0-12 — seen while reading for R2-P4-imread-13, by the register editor | `notes/parity/by_design.md` |
 | N4-coord-1 | the coordinator's list | tests that fail only under load, each seen once or a few times in the phase's runs and none changed by it | phase 5: `F-db021da0-37`, six tests | `bridge`, `controller`, `cluster/core` |
 
 ## Unread
@@ -625,31 +625,29 @@ The 159 findings, by their first disposition:
 
 | disposition | units | diff review | noticed, second read | rework | final | all |
 | --- | --- | --- | --- | --- | --- | --- |
-| fixed | 67 | 25 | 24 | 10 | 14 | 140 |
+| fixed | 68 | 25 | 24 | 10 | 14 | 141 |
 | a recorded divergence, no code change | 9 | 0 | 0 | 0 | 1 | 10 |
 | parity with matter.js, no change | 0 | 0 | 0 | 1 | 0 | 1 |
 | struck | 0 | 1 | 0 | 0 | 1 | 2 |
 | open: a findings row that names no phase | 2 | 0 | 0 | 0 | 1 | 3 |
-| open: this phase's notes, not done | 1 | 0 | 0 | 0 | 0 | 1 |
 | open: phase 5 | 2 | 0 | 0 | 0 | 0 | 2 |
 | all | 81 | 26 | 24 | 11 | 17 | 159 |
 
 By the severity their rows carry: 4 high, 20 medium, 98 low, 37 note.
 
-Of the 140 fixed: 30 were corrected by a finding of a later read, 9 name a
+Of the 141 fixed: 30 were corrected by a finding of a later read, 9 name a
 `by_design` entry beside the fix, 16 name a findings row — one the fix closes
 or one for what it leaves — and 1 leaves a part open in its disposition
 (R2-P4-cert-01).
 
 What earlier phases handed over: 79 rows for the 103 entries of the units'
-lists — 16 fixed, 9 a recorded divergence, no code change, 6 struck, 4 closed
-before this phase, 17 open: a findings row, 2 open: this phase's notes, not
+lists — 17 fixed, 9 a recorded divergence, no code change, 6 struck, 4 closed
+before this phase, 17 open: a findings row, 1 open: this phase's notes, not
 done, 3 open: phase 5, 22 open: phase 6.
 
-The 61 noticed items: 12 fixed, 4 a recorded divergence, no code change, 3
-struck, 4 open: a findings row, 1 open: this phase's notes, not done, 1 open:
-phase 4, the certification ports, 13 open: phase 5, 18 open: phase 6, 5 held
-back.
+The 61 noticed items: 13 fixed, 4 a recorded divergence, no code change, 3
+struck, 4 open: a findings row, 1 open: phase 4, the certification ports, 13
+open: phase 5, 18 open: phase 6, 5 held back.
 
 Unread: 10 rows for the 16 review units, phase 6, and 2 held-back rows.
 
@@ -712,15 +710,13 @@ out.
 
 ## Not placed, not verified
 
-- Not done, and placed by no source: R2-P4-imread-13. The finding asks for
-  `L10-D05` to be retired; its row and its detail did not change on the
-  branch, the keep-alive it compares with is fixed, and neither a fix note nor
-  the coordinator's list names the finding — the re-read of `by_design` read
-  the `BD-` entries, and this one stands under an audit table. The row beside
-  it, `L10-D06`, describes as a fix what `0591dff3` removed (N4-notes-2).
-  `BD-Matter-Controller-UnsecuredSessionOneHandshake` still says
+- Done after the tip this register counts from, by `736fec1c`: R2-P4-imread-13
+  (`L10-D05`, which stood under an audit table the re-read of the `BD-`
+  entries did not cover) and the row beside it, `L10-D06` (N4-notes-2). Not
+  done: `BD-Matter-Controller-UnsecuredSessionOneHandshake` still says
   connectedhomeip was not read, which N-rw3ctl-2 of phase 2 and this phase's
-  unit asked to be corrected. All three are this phase's notes.
+  unit asked to be corrected; it is this phase's notes and goes with phase
+  6's.
 - Owner decision 13 gave phase 4 the re-read of every citation at the older
   pin and a guard that ratchets citations at another commit to zero; decision
   58 put it into the fix wave. Measured at `308a8183`: 925 Go lines carry `at
