@@ -293,6 +293,40 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
+## Changed after v0.22.2: the facade review (wave A2)
+
+New fields and ports replace older ones; every older one keeps its
+behaviour until it is removed in the next minor release. The behaviour
+changes are the rows marked *changed*.
+
+| Before | Now |
+| --- | --- |
+| an uncommissioned node always opens its own window | `Commissioning.WindowOnDemand`: the node opens none by itself; the host calls `Node.OpenOwnWindow` (a User-Intent product). `Commissioning.Flow` (`node.FlowStandard`, `FlowUserIntent`, `FlowCustom`) states the flow in the QR code and selects the long manual code |
+| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` (16 bits) | `Hints` (`mdns.PairingHints`, every bit of the bitmap); both set is `mdns.ErrInvalidService`. On the facade: `Commissioning.PairingHints`, `Commissioning.PairingInstruction` |
+| *changed:* `Node.OpenOwnWindow`, `OpenBasicWindow`, `CloseWindow` before `Start` | return `node.ErrNotStarted` and open nothing; call them after `Start` |
+| *changed:* `Config.Advertiser` beside a `Network.MDNS` with `Off`, `HostName` or `Interfaces` | `Config.Validate` refuses the pair: `Network.MDNS` configures the node's own advertiser only — leave it zero beside a host advertiser |
+| *changed:* an advertised device name (`ProductDescription.Name`, else `BasicInformation.NodeLabel`) over 32 bytes | `Config.Validate` refuses it (decision 26); shorten it |
+| `Config.SupportedFabrics`, `Config.MaxPathsPerInvoke` | `Config.Limits.SupportedFabrics`, `Config.Limits.MaxPathsPerInvoke`; both set and different is `ErrInvalidConfig` |
+| `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` | none on the node (no node method returns them); `bridge.CommissioningWindowOpener` returns the `bridge` values |
+| `store.ErrScrubIncomplete`, `store.ErrFabricNotFound`, `dcl.ErrOTAImageTooLarge`, `dcl.DefaultMaxImageSize` compared from a node host | `node.ErrScrubIncomplete`, `node.ErrFabricNotFound`, `node.ErrOTAImageTooLarge`, `node.DCLDefaultMaxImageSize` (the same values) |
+| a host's `SetOnFabricRemoved`, `SetOnFabricUpdated`, `SetOnCommissioningComplete` or the window's `SetTransitionHook` replaced the facade's handler | *changed:* it adds a handler that runs after the facade's |
+| `bridge.Bridge.AttachRootPartsListProvider`, `AttachAggregatorPartsListProvider` | not needed: `Bridge.Start` installs the live PartsList of both itself; the two stay as overrides |
+| `bridge.Bridge.AttachPaseHandler`, `AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` with a provider that returns the one handler for every handshake |
+| `bridge.Bridge.SubscriptionPersistenceEnabled`, `FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence(b)` in a test |
+| `bridge.Bridge.ControllerRTT` | none |
+| `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE` | `contract.GATTPeripheral` (`RegisterService` returns a `contract.GATTService`, whose `Serve` takes the centrals), `node.Network.GATT`, `bridge.Config.GATT`: a refused registration is `StartBLE`'s error and nothing is advertised; both set is refused |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeExpired(func(ctx, fabricIndex))` | `SetOnFailSafeExpiry(func(ctx, core.FailSafeExpiry))`: `ArmedFabric`, `AddedFabric`, `OverPASE` |
+| `GeneralCommissioning.SetOnFailSafeRolledBack(func(ctx))` | `SetFailSafeSessionCloser(func(ctx) (closed []uint16))`, which names the PASE sessions it closed |
+| `GeneralCommissioning.ArmOnPaseEstablished(ctx)` | `ArmOnPaseSession(ctx, sessionID)`: refused only when a rollback closed that session |
+| `device.NewRootNode` | none: the root endpoint is the node's (`Node.Root`); `device.RootNodeType` stays for `device.Lookup` |
+| *changed:* the `*device.Type` of `<Name>Type()`, `device.Lookup`, `device.Types`, `Device.Type` was the registry's own value | each is a copy, and `device.New` copies the `Type` it is given: compare types by `ID`, not by pointer |
+| a composite (FloodlightCamera, VideoDoorbell) or a composed device only in code | `device.Spec.Parts`: `FromSpec` builds the parts; a composite missing a mandatory component is refused with the constructor's `ErrComposition` |
+| a data-driven host that found an unanswered attribute only at read time | `(*device.Type).RequiredInitial()` lists the attributes a type's default servers list without a value, with the `<cluster>def.Declare{Initial: …}` that states each |
+| `ThermostatServer.SetLocalTemperature` for a sensor's reading | `SetMeasuredTemperature`, which applies `LocalTemperatureCalibration`; `SetLocalTemperature` stays the uncalibrated setter |
+| `im.FabricFilterFromContext` / `im.LookupFabricFilter` in a host's server | `contract.AccessingFabric(ctx)` |
+| a host switch source's `WireMatterSwitchHandler` / `WireMatterSwitchPositions` matched by name | `contract.SwitchGestureSource`, `contract.SwitchPositionSource` |
+| a host Wi-Fi driver | may implement `contract.WiFiLinkWatcher` (link changes) and `contract.WiFiDisconnector` (leave the network at the fail-safe's expiry) |
+
 ## Changed after v0.22.2: the store port and the endpoint state
 
 The persistence port grows by six methods (review II, decision 107), which

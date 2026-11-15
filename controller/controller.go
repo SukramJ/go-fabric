@@ -676,10 +676,7 @@ func (c *Controller) keepStopping(reg *client.Registry) {
 func (c *Controller) Close(ctx context.Context) error {
 	done, first := c.beginClose()
 	if !first {
-		if err := awaitClose(ctx, done); err != nil {
-			return err
-		}
-		return c.awaitStopping(ctx)
+		return c.awaitLaterClose(ctx, done)
 	}
 	defer close(done)
 	var errs []error
@@ -762,6 +759,15 @@ func (c *Controller) Close(ctx context.Context) error {
 	// ends first): the gauge reads none once the stack is down.
 	c.gauge(MetricSessionsOpen, 0)
 	return errors.Join(errs...)
+}
+
+// awaitLaterClose is a Close after the first: it waits for the first to
+// return, then for the nodes that Close left stopping.
+func (c *Controller) awaitLaterClose(ctx context.Context, done <-chan struct{}) error {
+	if err := awaitClose(ctx, done); err != nil {
+		return err
+	}
+	return c.awaitStopping(ctx)
 }
 
 // awaitStopping waits, within ctx, for the nodes a Close left stopping

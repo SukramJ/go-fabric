@@ -722,7 +722,7 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		// src/app/server/CommissioningWindowManager.cpp:240-242 at
 		// 6170af84, MarkForEviction and HandleFailedAttempt; review II,
 		// R2-P3-pase-03).
-		if err := root.GeneralCommissioning.ArmOnPaseEstablished(life); err != nil {
+		if err := root.GeneralCommissioning.ArmOnPaseSession(life, sessionID); err != nil {
 			_ = sessions.Close(sessionID)
 			return fmt.Errorf("node: the PASE session's fail-safe: %w", err)
 		}

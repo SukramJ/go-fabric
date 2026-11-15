@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // The order between a fail-safe's end and the next arm (core2 item 1b).
@@ -33,7 +34,7 @@ type expiryRollbackKey struct{}
 // onFailSafeRolledBack is wired, and windowFabric when the window's
 // AddNOC added it (failSafeFabricAdded). A nil hook is nothing to wait
 // for. Caller holds g.mu.
-func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context, fabricIndex uint8), windowFabric uint8) func(ctx context.Context, fabricIndex uint8) {
+func (g *GeneralCommissioning) trackRollbackLocked(hook expiryHook, windowFabric uint8) func(ctx context.Context, fabricIndex uint8) {
 	if hook == nil {
 		return nil
 	}
@@ -41,16 +42,26 @@ func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context
 		g.expiryRollbacksDone = make(chan struct{})
 	}
 	g.expiryRollbacks++
-	pasesClosed := g.onFailSafeRolledBack != nil
+	// The deprecated onFailSafeRolledBack closes PASE sessions it does not
+	// name; the session closer names them.
+	unnamedClose := g.onFailSafeRolledBack != nil
+	pasesClosed := unnamedClose || g.failSafeSessionCloser != nil
 	var removed uint8
 	if g.failSafeFabricAdded {
 		removed = windowFabric
 	}
 	return func(ctx context.Context, fabricIndex uint8) {
+		var closed []uint16
 		defer func() {
 			g.mu.Lock()
 			if pasesClosed {
 				g.rollbackPaseCloses++
+			}
+			if unnamedClose {
+				g.rollbackUnnamedPaseCloses++
+			}
+			if g.pendingPaseArms > 0 {
+				g.rollbackClosedPase = append(g.rollbackClosedPase, closed...)
 			}
 			if removed != 0 {
 				if g.rollbackFabricRemovals == nil {
@@ -65,7 +76,7 @@ func (g *GeneralCommissioning) trackRollbackLocked(hook func(ctx context.Context
 			}
 			g.mu.Unlock()
 		}()
-		hook(context.WithValue(ctx, expiryRollbackKey{}, true), fabricIndex)
+		closed = hook(context.WithValue(ctx, expiryRollbackKey{}, true), fabricIndex)
 	}
 }
 
@@ -133,8 +144,9 @@ type settledExpiry struct {
 	// fabricAdded that AddNOC re-stamped it so (the rollback removes it).
 	fabricIndex uint8
 	fabricAdded bool
-	// pasesClosed: the rollback ran onFailSafeRolledBack, which ends every
-	// PASE session (the bridge wires it so, bridge/pase_close.go).
+	// pasesClosed: the rollback ran onFailSafeRolledBack or the session
+	// closer, which end every PASE session (the bridge wires the closer,
+	// bridge/pase_close.go).
 	pasesClosed bool
 }
 
@@ -168,16 +180,40 @@ var errGencommArmRolledBack = errors.New("core: GeneralCommissioning: the fail-s
 // rollback that finishes while the arm waits ran its PASE close or its
 // fabric removal after the arm's session existed. Caller holds g.mu, as
 // for settleExpiryLocked.
-func (g *GeneralCommissioning) settleArmLocked(ctx context.Context, sessFabric uint8) error {
+//
+// paseSession names the arming PASE session (ArmOnPaseSession; 0 unnamed):
+// a named session is refused by the session closer's close only when that
+// close named it (review II, R2-P2-comm-11); the deprecated
+// onFailSafeRolledBack, which names none, refuses it as before.
+func (g *GeneralCommissioning) settleArmLocked(ctx context.Context, sessFabric uint8, paseSession uint16) error {
 	paseCloses, removals := g.rollbackPaseCloses, g.rollbackFabricRemovals[sessFabric]
+	unnamedCloses := g.rollbackUnnamedPaseCloses
+	named := sessFabric == 0 && paseSession != 0
+	start := len(g.rollbackClosedPase)
+	if named {
+		g.pendingPaseArms++
+		defer func() {
+			g.pendingPaseArms--
+			if g.pendingPaseArms == 0 {
+				g.rollbackClosedPase = nil
+			}
+		}()
+	}
 	settled, err := g.settleExpiryLocked(ctx)
 	if err != nil {
 		return err
 	}
-	if settled.endedSession(sessFabric) {
+	switch {
+	case named:
+		// Only the legacy hook's closes (counted, unnamed) and the
+		// closer's named ones count; a closer's close that did not name
+		// this session leaves it free to arm.
+		if g.rollbackUnnamedPaseCloses != unnamedCloses || slices.Contains(g.rollbackClosedPase[start:], paseSession) {
+			return errGencommArmRolledBack
+		}
+	case settled.endedSession(sessFabric):
 		return errGencommArmRolledBack
-	}
-	if (sessFabric == 0 && g.rollbackPaseCloses != paseCloses) || (sessFabric != 0 && g.rollbackFabricRemovals[sessFabric] != removals) {
+	case (sessFabric == 0 && g.rollbackPaseCloses != paseCloses) || (sessFabric != 0 && g.rollbackFabricRemovals[sessFabric] != removals):
 		return errGencommArmRolledBack
 	}
 	return g.startFailSafeLocked(ctx, sessFabric, true)
@@ -204,7 +240,7 @@ func (g *GeneralCommissioning) settleExpiryLocked(ctx context.Context) (settledE
 				expired:     true,
 				fabricIndex: g.failSafeFabricIndex,
 				fabricAdded: g.failSafeFabricAdded,
-				pasesClosed: g.onFailSafeRolledBack != nil,
+				pasesClosed: g.onFailSafeRolledBack != nil || g.failSafeSessionCloser != nil,
 			}
 			after := g.expireLocked(fabricIndex)
 			func() {

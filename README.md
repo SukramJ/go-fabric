@@ -201,7 +201,7 @@ becomes permissible in:
 | `transport/mrp.NewWindowNoRollover` | `transport/mrp.NewWindowNoRolloverAt(0)` | `v0.23.0` |
 | `bridge.FailSafeArmer` | none; the fail-safe comes with the commissioner's ArmFailSafe or the arm of its PASE session | `v0.23.0` |
 | `bridge.CommissioningWindow.SetFailSafeArmer` | `CommissioningWindow.SetFailSafeExpirer` | `v0.23.0` |
-| `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseEstablished`, which returns the refusal of the arm | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession`, which returns the refusal of the arm and takes the session's id | `v0.23.0` |
 | `im/subscription.Manager.CloseEndpoint` | `Manager.Close` on each subscription to end; a Reassemble that removes an endpoint ends none | `v0.23.0` |
 | `bridge.MRPAckAdapter`, `bridge.NewMRPAckAdapter` | none; `Bridge.AttachAckTracker` wires the tracker, which a peer's acknowledgement does not discharge | `v0.23.0` |
 | `groups.NoKeyError` | `groups.DecodeError`, the outcome of a group message no candidate key passed; `Manager.Decode` no longer returns `NoKeyError` | `v0.23.0` |
@@ -215,6 +215,17 @@ becomes permissible in:
 | `cluster/wire.ScenesManagement` | `cluster/core.ScenesManagement` (`core.NewScenesManagement`) | `v0.23.0` |
 | `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, the `Schedules*` constants | the Thermostat server's schedules (`cluster/thermo`, `docs/guides/thermostat.md`) | `v0.23.0` |
 | `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` | none to call: a node reaches its OTA provider and its camera's requestor over its own peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session without a handshake | `v0.23.0` |
+| `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` | none; `bridge.CommissioningWindowOpener` returns the `bridge` values | `v0.23.0` |
+| `node.Config.SupportedFabrics`, `node.Config.MaxPathsPerInvoke` | `Config.Limits.SupportedFabrics`, `Config.Limits.MaxPathsPerInvoke` | `v0.23.0` |
+| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` | `Hints` (`mdns.PairingHints`) | `v0.23.0` |
+| `bridge.Bridge.AttachPaseHandler`, `bridge.Bridge.AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` | `v0.23.0` |
+| `bridge.Bridge.SubscriptionPersistenceEnabled`, `bridge.Bridge.FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence` | `v0.23.0` |
+| `bridge.Bridge.ControllerRTT` | none | `v0.23.0` |
+| `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE` | `contract.GATTPeripheral`, `node.Network.GATT`, `bridge.Config.GATT` | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeExpired` | `GeneralCommissioning.SetOnFailSafeExpiry` | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeRolledBack` | `GeneralCommissioning.SetFailSafeSessionCloser` | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.ArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession` | `v0.23.0` |
+| `device.NewRootNode` | none; the root endpoint is the node's (`node.Node.Root`) | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
