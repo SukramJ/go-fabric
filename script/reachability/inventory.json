@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8837,
+  "entry_points": 8852,
   "entry_packages": [
     ".",
     "bdx",
@@ -290,9 +290,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18588,
+    "total_exported": 18603,
     "reachable": 12507,
-    "whitelisted": 6081,
+    "whitelisted": 6096,
     "unreachable": 0
   },
   "by_package": [],
@@ -28300,10 +28300,17 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestCRLDownloadConnectsToPublicDestinationsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 517
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestCRLDownloadRefusesARedirectFromHTTPSToHTTP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 168
+      "line": 179
     },
     {
       "package": "controller/dcl",
@@ -28409,6 +28416,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/commission_test.go",
       "line": 130
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestConnectTargetRefusesAnUnmappedHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/connect_target_ascii_test.go",
+      "line": 15
     },
     {
       "package": "controller/dcl",
@@ -28762,10 +28776,38 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestGitHubNamedURLsConnectToPublicDestinationsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 605
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestGitHubRequestsCarryADeadline",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 217
+      "line": 228
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestGuardBehindAProxy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 546
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestGuardJudgesTheHostAsSent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 670
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestIPv4Legacy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 753
     },
     {
       "package": "controller/dcl",
@@ -28811,6 +28853,20 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestOTADownloadByURLSchemesAndDestinations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 489
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestOTADownloadConnectsToPublicDestinationsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 396
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestOTADownloadLongerThanAnnounced",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/ota_test.go",
@@ -28821,7 +28877,7 @@
       "identifier": "TestOTADownloadRefusesARedirectFromHTTPSToHTTP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 129
+      "line": 140
     },
     {
       "package": "controller/dcl",
@@ -28853,6 +28909,13 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestPublicDestination",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 255
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestResponseBounds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_test.go",
@@ -28870,7 +28933,7 @@
       "identifier": "TestRevocationLookupBoundsItsConcurrentDownloads",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 38
+      "line": 49
     },
     {
       "package": "controller/dcl",
@@ -29010,42 +29073,70 @@
       "identifier": "TestImagesDeleteParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 195
+      "line": 239
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesDownloadByOrigin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_destination_test.go",
+      "line": 34
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesDownloadUpdateParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 141
+      "line": 185
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesHonourTheLedgersMaxImageSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_bound_test.go",
-      "line": 23
+      "line": 24
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesOfflineParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 553
+      "line": 597
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesOpenParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 298
+      "line": 342
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesProvenanceNamesItsBytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 295
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesRequireTheLedgersChecksum",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 27
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesServeStoredLedgerImagesBoundToTheirChecksum",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 104
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesSpecificationVersionParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 338
+      "line": 382
     },
     {
       "package": "controller/softwareupdate",
@@ -29067,6 +29158,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_stream_test.go",
       "line": 225
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesTakeTheLedgerPathUnlessHostSupplied",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 224
     },
     {
       "package": "controller/softwareupdate",
@@ -29116,6 +29214,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_bdx_parity_matterjs_test.go",
       "line": 252
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerOffersOnlyServableStoredImages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 254
     },
     {
       "package": "controller/softwareupdate",

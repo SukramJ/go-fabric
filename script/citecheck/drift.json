@@ -2409,7 +2409,7 @@
   },
   {
     "file": "controller/dcl/github.go",
-    "line": 32,
+    "line": 36,
     "citation": "packages/general/src/util/Github.ts:131-133",
     "resolved": "packages/general/src/util/Github.ts",
     "identifier": "GitHub",
@@ -2418,16 +2418,7 @@
   },
   {
     "file": "controller/dcl/revocation.go",
-    "line": 365,
-    "citation": "DclCertificateService.ts:1543-1552",
-    "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
-    "identifier": "arrayBuffer",
-    "nearest": 1648,
-    "occurrences": 1
-  },
-  {
-    "file": "controller/dcl/revocation.go",
-    "line": 674,
+    "line": 680,
     "citation": "DclCertificateService.ts:2092-2104",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "identifier": "RevocationSetEntry",
