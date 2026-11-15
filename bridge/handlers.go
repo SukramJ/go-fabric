@@ -104,7 +104,8 @@ type PaseAdapter struct {
 	// transcript is SHA-256("CHIP PAKE V1 Commissioning" || request
 	// || response); both sides hash these into their context to bind
 	// the PASE session to the negotiated parameters. Captured by
-	// ProcessPBKDFParamRequest, consumed by ProcessPake1.
+	// ProcessPBKDFParamRequest, consumed by ProcessPake1, dropped
+	// when a step of the handshake is refused ([PaseAdapter.endHandshakeLocked]).
 	pbkdfReqBytes  []byte
 	pbkdfRespBytes []byte
 
@@ -290,6 +291,7 @@ func (a *PaseAdapter) ProcessPBKDFParamRequest(payload []byte) (opcode uint8, re
 	}
 	req, err := spake2.DecodePBKDFParamRequest(payload)
 	if err != nil {
+		a.endHandshakeLocked()
 		return 0, nil, fmt.Errorf("bridge: PBKDFParamRequest decode: %w", err)
 	}
 	// Reject a non-default PasscodeId before assembling the response.
@@ -302,6 +304,7 @@ func (a *PaseAdapter) ProcessPBKDFParamRequest(payload []byte) (opcode uint8, re
 	// packages/protocol/src/session/pase/PaseServer.ts:144-146 (passcodeId
 	// check) → :94-95 (catch → #pairingErrors++).
 	if req.PasscodeID != 0 {
+		a.endHandshakeLocked()
 		return 0, nil, fmt.Errorf("%w: %d", ErrUnsupportedPasscodeID, req.PasscodeID)
 	}
 	source := a.randomSource
@@ -387,7 +390,7 @@ func (a *PaseAdapter) ProcessPake1(payload []byte) (opcode uint8, respPayload []
 		// attacker hammer Pake1 without ever tripping the cap. Mirrors
 		// matter.js packages/protocol/src/session/pase/PaseServer.ts:172
 		// (readPasePake1) → :94-95 (catch → #pairingErrors++).
-		a.verifier = nil
+		a.endHandshakeLocked()
 		return 0, nil, fmt.Errorf("bridge: Pake1 decode: %w", err)
 	}
 	out, err := v.ProcessPake1(pA)
@@ -398,10 +401,25 @@ func (a *PaseAdapter) ProcessPake1(payload []byte) (opcode uint8, respPayload []
 		// brute-force cap. Mirrors matter.js
 		// packages/protocol/src/session/pase/PaseServer.ts:174
 		// (computeSecretAndVerifiersFromX) → :94-95 (catch → #pairingErrors++).
-		a.verifier = nil
+		a.endHandshakeLocked()
 		return 0, nil, fmt.Errorf("bridge: Pake1 verify: %w", err)
 	}
 	return mrp.SCOpcodePake2, spake2.EncodePake2(out), nil
+}
+
+// endHandshakeLocked drops the state of the handshake a refused step
+// ended: the verifier and the PBKDFParamRequest/Response transcript. The
+// router ends the handshake on every refusal — failure report, count, the
+// single-active-PASE claim freed ([Bridge.handlePase]) — and hands the
+// singleton handler of [Bridge.AttachPaseHandler] the next Pake1 whatever
+// began it, so a transcript kept here would let that Pake1 run against
+// the ended handshake without a new PBKDFParamRequest (R2-P5 Fable F3).
+// The next handshake starts with its own PBKDFParamRequest. Caller holds
+// a.mu.
+func (a *PaseAdapter) endHandshakeLocked() {
+	a.verifier = nil
+	a.pbkdfReqBytes = nil
+	a.pbkdfRespBytes = nil
 }
 
 // computePaseContextLocked derives the SPAKE2+ context per Matter
@@ -508,7 +526,7 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 		// start fresh from Pake1 — and surface the decode error so
 		// handlePase emits the single StatusReport(FAILURE) and counts
 		// the attempt toward the brute-force cap.
-		a.verifier = nil
+		a.endHandshakeLocked()
 		return nil, nil, 0, fmt.Errorf("bridge: Pake3 decode: %w", err)
 	}
 	if err := v.ProcessPake3(cA); err != nil {
@@ -517,7 +535,7 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 		// for a wrong-passcode cA that does not match the verifier's
 		// expected hAY) so handlePase emits the single
 		// StatusReport(FAILURE) and increments the brute-force counter.
-		a.verifier = nil
+		a.endHandshakeLocked()
 		return nil, nil, 0, err
 	}
 	sharedSecret = v.SharedSecret()
