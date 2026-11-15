@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8897,
+  "entry_points": 8928,
   "entry_packages": [
     ".",
     "bdx",
@@ -290,9 +290,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18614,
-    "reachable": 12516,
-    "whitelisted": 6098,
+    "total_exported": 18643,
+    "reachable": 12528,
+    "whitelisted": 6115,
     "unreachable": 0
   },
   "by_package": [],
@@ -4220,6 +4220,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInvokeStampsTheSessionIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_large_message_fact_test.go",
+      "line": 132
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInvokeStatesWhetherTheSessionCarriesLargeMessages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_large_message_fact_test.go",
+      "line": 54
+    },
+    {
+      "package": "bridge",
       "identifier": "TestKeepAliveStatusParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_keepalive_status_parity_matterjs_test.go",
@@ -4252,6 +4266,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/session_order_test.go",
       "line": 13
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestLivePeerSessionNewestByPeerActivity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/live_peer_session_test.go",
+      "line": 20
     },
     {
       "package": "bridge",
@@ -6051,6 +6072,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/root_dataversion_invoke_test.go",
       "line": 48
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRouteCarriesLargeMessages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_large_message_fact_test.go",
+      "line": 97
     },
     {
       "package": "bridge",
@@ -7969,6 +7997,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/address_test.go",
       "line": 23
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestBDXExchangeCarriesATransfer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/bdx_test.go",
+      "line": 19
     },
     {
       "package": "client/exchange",
@@ -10783,6 +10818,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
       "line": 287
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_RebootJudgedBySessionActivity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 577
     },
     {
       "package": "cluster/core",
@@ -24817,14 +24859,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 980
+      "line": 994
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 976
+      "line": 990
     },
     {
       "package": "controller",
@@ -33942,6 +33984,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestGroupInvokeLeavesALargeMessageCommandOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_large_message_gate_test.go",
+      "line": 183
+    },
+    {
+      "package": "im",
       "identifier": "TestGroupInvokeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/group_parity_matterjs_test.go",
@@ -34191,6 +34240,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_client_parity_matterjs_test.go",
       "line": 43
+    },
+    {
+      "package": "im",
+      "identifier": "TestInvokeLargeMessageGate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_large_message_gate_test.go",
+      "line": 76
+    },
+    {
+      "package": "im",
+      "identifier": "TestInvokeLargeMessageGateOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_large_message_gate_test.go",
+      "line": 148
     },
     {
       "package": "im",
@@ -36735,6 +36798,27 @@
     },
     {
       "package": "node",
+      "identifier": "PeerPathClientBuilt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_peer_test.go",
+      "line": 16
+    },
+    {
+      "package": "node",
+      "identifier": "PeerPathClientSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_peer_test.go",
+      "line": 20
+    },
+    {
+      "package": "node",
+      "identifier": "PeerPathInvoke",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_peer_test.go",
+      "line": 34
+    },
+    {
+      "package": "node",
       "identifier": "PowerSourceConfigurationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
@@ -36931,6 +37015,20 @@
     },
     {
       "package": "node",
+      "identifier": "TestClientServerStampsTheSessionIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 182
+    },
+    {
+      "package": "node",
+      "identifier": "TestClientSessionCommandGetsItsResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 135
+    },
+    {
+      "package": "node",
       "identifier": "TestConfigFaultsServedByRootGeneralDiagnostics",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/faults_test.go",
@@ -36962,14 +37060,21 @@
       "identifier": "TestFabricRemovalDeletesTheClientPeers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/client_fabric_internal_test.go",
-      "line": 53
+      "line": 57
+    },
+    {
+      "package": "node",
+      "identifier": "TestFabricUpdateEndsAHandshakeInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 73
     },
     {
       "package": "node",
       "identifier": "TestFabricUpdateForgetsTheClientResumptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/client_fabric_internal_test.go",
-      "line": 84
+      "line": 88
     },
     {
       "package": "node",
@@ -37026,6 +37131,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/pase_failsafe_refused_internal_test.go",
       "line": 24
+    },
+    {
+      "package": "node",
+      "identifier": "TestPeerClientFollowsTheFabricHooks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 29
     },
     {
       "package": "node",
@@ -38384,6 +38496,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_session_seed_test.go",
       "line": 29
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestNewestSessionForPeer_OrdersByLastPeerActivity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_newest_session_test.go",
+      "line": 19
     },
     {
       "package": "secure/operational",
