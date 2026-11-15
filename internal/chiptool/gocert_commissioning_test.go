@@ -746,7 +746,7 @@ func administratorBehaviorCase(tc string, basic bool) goCertCase {
 				return errors.New("TH_CR1's messages were not seen; step 6 must run first")
 			}
 			from := mark(th)
-			time.Sleep(turnedOffWindow)
+			sleepCtx(th.ctx, turnedOffWindow)
 			if ls := thLines(th, from, " src="+cr1Src+" "); len(ls) > 0 {
 				return fmt.Errorf("the TH received a message from TH_CR1: %s", ls[0])
 			}
@@ -932,7 +932,7 @@ func windowHandlingCase(tc string, basic bool) goCertCase {
 				}
 				// sleepUntil the window's open line + LATE_START (:384).
 				if d := time.Until(w.openedAt.Add(lateStart)); d > 0 {
-					time.Sleep(d)
+					sleepCtx(th.ctx, d)
 				}
 				delay := time.Since(w.openedAt)
 				if delay < lateStart {
@@ -983,7 +983,7 @@ func windowHandlingCase(tc string, basic bool) goCertCase {
 				if !strings.Contains(line, `resp="status=1 (path=ep=0 cl=0x003C cmd=0x2)"`) {
 					return fmt.Errorf("the TH's invoke line shows no Failure answer: %s", line)
 				}
-				time.Sleep(noActionWindow)
+				sleepCtx(th.ctx, noActionWindow)
 				for _, p := range []string{logEnhancedOpen, logBasicOpen, logWindowClosed, "msg=commissioning.own_window.open"} {
 					if ls := thLines(th, from, p); len(ls) > 0 {
 						return fmt.Errorf("the TH opened or closed a window after the refused revoke: %s", ls[0])

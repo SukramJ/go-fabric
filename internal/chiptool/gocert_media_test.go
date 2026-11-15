@@ -479,13 +479,11 @@ func caseLOWPOWER22() goCertCase {
 			if err := th.mediaInvoke(n, ep, mediaCommand{cluster: lowpower.ClusterID, cmd: lowpower.CmdSleep, name: "Sleep", fields: lowpower.SleepRequest{}}); err != nil {
 				return err
 			}
-			deadline := time.Now().Add(5 * time.Second)
-			for time.Now().Before(deadline) {
-				if strings.Contains(th.dut.snapshotStderr()[offset:], "msg=media.lowpower.sleep") {
-					th.note("the daemon logged media.lowpower.sleep")
-					return nil
-				}
-				time.Sleep(20 * time.Millisecond)
+			if waitFor(th.ctx, 5*time.Second, func() bool {
+				return strings.Contains(th.dut.snapshotStderr()[offset:], "msg=media.lowpower.sleep")
+			}) {
+				th.note("the daemon logged media.lowpower.sleep")
+				return nil
 			}
 			return fmt.Errorf("Sleep on endpoint %d succeeded, but the daemon logged no media.lowpower.sleep", ep)
 		}},
