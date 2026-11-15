@@ -373,5 +373,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-63`, `store/schema.sql:71-86`, `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go:38-69`, `store/schema.sql:71-86`, `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
 
