@@ -179,22 +179,22 @@ idempotent.
 | Table | Since | Holds |
 | --- | --- | --- |
 | `matter_fabrics` | v1 (v0.1.0), columns added in v8 | each fabric: index, fabric id, node id, root certificate and key, vendor, label, compressed fabric id; since v8 its commit state (`pending`: 0 committed, 1 an uncommitted AddNOC, 2 an uncommitted UpdateNOC), its VID verification statement and VVSC, and while it is 2 the node id, vendor id and VID data the UpdateNOC replaced |
-| `matter_node_identities` | v1, columns added in v8 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it; since v8, while the fabric is a pending update, the NOC, ICAC and private key the UpdateNOC replaced (the prior key stored as the key is, in clear) |
-| `matter_group_keys` | v1 | group key sets per fabric, up to three epoch keys |
+| `matter_node_identities` | v1, columns added in v8 and v10 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it; since v8, while the fabric is a pending update, the NOC, ICAC and private key the UpdateNOC replaced (the prior key stored as the key is); since v10 the row's seal mark (`sealed`). The keys are in clear unless the store is `store.NewSealed`'s ([sealing at rest](../security.md#sealing-at-rest)) |
+| `matter_group_keys` | v1, a column added in v10 | group key sets per fabric, up to three epoch keys; since v10 the row's seal mark |
 | `matter_group_key_map` | v1, rebuilt in v3 | GroupKeyMap: group id to key set; since v3 without a foreign key, so an entry may name a key set not yet written |
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
-| `matter_resumption` | v1 | CASE resumption records with the peer's CATs; the record's shared secret is stored in clear, like the fabric's keys ([security model](../security.md#what-the-store-holds-in-clear)) |
+| `matter_resumption` | v1, columns added in v9 and v10 | CASE resumption records with the peer's CATs; the record's shared secret is stored in clear, like the fabric's keys ([security model](../security.md#what-the-store-holds-in-clear)), unless the store seals it (v10's seal mark) |
 | `matter_diagnostics` | v1 | a single-row counter table, created and seeded but read by nothing (its typed API is removed in v0.10.0); the facade keeps its counters in `matter_settings` |
 | `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling`, and since v0.12.0 an ICD node's `icd_management.counter` |
-| `matter_settings` | v1 | string key/value pairs (next section) |
+| `matter_settings` | v1, a column added in v10 | string key/value pairs (next section); since v10 the seal mark of a secret setting |
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |
 | `matter_group_table` | v2 (v0.2.0) | GroupTable: the endpoints of each group |
 | `matter_groupcast_groups` | v2 | the Groupcast cluster's per-group properties |
 | `matter_server_subscriptions` | v2, a column added in v8 | the subscriptions of active CASE sessions, to re-establish after a restart; since v8 the exact order they were saved in (`save_seq`), which the re-establishment walks newest first |
 | `matter_ota_default_providers` | v4 (v0.3.0) | the OTA requestor's DefaultOTAProviders |
 | `matter_thermostat_presets` | v5 (v0.8.3) | a Thermostat endpoint's presets and active preset handle |
-| `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4) | a lock endpoint's users, credentials (encrypted) and schedules |
-| `matter_icd_registrations` | v7 (v0.12.0) | an ICD node's registered Check-In clients per fabric: check-in node id, monitored subject, key, client type; removed with the fabric. Since v0.12.1 the key is sealed at rest (AES-128-GCM under `icd_management.key`, bound to its row); `store.Upgrade` seals the keys an earlier release stored in clear |
+| `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4), columns added in v10 | a lock endpoint's users, credentials (encrypted) and schedules; since v10 whether a Matter command created a user or credential and made its last change (`created_through_matter`, `modified_through_matter`: GetUser and GetCredentialStatus answer its fabric indexes only then; a record seeded through `DoorLockConfig.Initial` answers them null, a row from before v10 takes 1), and a credential row's seal mark |
+| `matter_icd_registrations` | v7 (v0.12.0) | an ICD node's registered Check-In clients per fabric: check-in node id, monitored subject, key, client type; removed with the fabric. Since v0.12.1 the key is sealed at rest (AES-128-GCM under `icd_management.key`, bound to its row); `store.Upgrade` seals the keys an earlier release stored in clear. Since v10 the row's seal mark: under `store.NewSealed` the host's sealer seals the key instead |
 
 ### Tables of `endpoint/sqlitestore`
 
@@ -206,7 +206,7 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:18-390`, `store/migrations.go:43-62`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
+*Source: `store/schema.sql:25-412`, `store/migrations.go:43-67`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
 
 ### Settings keys
 
@@ -292,7 +292,7 @@ build while the key is not in a table of this page.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:274-280`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:286-292`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
 
 ## The controller database
 
@@ -348,16 +348,19 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-106`, `store/migrations.go:22-128`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
 
 ## Backup
 
 The module ships no backup tool. What a backup has to respect:
 
 - **The file holds private keys.** The node's operational keys and the
-  controller's CA key are stored unencrypted. The store's documentation
-  leaves file-system protection to the operator. Protect the database and
-  every copy of it like the keys.
+  controller's CA key are stored unencrypted, unless the node's store
+  seals them (`store.NewSealed`, [sealing at
+  rest](../security.md#sealing-at-rest)); the controller's are never
+  sealed. The store's documentation leaves file-system protection to the
+  operator. Protect the database and every copy of it like the keys — and,
+  under a sealer, keep the sealing key out of the backup.
 - **Copy a consistent state.** Stop the node first, or use SQLite's own
   online mechanisms (`VACUUM INTO`, the backup API). Copying the file of a
   running node can catch a write half-done.
@@ -365,5 +368,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-39`, `store/schema.sql:64-78`, `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go:38-63`, `store/schema.sql:71-86`, `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
 

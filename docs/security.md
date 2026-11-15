@@ -16,8 +16,11 @@ Two facts govern everything below:
    Fabric keys, operational keys, group keys and the controller's CA key
    live in that database **unencrypted**, and so do a device's CASE
    resumption secrets and a Wi-Fi node's network credentials
-   ([what the store holds in clear](#what-the-store-holds-in-clear)). File
-   location, permissions and encryption at rest are the host's.
+   ([what the store holds in clear](#what-the-store-holds-in-clear)). A
+   device's store seals them when the host hands it a sealer whose key lives
+   outside the database (`store.NewSealed`, [sealing at
+   rest](#sealing-at-rest)); the controller's store does not. File location,
+   permissions and the sealing key are the host's.
 
 ## Device side
 
@@ -44,8 +47,9 @@ rather than fall back silently.
 
 ### What the store holds in clear
 
-A device's store keeps these secrets as they are, with no encryption of
-its own:
+A device's store from `store.New` keeps these secrets as they are, with
+no encryption of its own; one from `store.NewSealed` seals every one of them
+([sealing at rest](#sealing-at-rest)):
 
 | Secret | Where |
 | --- | --- |
@@ -83,12 +87,40 @@ host can run again once the reader is gone. Copies the module does not see — t
 flash controller's wear-levelled blocks, file-system snapshots, the free
 blocks of a deleted journal, backups — are outside what it can promise.
 
-Whether the module should seal every secret at rest, uniformly and under a
-key that is not beside the data, is an open architecture question of the
-2026-11 review. Nothing on this page promises it; protect the file as the
-keys it holds.
+### Sealing at rest
 
-*Source: `store/schema.sql:195-199`, `store/resumption.go:58`, `store/erase.go` (`Erase`, `Scrub`, `ErrScrubIncomplete`; `TestStoreEraseLeavesNoResidue`, `TestStoreEraseWhoseCheckpointAReaderBlocks`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`, `TestFactoryResetWhoseScrubAReaderBlocksStillPins`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
+`store.NewSealed(ctx, db, sealer)` returns a store that seals every secret
+of the table above, the ICD keys, DoorLock credential data (over the lock's
+own encryption), the two sealing keys and the pending-NOC settings of a
+release before v8, under a `store.Sealer` the host supplies;
+`store.NewAESGCMSealer(key)` is the standard-library one (AES-256-GCM, a
+random nonce per value, a 32-byte key). The key must live outside the
+database — a file of its own, the operating system's keychain, a TPM or a
+KMS: only then is a copy of the file, its free pages and its `-wal`
+included, unreadable without it. Each value is bound to its table, column
+and row, so a value moved to another row or column does not open, and each
+row carries its seal mark (schema v10), so a clear row and a sealed one never
+pass for each other.
+
+On the way in `NewSealed` seals every clear row in one transaction and then
+scrubs the file as the factory reset does, so the clear values of an
+existing database do not stay behind; a second call writes nothing. A store
+without the sealer reads a sealed value as an error, never as the secret,
+and refuses a write that would leave a sealed identity half clear; every
+store of the database needs the sealer. Migration v10's `Down` refuses a
+database that holds a sealed row.
+
+Wiring: apply the schema (`store.Apply`), build the store with
+`store.NewSealed`, and hand it to the node as `node.Store{DB: db,
+Credentials: sealed}`. Provisioning and rotating the key are the host's;
+the module rotates nothing. The controller's store — its CA key, its node
+records — is not sealed.
+
+*Source: `store/seal.go` (`Sealer`, `AESGCMSealer`, `NewSealed`;
+`TestSealedStoreLeavesNoClearSecret`, `TestNewSealedSealsAClearDatabase`,
+`TestSealedStoreWrongKeyOrNoSealer`, `TestSealedValueMovedDoesNotOpen`,
+`TestMigrationV10DownRefusesSealedRows`), `store/migrations/v10.up.sql`,
+`store/schema.sql:205-209`, `store/resumption.go:39`, `store/erase.go` (`Erase`, `Scrub`, `ErrScrubIncomplete`; `TestStoreEraseLeavesNoResidue`, `TestStoreEraseWhoseCheckpointAReaderBlocks`), `node/factory_reset.go` (`eraseStores`; `TestFactoryResetLeavesNoEndpointRecordResidue`, `TestFactoryResetWhoseScrubAReaderBlocksStillPins`), `cluster/core/network_commissioning_wifi.go:116-125`, `:205-220`, `store/icd_cipher.go:18-27`, `store/doorlock.go:13-19`, `store/sqlite.go:41-47`.*
 
 ## Controller side
 
