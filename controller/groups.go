@@ -73,6 +73,15 @@ func (c *Controller) ensureFabricRow(ctx context.Context, st *store.Store) error
 	case rec.FabricID != c.fabric.FabricID:
 		return fmt.Errorf("%w: the database holds another fabric at index %d", ErrConfiguration, idx)
 	case rec.NodeID != c.fabric.RootNodeID:
+		// The row's resumption records were made under the former own
+		// node's id; the controller's CASE client reads this table
+		// (handshake.StoreResumption), and a resumption with one of them
+		// would hand the peer a session it takes for that node. They go
+		// with the take-over, as a node deletes a fabric's records when its
+		// identity on the fabric changes (review II, Fable P-4).
+		if err := st.RemoveResumptionsByFabric(ctx, idx); err != nil {
+			return err
+		}
 		return st.UpdateFabricNodeID(ctx, idx, c.fabric.RootNodeID)
 	}
 	return nil

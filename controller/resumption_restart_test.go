@@ -5,6 +5,7 @@ package controller_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // TestControllerResumesAcrossARestart: the controller keeps its CASE
@@ -72,4 +74,44 @@ func TestControllerResumesAcrossARestart(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+// TestControllerTakeOverDropsFormerResumptions: when the controller takes
+// over a fabric row left by the former own node (another node id on the
+// same fabric), the row's resumption records go with it — they were made
+// under that node's id, and resuming with one would hand the peer a session
+// it takes for that node (review II, Fable P-4). A row of the controller's
+// own id keeps its records (TestControllerResumesAcrossARestart).
+func TestControllerTakeOverDropsFormerResumptions(t *testing.T) {
+	t.Parallel()
+	var cfg controller.Config
+	site, _, c, n := sitePair(t, fabrictest.Topology{}, func(c *controller.Config) { cfg = *c })
+	addr, ok := n.PeerAddress()
+	if !ok {
+		t.Fatal("the paired node has no address")
+	}
+	idx := c.Fabric().FabricIndex
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	if err := site.Run(ctx, c.Close); err != nil {
+		t.Fatal(err)
+	}
+	st := store.New(cfg.DB)
+	if _, err := st.GetResumptionByPeer(ctx, idx, addr.NodeID); err != nil {
+		t.Fatalf("no resumption record after the pairing: %v", err)
+	}
+	// The row as the former own node left it: its node id, not RootNodeID.
+	if err := st.UpdateFabricNodeID(ctx, idx, 0x0BADC0DE); err != nil {
+		t.Fatal(err)
+	}
+	again := site.ControllerConfig(fabrictest.ControllerOptions{})
+	again.DB = cfg.DB
+	var c2 *controller.Controller
+	if err := site.Run(ctx, func(ctx context.Context) (err error) { c2, err = controller.New(ctx, again); return err }); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = site.Run(context.WithoutCancel(ctx), c2.Close) })
+	if _, err := st.GetResumptionByPeer(ctx, idx, addr.NodeID); !errors.Is(err, store.ErrResumptionNotFound) {
+		t.Fatalf("the former own node's resumption record after the take-over: %v, want gone", err)
+	}
 }
