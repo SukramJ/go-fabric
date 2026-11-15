@@ -322,7 +322,11 @@ func UnmarshalSigma1(b []byte) (Sigma1, error) {
 			copy(s.InitiatorRandom[:], val.octets)
 			hasRandom = true
 		case 2:
-			s.InitiatorSessionID = uint16(val.u & 0xFFFF)
+			id, err := sessionIDOf(val)
+			if err != nil {
+				return s, fmt.Errorf("%w: initiatorSessionId: %w", ErrSessionState, err)
+			}
+			s.InitiatorSessionID = id
 			hasSessionID = true
 		case 3:
 			if len(val.octets) != 32 {
@@ -339,13 +343,11 @@ func UnmarshalSigma1(b []byte) (Sigma1, error) {
 			// initiatorSessionParams container — the initiator's MRP
 			// tuning hints; retained so the responder's retransmission
 			// backoff can honour them (matter.js MRP.ts:129).
-			if val.container {
-				sp, err := parseSessionParameters(dec)
-				if err != nil {
-					return s, fmt.Errorf("%w: sessionParams (tag=5): %w", ErrSessionState, err)
-				}
-				s.InitiatorSessionParams = &sp
+			sp, err := sessionParamsOf(dec, val)
+			if err != nil {
+				return s, fmt.Errorf("%w: sessionParams (tag=5): %w", ErrSessionState, err)
 			}
+			s.InitiatorSessionParams = &sp
 		case 6:
 			// resumptionId — 16 bytes; present only on a resume attempt.
 			if len(val.octets) != 16 {

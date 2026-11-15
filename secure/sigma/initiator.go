@@ -564,7 +564,11 @@ func UnmarshalSigma2(b []byte) (Sigma2, error) {
 			copy(s.ResponderRandom[:], val.octets)
 			seen |= 1
 		case 2:
-			s.ResponderSessionID = uint16(val.u & 0xFFFF)
+			id, err := sessionIDOf(val)
+			if err != nil {
+				return s, fmt.Errorf("%w: sigma2 responderSessionId: %w", ErrSessionState, err)
+			}
+			s.ResponderSessionID = id
 			seen |= 2
 		case 3:
 			if len(val.octets) != EphPubKeySize {
@@ -576,13 +580,11 @@ func UnmarshalSigma2(b []byte) (Sigma2, error) {
 			s.Encrypted2 = append([]byte(nil), val.octets...)
 			seen |= 8
 		case 5:
-			if val.container {
-				sp, err := parseSessionParameters(dec)
-				if err != nil {
-					return s, fmt.Errorf("%w: sigma2 sessionParams: %w", ErrSessionState, err)
-				}
-				s.SessionParams = &sp
+			sp, err := sessionParamsOf(dec, val)
+			if err != nil {
+				return s, fmt.Errorf("%w: sigma2 sessionParams: %w", ErrSessionState, err)
 			}
+			s.SessionParams = &sp
 		default:
 			if val.container {
 				if err := dec.skipContainer(); err != nil {
@@ -628,16 +630,18 @@ func UnmarshalSigma2Resume(b []byte) (Sigma2Resume, error) {
 			s.Sigma2ResumeMIC = append([]byte(nil), val.octets...)
 			seen |= 2
 		case 3:
-			s.ResponderSessionID = uint16(val.u & 0xFFFF)
+			id, err := sessionIDOf(val)
+			if err != nil {
+				return s, fmt.Errorf("%w: sigma2resume responderSessionId: %w", ErrSessionState, err)
+			}
+			s.ResponderSessionID = id
 			seen |= 4
 		case 4:
-			if val.container {
-				sp, err := parseSessionParameters(dec)
-				if err != nil {
-					return s, fmt.Errorf("%w: sigma2resume sessionParams: %w", ErrSessionState, err)
-				}
-				s.SessionParams = &sp
+			sp, err := sessionParamsOf(dec, val)
+			if err != nil {
+				return s, fmt.Errorf("%w: sigma2resume sessionParams: %w", ErrSessionState, err)
 			}
+			s.SessionParams = &sp
 		default:
 			if val.container {
 				if err := dec.skipContainer(); err != nil {
