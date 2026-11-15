@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"syscall"
 	"testing"
@@ -155,5 +156,15 @@ func TestControllerRetriesAnAutoAssignedPortTakenForTCP(t *testing.T) {
 		if got := ports.attempts(); len(got) != 1 {
 			t.Fatalf("TCP binds %q on a given socket, want one", got)
 		}
+		// A New that fails closes the socket it was given
+		// (controller.go Config.Listener, New's deferred Close; R2-P5
+		// DR5a-code-02): its address binds again. A socket still open
+		// holds it, and the bind fails with EADDRINUSE.
+		again, err := net.ListenUDP("udp", l.LocalAddr())
+		if err != nil {
+			_ = l.Close()
+			t.Fatalf("the given socket's address after the failed New: %v, want it closed and free", err)
+		}
+		_ = again.Close()
 	})
 }
