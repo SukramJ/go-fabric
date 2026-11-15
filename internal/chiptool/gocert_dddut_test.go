@@ -600,11 +600,13 @@ func caseDD311() goCertCase {
 // ddFlowSupport is the support file the flow cases' steps are defined in.
 const ddFlowSupport = "tc-dd-flow-support.ts"
 
-// ddUserIntentTHArgs is USER_INTENT_TH_ARGS (tc-dd-flow-support.ts:46):
-// both flow cases start the TH with --custom-flow 1, TC-DD-3.13 included —
-// the daemon then opens no commissioning window until the app pipe's
-// UserIntentCommissioningStart (examples/reference-bridge, decision 96),
-// and the flow the DUT reads is written into the payload anyway.
+// ddUserIntentTHArgs is USER_INTENT_TH_ARGS (tc-dd-flow-support.ts:46),
+// the TH's arguments in both flow cases, TC-DD-3.13 included; the flow the
+// DUT reads is written into the payload anyway.
+//
+// Under --custom-flow 1 the daemon opens no commissioning window until the
+// app pipe's UserIntentCommissioningStart (examples/reference-bridge,
+// decision 96).
 var ddUserIntentTHArgs = []string{"--custom-flow", "1"}
 
 // notCommissionable is recordNotCommissionable (tc-dd-support.ts:1329-1337):
