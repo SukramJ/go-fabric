@@ -136,3 +136,15 @@ Wizard round 1 at the start of phase 5; the briefs and the phase plan were writt
 | 95 | Reports overlap (BD-Matter-Subscription-ReportsOverlap, F-db021da0-36) | **Adopt matter.js's hold in phase 5 (wave H)**: one report in flight per subscription, delivered = StatusResponse; F-36 pulled forward from phase 6 |
 | 96 | TC-DD-3.12 / 3.13 | **A public `node` option** (an uncommissioned node does not open its window at start; the host opens it) **+ `--custom-flow` and a pipe command in the daemon**; both cases re-ported at the pin; the option's form is the API review's (apinode), the DD part after wave A2 |
 | 97 | PBKDFParamRequest with no window open | **StatusReport Failure/InvalidParam as matter.js** (SecureChannelProtocol.ts:129-137) for the state "window closed" only; an unattached PASE port stays the fail-closed noop |
+
+Wizard at the end of phase 5a (CI and release), every option taken was the recommended one.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 98 | zizmor's dangerous-triggers finding on `dependabot-auto-merge.yml`'s `pull_request_target` | **An inline exception with its reason**: the workflow checks out and runs nothing of the pull request and acts only on a Dependabot pull request |
+| 99 | Are `test (linux/386)` and `workflow lint` required checks | **Both, after their first green run**: the owner adds them to branch protection, `required.txt` follows |
+| 100 | `wifi/wpasupplicant` does not build against the go-fabric version it requires (v0.22.1) | **Its require is raised with the next release**, held from now on by the nested-release check |
+| 101 | Are tags or releases signed or attested | **No**: a library without binaries, its integrity held by the Go checksum database; the provenance check (a tag on main with green required checks) stays |
+| 102 | Dependabot auto-merges a v0 module's minor update | **No blanket change**: the required checks gate it |
+| 103 | The nested-release check's convention | **`release/nested-*` stays, and the check is strict on any release pull request that changes a nested `go.mod`** |
+| 104 | The 32-bit test run's packages | **`controller/` and `mdns/` added after the first green run** |
