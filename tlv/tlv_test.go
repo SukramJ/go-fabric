@@ -805,19 +805,27 @@ func TestPutUint64Bounded_ValidValues(t *testing.T) {
 
 // --- Decoder diagnostic tests ---
 
-// TestDecodeAppleSigma1Bytes parses the first 32 bytes of an iPhone
-// Sigma1 capture so we can see the decoder's view of each element.
-// Diagnostic only — the assertions here are informational.
+// TestDecodeAppleSigma1Bytes decodes the first 32 bytes of an iPhone
+// Sigma1 capture. The prefix opens the anonymous structure (15) and then
+// declares initiatorRandom as a 32-byte octet string with tag 1 (30 01 20),
+// of which only 28 bytes are in the slice: the decoder must report the
+// overrun instead of handing back a short value (review II,
+// R2-P5-tassert-06; the full capture was not kept).
 func TestDecodeAppleSigma1Bytes(t *testing.T) {
-	b, _ := hex.DecodeString("15300120051c20660838df2ffc4996e8c28918a4f93a82e2a9e66fac50edf22a")
+	t.Parallel()
+	b, err := hex.DecodeString("15300120051c20660838df2ffc4996e8c28918a4f93a82e2a9e66fac50edf22a")
+	if err != nil {
+		t.Fatalf("hex: %v", err)
+	}
 	dec := NewDecoder(b)
-	for i := range 6 {
-		el, err := dec.Next()
-		if err != nil {
-			t.Logf("el%d err: %v", i, err)
-			return
-		}
-		t.Logf("el%d: pos=%d type=0x%02X tag=%+v container=%v end=%v octets_len=%d uint=%d",
-			i, dec.Pos(), el.Type, el.Tag, el.IsContainer, el.IsEndContainer, len(el.Octets), el.Uint)
+	el, err := dec.Next()
+	if err != nil {
+		t.Fatalf("el0: %v", err)
+	}
+	if el.Type != TypeStructure || !el.IsContainer || el.Tag.Kind != TagKindAnonymous {
+		t.Fatalf("el0 = type 0x%02X container=%v tag=%+v, want the anonymous structure", el.Type, el.IsContainer, el.Tag)
+	}
+	if el, err := dec.Next(); !errors.Is(err, ErrLengthOverflow) {
+		t.Fatalf("el1 = %+v, %v; want ErrLengthOverflow for 32 declared bytes with 28 left", el, err)
 	}
 }
