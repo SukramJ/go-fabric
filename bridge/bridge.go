@@ -606,11 +606,11 @@ type Bridge struct {
 
 	// reportCounterOwner maps the outbound-reliable MessageCounter of an
 	// ongoing report's last message ([reportCounterKey]) to what the
-	// report owes its subscription ([Bridge.noteReportSent]). The peer's
-	// acknowledgement takes it as a delivered update
-	// ([Bridge.releaseReportCounter]); the ACK pump's
-	// [mrp.ErrMaxRetransmissionsReached] as a failed one
-	// ([Bridge.noteReportUndelivered]).
+	// report owes its subscription, while its reporter waits for the
+	// peer's StatusResponse ([Bridge.deliverOngoingReport]). The peer's
+	// acknowledgement drops it ([Bridge.releaseReportCounter]); the ACK
+	// pump's [mrp.ErrMaxRetransmissionsReached] takes it as a failed
+	// update and ends the wait ([Bridge.noteReportUndelivered]).
 	reportCounterOwner sync.Map // map[uint64]*owedReport
 
 	// subSendErrorCount tracks how many consecutive send failures the
@@ -620,20 +620,16 @@ type Bridge struct {
 	// a transient send error (e.g. a momentary socket-write hiccup or
 	// fabric reload race) does not immediately reap an otherwise-healthy
 	// subscription. Reset by a delivered update: a report the peer
-	// acknowledged, or one sent without a tracked message. Subs that
-	// never reach 0 again — peer truly gone — exceed the cap and get
-	// closed via the existing eviction path.
+	// answered with a Success StatusResponse. Subs that never reach 0
+	// again — peer truly gone — exceed the cap and get closed via the
+	// existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
 	// subUpdateMu guards every change of subSendErrorCount
-	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates])
-	// and subUpdateSeq: the reporter, the ACK pump and the inbound
-	// acknowledgement change a subscription's count from their own
-	// goroutines. A leaf lock: nothing is called while it is held.
+	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates]):
+	// the reporter, the ACK pump and a subscription's release change a
+	// subscription's count from their own goroutines. A leaf lock:
+	// nothing is called while it is held.
 	subUpdateMu sync.Mutex
-	// subUpdateSeq numbers each subscription's ongoing reports, for their
-	// outcomes to be counted as matter.js counts updates
-	// ([Bridge.beginUpdate]); guarded by subUpdateMu.
-	subUpdateSeq map[uint32]*updateOrder
 
 	// subAccess remembers, per subscription, what [Bridge.subjectReadsNothing]
 	// last found: the ACL and topology the subject last read a path

@@ -58,7 +58,13 @@ func TestStatusResponseWithErrorStatusEndsTheOngoingSubscription(t *testing.T) {
 
 	answer := func(status im.StatusCode) {
 		t.Helper()
-		b.reportSubscription(context.Background(), sub, paths)
+		// The reporter waits for the answer ([Bridge.deliverOngoingReport]).
+		reported := make(chan struct{})
+		go func() {
+			defer close(reported)
+			b.reportSubscription(context.Background(), sub, paths)
+		}()
+		defer func() { <-reported }()
 		proto, _, ok := readOneIMDatagram(t, peerConn, peerSess, time.Second)
 		if !ok {
 			t.Fatal("no report reached the peer")

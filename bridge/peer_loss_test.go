@@ -342,7 +342,7 @@ func TestChunkedReportFirstChunkUnacknowledgedIsOneFailedUpdate(t *testing.T) {
 	if !errors.Is(err, errChunkUnanswered) {
 		t.Fatalf("send = %v, want the StatusResponse wait's timeout", err)
 	}
-	p.dev.br.noteSubscriptionSendError(p.reportSub, 0, "report", err)
+	p.dev.br.noteSubscriptionSendError(p.reportSub, "report", err)
 	if raw, _ := p.dev.br.subSendErrorCount.Load(p.reportSub); raw != 1 {
 		t.Errorf("failed updates counted: %v, want 1", raw)
 	}
