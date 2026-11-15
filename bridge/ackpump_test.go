@@ -459,16 +459,24 @@ func TestAckPump_MultipleExchanges(t *testing.T) {
 
 // TestAckPump_NoSrcDropsObligation verifies that an obligation added
 // directly to the tracker (without a src in exchangeSrcs) is drained by
-// RunAckPumpOnce but no UDP datagram is sent.
+// RunAckPumpOnce but no UDP datagram is sent. The pump sends from
+// RunAckPumpOnce itself, so the bridge's own socket has written nothing
+// when it returns; before review II, phase 5 a peer socket on a shared
+// loopback waited 50 ms for a datagram (F-db021da0-37).
 func TestAckPump_NoSrcDropsObligation(t *testing.T) {
 	t.Parallel()
-	b := newStartedBridge(t)
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	socket := useOwnedSocket(t, b)
+	if err := b.Start(t.Context()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.Background()) })
+	sock := socket()
 	tracker := mrp.NewAckTracker(0)
 	b.AttachAckTracker(tracker)
-
-	// Open a peer socket purely to detect any unexpected datagrams.
-	peerConn, _ := openPeerSocket(t)
-	defer peerConn.Close()
 
 	// Add an obligation directly to the tracker — no src in exchangeSrcs.
 	const (
@@ -476,23 +484,16 @@ func TestAckPump_NoSrcDropsObligation(t *testing.T) {
 		msgCounter uint32 = 1234
 	)
 	tracker.Owe(msgCounter, 0, exchangeID, false, time.Now())
+	before := sock.writes.Load()
 
 	// Pump should drain the obligation (returns 1) but not send to any peer.
 	n := b.RunAckPumpOnce(time.Now())
 	if n != 1 {
 		t.Errorf("RunAckPumpOnce: want 1 (drained), got %d", n)
 	}
-
-	// Verify no datagram arrives at the peer socket.
-	if err := peerConn.SetReadDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
-		t.Fatalf("SetReadDeadline: %v", err)
+	if sent := sock.writes.Load() - before; sent != 0 {
+		t.Errorf("the pump sent %d datagram(s) for an obligation without a route; emitStandaloneAck should have dropped it", sent)
 	}
-	buf := make([]byte, 512)
-	_, _, err := peerConn.ReadFromUDP(buf)
-	if err == nil {
-		t.Error("unexpected datagram received; emitStandaloneAck should have dropped for missing src")
-	}
-	// A deadline-exceeded or "i/o timeout" error is the expected outcome.
 }
 
 // TestTickOutboundReliable_NilListener verifies that tickOutboundReliable

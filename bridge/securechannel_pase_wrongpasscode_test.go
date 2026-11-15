@@ -176,7 +176,8 @@ func TestDispatchSecureChannel_WrongPasscodePake3_CountsAndRevokesWindowAtCap(t 
 // is a CASE-only code and must not ride a PASE failure.
 func TestDispatchSecureChannel_WrongPasscodePake3_StatusReportUsesInvalidParameter(t *testing.T) {
 	// Not parallel: binds a UDP peer socket and reads the reply back.
-	peer, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv6loopback, Port: 0})
+	// On 127.0.0.1, where newStartedBridge binds the bridge.
+	peer, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatalf("ListenUDP peer: %v", err)
 	}

@@ -85,11 +85,10 @@ func TestSubscribeAttributesToTheSessionPeerNotTheHeader(t *testing.T) {
 	t.Cleanup(func() { b.SessionClosed(sessA) }) // ends the attacker's priming wait
 
 	conn, _ := newSubscribeTestPeer(t)
-	bridgeAddr, err := net.ResolveUDPAddr("udp", b.LocalAddr())
+	bridgeAddr, err := net.ResolveUDPAddr("udp4", b.LocalAddr())
 	if err != nil {
 		t.Fatal(err)
 	}
-	bridgeAddr.IP = net.IPv4(127, 0, 0, 1)
 	enc := tlv.NewEncoder()
 	im.SubscribeRequest{KeepSubscriptions: false, MaxIntervalCeiling: 60, AttributeRequests: path}.MarshalTLV(enc)
 	payload, err := enc.Bytes()
@@ -107,7 +106,7 @@ func TestSubscribeAttributesToTheSessionPeerNotTheHeader(t *testing.T) {
 	}
 	// The teardown runs before the priming report: the attacker's first
 	// reply means it is done.
-	if _, _, ok := readOneIMDatagram(t, conn, pA, 3*time.Second); !ok {
+	if _, _, ok := readOneIMDatagramFrom(t, conn, bridgeAddr, pA, 3*time.Second); !ok {
 		t.Fatal("no reply to the SubscribeRequest reached session A's peer")
 	}
 	if _, err := mgr.Get(victim.ID); err != nil {

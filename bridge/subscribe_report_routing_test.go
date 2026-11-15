@@ -48,6 +48,39 @@ func readOneIMDatagram(t *testing.T, peerConn *net.UDPConn, peerSess *channel.Se
 	return proto, plain[protoLen:], true
 }
 
+// readOneIMDatagramFrom is readOneIMDatagram for the first datagram
+// from's socket sent: another socket's datagram — a test process that
+// reached this loopback port — is skipped until the deadline.
+func readOneIMDatagramFrom(t *testing.T, peerConn *net.UDPConn, from *net.UDPAddr, peerSess *channel.Session, wait time.Duration) (message.ProtocolHeader, []byte, bool) {
+	t.Helper()
+	buf := make([]byte, udp.MaxDatagramSize)
+	if err := peerConn.SetReadDeadline(time.Now().Add(wait)); err != nil {
+		t.Fatalf("SetReadDeadline: %v", err)
+	}
+	for {
+		n, src, err := peerConn.ReadFromUDP(buf)
+		if err != nil {
+			return message.ProtocolHeader{}, nil, false
+		}
+		if src.Port != from.Port || !src.IP.Equal(from.IP) {
+			continue
+		}
+		hdr, hdrLen, err := message.UnmarshalHeader(buf[:n])
+		if err != nil {
+			t.Fatalf("UnmarshalHeader: %v", err)
+		}
+		plain, _, err := peerSess.Decrypt(&hdr, securityFlagsByte(&hdr), buf[hdrLen:n])
+		if err != nil {
+			t.Fatalf("peer.Decrypt: %v", err)
+		}
+		proto, protoLen, err := message.UnmarshalProtocolHeader(plain)
+		if err != nil {
+			t.Fatalf("UnmarshalProtocolHeader: %v", err)
+		}
+		return proto, plain[protoLen:], true
+	}
+}
+
 // encryptIMFromPeer seals an IM message from the peer for the bridge's
 // local session id and returns the wire datagram.
 func encryptIMFromPeer(t *testing.T, peerSess *channel.Session, localSessionID uint16, proto message.ProtocolHeader, payload []byte) []byte {
