@@ -47,8 +47,11 @@ type (
 	EventEmitting interface {
 		Emit(endpoint uint16, eventID uint32, data any) error
 	}
-	// BeforeWriteSetter is a server that takes a write veto
-	// ([Server.SetBeforeWrite]).
+	// BeforeWriteSetter is a server that takes the host's write veto
+	// ([Server.SetBeforeWrite]): consulted behind the server's own rules
+	// and its comparison with the held value, so a write of the held value
+	// never reaches it, and never replacing the server's own rule
+	// ([ServerConfig.WriteRule]).
 	BeforeWriteSetter interface {
 		SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error)
 	}
@@ -204,7 +207,8 @@ func OnChangedAsyncOf[S any, P interface {
 
 // OnWriteOf installs a typed write veto on srv ([ServerConfig.BeforeWrite]):
 // fn receives the State S of srv with the written value in place of the
-// attribute's, and the attribute id; nil removes the veto.
+// attribute's, and the attribute id; nil removes the veto. The server's own
+// rule ([ServerConfig.WriteRule]) stays in place either way.
 // [ErrNoWriteVeto] for a server that is no [BeforeWriteSetter].
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func OnWriteOf[S any, P interface {

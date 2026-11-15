@@ -107,7 +107,9 @@ func (e *Events) Emit(inst *Instance, endpoint uint16, eventID uint32, data any)
 }
 
 // WriteVeto is a self-held server's write veto ([BeforeWriteSetter]):
-// the hook [ServerConfig.BeforeWrite] is on the generated server.
+// the host's hook [ServerConfig.BeforeWrite] is on the generated server.
+// The server's own rules are its own code, in front of its comparison
+// with the held value; the veto is consulted behind it.
 type WriteVeto struct {
 	// mu guards fn.
 	mu sync.Mutex
@@ -122,9 +124,13 @@ func (w *WriteVeto) Set(fn func(ctx context.Context, attrID uint32, value any) e
 }
 
 // Check runs the veto on a controller's write that passed the
-// definition's checks, with the value in its stored form; nil without a
-// veto. The error is returned as given: its IM status when it carries
-// one, FAILURE at the dispatcher otherwise.
+// definition's checks and the server's own rules, with the value in its
+// stored form; nil without a veto. The server calls it after its own
+// comparison with the value it holds, for a write that changes it only: a
+// write of the held value calls no veto, advances no data version and
+// notifies nothing, as [Server.MatterWrite] does. The error is returned as
+// given: its IM status when it carries one, FAILURE at the dispatcher
+// otherwise.
 func (w *WriteVeto) Check(ctx context.Context, attrID uint32, value any) error {
 	w.mu.Lock()
 	fn := w.fn
@@ -168,7 +174,8 @@ func (h *SelfHeld) Emit(endpoint uint16, eventID uint32, data any) error {
 	return h.srv.Emit(endpoint, eventID, data)
 }
 
-// SetBeforeWrite implements [BeforeWriteSetter] ([Server.SetBeforeWrite]).
+// SetBeforeWrite implements [BeforeWriteSetter] ([Server.SetBeforeWrite]):
+// the host's veto; the store's [ServerConfig.WriteRule] stays.
 func (h *SelfHeld) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
 	h.srv.SetBeforeWrite(fn)
 }

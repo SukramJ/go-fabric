@@ -159,7 +159,7 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 		zmdef.CmdRemoveTrigger:           z.removeTrigger,
 	}
 	srv, err := spec.NewServer(zmdef.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{
-		Handlers: handlers, DataVersion: cfg.DataVersion, BeforeWrite: z.beforeWrite, Sink: zonesSink{z},
+		Handlers: handlers, DataVersion: cfg.DataVersion, WriteRule: z.writeRule, Sink: zonesSink{z},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrZonesConfig, err)
@@ -232,11 +232,11 @@ func (z *Zones) Sensitivity() uint8 {
 	return z.sensitivity
 }
 
-// beforeWrite holds a write of Sensitivity to 1..SensitivityMax
+// writeRule holds a write of Sensitivity to 1..SensitivityMax
 // (CONSTRAINT_ERROR). Mirrors chip WriteAttribute
 // (ZoneManagementCluster.cpp:259-284); the definition's own constraint
 // says the same.
-func (z *Zones) beforeWrite(_ context.Context, attrID uint32, value any) error {
+func (z *Zones) writeRule(_ context.Context, attrID uint32, value any) error {
 	if attrID != zmdef.AttrSensitivity {
 		return nil
 	}

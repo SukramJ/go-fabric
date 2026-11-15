@@ -145,6 +145,11 @@ func TestColorControlTypedEmitAndOnWrite(t *testing.T) {
 	if len(seen) != 1 || seen[0] != ccdef.OptionsExecuteIfOff || s.Get().Options != 0 {
 		t.Errorf("the veto saw %v; Options %v", seen, s.Get().Options)
 	}
+	// A write of the held value (Options 0) calls no veto and changes
+	// nothing (R2-P5-apispec-02).
+	if changed, err := s.Underlying().(contract.ChangeReportingWriter).MatterWriteChanged(ctx, ccdef.AttrOptions, uint64(0)); err != nil || changed || len(seen) != 1 {
+		t.Errorf("held Options: changed %v err %v; the veto saw %v", changed, err, seen)
+	}
 	if err := s.OnWrite(nil); err != nil {
 		t.Fatal(err)
 	}

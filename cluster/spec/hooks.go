@@ -16,7 +16,7 @@ import (
 // SetAttributes over its own setters. The server embeds it, calls
 // [Hooks.Init] with its instance when it is built, runs [Hooks.Invoke]
 // first in its MatterInvoke and [Hooks.CheckWrite] after its own checks
-// of a controller's write, and hands the endpoint's emitter on with
+// of a controller's write and its comparison with the held value, and hands the endpoint's emitter on with
 // [Hooks.SetMatterEventEmitter] — promoted, or called from its own when
 // it keeps the emitter itself too.
 type Hooks struct {
@@ -58,7 +58,9 @@ func (h *Hooks) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value
 }
 
 // CheckWrite runs the veto on a controller's write that passed the
-// server's checks ([WriteVeto.Check]).
+// server's checks and changes the value it holds ([WriteVeto.Check]):
+// called after the server's own comparison, never for a write of the held
+// value.
 func (h *Hooks) CheckWrite(ctx context.Context, attrID uint32, value any) error {
 	return h.veto.Check(ctx, attrID, value)
 }

@@ -192,13 +192,15 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }

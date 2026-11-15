@@ -217,7 +217,7 @@ func NewAvStream(cfg AvStreamConfig) (*AvStream, error) {
 	}
 	opts := spec.Options{Features: uint32(f), Attributes: slices.Clone(cfg.Attributes)}
 	srv, err := spec.NewServer(csdef.Definition, opts, spec.ServerConfig{
-		Handlers: handlers, DataVersion: cfg.DataVersion, BeforeWrite: a.beforeWrite,
+		Handlers: handlers, DataVersion: cfg.DataVersion, WriteRule: a.writeRule,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrAvStreamConfig, err)
@@ -395,11 +395,11 @@ func (a *AvStream) snapshotCapabilities() []csdef.SnapshotCapabilitiesStruct {
 	return stored[[]csdef.SnapshotCapabilitiesStruct](a, csdef.AttrSnapshotCapabilities)
 }
 
-// beforeWrite holds a controller's write of Viewport to chip's rule; the
+// writeRule holds a controller's write of Viewport to chip's rule; the
 // other writes are the definition's (their constraints are the levels'
 // ranges and the rotation's bound, as chip's setters check them,
 // CameraAVStreamManagementCluster.cpp:1178-1256).
-func (a *AvStream) beforeWrite(_ context.Context, attrID uint32, value any) error {
+func (a *AvStream) writeRule(_ context.Context, attrID uint32, value any) error {
 	if attrID != csdef.AttrViewport {
 		return nil
 	}

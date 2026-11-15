@@ -31,10 +31,14 @@ import (
 // Server.OnChangedAsync queues the same call on the device's goroutine.
 //
 // Server.OnWrite installs a veto on a controller's write, called after the
-// definition's checks and before the store, an error refusing the write.
+// definition's checks, the server's own rule and the comparison with the
+// held value, and before the store, an error refusing the write; a write
+// of the held value never reaches it.
 // Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1172-1195
 // (preCommit, which emits `$Changing` with the new and old value before a
-// change commits) and packages/general/src/transaction/Participant.ts:16-23
+// change commits; only for a returned change, :1209-1212, and a deep-equal
+// value is none, :1406-1408, at db021da0) and
+// packages/general/src/transaction/Participant.ts:16-23
 // (a preCommit failure rolls the transaction back). matter.js fires
 // `$Changing` for every change in the transaction; the hull vetoes the
 // controller's writes, spec.Server.MatterWrite — a host's own Set is the
@@ -232,13 +236,15 @@ func (g *generator) server() ([]byte, error) {
 	w.p("\treturn spec.OnChangedAsyncOf(s.Wrapper, fn)")
 	w.p("}")
 	w.p("")
-	w.p("// OnWrite installs fn as the veto of a controller's write")
+	w.p("// OnWrite installs fn as the host's veto of a controller's write")
 	w.p("// (spec.ServerConfig.BeforeWrite): next is the state with the written")
-	w.p("// value in place, attrID the attribute written. An error refuses the")
+	w.p("// value in place, attrID the attribute written. It runs behind the")
+	w.p("// server's own rules and its comparison with the held value, so a")
+	w.p("// write of the held value never reaches it. An error refuses the")
 	w.p("// write — with the IM status it carries, FAILURE otherwise — and nothing")
-	w.p("// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server")
-	w.p("// that takes none. Declare.OnWrite is the veto at construction; this")
-	w.p("// setter changes it at run time.")
+	w.p("// is stored. nil removes the veto, never the server's own rule;")
+	w.p("// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is")
+	w.p("// the veto at construction; this setter changes it at run time.")
 	w.p("func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {")
 	w.p("\treturn spec.OnWriteOf(s.Underlying(), fn)")
 	w.p("}")

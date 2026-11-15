@@ -72,14 +72,30 @@ type ServerConfig struct {
 	Source Source
 	// Sink is optionally told about controller writes.
 	Sink Sink
-	// BeforeWrite optionally vetoes a controller write: called by
-	// [Server.MatterWrite] after the definition's checks and before the
-	// Sink and the store, with the value in its stored form. An error
-	// refuses the write and nothing is stored; the error answers the write
-	// with the IM status it carries, FAILURE when it carries none. It is
-	// the hook the generated typed server exposes as OnWrite (matter.js's
-	// pre-commit `$Changing` veto, cited in script/clustergen). Also set
-	// after construction with [Server.SetBeforeWrite].
+	// WriteRule is the cluster author's rule on a controller write: called
+	// by [Server.MatterWrite] after the definition's checks and before the
+	// comparison with the held value — on every write, a write of the held
+	// value included — with the value in its stored form. An error refuses
+	// the write and answers it with the IM status it carries, FAILURE when
+	// it carries none. [Server.SetBeforeWrite] and the typed server's
+	// OnWrite never replace it: a host cannot remove a server's own rule.
+	WriteRule func(ctx context.Context, attrID uint32, value any) error
+	// BeforeWrite optionally vetoes a controller write — the host's veto:
+	// called by [Server.MatterWrite] after the definition's checks, the
+	// [ServerConfig.WriteRule] and the comparison with the held value, and
+	// before the Sink and the store, with the value in its stored form. A
+	// write of the value the server holds calls no veto, advances no data
+	// version and notifies nothing. An error refuses the write and nothing
+	// is stored; the error answers the write with the IM status it
+	// carries, FAILURE when it carries none. It is the hook the generated
+	// typed server exposes as OnWrite. Also set after construction with
+	// [Server.SetBeforeWrite], which replaces it.
+	//
+	// Deprecated: as the place of a server's own rule. A rule set here is
+	// the host's veto, which the host's OnWrite replaces and a write of the
+	// held value skips; a cluster author's rule is
+	// [ServerConfig.WriteRule]. That use is removable in the next minor
+	// release; BeforeWrite as the host's veto at construction stays.
 	BeforeWrite func(ctx context.Context, attrID uint32, value any) error
 	// Initial holds the values the server starts with, checked as
 	// [Server.Set] checks a value.
@@ -127,6 +143,10 @@ type Server struct {
 	ext      *cluster.DataVersionTracker
 	source   Source
 	sink     Sink
+
+	// rule is the cluster author's write rule ([ServerConfig.WriteRule]);
+	// set once at construction, never replaced.
+	rule func(ctx context.Context, attrID uint32, value any) error
 
 	// mu guards beforeWrite, emitter, handlers and values.
 	mu          sync.Mutex
@@ -181,6 +201,7 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 		values:   map[uint32]any{},
 		handlers: map[uint32]CommandHandler{},
 
+		rule:        cfg.WriteRule,
 		beforeWrite: cfg.BeforeWrite,
 	}
 	// A command the conformance requires is fatal at construction when it
@@ -295,8 +316,9 @@ func (s *Server) Value(attrID uint32) (any, bool) {
 	return v, ok
 }
 
-// SetBeforeWrite installs fn as the write veto ([ServerConfig.BeforeWrite]),
-// replacing the one before; nil removes it.
+// SetBeforeWrite installs fn as the host's write veto
+// ([ServerConfig.BeforeWrite]), replacing the one before; nil removes it.
+// The server's own rule ([ServerConfig.WriteRule]) is not touched.
 func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
 	s.mu.Lock()
 	s.beforeWrite = fn
@@ -308,10 +330,11 @@ func (s *Server) peers(attrID uint32) (any, bool) { return s.MatterRead(attrID) 
 
 // MatterWrite implements [contract.ClusterServer]: [Instance.ValidateWrite]
 // answers the status of a write the definition refuses; the
-// [ServerConfig.BeforeWrite] veto, when set, may refuse it next; a value
-// the server holds then ends the write, unchanged; another goes to the
-// Sink, each handed the value in its stored form, and is stored, and a
-// change bumps the data version and is notified.
+// [ServerConfig.WriteRule], when set, may refuse it next; a value the
+// server holds then ends the write, unchanged; another goes to the host's
+// [ServerConfig.BeforeWrite] veto, when set, and to the Sink, each handed
+// the value in its stored form, and is stored, and a change bumps the
+// data version and is notified.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
 	_, err := s.MatterWriteChanged(ctx, attrID, value)
 	return err
@@ -334,26 +357,36 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 		return false, err
 	}
 	v = stored(s.def.Attribute(attrID).Type, v)
-	s.mu.Lock()
-	veto := s.beforeWrite
-	s.mu.Unlock()
-	if veto != nil {
-		if err := veto(ctx, attrID, v); err != nil {
+	// The author's rule judges every write, the held value included:
+	// matter.js runs a property's schema validator on the assigned value
+	// with no comparison to the previous one (StructManager.ts:273 assign,
+	// :279-298 validate, :294-297 undo on failure, at db021da0).
+	if s.rule != nil {
+		if err := s.rule(ctx, attrID, v); err != nil {
 			// As given: its IM status when it carries one, FAILURE
 			// otherwise (the dispatcher reads no status from the text).
 			return false, err
 		}
 	}
-	// The value the server holds reaches no Sink and stores nothing:
-	// matter.js emits neither `$Changing` (Datasource.ts:1406-1407 at
-	// db021da0, #computePreCommitChange) nor `$Changed` (:1479,
-	// #noteIfChanged) for a field equal to the held value and stores only
-	// the noted fields (:1447-1451). The store's comparison below, under
-	// the lock that stores, stays the deciding one: this check skips only
-	// when every answer the server gives equals the value, so a write it
-	// lets through at worst stores an equal value and answers unchanged.
+	// The value the server holds reaches no veto and no Sink and stores
+	// nothing: matter.js emits `$Changing` only for a returned change, and
+	// a deep-equal value is none (Datasource.ts:1209-1212, :1406-1408 at
+	// db021da0), and notes no field, advances no version and emits no
+	// `$Changed` for it (:1476-1481, :1456-1457, :1486-1492). The store's
+	// comparison below, under the lock that stores, stays the deciding
+	// one: this check skips only when every answer the server gives equals
+	// the value, so a write it lets through at worst stores an equal value
+	// and answers unchanged.
 	if s.holds(attrID, v) {
 		return false, nil
+	}
+	s.mu.Lock()
+	veto := s.beforeWrite
+	s.mu.Unlock()
+	if veto != nil {
+		if err := veto(ctx, attrID, v); err != nil {
+			return false, err
+		}
 	}
 	if s.sink != nil {
 		if err := s.sink.MatterWriteAttribute(ctx, attrID, v); err != nil {

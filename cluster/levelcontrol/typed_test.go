@@ -214,6 +214,24 @@ func TestHeldTypedHandleEmitOnWrite(t *testing.T) {
 	if st := s.Get(); st.OnLevel == nil || *st.OnLevel != 60 {
 		t.Errorf("OnLevel %v", st.OnLevel)
 	}
+	// A write of the held value calls no veto and changes nothing
+	// (R2-P5-apispec-02): the veto sits behind the comparison.
+	calls := 0
+	if err := s.OnWrite(func(context.Context, lvldef.State, uint32) error { calls++; return refusal }); err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []struct {
+		attr uint32
+		v    any
+	}{{lvldef.AttrOnLevel, uint64(60)}, {lvldef.AttrOptions, uint64(0)}} {
+		before := srv.MatterDataVersion()
+		if changed, err := srv.MatterWriteChanged(ctx, w.attr, w.v); err != nil || changed || srv.MatterDataVersion() != before {
+			t.Errorf("held 0x%04X: changed %v err %v version %d → %d", w.attr, changed, err, before, srv.MatterDataVersion())
+		}
+	}
+	if calls != 0 {
+		t.Errorf("the veto heard %d writes of the held value", calls)
+	}
 }
 
 // TestPortServerDoesNotHoldCurrentLevel: over a host's LevelSource the
