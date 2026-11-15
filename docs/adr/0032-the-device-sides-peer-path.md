@@ -122,8 +122,15 @@ note `peer`, Shape 2).
 
 - **Than matter.js**: equal in behaviour on the path — reuse across openers,
   TCP required for a Large Message command, newest by the peer's activity,
-  one record per peer. Behind it in structure: two stacks composed, where
-  matter.js has one. No claim of better.
+  one record per peer — and a session the node opens serves the node's
+  endpoint tree under the same gates as one the peer opened, as matter.js
+  serves every session of the node whoever opened it
+  (`packages/protocol/src/protocol/ExchangeManager.ts:331`, `:446`,
+  `:463-467`; `packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:375-378`).
+  Except: on such a session a SubscribeRequest is refused, a read reports no
+  events, and a request names no session to the clusters (the client stack
+  does not share the bridge's session-id space). Behind it in structure:
+  two stacks composed, where matter.js has one. No claim of better.
 - **Than connectedhomeip's camera app**: equal on the camera path (attach
   to a large-payload session, else establish with the capability); the
   quality is inferred from the schema in one place rather than passed by
@@ -131,8 +138,14 @@ note `peer`, Shape 2).
 - **Than before**: a camera of this module reaches a conformant requestor at
   all once the gate exists; establishment gains what `client/peer` has and
   the bridge initiator lacks — TCP, single-flight, the address schedule,
-  throttling by network profile, resumption across restarts — and the
-  duplicated Sigma driver shrinks back to its one ADR 0008 caller.
+  throttling by network profile — and the duplicated Sigma driver shrinks
+  back to its one ADR 0008 caller. A session the node opens to its OTA
+  provider or its camera's requestor serves that peer's requests, as the
+  bridge initiator's sessions did (they lived in the server stack), with
+  the remainder named above. Resumption across restarts is no gain over the
+  bridge initiator, which used the responder's persisted records; it is new
+  for the client stack's other users (bindings, `Node.Peers`) and for the
+  controller, whose records were in memory.
 - **The cut**: the module owns the transport rule, the composition and the
   gate; the host gains nothing to wire — a camera host sees one more error
   value, `contract/` is untouched. `node` is where the two stacks meet,
@@ -146,17 +159,23 @@ note `peer`, Shape 2).
   (`WithLargeMessageSession`), stated by both servers — the bridge from the
   route, the client stack's server from the session's transport.
 - `secure/operational`: `Entry.LastPeerActivity`,
-  `Manager.NewestSessionForPeer`. `bridge`: `PeerSessionRequirement`,
-  `LivePeerSession`, `PeerSession.LastActivityMonotonic`.
-  `client/exchange`: `BDXExchange`. `client/handshake`: `StoreResumption`.
-  `cluster/camera`: `ErrNoLargeMessageTransport`.
+  `Entry.LastPeerActivityMonotonic`, `Manager.NewestSessionForPeer`,
+  `Manager.PersistResumptionRecord` (the responder's record carries the
+  peer's session parameters). `bridge`: `PeerSessionRequirement`,
+  `LivePeerSession`, `PeerSession.LastActivityMonotonic`,
+  `Bridge.ElementQualities`. `client/exchange`: `BDXExchange`.
+  `client/handshake`: `StoreResumption`. `client/interaction`:
+  `ServerConfig.Dispatch`, `ServerConfig.RequestContext` (the node serves
+  its tree on its client stacks). `cluster/camera`:
+  `ErrNoLargeMessageTransport`.
 - A node and a controller restarted resume with a peer from the store's
   record instead of a full CASE.
 - The camera needs TCP: a node whose camera signals a requestor takes the
   TCP client role, and the requestor accepts TCP (or opened a TCP session
   itself).
-- A node's client stack serves no Interaction Model request on the sessions
-  it opens: a peer that sends a command back on such a session — a peer
-  reuses its newest live session with us (`Peer.ts:440-460`;
-  `OperationalSessionSetup.cpp:75-94`) — is answered InvalidAction there.
-  An open point of this shape; the single session layer closes it.
+- A node serves its endpoint tree on the sessions its client stacks open —
+  a peer sends its next request on the session it last received on
+  (`packages/protocol/src/peer/PeerExchangeProvider.ts:103-115`,
+  `Peer.ts:440-448`) — with the bridge's dispatcher, gates and request
+  facts. The remainder (no subscription, no events in a read, no session id)
+  is an open point of this shape; the single session layer closes it.

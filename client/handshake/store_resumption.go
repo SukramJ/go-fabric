@@ -13,11 +13,13 @@ import (
 // StoreResumption is a [ResumptionStore] over the store's resumption
 // records ([store.Resumption]): the one record per peer — fabric index and
 // node id — that the node's CASE responder reads and writes, read and
-// written by the CASE client too. A record the responder wrote carries no
-// session parameters (zero is absent, [store.ResumptionRecord]); a
-// resumption over it takes our own parameters, overlaid by those the peer
-// states in Sigma2Resume. Each save replaces the peer's record, whichever
-// role made it.
+// written by the CASE client too. A field of the record's session
+// parameters that is zero is absent ([store.ResumptionRecord]); a
+// resumption takes the unsecured session's parameters for it — what is
+// assumed of the peer for the handshake's exchange (case.go, the resume
+// branch) — overlaid by the record's and then by those the peer states in
+// Sigma2Resume (matter.js CaseClient.ts:184-188 at db021da0). Each save
+// replaces the peer's record, whichever role made it.
 //
 // matter.js keeps one resumption record per peer address for both roles:
 // packages/protocol/src/session/SessionManager.ts:261 at db021da0, read by
