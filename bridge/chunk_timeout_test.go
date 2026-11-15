@@ -35,7 +35,7 @@ func TestChunkStatusResponseTimeoutSumsBothDirections(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", SessionIntervals: tc.local}, nil)
+			b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0", SessionIntervals: tc.local}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

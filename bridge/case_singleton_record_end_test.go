@@ -23,7 +23,7 @@ import (
 // newUnsecuredRigOn is [newUnsecuredRig] with the bridge on clk.
 func newUnsecuredRigOn(t *testing.T, clk clock.Clock) *unsecuredRig {
 	t.Helper()
-	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", Clock: clk}, nil)
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0", Clock: clk}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

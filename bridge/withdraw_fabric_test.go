@@ -36,7 +36,7 @@ func TestWithdrawFabric_RemovesAnnouncedOperationalRecord(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
 	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
-		Listen: ":0",
+		Listen: "127.0.0.1:0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)
@@ -80,7 +80,7 @@ func TestWithdrawFabric_NeverAnnounced_NoPanic(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
 	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
-		Listen: ":0",
+		Listen: "127.0.0.1:0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)

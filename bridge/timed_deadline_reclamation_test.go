@@ -95,7 +95,7 @@ func TestBridgeStart_AckPumpReclaimsExpiredTimedDeadlines(t *testing.T) {
 		wbEmptySnapshotter,
 		mdns.NewNoop(),
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)

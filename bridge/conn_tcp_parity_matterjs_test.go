@@ -82,7 +82,7 @@ func (l *tcpSessionBindingLog) has(msg string) bool {
 // session registry; logger nil leaves New's default.
 func tcpSessionBindingBridge(t *testing.T, logger *slog.Logger) (*Bridge, *fakeSessionRegistry) {
 	t.Helper()
-	b, err := New(wbEmptySnapshotter, newFakeAdvertiser(), Config{Listen: ":0"}, logger)
+	b, err := New(wbEmptySnapshotter, newFakeAdvertiser(), Config{Listen: "127.0.0.1:0"}, logger)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

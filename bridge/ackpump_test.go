@@ -505,7 +505,7 @@ func TestTickOutboundReliable_NilListener(t *testing.T) {
 		wbEmptySnapshotter,
 		nil,
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)
@@ -649,7 +649,7 @@ func TestAckPump_PeerAckLeavesTheAckTheBridgeOwes(t *testing.T) {
 func startIdlePump(t *testing.T) (*Bridge, *clocktest.Fake, *mrp.AckTracker) {
 	t.Helper()
 	fake := clocktest.New(time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC))
-	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", Clock: fake}, nil)
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0", Clock: fake}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

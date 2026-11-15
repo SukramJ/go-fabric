@@ -49,7 +49,7 @@ func newTestBridge(t *testing.T) *bridge.Bridge {
 		emptySnapshotter,
 		mdns.NewNoop(),
 		bridge.Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)
@@ -85,7 +85,7 @@ func TestNew_ZeroConfigIsValid(t *testing.T) {
 func TestNew_NilAdvertiserOK(t *testing.T) {
 	t.Parallel()
 	b, err := bridge.New(emptySnapshotter, nil, bridge.Config{
-		Listen: ":0",
+		Listen: "127.0.0.1:0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New with nil advertiser: unexpected error: %v", err)
@@ -206,7 +206,7 @@ func TestStart_DefersOperationalRecord(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
 	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
-		Listen: ":0",
+		Listen: "127.0.0.1:0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)
@@ -251,7 +251,7 @@ func TestReassemble_InvokesSnapshotterAgain(t *testing.T) {
 	t.Parallel()
 	cs := &countingSnapshotter{}
 	b, err := bridge.New(cs.snap, mdns.NewNoop(), bridge.Config{
-		Listen: ":0",
+		Listen: "127.0.0.1:0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)
@@ -297,7 +297,7 @@ func TestStop_IsIdempotent(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
 	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
-		Listen: ":0",
+		Listen: "127.0.0.1:0",
 	}, nil)
 	if err != nil {
 		t.Fatalf("New: unexpected error: %v", err)

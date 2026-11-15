@@ -453,7 +453,7 @@ func (c *countingAdvertiser) publishes() int {
 func TestTriggerSessionReannounce_RepublishesActiveRecords(t *testing.T) {
 	t.Parallel()
 	adv := &countingAdvertiser{Noop: mdns.NewNoop()}
-	b, err := New(wbEmptySnapshotter, adv, Config{Listen: ":0"}, nil)
+	b, err := New(wbEmptySnapshotter, adv, Config{Listen: "127.0.0.1:0"}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -615,7 +615,7 @@ func (a *eventAdvertiser) events() (disconnected, retransmission []string) {
 func startedEventBridge(t *testing.T) (b *Bridge, adv *eventAdvertiser, op1, op2 string) {
 	t.Helper()
 	adv = &eventAdvertiser{Noop: mdns.NewNoop()}
-	b, err := New(wbEmptySnapshotter, adv, Config{Listen: ":0"}, nil)
+	b, err := New(wbEmptySnapshotter, adv, Config{Listen: "127.0.0.1:0"}, nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

@@ -163,7 +163,7 @@ func TestDeviceTypeValidationLogsRootAssertedAtDebug(t *testing.T) {
 		}}}})
 	}
 	rec := &levelRecorder{}
-	b, err := bridge.New(snap, mdns.NewNoop(), bridge.Config{Listen: ":0"}, slog.New(rec))
+	b, err := bridge.New(snap, mdns.NewNoop(), bridge.Config{Listen: "127.0.0.1:0"}, slog.New(rec))
 	if err != nil {
 		t.Fatal(err)
 	}

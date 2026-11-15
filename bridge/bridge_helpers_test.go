@@ -347,7 +347,7 @@ func newBridgeWithAdvertiser(t *testing.T, advertiser mdns.Advertiser, buf *byte
 		wbEmptySnapshotter,
 		advertiser,
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		logger,
 	)

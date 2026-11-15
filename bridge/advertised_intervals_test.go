@@ -17,7 +17,7 @@ func TestOperationalRecordCarriesSessionIntervals(t *testing.T) {
 	newBridge := func(t *testing.T, iv SessionIntervals) (*Bridge, *deviceAdvertiserRecorder) {
 		t.Helper()
 		rec := &deviceAdvertiserRecorder{fakeAdvertiser: newFakeAdvertiser()}
-		b, err := New(wbEmptySnapshotter, rec, Config{Listen: ":0", SessionIntervals: iv}, nil)
+		b, err := New(wbEmptySnapshotter, rec, Config{Listen: "127.0.0.1:0", SessionIntervals: iv}, nil)
 		if err != nil {
 			t.Fatalf("New: %v", err)
 		}

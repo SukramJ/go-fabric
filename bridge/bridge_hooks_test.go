@@ -48,7 +48,7 @@ func TestBridge_SetOnReassembled_CalledAfterReassemble(t *testing.T) {
 		emptySnapshotter,
 		mdns.NewNoop(),
 		bridge.Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)

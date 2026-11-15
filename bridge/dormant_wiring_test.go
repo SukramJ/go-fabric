@@ -34,7 +34,7 @@ func newReachabilityBridge(t *testing.T, ep *endpointpkg.Endpoint) *Bridge {
 		wbEmptySnapshotter,
 		nil,
 		Config{
-			Listen: ":0",
+			Listen: "127.0.0.1:0",
 		},
 		nil,
 	)
@@ -216,7 +216,7 @@ func TestForgetSigma1Replied_ClearsEntry(t *testing.T) {
 	b, err := New(
 		wbEmptySnapshotter,
 		nil,
-		Config{Listen: ":0"},
+		Config{Listen: "127.0.0.1:0"},
 		nil,
 	)
 	if err != nil {
@@ -247,7 +247,7 @@ func TestPerExchangeCaseProvider_EvictHookForgetsSigma1(t *testing.T) {
 	b, err := New(
 		wbEmptySnapshotter,
 		nil,
-		Config{Listen: ":0"},
+		Config{Listen: "127.0.0.1:0"},
 		nil,
 	)
 	if err != nil {
