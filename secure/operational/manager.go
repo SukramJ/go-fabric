@@ -547,6 +547,16 @@ func (e *Entry) LastActivity() time.Time {
 	return t
 }
 
+// LastPeerActivity returns when the peer last sent on this session, as
+// the wall clock reads it now: set when the session opened, moved by every
+// inbound decrypt ([Entry.MarkActiveRx]) and never by this node's own
+// sends. The zero time for an entry that never carried a peer.
+func (e *Entry) LastPeerActivity() time.Time {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return wallAsNow(e.clock, e.lastPeerActivity, e.lastPeerActivityMono)
+}
+
 // CreatedAt returns when the session was installed with its keys; the
 // zero time for a pre-allocated placeholder.
 func (e *Entry) CreatedAt() time.Time {
@@ -1864,6 +1874,53 @@ func (m *Manager) SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint
 	m.mu.RUnlock()
 	slices.Sort(out)
 	return out
+}
+
+// NewestSessionForPeer returns the id of the live session with
+// (fabricIndex, peerNodeID) the peer sent on last, among those usable
+// accepts (nil accepts every one); false when none qualifies. Ties go to
+// the higher id. usable runs without the manager's lock held, so it may
+// call back into the manager.
+//
+// Mirrors matter.js packages/protocol/src/peer/Peer.ts:582-602 at db021da0
+// (newestSession: the highest activeTimestamp among the sessions neither
+// closing nor peer-lost, optionally of one channel type — here usable's
+// part); activeTimestamp moves only when a message is received
+// (packages/protocol/src/session/Session.ts:142-147), the stamp
+// [Entry.MarkActiveRx] moves. A closed session is not in the table, so it
+// is never a candidate.
+func (m *Manager) NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usable func(id uint16) bool) (uint16, bool) {
+	type candidate struct {
+		id   uint16
+		mono time.Duration
+	}
+	var cands []candidate
+	m.mu.RLock()
+	for _, e := range m.sessions {
+		if e == nil || e.Session == nil {
+			continue
+		}
+		if e.FabricIndex() != fabricIndex || e.Session.PeerNodeID() != peerNodeID {
+			continue
+		}
+		e.mu.Lock()
+		mono := e.lastPeerActivityMono
+		e.mu.Unlock()
+		cands = append(cands, candidate{id: e.SessionID, mono: mono})
+	}
+	m.mu.RUnlock()
+	sort.Slice(cands, func(i, j int) bool {
+		if cands[i].mono != cands[j].mono {
+			return cands[i].mono > cands[j].mono
+		}
+		return cands[i].id > cands[j].id
+	})
+	for _, c := range cands {
+		if usable == nil || usable(c.id) {
+			return c.id, true
+		}
+	}
+	return 0, false
 }
 
 // Sessions returns a snapshot of every open session, ordered by session
