@@ -65,8 +65,10 @@ the handshake, segmentation and acknowledgement in a receive window. The
 segment size follows the negotiated ATT_MTU (at least 23 bytes less the
 3-byte ATT header). In go-fabric:
 [`transport/btp`](https://github.com/SukramJ/go-fabric/tree/main/transport/btp),
-used by the commissioner only
-([ADR 0024](../adr/0024-ble-commissioning-in-the-controller.md)).
+used by the commissioner
+([ADR 0024](../adr/0024-ble-commissioning-in-the-controller.md)) and by a
+node commissioned over BLE
+([ADR 0031](../adr/0031-ble-and-wifi-provisioning-on-the-device-side.md)).
 
 **Bridged Node / Bridged Device** — A device on a foreign network that a
 bridge represents; the Bridged Node device type marks the top endpoint of
@@ -286,7 +288,9 @@ endpoint assembler.
 handshake on the setup passcode that gives a commissioner its first secure
 session while a commissioning window is open. In go-fabric:
 [`secure/spake2`](https://github.com/SukramJ/go-fabric/tree/main/secure/spake2);
-the node holds only the verifier, never the passcode.
+the node keeps its configured passcode (for its own window and its
+pairing codes); an enhanced window an administrator opens hands it only a
+verifier.
 
 **Privilege** — The level an ACL entry grants: View, Operate, Manage,
 Administer (ProxyView is deprecated). Each includes the ones below it;
