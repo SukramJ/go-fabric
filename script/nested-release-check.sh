@@ -21,6 +21,9 @@
 #   - its replace is dropped, so the build resolves the require the way a
 #     consumer's build does, through GOPROXY;
 #   - no replace to a local path may remain;
+#   - go mod download first: a module that cannot be fetched (GOPROXY,
+#     the checksum database, the network) is the environment, exit 2, not
+#     a module out of release shape (review II, DR5a-ci-08);
 #   - go build ./... and go vet ./... with GOWORK=off and GOFLAGS=-mod=mod.
 #
 # With --tag <dir>/vX.Y.Z (a pushed nested tag) it checks that one module
@@ -29,16 +32,17 @@
 #
 # Usage: script/nested-release-check.sh [--tag <tag> | <module-dir> ...]
 # Exit 1: a module fails the release shape; 2: the environment or the
-# arguments (no git, no go, no jq, a directory without a go.mod).
+# arguments (no git, no go, no jq, a directory without a go.mod, a module
+# that cannot be downloaded).
 set -euo pipefail
 
 for tool in git go jq; do
 	command -v "$tool" >/dev/null || { echo "nested-release-check: $tool not found"; exit 2; }
 done
 
-root=$(git rev-parse --show-toplevel)
+root=$(git rev-parse --show-toplevel) || exit 2
 cd "$root"
-rootmod=$(GOWORK=off go list -m)
+rootmod=$(GOWORK=off go list -m) || exit 2
 
 modules=()
 if [ "${1:-}" = "--tag" ]; then
@@ -106,6 +110,10 @@ for dir in "${modules[@]}"; do
 			printf '     %s\n' "$local_replaces"
 			ok=false
 		fi
+	fi
+	if [ "$ok" = true ] && ! (cd "$work" && GOWORK=off GOFLAGS=-mod=mod go mod download); then
+		echo "nested-release-check: $dir: the modules it requires cannot be downloaded (above); the environment, not the release shape"
+		exit 2
 	fi
 	if [ "$ok" = true ]; then
 		if ! (cd "$work" && GOWORK=off GOFLAGS=-mod=mod go build ./... && GOWORK=off GOFLAGS=-mod=mod go vet ./...); then
