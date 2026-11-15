@@ -130,7 +130,7 @@ Wizard round 1 at the start of phase 5; the briefs and the phase plan were writt
 | # | Question | Decision |
 | --- | --- | --- |
 | 91 | Phase 5's cut and budget | **Variant A, two halves, two PRs** (≈24–27 M): 5a tests, docs, supply chain, daemon; 5b API cut, port extensions, peer path, generated redaction, wave H. Deferred to phase 6: bridge mutation survivors, ADR/history claim checks, 20–30 low/note carried rows; API reviewers read the exported surface only; one rework round |
-| 92 | Phases for the ten rows without one | **As plan.md §4**: phase 5 for F-db021da0-20, -22, -23, -27, -39, -45, -46, -47; phase 6 for -28 and -38 |
+| 92 | Phases for the ten rows without one | **Phase 5** for F-db021da0-20, -22, -23, -27, -39, -45, -46, -47; phase 6 for -28 and -38 |
 | 93 | Commissioning Proxy cluster (0x0455) | **A roadmap note tied to the Matter 1.7 lift**; no work in Review II |
 | 94 | The two TCP payload differences (BD-Matter-TCP-ExchangePayloadSize) | **Both closed as matter.js** (Session.ts:237-239, MessageChannel.ts:86-92 at db021da0); the entry is retired |
 | 95 | Reports overlap (BD-Matter-Subscription-ReportsOverlap, F-db021da0-36) | **Adopt matter.js's hold in phase 5 (wave H)**: one report in flight per subscription, delivered = StatusResponse; F-36 pulled forward from phase 6 |
