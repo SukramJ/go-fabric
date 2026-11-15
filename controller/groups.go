@@ -28,10 +28,9 @@ import (
 // openGroups composes the manager and gives it the controller's socket,
 // or [Config.GroupTransport].
 func (c *Controller) openGroups(ctx context.Context, cfg Config, log *slog.Logger) error {
+	// The own fabric row the key sets hang on is settled in New, before the
+	// socket opens (ensureFabricRow).
 	st := store.New(cfg.DB)
-	if err := c.ensureFabricRow(ctx, st); err != nil {
-		return err
-	}
 	m, err := groups.NewManager(st, log)
 	if err != nil {
 		return err

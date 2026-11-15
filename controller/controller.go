@@ -447,6 +447,13 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.fabric, err = commissioner.NewFabricAuthority(authority, log).DefaultFabric(fcfg, true); err != nil {
 		return nil, err
 	}
+	// The own fabric row before the socket opens and the CASE responder is
+	// registered: a row the former own node left is taken over with its
+	// resumption records gone, so no peer resumes with one of them in the
+	// start-up window (review II, Fable P-4a).
+	if err := c.ensureFabricRow(ctx, store.New(cfg.DB)); err != nil {
+		return nil, err
+	}
 	networks, err := c.openTransports(ctx, cfg, listen, openNames, clk, log)
 	if err != nil {
 		return nil, err
@@ -454,8 +461,9 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	// One resumption record per peer, kept in the database: a controller
 	// restarted resumes with a node instead of a full CASE (review II,
 	// R2-P5-port-06, F-db021da0-19). The records hang on the controller's
-	// own fabric row (openGroups, ensureFabricRow), written before any
-	// session is established.
+	// own fabric row, which ensureFabricRow settled above, before the
+	// socket opened and before the peer set and the CASE responder below
+	// read the table.
 	resumption := handshake.NewStoreResumption(store.New(cfg.DB))
 	fabrics := []*commissioner.Fabric{c.fabric}
 	pctx := peer.Context{
