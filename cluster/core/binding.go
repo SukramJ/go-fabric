@@ -177,9 +177,9 @@ type BindingConfig struct {
 	// Fabrics is the node's fabric list, the source AccessControl checks
 	// a write's fabric against ([FabricSource]; the node passes its
 	// store). The server takes a request's write only for a fabric it
-	// lists — also when Save is nil — and a persisted one (Save set)
-	// refuses every request write without it, fail closed (review II,
-	// R2-P6-store-1010, decision 158).
+	// lists, and refuses every request write without a source — fail
+	// closed, persisted or not (review II, R2-P6-store-1010, decision
+	// 158). nil keeps a source [Binding.SetFabricSource] gave.
 	Fabrics FabricSource
 }
 
@@ -203,7 +203,9 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 		}
 	}
 	b.save = cfg.Save
-	b.fabrics = cfg.Fabrics
+	if cfg.Fabrics != nil {
+		b.fabrics = cfg.Fabrics
+	}
 	b.mu.Lock()
 	before := b.bindings
 	if stored != nil {
@@ -214,6 +216,18 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 	b.writeMu.Unlock()
 	b.notify(contract.OriginHostSet, before, after)
 	return nil
+}
+
+// SetFabricSource gives the server the node's fabric list a request's
+// write is checked against ([BindingConfig.Fabrics] without Persist's
+// restore and store): the endpoint assembler hands its
+// [endpoint.Config.Fabrics] to every Binding it serves. A server without
+// a source refuses every request write — fail closed (review II,
+// R2-P6-store-1010, decision 158).
+func (b *Binding) SetFabricSource(src FabricSource) {
+	b.writeMu.Lock()
+	b.fabrics = src
+	b.writeMu.Unlock()
 }
 
 // OnAttributeChange implements [contract.AttributeChangeNotifier]: fn
@@ -651,17 +665,11 @@ var errBindingWriteRefused = errors.New("core: Binding write refused")
 // fabric list does not hold the fabric — removed while the write was on
 // its way, its removal's clear already run — or when the list cannot be
 // read (fail closed): the write would otherwise be kept under a removed
-// index (review II, R2-P6-store-1010, decision 158). A server given a
-// source is checked whether or not it persists; a persisted one without a
-// source refuses every request write. A server neither persisted nor
-// given a source — [NewBinding] as the endpoint assembler mounts it on a
-// host without the node — is not checked: nothing there can hand it the
-// node's fabric list, and refusing would end every Binding write of such a
-// host; its list leaves with the fabric's MatterDropFabric. writeMu is held.
+// index (review II, R2-P6-store-1010, decision 158). A server without a
+// source — neither [BindingConfig.Fabrics] nor [Binding.SetFabricSource]
+// gave one — refuses every request write, persisted or not. writeMu is
+// held.
 func (b *Binding) fabricGoneLocked(ctx context.Context, fabric uint8) error {
-	if b.fabrics == nil && b.save == nil {
-		return nil
-	}
 	if b.fabrics == nil {
 		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: "core: Binding: no fabric source to check the write's fabric against"}
 	}

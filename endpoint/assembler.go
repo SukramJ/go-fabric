@@ -40,6 +40,13 @@ type Config struct {
 	// as in matter.js (GroupsServer keeps it in the root's
 	// GroupKeyManagementServer). nil keeps whatever the source supplies.
 	Groups *groups.Manager
+	// Fabrics is the node's fabric list (the node passes its store): the
+	// assembler hands it to every Binding server an endpoint serves
+	// ([mattercore.Binding.SetFabricSource]), which checks a request's
+	// write against it. nil leaves the Binding servers without a source,
+	// and they refuse every request write — fail closed (review II,
+	// R2-P6-store-1010, decision 158).
+	Fabrics mattercore.FabricSource
 	// Persistence keeps a bridged endpoint's controller-written
 	// NodeLabel and its scene table across restarts ([Persistence]); the
 	// host hands a restored label back as [Spec.NodeLabel]. With Groups
@@ -292,6 +299,7 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		ep.BridgeVendorID = topology.VendorID
 		ep.BridgeProductID = topology.ProductID
 		ep.BridgeVendorName = topology.VendorName
+		ep.fabrics = a.cfg.Fabrics
 	}
 	return topology, nil
 }

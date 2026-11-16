@@ -148,6 +148,9 @@ type Endpoint struct {
 	// BridgedBasicInformation is [Spec.BridgedBasicInformation]: what the
 	// host states of the bridged device's BridgedDeviceBasicInformation.
 	BridgedBasicInformation bdbidef.Patch
+	// fabrics is the assembler's [Config.Fabrics], handed to the
+	// endpoint's Binding servers (mountBinding).
+	fabrics mattercore.FabricSource
 
 	// ParentEndpointID is the Matter endpoint ID of the parent
 	// endpoint in the bridge hierarchy. For bridged endpoints (ID ≥ 2)

@@ -22,7 +22,7 @@ import (
 // and OnWrite vetoes a controller write before it is stored.
 func TestTypedBindingServer(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	s := bindingdef.Wrap(b)
 	var changes []string
 	stop := b.OnChange(func(fabric uint8, added, removed []bindingdef.TargetStruct) {

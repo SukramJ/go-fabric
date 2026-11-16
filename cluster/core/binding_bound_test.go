@@ -53,7 +53,7 @@ const bindingFabricShare = bindingTableSize / 4
 // the table (R2-P6-bound-1008).
 func TestBinding_ListIsBounded(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	fabric := func(idx uint8) context.Context {
 		return im.WithFabricFilter(context.Background(), true, idx)
 	}
@@ -84,7 +84,7 @@ func TestBinding_ListIsBounded(t *testing.T) {
 // writes its own share (review II, R2-P6-bound-1008).
 func TestBinding_AFabricIsHeldToItsShare(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	fabric := func(idx uint8) context.Context {
 		return im.WithFabricFilter(context.Background(), true, idx)
 	}

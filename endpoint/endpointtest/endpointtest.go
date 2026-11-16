@@ -23,7 +23,9 @@ import (
 	"strconv"
 	"testing"
 
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // AssertDeviceTypeConformance fails tb for every device type violation
@@ -147,7 +149,24 @@ func AssemblerConfig() endpoint.Config {
 	return endpoint.Config{
 		VendorID:  assemblerVendorID,
 		ProductID: assemblerProductID,
+		Fabrics:   EveryFabric,
 	}
+}
+
+// EveryFabric is a fabric source that lists every fabric index, 1 to 254:
+// a test's Binding servers take a request's write from any fabric, as a
+// node's would from the fabrics it holds ([endpoint.Config.Fabrics];
+// review II, R2-P6-store-1010, decision 158).
+var EveryFabric mattercore.FabricSource = everyFabric{}
+
+type everyFabric struct{}
+
+func (everyFabric) ListFabrics(context.Context) ([]store.FabricRecord, error) {
+	out := make([]store.FabricRecord, 0, 254)
+	for f := 1; f <= 254; f++ {
+		out = append(out, store.FabricRecord{FabricIndex: uint8(f)})
+	}
+	return out, nil
 }
 
 // NewEmptySnapshotter returns a snapshot callback over an empty fleet: one

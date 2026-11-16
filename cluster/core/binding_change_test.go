@@ -80,7 +80,7 @@ func TestBindingKey(t *testing.T) {
 // observer hears nothing.
 func TestBindingOnChange(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	r := &changeRecorder{}
 	stop := b.OnChange(r.fn)
 	ctx := fabricCtx(1)
@@ -144,7 +144,7 @@ func eqChange(a, b bindingChange) bool {
 // accessing fabric's entries, an unfiltered one every fabric's.
 func TestBindingFabricScopedWrite(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	r := &changeRecorder{}
 	b.OnChange(r.fn)
 	if err := b.MatterWrite(fabricCtx(1), 0, []core.TargetStruct{{Node: 2, Endpoint: 1, FabricIndex: 9}}); err != nil {
@@ -202,7 +202,7 @@ func TestBindingFabricScopedWrite(t *testing.T) {
 // definition: a Group below its "min 1" is CONSTRAINT_ERROR.
 func TestBindingGeneratedValue(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	node, ep, cl := uint64(2), uint16(1), uint32(6)
 	if err := b.MatterWrite(fabricCtx(4), 0, []bindingdef.TargetStruct{{Node: &node, Endpoint: &ep, Cluster: &cl}}); err != nil {
 		t.Fatal(err)
@@ -222,7 +222,7 @@ func TestBindingGeneratedValue(t *testing.T) {
 // hear it (FabricScopedDataHandler.ts:109-122); another fabric's stay.
 func TestBindingRemoveFabric(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	if err := b.MatterWrite(fabricCtx(1), 0, []core.TargetStruct{{Node: 2, Endpoint: 1}}); err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestBindingRemoveFabric(t *testing.T) {
 // reports nothing.
 func TestBindingOrigins(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	var mu sync.Mutex
 	var got []contract.Change
 	b.OnAttributeChange(func(c contract.Change) {

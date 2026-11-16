@@ -86,10 +86,9 @@ func TestICDRegistrationOfARemovedFabricStoresNothing(t *testing.T) {
 }
 
 // TestFabricChecksFailClosedWithoutASource (review II, R2-P6-store-1010,
-// decision 158, round 2): a Binding given a source is checked although it
-// persists nothing, and an ICD Management without a Store refuses a
-// registration UNSUPPORTED_ACCESS, nothing kept. (A Binding neither
-// persisted nor given a source stays unchecked: see fabricGoneLocked.)
+// decision 158, rounds 2 and 3): a Binding given a source is checked
+// although it persists nothing, a Binding without a source and an ICD
+// Management without a Store refuse UNSUPPORTED_ACCESS, nothing kept.
 func TestFabricChecksFailClosedWithoutASource(t *testing.T) {
 	t.Parallel()
 	entry := core.TargetStruct{Node: 7, Endpoint: 1, EndpointPresent: true}
@@ -104,10 +103,37 @@ func TestFabricChecksFailClosedWithoutASource(t *testing.T) {
 		t.Errorf("in-memory Binding with a source, fabric 1: %v", err)
 	}
 
+	// Neither persisted nor given a source: refused as well (round 3).
+	bare := core.NewBinding()
+	if err := bare.MatterWrite(fabricCtx(1), 0x0000, []core.TargetStruct{entry}); statusOf(err) != im.StatusUnsupportedAccess {
+		t.Errorf("Binding without a source: %v, want UNSUPPORTED_ACCESS", err)
+	}
+	if v, _ := bare.MatterRead(0x0000); len(v.([]core.TargetStruct)) != 0 {
+		t.Errorf("Binding without a source kept %v", v)
+	}
+
 	s := newICDServer(t, core.ICDManagementConfig{})
 	_, err := s.MatterInvoke(icdInvokeCtx(1, privAdminister), icddef.CmdRegisterClient,
 		icddef.RegisterClientRequest{CheckInNodeId: 9, MonitoredSubject: 9, Key: icdKey(1)})
 	if icdStatus(err) != im.StatusUnsupportedAccess {
 		t.Errorf("ICD without a Store: %v, want UNSUPPORTED_ACCESS", err)
 	}
+}
+
+// everyFabric lists every fabric index, 1 to 254: a test's Binding that is
+// not about the fabric check takes it as its source.
+var everyFabric = func() fabricList {
+	l := make(fabricList, 0, 254)
+	for f := 1; f <= 254; f++ {
+		l = append(l, uint8(f))
+	}
+	return l
+}()
+
+// sourcedBinding is core.NewBinding with every fabric listed as its source
+// (a Binding without one refuses every request write, decision 158).
+func sourcedBinding() *core.Binding {
+	b := core.NewBinding()
+	b.SetFabricSource(everyFabric)
+	return b
 }

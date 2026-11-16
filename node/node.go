@@ -319,6 +319,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 			VendorName:  bi.VendorName,
 			Groups:      n.groups,
 			Persistence: n.endpoints,
+			// The node's fabric list: every Binding server checks a
+			// request's write against it (R2-P6-store-1010, decision 158).
+			Fabrics: n.st,
 			// The node's own conditions on the root: WiFi with a Wi-Fi
 			// reporter (Network.WiFi).
 			RootDeviceConditions: n.cfg.rootDeviceConditions(),

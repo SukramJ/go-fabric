@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	"github.com/SukramJ/go-fabric/im"
@@ -43,6 +45,7 @@ func TestAttributeValueReader_BindingAppend(t *testing.T) {
 		t.Fatalf("append item decoded %#v", av.Value)
 	}
 	srv := mattercore.NewBinding()
+	srv.SetFabricSource(endpointtest.EveryFabric)
 	ctx := im.WithFabricFilter(context.Background(), true, 1)
 	current, ok := srv.MatterReadFiltered(ctx, bindingdef.AttrBinding)
 	if !ok || reflect.TypeOf(current) != reflect.TypeOf(av.Value) {

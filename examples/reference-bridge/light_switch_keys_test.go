@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+
 	"github.com/SukramJ/go-fabric/binding"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
@@ -80,6 +82,7 @@ func TestLightSwitchSendRefusals(t *testing.T) {
 	if !ok {
 		t.Fatal("the switch serves no Binding")
 	}
+	b.SetFabricSource(endpointtest.EveryFabric) // the node hands the store's list (decision 158)
 	fabricCtx := im.WithFabricFilter(ctx, true, 1)
 	entry := mattercore.TargetStruct{Node: 0x99, Endpoint: 1, FabricIndex: 1}
 	if err := b.MatterWrite(im.WithListAppendWrite(fabricCtx), bindingdef.AttrBinding, []mattercore.TargetStruct{entry}); err != nil {

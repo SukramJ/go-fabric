@@ -25,7 +25,7 @@ import (
 // certification cases write exactly these.
 func TestBindingEntryAppendedOverTheWireIsApplied(t *testing.T) {
 	t.Parallel()
-	srv := mattercore.NewBinding()
+	srv := sourcedBinding()
 	eps := []*Endpoint{{ID: 0}, {ID: 1, Aggregator: true, DeviceType: 0x000E}, {ID: 2, Source: gateSource{srvs: []contract.ClusterServer{srv}}}}
 	d := NewTopologyDispatcher(&Topology{Endpoints: eps, VendorID: 0xFFF1, ProductID: 0x8000})
 	d.SetACLLister(fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeAdminister, nil)}})

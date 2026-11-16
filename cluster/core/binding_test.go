@@ -16,7 +16,7 @@ import (
 
 func TestBinding_ClusterID(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	if got := b.MatterClusterID(); got != 0x001E {
 		t.Fatalf("MatterClusterID = 0x%04X, want 0x001E", got)
 	}
@@ -24,7 +24,7 @@ func TestBinding_ClusterID(t *testing.T) {
 
 func TestBinding_ClusterRevision(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	v, ok := b.MatterRead(cluster.AttrGlobalClusterRevision)
 	if !ok {
 		t.Fatal("ClusterRevision: ok=false")
@@ -36,7 +36,7 @@ func TestBinding_ClusterRevision(t *testing.T) {
 
 func TestBinding_ReadInitiallyEmpty(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	v, ok := b.MatterRead(0x0000)
 	if !ok {
 		t.Fatal("Binding attr: ok=false")
@@ -49,7 +49,7 @@ func TestBinding_ReadInitiallyEmpty(t *testing.T) {
 
 func TestBinding_WriteSetsList(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	ctx := context.Background()
 	targets := []core.TargetStruct{
 		{Node: 1, Endpoint: 2, Cluster: 0x0006, FabricIndex: 1},
@@ -73,7 +73,7 @@ func TestBinding_WriteSetsList(t *testing.T) {
 
 func TestBinding_WriteWrongType(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	err := b.MatterWrite(context.Background(), 0x0000, "not-a-slice")
 	if spec.StatusOf(err) != im.StatusConstraintError {
 		t.Fatalf("Binding of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusConstraintError)
@@ -82,7 +82,7 @@ func TestBinding_WriteWrongType(t *testing.T) {
 
 func TestBinding_WriteUnknownAttribute(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	err := b.MatterWrite(context.Background(), 0xBEEF, []core.TargetStruct{})
 	if spec.StatusOf(err) != im.StatusUnsupportedAttribute {
 		t.Fatalf("unknown attribute: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedAttribute)
@@ -91,7 +91,7 @@ func TestBinding_WriteUnknownAttribute(t *testing.T) {
 
 func TestBinding_ReadReturnsDefensiveCopy(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	ctx := context.Background()
 	targets := []core.TargetStruct{{Node: 99, FabricIndex: 1}}
 	if err := b.MatterWrite(ctx, 0x0000, targets); err != nil {
@@ -109,7 +109,7 @@ func TestBinding_ReadReturnsDefensiveCopy(t *testing.T) {
 
 func TestBinding_InvokeReturnsError(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	ctx := context.Background()
 	for _, cmdID := range []uint32{0x00, 0x01} {
 		_, err := b.MatterInvoke(ctx, cmdID, nil)
@@ -121,7 +121,7 @@ func TestBinding_InvokeReturnsError(t *testing.T) {
 
 func TestBinding_ConcurrentReadWrite(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	ctx := context.Background()
 
 	const goroutines = 20
@@ -144,7 +144,7 @@ func TestBinding_ConcurrentReadWrite(t *testing.T) {
 
 func TestBinding_MatterReportable(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	list := b.MatterReportable()
 	// Binding (0x0000) must be listed per Matter §9.6.
 	have := make(map[uint32]bool)
@@ -158,7 +158,7 @@ func TestBinding_MatterReportable(t *testing.T) {
 
 func TestBinding_MatterAttributes(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	list := b.MatterAttributes()
 	if len(list) == 0 {
 		t.Fatal("MatterAttributes() is empty — dispatcher falls back to reportable-only surface")
