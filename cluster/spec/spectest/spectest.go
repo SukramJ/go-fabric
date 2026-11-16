@@ -350,6 +350,12 @@ func checkServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 				want = append(want, r.ID)
 			}
 		}
+		// An accepted command is a request the definition defines.
+		for _, id := range accepted {
+			if def.Command(id, spec.Request) == nil {
+				tb.Errorf("%s: accepted command 0x%02X is not a request the definition defines", def.Name, id)
+			}
+		}
 		// An accepted command has an implementation: matter.js lists the
 		// implemented commands only (ValidatedElements.ts:341-343,
 		// ServerBehaviorBacking.ts:130-147 at 0ceb202d). Checked where the
@@ -380,6 +386,11 @@ func checkServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 		for ei := range def.Events {
 			e := &def.Events[ei]
 			checkPresence(tb, def.Name, "event", e.Name, e.Conformance.Applicability(ctx), slices.Contains(events, e.ID))
+		}
+		for _, id := range events {
+			if def.Event(id) == nil {
+				tb.Errorf("%s: listed event 0x%02X is not defined by the definition", def.Name, id)
+			}
 		}
 	}
 }
