@@ -1407,11 +1407,13 @@ func (s *EvseServer) SetEndpoint(endpoint uint16) {
 	s.lock()
 	defer s.unlock()
 	s.endpoint = endpoint
+	// The store is stamped before the check, which may disable at once
+	// (review II, appinfra round 3).
+	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 	if s.quiesced {
 		s.quiesced = false
 		s.scheduleEnabledCheckLocked()
 	}
-	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the enabled-until timer.

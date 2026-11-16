@@ -143,12 +143,12 @@ func (s *CommodityTariffServer) MatterQuiesce() {
 // entry are derived for now — and arms the sync again, as EvseServer
 // re-arms its deadline (review II, R2-P6-fsm-1607).
 func (s *CommodityTariffServer) SetEndpoint(endpoint uint16) {
+	s.SelfHeld.SetEndpoint(endpoint) // stamped first, before the sync acts (appinfra round 3)
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.quiesced {
 		s.quiesced = false
 		_ = s.syncTimeLocked() // as a tick: there is no caller to answer
 		s.startSyncLocked()
 	}
-	s.mu.Unlock()
-	s.SelfHeld.SetEndpoint(endpoint)
 }

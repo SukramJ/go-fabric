@@ -1139,6 +1139,9 @@ func (p *PushTransport) SetMatterEventEmitter(emitter contract.EventEmitter) {
 // [PushTransport.MatterQuiesce] stopped comes back here, and each kept
 // expiry is armed again for the time left (review II, R2-P6-conc-1606).
 func (p *PushTransport) SetEndpoint(endpoint uint16) {
+	// The store is stamped first: an expiry re-armed below that fires at
+	// once publishes on the new endpoint (review II, appinfra round 3).
+	p.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 	p.mu.Lock()
 	p.endpoint = endpoint
 	if p.quiesced {
@@ -1149,5 +1152,4 @@ func (p *PushTransport) SetEndpoint(endpoint uint16) {
 		}
 	}
 	p.mu.Unlock()
-	p.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }

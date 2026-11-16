@@ -1149,6 +1149,9 @@ func (s *DeviceEnergyManagementServer) cancelRequest(ctx context.Context, _ any)
 // deadline, at once for one that passed meanwhile, as EvseServer re-arms
 // its own (review II, R2-P6-conc-1605).
 func (s *DeviceEnergyManagementServer) SetEndpoint(endpoint uint16) {
+	// The store is stamped first: a timer re-armed below that fires at
+	// once emits on the new endpoint (review II, appinfra round 3).
+	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 	s.mu.Lock()
 	s.endpoint = endpoint
 	now := s.clock.Now()
@@ -1161,7 +1164,6 @@ func (s *DeviceEnergyManagementServer) SetEndpoint(endpoint uint16) {
 		s.rearmPauseLocked(max(s.pauseUntil.Sub(now), 0))
 	}
 	s.mu.Unlock()
-	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the adjustment and pause timers (chip's destructor,
