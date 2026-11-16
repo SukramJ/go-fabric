@@ -641,7 +641,8 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// bandwidth at best and confuse Apple iOS's MRP layer at worst (it
 	// drops a late Sigma2 with `Dropping message without piggyback ack
 	// when we are waiting for an ack`, then aborts the handshake).
-	// Once the handler took the Sigma3 and before its reply is sent
+	// Once the handler established the session with the Sigma3 and
+	// before its reply is sent
 	// (processSigma3 below), so the reply to Sigma3 itself — the
 	// StatusReport that ends the handshake — stays tracked and is
 	// retransmitted until the initiator acknowledges it:
@@ -658,7 +659,8 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// that reached it after it established its session, a garbage one
 	// racing the completing Sigma3 included — abandons nothing: the
 	// success report it sent stays tracked (review II, N3-fixrrdev-1,
-	// N4-rwsub-3).
+	// N4-rwsub-3). Nor does a Sigma3 that fails: an unacknowledged Sigma2
+	// goes on being retransmitted (F-db021da0-7, owner decision 173).
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	if done, ok := b.completedHandshake(key); ok {
 		return b.handleSigma3OfCompleted(src, requestHdr, proto, payload, key, done)
@@ -673,7 +675,9 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	processSigma3 := func(p []byte) (uint8, []byte, error) {
 		op, reply, outcome, err := processSigma3With(ch, p)
 		step.outcome = outcome
-		if outcome != sigma3OfCompleted {
+		// A Sigma3 that fails drops nothing: an unacknowledged Sigma2
+		// goes on being retransmitted (owner decision 173).
+		if outcome == sigma3Established {
 			b.abandonHandshakeReplies(key)
 		}
 		if outcome == sigma3OfCompleted {
@@ -833,12 +837,22 @@ func (b *Bridge) dispatchPase(
 		if !begun {
 			return b.dropHandshakeNotBegun(src, proto)
 		}
-		// The commissioner has moved past Pake2: whatever of the
-		// handshake still waits for an acknowledgement is done. Before
-		// the handler runs, so the reply to Pake3 itself stays tracked.
-		b.abandonHandshakeReplies(key)
+		// A Pake3 the handler takes moves the commissioner past Pake2:
+		// whatever of the handshake still waits for an acknowledgement is
+		// done. After the handler and before its reply is sent, so the
+		// reply to Pake3 itself stays tracked, and handlePase has read
+		// whether the Pake2 was unacknowledged before (F-db021da0-7). A
+		// Pake3 that fails drops nothing: an unacknowledged Pake2 goes on
+		// being retransmitted (owner decision 173).
+		processPake3 := func(p []byte) (uint8, []byte, error) {
+			op, reply, err := h.ProcessPake3(p)
+			if err == nil && !failureReport(op, reply) {
+				b.abandonHandshakeReplies(key)
+			}
+			return op, reply, err
+		}
 		err := b.handlePase(src, requestHdr, proto, payload, "pake3",
-			h.ProcessPake3, h)
+			processPake3, h)
 		// Pake3 terminates the handshake either way (success installs
 		// the session, failure aborts the attempt) — release the
 		// single-active-PASE claim so the next commissioner can start.
@@ -1050,9 +1064,10 @@ func (b *Bridge) paseHandshakeOfAnother(key HandshakeKey) bool {
 // abandonHandshakeReplies drops the replies of the handshake key names
 // that still wait for their acknowledgement on the unsecured session: the
 // handshake ended, or moved past them
-// ([outboundReliableTracker.AbandonUnsecuredExchange]). A caller that goes
-// on to send the StatusReport ending the handshake calls it first — the
-// report is the one message that has to outlive the handshake. The replies
+// ([outboundReliableTracker.AbandonUnsecuredExchange]). A handshake that
+// fails on a message does not call it: what it sent goes on being
+// retransmitted until it is acknowledged or its retransmissions are spent
+// ([Bridge.sendHandshakeFailureReport], owner decision 173). The replies
 // of another initiator's handshake on the same exchange id stay.
 func (b *Bridge) abandonHandshakeReplies(key HandshakeKey) {
 	b.mu.RLock()
@@ -1079,13 +1094,14 @@ func (b *Bridge) handshakeReplyUnacknowledged(key HandshakeKey) bool {
 
 // endHandshakeUnreported ends a failed handshake without its failure
 // StatusReport, because a message the handshake sent still waited for its
-// acknowledgement when the failing message arrived: what it sent is
-// dropped ([Bridge.abandonHandshakeReplies]) and nothing is sent; the
-// failing message's own acknowledgement is left to the ACK pump. Review
-// II, F-db021da0-7: the report is skipped in that state, where it was
-// sent as a reliable message after the drop before.
+// acknowledgement when the failing message arrived: nothing is sent, and
+// that message is not dropped — it goes on being retransmitted until the
+// peer acknowledges it or its retransmissions are spent
+// ([Bridge.sendHandshakeFailureReport]); the failing message's own
+// acknowledgement is left to the ACK pump. Review II, F-db021da0-7 and
+// owner decision 173: before, the unacknowledged messages were dropped and
+// the report sent as a reliable message.
 func (b *Bridge) endHandshakeUnreported(key HandshakeKey, stage string) {
-	b.abandonHandshakeReplies(key)
 	b.logger.Debug("matter.sc.handshake.failure_report_skipped",
 		slog.String("stage", stage),
 		slog.Int("exchange_id", int(key.ExchangeID)),
@@ -1469,14 +1485,21 @@ func (b *Bridge) handleCase(
 }
 
 // sendHandshakeFailureReport ends the handshake on the request's exchange
-// with the failure StatusReport body, as a reliable message: it is the one
-// entry the exchange keeps and is retransmitted until the peer
-// acknowledges it. While a message the handshake sent still waits for its
-// acknowledgement no report is sent: the handshake ends unreported
-// ([Bridge.endHandshakeUnreported]; review II, F-db021da0-7). A caller
-// whose handler may have dropped those messages already reads the state
-// before the handler runs and calls endHandshakeUnreported itself
-// ([Bridge.handlePase], [Bridge.handleCase]). Both references send the
+// with the failure StatusReport body, as a reliable message retransmitted
+// until the peer acknowledges it. While a message the handshake sent still
+// waits for its acknowledgement no report is sent: the handshake ends
+// unreported ([Bridge.endHandshakeUnreported]; review II, F-db021da0-7),
+// and that message is not dropped but goes on being retransmitted until it
+// is acknowledged or its retransmissions are spent (owner decision 173) —
+// matter.js keeps retransmitting the unacknowledged message of an exchange
+// it closes (packages/protocol/src/protocol/MessageExchange.ts:1170-1190,
+// :943 at db021da0), and connectedhomeip leaves it in the retransmit table
+// unless the exchange is aborted (src/messaging/ExchangeContext.cpp:219-252,
+// :261-270, src/messaging/ExchangeHolder.h:122-139 at 6170af84). The ACK
+// pump's ticks are what retransmit, so it ends with [Bridge.Stop] too. A
+// caller reads the state before its handler runs and calls
+// endHandshakeUnreported itself ([Bridge.handlePase],
+// [Bridge.handleCase]). Both references send the
 // report that way: matter.js `sendError` is `exchange.send` without
 // `suppressAck`, which sets the R flag, starts the retransmission timer and
 // waits for the acknowledgement

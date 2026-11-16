@@ -139,9 +139,10 @@ func (r *unsecuredRig) wantOnlyTheStatusReport(t *testing.T, exchangeID uint16) 
 
 // TestUnsecuredRetransmitEntriesEndWithTheirHandshake: a handshake reply
 // waiting for its retransmission on the unsecured session goes when its
-// handshake ends — it fails, it times out, its responder is reaped, it
-// moves on — and the StatusReport that ends the handshake stays, because it
-// is sent after the rest was dropped. connectedhomeip drops an exchange's
+// handshake ends — it times out, its responder is reaped, it moves on —
+// and the StatusReport that ends the handshake stays. A handshake that
+// fails on a message drops nothing: an unacknowledged reply goes on being
+// retransmitted and no report is sent (F-db021da0-7, owner decision 173). connectedhomeip drops an exchange's
 // retransmission entry when the exchange is aborted
 // (src/messaging/ExchangeContext.cpp:241-246 and :277-287 at 6170af84,
 // `DoClose(true)` → `ClearRetransTable(this)`), and releasing a pairing
@@ -177,10 +178,11 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		if err := r.b.handlePase(r.peer.LocalAddr(), hdr, proto, nil, "pake1", refuse, parkedPeer); err == nil {
 			t.Fatal("handlePase accepted a refused Pake1")
 		}
-		// The PBKDFParamResponse is gone. Pake1 did not acknowledge it, so
-		// no failure report goes out (F-db021da0-7; the acknowledged case is
+		// Pake1 did not acknowledge the PBKDFParamResponse: no failure
+		// report, and the response goes on being retransmitted
+		// (F-db021da0-7, decision 173; the acknowledged case is
 		// TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged).
-		r.wantNoReport(t, 0x5001)
+		r.wantUnreportedRetransmitting(t, scKey(0x5001), mrp.SCOpcodePBKDFParamResponse)
 	})
 	t.Run("a CASE handshake that fails", func(t *testing.T) {
 		t.Parallel()
@@ -193,9 +195,9 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		if err := r.b.handleCase(r.peer.LocalAddr(), hdr, proto, nil, "sigma3", refuse, parkedPeer); err == nil {
 			t.Fatal("handleCase accepted a refused Sigma3")
 		}
-		// Sigma2 is gone; Sigma3 did not acknowledge it, so no failure
-		// report goes out (F-db021da0-7).
-		r.wantNoReport(t, 0x5002)
+		// Sigma3 did not acknowledge Sigma2: no failure report, and Sigma2
+		// goes on being retransmitted (F-db021da0-7, decision 173).
+		r.wantUnreportedRetransmitting(t, scKey(0x5002), mrp.SCOpcodeSigma2)
 	})
 	t.Run("a CASE handshake that completes", func(t *testing.T) {
 		t.Parallel()
@@ -228,8 +230,9 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		if err := r.b.dispatchSecureChannel(r.peer.LocalAddr(), hdr, proto, []byte{0x15, 0x18}); err != nil {
 			t.Fatalf("Sigma3: %v", err)
 		}
-		// Sigma3 did not acknowledge Sigma2: unreported (F-db021da0-7).
-		r.wantNoReport(t, 0x5008)
+		// Sigma3 did not acknowledge Sigma2: unreported, Sigma2 retransmitted
+		// (F-db021da0-7, decision 173).
+		r.wantUnreportedRetransmitting(t, scKey(0x5008), mrp.SCOpcodeSigma2)
 	})
 	t.Run("a CASE responder that is reaped", func(t *testing.T) {
 		t.Parallel()

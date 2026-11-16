@@ -13,26 +13,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// wantNoReport asserts that the handshake on exchangeID holds no entry and
-// that no StatusReport reached the peer. A report is sent synchronously
-// with the failing message's handling, so it is in the peer's socket
-// already when it was sent at all.
-func (r *unsecuredRig) wantNoReport(t *testing.T, exchangeID uint16) {
+// wantUnreportedRetransmitting asserts that no StatusReport reached the
+// peer — a report is sent synchronously with the failing message's
+// handling, so it is in the peer's socket already when it was sent at all —
+// and that the handshake's unacknowledged reply (opcode want) is still
+// tracked for retransmission (owner decision 173); then the peer's
+// acknowledgement ends it.
+func (r *unsecuredRig) wantUnreportedRetransmitting(t *testing.T, key HandshakeKey, want uint8) {
 	t.Helper()
-	if got := r.tracked(t, exchangeID); len(got) != 0 {
-		t.Errorf("entries of the exchange after its handshake ended unreported: opcodes %#x, want none", got)
+	if got := r.tracked(t, key.ExchangeID); len(got) != 1 || got[0] != want {
+		t.Errorf("entries of the exchange after its handshake ended unreported: opcodes %#x, want the unacknowledged reply %#x alone", got, want)
 	}
 	buf := make([]byte, 1500)
 	for {
 		_ = r.peer.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
 		n, from, err := r.peer.ReadFromUDP(buf)
 		if err != nil {
-			return // nothing more on the wire
+			break // nothing more on the wire
 		}
 		if !unsecuredFromBridge(r.b, from, buf[:n]) {
 			continue
@@ -45,6 +48,22 @@ func (r *unsecuredRig) wantNoReport(t *testing.T, exchangeID uint16) {
 		if err == nil && proto.Opcode == mrp.SCOpcodeStatusReport {
 			t.Fatal("a StatusReport reached the peer while the handshake's reply was unacknowledged")
 		}
+	}
+	// The acknowledgement ends the retransmission.
+	tr := r.b.outboundReliable
+	tr.mu.Lock()
+	var counters []uint32
+	for k, e := range tr.pending {
+		if k.sessionID == 0 && e.exchangeID == key.ExchangeID {
+			counters = append(counters, k.counter)
+		}
+	}
+	tr.mu.Unlock()
+	for _, c := range counters {
+		tr.AckUnsecured(key, c)
+	}
+	if got := r.tracked(t, key.ExchangeID); len(got) != 0 {
+		t.Errorf("entries after the peer acknowledged the reply: opcodes %#x, want none", got)
 	}
 }
 
@@ -85,6 +104,46 @@ func paseFailsAtPake1(t *testing.T, r *unsecuredRig, x uint16, acked bool) {
 	}
 }
 
+// pake3Refuser answers Pake1 with a Pake2 and refuses Pake3, as a wrong
+// passcode fails the key confirmation.
+type pake3Refuser struct{ noopPaseHandler }
+
+func (pake3Refuser) ProcessPake1([]byte) (opcode uint8, payload []byte, err error) {
+	return mrp.SCOpcodePake2, []byte{0x15, 0x18}, nil
+}
+
+func (pake3Refuser) ProcessPake3([]byte) (opcode uint8, payload []byte, err error) {
+	return 0, nil, errors.New("bridge: test: key confirmation failed")
+}
+
+// paseFailsAtPake3 runs Pake1, then a Pake3 the handler refuses, through
+// the router (dispatchPase), with the PASE claim held as a
+// PBKDFParamRequest leaves it. It asserts what a failed Pake3 does
+// whatever is reported: one PASE failure counted, the claim released.
+func paseFailsAtPake3(t *testing.T, r *unsecuredRig, x uint16, acked bool) {
+	t.Helper()
+	r.b.AttachPaseHandler(pake3Refuser{})
+	hdr, proto := r.request(mrp.SCOpcodePake1, x)
+	beginPase(t, r.b, handshakeKeyOf(hdr, x))
+	if err := r.b.dispatchPase(r.peer.LocalAddr(), hdr, proto, []byte{0x15, 0x18}); err != nil {
+		t.Fatalf("Pake1: %v", err)
+	}
+	if acked {
+		r.ackLastReply(t, x, mrp.SCOpcodePake2)
+	}
+	before := r.b.paseFailures.Load()
+	hdr, proto = r.request(mrp.SCOpcodePake3, x)
+	if err := r.b.dispatchPase(r.peer.LocalAddr(), hdr, proto, []byte{0x15, 0x18}); err == nil {
+		t.Fatal("dispatchPase accepted a refused Pake3")
+	}
+	if got := r.b.paseFailures.Load() - before; got != 1 {
+		t.Errorf("PASE failures counted for the refused Pake3 = %d, want 1", got)
+	}
+	if _, begun := r.b.resolvePaseContinuation(handshakeKeyOf(hdr, x)); begun {
+		t.Error("the PASE claim is still held after the refused Pake3")
+	}
+}
+
 // caseFailsAtSigma3 runs Sigma1, then a Sigma3 the handler refuses.
 func caseFailsAtSigma3(t *testing.T, r *unsecuredRig, x uint16, acked bool) {
 	t.Helper()
@@ -122,21 +181,24 @@ func caseRefusedAtSigma3(t *testing.T, r *unsecuredRig, x uint16, acked bool) {
 // TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged: a handshake
 // that fails on a message arriving while the handshake's previous reply
 // still waits for its acknowledgement ends without a failure StatusReport,
-// and what it sent is dropped; once that reply is acknowledged, the same
+// and that reply goes on being retransmitted until the peer acknowledges
+// it (owner decision 173); once that reply is acknowledged, the same
 // failure is reported, reliably (review II, F-db021da0-7; the register row
-// in notes/parity/matter_behaviour_findings.md). Before, the report was
-// sent reliably in both cases, after the drop. One case per role and per
+// in notes/parity/matter_behaviour_findings.md). Before, the reply was
+// dropped and the report sent reliably in both cases. One case per role and per
 // way a failure leaves the handler: an error, and a failure report as the
 // handler's reply.
 func TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name string
-		run  func(t *testing.T, r *unsecuredRig, x uint16, acked bool)
+		name  string
+		run   func(t *testing.T, r *unsecuredRig, x uint16, acked bool)
+		reply uint8 // the reply the failing message did not acknowledge
 	}{
-		{"PASE, the handler refuses Pake1", paseFailsAtPake1},
-		{"CASE, the handler refuses Sigma3", caseFailsAtSigma3},
-		{"CASE, the shipped adapter answers Sigma3 with its refusal", caseRefusedAtSigma3},
+		{"PASE, the handler refuses Pake1", paseFailsAtPake1, mrp.SCOpcodePBKDFParamResponse},
+		{"PASE, the handler refuses Pake3 (through the router)", paseFailsAtPake3, mrp.SCOpcodePake2},
+		{"CASE, the handler refuses Sigma3", caseFailsAtSigma3, mrp.SCOpcodeSigma2},
+		{"CASE, the shipped adapter answers Sigma3 with its refusal", caseRefusedAtSigma3, mrp.SCOpcodeSigma2},
 	}
 	for i, c := range cases {
 		for _, acked := range []bool{false, true} {
@@ -156,7 +218,7 @@ func TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged(t *testing.T) {
 					r.wantOnlyTheStatusReport(t, x)
 					return
 				}
-				r.wantNoReport(t, x)
+				r.wantUnreportedRetransmitting(t, scKey(x), c.reply)
 			})
 		}
 	}
@@ -165,7 +227,8 @@ func TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged(t *testing.T) {
 // TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged: a
 // handshake this node opened gets a Sigma2 that does not decode and does
 // not acknowledge the Sigma1. It ends without a StatusReport, and the
-// Sigma1 is dropped (review II, F-db021da0-7). The acknowledged case is
+// Sigma1 goes on being retransmitted until it is acknowledged (review II,
+// F-db021da0-7, owner decision 173). The acknowledged case is
 // TestInitiatedHandshakeKeepsItsFailureReportTracked.
 func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testing.T) {
 	t.Parallel()
@@ -215,5 +278,58 @@ func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testi
 	case <-ctx.Done():
 		t.Fatal("the handshake did not end")
 	}
-	r.wantNoReport(t, sigma1.ExchangeID)
+	r.wantUnreportedRetransmitting(t, HandshakeKey{InitiatorNodeID: sigma1Hdr.SourceNodeID, ExchangeID: sigma1.ExchangeID}, mrp.SCOpcodeSigma1)
+}
+
+// TestUnreportedRetransmissionEndsWithStop: the reply an unreported failure
+// leaves retransmitting is retransmitted by the ACK pump, so it stops with
+// Stop — it does not outlive the bridge (owner decision 173).
+func TestUnreportedRetransmissionEndsWithStop(t *testing.T) {
+	t.Parallel()
+	// The ACK pump runs only when its tracker is attached before Start.
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	b.AttachAckTracker(mrp.NewAckTracker(50 * time.Millisecond))
+	if err := b.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.Background()) })
+	peer, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		t.Fatalf("ListenUDP: %v", err)
+	}
+	t.Cleanup(func() { _ = peer.Close() })
+	r := &unsecuredRig{b: b, peer: peer}
+	const x = 0x5200
+	paseFailsAtPake3(t, r, x, false)
+	// The Pake2 the failure left goes out again.
+	if _, proto := r.nextMessage(t, "the Pake2 before the failure"); proto.Opcode != mrp.SCOpcodePake2 {
+		t.Fatalf("first datagram %#x, want Pake2", proto.Opcode)
+	}
+	if _, proto := r.nextMessage(t, "the Pake2 retransmitted after the failure"); proto.Opcode != mrp.SCOpcodePake2 {
+		t.Fatalf("retransmission %#x, want Pake2", proto.Opcode)
+	}
+	if err := r.b.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	buf := make([]byte, 1500)
+	_ = r.peer.SetReadDeadline(time.Now().Add(2 * time.Second))
+	for {
+		n, from, err := r.peer.ReadFromUDP(buf)
+		if err != nil {
+			return // nothing more after Stop
+		}
+		if !unsecuredFromBridge(r.b, from, buf[:n]) {
+			continue
+		}
+		_, hl, err := message.UnmarshalHeader(buf[:n])
+		if err != nil {
+			continue
+		}
+		if proto, _, err := message.UnmarshalProtocolHeader(buf[hl:n]); err == nil && proto.Opcode == mrp.SCOpcodePake2 {
+			t.Fatal("the Pake2 was retransmitted after Stop")
+		}
+	}
 }
