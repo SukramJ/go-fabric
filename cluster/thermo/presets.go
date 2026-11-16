@@ -50,6 +50,14 @@ const presetHandleLength = 16
 // when nothing was saved, and the server then seeds from
 // [ThermostatConfig.Presets]. store.ThermostatPresetStore implements it on
 // the module's store.
+//
+// SavePresets runs while the server holds the presets' save in turn: every
+// change of Presets or ActivePresetHandle — a write, a command, the
+// host's direct setpoint change that ends the active preset — waits for
+// it, so each save writes the pair current when it runs
+// (R2-P6-store-1501). SavePresets must therefore not call back into the
+// server's setters, which would wait for itself, and should return in
+// bounded time: the wait takes no context.
 type PresetStore = tdef.PresetStore
 
 // EncodePresets is the TLV encoding of a Presets list a [PresetStore]
@@ -327,8 +335,8 @@ func (s *ThermostatServer) unlockPersist() { <-s.persist }
 // savePresets hands presets and the active handle to the PresetStore; a
 // server without one keeps them in memory only. After construction the
 // caller holds persist, read the pair under it and stores what it saved
-// before it releases it (R2-P6-store-1501). A PresetStore must not call
-// back into the server's setters: they wait for persist.
+// before it releases it (R2-P6-store-1501); see [PresetStore] for what
+// that asks of the store.
 func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, active []byte) error {
 	if s.presetStore == nil {
 		return nil

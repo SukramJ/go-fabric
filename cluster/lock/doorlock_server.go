@@ -794,8 +794,9 @@ func (s *DoorLockServer) SetLockState(state lockdef.LockStateEnum) error {
 // when they are served. Mirrors matter.js DoorLockServer.ts:1345-1361
 // (#handleDoorStateChange, the doorState$Changed reactor :179). A state
 // equal to the stored one is no change: matter.js's $Changed does not
-// fire for it (packages/node/src/behavior/state/managed/Datasource.ts:823-825
-// at db021da0), so nothing is emitted or counted (W3-clua2-03).
+// fire for it (packages/node/src/behavior/state/managed/Datasource.ts:1476-1481
+// at db021da0, #noteIfChanged: an equal value notes no change), so
+// nothing is emitted or counted (W3-clua2-03).
 func (s *DoorLockServer) SetDoorState(state lockdef.DoorStateEnum) error {
 	if v, ok := s.Value(lockdef.AttrDoorState); ok && v == uint8(state) {
 		return nil
@@ -868,9 +869,11 @@ func (s *DoorLockServer) lockCommand(actuation Actuation) spec.CommandHandler {
 // keep what the operation did — a DisposableUser stays disabled, the lock
 // state is the hardware's — and the auto-relock follows the lock. The
 // command answers FAILURE, as matter.js answers a commit that fails after
-// the hardware moved (fable-6a-w2 G2: DoorLockServer.ts:1033-1041,
-// CommandInvokeResponse.ts:493, :509-520 at db021da0), where matter.js
-// rolls the state back and go-fabric keeps it (R2-P6-err-1504).
+// the hardware moved: it moves the hardware inside the command
+// (DoorLockServer.ts:1033-1041 at db021da0), saves at the transaction
+// commit after it (CommandInvokeResponse.ts:493) and answers a failed
+// commit FAILURE (:509-520) with the state rolled back
+// (Datasource.ts:1331-1341), where go-fabric keeps it (R2-P6-err-1504).
 type notSavedError struct{ err error }
 
 func (e notSavedError) Error() string                 { return "lock: save records: " + e.err.Error() }
