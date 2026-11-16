@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9335,
+  "entry_points": 9306,
   "entry_packages": [
     ".",
     "bdx",
@@ -292,9 +292,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19007,
-    "reachable": 12627,
-    "whitelisted": 6380,
+    "total_exported": 18977,
+    "reachable": 12632,
+    "whitelisted": 6345,
     "unreachable": 0
   },
   "by_package": [],
@@ -12979,6 +12979,41 @@
     },
     {
       "package": "cluster/levelcontrol",
+      "identifier": "TestNativeSourceQuiesceDropsTheOwedSwitchOff",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/levelcontrol/lifecycle_internal_test.go",
+      "line": 60
+    },
+    {
+      "package": "cluster/levelcontrol",
+      "identifier": "TestObserveLevelKeepsTheNewestReading",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/levelcontrol/lifecycle_internal_test.go",
+      "line": 122
+    },
+    {
+      "package": "cluster/levelcontrol",
+      "identifier": "TestRawPayloadKeepsTheDecoderStatus",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/levelcontrol/lifecycle_internal_test.go",
+      "line": 217
+    },
+    {
+      "package": "cluster/levelcontrol",
+      "identifier": "TestSetAttributesAllOrNothingOverAPort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/levelcontrol/lifecycle_internal_test.go",
+      "line": 196
+    },
+    {
+      "package": "cluster/levelcontrol",
+      "identifier": "TestSupersededTransitionKeepsTheNewCoupling",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/levelcontrol/lifecycle_internal_test.go",
+      "line": 152
+    },
+    {
+      "package": "cluster/levelcontrol",
       "identifier": "WireOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/levelcontrol/export_test.go",
@@ -13020,6 +13055,27 @@
       "line": 314
     },
     {
+      "package": "cluster/light",
+      "identifier": "TestColorQuiesceDropsQuieterReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/light/colorcontrol_rollback_test.go",
+      "line": 86
+    },
+    {
+      "package": "cluster/light",
+      "identifier": "TestFailedColorCommandKeepsTheScene",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/light/colorcontrol_rollback_test.go",
+      "line": 40
+    },
+    {
+      "package": "cluster/light",
+      "identifier": "TestHueTransitionRateFromTheEngineRead",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/light/colorcontrol_rollback_test.go",
+      "line": 122
+    },
+    {
       "package": "cluster/lock",
       "identifier": "AuthStore",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -13045,14 +13101,14 @@
       "identifier": "CumulativeEnergyMeasuredEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/measurement.go",
-      "line": 1288
+      "line": 1317
     },
     {
       "package": "cluster/measurement",
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1000
+      "line": 1014
     },
     {
       "package": "cluster/measurement",
@@ -13073,21 +13129,21 @@
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 992
+      "line": 1006
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1905
+      "line": 1942
     },
     {
       "package": "cluster/measurement",
       "identifier": "OccupancyChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/measurement.go",
-      "line": 920
+      "line": 934
     },
     {
       "package": "cluster/measurement",
@@ -13244,6 +13300,13 @@
       "line": 197
     },
     {
+      "package": "cluster/measurement",
+      "identifier": "WhToMilliWattHours",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/export_test.go",
+      "line": 16
+    },
+    {
       "package": "cluster/media",
       "identifier": "AccountLogin",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -13262,140 +13325,140 @@
       "identifier": "AppLauncherState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/applauncher.go",
-      "line": 20
+      "line": 19
     },
     {
       "package": "cluster/media",
       "identifier": "ChannelGuide",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/channel.go",
-      "line": 48
+      "line": 49
     },
     {
       "package": "cluster/media",
       "identifier": "ChannelRecorder",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/channel.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "cluster/media",
       "identifier": "ChannelState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/channel.go",
-      "line": 19
+      "line": 18
     },
     {
       "package": "cluster/media",
       "identifier": "Channels",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/channel.go",
-      "line": 44
+      "line": 45
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControl",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 57
+      "line": 56
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlApps",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 71
+      "line": 70
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlChannels",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 69
+      "line": 68
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlOnDemandRating",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 65
+      "line": 64
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlPIN",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 59
+      "line": 58
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlScheduledRating",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 67
+      "line": 66
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlScreenTime",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 61
+      "line": 60
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 20
+      "line": 19
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlTimeWindows",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 74
+      "line": 73
     },
     {
       "package": "cluster/media",
       "identifier": "ContentControlUnrated",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentcontrol.go",
-      "line": 63
+      "line": 62
     },
     {
       "package": "cluster/media",
       "identifier": "ContentLauncher",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentlauncher.go",
-      "line": 43
+      "line": 42
     },
     {
       "package": "cluster/media",
       "identifier": "ContentLauncherState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/contentlauncher.go",
-      "line": 20
+      "line": 19
     },
     {
       "package": "cluster/media",
       "identifier": "InputRenamer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/mediainput.go",
-      "line": 39
+      "line": 38
     },
     {
       "package": "cluster/media",
       "identifier": "InputState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/mediainput.go",
-      "line": 18
+      "line": 17
     },
     {
       "package": "cluster/media",
       "identifier": "Inputs",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/mediainput.go",
-      "line": 36
+      "line": 35
     },
     {
       "package": "cluster/media",
@@ -13416,70 +13479,70 @@
       "identifier": "OutputRenamer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/audiooutput.go",
-      "line": 38
+      "line": 37
     },
     {
       "package": "cluster/media",
       "identifier": "OutputState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/audiooutput.go",
-      "line": 17
+      "line": 16
     },
     {
       "package": "cluster/media",
       "identifier": "Outputs",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/audiooutput.go",
-      "line": 35
+      "line": 34
     },
     {
       "package": "cluster/media",
       "identifier": "Playback",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 52
+      "line": 59
     },
     {
       "package": "cluster/media",
       "identifier": "PlaybackAudioTracks",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 75
+      "line": 82
     },
     {
       "package": "cluster/media",
       "identifier": "PlaybackNext",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 61
+      "line": 68
     },
     {
       "package": "cluster/media",
       "identifier": "PlaybackPrevious",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 58
+      "line": 65
     },
     {
       "package": "cluster/media",
       "identifier": "PlaybackSeek",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 71
+      "line": 78
     },
     {
       "package": "cluster/media",
       "identifier": "PlaybackSkip",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 68
+      "line": 75
     },
     {
       "package": "cluster/media",
       "identifier": "PlaybackStartOver",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 55
+      "line": 62
     },
     {
       "package": "cluster/media",
@@ -13493,27 +13556,41 @@
       "identifier": "PlaybackTextTracks",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 79
+      "line": 86
     },
     {
       "package": "cluster/media",
       "identifier": "PlaybackVariableSpeed",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/playback.go",
-      "line": 65
+      "line": 72
     },
     {
       "package": "cluster/media",
       "identifier": "TargetState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/targetnavigator.go",
-      "line": 21
+      "line": 20
     },
     {
       "package": "cluster/media",
       "identifier": "Targets",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/targetnavigator.go",
+      "line": 38
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "TestMediaStateClonesAreDeep",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/media/clone_internal_test.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/media",
+      "identifier": "TestRefusedCommandLeavesTheCommittedState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/media/clone_internal_test.go",
       "line": 39
     },
     {
@@ -13521,35 +13598,56 @@
       "identifier": "WakeOnLanState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/media/wakeonlan.go",
-      "line": 19
+      "line": 18
+    },
+    {
+      "package": "cluster/modebase",
+      "identifier": "TestStoreReadsTheServersValues",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/modebase/held_internal_test.go",
+      "line": 22
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ChangeToModeRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 104
+      "line": 116
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ModeOptionStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 100
+      "line": 112
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ModeSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 123
+      "line": 135
     },
     {
       "package": "cluster/modeselect",
       "identifier": "SemanticTagStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 92
+      "line": 104
+    },
+    {
+      "package": "cluster/modeselect",
+      "identifier": "TestMustPanicsOnARefusedSelection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/modeselect/held_internal_test.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/modeselect",
+      "identifier": "TestStoreReadsTheServersValues",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/modeselect/held_internal_test.go",
+      "line": 28
     },
     {
       "package": "cluster/netinfra",
@@ -13781,6 +13879,20 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
       "line": 32
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "TestAmbientStateCloneIsDeep",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/sensing/ambient_clone_internal_test.go",
+      "line": 57
+    },
+    {
+      "package": "cluster/sensing",
+      "identifier": "TestObjectCountConfigIsTheServers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/sensing/ambient_clone_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/servicearea",
