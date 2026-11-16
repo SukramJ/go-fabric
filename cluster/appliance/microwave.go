@@ -80,7 +80,8 @@ type MicrowaveConfig struct {
 	MaxCookTime uint32
 	// CookTime is the initial CookTime; zero starts at DefaultCookTime.
 	CookTime uint32
-	// PowerSetting (PWRNUM) is the initial power setting.
+	// PowerSetting (PWRNUM) is the initial power setting; zero starts at
+	// the maximum power (MaxPower with PWRLMTS, [DefaultMaxPower] without).
 	PowerSetting uint8
 	// MinPower, MaxPower and PowerStep (PWRLMTS, fixed) bound PowerSetting.
 	MinPower, MaxPower, PowerStep uint8
@@ -178,10 +179,20 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 		return nil, fmt.Errorf("%w: %w", ErrMicrowaveValue, err)
 	}
 	if s.HasFeature("PWRNUM") {
-		if err := s.checkPower(cfg.PowerSetting); err != nil {
+		power := cfg.PowerSetting
+		if power == 0 {
+			// The cluster holds no start value: PowerSetting is the
+			// delegate's (connectedhomeip MicrowaveOvenControlCluster.cpp:109
+			// at 6170af84), and its example delegates start at kMaxPowerNum
+			// (chef-microwave-oven-control.h:96-98, microwave-oven-device.h:234,
+			// :248) — the start a zero takes here, as a zero CookTime takes
+			// DefaultCookTime (R2-P6-api-1592).
+			_, power, _ = s.powerLimits()
+		}
+		if err := s.checkPower(power); err != nil {
 			return nil, fmt.Errorf("%w: PowerSetting: %w", ErrMicrowaveValue, err)
 		}
-		if err := srv.Set(mwo.AttrPowerSetting, cfg.PowerSetting); err != nil {
+		if err := srv.Set(mwo.AttrPowerSetting, power); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrMicrowaveValue, err)
 		}
 	}
