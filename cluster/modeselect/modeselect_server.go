@@ -74,13 +74,16 @@ const featureMap uint32 = 0
 // refused it would be a programming error, reported at init where it is
 // made rather than as a nil instance at its first use (R2-P6-err-1468), as
 // cluster/measurement's mustInstance does.
-var instance = func() *spec.Instance {
-	inst, err := spec.New(msdef.Definition, spec.Options{Features: featureMap})
+var instance = must(spec.New(msdef.Definition, spec.Options{Features: featureMap}))
+
+// must is a construction over the package's fixed selection: an error is
+// a programming error, reported where it is made.
+func must[T any](v T, err error) T {
 	if err != nil {
 		panic(fmt.Sprintf("modeselect: the fixed selection: %v", err))
 	}
-	return inst
-}()
+	return v
+}
 
 // DescriptionMaxBytes is the Description constraint "max 64"
 // (matter.js mode-select-cluster.element.ts:25-28). The bound is applied
@@ -185,14 +188,11 @@ var (
 // NewServer constructs a ModeSelect server over cfg.Source.
 func NewServer(cfg Config) *Server {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
-	srv, err := spec.NewServer(msdef.Definition, spec.Options{Features: featureMap}, spec.ServerConfig{
+	// The selection is the fixed one [instance] was built from.
+	srv := must(spec.NewServer(msdef.Definition, spec.Options{Features: featureMap}, spec.ServerConfig{
 		DataVersion: s.tracker(), Source: modeSource{s},
 		Handlers: map[uint32]spec.CommandHandler{CmdChangeToMode: s.changeToMode},
-	})
-	if err != nil {
-		// The selection is the fixed one [instance] was built from.
-		panic(fmt.Sprintf("modeselect: the fixed selection: %v", err))
-	}
+	}))
 	s.held = spec.NewSelfHeld(srv)
 	return s
 }
