@@ -430,6 +430,11 @@ behaviour until it is removed in the next minor release.
 | `modebase.Server.Hooks`, `Init`, `Invoke`, `CheckWrite` | `Server.Handle` (host handler), `Server.MatterInvoke` (the checked command path); the server needs no `Init` |
 | a `cluster/wire` id that duplicates a generated one (`wire.ColorCtrlCmdMoveToHue`, `wire.WindowCoveringClusterID`, …) | the constant of `cluster/spec/<cluster>` (`colorcontrol.CmdMoveToHue`, `windowcovering.ClusterID`, …) |
 
+One change needs wiring rather than a rename: a host that assembles endpoints
+with `bridge/` and `endpoint/` but without the node sets `endpoint.Config.Fabrics`
+to its fabric store. A Binding without that source refuses every write, where it
+used to store an entry for any fabric index (decision 158). The node sets it.
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the
