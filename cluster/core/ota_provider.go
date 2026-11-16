@@ -864,7 +864,7 @@ func (p *OTAProvider) MatterDropFabric(_ context.Context, fabricIndex uint8) err
 func (p *OTAProvider) MatterHeldFabrics() []uint8 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	var out []uint8
+	out := make([]uint8, 0, len(p.inProgress)+len(p.consents))
 	for _, d := range p.inProgress {
 		out = append(out, d.peer.FabricIndex)
 	}
