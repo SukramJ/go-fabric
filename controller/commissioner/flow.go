@@ -1158,8 +1158,11 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		findings = result.Findings
 		f.dacKey = result.DACPublicKey
 		// Validate returned no error: the Certification Declaration names
-		// this vendor and product (decision 105). A failure the policy
-		// accepts leaves the pair unattested.
+		// this vendor and product (decision 105), and the pair is recorded.
+		// Its findings do not change that: the pair is recorded also when
+		// the chain was not checked (no trust store, DclServiceUnavailable)
+		// and when the policy accepts a LevelError finding below. Only an
+		// error of Validate leaves the pair unattested.
 		f.attested = &[2]uint16{f.data.vendorID, f.data.productID}
 	}
 

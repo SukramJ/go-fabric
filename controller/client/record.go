@@ -109,10 +109,11 @@ type Record struct {
 	// was commissioned, which device attestation validated against the
 	// node's Certification Declaration (the declaration's vendor_id is
 	// that VendorID and its product_id_array holds that ProductID). They
-	// are set together or not at all; nil when unknown — a node
-	// commissioned before the field existed, one whose attestation failed
-	// and was accepted by policy, one not commissioned (a decommission
-	// clears them). They are not the announced VendorID and ProductID
+	// are set together or not at all, also when attestation ran without a
+	// trust store (the DAC chain unchecked) or with a finding the policy
+	// accepted; nil when unknown — a node commissioned before the field
+	// existed, one whose attestation failed with an error and was accepted
+	// by policy, one not commissioned (a decommission clears them). They are not the announced VendorID and ProductID
 	// above, and not the DAC's ids, which a white-label product's
 	// declaration may name as dac_origin_vendor_id/product_id instead.
 	// Added by review II decision 105, for the OTA provider's identity
