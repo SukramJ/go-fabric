@@ -141,7 +141,9 @@ func TestProvenanceVerdict(t *testing.T) {
 		}
 		return strings.Join(lines, "\n") + "\n"
 	}
-	pending := []string{"failure\ttest (linux/386)", "failure\tworkflow lint"}
+	// Jobs of a ci run the protection does not require (none in ci.yml
+	// today; the names are the fixture's own).
+	pending := []string{"failure\tan advisory job", "failure\tanother advisory job"}
 
 	repo := scratchRepo(t)
 	for _, tc := range []struct {

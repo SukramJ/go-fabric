@@ -18,3 +18,5 @@ ble/bluez
 ble/esphome
 chip-tool commissions over BLE onto Wi-Fi (chip's mocks)
 wifi/wpasupplicant
+test (linux/386)
+workflow lint
