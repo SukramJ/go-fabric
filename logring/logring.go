@@ -44,6 +44,7 @@ package logring
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"slices"
 	"sync"
@@ -75,7 +76,10 @@ type Options struct {
 // Record is one kept log record.
 //
 // Attrs holds the record's attributes after the handler's own (from
-// WithAttrs), each value resolved ([slog.Value.Resolve]) and every group
+// WithAttrs), each value resolved ([slog.Value.Resolve]), a value of kind
+// [slog.KindAny] rendered to a string (fmt's %v) when the record is kept —
+// so the ring holds no reference into the caller's data and a value the
+// caller changes later does not change the record — and every group
 // flattened into its members: an attribute key inside group "a" is
 // "a.key", inside "a" then "b" it is "a.b.key". A group with an empty key
 // is inlined, and an empty attribute or an empty group is left out, as
@@ -210,6 +214,9 @@ func flatten(dst []slog.Attr, prefix string, a slog.Attr) []slog.Attr {
 		return dst
 	}
 	a.Key = prefix + a.Key
+	if a.Value.Kind() == slog.KindAny {
+		a.Value = slog.StringValue(fmt.Sprint(a.Value.Any()))
+	}
 	return append(dst, a)
 }
 

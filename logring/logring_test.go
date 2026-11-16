@@ -439,3 +439,32 @@ func TestObserverStopWinsOverQueuedRecord(t *testing.T) {
 		<-o.done
 	}
 }
+
+// TestKeptRecordDoesNotAliasCallerData holds R2-P6-api-0227: a value of
+// kind Any is rendered when the record is kept, so a slice the caller
+// changes after the log call does not change the ring's record, and the
+// ring holds no reference into it.
+func TestKeptRecordDoesNotAliasCallerData(t *testing.T) {
+	t.Parallel()
+	h := New(slog.DiscardHandler, Options{Size: 5})
+	data := []int{1, 2, 3}
+	slog.New(h).Info("m", "data", data, "err", errors.New("boom"), "n", 7)
+	data[0] = 99
+	recs := h.Records(0, 0)
+	if len(recs) != 1 {
+		t.Fatalf("records = %d, want 1", len(recs))
+	}
+	got := map[string]slog.Value{}
+	for _, a := range recs[0].Attrs {
+		got[a.Key] = a.Value
+	}
+	if v := got["data"]; v.Kind() != slog.KindString || v.String() != "[1 2 3]" {
+		t.Fatalf("data = %v (kind %v), want the string [1 2 3] as logged", v, v.Kind())
+	}
+	if v := got["err"]; v.Kind() != slog.KindString || v.String() != "boom" {
+		t.Fatalf("err = %v (kind %v), want the string boom", v, v.Kind())
+	}
+	if v := got["n"]; v.Kind() != slog.KindInt64 || v.Int64() != 7 {
+		t.Fatalf("n = %v (kind %v), want int64 7 kept as it is", v, v.Kind())
+	}
+}
