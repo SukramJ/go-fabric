@@ -284,8 +284,20 @@ type invokeSessionKeyCtxKey struct{}
 // (OperationalCredentialsServer.ts:143-146 → FailsafeContext.ts:176-185 at
 // db021da0, compared at OperationalCredentialsServer.ts:240-245), its ids
 // drawn from one SessionManager for every session (SessionManager.ts:581-606).
+//
+// A key that is neither nil nor a pointer is a stack's wiring mistake: it
+// stamps nothing as before, and is logged, since a request bound by no id
+// either matches only a CSR that named none (review II, 5b-peer R4-1b).
 func WithInvokeSession(ctx context.Context, key any) context.Context {
-	if key == nil || reflect.TypeOf(key).Kind() != reflect.Pointer || reflect.ValueOf(key).IsNil() {
+	if key == nil {
+		return ctx
+	}
+	if reflect.TypeOf(key).Kind() != reflect.Pointer {
+		slog.Default().Warn("matter.invoke_session.key_dropped", //nolint:forbidigo // a context helper without a component logger
+			slog.String("type", reflect.TypeOf(key).String()), slog.String("reason", "the session identity must be a pointer"))
+		return ctx
+	}
+	if reflect.ValueOf(key).IsNil() {
 		return ctx
 	}
 	return context.WithValue(ctx, invokeSessionKeyCtxKey{}, key)
