@@ -544,8 +544,13 @@ func (s *ColorControlServer) moveToColorTemperatureLogic(target, transitionTime 
 // moveColorTemperature is matter.js moveColorTemperature and
 // moveColorTemperatureLogic: Up or Down at Rate mireds per second towards
 // the bound the command names (0 is the physical one), a zero Rate
-// refused. Stop ends the hue and saturation movements only — as in
-// matter.js, a colour temperature move keeps running.
+// refused. Stop ends every colour movement, the colour temperature move
+// included, as connectedhomeip's MoveColorTemperature does
+// (src/app/clusters/color-control-server/codegen/color-control-server.cpp:2703-2706
+// at 6170af84: stopAllColorTransitions, then done for kStop). matter.js
+// ends the hue and saturation movements only, which leaves a controller's
+// Stop without effect on the move it names; this is a deliberate
+// divergence (R2-P6-par-1413, decision 149).
 func (s *ColorControlServer) moveColorTemperature(ctx context.Context, fields any) error {
 	r, err := moveColorTemperatureFields(fields)
 	if err != nil {
@@ -561,7 +566,7 @@ func (s *ColorControlServer) moveColorTemperature(ctx context.Context, fields an
 		return err
 	}
 	if r.MoveMode == ccdef.MoveModeStop {
-		s.stopHueAndSaturationMovement()
+		s.stopAllColorMovement()
 		return nil
 	}
 	lower, upper := s.commandBounds(r.ColorTemperatureMinimumMireds, r.ColorTemperatureMaximumMireds)

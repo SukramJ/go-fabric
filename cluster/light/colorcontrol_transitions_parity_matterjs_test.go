@@ -171,9 +171,10 @@ func TestMoveColorTemperatureReadsPartWay(t *testing.T) {
 }
 
 // TestMoveColorTemperatureRateAndStop pins matter.js #assertRate (Up or
-// Down at Rate 0 is INVALID_COMMAND, Stop at Rate 0 is not) and its Stop
-// branch, which ends hue and saturation moves only — a colour temperature
-// move keeps running (ColorControlServer.moveColorTemperature).
+// Down at Rate 0 is INVALID_COMMAND, Stop at Rate 0 is not) and the Stop
+// branch, which ends the colour temperature move with every other colour
+// movement, as connectedhomeip's MoveColorTemperature does — the
+// deliberate divergence from matter.js of R2-P6-par-1413 (decision 149).
 func TestMoveColorTemperatureRateAndStop(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, _ := managedCT(true)
@@ -193,8 +194,11 @@ func TestMoveColorTemperatureRateAndStop(t *testing.T) {
 		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(0, 0, 0, 0))
 		before := currentMireds(t, srv)
 		ctSleep(time.Second)
-		if after := currentMireds(t, srv); after <= before {
-			t.Errorf("MoveMode Stop halted the colour temperature move (%d → %d); matter.js leaves it running", before, after)
+		if after := currentMireds(t, srv); after != before {
+			t.Errorf("MoveMode Stop left the colour temperature move running (%d → %d); Stop ends it", before, after)
+		}
+		if got := remainingCT(t, srv); got != 0 {
+			t.Errorf("RemainingTime after Stop = %d, want 0", got)
 		}
 	})
 }
