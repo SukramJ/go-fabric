@@ -63,7 +63,8 @@ type WiFiManagementServer struct {
 
 	// change serialises SetNetworkCredentials and ClearNetworkCredentials:
 	// each takes the new credentials under mu and publishes them after
-	// mu is released, since the generated server runs a change callback
+	// mu is released (the values are checked first, so the publish refuses
+	// none), since the generated server runs a change callback
 	// inline and a callback may read the credentials back (R2-P6-conc-1118).
 	// A callback must not change the credentials.
 	change sync.Mutex
@@ -163,21 +164,16 @@ func (s *WiFiManagementServer) SetNetworkCredentials(ssid, passphrase []byte) er
 		}
 		changes[wdef.AttrPassphraseSurrogate] = surrogate
 	}
-	prevSSID, prevPassphrase, prevSurrogate := s.ssid, s.passphrase, s.surrogate
+	prevPassphrase := s.passphrase
 	s.ssid, s.passphrase, s.surrogate = slices.Clone(ssid), slices.Clone(passphrase), surrogate
 	s.mu.Unlock()
-	if err := s.srv.SetAttributes(changes); err != nil {
-		s.mu.Lock()
-		clear(s.passphrase)
-		s.ssid, s.passphrase, s.surrogate = prevSSID, prevPassphrase, prevSurrogate
-		s.mu.Unlock()
-		return err
-	}
 	// The replaced passphrase is zeroed, as a cleared one is.
 	if passphraseChanged {
 		clear(prevPassphrase)
 	}
-	return nil
+	// The values are inside the definition's constraints (checked above),
+	// which is all SetAttributes checks: it refuses none of them.
+	return s.srv.SetAttributes(changes)
 }
 
 // ClearNetworkCredentials drops the credentials (:62-72): Ssid and
@@ -192,17 +188,12 @@ func (s *WiFiManagementServer) ClearNetworkCredentials() error {
 		s.mu.Unlock()
 		return nil
 	}
-	prevSSID, prevPassphrase := s.ssid, s.passphrase
+	clear(s.passphrase)
 	s.ssid, s.passphrase = nil, nil
 	s.mu.Unlock()
-	if err := s.srv.SetAttributes(map[uint32]any{wdef.AttrSsid: nil, wdef.AttrPassphraseSurrogate: nil}); err != nil {
-		s.mu.Lock()
-		s.ssid, s.passphrase = prevSSID, prevPassphrase
-		s.mu.Unlock()
-		return err
-	}
-	clear(prevPassphrase)
-	return nil
+	// Null is inside the definition of both attributes, which is all
+	// SetAttributes checks.
+	return s.srv.SetAttributes(map[uint32]any{wdef.AttrSsid: nil, wdef.AttrPassphraseSurrogate: nil})
 }
 
 // HasNetworkCredentials reports whether credentials are set
