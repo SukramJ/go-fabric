@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9024,
+  "entry_points": 9030,
   "entry_packages": [
     ".",
     "bdx",
@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18782,
+    "total_exported": 18783,
     "reachable": 12621,
-    "whitelisted": 6161,
+    "whitelisted": 6162,
     "unreachable": 0
   },
   "by_package": [],
@@ -7480,6 +7480,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/imwrite_parity_matterjs_test.go",
       "line": 160
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 532
     },
     {
       "package": "bridge",
