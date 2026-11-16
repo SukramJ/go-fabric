@@ -30,14 +30,13 @@ import (
 // authoritative source for what each subject may read / write / invoke
 // on every cluster of every endpoint.
 //
-// go-fabric exposes the ACL list READ-ONLY in v1.1 — every entry is
-// inserted by the bridge itself (the AddNOC handler installs the
-// default Administer entry per §11.18.6.8.1 immediately after the
-// fabric is persisted). Apple Home reads ACL right after CASE; an
-// empty / missing cluster surfaces as ACCESS_DENIED on every
-// follow-up read and Apple's pairing UI tears the new fabric down via
-// RemoveFabric. Implementing ACL READ is the minimum surface that
-// keeps Apple happy through the post-CASE handshake.
+// AddNOC installs a fabric's first entry, the default Administer entry of
+// §11.18.6.8.1, as soon as the fabric is persisted; an administrator
+// writes the Acl and Extension lists of its own fabric afterwards
+// ([AccessControl.MatterWrite]), and both are persisted. Apple Home reads
+// Acl right after CASE; an empty / missing cluster surfaces as
+// ACCESS_DENIED on every follow-up read and Apple's pairing UI tears the
+// new fabric down via RemoveFabric.
 type AccessControl struct {
 	store ACLStoreFacade
 	// log is the logger [AccessControl.SetLogger] stored; nil is slog.Default().
@@ -64,10 +63,10 @@ type AccessControl struct {
 
 	// extensions holds the per-fabric AccessControlExtensionStruct list
 	// (attribute 0x0001, conformance EXTS). The list is keyed by fabric
-	// index and stored in-memory; the entries are vendor-opaque octstrings
-	// (max 128 bytes each) that controllers use to attach metadata to an
-	// ACL fabric. Mirroring matter.js AccessControlServer.ts in-memory
-	// extension state.
+	// index, loaded from the store at construction and written through to
+	// it (loadExtensions, the Extension write); the entries are
+	// vendor-opaque octstrings (max 128 bytes each) that controllers use
+	// to attach metadata to an ACL fabric.
 	extensions map[uint8][]AccessControlExtensionEntry
 
 	// Event surface — wired by the bridge during topology assembly via
@@ -237,9 +236,9 @@ const (
 // packages/model/src/standard/elements/access-control.element.ts:62-74.
 // Priority: Info (MatterEventPriorityInfo).
 //
-// AdminNodeID and AdminPasscodeID are both nullable (quality X); both
-// are nil in v1.1 because the IM layer does not yet track which
-// commissioner sent the write. LatestValue is nullable (quality X) and
+// AdminNodeID and AdminPasscodeID are both nullable (quality X): the
+// writer's CASE subject or, over PASE, passcode id 0 — the other one null
+// (aclAdminFromContext). LatestValue is nullable (quality X) and
 // set to nil for bulk-replace operations where per-entry diffing is
 // ambiguous.
 type AccessControlEntryChangedEvent struct {
@@ -257,8 +256,8 @@ type AccessControlEntryChangedEvent struct {
 // AccessControlExtensionStruct). Priority: Info
 // (MatterEventPriorityInfo).
 //
-// AdminNodeID and AdminPasscodeID are both nullable (quality X); both
-// are nil in v1.1 for the same reason as [AccessControlEntryChangedEvent].
+// AdminNodeID and AdminPasscodeID are both nullable (quality X) and set
+// as in [AccessControlEntryChangedEvent].
 type AccessControlExtensionChangedEvent struct {
 	AdminNodeID     *uint64                      // nullable; nil = "not tracked"
 	AdminPasscodeID *uint16                      // nullable; nil = "not tracked"
@@ -972,8 +971,8 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 			return false, err
 		}
 		// Every entry this write stores is re-stamped to the writer's own
-		// fabric below (v1.1 has no cross-fabric write path to begin
-		// with), so more than one entry in a single write always means
+		// fabric below (a write reaches no other fabric's list), so more
+		// than one entry in a single write always means
 		// more than one entry for that fabric. Mirrors matter.js
 		// AccessControlServer.ts:344-362 at db021da0
 		// (#validateAccessControlExtensionChanges): a fabric may hold at
@@ -1077,7 +1076,7 @@ func (a *AccessControl) MatterInvoke(_ context.Context, cmdID uint32, _ any) (an
 // MatterReportable returns the attributes that emit reports on
 // change. The ACL list and Extension list are reportable per
 // §9.10.4 so subscribers see entries appearing immediately after
-// AddNOC; v1.1 ships the static set.
+// AddNOC.
 func (a *AccessControl) MatterReportable() []uint32 {
 	return []uint32{accessControlAttrACL, accessControlAttrExtension}
 }
@@ -1105,10 +1104,8 @@ func (a *AccessControl) MatterAttributes() []uint32 {
 // correctly for this cluster. Includes AccessControlExtensionChanged
 // (0x0001) per matter.js
 // packages/model/src/standard/elements/access-control.element.ts:77-88
-// and chip's AccessControl cluster server (spec §9.10.7). The event is
-// listed here so EventList synthesis is complete if EventList suppression
-// is lifted; no emission path is wired because Extensions are not
-// implemented in v1.1.
+// and chip's AccessControl cluster server (spec §9.10.7). The Extension
+// write emits it ([AccessControl.MatterWrite]).
 func (a *AccessControl) MatterEvents() []uint32 {
 	events := []uint32{accessControlEventEntryChanged, accessControlEventExtensionChanged}
 	if a.auxiliaryEnabled() {

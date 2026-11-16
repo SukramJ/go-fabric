@@ -1256,10 +1256,8 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		}
 		return out, true
 	case opcredsAttrSupportedFabrics:
-		// Return the configured value (clamped to the spec floor of 5
-		// in NewOperationalCredentials). The previous hardcoded 16 was
-		// superseded now that OpcredsConfig.SupportedFabrics is stored
-		// on the struct. Default in cfg: 5 (Matter §11.18.6.4 floor).
+		// The configured OpcredsConfig.SupportedFabrics; 254 when none is
+		// configured (NewOperationalCredentials).
 		return o.supportedFabrics, true
 	case opcredsAttrCommissionedFabrics:
 		fabrics, err := o.store.ListFabrics(ctx)
