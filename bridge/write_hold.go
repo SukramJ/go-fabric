@@ -147,6 +147,18 @@ type heldPath struct {
 	markOnly bool
 }
 
+// add holds p once: a host that notifies the same path again while a
+// write is applied — a server that waits on its backend under a wildcard
+// write holds every endpoint — grows the table by distinct paths only, not
+// by its notification rate (R2-P6-bound-0409). Settlement is one advance
+// per cluster and one mark per path either way. The caller holds the
+// table's mutex.
+func (h *heldWrite) add(p heldPath) {
+	if !slices.Contains(h.paths, p) {
+		h.paths = append(h.paths, p)
+	}
+}
+
 // writeScope is the endpoints one write message names.
 type writeScope struct {
 	endpoints []uint16
@@ -217,7 +229,7 @@ func (t *writeHoldTable) holdPaths(ep *endpointpkg.Endpoint, mgr *subscription.M
 	}
 	h := t.entry(ep.ID)
 	for _, p := range paths {
-		h.paths = append(h.paths, heldPath{ep: ep, mgr: mgr, path: p})
+		h.add(heldPath{ep: ep, mgr: mgr, path: p})
 	}
 	return nil
 }
@@ -236,7 +248,7 @@ func (t *writeHoldTable) holdAdvance(ep *endpointpkg.Endpoint, cluster uint32, a
 	}
 	h := t.entry(ep.ID)
 	for _, a := range attrs {
-		h.paths = append(h.paths, heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true})
+		h.add(heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true})
 	}
 	return true
 }
@@ -255,7 +267,7 @@ func (t *writeHoldTable) holdMarks(ep *endpointpkg.Endpoint, mgr *subscription.M
 	}
 	h := t.entry(ep.ID)
 	for _, a := range attrs {
-		h.paths = append(h.paths, heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true})
+		h.add(heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true})
 	}
 	return true
 }
