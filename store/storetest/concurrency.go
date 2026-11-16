@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -39,7 +40,9 @@ func fabricsAddBesideWriter(ctx context.Context, t *testing.T, p store.Port) {
 			}
 			// A pause, so the writer does not starve the AddFabric calls
 			// past their busy timeout: the case is about the lock upgrade.
-			time.Sleep(200 * time.Microsecond)
+			if !clock.Sleep(clock.System{}, 200*time.Microsecond, stop) {
+				return
+			}
 		}
 	}()
 	failed := 0
