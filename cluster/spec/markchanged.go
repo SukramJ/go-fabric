@@ -33,6 +33,9 @@ type ChangeMarker interface {
 // change: it advances the data version once and notifies the change
 // listeners and the report listeners, as the host's
 // ([contract.OriginHostSet]). The ids are reported ascending, each once.
+// Called while a controller write's veto or Sink runs, the change joins
+// that write's commit, as a [Server.Set] there does: the write advances
+// the version once for both and tells them once it left its window.
 //
 // It refuses, and changes nothing, when attrIDs is empty, when an id is
 // not an attribute the server serves ([ErrNotServed]) — an attribute the
@@ -66,8 +69,21 @@ func (s *Server) MarkChanged(attrIDs ...uint32) error {
 		}
 	}
 	ids := slices.Compact(slices.Sorted(slices.Values(attrIDs)))
+	notify := func() { s.NotifyFrom(contract.OriginHostSet, ids...) }
+	// Inside an open commit — a controller write's veto or Sink — the
+	// change joins that commit as a Set there does ([Server.storeWith]):
+	// the write advances the version once for the union and tells it once
+	// the window is released (review II, R2-P6-conc-1308).
+	s.mu.Lock()
+	if open := s.commit; open != nil {
+		open.changed = append(open.changed, ids...)
+		open.notifies = append(open.notifies, notify)
+		s.mu.Unlock()
+		return nil
+	}
+	s.mu.Unlock()
 	s.tracker().Bump()
-	s.NotifyFrom(contract.OriginHostSet, ids...)
+	notify()
 	return nil
 }
 
