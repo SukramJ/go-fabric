@@ -613,6 +613,18 @@ func validateMandatory(c *Certificate) error {
 	if len(c.Signature) != 64 {
 		return fmt.Errorf("%w: signature length=%d (want 64)", ErrMalformed, len(c.Signature))
 	}
+	// The extensions member and four of its extensions are mandatory in
+	// every certificate kind: a certificate without basic constraints,
+	// key usage or either key identifier is malformed, whatever the
+	// verifier of its kind would check later. Mirrors matter.js's schema
+	// (packages/protocol/src/certificate/kinds/definitions/operational.ts:150
+	// `extensions: TlvField(10, …)`, :38, :45, :47, :48 TlvField at
+	// db021da0), which refuses a missing mandatory field at decode
+	// (packages/types/src/tlv/TlvObject.ts:257-261).
+	if ext := c.Extensions; !ext.HasBasicConstraints || !ext.HasKeyUsage || !ext.HasSubjectKeyID || !ext.HasAuthorityKeyID {
+		return fmt.Errorf("%w: a mandatory extension is missing (basicConstraints=%t, keyUsage=%t, subjectKeyId=%t, authorityKeyId=%t)",
+			ErrMalformed, ext.HasBasicConstraints, ext.HasKeyUsage, ext.HasSubjectKeyID, ext.HasAuthorityKeyID)
+	}
 	if c.NotAfter != 0 && c.NotAfter <= c.NotBefore {
 		return fmt.Errorf("%w: NotAfter (%d) <= NotBefore (%d)", ErrMalformed, c.NotAfter, c.NotBefore)
 	}

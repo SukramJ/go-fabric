@@ -42,6 +42,7 @@ func TestDecodeDNRulesPinDB021da0(t *testing.T) {
 		priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		enc.PutOctets(tlv.ContextTag(9), marshalPub(priv))
 		enc.StartList(tlv.ContextTag(10))
+		putMandatoryExtensions(enc)
 		_ = enc.EndContainer()
 		enc.PutOctets(tlv.ContextTag(11), make([]byte, 64))
 		_ = enc.EndContainer()

@@ -4,6 +4,7 @@
 package core_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -184,6 +185,10 @@ func encodeRootCertTLV(t *testing.T, pub []byte, issuerRCACID, subjectRCACID uin
 		t.Fatalf("encodeRootCertTLV: EndContainer basicConstraints: %v", err)
 	}
 	e.PutUint(tlv.ContextTag(2), uint64(0x60)) // KeyUsage: keyCertSign|cRLSign
+	// Subject and authority key identifiers, mandatory in every
+	// certificate (mattercert.Decode); equal on a self-signed root.
+	e.PutOctets(tlv.ContextTag(4), bytes.Repeat([]byte{0x5A}, 20))
+	e.PutOctets(tlv.ContextTag(5), bytes.Repeat([]byte{0x5A}, 20))
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("encodeRootCertTLV: EndContainer extensions: %v", err)
 	}

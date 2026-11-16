@@ -13,7 +13,8 @@ import (
 
 // shapeCert encodes a minimal NOC-shaped certificate. Each member is
 // written by a named writer; over replaces a writer (a nil one leaves the
-// member out), and the writers named "subject+" and "ext+" are appended
+// member out); the four mandatory extensions are "bc", "ku", "skid" and
+// "akid", and the writers named "subject+" and "ext+" are appended
 // at the end of the subject DN and of the extensions list.
 func shapeCert(t *testing.T, over map[string]func(e *tlv.Encoder)) []byte {
 	t.Helper()
@@ -34,8 +35,16 @@ func shapeCert(t *testing.T, over map[string]func(e *tlv.Encoder)) []byte {
 		"curve":      func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(tagEllipticCurveID), CurvePrime256v1) },
 		"pub":        func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(tagEllipticCurvePub), pub) },
 		"extensions": nil, // the list itself, written below unless replaced
-		"ext+":       func(*tlv.Encoder) {},
-		"signature":  func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(tagSignature), make([]byte, 64)) },
+		"bc": func(e *tlv.Encoder) {
+			e.StartStruct(tlv.ContextTag(extTagBasicConstraints))
+			e.PutBool(tlv.ContextTag(extBCInnerTagIsCa), false)
+			_ = e.EndContainer()
+		},
+		"ku":        func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(extTagKeyUsage), 0x01) },
+		"ext+":      func(*tlv.Encoder) {},
+		"skid":      func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), make([]byte, keyIDSize)) },
+		"akid":      func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), make([]byte, keyIDSize)) },
+		"signature": func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(tagSignature), make([]byte, 64)) },
 	}
 	w := func(k string, e *tlv.Encoder) {
 		f, ok := over[k]
@@ -69,7 +78,11 @@ func shapeCert(t *testing.T, over map[string]func(e *tlv.Encoder)) []byte {
 		}
 	} else {
 		e.StartList(tlv.ContextTag(tagExtensions))
+		w("bc", e)
+		w("ku", e)
 		w("ext+", e)
+		w("skid", e)
+		w("akid", e)
 		_ = e.EndContainer()
 	}
 	w("signature", e)
@@ -124,24 +137,24 @@ func TestDecodeRefusesAFieldOfAnotherTypeOrWidth(t *testing.T) {
 			_ = e.EndContainer()
 		})},
 		"extensions as an integer": {"extensions": put(func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(tagExtensions), 0) })},
-		"basic constraints as a list": {"ext+": put(func(e *tlv.Encoder) {
+		"basic constraints as a list": {"bc": put(func(e *tlv.Encoder) {
 			e.StartList(tlv.ContextTag(extTagBasicConstraints))
 			_ = e.EndContainer()
 		})},
-		"isCA as an integer": {"ext+": put(func(e *tlv.Encoder) {
+		"isCA as an integer": {"bc": put(func(e *tlv.Encoder) {
 			e.StartStruct(tlv.ContextTag(extTagBasicConstraints))
 			e.PutUint(tlv.ContextTag(extBCInnerTagIsCa), 1)
 			_ = e.EndContainer()
 		})},
-		"pathLen as a signed integer": {"ext+": put(func(e *tlv.Encoder) {
+		"pathLen as a signed integer": {"bc": put(func(e *tlv.Encoder) {
 			e.StartStruct(tlv.ContextTag(extTagBasicConstraints))
 			e.PutBool(tlv.ContextTag(extBCInnerTagIsCa), true)
 			e.PutInt(tlv.ContextTag(extBCInnerTagPathLen), 0)
 			_ = e.EndContainer()
 		})},
-		"key usage above 16 bits": {"ext+": put(func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(extTagKeyUsage), 0x1_0001) })},
-		"key usage as UTF-8":      {"ext+": utf8(extTagKeyUsage)},
-		"key usage twice": {"ext+": put(func(e *tlv.Encoder) {
+		"key usage above 16 bits": {"ku": put(func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(extTagKeyUsage), 0x1_0001) })},
+		"key usage as UTF-8":      {"ku": utf8(extTagKeyUsage)},
+		"key usage twice": {"ku": put(func(e *tlv.Encoder) {
 			e.PutUint(tlv.ContextTag(extTagKeyUsage), 0x01)
 			e.PutUint(tlv.ContextTag(extTagKeyUsage), 0x20)
 		})},
@@ -167,20 +180,25 @@ func TestDecodeRefusesAFieldOfAnotherTypeOrWidth(t *testing.T) {
 				_ = e.EndContainer()
 			}
 		})},
-		"subject key id as an integer": {"ext+": put(func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(extTagSubjectKeyID), 1) })},
-		"subject key id twice": {"ext+": put(func(e *tlv.Encoder) {
+		"subject key id as an integer": {"skid": put(func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(extTagSubjectKeyID), 1) })},
+		"subject key id twice": {"skid": put(func(e *tlv.Encoder) {
 			e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), []byte{1})
 			e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), []byte{2})
 		})},
-		"authority key id twice": {"ext+": put(func(e *tlv.Encoder) {
+		"authority key id twice": {"akid": put(func(e *tlv.Encoder) {
 			e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), []byte{1})
 			e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), []byte{2})
 		})},
-		"subject key id of 19 bytes":     {"ext+": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), make([]byte, 19)) })},
-		"subject key id of 1 byte":       {"ext+": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), []byte{1}) })},
-		"authority key id of 21 bytes":   {"ext+": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), make([]byte, 21)) })},
+		"subject key id of 19 bytes":     {"skid": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), make([]byte, 19)) })},
+		"subject key id of 1 byte":       {"skid": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), []byte{1}) })},
+		"authority key id of 21 bytes":   {"akid": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), make([]byte, 21)) })},
+		"basic constraints absent":       {"bc": nil},
+		"key usage absent":               {"ku": nil},
+		"subject key id absent":          {"skid": nil},
+		"authority key id absent":        {"akid": nil},
+		"extensions absent":              {"extensions": nil},
 		"future extension as an integer": {"ext+": put(func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(extTagFutureExtension), 1) })},
-		"basic constraints twice": {"ext+": put(func(e *tlv.Encoder) {
+		"basic constraints twice": {"bc": put(func(e *tlv.Encoder) {
 			for range 2 {
 				e.StartStruct(tlv.ContextTag(extTagBasicConstraints))
 				e.PutBool(tlv.ContextTag(extBCInnerTagIsCa), false)
@@ -215,16 +233,13 @@ func TestDecodeTakesWellFormedOptionalExtensions(t *testing.T) {
 			e.PutUint(tlv.ContextTag(dnTagMatterCASEAuth), 0xFFFF_0001)
 		},
 		"ext+": func(e *tlv.Encoder) {
-			e.StartStruct(tlv.ContextTag(extTagBasicConstraints))
-			e.PutBool(tlv.ContextTag(extBCInnerTagIsCa), false)
-			_ = e.EndContainer()
-			e.PutUint(tlv.ContextTag(extTagKeyUsage), 0x01)
 			e.StartArray(tlv.ContextTag(extTagExtendedKeyUsage))
 			e.PutUint(tlv.AnonymousTag(), 2)
 			e.PutUint(tlv.AnonymousTag(), 1)
 			_ = e.EndContainer()
-			e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), make([]byte, 20))
-			e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), make([]byte, 20))
+		},
+		"akid": func(e *tlv.Encoder) {
+			e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), make([]byte, keyIDSize))
 			e.PutOctets(tlv.ContextTag(extTagFutureExtension), []byte{0x30, 0x00})
 			e.PutOctets(tlv.ContextTag(extTagFutureExtension), []byte{0x30, 0x01})
 		},

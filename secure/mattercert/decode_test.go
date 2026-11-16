@@ -96,16 +96,21 @@ func buildTestCert(t *testing.T, opts certOptions) []byte {
 		e.PutOctets(tlv.ContextTag(9), pubKey)
 	}
 
-	// tag 10: Extensions (empty list unless a pathLen is asked for)
+	// tag 10: Extensions — the four every certificate must carry
+	// (basic constraints with the asked pathLen, key usage, both key
+	// identifiers).
 	e.StartList(tlv.ContextTag(10))
+	e.StartStruct(tlv.ContextTag(1))
+	e.PutBool(tlv.ContextTag(1), true)
 	if opts.bcPathLen != nil {
-		e.StartStruct(tlv.ContextTag(1))
-		e.PutBool(tlv.ContextTag(1), true)
 		e.PutUint(tlv.ContextTag(2), *opts.bcPathLen)
-		if err := e.EndContainer(); err != nil {
-			t.Fatalf("EndContainer basic-constraints: %v", err)
-		}
 	}
+	if err := e.EndContainer(); err != nil {
+		t.Fatalf("EndContainer basic-constraints: %v", err)
+	}
+	e.PutUint(tlv.ContextTag(2), 0x0060)
+	e.PutOctets(tlv.ContextTag(4), make([]byte, 20))
+	e.PutOctets(tlv.ContextTag(5), make([]byte, 20))
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer extensions: %v", err)
 	}
