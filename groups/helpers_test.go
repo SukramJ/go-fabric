@@ -30,6 +30,8 @@ type memStore struct {
 	// failList makes ListFabrics fail; failGet makes GetFabric fail.
 	failList bool
 	failGet  error
+	// failGetOf makes GetFabric fail for the fabrics it names.
+	failGetOf map[uint8]error
 	getCalls int // GetFabric calls
 	// meta is the matter_metadata counter table; failMeta / failMetaSet
 	// make its reads / writes fail.
@@ -53,6 +55,9 @@ func (s *memStore) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, 
 	s.getCalls++
 	if s.failGet != nil {
 		return store.FabricRecord{}, s.failGet
+	}
+	if err := s.failGetOf[idx]; err != nil {
+		return store.FabricRecord{}, err
 	}
 	r, ok := s.fabrics[idx]
 	if !ok {
