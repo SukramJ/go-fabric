@@ -608,7 +608,7 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 		b.reportWrittenAttributes(outcome.Results)
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_ended", resp.Status)
 	}
-	b.routing.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
+	b.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
 	b.reportWrittenAttributes(outcome.Results)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
@@ -1364,6 +1364,29 @@ func (b *Bridge) adoptPASESessionOnAddNOC(sessionID uint16, resp im.InvokeRespon
 
 // lookupSession is the live session of the id, nil for none (or the
 // unsecured id 0).
+// endWriteChunk is [exchangeRouting.endWriteChunk] for a chunk of the
+// session key names, then ends the session's chunked writes when the
+// session is gone: a chunk that announces more and stored its transaction
+// after the session's close dropped the table's entries
+// ([exchangeRouting.dropSessionWriteTxs]) would otherwise keep its hold
+// until a later write's sweep (N-req3-1). Without a session registry
+// nothing is known to be gone.
+func (b *Bridge) endWriteChunk(key mrp.ExchangeKey, tx *im.WriteTransaction, more bool) {
+	b.routing.endWriteChunk(key, tx, more)
+	if !more {
+		return
+	}
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if lookup == nil {
+		return
+	}
+	if _, live := lookup.Lookup(key.SessionID); !live {
+		b.routing.dropSessionWriteTxs(key.SessionID)
+	}
+}
+
 func (b *Bridge) lookupSession(sessionID uint16) *channel.Session {
 	if sessionID == 0 {
 		return nil
