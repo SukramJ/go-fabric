@@ -342,6 +342,18 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 ## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
 
 - **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
+- **Numeric bounds compare as float64.** `cluster/spec`'s constraint check
+  (`Instance.satisfies`, `bound_expr.go` `evalBound`) and `Bound.Int`
+  (int64) hold a bound beyond 2^53 inexactly: 2^62 + 1 compares equal to
+  2^62, and a uint64 bound above int64 cannot be stated. matter.js keeps
+  such bounds as bigints (`TlvOfModelTest.ts` "refuses a value beyond the
+  computed bound", "refuses the value above it", "states a bound beyond
+  the safe integers as a bigint"; `ConstraintTest.ts` "keeps the magnitude
+  of a decimal / hexadecimal / negative bound", "judges a value against a
+  bound only a bigint states" and its value tests at 2^53 ± 1 and 2^62 ± 1).
+  No served attribute states such a bound at the pin. Route: compare integers as integers (uint64/int64 or
+  math/big) where the type is a 64-bit integer.
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-par-1306): integer values compare exactly (`cluster/spec/write.go` `satisfiesInt`, `bound_expr.go` `evalBoundExact` / `exactOp`). The sentence "No served attribute states such a bound at the pin" was false: ElectricalEnergyMeasurement's served energy fields state "0 to 2^62" (the snapshot holds "-2^62 to 2^62" 18 times, "0 to 2^62" three times, "max (2^62) - 1" once). matter.js takes a BigInt power when the result exceeds `Number.MAX_SAFE_INTEGER`, for a whole base and a whole exponent ≥ 0 (`packages/model/src/aspects/Constraint.ts:1049-1058` at `db021da0`), and "+", "-", "*" propagate a BigInt (`:989-1024`); its "/" with a BigInt operand is `undefined` (numbers only) and a division by zero ±Infinity (`:1027-1034`), where this module divides exactly and refuses a division by zero — no such bound at the pin.
 
 ## matter.js pin db021da0 — open items (pin lift 2026-11-06)
 
