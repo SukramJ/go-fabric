@@ -131,6 +131,11 @@ type Manager struct {
 	// store is owed (reloadOwed): each is loaded again on its own, so a
 	// store failure leaves only that fabric absent.
 	owed map[uint8]bool
+	// owedRetryAt and owedBackoff pace reloadOwed on the receive path
+	// (owedDueLocked): a failing load is tried again owedBackoff later,
+	// on the send clock's monotonic reading; Load does not wait.
+	owedRetryAt time.Duration
+	owedBackoff time.Duration
 
 	// reception is matter.js MessagingState: the replay-protection
 	// window per operational key and source node, at most
@@ -178,7 +183,8 @@ type Manager struct {
 }
 
 // SetClock sets the clock that selects the current epoch key of a group
-// send; nil is [clock.System]. Call it before the first send.
+// send and paces the retry of a fabric reload [Manager.ForgetFabric] left
+// owed; nil is [clock.System]. Call it before the first send.
 func (m *Manager) SetClock(c clock.Clock) {
 	m.senderMu.Lock()
 	defer m.senderMu.Unlock()
@@ -478,8 +484,12 @@ func (m *Manager) ensureAllLoaded(ctx context.Context) error {
 	if done {
 		// A fabric ForgetFabric left owed is tried on its own; its failure
 		// leaves it absent and does not fail the call for the others
-		// ([Manager.Load] returns it).
-		_ = m.reloadOwed(ctx)
+		// ([Manager.Load] returns it). The receive path tries at most once
+		// per interval, so a group sender cannot drive a store read per
+		// datagram while the store fails.
+		if m.owedDue() {
+			m.noteOwedResult(m.reloadOwed(ctx))
+		}
 		return nil
 	}
 	m.storeMu.Lock()
@@ -533,8 +543,56 @@ func (m *Manager) Load(ctx context.Context) error {
 		return err
 	}
 	err := m.reloadOwed(ctx)
+	m.noteOwedResult(err)
 	m.notify()
 	return err
+}
+
+// Pacing of an owed reload that keeps failing: the first retry after
+// owedRetryFirst, doubling up to owedRetryMax.
+const (
+	owedRetryFirst = time.Second
+	owedRetryMax   = time.Minute
+)
+
+// owedDue reports whether an owed reload is due on the receive path and,
+// when it is, claims the attempt: concurrent receives do not try it twice.
+func (m *Manager) owedDue() bool {
+	now := m.monotonic()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.owed) == 0 || now < m.owedRetryAt {
+		return false
+	}
+	m.owedRetryAt = now + max(m.owedBackoff, owedRetryFirst)
+	return true
+}
+
+// noteOwedResult sets the next receive-path attempt after one ended with
+// err: none owed after a success, owedRetryFirst doubling up to
+// owedRetryMax after a failure.
+func (m *Manager) noteOwedResult(err error) {
+	now := m.monotonic()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err == nil {
+		m.owedBackoff, m.owedRetryAt = 0, 0
+		return
+	}
+	switch {
+	case m.owedBackoff == 0:
+		m.owedBackoff = owedRetryFirst
+	case m.owedBackoff < owedRetryMax:
+		m.owedBackoff = min(2*m.owedBackoff, owedRetryMax)
+	}
+	m.owedRetryAt = now + m.owedBackoff
+}
+
+// monotonic is the send clock's monotonic reading.
+func (m *Manager) monotonic() time.Duration {
+	m.senderMu.Lock()
+	defer m.senderMu.Unlock()
+	return clock.MonotonicOf(m.clock)
 }
 
 // Reload re-reads one fabric's key sets and GroupKeyMap from the store

@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -172,3 +174,73 @@ func TestParkedWindowsOfARemovedFabricAreDropped(t *testing.T) {
 		t.Fatalf("%d removed fabrics' windows still parked after the load, want 0", n)
 	}
 }
+
+// TestOwedReloadIsPacedOnTheReceivePath: while the owed fabric's load
+// fails, the receive path tries it at most once per interval — 1 s,
+// doubling up to 60 s, reset on success — so a group sender cannot drive
+// a store read per datagram; an explicit Load tries at once.
+func TestOwedReloadIsPacedOnTheReceivePath(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	m, st, op2, sid2 := twoFabricManager(t)
+	fake := clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC))
+	m.SetClock(fake)
+	reads := func() int {
+		st.mu.Lock()
+		defer st.mu.Unlock()
+		return st.getCalls
+	}
+	st.mu.Lock()
+	st.failGet = errStoreDown
+	st.mu.Unlock()
+	m.ForgetFabric(1)
+	counter := uint32(0)
+	flood := func(n int) {
+		for range n {
+			counter++
+			if _, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, counter, true, []byte("x"))); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	before := reads()
+	flood(100)
+	if got := reads() - before; got != 1 {
+		t.Fatalf("%d store reads for 100 datagrams within the first interval, want 1", got)
+	}
+	for _, step := range []struct {
+		advance time.Duration
+		want    int
+	}{
+		{time.Second, 1},     // the 1 s interval passed: one more try, the next in 2 s
+		{time.Second, 0},     // 1 s of 2
+		{time.Second, 1},     // 2 s passed; next in 4 s
+		{3 * time.Second, 0}, // 3 s of 4
+	} {
+		fake.Advance(step.advance)
+		before = reads()
+		flood(20)
+		if got := reads() - before; got != step.want {
+			t.Fatalf("after advancing %v: %d store reads for 20 datagrams, want %d", step.advance, got, step.want)
+		}
+	}
+	before = reads()
+	if err := m.Load(ctx); !errors.Is(err, errStoreDown) {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := reads() - before; got != 1 {
+		t.Fatalf("Load read the store %d times, want 1 (it does not wait for the interval)", got)
+	}
+	st.mu.Lock()
+	st.failGet = nil
+	st.mu.Unlock()
+	fake.Advance(time.Minute)
+	flood(1)
+	if _, err := m.Decode(ctx, sealGroup(t, opKeyOf1(t), sid1Of(t), 0x0101, 7, 1, true, []byte("x"))); err != nil {
+		t.Fatalf("fabric 1 after the store recovered: %v", err)
+	}
+}
+
+func opKeyOf1(t *testing.T) []byte { op, _ := opKeyOf(t, 0xA1); return op }
+
+func sid1Of(t *testing.T) uint16 { _, sid := opKeyOf(t, 0xA1); return sid }
