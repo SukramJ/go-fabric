@@ -105,14 +105,14 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 // integer to an unsigned attribute, and the reverse — by the attribute's
 // definition and the strict decoders (class [spec.ErrWrongType]); nil for
 // a value of the right type (its range is the definition's check on the
-// path), a null (its nullability likewise), a container (decoded above or
+// path), a null to a nullable attribute ([nullToNonNullableScalar]), a container (decoded above or
 // refused by [primitiveAttributeValue]) and an attribute no registered
 // definition types. matter.js decodes a written value strictly — the
 // integer relaxation is the client's alone — and throws for another type,
 // which ends the write interaction (owner decision 161; TlvNumber.ts:124-131,
 // TlvString.ts:58, TlvBoolean.ts:23 at db021da0, fable-read-6a-gate re-read §2).
 func scalarOfAnotherType(path im.ConcreteAttributePath, el tlv.Element) error {
-	if el.IsNull || el.IsContainer {
+	if el.IsContainer {
 		return nil
 	}
 	def := spec.Lookup(path.Cluster)
@@ -122,6 +122,9 @@ func scalarOfAnotherType(path im.ConcreteAttributePath, el tlv.Element) error {
 	a := def.Attribute(path.Attribute)
 	if a == nil {
 		return nil
+	}
+	if el.IsNull {
+		return nullToNonNullableScalar(def, a)
 	}
 	n := spec.Node{El: el}
 	var err error
@@ -143,6 +146,30 @@ func scalarOfAnotherType(path im.ConcreteAttributePath, el tlv.Element) error {
 	}
 	if errors.Is(err, spec.ErrWrongType) {
 		return fmt.Errorf("%s.%s: %w", def.Name, a.Name, err)
+	}
+	return nil
+}
+
+// nullToNonNullableScalar is the refusal of a null written to a scalar
+// attribute that is not nullable (owner decision 170, R4-1): matter.js
+// decodes the write with the attribute's TLV schema, which is nullable
+// only when the attribute is (packages/types/src/tlv/TlvOfModel.ts:234-236,
+// :242-244 at db021da0), and its number, boolean and string codecs throw
+// on another TLV type (TlvNumber.ts:124-131, TlvBoolean.ts:22-23,
+// TlvString.ts:57-58) before any validation — a throw that is no status
+// ends the write interaction with FAILURE
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:429,
+// :452-460; fable-6a-w3 H3). It was answered CONSTRAINT_ERROR on its
+// path. A null to a nullable attribute, and to a list or a struct, is the
+// definition's check on the path.
+func nullToNonNullableScalar(def *spec.Cluster, a *spec.Attribute) error {
+	if a.Quality.Nullable {
+		return nil
+	}
+	switch a.Type.Kind {
+	case spec.KindBool, spec.KindUint, spec.KindEnum, spec.KindBitmap, spec.KindInt,
+		spec.KindFloat32, spec.KindFloat64, spec.KindString, spec.KindBytes:
+		return fmt.Errorf("%s.%s: null to an attribute that is not nullable: %w", def.Name, a.Name, spec.ErrWrongType)
 	}
 	return nil
 }

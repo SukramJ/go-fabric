@@ -18,7 +18,7 @@ import (
 // tag are undecodable, so the write interaction ends with FAILURE, as
 // matter.js's TlvNumber / TlvString / TlvBoolean / TlvArray throw for them
 // (fable-read-6a-gate, re-read §1-2). A value of the right type, in or out
-// of range, and a null stay on the path.
+// of range, and a null to a nullable attribute stay on the path.
 func TestScalarOfAnotherTypeIsUndecodable(t *testing.T) {
 	t.Parallel()
 	onLevel := attrPath(lvldef.ClusterID, lvldef.AttrOnLevel)
@@ -40,6 +40,16 @@ func TestScalarOfAnotherTypeIsUndecodable(t *testing.T) {
 		if av := writeValueOf(t, onLevel, build); im.IsUndecodable(av) {
 			t.Errorf("OnLevel written %s: undecodable, want it on the path", name)
 		}
+	}
+	// A null to a non-nullable scalar is undecodable too (owner decision
+	// 170, R4-1): matter.js decodes a write with the attribute's TLV
+	// schema, which is nullable only when the attribute is, and its
+	// TlvNumber throws on the null before any validation, ending the write
+	// interaction with FAILURE (fable-6a-w3 H3: TlvOfModel.ts:234-236,
+	// TlvNumber.ts:124-131, AttributeWriteResponse.ts:429, :452-460).
+	offTransition := attrPath(lvldef.ClusterID, lvldef.AttrOnOffTransitionTime)
+	if av := writeValueOf(t, offTransition, func(enc *tlv.Encoder) { enc.PutNull(tlv.AnonymousTag()) }); !im.IsUndecodable(av) {
+		t.Errorf("OnOffTransitionTime (not nullable) written null: decoded to %#v, want undecodable", av.Value)
 	}
 	// An array whose one element, a structure, carries context tag 1 (the
 	// encoder refuses to write it, so the bytes are spelled out).
