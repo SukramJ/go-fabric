@@ -18,9 +18,12 @@ import (
 )
 
 // ErrAckWaitTimeout named a wait for an outbound message's acknowledgement
-// that ended without it. No function of the module returns it any more:
-// the tracker's wait for an acknowledgement, which had no caller outside
-// its tests, was removed in review II.
+// that ended without it.
+//
+// Deprecated: no function of the module returns it any more — the
+// tracker's wait for an acknowledgement, which had no caller outside its
+// tests, was removed in review II. Removable in the next minor release
+// (owner decision 174).
 var ErrAckWaitTimeout = errors.New("bridge: outbound ack wait: timeout")
 
 // outboundReliableTracker bookkeeps reliable outbound messages the
