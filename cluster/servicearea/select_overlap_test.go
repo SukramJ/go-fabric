@@ -15,7 +15,7 @@ import (
 // selection: SelectAreas removes area 9 through the host's setter.
 type removingSelector struct{ srv *servicearea.Server }
 
-func (r *removingSelector) SelectAreas(context.Context, []uint32) (servicearea.SelectAreasStatus, string, error) {
+func (r *removingSelector) SelectAreas(context.Context, []uint32) (status servicearea.SelectAreasStatus, text string, err error) {
 	if err := r.srv.SetSupportedAreas([]servicearea.Area{area(7, ptr[uint32](0), "Kitchen")}); err != nil {
 		return 0, "", err
 	}
