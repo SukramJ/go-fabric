@@ -17,6 +17,7 @@ import (
 	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // DatastoreClusterID is the JointFabricDatastore cluster id.
@@ -190,16 +191,20 @@ const settingPrefix = "jointfabric.datastore:"
 // node holds. The rules are connectedhomeip's JointFabricDatastore.cpp and
 // joint-fabric-datastore-server.cpp at 6170af84; matter.js's
 // JointFabricDatastoreServer is the generated behaviour
-// (JointFabricDatastoreServer.ts:14 at 862ad75f).
+// (JointFabricDatastoreServer.ts:14 at db021da0).
 //
-// A command of a peer is the anchor fabric's alone: a request of any
-// other fabric, or of any fabric while no anchor is recorded, answers
-// UNSUPPORTED_ACCESS (owner decision 129, ahead of connectedhomeip, whose
-// server asks no accessing fabric): the registry holds the Joint Fabric's
-// epoch keys and its pushes act with the anchor's authority. A call of the
-// host carries no request and is not fenced. A read is not fenced yet:
-// the dispatcher has no way for a server to refuse a read of an attribute
-// that is not fabric-scoped.
+// The datastore is the anchor fabric's alone (owner decision 129, ahead
+// of connectedhomeip, whose joint-fabric-datastore-server.cpp asks no
+// accessing fabric): the registry holds the Joint Fabric's epoch keys and
+// its pushes act with the anchor's authority. A command of a request of
+// any other fabric answers UNSUPPORTED_ACCESS; a read or a subscription
+// of one sees every list empty and every other attribute at its zero
+// value ([Datastore.MatterReadFiltered] — the contract has no way yet for
+// a server to refuse a read with a status). While no anchor is recorded,
+// every peer is refused so: a Datastore without an [Administrator], or
+// one whose anchor fabric's NOC lacks the administrator and anchor CATs,
+// serves a peer only after the host's [Datastore.SetAnchorFabricIndex]. A
+// call of the host carries no request and is not fenced.
 //
 // A command answers when its change is in the tables; the push to the
 // node runs after the answer, as connectedhomeip's delegate completes
@@ -222,10 +227,13 @@ type Datastore struct {
 	// tables differ from it, and a failed save restores them from it.
 	saved []byte
 	// gen counts the wipes of the tables; a refresh or a push started
-	// before one commits nothing after it (R2-P6-conc-1107).
-	gen        uint64
-	refreshing uint64 // 0: no refresh (kUndefinedNodeId)
-	inRefresh  bool
+	// before one calls no port and commits nothing after it
+	// (R2-P6-conc-1107).
+	gen uint64
+	// keepUnsaved keeps a change in memory when its save fails (a wipe).
+	keepUnsaved bool
+	refreshing  uint64 // 0: no refresh (kUndefinedNodeId)
+	inRefresh   bool
 
 	// pushes are the pushes the commands started.
 	pushes sync.WaitGroup
@@ -302,6 +310,7 @@ var (
 	_ contract.ClusterCommandInvokePrivilege = (*Datastore)(nil)
 	_ contract.AttributeChangeNotifier       = (*Datastore)(nil)
 	_ contract.FabricScopedState             = (*Datastore)(nil)
+	_ contract.FabricScopedReader            = (*Datastore)(nil)
 	_ spec.CommandRegistrar                  = (*Datastore)(nil)
 )
 
@@ -374,12 +383,15 @@ func (d *Datastore) update(ctx context.Context, fn func() error) error {
 	ids := d.takeDirtyLocked()
 	if d.store != nil {
 		if serr := d.persistLocked(ctx); serr != nil {
-			ids = nil
+			if !d.keepUnsaved {
+				ids = nil
+			}
 			if err == nil {
 				err = serr
 			}
 		}
 	}
+	d.keepUnsaved = false
 	d.mu.Unlock()
 	if len(ids) > 0 && d.srv != nil {
 		_ = d.srv.MarkChanged(ids...)
@@ -388,8 +400,12 @@ func (d *Datastore) update(ctx context.Context, fn func() error) error {
 }
 
 // persistLocked writes the tables to the store when they differ from the
-// record it holds; a failed write restores the tables from that record.
-// The caller holds d.mu.
+// record it holds; a failed write restores the tables from that record —
+// except a wipe's ([Datastore.MatterDropFabric] sets keepUnsaved), which
+// stays wiped in memory: the store keeps the stale record until the next
+// change saves the empty one, and after a restart the reconcile wipes the
+// stale record, whose anchor the fabric table no longer holds. The caller
+// holds d.mu.
 func (d *Datastore) persistLocked(ctx context.Context) error {
 	b, err := json.Marshal(d.t)
 	if err == nil && bytes.Equal(b, d.saved) {
@@ -405,8 +421,10 @@ func (d *Datastore) persistLocked(ctx context.Context) error {
 	} else {
 		err = fmt.Errorf("%w: encode %s: %w", ErrStore, d.key, err)
 	}
-	d.t = tables{}
-	_ = json.Unmarshal(d.saved, &d.t)
+	if !d.keepUnsaved {
+		d.t = tables{}
+		_ = json.Unmarshal(d.saved, &d.t)
+	}
 	return err
 }
 
@@ -435,6 +453,22 @@ type genKey struct{}
 
 // errWiped is a commit whose tables were wiped since its operation began.
 var errWiped = fmt.Errorf("%w: the datastore was wiped", ErrNotFound)
+
+// live refuses a push's port call or a refresh's step whose tables were
+// wiped since its operation began ([genKey] in ctx): the push carries the
+// removed Joint Fabric's entries, its key sets among them, to no node.
+func (d *Datastore) live(ctx context.Context) error {
+	gen, scoped := ctx.Value(genKey{}).(uint64)
+	if !scoped {
+		return nil
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if gen != d.gen {
+		return errWiped
+	}
+	return nil
+}
 
 // runPushes runs the pushes in order; the errors are joined under ErrSync.
 func runPushes(ctx context.Context, pushes []pushFn) error {
@@ -733,8 +767,37 @@ func (d *Datastore) SetAnchorVendorID(ctx context.Context, vendorID uint16) erro
 	})
 }
 
+// recordAnchor records an anchor in one change — its fabric index, root
+// certificate (one of 600 bytes or more is left out, as
+// SetAnchorRootCA refuses it), node id and vendor id — unless the
+// datastore records one already: an anchored datastore is never
+// re-pointed (it is wiped first). The error is the store's, or ErrInvalidArgument
+// for an anchor recorded already.
+func (d *Datastore) recordAnchor(ctx context.Context, f store.FabricRecord) error {
+	return d.update(ctx, func() error {
+		if d.t.AnchorFabricIndex != 0 {
+			return fmt.Errorf("%w: the datastore's anchor is fabric %d", ErrInvalidArgument, d.t.AnchorFabricIndex)
+		}
+		d.t.AnchorFabricIndex = f.FabricIndex
+		if len(f.RootCert) < maxDERCertLength {
+			d.t.AnchorRootCA = slices.Clone(f.RootCert)
+			d.markLocked(dsdef.AttrAnchorRootCa)
+		}
+		if f.NodeID != 0 {
+			d.t.AnchorNodeID = f.NodeID
+			d.markLocked(dsdef.AttrAnchorNodeId)
+		}
+		if f.VendorID != 0 {
+			d.t.AnchorVendorID = f.VendorID
+			d.markLocked(dsdef.AttrAnchorVendorId)
+		}
+		return nil
+	})
+}
+
 // SetAnchorFabricIndex records the Joint Fabric's index on this node, so
-// that its removal wipes the datastore (:316-317).
+// that its removal wipes the datastore (:316-317), and opens the
+// datastore to that fabric's peers.
 func (d *Datastore) SetAnchorFabricIndex(ctx context.Context, fabricIndex uint8) error {
 	return d.update(ctx, func() error {
 		d.t.AnchorFabricIndex = fabricIndex
@@ -772,8 +835,10 @@ func (d *Datastore) OnFabricRemoved(ctx context.Context, fabricIndex uint8) {
 
 // MatterDropFabric implements [contract.FabricScopedState]: the anchor
 // fabric's removal wipes the datastore and the anchor; any other fabric's
-// leaves it. A refresh or a push in flight then commits nothing more. The
-// error is the store's; the next reconcile wipes again. Mirrors
+// leaves it. A refresh or a push in flight then calls no port and commits
+// nothing more. A second call, from the administrator's forward or the
+// reconcile, changes nothing. The error is the store's: the tables stay
+// wiped in memory and the next change saves them ([Datastore.persistLocked]). Mirrors
 // JointFabricDatastore.h:323-338 (OnFabricRemoved, ClearAllRecords
 // :532-559); as a [contract.FabricScopedState] the node also wipes at its
 // reconcile the record of an anchor fabric removed while the datastore
@@ -785,12 +850,71 @@ func (d *Datastore) MatterDropFabric(ctx context.Context, fabricIndex uint8) err
 		}
 		d.t = tables{}
 		d.gen++
+		d.keepUnsaved = true
 		d.markLocked(dsdef.AttrAnchorRootCa, dsdef.AttrAnchorNodeId, dsdef.AttrAnchorVendorId, dsdef.AttrFriendlyName,
 			dsdef.AttrGroupKeySetList, dsdef.AttrGroupList, dsdef.AttrNodeList, dsdef.AttrAdminList, dsdef.AttrStatus,
 			dsdef.AttrEndpointGroupIdList, dsdef.AttrEndpointBindingList, dsdef.AttrNodeKeySetList, dsdef.AttrNodeAclList,
 			dsdef.AttrNodeEndpointList)
 		return nil
 	})
+}
+
+// admits reports whether a request of fabric reaches the datastore: the
+// recorded anchor fabric's alone, none while no anchor is recorded.
+func (d *Datastore) admits(fabric uint8) bool {
+	anchor := d.AnchorFabricIndex()
+	return anchor != 0 && fabric == anchor
+}
+
+// MatterReadFiltered implements [contract.FabricScopedReader]: a request
+// of a fabric the datastore does not admit ([Datastore.admits]) reads
+// every list empty and every other attribute at its zero value — the
+// endpoint dispatcher serves a reader's (value, true) as it is, for a
+// read and a subscription alike. No attribute of the cluster is
+// nullable. Owner decision 129, R2-P6-sec-1103; the status a read should
+// carry needs a contract seam the owner decides.
+func (d *Datastore) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
+	if _, fabric, request := im.LookupFabricFilter(ctx); request && !d.admits(fabric) {
+		if v, ok := withheld(attrID); ok {
+			return v, true
+		}
+	}
+	return d.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read
+}
+
+// withheld is what a request the datastore does not admit reads of attrID.
+func withheld(attrID uint32) (any, bool) {
+	switch attrID {
+	case dsdef.AttrAnchorRootCa:
+		return []byte{}, true
+	case dsdef.AttrAnchorNodeId:
+		return uint64(0), true
+	case dsdef.AttrAnchorVendorId:
+		return uint16(0), true
+	case dsdef.AttrFriendlyName:
+		return "", true
+	case dsdef.AttrStatus:
+		return StatusEntry{}, true
+	case dsdef.AttrGroupKeySetList:
+		return spec.List[GroupKeySet]{}, true
+	case dsdef.AttrGroupList:
+		return spec.List[GroupEntry]{}, true
+	case dsdef.AttrNodeList:
+		return spec.List[NodeEntry]{}, true
+	case dsdef.AttrAdminList:
+		return spec.List[AdminEntry]{}, true
+	case dsdef.AttrEndpointGroupIdList:
+		return spec.List[EndpointGroupIDEntry]{}, true
+	case dsdef.AttrEndpointBindingList:
+		return spec.List[EndpointBindingEntry]{}, true
+	case dsdef.AttrNodeKeySetList:
+		return spec.List[NodeKeySetEntry]{}, true
+	case dsdef.AttrNodeAclList:
+		return spec.List[ACLEntry]{}, true
+	case dsdef.AttrNodeEndpointList:
+		return spec.List[EndpointEntry]{}, true
+	}
+	return nil, false
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the anchor

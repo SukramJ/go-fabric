@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/jointfabric"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	jfdsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
 	"github.com/SukramJ/go-fabric/im"
@@ -117,6 +118,14 @@ func TestJointFabricSimSyncReachesNoNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	ds := j.dev.JointFabricDatastore().Underlying()
+	// A request reaches the datastore from its anchor fabric only (owner
+	// decision 129); the demo is commissioned by no anchor, so the test
+	// records fabric 1 as the host would.
+	if d, ok := ds.(*jointfabric.Datastore); !ok {
+		t.Fatalf("the datastore server is %T", ds)
+	} else if err := d.SetAnchorFabricIndex(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
 	invoke := func(cmdID uint32, req any) im.StatusCode {
 		_, err := ds.MatterInvoke(im.WithFabricFilter(ctx, true, 1), cmdID, req)
 		return spec.StatusOf(err)

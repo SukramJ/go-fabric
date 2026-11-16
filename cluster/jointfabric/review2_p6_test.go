@@ -80,10 +80,10 @@ func (p *keySetSync) FetchEndpointList(ctx context.Context, n uint64) ([]Endpoin
 }
 
 // TestRefreshKeepsTheDatastoresKeys (R2-P6-sec-1106, owner decision 129):
-// a refresh records that the node holds a key set the datastore holds and
-// replaces none of its keys — a KeySetRead's null keys erase nothing, a
-// node's own key substitutes nothing — and adopts no key set the
-// datastore does not hold.
+// a refresh replaces none of the datastore's keys — a KeySetRead's null
+// keys erase nothing, a node's own key substitutes nothing — adopts no
+// key set the datastore does not hold, and enrols the node as no
+// recipient of a key set on its own say-so (NodeKeySetList unchanged).
 func TestRefreshKeepsTheDatastoresKeys(t *testing.T) {
 	ctx := t.Context()
 	null := spec.Nullable[[]byte]{Null: true}
@@ -104,8 +104,7 @@ func TestRefreshKeepsTheDatastoresKeys(t *testing.T) {
 	if len(list) != 1 || list[0].GroupKeySetId != 5 || list[0].EpochKey0.Null || list[0].EpochKey0.Value[0] != 0xAA {
 		t.Fatalf("GroupKeySetList after the refresh: %+v", list)
 	}
-	nks := d.NodeKeySetList()
-	if len(nks) != 1 || nks[0].NodeId != 7 || nks[0].GroupKeySetId != 5 || nks[0].StatusEntry.State != stateCommitted {
+	if nks := d.NodeKeySetList(); len(nks) != 0 {
 		t.Fatalf("NodeKeySetList after the refresh: %+v", nks)
 	}
 }
@@ -238,18 +237,29 @@ func TestAdministratorFabricIndexAfterRestart(t *testing.T) {
 	}
 }
 
-// TestAdministratorLeavesTheDatastoreAlone (R2-P6-err-1120 a): the
-// administrator's removal no longer wipes the datastore; the datastore
-// hears of it once, as a FabricScopedState.
-func TestAdministratorLeavesTheDatastoreAlone(t *testing.T) {
+// TestRemovalReachesTheDatastoreIdempotently (R2-P6-err-1120 a): the
+// administrator hands the removal on (a host outside the node reaches the
+// datastore so), and the node's second call, as a FabricScopedState,
+// changes nothing: no error, no data version.
+func TestRemovalReachesTheDatastoreIdempotently(t *testing.T) {
 	ctx := t.Context()
-	d := newStore(t, nil)
+	st := &switchStore{}
+	d, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
 	mustOK(t, d.SetAnchorFabricIndex(ctx, 4))
 	mustOK(t, d.AddPendingNode(ctx, 9, "n"))
 	fx := newAdminFixture(t, AdministratorConfig{Datastore: d})
 	fx.a.OnFabricRemoved(ctx, 4)
-	if len(d.NodeList()) != 1 {
-		t.Fatal("the administrator handed the removal on")
+	if len(d.NodeList()) != 0 || d.AnchorFabricIndex() != 0 {
+		t.Fatal("the administrator's removal left the datastore")
+	}
+	dv := d.MatterDataVersion()
+	st.fmu.Lock()
+	st.fail = true // a second save would fail: there is none
+	st.fmu.Unlock()
+	mustOK(t, d.MatterDropFabric(ctx, 4))
+	if d.MatterDataVersion() != dv {
+		t.Fatal("the second removal changed the datastore")
 	}
 }
 
@@ -291,7 +301,9 @@ func TestRefreshEndsOnARefusedSave(t *testing.T) {
 
 // TestAddGroupAndMergesAreBounded (R2-P6-bound-1113): AddGroup holds
 // GroupList to MaxGroups; a refresh whose node lists more ACL entries
-// than MaxACLs ends with ErrNoMemory before it writes a list to the node.
+// than MaxACLs ends with ErrNoMemory before it writes a list to the node;
+// a datastore whose ACL table is full of other nodes' entries still
+// refreshes a further node within its own list.
 func TestAddGroupAndMergesAreBounded(t *testing.T) {
 	ctx := t.Context()
 	d := newStore(t, nil)
@@ -312,6 +324,20 @@ func TestAddGroupAndMergesAreBounded(t *testing.T) {
 	}
 	if len(d2.NodeACLList()) != 0 || r.syncedACLs != nil {
 		t.Fatalf("ACLs %d, pushed %d", len(d2.NodeACLList()), len(r.syncedACLs))
+	}
+	r3 := &refreshSync{trackingSync: *newTrackingSync()}
+	r3.acls = []ACLEntry{{ListId: 1000, AclEntry: viewCASE}}
+	d3 := newStore(t, r3)
+	for i := range MaxACLs {
+		d3.t.ACLs = append(d3.t.ACLs, aclEntry{NodeID: 100 + uint64(i), ListID: uint16(i), StatusEntry: StatusEntry{State: stateCommitted}})
+	}
+	mustOK(t, d3.AddPendingNode(ctx, 5, "n"))
+	mustOK(t, d3.RefreshNode(ctx, 5))
+	if n := len(d3.NodeACLList()); n != MaxACLs+1 {
+		t.Fatalf("%d ACL entries after the refresh of a further node", n)
+	}
+	if nodes := d3.NodeList(); len(nodes) != 1 || nodes[0].CommissioningStatusEntry.State != stateCommitted {
+		t.Fatalf("the further node: %+v", nodes)
 	}
 }
 
@@ -408,5 +434,189 @@ func TestAnnouncementClearsOnlyItsOwn(t *testing.T) {
 	}
 	if fx.a.VIDVerifiedFabric() != 3 {
 		t.Fatalf("VID verified %d", fx.a.VIDVerifiedFabric())
+	}
+}
+
+// TestDatastoreReadsAreTheAnchorFabrics (R2-P6-sec-1103 reads, owner
+// decision 129, option (b)): a request of another fabric, or of any
+// fabric while no anchor is recorded, reads no epoch key — every list
+// empty, every other attribute zero; the anchor fabric and the host read
+// the tables.
+func TestDatastoreReadsAreTheAnchorFabrics(t *testing.T) {
+	ctx := t.Context()
+	d := newStore(t, nil)
+	key := make([]byte, 16)
+	key[0] = 0xAA
+	mustOK(t, d.AddGroupKeySetEntry(ctx, GroupKeySet{GroupKeySetId: 5, GroupKeySecurityPolicy: dsdef.DatastoreGroupKeySecurityPolicyTrustFirst, EpochKey0: spec.Nullable[[]byte]{Value: key}}))
+	mustOK(t, d.SetAnchorRootCA(ctx, []byte{1, 2, 3}))
+	keySets := func(ctx context.Context) int {
+		v, ok := d.MatterReadFiltered(ctx, dsdef.AttrGroupKeySetList)
+		if !ok {
+			t.Fatal("GroupKeySetList not read")
+		}
+		return len(v.(spec.List[GroupKeySet]))
+	}
+	if n := keySets(peerOf(2)); n != 0 {
+		t.Fatalf("without an anchor fabric 2 read %d key sets", n)
+	}
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
+	if n := keySets(peerOf(2)); n != 0 {
+		t.Fatalf("fabric 2 read %d key sets", n)
+	}
+	for id := range attrIDs() {
+		v, ok := d.MatterReadFiltered(peerOf(2), id)
+		if !ok || v == nil {
+			t.Errorf("attribute 0x%04X of fabric 2: %v %v", id, v, ok)
+		}
+	}
+	if v, _ := d.MatterReadFiltered(peerOf(2), dsdef.AttrAnchorRootCa); len(v.([]byte)) != 0 {
+		t.Fatalf("fabric 2 read AnchorRootCA %X", v)
+	}
+	if n := keySets(peerOf(1)); n != 1 {
+		t.Fatalf("the anchor fabric read %d key sets", n)
+	}
+	if n := keySets(ctx); n != 1 {
+		t.Fatalf("the host read %d key sets", n)
+	}
+}
+
+// attrIDs are the cluster's 14 attributes.
+func attrIDs() map[uint32]bool {
+	return map[uint32]bool{
+		dsdef.AttrAnchorRootCa: true, dsdef.AttrAnchorNodeId: true, dsdef.AttrAnchorVendorId: true, dsdef.AttrFriendlyName: true,
+		dsdef.AttrGroupKeySetList: true, dsdef.AttrGroupList: true, dsdef.AttrNodeList: true, dsdef.AttrAdminList: true,
+		dsdef.AttrStatus: true, dsdef.AttrEndpointGroupIdList: true, dsdef.AttrEndpointBindingList: true,
+		dsdef.AttrNodeKeySetList: true, dsdef.AttrNodeAclList: true, dsdef.AttrNodeEndpointList: true,
+	}
+}
+
+// TestAnchorIsRecordedBeforeTheAttribute (administrator, round 2): with a
+// datastore that records no anchor, the fabric of the two CATs is recorded
+// in the datastore and then set as AdministratorFabricIndex — at
+// AttachNode too; a refused save leaves both unset, and the next
+// AttachNode records it.
+func TestAnchorIsRecordedBeforeTheAttribute(t *testing.T) {
+	ctx := t.Context()
+	st := &switchStore{}
+	d, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
+	fx := newAdminFixture(t, AdministratorConfig{Datastore: d})
+	anchor := newJFFabric(t, 4, adminCAT, anchorCAT)
+	table := &fakeFabrics{
+		fabrics: []store.FabricRecord{fx.f.record(), anchor.record()},
+		ids:     map[uint8]store.IdentityRecord{3: {NOC: fx.f.noc}, 4: {NOC: anchor.noc}},
+	}
+	st.fmu.Lock()
+	st.fail = true
+	st.fmu.Unlock()
+	fx.a.AttachNode(table, fx.window)
+	fx.a.OnCommissioningComplete(ctx)
+	if got := fx.a.administratorFabricIndex(); got != 0 || d.AnchorFabricIndex() != 0 {
+		t.Fatalf("a refused save: AdministratorFabricIndex %d, datastore anchor %d", got, d.AnchorFabricIndex())
+	}
+	st.fmu.Lock()
+	st.fail = false
+	st.fmu.Unlock()
+	fx.a.AttachNode(table, fx.window)
+	if got := fx.a.administratorFabricIndex(); got != 4 || d.AnchorFabricIndex() != 4 || d.AnchorNodeID() != anchor.nodeID {
+		t.Fatalf("at AttachNode: AdministratorFabricIndex %d, datastore anchor %d", got, d.AnchorFabricIndex())
+	}
+}
+
+// TestAnchoredDatastoreIsNeverRepointed (administrator, round 2): a
+// datastore that records an anchor keeps it: AdministratorFabricIndex
+// follows it while the fabric table holds it, and stays null when it does
+// not — another fabric whose NOC carries the two CATs takes nothing.
+func TestAnchoredDatastoreIsNeverRepointed(t *testing.T) {
+	ctx := t.Context()
+	d := newStore(t, nil)
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 4))
+	fx := newAdminFixture(t, AdministratorConfig{Datastore: d})
+	old := newJFFabric(t, 4, adminCAT, anchorCAT)
+	other := newJFFabric(t, 5, adminCAT, anchorCAT)
+	fx.a.AttachNode(&fakeFabrics{
+		fabrics: []store.FabricRecord{fx.f.record(), other.record(), old.record()},
+		ids:     map[uint8]store.IdentityRecord{3: {NOC: fx.f.noc}, 4: {NOC: old.noc}, 5: {NOC: other.noc}},
+	}, fx.window)
+	fx.a.OnCommissioningComplete(ctx)
+	if got := fx.a.administratorFabricIndex(); got != 4 || d.AnchorFabricIndex() != 4 {
+		t.Fatalf("anchor held: AdministratorFabricIndex %d, datastore anchor %d", got, d.AnchorFabricIndex())
+	}
+	a2, err := NewAdministrator(AdministratorConfig{Datastore: d})
+	mustOK(t, err)
+	a2.AttachNode(&fakeFabrics{
+		fabrics: []store.FabricRecord{fx.f.record(), other.record()},
+		ids:     map[uint8]store.IdentityRecord{3: {NOC: fx.f.noc}, 5: {NOC: other.noc}},
+	}, fx.window)
+	a2.OnCommissioningComplete(ctx)
+	if got := a2.administratorFabricIndex(); got != 0 || d.AnchorFabricIndex() != 4 {
+		t.Fatalf("anchor gone: AdministratorFabricIndex %d, datastore anchor %d", got, d.AnchorFabricIndex())
+	}
+}
+
+// TestFailedWipeStaysWiped (R2-P6-conc-1107 round 2): a wipe whose save
+// fails keeps the tables wiped in memory; the next change saves the empty
+// record.
+func TestFailedWipeStaysWiped(t *testing.T) {
+	ctx := t.Context()
+	st := &switchStore{}
+	d, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 4))
+	mustOK(t, d.AddPendingNode(ctx, 9, "n"))
+	st.fmu.Lock()
+	st.fail = true
+	st.fmu.Unlock()
+	if err := d.MatterDropFabric(ctx, 4); !errors.Is(err, ErrStore) {
+		t.Fatalf("wipe over a refusing store: %v", err)
+	}
+	if len(d.NodeList()) != 0 || d.AnchorFabricIndex() != 0 {
+		t.Fatal("the refused save restored the wiped tables")
+	}
+	st.fmu.Lock()
+	st.fail = false
+	st.fmu.Unlock()
+	mustOK(t, d.SetFriendlyName(ctx, "x"))
+	d2, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
+	if len(d2.NodeList()) != 0 || d2.AnchorFabricIndex() != 0 {
+		t.Fatal("the next change did not save the wipe")
+	}
+}
+
+// wipingSync wipes the datastore in its first SyncGroupKeySet and counts
+// the calls.
+type wipingSync struct {
+	*trackingSync
+	d     *Datastore
+	calls int
+}
+
+func (w *wipingSync) SyncGroupKeySet(ctx context.Context, _ uint64, _ GroupKeySet) error {
+	w.calls++
+	if w.calls == 1 {
+		_ = w.d.MatterDropFabric(ctx, 1)
+	}
+	return nil
+}
+
+// TestPushAfterTheWipeCallsNoPort (R2-P6-conc-1107 round 2): a push
+// collected before a wipe carries the removed fabric's key set to no node.
+func TestPushAfterTheWipeCallsNoPort(t *testing.T) {
+	ctx := t.Context()
+	w := &wipingSync{trackingSync: newTrackingSync()}
+	d := newStore(t, w)
+	w.d = d
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
+	key := make([]byte, 16)
+	mustOK(t, d.AddGroupKeySetEntry(ctx, GroupKeySet{GroupKeySetId: 5, GroupKeySecurityPolicy: dsdef.DatastoreGroupKeySecurityPolicyTrustFirst, EpochKey0: spec.Nullable[[]byte]{Value: key}}))
+	d.mu.Lock()
+	d.t.NodeKeySets = []NodeKeySetEntry{{NodeId: 7, GroupKeySetId: 5}, {NodeId: 8, GroupKeySetId: 5}}
+	d.mu.Unlock()
+	key2 := make([]byte, 16)
+	key2[0] = 1
+	_ = d.UpdateGroupKeySetEntry(ctx, GroupKeySet{GroupKeySetId: 5, GroupKeySecurityPolicy: dsdef.DatastoreGroupKeySecurityPolicyTrustFirst, EpochKey0: spec.Nullable[[]byte]{Value: key2}})
+	if w.calls != 1 {
+		t.Fatalf("%d SyncGroupKeySet calls; the push after the wipe reached the port", w.calls)
 	}
 }

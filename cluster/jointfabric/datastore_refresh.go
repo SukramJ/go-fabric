@@ -20,8 +20,8 @@ const rootEndpoint uint16 = 0
 // and taken over; each endpoint's groups and bindings are fetched and
 // merged, the root endpoint's too; the pending memberships are pushed,
 // the bindings pushed as the node's whole list; the node's key sets are
-// fetched (a held key set's keys are never replaced and an unknown one is
-// not adopted, below), and every node's pending key set entries pushed;
+// fetched and taken into nothing (below), and every node's pending key
+// set entries pushed;
 // its ACL entries are fetched, merged and pushed as the whole list; the
 // node goes Committed. A fetch that fails ends the refresh with the node
 // Pending. Without a Sync, with a refresh running, or for a node not held,
@@ -32,8 +32,8 @@ const rootEndpoint uint16 = 0
 // A store that refuses a step's save ends the refresh with its error
 // (ErrStore, R2-P6-err-1120); a wipe of the datastore while the refresh
 // runs ends it before its next step commits (R2-P6-conc-1107); a node
-// whose lists would carry a table past its capacity ends it with
-// ErrNoMemory before anything is pushed (R2-P6-bound-1113).
+// that lists more entries in one list than a command lets that list hold
+// ends it with ErrNoMemory before anything is pushed (R2-P6-bound-1113).
 func (d *Datastore) RefreshNode(ctx context.Context, nodeID uint64) error {
 	rctx, err := d.beginRefresh(ctx, nodeID)
 	if err != nil {
@@ -118,12 +118,18 @@ func (d *Datastore) runRefresh(ctx context.Context, nodeID uint64) (err error) {
 		return fmt.Errorf("%w: FetchGroupKeySetList: %w", ErrSync, err)
 	}
 	for _, id := range ids { // kFetchingGroupKeySets :714-767
-		ks, err := d.sync.FetchGroupKeySet(ctx, nodeID, id)
-		if err != nil {
+		// The key set is fetched, as connectedhomeip fetches it, and taken
+		// into nothing: the datastore is the source of the Joint Fabric's
+		// epoch keys, so a held key set's keys and policy are never
+		// replaced by what the node reports (a KeySetRead answers its keys
+		// null), a key set the datastore does not hold is not adopted, and
+		// the node's say-so enrols it as no recipient of a key set
+		// (NodeKeySetList is written by the commands alone). Owner decision
+		// 129, R2-P6-sec-1106; connectedhomeip updates the held entry with
+		// the node's and appends an unknown one
+		// (src/app/server/JointFabricDatastore.cpp:724-743 at 6170af84).
+		if _, err := d.sync.FetchGroupKeySet(ctx, nodeID, id); err != nil {
 			return fmt.Errorf("%w: FetchGroupKeySet %d: %w", ErrSync, id, err)
-		}
-		if err := d.commit(ctx, func() { d.takeKeySetLocked(nodeID, ks) }); err != nil {
-			return err
 		}
 	}
 	if err := d.syncKeySets(ctx); err != nil { // kRefreshingGroupKeySets :769-916
@@ -172,20 +178,14 @@ func (d *Datastore) refreshEndpointsLocked(nodeID uint64, endpoints []EndpointEn
 
 // mergeGroupsLocked adds the endpoint's fetched groups as Committed
 // memberships and drops the Committed or DeletePending memberships of the
-// endpoint the node no longer has (:368-412). Memberships that would
-// carry the list past MaxGroups, the bound AddGroupIDToEndpointForNode
-// holds (:1684), are ErrNoMemory before anything changes
-// (R2-P6-bound-1113, the module's bound).
+// endpoint the node no longer has (:368-412). A fetched list longer than
+// MaxGroups, the most one list holds through AddGroupIDToEndpointForNode
+// (:1684), is ErrNoMemory before anything changes; the table's total is
+// not bounded, as connectedhomeip's merge appends without one (:389)
+// (R2-P6-bound-1113, the module's per-list bound).
 func (d *Datastore) mergeGroupsLocked(nodeID uint64, ep uint16, groups []GroupEntry) error {
-	added := 0
-	for _, g := range groups {
-		e := EndpointGroupIDEntry{NodeId: nodeID, EndpointId: ep, GroupId: uint16(g.GroupId)} //nolint:gosec // a group id (:387)
-		if !slices.ContainsFunc(d.t.EndpointGroupIDs, func(x EndpointGroupIDEntry) bool { return sameEndpointGroup(x, e) }) {
-			added++
-		}
-	}
-	if len(d.t.EndpointGroupIDs)+added > MaxGroups {
-		return fmt.Errorf("%w: node %d endpoint %d: %d group memberships", ErrNoMemory, nodeID, ep, len(d.t.EndpointGroupIDs)+added)
+	if len(groups) > MaxGroups {
+		return fmt.Errorf("%w: node %d endpoint %d lists %d groups", ErrNoMemory, nodeID, ep, len(groups))
 	}
 	for _, g := range groups {
 		e := EndpointGroupIDEntry{NodeId: nodeID, EndpointId: ep, GroupId: uint16(g.GroupId)} //nolint:gosec // a group id (:387)
@@ -227,6 +227,9 @@ func (d *Datastore) syncGroupsOfNode(ctx context.Context, nodeID uint64) error {
 			}
 			continue
 		}
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncEndpointGroupID(ctx, nodeID, EndpointGroupIDEntry{}); err != nil { // :460-491
 			continue
 		}
@@ -254,21 +257,15 @@ func isCommitError(err error) bool {
 // DeletePending bindings the node no longer has (:536-586). The removal
 // is bounded to the endpoint, as the groups' is (:397); connectedhomeip's
 // predicate (:567-585) also drops the other endpoints' bindings of the
-// node. Bindings that would carry the list past MaxGroups, the bound
-// AddBindingToEndpointForNode holds (:1930), are ErrNoMemory before
+// node. A fetched list longer than MaxGroups, the most one list holds
+// through AddBindingToEndpointForNode (:1930), is ErrNoMemory before
 // anything changes — the refresh then writes no truncated list to the
-// node (R2-P6-bound-1113, the module's bound).
+// node; the table's total is not bounded, as connectedhomeip's merge
+// appends without one (:562) (R2-P6-bound-1113, the module's per-list
+// bound).
 func (d *Datastore) mergeBindingsLocked(nodeID uint64, ep uint16, bindings []EndpointBindingEntry) error {
-	added := 0
-	for _, b := range bindings {
-		if !slices.ContainsFunc(d.t.Bindings, func(e EndpointBindingEntry) bool {
-			return e.NodeId == nodeID && e.EndpointId == b.EndpointId && bindingMatches(e.Binding, b.Binding)
-		}) {
-			added++
-		}
-	}
-	if len(d.t.Bindings)+added > MaxGroups {
-		return fmt.Errorf("%w: node %d endpoint %d: %d bindings", ErrNoMemory, nodeID, ep, len(d.t.Bindings)+added)
+	if len(bindings) > MaxGroups {
+		return fmt.Errorf("%w: node %d endpoint %d lists %d bindings", ErrNoMemory, nodeID, ep, len(bindings))
 	}
 	for _, b := range bindings {
 		if slices.ContainsFunc(d.t.Bindings, func(e EndpointBindingEntry) bool {
@@ -360,28 +357,6 @@ func (d *Datastore) syncBindingsOfNode(ctx context.Context, nodeID uint64) error
 	})
 }
 
-// takeKeySetLocked records that the refreshed node holds a key set the
-// datastore holds: the node's key set entry of it, Committed, when the
-// node has none. The datastore is the source of the Joint Fabric's epoch
-// keys: a held key set's keys and policy are never replaced by what the
-// node reports (a KeySetRead answers its keys null), and a key set the
-// datastore does not hold is not adopted (owner decision 129,
-// R2-P6-sec-1106). connectedhomeip updates the held entry with the
-// node's and appends an unknown one (JointFabricDatastore.cpp:724-743 at
-// 6170af84).
-func (d *Datastore) takeKeySetLocked(nodeID uint64, ks GroupKeySet) {
-	if d.keySetIndexLocked(ks.GroupKeySetId) < 0 {
-		return
-	}
-	if slices.ContainsFunc(d.t.NodeKeySets, sameNodeKeySet(nodeID, ks.GroupKeySetId)) {
-		return
-	}
-	d.t.NodeKeySets = append(d.t.NodeKeySets, NodeKeySetEntry{
-		NodeId: nodeID, GroupKeySetId: ks.GroupKeySetId, StatusEntry: StatusEntry{State: stateCommitted},
-	})
-	d.markLocked(dsdef.AttrNodeKeySetList)
-}
-
 // syncKeySets pushes, for every held key set, the removal of each node's
 // DeletePending key set entry of it (a zero entry, erased once pushed),
 // then the key set to each node whose entry of it is Pending or
@@ -441,19 +416,15 @@ func (d *Datastore) syncKeySets(ctx context.Context) error {
 
 // mergeACLsLocked adds the node's fetched ACL entries it does not hold by
 // list id as Committed and drops its Committed or DeletePending entries
-// the node no longer has (:923-984). Entries that would carry the list
-// past MaxACLs, the bound AddACLToNode holds (:2122), are ErrNoMemory
+// the node no longer has (:923-984). A fetched list longer than MaxACLs,
+// the most the list holds through AddACLToNode (:2122), is ErrNoMemory
 // before anything changes — the refresh then writes no truncated list to
-// the node (R2-P6-bound-1113, the module's bound).
+// the node; the table's total is not bounded, as connectedhomeip's merge
+// appends without one (:959) (R2-P6-bound-1113, the module's per-list
+// bound).
 func (d *Datastore) mergeACLsLocked(nodeID uint64, acls []ACLEntry) error {
-	added := 0
-	for _, a := range acls {
-		if !slices.ContainsFunc(d.t.ACLs, func(e aclEntry) bool { return e.NodeID == nodeID && e.ListID == a.ListId }) {
-			added++
-		}
-	}
-	if len(d.t.ACLs)+added > MaxACLs {
-		return fmt.Errorf("%w: node %d: %d ACL entries", ErrNoMemory, nodeID, len(d.t.ACLs)+added)
+	if len(acls) > MaxACLs {
+		return fmt.Errorf("%w: node %d lists %d ACL entries", ErrNoMemory, nodeID, len(acls))
 	}
 	for _, a := range acls {
 		if slices.ContainsFunc(d.t.ACLs, func(e aclEntry) bool { return e.NodeID == nodeID && e.ListID == a.ListId }) {
