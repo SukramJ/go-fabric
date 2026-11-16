@@ -31,6 +31,11 @@ type Subscription struct {
 	// matter.js ServerSubscription #triggerSendUpdate defers an update
 	// while #currentUpdatePromise is pending.
 	reporting atomic.Bool
+	// reportEnded, when non-nil, is closed when the reporting flag clears
+	// or the subscription closes ([Subscription.endReport]): a flush that
+	// waits for the report in flight wakes on it (review II,
+	// R2-P6-bound-0517). Guarded by mu.
+	reportEnded chan struct{}
 	// ID is the bridge-allocated 32-bit subscription identifier
 	// returned in SubscribeResponse (Matter §8.5.5).
 	ID uint32
@@ -305,7 +310,34 @@ func (s *Subscription) Close() {
 	s.mu.Lock()
 	s.closed = true
 	s.pendingDirty = nil
+	s.wakeReportWaitersLocked()
 	s.mu.Unlock()
+}
+
+// endReport clears the reporting flag and wakes a flush waiting for it.
+func (s *Subscription) endReport() {
+	s.reporting.Store(false)
+	s.mu.Lock()
+	s.wakeReportWaitersLocked()
+	s.mu.Unlock()
+}
+
+// reportEndedCh returns the channel the next [Subscription.endReport] or
+// close closes.
+func (s *Subscription) reportEndedCh() <-chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.reportEnded == nil {
+		s.reportEnded = make(chan struct{})
+	}
+	return s.reportEnded
+}
+
+func (s *Subscription) wakeReportWaitersLocked() {
+	if s.reportEnded != nil {
+		close(s.reportEnded)
+		s.reportEnded = nil
+	}
 }
 
 // IsClosed reports whether [Close] was called.

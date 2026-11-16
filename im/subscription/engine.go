@@ -91,7 +91,7 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 		}
 		work := m.dueReport(ctx, sub, now, eventReporter)
 		if work == nil {
-			sub.reporting.Store(false)
+			sub.endReport()
 			continue
 		}
 		m.wg.Add(1)
@@ -101,7 +101,7 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 			defer m.wg.Done()
 			defer started.Done()
 			defer m.inflight.Leave(inflight.SubscriptionPending)
-			defer sub.reporting.Store(false)
+			defer sub.endReport()
 			work()
 		}()
 	}

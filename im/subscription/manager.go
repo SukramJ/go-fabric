@@ -754,7 +754,7 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 		}
 		work, due := sub.drainDue(now, m.eventSourceOf(), true)
 		if !due {
-			sub.reporting.Store(false)
+			sub.endReport()
 			continue
 		}
 		events, dirty := work.events, work.paths
@@ -763,7 +763,7 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 		go func() {
 			defer wg.Done()
 			defer m.inflight.Leave(inflight.SubscriptionPending)
-			defer sub.reporting.Store(false)
+			defer sub.endReport()
 			flushReporter(ctx, sub, events, dirty)
 		}()
 	}
@@ -774,21 +774,29 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 // engine is sending at that moment drained the queues before the data
 // the flush owes arrived, so the flush waits for it to finish instead of
 // skipping the subscription; it gives up when sub closes or ctx ends.
-// The wait is paced on the manager's clock.
+// It wakes when the report ends ([Subscription.endReport]) — it polled
+// the flag every millisecond, some ten thousand wake-ups for a report
+// that waits out its answer (review II, R2-P6-bound-0517).
 func (m *Manager) claimReport(ctx context.Context, sub *Subscription) bool {
-	for !sub.reporting.CompareAndSwap(false, true) {
+	for {
+		if sub.reporting.CompareAndSwap(false, true) {
+			return true
+		}
+		ended := sub.reportEndedCh()
+		// Taken after the channel: an end between the first attempt and
+		// the channel's creation is not missed.
+		if sub.reporting.CompareAndSwap(false, true) {
+			return true
+		}
 		if sub.IsClosed() {
 			return false
 		}
-		timer := m.cfg.Clock.NewTimer(time.Millisecond)
 		select {
 		case <-ctx.Done():
-			timer.Stop()
 			return false
-		case <-timer.C():
+		case <-ended:
 		}
 	}
-	return true
 }
 
 // CloseFabricExcept closes every subscription on fabricIndex except those
