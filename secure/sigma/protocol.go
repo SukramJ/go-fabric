@@ -136,11 +136,6 @@ type ResumptionRecord struct {
 	PeerCATs []uint32
 }
 
-// ResumptionStore is the read side the Responder requires during
-// ProcessSigma1 to attempt Sigma2_Resume. GetByID must return a
-// ResumptionRecord and nil when the id is known; it must return nil
-// record and a non-nil error when the id is unknown so the responder can
-// fall through to Full Sigma. Implementations must be safe for concurrent use.
 // sharedSecretSize is the length of a P-256 ECDH shared secret, the
 // only secret a [ResumptionRecord] can carry.
 const sharedSecretSize = 32
@@ -153,6 +148,13 @@ func (r *ResumptionRecord) wellFormed() bool {
 	return r != nil && len(r.SharedSecret) == sharedSecretSize && len(r.ResumptionID) == ResumptionIDSize
 }
 
+// ResumptionStore is the read side the Responder requires during
+// ProcessSigma1 to attempt Sigma2_Resume. GetByID must return a
+// ResumptionRecord and nil when the id is known; it must return nil
+// record and a non-nil error when the id is unknown so the responder can
+// fall through to Full Sigma. Implementations must be safe for concurrent use.
+// A record of another shape than a finished session leaves (a 32-byte
+// secret, a 16-byte id) is treated as unknown.
 type ResumptionStore interface {
 	GetByID(resumptionID []byte) (*ResumptionRecord, error)
 }

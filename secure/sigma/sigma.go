@@ -582,7 +582,7 @@ func unmarshalTBE2(b []byte) (TBE2Plaintext, error) {
 		}
 	}
 	if !hasNOC || !hasSignature || !hasResumptionID {
-		return p, fmt.Errorf("tbe2 missing a mandatory field (responderNoc=%t, signature=%t, resumptionId=%t)",
+		return p, fmt.Errorf("sigma: tbe2 missing a mandatory field (responderNoc=%t, signature=%t, resumptionId=%t)",
 			hasNOC, hasSignature, hasResumptionID)
 	}
 	return p, nil
@@ -708,7 +708,7 @@ func unmarshalTBE3(b []byte) (TBE3Plaintext, error) {
 		}
 	}
 	if !hasNOC || !hasSignature {
-		return p, fmt.Errorf("tbe3 missing a mandatory field (initiatorNoc=%t, signature=%t)", hasNOC, hasSignature)
+		return p, fmt.Errorf("sigma: tbe3 missing a mandatory field (initiatorNoc=%t, signature=%t)", hasNOC, hasSignature)
 	}
 	return p, nil
 }

@@ -145,7 +145,7 @@ func hexNibble(b byte) (byte, error) {
 	case b >= 'A' && b <= 'F':
 		return b - 'A' + 10, nil
 	}
-	return 0, fmt.Errorf("hex: bad nibble %q", b)
+	return 0, fmt.Errorf("spake2: hex: bad nibble %q", b)
 }
 
 // unmarshalUncompressed decodes a hex-encoded uncompressed P-256

@@ -124,10 +124,10 @@ func (d *sigmaDecoder) next() (tag uint8, val sigmaValue, end bool, err error) {
 		return 0, sigmaValue{}, true, nil
 	}
 	if el.Tag.Kind != tlv.TagKindContext {
-		return 0, sigmaValue{}, false, fmt.Errorf("expected context tag, got kind=%d", el.Tag.Kind)
+		return 0, sigmaValue{}, false, fmt.Errorf("sigma: expected context tag, got kind=%d", el.Tag.Kind)
 	}
 	if el.Tag.Number > 255 {
-		return 0, sigmaValue{}, false, fmt.Errorf("context tag out of range: %d", el.Tag.Number)
+		return 0, sigmaValue{}, false, fmt.Errorf("sigma: context tag out of range: %d", el.Tag.Number)
 	}
 	return uint8(el.Tag.Number & 0xFF), sigmaValue{
 		octets:    el.Octets,
@@ -165,10 +165,10 @@ func octetsOf(v sigmaValue, want int) ([]byte, error) {
 	switch v.elemType {
 	case tlv.TypeOctetStr1, tlv.TypeOctetStr2, tlv.TypeOctetStr4, tlv.TypeOctetStr8:
 	default:
-		return nil, fmt.Errorf("TLV type 0x%02X, want an octet string", uint8(v.elemType))
+		return nil, fmt.Errorf("sigma: TLV type 0x%02X, want an octet string", uint8(v.elemType))
 	}
 	if want != anyLength && len(v.octets) != want {
-		return nil, fmt.Errorf("length %d, want %d", len(v.octets), want)
+		return nil, fmt.Errorf("sigma: length %d, want %d", len(v.octets), want)
 	}
 	return append([]byte(nil), v.octets...), nil
 }

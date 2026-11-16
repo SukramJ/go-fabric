@@ -324,12 +324,8 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			return fmt.Errorf("%w: SerialNumber must be octet string", ErrMalformed)
 		}
 		cert.SerialNumber = append([]byte(nil), el.Octets...)
-	case tagSignatureAlgorithm:
-		v, err := uintField(el, 8, "signature algorithm")
-		if err != nil {
-			return err
-		}
-		cert.SignatureAlgorithm = v
+	case tagSignatureAlgorithm, tagPublicKeyAlgorithm, tagEllipticCurveID:
+		return assignAlgorithm(cert, el, tag)
 	case tagIssuer:
 		if !el.IsContainer || el.Type != tlv.TypeList {
 			// A DN is a TLV list; a structure (TC-JFADMIN-1.2 step 16
@@ -374,18 +370,6 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			return fmt.Errorf("subject: %w", err)
 		}
 		cert.Subject = dn
-	case tagPublicKeyAlgorithm:
-		v, err := uintField(el, 8, "public-key algorithm")
-		if err != nil {
-			return err
-		}
-		cert.PublicKeyAlgorithm = v
-	case tagEllipticCurveID:
-		v, err := uintField(el, 8, "elliptic curve")
-		if err != nil {
-			return err
-		}
-		cert.EllipticCurveID = v
 	case tagEllipticCurvePub:
 		v, err := octetsField(el, "ec-pub-key")
 		if err != nil {
@@ -417,6 +401,26 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 				return fmt.Errorf("unknown container tag %d: %w", tag, err)
 			}
 		}
+	}
+	return nil
+}
+
+// assignAlgorithm reads one of the three 8-bit algorithm members — the
+// signature algorithm, the public-key algorithm, the elliptic curve —
+// into cert.
+func assignAlgorithm(cert *Certificate, el tlv.Element, tag uint8) error {
+	names := map[uint8]string{tagSignatureAlgorithm: "signature algorithm", tagPublicKeyAlgorithm: "public-key algorithm", tagEllipticCurveID: "elliptic curve"}
+	v, err := uintField(el, 8, names[tag])
+	if err != nil {
+		return err
+	}
+	switch tag {
+	case tagSignatureAlgorithm:
+		cert.SignatureAlgorithm = v
+	case tagPublicKeyAlgorithm:
+		cert.PublicKeyAlgorithm = v
+	case tagEllipticCurveID:
+		cert.EllipticCurveID = v
 	}
 	return nil
 }
@@ -472,7 +476,7 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 			if err != nil {
 				return dn, err
 			}
-			dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v))
+			dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v)) //nolint:gosec // G115: uintField bounded v to 32 bits
 			dn.Order = append(dn.Order, tag)
 		default:
 			if isStandardDNTag(tag) {
@@ -634,7 +638,7 @@ const (
 // (R2-P6-wire-0103).
 func decodeExtensions(d *tlv.Decoder) (CertificateExtensions, error) {
 	var ext CertificateExtensions
-	var seen [extTagFutureExtension]bool
+	var seen uint8 // bit n: extension n (1..5) already read
 	for {
 		el, err := d.Next()
 		if err != nil {
@@ -648,74 +652,84 @@ func decodeExtensions(d *tlv.Decoder) (CertificateExtensions, error) {
 		}
 		tag := uint8(el.Tag.Number & 0xFF)
 		if tag >= extTagBasicConstraints && tag < extTagFutureExtension {
-			if seen[tag] {
+			if seen&(1<<tag) != 0 {
 				return ext, fmt.Errorf("%w: extension %d repeated", ErrMalformed, tag)
 			}
-			seen[tag] = true
+			seen |= 1 << tag
 		}
 		if tag >= extTagBasicConstraints && tag <= extTagFutureExtension {
 			ext.Order = append(ext.Order, tag)
 		}
-		switch tag {
-		case extTagBasicConstraints:
-			if el.Type != tlv.TypeStructure {
-				return ext, fmt.Errorf("%w: basic-constraints not a structure (type 0x%02X)", ErrMalformed, el.Type)
-			}
-			if err := decodeBasicConstraints(d, &ext); err != nil {
-				return ext, fmt.Errorf("basic-constraints: %w", err)
-			}
-		case extTagKeyUsage:
-			v, err := uintField(el, 16, "key-usage")
-			if err != nil {
-				return ext, err
-			}
-			ext.KeyUsage = uint16(v)
-			ext.HasKeyUsage = true
-		case extTagExtendedKeyUsage:
-			if el.Type != tlv.TypeArray {
-				return ext, fmt.Errorf("%w: extended-key-usage not an array (type 0x%02X)", ErrMalformed, el.Type)
-			}
-			eku, err := decodeUint8Array(d)
-			if err != nil {
-				return ext, fmt.Errorf("extended-key-usage: %w", err)
-			}
-			ext.ExtendedKeyUsage = eku
-			ext.HasExtendedKeyUsage = true
-		case extTagSubjectKeyID:
-			v, err := octetsField(el, "subject-key-id")
-			if err != nil {
-				return ext, err
-			}
-			if len(v) == 0 {
-				return ext, fmt.Errorf("%w: subject-key-id empty", ErrMalformed)
-			}
-			ext.SubjectKeyID = v
-			ext.HasSubjectKeyID = true
-		case extTagAuthorityKeyID:
-			v, err := octetsField(el, "authority-key-id")
-			if err != nil {
-				return ext, err
-			}
-			if len(v) == 0 {
-				return ext, fmt.Errorf("%w: authority-key-id empty", ErrMalformed)
-			}
-			ext.AuthorityKeyID = v
-			ext.HasAuthorityKeyID = true
-		case extTagFutureExtension:
-			v, err := octetsField(el, "future-extension")
-			if err != nil {
-				return ext, err
-			}
-			ext.FutureExtensions = append(ext.FutureExtensions, v)
-		default:
-			if el.IsContainer {
-				if err := skipContainer(d); err != nil {
-					return ext, fmt.Errorf("unknown extension container tag %d: %w", tag, err)
-				}
-			}
+		if err := decodeExtension(d, el, tag, &ext); err != nil {
+			return ext, err
 		}
 	}
 	return ext, nil
+}
+
+// decodeExtension reads one member of the extensions list, el with its
+// context tag, into ext.
+func decodeExtension(d *tlv.Decoder, el tlv.Element, tag uint8, ext *CertificateExtensions) error {
+	switch tag {
+	case extTagBasicConstraints:
+		if el.Type != tlv.TypeStructure {
+			return fmt.Errorf("%w: basic-constraints not a structure (type 0x%02X)", ErrMalformed, el.Type)
+		}
+		if err := decodeBasicConstraints(d, ext); err != nil {
+			return fmt.Errorf("basic-constraints: %w", err)
+		}
+	case extTagKeyUsage:
+		v, err := uintField(el, 16, "key-usage")
+		if err != nil {
+			return err
+		}
+		ext.KeyUsage = uint16(v) //nolint:gosec // G115: uintField bounded v to 16 bits
+		ext.HasKeyUsage = true
+	case extTagExtendedKeyUsage:
+		if el.Type != tlv.TypeArray {
+			return fmt.Errorf("%w: extended-key-usage not an array (type 0x%02X)", ErrMalformed, el.Type)
+		}
+		eku, err := decodeUint8Array(d)
+		if err != nil {
+			return fmt.Errorf("extended-key-usage: %w", err)
+		}
+		ext.ExtendedKeyUsage = eku
+		ext.HasExtendedKeyUsage = true
+	case extTagSubjectKeyID:
+		v, err := octetsField(el, "subject-key-id")
+		if err != nil {
+			return err
+		}
+		if len(v) == 0 {
+			return fmt.Errorf("%w: subject-key-id empty", ErrMalformed)
+		}
+		ext.SubjectKeyID = v
+		ext.HasSubjectKeyID = true
+	case extTagAuthorityKeyID:
+		v, err := octetsField(el, "authority-key-id")
+		if err != nil {
+			return err
+		}
+		if len(v) == 0 {
+			return fmt.Errorf("%w: authority-key-id empty", ErrMalformed)
+		}
+		ext.AuthorityKeyID = v
+		ext.HasAuthorityKeyID = true
+	case extTagFutureExtension:
+		v, err := octetsField(el, "future-extension")
+		if err != nil {
+			return err
+		}
+		ext.FutureExtensions = append(ext.FutureExtensions, v)
+	default:
+		if el.IsContainer {
+			if err := skipContainer(d); err != nil {
+				return fmt.Errorf("unknown extension container tag %d: %w", tag, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // decodeBasicConstraints reads the inner struct (consumed marker) of
@@ -747,7 +761,7 @@ func decodeBasicConstraints(d *tlv.Decoder, ext *CertificateExtensions) error {
 			if err != nil {
 				return err
 			}
-			ext.BasicConstraintsPathLen = uint8(v)
+			ext.BasicConstraintsPathLen = uint8(v) //nolint:gosec // G115: uintField bounded v to 8 bits
 			ext.BasicConstraintsHasPathLen = true
 		default:
 			if el.IsContainer {
@@ -776,6 +790,6 @@ func decodeUint8Array(d *tlv.Decoder) ([]uint8, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, uint8(v))
+		out = append(out, uint8(v)) //nolint:gosec // G115: uintField bounded v to 8 bits
 	}
 }
