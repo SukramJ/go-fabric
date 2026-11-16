@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -163,12 +164,56 @@ func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration, clo
 	}
 	run := closeNow
 	if grace > 0 {
-		run = func() { b.clk().AfterFunc(grace, closeNow) }
+		run = func() { b.armPASEClose(grace, closeNow) }
 	}
 	if !im.DeferAfterResponse(ctx, run) {
 		run()
 	}
 	return ids
+}
+
+// armPASEClose runs closeNow after grace, unless [Bridge.Stop] stops it
+// first ([Bridge.stopPASECloseTimers]); after Stop nothing is armed. The
+// sessions it names close with the others at Stop
+// (closeSecureSessionsForShutdown), so the timer has nothing left to do
+// then, and no timer of the bridge stays armed on its clock after Stop
+// (review II, R2-P6-fsm-0615).
+func (b *Bridge) armPASEClose(grace time.Duration, closeNow func()) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.paseCloseOver {
+		return
+	}
+	b.paseCloseSeq++
+	seq := b.paseCloseSeq
+	if b.paseCloseTimers == nil {
+		b.paseCloseTimers = make(map[uint64]clock.Timer)
+	}
+	// The callback takes b.mu, so it finds its entry installed even when
+	// the timer fires before AfterFunc returned.
+	b.paseCloseTimers[seq] = b.clk().AfterFunc(grace, func() {
+		b.mu.Lock()
+		_, armed := b.paseCloseTimers[seq]
+		delete(b.paseCloseTimers, seq)
+		b.mu.Unlock()
+		if armed {
+			closeNow()
+		}
+	})
+}
+
+// stopPASECloseTimers stops every PASE close [Bridge.armPASEClose] armed
+// and arms none from then on. The timers stop outside b.mu: a clock may
+// hold its own lock while it runs a callback, which takes b.mu.
+func (b *Bridge) stopPASECloseTimers() {
+	b.mu.Lock()
+	b.paseCloseOver = true
+	timers := b.paseCloseTimers
+	b.paseCloseTimers = nil
+	b.mu.Unlock()
+	for _, t := range timers {
+		t.Stop()
+	}
 }
 
 // paseSessionsCloser names the PASE sessions open now and returns what

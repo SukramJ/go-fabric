@@ -89,7 +89,8 @@
 //     addresses at once.
 //   - AttachAckTracker — silent, and wider than its name suggests. It
 //     also constructs the outbound reliability tracker, so without it
-//     sendReply never sets NeedsAck (reply.go:149,157): the bridge
+//     sendReply never sets NeedsAck (reply.go, sendReply's
+//     `needsAck := reliable && tracker != nil && usesMRP`): the bridge
 //     neither emits standalone ACKs nor retransmits its own reliable
 //     messages, and every reply degrades to best-effort UDP.
 //   - AttachAckHandler — silent and narrow: a port told of every
@@ -149,11 +150,14 @@
 //     leaves that endpoint with no servers. A concrete-endpoint read
 //     then returns UnsupportedCluster, but a wildcard read — what a
 //     commissioner actually sends — silently skips the endpoint
-//     (endpoint/dispatcher.go:155-169), so the bridge reads as present
+//     (endpoint/dispatcher.go, readAt: a wildcard endpoint without the
+//     cluster is skipped), so the bridge reads as present
 //     and empty rather than broken.
 //   - AttachRootPartsListProvider and AttachAggregatorPartsListProvider
-//     are overrides: without them Start installs the live PartsList of
-//     both endpoints itself, from the bridge's own topology. When used,
+//     are overrides: without them the bridge installs the live PartsList
+//     of both endpoints itself, from its own topology, on the Descriptor
+//     each AttachRootClusters / AttachAggregatorClusters call hands it —
+//     before Start or after it — and at Start. When used,
 //     each MUST follow its AttachRootClusters / AttachAggregatorClusters
 //     call: it walks the already-attached slice for the Descriptor
 //     cluster (0x001D) and installs the provider on it. Called first, or
@@ -746,6 +750,18 @@ type Bridge struct {
 	// closing, and do not keep a new PASE exchange out
 	// ([Bridge.paseSessionExists]). Guarded by b.mu.
 	paseClosing map[uint16]struct{}
+	// paseCloseTimers are the PASE closes [Bridge.closePASESessions] armed
+	// to run after their grace, by the sequence number paseCloseSeq hands
+	// out; [Bridge.Stop] stops them, and paseCloseOver keeps a further one
+	// from being armed after it (review II, R2-P6-fsm-0615). Guarded by
+	// b.mu.
+	paseCloseTimers map[uint64]clock.Timer
+	paseCloseSeq    uint64
+	paseCloseOver   bool
+	// advertiserClosed: [Bridge.Stop] withdrew the advertiser's records and
+	// closed it ([Bridge.closeAdvertiser]); a second Stop does not again.
+	// Guarded by b.mu.
+	advertiserClosed bool
 
 	// unsecuredWindows holds a per-source-node-id [mrp.Window] duplicate
 	// detector for unsecured (SessionID==0, PASE and CASE) traffic, so a
@@ -831,6 +847,12 @@ type Bridge struct {
 	// one-slot semaphore, so that the wait for it ends with the caller's
 	// context ([Bridge.lifecycleSlot]); guarded by mu until made.
 	lifecycle chan struct{}
+	// assembly runs the assemblies one at a time, from the snapshot to the
+	// swap ([Bridge.reassembleLocked]): a snapshot taken later is never
+	// replaced by one taken before it (review II, R2-P6-conc-0603). A
+	// one-slot semaphore, so that the wait for it ends with the caller's
+	// context; guarded by mu until made.
+	assembly chan struct{}
 	// runGen counts the runs Stop ended; guarded by mu. A Reassemble that
 	// started in one run installs nothing once it is over
 	// ([Bridge.Reassemble]).
@@ -1036,7 +1058,11 @@ func (b *Bridge) seedCounters() error {
 // [ErrAlreadyStarted]. A bridge is single-run: from the first
 // [Bridge.Stop] on, Start returns [ErrStopped] — Stop closes what the
 // bridge holds, the advertiser among them, and a host that comes back
-// builds a new bridge. A Start that failed leaves the bridge startable.
+// builds a new bridge. A Start that failed leaves the bridge startable,
+// and leaves nothing of its assembly installed: [Bridge.Topology] and
+// [Bridge.Dispatcher] return nil, the servers it assembled are quiesced,
+// and the device-type validation judges the next Start's topology as the
+// first (review II, R2-P6-api-0606).
 //
 //nolint:contextcheck // serve/ack-pump goroutines run in a fresh context torn down explicitly via the stored serveCancel (Stop); rooting them in the caller ctx would race listener teardown
 func (b *Bridge) Start(ctx context.Context) error {
@@ -1055,8 +1081,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 			// The initial assembly may have wired the host's listeners;
 			// a Start that failed after it leaves none behind (review II,
 			// R2-P1-req2-06) — Stop on a bridge that never started does
-			// not detach them.
+			// not detach them. Nor does it leave what the assembly
+			// installed (review II, R2-P6-api-0606).
 			b.detachHostListeners()
+			b.clearFailedAssembly()
 			b.startClaim.Store(false)
 		}
 	}()
@@ -1199,6 +1227,13 @@ func (b *Bridge) Start(ctx context.Context) error {
 //
 // Returns [ErrNotStarted] when the bridge has not been [Start]ed.
 //
+// Concurrent Reassembles run one at a time from the snapshot to the swap:
+// the one whose snapshot is taken later is installed later, so the live
+// topology is always the newest snapshot the Snapshotter returned, and
+// [Bridge.DeviceTypeViolations] describes it. A Reassemble waits for the
+// one in progress until ctx ends, and returns ctx's error then (review
+// II, R2-P6-conc-0603).
+//
 // A Reassemble that overlaps a [Bridge.Stop] — it passed this check
 // before the Stop ran — swaps nothing in and leaves no host listener
 // registered once the run it began in is over; it returns
@@ -1211,6 +1246,27 @@ func (b *Bridge) Reassemble(ctx context.Context) error {
 		return ErrNotStarted
 	}
 	return b.reassembleLocked(ctx, &run)
+}
+
+// clearFailedAssembly takes back what the initial assembly of a Start that
+// failed installed: the topology and its dispatcher (a failed Start serves
+// nothing), the servers' event emitters and transitions
+// ([Bridge.reconcileQuiescers]), and the device-type validator's record of
+// a topology that was never served — the next Start judges its own as the
+// first and reports every violation it finds. Called with the lifecycle
+// slot held, so no Reassemble or Stop runs beside it.
+func (b *Bridge) clearFailedAssembly() {
+	b.mu.Lock()
+	assembled := b.topology
+	b.topology = nil
+	b.dispatcher = nil
+	b.servedTopology = nil
+	b.servedGen++
+	if v := b.deviceTypes; v != nil {
+		b.deviceTypes = endpoint.NewDeviceTypeValidator(v.Mode())
+	}
+	b.mu.Unlock()
+	b.reconcileQuiescers(assembled)
 }
 
 // claimStart takes the start claim — [ErrAlreadyStarted] when a run or
@@ -1280,6 +1336,32 @@ func (b *Bridge) enterLifecycle(ctx context.Context) (release func(), err error)
 	}
 }
 
+// enterAssembly waits for the assembly slot ([Bridge.assembly]) until ctx
+// ends and returns its release, which may be called more than once. A free
+// slot is always taken, whatever ctx's state, as [Bridge.enterLifecycle]
+// takes its own.
+func (b *Bridge) enterAssembly(ctx context.Context) (release func(), err error) {
+	b.mu.Lock()
+	if b.assembly == nil {
+		b.assembly = make(chan struct{}, 1)
+	}
+	slot := b.assembly
+	b.mu.Unlock()
+	var once sync.Once
+	release = func() { once.Do(func() { <-slot }) }
+	select {
+	case slot <- struct{}{}:
+		return release, nil
+	default:
+	}
+	select {
+	case slot <- struct{}{}:
+		return release, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("bridge: waiting for an assembly in progress: %w", ctx.Err())
+	}
+}
+
 // runEndedLocked reports whether the run a Reassemble began in (run, nil
 // for Start's own assembly) is over. Caller holds b.mu.
 func (b *Bridge) runEndedLocked(run *uint64) bool {
@@ -1301,14 +1383,24 @@ func (b *Bridge) rewireListenersOfRun(run uint64) {
 
 // reassembleLocked is the shared implementation behind initial
 // assembly (Start) and re-assembly (Reassemble). The locking is
-// intentionally narrow — the snapshot+assemble work happens off-lock,
+// intentionally narrow — the snapshot+assemble work happens off b.mu,
 // and only the swap into b.topology / b.dispatcher takes the write
-// lock. Concurrent Reassembles serialise harmlessly: each finishes
-// independently, and the last writer wins (subsequent reads see one
-// of the two assembled topologies, never a torn intermediate). run is
-// the run a Reassemble began in ([Bridge.runEndedLocked]); nil for
-// Start's assembly.
+// lock — but the assemblies themselves run one at a time, from the
+// snapshot to the swap and the listener wiring that follows it
+// ([Bridge.assembly]): a Reassemble whose snapshot was taken first is
+// installed first, and a later one replaces it, never the other way
+// round (review II, R2-P6-conc-0603). What follows the wiring — the
+// superseded hooks drained, the quiescers reconciled, the PartsList
+// changes announced, the host's hook — runs outside it, so a host hook
+// that reassembles again does not wait for itself. run is the run a
+// Reassemble began in ([Bridge.runEndedLocked]); nil for Start's
+// assembly.
 func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //nolint:gocognit,gocyclo,funlen // single-purpose bridge topology reassembly with many endpoint/cluster branches
+	releaseAssembly, err := b.enterAssembly(ctx)
+	if err != nil {
+		return err
+	}
+	defer releaseAssembly()
 	topology, err := b.snapshotter(ctx)
 	if err != nil {
 		return fmt.Errorf("bridge: assemble: %w", err)
@@ -1467,6 +1559,9 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	if ended {
 		b.detachListenersOfGeneration(generation)
 	}
+	// The next assembly may take its snapshot now: this one is installed
+	// and wired.
+	releaseAssembly()
 
 	// Drain the swapped-out press-DP hooks now that the new topology
 	// is live. Doing this after the swap (instead of before wiring)
@@ -2099,6 +2194,11 @@ func (b *Bridge) CommissioningWindow() *CommissioningWindow {
 // chip-tool that has already established a session and started
 // reading must see the cluster set without waiting for a topology
 // re-roll.
+//
+// The root's Descriptor among servers gets the bridge's live PartsList, as
+// [Bridge.Start] installs it, unless the host attached its own provider
+// ([Bridge.AttachRootPartsListProvider]) — before Start and after it alike
+// (review II, R2-P6-api-0604).
 func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
 	b.wireDeviceLoad(cp)
@@ -2106,6 +2206,9 @@ func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	b.wireFailSafeExpiry(cp)
 	b.mu.Lock()
 	b.rootClusters = cp
+	if !b.rootPartsByHost {
+		setPartsListProvider(cp, b.rootPartsList)
+	}
 	window := b.commissioningWindow
 	if b.topology != nil {
 		if root := b.topology.FindByID(0); root != nil {
@@ -2129,8 +2232,8 @@ type PartsListProviderSetter interface {
 // installs the live PartsList provider on the Descriptor cluster
 // (cluster ID 0x001D). Returns true when the provider was wired,
 // false when no Descriptor is mounted. It is an override: without it,
-// [Bridge.Start] installs the bridge's own provider, every endpoint of
-// the live topology but the root.
+// [Bridge.AttachRootClusters] and [Bridge.Start] install the bridge's own
+// provider, every endpoint of the live topology but the root.
 func (b *Bridge) AttachRootPartsListProvider(provider func() []uint16) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -2166,17 +2269,27 @@ func (b *Bridge) installDefaultPartsListProviders() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if !b.rootPartsByHost {
-		setPartsListProvider(b.rootClusters, func() []uint16 {
-			return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() })
-		})
+		setPartsListProvider(b.rootClusters, b.rootPartsList)
 	}
 	if !b.aggregatorPartsByHost {
-		setPartsListProvider(b.aggregatorClusters, func() []uint16 {
-			return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool {
-				return !ep.IsRoot() && !ep.IsAggregator() && (!ep.HasParentEndpointID || ep.ParentEndpointID != 0)
-			})
-		})
+		setPartsListProvider(b.aggregatorClusters, b.aggregatorPartsList)
 	}
+}
+
+// rootPartsList is the root Descriptor's default PartsList
+// ([Bridge.installDefaultPartsListProviders]): every endpoint of the live
+// topology but the root.
+func (b *Bridge) rootPartsList() []uint16 {
+	return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() })
+}
+
+// aggregatorPartsList is the Aggregator Descriptor's default PartsList
+// ([Bridge.installDefaultPartsListProviders]): every endpoint of the live
+// topology but the root, the Aggregator and the root's other children.
+func (b *Bridge) aggregatorPartsList() []uint16 {
+	return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool {
+		return !ep.IsRoot() && !ep.IsAggregator() && (!ep.HasParentEndpointID || ep.ParentEndpointID != 0)
+	})
 }
 
 // liveEndpointIDs returns the ids of the live topology's endpoints that
@@ -2207,10 +2320,18 @@ func (b *Bridge) liveEndpointIDs(keep func(*endpoint.Endpoint) bool) []uint16 {
 // Pass nil to clear. Calling this after [Bridge.Start] swaps in the
 // new servers on the next [Bridge.Reassemble] and on the live topology
 // immediately.
+//
+// The Aggregator's Descriptor among servers gets the bridge's live
+// PartsList, as [Bridge.Start] installs it, unless the host attached its
+// own provider ([Bridge.AttachAggregatorPartsListProvider]) — before Start
+// and after it alike (review II, R2-P6-api-0604).
 func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
 	b.mu.Lock()
 	b.aggregatorClusters = cp
+	if !b.aggregatorPartsByHost {
+		setPartsListProvider(cp, b.aggregatorPartsList)
+	}
 	if b.topology != nil {
 		if agg := b.topology.Aggregator(); agg != nil {
 			agg.PublishClusterServers(cp)
@@ -2223,8 +2344,9 @@ func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
 // clusters and installs the live PartsList provider on the Aggregator's
 // Descriptor cluster (cluster ID 0x001D on endpoint 1). Returns true
 // when the provider was wired, false when no Descriptor is mounted on
-// the Aggregator. It is an override: without it, [Bridge.Start] installs
-// the bridge's own provider, every bridged endpoint of the live topology.
+// the Aggregator. It is an override: without it,
+// [Bridge.AttachAggregatorClusters] and [Bridge.Start] install the bridge's
+// own provider, every bridged endpoint of the live topology.
 func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -2241,7 +2363,11 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 // closes the UDP listener, withdraws
 // every published mDNS record, and waits up to ctx's deadline for
 // the serve goroutine to exit. Idempotent — a second call is a
-// no-op. Safe to call after a failed [Start]. The bridge is single-run:
+// no-op. Safe to call after a failed [Start], and on a bridge never
+// started: it withdraws and closes the advertiser and closes the
+// commissioning window there too, so neither a record nor an open window
+// outlives a bridge that can no longer start (review II,
+// R2-P6-fsm-0605). The bridge is single-run:
 // from the first Stop on, [Bridge.Start] returns [ErrStopped].
 // A Stop that overlaps a Start waits for it, until ctx ends, and then
 // stops its run; only that wait can make Stop return an error, and then
@@ -2275,9 +2401,17 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// Off the radio before the transports go: the advertisement stops,
 	// the central is disconnected and the GATT service unregistered.
 	b.stopBLEForShutdown(ctx)
+	// A PASE close armed after a CommissioningComplete does not fire on a
+	// stopped bridge; the sessions it names close with the others above.
+	b.stopPASECloseTimers()
 	b.mu.Lock()
 	if !b.started {
 		b.mu.Unlock()
+		// No run to end — none began, or Start failed and took its own
+		// assembly back ([Bridge.clearFailedAssembly]) — but what the host
+		// attached and published before goes as at the end of a run.
+		b.closeAdvertiser() //nolint:contextcheck // shutdown path: each withdraw runs on a fresh timeout ctx, as at the end of a run
+		b.stopCommissioningWindow()
 		return nil
 	}
 	// Going offline loses the buffered events, as a real restart does; the
@@ -2355,29 +2489,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		b.logger.Warn("matter.bridge.stop.bdx_responder_timeout", slog.Any("err", ctx.Err()))
 	}
 
-	// Best-effort mDNS withdraw + close. Errors here are logged but
-	// don't block teardown — an mDNS that cannot be reached on shutdown
-	// is no worse than one that was never published.
-	if b.advertiser != nil {
-		b.mu.Lock()
-		b.operationalByFabric = nil
-		b.mu.Unlock()
-		active := b.advertiser.Active()
-		for i := range active {
-			svc := &active[i]
-			withdrawCtx, withdrawCancel := clock.WithTimeout(context.Background(), b.clk(), b.cfg.AdvertiseTimeout)
-			//nolint:contextcheck // shutdown path: mDNS withdraw must run on a fresh timeout ctx, not the cancelled serve ctx
-			if err := b.advertiser.Withdraw(withdrawCtx, svc.InstanceName, svc.ServiceType); err != nil {
-				b.logger.Debug("matter.mdns.withdraw",
-					slog.String("instance", svc.InstanceName),
-					slog.Any("err", err))
-			}
-			withdrawCancel()
-		}
-		if err := b.advertiser.Close(); err != nil {
-			b.logger.Debug("matter.mdns.close", slog.Any("err", err))
-		}
-	}
+	b.closeAdvertiser() //nolint:contextcheck // shutdown path: each withdraw runs on a fresh timeout ctx, not the cancelled serve ctx
 
 	// A transition still running steps a device nobody can reach any
 	// more; stop it, as matter.js closes a behavior's transitions when the
@@ -2385,13 +2497,51 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// [Symbol.asyncDispose]).
 	b.reconcileQuiescers(b.Topology())
 
-	// The commissioning window's expiry timer goes with the bridge: no
-	// timer stays armed on its clock after Stop (ADR 0026 P5).
+	b.stopCommissioningWindow()
+
+	return nil
+}
+
+// stopCommissioningWindow ends the attached commissioning window with the
+// bridge: its expiry timer stops, so no timer stays armed on its clock
+// after Stop (ADR 0026 P5), and it opens no more ([ErrStopped]).
+func (b *Bridge) stopCommissioningWindow() {
 	if w := b.CommissioningWindow(); w != nil {
 		w.stopTimer()
 	}
+}
 
-	return nil
+// closeAdvertiser withdraws every record the advertiser holds and closes
+// it, once: a second [Bridge.Stop] finds it closed. Best effort — errors
+// are logged but don't block teardown; an mDNS that cannot be reached on
+// shutdown is no worse than one that was never published.
+func (b *Bridge) closeAdvertiser() {
+	if b.advertiser == nil {
+		return
+	}
+	b.mu.Lock()
+	closed := b.advertiserClosed
+	b.advertiserClosed = true
+	b.operationalByFabric = nil
+	b.mu.Unlock()
+	if closed {
+		return
+	}
+	active := b.advertiser.Active()
+	for i := range active {
+		svc := &active[i]
+		withdrawCtx, withdrawCancel := clock.WithTimeout(context.Background(), b.clk(), b.cfg.AdvertiseTimeout)
+		//nolint:contextcheck // shutdown path: mDNS withdraw must run on a fresh timeout ctx, not the cancelled serve ctx
+		if err := b.advertiser.Withdraw(withdrawCtx, svc.InstanceName, svc.ServiceType); err != nil {
+			b.logger.Debug("matter.mdns.withdraw",
+				slog.String("instance", svc.InstanceName),
+				slog.Any("err", err))
+		}
+		withdrawCancel()
+	}
+	if err := b.advertiser.Close(); err != nil {
+		b.logger.Debug("matter.mdns.close", slog.Any("err", err))
+	}
 }
 
 // flushSubscriptionsForShutdown reports what every subscription owes —
@@ -2583,8 +2733,9 @@ func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
 }
 
 // Topology returns the currently assembled topology. Returns nil
-// when the bridge has not been started; safe to call concurrently
-// with [Reassemble].
+// before [Bridge.Start] and after a Start that failed (it takes its
+// assembly back); after [Bridge.Stop], the topology the run served last.
+// Safe to call concurrently with [Reassemble].
 //
 // It is the live tree, not a copy: the dispatcher serves requests from
 // the same [endpoint.Topology] and its endpoints. Read it; do not
@@ -2599,7 +2750,8 @@ func (b *Bridge) Topology() *endpoint.Topology {
 }
 
 // Dispatcher returns the currently active IM dispatcher. Returns nil
-// when the bridge has not been started.
+// before [Bridge.Start] and after a Start that failed; after
+// [Bridge.Stop], the dispatcher of the topology the run served last.
 func (b *Bridge) Dispatcher() im.Dispatcher {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
