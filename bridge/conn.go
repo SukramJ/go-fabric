@@ -282,11 +282,11 @@ func noteSessionTraffic(route net.Addr) {
 // unbindSessionRoute forgets the route of secure session sid, which is
 // closing or closed. When the route is a connection and sid was the last
 // session bound to it, the connection is closed — the Go translation of
-// matter.js ExchangeManager.ts:674-681 #closeTcpChannelIfLastSession
-// ("Mimics CHIP SDK behavior: close TCP connection when last session is
-// removed"), scheduled from :691-708 #deleteSession for every session
-// whose transport channel is TCP. matter.js recounts the live sessions on
-// the channel (#sessionsOnChannel, :629-643); the bridge keeps the count
+// matter.js ExchangeManager.ts:739-746 at db021da0
+// #closeTcpChannelIfLastSession, scheduled from :761-779 #deleteSession
+// for every session whose transport channel is TCP. matter.js recounts the
+// live sessions on the channel (#sessionsOnChannel, :699-713); the bridge
+// keeps the count
 // on the route instead. The 10 s first-message timer of the listener is
 // not involved: it covers only a connection that never carried a message.
 func (b *Bridge) unbindSessionRoute(sid uint16) {
@@ -306,8 +306,8 @@ func (b *Bridge) unbindSessionRoute(sid uint16) {
 // otherwise. The caller holds b.routeBindMu.
 //
 // matter.js counts the unsecured sessions on the channel with the secure
-// ones (ExchangeManager.ts:634-648 #sessionsOnChannel, both loops at
-// :644-645), so #closeTcpChannelIfLastSession (:674-681) keeps a
+// ones (ExchangeManager.ts:699-713 at db021da0 #sessionsOnChannel, both
+// loops at :709-710), so #closeTcpChannelIfLastSession (:739-746) keeps a
 // connection that carries a handshake. A handshake's own end closes
 // nothing: only a secure session's removal schedules the check
 // (#deleteSession :691-708; #addSession :678-689 observes NodeSessions
@@ -533,7 +533,7 @@ func (b *Bridge) sessionHoldsSubscription(sessionID uint16) bool {
 // deadlines, exchange reply routes and ack obligations
 // ([Bridge.purgeSessionState]), forgets the session's route and closes a TCP
 // connection whose last session this was (unbindSessionRoute;
-// matter.js ExchangeManager.ts:674-681). Calling it for a session the
+// matter.js ExchangeManager.ts:739-746 at db021da0). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
 	b.purgeSessionState(sessionID)
@@ -610,7 +610,7 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 		// (sendVia) without MRP (routeUsesMRP). The handshake holds the
 		// connection open while it runs (holdHandshake, settleHandshake),
 		// as matter.js counts the unsecured session on the channel
-		// (ExchangeManager.ts:634-648).
+		// (ExchangeManager.ts:699-713 at db021da0).
 	}
 	return b.dispatch(ctx, buf, route)
 }
@@ -624,10 +624,9 @@ func (b *Bridge) handleTCPMessage(c *tcp.Conn, msg []byte, release func()) {
 }
 
 // handleTCPClose evicts every session bound to a dropped connection —
-// the Go translation of matter.js ExchangeManager.ts:655-670
-// #onConnectionDisconnect ("Mimics CHIP SDK behavior: evict all
-// sessions when TCP connection drops"), subscribed to the transport's
-// disconnect event at :600-609.
+// the Go translation of matter.js ExchangeManager.ts:715-731 at db021da0
+// #onConnectionDisconnect, subscribed to the transport's disconnect event
+// at :665-674.
 func (b *Bridge) handleTCPClose(c *tcp.Conn) {
 	b.evictConn(c)
 }
@@ -658,8 +657,8 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 		slog.Int("sessions", len(sids)))
 	for _, sid := range sids {
 		// One line per evicted session, as matter.js
-		// packages/protocol/src/protocol/ExchangeManager.ts:655 logs
-		// "Evicting session due to TCP disconnect".
+		// packages/protocol/src/protocol/ExchangeManager.ts:720 at
+		// db021da0 logs per session.
 		b.logger.Debug("matter.tcp.evict.session",
 			slog.String("conn", route.String()),
 			slog.Int("session_id", int(sid)))
@@ -672,7 +671,7 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 // first its exchanges, then the session itself without a CloseSession
 // farewell (the peer is lost), which cascades to its subscriptions
 // through the registry's close hook. Mirrors matter.js
-// ExchangeManager.ts:659-669 (close every exchange, then
+// ExchangeManager.ts:722-729 at db021da0 (close every exchange, then
 // Session.initiateForceClose, Session.ts:310-331, which closes the
 // subscriptions and does not notify the peer — NodeSession.ts:363-366
 // marks it lost).
