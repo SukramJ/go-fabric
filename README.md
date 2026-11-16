@@ -228,6 +228,9 @@ becomes permissible in:
 | `cluster/core.GeneralCommissioning.ArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession` | `v0.23.0` |
 | `device.NewRootNode` | none; the root endpoint is the node's (`node.Node.Root`) | `v0.23.0` |
 | `endpoint.WriteChanges`, `endpoint.WithWriteChanges` (`Unchanged`, `Changed`, `ChangedAttributes`) | `im.HandleWrite`, whose results carry each write's verdict in `im.WriteResult.Commit` | `v0.23.0` |
+| `commissioning` (the package: `PASEConfig`, `PASEResponder`, `NewPASEResponder`, `BuildAttestation`, `AttestationInput`, `AttestationResult`, `BuildCSR`, `CSRInput`, `CSRResult`, `DACChain`, `VerifyChain`, `LoadPAAPoolFromPEM`, `ErrPASE*`, `ErrAttestation*`, `ErrCSRNonce`, `ErrDAC*`) | the node's commissioning window (`node.Node.OpenBasicWindow`, `OpenOwnWindow`) and `cluster/core.OperationalCredentials`; `secure/spake2` and `secure/mattercert.CreateCSR` for the pieces; `controller/attestation.Validate` for the DAC chain | `v0.23.0` |
+| `mdns.DeriveUniqueIDFromIdentity` | `node.Commissioning.RotatingDeviceID`, or 16 random bytes drawn once and persisted, passed to `mdns.GenerateRotatingID` | `v0.23.0` |
+| `cluster/core.OperationalCredentials.SetCurrentFabric`, `cluster/core.GroupKeyManagement.SetCurrentFabric`, `cluster/core.AccessControl.SetCurrentFabric` | none: a fabric-scoped command or write takes its fabric from the request (`im.WithFabricFilter`) | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

@@ -395,6 +395,27 @@ request, whatever the server returns ([ports](ports.md)).
 | an entry of a fabric-scoped list without a `FabricIndex`, or with one outside 1 to 254 | the request is answered `FAILURE` for the attribute's path: give every entry its owning fabric |
 | fabric-sensitive events gated per cluster | gated per event from the generated table (`schema.EventReadScope`), with the event's own read privilege |
 
+## Changed after v0.22.2: store sealing, the RI and the core security servers
+
+Review II, phase 6a. Every deprecated identifier keeps its behaviour until
+it is removed in the next minor release; the behaviour changes are the
+rows marked *changed* or *breaking*.
+
+| Before | Now |
+| --- | --- |
+| *breaking:* a handle given to `store.Apply`, `store.Upgrade` or `node.Store.DB` without `PRAGMA foreign_keys` on | `_pragma=foreign_keys(1)` in its DSN (`store.OpenSQLite` sets it); without it they return `store.ErrForeignKeysOff`. A host that runs `store.Migrations()` with its own tool and then `store.Upgrade` opens that handle with the pragma too |
+| a host that carries the schema in its own migrations | applies `store/migrations/v11.up.sql` (`matter_group_key_map.position`, `matter_resumption.write_seq`) |
+| a host's own `store.Port` implementation | lists the GroupKeyMap in the order it was written (storetest `group-keys/map-order`) and keeps at most 16 resumption records per fabric, the one written longest ago evicted first (storetest `resumption/cap-per-fabric`) |
+| *changed:* `store.New` on a database a `store.NewSealed` has marked | refuses to write a secret (`store.ErrNoSealer`): open it with `NewSealed` and its sealer; `store.Reseal` rotates the key |
+| `mdns.DeriveUniqueIDFromIdentity` | `node.Commissioning.RotatingDeviceID`; a host that builds the record itself draws 16 random bytes once, persists them and passes them to `mdns.GenerateRotatingID` with a persisted lifetime counter |
+| *changed:* the commissionable record's RI, carried by default | carried only with `node.Commissioning.RotatingDeviceID` |
+| `commissioning` (the package) | nothing to wire: the node serves PASE through its commissioning window (`node.Node.OpenBasicWindow`, `OpenOwnWindow`) and attestation and CSR through `cluster/core.OperationalCredentials`; a host that needs the pieces uses `secure/spake2`, `secure/mattercert.CreateCSR` and, as a commissioner, `controller/attestation.Validate` |
+| `(*core.OperationalCredentials).SetCurrentFabric`, `(*core.GroupKeyManagement).SetCurrentFabric`, `(*core.AccessControl).SetCurrentFabric` | drop the call; pass the fabric in the context with `im.WithFabricFilter` |
+| *changed:* a direct `MatterInvoke` of UpdateNOC, UpdateFabricLabel or a GroupKeyManagement command without an accessing fabric | answers UnsupportedAccess: pass the fabric with `im.WithFabricFilter` |
+| *changed:* a `jointfabric.Datastore` wired outside the node | calls `Datastore.AttachNode` with the node's fabric table and forwards every fabric removal and install to it (`MatterDropFabric`); without a table every peer is refused. A datastore without a JointFabricAdministrator serves peers after `SetAnchorFabricIndex` |
+| *changed:* `spec.Register` of a different definition under a cluster id already registered (it replaced the first) | panics: register a vendor cluster under its own id; registering the held definition again is a no-op |
+| *changed:* `cluster.AsUint8`, `cluster.AsInt16` wrapping a value outside their width | refuse it (`false`), and a non-whole float too |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the
