@@ -18,9 +18,9 @@ import (
 
 // TestWireIDsEqualTheGeneratedOnes (review II, R2-P6-par-1262,
 // R2-P6-api-1261, decision 140): every hand-written id of cluster/wire that
-// the generated cluster/spec/<name> also names — kept for a consumer or
-// deprecated — carries the generated value. The five command ids absent
-// from the snapshot have no counterpart and are deprecated instead.
+// the generated cluster/spec/<name> also names — kept for a consumer, or
+// marked for removal — carries the generated value. The five command ids
+// absent from the snapshot have no counterpart and are marked instead.
 func TestWireIDsEqualTheGeneratedOnes(t *testing.T) { //nolint:staticcheck,funlen // the deprecated ids are compared for their window
 	t.Parallel()
 	for name, c := range map[string][2]uint64{
