@@ -138,6 +138,11 @@ type Manager struct {
 	// receptionFull marks the keys that refused a sender at
 	// maxGroupSendersPerKey, so the refusal is logged once per key.
 	receptionFull map[string]bool
+	// parkedReception holds, per forgotten fabric, the replay windows
+	// ForgetFabric dropped with it, by operational key, until the fabric
+	// is loaded again (restoreParked): a key the load brings back under
+	// the same key set id gets its windows back, every other is dropped.
+	parkedReception map[uint8]map[string]parkedKey
 
 	// observersMu guards observers and tableObservers.
 	observersMu        sync.Mutex
@@ -191,7 +196,8 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		fabrics:   make(map[uint8]*fabricGroups),
 		reception: make(map[string]map[uint64]*mrp.Window),
 
-		receptionFull: make(map[string]bool),
+		receptionFull:   make(map[string]bool),
+		parkedReception: make(map[uint8]map[string]parkedKey),
 
 		counterRandom: randomCounterStart,
 		senders:       make(map[senderKey]*Sender),
@@ -375,6 +381,7 @@ func (m *Manager) fabricStore(ctx context.Context, idx uint8) (*fabricGroups, er
 	m.mu.Lock()
 	m.fabrics[idx] = f
 	m.mu.Unlock()
+	m.restoreParked(f)
 	return f, nil
 }
 
@@ -469,6 +476,7 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 	}
 	m.fabrics[fabricIndex] = f
 	m.mu.Unlock()
+	m.restoreParked(f)
 	m.storeMu.Unlock()
 	m.forgetUnreferenced()
 	// A GroupKeyMap change moves Membership's KeySetId. Mirrors
@@ -485,15 +493,28 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 // The fabric's Groupcast properties go with it, as matter.js
 // GroupcastServer #handleFabricDeleted drops the departed fabric's
 // groupProperties.
+//
+// The replay windows the fabric's keys held are parked, not discarded:
+// a fail-closed path forgets a fabric and loads it again from the store,
+// and an unprimed window takes the first counter it sees, so a recorded
+// datagram would be admitted once after the reload. The next load of the
+// fabric index gives a key it brings back under the same key set id its
+// windows again and drops the rest (restoreParked).
 func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	m.storeMu.Lock() // no load or mutation installs the fabric again meanwhile
 	m.mu.Lock()
-	_, had := m.fabrics[fabricIndex]
+	f, had := m.fabrics[fabricIndex]
 	delete(m.fabrics, fabricIndex)
+	// The next Load or receive lists the store's fabrics again: a fabric
+	// the store still holds (a fail-closed path forgets it and loads it
+	// again) comes back, a removed one does not.
+	m.allLoaded = false
 	m.mu.Unlock()
+	// Under storeMu: no load can restore the fabric before its windows
+	// are parked.
+	m.park(fabricIndex, f, m.forgetUnreferenced())
 	m.storeMu.Unlock()
 	m.closeSenders(fabricIndex)
-	m.forgetUnreferenced()
 	if had {
 		m.notify()
 		m.notifyGroupcast(context.Background(), fabricIndex)
@@ -501,8 +522,8 @@ func (m *Manager) ForgetFabric(fabricIndex uint8) {
 }
 
 // forgetUnreferenced drops reception state for operational keys no
-// loaded key set derives.
-func (m *Manager) forgetUnreferenced() {
+// loaded key set derives and returns what it dropped, by key.
+func (m *Manager) forgetUnreferenced() map[string]map[uint64]*mrp.Window {
 	live := make(map[string]struct{})
 	m.mu.RLock()
 	for _, f := range m.fabrics {
@@ -514,8 +535,10 @@ func (m *Manager) forgetUnreferenced() {
 	}
 	m.mu.RUnlock()
 	m.receptionMu.Lock()
-	for k := range m.reception {
+	dropped := map[string]map[uint64]*mrp.Window{}
+	for k, w := range m.reception {
 		if _, ok := live[k]; !ok {
+			dropped[k] = w
 			delete(m.reception, k)
 		}
 	}
@@ -525,6 +548,69 @@ func (m *Manager) forgetUnreferenced() {
 		}
 	}
 	m.receptionMu.Unlock()
+	return dropped
+}
+
+// parkedKey is one operational key's replay windows, parked by
+// ForgetFabric, and the ids of the fabric's key sets that derived it.
+type parkedKey struct {
+	keySets []uint16
+	windows map[uint64]*mrp.Window
+}
+
+// park keeps the windows of dropped that f's key sets derived, for the
+// next load of fabric idx; whatever an earlier forget parked for idx is
+// replaced. f nil (a fabric that was not loaded) parks nothing.
+func (m *Manager) park(idx uint8, f *fabricGroups, dropped map[string]map[uint64]*mrp.Window) {
+	m.receptionMu.Lock()
+	defer m.receptionMu.Unlock()
+	delete(m.parkedReception, idx)
+	if f == nil || len(dropped) == 0 {
+		return
+	}
+	parked := map[string]parkedKey{}
+	for id, ks := range f.keySets {
+		for _, e := range ks.epochs {
+			k := hex.EncodeToString(e.key)
+			w, ok := dropped[k]
+			if !ok {
+				continue
+			}
+			pk := parked[k]
+			pk.windows = w
+			pk.keySets = append(pk.keySets, id)
+			parked[k] = pk
+		}
+	}
+	if len(parked) > 0 {
+		m.parkedReception[idx] = parked
+	}
+}
+
+// restoreParked gives the fabric f just loaded the windows ForgetFabric
+// parked for its index: a key one of its key sets derives under the same
+// key set id gets them back, unless a window set for the key exists
+// already; every other parked window is dropped.
+func (m *Manager) restoreParked(f *fabricGroups) {
+	m.receptionMu.Lock()
+	defer m.receptionMu.Unlock()
+	parked, ok := m.parkedReception[f.index]
+	if !ok {
+		return
+	}
+	delete(m.parkedReception, f.index)
+	for id, ks := range f.keySets {
+		for _, e := range ks.epochs {
+			k := hex.EncodeToString(e.key)
+			pk, ok := parked[k]
+			if !ok || !slices.Contains(pk.keySets, id) {
+				continue
+			}
+			if _, held := m.reception[k]; !held {
+				m.reception[k] = pk.windows
+			}
+		}
+	}
 }
 
 // Fabrics returns the index of every fabric the store knows, ascending,
