@@ -139,7 +139,9 @@ func (p *Provider) End(ctx context.Context, sessionID uint16, reason uint8) erro
 	if errors.Is(err, ErrNoPeerConnector) || errors.Is(err, ErrUnknownSession) {
 		return err
 	}
-	p.removeSession(contract.OriginHostSet, sessionID)
+	if rerr := p.removeSession(contract.OriginHostSet, sessionID); err == nil {
+		err = rerr
+	}
 	return err
 }
 

@@ -46,6 +46,8 @@ func heldFabrics[T any](entries []T, fabric func(T) uint8) []uint8 {
 // (FabricScopedDataHandler.ts:41-73 at db021da0); the camera's stack is
 // told, so it stops streaming to the removed fabric's peer.
 func (p *Provider) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	p.op.Lock()
+	defer p.op.Unlock()
 	p.mu.Lock()
 	var ids []uint16
 	for _, s := range p.sessions {
@@ -59,7 +61,9 @@ func (p *Provider) MatterDropFabric(ctx context.Context, fabricIndex uint8) erro
 		if err := p.port.EndSession(ctx, id, endReasonUnknown); err != nil {
 			errs = append(errs, fmt.Errorf("camera: EndSession %d of removed fabric %d: %w", id, fabricIndex, err))
 		}
-		p.removeSession(contract.OriginUnknown, id)
+		if err := p.removeSession(contract.OriginUnknown, id); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	return errors.Join(errs...)
 }
