@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/transport/tcp"
 )
 
@@ -29,14 +30,23 @@ func TestTCPInboundBoundDefaultsToTheDeviceBound(t *testing.T) {
 
 // TestTCPListenerHoldsTheConfiguredInboundBound: a bridge whose TCP
 // listener is bounded at one connection gives a second connection the
-// place of the first, which has delivered no message.
+// place of the first, which has delivered no message and is past the age
+// that spares a fresh connection (a fraction of
+// tcp.NewConnectionIdleTimeout, review II R2-P6-bound-0203).
 func TestTCPListenerHoldsTheConfiguredInboundBound(t *testing.T) {
 	t.Parallel()
+	fake := clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC))
 	h := newConnHarness(t, Config{
 		Listen: "127.0.0.1:0",
 		TCP:    TCPConfig{Incoming: true, MaxInboundConnections: 1},
+		Clock:  fake,
 	})
 	first, _ := h.dial()
+	h.bridge.mu.RLock()
+	tl := h.bridge.tcpListener
+	h.bridge.mu.RUnlock()
+	waitFor(t, "the first connection held", func() bool { return tl.Conns() == 1 })
+	fake.Advance(tcp.NewConnectionIdleTimeout / 2)
 	second, _ := h.dial()
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()

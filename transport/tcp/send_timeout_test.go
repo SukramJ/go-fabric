@@ -53,6 +53,8 @@ func TestSendToAPeerThatStopsReadingIsBounded(t *testing.T) {
 	if _, err := peer.Write([]byte{1, 0, 0, 0, 0x42}); err != nil {
 		t.Fatal(err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
 	select {
 	case o := <-done:
 		if !errors.Is(o.err, os.ErrDeadlineExceeded) {
@@ -66,7 +68,7 @@ func TestSendToAPeerThatStopsReadingIsBounded(t *testing.T) {
 		if err := o.conn.Send([]byte{1}); !errors.Is(err, ErrConnClosed) {
 			t.Fatalf("Send after the timeout returned %v, want ErrConnClosed", err)
 		}
-	case <-time.After(20 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("Send still blocked: no write deadline applies")
 	}
 }
