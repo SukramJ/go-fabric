@@ -337,7 +337,7 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 			return fmt.Errorf("group invoke: %w", err)
 		}
 		gctx := im.WithGroupSubject(im.WithFabricFilter(ctx, false, msg.FabricIndex), subject)
-		report := im.HandleGroupInvoke(gctx, dispatcher, req, schema.IsTimedInvoke)
+		report := b.handleGroupInvoke(gctx, dispatcher, req)
 		status = report.Status
 		for _, ev := range invokeOutcomeEvents(msg, srcIP, report) {
 			port.ReportGroupMessage(ev)
@@ -442,4 +442,17 @@ func invokeOutcomeEvents(msg *groups.Message, srcIP net.IP, report im.GroupInvok
 		out = append(out, ev)
 	}
 	return out
+}
+
+// handleGroupInvoke runs a group command as one commit per cluster it
+// reaches, as a unicast invoke runs ([Bridge.snapshotInvokedClusters],
+// [Bridge.reportInvokeChanges]): a change its servers make without a
+// notification of their own advances the cluster's DataVersion and reaches
+// the subscribers (R2-P6-par-0401) — matter.js runs a group invoke per
+// endpoint through the same command and commit as a concrete one
+// (CommandInvokeResponse.ts:330-358, :493 at db021da0).
+func (b *Bridge) handleGroupInvoke(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) im.GroupInvokeReport {
+	before := b.snapshotInvokedClusters(ctx, d, req)
+	defer b.reportInvokeChanges(ctx, d, before)
+	return im.HandleGroupInvoke(ctx, d, req, schema.IsTimedInvoke)
 }

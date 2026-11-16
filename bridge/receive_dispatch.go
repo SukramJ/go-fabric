@@ -959,29 +959,62 @@ type invokedCluster struct {
 	cluster  uint32
 }
 
-// snapshotInvokedClusters reads every attribute of each cluster a
-// concrete invoke path names, before the commands run, and opens the
-// commit of each ([invokeCommitTable]) that [Bridge.reportInvokeChanges]
-// ends. A subscription manager is required for the comparison to matter;
-// without one this is a no-op.
+// snapshotInvokedClusters reads every attribute of each cluster an invoke
+// path reaches, before the commands run, and opens the commit of each
+// ([invokeCommitTable]) that [Bridge.reportInvokeChanges] ends. A concrete
+// path reaches its endpoint; a wildcard-endpoint path — a group command's
+// only shape — every endpoint the command may run at ([commandEndpoints]),
+// so its change is one commit for subscribers and the DataVersion as a
+// concrete path's is (R2-P6-par-0401): matter.js runs and commits a
+// wildcard-endpoint or group invoke per endpoint exactly as a concrete
+// one, and the commit is what advances the DataVersion and announces the
+// change (CommandInvokeResponse.ts:330-358, :493; Datasource.ts:1455-1457,
+// :1319 at db021da0). A subscription manager is required for the
+// comparison to matter; without one this is a no-op.
 func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]attributeReading {
 	if b.subscriptionManagerLocked() == nil {
 		return nil
 	}
 	out := map[invokedCluster]map[uint32]attributeReading{}
 	for _, inv := range req.Invokes {
-		if !inv.Path.HasEndpoint {
-			continue
-		}
-		key := invokedCluster{inv.Path.Endpoint, inv.Path.Cluster}
-		if _, done := out[key]; !done {
-			out[key] = readCluster(ctx, d, key)
+		for _, endpoint := range commandEndpoints(ctx, d, inv.Path) {
+			key := invokedCluster{endpoint, inv.Path.Cluster}
+			if _, done := out[key]; !done {
+				out[key] = readCluster(ctx, d, key)
+			}
 		}
 	}
 	for key := range out {
 		b.invokeCommits.begin(key)
 	}
 	return out
+}
+
+// commandTargetLister is the part of a dispatcher that names the
+// endpoints a wildcard-endpoint command runs at
+// (endpoint.TopologyDispatcher.CommandTargets).
+type commandTargetLister interface {
+	CommandTargets(path im.ConcreteCommandPath, authorize im.CommandAuthorizer) []uint16
+}
+
+// commandEndpoints is the endpoints path may run at: its own for a
+// concrete path; for a wildcard one every endpoint whose server accepts
+// the command, narrowed to the group's endpoints for a group command. The
+// access check is not asked — a snapshot of an endpoint the command then
+// does not reach compares equal and reports nothing.
+func commandEndpoints(ctx context.Context, d im.Dispatcher, path im.ConcreteCommandPath) []uint16 {
+	if path.HasEndpoint {
+		return []uint16{path.Endpoint}
+	}
+	lister, ok := d.(commandTargetLister)
+	if !ok || !path.HasCluster || !path.HasCommand {
+		return nil
+	}
+	targets := lister.CommandTargets(path, nil)
+	if group, isGroup := im.GroupSubjectFromContext(ctx); isGroup {
+		targets = slices.DeleteFunc(slices.Clone(targets), func(e uint16) bool { return !slices.Contains(group.Endpoints, e) })
+	}
+	return targets
 }
 
 // invokeCommitTable makes a command one commit with one DataVersion
@@ -1082,13 +1115,11 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 	if len(before) == 0 {
 		return
 	}
+	// A manager detached while the command ran still gets the advance:
+	// the commit changed the cluster whether or not anyone subscribes, and
+	// a later read with a DataVersionFilter must see it; only the marks
+	// need a manager (N-findev-2).
 	mgr := b.subscriptionManagerLocked()
-	if mgr == nil {
-		for key := range before {
-			b.invokeCommits.end(key)
-		}
-		return
-	}
 	topo := b.Topology()
 	// Each commit ends after its cluster's read, so a report between the
 	// two is returned by end, not taken twice. A read that panics still
@@ -1138,7 +1169,7 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 // reportCommandChange advances key's DataVersion once and marks changed
 // dirty; advance owes the advance with nothing to mark — a quieter
 // attribute whose report waits for its throttle — and nothing changed
-// without it moves nothing. matter.js advances the version at the commit
+// without it moves nothing. A nil mgr advances without marking. matter.js advances the version at the commit
 // that changed a value, a quieter one's included
 // (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
 // db021da0).
@@ -1150,6 +1181,9 @@ func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, 
 		if ep := topo.FindByID(key.endpoint); ep != nil {
 			ep.BumpDataVersionOf(key.cluster)
 		}
+	}
+	if mgr == nil {
+		return
 	}
 	for _, attr := range changed {
 		mgr.OnAttributeChanged(im.ConcreteAttributePath{
