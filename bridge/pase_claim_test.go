@@ -98,30 +98,48 @@ func TestPaseClaimRunsFromItsFirstRequest(t *testing.T) {
 // TestRepeatedPBKDFParamRequestEndsThePairing: a further PBKDFParamRequest
 // on the handshake that holds the claim is an error of that pairing, as
 // matter.js's PASE server takes an unexpected message on the accepted
-// exchange: it is not answered, it counts one PASE failure, and the pairing
-// ends — the slot is free for the next commissioner at once, and a Pake1 of
-// the ended handshake begins nothing (review II, R2-P6-sec-0304, round 2).
+// exchange: it counts one PASE failure, and the pairing ends — the slot is
+// free for the next commissioner at once, and a Pake1 of the ended
+// handshake begins nothing. It is answered with a StatusReport
+// InvalidParameter when the PBKDFParamResponse was acknowledged, and not
+// answered while that response still waits for its acknowledgement
+// (review II, R2-P6-sec-0304, rounds 2 and 4).
 func TestRepeatedPBKDFParamRequestEndsThePairing(t *testing.T) {
-	r, _ := newPaseClaimRig(t)
-	holder := newPipelinePeer(t, r.b, 0xBAD)
-	const xid = uint16(0x0101)
-	if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), nil); err != nil {
-		t.Fatal(err)
-	}
-	holder.recv(mrp.SCOpcodePBKDFParamResponse, "the first PBKDFParamRequest")
-	if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), nil); err != nil {
-		t.Fatal(err)
-	}
-	holder.none(300*time.Millisecond, "a repeated PBKDFParamRequest of the claim's handshake")
-	if got := r.b.paseFailures.Load(); got != 1 {
-		t.Fatalf("PASE failures after a repeated PBKDFParamRequest: %d, want 1", got)
-	}
-	other := HandshakeKey{InitiatorNodeID: 0x600D, ExchangeID: 0x0202}
-	if r.b.paseHandshakeOfAnother(other) {
-		t.Fatal("the ended pairing still holds the slot")
-	}
-	if _, begun := r.b.resolvePaseContinuation(HandshakeKey{InitiatorNodeID: 0xBAD, ExchangeID: xid}); begun {
-		t.Fatal("a Pake1 of the ended pairing would still reach its handler")
+	for _, acked := range []bool{true, false} {
+		t.Run(map[bool]string{true: "the response acknowledged", false: "the response unacknowledged"}[acked], func(t *testing.T) {
+			r, _ := newPaseClaimRig(t)
+			holder := newPipelinePeer(t, r.b, 0xBAD)
+			const xid = uint16(0x0101)
+			if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), nil); err != nil {
+				t.Fatal(err)
+			}
+			_, counter, _ := holder.recv(mrp.SCOpcodePBKDFParamResponse, "the first PBKDFParamRequest")
+			var ack *uint32
+			if acked {
+				ack = &counter
+			}
+			if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), ack); err != nil {
+				t.Fatal(err)
+			}
+			if acked {
+				report, _, _ := holder.recv(mrp.SCOpcodeStatusReport, "the answer to a repeated PBKDFParamRequest")
+				if general, _, code, ok := decodeStatusReport(report); !ok || general != mrp.SCStatusGeneralFailure || code != mrp.SCStatusProtocolInvalidParameter {
+					t.Fatalf("report general %#x code %#x, want failure / InvalidParameter", general, code)
+				}
+			} else {
+				holder.none(300*time.Millisecond, "a repeated PBKDFParamRequest while the response waits for its acknowledgement")
+			}
+			if got := r.b.paseFailures.Load(); got != 1 {
+				t.Fatalf("PASE failures after a repeated PBKDFParamRequest: %d, want 1", got)
+			}
+			other := HandshakeKey{InitiatorNodeID: 0x600D, ExchangeID: 0x0202}
+			if r.b.paseHandshakeOfAnother(other) {
+				t.Fatal("the ended pairing still holds the slot")
+			}
+			if _, begun := r.b.resolvePaseContinuation(HandshakeKey{InitiatorNodeID: 0xBAD, ExchangeID: xid}); begun {
+				t.Fatal("a Pake1 of the ended pairing would still reach its handler")
+			}
+		})
 	}
 }
 
