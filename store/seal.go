@@ -285,7 +285,9 @@ func clearRowUnderSealer(table string) error {
 // fabric with its IPK and operational key; the node's Rotating Device
 // Identifier unique id is node's settingRotatingIDUniqueID (node.go) — not
 // a key, but whoever reads it computes every RI the node advertises.
-// TestSealedSettingsNameTheirSources holds the copies to them.
+// TestSealedSettingsNameTheirSources holds the copies to them. A secret
+// added here ships with an upgrade step
+// (TestSecretsAddedAfterV11ShipAnUpgradeStep, decision 157).
 var sealedSettings = map[string]bool{
 	SettingDoorLockCredentialKey:                 true,
 	SettingICDKey:                                true,
@@ -397,7 +399,9 @@ type secretColumns struct {
 // openColumn call names one of its columns
 // (TestSecretColumnsAreTheSealCallSites). The order is the upgrade's: the
 // ICD keys before the settings, because a clear ICD row's key may be sealed
-// under SettingICDKey, which is still a clear setting then.
+// under SettingICDKey, which is still a clear setting then. A secret
+// added here ships with an upgrade step
+// (TestSecretsAddedAfterV11ShipAnUpgradeStep, decision 157).
 var secretTables = []secretColumns{
 	{identityTable, []string{"fabric_index"}, []string{"private_key", "ipk", "prior_private_key"}, sealBlob},
 	{"matter_group_keys", []string{"fabric_index", "group_key_set_id"}, groupEpochKeyColumns[:], sealBlob},

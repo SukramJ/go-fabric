@@ -11,7 +11,7 @@ import "context"
 // It is the Go form of the session matter.js hands every `$Changed`
 // observer with the new and the old value
 // (packages/node/src/behavior/state/managed/Datasource.ts:393-395
-// ValueObserver, :1473-1476 the notification's params): a host tells its
+// ValueObserver, :1488-1491 the notification's params): a host tells its
 // own changes from a controller's by it, without keeping a copy of what
 // it set.
 type Origin uint8

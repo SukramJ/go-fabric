@@ -620,7 +620,7 @@ type CaseAdapter struct {
 	// without re-deriving keys (idempotent path). Without this guard
 	// `onEstablished` would also fire on
 	// every retransmit — registering the SAME operational session
-	// multiple times in `OpenFromSigmaWithID` and confusing Apple's
+	// multiple times in `OpenFromSigmaWithStake` and confusing Apple's
 	// session table. Reset on `SetResponder` so a fresh CASE
 	// handshake (post-AddNOC identity swap) gets a clean trigger, and
 	// on a Sigma1 that restarts the handshake — but not on the
@@ -740,7 +740,7 @@ func (a *CaseAdapter) handshakeFailed() {
 // InitiatorSessionID the commissioner sent in Sigma1 — the bridge
 // stamps it into outbound Header.SessionID so the peer resolves the
 // session in its own table. Implementations typically hand both to
-// [operational.Manager.OpenFromSigmaWithID].
+// [operational.Manager.OpenFromSigmaWithStake].
 type CaseSessionEstablished func(keys sigma.SessionKeys, peerSessionID uint16) error
 
 // NewCaseAdapter wraps r.

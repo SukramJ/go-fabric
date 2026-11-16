@@ -49,7 +49,7 @@ type CaseInitiation struct {
 	// CompressedFabricID names the peer's operational DNS-SD instance.
 	CompressedFabricID [8]byte
 	// OnEstablished registers the session under Initiator.SessionID()
-	// (secure/operational.Manager.OpenFromSigmaAsInitiatorWithID) and may
+	// (secure/operational.Manager.OpenFromSigmaAsInitiatorWithStake) and may
 	// persist the new resumption record. ctx is the handshake's. Returning
 	// an error abandons the session.
 	OnEstablished func(ctx context.Context, result sigma.InitiatorResult) error
