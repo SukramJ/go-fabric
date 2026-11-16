@@ -9,7 +9,9 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
+	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
@@ -49,12 +51,12 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		return listItemValue(path, el, dec)
 	}
 	switch {
-	case path.Cluster == 0x001F && path.Attribute == 0x0000: // AccessControl.ACL
-		return decodeACLList(el, dec)
-	case path.Cluster == 0x001F && path.Attribute == 0x0001: // AccessControl.Extension
-		return decodeExtensionList(el, dec)
-	case path.Cluster == 0x003F && path.Attribute == 0x0000: // GroupKeyManagement.GroupKeyMap
-		return decodeGroupKeyMapList(el, dec)
+	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrAcl && el.IsContainer:
+		return aclWriteValue(el, dec, false)
+	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrExtension && el.IsContainer:
+		return extensionWriteValue(el, dec, false)
+	case path.Cluster == gkmdef.ClusterID && path.Attribute == gkmdef.AttrGroupKeyMap && el.IsContainer:
+		return groupKeyMapWriteValue(el, dec, false)
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, false)
 	case path.Cluster == bindingdef.ClusterID && path.Attribute == bindingdef.AttrBinding && el.IsContainer:
@@ -166,334 +168,97 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 	return im.AttributeValue{Value: v}, nil
 }
 
-// decodeACLList reads an array of AccessControlEntryStruct (Matter
-// §9.10.4.4) from the TLV stream. el is the array opener; the caller
-// already consumed it via dec.Next() in [im.readAttributeData].
-func decodeACLList(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
-	if !el.IsContainer || el.Type != tlv.TypeArray {
-		return im.AttributeValue{}, fmt.Errorf("bridge: AccessControl.ACL: value is not array (type=0x%02X)", el.Type)
+// The AccessControl.ACL, .Extension and GroupKeyManagement.GroupKeyMap
+// writes decode through their generated definitions, as Binding's does,
+// and convert to the types the cluster/core servers take: an integer
+// wider than its field, a field of another type and a list element that
+// is not a struct are refused whole (an [undecodedValue]) — never cut to
+// width, read as 0 or dropped (R2-P6-acl-0441, R2-P6-wire-1703). The
+// FabricIndex is the placeholder [generatedAttributeValue] stamps; the
+// dispatcher assigns the accessing fabric.
+
+// aclWriteValue decodes an ACL write: the whole list, or for a list-append
+// write (item) one entry.
+func aclWriteValue(el tlv.Element, dec *tlv.Decoder, item bool) (im.AttributeValue, error) {
+	v, err := generatedAttributeValue(acldef.Definition, acldef.AttrAcl, el, dec, item)
+	if l, ok := v.Value.(spec.List[acldef.AccessControlEntryStruct]); ok && err == nil {
+		out := make([]mattercore.AccessControlEntryStruct, 0, len(l))
+		for _, e := range l {
+			out = append(out, aclEntryFromDef(e))
+		}
+		v.Value = out
 	}
-	var out []mattercore.AccessControlEntryStruct
-	for {
-		next, err := dec.Next()
-		if err != nil {
-			return im.AttributeValue{}, fmt.Errorf("AccessControl.ACL: %w", err)
-		}
-		if next.IsEndContainer {
-			return im.AttributeValue{Value: out}, nil
-		}
-		if !next.IsContainer || next.Type != tlv.TypeStructure {
-			// Skip unexpected elements but keep parsing — Apple emits
-			// only structs but we tolerate trailing padding.
-			if next.IsContainer {
-				if derr := skipContainerTLV(dec); derr != nil {
-					return im.AttributeValue{}, derr
-				}
-			}
-			continue
-		}
-		entry, err := decodeACLEntry(dec)
-		if err != nil {
-			return im.AttributeValue{}, err
-		}
-		out = append(out, entry)
-	}
+	return v, err
 }
 
-// decodeACLEntry reads one AccessControlEntryStruct (§9.10.4.4):
-//
-//	[1]   privilege   enum8
-//	[2]   auth-mode   enum8
-//	[3]   subjects    nullable list of node-id (uint64)
-//	[4]   targets     nullable list of struct{ [0] cluster, [1] endpoint, [2] device-type }
-//	[254] fabric-index uint8
-//
-// Caller has consumed the entry's struct opener.
-func decodeACLEntry(dec *tlv.Decoder) (mattercore.AccessControlEntryStruct, error) {
-	var e mattercore.AccessControlEntryStruct
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return mattercore.AccessControlEntryStruct{}, fmt.Errorf("ACL entry: %w", err)
-		}
-		if el.IsEndContainer {
-			return e, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch el.Tag.Number {
-		case 1:
-			e.Privilege = uint8(el.Uint & 0xFF)
-		case 2:
-			e.AuthMode = uint8(el.Uint & 0xFF)
-		case 3:
-			if el.IsNull {
-				e.Subjects = nil
-				continue
+// aclEntryFromDef is the cluster/core form of a decoded ACL entry. An
+// empty subject or target list is nil, as a null one: both match every
+// subject or target.
+func aclEntryFromDef(e acldef.AccessControlEntryStruct) mattercore.AccessControlEntryStruct {
+	out := mattercore.AccessControlEntryStruct{
+		Privilege:   uint8(e.Privilege),
+		AuthMode:    uint8(e.AuthMode),
+		FabricIndex: e.FabricIndex,
+	}
+	if !e.Subjects.Null && len(e.Subjects.Value) > 0 {
+		out.Subjects = append([]uint64(nil), e.Subjects.Value...)
+	}
+	if !e.Targets.Null && len(e.Targets.Value) > 0 {
+		out.Targets = make([]mattercore.ACLTargetStruct, 0, len(e.Targets.Value))
+		for _, t := range e.Targets.Value {
+			var ct mattercore.ACLTargetStruct
+			if !t.Cluster.Null {
+				ct.Cluster = &t.Cluster.Value
 			}
-			if !el.IsContainer || el.Type != tlv.TypeArray {
-				return mattercore.AccessControlEntryStruct{}, fmt.Errorf("bridge: ACL entry: subjects not array (type=0x%02X)", el.Type)
+			if !t.Endpoint.Null {
+				ct.Endpoint = &t.Endpoint.Value
 			}
-			subs, err := decodeACLSubjects(dec)
-			if err != nil {
-				return mattercore.AccessControlEntryStruct{}, err
+			if !t.DeviceType.Null {
+				ct.DeviceType = &t.DeviceType.Value
 			}
-			e.Subjects = subs
-		case 4:
-			if el.IsNull {
-				e.Targets = nil
-				continue
-			}
-			if !el.IsContainer || el.Type != tlv.TypeArray {
-				return mattercore.AccessControlEntryStruct{}, fmt.Errorf("bridge: ACL entry: targets not array (type=0x%02X)", el.Type)
-			}
-			tgts, err := decodeACLTargets(dec)
-			if err != nil {
-				return mattercore.AccessControlEntryStruct{}, err
-			}
-			e.Targets = tgts
-		case 5:
-			// AuxiliaryType: a controller may not write it; the cluster
-			// refuses the write with Failure (matter.js
-			// AccessControlServer #validateAccessControlListChanges).
-			if el.IsContainer {
-				if err := skipContainerTLV(dec); err != nil {
-					return mattercore.AccessControlEntryStruct{}, err
-				}
-			}
-			v := uint8(el.Uint & 0xFF)
-			e.AuxiliaryType = &v
-		case 254:
-			e.FabricIndex = uint8(el.Uint & 0xFF)
-		default:
-			if el.IsContainer {
-				if err := skipContainerTLV(dec); err != nil {
-					return mattercore.AccessControlEntryStruct{}, err
-				}
-			}
+			out.Targets = append(out.Targets, ct)
 		}
 	}
+	if e.AuxiliaryType != nil {
+		a := uint8(*e.AuxiliaryType)
+		out.AuxiliaryType = &a
+	}
+	return out
 }
 
-func decodeACLSubjects(dec *tlv.Decoder) ([]uint64, error) {
-	var out []uint64
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return nil, fmt.Errorf("ACL subjects: %w", err)
+// extensionWriteValue decodes an AccessControl.Extension write.
+func extensionWriteValue(el tlv.Element, dec *tlv.Decoder, item bool) (im.AttributeValue, error) {
+	v, err := generatedAttributeValue(acldef.Definition, acldef.AttrExtension, el, dec, item)
+	if l, ok := v.Value.(spec.List[acldef.AccessControlExtensionStruct]); ok && err == nil {
+		out := make([]mattercore.AccessControlExtensionEntry, 0, len(l))
+		for _, e := range l {
+			out = append(out, mattercore.AccessControlExtensionEntry{Data: append([]byte(nil), e.Data...), FabricIndex: e.FabricIndex})
 		}
-		if el.IsEndContainer {
-			return out, nil
-		}
-		out = append(out, el.Uint)
+		v.Value = out
 	}
+	return v, err
 }
 
-func decodeACLTargets(dec *tlv.Decoder) ([]mattercore.ACLTargetStruct, error) {
-	var out []mattercore.ACLTargetStruct
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return nil, fmt.Errorf("ACL targets: %w", err)
+// groupKeyMapWriteValue decodes a GroupKeyManagement.GroupKeyMap write.
+func groupKeyMapWriteValue(el tlv.Element, dec *tlv.Decoder, item bool) (im.AttributeValue, error) {
+	v, err := generatedAttributeValue(gkmdef.Definition, gkmdef.AttrGroupKeyMap, el, dec, item)
+	if l, ok := v.Value.(spec.List[gkmdef.GroupKeyMapStruct]); ok && err == nil {
+		out := make([]mattercore.GroupKeyMapStruct, 0, len(l))
+		for _, e := range l {
+			out = append(out, mattercore.GroupKeyMapStruct{GroupID: e.GroupId, GroupKeySetID: e.GroupKeySetId, FabricIndex: e.FabricIndex})
 		}
-		if el.IsEndContainer {
-			return out, nil
-		}
-		if !el.IsContainer || el.Type != tlv.TypeStructure {
-			continue
-		}
-		t, err := decodeACLTarget(dec)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
+		v.Value = out
 	}
-}
-
-func decodeACLTarget(dec *tlv.Decoder) (mattercore.ACLTargetStruct, error) {
-	var t mattercore.ACLTargetStruct
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return mattercore.ACLTargetStruct{}, fmt.Errorf("ACL target: %w", err)
-		}
-		if el.IsEndContainer {
-			return t, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch el.Tag.Number {
-		case 0:
-			if !el.IsNull {
-				v := uint32(el.Uint & 0xFFFFFFFF)
-				t.Cluster = &v
-			}
-		case 1:
-			if !el.IsNull {
-				v := uint16(el.Uint & 0xFFFF)
-				t.Endpoint = &v
-			}
-		case 2:
-			if !el.IsNull {
-				v := uint32(el.Uint & 0xFFFFFFFF)
-				t.DeviceType = &v
-			}
-		}
-	}
-}
-
-// decodeGroupKeyMapList reads an array of GroupKeyMapStruct
-// (Matter §11.2.10.4.1) from the TLV stream. el is the array opener; the
-// caller already consumed it via dec.Next(). Field tags mirror matter.js
-// packages/model/src/standard/elements/group-key-management.element.ts:106-111
-// (GroupId [1] uint16, GroupKeySetId [2] uint16, FabricIndex [254] uint8)
-// and the read-direction encoder in reply.go's []GroupKeyMapStruct case.
-// Draining this to nil (the old primitive fall-through) made every
-// GroupKeyMap write answer FAILURE, so no group-cast key binding was ever
-// established.
-func decodeGroupKeyMapList(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
-	if !el.IsContainer || el.Type != tlv.TypeArray {
-		return im.AttributeValue{}, fmt.Errorf("bridge: GroupKeyManagement.GroupKeyMap: value is not array (type=0x%02X)", el.Type)
-	}
-	var out []mattercore.GroupKeyMapStruct
-	for {
-		next, err := dec.Next()
-		if err != nil {
-			return im.AttributeValue{}, fmt.Errorf("GroupKeyManagement.GroupKeyMap: %w", err)
-		}
-		if next.IsEndContainer {
-			return im.AttributeValue{Value: out}, nil
-		}
-		if !next.IsContainer || next.Type != tlv.TypeStructure {
-			if next.IsContainer {
-				if derr := skipContainerTLV(dec); derr != nil {
-					return im.AttributeValue{}, derr
-				}
-			}
-			continue
-		}
-		entry, err := decodeGroupKeyMapEntry(dec)
-		if err != nil {
-			return im.AttributeValue{}, err
-		}
-		out = append(out, entry)
-	}
-}
-
-// decodeGroupKeyMapEntry reads one GroupKeyMapStruct (§11.2.10.4.1):
-//
-//	[1]   group-id        uint16
-//	[2]   group-key-set-id uint16
-//	[254] fabric-index    uint8
-//
-// Caller has consumed the entry's struct opener.
-func decodeGroupKeyMapEntry(dec *tlv.Decoder) (mattercore.GroupKeyMapStruct, error) {
-	var e mattercore.GroupKeyMapStruct
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return mattercore.GroupKeyMapStruct{}, fmt.Errorf("GroupKeyMap entry: %w", err)
-		}
-		if el.IsEndContainer {
-			return e, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch el.Tag.Number {
-		case 1:
-			e.GroupID = uint16(el.Uint & 0xFFFF)
-		case 2:
-			e.GroupKeySetID = uint16(el.Uint & 0xFFFF)
-		case 254:
-			e.FabricIndex = uint8(el.Uint & 0xFF)
-		default:
-			if el.IsContainer {
-				if err := skipContainerTLV(dec); err != nil {
-					return mattercore.GroupKeyMapStruct{}, err
-				}
-			}
-		}
-	}
-}
-
-// decodeExtensionList reads an array of AccessControlExtensionStruct
-// (Matter §9.10.4.6) from the TLV stream. el is the array opener; the
-// caller already consumed it via dec.Next(). Field tags mirror matter.js
-// packages/model/src/standard/elements/access-control.element.ts:204-208
-// (Data [1] octstr<128>, FabricIndex [254] uint8). The cluster server
-// re-stamps FabricIndex from the session context on write; it is decoded
-// here for symmetry with the read encoder. Draining this to nil (the old
-// primitive fall-through) made every Extension write answer FAILURE.
-func decodeExtensionList(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
-	if !el.IsContainer || el.Type != tlv.TypeArray {
-		return im.AttributeValue{}, fmt.Errorf("bridge: AccessControl.Extension: value is not array (type=0x%02X)", el.Type)
-	}
-	var out []mattercore.AccessControlExtensionEntry
-	for {
-		next, err := dec.Next()
-		if err != nil {
-			return im.AttributeValue{}, fmt.Errorf("AccessControl.Extension: %w", err)
-		}
-		if next.IsEndContainer {
-			return im.AttributeValue{Value: out}, nil
-		}
-		if !next.IsContainer || next.Type != tlv.TypeStructure {
-			if next.IsContainer {
-				if derr := skipContainerTLV(dec); derr != nil {
-					return im.AttributeValue{}, derr
-				}
-			}
-			continue
-		}
-		entry, err := decodeExtensionEntry(dec)
-		if err != nil {
-			return im.AttributeValue{}, err
-		}
-		out = append(out, entry)
-	}
-}
-
-// decodeExtensionEntry reads one AccessControlExtensionStruct (§9.10.4.6):
-//
-//	[1]   data         octstr<128>
-//	[254] fabric-index uint8
-//
-// Caller has consumed the entry's struct opener.
-func decodeExtensionEntry(dec *tlv.Decoder) (mattercore.AccessControlExtensionEntry, error) {
-	var e mattercore.AccessControlExtensionEntry
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return mattercore.AccessControlExtensionEntry{}, fmt.Errorf("extension entry: %w", err)
-		}
-		if el.IsEndContainer {
-			return e, nil
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch el.Tag.Number {
-		case 1:
-			e.Data = append([]byte(nil), el.Octets...)
-		case 254:
-			e.FabricIndex = uint8(el.Uint & 0xFF)
-		default:
-			if el.IsContainer {
-				if err := skipContainerTLV(dec); err != nil {
-					return mattercore.AccessControlExtensionEntry{}, err
-				}
-			}
-		}
-	}
+	return v, err
 }
 
 // primitiveAttributeValue extracts a primitive Go value from a
-// non-container TLV element. Containers are drained — without a
-// cluster-aware decoder the bridge has no way to surface the inner
-// structure and the cluster server will get a zero-typed value.
+// non-container TLV element. A container is drained and answered with an
+// [undecodedValue]: without a cluster-aware decoder the bridge cannot
+// surface its structure, and a value that is neither null nor anything
+// was a written null to the dispatcher — a structure written to a
+// nullable scalar cleared it with Success (R2-P6-wire-0442). The
+// definition's check refuses an undecoded value.
 func primitiveAttributeValue(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
 	if el.IsNull {
 		return im.AttributeValue{IsNull: true}, nil
@@ -502,7 +267,7 @@ func primitiveAttributeValue(el tlv.Element, dec *tlv.Decoder) (im.AttributeValu
 		if err := skipContainerTLV(dec); err != nil {
 			return im.AttributeValue{}, err
 		}
-		return im.AttributeValue{}, nil
+		return im.AttributeValue{Value: undecodedValue{fmt.Errorf("bridge: a %s written where the attribute has no structured decoder", containerKind(el))}}, nil
 	}
 	switch el.Type {
 	case tlv.TypeBoolTrue:
@@ -559,17 +324,13 @@ func skipContainerTLV(dec *tlv.Decoder) error {
 // appends (Matter §10.6.4.3.1); chip's TestOnlyWriteAttributeWithLegacyList
 // and matter.js's AttributeWriteResponse both produce and accept them.
 func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
-	isStruct := el.IsContainer && el.Type == tlv.TypeStructure
 	switch {
-	case path.Cluster == 0x001F && path.Attribute == 0x0000 && isStruct:
-		e, err := decodeACLEntry(dec)
-		return im.AttributeValue{Value: []mattercore.AccessControlEntryStruct{e}}, err
-	case path.Cluster == 0x001F && path.Attribute == 0x0001 && isStruct:
-		e, err := decodeExtensionEntry(dec)
-		return im.AttributeValue{Value: []mattercore.AccessControlExtensionEntry{e}}, err
-	case path.Cluster == 0x003F && path.Attribute == 0x0000 && isStruct:
-		e, err := decodeGroupKeyMapEntry(dec)
-		return im.AttributeValue{Value: []mattercore.GroupKeyMapStruct{e}}, err
+	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrAcl && el.IsContainer:
+		return aclWriteValue(el, dec, true)
+	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrExtension && el.IsContainer:
+		return extensionWriteValue(el, dec, true)
+	case path.Cluster == gkmdef.ClusterID && path.Attribute == gkmdef.AttrGroupKeyMap && el.IsContainer:
+		return groupKeyMapWriteValue(el, dec, true)
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, true)
 	case path.Cluster == bindingdef.ClusterID && path.Attribute == bindingdef.AttrBinding && el.IsContainer:
@@ -599,6 +360,9 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 	if err != nil {
 		return v, err
 	}
+	if _, undecoded := v.Value.(undecodedValue); undecoded {
+		return v, nil
+	}
 	return im.AttributeValue{Value: []any{v.Value}}, nil
 }
 
@@ -627,5 +391,17 @@ func stampFabricPlaceholder(n *spec.Node) {
 		if !found {
 			entry.Children = append(entry.Children, placeholder)
 		}
+	}
+}
+
+// containerKind names el's container type for an error text.
+func containerKind(el tlv.Element) string {
+	switch el.Type {
+	case tlv.TypeStructure:
+		return "structure"
+	case tlv.TypeArray:
+		return "array"
+	default:
+		return "list"
 	}
 }
