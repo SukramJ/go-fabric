@@ -110,11 +110,12 @@ func NewRequestor(cfg RequestorConfig) (*Requestor, error) {
 	return r, nil
 }
 
-// Sessions returns the tracked sessions, in the order they were added.
+// Sessions returns the tracked sessions, in the order they were added: a
+// deep copy, which the caller may change.
 func (r *Requestor) Sessions() []WebRTCSession {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return slices.Clone(r.sessions)
+	return cloneAll(r.sessions)
 }
 
 // UpsertSession registers or updates a session the host initiated with a
@@ -128,7 +129,7 @@ func (r *Requestor) Sessions() []WebRTCSession {
 //
 // It must not be called from the server's own change notification.
 func (r *Requestor) UpsertSession(session WebRTCSession) error {
-	enriched := session
+	enriched := session.Clone()
 	enriched.VideoStreamId = firstStream(session.VideoStreams) // :104
 	enriched.AudioStreamId = firstStream(session.AudioStreams) // :105
 	return r.change(contract.OriginHostSet, func(sessions []WebRTCSession) ([]WebRTCSession, bool) {
