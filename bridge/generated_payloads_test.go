@@ -41,7 +41,9 @@ func TestGeneratedRequestDecoding(t *testing.T) {
 	t.Parallel()
 	alias := *rvcrunmode.Definition
 	alias.ID = 0xFFF5_0054
-	spec.Register(&alias)
+	if spec.Lookup(alias.ID) == nil { // a second run (-count) keeps the first's: Register panics on a duplicate
+		spec.Register(&alias)
+	}
 	got := decodeCommandFields(t, alias.ID, rvcrunmode.CmdChangeToMode, "1524000718")
 	if got != (rvcrunmode.ChangeToModeRequest{NewMode: 7}) {
 		t.Errorf("decoded %#v", got)

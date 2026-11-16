@@ -198,10 +198,12 @@ func TestLevelPolicyFeatureSet(t *testing.T) {
 	// A selection no re-adding repairs withholds: feature A of a
 	// synthetic cluster is mandatory and not selected.
 	const id = 0xFFF1_FC01
-	spec.Register(&spec.Cluster{ID: id, Name: "Synthetic", Features: []spec.Feature{
-		{Name: "A", Bit: 0, Conformance: spec.Conformance{Op: spec.ConfMandatory}},
-		{Name: "B", Bit: 1, Conformance: spec.Conformance{Op: spec.ConfOptional}},
-	}})
+	if spec.Lookup(id) == nil { // a second run (-count) keeps the first's: Register panics on a duplicate
+		spec.Register(&spec.Cluster{ID: id, Name: "Synthetic", Features: []spec.Feature{
+			{Name: "A", Bit: 0, Conformance: spec.Conformance{Op: spec.ConfMandatory}},
+			{Name: "B", Bit: 1, Conformance: spec.Conformance{Op: spec.ConfOptional}},
+		}})
+	}
 	b := surface.Element{Endpoint: "s", Cluster: id, Kind: surface.KindFeature, ID: 0x2, Provenance: surface.ProvenanceHostDeclared, Levels: recent}
 	_, _, err = surface.Evaluate([]surface.Element{b}, surface.Policies{Level: "1.4"})
 	var w *surface.WithheldError
