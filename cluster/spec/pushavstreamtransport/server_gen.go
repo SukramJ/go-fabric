@@ -303,10 +303,18 @@ type TLSCredentials struct {
 // PushTransportPort is the camera's push uploader (cluster/camera
 // PushTransport, after connectedhomeip's PushAvStreamTransportDelegate,
 // push-av-stream-transport-delegate.h:42-348): the kit's server
-// validates each command — the transport options, the TLS endpoint,
-// the URL, the streams against the camera's CameraAvStreamManagement
-// and the motion zones against its ZoneManagement — before it calls
-// the port, and keeps CurrentConnections. TransportBusy reports a
+// validates each command before it calls the port, and keeps
+// CurrentConnections. AllocatePushTransport is checked whole — the
+// transport options, the accessing fabric's TLS endpoint, the URL, the
+// stream usage, the streams against the camera's
+// CameraAvStreamManagement, the motion zones against its
+// ZoneManagement, the segment, bandwidth and pre-roll rules.
+// ModifyPushTransport, as connectedhomeip's HandleModifyPushTransport
+// (PushAVStreamTransportLogic.cpp:1291, :1326-1332, :1334 at
+// 6170af84), is checked for the transport options and the streams
+// only: the port receives its TLSEndpointID, URL, usage and zones
+// unchecked, and resolves a TLS endpoint within the connection's
+// fabric (fabricIndex of AllocatePushTransport). TransportBusy reports a
 // connection that uploads now; ValidateBandwidthLimit refuses a
 // transport the network cannot carry; CMAFSessionNumber is the CMAF
 // session number of the events. An error answers its status,
