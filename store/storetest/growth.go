@@ -297,3 +297,29 @@ func resumptionSessionParametersCase(ctx context.Context, t *testing.T, p store.
 	must(t, err)
 	wantEqual(t, "the session parameters after an upsert without them", got.SessionParameters, sessionparams.Parameters{})
 }
+
+// eraseOwedEventIDsCase: an owed fabric event's ID is never assigned again,
+// an Erase between two events included — the event recorded after the
+// Erase has an ID above the one recorded before it.
+func eraseOwedEventIDsCase(ctx context.Context, t *testing.T, p store.Port) {
+	idx := installedFabric(ctx, t, p, 1, store.FabricPendingAdd)
+	was, err := p.RollbackFabric(ctx, idx)
+	wantState(t, "RollbackFabric of the pending add", was, store.FabricPendingAdd, err)
+	before, err := p.OwedFabricEvents(ctx)
+	must(t, err)
+	if len(before) != 1 {
+		t.Fatalf("OwedFabricEvents before the Erase = %+v; want the rollback's", before)
+	}
+	must(t, p.Erase(ctx))
+	idx = installedFabric(ctx, t, p, 1, store.FabricPendingAdd)
+	was, err = p.RollbackFabric(ctx, idx)
+	wantState(t, "RollbackFabric of the pending add after the Erase", was, store.FabricPendingAdd, err)
+	after, err := p.OwedFabricEvents(ctx)
+	must(t, err)
+	if len(after) != 1 {
+		t.Fatalf("OwedFabricEvents after the Erase = %+v; want the second rollback's alone", after)
+	}
+	if after[0].ID <= before[0].ID {
+		t.Errorf("the event after the Erase has ID %d, the one before it %d; want an ID never assigned before", after[0].ID, before[0].ID)
+	}
+}

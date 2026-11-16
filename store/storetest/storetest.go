@@ -102,6 +102,7 @@ var cases = []testCase{
 	{"copies/credentials", copiesCredentials},
 	{"concurrent", concurrentCase},
 	{"erase", eraseCase},
+	{"erase/owed-event-ids", eraseOwedEventIDsCase},
 }
 
 // eraseCase: Erase leaves the store as a fresh one (store.Eraser, the

@@ -151,11 +151,15 @@ func newTables() tables {
 	}
 }
 
-// Erase empties the store, as [New] returns it ([store.Eraser]).
+// Erase empties the store, as [New] returns it ([store.Eraser]) — except
+// the last owed fabric event ID, which is never given again
+// ([store.OwedFabricEvent.ID]), as SQLite's AUTOINCREMENT sequence
+// outlives the rows.
 func (s *Store) Erase(context.Context) error {
 	fresh := newTables()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	fresh.owedLastID = s.owedLastID
 	s.tables = fresh
 	return nil
 }
