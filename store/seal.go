@@ -67,9 +67,17 @@ func NewAESGCMSealer(key []byte) (*AESGCMSealer, error) {
 	return &AESGCMSealer{aead: aead}, nil
 }
 
+// maxSealedPlain bounds a value Seal takes: far above any secret the store
+// keeps, and low enough that the nonce, the value and the tag fit an int on
+// a 32-bit platform.
+const maxSealedPlain = 1 << 24
+
 // Seal implements [Sealer]: the nonce, then the sealed value with its tag.
 func (a *AESGCMSealer) Seal(plain, aad []byte) ([]byte, error) {
 	n := a.aead.NonceSize()
+	if len(plain) > maxSealedPlain {
+		return nil, errors.New("store: AES-GCM sealer: value too large to seal")
+	}
 	out := make([]byte, n, n+len(plain)+a.aead.Overhead())
 	if _, err := rand.Read(out); err != nil {
 		return nil, fmt.Errorf("store: AES-GCM sealer: nonce: %w", err)

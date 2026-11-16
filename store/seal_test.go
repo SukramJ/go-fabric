@@ -522,6 +522,12 @@ func TestAESGCMSealer(t *testing.T) {
 	if _, err := store.NewAESGCMSealer(make([]byte, 16)); err == nil {
 		t.Error("NewAESGCMSealer accepted a 16-byte key")
 	}
+	if _, err := a.Seal(make([]byte, 1<<24), aad); err != nil {
+		t.Errorf("Seal of a 16 MiB value: %v", err)
+	}
+	if _, err := a.Seal(make([]byte, 1<<24+1), aad); err == nil {
+		t.Error("Seal took a value above its bound")
+	}
 }
 
 // TestSealedStoreContract holds the sealed Store to the port's contract,
