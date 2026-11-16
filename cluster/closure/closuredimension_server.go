@@ -229,13 +229,13 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 		if err := s.checkState(*cfg.CurrentState, false); err != nil {
 			return nil, err
 		}
-		s.current = clone(cfg.CurrentState)
+		s.current = cloneState(cfg.CurrentState)
 	}
 	if cfg.TargetState != nil {
 		if err := s.checkState(*cfg.TargetState, true); err != nil {
 			return nil, err
 		}
-		s.target = clone(cfg.TargetState)
+		s.target = cloneState(cfg.TargetState)
 	}
 	return s, nil
 }
@@ -247,6 +247,17 @@ func clone[T any](p *T) *T {
 		return nil
 	}
 	v := *p
+	return &v
+}
+
+// cloneState is a deep copy of a DimensionState, nil for nil: the
+// generated Clone, so a state handed in or out shares no field with the
+// one the server holds (decision 142).
+func cloneState(p *DimensionState) *DimensionState {
+	if p == nil {
+		return nil
+	}
+	v := p.Clone()
 	return &v
 }
 
@@ -520,13 +531,12 @@ func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest
 		return spec.Errorf(im.StatusInvalidCommand, "closure: SetTarget without a field")
 	}
 	s.mu.Lock()
-	target := DimensionState{}
-	if s.target != nil {
-		target = *s.target
-	}
-	current := clone(s.current)
+	current := cloneState(s.current)
 	s.mu.Unlock()
 
+	// The fields the command sets; they are merged into the target as it
+	// is after the handler ran (mergeTarget).
+	var target DimensionState
 	position := clone(req.Position)
 	if position != nil && s.has(cd.FeaturePositioning) {
 		if *position > Percent100thsMax {
@@ -571,10 +581,53 @@ func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest
 	if err := s.cfg.Handler.SetTarget(ctx, position, req.Latch, req.Speed); err != nil {
 		return handlerRefusal("SetTarget", err)
 	}
-	if err := s.SetTargetState(&target); err != nil {
+	if err := s.mergeTarget(target); err != nil {
 		return spec.Errorf(im.StatusFailure, "closure: SetTarget: %v", err)
 	}
 	return nil
+}
+
+// mergeTarget stores the fields set gives — Position, Latch, Speed, each
+// when not nil — into TargetState as it is when the command stores it, so a
+// field the host's SetTargetState changed while the handler ran, and the
+// command did not set, survives (R2-P6-conc-1585). The merged state is
+// checked as SetTargetState checks one; a target that moved again between
+// the read and the store is merged again.
+func (s *DimensionServer) mergeTarget(set DimensionState) error {
+	for {
+		s.mu.Lock()
+		before := cloneState(s.target)
+		s.mu.Unlock()
+		next := DimensionState{}
+		if before != nil {
+			next = *before
+		}
+		if set.Position != nil {
+			next.Position = set.Position
+		}
+		if set.Latch != nil {
+			next.Latch = set.Latch
+		}
+		if set.Speed != nil {
+			next.Speed = set.Speed
+		}
+		if err := s.checkState(next, true); err != nil {
+			return err
+		}
+		s.mu.Lock()
+		if !equalState(s.target, before) {
+			s.mu.Unlock()
+			continue
+		}
+		if equalState(s.target, &next) {
+			s.mu.Unlock()
+			return nil
+		}
+		s.target = cloneState(&next)
+		s.mu.Unlock()
+		s.changed(cd.AttrTargetState)
+		return nil
+	}
 }
 
 // handlerRefusal is the answer to a handler's refusal of cmd: the status
@@ -601,13 +654,11 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 		return spec.Errorf(im.StatusConstraintError, "closure: NumberOfSteps 0")
 	}
 	s.mu.Lock()
-	target := DimensionState{}
-	if s.target != nil {
-		target = *s.target
-	}
-	current := clone(s.current)
+	current := cloneState(s.current)
 	limit := s.limit
 	s.mu.Unlock()
+
+	var target DimensionState // the fields Step sets (mergeTarget)
 
 	if req.Speed != nil && s.has(cd.FeatureSpeed) {
 		if !s.EnumSupported(cd.ThreeLevelAutoEnumDef, uint64(*req.Speed)) {
@@ -640,7 +691,7 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 		return handlerRefusal("Step", err)
 	}
 	target.Position = &spec.Nullable[uint16]{Value: uint16(pos)} //nolint:gosec // at most the ceiling, 10000
-	if err := s.SetTargetState(&target); err != nil {
+	if err := s.mergeTarget(target); err != nil {
 		return spec.Errorf(im.StatusFailure, "closure: Step: %v", err)
 	}
 	return nil
@@ -650,14 +701,14 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 func (s *DimensionServer) CurrentState() *DimensionState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return clone(s.current)
+	return cloneState(s.current)
 }
 
 // TargetState returns the target state; nil is null.
 func (s *DimensionServer) TargetState() *DimensionState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return clone(s.target)
+	return cloneState(s.target)
 }
 
 // SetCurrentState records the device's state; nil is null. It is refused
@@ -704,7 +755,7 @@ func (s *DimensionServer) SetCurrentState(st *DimensionState) error {
 			}
 		}
 	}
-	s.current = clone(st)
+	s.current = cloneState(st)
 	s.mu.Unlock()
 	if dirty {
 		s.changed(cd.AttrCurrentState)
@@ -729,7 +780,7 @@ func (s *DimensionServer) SetTargetState(st *DimensionState) error {
 		s.mu.Unlock()
 		return nil
 	}
-	s.target = clone(st)
+	s.target = cloneState(st)
 	s.mu.Unlock()
 	s.changed(cd.AttrTargetState)
 	return nil
