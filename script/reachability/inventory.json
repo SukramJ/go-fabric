@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9309,
+  "entry_points": 9297,
   "entry_packages": [
     ".",
     "bdx",
@@ -33716,7 +33716,7 @@
       "identifier": "TestCameraSimAppPipeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 858
+      "line": 866
     },
     {
       "package": "examples/reference-bridge",
@@ -33730,35 +33730,35 @@
       "identifier": "TestCameraSimChime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 831
+      "line": 839
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimDigitalPTZ",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 629
+      "line": 637
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimMechanicalPTZ",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 579
+      "line": 587
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimMotionTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 518
+      "line": 526
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimPushTransportLifecycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 412
+      "line": 420
     },
     {
       "package": "examples/reference-bridge",
@@ -33779,14 +33779,14 @@
       "identifier": "TestCameraSimWebRTCProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 287
+      "line": 292
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimZoneTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 723
+      "line": 731
     },
     {
       "package": "examples/reference-bridge",
