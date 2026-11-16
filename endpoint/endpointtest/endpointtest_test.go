@@ -77,3 +77,25 @@ func TestFakeStoreErase(t *testing.T) {
 		t.Fatalf("first number after the erase %d (%v), want 2", id, err)
 	}
 }
+
+// TestEveryFabricListsEveryIndex: the fabric source a test's Binding
+// servers take lists the indexes 1 to 254, once each (review II,
+// R2-P6-store-1010, decision 158).
+func TestEveryFabricListsEveryIndex(t *testing.T) {
+	t.Parallel()
+	got, err := endpointtest.EveryFabric.ListFabrics(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 254 {
+		t.Fatalf("%d fabrics, want 254", len(got))
+	}
+	for i, f := range got {
+		if int(f.FabricIndex) != i+1 {
+			t.Fatalf("entry %d is fabric %d, want %d", i, f.FabricIndex, i+1)
+		}
+	}
+	if c := endpointtest.AssemblerConfig(); c.Fabrics != endpointtest.EveryFabric {
+		t.Error("the assembler config does not carry EveryFabric")
+	}
+}

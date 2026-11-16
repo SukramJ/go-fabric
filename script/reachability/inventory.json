@@ -5164,7 +5164,7 @@
       "identifier": "TestPaseClaimIsReadUnderTheLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_claim_test.go",
-      "line": 211
+      "line": 213
     },
     {
       "package": "bridge",
