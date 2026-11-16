@@ -67,10 +67,11 @@ const messagesMax = 8
 //     ConfirmationResponse is INVALID_COMMAND (src/app/clusters/
 //     messages-server/messages-server.cpp:359-363); the host's refusal is
 //     FAILURE (:392-400).
-//   - A message whose MessageID is queued already replaces it: a presented
-//     one completes first (examples/tv-app/tv-common/clusters/messages/
-//     MessagesManager.cpp HandlePresentMessagesRequest), and the new one is
-//     queued and MessageQueued emitted.
+//   - A message whose MessageID the accessing fabric has queued already
+//     replaces it: a presented one completes first (examples/tv-app/
+//     tv-common/clusters/messages/MessagesManager.cpp
+//     HandlePresentMessagesRequest), and the new one is queued and
+//     MessageQueued emitted.
 //   - CancelMessagesRequest completes a presented message and drops a
 //     queued one; an unknown id is skipped (HandleCancelMessagesRequest).
 //   - ActiveMessageIds lists the presented messages
@@ -78,7 +79,13 @@ const messagesMax = 8
 //
 // Beyond both: a queue holding its eight messages (the list's "max 8")
 // answers a ninth RESOURCE_EXHAUSTED, and a cancel touches only the
-// accessing fabric's messages, as only they are visible to it.
+// accessing fabric's messages, as only they are visible to it. A present
+// whose MessageID another fabric's message holds — queued, or being
+// presented — is refused ALREADY_EXISTS and that message stays as it is:
+// chip's example looks the id up across fabrics and replaces it
+// (MessagesManager.cpp:73-87, FindCachedMessage(messageId)), so one
+// fabric could take down another's presented message (review II,
+// R2-P6-sec-1201, decision 129).
 type Messages struct {
 	*spec.Instance
 	cluster.AttributeChanges
@@ -98,9 +105,19 @@ type Messages struct {
 	// against the queue's eight so two presents cannot both take its last
 	// slot while the presenter has them.
 	presenting int
+	// inFlight holds the id and fabric of every present whose
+	// PresentMessage runs, so another fabric's present of the same id is
+	// refused while the presenter has it.
+	inFlight []messagesInFlight
 	// pending holds what a change under mu reports once mu is released.
 	pendingAttrs  []uint32
 	pendingEvents []messagesEvent
+}
+
+// messagesInFlight is one present at the presenter.
+type messagesInFlight struct {
+	id     []byte
+	fabric uint8
 }
 
 // messagesEvent is an event a change emits once the lock is released.
@@ -266,6 +283,10 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	// under mu, the presenter called without it, the result applied under
 	// it again (ADR 0026 P6).
 	m.mu.Lock()
+	if m.heldByAnotherLocked(msg.MessageId, fabric) {
+		m.unlock()
+		return bindingStatusError{code: im.StatusAlreadyExists, msg: "core: Messages: another fabric's message holds the MessageID"}
+	}
 	reserved := m.indexLocked(msg.MessageId) < 0
 	if reserved && len(m.messages)+m.presenting >= messagesMax {
 		m.unlock()
@@ -274,6 +295,8 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	if reserved {
 		m.presenting++
 	}
+	flight := messagesInFlight{id: msg.MessageId, fabric: fabric}
+	m.inFlight = append(m.inFlight, flight)
 	m.mu.Unlock()
 	err := m.presenter.PresentMessage(ctx, msg)
 	m.mu.Lock()
@@ -281,11 +304,18 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	if reserved {
 		m.presenting--
 	}
+	if f := slices.IndexFunc(m.inFlight, func(e messagesInFlight) bool {
+		return e.fabric == flight.fabric && bytes.Equal(e.id, flight.id)
+	}); f >= 0 {
+		m.inFlight = slices.Delete(m.inFlight, f, f+1)
+	}
 	if err != nil {
 		return messagesStatus(err)
 	}
 	// A message with the same id replaces the queued one, looked up again:
-	// it may have gone or come while the presenter ran.
+	// it may have gone or come while the presenter ran. Only the accessing
+	// fabric's can be there: another fabric's present of the id was
+	// refused while this one was in flight.
 	if i := m.indexLocked(msg.MessageId); i >= 0 {
 		m.removeLocked(i)
 	}
@@ -336,6 +366,17 @@ func messagesStatus(err error) error {
 		return err
 	}
 	return bindingStatusError{code: im.StatusFailure, msg: "core: Messages: " + err.Error()}
+}
+
+// heldByAnotherLocked reports whether a message of a fabric other than
+// fabric holds id: queued, or at the presenter (R2-P6-sec-1201).
+func (m *Messages) heldByAnotherLocked(id []byte, fabric uint8) bool {
+	if i := m.indexLocked(id); i >= 0 && m.messages[i].FabricIndex != fabric {
+		return true
+	}
+	return slices.ContainsFunc(m.inFlight, func(e messagesInFlight) bool {
+		return e.fabric != fabric && bytes.Equal(e.id, id)
+	})
 }
 
 // indexLocked is the queue position of id, -1 when it is not queued.
