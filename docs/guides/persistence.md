@@ -317,6 +317,7 @@ and `sqlstore.Apply`:
 | `matter_client_versions` | each stored cluster's DataVersion |
 | `matter_client_values`, cluster `0xFFFFFFFD` | each node's ICD Check-In registration: key, pending key, counter state, monitored subject, client type |
 | `matter_client_values`, cluster `0xFFFFFFFC` | a node's onboarding code, when kept (`Config.KeepOnboardingCodes`) or attached: the code, its source, the time, the checks it passed — a secret, like the keys above |
+| `matter_client_metadata` | the registry's marks: `sqlstore.seal_scrub_owed` while a sealing's scrub of the file has not finished (`sqlstore.NewSealed`) |
 
 The two `controller.ca` keys are `ca.SettingStore`'s default; another
 `Key` moves both. The controller keeps one CASE resumption record per node

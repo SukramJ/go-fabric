@@ -31,3 +31,11 @@ CREATE TABLE IF NOT EXISTS matter_client_versions (
     version     INTEGER  CHECK(version BETWEEN 0 AND 4294967295),
     PRIMARY KEY(node_id, endpoint, cluster)
 );
+
+-- matter_client_metadata holds the store's own counters and marks
+-- (migration v2): sqlstore.seal_scrub_owed while a sealing's scrub of the
+-- file has not finished (sqlstore.NewSealed).
+CREATE TABLE IF NOT EXISTS matter_client_metadata (
+    key         TEXT     PRIMARY KEY NOT NULL,
+    value       INTEGER  NOT NULL
+);

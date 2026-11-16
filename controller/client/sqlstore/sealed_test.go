@@ -6,7 +6,9 @@ package sqlstore_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -269,4 +271,108 @@ func TestSealedStoreErrors(t *testing.T) {
 	if _, err := sqlstore.NewSealed(ctx, closed, sealerOf(t, 7)); err == nil {
 		t.Error("NewSealed on a closed database")
 	}
+}
+
+// clearRegistry is a WAL database holding a clear onboarding code among
+// filler rows, as a registry written without a sealer leaves it.
+func clearRegistry(t *testing.T, code []byte) (db *sql.DB, path string) {
+	t.Helper()
+	ctx := context.Background()
+	path = filepath.Join(t.TempDir(), "client.db")
+	db, err := store.OpenSQLite(path, "journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := sqlstore.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	plain := sqlstore.New(db)
+	if err := plain.Save("n", 0, onboardingCluster, map[uint32][]byte{0: code}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 50 {
+		if err := plain.Save(fmt.Sprintf("filler-%02d", i), 1, 0x0006, map[uint32][]byte{0: bytes.Repeat([]byte{byte(i)}, 64)}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return db, path
+}
+
+// fileHolds reports whether the database file or its -wal holds plain.
+func fileHolds(t *testing.T, path string, plain []byte) bool {
+	t.Helper()
+	for _, f := range []string{path, path + "-wal"} {
+		b, err := os.ReadFile(f)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			t.Fatal(err)
+		}
+		if bytes.Contains(b, plain) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestNewSealedScrubsAScrubItOwes: the scrub a sealing owes is recorded
+// with the sealing and run by every NewSealed until it finished, as
+// store.NewSealed does for the device's store. A process that ends after
+// the sealing committed and before the scrub leaves the clear code in the
+// file; the next NewSealed scrubs it. A scrub a reader blocks is
+// store.ErrScrubIncomplete, and the next NewSealed, the reader gone,
+// scrubs.
+func TestNewSealedScrubsAScrubItOwes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	code := []byte("MT:OWEDSCRUBCODE0")
+
+	t.Run("a process that ended before the scrub", func(t *testing.T) {
+		t.Parallel()
+		db, path := clearRegistry(t, code)
+		if n, err := sqlstore.SealWithoutScrub(ctx, db, sealerOf(t, 7)); err != nil || n != 1 {
+			t.Fatalf("the sealing: %d, %v; want the code sealed", n, err)
+		}
+		if !fileHolds(t, path, code) {
+			t.Fatal("the clear code is gone without a scrub: the test shows nothing")
+		}
+		if _, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7)); err != nil {
+			t.Fatal(err)
+		}
+		if fileHolds(t, path, code) {
+			t.Error("the next NewSealed left the clear code in the file: the owed scrub was not run")
+		}
+	})
+	t.Run("a checkpoint a reader blocks", func(t *testing.T) {
+		t.Parallel()
+		db, path := clearRegistry(t, code)
+		// One connection whose blocked checkpoint answers at once, as
+		// store's TestStoreEraseWhoseCheckpointAReaderBlocks.
+		db.SetMaxOpenConns(1)
+		if _, err := db.ExecContext(ctx, `PRAGMA busy_timeout = 0`); err != nil {
+			t.Fatal(err)
+		}
+		reader, err := store.OpenSQLite(path, "journal_mode(WAL)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = reader.Close() }()
+		tx, err := reader.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var rows int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM matter_client_values`).Scan(&rows); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7)); !errors.Is(err, store.ErrScrubIncomplete) {
+			t.Fatalf("NewSealed while a reader held the -wal: %v, want store.ErrScrubIncomplete", err)
+		}
+		_ = tx.Rollback()
+		if _, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7)); err != nil {
+			t.Fatalf("NewSealed with the reader gone: %v", err)
+		}
+		if fileHolds(t, path, code) {
+			t.Error("the clear code is still in the file after the second NewSealed: the owed scrub was not run")
+		}
+	})
 }

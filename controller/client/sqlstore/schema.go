@@ -46,7 +46,8 @@ func Apply(ctx context.Context, db *sql.DB) error {
 // dependency bump. Steps:
 //
 //   - matter_client_values gains migration v2's seal mark when it lacks
-//     it, with v2's statement.
+//     it, with v2's statements (matter_client_metadata, which v2 also
+//     creates, comes with the schema's CREATE TABLE IF NOT EXISTS).
 func Upgrade(ctx context.Context, db *sql.DB) error {
 	var tables, columns int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'matter_client_values'`).Scan(&tables); err != nil {

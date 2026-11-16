@@ -98,16 +98,21 @@ func sealAAD(nodeID string, ep uint16, cluster, attribute uint32) []byte {
 
 // NewSealed returns the store over db with its secret values sealed under
 // s — the kept onboarding codes and the ICD Check-In keys ([isSecret]);
-// every other value stays clear. db must carry migration v2 ([Apply]). It does what
-// [store.NewSealed] does for the device's store
-// (store/seal.go, NewSealed): it first opens one sealed value the database
-// already holds, so a sealer under another key fails with
-// [store.ErrUnseal] before anything is written; then it seals every
-// secret value it finds in clear, in one transaction, and rewrites the
-// file and empties the -wal ([store.Scrub]) when it sealed one, so the
-// clear values do not stay behind in free pages. While the store is open
-// it writes no secret value in clear, and a secret value it reads without
-// the seal mark is refused with [store.ErrUnseal].
+// every other value stays clear. db must carry migration v2 ([Apply]). It
+// does what [store.NewSealed] does for the device's store
+// (store/seal.go, NewSealed and sealClearRows): it first opens one sealed
+// value the database already holds, so a sealer under another key fails
+// with [store.ErrUnseal] before anything is written; then it seals every
+// secret value it finds in clear in one transaction, which also records
+// that a scrub of the file is owed; and while one is owed it rewrites the
+// file and empties the -wal ([store.Scrub]), so the clear values do not
+// stay behind in free pages, and then deletes the record. A scrub that does
+// not finish — a reader holds the -wal — is [store.ErrScrubIncomplete],
+// and so is the next NewSealed's until one finishes; a process that ends
+// between the sealing and the scrub leaves the scrub to the next
+// NewSealed. While the store is open it writes no secret value in clear,
+// and a secret value it reads without the seal mark is refused with
+// [store.ErrUnseal].
 func NewSealed(ctx context.Context, db *sql.DB, s store.Sealer) (*Store, error) {
 	if s == nil {
 		return nil, errors.New("sqlstore: NewSealed: nil Sealer")
@@ -129,26 +134,44 @@ func NewSealed(ctx context.Context, db *sql.DB, s store.Sealer) (*Store, error) 
 			return nil, fmt.Errorf("sqlstore: open sealed store: %w: %w", store.ErrUnseal, err)
 		}
 	}
-	sealed, err := st.sealClearValues(ctx)
-	if err != nil {
+	if _, err := st.sealClearValues(ctx); err != nil {
 		return nil, err
 	}
-	if sealed > 0 {
-		if err := store.Scrub(ctx, db); err != nil {
-			return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
-		}
+	var owed int
+	switch err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed).Scan(&owed); {
+	case err != nil:
+		return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
+	case owed == 0:
+		return st, nil
+	}
+	if err := store.Scrub(ctx, db); err != nil {
+		return nil, fmt.Errorf("sqlstore: open sealed store: the clear values are sealed: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
 	}
 	return st, nil
 }
 
+// metadataKeySealScrubOwed marks a sealing whose [store.Scrub] has not
+// finished: set in the sealing's transaction, deleted once the scrub ran
+// (store's metadataKeySealScrubOwed, in the registry's own table).
+const metadataKeySealScrubOwed = "sqlstore.seal_scrub_owed"
+
 // sealClearValues seals every secret value held in clear, in one
-// transaction, and returns how many it sealed.
+// transaction that also records the scrub it owes
+// ([metadataKeySealScrubOwed]), and returns how many it sealed.
 func (s *Store) sealClearValues(ctx context.Context) (int, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("sqlstore: seal: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	// A write first, so the transaction holds the write lock before it
+	// reads, as store's sealClearRows takes it.
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_client_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return 0, fmt.Errorf("sqlstore: seal: %w", err)
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT node_id, endpoint, cluster, attribute, value FROM matter_client_values WHERE sealed = 0 AND cluster IN (?, ?)`, onboardingCluster, icdCluster)
 	if err != nil {
 		return 0, fmt.Errorf("sqlstore: seal: %w", err)
@@ -179,6 +202,11 @@ func (s *Store) sealClearValues(ctx context.Context) (int, error) {
 			return 0, fmt.Errorf("sqlstore: seal: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE matter_client_values SET value = ?, sealed = 1 WHERE node_id = ? AND endpoint = ? AND cluster = ? AND attribute = ?`, v, r.nodeID, r.ep, r.cluster, r.attr); err != nil {
+			return 0, fmt.Errorf("sqlstore: seal: %w", err)
+		}
+	}
+	if len(plain) > 0 {
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_client_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
 			return 0, fmt.Errorf("sqlstore: seal: %w", err)
 		}
 	}

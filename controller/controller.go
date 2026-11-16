@@ -163,7 +163,10 @@ type Config struct {
 	// ICD Check-In keys. The rest — certificates, fabric and node ids, the
 	// nodes' attribute values — stays readable. A database written without
 	// a sealer is sealed on the way in and its file scrubbed, as a node's
-	// store is (store.NewSealed). The key must live outside the database
+	// store is (store.NewSealed): each store records the scrub it owes with
+	// its sealing, and a scrub that did not finish (store.ErrScrubIncomplete
+	// from New, or a process that ended first) is run by the next New. The
+	// key must live outside the database
 	// (docs/security.md, "Sealing at rest"). Every later New needs the
 	// same sealer: under another key New fails with an error that wraps
 	// store.ErrUnseal (the stores open one sealed value first); without

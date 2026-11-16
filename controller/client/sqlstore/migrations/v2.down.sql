@@ -13,3 +13,4 @@ INSERT INTO matter_client_v2_down_guard (sealed_rows) SELECT COUNT(*) FROM matte
 DROP TABLE matter_client_v2_down_guard;
 
 ALTER TABLE matter_client_values DROP COLUMN sealed;
+DROP TABLE IF EXISTS matter_client_metadata;

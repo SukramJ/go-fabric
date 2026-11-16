@@ -155,8 +155,11 @@ the key are the host's; the module rotates nothing.
 The controller takes the same sealer as `controller.Config.Sealer` (opt-in,
 off by default): `New` opens its store with `store.NewSealed` and its node
 registry with `sqlstore.NewSealed`, under the same rules — a database
-written without a sealer is sealed on the way in and its file scrubbed,
-another key fails `New` with `store.ErrUnseal`, and a store without the
+written without a sealer is sealed on the way in and its file scrubbed
+(each store records the scrub it owes with its sealing, and a scrub that
+did not finish — `store.ErrScrubIncomplete`, or a process that ended
+first — is run by the next `New`), another key fails `New` with
+`store.ErrUnseal`, and a store without the
 sealer reads a sealed secret as `store.ErrNoSealer` (so `New` without it
 fails reading the sealed CA). What a controller's database holds, sealed or
 not:
