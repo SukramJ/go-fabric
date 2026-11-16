@@ -71,3 +71,15 @@ func (o *OperationalCredentials) FailCSRBuild(err error) {
 // command holds open (review II, R2-P6-conc-1007).
 func (a *AccessControl) BeginAuxiliaryBatch()                  { a.beginAuxiliaryBatch() }
 func (a *AccessControl) EndAuxiliaryBatch(ctx context.Context) { a.endAuxiliaryBatch(ctx) }
+
+// StaleGroupFabrics reports the fabrics GroupKeyManagement holds marked
+// stale (review II, R2-P6-err-1701 R-1).
+func (g *GroupKeyManagement) StaleGroupFabrics() []uint8 {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	out := make([]uint8, 0, len(g.staleGroups))
+	for f := range g.staleGroups {
+		out = append(out, f)
+	}
+	return out
+}

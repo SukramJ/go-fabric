@@ -200,3 +200,71 @@ func TestGKMGroupKeyMapReorderIsAChange(t *testing.T) {
 		})
 	}
 }
+
+// A KeySetRemove the store took, whose reload of the group state fails,
+// answers success and fails closed: the removed key set no longer
+// authenticates group messages before any reload succeeded; the reload
+// that succeeds re-announces the memberships; a stale fabric that is
+// removed is unmarked (review II, R2-P6-err-1701 R-1).
+func TestGKMFailedReloadAfterARemovalFailsClosed(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	if _, err := fs.AddFabric(ctx, mstore.FabricRecord{FabricID: 0xA}); err != nil {
+		t.Fatal(err)
+	}
+	mgrStore := &reloadFailStore{fakeStore: fs}
+	mgr, err := groups.NewManager(mgrStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var announced atomic.Int32
+	mgr.OnMembershipChanged(func() { announced.Add(1) })
+	gkm, err := core.NewGroupKeyManagement(fs, core.GroupKeyMgmtConfig{Groups: mgr})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(7)); err != nil {
+		t.Fatal(err)
+	}
+	if err := gkm.MatterWrite(fabricCtx(1), 0x0000, []core.GroupKeyMapStruct{{GroupID: 5, GroupKeySetID: 7}}); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := mgr.HasUsableKey(ctx, 1, 5); !ok || err != nil {
+		t.Fatalf("group 5 before the removal: usable key %v, %v", ok, err)
+	}
+	mgrStore.fail.Store(true)
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x03, core.KeySetRemoveRequest{GroupKeySetID: 7}); err != nil {
+		t.Fatalf("KeySetRemove the store took: %v, want success", err)
+	}
+	if ok, _ := mgr.HasUsableKey(ctx, 1, 5); ok {
+		t.Fatal("the removed key set still serves group 5 while the group state could not reload")
+	}
+	mgrStore.fail.Store(false)
+	before := announced.Load()
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x04, nil); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := mgr.HasUsableKey(ctx, 1, 5); ok {
+		t.Error("group 5 has a usable key after the reload; key set 7 was removed")
+	}
+	if len(gkm.StaleGroupFabrics()) != 0 {
+		t.Errorf("stale fabrics after the reload succeeded: %v", gkm.StaleGroupFabrics())
+	}
+	if announced.Load() == before {
+		t.Error("the recovered reload did not re-announce the memberships")
+	}
+	// A stale fabric whose row goes is unmarked at the next command.
+	mgrStore.fail.Store(true)
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(8)); err != nil {
+		t.Fatal(err)
+	}
+	mgrStore.fail.Store(false)
+	if err := fs.RemoveFabric(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = gkm.MatterInvoke(fabricCtx(2), 0x04, nil)
+	if got := gkm.StaleGroupFabrics(); len(got) != 0 {
+		t.Errorf("stale fabrics after the fabric's removal: %v, want none", got)
+	}
+}

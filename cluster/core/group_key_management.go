@@ -270,10 +270,11 @@ func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
 // has already taken the write, so the command succeeds and the stale group
 // state is reloaded.
 //
-// A reload that fails is logged and the fabric marked stale; the change
-// answers success for what is stored, and the next command or write of
-// this server reloads the fabric again (reloadStale) (review II,
-// R2-P6-err-1701, R2-P6-err-1014).
+// A reload that fails is logged, the fabric marked stale and its group
+// state dropped, failing closed (reloadGroups); the change answers success
+// for what is stored, and the next command or write of this server
+// reloads the fabric again (reloadStale) (review II, R2-P6-err-1701,
+// R2-P6-err-1014).
 func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) {
 	if g.groups == nil {
 		return
@@ -282,22 +283,40 @@ func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) {
 	g.reloadGroups(ctx, fabric)
 }
 
-// reloadGroups reloads fabric's operational group state, marking it stale
-// when the reload fails and clearing the mark when it succeeds.
+// reloadGroups reloads fabric's operational group state. A reload that
+// fails leaves the fabric marked stale and fails closed: the fabric's
+// group state — its keys among them — leaves the manager at once
+// (groups.Manager.ForgetFabric), so a key set the store no longer holds
+// stops authenticating group messages, whether or not the next reload
+// succeeds; the manager loads the fabric from the store again on its next
+// use (review II, R2-P6-err-1701 R-1). The reload that succeeds after a
+// stale mark re-announces the memberships the forget withdrew
+// (groups.Manager.Load). A fabric the store no longer holds is unmarked:
+// its removal took its group state.
 func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
 	err := g.groups.Reload(ctx, fabric)
 	g.mu.Lock()
-	defer g.mu.Unlock()
-	if err != nil {
-		g.logger.Warn("matter.group_key_management.group_state_stale",
-			slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
-		if g.staleGroups == nil {
-			g.staleGroups = map[uint8]bool{}
+	was := g.staleGroups[fabric]
+	switch {
+	case err == nil, errors.Is(err, groups.ErrNoFabric):
+		delete(g.staleGroups, fabric)
+		g.mu.Unlock()
+		if err == nil && was {
+			if lerr := g.groups.Load(ctx); lerr != nil {
+				g.logger.Warn("matter.group_key_management.group_state_reannounce_failed",
+					slog.Int("fabric_index", int(fabric)), slog.Any("err", lerr))
+			}
 		}
-		g.staleGroups[fabric] = true
 		return
 	}
-	delete(g.staleGroups, fabric)
+	if g.staleGroups == nil {
+		g.staleGroups = map[uint8]bool{}
+	}
+	g.staleGroups[fabric] = true
+	g.mu.Unlock()
+	g.logger.Warn("matter.group_key_management.group_state_stale",
+		slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
+	g.groups.ForgetFabric(fabric)
 }
 
 // reloadStale reloads every fabric syncGroups marked stale.
