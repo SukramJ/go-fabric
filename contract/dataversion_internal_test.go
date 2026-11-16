@@ -3,35 +3,31 @@
 
 package contract
 
-// Whitebox test for DataVersionTracker that exercises the wrap-around
-// branch in Bump (next==0 path). This requires direct access to the
-// unexported v atomic.Uint32 field which is only possible from within
-// the same package.
+// Whitebox tests of DataVersionTracker that set the packed state directly.
 
 import (
 	"math"
 	"testing"
 )
 
-// TestDataVersionTracker_Bump_WrapAround verifies that Bump skips zero
-// when the counter wraps from 0xFFFFFFFF. This exercises the
-// `if next == 0 { next = d.v.Add(1) }` branch in Bump.
-func TestDataVersionTracker_Bump_WrapAround(t *testing.T) {
+// TestDataVersionTracker_Bump_WrapsToZero (owner decision 146, review II,
+// F-db021da0-17): 0 is an ordinary version — the tracker holds "installed"
+// beside the value, so Bump wraps from 0xFFFFFFFF to 0, and a tracker
+// whose version is 0 keeps it, as matter.js's datasource version, which
+// starts at a random uint32 and wraps to 0 (fable-6a-w3 H4:
+// Datasource.ts:597, :690-699).
+func TestDataVersionTracker_Bump_WrapsToZero(t *testing.T) {
 	t.Parallel()
-
 	var dv DataVersionTracker
-	// Prime Current() so the once-init is done.
 	dv.Current()
-	// Set v to 0xFFFFFFFF so the next Add(1) wraps to 0, triggering the skip.
-	dv.v.Store(math.MaxUint32)
-
-	next := dv.Bump()
-	if next == 0 {
-		t.Fatal("Bump must skip zero on wrap-around (Matter §10.6.5)")
+	dv.v.Store(installedVersion | math.MaxUint32)
+	if next := dv.Bump(); next != 0 {
+		t.Fatalf("Bump after 0xFFFFFFFF = %d, want 0", next)
 	}
-	// After wrapping: Add(1) from 0xFFFFFFFF gives 0 (skipped),
-	// then Add(1) again gives 1. So next must be 1.
-	if next != 1 {
-		t.Fatalf("Bump after wrap-around = %d, want 1 (0 skipped, then +1)", next)
+	if got := dv.Current(); got != 0 {
+		t.Fatalf("Current after the wrap = %d, want 0 kept, not a fresh random version", got)
+	}
+	if next := dv.Bump(); next != 1 {
+		t.Fatalf("Bump after 0 = %d, want 1", next)
 	}
 }

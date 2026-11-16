@@ -44,11 +44,23 @@ import (
 //	    return nil
 //	}
 type DataVersionTracker struct {
-	v atomic.Uint32
+	// v packs the version (the low 32 bits) and whether one is installed
+	// ([installedVersion]): 0 is an ordinary version, not the "none
+	// installed yet" state (owner decision 146, review II,
+	// F-db021da0-17). matter.js's datasource version starts at a random
+	// uint32 and wraps to 0, and is compared by `!== undefined`, never by
+	// truthiness (packages/node/src/behavior/state/managed/Datasource.ts:597,
+	// :690-699 at db021da0; AttributeWriteResponse.ts:254-257,
+	// AttributeReadResponse.ts:276-281).
+	v atomic.Uint64
 }
 
-// initialDataVersion returns a uniformly-random non-zero uint32, the
-// first DataVersion of every tracker. Unexported (review 2026-11
+// installedVersion marks a tracker's packed state as holding a version.
+const installedVersion = uint64(1) << 32
+
+// initialDataVersion returns a uniformly-random uint32, the first
+// DataVersion of every tracker — 0 included, as matter.js's
+// entropy.randomUint32 (Datasource.ts:597). Unexported (review 2026-11
 // W5-api-12): a host that replaced it changed every server's first
 // DataVersion process-wide.
 func initialDataVersion() uint32 {
@@ -61,42 +73,38 @@ func initialDataVersion() uint32 {
 		// silently degrading.
 		panic("contract: crypto/rand.Read failed: " + err.Error())
 	}
-	v := binary.BigEndian.Uint32(b[:])
-	if v == 0 {
-		v = 1
-	}
-	return v
+	return binary.BigEndian.Uint32(b[:])
 }
 
 // Current returns the current DataVersion. On first access on a fresh
-// tracker, a uniformly-random non-zero uint32 is installed via CAS so
-// every subsequent reader sees the same value until [Bump] advances it.
+// tracker, a uniformly-random uint32 is installed via CAS so every
+// subsequent reader sees the same value until [Bump] advances it.
 func (d *DataVersionTracker) Current() uint32 {
-	if v := d.v.Load(); v != 0 {
-		return v
+	if v := d.v.Load(); v&installedVersion != 0 {
+		return uint32(v) //nolint:gosec // G115: the low 32 bits are the version
 	}
 	// Race-tolerant init: only the first CAS wins, every other caller
 	// reloads and observes the installed value.
-	d.v.CompareAndSwap(0, initialDataVersion())
-	return d.v.Load()
+	d.v.CompareAndSwap(0, installedVersion|uint64(initialDataVersion()))
+	return uint32(d.v.Load()) //nolint:gosec // G115: the low 32 bits are the version
 }
 
 // Bump increments the DataVersion and returns the new value. The first
 // call on a fresh tracker installs the random initial value first (via
-// [Current]) and then advances by 1, so the post-bump value is always
-// > 1 and unique across cluster instances.
+// [Current]) and then advances by 1.
 //
-// Wrap-around past 0xFFFFFFFF is intentional and fine — the IM filter
-// comparison uses == so any increment signals "cluster changed". Zero
-// is skipped because the tracker uses it for "no version installed
-// yet"; to a reader every value is a version ([ClusterDataVersion]).
+// Wrap-around past 0xFFFFFFFF to 0 is intentional and fine — the IM
+// filter comparison uses == so any increment signals "cluster changed",
+// and 0 is a version like any other (matter.js advanceVersion wraps to
+// 0, Datasource.ts:690-699 at db021da0; owner decision 146).
 func (d *DataVersionTracker) Bump() uint32 {
-	// Ensure the random initial value is installed before incrementing
-	// so we never bump from the reserved zero state.
+	// Ensure the random initial value is installed before incrementing.
 	_ = d.Current()
-	next := d.v.Add(1)
-	if next == 0 {
-		next = d.v.Add(1)
+	for {
+		old := d.v.Load()
+		next := installedVersion | uint64(uint32(old)+1) //nolint:gosec // G115: the low 32 bits are the version
+		if d.v.CompareAndSwap(old, next) {
+			return uint32(next) //nolint:gosec // G115: the low 32 bits are the version
+		}
 	}
-	return next
 }
