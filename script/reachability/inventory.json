@@ -38559,140 +38559,140 @@
       "identifier": "TestDecodeRefusesAFieldOfAnotherTypeOrWidth",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_field_shape_test.go",
-      "line": 95
+      "line": 108
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecodeRefusesATaggedExtendedKeyUsageEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_field_shape_test.go",
-      "line": 254
+      "line": 269
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecodeTakesWellFormedOptionalExtensions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_field_shape_test.go",
-      "line": 210
+      "line": 228
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_IsICA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 320
+      "line": 325
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_IsNOC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 339
+      "line": 344
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_IsRoot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 298
+      "line": 303
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_MissingSignature",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 265
+      "line": 270
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_NonStructureTop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 229
+      "line": 234
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PathLenBeyond8BitsRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 522
+      "line": 527
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyAbsentOrEmptyRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 465
+      "line": 470
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyECDSA_NonP256Curve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 393
+      "line": 398
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyECDSA_OffCurvePoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 404
+      "line": 409
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyECDSA_ValidKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 430
+      "line": 435
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_SerialNumber21OctetsAccepted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 362
+      "line": 367
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_SerialNumber22OctetsRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 382
+      "line": 387
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_SignatureWrongLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 276
+      "line": 281
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_TruncatedInput",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 221
+      "line": 226
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_UnsupportedSigAlgo",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 287
+      "line": 292
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_ValidNOCSubjectFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 241
+      "line": 246
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_ValidityBeyond32BitsRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 494
+      "line": 499
     },
     {
       "package": "secure/mattercert",
