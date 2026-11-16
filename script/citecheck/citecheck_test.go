@@ -93,7 +93,12 @@ import (
 // 380 after review II, phase 6a (unit secure): the #evictExcessSessionsFor
 // citation of secure/operational/manager.go re-cited at the pin
 // (R2-P6-doc-0116).
-const citecheckDriftRatchet = 380
+//
+// 377 after review II, phase 6a wave 1: the drifting citation of
+// groups/decode.go was rewritten with net's groups fixes, and the two of
+// schema/fabric_scoped.go went with the hand-written tables the generated
+// fabric-scope tables replaced.
+const citecheckDriftRatchet = 377
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

@@ -1350,7 +1350,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 225,
+    "line": 237,
     "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
     "resolved": "packages/model/src/standard/elements/access-control.element.ts",
     "identifier": "ChangeTypeEnum",
@@ -1413,7 +1413,7 @@
   },
   {
     "file": "cluster/core/group_key_management.go",
-    "line": 703,
+    "line": 905,
     "citation": "GroupKeyManagementServer.ts:96",
     "resolved": "packages/node/src/behaviors/group-key-management/GroupKeyManagementServer.ts",
     "at": "db021da0",
@@ -1432,7 +1432,7 @@
   },
   {
     "file": "cluster/core/group_key_management_test.go",
-    "line": 354,
+    "line": 352,
     "citation": "packages/types/src/tlv/TlvObject.ts:309-313",
     "resolved": "packages/types/src/tlv/TlvObject.ts",
     "at": "db021da0",
@@ -1442,7 +1442,7 @@
   },
   {
     "file": "cluster/core/group_key_management_test.go",
-    "line": 946,
+    "line": 941,
     "citation": "group-key-management.element.ts:109",
     "resolved": "packages/model/src/standard/elements/group-key-management.element.ts",
     "at": "db021da0",
@@ -1488,7 +1488,7 @@
   },
   {
     "file": "cluster/core/icd_management.go",
-    "line": 1080,
+    "line": 1083,
     "citation": "IcdManagementServer.ts:572-583",
     "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
     "at": "db021da0",
@@ -1508,7 +1508,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 319,
+    "line": 323,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1517,7 +1517,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 442,
+    "line": 446,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1526,7 +1526,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1768,
+    "line": 1770,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -2537,7 +2537,7 @@
   },
   {
     "file": "groups/decode.go",
-    "line": 48,
+    "line": 49,
     "citation": "GroupSession.ts:366-376",
     "resolved": "packages/protocol/src/session/GroupSession.ts",
     "at": "db021da0",
@@ -2547,23 +2547,13 @@
   },
   {
     "file": "groups/decode.go",
-    "line": 191,
+    "line": 192,
     "citation": "GroupSession.ts:371-374",
     "resolved": "packages/protocol/src/session/GroupSession.ts",
     "at": "db021da0",
     "identifier": "GroupKeyMap",
     "nearest": 334,
     "occurrences": 2
-  },
-  {
-    "file": "groups/decode.go",
-    "line": 399,
-    "citation": "packages/protocol/src/groups/MessagingState.ts:19",
-    "resolved": "packages/protocol/src/groups/MessagingState.ts",
-    "at": "db021da0",
-    "identifier": "receptionStateFor",
-    "nearest": 80,
-    "occurrences": 1
   },
   {
     "file": "groups/groupcast_test.go",
@@ -2606,7 +2596,7 @@
   },
   {
     "file": "groups/reception_replay_test.go",
-    "line": 217,
+    "line": 233,
     "citation": "GroupSession.ts:431-433",
     "resolved": "packages/protocol/src/session/GroupSession.ts",
     "at": "db021da0",
@@ -2939,7 +2929,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1578,
+    "line": 1677,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
@@ -3002,24 +2992,6 @@
     "identifier": "BasicInformation",
     "nearest": 1311,
     "occurrences": 5
-  },
-  {
-    "file": "schema/fabric_scoped.go",
-    "line": 23,
-    "citation": "operational-credentials.element.ts:104",
-    "resolved": "packages/model/src/standard/elements/operational-credentials.element.ts",
-    "identifier": "SetVidVerificationStatement",
-    "nearest": 142,
-    "occurrences": 1
-  },
-  {
-    "file": "schema/fabric_scoped.go",
-    "line": 33,
-    "citation": "scenes-management.element.ts:37-156",
-    "resolved": "packages/model/src/standard/elements/scenes-management.element.ts",
-    "identifier": "ScenesManagement",
-    "nearest": 19,
-    "occurrences": 3
   },
   {
     "file": "secure/attestation/builder.go",
@@ -3402,7 +3374,7 @@
   },
   {
     "file": "store/fabric.go",
-    "line": 328,
+    "line": 336,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "nodeId",
