@@ -99,8 +99,8 @@ func TestExcludesZero(t *testing.T) {
 func TestInitialRequirementNames(t *testing.T) {
 	t.Parallel()
 	var none *Type
-	if got := none.RequiredInitial(); got != nil {
-		t.Errorf("nil type: RequiredInitial = %v, want nil", got)
+	if got, err := none.RequiredInitial(); got != nil || err != nil {
+		t.Errorf("nil type: RequiredInitial = %v, %v; want nil, nil", got, err)
 	}
 	r := initialRequirement(nil, 0xFFF1FC00, 0x0005)
 	if r.ClusterName != "cluster 0xFFF1FC00" || r.AttributeName != "0x0005" || r.Declare != "the cluster's declaration" {

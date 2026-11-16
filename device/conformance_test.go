@@ -312,7 +312,7 @@ func TestEveryTypeConstructsAndConforms(t *testing.T) {
 			t.Parallel()
 			_, err := New(ty, testOptions(ty.Name))
 			want, refused := refusedDefaults[ty.Name]
-			if !refused && len(ty.RequiredInitial()) > 0 {
+			if req, _ := ty.RequiredInitial(); !refused && len(req) > 0 {
 				// An attribute matter.js requires a value of: the host
 				// states it (decision 17; initial_values_test.go).
 				want, refused = "has no value; state it with", true

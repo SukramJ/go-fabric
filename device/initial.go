@@ -50,14 +50,16 @@ func (r InitialRequirement) String() string {
 // RequiredInitial lists the attributes [New] refuses a device of the type
 // for unless the host's declarations state them ([InitialRequirement]): a
 // data-driven host checks its configuration against it before it builds a
-// device. It measures the
-// type's default servers, built without declarations; a type whose
-// defaults New refuses for another reason first (a feature selection, a
-// port, a server the host supplies) reports what the servers it could
-// build list. Nil: the type's defaults answer every attribute they list.
-func (t *Type) RequiredInitial() []InitialRequirement {
+// device. It measures the type's default servers, built without
+// declarations. A type whose defaults New refuses for another reason
+// first — a feature selection, a port, a server the host supplies — is
+// not measured: the error is that refusal, and New with the host's
+// declarations names what is still missing. No rows and no error: the
+// type's defaults answer every attribute they list (a nil type requires
+// nothing).
+func (t *Type) RequiredInitial() ([]InitialRequirement, error) {
 	if t == nil {
-		return nil
+		return nil, nil
 	}
 	s := newSettings()
 	s.key = "device.RequiredInitial:" + t.Name
@@ -65,10 +67,13 @@ func (t *Type) RequiredInitial() []InitialRequirement {
 	s.clock = &deviceClock{}
 	s.skipInitialCheck = true
 	d, err := buildDevice(t.clone(), Options{StableKey: endpoint.StringKey(s.key)}, s)
-	if d == nil || err != nil {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("device: %s: the defaults do not build without declarations, nothing measured: %w", t.Name, err)
 	}
-	return d.refusedInitial()
+	if d == nil {
+		return nil, fmt.Errorf("device: %s: the defaults built no device, nothing measured", t.Name)
+	}
+	return d.refusedInitial(), nil
 }
 
 // refusedInitial is the part of missingInitial matter.js refuses at a

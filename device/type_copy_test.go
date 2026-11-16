@@ -112,22 +112,30 @@ func TestFromSpecBuildsParts(t *testing.T) {
 // a type whose defaults answer everything lists nothing.
 func TestRequiredInitial(t *testing.T) {
 	t.Parallel()
-	req := device.AirQualitySensorType().RequiredInitial()
-	if len(req) != 1 || req[0].Cluster != airqualitydef.ClusterID || req[0].Attribute != airqualitydef.AttrAirQuality ||
+	req, err := device.AirQualitySensorType().RequiredInitial()
+	if err != nil || len(req) != 1 || req[0].Cluster != airqualitydef.ClusterID || req[0].Attribute != airqualitydef.AttrAirQuality ||
 		req[0].Declare != "airqualitydef.Declare{Initial: airqualitydef.Patch{AirQuality: …}}" {
-		t.Fatalf("AirQualitySensor RequiredInitial = %+v", req)
+		t.Fatalf("AirQualitySensor RequiredInitial = %+v, %v", req, err)
 	}
 	// OperationalError has a model default matter.js builds from the
 	// struct's child default: not required (decision 17).
-	if req := device.DishwasherType().RequiredInitial(); len(req) != 1 || req[0].Attribute != 0x0004 {
-		t.Errorf("Dishwasher RequiredInitial = %+v, want OperationalState alone", req)
+	if req, err := device.DishwasherType().RequiredInitial(); err != nil || len(req) != 1 || req[0].Attribute != 0x0004 {
+		t.Errorf("Dishwasher RequiredInitial = %+v, %v; want OperationalState alone", req, err)
 	}
 	if _, err := device.NewAirQualitySensor(device.Options{StableKey: endpoint.StringKey("aq-bare"), Name: "aq"}); !errors.Is(err, device.ErrConfiguration) ||
 		!strings.Contains(err.Error(), "airqualitydef.Declare{Initial: airqualitydef.Patch{AirQuality: …}}") {
 		t.Errorf("a bare AirQualitySensor = %v, want the refusal naming the declaration", err)
 	}
-	if req := device.DimmableLightType().RequiredInitial(); len(req) != 0 {
-		t.Errorf("DimmableLight RequiredInitial = %+v, want none", req)
+	if req, err := device.DimmableLightType().RequiredInitial(); err != nil || len(req) != 0 {
+		t.Errorf("DimmableLight RequiredInitial = %+v, %v; want none", req, err)
+	}
+	// A type whose bare defaults do not build is not measured: an error,
+	// not the empty list "nothing required" is (review II, phase 5b).
+	if _, bareErr := device.New(device.GenericSwitchType(), device.Options{StableKey: endpoint.StringKey("sw-bare"), Name: "sw"}); bareErr == nil {
+		t.Fatal("a bare GenericSwitch builds; pick a type whose defaults do not")
+	}
+	if req, err := device.GenericSwitchType().RequiredInitial(); err == nil || req != nil {
+		t.Errorf("GenericSwitch RequiredInitial = %+v, %v; want no rows and the refusal", req, err)
 	}
 	q := airqualitydef.AirQualityGood
 	d, err := device.NewAirQualitySensor(device.Options{StableKey: endpoint.StringKey("aq"), Name: "aq"}, required("AirQualitySensor",
