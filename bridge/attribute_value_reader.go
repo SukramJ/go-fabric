@@ -6,6 +6,7 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -129,6 +130,23 @@ func overlongBeforeIS1(path im.ConcreteAttributePath, el tlv.Element) (im.Attrib
 // without failing the rest of the write request.
 type undecodedValue struct{ err error }
 
+// refusedValue is the write value of a decode the definition refused. An
+// element of another type than the attribute's — a list element that is
+// not a structure, a string where a number belongs: the decoder's
+// INVALID_COMMAND refusals that say "is not a …" (cluster/spec codec.go,
+// decode_value.go) — is an [im.UndecodableValue], which ends the write
+// interaction with FAILURE (owner decision 161, R2-P6-wire-1703). Every
+// other refusal — a value outside its constraint, a struct missing a
+// mandatory field (node:TestUserLabelServerParity pins CONSTRAINT_ERROR
+// for it), a string that is not UTF-8 — is an [undecodedValue], answered
+// CONSTRAINT_ERROR on its path.
+func refusedValue(def *spec.Cluster, err error) any {
+	if fe, ok := errors.AsType[*spec.FieldError](err); ok && fe.Status == im.StatusInvalidCommand && strings.Contains(fe.Msg, "is not a") {
+		return im.UndecodableValue{Err: fmt.Errorf("%s: %w", def.Name, err)}
+	}
+	return undecodedValue{err}
+}
+
 // generatedAttributeValue decodes a structured write value with the
 // attribute's generated decoder (cluster/spec/<cluster>), as matter.js
 // decodes every write with the attribute's own schema. el is the value's
@@ -160,7 +178,7 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 	}
 	v, derr := attr.Decode(n)
 	if derr != nil {
-		v = undecodedValue{derr}
+		v = refusedValue(def, derr)
 	}
 	return im.AttributeValue{Value: v}, nil
 }
@@ -271,8 +289,9 @@ func groupKeyMapWriteValue(el tlv.Element, dec *tlv.Decoder, item bool) (im.Attr
 // [undecodedValue]: without a cluster-aware decoder the bridge cannot
 // surface its structure, and a value that is neither null nor anything
 // was a written null to the dispatcher — a structure written to a
-// nullable scalar cleared it with Success (R2-P6-wire-0442). The
-// definition's check refuses an undecoded value.
+// nullable scalar cleared it with Success (R2-P6-wire-0442). The write
+// interaction ends there with FAILURE ([im.UndecodableValue], owner
+// decision 161).
 func primitiveAttributeValue(el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
 	if el.IsNull {
 		return im.AttributeValue{IsNull: true}, nil
@@ -281,7 +300,7 @@ func primitiveAttributeValue(el tlv.Element, dec *tlv.Decoder) (im.AttributeValu
 		if err := skipContainerTLV(dec); err != nil {
 			return im.AttributeValue{}, err
 		}
-		return im.AttributeValue{Value: undecodedValue{fmt.Errorf("bridge: a %s written where the attribute has no structured decoder", containerKind(el))}}, nil
+		return im.AttributeValue{Value: im.UndecodableValue{Err: fmt.Errorf("bridge: a %s written where the attribute has no structured decoder", containerKind(el))}}, nil
 	}
 	switch el.Type {
 	case tlv.TypeBoolTrue:
@@ -371,7 +390,7 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 	if err != nil {
 		return v, err
 	}
-	if _, undecoded := v.Value.(undecodedValue); undecoded {
+	if im.IsUndecodable(v) {
 		return v, nil
 	}
 	return im.AttributeValue{Value: []any{v.Value}}, nil

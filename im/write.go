@@ -540,23 +540,23 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 		// interaction's chunked write holds (matter.js
 		// AttributeWriteResponse.ts:355-358 isHeldByOtherWrite).
 		//
-		// A path with a numeric ListIndex is never written: where its
-		// value would be written — past every other gate, the dispatcher's
-		// existence, writability, access and timed checks included — the
-		// interaction ends with InvalidAction ([listIndexGate]).
+		// A path with a numeric ListIndex, and a value its attribute's type
+		// cannot decode, is never written: where its value would be written
+		// — past every other gate, the dispatcher's existence, writability,
+		// access, timed and fabric checks included — the interaction ends
+		// ([valueGate]).
 		var results []WriteResult
-		var indexGate listIndexGate
-		numericIndex := w.Path.HasListIndex && !w.Path.ListAppend
+		gate := valueGateFor(w)
 		switch {
-		case w.Path.HasEndpoint && numericIndex && hasAuthWriter:
-			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(nil))
-		case numericIndex && !hasAuthWriter:
+		case w.Path.HasEndpoint && gate != nil && hasAuthWriter:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, gate.wrap(nil))
+		case gate != nil && !hasAuthWriter:
 			// No dispatcher gate to wait for: the element ends here.
-			indexGate.reached = true
+			gate.reached = true
 		case w.Path.HasEndpoint:
 			results = d.Write(ctx, w.Path, w.Value)
-		case hasAuthWriter && numericIndex:
-			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(authorizeWildcard))
+		case hasAuthWriter && gate != nil:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, gate.wrap(authorizeWildcard))
 		case hasAuthWriter:
 			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, authorizeWildcard)
 		case !aclActive:
@@ -572,8 +572,8 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 			})
 			continue
 		}
-		if indexGate.reached {
-			wr.Status = StatusInvalidAction
+		if gate != nil && gate.reached {
+			wr.Status = gate.status
 			break
 		}
 		lastWritten = nil
@@ -611,22 +611,44 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 	return WriteOutcome{Response: wr, Results: applied}
 }
 
-// listIndexGate ends a write whose path carries a numeric ListIndex at the
-// point its value would be written. matter.js answers such a path in
-// writeValue, after the existence, writability, access, timed and
-// DataVersion checks and outside the try that turns errors into a path
-// status, so the interaction ends with StatusResponse(InvalidAction) and
-// nothing is written for the path (packages/protocol/src/action/server/
-// AttributeWriteResponse.ts:419-424 at db021da0, "Unsupported Write path
-// provided: listIndex"); on a wildcard or group path the first endpoint
-// that reaches writeValue ends it (:360). The gate rides on the
-// dispatcher's authorizer, which endpoint.TopologyDispatcher asks for such
-// a path after its timed check, not before it.
-type listIndexGate struct{ reached bool }
+// valueGate ends a write interaction at the point a path's value would be
+// written, with status. Two kinds of element take it:
+//
+//   - a path with a numeric ListIndex: matter.js answers such a path in
+//     writeValue, after the existence, writability, access, timed and
+//     DataVersion checks and outside the try that turns errors into a path
+//     status, so the interaction ends with StatusResponse(InvalidAction)
+//     and nothing is written for the path
+//     (packages/protocol/src/action/server/AttributeWriteResponse.ts:419-424
+//     at db021da0, "Unsupported Write path provided: listIndex"); on a
+//     wildcard or group path the first endpoint that reaches writeValue
+//     ends it (:360);
+//   - an [UndecodableValue], which ends it with FAILURE (R2-P6-wire-0442,
+//     -1703; the matter.js lines at [UndecodableValue]). A numeric
+//     ListIndex is answered first (:419-424 before :429).
+//
+// The gate rides on the dispatcher's authorizer, which
+// endpoint.TopologyDispatcher asks for such a path after its timed and
+// accessing-fabric checks, not before them.
+type valueGate struct {
+	reached bool
+	status  StatusCode
+}
+
+// valueGateFor is the gate of w, nil for an element that takes none.
+func valueGateFor(w AttributeWrite) *valueGate {
+	switch {
+	case w.Path.HasListIndex && !w.Path.ListAppend:
+		return &valueGate{status: StatusInvalidAction}
+	case IsUndecodable(w.Value):
+		return &valueGate{status: StatusFailure}
+	}
+	return nil
+}
 
 // wrap returns the authorizer the dispatcher asks where the value would be
 // written: inner's verdict first, then the end of the interaction.
-func (g *listIndexGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
+func (g *valueGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
 	return func(endpoint uint16, clusterID, attrID uint32) StatusCode {
 		if inner != nil {
 			if status := inner(endpoint, clusterID, attrID); !status.IsSuccess() {
@@ -634,7 +656,7 @@ func (g *listIndexGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
 			}
 		}
 		g.reached = true
-		return StatusInvalidAction
+		return g.status
 	}
 }
 

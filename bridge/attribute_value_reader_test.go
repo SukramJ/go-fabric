@@ -154,8 +154,8 @@ func TestPrimitiveAttributeValue_Container_DrainsToUndecoded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error draining container: %v", err)
 	}
-	if _, undecoded := got.Value.(undecodedValue); !undecoded || got.IsNull {
-		t.Errorf("expected an undecoded value after the container drain, got %+v", got)
+	if !im.IsUndecodable(got) || got.IsNull {
+		t.Errorf("expected an undecodable value after the container drain, got %+v", got)
 	}
 }
 

@@ -299,13 +299,13 @@ func handleGroupWrite(ctx context.Context, d Dispatcher, req WriteRequest, recor
 			}
 			return authorize(endpoint, clusterID, priv)
 		}
-		// A numeric ListIndex ends the interaction where the value would be
-		// written ([listIndexGate]).
-		if w.Path.HasListIndex && !w.Path.ListAppend {
-			var indexGate listIndexGate
-			record(writer.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(groupAuthorize)))
-			if indexGate.reached {
-				return StatusInvalidAction
+		// A numeric ListIndex, and a value its attribute's type cannot
+		// decode, ends the interaction where the value would be written
+		// ([valueGate]).
+		if gate := valueGateFor(w); gate != nil {
+			record(writer.WriteAuthorized(ctx, w.Path, w.Value, gate.wrap(groupAuthorize)))
+			if gate.reached {
+				return gate.status
 			}
 			continue
 		}

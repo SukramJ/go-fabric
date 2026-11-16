@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -63,11 +62,8 @@ func TestContainerWrittenToAScalarIsRefused(t *testing.T) {
 				t.Errorf("attr 0x%04X, %s: decoded to a null (%+v)", attr, name, av)
 				continue
 			}
-			if _, undecoded := av.Value.(undecodedValue); !undecoded {
-				t.Errorf("attr 0x%04X, %s: decoded to %T, want an undecoded value", attr, name, av.Value)
-			}
-			if err := spec.CheckWritten(lvldef.Definition, 0, attr, av.Value, nil); err == nil {
-				t.Errorf("attr 0x%04X, %s: the definition accepts it", attr, name)
+			if !im.IsUndecodable(av) {
+				t.Errorf("attr 0x%04X, %s: decoded to %T, want an undecodable value", attr, name, av.Value)
 			}
 		}
 	}
@@ -79,8 +75,8 @@ func TestContainerWrittenToAScalarIsRefused(t *testing.T) {
 		enc.StartStruct(tlv.AnonymousTag())
 		_ = enc.EndContainer()
 	})
-	if _, undecoded := av.Value.(undecodedValue); !undecoded {
-		t.Errorf("append item: decoded to %#v, want an undecoded value", av.Value)
+	if !im.IsUndecodable(av) {
+		t.Errorf("append item: decoded to %#v, want an undecodable value", av.Value)
 	}
 }
 
@@ -154,10 +150,16 @@ func TestAccessControlWritesDecodeThroughTheirDefinitions(t *testing.T) {
 			func(enc *tlv.Encoder) { enc.PutUint(tlv.AnonymousTag(), 7) },
 		),
 	}
+	// A wrong type is undecodable (the interaction ends with FAILURE); an
+	// integer of the right type beyond its width is refused on the path.
 	for name, build := range refused {
 		av := writeValueOf(t, acl, build)
-		if _, undecoded := av.Value.(undecodedValue); !undecoded {
-			t.Errorf("ACL with %s: decoded to %#v, want it refused", name, av.Value)
+		_, constraint := av.Value.(undecodedValue)
+		switch {
+		case name == "privilege 0x0105" && !constraint:
+			t.Errorf("ACL with %s: decoded to %#v, want it refused on the path", name, av.Value)
+		case name != "privilege 0x0105" && !im.IsUndecodable(av):
+			t.Errorf("ACL with %s: decoded to %#v, want it undecodable", name, av.Value)
 		}
 	}
 
@@ -166,7 +168,7 @@ func TestAccessControlWritesDecodeThroughTheirDefinitions(t *testing.T) {
 		enc.PutOctets(tlv.ContextTag(1), []byte{1, 2})
 		_ = enc.EndContainer()
 	}, func(enc *tlv.Encoder) { enc.PutBool(tlv.AnonymousTag(), true) }))
-	if _, undecoded := ext.Value.(undecodedValue); !undecoded {
+	if !im.IsUndecodable(ext) {
 		t.Errorf("Extension with a non-struct element: decoded to %#v", ext.Value)
 	}
 	gkm := writeValueOf(t, attrPath(0x003F, 0x0000), list(func(enc *tlv.Encoder) {

@@ -309,13 +309,30 @@ func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.Co
 	if lister, ok := srv.(contract.ClusterAttributeLister); ok {
 		listed = slices.Contains(lister.MatterAttributes(), path.Attribute)
 	}
-	if !readAllowed(ctx, srv, path.Attribute) {
+	if !d.readAuthorized(ctx, path) || !readAllowed(ctx, srv, path.Attribute) {
 		return im.StatusUnsupportedAccess
 	}
 	if listed {
 		return im.StatusSuccess
 	}
 	return readOne(ctx, ep, srv, path).Status
+}
+
+// readAuthorized asks the subject's access check the request carries
+// ([im.LookupAuthority]) at path's resolved location with the attribute's
+// read privilege, before the server is read there: a subject without the
+// grant drives no read of the server (R2-P6-bound-0405). matter.js
+// authorises a location before it reads the value
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:250, :272
+// at db021da0). A request without a stamped check — PASE, a local caller,
+// an im without an ACL checker — is not asked here; im's per-result check
+// stays the gate of what is reported.
+func (d *TopologyDispatcher) readAuthorized(ctx context.Context, path im.ConcreteAttributePath) bool {
+	authority, ok := im.LookupAuthority(ctx)
+	if !ok {
+		return true
+	}
+	return authority(path.Endpoint, path.Cluster, d.MinReadPrivilege(path.Endpoint, path.Cluster, path.Attribute)).IsSuccess()
 }
 
 // readAllowed asks a [contract.ReadAccessDeclarer] whether the request
@@ -398,7 +415,7 @@ func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.C
 			aPath := cPath
 			aPath.Attribute = attrID
 			aPath.HasAttribute = true
-			if !readAllowed(ctx, srv, attrID) {
+			if !d.readAuthorized(ctx, aPath) || !readAllowed(ctx, srv, attrID) {
 				if concrete {
 					results = append(results, im.ReadResult{Path: aPath, Status: im.StatusUnsupportedAccess})
 				}
@@ -547,20 +564,33 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// An attribute with the timed access quality outside a
 				// timed interaction (the check below the access gate).
 				timedRefused := timedKnown && !timed && d.isTimedWrite(aPath.Cluster, aPath.Attribute)
-				// A path with a numeric ListIndex meets the timed check
-				// before authorize: im's authorizer for it ends the
-				// interaction where the value would be written
-				// (im.listIndexGate), which matter.js does in writeValue,
-				// after the timed check
-				// (packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247,
-				// :343-345 before :419-424 at db021da0). The order against
+				// The accessing-fabric gate of a fabric-scoped attribute
+				// (RW-i3): a request without an accessing fabric does not
+				// write it, for every server, a declarer's attribute
+				// included — im's gate knows only the snapshot's.
+				// matter.js answers it after the timed check
+				// (AttributeWriteResponse.ts:248-251 at db021da0).
+				scope := fabricScopeFor(ctx, srv, attrID)
+				noFabric := scope != nil && !im.HasAccessingFabric(scope.Fabric)
+				// A path whose value im's authorizer ends the interaction
+				// at — a numeric ListIndex, a value its type cannot decode
+				// (im.UndecodableValue) — meets the timed and fabric checks
+				// before authorize, so the gate fires where the value would
+				// be written, which matter.js does in writeValue
+				// (packages/protocol/src/action/server/AttributeWriteResponse.ts:243-251,
+				// :343-345 before :419-429 at db021da0). The order against
 				// the access check is kept: on a concrete path im decided
 				// access before dispatch and the authorizer is the gate
-				// alone, on a wildcard path both refusals skip the
+				// alone, on a wildcard path every refusal skips the
 				// attribute without a status.
-				if timedRefused && path.HasListIndex && !path.ListAppend {
+				gated := (path.HasListIndex && !path.ListAppend) || im.IsUndecodable(value)
+				if gated && (timedRefused || noFabric) {
 					if !wildcardEndpoint && path.HasAttribute {
-						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusNeedsTimedInteraction})
+						status := im.StatusNeedsTimedInteraction
+						if !timedRefused {
+							status = im.StatusUnsupportedAccess
+						}
+						results = append(results, im.WriteResult{Path: aPath, Status: status})
 					}
 					continue
 				}
@@ -597,6 +627,20 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					}
 					continue
 				}
+				if noFabric {
+					if !wildcardEndpoint && path.HasAttribute {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedAccess})
+					}
+					continue
+				}
+				// A value its attribute's type cannot decode reaches no
+				// server (owner decision 161). Behind im's gate this place
+				// is not reached; a caller without one gets FAILURE for
+				// the path.
+				if im.IsUndecodable(value) {
+					results = append(results, im.WriteResult{Path: aPath, Status: im.StatusFailure})
+					continue
+				}
 
 				writeCtx := ctx
 				// The value written at this location: the request's own
@@ -620,23 +664,14 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					// just that one as Added).
 					writeCtx = im.WithListAppendWrite(ctx)
 				}
-				// A fabric-scoped attribute is written by the accessing
-				// fabric alone: a request without one is refused here for
-				// every server, a declarer's attribute included — im's gate
-				// knows only the snapshot's (RW-i3) — and every entry of
-				// the written value carries the accessing fabric, whatever
-				// the request wrote (R2-P6-acl-0402). matter.js injects
+				// Every entry of a written fabric-scoped value carries the
+				// accessing fabric, whatever the request wrote
+				// (R2-P6-acl-0402). matter.js injects
 				// the accessing fabric into every decoded write value
 				// ("We always inject the current fabricIndex for writes",
 				// packages/protocol/src/action/server/AttributeWriteResponse.ts:466-473
 				// at db021da0) before the behaviour sees it.
-				if scope := fabricScopeFor(ctx, srv, attrID); scope != nil {
-					if !im.HasAccessingFabric(scope.Fabric) {
-						if !wildcardEndpoint && path.HasAttribute {
-							results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedAccess})
-						}
-						continue
-					}
+				if scope != nil {
 					v.Value = stampAccessingFabric(v.Value, scope.Fabric)
 				}
 				// The written value against the cluster's definition,

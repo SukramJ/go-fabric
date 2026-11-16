@@ -403,8 +403,6 @@ type ReadReports struct {
 // mode as for [HandleReadRequest].
 func NewReadReports(ctx context.Context, d Dispatcher, req ReadRequest) *ReadReports {
 	r := &ReadReports{
-		exp:     NewAttributeExpansion(ctx, d, req.AttributeRequests),
-		ctx:     ctx,
 		filters: dataVersionFiltersForContext(ctx, req.DataVersionFilters),
 		// A PASE session keeps its implicit Administer grant after AddNOC
 		// adopted it onto the new fabric, so the gate is keyed on the auth
@@ -416,6 +414,18 @@ func NewReadReports(ctx context.Context, d Dispatcher, req ReadRequest) *ReadRep
 	r.subjectNodeID, r.subjectCATs = SubjectFromContext(ctx)
 	r.aclChecker, r.hasACL = d.(ACLChecker)
 	r.privProvider, r.hasPriv = d.(AttributeReadPrivilegeProvider)
+	// The subject's access check rides with the request, so a dispatcher
+	// authorises each location before it reads the server there
+	// ([LookupAuthority], R2-P6-bound-0405); the per-result check below
+	// stays the gate of what is reported.
+	if r.hasACL && !r.pase {
+		base := ctx
+		ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
+			return checkSubjectACL(base, r.aclChecker, r.fabricIndex, r.subjectNodeID, r.subjectCATs, endpoint, clusterID, privilege)
+		})
+	}
+	r.ctx = ctx
+	r.exp = NewAttributeExpansion(ctx, d, req.AttributeRequests)
 	// Every status of a concrete path precedes the first value
 	// ([AttributeExpansion.StatusesFirst]).
 	r.exp.StatusesFirst(func(path ConcreteAttributePath, res ReadResult) bool {
