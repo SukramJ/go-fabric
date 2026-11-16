@@ -72,3 +72,53 @@ func TestManagerStopDoesNotWaitOutAnUnansweredReportChunk(t *testing.T) {
 		t.Fatal("Manager.Stop still waits on a report parked on an unanswered chunk after 5 s")
 	}
 }
+
+// TestSubscriptionCloseEndsAnOngoingReportWait (review II,
+// R2-P6-fsm-0513): an ongoing report parked on a chunk its peer never
+// answers returns as soon as its subscription closes — a
+// KeepSubscriptions=false teardown, a fabric's removal — as a priming
+// report's wait does, not after chunkStatusResponseTimeout (30 s here).
+func TestSubscriptionCloseEndsAnOngoingReportWait(t *testing.T) {
+	t.Parallel()
+	const sessionID uint16 = 94
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
+	b.chunkStatusResponseTimeoutOverride = 30 * time.Second
+	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+
+	mgr := subscription.NewManager(subscription.Config{}, b.SubscriptionReporter(), nil)
+	b.AttachSubscriptionManager(mgr)
+	var paths []im.ConcreteAttributePath
+	for _, ep := range b.Topology().Endpoints {
+		if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+			paths = append(paths, endpointpkg.ReportablePaths(ep)...)
+		}
+	}
+	sub, err := mgr.Subscribe(subscription.SubscribeArgs{
+		SessionID: sessionID, MaxIntervalCeiling: 60, AttributePaths: paths,
+	})
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	b.routing.subTargets.Store(sub.ID, subTarget{
+		pase: true,
+		src:  peerAddr, hasPeerSourceNodeID: true, peerSourceNodeID: 0xBBBB4444,
+		exchangeID: 24, sessionID: sessionID, peerInitiator: true,
+	})
+	returned := make(chan struct{})
+	go func() {
+		defer close(returned)
+		b.reportSubscription(context.Background(), sub, paths)
+	}()
+	counts, more := drainReportDataChunks(t, peerConn, peerSess)
+	if len(counts) != 1 || !more[0] {
+		t.Fatalf("the report went out in %d chunk(s) (more flags %v); the test needs a first chunk waiting for its answer", len(counts), more)
+	}
+	if err := mgr.Close(sub.ID); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-returned:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the reporter still waits on an unanswered chunk 5 s after its subscription closed")
+	}
+}

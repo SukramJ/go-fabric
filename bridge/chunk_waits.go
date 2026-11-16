@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"context"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -135,6 +136,26 @@ func (b *Bridge) closePrimingAbort(subID uint32) {
 		if ch, ok := v.(chan struct{}); ok {
 			close(ch)
 		}
+	}
+}
+
+// reportAbort is the abort of an ongoing report's chunk waits: it closes
+// when ctx ends — the engine's stop (W2-conc-06) — and when the
+// subscription closes, as a priming report's ([Bridge.primingAbort]), so
+// a report of a subscription a KeepSubscriptions=false request, a fabric's
+// removal or an emptied grant ended returns at once instead of waiting
+// out chunkStatusResponseTimeout (review II, R2-P6-fsm-0513). A
+// subscription has one report in flight, so the priming table holds it.
+// done stops it; the caller defers done.
+func (b *Bridge) reportAbort(ctx context.Context, subID uint32) (abort <-chan struct{}, done func()) {
+	ch := b.primingAbort(subID)
+	if ch == nil {
+		return ctx.Done(), func() {}
+	}
+	stop := context.AfterFunc(ctx, func() { b.closePrimingAbort(subID) })
+	return ch, func() {
+		stop()
+		b.forgetPrimingAbort(subID)
 	}
 }
 

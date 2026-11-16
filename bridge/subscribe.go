@@ -446,8 +446,11 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		return
 	}
 
-	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
-	target.abort = ctx.Done()
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06),
+	// and so does the subscription's close (R2-P6-fsm-0513).
+	abort, endAbort := b.reportAbort(ctx, sub.ID)
+	defer endAbort()
+	target.abort = abort
 
 	// Same bridge-initiated exchange as the attribute path: the
 	// commissioner closed its Subscribe exchange when the
@@ -659,8 +662,11 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		return
 	}
 
-	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
-	target.abort = ctx.Done()
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06),
+	// and so does the subscription's close (R2-P6-fsm-0513).
+	abort, endAbort := b.reportAbort(ctx, sub.ID)
+	defer endAbort()
+	target.abort = abort
 
 	report := im.ReportData{
 		HasSubscription: true,
