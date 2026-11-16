@@ -8,7 +8,6 @@ import (
 	"errors"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
@@ -50,22 +49,6 @@ func (g *slowGATT) RegisterService(ctx context.Context, c3 []byte) (contract.GAT
 	return g.Radio.RegisterService(ctx, c3)
 }
 
-// within runs fn and reports whether it returned within d; on false fn is
-// still running.
-func within(d time.Duration, fn func()) bool {
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		fn()
-	}()
-	select {
-	case <-done:
-		return true
-	case <-time.After(d):
-		return false
-	}
-}
-
 // TestStartBLERegistersWithoutTheLock (review II, phase 5b): StartBLE calls the
 // host's RegisterService without the BLE side's lock held. A StopBLE while
 // a registration runs ends it instead of waiting for it; a service the
@@ -73,7 +56,8 @@ func within(d time.Duration, fn func()) bool {
 // registers it again; a host whose RegisterService calls back into the
 // bridge's BLE surface does not deadlock. Before, the registration ran
 // under the lock: StopBLE and Stop waited for it, and a call back from it
-// never returned.
+// never returned — each case below then hangs until the test binary's
+// timeout, the regression's signal.
 func TestStartBLERegistersWithoutTheLock(t *testing.T) {
 	t.Parallel()
 	t.Run("StopBLE ends the registration", func(t *testing.T) {
@@ -84,17 +68,9 @@ func TestStartBLERegistersWithoutTheLock(t *testing.T) {
 		started := make(chan error, 1)
 		go func() { started <- h.bridge.StartBLE(context.Background(), bleWindow) }()
 		<-g.entered
-		var stopErr error
-		if !within(2*time.Second, func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			stopErr = h.bridge.StopBLE(ctx)
-		}) {
-			t.Error("StopBLE waits for the host's registration")
-			close(g.release)
-			return
-		}
-		if stopErr != nil {
+		// The registration never ends on its own (release stays shut):
+		// StopBLE returns only because it ends the registration.
+		if stopErr := h.bridge.StopBLE(context.Background()); stopErr != nil {
 			t.Errorf("StopBLE: %v", stopErr)
 		}
 		if err := <-started; !errors.Is(err, context.Canceled) {
@@ -112,17 +88,11 @@ func TestStartBLERegistersWithoutTheLock(t *testing.T) {
 		started := make(chan error, 1)
 		go func() { started <- h.bridge.StartBLE(context.Background(), bleWindow) }()
 		<-g.entered
-		var stopErr error
-		if !within(2*time.Second, func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-			defer cancel()
-			stopErr = h.bridge.StopBLE(ctx)
-		}) {
-			t.Error("StopBLE waits for the host's registration past its own context")
-			close(g.release)
-			return
-		}
-		if !errors.Is(stopErr, context.DeadlineExceeded) {
+		// The platform ignores the registration's ctx: StopBLE waits for
+		// it until its own ctx ends, not for the lock.
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if stopErr := h.bridge.StopBLE(ctx); !errors.Is(stopErr, context.Canceled) {
 			t.Errorf("StopBLE while the platform still registers = %v, want its context's end", stopErr)
 		}
 		close(g.release)
@@ -149,11 +119,7 @@ func TestStartBLERegistersWithoutTheLock(t *testing.T) {
 				t.Errorf("WithdrawBLE from inside RegisterService: %v", err)
 			}
 		}
-		var err error
-		if !within(2*time.Second, func() { err = h.bridge.StartBLE(context.Background(), bleWindow) }) {
-			t.Fatal("StartBLE deadlocks on a call back from the host's RegisterService")
-		}
-		if err != nil {
+		if err := h.bridge.StartBLE(context.Background(), bleWindow); err != nil {
 			t.Fatalf("StartBLE: %v", err)
 		}
 		waitFor(t, "the GATT service served", func() bool { s, _ := p.Radio().Serving(); return s })
