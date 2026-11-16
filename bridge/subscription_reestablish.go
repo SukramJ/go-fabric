@@ -254,6 +254,15 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 		fabricIndex = rec.FabricIndex
 	}
 
+	// A record written before a subscription's paths were cleared of
+	// this node's id restores as Subscribe admits one: a path naming this
+	// node names none, a path naming another node is left out (review
+	// II, R2-P6-store-0506, N4-im2-2; as handleSubscribeRequest,
+	// R2-P2-alloc-07, R2-P4-imread-07). The priming report reads the
+	// same paths.
+	localNodeID := b.localNodeIDFor(link.sessionID, fabricIndex)
+	rec.AttributeRequests = pathsForThisNode(rec.AttributeRequests, localNodeID)
+	rec.EventRequests = im.EventPathsForNode(rec.EventRequests, localNodeID)
 	sub, err := m.Restore(rec, link.sessionID)
 	if err != nil {
 		return err
@@ -276,7 +285,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 
 	readCtx := im.WithFabricFilter(ctx, rec.IsFabricFiltered, fabricIndex)
 	readCtx = im.WithSubject(readCtx, subjectNodeID, subjectCATs)
-	readCtx = im.WithLocalNodeID(readCtx, b.localNodeIDFor(link.sessionID, fabricIndex))
+	readCtx = im.WithLocalNodeID(readCtx, localNodeID)
 	primingReq := im.SubscribeRequest{
 		MinIntervalFloor:   rec.MinIntervalFloor,
 		MaxIntervalCeiling: rec.MaxIntervalCeiling,
