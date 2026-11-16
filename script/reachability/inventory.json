@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9044,
+  "entry_points": 9050,
   "entry_packages": [
     ".",
     "bdx",
@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18791,
-    "reachable": 12621,
-    "whitelisted": 6170,
+    "total_exported": 18793,
+    "reachable": 12622,
+    "whitelisted": 6171,
     "unreachable": 0
   },
   "by_package": [],
@@ -25035,14 +25035,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1055
+      "line": 1064
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1051
+      "line": 1060
     },
     {
       "package": "controller",
@@ -25130,10 +25130,17 @@
     },
     {
       "package": "controller",
+      "identifier": "TestSealerSealsAClearControllerDatabase",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/sealer_internal_test.go",
+      "line": 174
+    },
+    {
+      "package": "controller",
       "identifier": "TestSealerSealsTheControllersStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/sealer_internal_test.go",
-      "line": 47
+      "line": 99
     },
     {
       "package": "controller",
