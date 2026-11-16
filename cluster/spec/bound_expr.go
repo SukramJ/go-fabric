@@ -84,7 +84,7 @@ func parseBoundNode(raw json.RawMessage) *boundExpr {
 // -(|a|^b) for a negative base, maxOf / minOf over the numeric arguments
 // only (Constraint.ts:14-36, Functions.extreme), a reference resolved by
 // name (NameResolver) and anything else undefined. matter.js computes a
-// power beyond 2^53 as a BigInt (Constraint.ts:1049-1058); the bounds here
+// power above Number.MAX_SAFE_INTEGER (2^53 - 1) as a BigInt (Constraint.ts:1049-1058); the bounds here
 // are float64, for a float, a length and a count ([Instance.satisfies]); an
 // integer value is held to [Instance.evalBoundExact] instead, where
 // 2^62 - 1 stays 2^62 - 1.
@@ -148,7 +148,7 @@ const maxExactExponent = 256
 // evalBoundExact is [Instance.evalBound] computed in exact rationals, for
 // an integer value ([Instance.satisfiesInt]): "+", "-", "*" and "/" exactly,
 // "^" exactly for an integer base and a whole exponent up to
-// maxExactExponent — matter.js computes a power beyond 2^53 as a BigInt
+// maxExactExponent — matter.js computes a power above Number.MAX_SAFE_INTEGER (2^53 - 1) as a BigInt
 // (Constraint.ts:1049-1058) — and maxOf / minOf over the numeric
 // arguments only. What evalBound leaves without a number has none here.
 func (i *Instance) evalBoundExact(e *boundExpr, peers Peers) (*big.Rat, bool) {

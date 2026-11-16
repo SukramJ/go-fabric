@@ -58,11 +58,15 @@ func snapshotRequestCommands(t *testing.T) []snapshotRequestAccess {
 			if dir != "request" {
 				continue
 			}
-			r := snapshotRequestAccess{cluster: c.ID, command: m.ID, clusterName: c.Name, name: m.Name}
-			if m.Effective != nil {
-				r.fabric, r.writePriv = m.Effective.Access.Fabric, m.Effective.Access.WritePriv
+			if m.Effective == nil {
+				// The generator refuses it too: a request without an
+				// effective access has none to hold the tables to.
+				t.Fatalf("%s.%s: request command without an effective block", c.Name, m.Name)
 			}
-			out = append(out, r)
+			out = append(out, snapshotRequestAccess{
+				cluster: c.ID, command: m.ID, clusterName: c.Name, name: m.Name,
+				fabric: m.Effective.Access.Fabric, writePriv: m.Effective.Access.WritePriv,
+			})
 		}
 	}
 	if len(out) == 0 {

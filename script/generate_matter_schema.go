@@ -1164,8 +1164,13 @@ func writeInvokeAccessFile(clusters []snapshotCluster) error {
 		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
 		cr := clusterRows{c: c}
 		for _, m := range cmds {
-			if commandDirection(m) != "request" || m.Effective == nil {
+			if commandDirection(m) != "request" {
 				continue
+			}
+			if m.Effective == nil {
+				// No effective access: the tables would leave the command
+				// out (fail open), so the generation stops instead.
+				return fmt.Errorf("%s.%s: request command without an effective block: no access to generate from", c.Name, m.Name)
 			}
 			acc := m.Effective.Access
 			switch acc.Fabric {
