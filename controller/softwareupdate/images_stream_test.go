@@ -18,8 +18,8 @@ import (
 
 // streamOnlyBlobs is a backend that opts in to [BlobStreamer] on its own
 // type and refuses every whole-slice Put or Get of an image, so a download
-// that buffers the image fails (R2-P5-port-14). A record (.meta) is small
-// and still goes through Put and Get. Its files live in the embedded
+// that buffers the image fails (R2-P5-port-14). A record (.meta) and a
+// provenance record (.origin) are small and still go through Put and Get. Its files live in the embedded
 // MemoryBlobs; it counts its writers' Commits and Aborts, and runs onVerify
 // on the first OpenBlob of a name after its Commit.
 type streamOnlyBlobs struct {
@@ -32,15 +32,21 @@ type streamOnlyBlobs struct {
 
 var errWholeSlice = errors.New("whole-slice image access")
 
+// record reports whether name is a small record that goes through Put
+// and Get: an image's .meta or .origin.
+func record(name string) bool {
+	return strings.HasSuffix(name, metaSuffix) || strings.HasSuffix(name, originSuffix)
+}
+
 func (s *streamOnlyBlobs) Put(ctx context.Context, name string, data []byte) error {
-	if !strings.HasSuffix(name, metaSuffix) {
+	if !record(name) {
 		return errWholeSlice
 	}
 	return s.MemoryBlobs.Put(ctx, name, data)
 }
 
 func (s *streamOnlyBlobs) Get(ctx context.Context, name string) ([]byte, error) {
-	if !strings.HasSuffix(name, metaSuffix) {
+	if !record(name) {
 		return nil, errWholeSlice
 	}
 	return s.MemoryBlobs.Get(ctx, name)
@@ -137,7 +143,7 @@ func TestImagesStreamedDownload(t *testing.T) {
 	if c, a := b.counts(); c != 1 || a != 0 {
 		t.Fatalf("%d commits, %d aborts; want 1 and 0", c, a)
 	}
-	if got := listed(t, b); !slices.Equal(got, []string{name, name + metaSuffix}) {
+	if got := listed(t, b); !slices.Equal(got, []string{name, name + metaSuffix, name + originSuffix}) {
 		t.Fatalf("stored %v", got)
 	}
 	found := imgs.Find(ctx, FindOptions{})
@@ -278,5 +284,38 @@ func TestImagesBufferedDownloadWithoutStreamer(t *testing.T) {
 	blob, err := imgs.Open(ctx, name)
 	if err != nil || blob.Size() != int64(len(img)) {
 		t.Fatalf("Open = %v, %v", blob, err)
+	}
+}
+
+// TestImagesStreamedDownloadUnderTheChecksumRule: under the default
+// configuration — a ledger image needs the ledger's checksum — a streamed
+// download of a record with its checksum records the image's provenance
+// (.origin, through Put like .meta), so the stored image opens and is
+// offered from the store afterwards, as one downloaded through memory is.
+func TestImagesStreamedDownloadUnderTheChecksumRule(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := newFetchMock(t)
+	img := createOtaImage(t, 0xfff1, 0x8000, 3)
+	info := withChecksum(ledgerUpdate(f.add("/ota-v3.bin", img), 0xfff1, 0x8000, 3, len(img), 7), img)
+	b := &streamOnlyBlobs{}
+	imgs := NewImages(ImagesConfig{Blobs: b, Ledger: hostLedger(0), Logger: quietLog()})
+	name := mustDownload(t, imgs, info, false)
+	if c, a := b.counts(); c != 1 || a != 0 {
+		t.Fatalf("%d commits, %d aborts; want 1 and 0", c, a)
+	}
+	if got := listed(t, b); !slices.Equal(got, []string{name, name + metaSuffix, name + originSuffix}) {
+		t.Fatalf("stored %v; want the image, its record and its provenance", got)
+	}
+	blob, err := imgs.Open(ctx, name)
+	if err != nil {
+		t.Fatalf("Open of the streamed image: %v", err)
+	}
+	got, err := io.ReadAll(io.NewSectionReader(blob, 0, blob.Size()))
+	if err != nil || !bytes.Equal(got, img) {
+		t.Fatalf("served %d bytes (%v), want the image's %d", len(got), err, len(img))
+	}
+	if u, ok := imgs.CheckForUpdate(ctx, 0xfff1, 0x8000, 2, CheckOptions{IncludeStored: true}); !ok || u.SoftwareVersion != 3 {
+		t.Fatalf("CheckForUpdate with IncludeStored = %+v, %v; want the stored image offered", u, ok)
 	}
 }

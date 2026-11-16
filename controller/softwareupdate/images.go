@@ -126,7 +126,8 @@ type Blobs interface {
 // image into it as the image arrives and verifies it by reading it back,
 // and every other read of an image ([Images.Find], [Images.Open], the
 // check of a stored image) reads the file in place; without it each image
-// passes through memory whole (Put, Get).
+// passes through memory whole (Put, Get). An image's small records — its
+// .meta and its provenance (.origin) — go through Put and Get either way.
 //
 // A backend opts in by implementing it on its own type; [MemoryBlobs]
 // does not. Embedding a type that implements it promotes the capability:
