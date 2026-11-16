@@ -184,7 +184,8 @@ type Manager struct {
 
 // SetClock sets the clock that selects the current epoch key of a group
 // send and paces the retry of a fabric reload [Manager.ForgetFabric] left
-// owed; nil is [clock.System]. Call it before the first send.
+// owed; nil is [clock.System]. Call it before the first send and before
+// the first forget.
 func (m *Manager) SetClock(c clock.Clock) {
 	m.senderMu.Lock()
 	defer m.senderMu.Unlock()
@@ -478,9 +479,18 @@ func (m *Manager) rlockFabric(ctx context.Context, idx uint8) (*fabricGroups, er
 // which restores the key sets, the key map and the group endpoint map of
 // every fabric at startup ("fd65e989: restore group endpoint mappings").
 func (m *Manager) ensureAllLoaded(ctx context.Context) error {
+	return m.loadAll(ctx, true)
+}
+
+// loadAll is ensureAllLoaded; paced false leaves an owed reload to the
+// caller ([Manager.Load] runs it itself, once).
+func (m *Manager) loadAll(ctx context.Context, paced bool) error {
 	m.mu.RLock()
 	done := m.allLoaded
 	m.mu.RUnlock()
+	if done && !paced {
+		return nil
+	}
 	if done {
 		// A fabric ForgetFabric left owed is tried on its own; its failure
 		// leaves it absent and does not fail the call for the others
@@ -536,10 +546,13 @@ func (m *Manager) ensureAllLoaded(ctx context.Context) error {
 // message is due.
 //
 // A fabric [Manager.ForgetFabric] dropped while the store still holds it
-// is loaded again here (and on the next receive); Load returns the error
-// of one that fails, which stays absent while the others serve.
+// is loaded again here, at once — or by a receive once the retry interval
+// has passed (1 s after a failure, doubling to 60 s). Load returns the
+// error of one that fails, which stays absent while the others serve.
+// Only Load announces the multicast memberships again; a receive-path
+// reload restores the keys, not the memberships.
 func (m *Manager) Load(ctx context.Context) error {
-	if err := m.ensureAllLoaded(ctx); err != nil {
+	if err := m.loadAll(ctx, false); err != nil {
 		return err
 	}
 	err := m.reloadOwed(ctx)
@@ -558,6 +571,12 @@ const (
 // owedDue reports whether an owed reload is due on the receive path and,
 // when it is, claims the attempt: concurrent receives do not try it twice.
 func (m *Manager) owedDue() bool {
+	m.mu.RLock()
+	n := len(m.owed)
+	m.mu.RUnlock()
+	if n == 0 {
+		return false
+	}
 	now := m.monotonic()
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -620,8 +639,10 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 	}
 	m.mu.Unlock()
 	m.installLocked(f)
-	m.storeMu.Unlock()
+	// Under storeMu: its live-key snapshot and its drop cannot straddle
+	// another fabric's install, whose restored windows it would drop.
 	m.forgetUnreferenced()
+	m.storeMu.Unlock()
 	// A GroupKeyMap change moves Membership's KeySetId. Mirrors
 	// GroupcastServer's groupKeyMap$Changed reactor (#deriveNow).
 	m.notifyGroupcast(ctx, fabricIndex)
@@ -645,10 +666,14 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 // windows again and drops the rest (restoreParked).
 //
 // The fabric's reload from the store is owed (reloadOwed): the next
-// [Manager.Load] or receive loads it again on its own. For a removed
-// fabric that finds no row, and its parked windows go; a fabric the store
-// still holds comes back. While its load fails it stays absent and the
-// other fabrics serve from memory.
+// [Manager.Load] loads it again on its own at once, a receive once the
+// retry interval has passed (the first receive after the forget, then 1 s
+// after a failure, doubling to 60 s). For a removed fabric that finds no
+// row, and its parked windows go; a fabric the store still holds comes
+// back — its keys on either path, its multicast memberships only through
+// Load. While its load fails it stays absent and the other fabrics serve
+// from memory. ForgetFabric waits for a store read in progress (storeMu),
+// as every mutation does.
 func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	m.storeMu.Lock() // no load or mutation installs the fabric again meanwhile
 	m.mu.Lock()
@@ -658,6 +683,12 @@ func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	// on its own (reloadOwed) — a fabric the store still holds (a
 	// fail-closed path forgets it and loads it again) comes back, a
 	// removed one does not, and a store failure leaves only it absent.
+	if len(m.owed) == 0 {
+		// A new debt starts unpaced: a deadline left by a debt another
+		// route cleared (Reload, a lazy load) does not hold it back. A
+		// repeated forget of an owed fabric keeps the pacing.
+		m.owedRetryAt, m.owedBackoff = 0, 0
+	}
 	m.owed[fabricIndex] = true
 	m.mu.Unlock()
 	// Under storeMu: no load can restore the fabric before its windows

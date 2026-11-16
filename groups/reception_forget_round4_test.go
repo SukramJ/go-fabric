@@ -241,3 +241,66 @@ func TestOwedReloadIsPacedOnTheReceivePath(t *testing.T) {
 		t.Fatalf("fabric 1 after the store recovered: %v", err)
 	}
 }
+
+// TestLoadReadsAnOwedFabricOnce: Load does not run the receive path's
+// paced attempt besides its own — one store read and one backoff step per
+// Load (round 6).
+func TestLoadReadsAnOwedFabricOnce(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	m, st, _, _ := twoFabricManager(t)
+	m.SetClock(clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)))
+	st.mu.Lock()
+	st.failGet = errStoreDown
+	st.mu.Unlock()
+	m.ForgetFabric(1)
+	st.mu.Lock()
+	before := st.getCalls
+	st.mu.Unlock()
+	if err := m.Load(ctx); !errors.Is(err, errStoreDown) {
+		t.Fatalf("Load: %v", err)
+	}
+	st.mu.Lock()
+	reads := st.getCalls - before
+	st.mu.Unlock()
+	m.mu.RLock()
+	backoff := m.owedBackoff
+	m.mu.RUnlock()
+	if reads != 1 || backoff != owedRetryFirst {
+		t.Fatalf("one Load: %d store reads, backoff %v; want 1 and %v", reads, backoff, owedRetryFirst)
+	}
+}
+
+// TestNewForgetStartsUnpaced: a debt cleared by another route (here a
+// Reload after the store recovered) leaves no deadline behind — the next
+// forget's first receive-path attempt is not held back by the old
+// backoff (round 6).
+func TestNewForgetStartsUnpaced(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	op1, sid1 := opKeyOf(t, 0xA1)
+	m, st, op2, sid2 := twoFabricManager(t)
+	m.SetClock(clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)))
+	st.mu.Lock()
+	st.failGet = errStoreDown
+	st.mu.Unlock()
+	m.ForgetFabric(1)
+	for c := range uint32(3) { // paced attempts fail: a backoff is set
+		if _, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, c+1, true, []byte("x"))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	st.mu.Lock()
+	st.failGet = nil
+	st.mu.Unlock()
+	if err := m.Reload(ctx, 1); err != nil { // the debt is cleared, not through the pacing
+		t.Fatal(err)
+	}
+	m.ForgetFabric(2)
+	if msg, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, 10, true, []byte("x"))); err != nil || msg.Duplicate {
+		t.Fatalf("fabric 2 on the first receive after its forget: err %v (held back by an old backoff?)", err)
+	}
+	if msg, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, []byte("x"))); err != nil || msg.Duplicate {
+		t.Fatalf("fabric 1 after its Reload: err %v", err)
+	}
+}
