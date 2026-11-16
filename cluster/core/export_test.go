@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"crypto/ecdsa"
+	"slices"
 	"time"
 )
 
@@ -82,4 +83,20 @@ func (g *GroupKeyManagement) StaleGroupFabrics() []uint8 {
 		out = append(out, f)
 	}
 	return out
+}
+// PendingSceneChanges is the number of consequences waiting for st's table
+// to load (review II, R2-P6-store-1202).
+func PendingSceneChanges(st *ScenesState) int {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return len(st.pending)
+}
+
+// SceneTable loads st's table and returns a copy of it (review II,
+// R2-P6-store-1212).
+func SceneTable(st *ScenesState) []SceneEntry {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.ensureLoaded(context.Background())
+	return slices.Clone(st.table)
 }

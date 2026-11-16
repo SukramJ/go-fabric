@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"unicode/utf16"
@@ -142,7 +143,7 @@ type ScenesState struct {
 	// its load.
 	loaded  bool
 	dirty   bool
-	pending []func()
+	pending []scenesPending
 	// changes carries FabricSceneInfo change reports: matter.js keeps
 	// fabricSceneInfo as behavior state, so every change to a count, the
 	// current scene or its validity reaches subscribers.
@@ -192,6 +193,15 @@ func (st *ScenesState) reportIfChanged(before string) {
 	}
 }
 
+// scenesPending is a consequence waiting for the table to load. A keyed
+// one replaces the earlier one of the same key — a global scene's store,
+// which the next one overwrites whole — so repeated consequences while the
+// load fails do not grow the list (review II, R2-P6-store-1202).
+type scenesPending struct {
+	key   string
+	apply func()
+}
+
 // NewScenesState returns an empty state; persist may be nil.
 func NewScenesState(persist func([]byte)) *ScenesState {
 	st := &ScenesState{info: map[uint8]*SceneInfoStruct{}, tableSize: scenesDefaultTableSize, loaded: true}
@@ -213,7 +223,49 @@ func LoadScenesState(data []byte, persist func([]byte)) (*ScenesState, error) {
 	if err := json.Unmarshal(data, &s.table); err != nil {
 		return s, fmt.Errorf("core: ScenesManagement: restore scene table: %w", err)
 	}
+	s.table = s.validTable(s.table)
 	return s, nil
+}
+
+// validTable holds a restored table to the rules a scene command is held
+// to: an entry whose (fabric, group, scene) an earlier entry holds is
+// dropped, the entries beyond SceneTableSize too, and a name longer than
+// 16 UTF-16 units is cut to it. What it drops or cuts is logged (review
+// II, R2-P6-store-1212).
+func (st *ScenesState) validTable(table []SceneEntry) []SceneEntry {
+	type key struct {
+		f uint8
+		g uint16
+		s uint8
+	}
+	seen := make(map[key]bool, len(table))
+	out := table[:0]
+	duplicates, beyond, cut := 0, 0, 0
+	for _, e := range table {
+		k := key{e.FabricIndex, e.GroupID, e.SceneID}
+		switch {
+		case seen[k]:
+			duplicates++
+			continue
+		case len(out) >= int(st.tableSize):
+			beyond++
+			continue
+		}
+		seen[k] = true
+		if name := []rune(e.Name); len(utf16.Encode(name)) > scenesMaxNameLength {
+			for len(utf16.Encode(name)) > scenesMaxNameLength {
+				name = name[:len(name)-1]
+			}
+			e.Name = string(name)
+			cut++
+		}
+		out = append(out, e)
+	}
+	if duplicates+beyond+cut > 0 {
+		slog.Default().Warn("core: ScenesManagement: stored scene table held to the rules",
+			"duplicates_dropped", duplicates, "beyond_table_size_dropped", beyond, "names_cut", cut)
+	}
+	return out
 }
 
 // NewPersistedScenesState returns a state over a store: load reads the
@@ -249,10 +301,11 @@ func (st *ScenesState) ensureLoaded(ctx context.Context) bool {
 			st.table = nil
 		}
 	}
+	st.table = st.validTable(st.table)
 	st.loaded = true
 	if len(st.pending) > 0 {
-		for _, apply := range st.pending {
-			apply()
+		for _, p := range st.pending {
+			p.apply()
 		}
 		st.pending = nil
 		st.store(ctx, false)
@@ -345,11 +398,20 @@ func (st *ScenesState) store(ctx context.Context, keep bool) bool {
 // (command false) is kept when the store refuses it, and reaches an
 // unloaded table as a pending change. Caller holds mu.
 func (st *ScenesState) change(ctx context.Context, command bool, fabric uint8, mutate func() (im.StatusCode, bool)) im.StatusCode {
+	return st.changeKeyed(ctx, command, fabric, "", mutate)
+}
+
+// changeKeyed is [ScenesState.change] whose pending consequence, when key
+// is not empty, replaces the pending one of the same key. Caller holds mu.
+func (st *ScenesState) changeKeyed(ctx context.Context, command bool, fabric uint8, key string, mutate func() (im.StatusCode, bool)) im.StatusCode {
 	if !st.ensureLoaded(ctx) {
 		if command {
 			return im.StatusFailure
 		}
-		st.pending = append(st.pending, func() { mutate() })
+		if key != "" {
+			st.pending = slices.DeleteFunc(st.pending, func(p scenesPending) bool { return p.key == key })
+		}
+		st.pending = append(st.pending, scenesPending{key: key, apply: func() { mutate() }})
 		return im.StatusSuccess
 	}
 	prev := slices.Clone(st.table)
@@ -483,9 +545,15 @@ func (st *ScenesState) forgetFabric(ctx context.Context, fabric uint8) {
 
 // Fabrics lists the fabrics the table holds scenes or a scene info entry
 // for, ascending.
+//
+// A table not loaded yet is loaded first, so the node's reconcile of a
+// fabric removed while the endpoint was away sees the stored fabrics
+// (review II, R2-P6-store-1212); while the store refuses the load, only
+// the scene info entries are listed.
 func (st *ScenesState) Fabrics() []uint8 {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	st.ensureLoaded(context.Background())
 	out := fabricsOf(st.table, func(e SceneEntry) uint8 { return e.FabricIndex })
 	for f := range st.info {
 		if !slices.Contains(out, f) {
@@ -581,20 +649,30 @@ func (s *ScenesManagement) StoreGlobalScene(ctx context.Context, fabricIndex uin
 	values := s.captureValues()
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	i := st.indexOf(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID)
-	entry := SceneEntry{
-		FabricIndex: fabricIndex, GroupID: scenesUndefinedGroup, SceneID: scenesGlobalSceneID,
-		Name: scenesGlobalSceneName, TransitionTime: 0, Values: values,
-	}
-	if i != -1 {
-		entry = st.table[i]
-		entry.Values = values
-	}
 	// matter.js ignores the status of #addOrReplaceSceneEntry here: a
 	// fabric at capacity stores no global scene. It is the consequence of
 	// OffWithEffect, which a refused store does not fail: the scene is
-	// kept and stored with the next change.
-	_ = st.addOrReplace(ctx, false, entry, i)
+	// kept and stored with the next change. The existing entry is looked
+	// up when the change applies — on the loaded table, also when the
+	// change waited for the load — never on a table not loaded yet, where
+	// it would be missed and a second (fabric, 0, 0) entry appended
+	// (review II, R2-P6-store-1202).
+	_ = st.changeKeyed(ctx, false, fabricIndex, fmt.Sprintf("global/%d", fabricIndex), func() (im.StatusCode, bool) {
+		entry := SceneEntry{
+			FabricIndex: fabricIndex, GroupID: scenesUndefinedGroup, SceneID: scenesGlobalSceneID,
+			Name: scenesGlobalSceneName, TransitionTime: 0, Values: values,
+		}
+		switch i := st.indexOf(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID); {
+		case i != -1:
+			st.table[i].Values = values
+		case st.remainingCapacity(st.countFor(fabricIndex)) == 0:
+			return im.StatusResourceExhausted, false
+		default:
+			st.table = append(st.table, entry)
+		}
+		st.infoFor(fabricIndex)
+		return im.StatusSuccess, true
+	})
 }
 
 // RecallGlobalScene mirrors matter.js recallGlobalScene
@@ -607,6 +685,14 @@ func (s *ScenesManagement) RecallGlobalScene(ctx context.Context, fabricIndex ui
 	st := s.cfg.State
 	defer st.reportIfChanged(st.snapshot())
 	st.mu.Lock()
+	// The table is loaded first: on one nothing has loaded since start the
+	// stored global scene would be missed (review II, R2-P6-store-1203).
+	if !st.ensureLoaded(ctx) {
+		st.mu.Unlock()
+		slog.Default().Warn("core: ScenesManagement: OnWithRecallGlobalScene recalls nothing: the scene table does not load",
+			"fabric", fabricIndex)
+		return
+	}
 	i := st.indexOf(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID)
 	if i == -1 {
 		st.mu.Unlock()
