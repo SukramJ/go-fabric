@@ -23,11 +23,14 @@ import (
 // bypassed the decoder is held to the same rules.
 
 // requestOf normalises fields to T: T itself, a *T, or a tag map fromMap
-// reads.
-func requestOf[T any](fields any, name string, fromMap func(map[uint8]any) T) (T, error) {
+// reads. A tag map is held to the statuses the generated decoder gives the
+// wire form ([tagMap]): the first field that fails answers the command.
+func requestOf[T any](fields any, name string, fromMap func(*tagMap) T) (T, error) {
 	switch v := fields.(type) {
 	case map[uint8]any:
-		return fromMap(v), nil
+		m := &tagMap{m: v, cmd: name}
+		r := fromMap(m)
+		return r, m.err
 	case *T:
 		if v != nil {
 			return *v, nil
@@ -39,22 +42,62 @@ func requestOf[T any](fields any, name string, fromMap func(map[uint8]any) T) (T
 	return zero, colorControlInvalidCommandErr(fmt.Sprintf("light: %s carried %T", name, fields))
 }
 
-// tagUint reads an unsigned field of the generic tag map the bridge hands
-// over, 0 when absent or wider than the field (the bridge decodes the
-// payload with the field's own width, so a wider value is malformed).
-func tagUint(m map[uint8]any, tag uint8, limit uint64) uint64 {
-	v, ok := cluster.AsUintMax(m[tag], limit)
+// tagMap reads the generic tag map an in-process caller hands over, field
+// by field, held to what the generated decoder answers for the wire form
+// (spec.DecodeFields, spec.DecodeUintIn, spec.DecodeIntIn): every field of
+// a ColorControl request is mandatory ("M"), so an absent or null field is
+// INVALID_COMMAND; a value that is not an integer of the field's
+// signedness is INVALID_COMMAND; one outside the field's width is
+// CONSTRAINT_ERROR (R2-P6-api-1411). err keeps the first failure; a field
+// read after it reads 0.
+type tagMap struct {
+	m   map[uint8]any
+	cmd string
+	err error
+}
+
+func (t *tagMap) fail(err error) {
+	if t.err == nil {
+		t.err = err
+	}
+}
+
+// raw returns the field at tag, or records it as missing.
+func (t *tagMap) raw(tag uint8) (any, bool) {
+	v, ok := t.m[tag]
+	if !ok || v == nil {
+		t.fail(colorControlInvalidCommandErr(fmt.Sprintf("light: %s is missing the mandatory field %d", t.cmd, tag)))
+		return nil, false
+	}
+	return v, true
+}
+
+// uint reads an unsigned field of at most limit.
+func (t *tagMap) uint(tag uint8, limit uint64) uint64 {
+	raw, ok := t.raw(tag)
 	if !ok {
+		return 0
+	}
+	if _, ok := cluster.AsUintMax(raw, math.MaxUint64); !ok {
+		t.fail(colorControlInvalidCommandErr(fmt.Sprintf("light: %s field %d is %T, not an unsigned integer", t.cmd, tag, raw)))
+		return 0
+	}
+	v, ok := cluster.AsUintMax(raw, limit)
+	if !ok {
+		t.fail(colorControlConstraintErr(fmt.Sprintf("light: %s field %d is outside 0..%d", t.cmd, tag, limit)))
 		return 0
 	}
 	return v
 }
 
-// tagInt reads a signed field of the generic tag map, 0 when absent or
-// outside lo..hi.
-func tagInt(m map[uint8]any, tag uint8, lo, hi int64) int64 {
+// int reads a signed field within lo..hi.
+func (t *tagMap) int(tag uint8, lo, hi int64) int64 {
+	raw, ok := t.raw(tag)
+	if !ok {
+		return 0
+	}
 	var n int64
-	switch v := m[tag].(type) {
+	switch v := raw.(type) {
 	case int64:
 		n = v
 	case int:
@@ -67,32 +110,38 @@ func tagInt(m map[uint8]any, tag uint8, lo, hi int64) int64 {
 		n = int64(v)
 	case uint64:
 		if v > math.MaxInt64 {
+			t.fail(colorControlConstraintErr(fmt.Sprintf("light: %s field %d is outside %d..%d", t.cmd, tag, lo, hi)))
 			return 0
 		}
 		n = int64(v)
+	case uint8, uint16, uint32:
+		u, _ := cluster.AsUintMax(v, math.MaxUint32)
+		n = int64(u) //nolint:gosec // at most MaxUint32
 	default:
+		t.fail(colorControlInvalidCommandErr(fmt.Sprintf("light: %s field %d is %T, not an integer", t.cmd, tag, raw)))
 		return 0
 	}
 	if n < lo || n > hi {
+		t.fail(colorControlConstraintErr(fmt.Sprintf("light: %s field %d is outside %d..%d", t.cmd, tag, lo, hi)))
 		return 0
 	}
 	return n
 }
 
-// u8 / u16 read bounded tag map fields.
-func u8(m map[uint8]any, tag uint8) uint8 {
-	return uint8(tagUint(m, tag, math.MaxUint8)) //nolint:gosec // bounded by tagUint
+// u8 / u16 / i16 / opts read bounded tag map fields.
+func u8(m *tagMap, tag uint8) uint8 {
+	return uint8(m.uint(tag, math.MaxUint8)) //nolint:gosec // bounded by tagMap.uint
 }
 
-func u16(m map[uint8]any, tag uint8) uint16 {
-	return uint16(tagUint(m, tag, math.MaxUint16)) //nolint:gosec // bounded by tagUint
+func u16(m *tagMap, tag uint8) uint16 {
+	return uint16(m.uint(tag, math.MaxUint16)) //nolint:gosec // bounded by tagMap.uint
 }
 
-func i16(m map[uint8]any, tag uint8) int16 {
-	return int16(tagInt(m, tag, math.MinInt16, math.MaxInt16)) //nolint:gosec // bounded by tagInt
+func i16(m *tagMap, tag uint8) int16 {
+	return int16(m.int(tag, math.MinInt16, math.MaxInt16)) //nolint:gosec // bounded by tagMap.int
 }
 
-func opts(m map[uint8]any, tag uint8) ccdef.OptionsBitmap { return ccdef.OptionsBitmap(u8(m, tag)) }
+func opts(m *tagMap, tag uint8) ccdef.OptionsBitmap { return ccdef.OptionsBitmap(u8(m, tag)) }
 
 // The field constraints of color-control.element.ts.
 const (
@@ -142,7 +191,7 @@ func firstErr(errs ...error) error {
 
 func moveToHueFields(fields any) (ccdef.MoveToHueRequest, error) {
 	r, err := requestOf(fields, "MoveToHue",
-		func(m map[uint8]any) ccdef.MoveToHueRequest {
+		func(m *tagMap) ccdef.MoveToHueRequest {
 			return ccdef.MoveToHueRequest{
 				Hue: u8(m, 0), Direction: ccdef.DirectionEnum(u8(m, 1)), TransitionTime: u16(m, 2),
 				OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -160,7 +209,7 @@ func moveToHueFields(fields any) (ccdef.MoveToHueRequest, error) {
 
 func moveHueFields(fields any) (ccdef.MoveHueRequest, error) {
 	r, err := requestOf(fields, "MoveHue",
-		func(m map[uint8]any) ccdef.MoveHueRequest {
+		func(m *tagMap) ccdef.MoveHueRequest {
 			return ccdef.MoveHueRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u8(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
 			}
@@ -173,7 +222,7 @@ func moveHueFields(fields any) (ccdef.MoveHueRequest, error) {
 
 func stepHueFields(fields any) (ccdef.StepHueRequest, error) {
 	r, err := requestOf(fields, "StepHue",
-		func(m map[uint8]any) ccdef.StepHueRequest {
+		func(m *tagMap) ccdef.StepHueRequest {
 			return ccdef.StepHueRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u8(m, 1), TransitionTime: u8(m, 2),
 				OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -187,7 +236,7 @@ func stepHueFields(fields any) (ccdef.StepHueRequest, error) {
 
 func moveToSaturationFields(fields any) (ccdef.MoveToSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveToSaturation",
-		func(m map[uint8]any) ccdef.MoveToSaturationRequest {
+		func(m *tagMap) ccdef.MoveToSaturationRequest {
 			return ccdef.MoveToSaturationRequest{
 				Saturation: u8(m, 0), TransitionTime: u16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
 			}
@@ -203,7 +252,7 @@ func moveToSaturationFields(fields any) (ccdef.MoveToSaturationRequest, error) {
 
 func moveSaturationFields(fields any) (ccdef.MoveSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveSaturation",
-		func(m map[uint8]any) ccdef.MoveSaturationRequest {
+		func(m *tagMap) ccdef.MoveSaturationRequest {
 			return ccdef.MoveSaturationRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u8(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
 			}
@@ -216,7 +265,7 @@ func moveSaturationFields(fields any) (ccdef.MoveSaturationRequest, error) {
 
 func stepSaturationFields(fields any) (ccdef.StepSaturationRequest, error) {
 	r, err := requestOf(fields, "StepSaturation",
-		func(m map[uint8]any) ccdef.StepSaturationRequest {
+		func(m *tagMap) ccdef.StepSaturationRequest {
 			return ccdef.StepSaturationRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u8(m, 1), TransitionTime: u8(m, 2),
 				OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -230,7 +279,7 @@ func stepSaturationFields(fields any) (ccdef.StepSaturationRequest, error) {
 
 func moveToHueAndSaturationFields(fields any) (ccdef.MoveToHueAndSaturationRequest, error) {
 	r, err := requestOf(fields, "MoveToHueAndSaturation",
-		func(m map[uint8]any) ccdef.MoveToHueAndSaturationRequest {
+		func(m *tagMap) ccdef.MoveToHueAndSaturationRequest {
 			return ccdef.MoveToHueAndSaturationRequest{
 				Hue: u8(m, 0), Saturation: u8(m, 1), TransitionTime: u16(m, 2), OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
 			}
@@ -247,7 +296,7 @@ func moveToHueAndSaturationFields(fields any) (ccdef.MoveToHueAndSaturationReque
 
 func moveToColorFields(fields any) (ccdef.MoveToColorRequest, error) {
 	r, err := requestOf(fields, "MoveToColor",
-		func(m map[uint8]any) ccdef.MoveToColorRequest {
+		func(m *tagMap) ccdef.MoveToColorRequest {
 			return ccdef.MoveToColorRequest{
 				ColorX: u16(m, 0), ColorY: u16(m, 1), TransitionTime: u16(m, 2), OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
 			}
@@ -264,14 +313,14 @@ func moveToColorFields(fields any) (ccdef.MoveToColorRequest, error) {
 
 func moveColorFields(fields any) (ccdef.MoveColorRequest, error) {
 	return requestOf(fields, "MoveColor",
-		func(m map[uint8]any) ccdef.MoveColorRequest {
+		func(m *tagMap) ccdef.MoveColorRequest {
 			return ccdef.MoveColorRequest{RateX: i16(m, 0), RateY: i16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3)}
 		})
 }
 
 func stepColorFields(fields any) (ccdef.StepColorRequest, error) {
 	r, err := requestOf(fields, "StepColor",
-		func(m map[uint8]any) ccdef.StepColorRequest {
+		func(m *tagMap) ccdef.StepColorRequest {
 			return ccdef.StepColorRequest{
 				StepX: i16(m, 0), StepY: i16(m, 1), TransitionTime: u16(m, 2), OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
 			}
@@ -284,7 +333,7 @@ func stepColorFields(fields any) (ccdef.StepColorRequest, error) {
 
 func moveToColorTemperatureFields(fields any) (ccdef.MoveToColorTemperatureRequest, error) {
 	r, err := requestOf(fields, "MoveToColorTemperature",
-		func(m map[uint8]any) ccdef.MoveToColorTemperatureRequest {
+		func(m *tagMap) ccdef.MoveToColorTemperatureRequest {
 			return ccdef.MoveToColorTemperatureRequest{
 				ColorTemperatureMireds: u16(m, 0), TransitionTime: u16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
 			}
@@ -300,7 +349,7 @@ func moveToColorTemperatureFields(fields any) (ccdef.MoveToColorTemperatureReque
 
 func moveColorTemperatureFields(fields any) (ccdef.MoveColorTemperatureRequest, error) {
 	r, err := requestOf(fields, "MoveColorTemperature",
-		func(m map[uint8]any) ccdef.MoveColorTemperatureRequest {
+		func(m *tagMap) ccdef.MoveColorTemperatureRequest {
 			return ccdef.MoveColorTemperatureRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u16(m, 1), ColorTemperatureMinimumMireds: u16(m, 2),
 				ColorTemperatureMaximumMireds: u16(m, 3), OptionsMask: opts(m, 4), OptionsOverride: opts(m, 5),
@@ -318,7 +367,7 @@ func moveColorTemperatureFields(fields any) (ccdef.MoveColorTemperatureRequest, 
 
 func stepColorTemperatureFields(fields any) (ccdef.StepColorTemperatureRequest, error) {
 	r, err := requestOf(fields, "StepColorTemperature",
-		func(m map[uint8]any) ccdef.StepColorTemperatureRequest {
+		func(m *tagMap) ccdef.StepColorTemperatureRequest {
 			return ccdef.StepColorTemperatureRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u16(m, 1), TransitionTime: u16(m, 2),
 				ColorTemperatureMinimumMireds: u16(m, 3), ColorTemperatureMaximumMireds: u16(m, 4),
@@ -338,7 +387,7 @@ func stepColorTemperatureFields(fields any) (ccdef.StepColorTemperatureRequest, 
 
 func enhancedMoveToHueFields(fields any) (ccdef.EnhancedMoveToHueRequest, error) {
 	r, err := requestOf(fields, "EnhancedMoveToHue",
-		func(m map[uint8]any) ccdef.EnhancedMoveToHueRequest {
+		func(m *tagMap) ccdef.EnhancedMoveToHueRequest {
 			return ccdef.EnhancedMoveToHueRequest{
 				EnhancedHue: u16(m, 0), Direction: ccdef.DirectionEnum(u8(m, 1)), TransitionTime: u16(m, 2),
 				OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -355,7 +404,7 @@ func enhancedMoveToHueFields(fields any) (ccdef.EnhancedMoveToHueRequest, error)
 
 func enhancedMoveHueFields(fields any) (ccdef.EnhancedMoveHueRequest, error) {
 	r, err := requestOf(fields, "EnhancedMoveHue",
-		func(m map[uint8]any) ccdef.EnhancedMoveHueRequest {
+		func(m *tagMap) ccdef.EnhancedMoveHueRequest {
 			return ccdef.EnhancedMoveHueRequest{
 				MoveMode: ccdef.MoveModeEnum(u8(m, 0)), Rate: u16(m, 1), OptionsMask: opts(m, 2), OptionsOverride: opts(m, 3),
 			}
@@ -368,7 +417,7 @@ func enhancedMoveHueFields(fields any) (ccdef.EnhancedMoveHueRequest, error) {
 
 func enhancedStepHueFields(fields any) (ccdef.EnhancedStepHueRequest, error) {
 	r, err := requestOf(fields, "EnhancedStepHue",
-		func(m map[uint8]any) ccdef.EnhancedStepHueRequest {
+		func(m *tagMap) ccdef.EnhancedStepHueRequest {
 			return ccdef.EnhancedStepHueRequest{
 				StepMode: ccdef.StepModeEnum(u8(m, 0)), StepSize: u16(m, 1), TransitionTime: u16(m, 2),
 				OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -385,7 +434,7 @@ func enhancedStepHueFields(fields any) (ccdef.EnhancedStepHueRequest, error) {
 
 func enhancedMoveToHueAndSaturationFields(fields any) (ccdef.EnhancedMoveToHueAndSaturationRequest, error) {
 	r, err := requestOf(fields, "EnhancedMoveToHueAndSaturation",
-		func(m map[uint8]any) ccdef.EnhancedMoveToHueAndSaturationRequest {
+		func(m *tagMap) ccdef.EnhancedMoveToHueAndSaturationRequest {
 			return ccdef.EnhancedMoveToHueAndSaturationRequest{
 				EnhancedHue: u16(m, 0), Saturation: u8(m, 1), TransitionTime: u16(m, 2),
 				OptionsMask: opts(m, 3), OptionsOverride: opts(m, 4),
@@ -402,7 +451,7 @@ func enhancedMoveToHueAndSaturationFields(fields any) (ccdef.EnhancedMoveToHueAn
 
 func colorLoopSetFields(fields any) (ccdef.ColorLoopSetRequest, error) {
 	r, err := requestOf(fields, "ColorLoopSet",
-		func(m map[uint8]any) ccdef.ColorLoopSetRequest {
+		func(m *tagMap) ccdef.ColorLoopSetRequest {
 			return ccdef.ColorLoopSetRequest{
 				UpdateFlags: ccdef.UpdateFlagsBitmap(u8(m, 0)), Action: ccdef.ColorLoopActionEnum(u8(m, 1)),
 				Direction: ccdef.ColorLoopDirectionEnum(u8(m, 2)), Time: u16(m, 3), StartHue: u16(m, 4),
@@ -426,7 +475,7 @@ func stopMoveStepFields(fields any) (ccdef.StopMoveStepRequest, error) {
 		return ccdef.StopMoveStepRequest{}, nil
 	}
 	return requestOf(fields, "StopMoveStep",
-		func(m map[uint8]any) ccdef.StopMoveStepRequest {
+		func(m *tagMap) ccdef.StopMoveStepRequest {
 			return ccdef.StopMoveStepRequest{OptionsMask: opts(m, 0), OptionsOverride: opts(m, 1)}
 		})
 }

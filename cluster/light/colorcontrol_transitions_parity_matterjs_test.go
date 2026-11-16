@@ -312,7 +312,7 @@ func TestColorControlExecuteIfOff(t *testing.T) {
 		if m := currentMireds(t, srv); m != 300 {
 			t.Errorf("ExecuteIfOff override: %d, want 300", m)
 		}
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, map[uint8]any{0: uint64(1), 1: uint64(10), 4: uint64(1), 5: uint64(1)})
+		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, map[uint8]any{0: uint64(1), 1: uint64(10), 2: uint64(0), 3: uint64(0), 4: uint64(1), 5: uint64(1)})
 		ctSleep(time.Second)
 		_ = ctInvoke(t, srv, wire.ColorCtrlCmdStopMoveStep, nil)
 		if remainingCT(t, srv) == 0 {

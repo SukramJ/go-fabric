@@ -266,8 +266,9 @@ func TestParityMatterJS_ColorControl_MoveToColorTemperatureTagMapPayload(t *test
 	srv := light.NewColorControlServer(cfg)
 	ctx := context.Background()
 
-	// Tag 0 = ColorTemperatureMireds as uint64 (generic-tag-map encoding).
-	fields := map[uint8]any{0: uint64(250)}
+	// Tag 0 = ColorTemperatureMireds as uint64 (generic-tag-map encoding);
+	// TransitionTime and the two option bitmaps are mandatory as well.
+	fields := map[uint8]any{0: uint64(250), 1: uint64(0), 2: uint64(0), 3: uint64(0)}
 	if _, err := srv.MatterInvoke(ctx, wire.ColorCtrlCmdMoveToColorTemperature, fields); err != nil {
 		t.Fatalf("MoveToColorTemperature(tag map): %v", err)
 	}
