@@ -468,7 +468,14 @@ var (
 	_ contract.ClusterEventLister      = (*Server)(nil)
 	_ contract.EventReceiver           = (*Server)(nil)
 	_ contract.AttributeChangeNotifier = (*Server)(nil)
+	_ contract.ClusterQuiescer         = (*Server)(nil)
 )
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: it disarms the
+// CountdownTime throttle's deferred report ([cluster.Quieter.Stop]), the
+// one timer the server runs, so it does not report after the bridge let
+// the server go (R2-P6-conc-1506).
+func (s *Server) MatterQuiesce() { s.quiet.Stop() }
 
 // NewServer builds an OperationalState (0x0060) server.
 func NewServer(cfg Config) (*Server, error) { return newServer(baseVariant, cfg) }
