@@ -43,7 +43,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -472,17 +471,17 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 	defer s.mu.RUnlock()
 
 	switch attrID {
-	case wire.WindowCoveringAttrType:
+	case wcdef.AttrType:
 		return s.wcType, true
-	case wire.WindowCoveringAttrConfigStatus:
+	case wcdef.AttrConfigStatus:
 		return s.configStatusLocked(), true
-	case wire.WindowCoveringAttrOperationalStatus:
+	case wcdef.AttrOperationalStatus:
 		return s.operationalStatus, true
-	case wire.WindowCoveringAttrEndProductType:
+	case wcdef.AttrEndProductType:
 		return s.endProductType, true
-	case wire.WindowCoveringAttrMode:
+	case wcdef.AttrMode:
 		return s.wcMode, true
-	case wire.WindowCoveringAttrSafetyStatus:
+	case wcdef.AttrSafetyStatus:
 		return uint16(0), true
 	}
 	for _, a := range []*axis{s.lift, s.tilt} {
@@ -636,10 +635,10 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 	// by postCommit, :1302-1317, at db021da0).
 	var changed []uint32 // ascending: ConfigStatus 0x0007, Mode 0x0017
 	if moved {
-		changed = append(changed, wire.WindowCoveringAttrConfigStatus)
+		changed = append(changed, wcdef.AttrConfigStatus)
 	}
 	if modeChanged {
-		changed = append(changed, wire.WindowCoveringAttrMode)
+		changed = append(changed, wcdef.AttrMode)
 	}
 	s.changes.NotifyFrom(contract.OriginControllerWrite, changed...)
 	return len(changed) > 0, nil
@@ -687,11 +686,11 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 	switch cmdID {
 	case wcdef.CmdUpOrOpen:
 		return both(0), nil
-	case wire.WindowCoveringCmdDownOrClose:
+	case wcdef.CmdDownOrClose:
 		return both(10000), nil
-	case wire.WindowCoveringCmdStopMotion:
+	case wcdef.CmdStopMotion:
 		return command{stop: true}, nil
-	case wire.WindowCoveringCmdGoToLiftPercentage:
+	case wcdef.CmdGoToLiftPercentage:
 		if s.lift == nil {
 			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift feature")
 		}
@@ -703,7 +702,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 			return openOrClose(pct, both), nil
 		}
 		return command{lift: &pct}, nil
-	case wire.WindowCoveringCmdGoToTiltPercentage:
+	case wcdef.CmdGoToTiltPercentage:
 		if s.tilt == nil {
 			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt feature")
 		}
@@ -935,7 +934,7 @@ func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
 	s.operationalStatus = status
 	s.mu.Unlock()
 	if changed {
-		s.changes.NotifyFrom(contract.OriginHostSet, wire.WindowCoveringAttrOperationalStatus)
+		s.changes.NotifyFrom(contract.OriginHostSet, wcdef.AttrOperationalStatus)
 	}
 }
 
@@ -1039,7 +1038,7 @@ func (s *WindowCoveringServer) tick(a *axis, m *movement) {
 		a.current = m.target
 		s.setAxisStatusLocked(a, movementStopped)
 		a.move = nil
-		changed = append(changed, wire.WindowCoveringAttrOperationalStatus)
+		changed = append(changed, wcdef.AttrOperationalStatus)
 	} else {
 		// A host report during the travel moves the base the steps add to
 		// (SetCurrentPosition does not stop it): a step never passes the

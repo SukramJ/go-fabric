@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 )
 
 // TestParity_WindowCovering_ConfigStatus_Bitmap verifies that
@@ -31,7 +31,7 @@ func TestParity_WindowCovering_ConfigStatus_Bitmap(t *testing.T) {
 		FeatureMap:     0x05, // LF (bit 0) + PA_LF (bit 2)
 	})
 
-	v, ok := srv.MatterRead(wire.WindowCoveringAttrConfigStatus)
+	v, ok := srv.MatterRead(wcdef.AttrConfigStatus)
 	if !ok {
 		t.Fatal("ConfigStatus: ok=false")
 	}

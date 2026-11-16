@@ -11,7 +11,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -33,7 +32,7 @@ func (f *fakeColorTemperatureWriter) SetColorTemperatureMireds(_ context.Context
 // server and fails the test if the attribute is absent or has the wrong type.
 func currentMireds(t *testing.T, srv *light.ColorControlServer) uint16 {
 	t.Helper()
-	v, ok := srv.MatterRead(wire.ColorCtrlAttrColorTemperatureMireds)
+	v, ok := srv.MatterRead(ccdef.AttrColorTemperatureMireds)
 	if !ok {
 		t.Fatal("MatterRead(ColorTemperatureMireds) returned ok=false")
 	}
@@ -56,7 +55,7 @@ func TestColorControl_WriteThrough_WriterCalledOnce(t *testing.T) {
 	srv.SetWriter(w)
 
 	const target uint16 = 300
-	ret, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
+	ret, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColorTemperature,
 		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
 	if err != nil {
 		t.Fatalf("MatterInvoke returned error: %v", err)
@@ -92,7 +91,7 @@ func TestColorControl_WriteThrough_WriterError(t *testing.T) {
 		t.Fatalf("pre-condition failed: initial mireds = %d, want %d", before, initialMireds)
 	}
 
-	_, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
+	_, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColorTemperature,
 		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
 
 	if spec.StatusOf(err) != im.StatusFailure {
@@ -132,7 +131,7 @@ func TestColorControl_WriteThrough_Clamping(t *testing.T) {
 			w := &fakeColorTemperatureWriter{}
 			srv.SetWriter(w)
 
-			_, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
+			_, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColorTemperature,
 				ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: tc.target})
 			if err != nil {
 				t.Fatalf("MatterInvoke returned error: %v", err)
@@ -162,7 +161,7 @@ func TestColorControl_WriteThrough_NoWriter(t *testing.T) {
 	// No SetWriter call — writer is nil.
 
 	const target uint16 = 250
-	ret, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
+	ret, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColorTemperature,
 		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
 	if err != nil {
 		t.Fatalf("MatterInvoke without writer returned error: %v", err)
@@ -187,7 +186,7 @@ func TestColorControl_WriteThrough_SetWriterNil(t *testing.T) {
 	srv.SetWriter(nil) // detach
 
 	const target uint16 = 200
-	_, err := srv.MatterInvoke(context.Background(), wire.ColorCtrlCmdMoveToColorTemperature,
+	_, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColorTemperature,
 		ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: target})
 	if err != nil {
 		t.Fatalf("MatterInvoke after SetWriter(nil) returned error: %v", err)
@@ -206,18 +205,18 @@ func TestColorControl_WriteThrough_SetWriterNil(t *testing.T) {
 func TestColorControlOptionsWritable(t *testing.T) {
 	t.Parallel()
 	s := light.NewColorControlServer(light.DefaultColorControlServerConfig())
-	if err := s.MatterWrite(context.Background(), wire.ColorCtrlAttrOptions, uint8(1)); err != nil {
+	if err := s.MatterWrite(context.Background(), ccdef.AttrOptions, uint8(1)); err != nil {
 		t.Fatalf("write Options 1: %v", err)
 	}
-	if v, _ := s.MatterRead(wire.ColorCtrlAttrOptions); v != uint8(1) {
+	if v, _ := s.MatterRead(ccdef.AttrOptions); v != uint8(1) {
 		t.Fatalf("Options = %v, want 1", v)
 	}
-	err := s.MatterWrite(context.Background(), wire.ColorCtrlAttrOptions, uint8(0x80))
+	err := s.MatterWrite(context.Background(), ccdef.AttrOptions, uint8(0x80))
 	var sc interface{ MatterStatusCode() im.StatusCode }
 	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
 		t.Fatalf("an undefined bit: %v, want CONSTRAINT_ERROR", err)
 	}
-	if v, _ := s.MatterRead(wire.ColorCtrlAttrOptions); v != uint8(1) {
+	if v, _ := s.MatterRead(ccdef.AttrOptions); v != uint8(1) {
 		t.Fatalf("a refused write changed Options to %v", v)
 	}
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -103,16 +102,16 @@ func TestMoverGetsOneGoToPerCommand(t *testing.T) {
 		want   uint16
 	}{
 		{wcdef.CmdUpOrOpen, nil, 0},
-		{clusterwire.WindowCoveringCmdDownOrClose, nil, 10000},
-		{clusterwire.WindowCoveringCmdGoToLiftPercentage, wcdef.GoToLiftPercentageRequest{LiftPercent100thsValue: 3500}, 3500},
+		{wcdef.CmdDownOrClose, nil, 10000},
+		{wcdef.CmdGoToLiftPercentage, wcdef.GoToLiftPercentageRequest{LiftPercent100thsValue: 3500}, 3500},
 	} {
 		if _, err := srv.MatterInvoke(ctx, step.cmd, step.fields); err != nil {
 			t.Fatalf("command 0x%02X: %v", step.cmd, err)
 		}
-		if got := readU16(t, srv, clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths); got != step.want {
+		if got := readU16(t, srv, wcdef.AttrTargetPositionLiftPercent100ths); got != step.want {
 			t.Errorf("command 0x%02X: target %d, want %d", step.cmd, got, step.want)
 		}
-		if got := readU16(t, srv, clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths); got != 5000 {
+		if got := readU16(t, srv, wcdef.AttrCurrentPositionLiftPercent100ths); got != 5000 {
 			t.Errorf("command 0x%02X: current %d, want 5000 (the device moves, not the server)", step.cmd, got)
 		}
 	}
@@ -133,14 +132,14 @@ func TestMoverStopSetsTargetToCurrent(t *testing.T) {
 	m := &recordingMover{}
 	srv := newMoverServer(t, m, 2000)
 	ctx := context.Background()
-	if _, err := srv.MatterInvoke(ctx, clusterwire.WindowCoveringCmdDownOrClose, nil); err != nil {
+	if _, err := srv.MatterInvoke(ctx, wcdef.CmdDownOrClose, nil); err != nil {
 		t.Fatal(err)
 	}
 	srv.SetCurrentPosition(new(uint16(4200)), nil)
-	if _, err := srv.MatterInvoke(ctx, clusterwire.WindowCoveringCmdStopMotion, nil); err != nil {
+	if _, err := srv.MatterInvoke(ctx, wcdef.CmdStopMotion, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := readU16(t, srv, clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths); got != 4200 {
+	if got := readU16(t, srv, wcdef.AttrTargetPositionLiftPercent100ths); got != 4200 {
 		t.Errorf("target after StopMotion %d, want 4200", got)
 	}
 	want := []moverCall{{"goto", 10000}, {"stop", 0}}
@@ -156,18 +155,18 @@ func TestMoverErrorAnswersFailureAndRestoresTheTarget(t *testing.T) {
 	m := &recordingMover{err: errors.New("device unreachable")}
 	srv := newMoverServer(t, m, 6000)
 	ctx := context.Background()
-	for _, cmd := range []uint32{wcdef.CmdUpOrOpen, clusterwire.WindowCoveringCmdStopMotion} {
+	for _, cmd := range []uint32{wcdef.CmdUpOrOpen, wcdef.CmdStopMotion} {
 		_, err := srv.MatterInvoke(ctx, cmd, nil)
 		var sc im.StatusCodeError
 		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusFailure {
 			t.Fatalf("command 0x%02X: error %v, want FAILURE", cmd, err)
 		}
-		if got := readU16(t, srv, clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths); got != 6000 {
+		if got := readU16(t, srv, wcdef.AttrTargetPositionLiftPercent100ths); got != 6000 {
 			t.Errorf("command 0x%02X: target %d after a refusal, want 6000", cmd, got)
 		}
 	}
 	// A command the server refuses itself never reaches the Mover.
-	_, err := srv.MatterInvoke(ctx, clusterwire.WindowCoveringCmdGoToLiftPercentage, uint16(10001))
+	_, err := srv.MatterInvoke(ctx, wcdef.CmdGoToLiftPercentage, uint16(10001))
 	var sc im.StatusCodeError
 	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
 		t.Errorf("GoToLiftPercentage 10001: error %v, want CONSTRAINT_ERROR", err)
@@ -200,13 +199,13 @@ func TestInboundSettersReportWithoutTheMover(t *testing.T) {
 	srv.SetOperationalStatus(0b0000_1010)           // global Closing, lift Closing
 	srv.SetOperationalStatus(0b0000_1010)           // unchanged: not reported
 	srv.SetCurrentPosition(new(uint16(12000)), nil) // clamped to 10000
-	if got := readU16(t, srv, clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths); got != 10000 {
+	if got := readU16(t, srv, wcdef.AttrCurrentPositionLiftPercent100ths); got != 10000 {
 		t.Errorf("current %d, want 10000", got)
 	}
-	if v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrCurrentPositionLiftPercentage); v != uint8(100) {
+	if v, _ := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercentage); v != uint8(100) {
 		t.Errorf("CurrentPositionLiftPercentage %v, want 100", v)
 	}
-	if v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrOperationalStatus); v != uint8(0b0000_1010) {
+	if v, _ := srv.MatterRead(wcdef.AttrOperationalStatus); v != uint8(0b0000_1010) {
 		t.Errorf("OperationalStatus %v, want 0x0A", v)
 	}
 	if n := len(m.recorded()); n != 0 {
@@ -215,8 +214,8 @@ func TestInboundSettersReportWithoutTheMover(t *testing.T) {
 	mu.Lock()
 	got := append([]uint32(nil), reported...)
 	mu.Unlock()
-	pos := []uint32{clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths, clusterwire.WindowCoveringAttrCurrentPositionLiftPercentage}
-	want := append(append(append([]uint32(nil), pos...), clusterwire.WindowCoveringAttrOperationalStatus), pos...)
+	pos := []uint32{wcdef.AttrCurrentPositionLiftPercent100ths, wcdef.AttrCurrentPositionLiftPercentage}
+	want := append(append(append([]uint32(nil), pos...), wcdef.AttrOperationalStatus), pos...)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("reported %v, want %v", got, want)
 	}
@@ -231,10 +230,10 @@ func TestMoverMayReportFromInsideGoTo(t *testing.T) {
 	m.mu.Lock()
 	m.srv = srv
 	m.mu.Unlock()
-	if _, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, uint16(7000)); err != nil {
+	if _, err := srv.MatterInvoke(context.Background(), wcdef.CmdGoToLiftPercentage, uint16(7000)); err != nil {
 		t.Fatal(err)
 	}
-	if got := readU16(t, srv, clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths); got != 7000 {
+	if got := readU16(t, srv, wcdef.AttrCurrentPositionLiftPercent100ths); got != 7000 {
 		t.Errorf("current %d, want 7000", got)
 	}
 }
@@ -260,7 +259,7 @@ func TestMoverPathRefusesWhatTheServerRefuses(t *testing.T) {
 		t.Error("unknown command accepted")
 	}
 	srv.SetOperationalStatus(0xC5)
-	if v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrOperationalStatus); v != uint8(0x05) {
+	if v, _ := srv.MatterRead(wcdef.AttrOperationalStatus); v != uint8(0x05) {
 		t.Errorf("OperationalStatus %v, want 0x05", v)
 	}
 	if n := len(m.recorded()); n != 0 {
@@ -275,13 +274,13 @@ func TestMoverStatusErrorPassesThrough(t *testing.T) {
 	t.Parallel()
 	m := &recordingMover{err: spec.Errorf(im.StatusBusy, "motor busy")}
 	srv := newMoverServer(t, m, 3000)
-	for _, cmd := range []uint32{clusterwire.WindowCoveringCmdDownOrClose, clusterwire.WindowCoveringCmdStopMotion} {
+	for _, cmd := range []uint32{wcdef.CmdDownOrClose, wcdef.CmdStopMotion} {
 		_, err := srv.MatterInvoke(context.Background(), cmd, nil)
 		var sc im.StatusCodeError
 		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusBusy {
 			t.Errorf("command 0x%02X: error %v, want BUSY", cmd, err)
 		}
-		if got := readU16(t, srv, clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths); got != 3000 {
+		if got := readU16(t, srv, wcdef.AttrTargetPositionLiftPercent100ths); got != 3000 {
 			t.Errorf("command 0x%02X: target %d after a refusal, want 3000", cmd, got)
 		}
 	}

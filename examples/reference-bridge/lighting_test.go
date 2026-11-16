@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 )
 
@@ -55,12 +56,12 @@ func TestCeilingLightRampsThroughTheEngine(t *testing.T) {
 			t.Errorf("after 2 s the level is %d, want 227", level)
 		}
 
-		if _, err := cc.MatterInvoke(ctx, wire.ColorCtrlCmdMoveColorTemperature, map[uint8]any{0: uint64(1), 1: uint64(10), 2: uint64(0), 3: uint64(0), 4: uint64(0), 5: uint64(0)}); err != nil {
+		if _, err := cc.MatterInvoke(ctx, ccdef.CmdMoveColorTemperature, map[uint8]any{0: uint64(1), 1: uint64(10), 2: uint64(0), 3: uint64(0), 4: uint64(0), 5: uint64(0)}); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(time.Second)
 		synctest.Wait()
-		if v, _ := cc.MatterRead(wire.ColorCtrlAttrColorTemperatureMireds); v.(uint16) <= 370 || v.(uint16) >= 500 {
+		if v, _ := cc.MatterRead(ccdef.AttrColorTemperatureMireds); v.(uint16) <= 370 || v.(uint16) >= 500 {
 			t.Errorf("after 1 s the colour temperature is %v, want on its way from 370 to 500", v)
 		}
 		cc.MatterQuiesce()

@@ -11,7 +11,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/light"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
 )
@@ -48,9 +47,9 @@ func findClusterCC(s *matterSchemaCC, id uint32) (revision uint16, found bool) {
 func TestParityMatterJS_ColorControlClusterRevision(t *testing.T) {
 	t.Parallel()
 	schema := loadSchemaCC(t)
-	rev, ok := findClusterCC(schema, wire.ColorControlClusterID)
+	rev, ok := findClusterCC(schema, ccdef.ClusterID)
 	if !ok {
-		t.Fatalf("matter.js schema has no ColorControl cluster (0x%04X)", wire.ColorControlClusterID)
+		t.Fatalf("matter.js schema has no ColorControl cluster (0x%04X)", ccdef.ClusterID)
 	}
 	if light.ColorControlClusterRevision != rev {
 		t.Errorf("ColorControlClusterRevision = %d, want %d (matter.js HEAD)",
@@ -74,17 +73,17 @@ func TestParityMatterJS_ColorControlMandatoryAttributes(t *testing.T) {
 		id   uint32
 		name string
 	}{
-		{wire.ColorCtrlAttrColorTemperatureMireds, "ColorTemperatureMireds (0x0007)"},
-		{wire.ColorCtrlAttrColorMode, "ColorMode (0x0008)"},
-		{wire.ColorCtrlAttrOptions, "Options (0x000F)"},
-		{wire.ColorCtrlAttrEnhancedColorMode, "EnhancedColorMode (0x4001)"},
-		{wire.ColorCtrlAttrColorCapabilities, "ColorCapabilities (0x400A)"},
-		{wire.ColorCtrlAttrColorTempPhysicalMin, "ColorTempPhysicalMinMireds (0x400B)"},
-		{wire.ColorCtrlAttrColorTempPhysicalMax, "ColorTempPhysicalMaxMireds (0x400C)"},
+		{ccdef.AttrColorTemperatureMireds, "ColorTemperatureMireds (0x0007)"},
+		{ccdef.AttrColorMode, "ColorMode (0x0008)"},
+		{ccdef.AttrOptions, "Options (0x000F)"},
+		{ccdef.AttrEnhancedColorMode, "EnhancedColorMode (0x4001)"},
+		{ccdef.AttrColorCapabilities, "ColorCapabilities (0x400A)"},
+		{ccdef.AttrColorTempPhysicalMinMireds, "ColorTempPhysicalMinMireds (0x400B)"},
+		{ccdef.AttrColorTempPhysicalMaxMireds, "ColorTempPhysicalMaxMireds (0x400C)"},
 		// Conformance "CT" (color-control.element.ts:183-189); found
 		// missing by the chip-tool data-model sweep.
-		{wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds, "CoupleColorTempToLevelMinMireds (0x400D)"},
-		{wire.ColorCtrlAttrStartUpColorTemperatureMireds, "StartUpColorTemperatureMireds (0x4010)"},
+		{ccdef.AttrCoupleColorTempToLevelMinMireds, "CoupleColorTempToLevelMinMireds (0x400D)"},
+		{ccdef.AttrStartUpColorTemperatureMireds, "StartUpColorTemperatureMireds (0x4010)"},
 	}
 	for _, m := range mandatory {
 		if !present[m.id] {
@@ -105,7 +104,7 @@ func TestParityMatterJS_ColorControlMandatoryAttributes(t *testing.T) {
 func TestParityMatterJS_ColorControlColorCapabilitiesBits(t *testing.T) {
 	t.Parallel()
 	srv := light.NewColorControlServer(light.DefaultColorControlServerConfig())
-	raw, ok := srv.MatterRead(wire.ColorCtrlAttrColorCapabilities)
+	raw, ok := srv.MatterRead(ccdef.AttrColorCapabilities)
 	if !ok {
 		t.Fatal("MatterRead(ColorCapabilities) returned ok=false")
 	}
@@ -136,8 +135,8 @@ func TestParityMatterJS_ColorControlColorModeDefault(t *testing.T) {
 		id   uint32
 		name string
 	}{
-		{wire.ColorCtrlAttrColorMode, "ColorMode (0x0008)"},
-		{wire.ColorCtrlAttrEnhancedColorMode, "EnhancedColorMode (0x4001)"},
+		{ccdef.AttrColorMode, "ColorMode (0x0008)"},
+		{ccdef.AttrEnhancedColorMode, "EnhancedColorMode (0x4001)"},
 	} {
 		raw, ok := srv.MatterRead(tc.id)
 		if !ok {
@@ -174,10 +173,10 @@ func TestParityMatterJS_ColorControlAcceptedCommands(t *testing.T) {
 		id   uint32
 		name string
 	}{
-		{wire.ColorCtrlCmdMoveToColorTemperature, "MoveToColorTemperature (0x0A)"},
-		{wire.ColorCtrlCmdStopMoveStep, "StopMoveStep (0x47)"},
-		{wire.ColorCtrlCmdMoveColorTemperature, "MoveColorTemperature (0x4B)"},
-		{wire.ColorCtrlCmdStepColorTemperature, "StepColorTemperature (0x4C)"},
+		{ccdef.CmdMoveToColorTemperature, "MoveToColorTemperature (0x0A)"},
+		{ccdef.CmdStopMoveStep, "StopMoveStep (0x47)"},
+		{ccdef.CmdMoveColorTemperature, "MoveColorTemperature (0x4B)"},
+		{ccdef.CmdStepColorTemperature, "StepColorTemperature (0x4C)"},
 	}
 	for _, w := range want {
 		if !got[w.id] {
@@ -241,10 +240,10 @@ func TestParityMatterJS_ColorControl_MoveToColorTemperatureCropsToRange(t *testi
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			srv2 := light.NewColorControlServer(cfg)
-			if _, err := srv2.MatterInvoke(ctx, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: tc.target}); err != nil {
+			if _, err := srv2.MatterInvoke(ctx, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: tc.target}); err != nil {
 				t.Fatalf("MoveToColorTemperature(%d): %v", tc.target, err)
 			}
-			v, ok := srv2.MatterRead(wire.ColorCtrlAttrColorTemperatureMireds)
+			v, ok := srv2.MatterRead(ccdef.AttrColorTemperatureMireds)
 			if !ok {
 				t.Fatal("ColorTemperatureMireds: ok=false after command")
 			}
@@ -269,10 +268,10 @@ func TestParityMatterJS_ColorControl_MoveToColorTemperatureTagMapPayload(t *test
 	// Tag 0 = ColorTemperatureMireds as uint64 (generic-tag-map encoding);
 	// TransitionTime and the two option bitmaps are mandatory as well.
 	fields := map[uint8]any{0: uint64(250), 1: uint64(0), 2: uint64(0), 3: uint64(0)}
-	if _, err := srv.MatterInvoke(ctx, wire.ColorCtrlCmdMoveToColorTemperature, fields); err != nil {
+	if _, err := srv.MatterInvoke(ctx, ccdef.CmdMoveToColorTemperature, fields); err != nil {
 		t.Fatalf("MoveToColorTemperature(tag map): %v", err)
 	}
-	v, ok := srv.MatterRead(wire.ColorCtrlAttrColorTemperatureMireds)
+	v, ok := srv.MatterRead(ccdef.AttrColorTemperatureMireds)
 	if !ok {
 		t.Fatal("ColorTemperatureMireds: ok=false")
 	}
@@ -296,10 +295,10 @@ func TestColorControl_NoHSXYAttributes(t *testing.T) {
 		id   uint32
 		name string
 	}{
-		{wire.ColorCtrlAttrCurrentHue, "CurrentHue (0x0000) — HS conformance"},
-		{wire.ColorCtrlAttrCurrentSaturation, "CurrentSaturation (0x0001) — HS conformance"},
-		{wire.ColorCtrlAttrCurrentX, "CurrentX (0x0003) — XY conformance"},
-		{wire.ColorCtrlAttrCurrentY, "CurrentY (0x0004) — XY conformance"},
+		{ccdef.AttrCurrentHue, "CurrentHue (0x0000) — HS conformance"},
+		{ccdef.AttrCurrentSaturation, "CurrentSaturation (0x0001) — HS conformance"},
+		{ccdef.AttrCurrentX, "CurrentX (0x0003) — XY conformance"},
+		{ccdef.AttrCurrentY, "CurrentY (0x0004) — XY conformance"},
 	}
 	for _, a := range hsXY {
 		if haveAttrs[a.id] {
@@ -318,7 +317,7 @@ func TestColorControl_NoHSXYAttributes(t *testing.T) {
 func TestParityMatterJS_ColorControlStartUpColorTemperatureMireds(t *testing.T) {
 	t.Parallel()
 	srv := light.NewColorControlServer(light.DefaultColorControlServerConfig())
-	attr := wire.ColorCtrlAttrStartUpColorTemperatureMireds
+	attr := ccdef.AttrStartUpColorTemperatureMireds
 	if v, ok := srv.MatterRead(attr); !ok || v != nil {
 		t.Fatalf("initial read = %v, %v; want null", v, ok)
 	}
@@ -344,7 +343,7 @@ func TestParityMatterJS_ColorControlStartUpColorTemperatureMireds(t *testing.T) 
 	if v, _ := srv.MatterRead(attr); v != nil {
 		t.Errorf("after null write read %v", v)
 	}
-	if v, _ := srv.MatterRead(wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds); v != uint16(153) {
+	if v, _ := srv.MatterRead(ccdef.AttrCoupleColorTempToLevelMinMireds); v != uint16(153) {
 		t.Errorf("CoupleColorTempToLevelMinMireds = %v, want the physical minimum 153", v)
 	}
 }

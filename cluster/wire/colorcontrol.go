@@ -4,31 +4,108 @@
 package wire
 
 // ColorControlClusterID is the Matter cluster ID for ColorControl.
+//
+// Deprecated: use ClusterID of cluster/spec/colorcontrol, the
+// generated id: one source of ids (review II, R2-P6-par-1262,
+// decision 140). Removable in the next minor release.
 const ColorControlClusterID uint32 = 0x0300
 
 // ColorControl attribute IDs per Matter §3.2.6.
 const (
-	ColorCtrlAttrCurrentHue        uint32 = 0x0000
+	// ColorCtrlAttrCurrentHue duplicates a generated constant.
+	//
+	// Deprecated: use AttrCurrentHue of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrCurrentHue uint32 = 0x0000
+	// ColorCtrlAttrCurrentSaturation duplicates a generated constant.
+	//
+	// Deprecated: use AttrCurrentSaturation of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorCtrlAttrCurrentSaturation uint32 = 0x0001
-	ColorCtrlAttrCurrentX          uint32 = 0x0003
-	ColorCtrlAttrCurrentY          uint32 = 0x0004
+	// ColorCtrlAttrCurrentX duplicates a generated constant.
+	//
+	// Deprecated: use AttrCurrentX of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrCurrentX uint32 = 0x0003
+	// ColorCtrlAttrCurrentY duplicates a generated constant.
+	//
+	// Deprecated: use AttrCurrentY of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrCurrentY uint32 = 0x0004
 	// ColorCtrlAttrRemainingTime is RemainingTime (0x0002): conformance "O"
 	// on the cluster, made mandatory by the ColorTemperatureLight device
 	// type (color-temperature-light.element.ts element requirement).
-	ColorCtrlAttrRemainingTime          uint32 = 0x0002
+	//
+	// Deprecated: use AttrRemainingTime of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrRemainingTime uint32 = 0x0002
+	// ColorCtrlAttrColorTemperatureMireds duplicates a generated constant.
+	//
+	// Deprecated: use AttrColorTemperatureMireds of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorCtrlAttrColorTemperatureMireds uint32 = 0x0007
-	ColorCtrlAttrColorMode              uint32 = 0x0008
-	ColorCtrlAttrOptions                uint32 = 0x000F
-	ColorCtrlAttrNumberOfPrimaries      uint32 = 0x0010 // nullable uint8, quality X; mandatory per spec §3.2.6
-	ColorCtrlAttrEnhancedColorMode      uint32 = 0x4001
-	ColorCtrlAttrColorCapabilities      uint32 = 0x400A
-	ColorCtrlAttrColorTempPhysicalMin   uint32 = 0x400B
-	ColorCtrlAttrColorTempPhysicalMax   uint32 = 0x400C
+	// ColorCtrlAttrColorMode duplicates a generated constant.
+	//
+	// Deprecated: use AttrColorMode of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrColorMode uint32 = 0x0008
+	// ColorCtrlAttrOptions duplicates a generated constant.
+	//
+	// Deprecated: use AttrOptions of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrOptions uint32 = 0x000F
+	// ColorCtrlAttrNumberOfPrimaries duplicates a generated constant.
+	//
+	// Deprecated: use AttrNumberOfPrimaries of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrNumberOfPrimaries uint32 = 0x0010 // nullable uint8, quality X; mandatory per spec §3.2.6
+	// ColorCtrlAttrEnhancedColorMode duplicates a generated constant.
+	//
+	// Deprecated: use AttrEnhancedColorMode of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrEnhancedColorMode uint32 = 0x4001
+	// ColorCtrlAttrColorCapabilities duplicates a generated constant.
+	//
+	// Deprecated: use AttrColorCapabilities of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrColorCapabilities uint32 = 0x400A
+	// ColorCtrlAttrColorTempPhysicalMin duplicates a generated constant.
+	//
+	// Deprecated: use AttrColorTempPhysicalMinMireds of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrColorTempPhysicalMin uint32 = 0x400B
+	// ColorCtrlAttrColorTempPhysicalMax duplicates a generated constant.
+	//
+	// Deprecated: use AttrColorTempPhysicalMaxMireds of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrColorTempPhysicalMax uint32 = 0x400C
 	// ColorCtrlAttrCoupleColorTempToLevelMinMireds and
 	// ColorCtrlAttrStartUpColorTemperatureMireds carry conformance "CT"
 	// (matter.js color-control.element.ts:183-189).
+	//
+	// Deprecated: use AttrCoupleColorTempToLevelMinMireds of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorCtrlAttrCoupleColorTempToLevelMinMireds uint32 = 0x400D
-	ColorCtrlAttrStartUpColorTemperatureMireds   uint32 = 0x4010
+	// ColorCtrlAttrStartUpColorTemperatureMireds duplicates a generated constant.
+	//
+	// Deprecated: use AttrStartUpColorTemperatureMireds of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlAttrStartUpColorTemperatureMireds uint32 = 0x4010
 )
 
 // ColorControl command IDs per Matter §3.2.7.
@@ -92,11 +169,31 @@ const (
 	// Deprecated: use CmdStepColor of cluster/spec/colorcontrol, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
 	// decision 140). Removable in the next minor release.
-	ColorCtrlCmdStepColor              uint32 = 0x09
+	ColorCtrlCmdStepColor uint32 = 0x09
+	// ColorCtrlCmdMoveToColorTemperature duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveToColorTemperature of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorCtrlCmdMoveToColorTemperature uint32 = 0x0A
-	ColorCtrlCmdStopMoveStep           uint32 = 0x47
-	ColorCtrlCmdMoveColorTemperature   uint32 = 0x4B
-	ColorCtrlCmdStepColorTemperature   uint32 = 0x4C
+	// ColorCtrlCmdStopMoveStep duplicates a generated constant.
+	//
+	// Deprecated: use CmdStopMoveStep of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdStopMoveStep uint32 = 0x47
+	// ColorCtrlCmdMoveColorTemperature duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveColorTemperature of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdMoveColorTemperature uint32 = 0x4B
+	// ColorCtrlCmdStepColorTemperature duplicates a generated constant.
+	//
+	// Deprecated: use CmdStepColorTemperature of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdStepColorTemperature uint32 = 0x4C
 )
 
 // HueDirection values per Matter §3.2.7.4.2.

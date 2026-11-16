@@ -68,7 +68,6 @@ import (
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/cluster/transition"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -526,7 +525,7 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 			return s.st.property(name)
 		},
 		Apply:                s.applyChanges,
-		RemainingTimeChanged: func() { s.changes.NotifyFrom(contract.OriginCommand, wire.ColorCtrlAttrRemainingTime) },
+		RemainingTimeChanged: func() { s.changes.NotifyFrom(contract.OriginCommand, ccdef.AttrRemainingTime) },
 		Settled: func(name string) {
 			if q := s.quiet[propAttribute[name]]; q != nil {
 				q.EmitNow()
@@ -635,7 +634,7 @@ func (s *ColorControlServer) Color() Color {
 }
 
 // MatterClusterID returns the ColorControl cluster ID (0x0300).
-func (s *ColorControlServer) MatterClusterID() uint32 { return wire.ColorControlClusterID }
+func (s *ColorControlServer) MatterClusterID() uint32 { return ccdef.ClusterID }
 
 // MatterRead returns the value of a served attribute. Returns (nil, false)
 // for an attribute the feature selection does not serve, so the IM

@@ -74,7 +74,7 @@ func TestApplicationPayloadsMatchMatterJS(t *testing.T) {
 			case f.Kind == "commands" && f.Element == "Step":
 				// The generated request, an absent optional field nil (the
 				// fan server applies its default, LowestOff true).
-				got, ok := decodeCommandFields(t, f.Cluster, clusterwire.FanControlCmdStep, f.BytesHex).(fandef.StepRequest)
+				got, ok := decodeCommandFields(t, f.Cluster, fandef.CmdStep, f.BytesHex).(fandef.StepRequest)
 				if !ok || uint8(got.Direction) != f.Fixture.Direction || !samePtr(got.Wrap, f.Fixture.Wrap) || !samePtr(got.LowestOff, f.Fixture.LowestOff) {
 					t.Fatalf("decoded %+v, want Direction %d, Wrap %v, LowestOff %v", got, f.Fixture.Direction, f.Fixture.Wrap, f.Fixture.LowestOff)
 				}

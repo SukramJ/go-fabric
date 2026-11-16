@@ -25,7 +25,6 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -244,12 +243,12 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := firstDevice.Server(wcdef.ClusterID)
-	if _, err := srv.MatterInvoke(ctx, wire.WindowCoveringCmdGoToLiftPercentage, uint16(9000)); err != nil {
+	if _, err := srv.MatterInvoke(ctx, wcdef.CmdGoToLiftPercentage, uint16(9000)); err != nil {
 		t.Fatalf("GoToLiftPercentage: %v", err)
 	}
 	deadline := time.After(20 * time.Second)
 	for {
-		if v, _ := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v == uint16(9000) {
+		if v, _ := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths); v == uint16(9000) {
 			break
 		}
 		select {
@@ -264,7 +263,7 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := secondDevice.Server(wcdef.ClusterID).MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
+	if v, _ := secondDevice.Server(wcdef.ClusterID).MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
 		t.Fatalf("restarted blind at %v, want 9000", v)
 	}
 }

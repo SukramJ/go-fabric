@@ -437,7 +437,7 @@ func TestFanStepDecoderRejectsMalformedFields(t *testing.T) {
 		}
 		dec := tlv.NewDecoder(b)
 		open, _ := dec.Next()
-		_, err = commandFieldsReader(im.ConcreteCommandPath{Cluster: clusterwire.FanControlClusterID, Command: clusterwire.FanControlCmdStep}, dec, open)
+		_, err = commandFieldsReader(im.ConcreteCommandPath{Cluster: fandef.ClusterID, Command: fandef.CmdStep}, dec, open)
 		var sce im.StatusCodeError
 		if !errors.As(err, &sce) || sce.MatterStatusCode() != tc.want {
 			t.Errorf("%s: err = %v, want %v", tc.name, err, tc.want)
@@ -454,7 +454,7 @@ func TestFanStepDecoderRejectsMalformedFields(t *testing.T) {
 	b, _ := enc.Bytes()
 	dec := tlv.NewDecoder(b)
 	open, _ := dec.Next()
-	got, err := commandFieldsReader(im.ConcreteCommandPath{Cluster: clusterwire.FanControlClusterID, Command: clusterwire.FanControlCmdStep}, dec, open)
+	got, err := commandFieldsReader(im.ConcreteCommandPath{Cluster: fandef.ClusterID, Command: fandef.CmdStep}, dec, open)
 	if req, ok := got.(fandef.StepRequest); err != nil || !ok || req.Direction != 1 || req.Wrap != nil || req.LowestOff != nil {
 		t.Errorf("Step with extra fields = %+v, %v", got, err)
 	}

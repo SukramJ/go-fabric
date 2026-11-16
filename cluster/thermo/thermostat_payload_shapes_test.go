@@ -28,7 +28,7 @@ const (
 // setpointPayload encodes a SetpointRaiseLower payload the way the
 // firmware sends it: Mode on context tag 0, Amount on tag 1
 // (thermostat-cluster.element.ts:322-323).
-func setpointPayload(t *testing.T, mode uint8, amount int8) []byte {
+func setpointPayload(t *testing.T, mode tdef.SetpointRaiseLowerModeEnum, amount int8) []byte {
 	t.Helper()
 	e := tlv.NewEncoder()
 	e.StartStruct(tlv.AnonymousTag())
@@ -71,20 +71,20 @@ func readInt16(t *testing.T, srv *thermo.ThermostatServer, attrID uint32) int16 
 func TestSetpointRaiseLowerAcceptsEveryPayloadShape(t *testing.T) {
 	t.Parallel()
 	const amount int8 = 15
-	mode := clusterwire.ThermostatSetpointModeHeat
+	mode := tdef.SetpointRaiseLowerModeHeat
 
 	shapes := map[string]any{
-		"typed value":    tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: amount},
-		"typed pointer":  &tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: amount},
+		"typed value":    tdef.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},
+		"typed pointer":  &tdef.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},
 		"bridge tag map": map[uint8]any{0: uint64(mode), 1: int64(amount)},
-		"string map":     map[string]any{"mode": mode, "amount": amount},
+		"string map":     map[string]any{"mode": uint8(mode), "amount": amount},
 	}
 	for name, fields := range shapes {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			srv := newHeatCool()
 			if _, err := srv.MatterInvoke(
-				context.Background(), clusterwire.ThermostatCmdSetpointRaiseLower, fields,
+				context.Background(), tdef.CmdSetpointRaiseLower, fields,
 			); err != nil {
 				t.Fatalf("SetpointRaiseLower: %v", err)
 			}
@@ -105,21 +105,21 @@ func TestSetpointRaiseLowerRejectsAPayloadItCannotRead(t *testing.T) {
 		"nil typed pointer": (*tdef.SetpointRaiseLowerRequest)(nil),
 		// The raw TLV is the bridge's to decode (through the generated
 		// definition); the server takes the decoded request only.
-		"raw TLV": setpointPayload(t, clusterwire.ThermostatSetpointModeHeat, 5),
+		"raw TLV": setpointPayload(t, tdef.SetpointRaiseLowerModeHeat, 5),
 		// Mode is conformance M — a payload without it is refused rather
 		// than acknowledged as a no-op.
 		"tag map without Mode":   map[uint8]any{1: int64(5)},
-		"tag map without Amount": map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat)},
+		"tag map without Amount": map[uint8]any{0: uint64(tdef.SetpointRaiseLowerModeHeat)},
 		"tag map Mode not an enum8": map[uint8]any{
 			0: "heat", 1: int64(5),
 		},
 		// Amount is int8 (thermostat-cluster.element.ts:323): a wider
 		// value is a malformed field.
 		"tag map Amount wider than int8": map[uint8]any{
-			0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(200),
+			0: uint64(tdef.SetpointRaiseLowerModeHeat), 1: int64(200),
 		},
 		"tag map Amount below int8": map[uint8]any{
-			0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(-200),
+			0: uint64(tdef.SetpointRaiseLowerModeHeat), 1: int64(-200),
 		},
 		"string map without mode":       map[string]any{"amount": int8(5)},
 		"string map mode not an enum8":  map[string]any{"mode": "heat"},
@@ -135,7 +135,7 @@ func TestSetpointRaiseLowerRejectsAPayloadItCannotRead(t *testing.T) {
 			t.Parallel()
 			srv := newHeatCool()
 			_, err := srv.MatterInvoke(
-				context.Background(), clusterwire.ThermostatCmdSetpointRaiseLower, fields,
+				context.Background(), tdef.CmdSetpointRaiseLower, fields,
 			)
 			if err == nil {
 				t.Fatal("SetpointRaiseLower accepted a payload it cannot read")
@@ -163,8 +163,8 @@ func TestSetpointRaiseLowerStringMapAmountDefaultsToZero(t *testing.T) {
 	t.Parallel()
 	srv := newHeatCool()
 	if _, err := srv.MatterInvoke(
-		context.Background(), clusterwire.ThermostatCmdSetpointRaiseLower,
-		map[string]any{"mode": clusterwire.ThermostatSetpointModeHeat},
+		context.Background(), tdef.CmdSetpointRaiseLower,
+		map[string]any{"mode": uint8(tdef.SetpointRaiseLowerModeHeat)},
 	); err != nil {
 		t.Fatalf("SetpointRaiseLower: %v", err)
 	}
@@ -182,8 +182,8 @@ func TestSetpointRaiseLowerCoolOnlyBothMovesTheCoolingSetpoint(t *testing.T) {
 	t.Parallel()
 	srv := newCoolOnly()
 	if _, err := srv.MatterInvoke(
-		context.Background(), clusterwire.ThermostatCmdSetpointRaiseLower,
-		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeBoth), Amount: -20},
+		context.Background(), tdef.CmdSetpointRaiseLower,
+		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeBoth, Amount: -20},
 	); err != nil {
 		t.Fatalf("SetpointRaiseLower: %v", err)
 	}
@@ -206,8 +206,8 @@ func TestSetpointRaiseLowerCoolOnlyRejectsHeatMode(t *testing.T) {
 	t.Parallel()
 	srv := newCoolOnly()
 	_, err := srv.MatterInvoke(
-		context.Background(), clusterwire.ThermostatCmdSetpointRaiseLower,
-		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeHeat), Amount: 5},
+		context.Background(), tdef.CmdSetpointRaiseLower,
+		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeHeat, Amount: 5},
 	)
 	var status im.StatusCodeError
 	if !errors.As(err, &status) {

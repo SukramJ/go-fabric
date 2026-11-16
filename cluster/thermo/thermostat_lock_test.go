@@ -13,7 +13,6 @@ import (
 
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -129,7 +128,7 @@ func TestSinkSynchronousRaiseLowerEcho(t *testing.T) {
 	}
 	within(t, "SetpointRaiseLower", func() {
 		if _, err := srv.MatterInvoke(context.Background(), tdef.CmdSetpointRaiseLower,
-			tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeBoth), Amount: 3}); err != nil {
+			tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeBoth, Amount: 3}); err != nil {
 			t.Errorf("invoke: %v", err)
 		}
 	})

@@ -12,7 +12,6 @@ import (
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -29,7 +28,7 @@ func newLiftServer() *cover.WindowCoveringServer {
 // matter.js packages/model/src/standard/elements/window-covering-cluster.element.ts:71).
 func readPercent100ths(t *testing.T, srv *cover.WindowCoveringServer) uint16 {
 	t.Helper()
-	raw, ok := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+	raw, ok := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 	if !ok {
 		t.Fatal("CurrentPositionLiftPercent100ths: ok = false")
 	}
@@ -62,7 +61,7 @@ func TestWindowCoveringGoToLiftPercentageAcceptsEveryPayloadShape(t *testing.T) 
 			t.Parallel()
 			srv := newLiftServer()
 			if _, err := srv.MatterInvoke(
-				context.Background(), wire.WindowCoveringCmdGoToLiftPercentage, fields,
+				context.Background(), wcdef.CmdGoToLiftPercentage, fields,
 			); err != nil {
 				t.Fatalf("GoToLiftPercentage: %v", err)
 			}
@@ -98,7 +97,7 @@ func TestWindowCoveringGoToLiftPercentageRejectsAPayloadItCannotRead(t *testing.
 				InitialPositionPercent100ths: 2500,
 			})
 			if _, err := srv.MatterInvoke(
-				context.Background(), wire.WindowCoveringCmdGoToLiftPercentage, fields,
+				context.Background(), wcdef.CmdGoToLiftPercentage, fields,
 			); err == nil {
 				t.Fatal("GoToLiftPercentage accepted a payload it cannot read")
 			}
@@ -125,7 +124,7 @@ func TestWindowCoveringConstraintErrorNamesTheLimit(t *testing.T) {
 		t.Parallel()
 		srv := newLiftServer()
 		_, err := srv.MatterInvoke(
-			context.Background(), wire.WindowCoveringCmdGoToLiftPercentage, uint16(10001),
+			context.Background(), wcdef.CmdGoToLiftPercentage, uint16(10001),
 		)
 		var status im.StatusCodeError
 		if !errors.As(err, &status) {
@@ -142,7 +141,7 @@ func TestWindowCoveringConstraintErrorNamesTheLimit(t *testing.T) {
 	t.Run("mode above 15", func(t *testing.T) {
 		t.Parallel()
 		srv := newLiftServer()
-		err := srv.MatterWrite(context.Background(), wire.WindowCoveringAttrMode, uint8(16))
+		err := srv.MatterWrite(context.Background(), wcdef.AttrMode, uint8(16))
 		var status im.StatusCodeError
 		if !errors.As(err, &status) {
 			t.Fatalf("err = %v (%T), want an im.StatusCodeError", err, err)
@@ -154,7 +153,7 @@ func TestWindowCoveringConstraintErrorNamesTheLimit(t *testing.T) {
 			t.Errorf("message = %q, want it to name the limit 15", msg)
 		}
 		// A refused write must not land.
-		raw, ok := srv.MatterRead(wire.WindowCoveringAttrMode)
+		raw, ok := srv.MatterRead(wcdef.AttrMode)
 		if !ok || raw.(uint8) != 0 {
 			t.Errorf("Mode = %v after a refused write, want the default 0", raw)
 		}
@@ -169,7 +168,7 @@ func TestWindowCoveringConstraintErrorNamesTheLimit(t *testing.T) {
 func TestWindowCoveringModeWriteRejectsANonNumericValue(t *testing.T) {
 	t.Parallel()
 	srv := newLiftServer()
-	if err := srv.MatterWrite(context.Background(), wire.WindowCoveringAttrMode, "reversed"); err == nil {
+	if err := srv.MatterWrite(context.Background(), wcdef.AttrMode, "reversed"); err == nil {
 		t.Fatal("Mode accepted a string")
 	}
 }
@@ -205,11 +204,11 @@ func TestWindowCoveringDeprecatedLiftPercentageTracksPercent100ths(t *testing.T)
 	t.Parallel()
 	srv := newLiftServer()
 	if _, err := srv.MatterInvoke(
-		context.Background(), wire.WindowCoveringCmdGoToLiftPercentage, uint16(7350),
+		context.Background(), wcdef.CmdGoToLiftPercentage, uint16(7350),
 	); err != nil {
 		t.Fatalf("GoToLiftPercentage: %v", err)
 	}
-	raw, ok := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercentage)
+	raw, ok := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercentage)
 	if !ok {
 		t.Fatal("CurrentPositionLiftPercentage: ok = false")
 	}

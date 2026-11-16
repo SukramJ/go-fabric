@@ -13,7 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -25,7 +25,7 @@ func TestTravelStaysInsideTheRangeAfterAHostPosition(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		const step = time.Second
 		s := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0b101, InitialPositionPercent100ths: 10000, MoveStep: step})
-		if _, err := s.MatterInvoke(context.Background(), wire.WindowCoveringCmdUpOrOpen, nil); err != nil {
+		if _, err := s.MatterInvoke(context.Background(), wcdef.CmdUpOrOpen, nil); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(step)
@@ -35,12 +35,12 @@ func TestTravelStaysInsideTheRangeAfterAHostPosition(t *testing.T) {
 		for range 6 {
 			time.Sleep(step)
 			synctest.Wait()
-			cur, _ := s.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+			cur, _ := s.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 			if n, _ := cur.(uint16); n > 100 {
 				t.Fatalf("CurrentPositionLiftPercent100ths %d: a step went past the target 0 from the host's 100", n)
 			}
 		}
-		if cur, _ := s.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(0) {
+		if cur, _ := s.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths); cur != uint16(0) {
 			t.Errorf("the travel ended at %v, want the target 0", cur)
 		}
 	})
@@ -60,12 +60,12 @@ func TestMatterQuiesceEndsATravel(t *testing.T) {
 		}
 		var reports atomic.Int32
 		s.OnAttributeChange(func(contract.Change) { reports.Add(1) })
-		if _, err := s.MatterInvoke(context.Background(), wire.WindowCoveringCmdUpOrOpen, nil); err != nil {
+		if _, err := s.MatterInvoke(context.Background(), wcdef.CmdUpOrOpen, nil); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(step)
 		synctest.Wait()
-		before, _ := s.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+		before, _ := s.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 		q.MatterQuiesce()
 		n := reports.Load()
 		time.Sleep(10 * step)
@@ -73,15 +73,15 @@ func TestMatterQuiesceEndsATravel(t *testing.T) {
 		if got := reports.Load(); got != n {
 			t.Errorf("%d reports after MatterQuiesce, want none", got-n)
 		}
-		if after, _ := s.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); after != before {
+		if after, _ := s.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths); after != before {
 			t.Errorf("the position moved from %v to %v after MatterQuiesce", before, after)
 		}
-		if _, err := s.MatterInvoke(context.Background(), wire.WindowCoveringCmdDownOrClose, nil); err != nil {
+		if _, err := s.MatterInvoke(context.Background(), wcdef.CmdDownOrClose, nil); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(6 * step)
 		synctest.Wait()
-		if cur, _ := s.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(10000) {
+		if cur, _ := s.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths); cur != uint16(10000) {
 			t.Errorf("a command after MatterQuiesce left the position at %v, want 10000", cur)
 		}
 	})

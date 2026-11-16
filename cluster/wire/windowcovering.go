@@ -10,33 +10,102 @@ import (
 )
 
 // WindowCoveringClusterID is the Matter cluster identifier for WindowCovering.
+//
+// Deprecated: use ClusterID of cluster/spec/windowcovering, the
+// generated id: one source of ids (review II, R2-P6-par-1262,
+// decision 140). Removable in the next minor release.
 const WindowCoveringClusterID uint32 = 0x0102
 
 // WindowCovering attribute IDs.
 const (
-	WindowCoveringAttrType                             uint32 = 0x0000
-	WindowCoveringAttrCurrentPositionLiftPercentage    uint32 = 0x0008
-	WindowCoveringAttrOperationalStatus                uint32 = 0x000A
-	WindowCoveringAttrTargetPositionLiftPercent100ths  uint32 = 0x000B
+	// WindowCoveringAttrType duplicates a generated constant.
+	//
+	// Deprecated: use AttrType of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrType uint32 = 0x0000
+	// WindowCoveringAttrCurrentPositionLiftPercentage duplicates a generated constant.
+	//
+	// Deprecated: use AttrCurrentPositionLiftPercentage of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrCurrentPositionLiftPercentage uint32 = 0x0008
+	// WindowCoveringAttrOperationalStatus duplicates a generated constant.
+	//
+	// Deprecated: use AttrOperationalStatus of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrOperationalStatus uint32 = 0x000A
+	// WindowCoveringAttrTargetPositionLiftPercent100ths duplicates a generated constant.
+	//
+	// Deprecated: use AttrTargetPositionLiftPercent100ths of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrTargetPositionLiftPercent100ths uint32 = 0x000B
+	// WindowCoveringAttrCurrentPositionLiftPercent100ths duplicates a generated constant.
+	//
+	// Deprecated: use AttrCurrentPositionLiftPercent100ths of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	WindowCoveringAttrCurrentPositionLiftPercent100ths uint32 = 0x000E
-	WindowCoveringAttrEndProductType                   uint32 = 0x000D
-	WindowCoveringAttrConfigStatus                     uint32 = 0x0007
-	WindowCoveringAttrMode                             uint32 = 0x0017
-	WindowCoveringAttrSafetyStatus                     uint32 = 0x001A
+	// WindowCoveringAttrEndProductType duplicates a generated constant.
+	//
+	// Deprecated: use AttrEndProductType of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrEndProductType uint32 = 0x000D
+	// WindowCoveringAttrConfigStatus duplicates a generated constant.
+	//
+	// Deprecated: use AttrConfigStatus of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrConfigStatus uint32 = 0x0007
+	// WindowCoveringAttrMode duplicates a generated constant.
+	//
+	// Deprecated: use AttrMode of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrMode uint32 = 0x0017
+	// WindowCoveringAttrSafetyStatus duplicates a generated constant.
+	//
+	// Deprecated: use AttrSafetyStatus of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringAttrSafetyStatus uint32 = 0x001A
 )
 
 // WindowCovering command IDs per Matter §5.3.7.
 const (
-	WindowCoveringCmdUpOrOpen    uint32 = 0x00
+	// WindowCoveringCmdUpOrOpen duplicates a generated constant.
+	//
+	// Deprecated: use CmdUpOrOpen of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringCmdUpOrOpen uint32 = 0x00
+	// WindowCoveringCmdDownOrClose duplicates a generated constant.
+	//
+	// Deprecated: use CmdDownOrClose of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	WindowCoveringCmdDownOrClose uint32 = 0x01
-	WindowCoveringCmdStopMotion  uint32 = 0x02
+	// WindowCoveringCmdStopMotion duplicates a generated constant.
+	//
+	// Deprecated: use CmdStopMotion of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	WindowCoveringCmdStopMotion uint32 = 0x02
 	// WindowCoveringCmdGoToLiftValue names a command id.
 	//
 	// Deprecated: the command is not in the Matter model this module serves
 	// (parity/schema.json has no command 0x04 on WindowCovering); nothing
 	// outside this package uses it (review II, R2-P6-api-1261, decision 140).
 	// Removable in the next minor release.
-	WindowCoveringCmdGoToLiftValue      uint32 = 0x04
+	WindowCoveringCmdGoToLiftValue uint32 = 0x04
+	// WindowCoveringCmdGoToLiftPercentage duplicates a generated constant.
+	//
+	// Deprecated: use CmdGoToLiftPercentage of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	WindowCoveringCmdGoToLiftPercentage uint32 = 0x05
 	// WindowCoveringCmdGoToTiltValue names a command id.
 	//
@@ -44,7 +113,12 @@ const (
 	// (parity/schema.json has no command 0x07 on WindowCovering); nothing
 	// outside this package uses it (review II, R2-P6-api-1261, decision 140).
 	// Removable in the next minor release.
-	WindowCoveringCmdGoToTiltValue      uint32 = 0x07
+	WindowCoveringCmdGoToTiltValue uint32 = 0x07
+	// WindowCoveringCmdGoToTiltPercentage duplicates a generated constant.
+	//
+	// Deprecated: use CmdGoToTiltPercentage of cluster/spec/windowcovering, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	WindowCoveringCmdGoToTiltPercentage uint32 = 0x08
 )
 

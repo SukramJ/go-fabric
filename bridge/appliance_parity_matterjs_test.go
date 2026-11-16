@@ -20,7 +20,9 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
 	"github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
 	"github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
+	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
 	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -29,7 +31,7 @@ import (
 // applianceClusters are the clusters this file checks; the generic
 // application test skips them.
 var applianceClusters = []uint32{
-	clusterwire.OperationalStateClusterID, clusterwire.RvcOperationalStateClusterID,
+	opdef.ClusterID, rvcopdef.ClusterID,
 	clusterwire.LaundryWasherModeClusterID, clusterwire.RvcRunModeClusterID,
 	clusterwire.RvcCleanModeClusterID, clusterwire.DishwasherModeClusterID,
 }
@@ -107,7 +109,7 @@ func elapsedFixture(t *testing.T, fields map[string]json.RawMessage, name string
 
 func TestOperationalStatePayloadsMatchMatterJS(t *testing.T) {
 	t.Parallel()
-	for _, f := range loadApplianceFixtures(t, clusterwire.OperationalStateClusterID, clusterwire.RvcOperationalStateClusterID) {
+	for _, f := range loadApplianceFixtures(t, opdef.ClusterID, rvcopdef.ClusterID) {
 		t.Run(f.Label, func(t *testing.T) {
 			t.Parallel()
 			var got any

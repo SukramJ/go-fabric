@@ -5,6 +5,11 @@ package wire
 
 // Thermostat command IDs per Matter §4.3.9.
 const (
+	// ThermostatCmdSetpointRaiseLower duplicates a generated constant.
+	//
+	// Deprecated: use CmdSetpointRaiseLower of cluster/spec/thermostat, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ThermostatCmdSetpointRaiseLower uint32 = 0x00
 	// ThermostatCmdSetWeeklySchedule names a command id.
 	//
@@ -32,7 +37,22 @@ const (
 
 // SetpointRaiseLower mode values per Matter §4.3.9.1.
 const (
+	// ThermostatSetpointModeHeat duplicates a generated constant.
+	//
+	// Deprecated: use SetpointRaiseLowerModeHeat of cluster/spec/thermostat, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ThermostatSetpointModeHeat uint8 = 0
+	// ThermostatSetpointModeCool duplicates a generated constant.
+	//
+	// Deprecated: use SetpointRaiseLowerModeCool of cluster/spec/thermostat, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ThermostatSetpointModeCool uint8 = 1
+	// ThermostatSetpointModeBoth duplicates a generated constant.
+	//
+	// Deprecated: use SetpointRaiseLowerModeBoth of cluster/spec/thermostat, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ThermostatSetpointModeBoth uint8 = 2
 )

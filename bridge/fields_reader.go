@@ -16,6 +16,7 @@ import (
 	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
 	scenesdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -694,7 +695,7 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 	case mattercore.LeaveGroupResponse:
 		ent.Path.Command = 0x02
 	case wire.OperationalCommandResponse:
-		ent.Path.Command = wire.OperationalStateCmdOperationalCommandResponse
+		ent.Path.Command = opdef.CmdOperationalCommandResponse
 	case wire.ChangeToModeResponse:
 		ent.Path.Command = wire.ModeBaseCmdChangeToModeResponse
 	case spec.ResponsePayload:

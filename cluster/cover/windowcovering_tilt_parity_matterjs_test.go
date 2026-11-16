@@ -13,7 +13,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -252,7 +251,7 @@ func TestSetTargetPosition_StoresAndReportsWithoutTheMover(t *testing.T) {
 	mu.Lock()
 	got := append([]uint32(nil), reported...)
 	mu.Unlock()
-	want := []uint32{clusterwire.WindowCoveringAttrOperationalStatus, wcdef.AttrTargetPositionLiftPercent100ths, wcdef.AttrTargetPositionLiftPercent100ths}
+	want := []uint32{wcdef.AttrOperationalStatus, wcdef.AttrTargetPositionLiftPercent100ths, wcdef.AttrTargetPositionLiftPercent100ths}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("reported %v, want %v", got, want)
 	}

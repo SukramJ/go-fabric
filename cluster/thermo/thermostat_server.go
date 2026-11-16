@@ -61,7 +61,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -1506,7 +1505,7 @@ func absInt(x int) int {
 //
 // Mode values are SetpointRaiseLowerModeEnum
 // (thermostat-cluster.element.ts:510-514): Heat 0x0, Cool 0x1, Both 0x2 —
-// the [wire.ThermostatSetpointModeHeat] family, never bare literals.
+// the [tdef.SetpointRaiseLowerModeHeat] family, never bare literals.
 //
 // The new setpoints are computed first; with a [Sink] what moves goes to
 // it in one call before anything is stored (cooling primary, heating its
@@ -1519,18 +1518,21 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	if err != nil {
 		return err
 	}
-	mode, amount := uint8(req.Mode), req.Amount
+	mode, amount := req.Mode, req.Amount
 
 	// matter.js ThermostatServer.ts:189-198: reject Heat/Cool modes when feature absent.
 	switch mode {
-	case uint8(tdef.SetpointRaiseLowerModeHeat):
+	case tdef.SetpointRaiseLowerModeHeat:
 		if s.features&ThermostatFeatureHEAT == 0 {
 			return thermoInvalidCommandErr{"thermo: SetpointRaiseLower mode=Heat requires HEAT feature"}
 		}
-	case wire.ThermostatSetpointModeCool:
+	case tdef.SetpointRaiseLowerModeCool:
 		if s.features&ThermostatFeatureCOOL == 0 {
 			return thermoInvalidCommandErr{"thermo: SetpointRaiseLower mode=Cool requires COOL feature"}
 		}
+	case tdef.SetpointRaiseLowerModeBoth:
+		// Both needs neither feature here; the dispatch below moves what
+		// the thermostat has.
 	}
 
 	s.op.Lock()
@@ -1578,7 +1580,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	}
 
 	switch mode {
-	case wire.ThermostatSetpointModeBoth:
+	case tdef.SetpointRaiseLowerModeBoth:
 		heat := s.features&ThermostatFeatureHEAT != 0
 		cool := s.features&ThermostatFeatureCOOL != 0
 		switch {
@@ -1611,7 +1613,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 		default: // heating-only (matter.js falls through to the heating setpoint)
 			occupHeat = clampHeat(int(occupHeat) + delta)
 		}
-	case wire.ThermostatSetpointModeHeat:
+	case tdef.SetpointRaiseLowerModeHeat:
 		occupHeat = clampHeat(int(occupHeat) + delta)
 		// On an AUTO thermostat the cooling setpoint follows to keep the
 		// deadband, or the command is refused. Mirrors matter.js
@@ -1625,7 +1627,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 			}
 			occupCool = int16(companion) //nolint:gosec // within [minCool, maxCool], checked above
 		}
-	case wire.ThermostatSetpointModeCool:
+	case tdef.SetpointRaiseLowerModeCool:
 		occupCool = clampCool(int(occupCool) + delta)
 		// The heating setpoint follows the same way. Mirrors matter.js
 		// ThermostatServer.ts:229-249 (db021da0).

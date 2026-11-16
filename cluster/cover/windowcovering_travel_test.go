@@ -13,7 +13,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -36,57 +35,57 @@ func TestParityMatterJS_WindowCovering_TravellingMovement(t *testing.T) {
 			mu.Unlock()
 		})
 		ctx := context.Background()
-		if _, err := s.MatterInvoke(ctx, wire.WindowCoveringCmdUpOrOpen, nil); err != nil {
+		if _, err := s.MatterInvoke(ctx, wcdef.CmdUpOrOpen, nil); err != nil {
 			t.Fatal(err)
 		}
 		read := func(id uint32) any { v, _ := s.MatterRead(id); return v }
-		if st := read(wire.WindowCoveringAttrOperationalStatus); st != uint8(0b0101) {
+		if st := read(wcdef.AttrOperationalStatus); st != uint8(0b0101) {
 			t.Fatalf("OperationalStatus while opening = %v, want 5 (global and lift Opening)", st)
 		}
-		if tg := read(wire.WindowCoveringAttrTargetPositionLiftPercent100ths); tg != uint16(0) {
+		if tg := read(wcdef.AttrTargetPositionLiftPercent100ths); tg != uint16(0) {
 			t.Fatalf("target = %v, want 0", tg)
 		}
 		time.Sleep(step)
 		synctest.Wait()
-		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(10000-1666) {
+		if cur := read(wcdef.AttrCurrentPositionLiftPercent100ths); cur != uint16(10000-1666) {
 			t.Fatalf("position after one step = %v, want 8334", cur)
 		}
 		time.Sleep(5 * step)
 		synctest.Wait()
-		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(0) {
+		if cur := read(wcdef.AttrCurrentPositionLiftPercent100ths); cur != uint16(0) {
 			t.Fatalf("position after six steps = %v, want 0", cur)
 		}
-		if st := read(wire.WindowCoveringAttrOperationalStatus); st != uint8(0) {
+		if st := read(wcdef.AttrOperationalStatus); st != uint8(0) {
 			t.Fatalf("OperationalStatus after arrival = %v, want 0", st)
 		}
 		mu.Lock()
 		n := len(reported)
 		last := reported[n-1]
 		mu.Unlock()
-		if n != 6 || !slices.Contains(last, wire.WindowCoveringAttrOperationalStatus) {
+		if n != 6 || !slices.Contains(last, wcdef.AttrOperationalStatus) {
 			t.Fatalf("reported %d steps (last %v), want 6 ending with OperationalStatus", n, last)
 		}
 
 		// Closing, then a StopMotion mid-way: the lift stays put and the
 		// target follows it.
-		if _, err := s.MatterInvoke(ctx, wire.WindowCoveringCmdDownOrClose, nil); err != nil {
+		if _, err := s.MatterInvoke(ctx, wcdef.CmdDownOrClose, nil); err != nil {
 			t.Fatal(err)
 		}
-		if st := read(wire.WindowCoveringAttrOperationalStatus); st != uint8(0b1010) {
+		if st := read(wcdef.AttrOperationalStatus); st != uint8(0b1010) {
 			t.Fatalf("OperationalStatus while closing = %v, want 10", st)
 		}
 		time.Sleep(2 * step)
 		synctest.Wait()
-		if _, err := s.MatterInvoke(ctx, wire.WindowCoveringCmdStopMotion, nil); err != nil {
+		if _, err := s.MatterInvoke(ctx, wcdef.CmdStopMotion, nil); err != nil {
 			t.Fatal(err)
 		}
-		cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
-		if cur != uint16(3332) || read(wire.WindowCoveringAttrTargetPositionLiftPercent100ths) != cur {
-			t.Fatalf("after StopMotion: position %v target %v, want both 3332", cur, read(wire.WindowCoveringAttrTargetPositionLiftPercent100ths))
+		cur := read(wcdef.AttrCurrentPositionLiftPercent100ths)
+		if cur != uint16(3332) || read(wcdef.AttrTargetPositionLiftPercent100ths) != cur {
+			t.Fatalf("after StopMotion: position %v target %v, want both 3332", cur, read(wcdef.AttrTargetPositionLiftPercent100ths))
 		}
 		time.Sleep(10 * step)
 		synctest.Wait()
-		if read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths) != cur {
+		if read(wcdef.AttrCurrentPositionLiftPercent100ths) != cur {
 			t.Fatal("the lift moved after StopMotion")
 		}
 	})
@@ -104,13 +103,13 @@ func TestTravelFromAPositionTheHostMadeUnknown(t *testing.T) {
 		srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0b101, InitialPositionPercent100ths: 10000, MoveStep: step})
 		typed := wcdef.Wrap(srv)
 		ctx := context.Background()
-		if _, err := srv.MatterInvoke(ctx, wire.WindowCoveringCmdUpOrOpen, nil); err != nil {
+		if _, err := srv.MatterInvoke(ctx, wcdef.CmdUpOrOpen, nil); err != nil {
 			t.Fatal(err)
 		}
 		read := func(id uint32) any { v, _ := srv.MatterRead(id); return v }
 		time.Sleep(step)
 		synctest.Wait()
-		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(8334) {
+		if cur := read(wcdef.AttrCurrentPositionLiftPercent100ths); cur != uint16(8334) {
 			t.Fatalf("position after one step = %v, want 8334", cur)
 		}
 		if err := typed.Set(wcdef.Patch{Null: []uint32{wcdef.AttrCurrentPositionLiftPercent100ths}}); err != nil {
@@ -125,7 +124,7 @@ func TestTravelFromAPositionTheHostMadeUnknown(t *testing.T) {
 		})
 		time.Sleep(2 * step)
 		synctest.Wait()
-		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != nil {
+		if cur := read(wcdef.AttrCurrentPositionLiftPercent100ths); cur != nil {
 			t.Errorf("position two steps after the host made it unknown = %v, want null", cur)
 		}
 		time.Sleep(3 * step) // the sixth step ends the travel
@@ -139,7 +138,7 @@ func TestTravelFromAPositionTheHostMadeUnknown(t *testing.T) {
 		srv.SetCurrentPosition(new(uint16(5000)), nil)
 		time.Sleep(10 * step)
 		synctest.Wait()
-		if cur := read(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); cur != uint16(5000) {
+		if cur := read(wcdef.AttrCurrentPositionLiftPercent100ths); cur != uint16(5000) {
 			t.Errorf("the host's position after the travel ended = %v, want 5000 kept", cur)
 		}
 	})
