@@ -267,7 +267,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
-		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: cfg.BootReason,
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock, cfg.Logger), bootReason: cfg.BootReason,
 		attestationErr: attestationErr, lifecycle: make(chan struct{}, 1),
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -1558,9 +1558,11 @@ func (w *countedWork) resume() {
 
 // newCallbackQueue is the node's own `…Async` callback queue; a callback
 // counts as work of the in-flight group clk carries until it returned
-// (internal/inflight DeviceCallbacks).
-func newCallbackQueue(clk clock.Clock) *serialqueue.Queue {
+// (internal/inflight DeviceCallbacks). Its warnings (a dropped callback,
+// the end of an overflow) go to the host's logger (R2-P6-bound-0209).
+func newCallbackQueue(clk clock.Clock, log *slog.Logger) *serialqueue.Queue {
 	q := serialqueue.New()
+	q.SetLogger(log)
 	g := inflight.Of(clk)
 	q.CountIn(func() *inflight.Group { return g })
 	return q

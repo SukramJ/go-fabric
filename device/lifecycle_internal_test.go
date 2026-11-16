@@ -154,7 +154,7 @@ func TestDeviceClockAndQueue(t *testing.T) {
 	<-tk.C()
 	tk.Stop()
 
-	q := newQueue(&deviceClock{})
+	q := newQueue(&deviceClock{}, nil)
 	q.Enqueue(func() { t.Error("ran on a stopped queue") })
 	q.Enqueue(nil)
 	q.Stop() // not running: a no-op

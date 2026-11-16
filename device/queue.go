@@ -4,6 +4,7 @@
 package device
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 
@@ -25,8 +26,11 @@ type queue = serialqueue.Queue
 // A callback counts as work of the node's in-flight group from its queuing
 // until it returned (internal/inflight DeviceCallbacks): a fabrictest site
 // does not move its clock while the host's code for a change still runs.
-func newQueue(clk *deviceClock) *queue {
+// Its warnings (a dropped callback, the end of an overflow) go to the
+// device's logger (R2-P6-bound-0209).
+func newQueue(clk *deviceClock, log *slog.Logger) *queue {
 	q := serialqueue.New()
+	q.SetLogger(log)
 	q.CountIn(clk.InflightGroup)
 	return q
 }

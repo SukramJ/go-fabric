@@ -207,7 +207,7 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	}
 	d := &Device{
 		typ: t, opts: opts, clients: slices.Clone(s.clients), measured: m,
-		clock: clk, queue: newQueue(clk), bridgedPowerSource: bridgedPS,
+		clock: clk, queue: newQueue(clk, s.logger), bridgedPowerSource: bridgedPS,
 	}
 	if s.bridgedInfo != nil {
 		d.bridgedInfo = *s.bridgedInfo
