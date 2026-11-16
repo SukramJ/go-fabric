@@ -181,6 +181,11 @@ type Config struct {
 	// non-nil the server bumps and reports the caller's counter, so the
 	// version survives server reconstruction; when nil an embedded
 	// tracker is used.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Events are the optional events the server declares
 	// (ValveStateChanged, ValveFault), which the host emits through the
