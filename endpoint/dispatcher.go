@@ -783,6 +783,13 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
 		if err != nil {
 			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err)
+		} else {
+			// As the concrete path does ([TopologyDispatcher.Invoke]):
+			// matter.js runs a wildcard-endpoint or group invoke per
+			// endpoint exactly as a concrete one
+			// (CommandInvokeResponse.ts:330-358), and the scene
+			// invalidation is the command's (R2-P6-par-0404).
+			t.ep.invalidateSceneOnCommand(t.srv, path.Cluster)
 		}
 		results = append(results, res)
 	}

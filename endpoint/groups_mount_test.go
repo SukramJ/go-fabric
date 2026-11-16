@@ -337,3 +337,52 @@ type oneFabricGroupStore struct{ nopGroupStore }
 func (oneFabricGroupStore) ListFabrics(context.Context) ([]store.FabricRecord, error) {
 	return []store.FabricRecord{{FabricIndex: 1}}, nil
 }
+
+// TestWildcardInvokeInvalidatesTheSceneAsAConcreteOne (R2-P6-par-0404): a
+// wildcard-endpoint command — every group command's shape — ends the
+// validity of the endpoint's current scene as the same command on a
+// concrete path does, for a server that does not invalidate itself.
+// matter.js runs a wildcard or group invoke per endpoint through the same
+// command as a concrete one (CommandInvokeResponse.ts:330-358), and the
+// invalidation sits in the command (OnOffServer.ts:97-100, :115-122).
+func TestWildcardInvokeInvalidatesTheSceneAsAConcreteOne(t *testing.T) {
+	t.Parallel()
+	for _, wildcard := range []bool{false, true} {
+		var invoked []uint16
+		mgr, _ := groups.NewManager(oneFabricGroupStore{}, nil)
+		ep := &Endpoint{
+			ID: 7, DeviceType: 0x0100, FriendlyName: "Lamp", SourceKey: StringKey("lamp"),
+			Source: deviceTypeSource{dt: 0x0100, servers: []contract.ClusterServer{commandServer{fakeServer: fakeServer{id: 0x0006}, accepted: []uint32{0}, invoked: &invoked, ep: 7}}},
+			groups: mgr,
+		}
+		var scenes *mattercore.ScenesManagement
+		for _, s := range ClusterServers(ep) {
+			if sm, ok := s.(*mattercore.ScenesManagement); ok {
+				scenes = sm
+			}
+		}
+		if scenes == nil {
+			t.Fatal("no stack ScenesManagement server")
+		}
+		ctx := im.WithFabricFilter(context.Background(), true, 1)
+		if _, err := scenes.MatterInvoke(ctx, 0x04, mattercore.SceneRef{GroupID: 0, SceneID: 1}); err != nil {
+			t.Fatal(err)
+		}
+		valid := func() bool {
+			v, _ := scenes.MatterReadFiltered(ctx, 0x0002)
+			si, _ := v.([]mattercore.SceneInfoStruct)
+			return len(si) == 1 && si[0].SceneValid
+		}
+		if !valid() {
+			t.Fatal("the stored scene is not current")
+		}
+		d := NewTopologyDispatcher(makeTopology(ep))
+		path := im.ConcreteCommandPath{Endpoint: 7, HasEndpoint: !wildcard, Cluster: 0x0006, HasCluster: true, Command: 0x00, HasCommand: true}
+		if res := d.InvokeAuthorized(ctx, path, nil, nil); len(res) != 1 || res[0].Status != im.StatusSuccess {
+			t.Fatalf("wildcard=%v: results %+v", wildcard, res)
+		}
+		if valid() {
+			t.Errorf("wildcard=%v: the scene stayed valid after an OnOff command", wildcard)
+		}
+	}
+}
