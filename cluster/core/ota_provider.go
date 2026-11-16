@@ -21,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/caseauth"
 )
 
 // OTAProvider is the OTA Software Update Provider (0x0029): it answers an
@@ -352,13 +353,14 @@ func (s *otaImageStorage) Open(ctx context.Context, name string) (bdx.Blob, erro
 
 // remotePeer is OP's assertRemoteActor + NodeSession.assert: the
 // requestor of a command, its fabric and node, and the session id the
-// command arrived on.
+// command arrived on. CASE is told apart by internal/caseauth, the one
+// rule every CASE-only server of the module shares.
 func remotePeer(ctx context.Context) (OTAPeer, uint16, error) {
-	_, fabric := im.FabricFilterFromContext(ctx)
-	node, _ := im.SubjectFromContext(ctx)
-	if fabric == 0 || node == 0 || im.IsPASEFromContext(ctx) {
+	if !caseauth.IsCASE(ctx) {
 		return OTAPeer{}, 0, otaStatusError{im.StatusUnsupportedAccess, "OTA provider commands need a CASE session"}
 	}
+	_, fabric := im.FabricFilterFromContext(ctx)
+	node, _ := im.SubjectFromContext(ctx)
 	return OTAPeer{FabricIndex: fabric, NodeID: node}, InvokeSessionIDFromContext(ctx), nil
 }
 
@@ -830,7 +832,43 @@ type otaStatusUpdate struct {
 	state, previous OTAUpdateStatus
 	applied         uint32
 	cleanup         func()
+	// evicted is the cleanup of the entry a new one displaced
+	// (otaInProgressPerFabric).
+	evicted func()
 }
+
+// evictForLocked makes room for a new entry of fabric when the fabric holds
+// its otaInProgressPerFabric share: the entry touched longest ago leaves,
+// and its cleanup is returned to run once p.mu is released. p.mu is held.
+func (p *OTAProvider) evictForLocked(fabric uint8) func() {
+	held, victim := 0, ""
+	for _, key := range p.sortedKeysLocked() {
+		d := p.inProgress[key]
+		if d.peer.FabricIndex != fabric {
+			continue
+		}
+		held++
+		if victim == "" || d.timestamp.Before(p.inProgress[victim].timestamp) {
+			victim = key
+		}
+	}
+	if held < otaInProgressPerFabric {
+		return nil
+	}
+	d := p.inProgress[victim]
+	delete(p.inProgress, victim)
+	p.logger.Info("ota.provider.entry_evicted", slog.Uint64("node_id", d.peer.NodeID), slog.Int("fabric_index", int(fabric)))
+	return d.cleanup
+}
+
+// otaInProgressPerFabric is the share of in-progress entries one fabric's
+// requestors hold. matter.js creates an entry for every token an
+// ApplyUpdateRequest names, one it never issued included, and drops none
+// at a fabric's removal (OtaSoftwareUpdateProviderServer.ts:421, :445,
+// :605-613, :636 at db021da0): its entries grow with the tokens a peer
+// invents. The number is the module's: room for that many concurrent
+// updates on one fabric (review II, R2-P6-bound-1206, decision 134).
+const otaInProgressPerFabric = 16
 
 // updateInProgressLocked is updateInProgress's write; p.mu is held.
 func (p *OTAProvider) updateInProgressLocked(peer OTAPeer, token []byte, state OTAUpdateStatus, version *uint32, directConsent bool) otaStatusUpdate {
@@ -838,6 +876,10 @@ func (p *OTAProvider) updateInProgressLocked(peer OTAPeer, token []byte, state O
 	d := p.inProgress[key]
 	u := otaStatusUpdate{peer: peer, state: state, previous: OTAUpdateUnknown}
 	if d == nil {
+		if state != OTAUpdateDone && state != OTAUpdateCancelled {
+			// A terminal state's entry goes at once and displaces none.
+			u.evicted = p.evictForLocked(peer.FabricIndex)
+		}
 		d = &otaInProgress{peer: peer}
 	} else {
 		u.previous = d.lastState
@@ -873,6 +915,9 @@ func (p *OTAProvider) announce(u otaStatusUpdate) {
 	}
 	if u.cleanup != nil {
 		u.cleanup()
+	}
+	if u.evicted != nil {
+		u.evicted()
 	}
 }
 
