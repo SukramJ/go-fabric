@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
@@ -254,7 +255,8 @@ var errCASEFabricRemoved = errors.New("node: the CASE session's fabric was remov
 // (node.fabricRemoved: forget, then the bridge's EmitFabricRemovedContext),
 // so a removal that lands between the two checks either finds this session
 // open and closes it, or leaves the second check without the identity, and
-// the session is closed here.
+// the session is closed here — the session open returned, only while it
+// still holds its id.
 func (c *caseIdentities) admitSession(sessions *operational.Manager, fabricIndex uint8, open func() (*operational.Entry, error)) (*operational.Entry, error) {
 	if _, ok := c.forFabric(fabricIndex); !ok {
 		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
@@ -264,7 +266,9 @@ func (c *caseIdentities) admitSession(sessions *operational.Manager, fabricIndex
 		return nil, err
 	}
 	if _, ok := c.forFabric(fabricIndex); !ok {
-		_ = sessions.Close(entry.SessionID)
+		// The entry itself, not its id: by now the id may name another
+		// session or another handshake's stake (decision 159).
+		sessionseam.CloseEntry(sessions, entry)
 		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
 	}
 	return entry, nil
@@ -704,7 +708,10 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		// `ClearSecretData(Kae)`; review II, W1-sec-05, owner decision 6).
 		defer clear(sharedSecret)
 		// PASE predates the fabric, so both node ids are zero.
-		entry, err := sessions.OpenFromPaseWithID(sessionID, 0, 0, peerSessionID, sharedSecret)
+		// The install takes the stake, not the bare id: a stake an
+		// allocation at a full table took over installs nothing
+		// (operational.ErrStakeLost, decision 159).
+		entry, err := sessions.OpenFromPaseWithStake(stake, 0, 0, peerSessionID, sharedSecret)
 		if err != nil {
 			sessions.ReleaseStake(stake)
 			return err
@@ -726,7 +733,7 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		// 6170af84, MarkForEviction and HandleFailedAttempt; review II,
 		// R2-P3-pase-03).
 		if err := root.GeneralCommissioning.ArmOnPaseSession(life, sessionID); err != nil {
-			_ = sessions.Close(sessionID)
+			sessionseam.CloseEntry(sessions, entry)
 			return fmt.Errorf("node: the PASE session's fail-safe: %w", err)
 		}
 		return nil

@@ -632,8 +632,9 @@ var (
 	// ErrSessionNotFound is returned by [Manager.Get] / [Manager.Close]
 	// when no session matches the supplied id.
 	ErrSessionNotFound = errors.New("operational: session not found")
-	// ErrStakeLost is returned by [Manager.OpenFromSigmaWithStake] and
-	// [Manager.OpenFromSigmaAsInitiatorWithStake] when the [Stake] no
+	// ErrStakeLost is returned by [Manager.OpenFromSigmaWithStake],
+	// [Manager.OpenFromSigmaAsInitiatorWithStake] and
+	// [Manager.OpenFromPaseWithStake] when the [Stake] no
 	// longer holds its id: the handshake released it, the reaper reclaimed
 	// it past [PlaceholderIDTTL], or an allocation at a full table gave the
 	// id to another handshake, which may have established its session
@@ -754,10 +755,13 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 // parallel CASE session into a single lookup slot and break peer →
 // bridge routing.
 //
-// The id comes back unbound to its stake: at a full table a later
-// allocation may give it to another handshake, and [Manager.ReleaseID] then
-// frees that one's stake. A caller that releases takes a [Stake] from
-// [Manager.AllocateStake] instead.
+// Deprecated: the id comes back unbound to its stake: at a full table a
+// later allocation may give it to another handshake, and
+// [Manager.ReleaseID] then frees that one's stake, and
+// [Manager.OpenFromSigmaWithID] installs over it (review II, R2-P3-dr-dev-07,
+// N3-findev-1, decision 160). Use [Manager.AllocateStake], whose [Stake]
+// [Manager.ReleaseStake] and the …WithStake installs take; AllocateID is
+// removable in the next minor release.
 func (m *Manager) AllocateID() (uint16, error) {
 	s, err := m.AllocateStake()
 	return s.ID, err
@@ -1164,10 +1168,9 @@ func paseSession(localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSec
 // afterwards. Production code never replaces it.
 var secretHook = func(string, []byte) {}
 
-// OpenFromPaseWithID is a variant of [Manager.OpenFromPase] that
-// registers the new PASE session under a pre-allocated id (see
-// [Manager.AllocateID]). It overwrites any placeholder entry left by
-// AllocateID.
+// OpenFromPaseWithStake is a variant of [Manager.OpenFromPase] that
+// registers the new PASE session under the id s reserved (see
+// [Manager.AllocateStake]), in place of s's placeholder.
 //
 // Use this when the responder session id must be known BEFORE the
 // PBKDFParamResponse is sent — the commissioner echoes it back as
@@ -1176,7 +1179,35 @@ var secretHook = func(string, []byte) {}
 // PBKDFParamResponse guarantees the bridge's session lookup resolves
 // the correct entry for every subsequent datagram, even when other
 // sessions occupy the lower-numbered slots.
+//
+// The install takes the stake, not the bare id, with the contract of
+// [Manager.OpenFromSigmaWithStake]: it registers the session only while
+// s still holds its id, and otherwise returns [ErrStakeLost] and
+// installs nothing; another handshake's stake, or the session it
+// established under the id, stays as it is (review II, decision 159).
+func (m *Manager) OpenFromPaseWithStake(s Stake, localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSecret []byte) (*Entry, error) {
+	return m.openFromPase(s.ID, &s, localNodeID, peerNodeID, peerSessionID, sharedSecret)
+}
+
+// OpenFromPaseWithID is [Manager.OpenFromPaseWithStake] under a bare id
+// (see [Manager.AllocateID]). It overwrites any placeholder entry left by
+// AllocateID.
+//
+// Deprecated: the install takes the id, not the [Stake]: at a full table
+// [Manager.AllocateStake] may have handed the id to another handshake
+// since, and the install then overwrites that handshake's stake, or
+// closes the session it established under the id (review II, decision
+// 159). Use [Manager.AllocateStake] and [Manager.OpenFromPaseWithStake],
+// which install under the caller's own stake only; OpenFromPaseWithID is
+// removable in the next minor release.
 func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSecret []byte) (*Entry, error) {
+	return m.openFromPase(id, nil, localNodeID, peerNodeID, peerSessionID, sharedSecret)
+}
+
+// openFromPase installs a PASE session under id, with openFromSigma's
+// stake contract: a non-nil stake must still hold id, or nothing is
+// installed and the error is [ErrStakeLost].
+func (m *Manager) openFromPase(id uint16, stake *Stake, localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSecret []byte) (*Entry, error) {
 	sess, challenge, err := paseSession(localNodeID, peerNodeID, peerSessionID, sharedSecret)
 	if err != nil {
 		return nil, err
@@ -1197,6 +1228,11 @@ func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, 
 		clock:                m.clk(),
 	}
 	m.mu.Lock()
+	if stake != nil && !m.stakes(placeholderRef{id: stake.ID, e: stake.e}) {
+		m.mu.Unlock()
+		sess.Close()
+		return nil, ErrStakeLost
+	}
 	displaced := m.installEntryLocked(id, entry)
 	m.mu.Unlock()
 	if displaced != nil {
@@ -1322,6 +1358,33 @@ func (m *Manager) Close(sessionID uint16) error {
 	}
 	delete(m.sessions, sessionID)
 	m.mu.Unlock()
+	m.finishClose(entry)
+	return nil
+}
+
+// closeEntry is [Manager.Close] of e itself rather than of its id: it
+// closes e only while e still holds its id, and reports whether it did.
+// A caller that closes the session it installed a moment ago uses it, so
+// an id another session or stake holds by then is left alone (review
+// II, decision 159 / Fable Q1 record).
+func (m *Manager) closeEntry(e *Entry) bool {
+	if e == nil {
+		return false
+	}
+	m.mu.Lock()
+	if cur, ok := m.sessions[e.SessionID]; !ok || cur != e {
+		m.mu.Unlock()
+		return false
+	}
+	delete(m.sessions, e.SessionID)
+	m.mu.Unlock()
+	m.finishClose(e)
+	return true
+}
+
+// finishClose is the teardown of an entry [Manager.Close] took out of the
+// table, outside the lock.
+func (m *Manager) finishClose(entry *Entry) {
 	// A pre-allocated id whose handshake never reached key derivation has
 	// no Session under it; dropping the reservation is the whole teardown.
 	if entry.Session != nil {
@@ -1329,7 +1392,6 @@ func (m *Manager) Close(sessionID uint16) error {
 	}
 	m.fireOnSessionClose([]*Entry{entry})
 	m.fireReannounceIfPeerGone([]*Entry{entry})
-	return nil
 }
 
 // CloseAllGraceful tears down every live session, notifying each peer

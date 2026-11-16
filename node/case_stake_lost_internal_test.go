@@ -114,3 +114,47 @@ func TestCASEInitiatorWhoseStakeWasTakenOverOpensNoSession(t *testing.T) {
 		t.Fatalf("after the taker released its stake: occupancy %+v, want its id free", occ)
 	}
 }
+
+// TestAdmitSessionClosesOnlyTheSessionItOpened (review II, decision 159,
+// Fable Q1 record): when the fabric went while the session opened,
+// admitSession closes the session it installed, not whatever holds that
+// session's id by then. The stand-in for the race: inside the open, the
+// installed session is closed (as an eviction would) and its id — the only
+// free one — is staked by another handshake before admitSession closes.
+func TestAdmitSessionClosesOnlyTheSessionItOpened(t *testing.T) {
+	t.Parallel()
+	fx := newCaseFabricFixture(t)
+	sessions := operational.NewManager(testStore(t))
+	var own operational.Stake
+	for range operational.SessionIDSpace {
+		s, err := sessions.AllocateStake()
+		if err != nil {
+			t.Fatalf("AllocateStake: %v", err)
+		}
+		own = s
+	}
+	var keys sigma.SessionKeys
+	_, _ = rand.Read(keys.I2RKey[:])
+	_, _ = rand.Read(keys.R2IKey[:])
+	var other operational.Stake
+	_, err := fx.ids.admitSession(sessions, 1, func() (*operational.Entry, error) {
+		e, err := sessions.OpenFromSigmaWithStake(own, 1, fx.local.NodeID, fx.peer.NodeID, 0x2002, nil, keys)
+		if err != nil {
+			return nil, err
+		}
+		fx.ids.forget(1)
+		if err := sessions.Close(e.SessionID); err != nil {
+			t.Fatalf("close the installed session: %v", err)
+		}
+		if other, err = sessions.AllocateStake(); err != nil || other.ID != e.SessionID {
+			t.Fatalf("AllocateStake = (%d, %v), want the only free id %d", other.ID, err, e.SessionID)
+		}
+		return e, nil
+	})
+	if !errors.Is(err, errCASEFabricRemoved) {
+		t.Fatalf("admitSession = %v, want errCASEFabricRemoved", err)
+	}
+	if occ := sessions.Occupancy(); occ.Reserved != operational.SessionIDSpace {
+		t.Fatalf("occupancy %+v, want every id staked: admitSession's close took the other handshake's stake", occ)
+	}
+}

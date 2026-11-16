@@ -94,8 +94,8 @@ func TestAFailedCASEHandshakeReleasesOnlyItsOwnStake(t *testing.T) {
 	staked := begin(first)
 	// Every other id staked too: the table is full of stakes.
 	for range operational.SessionIDSpace - 1 {
-		if _, err := sessions.AllocateID(); err != nil {
-			t.Fatalf("AllocateID: %v", err)
+		if _, err := sessions.AllocateStake(); err != nil {
+			t.Fatalf("AllocateStake: %v", err)
 		}
 	}
 	if occ := sessions.Occupancy(); occ.Reserved != operational.SessionIDSpace {
@@ -106,7 +106,7 @@ func TestAFailedCASEHandshakeReleasesOnlyItsOwnStake(t *testing.T) {
 	}
 	provider.Forget(first) // the first handshake is dropped unfinished
 
-	if next, err := sessions.AllocateID(); err != nil || next == staked {
-		t.Fatalf("after the first handshake let go, AllocateID = (%d, %v): the id the second handshake holds was free again", next, err)
+	if next, err := sessions.AllocateStake(); err != nil || next.ID == staked {
+		t.Fatalf("after the first handshake let go, AllocateStake = (%d, %v): the id the second handshake holds was free again", next.ID, err)
 	}
 }

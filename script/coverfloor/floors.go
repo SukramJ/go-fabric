@@ -265,6 +265,7 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: a function variable node installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
+	{pkg: "github.com/SukramJ/go-fabric/internal/sessionseam", min: 0, unmeasurable: true, why: "function variables only: secure/operational installs them, node and the module's test fixtures call them (review II, decisions 159, 160)"},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/surfaceseam",
 		min:          0,

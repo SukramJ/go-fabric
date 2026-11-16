@@ -27,6 +27,9 @@ var stakeInstalls = []stakeInstall{
 	{"OpenFromSigmaAsInitiatorWithStake", func(m *Manager, s Stake, peer uint64, keys sigma.SessionKeys) (*Entry, error) {
 		return m.OpenFromSigmaAsInitiatorWithStake(s, 1, 0x10, peer, 0x2000, nil, keys)
 	}},
+	{"OpenFromPaseWithStake", func(m *Manager, s Stake, peer uint64, keys sigma.SessionKeys) (*Entry, error) {
+		return m.OpenFromPaseWithStake(s, 0x10, peer, 0x2000, keys.I2RKey[:])
+	}},
 }
 
 // closedIDs records the ids [Manager.SetOnSessionClose] reports.
@@ -68,7 +71,8 @@ func fillAndTakeOver(t *testing.T, m *Manager) (lost, taker Stake) {
 	return lost, taker
 }
 
-// TestOpenWithAStakeThatLostItsIDInstallsNothing (review II, N3-findev-1):
+// TestOpenWithAStakeThatLostItsIDInstallsNothing (review II, N3-findev-1;
+// the PASE install, decision 159):
 // an install that takes a stake registers its session only while the stake
 // still holds its id. A stake an allocation at a full table took over, one
 // released, one the reaper reclaimed, one already installed and the zero
