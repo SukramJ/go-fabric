@@ -934,6 +934,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		sessionID := r.SessionID()
 		a.mu.Lock()
 		install := !a.established || sessionID != a.establishedSessionID
+		prevEstablished, prevSessionID, prevAccepted := a.established, a.establishedSessionID, a.sigma3Accepted
 		a.established = true
 		a.establishedSessionID = sessionID
 		a.sigma3Accepted = false
@@ -947,6 +948,20 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 			// resumed session under a peer id the initiator never
 			// allocated, so it dropped every reply.
 			if err := a.onEstablished(result.ResumeKeys, r.PeerSessionID()); err != nil {
+				// No session was installed — the host's stake was lost
+				// (operational.ErrStakeLost) or its table refused it: the
+				// resume began nothing. The adapter's state goes back to
+				// what it was, and an adapter whose handshake had not
+				// begun ends as a failed Sigma1 ends it — it leaves its
+				// provider and returns its staked id — rather than wait
+				// for the reaper (review II, R2-P6-sec-0301).
+				a.mu.Lock()
+				a.established, a.establishedSessionID, a.sigma3Accepted = prevEstablished, prevSessionID, prevAccepted
+				begun := a.established || a.lastSigma2 != nil
+				a.mu.Unlock()
+				if !begun {
+					a.handshakeFailed()
+				}
 				return 0, nil, fmt.Errorf("bridge: CASE resume session pickup: %w", err)
 			}
 		}
