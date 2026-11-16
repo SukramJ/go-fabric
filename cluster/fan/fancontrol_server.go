@@ -451,6 +451,10 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	}
 }
 
+// logger is the server's logger: the process default (Config carries
+// none).
+func (*Server) logger() *slog.Logger { return slog.Default() }
+
 // admitted is the host's enum value v of attrID when the selection admits
 // it, remembered in last; the last admitted one otherwise, with a warning.
 func (s *Server) admitted(attrID uint32, v uint8, last *atomic.Uint32) uint8 {
@@ -459,7 +463,7 @@ func (s *Server) admitted(attrID uint32, v uint8, last *atomic.Uint32) uint8 {
 		return v
 	}
 	served := uint8(last.Load()) //nolint:gosec // a stored uint8
-	slog.Default().Warn("matter.fancontrol.inbound_value_not_admitted",
+	s.logger().Warn("matter.fancontrol.inbound_value_not_admitted",
 		slog.Int("attribute", int(attrID)), slog.Int("value", int(v)), slog.Int("served", int(served)))
 	return served
 }

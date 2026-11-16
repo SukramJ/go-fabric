@@ -1424,6 +1424,10 @@ func (s *DoorLockServer) commit(ctx context.Context, fn func() error) error {
 	return err
 }
 
+// logger is the server's logger: the process default (DoorLockConfig
+// carries none).
+func (*DoorLockServer) logger() *slog.Logger { return slog.Default() }
+
 // commitMoved runs fn under mu after the hardware moved and saves the
 // records it changed. A failed save keeps them — the physical outcome
 // stands — logs it and answers [notSavedError] (R2-P6-err-1504); the
@@ -1442,7 +1446,7 @@ func (s *DoorLockServer) commitMoved(ctx context.Context, fn func()) error {
 	var err error
 	if dirty && s.auth != nil {
 		if perr := s.auth.SaveDoorLockAuth(ctx, s.authKey, snapshot); perr != nil {
-			slog.Default().Warn("matter.doorlock.records_not_saved", slog.String("reason", perr.Error()))
+			s.logger().Warn("matter.doorlock.records_not_saved", slog.String("reason", perr.Error()))
 			err = notSavedError{perr}
 		}
 	}
