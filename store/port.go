@@ -38,8 +38,11 @@ import "context"
 //     and wraps after 254, skipping occupied indexes (matter.js
 //     FabricManager #nextFabricIndex).
 //   - Returned slices are the caller's: mutating one never changes the store.
-//   - After the backend is closed every method returns a non-nil error and
-//     changes nothing; the node and the controller call no method after
+//   - A backend that closes — the SQLite [Store], whose handle the host
+//     closes — returns a non-nil error from every method after that and
+//     changes nothing (store_closed_db_test.go holds the SQLite store to it;
+//     the port has no Close and storetest no closed case, and memstore
+//     does not close). The node and the controller call no method after
 //     their Stop or Close returned.
 //
 // matter.js has the same split one level down: a StorageService
