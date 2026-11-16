@@ -422,8 +422,14 @@ type Server struct {
 	// reported once, by the quieter rules.
 	level      uint8
 	levelKnown bool
-	// coupling is what the running transition couples to.
-	coupling coupling
+	// coupling is what the running transition couples to, recorded under
+	// couplingGen, the generation of the command that started it
+	// ([Server.nextCoupling]).
+	coupling    coupling
+	couplingGen uint64
+	// observe serialises an observation of CurrentLevel: the read from
+	// the source and the compare-and-store ([Server.noteLevel]).
+	observe sync.Mutex
 	// listeners counts the change listeners and forwards holds the
 	// callbacks [Server.OnMatterValueChanged] forwards the host's
 	// notifications to, in registration order; the host's notifier is
@@ -1320,6 +1326,11 @@ func stepRequestFrom(name string, fields any) (wire.StepRequest, error) {
 	case []byte:
 		req, err := wire.DecodeStep(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status, as MoveToLevel's and Move's (R2-P6-wire-1416).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil
@@ -1372,6 +1383,11 @@ func stopRequestFrom(name string, fields any) (wire.StopRequest, error) {
 	case []byte:
 		req, err := wire.DecodeStop(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status, as MoveToLevel's and Move's (R2-P6-wire-1416).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil

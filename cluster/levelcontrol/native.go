@@ -56,6 +56,13 @@ type NativeSource struct {
 	// the level is there; nil when none is owed.
 	off   *pendingOff
 	clock clock.Clock
+
+	// notifier is the device's own change notifier, nil when it has none;
+	// subMu guards unsub, the release of the source's subscription to it
+	// (nil while not subscribed).
+	notifier contract.ChangeNotifier
+	subMu    sync.Mutex
+	unsub    func()
 }
 
 // pendingOff is a switch-off owed by one ramp: armed until the level
@@ -100,9 +107,41 @@ func NewNativeSource(dev lvldef.NativeRamp, onOff OnOff, cfg NativeConfig) *Nati
 	// A device that notifies settles an owed switch-off the moment its
 	// level arrives at the minimum.
 	if c, ok := dev.(contract.ChangeNotifier); ok && c != nil {
-		c.OnMatterValueChanged(n.settleOff)
+		n.notifier = c
+		n.subscribe()
 	}
 	return n
+}
+
+// subscribe subscribes the source to the device's notifier unless it is
+// subscribed: at construction, and again for a ramp after
+// [NativeSource.quiesce] released it.
+func (n *NativeSource) subscribe() {
+	if n.notifier == nil {
+		return
+	}
+	n.subMu.Lock()
+	defer n.subMu.Unlock()
+	if n.unsub == nil {
+		n.unsub = n.notifier.OnMatterValueChanged(n.settleOff)
+	}
+}
+
+// quiesce is the source's part of the server's MatterQuiesce
+// ([contract.ClusterQuiescer]): an owed switch-off is dropped with its
+// deadline, and the subscription to the device's notifier is released,
+// so neither outlives the server and a rebuilt source does not add to
+// the device's subscriptions (R2-P6-fsm-1406). A later ramp subscribes
+// again.
+func (n *NativeSource) quiesce() {
+	n.cancelOff()
+	n.subMu.Lock()
+	unsub := n.unsub
+	n.unsub = nil
+	n.subMu.Unlock()
+	if unsub != nil {
+		unsub()
+	}
 }
 
 // CurrentLevel implements [LevelSource]: the device's level.
@@ -419,6 +458,7 @@ func (n *NativeSource) ramp(ctx context.Context, target uint8, duration func(cur
 		}
 		return nil
 	}
+	n.subscribe()
 	p := &pendingOff{ctx: context.WithoutCancel(ctx)}
 	n.mu.Lock()
 	n.off = p

@@ -203,12 +203,17 @@ func (s *Server) observeLevel(origin contract.Origin) {
 // DataVersion already when advanced is true: the host's set of
 // CurrentLevel with another attribute is one commit, one advance.
 func (s *Server) noteLevel(origin contract.Origin, advanced bool) {
+	// The read and the compare-and-store are one step, so an older reading
+	// is never stored after a newer one (R2-P6-conc-1408): the host's
+	// notifier, the engine's step and a command observe concurrently.
+	s.observe.Lock()
 	level, known := s.src.CurrentLevel()
 	s.mu.Lock()
 	wasNull := !s.levelKnown
 	changed := known != s.levelKnown || (known && level != s.level)
 	s.level, s.levelKnown = level, known
 	s.mu.Unlock()
+	s.observe.Unlock()
 	if !changed {
 		return
 	}
@@ -298,6 +303,11 @@ func (s *Server) MatterSelfReportedAttributes() []uint32 {
 // "delayed emit" timer, #stop :1309-1314). The quieter stays usable: a
 // later command reports by its rules again.
 func (s *Server) MatterQuiesce() {
+	// On the hand-off path the module's own NativeSource owes a switch-off
+	// with a deadline of its own; it is dropped as well (R2-P6-fsm-1406).
+	if q, ok := s.src.(interface{ quiesce() }); ok {
+		q.quiesce()
+	}
 	if s.engine == nil {
 		return
 	}
@@ -437,7 +447,8 @@ func (s *Server) transitionAndInvalidate(ctx context.Context, target, rate float
 // constant rate (Move, Step; 0 applies at once); rateFrom, when set,
 // derives it from the current level (MoveToLevel).
 func (s *Server) transition(ctx context.Context, target, rate float64, rateFrom func(current float64) float64, withOnOff bool, options uint8) error {
-	c, err := s.couple(ctx, withOnOff, options, target)
+	gen := s.nextCoupling()
+	c, err := s.couple(ctx, gen, withOnOff, options, target)
 	if err != nil {
 		return err
 	}
@@ -463,24 +474,38 @@ func (s *Server) transition(ctx context.Context, target, rate float64, rateFrom 
 	stepCtx := context.WithoutCancel(ctx)
 	if err := s.engine.Start(transition.Transition{
 		Name: propCurrentLevel, Rate: rate, RateFrom: rateFrom, Target: target,
-		OnStep: func(float64) { _, _ = s.couple(stepCtx, withOnOff, options, target) },
+		OnStep: func(float64) { _, _ = s.couple(stepCtx, gen, withOnOff, options, target) },
 	}); err != nil {
 		return err
 	}
 	return s.commit(ctx, c)
 }
 
+// nextCoupling starts a command's coupling: the generation its
+// transition records its coupling under ([Server.couple]).
+func (s *Server) nextCoupling() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.couplingGen++
+	return s.couplingGen
+}
+
 // couple is matter.js LevelControlServer.couple: it records what the
 // transition couples to and switches the device on for a "with On/Off"
-// command whose transition does not end at the minimum.
-func (s *Server) couple(ctx context.Context, withOnOff bool, options uint8, target float64) (coupling, error) {
+// command whose transition does not end at the minimum. gen is the
+// command's [Server.nextCoupling]: a step of a transition a newer command
+// replaced records nothing, so the coupling the newer command's immediate
+// level commits with is its own (R2-P6-conc-1409).
+func (s *Server) couple(ctx context.Context, gen uint64, withOnOff bool, options uint8, target float64) (coupling, error) {
 	coupleOnOff := withOnOff && s.onOff != nil
 	c := coupling{
 		turnsOff:         coupleOnOff && min(max(target, float64(s.minLevel())), float64(lvldef.LevelMax)) <= float64(s.minLevel()),
 		colorTemperature: s.lighting && options&OptionCoupleColorTempToLevel != 0 && s.ct != nil,
 	}
 	s.mu.Lock()
-	s.coupling = c
+	if gen == s.couplingGen {
+		s.coupling = c
+	}
 	s.mu.Unlock()
 	if coupleOnOff && !c.turnsOff && !s.onOff.OnOff() {
 		// Moving towards on takes effect at once, which the CHIP tests

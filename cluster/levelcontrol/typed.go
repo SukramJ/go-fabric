@@ -5,6 +5,7 @@ package levelcontrol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -35,8 +36,9 @@ var (
 // (packages/node/src/behavior/Transitions.ts:455-534, :537-574); matter.js
 // ends the transition only when the written value equals its target
 // (:659-693 #instrumentProperty), which the engine does not mirror. OnLevel
-// and Options go to the port (the held state of [New]), StartUpCurrentLevel
-// is the server's, and MinLevel and MaxLevel accept their fixed values only.
+// and Options go to the port (the held state of [New]) first — a write the
+// port refuses undoes the port's writes before it, so the set stays all or
+// nothing —, StartUpCurrentLevel is the server's, and MinLevel and MaxLevel accept their fixed values only.
 // RemainingTime is derived: [spec.ErrNotHeld].
 func (s *Server) SetAttributes(values map[uint32]any) error {
 	type set struct {
@@ -78,29 +80,60 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 	// db021da0 (the version advances once `if (changes)`) and :1476-1481
 	// (#noteIfChanged notes nothing for an equal value).
 	var changed []uint32
+	// The port's writes go first, each undone when a later one is
+	// refused, so the set is all or nothing over a port as well
+	// (R2-P6-api-1410); the server's own values cannot be refused and
+	// follow. An undo the port refuses as well leaves its value changed:
+	// the error says so, and the change is reported.
+	var undo []func() error
+	refuse := func(err error) error {
+		var kept []uint32
+		for i := len(undo) - 1; i >= 0; i-- {
+			if uerr := undo[i](); uerr != nil {
+				err = errors.Join(err, uerr)
+				kept = append(kept, changed[i])
+			}
+		}
+		if len(kept) > 0 {
+			slices.Sort(kept)
+			s.tracker().Bump()
+			s.changes.NotifyFrom(contract.OriginHostSet, kept...)
+		}
+		return err
+	}
+	for _, c := range checked {
+		switch c.id {
+		case AttrOptions:
+			options, _ := c.v.(uint8) // a map8 per CheckSet
+			before := s.src.Options()
+			if err := s.src.SetOptions(context.Background(), options); err != nil {
+				return refuse(fmt.Errorf("levelcontrol: set Options: %w", err))
+			}
+			if s.src.Options() != before {
+				changed = append(changed, c.id)
+				undo = append(undo, func() error { return s.src.SetOptions(context.Background(), before) })
+			}
+		case AttrOnLevel:
+			before, knownBefore := s.src.OnLevel()
+			if err := s.src.SetOnLevel(context.Background(), setUint8(c.v)); err != nil {
+				return refuse(fmt.Errorf("levelcontrol: set OnLevel: %w", err))
+			}
+			if after, known := s.src.OnLevel(); known != knownBefore || (known && after != before) {
+				changed = append(changed, c.id)
+				var prev *uint8
+				if knownBefore {
+					prev = &before
+				}
+				undo = append(undo, func() error { return s.src.SetOnLevel(context.Background(), prev) })
+			}
+		}
+	}
 	level := false
 	for _, c := range checked {
 		switch c.id {
 		case AttrCurrentLevel:
 			s.held.setLevel(setUint8(c.v))
 			level = true
-		case AttrOptions:
-			options, _ := c.v.(uint8) // a map8 per CheckSet
-			before := s.src.Options()
-			if err := s.src.SetOptions(context.Background(), options); err != nil {
-				return fmt.Errorf("levelcontrol: set Options: %w", err)
-			}
-			if s.src.Options() != before {
-				changed = append(changed, c.id)
-			}
-		case AttrOnLevel:
-			before, knownBefore := s.src.OnLevel()
-			if err := s.src.SetOnLevel(context.Background(), setUint8(c.v)); err != nil {
-				return fmt.Errorf("levelcontrol: set OnLevel: %w", err)
-			}
-			if after, known := s.src.OnLevel(); known != knownBefore || (known && after != before) {
-				changed = append(changed, c.id)
-			}
 		case AttrStartUpCurrentLevel:
 			next := setUint8(c.v)
 			s.mu.Lock()
