@@ -1902,6 +1902,11 @@ func (m *Manager) SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint
 // the higher id. usable runs without the manager's lock held, so it may
 // call back into the manager.
 //
+// usable is asked about the candidates one at a time, newest first, and
+// not again once it answered true: the id returned is the one of that
+// last call. A caller may so keep what usable found for the id it
+// accepted (bridge livePeerLink does) without comparing ids.
+//
 // Mirrors matter.js packages/protocol/src/peer/Peer.ts:582-602 at db021da0
 // (newestSession: the highest activeTimestamp among the sessions neither
 // closing nor peer-lost, optionally of one channel type — here usable's

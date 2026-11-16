@@ -69,4 +69,15 @@ func TestNewestSessionForPeer_OrdersByLastPeerActivity(t *testing.T) {
 	if _, ok := m.NewestSessionForPeer(fabric+1, peer, nil); ok {
 		t.Error("NewestSessionForPeer crossed fabrics")
 	}
+	// usable is asked newest first and not again after its first true,
+	// whose id is the one returned (bridge livePeerLink keeps what that
+	// call found; review II, phase 5b).
+	var asked []uint16
+	id, ok = m.NewestSessionForPeer(fabric, peer, func(id uint16) bool {
+		asked = append(asked, id)
+		return true
+	})
+	if !ok || id != older.SessionID || len(asked) != 1 || asked[0] != older.SessionID {
+		t.Fatalf("NewestSessionForPeer = %d, %v after asking %v; want %d after asking it alone", id, ok, asked, older.SessionID)
+	}
 }

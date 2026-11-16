@@ -176,7 +176,9 @@ func abandon(init *CaseInitiation) {
 
 // newestPeerSessionFinder is the optional [SessionRegistry] capability
 // that names the live session of a peer the peer sent on last
-// (secure/operational.Manager.NewestSessionForPeer has it).
+// (secure/operational.Manager.NewestSessionForPeer has it). Its contract,
+// which livePeerLink relies on: usable is asked newest first and not
+// again after its first true, whose id is the one returned.
 type newestPeerSessionFinder interface {
 	NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usable func(id uint16) bool) (uint16, bool)
 }
