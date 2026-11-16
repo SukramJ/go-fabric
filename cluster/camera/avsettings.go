@@ -580,7 +580,11 @@ func (a *AvSettings) skipTakenPresetID() {
 // PhysicalMovementComplete reports the end of the movement a command
 // started: on success (nil) the target becomes MPTZPosition; either way
 // MovementState returns to Idle. Mirrors chip OnPhysicalMovementComplete
-// (CameraAvSettingsUserLevelManagementLogic.cpp:1263-1284).
+// (CameraAvSettingsUserLevelManagementLogic.cpp:1263-1284): a completion
+// is taken whatever MovementState is, and the target stays after it — a
+// second completion moves MPTZPosition back to it — and nothing times a
+// movement out: a host that never reports the completion leaves the MPTZ
+// commands BUSY (review II, R2-P6-fsm-1614, kept as chip's).
 func (a *AvSettings) PhysicalMovementComplete(err error) {
 	_ = a.change(contract.OriginHostSet, func() []uint32 { // a target the command held to the limits
 		ids := []uint32{avdef.AttrMovementState}

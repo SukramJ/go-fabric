@@ -1180,7 +1180,10 @@ func (s *CommodityTariffServer) getTariffComponent(_ context.Context, fields any
 				}
 				label = append(label, ';', ' ')
 			}
-			n := min(len(p.Label.Value), tariffDefaultStringValuesMaxBuf-len(label)) // :1151-1157
+			// A byte count, as chip's memcpy (:1151-1157): a label cut
+			// inside a multi-byte character answers a string that is not
+			// valid UTF-8 (review II, R2-P6-wire-1624, kept as chip's).
+			n := min(len(p.Label.Value), tariffDefaultStringValuesMaxBuf-len(label))
 			label = append(label, p.Label.Value[:n]...)
 			first = false
 			if len(label) >= tariffDefaultStringValuesMaxBuf { // :1161-1165

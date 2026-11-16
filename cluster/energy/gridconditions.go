@@ -148,7 +148,11 @@ func (s *GridConditionsServer) SetCurrentConditions(c *GridConditions) error {
 // SetForecastConditions records ForecastConditions, FORE only
 // (electrical-grid-conditions-server.cpp:165-174; the read refuses the
 // attribute without the feature, :68-73). chip stores the list as given;
-// the generated server holds it to the definition's constraints.
+// the generated server holds it to the definition's constraints — the
+// carbon levels' enum and at most 56 entries — but not to
+// SetCurrentConditions' period rule: an entry whose PeriodEnd is not after
+// its PeriodStart, and entries out of order, are stored (review II,
+// R2-P6-wire-1613, kept as chip's).
 func (s *GridConditionsServer) SetForecastConditions(forecast []GridConditions) error {
 	if !s.HasFeature("FORE") {
 		return errors.New("energy: ElectricalGridConditions: ForecastConditions needs the Forecasting feature")

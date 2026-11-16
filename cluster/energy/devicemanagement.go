@@ -796,6 +796,9 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 		}
 		earliest = now
 	}
+	// uint32 throughout, as chip's (:462, :470): a host forecast whose
+	// EndTime is before its StartTime and a start near 2^32 wrap (review
+	// II, R2-P6-wire-1617, kept as chip's).
 	duration := f.EndTime - f.StartTime  // :462
 	if r.RequestedStartTime < earliest { // :463-468
 		return nil, demConstraint("RequestedStartTime %d before EarliestStartTime %d", r.RequestedStartTime, earliest)
@@ -901,7 +904,12 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 
 // pauseFailureLocked is HandlePauseRequestFailure (DelegateImpl.cpp:
 // 499-509). chip cancels the power-adjustment timer there (:501), not the
-// pause timer it started (:443); this transcribes it as written.
+// pause timer it started (:443); this transcribes it as written. A pause
+// refused during a power adjustment therefore leaves powerAdjustInProgress
+// set with no timer: the adjustment never ends by itself (no
+// PowerAdjustEnd, the capability's cause stays), CancelPowerAdjustRequest
+// answers INVALID_IN_STATE for the ESAState Online set here, and only a
+// new PowerAdjustRequest recovers (review II, R2-P6-fsm-1623).
 func (s *DeviceEnergyManagementServer) pauseFailureLocked() {
 	s.stopPowerAdjustTimerLocked()
 	_ = s.setLocked(dem.AttrEsaState, EsaStateOnline)
@@ -1078,6 +1086,8 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 			}
 		}
 	}
+	// The overlap check adds in uint32, as chip's (:776-777): a start near
+	// 2^32 wraps (R2-P6-wire-1617, kept as chip's).
 	for i := 1; i < len(r.Constraints); i++ { // :767-793
 		prev, c := r.Constraints[i-1], r.Constraints[i]
 		if c.StartTime < prev.StartTime || prev.StartTime+prev.Duration >= c.StartTime {
