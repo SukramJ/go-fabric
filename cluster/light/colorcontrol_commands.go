@@ -42,6 +42,9 @@ func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	// command that fails afterwards keeps the scene with the rest of the
 	// state its rollback restores, as LevelControl's
 	// transitionAndInvalidate does (R2-P6-err-1404).
+	// matter.js invalidates at the same place (ColorControlServer.ts:597) inside the command's
+	// transaction, whose rollback (CommandInvokeResponse.ts:516) restores state, sceneValid included
+	// (ScenesManagementServer.ts:972; inferred, not run).
 	if s.endsScene {
 		s.invalidateScenes()
 	}
