@@ -114,3 +114,22 @@ func TestColorQuiesceDropsQuieterReports(t *testing.T) {
 		t.Error("no report after quiesce for a later change")
 	}
 }
+
+// TestHueTransitionRateFromTheEngineRead holds R2-P6-conc-1407's rate
+// half: MoveToHue's rate follows the hue the engine reads when it starts
+// the transition (RateFrom), not a value the command read before, which a
+// step of a running transition may have moved since.
+func TestHueTransitionRateFromTheEngineRead(t *testing.T) {
+	hs := ColorModeHueSaturation
+	s, err := NewColorControl(ColorControlServerConfig{Features: ColorFeatureHueSaturation, InitialColorMode: &hs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := s.hueTransition(100, ccdef.DirectionUp, 10, false)
+	if tr.RateFrom == nil {
+		t.Fatal("hueTransition carries no RateFrom: its rate comes from a read before the engine's")
+	}
+	if got := tr.RateFrom(60); got != 40 {
+		t.Errorf("RateFrom(60) towards 100 over 1 s = %v, want 40", got)
+	}
+}

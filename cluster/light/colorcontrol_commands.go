@@ -164,12 +164,20 @@ func (s *ColorControlServer) hueTransition(target float64, direction ccdef.Direc
 	if enhanced {
 		name, maxHue = propEnhancedHue, maxEnhancedHueValue
 	}
-	current, _ := s.state().property(name)
 	dir := transition.HueDirection(direction)
+	// The rate from the engine's own read of the current hue (RateFrom), so
+	// a step of a running transition cannot land between the read and the
+	// start (R2-P6-conc-1407); the state's hue is the fallback the engine
+	// keeps for an unknown value.
+	rate := func(current float64) float64 {
+		return transition.HueDistance(current, target, dir, maxHue) / transitionTime * 10
+	}
+	current, _ := s.state().property(name)
 	return transition.Transition{
-		Name:   name,
-		Rate:   transition.HueDistance(current, target, dir, maxHue) / transitionTime * 10,
-		Target: target,
+		Name:     name,
+		Rate:     rate(current),
+		RateFrom: rate,
+		Target:   target,
 		CyclicDistance: func(c, t float64) float64 {
 			return transition.HueDistance(c, t, dir, maxHue)
 		},
@@ -444,10 +452,15 @@ func (s *ColorControlServer) moveToColor(ctx context.Context, fields any) error 
 // immediate move applies both in one update — one write to the
 // ColorWriter with both targets (#84).
 func (s *ColorControlServer) moveToColorLogic(x, y, transitionTime float64) error {
+	// The rates from the engine's own read of x and y (RateFrom), as
+	// hueTransition (R2-P6-conc-1407).
+	toward := func(target float64) func(float64) float64 {
+		return func(current float64) float64 { return (target - current) / transitionTime * 10 }
+	}
 	st := s.state()
 	return s.startTransitions(
-		transition.Transition{Name: propX, Rate: (x - float64(st.x)) / transitionTime * 10, Target: x},
-		transition.Transition{Name: propY, Rate: (y - float64(st.y)) / transitionTime * 10, Target: y},
+		transition.Transition{Name: propX, Rate: toward(x)(float64(st.x)), RateFrom: toward(x), Target: x},
+		transition.Transition{Name: propY, Rate: toward(y)(float64(st.y)), RateFrom: toward(y), Target: y},
 	)
 }
 
