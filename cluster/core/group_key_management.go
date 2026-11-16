@@ -316,7 +316,7 @@ func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
 	g.mu.Unlock()
 	g.logger.Warn("matter.group_key_management.group_state_stale",
 		slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
-	g.groups.ForgetFabric(fabric)
+	g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
 }
 
 // reloadStale reloads every fabric syncGroups marked stale.

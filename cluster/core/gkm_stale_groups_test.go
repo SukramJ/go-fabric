@@ -165,6 +165,7 @@ func TestGKMGroupKeyMapReorderIsAChange(t *testing.T) {
 	t.Parallel()
 	for name, st := range map[string]core.GroupStoreFacade{"memstore": memstore.New(), "fake": newFakeStore()} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			if _, err := st.(interface {
 				AddFabric(context.Context, mstore.FabricRecord) (uint8, error)
