@@ -106,7 +106,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 
 	var paa *attCert
 	if ctx.Store == nil {
-		// DAV:224-231.
+		// DAV:312-318 at db021da0.
 		findings = append(findings, Finding{
 			Level: LevelWarning, Check: DclServiceUnavailable,
 			Message: "DclCertificateService not available; skipping PAA trust store, chain, and revocation checks. " +
