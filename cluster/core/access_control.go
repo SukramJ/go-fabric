@@ -68,6 +68,10 @@ type AccessControl struct {
 	// vendor-opaque octstrings (max 128 bytes each) that controllers use
 	// to attach metadata to an ACL fabric.
 	extensions map[uint8][]AccessControlExtensionEntry
+	// extLoadErr is the error of each fabric whose stored Extension could
+	// not be read at construction (loadExtensions); that fabric's Extension
+	// write is refused while it stands.
+	extLoadErr map[uint8]error
 
 	// Event surface — wired by the bridge during topology assembly via
 	// [SetMatterEventEmitter] + [SetEndpoint] so [MatterWrite] can fire
@@ -339,7 +343,18 @@ func (a *AccessControl) loadExtensions(ctx context.Context) {
 	}
 	for f := 1; f <= 254; f++ {
 		v, found, err := p.GetSetting(ctx, aclExtensionSettingKey(uint8(f)))
-		if err != nil || !found || v == "" {
+		if err != nil {
+			// Logged, and the fabric's Extension write refused while it
+			// stands, so the stored value is never overwritten unseen
+			// (review II, R2-P6-err-1016).
+			a.logger().Warn("matter.access_control.extension_load_failed", slog.Int("fabric_index", f), slog.Any("err", err))
+			if a.extLoadErr == nil {
+				a.extLoadErr = make(map[uint8]error)
+			}
+			a.extLoadErr[uint8(f)] = err
+			continue
+		}
+		if !found || v == "" {
 			continue
 		}
 		data, err := hex.DecodeString(v)
@@ -469,6 +484,7 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 	if had {
 		delete(a.extensions, fabricIndex)
 	}
+	delete(a.extLoadErr, fabricIndex)
 	a.mu.Unlock()
 	if !had {
 		return nil
@@ -641,10 +657,20 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) ([]uint8, error) {
 	lister, ok := a.store.(fabricLister)
 	if !ok {
-		if accessing == 0 {
-			return nil, nil
+		// The fabrics this server holds an Extension of are known without
+		// the store; the Acl of another fabric is not (review II,
+		// N4-w3core-1).
+		var out []uint8
+		a.mu.RLock()
+		for fabric := range a.extensions {
+			out = append(out, fabric)
 		}
-		return []uint8{accessing}, nil
+		a.mu.RUnlock()
+		if accessing != 0 {
+			out = append(out, accessing)
+		}
+		slices.Sort(out)
+		return slices.Compact(out), nil
 	}
 	recs, err := lister.ListFabrics(ctx)
 	if err != nil {
@@ -667,6 +693,29 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 	}
 	slices.Sort(out)
 	return slices.Compact(out), nil
+}
+
+// fabricGone refuses a write of attr for a fabric the store no longer
+// holds — one removed while the write was on its way, whose removal's
+// clear has already run: without the check the write would store under a
+// removed index (review II, R2-P6-store-1010, N4-notesE-1). A pending row
+// counts as held. A store that cannot list fabrics, or whose listing
+// fails, refuses nothing. writeMu is held, as by MatterDropFabric.
+func (a *AccessControl) fabricGone(ctx context.Context, fabric uint8, attr string) error {
+	lister, ok := a.store.(fabricLister)
+	if !ok {
+		return nil
+	}
+	recs, err := lister.ListFabrics(ctx)
+	if err != nil {
+		return nil //nolint:nilerr // no listing, no refusal: the write's own store call decides
+	}
+	for i := range recs {
+		if recs[i].FabricIndex == fabric {
+			return nil
+		}
+	}
+	return aclStatusError{im.StatusUnsupportedAccess, fmt.Sprintf("%s write for fabric %d, which no longer exists", attr, fabric)}
 }
 
 // writeFabric resolves the accessing fabric of a write to the
@@ -888,6 +937,9 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// nothing, so it cannot undo a change another write made.
 		a.writeMu.Lock()
 		defer a.writeMu.Unlock()
+		if err := a.fabricGone(ctx, fabric, "Acl"); err != nil {
+			return false, err
+		}
 		// Snapshot old ACL before the replace so we can classify the
 		// change type for the spec-mandated AccessControlEntryChanged event
 		// (§9.10.7.1). We read before write; a store error here is
@@ -1015,9 +1067,19 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// and fire no event (Datasource.ts:1476-1492 at db021da0).
 		a.writeMu.Lock()
 		defer a.writeMu.Unlock()
+		if err := a.fabricGone(ctx, fabric, "Extension"); err != nil {
+			return false, err
+		}
 		a.mu.RLock()
 		oldExtensions := a.extensions[fabric]
+		loadErr := a.extLoadErr[fabric]
 		a.mu.RUnlock()
+		if loadErr != nil {
+			// The stored Extension of the fabric could not be read at
+			// construction: a write would replace a value nobody saw
+			// (review II, R2-P6-err-1016).
+			return false, spec.Errorf(im.StatusFailure, "core: AccessControl.Extension write: the stored Extension of fabric %d could not be read: %v", fabric, loadErr)
+		}
 		if extensionsEqual(oldExtensions, stamped) {
 			return false, nil
 		}

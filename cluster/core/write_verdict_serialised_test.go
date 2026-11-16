@@ -124,6 +124,9 @@ func TestACLWriteVerdictIsTheWritesOwnUnderAConcurrentWrite(t *testing.T) {
 		{Privilege: 3, AuthMode: 2, Subjects: []uint64{445566}, FabricIndex: 1},
 	}
 	fs := newFakeStore()
+	if _, err := fs.AddFabric(context.Background(), mstore.FabricRecord{FabricID: 1}); err != nil {
+		t.Fatal(err)
+	}
 	gate := newStoreGate()
 	ac, err := core.NewAccessControl(gatedACLStore{fakeStore: fs, gate: gate})
 	if err != nil {
