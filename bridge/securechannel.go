@@ -945,8 +945,9 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 	now := b.clk().Now()
 	held := !b.paseInFlightSince.IsZero()
 	if held && now.Sub(b.paseInFlightSince) <= pasePairingTimeout {
+		ours := b.paseInFlight == key // read under the lock
 		b.mu.Unlock()
-		if b.paseInFlight == key {
+		if ours {
 			return paseClaimRepeated
 		}
 		return paseClaimBusy
