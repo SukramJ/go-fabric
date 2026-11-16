@@ -62,6 +62,79 @@ type State struct {
 	ImageRotationDiscreteAngles      uint16                               // attribute 0x0029: uint16, P, [Rev >= v2 & ICTL & !ImageRotation].b+, RW M, N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.VideoSensorParams = st.VideoSensorParams.Clone()
+	c.RateDistortionTradeOffPoints = func(s []RateDistortionTradeOffPointsStruct) []RateDistortionTradeOffPointsStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]RateDistortionTradeOffPointsStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.RateDistortionTradeOffPoints)
+	c.MicrophoneCapabilities = st.MicrophoneCapabilities.Clone()
+	c.SpeakerCapabilities = st.SpeakerCapabilities.Clone()
+	c.SnapshotCapabilities = func(s []SnapshotCapabilitiesStruct) []SnapshotCapabilitiesStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]SnapshotCapabilitiesStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.SnapshotCapabilities)
+	c.SupportedStreamUsages = func(s []StreamUsageEnum) []StreamUsageEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]StreamUsageEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedStreamUsages)
+	c.AllocatedVideoStreams = func(s []VideoStreamStruct) []VideoStreamStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]VideoStreamStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.AllocatedVideoStreams)
+	c.AllocatedAudioStreams = func(s []AudioStreamStruct) []AudioStreamStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AudioStreamStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.AllocatedAudioStreams)
+	c.AllocatedSnapshotStreams = func(s []SnapshotStreamStruct) []SnapshotStreamStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]SnapshotStreamStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.AllocatedSnapshotStreams)
+	c.StreamUsagePriorities = func(s []StreamUsageEnum) []StreamUsageEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]StreamUsageEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.StreamUsagePriorities)
+	return c
+}
+
 // Patch is a change to the CameraAvStreamManagement state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

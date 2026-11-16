@@ -44,6 +44,140 @@ type State struct {
 	AlarmMask              uint16            // attribute 0x0022: uint16, D, RW VO
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.MaxPressure = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxPressure)
+	c.MaxSpeed = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxSpeed)
+	c.MaxFlow = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxFlow)
+	c.MinConstPressure = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinConstPressure)
+	c.MaxConstPressure = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxConstPressure)
+	c.MinCompPressure = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinCompPressure)
+	c.MaxCompPressure = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxCompPressure)
+	c.MinConstSpeed = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinConstSpeed)
+	c.MaxConstSpeed = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxConstSpeed)
+	c.MinConstFlow = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinConstFlow)
+	c.MaxConstFlow = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxConstFlow)
+	c.MinConstTemp = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinConstTemp)
+	c.MaxConstTemp = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxConstTemp)
+	c.Capacity = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Capacity)
+	c.Speed = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Speed)
+	c.LifetimeRunningHours = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LifetimeRunningHours)
+	c.Power = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Power)
+	c.LifetimeEnergyConsumed = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LifetimeEnergyConsumed)
+	return c
+}
+
 // Patch is a change to the PumpConfigurationAndControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

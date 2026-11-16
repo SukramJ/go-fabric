@@ -22,6 +22,21 @@ type State struct {
 	AdministratorFabricIndex *uint8 // attribute 0x0000: fabric-idx, M, R A, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.AdministratorFabricIndex = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.AdministratorFabricIndex)
+	return c
+}
+
 // Patch is a change to the JointFabricAdministrator state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

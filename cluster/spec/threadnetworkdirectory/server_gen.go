@@ -23,6 +23,38 @@ type State struct {
 	ThreadNetworkTableSize uint8                 // attribute 0x0002: uint8, M, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.PreferredExtendedPanId = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.PreferredExtendedPanId)
+	c.ThreadNetworks = func(s []ThreadNetworkStruct) []ThreadNetworkStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ThreadNetworkStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.ThreadNetworks)
+	return c
+}
+
 // Patch is a change to the ThreadNetworkDirectory state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

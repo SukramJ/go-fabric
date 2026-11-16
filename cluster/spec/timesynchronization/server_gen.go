@@ -33,6 +33,60 @@ type State struct {
 	SupportsDnsResolve   bool                     // attribute 0x000C: bool, NTPC, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.UtcTime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.UtcTime)
+	c.TrustedTimeSource = func(p *TrustedTimeSourceStruct) *TrustedTimeSourceStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TrustedTimeSource)
+	c.DefaultNtp = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DefaultNtp)
+	c.TimeZone = func(s []TimeZoneStruct) []TimeZoneStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TimeZoneStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.TimeZone)
+	c.DstOffset = func(s []DSTOffsetStruct) []DSTOffsetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DSTOffsetStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.DstOffset)
+	c.LocalTime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LocalTime)
+	return c
+}
+
 // Patch is a change to the TimeSynchronization state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

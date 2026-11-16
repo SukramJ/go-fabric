@@ -25,6 +25,49 @@ type State struct {
 	PowerThreshold    *PowerThresholdStruct // attribute 0x0004: PowerThresholdStruct, PWRTHLD, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.MeterType = func(p *MeterTypeEnum) *MeterTypeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MeterType)
+	c.PointOfDelivery = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PointOfDelivery)
+	c.MeterSerialNumber = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MeterSerialNumber)
+	c.ProtocolVersion = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ProtocolVersion)
+	c.PowerThreshold = func(p *PowerThresholdStruct) *PowerThresholdStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.PowerThreshold)
+	return c
+}
+
 // Patch is a change to the MeterIdentification state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

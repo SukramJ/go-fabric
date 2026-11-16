@@ -22,6 +22,29 @@ type State struct {
 	SelectedDrynessLevel   *DrynessLevelEnum  // attribute 0x0001: DrynessLevelEnum, M, RW VO, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedDrynessLevels = func(s []DrynessLevelEnum) []DrynessLevelEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]DrynessLevelEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedDrynessLevels)
+	c.SelectedDrynessLevel = func(p *DrynessLevelEnum) *DrynessLevelEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SelectedDrynessLevel)
+	return c
+}
+
 // Patch is a change to the LaundryDryerControls state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

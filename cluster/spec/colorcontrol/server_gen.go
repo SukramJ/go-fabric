@@ -72,6 +72,91 @@ type State struct {
 	StartUpColorTemperatureMireds   *uint16                 // attribute 0x4010: uint16, CT, RW VM, X N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.NumberOfPrimaries = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NumberOfPrimaries)
+	c.Primary1Intensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Primary1Intensity)
+	c.Primary2Intensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Primary2Intensity)
+	c.Primary3Intensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Primary3Intensity)
+	c.Primary4Intensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Primary4Intensity)
+	c.Primary5Intensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Primary5Intensity)
+	c.Primary6Intensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Primary6Intensity)
+	c.ColorPointRIntensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ColorPointRIntensity)
+	c.ColorPointGIntensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ColorPointGIntensity)
+	c.ColorPointBIntensity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ColorPointBIntensity)
+	c.StartUpColorTemperatureMireds = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StartUpColorTemperatureMireds)
+	return c
+}
+
 // Patch is a change to the ColorControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

@@ -26,6 +26,22 @@ type State struct {
 	SupportedTemperatureLevels []string // attribute 0x0005: list[string], TL, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedTemperatureLevels = func(s []string) []string {
+		if s == nil {
+			return nil
+		}
+		out := make([]string, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedTemperatureLevels)
+	return c
+}
+
 // Patch is a change to the TemperatureControl state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

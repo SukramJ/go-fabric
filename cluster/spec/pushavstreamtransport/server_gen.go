@@ -24,6 +24,32 @@ type State struct {
 	CurrentConnections []TransportConfigurationStruct // attribute 0x0001: list[TransportConfigurationStruct], M, R S V, N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedFormats = func(s []SupportedFormatStruct) []SupportedFormatStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]SupportedFormatStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedFormats)
+	c.CurrentConnections = func(s []TransportConfigurationStruct) []TransportConfigurationStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TransportConfigurationStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.CurrentConnections)
+	return c
+}
+
 // Patch is a change to the PushAvStreamTransport state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

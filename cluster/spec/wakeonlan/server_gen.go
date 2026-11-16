@@ -22,6 +22,22 @@ type State struct {
 	LinkLocalAddress []byte // attribute 0x0001: ipv6adr, O, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.LinkLocalAddress = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(st.LinkLocalAddress)
+	return c
+}
+
 // Patch is a change to the WakeOnLan state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

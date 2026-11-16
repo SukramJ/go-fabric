@@ -23,6 +23,28 @@ type State struct {
 	AdminVendorId    *uint16                       // attribute 0x0002: vendor-id, M, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.AdminFabricIndex = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.AdminFabricIndex)
+	c.AdminVendorId = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.AdminVendorId)
+	return c
+}
+
 // Patch is a change to the AdministratorCommissioning state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

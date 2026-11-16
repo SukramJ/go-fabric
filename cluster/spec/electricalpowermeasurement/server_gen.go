@@ -39,6 +39,153 @@ type State struct {
 	NeutralCurrent           *int64                       // attribute 0x0012: amperage-mA, [POLY], R V, X Q
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.Accuracy = func(s []MeasurementAccuracyStruct) []MeasurementAccuracyStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]MeasurementAccuracyStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Accuracy)
+	c.Ranges = func(s []MeasurementRangeStruct) []MeasurementRangeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]MeasurementRangeStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Ranges)
+	c.Voltage = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Voltage)
+	c.ActiveCurrent = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ActiveCurrent)
+	c.ReactiveCurrent = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ReactiveCurrent)
+	c.ApparentCurrent = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ApparentCurrent)
+	c.ActivePower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ActivePower)
+	c.ReactivePower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ReactivePower)
+	c.ApparentPower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ApparentPower)
+	c.RmsVoltage = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.RmsVoltage)
+	c.RmsCurrent = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.RmsCurrent)
+	c.RmsPower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.RmsPower)
+	c.Frequency = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Frequency)
+	c.HarmonicCurrents = func(p *[]HarmonicMeasurementStruct) *[]HarmonicMeasurementStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []HarmonicMeasurementStruct) []HarmonicMeasurementStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]HarmonicMeasurementStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.HarmonicCurrents)
+	c.HarmonicPhases = func(p *[]HarmonicMeasurementStruct) *[]HarmonicMeasurementStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []HarmonicMeasurementStruct) []HarmonicMeasurementStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]HarmonicMeasurementStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.HarmonicPhases)
+	c.PowerFactor = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PowerFactor)
+	c.NeutralCurrent = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NeutralCurrent)
+	return c
+}
+
 // Patch is a change to the ElectricalPowerMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

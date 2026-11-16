@@ -32,6 +32,28 @@ type State struct {
 	AirflowDirection AirflowDirectionEnum // attribute 0x000B: AirflowDirectionEnum, DIR, RW VO
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.PercentSetting = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PercentSetting)
+	c.SpeedSetting = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SpeedSetting)
+	return c
+}
+
 // Patch is a change to the FanControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

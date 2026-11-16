@@ -33,6 +33,112 @@ type State struct {
 	OverrunCount           *uint64           // attribute 0x000C: uint64, ERRCNT, R V, X C
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.Bssid = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.Bssid)
+	c.SecurityType = func(p *SecurityTypeEnum) *SecurityTypeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SecurityType)
+	c.WiFiVersion = func(p *WiFiVersionEnum) *WiFiVersionEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.WiFiVersion)
+	c.ChannelNumber = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ChannelNumber)
+	c.Rssi = func(p *int8) *int8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Rssi)
+	c.BeaconLostCount = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BeaconLostCount)
+	c.BeaconRxCount = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BeaconRxCount)
+	c.PacketMulticastRxCount = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PacketMulticastRxCount)
+	c.PacketMulticastTxCount = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PacketMulticastTxCount)
+	c.PacketUnicastRxCount = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PacketUnicastRxCount)
+	c.PacketUnicastTxCount = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PacketUnicastTxCount)
+	c.CurrentMaxRate = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentMaxRate)
+	c.OverrunCount = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OverrunCount)
+	return c
+}
+
 // Patch is a change to the WiFiNetworkDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

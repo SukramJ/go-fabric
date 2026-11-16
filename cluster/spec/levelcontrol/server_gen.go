@@ -35,6 +35,56 @@ type State struct {
 	StartUpCurrentLevel *uint8        // attribute 0x4000: uint8, LT, RW VM, X N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.CurrentLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentLevel)
+	c.OnLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OnLevel)
+	c.OnTransitionTime = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OnTransitionTime)
+	c.OffTransitionTime = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OffTransitionTime)
+	c.DefaultMoveRate = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DefaultMoveRate)
+	c.StartUpCurrentLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StartUpCurrentLevel)
+	return c
+}
+
 // Patch is a change to the LevelControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

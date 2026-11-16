@@ -24,6 +24,51 @@ type State struct {
 	MaximumMeteredQuantities *uint16                  // attribute 0x0003: uint16, M, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.MeteredQuantity = func(p *[]MeteredQuantityStruct) *[]MeteredQuantityStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []MeteredQuantityStruct) []MeteredQuantityStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]MeteredQuantityStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.MeteredQuantity)
+	c.MeteredQuantityTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MeteredQuantityTimestamp)
+	c.TariffUnit = func(p *TariffUnitEnum) *TariffUnitEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TariffUnit)
+	c.MaximumMeteredQuantities = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaximumMeteredQuantities)
+	return c
+}
+
 // Patch is a change to the CommodityMetering state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

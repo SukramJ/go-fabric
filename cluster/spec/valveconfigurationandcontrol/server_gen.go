@@ -31,6 +31,70 @@ type State struct {
 	LevelStep           uint8            // attribute 0x000A: uint8, [LVL], R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.OpenDuration = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OpenDuration)
+	c.DefaultOpenDuration = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DefaultOpenDuration)
+	c.AutoCloseTime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.AutoCloseTime)
+	c.RemainingDuration = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.RemainingDuration)
+	c.CurrentState = func(p *ValveStateEnum) *ValveStateEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentState)
+	c.TargetState = func(p *ValveStateEnum) *ValveStateEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TargetState)
+	c.CurrentLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentLevel)
+	c.TargetLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TargetLevel)
+	return c
+}
+
 // Patch is a change to the ValveConfigurationAndControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

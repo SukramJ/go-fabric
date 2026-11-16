@@ -46,6 +46,7 @@ func TestCodecsRoundTrip(t *testing.T) {
 func TestCloneIsDeep(t *testing.T) {
 	t.Parallel()
 	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
 		spectest.CheckClone[OverallCurrentStateStruct],
 		spectest.CheckClone[OverallTargetStateStruct],
 		spectest.CheckClone[MoveToRequest],

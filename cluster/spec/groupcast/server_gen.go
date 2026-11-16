@@ -27,6 +27,14 @@ type State struct {
 	FabricUnderTest    uint8  // attribute 0x0004: fabric-idx, M, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	return c
+}
+
 // Patch is a change to the Groupcast state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

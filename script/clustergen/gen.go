@@ -2027,10 +2027,11 @@ func (g *generator) roundTrips() []string {
 }
 
 // clones names every struct and payload writePayload gives a Clone, in
-// the order source() writes them: the body of the generated
-// TestCloneIsDeep (decision 142).
+// the order source() writes them, and the State every cluster's
+// stateClone gives one: the body of the generated TestCloneIsDeep
+// (decision 142).
 func (g *generator) clones() []string {
-	var names []string
+	names := []string{"State"}
 	for _, di := range g.dataList {
 		if di.kind == kindStruct && payloadNeedsClone(di.fields) {
 			names = append(names, di.goName)
@@ -2238,12 +2239,20 @@ func fieldCloneExpr(f *fieldInfo, src string) string {
 	if f.mandatory {
 		return valueCloneExpr(f.t, f.nullable, src)
 	}
-	inner := valueCloneExpr(f.t, f.nullable, "(*p)")
+	return pointerCloneExpr(f.goType(), f.t, f.nullable, src)
+}
+
+// pointerCloneExpr is the Go expression of a deep copy of src, a pointer
+// to a value of type t (goType, wrapped in spec.Nullable when nullable):
+// nil stays nil, any other pointer is a new one to a deep copy of its
+// value.
+func pointerCloneExpr(goType string, t typeInfo, nullable bool, src string) string {
+	inner := valueCloneExpr(t, nullable, "(*p)")
 	if inner == "(*p)" {
 		inner = "*p"
 	}
 	return fmt.Sprintf("func(p *%s) *%s { if p == nil { return nil }; x := %s; return &x }(%s)",
-		f.goType(), f.goType(), inner, src)
+		goType, goType, inner, src)
 }
 
 // valueCloneExpr is the Go expression of a deep copy of a value src of

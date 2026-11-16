@@ -30,6 +30,14 @@ type State struct {
 	CriticalUnderTemperatureThreshold int16       // attribute 0x0085: temperature, UNDER, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	return c
+}
+
 // Patch is a change to the TemperatureAlarm state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

@@ -22,6 +22,22 @@ type State struct {
 	CurrentOutput uint8              // attribute 0x0001: uint8, M, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.OutputList = func(s []OutputInfoStruct) []OutputInfoStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]OutputInfoStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.OutputList)
+	return c
+}
+
 // Patch is a change to the AudioOutput state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

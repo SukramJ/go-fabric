@@ -22,6 +22,22 @@ type State struct {
 	SupportedLocales []string // attribute 0x0001: list[string], M, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedLocales = func(s []string) []string {
+		if s == nil {
+			return nil
+		}
+		out := make([]string, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedLocales)
+	return c
+}
+
 // Patch is a change to the LocalizationConfiguration state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

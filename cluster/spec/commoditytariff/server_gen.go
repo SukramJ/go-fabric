@@ -40,6 +40,219 @@ type State struct {
 	DefaultRandomizationType   *DayEntryRandomizationTypeEnum // attribute 0x0012: DayEntryRandomizationTypeEnum, RNDM, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.TariffInfo = func(p *TariffInformationStruct) *TariffInformationStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.TariffInfo)
+	c.TariffUnit = func(p *TariffUnitEnum) *TariffUnitEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TariffUnit)
+	c.StartDate = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StartDate)
+	c.DayEntries = func(p *[]DayEntryStruct) *[]DayEntryStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []DayEntryStruct) []DayEntryStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]DayEntryStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.DayEntries)
+	c.DayPatterns = func(p *[]DayPatternStruct) *[]DayPatternStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []DayPatternStruct) []DayPatternStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]DayPatternStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.DayPatterns)
+	c.CalendarPeriods = func(p *[]CalendarPeriodStruct) *[]CalendarPeriodStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []CalendarPeriodStruct) []CalendarPeriodStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]CalendarPeriodStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.CalendarPeriods)
+	c.IndividualDays = func(p *[]DayStruct) *[]DayStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []DayStruct) []DayStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]DayStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.IndividualDays)
+	c.CurrentDay = func(p *DayStruct) *DayStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.CurrentDay)
+	c.NextDay = func(p *DayStruct) *DayStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.NextDay)
+	c.CurrentDayEntry = func(p *DayEntryStruct) *DayEntryStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.CurrentDayEntry)
+	c.CurrentDayEntryDate = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentDayEntryDate)
+	c.NextDayEntry = func(p *DayEntryStruct) *DayEntryStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.NextDayEntry)
+	c.NextDayEntryDate = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NextDayEntryDate)
+	c.TariffComponents = func(p *[]TariffComponentStruct) *[]TariffComponentStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []TariffComponentStruct) []TariffComponentStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TariffComponentStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.TariffComponents)
+	c.TariffPeriods = func(p *[]TariffPeriodStruct) *[]TariffPeriodStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []TariffPeriodStruct) []TariffPeriodStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TariffPeriodStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.TariffPeriods)
+	c.CurrentTariffComponents = func(p *[]TariffComponentStruct) *[]TariffComponentStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []TariffComponentStruct) []TariffComponentStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TariffComponentStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.CurrentTariffComponents)
+	c.NextTariffComponents = func(p *[]TariffComponentStruct) *[]TariffComponentStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []TariffComponentStruct) []TariffComponentStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TariffComponentStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.NextTariffComponents)
+	c.DefaultRandomizationOffset = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DefaultRandomizationOffset)
+	c.DefaultRandomizationType = func(p *DayEntryRandomizationTypeEnum) *DayEntryRandomizationTypeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DefaultRandomizationType)
+	return c
+}
+
 // Patch is a change to the CommodityTariff state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

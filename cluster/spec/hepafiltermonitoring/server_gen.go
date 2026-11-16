@@ -26,6 +26,29 @@ type State struct {
 	ReplacementProductList []ReplacementProductStruct // attribute 0x0005: list[ReplacementProductStruct], REP, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.LastChangedTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LastChangedTime)
+	c.ReplacementProductList = func(s []ReplacementProductStruct) []ReplacementProductStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ReplacementProductStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.ReplacementProductList)
+	return c
+}
+
 // Patch is a change to the HepaFilterMonitoring state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

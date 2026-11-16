@@ -23,6 +23,36 @@ type State struct {
 	ForecastConditions       []ElectricalGridConditionsStruct // attribute 0x0002: list[ElectricalGridConditionsStruct], FORE, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.LocalGenerationAvailable = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LocalGenerationAvailable)
+	c.CurrentConditions = func(p *ElectricalGridConditionsStruct) *ElectricalGridConditionsStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentConditions)
+	c.ForecastConditions = func(s []ElectricalGridConditionsStruct) []ElectricalGridConditionsStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ElectricalGridConditionsStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.ForecastConditions)
+	return c
+}
+
 // Patch is a change to the ElectricalGridConditions state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

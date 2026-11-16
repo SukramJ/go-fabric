@@ -31,6 +31,95 @@ type State struct {
 	AvailableTextTracks  *[]TrackStruct          // attribute 0x000A: list[TrackStruct], TT, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.StartTime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StartTime)
+	c.Duration = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Duration)
+	c.SampledPosition = func(p *PlaybackPositionStruct) *PlaybackPositionStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SampledPosition)
+	c.SeekRangeEnd = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SeekRangeEnd)
+	c.SeekRangeStart = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SeekRangeStart)
+	c.ActiveAudioTrack = func(p *TrackStruct) *TrackStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.ActiveAudioTrack)
+	c.AvailableAudioTracks = func(p *[]TrackStruct) *[]TrackStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []TrackStruct) []TrackStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TrackStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.AvailableAudioTracks)
+	c.ActiveTextTrack = func(p *TrackStruct) *TrackStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.ActiveTextTrack)
+	c.AvailableTextTracks = func(p *[]TrackStruct) *[]TrackStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []TrackStruct) []TrackStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TrackStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(st.AvailableTextTracks)
+	return c
+}
+
 // Patch is a change to the MediaPlayback state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

@@ -69,6 +69,112 @@ type State struct {
 	NumberOfAliroEndpointKeysSupported                 uint16                         // attribute 0x0088: uint16, ALIRO, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.LockState = func(p *LockStateEnum) *LockStateEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LockState)
+	c.DoorState = func(p *DoorStateEnum) *DoorStateEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DoorState)
+	c.AliroReaderVerificationKey = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.AliroReaderVerificationKey)
+	c.AliroReaderGroupIdentifier = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.AliroReaderGroupIdentifier)
+	c.AliroReaderGroupSubIdentifier = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(st.AliroReaderGroupSubIdentifier)
+	c.AliroExpeditedTransactionSupportedProtocolVersions = func(s [][]byte) [][]byte {
+		if s == nil {
+			return nil
+		}
+		out := make([][]byte, len(s))
+		for i := range s {
+			out[i] = func(s []byte) []byte {
+				if s == nil {
+					return nil
+				}
+				out := make([]byte, len(s))
+				copy(out, s)
+				return out
+			}(s[i])
+		}
+		return out
+	}(st.AliroExpeditedTransactionSupportedProtocolVersions)
+	c.AliroGroupResolvingKey = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.AliroGroupResolvingKey)
+	c.AliroSupportedBleuwbProtocolVersions = func(s [][]byte) [][]byte {
+		if s == nil {
+			return nil
+		}
+		out := make([][]byte, len(s))
+		for i := range s {
+			out[i] = func(s []byte) []byte {
+				if s == nil {
+					return nil
+				}
+				out := make([]byte, len(s))
+				copy(out, s)
+				return out
+			}(s[i])
+		}
+		return out
+	}(st.AliroSupportedBleuwbProtocolVersions)
+	return c
+}
+
 // Patch is a change to the DoorLock state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

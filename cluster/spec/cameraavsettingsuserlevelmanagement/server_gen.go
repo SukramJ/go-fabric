@@ -30,6 +30,33 @@ type State struct {
 	MovementState PhysicalMovementEnum // attribute 0x0009: PhysicalMovementEnum, MPAN | MTILT | MZOOM, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.MptzPosition = st.MptzPosition.Clone()
+	c.MptzPresets = func(s []MPTZPresetStruct) []MPTZPresetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]MPTZPresetStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.MptzPresets)
+	c.DptzStreams = func(s []DPTZStruct) []DPTZStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DPTZStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.DptzStreams)
+	return c
+}
+
 // Patch is a change to the CameraAvSettingsUserLevelManagement state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

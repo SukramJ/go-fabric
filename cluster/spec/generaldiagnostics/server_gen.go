@@ -33,6 +33,48 @@ type State struct {
 	DeviceLoadStatus         DeviceLoadStruct    // attribute 0x000A: DeviceLoadStruct, Rev >= v3, R V, C
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.NetworkInterfaces = func(s []NetworkInterface) []NetworkInterface {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkInterface, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.NetworkInterfaces)
+	c.ActiveHardwareFaults = func(s []HardwareFaultEnum) []HardwareFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]HardwareFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveHardwareFaults)
+	c.ActiveRadioFaults = func(s []RadioFaultEnum) []RadioFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]RadioFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveRadioFaults)
+	c.ActiveNetworkFaults = func(s []NetworkFaultEnum) []NetworkFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveNetworkFaults)
+	return c
+}
+
 // Patch is a change to the GeneralDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

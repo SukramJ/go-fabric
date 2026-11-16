@@ -28,6 +28,28 @@ type State struct {
 	OptOutState               OptOutStateEnum              // attribute 0x0007: OptOutStateEnum, PA | STA | PAU | FA | CON, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.PowerAdjustmentCapability = func(p *PowerAdjustCapabilityStruct) *PowerAdjustCapabilityStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.PowerAdjustmentCapability)
+	c.Forecast = func(p *ForecastStruct) *ForecastStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.Forecast)
+	return c
+}
+
 // Patch is a change to the DeviceEnergyManagement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

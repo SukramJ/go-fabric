@@ -24,6 +24,38 @@ type State struct {
 	PriceForecast []CommodityPriceStruct // attribute 0x0003: list[CommodityPriceStruct], FORE, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.Currency = func(p *Currency) *Currency {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Currency)
+	c.CurrentPrice = func(p *CommodityPriceStruct) *CommodityPriceStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.CurrentPrice)
+	c.PriceForecast = func(s []CommodityPriceStruct) []CommodityPriceStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]CommodityPriceStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.PriceForecast)
+	return c
+}
+
 // Patch is a change to the CommodityPrice state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

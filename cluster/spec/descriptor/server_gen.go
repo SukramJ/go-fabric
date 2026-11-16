@@ -26,6 +26,56 @@ type State struct {
 	EndpointUniqueId string             // attribute 0x0005: string, O, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.DeviceTypeList = func(s []DeviceTypeStruct) []DeviceTypeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DeviceTypeStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.DeviceTypeList)
+	c.ServerList = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(st.ServerList)
+	c.ClientList = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(st.ClientList)
+	c.PartsList = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(st.PartsList)
+	c.TagList = func(s []Semtag) []Semtag {
+		if s == nil {
+			return nil
+		}
+		out := make([]Semtag, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.TagList)
+	return c
+}
+
 // Patch is a change to the Descriptor state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

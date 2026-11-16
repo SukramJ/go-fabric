@@ -28,6 +28,22 @@ type State struct {
 	AllowedVendorList  []uint16              // attribute 0x0007: list[vendor-id], M, R A, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.AllowedVendorList = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(st.AllowedVendorList)
+	return c
+}
+
 // Patch is a change to the ApplicationBasic state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

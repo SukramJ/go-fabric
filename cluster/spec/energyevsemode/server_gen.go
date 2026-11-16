@@ -24,6 +24,38 @@ type State struct {
 	OnMode         *uint8             // attribute 0x0003: uint8, X, RW VO, X N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedModes = func(s []ModeOptionStruct) []ModeOptionStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ModeOptionStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.SupportedModes)
+	c.StartUpMode = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StartUpMode)
+	c.OnMode = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OnMode)
+	return c
+}
+
 // Patch is a change to the EnergyEvseMode state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

@@ -81,6 +81,193 @@ type State struct {
 	ThermostatSuggestionNotFollowingReason *ThermostatSuggestionNotFollowingReasonBitmap // attribute 0x0056: ThermostatSuggestionNotFollowingReasonBitmap, TSUGGEST, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.LocalTemperature = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LocalTemperature)
+	c.OutdoorTemperature = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OutdoorTemperature)
+	c.TemperatureSetpointHoldDuration = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TemperatureSetpointHoldDuration)
+	c.SetpointChangeAmount = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SetpointChangeAmount)
+	c.OccupiedSetback = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OccupiedSetback)
+	c.OccupiedSetbackMin = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OccupiedSetbackMin)
+	c.OccupiedSetbackMax = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OccupiedSetbackMax)
+	c.UnoccupiedSetback = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.UnoccupiedSetback)
+	c.UnoccupiedSetbackMin = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.UnoccupiedSetbackMin)
+	c.UnoccupiedSetbackMax = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.UnoccupiedSetbackMax)
+	c.AcCoilTemperature = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.AcCoilTemperature)
+	c.PresetTypes = func(s []PresetTypeStruct) []PresetTypeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]PresetTypeStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.PresetTypes)
+	c.ScheduleTypes = func(s []ScheduleTypeStruct) []ScheduleTypeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ScheduleTypeStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.ScheduleTypes)
+	c.NumberOfScheduleTransitionPerDay = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NumberOfScheduleTransitionPerDay)
+	c.ActivePresetHandle = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.ActivePresetHandle)
+	c.ActiveScheduleHandle = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.ActiveScheduleHandle)
+	c.Presets = func(s []PresetStruct) []PresetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]PresetStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Presets)
+	c.Schedules = func(s []ScheduleStruct) []ScheduleStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ScheduleStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Schedules)
+	c.SetpointHoldExpiryTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SetpointHoldExpiryTimestamp)
+	c.ThermostatSuggestions = func(s []ThermostatSuggestionStruct) []ThermostatSuggestionStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ThermostatSuggestionStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.ThermostatSuggestions)
+	c.CurrentThermostatSuggestion = func(p *ThermostatSuggestionStruct) *ThermostatSuggestionStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.CurrentThermostatSuggestion)
+	c.ThermostatSuggestionNotFollowingReason = func(p *ThermostatSuggestionNotFollowingReasonBitmap) *ThermostatSuggestionNotFollowingReasonBitmap {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ThermostatSuggestionNotFollowingReason)
+	return c
+}
+
 // Patch is a change to the Thermostat state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

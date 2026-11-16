@@ -43,6 +43,119 @@ type State struct {
 	SessionEnergyDischarged  *int64          // attribute 0x0043: energy-mWh, V2X, R V, X N Q
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.State = func(p *StateEnum) *StateEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.State)
+	c.ChargingEnabledUntil = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ChargingEnabledUntil)
+	c.DischargingEnabledUntil = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DischargingEnabledUntil)
+	c.NextChargeStartTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NextChargeStartTime)
+	c.NextChargeTargetTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NextChargeTargetTime)
+	c.NextChargeRequiredEnergy = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NextChargeRequiredEnergy)
+	c.NextChargeTargetSoC = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NextChargeTargetSoC)
+	c.ApproximateEvEfficiency = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ApproximateEvEfficiency)
+	c.StateOfCharge = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StateOfCharge)
+	c.BatteryCapacity = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BatteryCapacity)
+	c.VehicleId = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.VehicleId)
+	c.SessionId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SessionId)
+	c.SessionDuration = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SessionDuration)
+	c.SessionEnergyCharged = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SessionEnergyCharged)
+	c.SessionEnergyDischarged = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SessionEnergyDischarged)
+	return c
+}
+
 // Patch is a change to the EnergyEvse state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.
