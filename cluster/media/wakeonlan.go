@@ -5,7 +5,6 @@ package media
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
@@ -26,7 +25,7 @@ func wakeOnLanValues(st WakeOnLanState) map[uint32]any {
 }
 
 func cloneWakeOnLan(st WakeOnLanState) WakeOnLanState {
-	st.LinkLocalAddress = slices.Clone(st.LinkLocalAddress)
+	st.LinkLocalAddress = cloneSlice(st.LinkLocalAddress)
 	return st
 }
 

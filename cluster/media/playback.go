@@ -38,7 +38,14 @@ func playbackValues(st PlaybackState) map[uint32]any {
 }
 
 func clonePlayback(st PlaybackState) PlaybackState {
+	st.StartTime = clonePtr(st.StartTime)
+	st.Duration = clonePtr(st.Duration)
+	st.SampledPosition = clonePtr(st.SampledPosition)
+	st.SeekRangeEnd = clonePtr(st.SeekRangeEnd)
+	st.SeekRangeStart = clonePtr(st.SeekRangeStart)
+	st.ActiveAudioTrack = clonePtr(st.ActiveAudioTrack)
 	st.AvailableAudioTracks = cloneList(st.AvailableAudioTracks)
+	st.ActiveTextTrack = clonePtr(st.ActiveTextTrack)
 	st.AvailableTextTracks = cloneList(st.AvailableTextTracks)
 	return st
 }
@@ -97,7 +104,6 @@ type PlaybackConfig struct {
 type PlaybackServer struct {
 	*spec.Server
 	stateful[PlaybackState]
-	events
 }
 
 // NewPlayback builds a MediaPlayback server over cfg.Port.
@@ -210,9 +216,5 @@ func (s *PlaybackServer) EmitStateChanged(ev mpdef.StateChangedEvent) error {
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
-// server's events are addressed to, for its own events and the store's
-// EmitEvent alike.
-func (s *PlaybackServer) SetEndpoint(endpoint uint16) {
-	s.events.SetEndpoint(endpoint)
-	s.Server.SetEndpoint(endpoint)
-}
+// server's events are addressed to, the store's ([spec.Server.EmitEvent]).
+func (s *PlaybackServer) SetEndpoint(endpoint uint16) { s.Server.SetEndpoint(endpoint) }

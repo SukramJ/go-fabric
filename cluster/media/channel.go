@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
@@ -31,7 +30,9 @@ func channelValues(st ChannelState) map[uint32]any {
 }
 
 func cloneChannel(st ChannelState) ChannelState {
-	st.ChannelList = slices.Clone(st.ChannelList)
+	st.ChannelList = cloneSlice(st.ChannelList)
+	st.Lineup = clonePtr(st.Lineup)
+	st.CurrentChannel = clonePtr(st.CurrentChannel)
 	return st
 }
 

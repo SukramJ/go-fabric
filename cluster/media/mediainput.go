@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	inputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
@@ -25,7 +24,7 @@ func inputValues(st InputState) map[uint32]any {
 }
 
 func cloneInput(st InputState) InputState {
-	st.InputList = slices.Clone(st.InputList)
+	st.InputList = cloneSlice(st.InputList)
 	return st
 }
 

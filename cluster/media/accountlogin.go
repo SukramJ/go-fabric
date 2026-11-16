@@ -36,7 +36,6 @@ type AccountLoginConfig struct {
 // attributes beyond the globals.
 type AccountLoginServer struct {
 	*spec.Server
-	events
 }
 
 // NewAccountLogin builds an AccountLogin server over cfg.Port.
@@ -69,9 +68,5 @@ func (s *AccountLoginServer) EmitLoggedOut(ev logindef.LoggedOutEvent) error {
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
-// server's events are addressed to, for its own events and the store's
-// EmitEvent alike.
-func (s *AccountLoginServer) SetEndpoint(endpoint uint16) {
-	s.events.SetEndpoint(endpoint)
-	s.Server.SetEndpoint(endpoint)
-}
+// server's events are addressed to, the store's ([spec.Server.EmitEvent]).
+func (s *AccountLoginServer) SetEndpoint(endpoint uint16) { s.Server.SetEndpoint(endpoint) }

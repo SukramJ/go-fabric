@@ -6,7 +6,6 @@ package media
 import (
 	"fmt"
 	"reflect"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
@@ -42,7 +41,8 @@ func (st AppBasicState) values() map[uint32]any {
 }
 
 func (st AppBasicState) clone() AppBasicState {
-	st.AllowedVendorList = slices.Clone(st.AllowedVendorList)
+	st.Application = clonePtr(st.Application)
+	st.AllowedVendorList = cloneSlice(st.AllowedVendorList)
 	return st
 }
 

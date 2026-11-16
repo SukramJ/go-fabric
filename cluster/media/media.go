@@ -52,7 +52,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -296,13 +295,50 @@ func nullListOr[T spec.Encodable](p *[]T) any {
 	return spec.List[T](*p)
 }
 
-// cloneList copies the list p points to, so a port changing it touches no
-// committed value; nil stays nil.
+// The state clones are deep (R2-P6-err-1460, decision 142): a port that
+// changes the copy it is handed — through a list, a pointer or a field
+// nested in either — touches no committed value, and neither does a host
+// that changes the copy [stateful.State] returns. Each entry is copied by
+// its generated Clone where the generated type has one (a struct that
+// holds a list or pointer); a value with nothing to share is copied as it
+// is.
+
+// cloneOf is v's generated deep Clone, or v itself when its type has none.
+func cloneOf[T any](v T) T {
+	if c, ok := any(v).(interface{ Clone() T }); ok {
+		return c.Clone()
+	}
+	return v
+}
+
+// cloneSlice copies l entry by entry ([cloneOf]); nil stays nil and empty
+// stays empty.
+func cloneSlice[T any](l []T) []T {
+	if l == nil {
+		return nil
+	}
+	out := make([]T, len(l))
+	for i := range l {
+		out[i] = cloneOf(l[i])
+	}
+	return out
+}
+
+// clonePtr copies the value p points to ([cloneOf]); nil stays nil.
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := cloneOf(*p)
+	return &v
+}
+
+// cloneList copies the list p points to ([cloneSlice]); nil stays nil.
 func cloneList[T any](p *[]T) *[]T {
 	if p == nil {
 		return nil
 	}
-	l := slices.Clone(*p)
+	l := cloneSlice(*p)
 	return &l
 }
 
@@ -430,20 +466,3 @@ func (s *stateful[S]) transact(fn func(st *S) (any, error)) (any, error) {
 
 // dataVersion is the optional host-owned data version every config takes.
 type dataVersion = *cluster.DataVersionTracker
-
-// events stamps the endpoint a server's events are addressed to; the
-// bridge calls SetEndpoint when it mounts the server.
-type events struct {
-	// epMu guards ep.
-	epMu sync.Mutex
-	ep   uint16
-}
-
-// SetEndpoint stamps the endpoint the server's events are addressed to. A
-// server that embeds a *spec.Server beside events declares its own
-// SetEndpoint, which calls this and the store's.
-func (e *events) SetEndpoint(endpoint uint16) {
-	e.epMu.Lock()
-	e.ep = endpoint
-	e.epMu.Unlock()
-}

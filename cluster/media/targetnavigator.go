@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
@@ -28,7 +27,7 @@ func targetValues(st TargetState) map[uint32]any {
 }
 
 func cloneTarget(st TargetState) TargetState {
-	st.TargetList = slices.Clone(st.TargetList)
+	st.TargetList = cloneSlice(st.TargetList)
 	return st
 }
 
@@ -57,7 +56,6 @@ type TargetsConfig struct {
 type TargetsServer struct {
 	*spec.Server
 	stateful[TargetState]
-	events
 }
 
 // NewTargets builds a TargetNavigator server over cfg.Port.
@@ -96,9 +94,5 @@ func (s *TargetsServer) EmitTargetUpdated(ev targetdef.TargetUpdatedEvent) error
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
-// server's events are addressed to, for its own events and the store's
-// EmitEvent alike.
-func (s *TargetsServer) SetEndpoint(endpoint uint16) {
-	s.events.SetEndpoint(endpoint)
-	s.Server.SetEndpoint(endpoint)
-}
+// server's events are addressed to, the store's ([spec.Server.EmitEvent]).
+func (s *TargetsServer) SetEndpoint(endpoint uint16) { s.Server.SetEndpoint(endpoint) }

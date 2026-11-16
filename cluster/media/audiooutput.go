@@ -5,7 +5,6 @@ package media
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
@@ -24,7 +23,7 @@ func outputValues(st OutputState) map[uint32]any {
 }
 
 func cloneOutput(st OutputState) OutputState {
-	st.OutputList = slices.Clone(st.OutputList)
+	st.OutputList = cloneSlice(st.OutputList)
 	return st
 }
 

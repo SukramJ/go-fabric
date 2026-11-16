@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
@@ -31,7 +30,7 @@ func contentLauncherValues(st ContentLauncherState) map[uint32]any {
 }
 
 func cloneContentLauncher(st ContentLauncherState) ContentLauncherState {
-	st.AcceptHeader = slices.Clone(st.AcceptHeader)
+	st.AcceptHeader = cloneSlice(st.AcceptHeader)
 	return st
 }
 

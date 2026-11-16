@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
@@ -27,7 +26,8 @@ func appLauncherValues(st AppLauncherState) map[uint32]any {
 }
 
 func cloneAppLauncher(st AppLauncherState) AppLauncherState {
-	st.CatalogList = slices.Clone(st.CatalogList)
+	st.CatalogList = cloneSlice(st.CatalogList)
+	st.CurrentApp = clonePtr(st.CurrentApp)
 	return st
 }
 

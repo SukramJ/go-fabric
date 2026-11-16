@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/contentcontrol"
@@ -36,11 +35,11 @@ func contentControlValues(st ContentControlState) map[uint32]any {
 }
 
 func cloneContentControl(st ContentControlState) ContentControlState {
-	st.OnDemandRatings = slices.Clone(st.OnDemandRatings)
-	st.ScheduledContentRatings = slices.Clone(st.ScheduledContentRatings)
-	st.BlockChannelList = slices.Clone(st.BlockChannelList)
-	st.BlockApplicationList = slices.Clone(st.BlockApplicationList)
-	st.BlockContentTimeWindow = slices.Clone(st.BlockContentTimeWindow)
+	st.OnDemandRatings = cloneSlice(st.OnDemandRatings)
+	st.ScheduledContentRatings = cloneSlice(st.ScheduledContentRatings)
+	st.BlockChannelList = cloneSlice(st.BlockChannelList)
+	st.BlockApplicationList = cloneSlice(st.BlockApplicationList)
+	st.BlockContentTimeWindow = cloneSlice(st.BlockContentTimeWindow)
 	return st
 }
 
@@ -93,7 +92,6 @@ type ContentControlConfig struct {
 type ContentControlServer struct {
 	*spec.Server
 	stateful[ContentControlState]
-	events
 }
 
 // NewContentControl builds a ContentControl server over cfg.Port.
@@ -206,9 +204,5 @@ func (s *ContentControlServer) EmitEnteringBlockContentTimeWindow() error {
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
-// server's events are addressed to, for its own events and the store's
-// EmitEvent alike.
-func (s *ContentControlServer) SetEndpoint(endpoint uint16) {
-	s.events.SetEndpoint(endpoint)
-	s.Server.SetEndpoint(endpoint)
-}
+// server's events are addressed to, the store's ([spec.Server.EmitEvent]).
+func (s *ContentControlServer) SetEndpoint(endpoint uint16) { s.Server.SetEndpoint(endpoint) }
