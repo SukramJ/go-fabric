@@ -5,6 +5,7 @@ package core_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -32,13 +33,17 @@ type fakeStore struct {
 	identity  map[uint8]mstore.IdentityRecord
 	groupKeys map[[2]uint64]mstore.GroupKeySet     // key: [fabric, gks-id]
 	groupMaps map[[2]uint64]mstore.GroupKeyMapping // key: [fabric, group-id]
-	acls      map[uint8][]mstore.ACLEntry          // key: fabric
-	table     map[[2]uint64]mstore.GroupTableEntry // key: [fabric, group-id]
-	gcast     map[[2]uint64]mstore.GroupcastGroup  // key: [fabric, group-id]
-	prior     map[uint8]fakePrior                  // key: fabric of a pending UpdateNOC
-	settings  map[string]string
-	owed      []mstore.OwedFabricEvent
-	owedID    uint64
+	// gmSeq orders the mappings as they were written (the written order a
+	// store keeps, decision 148); gmNext is the next sequence number.
+	gmSeq    map[[2]uint64]uint64
+	gmNext   uint64
+	acls     map[uint8][]mstore.ACLEntry          // key: fabric
+	table    map[[2]uint64]mstore.GroupTableEntry // key: [fabric, group-id]
+	gcast    map[[2]uint64]mstore.GroupcastGroup  // key: [fabric, group-id]
+	prior    map[uint8]fakePrior                  // key: fabric of a pending UpdateNOC
+	settings map[string]string
+	owed     []mstore.OwedFabricEvent
+	owedID   uint64
 }
 
 // fakePrior is what a pending UpdateNOC replaced (store.Fabrics
@@ -55,6 +60,7 @@ func newFakeStore() *fakeStore {
 		identity:  make(map[uint8]mstore.IdentityRecord),
 		groupKeys: make(map[[2]uint64]mstore.GroupKeySet),
 		groupMaps: make(map[[2]uint64]mstore.GroupKeyMapping),
+		gmSeq:     make(map[[2]uint64]uint64),
 		acls:      make(map[uint8][]mstore.ACLEntry),
 		table:     make(map[[2]uint64]mstore.GroupTableEntry),
 		gcast:     make(map[[2]uint64]mstore.GroupcastGroup),
@@ -449,6 +455,8 @@ func (f *fakeStore) ReplaceGroupKeyMappings(_ context.Context, fabricIndex uint8
 	for _, m := range mappings {
 		m.FabricIndex = fabricIndex
 		f.groupMaps[gmKey(fabricIndex, m.GroupID)] = m
+		f.gmNext++
+		f.gmSeq[gmKey(fabricIndex, m.GroupID)] = f.gmNext
 	}
 	return nil
 }
@@ -456,6 +464,10 @@ func (f *fakeStore) ReplaceGroupKeyMappings(_ context.Context, fabricIndex uint8
 func (f *fakeStore) SetGroupKeyMapping(_ context.Context, m mstore.GroupKeyMapping) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if _, ok := f.groupMaps[gmKey(m.FabricIndex, m.GroupID)]; !ok {
+		f.gmNext++
+		f.gmSeq[gmKey(m.FabricIndex, m.GroupID)] = f.gmNext
+	}
 	f.groupMaps[gmKey(m.FabricIndex, m.GroupID)] = m
 	return nil
 }
@@ -476,6 +488,9 @@ func (f *fakeStore) ListGroupKeyMappings(_ context.Context, fabricIndex uint8) (
 			out = append(out, v)
 		}
 	}
+	slices.SortFunc(out, func(a, b mstore.GroupKeyMapping) int {
+		return cmp.Compare(f.gmSeq[gmKey(fabricIndex, a.GroupID)], f.gmSeq[gmKey(fabricIndex, b.GroupID)])
+	})
 	return out, nil
 }
 

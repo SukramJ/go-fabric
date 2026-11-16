@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/store/memstore"
 )
 
 // reloadFailStore fails the group state's read of a fabric's key sets
@@ -153,5 +154,49 @@ func TestGKMConcurrentKeySetWritesKeepTheBudget(t *testing.T) {
 	wg.Wait()
 	if n := ok.Load(); n != 1 {
 		t.Errorf("%d new key sets taken at one below the cap, want 1", n)
+	}
+}
+
+// A GroupKeyMap write that only reorders the held bindings is a change: it
+// is stored and advances the DataVersion; the held list written again in
+// its order is not (owner decision 148, F-38 server half). Over memstore
+// and over the in-memory fake, which keeps the written order.
+func TestGKMGroupKeyMapReorderIsAChange(t *testing.T) {
+	t.Parallel()
+	for name, st := range map[string]core.GroupStoreFacade{"memstore": memstore.New(), "fake": newFakeStore()} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			if _, err := st.(interface {
+				AddFabric(context.Context, mstore.FabricRecord) (uint8, error)
+			}).AddFabric(ctx, mstore.FabricRecord{FabricID: 0xA, RootPublicKey: []byte{4, 1}}); err != nil {
+				t.Fatal(err)
+			}
+			gkm, err := core.NewGroupKeyManagement(st, core.GroupKeyMgmtConfig{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(7)); err != nil {
+				t.Fatal(err)
+			}
+			held, err := st.ListGroupKeyMappings(ctx, 1)
+			if err != nil || len(held) != 0 {
+				t.Fatalf("held mappings = %v, %v", held, err)
+			}
+			first := []core.GroupKeyMapStruct{{GroupID: 3, GroupKeySetID: 7}, {GroupID: 5, GroupKeySetID: 7}}
+			if changed, err := gkm.MatterWriteChanged(fabricCtx(1), 0x0000, first); err != nil || !changed {
+				t.Fatalf("first write: changed %v, %v", changed, err)
+			}
+			v := gkm.MatterDataVersion()
+			if changed, err := gkm.MatterWriteChanged(fabricCtx(1), 0x0000, first); err != nil || changed {
+				t.Errorf("the held list again, in its order: changed %v, %v; want unchanged", changed, err)
+			}
+			reordered := []core.GroupKeyMapStruct{{GroupID: 5, GroupKeySetID: 7}, {GroupID: 3, GroupKeySetID: 7}}
+			if changed, err := gkm.MatterWriteChanged(fabricCtx(1), 0x0000, reordered); err != nil || !changed {
+				t.Errorf("a reorder-only write: changed %v, %v; want stored", changed, err)
+			}
+			if gkm.MatterDataVersion() == v {
+				t.Error("a reorder-only write left the DataVersion")
+			}
+		})
 	}
 }

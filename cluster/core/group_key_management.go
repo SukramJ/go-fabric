@@ -628,8 +628,8 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 // equal to the held ones are not stored and leave the server's own
 // version (matter.js Datasource.ts:1456-1457, :1476-1492 at db021da0: an
 // equal value is no change); the read, the comparison and the store hold
-// writeMu. The bindings are kept per group, so the order of the written
-// entries does not count.
+// writeMu. The written order counts: the same bindings in another order
+// are a change (sameGroupKeyMap).
 func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	g.reloadStale(ctx)
 	if attrID != groupKeyMgmtAttrGroupKeyMap {
@@ -689,21 +689,18 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	return true, nil
 }
 
-// sameGroupKeyMap reports whether the written list binds the groups the
-// held mappings bind, each to the same key set.
+// sameGroupKeyMap reports whether the written list is the held one entry
+// for entry, in its order: the GroupKeyMap keeps its written order (owner
+// decision 148, F-38; the store keeps the order it was given), so a write
+// that only reorders the entries is a change and is stored.
 func sameGroupKeyMap(held []store.GroupKeyMapping, list []GroupKeyMapStruct) bool {
 	if len(held) != len(list) {
 		return false
 	}
-	bound := make(map[uint16]uint16, len(held))
-	for _, m := range held {
-		bound[m.GroupID] = m.GroupKeySetID
-	}
-	for _, m := range list {
-		if ks, ok := bound[m.GroupID]; !ok || ks != m.GroupKeySetID {
+	for i, m := range list {
+		if held[i].GroupID != m.GroupID || held[i].GroupKeySetID != m.GroupKeySetID {
 			return false
 		}
-		delete(bound, m.GroupID)
 	}
 	return true
 }
