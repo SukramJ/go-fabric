@@ -260,6 +260,42 @@ func TestSealedStoreErrors(t *testing.T) {
 		t.Errorf("after the failed Save: %+v, %v; want nothing written", eps, err)
 	}
 
+	// Without the metadata table the sealing cannot record its scrub, and
+	// is refused before anything is sealed.
+	noMeta := openTestDB(t)
+	if err := sqlstore.New(noMeta).Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := noMeta.ExecContext(ctx, `DROP TABLE matter_client_metadata`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sqlstore.NewSealed(ctx, noMeta, sealerOf(t, 7)); err == nil {
+		t.Error("NewSealed without matter_client_metadata")
+	}
+	if got := value(t, sqlstore.New(noMeta), onboardingCluster, 0); string(got) != "MT:X" {
+		t.Errorf("the code after the refused sealing: %q, want it unchanged", got)
+	}
+
+	// A write of the sealing the database refuses leaves the code clear and
+	// owes no scrub; a marker the database will not delete after the scrub
+	// fails NewSealed, and the marker stays for the next one.
+	for _, c := range []struct{ name, trigger string }{
+		{"the sealed value", `CREATE TRIGGER refuse BEFORE UPDATE ON matter_client_values BEGIN SELECT RAISE(ABORT, 'refused'); END`},
+		{"the owed-scrub mark", `CREATE TRIGGER refuse BEFORE INSERT ON matter_client_metadata BEGIN SELECT RAISE(ABORT, 'refused'); END`},
+		{"the mark's deletion", `CREATE TRIGGER refuse BEFORE DELETE ON matter_client_metadata BEGIN SELECT RAISE(ABORT, 'refused'); END`},
+	} {
+		refusing := openTestDB(t)
+		if err := sqlstore.New(refusing).Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := refusing.ExecContext(ctx, c.trigger); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := sqlstore.NewSealed(ctx, refusing, sealerOf(t, 7)); err == nil {
+			t.Errorf("%s refused: NewSealed succeeded", c.name)
+		}
+	}
+
 	if err := sqlstore.Upgrade(ctx, openEmptyDB(t)); err != nil {
 		t.Errorf("Upgrade of a database without the tables: %v", err)
 	}
