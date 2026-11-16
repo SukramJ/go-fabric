@@ -574,9 +574,11 @@ func (s *Session) processSendQueueLocked() error {
 			// this package the bridge bounds it — a BLE connection that
 			// carries neither a secure session nor a PASE handshake in
 			// flight is dropped every ConnRspTimeout (bridge/ble.go
-			// watchBLEPASE) — and once a secure session runs, the
-			// session's own idle timeout and the commissioning window's
-			// fail-safe do (review II, R2-P6-fsm-0212).
+			// watchBLEPASE) until a secure session runs; a session over
+			// BLE is a commissioning one (a node with a fabric is never
+			// on the radio, ADR 0031), bounded from then on by the
+			// commissioning window and its fail-safe (review II,
+			// R2-P6-fsm-0212).
 			s.idleTimer.start()
 		}
 		if isEnding {
