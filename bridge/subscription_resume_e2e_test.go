@@ -30,6 +30,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/operational"
@@ -698,7 +699,7 @@ func subscribeOverCASEWith(t *testing.T, dev *resumeDevice, ctrl *fakeController
 	var keys sigma.SessionKeys
 	_, _ = rand.Read(keys.I2RKey[:])
 	_, _ = rand.Read(keys.R2IKey[:])
-	if _, err := dev.sessions.OpenFromSigmaWithID(resumeDeviceSIDRun, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, resumeCtrlSIDRun1, nil, keys); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
+	if _, err := sessionseam.OpenAt(dev.sessions, resumeDeviceSIDRun, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, resumeCtrlSIDRun1, nil, keys); err != nil {
 		t.Fatal(err)
 	}
 	sess, err := channel.New(channel.Config{

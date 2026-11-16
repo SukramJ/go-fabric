@@ -21,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -175,7 +176,7 @@ func newUndeliveredReportRig(t *testing.T, base uint16) *undeliveredReportRig {
 		t.Fatalf("peer address %T", silent.LocalAddr())
 	}
 	for _, sid := range []uint16{r.reportSID, r.siblingSID} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, sid+0x100, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
+		if _, err := sessionseam.OpenAt(dev.sessions, sid, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		dev.br.sessionPeerAddrs.Store(sid, peerAddr)

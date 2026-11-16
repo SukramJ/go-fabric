@@ -12,6 +12,7 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -64,7 +65,7 @@ func TestCloseFabricSessionsExcept_TellsEachOtherSession(t *testing.T) {
 		sid    uint16
 		fabric uint8
 	}{{invoking, resumeFabricIndex}, {sibling, resumeFabricIndex}, {unrouted, resumeFabricIndex}, {other, resumeFabricIndex + 1}} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(s.sid, s.fabric, resumeDeviceNode, resumeCtrlNode+uint64(s.sid), s.sid+0x100, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
+		if _, err := sessionseam.OpenAt(dev.sessions, s.sid, false, s.fabric, resumeDeviceNode, resumeCtrlNode+uint64(s.sid), s.sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		if s.sid != unrouted {
@@ -111,7 +112,7 @@ func TestEmitFabricRemovedContext_InvokingSessionLast(t *testing.T) {
 		sibling  = uint16(0x1102)
 	)
 	for _, sid := range []uint16{invoking, sibling} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
+		if _, err := sessionseam.OpenAt(dev.sessions, sid, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		dev.br.bindSessionRoute(sid, peerAddr)
@@ -135,7 +136,7 @@ func TestEmitFabricRemovedContext_InvokingSessionLast(t *testing.T) {
 
 	// Outside a command: every session of the fabric is told.
 	const lone = uint16(0x1103)
-	if _, err := dev.sessions.OpenFromSigmaWithID(lone, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, lone+0x100, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
+	if _, err := sessionseam.OpenAt(dev.sessions, lone, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, lone+0x100, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
 	dev.br.bindSessionRoute(lone, peerAddr)
@@ -185,7 +186,7 @@ func TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo(t *testing.T
 		sibling  = uint16(0x0E02)
 	)
 	for _, sid := range []uint16{invoking, sibling} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
+		if _, err := sessionseam.OpenAt(dev.sessions, sid, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		dev.br.bindSessionRoute(sid, peerAddr)

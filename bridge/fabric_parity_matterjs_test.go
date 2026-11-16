@@ -18,6 +18,7 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/operational"
 )
 
@@ -32,7 +33,7 @@ func TestFabricRemoveFromSession(t *testing.T) {
 			session2 = uint16(2) // FabricTest.ts:163-174, the exchange's session
 		)
 		for _, sid := range []uint16{session1, session2} {
-			if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x8d4b, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
+			if _, err := sessionseam.OpenAt(dev.sessions, sid, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x8d4b, nil, peerLossKeys(t)); err != nil {
 				t.Fatal(err)
 			}
 		}
