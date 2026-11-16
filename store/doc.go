@@ -43,7 +43,10 @@
 // (matter_resumption), the ICDToken keys of the ICD registrations, the
 // DoorLock credential data, and, in the settings table, the committed
 // Wi-Fi networks with their credentials, which cluster/core's Wi-Fi
-// NetworkCommissioning server writes under netcomm.wifi.networks.
+// NetworkCommissioning server writes under netcomm.wifi.networks. A
+// controller's database (controller.New) holds its CASE resumption records
+// in the same table, built with [New]: the controller has no sealing
+// option.
 //
 // A Store from [New] keeps them as they are, except two kinds it or its
 // caller seals under a key kept as a setting of the same database: the ICD
