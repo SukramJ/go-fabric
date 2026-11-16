@@ -457,6 +457,10 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 		w.p("\t// Commands are optional commands the server accepts beyond the")
 		w.p("\t// ones the selection mandates: the kit's server carries them out")
 		w.p("\t// (through its port), a Handle field below handles one in its place.")
+		w.p("\t// Where the device serves the cluster with the generated server")
+		w.p("\t// (no kit server for the selection), a command declared here")
+		w.p("\t// without its Handle field is refused when the device is built")
+		w.p("\t// (device.New), not left out of AcceptedCommandList unannounced.")
 		w.p("\tCommands []uint32")
 	}
 	if len(g.hullEvents()) > 0 {
