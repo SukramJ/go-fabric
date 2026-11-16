@@ -37,9 +37,11 @@ func TestLicenseHeaderOnEveryGoFile(t *testing.T) {
 			return err
 		}
 		if d.IsDir() {
-			// .git holds no Go source; a vendor tree would hold
-			// third-party source carrying its own upstream notice.
-			if name := d.Name(); name == ".git" || name == "vendor" {
+			// A hidden directory holds no source of this checkout (.git;
+			// .claude's worktrees are other checkouts, [hiddenBelow]); a
+			// vendor tree would hold third-party source carrying its own
+			// upstream notice.
+			if name := d.Name(); hiddenBelow(root, path, name) || name == "vendor" {
 				return filepath.SkipDir
 			}
 			return nil

@@ -247,7 +247,8 @@ func TestDeprecatedConstGroupIsChecked(t *testing.T) {
 }
 
 // walkGoFiles visits every .go file in the module, skipping the directories
-// that carry no module source.
+// that carry no module source: a hidden one below root ([hiddenBelow]),
+// testdata and node_modules.
 func walkGoFiles(t *testing.T, root string, fn func(path string, src []byte)) {
 	t.Helper()
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -255,8 +256,7 @@ func walkGoFiles(t *testing.T, root string, fn func(path string, src []byte)) {
 			return err
 		}
 		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "testdata", "node_modules":
+			if hiddenBelow(root, path, d.Name()) || d.Name() == "testdata" || d.Name() == "node_modules" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -273,5 +273,48 @@ func walkGoFiles(t *testing.T, root string, fn func(path string, src []byte)) {
 	})
 	if err != nil {
 		t.Fatalf("walk module: %v", err)
+	}
+}
+
+// hiddenBelow reports whether the directory path, named name, is a hidden
+// one below the walk's root: .git, .github, and .claude, whose worktrees
+// are other checkouts of the repository — read as this module's files they
+// answer for a branch that is not the one under test. The repository's
+// nested modules (ble/bluez and its siblings) are its own source and are
+// walked.
+func hiddenBelow(root, path, name string) bool {
+	return filepath.Clean(path) != filepath.Clean(root) && strings.HasPrefix(name, ".")
+}
+
+// TestRepositoryWalksSkipHiddenDirectories: walkGoFiles, and with
+// hiddenBelow the licence header walk, visit the repository's files and
+// its nested modules, and nothing under a hidden directory such as an
+// agent's .claude/worktrees/ checkout.
+func TestRepositoryWalksSkipHiddenDirectories(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for _, path := range []string{
+		"a.go", "pkg/b.go", "ble/bluez/c.go", "pkg/testdata/d.go",
+		".claude/worktrees/other/e.go", ".git/f.go", ".github/g.go",
+	} {
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("package x\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var visited []string
+	walkGoFiles(t, root, func(path string, _ []byte) {
+		rel, _ := filepath.Rel(root, path)
+		visited = append(visited, filepath.ToSlash(rel))
+	})
+	slices.Sort(visited)
+	if want := []string{"a.go", "ble/bluez/c.go", "pkg/b.go"}; !slices.Equal(visited, want) {
+		t.Errorf("walkGoFiles visited %v, want %v", visited, want)
+	}
+	if hiddenBelow(root, root, filepath.Base(root)) {
+		t.Error("the walk's root counts as hidden")
 	}
 }
