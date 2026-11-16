@@ -341,6 +341,13 @@ func NewServer(cfg Config) (*Server, error) {
 			return nil, ErrSetterMissing
 		}
 	}
+	// The event ids first, so ErrUnknownEvent names an unknown event and
+	// nothing else (R2-P6-err-1590).
+	for _, id := range cfg.Events {
+		if pumpdef.Definition.Event(id) == nil {
+			return nil, fmt.Errorf("%w: 0x%02X", ErrUnknownEvent, id)
+		}
+	}
 	opts := spec.Options{Features: uint32(cfg.Features), Events: cfg.Events}
 	for _, o := range optionalAttributes {
 		if cfg.Optional&o.opt != 0 {
@@ -349,7 +356,7 @@ func NewServer(cfg Config) (*Server, error) {
 	}
 	inst, err := spec.New(pumpdef.Definition, opts)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrUnknownEvent, err)
+		return nil, fmt.Errorf("pump: %w", err)
 	}
 	return &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, inst: inst}, nil
 }
@@ -470,15 +477,32 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	}
 }
 
+// signedLimits and unsignedLimits read the fixed limit attributes of
+// Config.Limits, built once rather than on every read (R2-P6-bound-1591).
+var (
+	signedLimits = map[uint32]func(Limits) *int16{
+		AttrMaxPressure:      func(l Limits) *int16 { return l.MaxPressure },
+		AttrMinConstPressure: func(l Limits) *int16 { return l.MinConstPressure },
+		AttrMaxConstPressure: func(l Limits) *int16 { return l.MaxConstPressure },
+		AttrMinCompPressure:  func(l Limits) *int16 { return l.MinCompPressure },
+		AttrMaxCompPressure:  func(l Limits) *int16 { return l.MaxCompPressure },
+		AttrMinConstTemp:     func(l Limits) *int16 { return l.MinConstTemp },
+		AttrMaxConstTemp:     func(l Limits) *int16 { return l.MaxConstTemp },
+	}
+	unsignedLimits = map[uint32]func(Limits) *uint16{
+		AttrMaxSpeed:      func(l Limits) *uint16 { return l.MaxSpeed },
+		AttrMaxFlow:       func(l Limits) *uint16 { return l.MaxFlow },
+		AttrMinConstSpeed: func(l Limits) *uint16 { return l.MinConstSpeed },
+		AttrMaxConstSpeed: func(l Limits) *uint16 { return l.MaxConstSpeed },
+		AttrMinConstFlow:  func(l Limits) *uint16 { return l.MinConstFlow },
+		AttrMaxConstFlow:  func(l Limits) *uint16 { return l.MaxConstFlow },
+	}
+)
+
 // readLimit answers the fixed limit attributes from Config.Limits.
 func (s *Server) readLimit(attrID uint32) (any, bool) {
-	l := s.cfg.Limits
-	signed := map[uint32]*int16{
-		AttrMaxPressure: l.MaxPressure, AttrMinConstPressure: l.MinConstPressure, AttrMaxConstPressure: l.MaxConstPressure,
-		AttrMinCompPressure: l.MinCompPressure, AttrMaxCompPressure: l.MaxCompPressure,
-		AttrMinConstTemp: l.MinConstTemp, AttrMaxConstTemp: l.MaxConstTemp,
-	}
-	if v, ok := signed[attrID]; ok {
+	if get, ok := signedLimits[attrID]; ok {
+		v := get(s.cfg.Limits)
 		// A numeric lower bound ("min -27315" on the temperature limits).
 		if b := pumpdef.Definition.Attribute(attrID).Constraint.Min; b.IsInt() && v != nil && int64(*v) < b.Int {
 			floor := int16(b.Int) //nolint:gosec // an int16 attribute's own bound
@@ -486,12 +510,8 @@ func (s *Server) readLimit(attrID uint32) (any, bool) {
 		}
 		return nullableInt16(v), true
 	}
-	unsigned := map[uint32]*uint16{
-		AttrMaxSpeed: l.MaxSpeed, AttrMaxFlow: l.MaxFlow, AttrMinConstSpeed: l.MinConstSpeed,
-		AttrMaxConstSpeed: l.MaxConstSpeed, AttrMinConstFlow: l.MinConstFlow, AttrMaxConstFlow: l.MaxConstFlow,
-	}
-	if v, ok := unsigned[attrID]; ok {
-		return nullableUint16(v), true
+	if get, ok := unsignedLimits[attrID]; ok {
+		return nullableUint16(get(s.cfg.Limits)), true
 	}
 	return nil, false
 }
