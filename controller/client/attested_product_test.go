@@ -17,8 +17,9 @@ import (
 // TestRecordKeepsTheAttestedProduct: a commission whose attestation
 // validates keeps the BasicInformation vendor and product id the
 // Certification Declaration was checked against (review II decision 105);
-// a decommission clears them; a commission whose attestation failed and
-// was accepted by policy keeps none.
+// a decommission clears them; a commission whose attestation failed, ran
+// without a trust store or had an error finding the policy accepted keeps
+// none (decision 119).
 func TestRecordKeepsTheAttestedProduct(t *testing.T) {
 	t.Run("attested, then decommissioned", func(t *testing.T) {
 		cp := newClientPair(t, clientPairOptions{
@@ -59,6 +60,29 @@ func TestRecordKeepsTheAttestedProduct(t *testing.T) {
 		}
 		if v, ok := storedAttested(t, store, cp.node.ID()); ok {
 			t.Fatalf("the stored record still carries the attested pair %x", v)
+		}
+	})
+	t.Run("without a trust store the pair is not attested", func(t *testing.T) {
+		cp := newClientPair(t, clientPairOptions{
+			rootOnly:   true,
+			controller: fabrictest.ControllerOptions{NoAttestationStore: true},
+			commission: client.CommissionOptions{OnAttestationFailure: attestation.Accept()},
+		})
+		if rec := cp.node.Record(); rec.AttestedVendorID != nil || rec.AttestedProductID != nil {
+			t.Fatalf("attested %v/%v without a trust store, want none", rec.AttestedVendorID, rec.AttestedProductID)
+		}
+	})
+	t.Run("an accepted error finding is not attested", func(t *testing.T) {
+		// A test PAA under a store that accepts no test certificates:
+		// Validate returns no error and a LevelError
+		// TrustedAsTestCertificate finding, which the policy accepts.
+		cp := newClientPair(t, clientPairOptions{
+			rootOnly:   true,
+			controller: fabrictest.ControllerOptions{Attestation: attestationStore(false, secattestation.TestPAANoVIDCert)},
+			commission: client.CommissionOptions{OnAttestationFailure: attestation.Accept()},
+		})
+		if rec := cp.node.Record(); rec.AttestedVendorID != nil || rec.AttestedProductID != nil {
+			t.Fatalf("attested %v/%v after an accepted error finding, want none", rec.AttestedVendorID, rec.AttestedProductID)
 		}
 	})
 	t.Run("a failure the policy accepted is not attested", func(t *testing.T) {

@@ -212,12 +212,14 @@ type Result struct {
 	// BasicInformation VendorID and ProductID when device attestation
 	// validated them — [attestation.Validate] returned no error, so the
 	// Certification Declaration's vendor_id is that VendorID and its
-	// product_id_array holds that ProductID. Validate's findings do not
-	// unset them: they are set also when the DAC chain was not checked (no
-	// trust store) and when the policy accepted a LevelError finding. Both
-	// nil when Validate returned an error and the OnAttestationFailure
-	// policy let commissioning go on. client.Record keeps them (review II
-	// decision 105).
+	// product_id_array holds that ProductID — and the DAC chain was
+	// verified against the trust store and no error finding stands. Both
+	// nil otherwise, also when the OnAttestationFailure policy let
+	// commissioning go on: an error of Validate, a check that did not run
+	// for want of a trust store (attestation.DclServiceUnavailable), an
+	// accepted attestation.LevelError finding; the commissioning log names
+	// the reason (matter.controller.commissioning.attested_identity_not_recorded).
+	// client.Record keeps them (review II decisions 105 and 119).
 	AttestedVendorID, AttestedProductID *uint16
 }
 

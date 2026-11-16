@@ -1158,12 +1158,16 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		findings = result.Findings
 		f.dacKey = result.DACPublicKey
 		// Validate returned no error: the Certification Declaration names
-		// this vendor and product (decision 105), and the pair is recorded.
-		// Its findings do not change that: the pair is recorded also when
-		// the chain was not checked (no trust store, DclServiceUnavailable)
-		// and when the policy accepts a LevelError finding below. Only an
-		// error of Validate leaves the pair unattested.
-		f.attested = &[2]uint16{f.data.vendorID, f.data.productID}
+		// this vendor and product (decision 105). The pair is recorded only
+		// when the chain was verified as well and no error finding stands
+		// (owner decision 119): a finding that a check could not run (no
+		// trust store, DclServiceUnavailable) or a LevelError one the
+		// policy accepts below leaves it unattested, with one log line.
+		if why, withheld := attestedPairWithheld(findings); withheld {
+			f.log.Info("matter.controller.commissioning.attested_identity_not_recorded", slog.String("reason", why))
+		} else {
+			f.attested = &[2]uint16{f.data.vendorID, f.data.productID}
+		}
 	}
 
 	if len(findings) > 0 {
@@ -1193,6 +1197,26 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		f.dacKey = key
 	}
 	return stepSuccess, nil
+}
+
+// attestedPairWithheld reports why an attestation that returned no error
+// still records no attested pair: a check that did not run because no
+// trust store (DCL service) was available — the DAC chain, or the
+// Certification Declaration's authorized_paa_list
+// ([attestation.DclServiceUnavailable]) — or an error finding
+// ([attestation.LevelError]), which a policy may accept.
+func attestedPairWithheld(findings []attestation.Finding) (string, bool) {
+	for _, fd := range findings {
+		if fd.Check == attestation.DclServiceUnavailable {
+			return "the attestation chain was not verified: " + fd.Message, true
+		}
+	}
+	for _, fd := range findings {
+		if fd.Level == attestation.LevelError {
+			return "an error finding was accepted: " + string(fd.Check) + ": " + fd.Message, true
+		}
+	}
+	return "", false
 }
 
 // dacKeyOf reads the DAC's EC P-256 key (Dac.fromAsn1, :1324).
