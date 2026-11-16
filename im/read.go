@@ -600,8 +600,8 @@ func minEventNumberFromFilters(filters []EventMinimumNumber) uint64 {
 // attributes. It mirrors the path-expansion + deduplication logic in
 // matter.js packages/protocol/src/action/server/EventReadResponse.ts
 // (EventReadResponse.process → #readAllowedEvents) and the event
-// retrieval in matter.js packages/protocol/src/interaction/EventHandler.ts
-// (getEvents). Wildcard-expand-then-filter semantics and sort-by-Number
+// retrieval in matter.js packages/protocol/src/events/OccurrenceManager.ts:250-285
+// at db021da0 (get; review II, R2-P6-doc-0703). Wildcard-expand-then-filter semantics and sort-by-Number
 // ascending output order match the matter.js reference implementation.
 //
 // Each [ConcreteEventPath] is evaluated independently; results are
@@ -720,8 +720,8 @@ func EventPathsForNode(paths []ConcreteEventPath, localNodeID uint64) []Concrete
 //
 // Mirrors matter.js packages/protocol/src/action/server/EventReadResponse.ts
 // (EventReadResponse.process) for the request-level dispatch and
-// matter.js packages/protocol/src/interaction/EventHandler.ts (getEvents)
-// for the per-path log query. Passes req.EventFilters to [BuildEventReports]
+// matter.js packages/protocol/src/events/OccurrenceManager.ts:250-285 at
+// db021da0 (get) for the log query (review II, R2-P6-doc-0703). Passes req.EventFilters to [BuildEventReports]
 // for minimum-event-number gating; the caller selects them for this node
 // with [EventFiltersFor] first.
 func HandleReadEventRequest(req ReadRequest, log *EventLog) []EventReport {

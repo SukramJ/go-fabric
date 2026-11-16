@@ -409,13 +409,17 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	id := m.allocateIDLocked()
 	// MaxInterval publisher selection semantics (chip alignment):
 	// Matter §10.6.3.2 requires the publisher's MaxInterval in SubscribeResponse
-	// to be ≤ the subscriber's requested MaxInterval. chip (non-ICD path,
-	// `src/app/ReadHandler.cpp:769-809`) accepts the subscriber's MaxInterval
-	// directly and bounds it only by `kSubscriptionMaxIntervalPublisherLimit`
-	// (3600 s). matter.js (`packages/node/src/node/server/ServerSubscription.ts:314-344` at db021da0)
+	// to be ≤ the subscriber's requested MaxInterval. chip takes the
+	// subscriber's MaxInterval as it is and refuses only min > max
+	// (`src/app/ReadHandler.cpp:761-765` at 6170af84);
+	// `kSubscriptionMaxIntervalPublisherLimit` enters only through
+	// `GetPublisherSelectedIntervalLimit` (:42-52), inside the
+	// `CHIP_CONFIG_ENABLE_ICD_SERVER` block (:767-803, :780) — the non-ICD
+	// path has no cap (review II, R2-P6-par-0705). matter.js (`packages/node/src/node/server/ServerSubscription.ts:314-344` at db021da0)
 	// further clamps to min(subscriptionMaxInterval, maxIntervalCeiling) and
 	// also lifts by minIntervalFloor. go-fabric clamps maxCeil down to
-	// cfg.MaxIntervalCeilingSeconds (default 3600 s, matching chip) and
+	// cfg.MaxIntervalCeilingSeconds (default 3600 s, the value of chip's
+	// ICD-path limit, a cap of this module's own on the non-ICD path) and
 	// minFloor up to cfg.MinIntervalFloorSeconds (default 0: the request
 	// as it is). The post-clamp inversion
 	// check (ErrCadenceInvertedAfterClamp) rejects requests where the floored

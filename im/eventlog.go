@@ -12,7 +12,8 @@ import (
 )
 
 // EventRecord is one persisted event entry.
-// Mirrors matter.js packages/protocol/src/interaction/EventHandler.ts::EventRecord.
+// Mirrors matter.js packages/protocol/src/events/Occurrence.ts at db021da0
+// (Occurrence, NumberedOccurrence; review II, R2-P6-doc-0703).
 //
 // EpochMS is milliseconds since the Unix epoch (Matter §10.6.6.1
 // EpochTimestamp is POSIX milliseconds — matter.js TlvPosixMs); Priority
@@ -112,8 +113,10 @@ func (c bufferConfig) normalized() bufferConfig {
 }
 
 // EventLog buffers emitted events for retrospective Read-Event queries.
-// Bounded: keeps the most recent N entries per priority bucket.
-// Older entries are evicted in FIFO order. Thread-safe.
+// Bounded: one buffer holds the events of every priority; once it is
+// full the harvest drops the least valuable records first, the oldest of
+// a class before its newer ones ([EventLog.harvestLocked]; review II,
+// N5-fxdocs-2). Thread-safe.
 //
 // Matter §10.6.6 requires Critical events to be persisted; this
 // implementation is an in-memory buffer (survives the session, not
@@ -122,7 +125,9 @@ func (c bufferConfig) normalized() bufferConfig {
 // value ([EventLog.SeedNumber]), is the event number's ceiling, so the
 // numbering continues after a reboot instead of restarting.
 //
-// Mirrors matter.js packages/protocol/src/interaction/EventHandler.ts.
+// Mirrors matter.js packages/protocol/src/events/OccurrenceManager.ts at
+// db021da0 (OccurrenceManager, over BaseEventStore.ts for the numbering;
+// review II, R2-P6-doc-0703).
 type EventLog struct {
 	// ceilingMu serialises the persistence of a new counter ceiling
 	// (persistFn): Append and DropBuffered take it before mu when the
@@ -185,8 +190,8 @@ func newEventLogWithBuffer(cfg bufferConfig) *EventLog {
 
 // Append records an event with a freshly-allocated monotonic Number and
 // the current wall-clock epoch timestamp, then returns the assigned Number.
-// The record is placed in the priority bucket corresponding to rec.Priority;
-// the oldest entry in that bucket is evicted when the bucket is full.
+// The record joins the one buffer; a full buffer is harvested
+// ([EventLog.harvestLocked]).
 func (l *EventLog) Append(rec EventRecord) uint64 {
 	return l.AppendRecord(rec).Number
 }

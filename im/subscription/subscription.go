@@ -365,7 +365,15 @@ func (s *Subscription) touchLastReport(now time.Time) {
 // The events fired in that window go with them, urgent or not: matter.js
 // sends whatever is outstanding at activation, attribute changes and
 // events alike (ServerSubscription.ts:443-445 at db021da0). There they
-// go at once; here they wait for MinIntervalFloor.
+// go at once; here they wait for MinIntervalFloor, as connectedhomeip
+// holds the floor from the establishment: the priming done, the handler
+// is registered with the scheduler at now (src/app/ReadHandler.cpp:249-259,
+// reporting/ReportSchedulerImpl.cpp:93-111 at 6170af84), its
+// mMinTimestamp = now + minInterval (reporting/ReportScheduler.h:141-147),
+// it is reportable only from then (:120-125), a dirty handler inside the
+// floor is scheduled for its end (ReportSchedulerImpl.cpp:190-204), and an
+// urgent event waits too (reporting/Engine.cpp:1234). Owner decision 144
+// keeps chip's floor (review II, F-db021da0-4, R2-P6-par-0779).
 func (s *Subscription) EndPriming(now time.Time) {
 	s.mu.Lock()
 	s.priming = false

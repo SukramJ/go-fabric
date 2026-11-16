@@ -56,8 +56,12 @@ type ACLChecker interface {
 	// is granted.
 	//
 	// fabricIndex is the requesting fabric index extracted from the session
-	// context (via [FabricFilterFromContext]). fabricIndex==0 means PASE /
-	// pre-commissioning — ACL does not yet apply (always granted).
+	// context (via [FabricFilterFromContext]); it names a fabric (1 to
+	// 254). The gates ask only for a request that is not on a PASE
+	// session — a PASE session keeps its implicit grant by its auth mode
+	// ([IsPASEFromContext]) — and refuse a request without an accessing
+	// fabric before the checker is asked ([HasAccessingFabric]; review II,
+	// R2-P6-doc-0561).
 	//
 	// subjectNodeID + subjectCATs identify the requesting peer for per-
 	// subject ACE matching (Matter §9.10.5.6). For CASE sessions both are
@@ -182,9 +186,10 @@ type CommandPathChecker interface {
 }
 
 // Dispatcher is the cluster-server-side surface the IM layer routes
-// Read / Write / Invoke requests through. The endpoint assembler in
-// [..]/north/matter/endpoint constructs and registers a Dispatcher
-// that walks the model registry to satisfy each call.
+// Read / Write / Invoke requests through. Package endpoint's
+// TopologyDispatcher (endpoint.TopologyDispatcher), which the bridge
+// builds for its topology, is the one in this module (review II,
+// R2-P6-doc-0563).
 //
 // Implementations:
 //

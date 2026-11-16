@@ -9,8 +9,10 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// The client side of Invoke: the one interaction this node initiates, for
-// the OTA Software Update Requestor's commands to its provider (ADR 0019).
+// The client side of Invoke: the encoder and decoder of every invoke this
+// node initiates — the OTA Software Update Requestor's commands to its
+// provider (ADR 0019) and every controller invoke of client/interaction
+// (review II, R2-P6-doc-0563).
 // The tags are the server side's; the shape is matter.js's TlvInvokeRequest
 // / TlvInvokeResponse (packages/types/src/protocol/messages/).
 
@@ -20,7 +22,10 @@ import (
 // at 862ad75f): the DelayReportData (tag 3) when req carries one, both its
 // fields written (TlvDelayReportData.ts, TlvField with a decode fallback
 // only), then req's InteractionModelRevision — this module's
-// [MatterInteractionModelRevision] when 0.
+// [MatterInteractionModelRevision] when 0. fieldsWriter is required: it
+// is called for every command data, and a nil one panics — unlike the
+// reader of [UnmarshalInvokeResponseTLV], which may be nil (review II,
+// R2-P6-api-0566).
 func MarshalInvokeRequestTLV(enc *tlv.Encoder, req InvokeRequest, fieldsWriter CommandFieldsWriter) {
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.PutBool(tlv.ContextTag(tagInvokeReqSuppressResponse), req.SuppressResponse)

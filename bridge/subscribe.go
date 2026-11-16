@@ -72,8 +72,10 @@ const (
 // :198-224), plus the default expected processing time and the response
 // buffer — and adds the formula's peer term, the peer's retransmission
 // schedule, which matter.js leaves at 0 for this wait
-// (MessageExchange.ts:875-886 passes no includeMaximumSendingTime, :882;
-// MessageChannel.ts:240): the module's one timer runs from the send, not
+// (packages/protocol/src/protocol/MessageExchange.ts:878-885 passes
+// undefined for includeMaximumSendingTime, :882; MessageChannel.ts:239-240
+// then hands no peerSessionParameters; MRP.ts:104 makes the term 0 — review
+// II, R2-P6-par-0707): the module's one timer runs from the send, not
 // from the report's acknowledgement (notes/parity/by_design.md,
 // BD-Matter-Subscription-ReportWaitBound; review II, R2-P1-req2-12).
 //
@@ -244,9 +246,10 @@ func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
 // peerSourceNodeID is the value the commissioner stamped into
 // SourceNodeID on the original SubscribeRequest header — the bridge
 // echoes it as DestNodeID in every outbound report (Matter §4.4.1.2).
-// sessionID is the operational session under which the reports
-// travel; SessionID==0 means PASE (unencrypted), >0 means CASE
-// (AES-CCM-sealed via [channel.Session]).
+// sessionID is the secure session under which the reports travel,
+// AES-CCM-sealed via [channel.Session] — a CASE or a PASE one ([subTarget.pase]
+// tells them apart). Session 0 is the unsecured session, which carries no
+// IM ([Bridge.resolveSessionPASE]); review II, R2-P6-doc-0515.
 type subTarget struct {
 	src                 net.Addr
 	hasPeerSourceNodeID bool
@@ -1511,7 +1514,7 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 	return uint16(b.outboundExchangeID.Add(1)) //nolint:gosec // G115: the truncation to 16 bits is the wrap past 0xFFFF to 0
 }
 
-// sendReportChunks splits report into per-datagram chunks and ships
+// sendReportChunksNotify splits report into per-datagram chunks and ships
 // them in order on target's exchange, returning the MRP counter of
 // every chunk that was tracked (empty when the bridge sends
 // best-effort). All chunks but the last carry MoreChunkedMessages
@@ -1539,13 +1542,8 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // attribute reports to it (TC-IDM-4.3 step 10). A single-chunk report — the
 // common case — still does not wait: its StatusResponse is consumed by the
 // subscription's own report bookkeeping.
-func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
-	counters, _, err := b.sendReportChunksNotify(target, report, false)
-	return counters, err
-}
-
-// sendReportChunksNotify is [Bridge.sendReportChunks] that, with armFinal,
-// also arms the wait for the peer's StatusResponse to the last chunk just
+//
+// With armFinal it also arms the wait for the peer's StatusResponse to the last chunk just
 // before that chunk goes out and returns it as finalWait — the waits for
 // the chunks before it are this loop's own, on the same key, so arming the
 // final wait up front would have the first of them replace and close it.
@@ -1620,7 +1618,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 	return counters, finalWait, nil
 }
 
-// sendInitiatedReport ships report on a **fresh bridge-initiated
+// sendInitiatedReportArmed ships report on a **fresh bridge-initiated
 // exchange** instead of reusing the commissioner's Subscribe exchange.
 // Use this for ongoing subscribe reports (matter.js's
 // ServerSubscription.#sendUpdateMessage pattern,
@@ -1642,13 +1640,8 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 // "subscription stays alive across exchanges" expectation via the
 // negotiated SubscriptionID — which matches the commissioner's
 // expectation regardless of which exchange carries the report.
-func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (counters []uint32, exchangeID uint16, err error) {
-	counters, exchangeID, _, err = b.sendInitiatedReportArmed(target, report, false)
-	return counters, exchangeID, err
-}
-
-// sendInitiatedReportArmed is [Bridge.sendInitiatedReport] that, with
-// arm, also arms the wait for the peer's StatusResponse to the report's
+//
+// With arm it also arms the wait for the peer's StatusResponse to the report's
 // last chunk on the fresh exchange, just before that chunk goes out
 // ([Bridge.sendReportChunksNotify] armFinal), so the answer cannot land
 // before the waiter exists; the caller receives on wait through
@@ -1763,9 +1756,9 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 
 	// sendUnsolicitedIM is the low-level primitive that ships an IM
 	// datagram on whichever exchange the caller has prepared in `target`.
-	// sendReportChunks is the caller; both ongoing reporters (attributes
-	// and events) and the flush reach it through sendInitiatedReport or
-	// sendInitiatedReportArmed, which forge a fresh bridge-opened exchange
+	// sendReportChunksNotify is the caller; both ongoing reporters
+	// (attributes and events) and the flush reach it through
+	// sendInitiatedReportArmed, which forges a fresh bridge-opened exchange
 	// (target.peerInitiator=false → Initiator=true). A target with peerInitiator=true would answer on
 	// the peer-opened exchange instead — only meaningful while that
 	// exchange is still open on the peer's side.
@@ -2484,7 +2477,8 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 // observable (ServerBehaviorBacking.ts:253-261 at db021da0) — and the version
 // advanced through OnAttributeChange, which tells of every change at once
 // ([quieterVersion]); any other server is subscribed through
-// OnAttributeChange alone. Caller holds b.mu.
+// OnAttributeChange alone. It takes no lock of b's; the rewire calls it
+// without b.mu (review II, R2-P6-doc-0515).
 func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
 	for _, ep := range topology.Endpoints {
 		if ep == nil {

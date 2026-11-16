@@ -92,8 +92,9 @@ type SubscribeRequest struct {
 	// EventFilters carries per-source minimum-event-number hints the
 	// controller sends to avoid re-receiving events it has already seen
 	// (Matter §10.6.9 EventFilterIB). The bridge evaluates the filters
-	// in BuildEventReports and skips events whose Number ≤ the
-	// supplied EventMin.
+	// in BuildEventReports and skips events whose Number < the
+	// supplied EventMin: EventMin is inclusive (review II,
+	// R2-P6-doc-0562).
 	EventFilters   []EventMinimumNumber
 	FabricFiltered bool
 	// DataVersionFilters carries per-cluster version hints the

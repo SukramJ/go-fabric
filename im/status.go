@@ -40,8 +40,8 @@ type StatusCodeError interface {
 // StatusIB with both Status=IMStatus and ClusterStatus=clusterCode.
 //
 // Use case: AdministratorCommissioning §11.19.7.3 PAKEParameterError
-// (cluster-specific code 0x02) alongside Status=ClusterSpecificFailure
-// (0x01). Implement both MatterStatusCode() and MatterClusterStatus():
+// (cluster-specific code 0x02) alongside Status=Failure (0x01; review II,
+// R2-P6-doc-0563). Implement both MatterStatusCode() and MatterClusterStatus():
 //
 //	type pakeErr struct{}
 //	func (pakeErr) Error() string            { return "PAKE parameter error" }
