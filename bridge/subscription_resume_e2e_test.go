@@ -563,16 +563,23 @@ func (nopResumptionStore) RemoveResumption(context.Context, uint8, uint64) error
 
 func startResumeDevice(t *testing.T, st SubscriptionStore, configure func(*Bridge, *operational.Manager)) *resumeDevice {
 	t.Helper()
+	return startResumeDeviceWith(t, st, []store.ACLEntry{{FabricIndex: resumeFabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE}}, nil, configure)
+}
+
+// startResumeDeviceWith is [startResumeDevice] with the fabric's ACL
+// entries and further root cluster servers beside AccessControl.
+func startResumeDeviceWith(t *testing.T, st SubscriptionStore, entries []store.ACLEntry, extra []contract.ClusterServer, configure func(*Bridge, *operational.Manager)) *resumeDevice {
+	t.Helper()
 	br, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acl := &aclStoreFake{entries: []store.ACLEntry{{FabricIndex: resumeFabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE}}}
+	acl := &aclStoreFake{entries: entries}
 	ac, err := core.NewAccessControl(acl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	br.AttachRootClusters([]contract.ClusterServer{ac})
+	br.AttachRootClusters(append([]contract.ClusterServer{ac}, extra...))
 	br.AttachACLLister(acl)
 	sessions := operational.NewManager(nopResumptionStore{})
 	br.AttachSessionLookup(NewOperationalSessionLookup(func(id uint16) (*channel.Session, bool) {
@@ -675,6 +682,18 @@ func resumeInitiatorProvider(fab resumeFabric, sessions *operational.Manager) Ca
 // SubscribeRequest over the wire. Returns the subscription id.
 func subscribeOverCASE(t *testing.T, dev *resumeDevice, ctrl *fakeController) uint32 {
 	t.Helper()
+	return subscribeOverCASEWith(t, dev, ctrl, im.SubscribeRequest{
+		KeepSubscriptions:  true,
+		MinIntervalFloor:   0,
+		MaxIntervalCeiling: 120,
+		FabricFiltered:     true,
+		AttributeRequests:  []im.ConcreteAttributePath{accessControlACLPath()},
+	})
+}
+
+// subscribeOverCASEWith is [subscribeOverCASE] with req.
+func subscribeOverCASEWith(t *testing.T, dev *resumeDevice, ctrl *fakeController, req im.SubscribeRequest) uint32 {
+	t.Helper()
 	var keys sigma.SessionKeys
 	_, _ = rand.Read(keys.I2RKey[:])
 	_, _ = rand.Read(keys.R2IKey[:])
@@ -689,13 +708,7 @@ func subscribeOverCASE(t *testing.T, dev *resumeDevice, ctrl *fakeController) ui
 		t.Fatal(err)
 	}
 	ctrl.setSession(sess, resumeCtrlSIDRun1, resumeDeviceSIDRun)
-	ctrl.subscribe(im.SubscribeRequest{
-		KeepSubscriptions:  true,
-		MinIntervalFloor:   0,
-		MaxIntervalCeiling: 120,
-		FabricFiltered:     true,
-		AttributeRequests:  []im.ConcreteAttributePath{accessControlACLPath()},
-	})
+	ctrl.subscribe(req)
 	priming := ctrl.nextReport(t, 3*time.Second)
 	if priming.attrs == 0 {
 		t.Fatal("first-run priming report carried no attribute")

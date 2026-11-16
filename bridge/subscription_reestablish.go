@@ -286,6 +286,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 	readCtx := im.WithFabricFilter(ctx, rec.IsFabricFiltered, fabricIndex)
 	readCtx = im.WithSubject(readCtx, subjectNodeID, subjectCATs)
 	readCtx = im.WithLocalNodeID(readCtx, localNodeID)
+	readCtx = withReadAuthority(readCtx, dispatcher)
 	primingReq := im.SubscribeRequest{
 		MinIntervalFloor:   rec.MinIntervalFloor,
 		MaxIntervalCeiling: rec.MaxIntervalCeiling,

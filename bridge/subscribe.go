@@ -614,6 +614,36 @@ func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im
 	}
 }
 
+// withReadAuthority stamps on ctx the subject's read check
+// ([im.WithAuthority]) that [readResultAuthorizer] applies to the
+// results, so the dispatcher authorises a location before it reads the
+// server there ([im.LookupAuthority]): a subscriber without the grant
+// drives no server read in its priming report or its reports, as a
+// Read's subject drives none since R2-P6-bound-0405 (decision 162;
+// review II, wave 3, the gate's hand-over). The per-result filter stays
+// the gate of what is reported. A PASE session and a dispatcher without
+// an [im.ACLChecker] get no stamp — nothing is checked for them; a
+// session without an accessing fabric gets one that refuses every
+// location, as the filter refuses every result.
+func withReadAuthority(ctx context.Context, dispatcher im.Dispatcher) context.Context {
+	if im.IsPASEFromContext(ctx) {
+		return ctx
+	}
+	aclChecker, hasACL := dispatcher.(im.ACLChecker)
+	if !hasACL {
+		return ctx
+	}
+	_, fabricIndex := im.FabricFilterFromContext(ctx)
+	if !im.HasAccessingFabric(fabricIndex) {
+		return im.WithAuthority(ctx, func(uint16, uint32, uint8) im.StatusCode { return im.StatusUnsupportedAccess })
+	}
+	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
+	base := ctx
+	return im.WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) im.StatusCode {
+		return aclChecker.CheckACL(base, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
+	})
+}
+
 // reportSubscription assembles + ships a ReportData for sub. Called
 // by the manager's engine tick.
 func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subscription, paths []im.ConcreteAttributePath) {
@@ -907,6 +937,7 @@ func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im
 	if target.pase {
 		readCtx = im.WithAuthModePASE(readCtx)
 	}
+	readCtx = withReadAuthority(readCtx, dispatcher)
 	var reports []im.AttributeReport
 	for _, path := range b.unskippedChangedPaths(readCtx, dispatcher, sub, paths) {
 		for _, rr := range b.readAuthorizedResults(readCtx, dispatcher, path) {
@@ -1931,6 +1962,7 @@ func (b *Bridge) subscribeWith(
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		subCtx = im.WithAuthModePASE(subCtx)
 	}
+	subCtx = withReadAuthority(subCtx, dispatcher)
 
 	// A normal subscribe from this peer has begun: a re-establishment of
 	// its former subscriptions still in flight must leave it alone.
