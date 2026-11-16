@@ -147,7 +147,7 @@ func (g gatedZones) CreateTwoDCartesianZone(ctx context.Context, zone camera.Two
 func TestZonesCreateRunsOneAtATime(t *testing.T) {
 	t.Parallel()
 	g := gatedZones{mockZones: &mockZones{nextID: 100}, entered: make(chan struct{}, 1), gate: make(chan struct{})}
-	var held []camera.Zone
+	held := make([]camera.Zone, 0, zoneMaxUserDefined-1)
 	for i := range uint16(zoneMaxUserDefined - 1) {
 		zone := camera.TwoDZone{Name: "held", Use: zmdef.ZoneUseMotion, Vertices: triangle(100 * (i + 1))}
 		held = append(held, camera.Zone{ZoneId: i + 1, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser, TwoDCartesianZone: &zone})

@@ -262,17 +262,18 @@ func (p *PushTransport) MatterQuiesce() {
 }
 
 // change applies edit to a copy of the connection table and, when edit
-// reports a change, publishes the result and keeps it — both under pub; a
+// reports a change, publishes the result (a command's change, as each one
+// is) and keeps it — both under pub; a
 // table the schema refuses is neither published nor kept (review II,
 // R2-P6-err-1611).
-func (p *PushTransport) change(origin contract.Origin, edit func([]TransportConfiguration) ([]TransportConfiguration, bool)) error {
+func (p *PushTransport) change(edit func([]TransportConfiguration) ([]TransportConfiguration, bool)) error {
 	p.pub.Lock()
 	defer p.pub.Unlock()
 	next, changed := edit(p.Connections())
 	if !changed {
 		return nil
 	}
-	if err := p.srv.SetAttributesFrom(origin, map[uint32]any{padef.AttrCurrentConnections: spec.List[TransportConfiguration](nonNil(next))}); err != nil {
+	if err := p.srv.SetAttributesFrom(contract.OriginCommand, map[uint32]any{padef.AttrCurrentConnections: spec.List[TransportConfiguration](nonNil(next))}); err != nil {
 		return fmt.Errorf("camera: CurrentConnections: %w", err)
 	}
 	p.mu.Lock()
@@ -740,17 +741,26 @@ func (p *PushTransport) allocate(ctx context.Context, fields any) (any, error) {
 	}
 	opts := stored
 	conn := TransportConfiguration{ConnectionId: id, TransportStatus: padef.TransportStatusInactive, TransportOptions: &opts, FabricIndex: fabric} // :1198-1200
-	if err := p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
-		return append(next, conn.Clone()), true
-	}); err != nil {
-		return nil, commitError(err)
-	}
-	if o.ExpiryTime != nil { // :1213-1217
-		p.mu.Lock()
-		p.scheduleLocked(ctx, id, time.Duration(*o.ExpiryTime)*time.Second)
-		p.mu.Unlock()
+	if err := p.commitAllocation(ctx, conn, o.ExpiryTime); err != nil {
+		return nil, err
 	}
 	return padef.AllocatePushTransportResponse{TransportConfiguration: conn}, nil
+}
+
+// commitAllocation stores an allocated connection and arms its expiry
+// (:1198-1217).
+func (p *PushTransport) commitAllocation(ctx context.Context, conn TransportConfiguration, expirySeconds *uint32) error {
+	if err := p.change(func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+		return append(next, conn.Clone()), true
+	}); err != nil {
+		return commitError(err)
+	}
+	if expirySeconds != nil {
+		p.mu.Lock()
+		p.scheduleLocked(ctx, conn.ConnectionId, time.Duration(*expirySeconds)*time.Second)
+		p.mu.Unlock()
+	}
+	return nil
 }
 
 func nvalue(id uint16) *spec.Nullable[uint16] {
@@ -814,7 +824,7 @@ func (p *PushTransport) remove(id uint16) error {
 		delete(p.timers, id)
 	}
 	p.mu.Unlock()
-	return p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+	return p.change(func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
 		i := slices.IndexFunc(next, func(c TransportConfiguration) bool { return c.ConnectionId == id })
 		if i < 0 {
 			return next, false
@@ -877,7 +887,7 @@ func (p *PushTransport) modify(ctx context.Context, fields any) (any, error) {
 	if err := p.port.ModifyPushTransport(ctx, req.ConnectionId, stored); err != nil { // :1334
 		return nil, portError("ModifyPushTransport", err)
 	}
-	if err := p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+	if err := p.change(func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
 		i := slices.IndexFunc(next, func(c TransportConfiguration) bool { // :1337-1352
 			return c.ConnectionId == req.ConnectionId && c.FabricIndex == fabric
 		})
@@ -923,7 +933,7 @@ func (p *PushTransport) setStatus(ctx context.Context, fields any) (any, error) 
 	if err := p.port.SetTransportStatus(ctx, slices.Clone(ids), req.TransportStatus); err != nil { // :1406
 		return nil, portError("SetTransportStatus", err)
 	}
-	if err := p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+	if err := p.change(func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
 		for i := range next { // :1410-1419
 			if slices.Contains(ids, next[i].ConnectionId) {
 				next[i].TransportStatus = req.TransportStatus

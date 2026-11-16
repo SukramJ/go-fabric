@@ -163,7 +163,12 @@ type AvStream struct {
 	capture  SnapshotCapturePort
 	maxImage int
 
-	// mu guards the streams and the priorities.
+	// op serialises the commands from their checks through the port to
+	// their commit ([serial]); pub serialises each change of the streams
+	// or the priorities with its publication ([AvStream.change]); mu
+	// guards the streams and the priorities.
+	op         sync.Mutex
+	pub        sync.Mutex
 	mu         sync.Mutex
 	videos     []VideoStream
 	audios     []AudioStream
@@ -204,16 +209,16 @@ func NewAvStream(cfg AvStreamConfig) (*AvStream, error) {
 		a.maxImage = DefaultMaxSnapshotSize
 	}
 	handlers := map[uint32]spec.CommandHandler{
-		csdef.CmdVideoStreamAllocate:      a.videoStreamAllocate,
-		csdef.CmdVideoStreamModify:        a.videoStreamModify,
-		csdef.CmdVideoStreamDeallocate:    a.videoStreamDeallocate,
-		csdef.CmdAudioStreamAllocate:      a.audioStreamAllocate,
-		csdef.CmdAudioStreamDeallocate:    a.audioStreamDeallocate,
-		csdef.CmdSnapshotStreamAllocate:   a.snapshotStreamAllocate,
-		csdef.CmdSnapshotStreamModify:     a.snapshotStreamModify,
-		csdef.CmdSnapshotStreamDeallocate: a.snapshotStreamDeallocate,
-		csdef.CmdSetStreamPriorities:      a.setStreamPriorities,
-		csdef.CmdCaptureSnapshot:          a.captureSnapshot,
+		csdef.CmdVideoStreamAllocate:      serial(&a.op, a.videoStreamAllocate),
+		csdef.CmdVideoStreamModify:        serial(&a.op, a.videoStreamModify),
+		csdef.CmdVideoStreamDeallocate:    serial(&a.op, a.videoStreamDeallocate),
+		csdef.CmdAudioStreamAllocate:      serial(&a.op, a.audioStreamAllocate),
+		csdef.CmdAudioStreamDeallocate:    serial(&a.op, a.audioStreamDeallocate),
+		csdef.CmdSnapshotStreamAllocate:   serial(&a.op, a.snapshotStreamAllocate),
+		csdef.CmdSnapshotStreamModify:     serial(&a.op, a.snapshotStreamModify),
+		csdef.CmdSnapshotStreamDeallocate: serial(&a.op, a.snapshotStreamDeallocate),
+		csdef.CmdSetStreamPriorities:      serial(&a.op, a.setStreamPriorities),
+		csdef.CmdCaptureSnapshot:          serial(&a.op, a.captureSnapshot),
 	}
 	opts := spec.Options{Features: uint32(f), Attributes: slices.Clone(cfg.Attributes)}
 	srv, err := spec.NewServer(csdef.Definition, opts, spec.ServerConfig{
@@ -235,7 +240,7 @@ func NewAvStream(cfg AvStreamConfig) (*AvStream, error) {
 	if a.priorities == nil {
 		a.priorities = a.supportedStreamUsages()
 	}
-	a.videos = slices.Clone(cfg.AllocatedVideoStreams)
+	a.videos = cloneAll(cfg.AllocatedVideoStreams)
 	for i := range a.videos {
 		a.videos[i].ReferenceCount = 0
 	}
@@ -243,7 +248,7 @@ func NewAvStream(cfg AvStreamConfig) (*AvStream, error) {
 	for i := range a.audios {
 		a.audios[i].ReferenceCount = 0
 	}
-	a.snapshots = slices.Clone(cfg.AllocatedSnapshotStreams)
+	a.snapshots = cloneAll(cfg.AllocatedSnapshotStreams)
 	for i := range a.snapshots {
 		a.snapshots[i].ReferenceCount = 0
 	}
@@ -362,19 +367,66 @@ func (a *AvStream) served(values map[uint32]any) map[uint32]any {
 	return out
 }
 
-// publish stores the held attributes among ids at their current value;
-// the generated server reports the ones that changed. Mirrors chip's
-// PersistAndNotify (CameraAVStreamManagementCluster.cpp:1763-1773), the
-// persistence being the host's.
-func (a *AvStream) publish(origin contract.Origin, ids ...uint32) {
+// avStreamState is the state a change edits.
+type avStreamState struct {
+	videos     []VideoStream
+	audios     []AudioStream
+	snapshots  []SnapshotStream
+	priorities []StreamUsage
+}
+
+// saveLocked is a deep copy of the state; the caller holds a.mu.
+func (a *AvStream) saveLocked() avStreamState {
+	return avStreamState{
+		videos: cloneAll(a.videos), audios: slices.Clone(a.audios), // AudioStreamStruct holds no list or pointer
+		snapshots: cloneAll(a.snapshots), priorities: slices.Clone(a.priorities),
+	}
+}
+
+// restoreLocked sets the state to st; the caller holds a.mu.
+func (a *AvStream) restoreLocked(st avStreamState) {
+	a.videos, a.audios, a.snapshots, a.priorities = st.videos, st.audios, st.snapshots, st.priorities
+}
+
+// change runs edit on the state under a.mu; edit returns the attributes it
+// changed. Their values are published — chip's PersistAndNotify
+// (CameraAVStreamManagementCluster.cpp:1763-1773), the persistence being
+// the host's — and the edited state kept, both under pub; a value the
+// store refuses is neither, the state stays as it was and the error is
+// returned (review II, R2-P6-err-1611).
+func (a *AvStream) change(origin contract.Origin, edit func() []uint32) error {
+	a.pub.Lock()
+	defer a.pub.Unlock()
 	a.mu.Lock()
-	all := a.held()
+	before := a.saveLocked()
+	ids := edit()
+	if len(ids) == 0 {
+		a.mu.Unlock()
+		return nil
+	}
+	after, all := a.saveLocked(), a.held()
+	a.restoreLocked(before)
 	a.mu.Unlock()
 	values := make(map[uint32]any, len(ids))
 	for _, id := range ids {
 		values[id] = all[id]
 	}
-	_ = a.srv.SetAttributesFrom(origin, a.served(values))
+	if err := a.srv.SetAttributesFrom(origin, a.served(values)); err != nil {
+		return fmt.Errorf("camera: CameraAvStreamManagement: %w", err)
+	}
+	a.mu.Lock()
+	a.restoreLocked(after)
+	a.mu.Unlock()
+	return nil
+}
+
+// commandChange is [AvStream.change] for a command: a refused value
+// answers FAILURE.
+func (a *AvStream) commandChange(edit func() []uint32) error {
+	if err := a.change(contract.OriginCommand, edit); err != nil {
+		return commitError(err)
+	}
+	return nil
 }
 
 // stored returns attribute id's value as T; the zero T when the server
@@ -480,6 +532,8 @@ func (a *AvStream) SetAttributes(values map[uint32]any) error {
 	if setPriorities {
 		rest[csdef.AttrStreamUsagePriorities] = nonNil(priorities)
 	}
+	a.pub.Lock()
+	defer a.pub.Unlock()
 	if err := a.srv.SetAttributes(rest); err != nil {
 		return err
 	}
@@ -509,7 +563,7 @@ func (a *AvStream) checkViewportWith(vp csdef.ViewportStruct, pending map[uint32
 func (a *AvStream) VideoStreams() []VideoStream {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return slices.Clone(a.videos)
+	return cloneAll(a.videos)
 }
 
 // AudioStreams returns AllocatedAudioStreams.
@@ -523,7 +577,7 @@ func (a *AvStream) AudioStreams() []AudioStream {
 func (a *AvStream) SnapshotStreams() []SnapshotStream {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return slices.Clone(a.snapshots)
+	return cloneAll(a.snapshots)
 }
 
 // StreamUsagePriorities returns the ranked stream usages.
@@ -589,23 +643,26 @@ func (a *AvStream) UpdateSnapshotStreamRefCount(snapshotStreamID uint16, increme
 }
 
 func (a *AvStream) updateRefCount(attrID uint32, find func() (*uint8, bool), increment bool) error {
-	a.mu.Lock()
-	count, ok := find()
-	switch {
-	case !ok:
-		a.mu.Unlock()
-		return ErrStreamNotFound
-	case increment && *count == math.MaxUint8, !increment && *count == 0:
-		a.mu.Unlock()
-		return ErrStreamRefCount
-	case increment:
-		*count++
-	default:
-		*count--
+	var refused error
+	if err := a.change(contract.OriginHostSet, func() []uint32 {
+		count, ok := find()
+		switch {
+		case !ok:
+			refused = ErrStreamNotFound
+			return nil
+		case increment && *count == math.MaxUint8, !increment && *count == 0:
+			refused = ErrStreamRefCount
+			return nil
+		case increment:
+			*count++
+		default:
+			*count--
+		}
+		return []uint32{attrID}
+	}); err != nil {
+		return err
 	}
-	a.mu.Unlock()
-	a.publish(contract.OriginHostSet, attrID)
-	return nil
+	return refused
 }
 
 // ReusableVideoStreamID is chip's GetReusableVideoStreamId
@@ -741,21 +798,23 @@ func (a *AvStream) videoStreamAllocate(ctx context.Context, fields any) (any, er
 	if err != nil {
 		return nil, portError("VideoStreamAllocate", err)
 	}
-	a.mu.Lock()
-	action, stream, changed := StreamNewAllocation, args, true
-	if i := slices.IndexFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == id }); i < 0 { // :2151-2159
-		stream.VideoStreamId = id
-		a.videos = append(a.videos, stream)
-	} else { // :2160-2171
-		changed = narrowVideoStream(&a.videos[i], args)
-		action, stream = StreamReuse, a.videos[i]
-		if changed {
-			action = StreamModification
+	action, stream := StreamNewAllocation, args.Clone()
+	if err := a.commandChange(func() []uint32 {
+		i := slices.IndexFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == id })
+		if i < 0 { // :2151-2159
+			stream.VideoStreamId = id
+			a.videos = append(a.videos, stream.Clone())
+			return []uint32{csdef.AttrAllocatedVideoStreams}
 		}
-	}
-	a.mu.Unlock()
-	if changed {
-		a.publish(contract.OriginCommand, csdef.AttrAllocatedVideoStreams)
+		changed := narrowVideoStream(&a.videos[i], args) // :2160-2171
+		action, stream = StreamReuse, a.videos[i].Clone()
+		if !changed {
+			return nil
+		}
+		action = StreamModification
+		return []uint32{csdef.AttrAllocatedVideoStreams}
+	}); err != nil {
+		return nil, err
 	}
 	a.video.VideoStreamAllocated(ctx, stream, action)
 	return csdef.VideoStreamAllocateResponse{VideoStreamId: id}, nil
@@ -839,16 +898,13 @@ func (a *AvStream) videoStreamModify(ctx context.Context, fields any) (any, erro
 	if err := a.video.VideoStreamModify(ctx, req.VideoStreamId, req.WatermarkEnabled, req.OsdEnabled); err != nil {
 		return nil, portError("VideoStreamModify", err)
 	}
-	a.mu.Lock()
-	changed := false
-	if i := slices.IndexFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == req.VideoStreamId }); i >= 0 {
-		changed = applyModify(&a.videos[i].WatermarkEnabled, &a.videos[i].OsdEnabled, req.WatermarkEnabled, req.OsdEnabled)
-	}
-	a.mu.Unlock()
-	if changed {
-		a.publish(contract.OriginCommand, csdef.AttrAllocatedVideoStreams)
-	}
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		i := slices.IndexFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == req.VideoStreamId })
+		if i < 0 || !applyModify(&a.videos[i].WatermarkEnabled, &a.videos[i].OsdEnabled, req.WatermarkEnabled, req.OsdEnabled) {
+			return nil
+		}
+		return []uint32{csdef.AttrAllocatedVideoStreams}
+	})
 }
 
 // applyModify sets the given flags and reports a change (chip
@@ -887,11 +943,10 @@ func (a *AvStream) videoStreamDeallocate(ctx context.Context, fields any) (any, 
 	if err := a.video.VideoStreamDeallocate(ctx, req.VideoStreamId); err != nil {
 		return nil, portError("VideoStreamDeallocate", err)
 	}
-	a.mu.Lock()
-	a.videos = slices.DeleteFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == req.VideoStreamId })
-	a.mu.Unlock()
-	a.publish(contract.OriginCommand, csdef.AttrAllocatedVideoStreams)
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		a.videos = slices.DeleteFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == req.VideoStreamId })
+		return []uint32{csdef.AttrAllocatedVideoStreams}
+	})
 }
 
 // audioStreamAllocate carries out AudioStreamAllocate. Mirrors chip
@@ -930,16 +985,15 @@ func (a *AvStream) audioStreamAllocate(ctx context.Context, fields any) (any, er
 	if err != nil {
 		return nil, portError("AudioStreamAllocate", err)
 	}
-	a.mu.Lock()
-	added := false
-	if !slices.ContainsFunc(a.audios, func(s AudioStream) bool { return s.AudioStreamId == id }) { // :2320-2331
+	if err := a.commandChange(func() []uint32 {
+		if slices.ContainsFunc(a.audios, func(s AudioStream) bool { return s.AudioStreamId == id }) { // :2320-2331
+			return nil
+		}
 		args.AudioStreamId = id
 		a.audios = append(a.audios, args)
-		added = true
-	}
-	a.mu.Unlock()
-	if added {
-		a.publish(contract.OriginCommand, csdef.AttrAllocatedAudioStreams)
+		return []uint32{csdef.AttrAllocatedAudioStreams}
+	}); err != nil {
+		return nil, err
 	}
 	return csdef.AudioStreamAllocateResponse{AudioStreamId: id}, nil
 }
@@ -964,11 +1018,10 @@ func (a *AvStream) audioStreamDeallocate(ctx context.Context, fields any) (any, 
 	if err := a.audio.AudioStreamDeallocate(ctx, req.AudioStreamId); err != nil {
 		return nil, portError("AudioStreamDeallocate", err)
 	}
-	a.mu.Lock()
-	a.audios = slices.DeleteFunc(a.audios, func(s AudioStream) bool { return s.AudioStreamId == req.AudioStreamId })
-	a.mu.Unlock()
-	a.publish(contract.OriginCommand, csdef.AttrAllocatedAudioStreams)
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		a.audios = slices.DeleteFunc(a.audios, func(s AudioStream) bool { return s.AudioStreamId == req.AudioStreamId })
+		return []uint32{csdef.AttrAllocatedAudioStreams}
+	})
 }
 
 // matchingSnapshotCapability is the first SnapshotCapabilities entry of
@@ -1031,17 +1084,16 @@ func (a *AvStream) snapshotStreamAllocate(ctx context.Context, fields any) (any,
 	if err != nil {
 		return nil, portError("SnapshotStreamAllocate", err)
 	}
-	a.mu.Lock()
-	changed := true
-	if i := slices.IndexFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == id }); i < 0 { // :2461-2478
-		args.SnapshotStreamId = id
-		a.snapshots = append(a.snapshots, args)
-	} else { // :2479-2484
-		changed = narrowSnapshotStream(&a.snapshots[i], args)
-	}
-	a.mu.Unlock()
-	if changed {
-		a.publish(contract.OriginCommand, csdef.AttrAllocatedSnapshotStreams)
+	if err := a.commandChange(func() []uint32 {
+		if i := slices.IndexFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == id }); i < 0 { // :2461-2478
+			args.SnapshotStreamId = id
+			a.snapshots = append(a.snapshots, args.Clone())
+		} else if !narrowSnapshotStream(&a.snapshots[i], args) { // :2479-2484
+			return nil
+		}
+		return []uint32{csdef.AttrAllocatedSnapshotStreams}
+	}); err != nil {
+		return nil, err
 	}
 	return csdef.SnapshotStreamAllocateResponse{SnapshotStreamId: id}, nil
 }
@@ -1104,16 +1156,13 @@ func (a *AvStream) snapshotStreamModify(ctx context.Context, fields any) (any, e
 	if err := a.snapshot.SnapshotStreamModify(ctx, req.SnapshotStreamId, req.WatermarkEnabled, req.OsdEnabled); err != nil {
 		return nil, portError("SnapshotStreamModify", err)
 	}
-	a.mu.Lock()
-	changed := false
-	if i := slices.IndexFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == req.SnapshotStreamId }); i >= 0 {
-		changed = applyModify(&a.snapshots[i].WatermarkEnabled, &a.snapshots[i].OsdEnabled, req.WatermarkEnabled, req.OsdEnabled)
-	}
-	a.mu.Unlock()
-	if changed {
-		a.publish(contract.OriginCommand, csdef.AttrAllocatedSnapshotStreams)
-	}
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		i := slices.IndexFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == req.SnapshotStreamId })
+		if i < 0 || !applyModify(&a.snapshots[i].WatermarkEnabled, &a.snapshots[i].OsdEnabled, req.WatermarkEnabled, req.OsdEnabled) {
+			return nil
+		}
+		return []uint32{csdef.AttrAllocatedSnapshotStreams}
+	})
 }
 
 // snapshotStreamDeallocate carries out SnapshotStreamDeallocate. Mirrors
@@ -1129,11 +1178,10 @@ func (a *AvStream) snapshotStreamDeallocate(ctx context.Context, fields any) (an
 	if err := a.snapshot.SnapshotStreamDeallocate(ctx, req.SnapshotStreamId); err != nil {
 		return nil, portError("SnapshotStreamDeallocate", err)
 	}
-	a.mu.Lock()
-	a.snapshots = slices.DeleteFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == req.SnapshotStreamId })
-	a.mu.Unlock()
-	a.publish(contract.OriginCommand, csdef.AttrAllocatedSnapshotStreams)
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		a.snapshots = slices.DeleteFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == req.SnapshotStreamId })
+		return []uint32{csdef.AttrAllocatedSnapshotStreams}
+	})
 }
 
 // setStreamPriorities carries out SetStreamPriorities. Mirrors chip
@@ -1168,11 +1216,10 @@ func (a *AvStream) setStreamPriorities(_ context.Context, fields any) (any, erro
 		}
 		seen[u] = true
 	}
-	a.mu.Lock()
-	a.priorities = slices.Clone(req.StreamPriorities)
-	a.mu.Unlock()
-	a.publish(contract.OriginCommand, csdef.AttrStreamUsagePriorities)
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		a.priorities = slices.Clone(req.StreamPriorities)
+		return []uint32{csdef.AttrStreamUsagePriorities}
+	})
 }
 
 // captureSnapshot carries out CaptureSnapshot. Mirrors chip
