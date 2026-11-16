@@ -754,19 +754,10 @@ type KeySetReadAllIndicesResponse struct {
 
 // MatterInvoke implements [contract.ClusterServer].
 func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	// Resolve fabric from IM dispatcher context: SetCurrentFabric has no
-	// production caller, so every KeySetWrite / KeySetRead / KeySetRemove /
-	// KeySetReadAllIndices command arriving on a post-AddNOC CASE session
-	// previously saw fabric=0 and returned "command without active fabric" —
-	// which commissioners retransmit-loop on. FabricFilterFromContext returns
-	// the session's fabric (CASE > 0) and falls through to the legacy
-	// currentFabric only when no IM context is wired (test paths).
+	// The fabric is the request's accessing fabric
+	// (FabricFilterFromContext), never a server-wide value: a command
+	// without one is refused (review II, R2-P6-sec-1006).
 	_, fabric := im.FabricFilterFromContext(ctx)
-	if fabric == 0 {
-		g.mu.RLock()
-		fabric = g.currentFabric
-		g.mu.RUnlock()
-	}
 	if fabric == 0 {
 		// A fabric-scoped operation without an accessing fabric is
 		// UNSUPPORTED_ACCESS, matter.js's AccessDeniedError
@@ -853,11 +844,16 @@ func (g *GroupKeyManagement) MatterGeneratedCommands() []uint32 {
 	}
 }
 
-// SetCurrentFabric sets the fabric a local call — [GroupKeyManagement.MatterInvoke]
-// or [GroupKeyManagement.MatterWrite] with no accessing fabric in its
-// context — runs against. It scopes no read: a read with no request
-// behind it covers every fabric, and a request's read is scoped by the
-// request's own fabric. Nothing in this module calls it.
+// SetCurrentFabric sets the fabric a local write —
+// [GroupKeyManagement.MatterWrite] with no request in its context — lands
+// on. It scopes no command — [GroupKeyManagement.MatterInvoke] without an
+// accessing fabric answers UnsupportedAccess — and no read: a read with
+// no request behind it covers every fabric, and a request's read is
+// scoped by the request's own fabric. Nothing in this module calls it.
+//
+// Deprecated: a fabric-scoped write takes its fabric from the request
+// ([im.WithFabricFilter]); there is no replacement. Removable in the next
+// minor release.
 func (g *GroupKeyManagement) SetCurrentFabric(idx uint8) {
 	g.mu.Lock()
 	g.currentFabric = idx

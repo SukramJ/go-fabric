@@ -163,10 +163,9 @@ func TestGKMPrivilegesMatchTheElementAccessTags(t *testing.T) {
 func TestGKMUnsupportedCommandIsRefused(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
 
 	// 0x02 is KeySetReadResponse — a response, never an accepted command.
-	_, err := gkm.MatterInvoke(context.Background(), 0x02, nil)
+	_, err := gkm.MatterInvoke(fabricCtx(1), 0x02, nil)
 	var status im.StatusCodeError
 	if !errors.As(err, &status) {
 		t.Fatalf("err = %v (%T), want an im.StatusCodeError", err, err)
@@ -192,8 +191,7 @@ func TestGKMCommandsRejectTheWrongRequestType(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			gkm := newGKM(t)
-			gkm.SetCurrentFabric(1)
-			if _, err := gkm.MatterInvoke(context.Background(), cmdID, "not a request"); err == nil {
+			if _, err := gkm.MatterInvoke(fabricCtx(1), cmdID, "not a request"); err == nil {
 				t.Fatalf("%s accepted a payload of the wrong type", name)
 			}
 		})
@@ -207,7 +205,7 @@ func TestGKMCommandsRejectTheWrongRequestType(t *testing.T) {
 // bridge does not hold.
 func TestGKMSurfacesStoreFailures(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := fabricCtx(1)
 
 	t.Run("KeySetWrite upsert fails", func(t *testing.T) {
 		t.Parallel()
@@ -382,34 +380,31 @@ func TestGKMKeySetWriteEpochKeyLengthConstraint(t *testing.T) {
 	t.Run("EpochKey0 too short", func(t *testing.T) {
 		t.Parallel()
 		gkm := newGKM(t)
-		gkm.SetCurrentFabric(1)
 		req := validKeySet(7)
 		req.GroupKeySet.EpochKey0 = make([]byte, 8)
-		if _, err := gkm.MatterInvoke(ctx, 0x00, req); statusOf(err) != im.StatusConstraintError {
+		if _, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, req); statusOf(err) != im.StatusConstraintError {
 			t.Fatalf("an 8-byte EpochKey0: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 		}
 	})
 	t.Run("EpochKey1 too long", func(t *testing.T) {
 		t.Parallel()
 		gkm := newGKM(t)
-		gkm.SetCurrentFabric(1)
 		req := validKeySet(7)
 		req.GroupKeySet.EpochKey1 = make([]byte, 17)
 		req.GroupKeySet.EpochStartTime1 = 2000
-		if _, err := gkm.MatterInvoke(ctx, 0x00, req); statusOf(err) != im.StatusConstraintError {
+		if _, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, req); statusOf(err) != im.StatusConstraintError {
 			t.Fatalf("a 17-byte EpochKey1: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 		}
 	})
 	t.Run("EpochKey2 too short", func(t *testing.T) {
 		t.Parallel()
 		gkm := newGKM(t)
-		gkm.SetCurrentFabric(1)
 		req := validKeySet(7)
 		req.GroupKeySet.EpochKey1 = make([]byte, 16)
 		req.GroupKeySet.EpochStartTime1 = 2000
 		req.GroupKeySet.EpochKey2 = make([]byte, 4)
 		req.GroupKeySet.EpochStartTime2 = 3000
-		if _, err := gkm.MatterInvoke(ctx, 0x00, req); statusOf(err) != im.StatusConstraintError {
+		if _, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, req); statusOf(err) != im.StatusConstraintError {
 			t.Fatalf("a 4-byte EpochKey2: %v (status %v), want CONSTRAINT_ERROR", err, statusOf(err))
 		}
 	})
@@ -424,7 +419,6 @@ func TestGKMKeySetWriteEpochKeyLengthConstraint(t *testing.T) {
 func TestGKMKeySetWriteDisablesASlotOnTheSentinelStartTime(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
 
 	req := validKeySet(7)
 	req.GroupKeySet.EpochKey1 = make([]byte, 16)
@@ -432,10 +426,10 @@ func TestGKMKeySetWriteDisablesASlotOnTheSentinelStartTime(t *testing.T) {
 	req.GroupKeySet.EpochKey2 = make([]byte, 16)
 	req.GroupKeySet.EpochStartTime2 = 0xFFFFFFFFFFFFFFFF
 
-	if _, err := gkm.MatterInvoke(context.Background(), 0x00, req); err != nil {
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, req); err != nil {
 		t.Fatalf("KeySetWrite with two disabled slots: %v", err)
 	}
-	raw, err := gkm.MatterInvoke(context.Background(), 0x01, core.KeySetReadRequest{GroupKeySetID: 7})
+	raw, err := gkm.MatterInvoke(fabricCtx(1), 0x01, core.KeySetReadRequest{GroupKeySetID: 7})
 	if err != nil {
 		t.Fatalf("KeySetRead: %v", err)
 	}
@@ -490,10 +484,9 @@ func TestGKMKeySetWriteEpochSlotOrdering(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			gkm := newGKM(t)
-			gkm.SetCurrentFabric(1)
 			req := validKeySet(7)
 			mutate(&req.GroupKeySet)
-			if _, err := gkm.MatterInvoke(context.Background(), 0x00, req); statusOf(err) != im.StatusInvalidCommand {
+			if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, req); statusOf(err) != im.StatusInvalidCommand {
 				t.Fatalf("KeySetWrite with %s: %v (status %v), want INVALID_COMMAND", name, err, statusOf(err))
 			}
 		})

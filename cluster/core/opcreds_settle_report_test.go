@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
 )
@@ -115,5 +116,57 @@ func TestAddTrustedRootExpiryInBetweenLeavesNoRoot(t *testing.T) {
 	v, _ := oc.MatterRead(0x0004)
 	if roots := reflect.ValueOf(v); roots.Len() != 0 {
 		t.Errorf("TrustedRootCertificates after the window ended = %d entries, want none", roots.Len())
+	}
+}
+
+// UpdateFabricLabel without an accessing fabric answers UnsupportedAccess
+// on a direct call after an AddNOC: the fabric the last AddNOC installed
+// never stands in for the request's (review II, R2-P6-sec-1006). UpdateNOC
+// lost the same fallback; its own guards refuse a request without a fabric
+// before it (the CSR for an update needs one, and a session fabric 0 does
+// not match a fabric's fail-safe).
+func TestFabricScopedOpcredsCommandsWithoutFabricAreRefused(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newFakeStore()
+	oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv)}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+	pendingPub := issueCSRPendingPubKey(ctx, t, oc, false)
+	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+		NOCValue: buildCoreSignedCertForPubKey(t, pendingPub, false, rootPriv, testDefaultFabricID, testDefaultNodeID),
+		IPKValue: make([]byte, 16), CaseAdminSubject: testDefaultNodeID, AdminVendorID: 0xFFF1,
+	})
+	if noc, ok := resp.(core.NOCResponse); err != nil || !ok || noc.StatusCode != core.NOCStatusOK {
+		t.Fatalf("AddNOC = %#v, %v", resp, err)
+	}
+	for _, c := range []struct {
+		name   string
+		cmd    uint32
+		fields any
+	}{
+		{"UpdateFabricLabel", 0x09, core.UpdateFabricLabelRequest{Label: "relabelled"}},
+	} {
+		_, err := oc.MatterInvoke(ctx, c.cmd, c.fields)
+		if got := spec.StatusOf(err); got != im.StatusUnsupportedAccess {
+			t.Errorf("%s without an accessing fabric: %v (status %v), want UnsupportedAccess", c.name, err, got)
+		}
+	}
+	fabrics, err := st.ListFabrics(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range fabrics {
+		if fabrics[i].Label != "" {
+			t.Errorf("fabric %d relabelled to %q", fabrics[i].FabricIndex, fabrics[i].Label)
+		}
 	}
 }

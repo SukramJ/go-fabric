@@ -141,14 +141,18 @@ func TestGKM_ReadGroupTableInitiallyEmpty(t *testing.T) {
 	}
 }
 
-func TestGKM_SetCurrentFabric(t *testing.T) {
+// The deprecated SetCurrentFabric scopes no command: a command without an
+// accessing fabric answers UnsupportedAccess whatever the setter holds
+// (review II, R2-P6-sec-1006).
+func TestGKM_SetCurrentFabricScopesNoCommand(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
 	gkm.SetCurrentFabric(3)
-	// Invoke should now proceed (fabric != 0).
-	_, err := gkm.MatterInvoke(context.Background(), 0x04 /*KeySetReadAllIndices*/, nil)
-	if err != nil {
-		t.Fatalf("KeySetReadAllIndices after SetCurrentFabric: %v", err)
+	for _, ctx := range []context.Context{context.Background(), fabricCtx(0)} {
+		_, err := gkm.MatterInvoke(ctx, 0x04 /*KeySetReadAllIndices*/, nil)
+		if spec.StatusOf(err) != im.StatusUnsupportedAccess {
+			t.Errorf("KeySetReadAllIndices without an accessing fabric after SetCurrentFabric: %v, want UnsupportedAccess", err)
+		}
 	}
 }
 
@@ -165,7 +169,6 @@ func TestGKM_InvokeWithoutFabric_Fails(t *testing.T) {
 func TestGKM_KeySetWriteAndRead_RoundTrip(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
 	req := core.KeySetWriteRequest{
@@ -176,12 +179,12 @@ func TestGKM_KeySetWriteAndRead_RoundTrip(t *testing.T) {
 			EpochStartTime0:        100,
 		},
 	}
-	_, err := gkm.MatterInvoke(ctx, 0x00 /*KeySetWrite*/, req)
+	_, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00 /*KeySetWrite*/, req)
 	if err != nil {
 		t.Fatalf("KeySetWrite: %v", err)
 	}
 
-	resp, err := gkm.MatterInvoke(ctx, 0x01 /*KeySetRead*/, core.KeySetReadRequest{GroupKeySetID: 42})
+	resp, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x01 /*KeySetRead*/, core.KeySetReadRequest{GroupKeySetID: 42})
 	if err != nil {
 		t.Fatalf("KeySetRead: %v", err)
 	}
@@ -208,8 +211,7 @@ func TestGKM_KeySetWriteAndRead_RoundTrip(t *testing.T) {
 func TestGKM_KeySetRead_Miss(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
-	_, err := gkm.MatterInvoke(context.Background(), 0x01, core.KeySetReadRequest{GroupKeySetID: 9999})
+	_, err := gkm.MatterInvoke(fabricCtx(1), 0x01, core.KeySetReadRequest{GroupKeySetID: 9999})
 	// matter.js GroupKeyManagementServer.ts:388-398 (db021da0): NotFound
 	// (review II, W6-test-17).
 	if got := statusOf(err); got != im.StatusNotFound {
@@ -220,22 +222,21 @@ func TestGKM_KeySetRead_Miss(t *testing.T) {
 func TestGKM_KeySetRemove(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
 	// Write first.
-	_, _ = gkm.MatterInvoke(ctx, 0x00, core.KeySetWriteRequest{
+	_, _ = gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, core.KeySetWriteRequest{
 		GroupKeySet: core.GroupKeySetStruct{GroupKeySetID: 7, EpochKey0: make([]byte, 16), EpochStartTime0: 1},
 	})
 
 	// Remove.
-	_, err := gkm.MatterInvoke(ctx, 0x03, core.KeySetRemoveRequest{GroupKeySetID: 7})
+	_, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x03, core.KeySetRemoveRequest{GroupKeySetID: 7})
 	if err != nil {
 		t.Fatalf("KeySetRemove: %v", err)
 	}
 
 	// Read after remove must miss.
-	_, err = gkm.MatterInvoke(ctx, 0x01, core.KeySetReadRequest{GroupKeySetID: 7})
+	_, err = gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x01, core.KeySetReadRequest{GroupKeySetID: 7})
 	if got := statusOf(err); got != im.StatusNotFound {
 		t.Fatalf("KeySetRead after remove: %v (status 0x%02X), want NOT_FOUND", err, got)
 	}
@@ -249,9 +250,8 @@ func TestGKM_KeySetRemove(t *testing.T) {
 func TestGKM_KeySetRead_NotFoundStatusCode(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
 
-	_, err := gkm.MatterInvoke(context.Background(), 0x01 /*KeySetRead*/, core.KeySetReadRequest{GroupKeySetID: 9999})
+	_, err := gkm.MatterInvoke(fabricCtx(1), 0x01 /*KeySetRead*/, core.KeySetReadRequest{GroupKeySetID: 9999})
 	if err == nil {
 		t.Fatal("KeySetRead of never-written id: expected error, got nil")
 	}
@@ -273,9 +273,8 @@ func TestGKM_KeySetRead_NotFoundStatusCode(t *testing.T) {
 func TestGKM_KeySetRemove_NotFoundStatusCode(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
 
-	_, err := gkm.MatterInvoke(context.Background(), 0x03 /*KeySetRemove*/, core.KeySetRemoveRequest{GroupKeySetID: 55})
+	_, err := gkm.MatterInvoke(fabricCtx(1), 0x03 /*KeySetRemove*/, core.KeySetRemoveRequest{GroupKeySetID: 55})
 	if err == nil {
 		t.Fatal("KeySetRemove of never-written id: expected error, got nil")
 	}
@@ -292,16 +291,15 @@ func TestGKM_KeySetRemove_NotFoundStatusCode(t *testing.T) {
 func TestGKM_KeySetReadAllIndices(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
-	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
 	for _, id := range []uint16{10, 20, 30} {
-		_, _ = gkm.MatterInvoke(ctx, 0x00, core.KeySetWriteRequest{
+		_, _ = gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, core.KeySetWriteRequest{
 			GroupKeySet: core.GroupKeySetStruct{GroupKeySetID: id, EpochKey0: make([]byte, 16), EpochStartTime0: 1},
 		})
 	}
 
-	resp, err := gkm.MatterInvoke(ctx, 0x04, nil)
+	resp, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x04, nil)
 	if err != nil {
 		t.Fatalf("KeySetReadAllIndices: %v", err)
 	}
@@ -577,9 +575,8 @@ func TestGKM_KeySetWriteValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			gkm := newGKM(t)
-			gkm.SetCurrentFabric(1)
 			_, err := gkm.MatterInvoke(
-				context.Background(),
+				fabricCtx(1),
 				0x00, // KeySetWrite
 				core.KeySetWriteRequest{GroupKeySet: tc.gks},
 			)
@@ -646,21 +643,20 @@ func TestGKM_KeySetWriteBudget_CapReached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGroupKeyManagement: %v", err)
 	}
-	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
 	// Writes up to the cap must all succeed. The implicit IPK key set 0
 	// occupies one slot of the cap, so a cap of three leaves room for two
 	// written key sets.
 	for _, id := range []uint16{1, 2} {
-		if _, err := gkm.MatterInvoke(ctx, 0x00 /*KeySetWrite*/, keySetWriteFields(id)); err != nil {
+		if _, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00 /*KeySetWrite*/, keySetWriteFields(id)); err != nil {
 			t.Fatalf("KeySetWrite id=%d: unexpected error: %v", id, err)
 		}
 	}
 
 	// The next ADD (a new, third written id) must be rejected: written
 	// key sets + the IPK == cap already.
-	_, err = gkm.MatterInvoke(ctx, 0x00, keySetWriteFields(3))
+	_, err = gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, keySetWriteFields(3))
 	mustBeResourceExhausted(t, err)
 }
 
@@ -677,23 +673,22 @@ func TestGKM_KeySetWriteBudget_UpdateAtCapSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGroupKeyManagement: %v", err)
 	}
-	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
 	for _, id := range []uint16{1, 2} {
-		if _, err := gkm.MatterInvoke(ctx, 0x00, keySetWriteFields(id)); err != nil {
+		if _, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, keySetWriteFields(id)); err != nil {
 			t.Fatalf("KeySetWrite id=%d: unexpected error: %v", id, err)
 		}
 	}
 
 	// Re-writing an existing id (an UPDATE, not an ADD) at the cap must
 	// still succeed.
-	if _, err := gkm.MatterInvoke(ctx, 0x00, keySetWriteFields(2)); err != nil {
+	if _, err := gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, keySetWriteFields(2)); err != nil {
 		t.Fatalf("KeySetWrite update of existing id=2 at cap: unexpected error: %v", err)
 	}
 
 	// A genuinely new id at the cap must still be rejected.
-	_, err = gkm.MatterInvoke(ctx, 0x00, keySetWriteFields(9))
+	_, err = gkm.MatterInvoke(im.WithFabricFilter(ctx, false, 1), 0x00, keySetWriteFields(9))
 	mustBeResourceExhausted(t, err)
 }
 

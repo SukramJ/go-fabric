@@ -2627,14 +2627,14 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// currentFabric (only ever set on a successful AddNOC). Mirrors
 	// matter.js OperationalCredentialsServer.ts:#updateNoc which reads
 	// `session.fabric.fabricIndex`.
+	// A request without an accessing fabric is refused, as
+	// SetVIDVerificationStatement refuses it: no server-wide fabric stands
+	// in for the request's (review II, R2-P6-sec-1006). The IM gate
+	// refuses such a request before the server; this is the answer on a
+	// direct call.
 	_, idx := im.FabricFilterFromContext(ctx)
 	if idx == 0 {
-		o.mu.RLock()
-		idx = o.currentFabric
-		o.mu.RUnlock()
-	}
-	if idx == 0 {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: "no current fabric"}, nil
+		return nil, opcredsUnsupportedAccessErr{"core: UpdateNOC needs an accessing fabric"}
 	}
 	// Validate the new NOC before persisting anything. UpdateNOC has no
 	// AddTrustedRootCertificate step — the trust anchor is the fabric's
@@ -2742,21 +2742,16 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	// every retry — the controller kept retransmitting the same
 	// Invoke at the MRP retry cadence because the bridge never
 	// confirmed the label-write with StatusCode=OK.
-	_, ctxIdx := im.FabricFilterFromContext(ctx)
-	o.mu.RLock()
-	curIdx := o.currentFabric
-	o.mu.RUnlock()
-	idx := ctxIdx
-	if idx == 0 {
-		idx = curIdx
-	}
+	//
+	// A request without an accessing fabric is refused with
+	// UnsupportedAccess: no server-wide fabric stands in for it (review II,
+	// R2-P6-sec-1006).
+	_, idx := im.FabricFilterFromContext(ctx)
 	o.logger().Debug("matter.opcreds.update_fabric_label",
-		slog.Int("ctx_fabric_index", int(ctxIdx)),
-		slog.Int("current_fabric_index", int(curIdx)),
 		slog.Int("fabric_index", int(idx)),
 		slog.String("label", req.Label))
 	if idx == 0 {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: "no current fabric"}, nil
+		return nil, opcredsUnsupportedAccessErr{"core: UpdateFabricLabel needs an accessing fabric"}
 	}
 	// A label another fabric on this node already carries — the empty
 	// label every fabric starts with included — is answered LabelConflict.
@@ -3009,9 +3004,16 @@ func (o *OperationalCredentials) notifyFabricRemoved(fabricIndex uint8) {
 	o.dataVersion.Bump()
 }
 
-// SetCurrentFabric is called by the message dispatcher before
-// invoking a fabric-scoped command, so MatterRead's
-// CurrentFabricIndex returns the right value.
+// SetCurrentFabric sets the value the unfiltered read of
+// CurrentFabricIndex ([OperationalCredentials.MatterRead]) returns until
+// the next AddNOC. No command falls back to it: UpdateNOC and
+// UpdateFabricLabel without an accessing fabric answer UnsupportedAccess,
+// and a request's read of CurrentFabricIndex is its own fabric. Nothing
+// in this module calls it.
+//
+// Deprecated: a fabric-scoped command or read takes its fabric from the
+// request ([im.WithFabricFilter]); there is no replacement. Removable in
+// the next minor release.
 func (o *OperationalCredentials) SetCurrentFabric(idx uint8) {
 	o.mu.Lock()
 	o.currentFabric = idx

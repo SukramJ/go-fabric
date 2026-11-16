@@ -412,6 +412,11 @@ func (*AccessControl) MinWritePrivilege(attrID uint32) uint8 {
 // — lands on (see writeFabric). It scopes no read: a read with no request
 // behind it sees every fabric's entries whole, and a request's read is
 // scoped by the request's own fabric. Nothing in this module calls it.
+//
+// Deprecated: a fabric-scoped write takes its fabric from the request
+// ([im.WithFabricFilter]); a local write without one lands on the fabric
+// its entries carry. There is no replacement. Removable in the next minor
+// release.
 func (a *AccessControl) SetCurrentFabric(idx uint8) {
 	a.mu.Lock()
 	a.currentFabric = idx
