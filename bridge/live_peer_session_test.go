@@ -27,12 +27,12 @@ func TestLivePeerSessionNewestByPeerActivity(t *testing.T) {
 		olderSID = uint16(0x0B01)
 		newerSID = uint16(0x0B02)
 	)
-	older, err := dev.sessions.OpenFromSigmaWithID(olderSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C01, nil, peerLossKeys(t))
+	older, err := dev.sessions.OpenFromSigmaWithID(olderSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C01, nil, peerLossKeys(t)) //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	stamp.step(time.Millisecond)
-	if _, err := dev.sessions.OpenFromSigmaWithID(newerSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C02, nil, peerLossKeys(t)); err != nil {
+	if _, err := dev.sessions.OpenFromSigmaWithID(newerSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C02, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 		t.Fatal(err)
 	}
 	udp := &net.UDPAddr{IP: net.IPv6loopback, Port: 5541}

@@ -315,7 +315,7 @@ const SessionIdleTimeout = 5 * time.Minute
 
 // PlaceholderIDTTL is how long a session id staked by
 // [Manager.AllocateID] survives without the handshake that reserved it
-// reaching [Manager.OpenFromSigmaWithID]. Past it the reaper hands the
+// reaching [Manager.OpenFromSigmaWithStake]. Past it the reaper hands the
 // slot back.
 //
 // matter.js has no equivalent because it stakes nothing:
@@ -632,6 +632,14 @@ var (
 	// ErrSessionNotFound is returned by [Manager.Get] / [Manager.Close]
 	// when no session matches the supplied id.
 	ErrSessionNotFound = errors.New("operational: session not found")
+	// ErrStakeLost is returned by [Manager.OpenFromSigmaWithStake] and
+	// [Manager.OpenFromSigmaAsInitiatorWithStake] when the [Stake] no
+	// longer holds its id: the handshake released it, the reaper reclaimed
+	// it past [PlaceholderIDTTL], or an allocation at a full table gave the
+	// id to another handshake, which may have established its session
+	// under it since. Nothing is installed and the id's holder stays as it
+	// is (review II, N3-findev-1).
+	ErrStakeLost = errors.New("operational: session id stake lost")
 )
 
 // SetClock sets the clock the manager stamps sessions with and paces the
@@ -792,7 +800,7 @@ func (m *Manager) AllocateStake() (Stake, error) {
 	defer m.closeEvicted(evicted)
 	defer m.mu.Unlock()
 	// Stake a placeholder so concurrent allocators do not hand the
-	// same id out twice; OpenFromSigmaWithID overwrites it. The stamp
+	// same id out twice; OpenFromSigmaWithStake replaces it. The stamp
 	// is what lets the reaper tell an in-flight handshake from one
 	// that was abandoned — see [PlaceholderIDTTL].
 	e := &Entry{SessionID: id, allocatedAt: m.clk().Now(), clock: m.clk()}
@@ -923,7 +931,7 @@ func (m *Manager) ReleaseID(id uint16) {
 }
 
 // ReleaseStake frees s's id when the handshake that staked it never
-// reached OpenFromSigmaWithID — only while the id still holds s's
+// reached OpenFromSigmaWithStake — only while the id still holds s's
 // placeholder: an id an allocation at a full table gave to another
 // handshake since, or one a session holds now, stays as it is.
 func (m *Manager) ReleaseStake(s Stake) {
@@ -934,17 +942,16 @@ func (m *Manager) ReleaseStake(s Stake) {
 	m.mu.Unlock()
 }
 
-// OpenFromSigmaWithID is a variant of [Manager.OpenFromSigma] that
-// registers the new session under a pre-allocated id (see
-// [Manager.AllocateID]). It overwrites any placeholder entry left
-// by AllocateID.
+// OpenFromSigmaWithStake is a variant of [Manager.OpenFromSigma] that
+// registers the new session under the id s reserved (see
+// [Manager.AllocateStake]), in place of s's placeholder.
 //
-// The install takes the id, not the [Stake]: it does not check that the
-// id still holds this handshake's reservation. At a full table
-// [Manager.AllocateStake] may have handed the id to another handshake
-// since, and the install then overwrites that handshake's stake, or
-// closes the session it already established under the id (review II,
-// N3-findev-1).
+// The install takes the stake, not the bare id: it registers the session
+// only while s still holds its id, and otherwise returns [ErrStakeLost]
+// and installs nothing. At a full table [Manager.AllocateStake] may have
+// handed s's id to another handshake since; that handshake's stake, or
+// the session it established under the id, stays as it is (review II,
+// N3-findev-1). The zero Stake holds nothing and is refused.
 //
 // peerSessionID is the InitiatorSessionID the commissioner sent in
 // Sigma1 — every outbound encrypted reply must carry this in
@@ -955,21 +962,52 @@ func (m *Manager) ReleaseStake(s Stake) {
 // peer's NOC subject at Sigma3 verification. Stored on the session
 // so the IM dispatcher's ACL gate can match CAT-bearing ACEs (Matter
 // §9.10.5.6). Pass nil when the peer NOC carried no CATs.
-func (m *Manager) OpenFromSigmaWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
-	return m.openFromSigma(id, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false)
+func (m *Manager) OpenFromSigmaWithStake(s Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
+	return m.openFromSigma(s.ID, &s, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false)
 }
 
-// OpenFromSigmaAsInitiatorWithID is [Manager.OpenFromSigmaWithID] for a
-// session this node opened as the CASE initiator: it encrypts with the
-// I2R key and decrypts with R2I. The only initiator in this module
+// OpenFromSigmaAsInitiatorWithStake is [Manager.OpenFromSigmaWithStake]
+// for a session this node opened as the CASE initiator: it encrypts with
+// the I2R key and decrypts with R2I. The only initiator in this module
 // re-establishes former subscriptions after a restart (docs/adr/0008);
 // matter.js creates the same session from CaseClient.ts:#doPair with
 // `isInitiator: true`.
-func (m *Manager) OpenFromSigmaAsInitiatorWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
-	return m.openFromSigma(id, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true)
+func (m *Manager) OpenFromSigmaAsInitiatorWithStake(s Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
+	return m.openFromSigma(s.ID, &s, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true)
 }
 
-func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys, initiator bool) (*Entry, error) {
+// OpenFromSigmaWithID is [Manager.OpenFromSigmaWithStake] under a bare id
+// (see [Manager.AllocateID]). It overwrites any placeholder entry left
+// by AllocateID.
+//
+// Deprecated: the install takes the id, not the [Stake]: it does not
+// check that the id still holds this handshake's reservation. At a full
+// table [Manager.AllocateStake] may have handed the id to another
+// handshake since, and the install then overwrites that handshake's
+// stake, or closes the session it already established under the id
+// (review II, N3-findev-1). Use [Manager.AllocateStake] and
+// [Manager.OpenFromSigmaWithStake], which install under the caller's own
+// stake only; OpenFromSigmaWithID is removable in the next minor release.
+func (m *Manager) OpenFromSigmaWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
+	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false)
+}
+
+// OpenFromSigmaAsInitiatorWithID is [Manager.OpenFromSigmaWithID] for a
+// session this node opened as the CASE initiator.
+//
+// Deprecated: as [Manager.OpenFromSigmaWithID], the install does not
+// check the stake. Use [Manager.AllocateStake] and
+// [Manager.OpenFromSigmaAsInitiatorWithStake];
+// OpenFromSigmaAsInitiatorWithID is removable in the next minor release.
+func (m *Manager) OpenFromSigmaAsInitiatorWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
+	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true)
+}
+
+// openFromSigma installs a CASE session under id. A non-nil stake must
+// still hold id when the session is installed, or nothing is and the
+// error is [ErrStakeLost]; a nil stake installs under the bare id, as
+// [Manager.OpenFromSigmaWithID] does.
+func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys, initiator bool) (*Entry, error) {
 	encryptKey, decryptKey := keys.R2IKey[:], keys.I2RKey[:]
 	if initiator {
 		encryptKey, decryptKey = keys.I2RKey[:], keys.R2IKey[:]
@@ -1008,6 +1046,14 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 		clock:                m.clk(),
 	}
 	m.mu.Lock()
+	// A stake that no longer holds its id installs nothing: the id's
+	// holder now — another handshake's stake or its session — stays
+	// (N3-findev-1). The check and the install share the lock.
+	if stake != nil && !m.stakes(placeholderRef{id: stake.ID, e: stake.e}) {
+		m.mu.Unlock()
+		sess.Close()
+		return nil, ErrStakeLost
+	}
 	// The pre-allocated id is in m.sessions as a placeholder Entry
 	// (Session==nil) that is overwritten here. A LIVE session can hold
 	// the slot too; it goes through the graceful close cascade rather
@@ -1424,7 +1470,7 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	for id, entry := range m.sessions {
 		if entry.Session == nil {
 			// Pre-allocated id placeholder — the handshake that owns
-			// it has not reached OpenFromSigmaWithID yet. Leaving the
+			// it has not reached OpenFromSigmaWithStake yet. Leaving the
 			// placeholder in place is harmless: the placeholder has
 			// no key material, so an inbound packet for it cannot
 			// authenticate.
@@ -1756,7 +1802,7 @@ func idleSince(e *Entry, cutoff time.Time) bool {
 // dropping them here silently strips CAT-scoped ACL privilege from
 // every resumed session. Wired in daemon.go (matter init) and called
 // from both CASE-onEstablished paths after every successful
-// OpenFromSigmaWithID. Mirrors matter.js
+// OpenFromSigmaWithStake. Mirrors matter.js
 // packages/protocol/src/session/case/CaseServer.ts:219
 // `this.#sessions.saveResumptionRecord(cx.resumptionRecord)`.
 func (m *Manager) PersistResumption(ctx context.Context, fabricIndex uint8, peerNodeID uint64, resumptionID, sharedSecret []byte, peerCATs []uint32) error {

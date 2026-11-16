@@ -96,10 +96,10 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 		responderSID = uint16(0x0A02)
 		laterSID     = uint16(0x0A03)
 	)
-	if _, err := dev.sessions.OpenFromSigmaAsInitiatorWithID(initiatorSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B01, nil, peerLossKeys(t)); err != nil {
+	if _, err := dev.sessions.OpenFromSigmaAsInitiatorWithID(initiatorSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B01, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 		t.Fatal(err)
 	}
-	if _, err := dev.sessions.OpenFromSigmaWithID(responderSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B02, nil, peerLossKeys(t)); err != nil {
+	if _, err := dev.sessions.OpenFromSigmaWithID(responderSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B02, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 		t.Fatal(err)
 	}
 	dev.br.sessionPeerAddrs.Store(initiatorSID, peerAddr)
@@ -116,7 +116,7 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 	defer func() { _ = ex.Close() }()
 	// Established after the exchange was opened: not what went unanswered.
 	stamp.step(time.Millisecond)
-	if _, err := dev.sessions.OpenFromSigmaWithID(laterSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B03, nil, peerLossKeys(t)); err != nil {
+	if _, err := dev.sessions.OpenFromSigmaWithID(laterSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B03, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 		t.Fatal(err)
 	}
 
@@ -170,7 +170,7 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 func TestInitiatedPeerLoss_UnknownExchangeIsNoOp(t *testing.T) {
 	t.Parallel()
 	dev := startResumeDevice(t, newMemSubscriptionStore(), nil)
-	if _, err := dev.sessions.OpenFromSigmaWithID(0x0C01, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0D01, nil, peerLossKeys(t)); err != nil {
+	if _, err := dev.sessions.OpenFromSigmaWithID(0x0C01, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0D01, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 		t.Fatal(err)
 	}
 	dev.br.handleInitiatedPeerLoss(0x0C01, 0x7777)
@@ -237,7 +237,7 @@ func newChunkedReportPeer(t *testing.T, base uint16) *chunkedReportPeer {
 		sid  uint16
 		peer uint64
 	}{{p.reportSID, resumeCtrlNode}, {p.siblingSID, resumeCtrlNode}, {p.otherSID, 0xD1D1D1D1}} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(s.sid, resumeFabricIndex, resumeDeviceNode, s.peer, s.sid+0x100, nil, peerLossKeys(t)); err != nil {
+		if _, err := dev.sessions.OpenFromSigmaWithID(s.sid, resumeFabricIndex, resumeDeviceNode, s.peer, s.sid+0x100, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 			t.Fatal(err)
 		}
 		dev.br.sessionPeerAddrs.Store(s.sid, peerAddr)

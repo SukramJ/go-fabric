@@ -606,7 +606,10 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 			CompressedFabricID: fabric.identity.CompressedFabricID,
 			OnEstablished: func(ctx context.Context, res sigma.InitiatorResult) error {
 				entry, err := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
-					return sessions.OpenFromSigmaAsInitiatorWithID(sessionID, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+					// The install takes the stake, not the bare id: a stake an
+					// allocation at a full table took over installs nothing
+					// (operational.ErrStakeLost, N3-findev-1).
+					return sessions.OpenFromSigmaAsInitiatorWithStake(stake, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
 				})
 				if err != nil {
 					return err
@@ -758,6 +761,18 @@ func (h *handshakeStake) renew(uint16) (uint16, bool) {
 	return next.ID, true
 }
 
+// of returns the stake when it is the one of id, the id the handshake
+// announced; otherwise the zero Stake, which every install refuses
+// ([operational.ErrStakeLost]).
+func (h *handshakeStake) of(id uint16) operational.Stake {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.stake.ID != id {
+		return operational.Stake{}
+	}
+	return h.stake
+}
+
 // release releases the stake when it is the one of id, the id the
 // handshake announced.
 func (h *handshakeStake) release(id uint16) {
@@ -847,7 +862,10 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			}
 		}
 		entry, openErr := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
-			return sessions.OpenFromSigmaWithID(effectiveID, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
+			// The install takes this handshake's stake, not the bare id:
+			// a stake an allocation at a full table took over installs
+			// nothing (operational.ErrStakeLost, N3-findev-1).
+			return sessions.OpenFromSigmaWithStake(held.of(effectiveID), fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
 		})
 		if openErr != nil {
 			held.release(effectiveID)

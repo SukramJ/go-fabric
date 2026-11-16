@@ -175,7 +175,7 @@ func newUndeliveredReportRig(t *testing.T, base uint16) *undeliveredReportRig {
 		t.Fatalf("peer address %T", silent.LocalAddr())
 	}
 	for _, sid := range []uint16{r.reportSID, r.siblingSID} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, sid+0x100, nil, peerLossKeys(t)); err != nil {
+		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, sid+0x100, nil, peerLossKeys(t)); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 			t.Fatal(err)
 		}
 		dev.br.sessionPeerAddrs.Store(sid, peerAddr)

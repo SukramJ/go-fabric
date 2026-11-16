@@ -356,7 +356,7 @@ func (r *Responder) PeerCATs() []uint32 {
 // SessionIdentity returns the (FabricIndex, NodeID) the multi-fabric
 // destination resolver landed on for the current exchange. ok==false
 // before Sigma1 has been processed. Bridge callers feed these values
-// into [operational.Manager.OpenFromSigmaWithID] so the secure session
+// into [operational.Manager.OpenFromSigmaWithStake] so the secure session
 // is registered under the actually-selected fabric — without this, a
 // Sigma1 that the resolver routed to fabric #1 would still be tagged
 // with the factory-time fabric #2 (the bridge's last-installed default),

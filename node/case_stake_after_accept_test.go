@@ -21,14 +21,14 @@ func TestAnUnacceptedSigma1ClosesNoLiveSession(t *testing.T) {
 	t.Parallel()
 	sessions := operational.NewManager(testStore(t))
 	for i := range operational.SessionIDSpace {
-		id, err := sessions.AllocateID()
+		stake, err := sessions.AllocateStake()
 		if err != nil {
-			t.Fatalf("AllocateID %d: %v", i, err)
+			t.Fatalf("AllocateStake %d: %v", i, err)
 		}
 		// Sessions this node opened, which the per-peer bound leaves
 		// alone, so the table fills without a walk per session.
-		if _, err := sessions.OpenFromSigmaAsInitiatorWithID(id, 1, 0x1, uint64(0x1000+i), 0x100, nil, sigma.SessionKeys{}); err != nil {
-			t.Fatalf("OpenFromSigmaAsInitiatorWithID %d: %v", i, err)
+		if _, err := sessions.OpenFromSigmaAsInitiatorWithStake(stake, 1, 0x1, uint64(0x1000+i), 0x100, nil, sigma.SessionKeys{}); err != nil {
+			t.Fatalf("OpenFromSigmaAsInitiatorWithStake %d: %v", i, err)
 		}
 	}
 	if occ := sessions.Occupancy(); occ.Live != operational.SessionIDSpace {

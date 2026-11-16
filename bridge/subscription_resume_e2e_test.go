@@ -660,7 +660,7 @@ func resumeInitiatorProvider(fab resumeFabric, sessions *operational.Manager) Ca
 			Initiator:          ini,
 			CompressedFabricID: fab.cfid,
 			OnEstablished: func(_ context.Context, res sigma.InitiatorResult) error {
-				_, err := sessions.OpenFromSigmaAsInitiatorWithID(stake.ID, fabricIndex, resumeDeviceNode, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+				_, err := sessions.OpenFromSigmaAsInitiatorWithStake(stake, fabricIndex, resumeDeviceNode, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
 				return err
 			},
 			OnAbandoned: func() { sessions.ReleaseStake(stake) },
@@ -676,7 +676,7 @@ func subscribeOverCASE(t *testing.T, dev *resumeDevice, ctrl *fakeController) ui
 	var keys sigma.SessionKeys
 	_, _ = rand.Read(keys.I2RKey[:])
 	_, _ = rand.Read(keys.R2IKey[:])
-	if _, err := dev.sessions.OpenFromSigmaWithID(resumeDeviceSIDRun, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, resumeCtrlSIDRun1, nil, keys); err != nil {
+	if _, err := dev.sessions.OpenFromSigmaWithID(resumeDeviceSIDRun, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, resumeCtrlSIDRun1, nil, keys); err != nil { //nolint:staticcheck // SA1019: a fixture session under a chosen id, which no stake install takes (N3-findev-1)
 		t.Fatal(err)
 	}
 	sess, err := channel.New(channel.Config{
