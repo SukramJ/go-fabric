@@ -80,7 +80,8 @@ func (s *ControlServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter
 	s.mu.Unlock()
-	s.Hooks.SetMatterEventEmitter(emitter)
+	s.events.SetEmitter(emitter)
+	s.Hooks.SetMatterEventEmitter(emitter) //nolint:staticcheck // the deprecated field stays bound for its window
 }
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
@@ -89,7 +90,8 @@ func (s *ControlServer) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
-	s.Hooks.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
+	s.events.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
+	s.Hooks.SetEndpoint(endpoint)  //nolint:staticcheck // the deprecated field stays bound for its window
 }
 
 // pendingEvent is an event decided under the lock and emitted after it.

@@ -154,7 +154,22 @@ type ControlServer struct {
 	// change the drive reports between commands (an arrival, an error)
 	// reaches subscribers for exactly those attributes.
 	cluster.AttributeChanges
-	spec.Hooks
+	// Hooks was the server's command, event and veto path.
+	//
+	// Deprecated: the server routes its commands through [spec.InvokeHeld]
+	// and declares Handle, Emit, EmitEvent and SetBeforeWrite itself
+	// (review II, decision 154); the field is still bound to the server's
+	// instance and emitter, but a handler registered or a veto set on it
+	// directly is not consulted. Removable in the next minor release.
+	spec.Hooks //nolint:staticcheck // the deprecated field keeps its exact shape for the deprecation window
+
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([ControlServer.Handle]) ahead of the server's own
+	// logic (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
 
 	// op serialises the commands — MoveTo, Stop, Calibrate — from their
 	// gate to their record, as WindowCovering's queue does, so two cannot
@@ -241,13 +256,8 @@ func New(cfg Config) (*ControlServer, error) {
 	}
 	// Positioning holds "O.a+" and "[PS]"; Speed "[PS & !IS]" is the one
 	// conformance a served selection can break, and spec.New refuses it.
-	inst, err := spec.New(closuredef.Definition, spec.Options{Features: fm})
-	if err != nil {
-		return nil, fmt.Errorf("closure: %w", err)
-	}
 	s := &ControlServer{
 		op:    make(chan struct{}, 1),
-		inst:  inst,
 		mover: cfg.Mover,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
 		// and Stopped is a claim about a device we have not heard from.
@@ -255,6 +265,11 @@ func New(cfg Config) (*ControlServer, error) {
 		mainState: wire.ClosureMainStateSetupRequired,
 		errorList: wire.ClosureErrorList{},
 	}
+	srv, err := newHeld(closuredef.Definition, spec.Options{Features: fm}, s.MatterRead, s.invoke)
+	if err != nil {
+		return nil, fmt.Errorf("closure: %w", err)
+	}
+	s.inst, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	if l, ok := cfg.Mover.(closuredef.Latcher); ok && s.has(wire.ClosureControlFeatureMotionLatching) {
 		s.latchModes = l.LatchControlModes()
 	}
@@ -262,8 +277,33 @@ func New(cfg Config) (*ControlServer, error) {
 		cur, tgt := closuredef.ThreeLevelAutoAuto, closuredef.ThreeLevelAutoAuto
 		s.currentSpeed, s.targetSpeed = &cur, &tgt
 	}
-	s.Init(inst)
+	s.Init(s.inst) //nolint:staticcheck // the deprecated Hooks field stays bound for its window
 	return s, nil
+}
+
+// Handle implements [spec.CommandRegistrar] ([spec.SelfHeld.Handle]): the
+// host's handler of cmdID replaces the server's own handling of it; nil
+// hands it back.
+func (s *ControlServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	return s.held.Handle(cmdID, fn)
+}
+
+// Emit implements [spec.EventEmitting]: eventID with data on endpoint at
+// the priority the definition gives it ([spec.Events.Emit]).
+func (s *ControlServer) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.events.Emit(s.inst, endpoint, eventID, data)
+}
+
+// EmitEvent emits eventID with data on the endpoint the server is mounted
+// on ([spec.Events.EmitEvent]): the call the typed Record<Event> makes.
+func (s *ControlServer) EmitEvent(eventID uint32, data any) error {
+	return s.events.EmitEvent(s.inst, eventID, data)
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.WriteVeto]).
+// Every ClosureControl attribute is read-only, so no write reaches it.
+func (s *ControlServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.veto.Set(fn)
 }
 
 // has reports whether the advertised FeatureMap carries feature.
@@ -333,7 +373,7 @@ func (s *ControlServer) MatterWrite(ctx context.Context, attrID uint32, value an
 	if err != nil {
 		return err
 	}
-	return s.CheckWrite(ctx, attrID, spec.Stored(closuredef.Definition.Attribute(attrID).Type, v))
+	return s.veto.Check(ctx, attrID, spec.Stored(closuredef.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
@@ -382,9 +422,13 @@ var (
 func (s *ControlServer) MatterInvoke(
 	ctx context.Context, cmdID uint32, fields any,
 ) (response any, err error) {
-	if resp, handled, err := s.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own MoveTo, Stop and Calibrate, which
+// [spec.InvokeHeld] runs when the host registered no handler; the
+// commands run one at a time (op).
+func (s *ControlServer) invoke(ctx context.Context, cmdID uint32, fields any) (response any, err error) {
 	s.op <- struct{}{}
 	defer func() { <-s.op }()
 	switch cmdID {

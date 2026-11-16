@@ -182,7 +182,13 @@ var (
 type DimensionServer struct {
 	*spec.Instance
 	cluster.AttributeChanges
-	hooks spec.Hooks
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([DimensionServer.Handle]) ahead of the server's own
+	// logic (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
 	// commands counts the commands whose handlers run: the changes made
 	// meanwhile are OriginCommand — the handler moves the state through
 	// the host setters, which take no context. A count, not a flag, so a
@@ -221,13 +227,13 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 	if cfg.Handler == nil {
 		return nil, ErrNoDimensionHandler
 	}
-	inst, err := spec.New(cd.Definition, spec.Options{Features: uint32(cfg.Features)})
+	cfg.Clock = clock.Or(cfg.Clock)
+	s := &DimensionServer{ext: cfg.DataVersion, cfg: cfg}
+	srv, err := newHeld(cd.Definition, spec.Options{Features: uint32(cfg.Features)}, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("closure: %w", err)
 	}
-	cfg.Clock = clock.Or(cfg.Clock)
-	s := &DimensionServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
-	s.hooks.Init(inst)
+	s.Instance, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	if err := s.checkFixed(); err != nil {
 		return nil, err
 	}
@@ -403,20 +409,20 @@ func (s *DimensionServer) origin() contract.Origin {
 	return contract.OriginHostSet
 }
 
-// Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
+// Handle implements [spec.CommandRegistrar] ([spec.SelfHeld.Handle]).
 func (s *DimensionServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
-	return s.hooks.Handle(cmdID, fn)
+	return s.held.Handle(cmdID, fn)
 }
 
 // Emit implements [spec.EventEmitting]: ClosureDimension defines no
 // event, so every one is [spec.ErrNotEmitted].
 func (s *DimensionServer) Emit(endpoint uint16, eventID uint32, data any) error {
-	return s.hooks.Emit(endpoint, eventID, data)
+	return s.events.Emit(s.Instance, endpoint, eventID, data)
 }
 
-// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.Hooks]).
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.WriteVeto]).
 func (s *DimensionServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
-	s.hooks.SetBeforeWrite(fn)
+	s.veto.Set(fn)
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -494,7 +500,7 @@ func (s *DimensionServer) MatterWrite(ctx context.Context, attrID uint32, value 
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, spec.Stored(cd.Definition.Attribute(attrID).Type, v))
+	return s.veto.Check(ctx, attrID, spec.Stored(cd.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
@@ -509,9 +515,12 @@ func (s *DimensionServer) MatterInvoke(ctx context.Context, cmdID uint32, fields
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("closure: command 0x%02X is not supported", cmdID)
 	}
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own SetTarget and Step, which [spec.InvokeHeld]
+// runs when the host registered no handler.
+func (s *DimensionServer) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	s.commands.Add(1)
 	defer s.commands.Add(-1)
 	if cmdID == cd.CmdSetTarget {
