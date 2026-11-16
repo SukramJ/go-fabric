@@ -65,7 +65,7 @@ write, per the contract.
 ## Tier 2 — MEDIUM
 
 **Core clusters**
-- SetRegulatoryConfig ignores CountryCode (Location stays "XX"). `cluster/core/general_commissioning.go:629` vs `GeneralCommissioningServer.ts:210`. **Still open (2026-10-13):** deferred by batch 1 with its reason (Apple Home sent RemoveFabric after a non-empty Location); `bridge/fields_reader.go` (`decodeSetRegulatoryConfigRequest`) reads the field as octets while a UTF-8 string lands in `el.String`, so CountryCode is always empty, and `general_commissioning.go` (`handleSetRegulatoryConfig`) checks only the length. Fix package: decode the string, store it as Location, and verify against Apple Home in concept v2 phase 5 before it ships.
+- SetRegulatoryConfig ignores CountryCode (Location stays "XX"). `cluster/core/general_commissioning.go:629` vs `GeneralCommissioningServer.ts:210`. **Still open (2026-10-13):** deferred by batch 1 with its reason (Apple Home sent RemoveFabric after a non-empty Location); `bridge/fields_reader.go` (`decodeSetRegulatoryConfigRequest`) reads the field as octets while a UTF-8 string lands in `el.String`, so CountryCode is always empty, and `general_commissioning.go` (`handleSetRegulatoryConfig`) checks only the length. Fix package: decode the string, store it as Location, and verify against Apple Home in concept v2 phase 5 before it ships. **Review II, phase 6a (decision 127):** still true — owner decision pending (the revert's reason is Apple Home, outside matter.js); `bridge/fields_reader.go` still reads `el.Octets` for the UTF-8 field, and `handleSetRegulatoryConfig` is `cluster/core/general_commissioning.go:1133-1173` at `1a0d8ba9` (R2-P6-doc-1019). The matter.js lines of the row were not re-read at the pin (unverified).
 
 ---
 
@@ -272,7 +272,9 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: owner: a re-audit with Apple Hom
   `FailSafeMaxSeconds` at 900 (`cluster/core/general_commissioning.go:226-232`)
   and refuses a longer ArmFailSafe with ValueOutsideRange (`:594-599`), a
   check matter.js has not. (Milestone 3, phase 19; decide together with the
-  SetRegulatoryConfig CountryCode item below.)
+  SetRegulatoryConfig CountryCode item below.) Review II, phase 6a
+  (R2-P6-doc-1019): still true; the floor is
+  `cluster/core/general_commissioning.go:327-334` at `1a0d8ba9`.
 
 Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
 `862ad75f`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
@@ -664,12 +666,25 @@ with a port of the named case.
   ConnectNetwork path at that point. The driver's late result finds the
   handle gone and returns before it builds a ConnectNetworkResponse
   (`NetworkCommissioningCluster.cpp:845-857`, under
-  `CHIP_DEVICE_CONFIG_SUPPORTS_CONCURRENT_CONNECTION`). What the finalized
-  message carries for a path nothing was added to was not traced
-  (unverified). Since `3b77e4e8` this module's late result touches neither
-  the reverted networks nor the Breadcrumb, but the command still answers
-  a ConnectNetworkResponse with the driver's status, after the expiry
-  (`cluster/core/network_commissioning_wifi.go`, `connect`). Fix: decide
+  `CHIP_DEVICE_CONFIG_SUPPORTS_CONCURRENT_CONNECTION`, which
+  `src/include/platform/CHIPDeviceConfig.h:337` defines to 1). Nothing is
+  sent, at the expiry or afterwards: `HandleConnectNetwork` adds nothing
+  (`NetworkCommissioningCluster.cpp:649`, `:682`), so finalizing returns
+  `CHIP_ERROR_INCORRECT_STATE` (`src/app/CommandHandlerImpl.cpp:1000`), and
+  the response sender, with nothing to send, logs "Failed to send
+  InvokeResponseMessage" and sends no Failure StatusResponse either
+  (`src/app/CommandResponseSender.cpp:82-103`, `:88-100`, under
+  `TODO(#30453)`); the client's invoke runs into its own timeout (read end
+  to end, not executed; an invoke batch whose other commands added a
+  response, and a build without concurrent connection, were not covered).
+  Since `3b77e4e8` this module's late result touches neither the reverted
+  networks nor the Breadcrumb, and since `7c5c2c75` the Thread server's
+  neither: both servers match connectedhomeip in state. The answer still
+  differs: the command answers a ConnectNetworkResponse with the driver's
+  status, after the expiry (`cluster/core/network_commissioning_wifi.go`,
+  `connect`; `network_commissioning_thread.go`, `OnFailSafeExpired`).
+  Answering nothing needs a way for a server to end the interaction
+  without a response, an `im` move (review II, phase 6a, R2-P6-fsm-1001). Fix: decide
   what the invoke answers once its fail-safe has expired — the handler here
   returns only when the driver does, so ending the interaction at the
   expiry needs the expiry to end the handler's wait — and pin it with
@@ -776,6 +791,7 @@ with a port of the named case.
 - **F-db021da0-57: WindowCovering and FanControl answer one verdict for the cluster, not the attributes their write changed.** matter.js broadcasts the names its commit changed (`packages/node/src/behavior/state/managed/Datasource.ts:1476-1484`, `:1319` at `db021da0`), and since review II, phase 5b a server names them here through `contract.ChangeNamingWriter`. `cluster/cover` already computes the attributes a write changed and `cluster/fan` moves PercentSetting and SpeedSetting with FanMode, but both answer one verdict for the cluster (`MatterWriteChanged`), recorded under the written attribute, so the written attribute is marked when only a sibling moved. No kit write was found that changes a sibling and leaves the written attribute (the wave's read, not a search of every host). Fix: both servers onto `ChangeNamingWriter`. Found in review II, phase 5b (wave C).
 - **F-db021da0-58: `fabrictest:TestControllerRecoversFromASilentRestart` failed once under load.** Test quality, not a behaviour gap. Its subscription case failed once ("session … not dropped") in a guard run beside six agents and passed 35 times on a rerun under `-race`. Fix: none known; the row records the failure until it recurs or its cause is found. Found in review II, phase 5b (the guards at `1a3b760f`).
 - **F-db021da0-59: a controller's write to a server that reports its changes through its change notifier alone is marked before the dispatcher advances the version.** matter.js advances a datasource's version before it broadcasts the commit's change list (`packages/node/src/behavior/state/managed/Datasource.ts:1456-1457`, `:1319` at `db021da0`). Since review II, phase 5b a server with a report view has a change it names as the controller's write held until the write's report marks it after the advance (`reportServerChange`, `bridge/subscribe.go`; `settleWrite`, `bridge/write_hold.go`; `bridge:TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances`). A server without a report view is wired to advance on its own (`wireAttributeNotifiers`), and a change it names as the controller's write is marked at once and the host hook runs, before the dispatcher advances the endpoint's version after the server returns (`endpoint/dispatcher.go`). Servers that name the controller's write from inside `MatterWrite` and have no report view: Thermostat (`cluster/thermo/thermostat_server.go`), WindowCovering (`cluster/cover/windowcovering_server.go`) and OccupancySensing's HoldTime (`cluster/sensing/occupancy.go`). A report built in that window carries the new value with the cluster's old version, the next one the same value with the new version. Read, not measured; whether a report is built inside the window in production was not read (unverified). Distinct from F-db021da0-56, where a held host change gets no advance of its own. Fix: hold a controller-write change of these servers as a report view's is held, or give them a report view. Found in review II, phase 5b (the reference read of wave C).
+- **N4-d4wifi-1: ConnectNetwork on a Wi-Fi interface whose InterfaceEnabled is false joins and leaves the attribute false.** That also keeps the rejoin of the committed network disarmed (`cluster/core/network_commissioning_wifi.go` setInterfaceEnabledLocked / armRejoinLocked). connectedhomeip's cluster reads InterfaceEnabled in neither ScanNetworks nor ConnectNetwork (`src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:333-367`, `:635-683`; the attribute only at `:1084-1085`, `:1120-1132` at `6170af84`), and the one driver that models it re-enables the interface before it connects (`src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp:209-213`). Open: whether the Wi-Fi server's ConnectNetwork sets InterfaceEnabled true as that driver does. `wifi/wpasupplicant` does not implement the switch. matter.js's server was not read for it. Found in review II, phase 4; recorded in phase 6a.
 ## Tier 3 — LOW
 
 
@@ -870,6 +886,9 @@ What `endpoint.ValidateDeviceTypes`
 the module builds itself (`endpoint/devicetype_module_test.go` pins each).
 
 ## Verified sound (no action)
+
+- **GroupcastTesting keeps one FabricUnderTest for the node.** Any fabric's command replaces or clears it, and removing the fabric under test does not end the test before its timer — as matter.js (`packages/node/src/behaviors/groupcast/GroupcastServer.ts:404-430`, `:522-525` at `db021da0`). Mirrored; no `by_design` entry; clearing on removal would be ahead of matter.js (review II, phase 6a, R2-P6-fsm-1018).
+- **The BTP idle timer runs on the central only.** A peripheral session whose central completed the handshake and then sends nothing has no idle timer (`transport/btp/session.go`), as in matter.js, whose "Central Device Idle Timer" (`packages/protocol/src/ble/BtpSessionHandler.ts:48` at `db021da0`) is restarted only for the central role (`:495-500`). A silent central is bounded by `bridge/ble.go` `watchBLEPASE` until a secure session exists, then by the commissioning window and its fail-safe (review II, phase 6a, R2-P6-fsm-0212).
 
 - **A subscription is persisted after its SubscribeResponse, so a Stop in the same instant loses it.** `bridge/subscribe.go:1062-1071` records the subscription once the response is sent; matter.js's `SubscriptionsServer.#addSubscription` fires on `subscriptionAdded`, which the InteractionServer emits after the SubscribeResponse (`SubscriptionsServer.ts:54`, `:133-140`). Same timing; a test waits until it is stored (report S, question 7).
 
