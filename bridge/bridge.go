@@ -627,6 +627,11 @@ type Bridge struct {
 	// for the oldest to lose its place past [maxCaseHandshakes]; guarded
 	// by mu.
 	sigma1Seq uint64
+	// caseHandlerGen counts the singleton CASE handlers attached
+	// ([Bridge.AttachCaseHandler]): a Sigma1 judged across a swap is told
+	// from one the current handler judged ([Bridge.handleSigma1]); guarded
+	// by mu.
+	caseHandlerGen uint64
 
 	// reportCounterOwner maps the outbound-reliable MessageCounter of an
 	// ongoing report's last message ([reportCounterKey]) to what the
