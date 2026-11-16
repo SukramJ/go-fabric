@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // White-box tests for the end of a chunk wait — the handler that has sent
@@ -359,5 +360,27 @@ func TestChunkWaitsBoundTheBatchInvoke(t *testing.T) {
 	}
 	if n := claims(); n != maxChunkWaitsPerSession-1 {
 		t.Errorf("claims after the served batch = %d, want %d (its claim given back)", n, maxChunkWaitsPerSession-1)
+	}
+}
+
+// TestEndSessionChunkWaitsEndsOnlyItsOwn: the end of one session's chunk
+// waits leaves another session's wait armed (R2-P5-tmut-20, bridge's own
+// test of a mutant only fabrictest caught).
+func TestEndSessionChunkWaitsEndsOnlyItsOwn(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	mine := b.armStatusResponseWait(1, 0x10, false)
+	theirs := b.armStatusResponseWait(2, 0x10, false)
+	b.endSessionChunkWaits(1)
+	if _, open := <-mine; open {
+		t.Fatal("session 1's wait was not ended")
+	}
+	if _, armed := b.routing.statusResponseWaits.Load(mrp.ExchangeKey{SessionID: 2, ExchangeID: 0x10}); !armed {
+		t.Fatal("session 2's wait was ended with session 1's")
+	}
+	select {
+	case <-theirs:
+		t.Fatal("session 2's wait channel was closed")
+	default:
 	}
 }

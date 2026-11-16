@@ -58,3 +58,31 @@ func TestWriteTransactionsShareHolds(t *testing.T) {
 		t.Fatalf("write after the abandoned chunked write expired %v, want SUCCESS", s)
 	}
 }
+
+// TestEndWriteChunkKeepsAnOpenWritesHolds: the end of a chunk whose
+// chunked write is still open (its transaction in the table) gives nothing
+// back — the attribute stays held against another exchange's write until
+// the final chunk (R2-P5-tmut-20, bridge's own test of a mutant only
+// fabrictest caught).
+func TestEndWriteChunkKeepsAnOpenWritesHolds(t *testing.T) {
+	t.Parallel()
+	var r exchangeRouting
+	nodeLabel := im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: 5, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	write := func(tx *im.WriteTransaction, more bool) im.StatusCode {
+		resp := im.HandleWriteRequest(im.WithWriteTransaction(context.Background(), tx), holdDispatcher{}, im.WriteRequest{
+			MoreChunkedMessages: more,
+			Writes:              []im.AttributeWrite{{Path: nodeLabel, Value: im.AttributeValue{Value: "x"}}},
+		})
+		return resp.Responses[0].Status.Status
+	}
+	now := time.Now()
+	holder := mrp.ExchangeKey{SessionID: 1, ExchangeID: 10}
+	tx := r.writeTransaction(holder, true, now)
+	if s := write(tx, true); s != im.StatusSuccess {
+		t.Fatalf("first chunk %v", s)
+	}
+	r.endWriteChunk(holder, tx, true)
+	if s := write(r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 10}, false, now), false); s != im.StatusBusy {
+		t.Fatalf("a competing write after the open write's chunk ended: %v, want BUSY", s)
+	}
+}
