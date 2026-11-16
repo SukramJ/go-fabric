@@ -60,6 +60,12 @@ type WiFiManagementServer struct {
 	srv   *spec.Server
 	clock clock.Clock
 
+	// change serialises SetNetworkCredentials and ClearNetworkCredentials:
+	// each takes the new credentials under mu and publishes them after
+	// mu is released, since the generated server runs a change callback
+	// inline and a callback may read the credentials back (R2-P6-conc-1118).
+	// A callback must not change the credentials.
+	change sync.Mutex
 	// mu guards ssid, passphrase and surrogate.
 	mu         sync.Mutex
 	ssid       []byte
@@ -135,11 +141,13 @@ func (s *WiFiManagementServer) SetNetworkCredentials(ssid, passphrase []byte) er
 		// The length only: the passphrase itself never reaches an error.
 		return fmt.Errorf("%w: passphrase of %d bytes is no WPA personal credential", ErrInvalidCredentials, len(passphrase))
 	}
+	s.change.Lock()
+	defer s.change.Unlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	ssidChanged := !bytes.Equal(s.ssid, ssid)
 	passphraseChanged := !bytes.Equal(s.passphrase, passphrase)
 	if !ssidChanged && !passphraseChanged {
+		s.mu.Unlock()
 		return nil
 	}
 	changes := map[uint32]any{}
@@ -154,10 +162,20 @@ func (s *WiFiManagementServer) SetNetworkCredentials(ssid, passphrase []byte) er
 		}
 		changes[wdef.AttrPassphraseSurrogate] = surrogate
 	}
+	prevSSID, prevPassphrase, prevSurrogate := s.ssid, s.passphrase, s.surrogate
+	s.ssid, s.passphrase, s.surrogate = slices.Clone(ssid), slices.Clone(passphrase), surrogate
+	s.mu.Unlock()
 	if err := s.srv.SetAttributes(changes); err != nil {
+		s.mu.Lock()
+		clear(s.passphrase)
+		s.ssid, s.passphrase, s.surrogate = prevSSID, prevPassphrase, prevSurrogate
+		s.mu.Unlock()
 		return err
 	}
-	s.ssid, s.passphrase, s.surrogate = slices.Clone(ssid), slices.Clone(passphrase), surrogate
+	// The replaced passphrase is zeroed, as a cleared one is.
+	if passphraseChanged {
+		clear(prevPassphrase)
+	}
 	return nil
 }
 
@@ -166,16 +184,23 @@ func (s *WiFiManagementServer) SetNetworkCredentials(ssid, passphrase []byte) er
 // reports nothing. The surrogate's count survives, so the next passphrase
 // still advances it.
 func (s *WiFiManagementServer) ClearNetworkCredentials() error {
+	s.change.Lock()
+	defer s.change.Unlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.ssid == nil {
+		s.mu.Unlock()
 		return nil
 	}
+	prevSSID, prevPassphrase := s.ssid, s.passphrase
+	s.ssid, s.passphrase = nil, nil
+	s.mu.Unlock()
 	if err := s.srv.SetAttributes(map[uint32]any{wdef.AttrSsid: nil, wdef.AttrPassphraseSurrogate: nil}); err != nil {
+		s.mu.Lock()
+		s.ssid, s.passphrase = prevSSID, prevPassphrase
+		s.mu.Unlock()
 		return err
 	}
-	clear(s.passphrase)
-	s.ssid, s.passphrase = nil, nil
+	clear(prevPassphrase)
 	return nil
 }
 

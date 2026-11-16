@@ -342,10 +342,13 @@ func (s *ThreadDirectoryServer) load(ctx context.Context) error {
 // the cluster and reports ThreadNetworks when it moved. chip reads the
 // storage on every read (:153-183); this server serves its table, so a
 // host that writes the store directly calls this. A preferred network
-// the store no longer holds is cleared, and the store saves the clearing.
+// the store no longer holds is cleared, and the store saves the clearing;
+// a save that fails refuses the reload and keeps the table the attribute
+// lists (R2-P6-store-1119).
 func (s *ThreadDirectoryServer) ReloadNetworks(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	prevOrder, prevEntries := s.order, s.entries
 	if err := s.load(ctx); err != nil {
 		return err
 	}
@@ -356,6 +359,7 @@ func (s *ThreadDirectoryServer) ReloadNetworks(ctx context.Context) error {
 	if p, ok := s.preferredLocked(); ok {
 		if _, held := s.entries[string(p)]; !held {
 			if err := s.store.SavePreferred(ctx, nil); err != nil {
+				s.order, s.entries = prevOrder, prevEntries
 				return fmt.Errorf("netinfra: clearing the preferred network: %w", err)
 			}
 			changes[tdir.AttrPreferredExtendedPanId] = nil

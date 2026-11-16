@@ -122,7 +122,7 @@ type ManagementServer struct {
 	panChange bool
 	logger    *slog.Logger
 
-	// mu guards armed, setBreadcrumb, seq, pending and running.
+	// mu guards failSafe, setBreadcrumb, seq, pending and running.
 	mu            sync.Mutex
 	failSafe      func() (fabricIndex uint8, armed bool)
 	setBreadcrumb func(uint64)

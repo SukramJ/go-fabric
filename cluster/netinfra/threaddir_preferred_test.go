@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/netinfra"
@@ -130,6 +131,14 @@ func TestThreadDirectoryUnknownPreferredIsCleared(t *testing.T) {
 	store.datasets, store.savePref = nil, errors.New("disk")
 	if err := r.ReloadNetworks(ctx); err == nil {
 		t.Error("a failing save of the clearing passed the reload")
+	}
+	// The refused reload keeps the table its attribute lists
+	// (R2-P6-store-1119 b).
+	if v, _ := r.MatterRead(tdir.AttrThreadNetworks); reflect.ValueOf(v).Len() != 1 {
+		t.Errorf("ThreadNetworks after the refused reload: %v", v)
+	}
+	if _, err := r.MatterInvoke(caseCtx(), tdir.CmdGetOperationalDataset, tdir.GetOperationalDatasetRequest{ExtendedPanId: exPanID1}); err != nil {
+		t.Errorf("the network ThreadNetworks lists after the refused reload: %v", err)
 	}
 	store.savePref = nil
 	mustT(t, r.ReloadNetworks(ctx))
