@@ -90,7 +90,11 @@ func sigmaTLVDecoder(b []byte) *sigmaDecoder {
 // Returns an error when the wire bytes do not start with a structure: an
 // Array or a List is refused as well, not read as if it were one — the
 // rule [sessionParamsOf] states for the nested session parameters
-// (R2-P6-wire-0101).
+// (R2-P6-wire-0101). Mirrors matter.js, which refuses another top-level
+// type (packages/types/src/tlv/TlvObject.ts:205-207 at db021da0);
+// connectedhomeip does the same for TBE2 and TBE3
+// (src/protocols/secure_channel/CASESession.cpp:1651-1653, :2069-2070 at
+// 6170af84).
 func (d *sigmaDecoder) openStruct() error {
 	el, err := d.dec.Next()
 	if err != nil {

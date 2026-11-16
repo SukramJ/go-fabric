@@ -4,6 +4,7 @@
 package mattercert
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -175,6 +176,9 @@ func TestDecodeRefusesAFieldOfAnotherTypeOrWidth(t *testing.T) {
 			e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), []byte{1})
 			e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), []byte{2})
 		})},
+		"subject key id of 19 bytes":     {"ext+": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), make([]byte, 19)) })},
+		"subject key id of 1 byte":       {"ext+": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagSubjectKeyID), []byte{1}) })},
+		"authority key id of 21 bytes":   {"ext+": put(func(e *tlv.Encoder) { e.PutOctets(tlv.ContextTag(extTagAuthorityKeyID), make([]byte, 21)) })},
 		"future extension as an integer": {"ext+": put(func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(extTagFutureExtension), 1) })},
 		"basic constraints twice": {"ext+": put(func(e *tlv.Encoder) {
 			for range 2 {
@@ -237,5 +241,32 @@ func TestDecodeTakesWellFormedOptionalExtensions(t *testing.T) {
 	}
 	if got := c.Extensions.ExtendedKeyUsage; len(got) != 2 || got[0] != 2 || got[1] != 1 {
 		t.Errorf("ExtendedKeyUsage = %v, want [2 1]", got)
+	}
+}
+
+// TestDecodeRefusesATaggedExtendedKeyUsageEntry holds the anonymous-element
+// rule of the extended key usage array: an entry that carries a context
+// tag is refused, as matter.js's array decoder refuses it
+// (packages/types/src/tlv/TlvArray.ts:78 at db021da0, "Array element tags
+// should be anonymous"). The encoder cannot write such an entry, so the
+// test writes the anonymous one and patches its control byte and tag in;
+// the unpatched certificate is the control.
+func TestDecodeRefusesATaggedExtendedKeyUsageEntry(t *testing.T) {
+	t.Parallel()
+	raw := shapeCert(t, map[string]func(e *tlv.Encoder){"ext+": func(e *tlv.Encoder) {
+		e.StartArray(tlv.ContextTag(extTagExtendedKeyUsage))
+		e.PutUint(tlv.AnonymousTag(), 0x02)
+		_ = e.EndContainer()
+	}})
+	if _, err := Decode(raw); err != nil {
+		t.Fatalf("control: the anonymous entry is refused: %v", err)
+	}
+	anonymous := []byte{0x36, extTagExtendedKeyUsage, 0x04, 0x02, 0x18}
+	tagged := []byte{0x36, extTagExtendedKeyUsage, 0x24, 0x01, 0x02, 0x18}
+	if bytes.Count(raw, anonymous) != 1 {
+		t.Fatalf("the extended key usage array is not encoded as % X", anonymous)
+	}
+	if _, err := Decode(bytes.Replace(raw, anonymous, tagged, 1)); !errors.Is(err, ErrMalformed) {
+		t.Fatalf("a context-tagged entry: %v, want ErrMalformed", err)
 	}
 }

@@ -379,7 +379,10 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 	case tagExtensions:
 		// The extensions are a TLV list, as the encoder writes them
 		// (encode.go); a structure, an array or a scalar is malformed,
-		// not descended into as if it were one (R2-P6-wire-0103).
+		// not descended into as if it were one (R2-P6-wire-0103). Mirrors
+		// matter.js: a TlvTaggedListPreservingOrder (operational.ts:37,
+		// :150 at db021da0) is of type List (TlvObject.ts:392-393) and
+		// refuses another type (:205-207).
 		if el.Type != tlv.TypeList {
 			return fmt.Errorf("%w: extensions are not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
 		}
@@ -532,7 +535,11 @@ func isStandardDNTag(tag uint8) bool {
 // uintField is an unsigned-integer member's value: an element of another
 // TLV type, or a value wider than the member's bits, is refused — not
 // masked to the width or read as 0 (R2-P6-wire-0103). The encoding's own
-// width is free; only the value is bounded.
+// width is free; only the value is bounded. Mirrors matter.js's number
+// schemas, which refuse another type (packages/types/src/tlv/TlvNumber.ts:124-131
+// at db021da0) and validate the bounds (:151-155) of the certificate's
+// integer members (packages/protocol/src/certificate/kinds/definitions/operational.ts:129-151;
+// the DN's Matter ids :58-64).
 func uintField(el tlv.Element, bits uint, name string) (uint64, error) {
 	switch el.Type {
 	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
@@ -546,7 +553,9 @@ func uintField(el tlv.Element, bits uint, name string) (uint64, error) {
 }
 
 // octetsField is an octet-string member's value; an element of another
-// TLV type is refused rather than read as empty (R2-P6-wire-0103).
+// TLV type is refused rather than read as empty (R2-P6-wire-0103), as
+// matter.js refuses it (packages/types/src/tlv/TlvString.ts:58 at
+// db021da0).
 func octetsField(el tlv.Element, name string) ([]byte, error) {
 	if el.Type < tlv.TypeOctetStr1 || el.Type > tlv.TypeOctetStr8 {
 		return nil, fmt.Errorf("%w: %s: TLV type 0x%02X, want an octet string", ErrMalformed, name, uint8(el.Type))
@@ -615,6 +624,12 @@ func validateMandatory(c *Certificate) error {
 	return nil
 }
 
+// keyIDSize is the length of the subject and authority key identifiers:
+// 160 bits, as matter.js's certificate schema bounds them
+// (packages/protocol/src/certificate/kinds/definitions/operational.ts:47-48
+// at db021da0).
+const keyIDSize = 20
+
 // Extension TLV tags inside the [tagExtensions] List per Matter
 // §6.5.1.4. Tag 6 (future-extension) is repeatable; the others are
 // each at most once.
@@ -635,7 +650,13 @@ const (
 // constraints a structure, extended key usage an array of 8-bit values,
 // key usage a 16-bit value, the key ids and a future extension octet
 // strings — and every extension but a future one occurs at most once
-// (R2-P6-wire-0103).
+// (R2-P6-wire-0103). Mirrors matter.js's extensions schema
+// (packages/protocol/src/certificate/kinds/definitions/operational.ts:37-50
+// at db021da0): basic constraints a TlvObject (:38-44), isCA a TlvBoolean
+// (:41; packages/types/src/tlv/TlvBoolean.ts:22-23), the extended key
+// usage a TlvArray(TlvUInt8) (:46; TlvArray.ts:73-74), a member given
+// twice refused in an order-preserving list (TlvObject.ts:230-232), the
+// future extension a repeated field (:49).
 func decodeExtensions(d *tlv.Decoder) (CertificateExtensions, error) {
 	var ext CertificateExtensions
 	var seen uint8 // bit n: extension n (1..5) already read
@@ -700,8 +721,8 @@ func decodeExtension(d *tlv.Decoder, el tlv.Element, tag uint8, ext *Certificate
 		if err != nil {
 			return err
 		}
-		if len(v) == 0 {
-			return fmt.Errorf("%w: subject-key-id empty", ErrMalformed)
+		if len(v) != keyIDSize {
+			return fmt.Errorf("%w: subject-key-id of %d bytes, want %d", ErrMalformed, len(v), keyIDSize)
 		}
 		ext.SubjectKeyID = v
 		ext.HasSubjectKeyID = true
@@ -710,8 +731,8 @@ func decodeExtension(d *tlv.Decoder, el tlv.Element, tag uint8, ext *Certificate
 		if err != nil {
 			return err
 		}
-		if len(v) == 0 {
-			return fmt.Errorf("%w: authority-key-id empty", ErrMalformed)
+		if len(v) != keyIDSize {
+			return fmt.Errorf("%w: authority-key-id of %d bytes, want %d", ErrMalformed, len(v), keyIDSize)
 		}
 		ext.AuthorityKeyID = v
 		ext.HasAuthorityKeyID = true
@@ -785,6 +806,12 @@ func decodeUint8Array(d *tlv.Decoder) ([]uint8, error) {
 		}
 		if el.IsEndContainer {
 			return out, nil
+		}
+		// An array's entries are anonymous; one with a tag is refused, as
+		// matter.js refuses it ("Array element tags should be anonymous",
+		// packages/types/src/tlv/TlvArray.ts:78 at db021da0).
+		if el.Tag.Kind != tlv.TagKindAnonymous {
+			return nil, fmt.Errorf("%w: extended-key-usage entry with a tag", ErrMalformed)
 		}
 		v, err := uintField(el, 8, "extended-key-usage entry")
 		if err != nil {

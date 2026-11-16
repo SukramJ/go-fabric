@@ -537,7 +537,13 @@ func marshalTBE2(p TBE2Plaintext) []byte {
 // id (tag 4, 16 bytes) are mandatory octet strings, the ICAC (tag 2) an
 // optional one: a TBE2 that lacks one or carries one of another type or
 // length is refused here, before the initiator keeps a resumption id the
-// store would refuse later (R2-P6-wire-0102).
+// store would refuse later (R2-P6-wire-0102). Mirrors matter.js
+// packages/protocol/src/session/case/CaseMessages.ts:78-83 at db021da0,
+// decoded with validation (CaseClient.ts:273, CaseServer.ts:290): another
+// TLV type is refused (packages/types/src/tlv/TlvString.ts:58), a missing
+// mandatory member (TlvObject.ts:257-261), a wrong length
+// (TlvString.ts:82-90). connectedhomeip makes the same refusals
+// (src/protocols/secure_channel/CASESession.cpp:1648-1689 at 6170af84).
 func unmarshalTBE2(b []byte) (TBE2Plaintext, error) {
 	var p TBE2Plaintext
 	var hasNOC, hasSignature, hasResumptionID bool
@@ -669,6 +675,8 @@ func marshalTBE3(p TBE3Plaintext) []byte {
 // (tag 1) and its transcript signature (tag 3, 64 bytes) are mandatory
 // octet strings, the ICAC (tag 2) an optional one; a TBE3 that lacks one
 // or carries one of another type or length is refused (R2-P6-wire-0102).
+// Mirrors matter.js CaseMessages.ts:87-91 at db021da0, refused as for
+// TBE2; connectedhomeip the same (CASESession.cpp:2066-2096 at 6170af84).
 func unmarshalTBE3(b []byte) (TBE3Plaintext, error) {
 	var p TBE3Plaintext
 	var hasNOC, hasSignature bool

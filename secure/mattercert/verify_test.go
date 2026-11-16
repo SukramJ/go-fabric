@@ -219,6 +219,13 @@ func buildSignedCert(t *testing.T, opts verifyTestCertOpts, priv *ecdsa.PrivateK
 	probeRaw = append(probeRaw, make([]byte, 64)...)
 	probeRaw = append(probeRaw, 0x18)
 	probeCert, err := mattercert.Decode(probeRaw)
+	if errors.Is(err, mattercert.ErrMalformed) {
+		// A certificate the decoder refuses (a key identifier that is
+		// not 160 bits, say) has no TBS to sign; it is returned with the
+		// placeholder signature, and the verifier refuses it at its
+		// decode as it would the signed one.
+		return probeRaw
+	}
 	if err != nil {
 		t.Fatalf("decode probe TBS: %v", err)
 	}
