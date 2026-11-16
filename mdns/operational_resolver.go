@@ -137,13 +137,24 @@ func jitter(d time.Duration) time.Duration {
 	return time.Duration(float64(d) * f)
 }
 
+// maxResolvedAddressesPerHost bounds the addresses a resolve keeps for its
+// SRV target. Every responder on the link can multicast A/AAAA records
+// for the name; a usable one ends the resolve at once, so the bound only
+// matters while none is usable (a link-local address whose interface is
+// unknown).
+const maxResolvedAddressesPerHost = 16
+
 // resolution accumulates the records of one instance across responses.
 type resolution struct {
 	instance string
 	target   string
 	port     uint16
-	hosts    map[string][]netip.Addr // lower-case host name → addresses
-	zones    map[netip.Addr]string
+	// hosts holds the addresses of the SRV target only (lower-case name →
+	// at most maxResolvedAddressesPerHost addresses): the records of every
+	// other name a responder multicasts while the resolve runs are not
+	// kept, so a party on the link cannot grow the resolve's memory.
+	hosts map[string][]netip.Addr
+	zones map[netip.Addr]string
 }
 
 func newResolution(instance string) *resolution {
@@ -197,9 +208,20 @@ func (r *resolution) absorb(in QueryResponse) bool {
 	for _, rr := range records {
 		srv, ok := rr.(*dns.SRV)
 		if ok && strings.EqualFold(srv.Hdr.Name, r.instance) && srv.Hdr.Ttl > 0 {
+			if !strings.EqualFold(srv.Target, r.target) {
+				// A new target: the old one's addresses are not its.
+				clear(r.hosts)
+				clear(r.zones)
+			}
 			r.target, r.port = srv.Target, srv.Port
 		}
 	}
+	if r.target == "" {
+		// No target yet: no address is the instance's. Once the SRV
+		// names one, its addresses are asked for at once.
+		return true
+	}
+	target := strings.ToLower(r.target)
 	for _, rr := range records {
 		var ip net.IP
 		switch v := rr.(type) {
@@ -219,7 +241,13 @@ func (r *resolution) absorb(in QueryResponse) bool {
 		}
 		addr = addr.Unmap()
 		host := strings.ToLower(rr.Header().Name)
+		if host != target {
+			continue
+		}
 		if !slices.Contains(r.hosts[host], addr) {
+			if len(r.hosts[host]) >= maxResolvedAddressesPerHost {
+				continue
+			}
 			r.hosts[host] = append(r.hosts[host], addr)
 		}
 		if addr.Is6() && addr.IsLinkLocalUnicast() && zone != "" {
