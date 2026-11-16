@@ -265,16 +265,23 @@ func (s *ColorControlServer) stepHueLogic(mode ccdef.StepModeEnum, step, transit
 	if enhanced {
 		name, maxHue = propEnhancedHue, maxEnhancedHueValue
 	}
-	current, _ := s.state().property(name)
 	sign := moveSign(mode, ccdef.StepModeUp)
 	dir := transition.HueDown
 	if mode == ccdef.StepModeUp {
 		dir = transition.HueUp
 	}
+	// The target from the engine's own read of the current hue
+	// (TargetFrom, decision 164), the state's hue the fallback for an
+	// unknown value.
+	target := func(current float64) float64 {
+		return transition.AddWithOverflow(current, step*sign, minHueValue, maxHue)
+	}
+	current, _ := s.state().property(name)
 	return s.startTransition(transition.Transition{
-		Name:   name,
-		Rate:   step / transitionTime * 10 * sign,
-		Target: transition.AddWithOverflow(current, step*sign, minHueValue, maxHue),
+		Name:       name,
+		Rate:       step / transitionTime * 10 * sign,
+		Target:     target(current),
+		TargetFrom: target,
 		CyclicDistance: func(c, t float64) float64 {
 			return transition.HueDistance(c, t, dir, maxHue)
 		},
@@ -354,9 +361,11 @@ func (s *ColorControlServer) stepSaturation(ctx context.Context, fields any) err
 	// the transition ends.
 	sign := moveSign(r.StepMode, ccdef.StepModeUp)
 	step := float64(r.StepSize)
+	// The target from the engine's own read (TargetFrom, decision 164).
+	target := func(current float64) float64 { return current + step*sign }
 	return s.startTransition(transition.Transition{
 		Name: propSaturation, Rate: step / float64(r.TransitionTime) * 10 * sign,
-		Target: float64(s.state().saturation) + step*sign,
+		Target: target(float64(s.state().saturation)), TargetFrom: target,
 	})
 }
 
@@ -516,14 +525,18 @@ func (s *ColorControlServer) stepColor(ctx context.Context, fields any) error {
 	}
 	tt := float64(r.TransitionTime)
 	st := s.state()
+	// The targets from the engine's own reads (TargetFrom, decision 164).
+	by := func(step float64) func(float64) float64 {
+		return func(current float64) float64 { return current + step }
+	}
 	var ts []transition.Transition
 	if r.StepX != 0 {
 		step := float64(r.StepX)
-		ts = append(ts, transition.Transition{Name: propX, Rate: step / tt * 10, Target: float64(st.x) + step})
+		ts = append(ts, transition.Transition{Name: propX, Rate: step / tt * 10, Target: float64(st.x) + step, TargetFrom: by(step)})
 	}
 	if r.StepY != 0 {
 		step := float64(r.StepY)
-		ts = append(ts, transition.Transition{Name: propY, Rate: step / tt * 10, Target: float64(st.y) + step})
+		ts = append(ts, transition.Transition{Name: propY, Rate: step / tt * 10, Target: float64(st.y) + step, TargetFrom: by(step)})
 	}
 	return s.startTransitions(ts...)
 }
@@ -616,9 +629,11 @@ func (s *ColorControlServer) stepColorTemperature(ctx context.Context, fields an
 	}
 	lower, upper := s.commandBounds(r.ColorTemperatureMinimumMireds, r.ColorTemperatureMaximumMireds)
 	sign := moveSign(r.StepMode, ccdef.StepModeUp)
+	// The target from the engine's own read (TargetFrom, decision 164).
+	target := func(current float64) float64 { return cropValue(current+step*sign, lower, upper) }
 	return s.startTransition(transition.Transition{
 		Name: propColorTemperature, Rate: step / float64(r.TransitionTime) * 10 * sign,
-		Target: cropValue(float64(s.state().mireds)+step*sign, lower, upper),
+		Target: target(float64(s.state().mireds)), TargetFrom: target,
 	})
 }
 
