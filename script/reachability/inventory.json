@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9292,
+  "entry_points": 9293,
   "entry_packages": [
     ".",
     "bdx",
@@ -236,6 +236,7 @@
     "internal/paritytest",
     "internal/reportchunk",
     "internal/serialqueue",
+    "internal/sessionseam",
     "internal/valuejson",
     "logring",
     "mdns",
