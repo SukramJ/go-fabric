@@ -101,7 +101,11 @@ type Zones struct {
 	port ZonePort
 	cfg  ZonesConfig
 
-	// mu guards the state below.
+	// op serialises the commands from their checks through the port to
+	// their commit ([serial]); pub serialises each change of Zones or
+	// Triggers with its publication; mu guards the state below.
+	op          sync.Mutex
+	pub         sync.Mutex
 	mu          sync.Mutex
 	endpoint    uint16
 	zones       []Zone
@@ -148,15 +152,15 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 		}
 		z.sensitivity = cfg.Sensitivity
 	}
-	z.zones = slices.Clone(cfg.Zones)
-	z.triggers = slices.Clone(cfg.Triggers)
+	z.zones = cloneAll(cfg.Zones)
+	z.triggers = cloneAll(cfg.Triggers)
 	z.userDefined = min(countUserZones(z.zones), int(cfg.MaxUserDefinedZones)) // :135-136
 	handlers := map[uint32]spec.CommandHandler{
-		zmdef.CmdCreateTwoDCartesianZone: z.createTwoDCartesianZone,
-		zmdef.CmdUpdateTwoDCartesianZone: z.updateTwoDCartesianZone,
-		zmdef.CmdRemoveZone:              z.removeZone,
-		zmdef.CmdCreateOrUpdateTrigger:   z.createOrUpdateTrigger,
-		zmdef.CmdRemoveTrigger:           z.removeTrigger,
+		zmdef.CmdCreateTwoDCartesianZone: serial(&z.op, z.createTwoDCartesianZone),
+		zmdef.CmdUpdateTwoDCartesianZone: serial(&z.op, z.updateTwoDCartesianZone),
+		zmdef.CmdRemoveZone:              serial(&z.op, z.removeZone),
+		zmdef.CmdCreateOrUpdateTrigger:   serial(&z.op, z.createOrUpdateTrigger),
+		zmdef.CmdRemoveTrigger:           serial(&z.op, z.removeTrigger),
 	}
 	srv, err := spec.NewServer(zmdef.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{
 		Handlers: handlers, DataVersion: cfg.DataVersion, WriteRule: z.writeRule, Sink: zonesSink{z},
@@ -196,21 +200,21 @@ func countUserZones(zones []Zone) int {
 	return n
 }
 
-// ZoneList returns Zones.
+// ZoneList returns Zones: a deep copy, which the caller may change.
 func (z *Zones) ZoneList() []Zone {
 	z.mu.Lock()
 	defer z.mu.Unlock()
-	return slices.Clone(z.zones)
+	return cloneAll(z.zones)
 }
 
 // MaxZones returns MaxZones.
 func (z *Zones) MaxZones() uint8 { return z.cfg.MaxZones }
 
-// TriggerList returns Triggers.
+// TriggerList returns Triggers: a deep copy, which the caller may change.
 func (z *Zones) TriggerList() []ZoneTrigger {
 	z.mu.Lock()
 	defer z.mu.Unlock()
-	return slices.Clone(z.triggers)
+	return cloneAll(z.triggers)
 }
 
 // TriggerFor returns the trigger of a zone (chip GetTriggerForZone,
@@ -222,7 +226,7 @@ func (z *Zones) TriggerFor(zoneID uint16) (ZoneTrigger, bool) {
 	if i < 0 {
 		return ZoneTrigger{}, false
 	}
-	return z.triggers[i], true
+	return z.triggers[i].Clone(), true
 }
 
 // Sensitivity returns Sensitivity.
@@ -294,20 +298,36 @@ func (z *Zones) SetAttributes(values map[uint32]any) error {
 	return z.srv.SetAttributes(map[uint32]any{zmdef.AttrSensitivity: s})
 }
 
-// publish stores Zones or Triggers at their current value.
-func (z *Zones) publish(ids ...uint32) {
+// zoneTables is the state a command changes: Zones, Triggers and the
+// user-defined zone count.
+type zoneTables struct {
+	zones       []Zone
+	triggers    []ZoneTrigger
+	userDefined int
+}
+
+// change applies edit to a copy of the tables and publishes the attribute
+// attrID names (Zones or Triggers) and keeps the result — both under pub;
+// a table the schema refuses is neither published nor kept, and the
+// command answers FAILURE (review II, R2-P6-err-1611).
+func (z *Zones) change(attrID uint32, edit func(*zoneTables)) error {
+	z.pub.Lock()
+	defer z.pub.Unlock()
 	z.mu.Lock()
-	values := map[uint32]any{}
-	for _, id := range ids {
-		switch id {
-		case zmdef.AttrZones:
-			values[id] = spec.List[Zone](nonNil(z.zones))
-		case zmdef.AttrTriggers:
-			values[id] = spec.List[ZoneTrigger](nonNil(z.triggers))
-		}
-	}
+	t := zoneTables{zones: cloneAll(z.zones), triggers: cloneAll(z.triggers), userDefined: z.userDefined}
 	z.mu.Unlock()
-	_ = z.srv.SetAttributesFrom(contract.OriginCommand, values)
+	edit(&t)
+	var v any = spec.List[Zone](nonNil(t.zones))
+	if attrID == zmdef.AttrTriggers {
+		v = spec.List[ZoneTrigger](nonNil(t.triggers))
+	}
+	if err := z.srv.SetAttributesFrom(contract.OriginCommand, map[uint32]any{attrID: v}); err != nil {
+		return commitError(fmt.Errorf("camera: ZoneManagement: %w", err))
+	}
+	z.mu.Lock()
+	z.zones, z.triggers, z.userDefined = t.zones, t.triggers, t.userDefined
+	z.mu.Unlock()
+	return nil
 }
 
 // validateTwoDZone is chip's ValidateTwoDCartesianZone (:445-460): a name
@@ -372,16 +392,6 @@ func zoneRequestOf[T any](fields any, name string) (T, error) {
 	return req, nil
 }
 
-func cloneTwoDZone(zone TwoDZone) *TwoDZone {
-	c := zone
-	c.Vertices = slices.Clone(zone.Vertices)
-	if zone.Color != nil {
-		color := *zone.Color
-		c.Color = &color
-	}
-	return &c
-}
-
 // createTwoDCartesianZone carries out CreateTwoDCartesianZone. Mirrors
 // chip HandleCreateTwoDCartesianZone (ZoneManagementCluster.cpp:462-521):
 // the zone's checks, a Focus zone only with FOCUSZONES (CONSTRAINT_ERROR),
@@ -411,14 +421,16 @@ func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, e
 	if err != nil {
 		return nil, portError("CreateTwoDCartesianZone", err)
 	}
-	z.mu.Lock()
-	z.zones = append(z.zones, Zone{ // :512-515
-		ZoneId: id, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser,
-		TwoDCartesianZone: cloneTwoDZone(req.Zone),
-	})
-	z.userDefined++
-	z.mu.Unlock()
-	z.publish(zmdef.AttrZones)
+	zone := req.Zone.Clone()
+	if err := z.change(zmdef.AttrZones, func(t *zoneTables) {
+		t.zones = append(t.zones, Zone{ // :512-515
+			ZoneId: id, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser,
+			TwoDCartesianZone: &zone,
+		})
+		t.userDefined++
+	}); err != nil {
+		return nil, err
+	}
 	return zmdef.CreateTwoDCartesianZoneResponse{ZoneId: id}, nil
 }
 
@@ -456,15 +468,17 @@ func (z *Zones) updateTwoDCartesianZone(ctx context.Context, fields any) (any, e
 	if err := z.port.UpdateTwoDCartesianZone(ctx, req.ZoneId, req.Zone); err != nil { // :574
 		return nil, portError("UpdateTwoDCartesianZone", err)
 	}
-	z.mu.Lock()
-	if i := slices.IndexFunc(z.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId }); i >= 0 { // :577-579
-		z.zones[i] = Zone{
-			ZoneId: req.ZoneId, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser,
-			TwoDCartesianZone: cloneTwoDZone(req.Zone),
+	zone := req.Zone.Clone()
+	if err := z.change(zmdef.AttrZones, func(t *zoneTables) {
+		if i := slices.IndexFunc(t.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId }); i >= 0 { // :577-579
+			t.zones[i] = Zone{
+				ZoneId: req.ZoneId, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser,
+				TwoDCartesianZone: &zone,
+			}
 		}
+	}); err != nil {
+		return nil, err
 	}
-	z.mu.Unlock()
-	z.publish(zmdef.AttrZones)
 	return nil, nil
 }
 
@@ -495,13 +509,14 @@ func (z *Zones) removeZone(ctx context.Context, fields any) (any, error) {
 	if err := z.port.RemoveZone(ctx, req.ZoneId); err != nil { // :600
 		return nil, portError("RemoveZone", err)
 	}
-	z.mu.Lock()
-	z.zones = slices.DeleteFunc(z.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId })
-	if z.userDefined > 0 { // :604-607
-		z.userDefined--
+	if err := z.change(zmdef.AttrZones, func(t *zoneTables) {
+		t.zones = slices.DeleteFunc(t.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId })
+		if t.userDefined > 0 { // :604-607
+			t.userDefined--
+		}
+	}); err != nil {
+		return nil, err
 	}
-	z.mu.Unlock()
-	z.publish(zmdef.AttrZones)
 	return nil, nil
 }
 
@@ -549,10 +564,7 @@ func (z *Zones) createOrUpdateTrigger(ctx context.Context, fields any) (any, err
 	case found.TwoDCartesianZone != nil && found.TwoDCartesianZone.Use != zmdef.ZoneUseMotion: // :642-644
 		return nil, spec.Errorf(im.StatusConstraintError, "ZoneManagement: zone %d is no Motion zone", t.ZoneId)
 	}
-	if t.Sensitivity != nil {
-		s := *t.Sensitivity
-		t.Sensitivity = &s
-	}
+	t = t.Clone()
 	if exists { // :417-424
 		if err := z.port.UpdateTrigger(ctx, t); err != nil {
 			return nil, portError("UpdateTrigger", err)
@@ -560,14 +572,15 @@ func (z *Zones) createOrUpdateTrigger(ctx context.Context, fields any) (any, err
 	} else if err := z.port.CreateTrigger(ctx, t); err != nil { // :409-416
 		return nil, portError("CreateTrigger", err)
 	}
-	z.mu.Lock()
-	if j := slices.IndexFunc(z.triggers, func(x ZoneTrigger) bool { return x.ZoneId == t.ZoneId }); j >= 0 {
-		z.triggers[j] = t
-	} else {
-		z.triggers = append(z.triggers, t)
+	if err := z.change(zmdef.AttrTriggers, func(tt *zoneTables) {
+		if j := slices.IndexFunc(tt.triggers, func(x ZoneTrigger) bool { return x.ZoneId == t.ZoneId }); j >= 0 {
+			tt.triggers[j] = t
+		} else {
+			tt.triggers = append(tt.triggers, t)
+		}
+	}); err != nil {
+		return nil, err
 	}
-	z.mu.Unlock()
-	z.publish(zmdef.AttrTriggers)
 	return nil, nil
 }
 
@@ -585,10 +598,11 @@ func (z *Zones) removeTrigger(ctx context.Context, fields any) (any, error) {
 	if err := z.port.RemoveTrigger(ctx, req.ZoneId); err != nil { // :433
 		return nil, portError("RemoveTrigger", err)
 	}
-	z.mu.Lock()
-	z.triggers = slices.DeleteFunc(z.triggers, func(t ZoneTrigger) bool { return t.ZoneId == req.ZoneId })
-	z.mu.Unlock()
-	z.publish(zmdef.AttrTriggers)
+	if err := z.change(zmdef.AttrTriggers, func(t *zoneTables) {
+		t.triggers = slices.DeleteFunc(t.triggers, func(t ZoneTrigger) bool { return t.ZoneId == req.ZoneId })
+	}); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 

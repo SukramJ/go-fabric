@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
+	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -119,5 +120,54 @@ func TestPushAllocateRunsOneAtATime(t *testing.T) {
 	wantCode(t, "second", statusOf(<-second), im.StatusResourceExhausted)
 	if n := len(p.Connections()); n != 1 {
 		t.Fatalf("%d connections, want 1", n)
+	}
+}
+
+// gatedZones is the zone port whose CreateTwoDCartesianZone waits on gate
+// after it reported, on entered, that it was called.
+type gatedZones struct {
+	*mockZones
+	entered, gate chan struct{}
+}
+
+func (g gatedZones) CreateTwoDCartesianZone(ctx context.Context, zone camera.TwoDZone) (uint16, error) {
+	select {
+	case g.entered <- struct{}{}:
+	default:
+	}
+	<-g.gate
+	return g.mockZones.CreateTwoDCartesianZone(ctx, zone)
+}
+
+// TestZonesCreateRunsOneAtATime holds MaxUserDefinedZones across the port
+// call: with one user-defined zone left, a second CreateTwoDCartesianZone
+// that arrives while the first waits on the port is answered
+// RESOURCE_EXHAUSTED after it. Before, both passed the budget before
+// either was counted (review II, R2-P6-conc-1609).
+func TestZonesCreateRunsOneAtATime(t *testing.T) {
+	t.Parallel()
+	g := gatedZones{mockZones: &mockZones{nextID: 100}, entered: make(chan struct{}, 1), gate: make(chan struct{})}
+	var held []camera.Zone
+	for i := range uint16(zoneMaxUserDefined - 1) {
+		zone := camera.TwoDZone{Name: "held", Use: zmdef.ZoneUseMotion, Vertices: triangle(100 * (i + 1))}
+		held = append(held, camera.Zone{ZoneId: i + 1, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser, TwoDCartesianZone: &zone})
+	}
+	z, _ := newChipZones(t, twoDUser, func(c *camera.ZonesConfig) { c.Port, c.Zones = g, held })
+	first, second := make(chan im.StatusCode, 1), make(chan im.StatusCode, 1)
+	go func() {
+		_, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("a", triangle(1)))
+		first <- st
+	}()
+	<-g.entered
+	go func() {
+		_, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("b", triangle(2)))
+		second <- st
+	}()
+	settle(g.entered)
+	close(g.gate)
+	wantCode(t, "first", <-first, im.StatusSuccess)
+	wantCode(t, "second", <-second, im.StatusResourceExhausted)
+	if n := len(z.ZoneList()); n != zoneMaxUserDefined {
+		t.Fatalf("%d zones, want %d", n, zoneMaxUserDefined)
 	}
 }
