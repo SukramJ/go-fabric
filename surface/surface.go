@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/bits"
 	"slices"
+	"strings"
 )
 
 // Surface is the served surface of a node: the root endpoint and every
@@ -237,7 +238,10 @@ func (c Change) String() string {
 // Diff returns every difference from a to b, endpoint by endpoint in key
 // order (the root first), then device types, then clusters by ID; an empty
 // slice when a controller could not tell them apart. Endpoint numbers are
-// no difference. An endpoint or a cluster that only one side has is one
+// no difference. A device type is one Change per id: its entries'
+// revisions ("revision 3", or "revision 3, revision 2" for an id listed
+// twice) when they differ, else its positions in the DeviceTypeList
+// ("position 0") when only the order moved. An endpoint or a cluster that only one side has is one
 // Change per device type or one per cluster, not one per element.
 func Diff(a, b Surface) []Change {
 	out := []Change{}
@@ -270,28 +274,71 @@ func byKey(eps []Endpoint) map[string]Endpoint {
 
 func revision(r uint16) string { return fmt.Sprintf("revision %d", r) }
 
+// deviceTypeEntries is, per device-type id, the revisions of its entries
+// in a DeviceTypeList and their positions, in list order.
+type deviceTypeEntries struct {
+	revisions []uint16
+	positions []int
+}
+
+func deviceTypesByID(dts []DeviceTypeRef) map[uint32]*deviceTypeEntries {
+	m := map[uint32]*deviceTypeEntries{}
+	for n, dt := range dts {
+		e := m[dt.ID]
+		if e == nil {
+			e = &deviceTypeEntries{}
+			m[dt.ID] = e
+		}
+		e.revisions = append(e.revisions, dt.Revision)
+		e.positions = append(e.positions, n)
+	}
+	return m
+}
+
+// revisions renders the revisions of one id's entries: "revision 3", or
+// "revision 3, revision 2" for a duplicated id.
+func revisions(rs []uint16) string {
+	parts := make([]string, len(rs))
+	for n, r := range rs {
+		parts[n] = revision(r)
+	}
+	return strings.Join(parts, ", ")
+}
+
+func positions(ps []int) string {
+	parts := make([]string, len(ps))
+	for n, p := range ps {
+		parts[n] = fmt.Sprintf("position %d", p)
+	}
+	return strings.Join(parts, ", ")
+}
+
 func diffEndpoint(out []Change, a, b Endpoint) []Change {
 	key := cmp.Or(a.Key, b.Key)
-	dtA := map[uint32]uint16{}
-	for _, dt := range a.DeviceTypes {
-		dtA[dt.ID] = dt.Revision
-	}
-	dtB := map[uint32]uint16{}
-	for _, dt := range b.DeviceTypes {
-		dtB[dt.ID] = dt.Revision
-	}
+	// The DeviceTypeList is an ordered list a controller reads as it is
+	// served ([Endpoint.Digest] sees its order): an id whose entries'
+	// revisions differ is a revision change, one whose entries only moved
+	// a position change, so a list that differs always names a Change
+	// (review II, R2-P6-api-1362).
+	dtA := deviceTypesByID(a.DeviceTypes)
+	dtB := deviceTypesByID(b.DeviceTypes)
 	for _, id := range unionKeys(dtA, dtB) {
-		ra, inA := dtA[id]
-		rb, inB := dtB[id]
-		if inA && inB && ra == rb {
-			continue
-		}
+		ea, inA := dtA[id]
+		eb, inB := dtB[id]
 		ch := Change{Endpoint: key, Kind: KindDeviceType, ID: id}
-		if inA {
-			ch.Before = revision(ra)
-		}
-		if inB {
-			ch.After = revision(rb)
+		switch {
+		case inA && inB && slices.Equal(ea.revisions, eb.revisions):
+			if slices.Equal(ea.positions, eb.positions) {
+				continue
+			}
+			ch.Before, ch.After = positions(ea.positions), positions(eb.positions)
+		default:
+			if inA {
+				ch.Before = revisions(ea.revisions)
+			}
+			if inB {
+				ch.After = revisions(eb.revisions)
+			}
 		}
 		out = append(out, ch)
 	}
