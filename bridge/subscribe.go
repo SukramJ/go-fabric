@@ -1870,10 +1870,14 @@ func (b *Bridge) currentPeerAddr(sessionID uint16, fallback net.Addr) net.Addr {
 // abandonPrimingSubscription closes a subscription whose priming report
 // or SubscribeResponse did not go out: the controller never saw it
 // established, and a priming subscription would otherwise sit silent in
-// the manager until its session closed.
+// the manager until its session closed. It never became active, so it is
+// released, not terminated: no row was persisted for it and the fabric is
+// not re-announced, as the re-establishment unwinds the same state
+// (review II, R2-P6-sec-0509). A CASE peer that subscribes to nothing
+// does not start one re-announcement per request.
 func (b *Bridge) abandonPrimingSubscription(subID uint32) {
 	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
-		_ = m.Close(subID)
+		_ = m.Release(subID)
 	}
 }
 

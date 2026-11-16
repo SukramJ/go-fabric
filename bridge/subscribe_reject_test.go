@@ -19,6 +19,7 @@ package bridge
 import (
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -212,5 +213,34 @@ func TestHandleSubscribeRequest_ManagerRejection_SendsStatusResponse(t *testing.
 				t.Errorf("mgr.Active() = %d, want 0", n)
 			}
 		})
+	}
+}
+
+// TestHandleSubscribeRequest_NoMatchingPaths_TerminatesNothing (review II,
+// R2-P6-sec-0509): a Subscribe that matches nothing never became active —
+// it is released, not terminated, so the terminated hook (the row's
+// delete and the fabric's re-announcement) does not run for it.
+func TestHandleSubscribeRequest_NoMatchingPaths_TerminatesNothing(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	b.AttachSubscriptionManager(mgr)
+	var terminated atomic.Int32
+	mgr.SetOnSubscriptionTerminated(func(uint32, uint8) { terminated.Add(1) })
+	attachPASETestPeer(t, b)
+
+	hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: 105}
+	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: 1}
+	req := im.SubscribeRequest{
+		AttributeRequests:  []im.ConcreteAttributePath{{HasCluster: true, Cluster: 0xFFFF0001}},
+		MaxIntervalCeiling: 60,
+	}
+	_, peerAddr := newSubscribeTestPeer(t)
+	_ = b.handleSubscribeRequest(context.Background(), peerAddr, hdr, proto, req)
+	if n := mgr.Active(); n != 0 {
+		t.Fatalf("mgr.Active() = %d, want 0", n)
+	}
+	if n := terminated.Load(); n != 0 {
+		t.Fatalf("a Subscribe matching nothing fired the terminated hook %d times", n)
 	}
 }

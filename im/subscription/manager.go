@@ -560,12 +560,16 @@ func (m *Manager) Close(id uint32) error {
 	return m.closeOne(id, true)
 }
 
-// Release closes a single subscription without terminating it — the
-// transport gave up on it without the peer having cancelled it (matter.js
-// closes a subscription on a non-InvalidSubscription error status without
-// setting `isTerminated`, ServerSubscription.ts:#sendUpdateMessage), or a
-// re-establishment attempt that never became active is unwound. The
-// terminated hook stays silent.
+// Release closes a single subscription without terminating it: one that
+// never became active — a Subscribe whose priming report or
+// SubscribeResponse did not go out, a re-establishment attempt unwound —
+// whose end has nothing persisted to forget and nothing to re-announce.
+// The terminated hook stays silent. A subscription the peer refused or
+// the transport gave up on is terminated ([Manager.Close]): at db021da0
+// matter.js marks every refused report terminated
+// (packages/node/src/node/server/ServerSubscription.ts:938-950) and so
+// the third failed update (#closeFromUpdate, :602, :791-793) — review
+// II, R2-P6-doc-0514, R2-P6-sec-0509.
 func (m *Manager) Release(id uint32) error {
 	return m.closeOne(id, false)
 }
