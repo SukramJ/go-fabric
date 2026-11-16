@@ -15,7 +15,17 @@ import (
 // packages/model/src/standard/elements/operational-state.element.ts,
 // rvc-operational-state.element.ts).
 const (
-	OperationalStateClusterID    uint32 = 0x0060
+	// OperationalStateClusterID duplicates a generated constant.
+	//
+	// Deprecated: use ClusterID of cluster/spec/operationalstate, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	OperationalStateClusterID uint32 = 0x0060
+	// RvcOperationalStateClusterID duplicates a generated constant.
+	//
+	// Deprecated: use ClusterID of cluster/spec/rvcoperationalstate, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	RvcOperationalStateClusterID uint32 = 0x0061
 )
 
@@ -23,12 +33,37 @@ const (
 // rvc-operational-state.element.ts:21-30). Every request is fieldless and
 // answered by OperationalCommandResponse.
 const (
-	OperationalStateCmdPause                      uint32 = 0x00
-	OperationalStateCmdStop                       uint32 = 0x01
-	OperationalStateCmdStart                      uint32 = 0x02
+	// OperationalStateCmdPause duplicates a generated constant.
+	//
+	// Deprecated: use CmdPause of cluster/spec/operationalstate, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	OperationalStateCmdPause uint32 = 0x00
+	// OperationalStateCmdStop duplicates a generated constant.
+	//
+	// Deprecated: use CmdStop of cluster/spec/operationalstate, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	OperationalStateCmdStop uint32 = 0x01
+	// OperationalStateCmdStart duplicates a generated constant.
+	//
+	// Deprecated: use CmdStart of cluster/spec/operationalstate, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	OperationalStateCmdStart uint32 = 0x02
+	// OperationalStateCmdResume duplicates a generated constant.
+	//
+	// Deprecated: use CmdResume of cluster/spec/operationalstate, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	OperationalStateCmdResume                     uint32 = 0x03
 	OperationalStateCmdOperationalCommandResponse uint32 = 0x04
-	RvcOperationalStateCmdGoHome                  uint32 = 0x80
+	// RvcOperationalStateCmdGoHome duplicates a generated constant.
+	//
+	// Deprecated: use CmdGoHome of cluster/spec/rvcoperationalstate, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	RvcOperationalStateCmdGoHome uint32 = 0x80
 )
 
 // Manufacturer-specific operational state and error state ids carry a

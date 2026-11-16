@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	colordef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
@@ -148,7 +149,7 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 2}); err != nil {
 		t.Fatal(err)
 	}
-	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToHueAndSaturation {
+	if len(color.cmds) != 1 || color.cmds[0] != colordef.CmdMoveToHueAndSaturation {
 		t.Fatalf("color commands %v, want MoveToHueAndSaturation", color.cmds)
 	}
 	if len(level.applied) != 1 {

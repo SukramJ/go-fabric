@@ -54,7 +54,7 @@ func TestParityMatterJS_DecoderFieldBounds(t *testing.T) {
 		},
 		{
 			"GoToLiftValue 65536", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(0), 65536) },
-			func(p []byte) error { _, err := wire.DecodeGoToLiftValue(p); return err }, wire.ErrWindowCoveringMalformed, im.StatusConstraintError,
+			func(p []byte) error { _, err := wire.DecodeGoToLiftValue(p); return err }, wire.ErrWindowCoveringMalformed, im.StatusConstraintError, //nolint:staticcheck // the deprecated GoToLiftValue decoder keeps its window (R2-P6-api-1261)
 		},
 		{
 			"LockDoor PINCode as an integer", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(0), 1234) },

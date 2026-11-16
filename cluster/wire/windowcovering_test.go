@@ -13,7 +13,7 @@ import (
 
 // TestDecodeGoToLiftValueTag0 verifies that context tag 0 carries the
 // raw uint16 position (1234 → LiftValue=1234).
-func TestDecodeGoToLiftValueTag0(t *testing.T) {
+func TestDecodeGoToLiftValueTag0(t *testing.T) { //nolint:staticcheck // the deprecated GoTo*Value surface is tested for its window (R2-P6-api-1261)
 	t.Parallel()
 	payload := buildPayload(t, func(e *tlv.Encoder) {
 		e.PutUint(tlv.ContextTag(0), 1234)
@@ -29,7 +29,7 @@ func TestDecodeGoToLiftValueTag0(t *testing.T) {
 
 // TestDecodeGoToLiftValueMalformed verifies that a truncated payload
 // wraps ErrWindowCoveringMalformed.
-func TestDecodeGoToLiftValueMalformed(t *testing.T) {
+func TestDecodeGoToLiftValueMalformed(t *testing.T) { //nolint:staticcheck // the deprecated GoTo*Value surface is tested for its window (R2-P6-api-1261)
 	t.Parallel()
 	_, err := wire.DecodeGoToLiftValue([]byte{0x15})
 	if !errors.Is(err, wire.ErrWindowCoveringMalformed) {
@@ -39,7 +39,7 @@ func TestDecodeGoToLiftValueMalformed(t *testing.T) {
 
 // TestDecodeGoToTiltValueTag0 verifies that context tag 0 carries the
 // raw uint16 position (4321 → TiltValue=4321).
-func TestDecodeGoToTiltValueTag0(t *testing.T) {
+func TestDecodeGoToTiltValueTag0(t *testing.T) { //nolint:staticcheck // the deprecated GoTo*Value surface is tested for its window (R2-P6-api-1261)
 	t.Parallel()
 	payload := buildPayload(t, func(e *tlv.Encoder) {
 		e.PutUint(tlv.ContextTag(0), 4321)
@@ -55,7 +55,7 @@ func TestDecodeGoToTiltValueTag0(t *testing.T) {
 
 // TestDecodeGoToTiltValueMalformed verifies that a truncated payload
 // wraps ErrWindowCoveringMalformed.
-func TestDecodeGoToTiltValueMalformed(t *testing.T) {
+func TestDecodeGoToTiltValueMalformed(t *testing.T) { //nolint:staticcheck // the deprecated GoTo*Value surface is tested for its window (R2-P6-api-1261)
 	t.Parallel()
 	_, err := wire.DecodeGoToTiltValue([]byte{0x15})
 	if !errors.Is(err, wire.ErrWindowCoveringMalformed) {

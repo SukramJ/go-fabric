@@ -33,15 +33,65 @@ const (
 
 // ColorControl command IDs per Matter §3.2.7.
 const (
-	ColorCtrlCmdMoveToHue              uint32 = 0x00
-	ColorCtrlCmdMoveHue                uint32 = 0x01
-	ColorCtrlCmdStepHue                uint32 = 0x02
-	ColorCtrlCmdMoveToSaturation       uint32 = 0x03
-	ColorCtrlCmdMoveSaturation         uint32 = 0x04
-	ColorCtrlCmdStepSaturation         uint32 = 0x05
+	// ColorCtrlCmdMoveToHue duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveToHue of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdMoveToHue uint32 = 0x00
+	// ColorCtrlCmdMoveHue duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveHue of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdMoveHue uint32 = 0x01
+	// ColorCtrlCmdStepHue duplicates a generated constant.
+	//
+	// Deprecated: use CmdStepHue of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdStepHue uint32 = 0x02
+	// ColorCtrlCmdMoveToSaturation duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveToSaturation of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdMoveToSaturation uint32 = 0x03
+	// ColorCtrlCmdMoveSaturation duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveSaturation of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdMoveSaturation uint32 = 0x04
+	// ColorCtrlCmdStepSaturation duplicates a generated constant.
+	//
+	// Deprecated: use CmdStepSaturation of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdStepSaturation uint32 = 0x05
+	// ColorCtrlCmdMoveToHueAndSaturation duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveToHueAndSaturation of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorCtrlCmdMoveToHueAndSaturation uint32 = 0x06
-	ColorCtrlCmdMoveToColor            uint32 = 0x07
-	ColorCtrlCmdMoveColor              uint32 = 0x08
+	// ColorCtrlCmdMoveToColor duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveToColor of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdMoveToColor uint32 = 0x07
+	// ColorCtrlCmdMoveColor duplicates a generated constant.
+	//
+	// Deprecated: use CmdMoveColor of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorCtrlCmdMoveColor uint32 = 0x08
+	// ColorCtrlCmdStepColor duplicates a generated constant.
+	//
+	// Deprecated: use CmdStepColor of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorCtrlCmdStepColor              uint32 = 0x09
 	ColorCtrlCmdMoveToColorTemperature uint32 = 0x0A
 	ColorCtrlCmdStopMoveStep           uint32 = 0x47
@@ -51,21 +101,66 @@ const (
 
 // HueDirection values per Matter §3.2.7.4.2.
 const (
+	// ColorHueDirShortest duplicates a generated constant.
+	//
+	// Deprecated: use DirectionShortest of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorHueDirShortest uint8 = 0
-	ColorHueDirLongest  uint8 = 1
-	ColorHueDirUp       uint8 = 2
-	ColorHueDirDown     uint8 = 3
+	// ColorHueDirLongest duplicates a generated constant.
+	//
+	// Deprecated: use DirectionLongest of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorHueDirLongest uint8 = 1
+	// ColorHueDirUp duplicates a generated constant.
+	//
+	// Deprecated: use DirectionUp of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorHueDirUp uint8 = 2
+	// ColorHueDirDown duplicates a generated constant.
+	//
+	// Deprecated: use DirectionDown of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorHueDirDown uint8 = 3
 )
 
 // ColorMoveMode values per Matter §3.2.7.5 / §3.2.7.8.
 const (
+	// ColorMoveModeStop duplicates a generated constant.
+	//
+	// Deprecated: use MoveModeStop of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorMoveModeStop uint8 = 0
-	ColorMoveModeUp   uint8 = 1
+	// ColorMoveModeUp duplicates a generated constant.
+	//
+	// Deprecated: use MoveModeUp of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorMoveModeUp uint8 = 1
+	// ColorMoveModeDown duplicates a generated constant.
+	//
+	// Deprecated: use MoveModeDown of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorMoveModeDown uint8 = 3
 )
 
 // ColorStepMode values per Matter §3.2.7.6 / §3.2.7.9.
 const (
-	ColorStepModeUp   uint8 = 1
+	// ColorStepModeUp duplicates a generated constant.
+	//
+	// Deprecated: use StepModeUp of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
+	ColorStepModeUp uint8 = 1
+	// ColorStepModeDown duplicates a generated constant.
+	//
+	// Deprecated: use StepModeDown of cluster/spec/colorcontrol, the
+	// generated id: one source of ids (review II, R2-P6-par-1262,
+	// decision 140). Removable in the next minor release.
 	ColorStepModeDown uint8 = 3
 )
