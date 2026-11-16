@@ -335,3 +335,35 @@ func TestRespondedExchangeIsNeverStoredUnbound(t *testing.T) {
 		t.Fatal("an exchange was stored without its session")
 	}
 }
+
+// TestSendRacingTheSessionCloseLeavesNoEntry: a Send whose session closes
+// between its check and the tracking of its message — the purge's drop of
+// the session's entries ran in between — takes its entry back and ends the
+// exchange, so no entry of the closed session stays under the bare id to be
+// retransmitted and to take a place of the next session given the id
+// (review II, R2-P6-sec-0302 round 2, Fable read row 5).
+func TestSendRacingTheSessionCloseLeavesNoEntry(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	b.AttachAckTracker(mrp.NewAckTracker(time.Hour))
+	sess, err := channel.New(channel.Config{EncryptKey: bytes.Repeat([]byte{0xAA}, 16), DecryptKey: bytes.Repeat([]byte{0xBB}, 16), LocalNodeID: 1, PeerNodeID: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	looks := 0
+	b.AttachSessionLookup(sessionLookupFunc(func(uint16) (*channel.Session, bool) {
+		looks++
+		if looks == 1 {
+			return sess, true // Send's check
+		}
+		return nil, false // closed right after it
+	}))
+	const sid = uint16(0x0505)
+	ex := &initiatedSecureExchange{b: b, sessionID: sid, addr: loopbackSrc(), session: sess, exchangeID: 0x0606, in: make(chan bdx.Message, 1), done: make(chan struct{})}
+	if err := ex.Send(context.Background(), bdx.ProtocolID, uint8(bdx.MessageSendInit), []byte{0x01}); !errors.Is(err, ErrExchangeClosed) {
+		t.Fatalf("Send across its session's close: %v, want ErrExchangeClosed", err)
+	}
+	if n := b.outboundReliable.Pending(); n != 0 {
+		t.Fatalf("%d entries of the closed session left in the retransmit table", n)
+	}
+}
