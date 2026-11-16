@@ -562,12 +562,19 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 			return nil, errors.New("im: EventReportIB is not a structure")
 		}
 		var rep EventReport
+		// Exactly one of EventStatusIB and EventDataIB, as the
+		// AttributeReportIB decoder holds its two ([readAttributeReport];
+		// review II, R2-P6-wire-0516).
+		members := 0
 		for {
 			el, err := dec.Next()
 			if err != nil {
 				return nil, err
 			}
 			if el.IsEndContainer {
+				if members != 1 {
+					return nil, fmt.Errorf("im: EventReportIB carries %d of EventStatusIB and EventDataIB, want one", members)
+				}
 				break
 			}
 			switch {
@@ -576,10 +583,12 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 					return nil, err
 				}
 				rep.IsStatus = true
+				members++
 			case el.Tag.Kind == tlv.TagKindContext && el.Tag.Number == uint32(tagEventReportData) && el.IsContainer && el.Type == tlv.TypeStructure:
 				if err := readEventDataFields(dec, &rep, eventReader); err != nil {
 					return nil, err
 				}
+				members++
 			default:
 				if err := skipElement(dec, el); err != nil {
 					return nil, err
@@ -593,12 +602,18 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 // readEventStatusFields reads an EventStatusIB after its opener
 // (TlvEventStatus.ts: Path (0), Status (1)).
 func readEventStatusFields(dec *tlv.Decoder, rep *EventReport) error {
+	var hasPath, hasStatus bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return err
 		}
 		if el.IsEndContainer {
+			// Path and Status are both required, as the attribute side
+			// requires its status's (R2-P6-wire-0516).
+			if !hasPath || !hasStatus {
+				return errors.New("im: EventStatusIB without its path or its status")
+			}
 			return nil
 		}
 		switch {
@@ -606,10 +621,12 @@ func readEventStatusFields(dec *tlv.Decoder, rep *EventReport) error {
 			if rep.Path, err = readEventPathFields(dec); err != nil {
 				return err
 			}
+			hasPath = true
 		case el.Tag.Kind == tlv.TagKindContext && el.Tag.Number == uint32(tagEventStatusStatus) && el.IsContainer && el.Type == tlv.TypeStructure:
 			if err := readStatusIBFields(dec, &rep.Status); err != nil {
 				return err
 			}
+			hasStatus = true
 		default:
 			if err := skipElement(dec, el); err != nil {
 				return err

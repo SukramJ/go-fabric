@@ -78,3 +78,47 @@ func TestAttributeDataIsDecodedWithTheFinalPath(t *testing.T) {
 		}
 	}
 }
+
+// TestClientEventReportIBNeedsExactlyOneMember (review II,
+// R2-P6-wire-0516): the client refuses an EventReportIB with neither or
+// both of EventStatusIB and EventDataIB, and an EventStatusIB without its
+// path or its status, as it refuses the attribute side's.
+func TestClientEventReportIBNeedsExactlyOneMember(t *testing.T) {
+	t.Parallel()
+	status := func(enc *tlv.Encoder, withPath, withStatus bool) {
+		enc.StartStruct(tlv.ContextTag(tagEventReportStatus))
+		if withPath {
+			enc.StartList(tlv.ContextTag(tagEventStatusPath))
+			enc.PutUint(tlv.ContextTag(1), 1)
+			_ = enc.EndContainer()
+		}
+		if withStatus {
+			enc.StartStruct(tlv.ContextTag(tagEventStatusStatus))
+			enc.PutUint(tlv.ContextTag(0), 0x86)
+			_ = enc.EndContainer()
+		}
+		_ = enc.EndContainer()
+	}
+	for name, body := range map[string]func(*tlv.Encoder){
+		"no member":               func(*tlv.Encoder) {},
+		"two statuses":            func(e *tlv.Encoder) { status(e, true, true); status(e, true, true) },
+		"a status without path":   func(e *tlv.Encoder) { status(e, false, true) },
+		"a status without status": func(e *tlv.Encoder) { status(e, true, false) },
+	} {
+		enc := tlv.NewEncoder()
+		enc.StartArray(tlv.AnonymousTag())
+		enc.StartStruct(tlv.AnonymousTag())
+		body(enc)
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		wire, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		dec := tlv.NewDecoder(wire)
+		_, _ = dec.Next() // the array opener
+		if _, err := readEventReports(dec, nil); err == nil {
+			t.Errorf("%s: decoded, want refused", name)
+		}
+	}
+}
