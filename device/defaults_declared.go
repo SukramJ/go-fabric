@@ -166,7 +166,7 @@ func newModeSelectServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("modeselect: %w", errNoPort))
 	}
 	hostState(b.initial)
-	return modeselect.NewServer(modeselect.Config{Source: d.ModeSource, DataVersion: b.cfg.DataVersion}), nil
+	return modeselect.NewServer(modeselect.Config{Source: d.ModeSource, DataVersion: b.cfg.DataVersion}), nil //nolint:staticcheck // the deprecated tracker passed on for its window (decision 165)
 }
 
 // newServiceAreaServer is the module's ServiceArea server
@@ -264,7 +264,7 @@ func newMicrowaveModeServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(errors.New("device: microwaveovenmode: the declaration's Initial carries no SupportedModes"))
 	}
 	delete(b.initial, modeAttrSupportedModes)
-	cfg := modebase.Config{SupportedModes: modeOptionsOf(v), Features: modebase.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	cfg := modebase.Config{SupportedModes: modeOptionsOf(v), Features: modebase.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion} //nolint:staticcheck // the deprecated tracker passed on for its window (decision 165)
 	if m, ok := consume8(b.initial, modeAttrCurrentMode); ok {
 		cfg.CurrentMode = m
 	}

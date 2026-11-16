@@ -264,6 +264,11 @@ type Config struct {
 	// Features: FeatureDirectModeChange on RvcRunMode / RvcCleanMode.
 	Features Feature
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: no controller reads this tracker — the wire carries the
+	// endpoint's DataVersion for the cluster, which the bridge keeps
+	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
+	// minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -497,7 +502,7 @@ func (s *Server) EmitEvent(eventID uint32, data any) error {
 }
 
 // SetEndpoint implements [contract.EndpointReceiver] for the store and the
-// deprecated [Server.Hooks].
+// Hooks field ([Server.Hooks]).
 func (s *Server) SetEndpoint(endpoint uint16) {
 	s.SelfHeld.SetEndpoint(endpoint)
 	s.Hooks.SetEndpoint(endpoint) //nolint:staticcheck // mirrored into the deprecated field
@@ -747,7 +752,12 @@ func (s *Server) Revision() uint16 { return s.inst.Revision() }
 // MatterClusterID returns the derivation's cluster id.
 func (s *Server) MatterClusterID() uint32 { return s.inst.MatterClusterID() }
 
-// MatterDataVersion implements [contract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion]: the
+// server's own tracker, the host's when it supplied one.
+//
+// Deprecated: no controller reads this version — the wire carries the
+// endpoint's DataVersion for the cluster, which the bridge keeps
+// (decision 165, F-db021da0-46). Removable in the next minor release.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister].

@@ -145,6 +145,11 @@ type Config struct {
 	// mode the device changed on its own reaches a subscriber the
 	// moment the host bumps it, and the version survives server
 	// reconstruction; when nil an embedded tracker is used.
+	//
+	// Deprecated: no controller reads this tracker — the wire carries the
+	// endpoint's DataVersion for the cluster, which the bridge keeps
+	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
+	// minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -287,7 +292,12 @@ func Revision() uint16 { return msdef.Revision }
 // MatterClusterID returns 0x0050 (ModeSelect).
 func (*Server) MatterClusterID() uint32 { return ClusterID }
 
-// MatterDataVersion implements [contract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion]: the
+// server's own tracker, the host's when it supplied one.
+//
+// Deprecated: no controller reads this version — the wire carries the
+// endpoint's DataVersion for the cluster, which the bridge keeps
+// (decision 165, F-db021da0-46). Removable in the next minor release.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterRead resolves the four conformance-M attributes plus the two

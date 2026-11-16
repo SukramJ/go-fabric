@@ -290,7 +290,7 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	// Bridged as onoff.Config is (newOnOffServer): every device the kit
 	// builds is added under the Aggregator, where matter.js does not apply
 	// StartUpCurrentLevel (LevelControlServer.ts:224).
-	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock, ManageTransitions: b.transitions, Bridged: true}
+	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock, ManageTransitions: b.transitions, Bridged: true} //nolint:staticcheck // the deprecated tracker passed on for its window (decision 165)
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
