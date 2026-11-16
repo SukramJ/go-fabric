@@ -697,15 +697,17 @@ func (n *ThreadNetworkCommissioning) OnCommissioningComplete(context.Context) {
 // A ConnectNetwork the window admitted that still runs is abandoned: its
 // attach is cancelled, its result writes no attribute and no Breadcrumb,
 // and once it returned the reverted network is attached again
-// (reattachReverted); it still answers the driver's result (review II,
-// R2-P6-fsm-1001).
-// Follows connectedhomeip
+// (reattachReverted) (review II, R2-P6-fsm-1001). For the state this
+// follows connectedhomeip
 // src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
 // at 6170af84: the fail-safe expiry reverts the driver and releases the
 // pending command handle (:1001-1002), and a driver result that arrives
 // afterwards returns before it writes LastNetworkID, LastNetworkingStatus,
 // LastConnectErrorValue or the Breadcrumb and before it adds a
-// ConnectNetworkResponse (:845-857).
+// ConnectNetworkResponse (:845-857). The answer differs: chip sends
+// nothing for the command (src/app/CommandHandlerImpl.cpp:481-488, :1000;
+// src/app/CommandResponseSender.cpp:82-102 at 6170af84), this server
+// answers the driver's result (F-db021da0-10).
 func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	n.mu.Lock()
 	n.expiries++

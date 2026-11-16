@@ -1299,7 +1299,10 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		// connectedhomeip releases the pending command on the expiry
 		// (NetworkCommissioningCluster.cpp:1002 at 6170af84) and its
 		// OnResult returns on the released handle (:850-857) (review II,
-		// R2-P1-core-06).
+		// R2-P1-core-06). The answer differs: chip sends nothing for the
+		// command (src/app/CommandHandlerImpl.cpp:481-488, :1000;
+		// src/app/CommandResponseSender.cpp:82-102 at 6170af84), this
+		// server answers the driver's result (F-db021da0-10).
 		w.mu.Unlock()
 		if !statusOK(status) {
 			resp.ErrorValue = spec.Nullable[int32]{Value: errValue}

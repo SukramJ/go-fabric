@@ -869,7 +869,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// is left without side effect. Mirrors matter.js
 		// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:95-98
 		// (`if (expiryLengthSeconds === 0) return SuccessResponse` when not
-		// armed) and :92-97 → packages/protocol/src/common/FailsafeTimer.ts:61-65
+		// armed) and :89-94 → packages/protocol/src/common/FailsafeTimer.ts:61-65
 		// (an armed fail-safe expires) → FailsafeContext.ts:314
 		// restoreBreadcrumb → ServerNodeFailsafeContext.ts:84-91 (breadcrumb
 		// 0); chip GeneralCommissioningCluster.cpp:429-435 ("Don't set the

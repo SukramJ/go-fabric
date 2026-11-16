@@ -2404,7 +2404,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		// keeps the IPK in the fabric
 		// (packages/protocol/src/common/FailsafeContext.ts:251-256 at db021da0)
 		// and deletes the new fabric when a later step of addNoc throws
-		// (OperationalCredentialsServer.ts:299-305).
+		// (OperationalCredentialsServer.ts:300-305).
 		//
 		// The pending row goes with everything it owns, and the answer is
 		// the NOCResponse the store failures around this step give (review
