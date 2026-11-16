@@ -416,6 +416,20 @@ rows marked *changed* or *breaking*.
 | *changed:* `spec.Register` of a different definition under a cluster id already registered (it replaced the first) | panics: register a vendor cluster under its own id; registering the held definition again is a no-op |
 | *changed:* `cluster.AsUint8`, `cluster.AsInt16` wrapping a value outside their width | refuse it (`false`), and a non-whole float too |
 
+## Changed after v0.22.2: the session stake, self-held servers and the wire ids
+
+Review II, phase 6a, second wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release.
+
+| Before | Now |
+| --- | --- |
+| `id, _ := m.AllocateID(); m.OpenFromSigmaWithID(id, …)` (and `OpenFromSigmaAsInitiatorWithID`) | `s, _ := m.AllocateStake(); m.OpenFromSigmaWithStake(s, …)` (`OpenFromSigmaAsInitiatorWithStake`), `ReleaseStake(s)` on abort; handle `operational.ErrStakeLost` as a failed handshake |
+| `id, _ := m.AllocateID(); m.OpenFromPaseWithID(id, …)` | `s, _ := m.AllocateStake(); m.OpenFromPaseWithStake(s, …)`; `s.ID` where the id is announced |
+| a self-held server on `spec.Hooks` | a `spec.Server` over the server's state — `ServerConfig.Source` answering its reads, a handler per request command — with MatterInvoke routed through `spec.InvokeHeld` over `spec.NewSelfHeld`; events through `spec.Events`, the veto through `spec.WriteVeto` |
+| `closure.ControlServer.Hooks.Handle`, `.Emit`, `.EmitEvent`, `.SetBeforeWrite` | the same methods on `ControlServer`; a handler or veto set on the field is no longer consulted |
+| `modebase.Server.Hooks`, `Init`, `Invoke`, `CheckWrite` | `Server.Handle` (host handler), `Server.MatterInvoke` (the checked command path); the server needs no `Init` |
+| a `cluster/wire` id that duplicates a generated one (`wire.ColorCtrlCmdMoveToHue`, `wire.WindowCoveringClusterID`, …) | the constant of `cluster/spec/<cluster>` (`colorcontrol.CmdMoveToHue`, `windowcovering.ClusterID`, …) |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the
