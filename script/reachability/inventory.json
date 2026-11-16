@@ -11533,14 +11533,14 @@
       "identifier": "TestThreadBreadcrumbListenerMayReadTheServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_thread_p6_test.go",
-      "line": 104
+      "line": 105
     },
     {
       "package": "cluster/core",
       "identifier": "TestThreadConnectOutlivesFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_thread_p6_test.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "cluster/core",
@@ -11582,7 +11582,7 @@
       "identifier": "TestThreadSecondConnectIsBusy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_thread_p6_test.go",
-      "line": 128
+      "line": 131
     },
     {
       "package": "cluster/core",
@@ -11610,14 +11610,14 @@
       "identifier": "TestWiFiDriverCallsAreBoundedByTheAdvertisedTimes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_p6_test.go",
-      "line": 77
+      "line": 80
     },
     {
       "package": "cluster/core",
       "identifier": "TestWiFiExpiryAbandonsTheCommandsJoinBeforeTheRejoin",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_p6_test.go",
-      "line": 21
+      "line": 22
     },
     {
       "package": "cluster/core",
