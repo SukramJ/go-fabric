@@ -4,6 +4,7 @@
 package store_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"path/filepath"
@@ -364,5 +365,43 @@ VALUES (2, X'0000000000000003', X'0000000000000002', X'04', 65521, X'01020304050
 	}
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_schema WHERE name = 'matter_owed_fabric_events'`).Scan(&rows); err != nil || rows != 0 {
 		t.Errorf("matter_owed_fabric_events after v9 down: %d, %v; want gone", rows, err)
+	}
+}
+
+// TestApplyUpgradesAClearICDKey: a database at v7, v8 or v9 that holds an
+// ICD key in clear — as releases before the sealing stored it — upgrades
+// with Apply: the key is sealed under the store's ICD key and reads back.
+func TestApplyUpgradesAClearICDKey(t *testing.T) {
+	t.Parallel()
+	for _, version := range []string{"v7", "v8", "v9"} {
+		t.Run(version, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			db := openEmptyDB(t)
+			applyUp(t, db, version)
+			if _, err := db.ExecContext(ctx, `INSERT INTO matter_fabrics (fabric_index, fabric_id, node_id, root_public_key, vendor_id, compressed_id)
+VALUES (1, X'0000000000000001', X'0000000000000002', X'04', 65521, X'0102030405060708')`); err != nil {
+				t.Fatal(err)
+			}
+			key := bytes.Repeat([]byte{0x5A}, 16)
+			if _, err := db.ExecContext(ctx, `INSERT INTO matter_icd_registrations (fabric_index, position, check_in_node_id, monitored_subject, icd_key, client_type)
+VALUES (1, 0, X'0000000000000011', X'0000000000000022', ?, 0)`, key); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Apply(ctx, db); err != nil {
+				t.Fatalf("Apply on %s with a clear ICD key: %v", version, err)
+			}
+			var raw []byte
+			if err := db.QueryRowContext(ctx, `SELECT icd_key FROM matter_icd_registrations`).Scan(&raw); err != nil {
+				t.Fatal(err)
+			}
+			if len(raw) == len(key) || bytes.Contains(raw, key) {
+				t.Errorf("the key is still clear after Apply: %x", raw)
+			}
+			got, err := store.New(db).ListICDRegistrations(ctx)
+			if err != nil || len(got) != 1 || !bytes.Equal(got[0].Key, key) {
+				t.Errorf("ListICDRegistrations after Apply = %+v, %v; want the key", got, err)
+			}
+		})
 	}
 }
