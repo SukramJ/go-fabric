@@ -170,26 +170,8 @@ func (i *Instance) evalBoundExact(e *boundExpr, peers Peers) (*big.Rat, bool) {
 		if !okL || !okR {
 			return nil, false
 		}
-		switch e.op {
-		case "+":
-			return new(big.Rat).Add(l, r), true
-		case "-":
-			return new(big.Rat).Sub(l, r), true
-		case "*":
-			return new(big.Rat).Mul(l, r), true
-		case "/":
-			if r.Sign() == 0 {
-				return nil, false
-			}
-			return new(big.Rat).Quo(l, r), true
-		}
-		if l.IsInt() && r.IsInt() && r.Sign() >= 0 && r.Num().IsInt64() && r.Num().Int64() <= maxExactExponent {
-			// Constraint.ts:1038-1061: -a^b is -(|a|^b).
-			p := new(big.Int).Exp(new(big.Int).Abs(l.Num()), r.Num(), nil)
-			if l.Sign() < 0 {
-				p.Neg(p)
-			}
-			return new(big.Rat).SetInt(p), true
+		if v, ok, exact := exactOp(e.op, l, r); exact {
+			return v, ok
 		}
 		f, ok := i.evalBound(e, peers)
 		if !ok || math.IsNaN(f) || math.IsInf(f, 0) {
@@ -210,4 +192,32 @@ func (i *Instance) evalBoundExact(e *boundExpr, peers Peers) (*big.Rat, bool) {
 		return out, out != nil
 	}
 	return nil, false
+}
+
+// exactOp computes l op r exactly; exact is false for a power it leaves to
+// float64 (a fractional base or exponent, a negative exponent, one beyond
+// maxExactExponent), ok false for a division by zero.
+func exactOp(op string, l, r *big.Rat) (v *big.Rat, ok, exact bool) {
+	switch op {
+	case "+":
+		return new(big.Rat).Add(l, r), true, true
+	case "-":
+		return new(big.Rat).Sub(l, r), true, true
+	case "*":
+		return new(big.Rat).Mul(l, r), true, true
+	case "/":
+		if r.Sign() == 0 {
+			return nil, false, true
+		}
+		return new(big.Rat).Quo(l, r), true, true
+	}
+	if !l.IsInt() || !r.IsInt() || r.Sign() < 0 || !r.Num().IsInt64() || r.Num().Int64() > maxExactExponent {
+		return nil, false, false
+	}
+	// Constraint.ts:1038-1061: -a^b is -(|a|^b).
+	p := new(big.Int).Exp(new(big.Int).Abs(l.Num()), r.Num(), nil)
+	if l.Sign() < 0 {
+		p.Neg(p)
+	}
+	return new(big.Rat).SetInt(p), true, true
 }
