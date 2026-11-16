@@ -219,3 +219,41 @@ func TestTerminatedHook_SeparatesTerminationFromClose(t *testing.T) {
 		})
 	}
 }
+
+// TestPeerSubscription_KeepsWildcardPathFlags: a wildcard path's
+// WildcardPathFlags survive the persisted round trip and reach the
+// restored subscription, so a re-established subscription skips what the
+// controller asked it to skip; its WildcardFilterConfigurationVersion is
+// not kept, as the matter.js record keeps none (review II,
+// R2-P6-store-0501).
+func TestPeerSubscription_KeepsWildcardPathFlags(t *testing.T) {
+	t.Parallel()
+	in := samplePeerSubscription()
+	in.AttributeRequests = []im.ConcreteAttributePath{
+		{WildcardPathFlags: im.WildcardSkipRootNode | im.WildcardSkipDiagnosticsClusters, WildcardFilterConfigurationVersion: 3, HasWildcardFilterConfigurationVersion: true},
+		{HasEndpoint: true, Endpoint: 1},
+	}
+	b, err := MarshalPeerSubscription(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := UnmarshalPeerSubscription(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := im.ConcreteAttributePath{WildcardPathFlags: im.WildcardSkipRootNode | im.WildcardSkipDiagnosticsClusters}
+	if got := out.AttributeRequests[0]; got != want {
+		t.Fatalf("persisted flagged path = %+v, want %+v", got, want)
+	}
+	if got := out.AttributeRequests[1]; got != in.AttributeRequests[1] {
+		t.Fatalf("unflagged path = %+v, want %+v", got, in.AttributeRequests[1])
+	}
+	m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
+	sub, err := m.Restore(out, 0x4242)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := sub.AttributePaths[0].WildcardPathFlags; got != want.WildcardPathFlags {
+		t.Fatalf("restored flags = %#x, want %#x", got, want.WildcardPathFlags)
+	}
+}

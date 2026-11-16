@@ -171,12 +171,20 @@ type peerAddressWire struct {
 	NodeID      uint64 `json:"nodeId"`
 }
 
+// attributePathWire is one persisted attribute path. WildcardPathFlags is
+// kept with its path, as matter.js persists `wildcardPathFlags` with each
+// attribute path (packages/node/src/behavior/system/subscriptions/
+// SubscriptionsServer.ts:87-106 at db021da0), so a re-established
+// wildcard subscription skips what the controller asked it to skip
+// (review II, R2-P6-store-0501). The WildcardFilterConfigurationVersion
+// is not kept: the same entry there carries none (:95-106).
 type attributePathWire struct {
-	NodeID      *uint64 `json:"nodeId,omitempty"`
-	EndpointID  *uint16 `json:"endpointId,omitempty"`
-	ClusterID   *uint32 `json:"clusterId,omitempty"`
-	AttributeID *uint32 `json:"attributeId,omitempty"`
-	ListIndex   *uint16 `json:"listIndex,omitempty"`
+	NodeID            *uint64 `json:"nodeId,omitempty"`
+	EndpointID        *uint16 `json:"endpointId,omitempty"`
+	ClusterID         *uint32 `json:"clusterId,omitempty"`
+	AttributeID       *uint32 `json:"attributeId,omitempty"`
+	ListIndex         *uint16 `json:"listIndex,omitempty"`
+	WildcardPathFlags *uint32 `json:"wildcardPathFlags,omitempty"`
 }
 
 type eventPathWire struct {
@@ -223,6 +231,8 @@ func MarshalPeerSubscription(p PeerSubscription) ([]byte, error) {
 			ClusterID:   ptrIf(a.HasCluster, a.Cluster),
 			AttributeID: ptrIf(a.HasAttribute, a.Attribute),
 			ListIndex:   ptrIf(a.HasListIndex, a.ListIndex),
+			// Zero is the absent field (im.ConcreteAttributePath).
+			WildcardPathFlags: ptrIf(a.WildcardPathFlags != 0, a.WildcardPathFlags),
 		})
 	}
 	for _, e := range p.EventRequests {
@@ -280,6 +290,7 @@ func UnmarshalPeerSubscription(b []byte) (PeerSubscription, error) {
 		path.Cluster, path.HasCluster = valOf(a.ClusterID)
 		path.Attribute, path.HasAttribute = valOf(a.AttributeID)
 		path.ListIndex, path.HasListIndex = valOf(a.ListIndex)
+		path.WildcardPathFlags, _ = valOf(a.WildcardPathFlags)
 		p.AttributeRequests = append(p.AttributeRequests, path)
 	}
 	for _, e := range w.EventRequests {
