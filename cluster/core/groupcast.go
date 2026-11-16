@@ -904,11 +904,15 @@ func (g *Groupcast) configureAuxiliaryACL(ctx context.Context, fabric uint8, req
 }
 
 // groupcastTesting mirrors matter.js GroupcastServer.groupcastTesting
-// (GroupcastServer.ts:405-431): DisableTesting clears FabricUnderTest;
-// EnableListenerTesting and EnableSenderTesting alike put the accessing
-// fabric under test for DurationSeconds (60 by default, :79) and report
-// every received group message as a GroupcastTesting event meanwhile. The
-// sender side of the event (messages this node sends) is not reported.
+// (GroupcastServer.ts:404-424, the expiry :427-430): DisableTesting clears
+// FabricUnderTest; EnableListenerTesting and EnableSenderTesting alike put
+// the accessing fabric under test for DurationSeconds (60 by default, :80)
+// and report every received group message as a GroupcastTesting event
+// meanwhile. The sender side of the event (messages this node sends) is
+// not reported. FabricUnderTest is one value for the node: any fabric's
+// command replaces or clears it, and removing the fabric under test does
+// not end the test before its timer, as matter.js (:404-430, :522-525)
+// (review II, R2-P6-fsm-1018).
 func (g *Groupcast) groupcastTesting(fabric uint8, req GroupcastTestingRequest) error {
 	switch req.TestOperation {
 	case groupcastTestingDisable, groupcastTestingEnableListener, groupcastTestingEnableSender:

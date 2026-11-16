@@ -871,7 +871,10 @@ func (s *ICDManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
 	}
 	if st := s.cfg.Store; st != nil {
 		if err := st.ReplaceICDRegistrations(ctx, fabricIndex, nil); err != nil {
-			s.logger.Debug("icd.management.fabric_removed_persist", slog.Uint64("fabric_index", uint64(fabricIndex)), slog.Any("err", err))
+			// The fabric's rows normally went with its removal (the
+			// store's cascade); a clear that fails here is said (review
+			// II, R2-P6-sup-1025).
+			s.logger.Warn("icd.management.fabric_removed_persist", slog.Uint64("fabric_index", uint64(fabricIndex)), slog.Any("err", err))
 		}
 	}
 	if removed {
