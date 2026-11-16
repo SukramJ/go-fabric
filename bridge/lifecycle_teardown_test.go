@@ -350,3 +350,32 @@ func TestStopStopsThePASECloseTimer(t *testing.T) {
 		})
 	}
 }
+
+// TestStrictValidationSetAfterStartJudgesEveryEndpointAsAdded pins what
+// [Bridge.SetDeviceTypeValidation] states for a call after Start: the new
+// validator knows no endpoint, so the next Reassemble judges every endpoint
+// as an addition and strict refuses the violations of endpoints already
+// served (review II, R2-P6-api-0611).
+func TestStrictValidationSetAfterStartJudgesEveryEndpointAsAdded(t *testing.T) {
+	t.Parallel()
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := b.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.Background()) })
+	if len(b.DeviceTypeViolations()) == 0 {
+		t.Fatal("the served topology violates nothing: the scenario needs a violation on a served endpoint")
+	}
+	served := b.Topology()
+	b.SetDeviceTypeValidation(endpoint.DeviceTypeValidationStrict)
+	var refusal *endpoint.DeviceTypeConformanceError
+	if err := b.Reassemble(context.Background()); !errors.As(err, &refusal) {
+		t.Fatalf("Reassemble of the unchanged topology under strict set after Start: %v, want a DeviceTypeConformanceError", err)
+	}
+	if b.Topology() != served {
+		t.Error("the refused topology replaced the served one")
+	}
+}
