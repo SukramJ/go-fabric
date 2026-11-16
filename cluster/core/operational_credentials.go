@@ -2379,12 +2379,24 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		EpochStart0:    0, // sentinel: IPK epoch start is 0 per Matter §11.18.6.8.6
 	}
 	if err := o.store.UpsertGroupKeySet(ctx, ipkRec); err != nil {
-		// Non-fatal: the identity and fabric rows are already committed;
-		// log and continue so the pair does not fail over a GKM write
-		// error. Matches chip's tolerant handling of secondary state.
+		// Follows connectedhomeip
+		// src/app/clusters/operational-credentials-server/OperationalCredentialsCluster.cpp:528-529
+		// and :572-584 at 6170af84: a failed write of the IPK key set fails
+		// AddNOC, and the pending operational certificates, the fabric's group
+		// keys and its ACL entries are reverted; the trusted root stays. matter.js
+		// keeps the IPK in the fabric
+		// (packages/protocol/src/common/FailsafeContext.ts:251-256 at db021da0)
+		// and deletes the new fabric when a later step of addNoc throws
+		// (OperationalCredentialsServer.ts:299-305).
+		//
+		// The pending row goes with everything it owns, and the answer is
+		// the NOCResponse the store failures around this step give (review
+		// II, R2-P6-err-1004).
 		o.logger().Warn("matter.opcreds.addnoc.ipk_gkm_write_failed",
 			slog.Int("fabric_index", int(idx)),
 			slog.Any("err", err))
+		o.rollbackFailedAddNOC(ctx, idx)
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode
 	}
 
 	// Per Matter Core §11.18.6.8.1 the AddNOC implementation MUST
