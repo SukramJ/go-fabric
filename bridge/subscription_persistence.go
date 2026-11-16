@@ -227,6 +227,82 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 		b.logger.Warn("matter.subscription.persist.save",
 			slog.Int("subscription_id", int(subID)),
 			slog.Any("err", err))
+		return
+	}
+	b.boundPersistedSubscriptionsLocked(saveCtx, m, rec, sub.KeepSubscriptions, persistedRowQuota(m))
+}
+
+// persistedRowQuota is the number of rows a fabric may keep: the
+// manager's subscription quota, when the manager states it. Zero leaves
+// the per-fabric cap off (the peer's purge still runs).
+func persistedRowQuota(m *subscription.Manager) int {
+	if q, ok := any(m).(interface{ MaxSubscriptionsPerFabric() int }); ok {
+		return q.MaxSubscriptionsPerFabric()
+	}
+	return 0
+}
+
+// boundPersistedSubscriptionsLocked keeps the persisted rows of rec's
+// fabric bounded once rec was saved (review II, R2-P6-bound-0502; owner
+// decision 134). A row outlives its subscription when the subscription
+// closes with its session, so without a bound every subscribe and
+// session loss adds one for the rest of the run, and every row is loaded
+// and dialled at the next start. Two rules, ahead of matter.js, whose
+// SubscriptionsServer keeps such an entry as long (verify A of review II):
+//
+//   - a peer that subscribes with KeepSubscriptions=false gives up its
+//     former subscriptions: its rows whose subscription is not live go;
+//   - a fabric keeps at most quota rows: beyond it the oldest whose
+//     subscription is not live go first, in the store's order, the least
+//     recently saved first (store.ServerSubscriptions). A live
+//     subscription's row is never dropped.
+//
+// Runs under resumption.mu, as the save before it.
+func (b *Bridge) boundPersistedSubscriptionsLocked(ctx context.Context, m *subscription.Manager, rec subscription.PeerSubscription, keepSubscriptions bool, quota int) {
+	if keepSubscriptions && quota <= 0 {
+		return
+	}
+	st := b.resumption.storeLocked()
+	rows, err := st.LoadServerSubscriptions(ctx)
+	if err != nil {
+		b.logger.Warn("matter.subscription.persist.load", slog.Any("err", err))
+		return
+	}
+	live := func(id uint32) bool {
+		_, err := m.Get(id)
+		return err == nil
+	}
+	drop := func(id uint32) bool {
+		if err := st.DeleteServerSubscription(ctx, id); err != nil {
+			b.logger.Warn("matter.subscription.persist.delete",
+				slog.Int("subscription_id", int(id)),
+				slog.Any("err", err))
+			return false
+		}
+		return true
+	}
+	var fabricRows []subscription.PeerSubscription
+	for _, row := range rows {
+		other, err := subscription.UnmarshalPeerSubscription(row)
+		if err != nil || other.FabricIndex != rec.FabricIndex {
+			continue
+		}
+		if !keepSubscriptions && other.PeerNodeID == rec.PeerNodeID && other.SubscriptionID != rec.SubscriptionID && !live(other.SubscriptionID) && drop(other.SubscriptionID) {
+			continue
+		}
+		fabricRows = append(fabricRows, other)
+	}
+	excess := len(fabricRows) - quota
+	if quota <= 0 || excess <= 0 {
+		return
+	}
+	for _, other := range fabricRows {
+		if excess == 0 {
+			return
+		}
+		if other.SubscriptionID != rec.SubscriptionID && !live(other.SubscriptionID) && drop(other.SubscriptionID) {
+			excess--
+		}
 	}
 }
 
