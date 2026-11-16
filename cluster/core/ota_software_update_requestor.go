@@ -698,9 +698,10 @@ func (r *OTASoftwareUpdateRequestor) MatterInvoke(ctx context.Context, cmdID uin
 
 // otaActiveProvidersPerFabric is the share of the active provider list one
 // fabric's announcements hold, and of the announcements deferred behind a
-// query. matter.js bounds neither (#addActiveOtaProvider pushes,
-// OtaSoftwareUpdateRequestorServer.ts:423-438 at db021da0) and has no
-// deferred queue; one fabric's Administer subject could grow the list —
+// query. matter.js bounds the list nowhere (#addActiveOtaProvider pushes,
+// OtaSoftwareUpdateRequestorServer.ts:423-438 at db021da0) and handles an
+// announcement inline (:376-420); one fabric's Administer subject could
+// grow the list —
 // and the state stored with each announcement — for every fabric. The
 // number is the module's: one DefaultOTAProviders entry per fabric and
 // room for three announced providers beside it (review II,
