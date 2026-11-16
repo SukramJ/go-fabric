@@ -145,7 +145,12 @@ type AvSettings struct {
 	presets MechanicalPresets
 	digital DigitalPTZ
 
-	// mu guards the state below.
+	// op serialises the commands from their checks through the port to
+	// their commit ([serial]); pub serialises each change of the state
+	// with its publication ([AvSettings.change]); mu guards the state
+	// below.
+	op                     sync.Mutex
+	pub                    sync.Mutex
 	mu                     sync.Mutex
 	maxPresets             uint8
 	panMin, panMax         int16
@@ -221,13 +226,13 @@ func NewAvSettings(cfg AvSettingsConfig) (*AvSettings, error) {
 		opts.Commands = append(opts.Commands, avdef.CmdDptzRelativeMove) // :99-103
 	}
 	handlers := map[uint32]spec.CommandHandler{
-		avdef.CmdMptzSetPosition:  a.mptzSetPosition,
-		avdef.CmdMptzRelativeMove: a.mptzRelativeMove,
-		avdef.CmdMptzMoveToPreset: a.mptzMoveToPreset,
-		avdef.CmdMptzSavePreset:   a.mptzSavePreset,
-		avdef.CmdMptzRemovePreset: a.mptzRemovePreset,
-		avdef.CmdDptzSetViewport:  a.dptzSetViewport,
-		avdef.CmdDptzRelativeMove: a.dptzRelativeMove,
+		avdef.CmdMptzSetPosition:  serial(&a.op, a.mptzSetPosition),
+		avdef.CmdMptzRelativeMove: serial(&a.op, a.mptzRelativeMove),
+		avdef.CmdMptzMoveToPreset: serial(&a.op, a.mptzMoveToPreset),
+		avdef.CmdMptzSavePreset:   serial(&a.op, a.mptzSavePreset),
+		avdef.CmdMptzRemovePreset: serial(&a.op, a.mptzRemovePreset),
+		avdef.CmdDptzSetViewport:  serial(&a.op, a.dptzSetViewport),
+		avdef.CmdDptzRelativeMove: serial(&a.op, a.dptzRelativeMove),
 	}
 	srv, err := spec.NewServer(avdef.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
@@ -237,11 +242,14 @@ func NewAvSettings(cfg AvSettingsConfig) (*AvSettings, error) {
 
 	// The persisted position, or the defaults (:668-687).
 	if cfg.MptzPosition != nil {
-		a.position = *cfg.MptzPosition
+		a.position = cfg.MptzPosition.Clone()
 	} else {
 		a.setPosition(ptr(DefaultPan), ptr(DefaultTilt), ptr(DefaultZoom))
 	}
-	a.mptzPresets = slices.Clone(cfg.MptzPresets)
+	if len(cfg.MptzPresets) > int(a.maxPresets) {
+		return nil, fmt.Errorf("%w: %d MPTZPresets, MaxPresets %d", ErrAvSettingsConfig, len(cfg.MptzPresets), a.maxPresets)
+	}
+	a.mptzPresets = cloneAll(cfg.MptzPresets)
 	a.dptzStreams = slices.Clone(cfg.DptzStreams)
 	a.skipTakenPresetID()
 	a.movement = MovementIdle // :68
@@ -293,17 +301,77 @@ func (a *AvSettings) served(values map[uint32]any) map[uint32]any {
 	return out
 }
 
-// publish stores the served attributes among ids at their current value;
-// the generated server reports the ones that changed.
-func (a *AvSettings) publish(origin contract.Origin, ids ...uint32) {
+// avSettingsState is the state a change edits, as [AvSettings.change]
+// keeps a copy of it.
+type avSettingsState struct {
+	panMin, panMax, tiltMin, tiltMax int16
+	zoomMax                          uint8
+	position                         MPTZ
+	movement                         PhysicalMovement
+	targetPan, targetTilt            *int16
+	targetZoom                       *uint8
+	mptzPresets                      []MPTZPreset
+	dptzStreams                      []DPTZStream
+	currentPresetID                  uint8
+}
+
+// saveLocked is a deep copy of the state; the caller holds a.mu.
+func (a *AvSettings) saveLocked() avSettingsState {
+	return avSettingsState{
+		panMin: a.panMin, panMax: a.panMax, tiltMin: a.tiltMin, tiltMax: a.tiltMax, zoomMax: a.zoomMax,
+		position: a.position.Clone(), movement: a.movement,
+		targetPan: a.targetPan, targetTilt: a.targetTilt, targetZoom: a.targetZoom, // replaced, never written through
+		mptzPresets: cloneAll(a.mptzPresets), dptzStreams: slices.Clone(a.dptzStreams), currentPresetID: a.currentPresetID,
+	}
+}
+
+// restoreLocked sets the state to st; the caller holds a.mu.
+func (a *AvSettings) restoreLocked(st avSettingsState) {
+	a.panMin, a.panMax, a.tiltMin, a.tiltMax, a.zoomMax = st.panMin, st.panMax, st.tiltMin, st.tiltMax, st.zoomMax
+	a.position, a.movement = st.position, st.movement
+	a.targetPan, a.targetTilt, a.targetZoom = st.targetPan, st.targetTilt, st.targetZoom
+	a.mptzPresets, a.dptzStreams, a.currentPresetID = st.mptzPresets, st.dptzStreams, st.currentPresetID
+}
+
+// change runs edit on the state under a.mu; edit returns the attributes it
+// changed. Their served values are published and the edited state kept —
+// both under pub, so changes land in order — and a value the store
+// refuses is neither: the state stays as it was and the error is
+// returned, so the server never holds what its attributes do not (review
+// II, R2-P6-err-1611, R2-P6-store-1608).
+func (a *AvSettings) change(origin contract.Origin, edit func() []uint32) error {
+	a.pub.Lock()
+	defer a.pub.Unlock()
 	a.mu.Lock()
-	all := a.snapshot()
+	before := a.saveLocked()
+	ids := edit()
+	if len(ids) == 0 {
+		a.mu.Unlock()
+		return nil
+	}
+	after, all := a.saveLocked(), a.snapshot()
+	a.restoreLocked(before)
 	a.mu.Unlock()
 	values := make(map[uint32]any, len(ids))
 	for _, id := range ids {
 		values[id] = all[id]
 	}
-	_ = a.srv.SetAttributesFrom(origin, a.served(values))
+	if err := a.srv.SetAttributesFrom(origin, a.served(values)); err != nil {
+		return fmt.Errorf("camera: CameraAvSettingsUserLevelManagement: %w", err)
+	}
+	a.mu.Lock()
+	a.restoreLocked(after)
+	a.mu.Unlock()
+	return nil
+}
+
+// commandChange is [AvSettings.change] for a command: a refused value
+// answers FAILURE.
+func (a *AvSettings) commandChange(edit func() []uint32) error {
+	if err := a.change(contract.OriginCommand, edit); err != nil {
+		return commitError(err)
+	}
+	return nil
 }
 
 // setPosition sets the pan, tilt and zoom each value and its feature
@@ -327,19 +395,19 @@ func (a *AvSettings) setPosition(pan, tilt *int16, zoom *uint8) bool {
 // change, chip's SetPan / SetTilt / SetZoom): each value with its feature
 // is set, nil leaves one as it is.
 func (a *AvSettings) SetPosition(pan, tilt *int16, zoom *uint8) {
-	a.mu.Lock()
-	changed := a.setPosition(pan, tilt, zoom)
-	a.mu.Unlock()
-	if changed {
-		a.publish(contract.OriginHostSet, avdef.AttrMptzPosition)
-	}
+	_ = a.change(contract.OriginHostSet, func() []uint32 { // a position within the int16/uint8 the schema holds
+		if a.setPosition(pan, tilt, zoom) {
+			return []uint32{avdef.AttrMptzPosition}
+		}
+		return nil
+	})
 }
 
 // Position returns MPTZPosition.
 func (a *AvSettings) Position() MPTZ {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.position
+	return a.position.Clone()
 }
 
 // MovementState returns MovementState.
@@ -349,11 +417,11 @@ func (a *AvSettings) MovementState() PhysicalMovement {
 	return a.movement
 }
 
-// Presets returns MPTZPresets.
+// Presets returns MPTZPresets: a deep copy, which the caller may change.
 func (a *AvSettings) Presets() []MPTZPreset {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return slices.Clone(a.mptzPresets)
+	return cloneAll(a.mptzPresets)
 }
 
 // Streams returns DPTZStreams.
@@ -396,22 +464,21 @@ func (a *AvSettings) setLimit(attrID uint32, v any) error {
 	if err != nil {
 		return err
 	}
-	a.mu.Lock()
-	switch attrID {
-	case avdef.AttrPanMin:
-		a.panMin, _ = checked.(int16)
-	case avdef.AttrPanMax:
-		a.panMax, _ = checked.(int16)
-	case avdef.AttrTiltMin:
-		a.tiltMin, _ = checked.(int16)
-	case avdef.AttrTiltMax:
-		a.tiltMax, _ = checked.(int16)
-	case avdef.AttrZoomMax:
-		a.zoomMax, _ = checked.(uint8)
-	}
-	a.mu.Unlock()
-	a.publish(contract.OriginHostSet, attrID)
-	return nil
+	return a.change(contract.OriginHostSet, func() []uint32 {
+		switch attrID {
+		case avdef.AttrPanMin:
+			a.panMin, _ = checked.(int16)
+		case avdef.AttrPanMax:
+			a.panMax, _ = checked.(int16)
+		case avdef.AttrTiltMin:
+			a.tiltMin, _ = checked.(int16)
+		case avdef.AttrTiltMax:
+			a.tiltMax, _ = checked.(int16)
+		case avdef.AttrZoomMax:
+			a.zoomMax, _ = checked.(uint8)
+		}
+		return []uint32{attrID}
+	})
 }
 
 // The DPTZ streams the host announces, chip's AddMoveCapableVideoStream …
@@ -420,57 +487,57 @@ func (a *AvSettings) setLimit(attrID uint32, v any) error {
 
 // AddMoveCapableVideoStream adds an allocated stream with its default
 // viewport (:469-489).
+// A viewport the schema refuses adds nothing.
 func (a *AvSettings) AddMoveCapableVideoStream(videoStreamID uint16, viewport Viewport) {
-	a.mu.Lock()
-	a.dptzStreams = append(a.dptzStreams, DPTZStream{VideoStreamId: videoStreamID, Viewport: viewport})
-	a.mu.Unlock()
-	a.publish(contract.OriginHostSet, avdef.AttrDptzStreams)
+	_ = a.change(contract.OriginHostSet, func() []uint32 {
+		a.dptzStreams = append(a.dptzStreams, DPTZStream{VideoStreamId: videoStreamID, Viewport: viewport})
+		return []uint32{avdef.AttrDptzStreams}
+	})
 }
 
 // UpdateMoveCapableVideoStream sets a known stream's viewport; an unknown
 // stream changes nothing (:491-523).
 func (a *AvSettings) UpdateMoveCapableVideoStream(videoStreamID uint16, viewport Viewport) {
-	a.updateStream(contract.OriginHostSet, videoStreamID, viewport)
+	_ = a.updateStream(contract.OriginHostSet, videoStreamID, viewport) // a refused viewport changes nothing
 }
 
-func (a *AvSettings) updateStream(origin contract.Origin, videoStreamID uint16, viewport Viewport) {
-	a.mu.Lock()
-	i := slices.IndexFunc(a.dptzStreams, func(s DPTZStream) bool { return s.VideoStreamId == videoStreamID })
-	if i >= 0 {
+func (a *AvSettings) updateStream(origin contract.Origin, videoStreamID uint16, viewport Viewport) error {
+	return a.change(origin, func() []uint32 {
+		i := slices.IndexFunc(a.dptzStreams, func(s DPTZStream) bool { return s.VideoStreamId == videoStreamID })
+		if i < 0 {
+			return nil
+		}
 		a.dptzStreams[i].Viewport = viewport
-	}
-	a.mu.Unlock()
-	if i >= 0 {
-		a.publish(origin, avdef.AttrDptzStreams)
-	}
+		return []uint32{avdef.AttrDptzStreams}
+	})
 }
 
 // UpdateMoveCapableVideoStreams sets every stream's viewport, after the
 // device's default viewport changed; without a stream nothing changes
 // (:525-556).
 func (a *AvSettings) UpdateMoveCapableVideoStreams(viewport Viewport) {
-	a.mu.Lock()
-	n := len(a.dptzStreams)
-	for i := range a.dptzStreams {
-		a.dptzStreams[i].Viewport = viewport
-	}
-	a.mu.Unlock()
-	if n > 0 {
-		a.publish(contract.OriginHostSet, avdef.AttrDptzStreams)
-	}
+	_ = a.change(contract.OriginHostSet, func() []uint32 { // a refused viewport changes nothing
+		if len(a.dptzStreams) == 0 {
+			return nil
+		}
+		for i := range a.dptzStreams {
+			a.dptzStreams[i].Viewport = viewport
+		}
+		return []uint32{avdef.AttrDptzStreams}
+	})
 }
 
 // RemoveMoveCapableVideoStream removes a deallocated stream; an unknown one
 // changes nothing (:558-580).
 func (a *AvSettings) RemoveMoveCapableVideoStream(videoStreamID uint16) {
-	a.mu.Lock()
-	n := len(a.dptzStreams)
-	a.dptzStreams = slices.DeleteFunc(a.dptzStreams, func(s DPTZStream) bool { return s.VideoStreamId == videoStreamID })
-	removed := len(a.dptzStreams) != n
-	a.mu.Unlock()
-	if removed {
-		a.publish(contract.OriginHostSet, avdef.AttrDptzStreams)
-	}
+	_ = a.change(contract.OriginHostSet, func() []uint32 { // a shorter list the store held before
+		n := len(a.dptzStreams)
+		a.dptzStreams = slices.DeleteFunc(a.dptzStreams, func(s DPTZStream) bool { return s.VideoStreamId == videoStreamID })
+		if len(a.dptzStreams) == n {
+			return nil
+		}
+		return []uint32{avdef.AttrDptzStreams}
+	})
 }
 
 // knownVideoStreamID reports a stream of DPTZStreams (:585-591).
@@ -515,28 +582,24 @@ func (a *AvSettings) skipTakenPresetID() {
 // MovementState returns to Idle. Mirrors chip OnPhysicalMovementComplete
 // (CameraAvSettingsUserLevelManagementLogic.cpp:1263-1284).
 func (a *AvSettings) PhysicalMovementComplete(err error) {
-	a.mu.Lock()
-	moved := false
-	if err == nil {
-		moved = a.setPosition(a.targetPan, a.targetTilt, a.targetZoom)
-	}
-	a.movement = MovementIdle
-	a.mu.Unlock()
-	ids := []uint32{avdef.AttrMovementState}
-	if moved {
-		ids = append(ids, avdef.AttrMptzPosition)
-	}
-	a.publish(contract.OriginHostSet, ids...)
+	_ = a.change(contract.OriginHostSet, func() []uint32 { // a target the command held to the limits
+		ids := []uint32{avdef.AttrMovementState}
+		if err == nil && a.setPosition(a.targetPan, a.targetTilt, a.targetZoom) {
+			ids = append(ids, avdef.AttrMptzPosition)
+		}
+		a.movement = MovementIdle
+		return ids
+	})
 }
 
 // startMovement records the target of a movement the port started and
 // sets MovementState Moving (:803-813).
-func (a *AvSettings) startMovement(pan, tilt *int16, zoom *uint8) {
-	a.mu.Lock()
-	a.targetPan, a.targetTilt, a.targetZoom = pan, tilt, zoom
-	a.movement = MovementMoving
-	a.mu.Unlock()
-	a.publish(contract.OriginCommand, avdef.AttrMovementState)
+func (a *AvSettings) startMovement(pan, tilt *int16, zoom *uint8) error {
+	return a.commandChange(func() []uint32 {
+		a.targetPan, a.targetTilt, a.targetZoom = pan, tilt, zoom
+		a.movement = MovementMoving
+		return []uint32{avdef.AttrMovementState}
+	})
 }
 
 // avStatus answers a command with an IM status.
@@ -591,8 +654,7 @@ func (a *AvSettings) mptzSetPosition(ctx context.Context, fields any) (any, erro
 	if err := a.mech.MptzSetPosition(ctx, MPTZ(req)); err != nil { // :797-802
 		return nil, portError("MPTZSetPosition", err)
 	}
-	a.startMovement(req.Pan, req.Tilt, req.Zoom)
-	return nil, nil
+	return nil, a.startMovement(req.Pan, req.Tilt, req.Zoom)
 }
 
 // mptzRelativeMove carries out MPTZRelativeMove: a delta needs its
@@ -652,8 +714,7 @@ func (a *AvSettings) mptzRelativeMove(ctx context.Context, fields any) (any, err
 	if err := a.mech.MptzRelativeMove(ctx, MPTZ{Pan: newPan, Tilt: newTilt, Zoom: newZoom}); err != nil { // :949-954
 		return nil, portError("MPTZRelativeMove", err)
 	}
-	a.startMovement(newPan, newTilt, newZoom)
-	return nil, nil
+	return nil, a.startMovement(newPan, newTilt, newZoom)
 }
 
 func deref[T any](p *T) T {
@@ -702,8 +763,7 @@ func (a *AvSettings) mptzMoveToPreset(ctx context.Context, fields any) (any, err
 	if err := a.presets.MptzMoveToPreset(ctx, req.PresetId, settings); err != nil { // :1012-1017
 		return nil, portError("MPTZMoveToPreset", err)
 	}
-	a.startMovement(settings.Pan, settings.Tilt, settings.Zoom)
-	return nil, nil
+	return nil, a.startMovement(settings.Pan, settings.Tilt, settings.Zoom)
 }
 
 // mptzSavePreset carries out MPTZSavePreset: the current position is
@@ -729,7 +789,7 @@ func (a *AvSettings) mptzSavePreset(ctx context.Context, fields any) (any, error
 	a.mu.Lock()
 	i := slices.IndexFunc(a.mptzPresets, func(p MPTZPreset) bool { return p.PresetId == id })
 	updating := i >= 0 && req.PresetId != nil // :1062
-	full := len(a.mptzPresets) == int(a.maxPresets)
+	full := len(a.mptzPresets) >= int(a.maxPresets)
 	a.mu.Unlock()
 	if !updating && full { // :1064-1073
 		return nil, avStatus(im.StatusResourceExhausted, "every one of %d presets is taken", a.maxPresets)
@@ -737,19 +797,18 @@ func (a *AvSettings) mptzSavePreset(ctx context.Context, fields any) (any, error
 	if err := a.presets.MptzSavePreset(ctx, id); err != nil { // :1078-1083
 		return nil, portError("MPTZSavePreset", err)
 	}
-	a.mu.Lock()
-	preset := MPTZPreset{PresetId: id, Name: req.Name, Settings: a.position} // :1087-1091
-	if j := slices.IndexFunc(a.mptzPresets, func(p MPTZPreset) bool { return p.PresetId == id }); updating && j >= 0 {
-		a.mptzPresets[j] = preset // :1098-1104
-	} else {
-		a.mptzPresets = append(a.mptzPresets, preset) // :1105-1110
-	}
-	if id == a.currentPresetID { // :1133-1136
-		a.updatePresetID()
-	}
-	a.mu.Unlock()
-	a.publish(contract.OriginCommand, avdef.AttrMptzPresets)
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		preset := MPTZPreset{PresetId: id, Name: req.Name, Settings: a.position.Clone()} // :1087-1091
+		if j := slices.IndexFunc(a.mptzPresets, func(p MPTZPreset) bool { return p.PresetId == id }); updating && j >= 0 {
+			a.mptzPresets[j] = preset // :1098-1104
+		} else {
+			a.mptzPresets = append(a.mptzPresets, preset) // :1105-1110
+		}
+		if id == a.currentPresetID { // :1133-1136
+			a.updatePresetID()
+		}
+		return []uint32{avdef.AttrMptzPresets}
+	})
 }
 
 // mptzRemovePreset carries out MPTZRemovePreset: the id must lie in 1 to
@@ -774,11 +833,10 @@ func (a *AvSettings) mptzRemovePreset(ctx context.Context, fields any) (any, err
 	if err := a.presets.MptzRemovePreset(ctx, req.PresetId); err != nil { // :1170-1175
 		return nil, portError("MPTZRemovePreset", err)
 	}
-	a.mu.Lock()
-	a.mptzPresets = slices.DeleteFunc(a.mptzPresets, func(p MPTZPreset) bool { return p.PresetId == req.PresetId }) // :1191
-	a.mu.Unlock()
-	a.publish(contract.OriginCommand, avdef.AttrMptzPresets)
-	return nil, nil
+	return nil, a.commandChange(func() []uint32 {
+		a.mptzPresets = slices.DeleteFunc(a.mptzPresets, func(p MPTZPreset) bool { return p.PresetId == req.PresetId }) // :1191
+		return []uint32{avdef.AttrMptzPresets}
+	})
 }
 
 // dptzSetViewport carries out DPTZSetViewport: the stream must be one of
@@ -796,7 +854,9 @@ func (a *AvSettings) dptzSetViewport(ctx context.Context, fields any) (any, erro
 	if err := a.digital.DptzSetViewport(ctx, req.VideoStreamId, req.Viewport); err != nil { // :1212
 		return nil, portError("DPTZSetViewport", err)
 	}
-	a.updateStream(contract.OriginCommand, req.VideoStreamId, req.Viewport) // :1214-1219
+	if err := a.updateStream(contract.OriginCommand, req.VideoStreamId, req.Viewport); err != nil { // :1214-1219
+		return nil, commitError(err)
+	}
 	return nil, nil
 }
 
@@ -821,14 +881,19 @@ func (a *AvSettings) dptzRelativeMove(ctx context.Context, fields any) (any, err
 	if err != nil {
 		return nil, portError("DPTZRelativeMove", err)
 	}
-	a.updateStream(contract.OriginCommand, req.VideoStreamId, viewport) // :1255-1258
+	if err := a.updateStream(contract.OriginCommand, req.VideoStreamId, viewport); err != nil { // :1255-1258
+		return nil, commitError(err)
+	}
 	return nil, nil
 }
 
 // SetAttributes implements [spec.AttributeSetter]: the host's own change.
 // The limits follow their setters, MPTZPosition [AvSettings.SetPosition],
 // MPTZPresets and DPTZStreams replace the lists; MaxPresets is fixed and
-// MovementState follows the movement ([spec.ErrNotHeld]). All or nothing.
+// MovementState follows the movement ([spec.ErrNotHeld]). MPTZPresets
+// holds at most MaxPresets presets ([spec.ErrInvalidValue]). All or
+// nothing: a value the store refuses leaves every attribute and the
+// server's state as they were.
 func (a *AvSettings) SetAttributes(values map[uint32]any) error {
 	ids := slices.Sorted(maps.Keys(values))
 	checked := make(map[uint32]any, len(ids))
@@ -840,9 +905,21 @@ func (a *AvSettings) SetAttributes(values map[uint32]any) error {
 		if err != nil {
 			return err
 		}
+		if id == avdef.AttrMptzPresets {
+			if n := len(listOf[MPTZPreset](v)); n > int(a.maxPresets) { // "max maxPresets", which CheckSet does not resolve without peers
+				return fmt.Errorf("%w: camera: %d MPTZPresets, MaxPresets %d", spec.ErrInvalidValue, n, a.maxPresets)
+			}
+		}
 		checked[id] = v
 	}
-	a.mu.Lock()
+	return a.change(contract.OriginHostSet, func() []uint32 {
+		a.setAttributesLocked(checked)
+		return ids
+	})
+}
+
+// setAttributesLocked applies checked values; the caller holds a.mu.
+func (a *AvSettings) setAttributesLocked(checked map[uint32]any) {
 	for id, v := range checked {
 		switch id {
 		case avdef.AttrPanMin:
@@ -860,15 +937,12 @@ func (a *AvSettings) SetAttributes(values map[uint32]any) error {
 				a.setPosition(p.Pan, p.Tilt, p.Zoom)
 			}
 		case avdef.AttrMptzPresets:
-			a.mptzPresets = listOf[MPTZPreset](v)
+			a.mptzPresets = cloneAll(listOf[MPTZPreset](v))
 			a.skipTakenPresetID()
 		case avdef.AttrDptzStreams:
 			a.dptzStreams = listOf[DPTZStream](v)
 		}
 	}
-	a.mu.Unlock()
-	a.publish(contract.OriginHostSet, ids...)
-	return nil
 }
 
 // listOf is a stored list value as a slice.
