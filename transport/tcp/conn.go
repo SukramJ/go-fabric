@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/transport"
 )
 
@@ -139,7 +140,9 @@ func (c *Conn) Send(msg []byte) error {
 		return ErrConnClosed
 	}
 	if c.sendTimeout > 0 {
-		_ = c.nc.SetWriteDeadline(time.Now().Add(c.sendTimeout))
+		// A socket deadline is a wall-clock instant: the system clock, not
+		// an injected one (a fake clock cannot move the kernel's timer).
+		_ = c.nc.SetWriteDeadline(clock.System{}.Now().Add(c.sendTimeout))
 	}
 	if _, err := c.nc.Write(frame); err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {

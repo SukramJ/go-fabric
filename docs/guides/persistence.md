@@ -190,7 +190,7 @@ idempotent.
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
 | `matter_resumption` | v1, columns added in v9, v10 and v11 | CASE resumption records with the peer's CATs, at most 16 per fabric (the least recently written goes first, by the store's own write counter `write_seq`, added in v11); the record's shared secret is stored in clear, like the fabric's keys ([security model](../security.md#what-the-store-holds-in-clear)), unless the store seals it (v10's seal mark) |
 | `matter_diagnostics` | v1 | a single-row counter table, created and seeded but read by nothing (its typed API is removed in v0.10.0); the facade keeps its counters in `matter_settings`. `Erase` seeds its row again, as every row the schema seeds |
-| `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling`, and since v0.12.0 an ICD node's `icd_management.counter` |
+| `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling`, since v0.12.0 an ICD node's `icd_management.counter`, and with `Commissioning.RotatingDeviceID` the Rotating Device Identifier's `rotating_device_id_lifetime_counter`, advanced at every advertised commissioning window |
 | `matter_settings` | v1, a column added in v10 | string key/value pairs (next section); since v10 the seal mark of a secret setting |
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |
 | `matter_group_table` | v2 (v0.2.0) | GroupTable: the endpoints of each group |
@@ -230,6 +230,7 @@ delete it.
 | `basic_information.node_label`, `basic_information.location` | the facade | the root's NodeLabel and Location as a controller wrote them, the NodeLabel also as `Node.SetNodeLabel` set it; both in one write |
 | `basic_information.configuration_version` | the facade | the root's ConfigurationVersion |
 | `basic_information.unique_id` | the facade | UniqueID, derived on the first boot and pinned |
+| `commissioning.rotating_device_id.unique_id` | the facade | with `Commissioning.RotatingDeviceID`: the Rotating Device Identifier's unique id, 16 random bytes in hex, drawn at the first advertised window; its lifetime counter is the `matter_metadata` counter `rotating_device_id_lifetime_counter` |
 | `bridged_node_label.<key>` | the facade | a bridged endpoint's NodeLabel |
 | `bridged_configuration_version.<key>` | the facade | a bridged endpoint's ConfigurationVersion |
 | `scenes.<key>` | the facade | a bridged endpoint's scene table |

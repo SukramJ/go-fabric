@@ -672,7 +672,7 @@ func (r *rotatingDeviceID) next(ctx context.Context) string {
 	}
 	counter, _, err := r.st.GetMetadataCounter(ctx, metadataKeyRotatingLifetimeCounter)
 	if err != nil {
-		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("read the lifetime counter: %w", err)))
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("node: read the RI lifetime counter: %w", err)))
 		return ""
 	}
 	counter++
@@ -680,7 +680,7 @@ func (r *rotatingDeviceID) next(ctx context.Context) string {
 		counter = 1
 	}
 	if err := r.st.SetMetadataCounter(ctx, metadataKeyRotatingLifetimeCounter, counter); err != nil {
-		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("persist the lifetime counter: %w", err)))
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("node: persist the RI lifetime counter: %w", err)))
 		return ""
 	}
 	return mdns.GenerateRotatingID(uid, uint16(counter)) //nolint:gosec // G115: the identifier carries the counter's low 16 bits
@@ -690,21 +690,21 @@ func (r *rotatingDeviceID) next(ctx context.Context) string {
 func (r *rotatingDeviceID) uniqueID(ctx context.Context) ([]byte, error) {
 	v, ok, err := r.st.GetSetting(ctx, settingRotatingIDUniqueID)
 	if err != nil {
-		return nil, fmt.Errorf("read the unique id: %w", err)
+		return nil, fmt.Errorf("node: read the RI unique id: %w", err)
 	}
 	if ok {
 		uid, err := hex.DecodeString(v)
 		if err != nil || len(uid) < mdns.RotatingIDUniqueIDLength {
-			return nil, fmt.Errorf("the stored unique id is not %d hex-encoded bytes or more", mdns.RotatingIDUniqueIDLength)
+			return nil, fmt.Errorf("node: the stored RI unique id is not %d hex-encoded bytes or more", mdns.RotatingIDUniqueIDLength)
 		}
 		return uid, nil
 	}
 	uid := make([]byte, mdns.RotatingIDUniqueIDLength)
 	if _, err := rand.Read(uid); err != nil {
-		return nil, fmt.Errorf("draw the unique id: %w", err)
+		return nil, fmt.Errorf("node: draw the RI unique id: %w", err)
 	}
 	if err := r.st.SetSetting(ctx, settingRotatingIDUniqueID, hex.EncodeToString(uid)); err != nil {
-		return nil, fmt.Errorf("persist the unique id: %w", err)
+		return nil, fmt.Errorf("node: persist the RI unique id: %w", err)
 	}
 	return uid, nil
 }
