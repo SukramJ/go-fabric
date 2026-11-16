@@ -165,7 +165,7 @@ type outboundEntry struct {
 // default as its base interval.
 func newOutboundReliableTracker(baseIntervalFor func(sessionID uint16, now time.Time) time.Duration, clk clock.Clock) *outboundReliableTracker {
 	return &outboundReliableTracker{
-		clock:           clock.Or(clk),
+		clock:            clock.Or(clk),
 		pending:          make(map[outboundKey]*outboundEntry),
 		waiters:          make(map[outboundKey]chan error),
 		abandoned:        make(map[outboundKey]time.Time),
