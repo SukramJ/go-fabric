@@ -196,8 +196,11 @@ func (s *PeerSession) transport() string {
 	if s.link.addr == nil {
 		return ""
 	}
-	if r, ok := s.link.addr.(*connRoute); ok && r.conn != nil && r.conn.Remote() != nil {
-		return r.conn.Remote().Network()
+	if r, ok := s.link.addr.(*connRoute); ok {
+		if r == nil {
+			return ""
+		}
+		return connNetwork(r.conn)
 	}
 	return s.link.addr.Network()
 }

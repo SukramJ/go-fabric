@@ -501,7 +501,7 @@ func (b *Bridge) connMessageLimit(route net.Addr, sessionID uint16) (int, bool) 
 		return 0, false
 	}
 	channelMax := m.MaxMessageSize()
-	if r.conn.Remote().Network() != "tcp" {
+	if connNetwork(r.conn) != "tcp" {
 		return channelMax, true
 	}
 	peer := int(sessionparams.DefaultMaxTCPMessageSize)
@@ -525,7 +525,7 @@ func (b *Bridge) connMessageLimit(route net.Addr, sessionID uint16) (int, bool) 
 // encoded message above maxPayloadSize on a TCP channel, before the write
 // (packages/protocol/src/protocol/MessageChannel.ts:104-112 at db021da0).
 func (b *Bridge) sendRouted(listener *udp.Listener, dst net.Addr, sessionID uint16, datagram []byte) error {
-	if r, ok := dst.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Remote().Network() == "tcp" {
+	if r, ok := dst.(*connRoute); ok && r != nil && connNetwork(r.conn) == "tcp" {
 		if limit, ok := b.connMessageLimit(dst, sessionID); ok && len(datagram) > limit {
 			return fmt.Errorf("%w: %d bytes exceed the limit of %d for session %d", tcp.ErrMessageTooLarge, len(datagram), limit, sessionID)
 		}
