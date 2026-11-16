@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9491,
+  "entry_points": 9492,
   "entry_packages": [
     ".",
     "bdx",
@@ -230,6 +230,7 @@
     "internal/chipdm",
     "internal/chiptool",
     "internal/clockvar",
+    "internal/deepcopy",
     "internal/forward",
     "internal/inflight",
     "internal/netwatch",
@@ -293,8 +294,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19097,
-    "reachable": 12642,
+    "total_exported": 19098,
+    "reachable": 12643,
     "whitelisted": 6455,
     "unreachable": 0
   },
@@ -10050,7 +10051,7 @@
       "identifier": "AlarmSeverityEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
-      "line": 815
+      "line": 820
     },
     {
       "package": "cluster/alarm",
@@ -10197,28 +10198,28 @@
       "identifier": "AudioStream",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/camera",
       "identifier": "AudioStreamPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 48
+      "line": 50
     },
     {
       "package": "cluster/camera",
       "identifier": "AvFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/camera",
       "identifier": "AvStreamFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 29
+      "line": 31
     },
     {
       "package": "cluster/camera",
@@ -10239,70 +10240,70 @@
       "identifier": "DPTZStream",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/camera",
       "identifier": "DigitalPTZ",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 44
+      "line": 46
     },
     {
       "package": "cluster/camera",
       "identifier": "ICECandidate",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 28
+      "line": 30
     },
     {
       "package": "cluster/camera",
       "identifier": "ICEServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 29
+      "line": 31
     },
     {
       "package": "cluster/camera",
       "identifier": "MPTZ",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 29
+      "line": 31
     },
     {
       "package": "cluster/camera",
       "identifier": "MPTZPreset",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "cluster/camera",
       "identifier": "MechanicalPTZ",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "cluster/camera",
       "identifier": "MechanicalPresets",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/camera",
       "identifier": "OfferArgs",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/camera",
       "identifier": "PhysicalMovement",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/camera",
@@ -10316,203 +10317,203 @@
       "identifier": "ProviderPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "cluster/camera",
       "identifier": "ProviderSession",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/camera",
       "identifier": "PushFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/pushtransport.go",
-      "line": 28
+      "line": 30
     },
     {
       "package": "cluster/camera",
       "identifier": "PushTransportPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/pushtransport.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/camera",
       "identifier": "RequestorPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 30
+      "line": 32
     },
     {
       "package": "cluster/camera",
       "identifier": "RequestorRefusals",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/camera",
       "identifier": "Signal",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/camera",
       "identifier": "SnapshotCapturePort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 52
+      "line": 54
     },
     {
       "package": "cluster/camera",
       "identifier": "SnapshotImage",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "cluster/camera",
       "identifier": "SnapshotStream",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/camera",
       "identifier": "SnapshotStreamPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 50
+      "line": 52
     },
     {
       "package": "cluster/camera",
       "identifier": "StreamAllocationAction",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 44
+      "line": 46
     },
     {
       "package": "cluster/camera",
       "identifier": "StreamUsage",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/camera",
       "identifier": "TLSCredentials",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/pushtransport.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/camera",
       "identifier": "TransportConfiguration",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/pushtransport.go",
-      "line": 30
+      "line": 32
     },
     {
       "package": "cluster/camera",
       "identifier": "TransportOptions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/pushtransport.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/camera",
       "identifier": "TwoDZone",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/camera",
       "identifier": "Vertex",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/camera",
       "identifier": "VideoResolution",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "cluster/camera",
       "identifier": "VideoStream",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "cluster/camera",
       "identifier": "VideoStreamPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avstream.go",
-      "line": 46
+      "line": 48
     },
     {
       "package": "cluster/camera",
       "identifier": "Viewport",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/avsettings.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/camera",
       "identifier": "WebRTCSession",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 26
+      "line": 28
     },
     {
       "package": "cluster/camera",
       "identifier": "Zone",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 29
+      "line": 31
     },
     {
       "package": "cluster/camera",
       "identifier": "ZoneFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "cluster/camera",
       "identifier": "ZonePort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/camera",
       "identifier": "ZoneStoppedReason",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/camera",
       "identifier": "ZoneTrigger",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/camera",
       "identifier": "ZoneTriggeredReason",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/zone.go",
-      "line": 40
+      "line": 42
     },
     {
       "package": "cluster/closure",
@@ -11905,7 +11906,7 @@
       "identifier": "Balance",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/preference.go",
-      "line": 29
+      "line": 31
     },
     {
       "package": "cluster/energy",
@@ -11933,14 +11934,14 @@
       "identifier": "ChargingTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 57
+      "line": 59
     },
     {
       "package": "cluster/energy",
       "identifier": "ChargingTargetSchedule",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 55
+      "line": 57
     },
     {
       "package": "cluster/energy",
@@ -11975,7 +11976,7 @@
       "identifier": "DayEntryRandomizationType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 65
+      "line": 67
     },
     {
       "package": "cluster/energy",
@@ -12017,21 +12018,21 @@
       "identifier": "EvseFault",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 53
+      "line": 55
     },
     {
       "package": "cluster/energy",
       "identifier": "EvseFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 47
+      "line": 49
     },
     {
       "package": "cluster/energy",
       "identifier": "EvseState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "cluster/energy",
@@ -12094,14 +12095,14 @@
       "identifier": "MeteredQuantity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditymetering.go",
-      "line": 28
+      "line": 30
     },
     {
       "package": "cluster/energy",
       "identifier": "MeteringTariffUnit",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditymetering.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "cluster/energy",
@@ -12136,7 +12137,7 @@
       "identifier": "PreferenceFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/preference.go",
-      "line": 26
+      "line": 28
     },
     {
       "package": "cluster/energy",
@@ -12157,7 +12158,7 @@
       "identifier": "Priority",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/preference.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "cluster/energy",
@@ -12171,77 +12172,77 @@
       "identifier": "SupplyState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "cluster/energy",
       "identifier": "TargetDays",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 59
+      "line": 61
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffCalendarPeriod",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 60
+      "line": 62
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffComponent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 54
+      "line": 56
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffDay",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 58
+      "line": 60
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffDayEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 50
+      "line": 52
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffDayPattern",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 52
+      "line": 54
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 46
+      "line": 48
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffInformation",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 48
+      "line": 50
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffPeriod",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 56
+      "line": 58
     },
     {
       "package": "cluster/energy",
       "identifier": "TariffUnit",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/commoditytariff.go",
-      "line": 63
+      "line": 65
     },
     {
       "package": "cluster/energy",
@@ -12374,35 +12375,35 @@
       "identifier": "ACLEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AccessControlEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AccessControlTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 53
+      "line": 55
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AddGroupRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 63
+      "line": 65
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AdminEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "cluster/jointfabric",
@@ -12423,7 +12424,7 @@
       "identifier": "BindingTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 57
+      "line": 59
     },
     {
       "package": "cluster/jointfabric",
@@ -12444,49 +12445,49 @@
       "identifier": "DatastoreStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 33
+      "line": 35
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "DatastoreSync",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointBindingEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 55
+      "line": 57
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointGroupIDEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 43
+      "line": 45
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "GroupEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "GroupKeySet",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/jointfabric",
@@ -12507,28 +12508,28 @@
       "identifier": "NodeEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "NodeKeySetEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 47
+      "line": 49
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "State",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 61
+      "line": 63
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "StatusEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 59
+      "line": 61
     },
     {
       "package": "cluster/jointfabric",
@@ -13151,7 +13152,7 @@
       "identifier": "UpdateGroupRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 65
+      "line": 67
     },
     {
       "package": "cluster/levelcontrol",
@@ -14019,35 +14020,35 @@
       "identifier": "AmbientContextFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
-      "line": 30
+      "line": 32
     },
     {
       "package": "cluster/sensing",
       "identifier": "Detection",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
-      "line": 34
+      "line": 36
     },
     {
       "package": "cluster/sensing",
       "identifier": "HoldTimeLimits",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/sensing",
       "identifier": "Namespace",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/sensing",
       "identifier": "ObjectCountConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
-      "line": 36
+      "line": 38
     },
     {
       "package": "cluster/sensing",
@@ -14068,14 +14069,14 @@
       "identifier": "PredictedActivity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
-      "line": 40
+      "line": 42
     },
     {
       "package": "cluster/sensing",
       "identifier": "SemanticTag",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/sensing/ambient.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/sensing",
@@ -14096,84 +14097,84 @@
       "identifier": "Area",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 85
+      "line": 87
     },
     {
       "package": "cluster/servicearea",
       "identifier": "AreaInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 87
+      "line": 89
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 83
+      "line": 85
     },
     {
       "package": "cluster/servicearea",
       "identifier": "LandmarkInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 91
+      "line": 93
     },
     {
       "package": "cluster/servicearea",
       "identifier": "LocationInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 89
+      "line": 91
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Map",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 93
+      "line": 95
     },
     {
       "package": "cluster/servicearea",
       "identifier": "OperationalStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 97
+      "line": 99
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Progress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 95
+      "line": 97
     },
     {
       "package": "cluster/servicearea",
       "identifier": "SelectAreasStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 99
+      "line": 101
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Selector",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 133
+      "line": 135
     },
     {
       "package": "cluster/servicearea",
       "identifier": "SkipAreaStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 101
+      "line": 103
     },
     {
       "package": "cluster/servicearea",
       "identifier": "Skipper",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
-      "line": 139
+      "line": 141
     },
     {
       "package": "cluster/servicearea",
@@ -26143,35 +26144,35 @@
       "identifier": "Preset",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 32
+      "line": 34
     },
     {
       "package": "cluster/thermo",
       "identifier": "PresetStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 61
+      "line": 63
     },
     {
       "package": "cluster/thermo",
       "identifier": "PresetType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/thermo",
       "identifier": "Schedule",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "cluster/thermo",
       "identifier": "SchedulePort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 53
+      "line": 55
     },
     {
       "package": "cluster/thermo",
@@ -26185,21 +26186,21 @@
       "identifier": "ScheduleTransition",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "cluster/thermo",
       "identifier": "ScheduleType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/thermo",
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 333
+      "line": 335
     },
     {
       "package": "cluster/thermo",
@@ -26276,14 +26277,14 @@
       "identifier": "TestScheduleHelpersInternal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/schedules_rules_internal_test.go",
-      "line": 150
+      "line": 152
     },
     {
       "package": "cluster/thermo",
       "identifier": "TestScheduleRulesAppendPending",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/schedules_rules_internal_test.go",
-      "line": 56
+      "line": 58
     },
     {
       "package": "cluster/thermo",
