@@ -129,9 +129,10 @@ type Manager struct {
 	allLoaded bool
 
 	// reception is matter.js MessagingState: the replay-protection
-	// window per operational key and source node, without a bound on the
-	// source nodes of a key ([Manager.receptionWindow] says what that
-	// keeps and what it costs). In memory only, as in matter.js.
+	// window per operational key and source node, at most
+	// maxGroupSendersPerKey source nodes a key, none evicted
+	// ([Manager.receptionWindow] says what that keeps and what it costs).
+	// In memory only, as in matter.js.
 	receptionMu sync.Mutex
 	reception   map[string]map[uint64]*mrp.Window
 

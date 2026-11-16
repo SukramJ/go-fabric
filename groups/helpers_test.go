@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // memStore is an in-memory [Store].
@@ -243,4 +244,11 @@ func (s *memStore) metaValue(key string) (uint64, bool) {
 	defer s.mu.Unlock()
 	v, ok := s.meta[key]
 	return v, ok
+}
+
+// window is the reception window of (key, source), created on first use;
+// nil when the key's table is full ([Manager.receptionWindow]).
+func window(m *Manager, key []byte, source uint64) *mrp.Window {
+	w, _ := m.receptionWindow(key, source)
+	return w
 }
