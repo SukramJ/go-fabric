@@ -991,16 +991,11 @@ func (b *Bridge) endRepeatedPairing(src net.Addr, requestHdr *message.Header, pr
 	b.logger.Info("matter.rx.sc.pase_request_repeated",
 		slog.String("src", srcString(src)),
 		slog.Int("exchange_id", int(key.ExchangeID)))
-	b.mu.RLock()
-	tracker := b.outboundReliable
-	b.mu.RUnlock()
-	if tracker != nil && tracker.holdsUnsecuredExchange(key) {
-		b.abandonHandshakeReplies(key)
-	} else {
-		body := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
-		if err := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(nil, b.clk().Now())); err != nil {
-			b.logger.Debug("matter.rx.sc.pase_request_repeated.status_report_send_failed", slog.Any("err", err))
-		}
+	// Unreported while the pairing's last reply waits for its
+	// acknowledgement ([Bridge.sendHandshakeFailureReport]).
+	body := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
+	if err := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(nil, b.clk().Now())); err != nil {
+		b.logger.Debug("matter.rx.sc.pase_request_repeated.status_report_send_failed", slog.Any("err", err))
 	}
 	b.recordPaseFailure()
 	b.releasePaseInFlight(key)
@@ -1071,6 +1066,40 @@ func (b *Bridge) abandonHandshakeReplies(key HandshakeKey) {
 			slog.Int("exchange_id", int(key.ExchangeID)),
 			slog.Int("cleared", cleared))
 	}
+}
+
+// handshakeReplyUnacknowledged reports whether a message of the handshake
+// key names still waits for its acknowledgement on the unsecured session.
+func (b *Bridge) handshakeReplyUnacknowledged(key HandshakeKey) bool {
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	return tracker != nil && tracker.holdsUnsecuredExchange(key)
+}
+
+// endHandshakeUnreported ends a failed handshake without its failure
+// StatusReport, because a message the handshake sent still waited for its
+// acknowledgement when the failing message arrived: what it sent is
+// dropped ([Bridge.abandonHandshakeReplies]) and nothing is sent; the
+// failing message's own acknowledgement is left to the ACK pump. Review
+// II, F-db021da0-7: the report is skipped in that state, where it was
+// sent as a reliable message after the drop before.
+func (b *Bridge) endHandshakeUnreported(key HandshakeKey, stage string) {
+	b.abandonHandshakeReplies(key)
+	b.logger.Debug("matter.sc.handshake.failure_report_skipped",
+		slog.String("stage", stage),
+		slog.Int("exchange_id", int(key.ExchangeID)),
+		slog.String("reason", "reply_unacknowledged"))
+}
+
+// failureReport reports whether a handshake reply is a failure
+// StatusReport.
+func failureReport(respOpcode uint8, respPayload []byte) bool {
+	if respOpcode != mrp.SCOpcodeStatusReport {
+		return false
+	}
+	general, _, _, ok := decodeStatusReport(respPayload)
+	return ok && general != mrp.SCStatusGeneralSuccess
 }
 
 // releasePaseInFlight clears the single-active-PASE claim held by the
@@ -1233,6 +1262,8 @@ func (b *Bridge) handlePase(
 		slog.String("src", srcString(src)),
 		slog.Int("exchange_id", int(proto.ExchangeID)))
 	rxAt := b.clk().Now()
+	// Read before the handler runs: a step may drop what came before it.
+	replyUnacked := b.handshakeReplyUnacknowledged(handshakeKeyOf(requestHdr, proto.ExchangeID))
 	respOpcode, respPayload, err := process(payload)
 	if stage == "pake3" && err == nil {
 		// The session is established: free the single-active-PASE slot
@@ -1286,7 +1317,9 @@ func (b *Bridge) handlePase(
 				mrp.SCStatusProtocolInvalidParameter,
 				nil,
 			)
-			if sendErr := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(handler, rxAt)); sendErr != nil {
+			if replyUnacked {
+				b.endHandshakeUnreported(handshakeKeyOf(requestHdr, proto.ExchangeID), stage)
+			} else if sendErr := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(handler, rxAt)); sendErr != nil {
 				b.logger.Debug("matter.rx.sc.pase_err.status_report_send_failed",
 					slog.String("stage", stage),
 					slog.Any("err", sendErr))
@@ -1323,6 +1356,10 @@ func (b *Bridge) handlePase(
 		// happy-path, for instance). Nothing more to do.
 		return nil
 	}
+	if replyUnacked && failureReport(respOpcode, respPayload) {
+		b.endHandshakeUnreported(handshakeKeyOf(requestHdr, proto.ExchangeID), stage)
+		return nil
+	}
 	// Reliable: PASE continuation messages (PBKDFParamResponse, Pake2)
 	// are part of the reliable Secure-Channel exchange. A dropped Pake2
 	// aborts commissioning — the commissioner waits for a reply that the
@@ -1348,6 +1385,9 @@ func (b *Bridge) handleCase(
 	handler any,
 ) error {
 	rxAt := b.clk().Now()
+	// Read before the handler runs: a Sigma3 drops the Sigma2 before its
+	// reply goes out (dispatchCase).
+	replyUnacked := b.handshakeReplyUnacknowledged(handshakeKeyOf(requestHdr, proto.ExchangeID))
 	respOpcode, respPayload, err := process(payload)
 	b.settleHandshake(src, handshakeKeyOf(requestHdr, proto.ExchangeID), handler, respOpcode, respPayload, err)
 	if err != nil {
@@ -1397,7 +1437,9 @@ func (b *Bridge) handleCase(
 			// The handshake is over: a Sigma2 still waiting for its
 			// acknowledgement is not retransmitted to a peer whose
 			// Sigma3 was refused; the report that tells it so is.
-			if sendErr := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(handler, rxAt)); sendErr != nil {
+			if replyUnacked {
+				b.endHandshakeUnreported(handshakeKeyOf(requestHdr, proto.ExchangeID), stage)
+			} else if sendErr := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(handler, rxAt)); sendErr != nil {
 				b.logger.Debug("matter.rx.sc.case_err.status_report_send_failed",
 					slog.String("stage", stage),
 					slog.Any("err", sendErr))
@@ -1406,6 +1448,10 @@ func (b *Bridge) handleCase(
 		return err
 	}
 	if respPayload == nil {
+		return nil
+	}
+	if replyUnacked && failureReport(respOpcode, respPayload) {
+		b.endHandshakeUnreported(handshakeKeyOf(requestHdr, proto.ExchangeID), stage)
 		return nil
 	}
 	// Reliable: Sigma2 is a CASE continuation message on the reliable
@@ -1423,10 +1469,14 @@ func (b *Bridge) handleCase(
 }
 
 // sendHandshakeFailureReport ends the handshake on the request's exchange
-// with the failure StatusReport body: what the handshake sent and the peer
-// has not acknowledged is dropped first, then the report goes out as a
-// reliable message, so it is the one entry the exchange keeps and is
-// retransmitted until the peer acknowledges it. Both references send the
+// with the failure StatusReport body, as a reliable message: it is the one
+// entry the exchange keeps and is retransmitted until the peer
+// acknowledges it. While a message the handshake sent still waits for its
+// acknowledgement no report is sent: the handshake ends unreported
+// ([Bridge.endHandshakeUnreported]; review II, F-db021da0-7). A caller
+// whose handler may have dropped those messages already reads the state
+// before the handler runs and calls endHandshakeUnreported itself
+// ([Bridge.handlePase], [Bridge.handleCase]). Both references send the
 // report that way: matter.js `sendError` is `exchange.send` without
 // `suppressAck`, which sets the R flag, starts the retransmission timer and
 // waits for the acknowledgement
@@ -1448,7 +1498,11 @@ func (b *Bridge) sendHandshakeFailureReport(
 	body []byte,
 	peer *handshakePeerTiming,
 ) error {
-	b.abandonHandshakeReplies(handshakeKeyOf(requestHdr, proto.ExchangeID))
+	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
+	if b.handshakeReplyUnacknowledged(key) {
+		b.endHandshakeUnreported(key, "failure_report")
+		return nil
+	}
 	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body, peer); err != nil {
 		return err
 	}

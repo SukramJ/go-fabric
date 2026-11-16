@@ -341,9 +341,10 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	case mrp.SCOpcodeSigma2:
 		sigma3, perr := init.Initiator.ProcessSigma2Bytes(reply.payload)
 		if perr != nil {
+			unacked := b.handshakeReplyUnacknowledged(key)
 			abandon()
 			reported = true
-			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter)
+			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter, unacked)
 			return 0, perr
 		}
 		if err := b.sendInitiatedUnsecured(addr, exchangeID, ephemeral, mrp.SCOpcodeSigma3, sigma3, &reply.counter); err != nil {
@@ -364,10 +365,11 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		// budget ran out (seen against matter.js's controller).
 		b.sendInitiatedAck(addr, exchangeID, ephemeral, status.counter)
 	case mrp.SCOpcodeSigma2Resume:
+		unacked := b.handshakeReplyUnacknowledged(key)
 		abandon()
 		reported = true
 		if perr := init.Initiator.ProcessSigma2Resume(reply.payload); perr != nil {
-			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter)
+			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter, unacked)
 			return 0, perr
 		}
 		ok := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)
@@ -440,8 +442,19 @@ func statusReportSuccessOr(payload []byte, failure error) error {
 // sendCASEError reports a failed handshake to the peer, best effort —
 // matter.js CaseClient.pair sends StatusReport(InvalidParam) unless the
 // failure was a transport one. The caller has dropped the handshake's
-// unacknowledged messages before, so the report stays tracked.
-func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, ackCounter uint32) {
+// unacknowledged messages before, so the report stays tracked. Nothing is
+// sent when sigma1Unacked: the Sigma1 still waited for its acknowledgement
+// when the failing reply arrived, and the handshake ends unreported
+// (review II, F-db021da0-7; [Bridge.endHandshakeUnreported] on the
+// responder side).
+func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, ackCounter uint32, sigma1Unacked bool) {
+	if sigma1Unacked {
+		b.logger.Debug("matter.sc.handshake.failure_report_skipped",
+			slog.String("stage", "case_initiator"),
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.String("reason", "reply_unacknowledged"))
+		return
+	}
 	report := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
 	if err := b.sendInitiatedUnsecured(addr, exchangeID, ephemeral, mrp.SCOpcodeStatusReport, report, &ackCounter); err != nil {
 		b.logger.Debug("matter.case.initiator.error_send", slog.Any("err", err))
