@@ -136,7 +136,9 @@ func (i *Instance) ValidateWrite(attrID uint32, value any, peers Peers) (any, er
 		return nil, Errorf(im.StatusUnsupportedWrite, "%s: attribute %s is read-only", i.def.Name, a.Name)
 	}
 	t, c := held(a.Type, a.Constraint, a.Relaxed)
-	v, err := i.checkValue(a.Name, t, a.Quality.Nullable, c, value, peers)
+	// A named scalar type is judged by its underlying kind, as CheckValue
+	// and CheckWritten judge it (review II, R2-P6-api-1309).
+	v, err := i.checkValue(a.Name, t, a.Quality.Nullable, c, underlying(value), peers)
 	if err != nil {
 		return nil, err
 	}
