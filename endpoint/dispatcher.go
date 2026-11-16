@@ -656,7 +656,7 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 		return im.StatusUnsupportedEndpoint
 	}
 	for _, srv := range ClusterServers(ep) {
-		if srv == nil || srv.MatterClusterID() != path.Cluster {
+		if srv.MatterClusterID() != path.Cluster {
 			continue
 		}
 		if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), path.Command) {
@@ -685,7 +685,7 @@ func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.Statu
 		return im.StatusUnsupportedEndpoint
 	}
 	for _, srv := range ClusterServers(ep) {
-		if srv == nil || srv.MatterClusterID() != path.Cluster {
+		if srv.MatterClusterID() != path.Cluster {
 			continue
 		}
 		var events []uint32
@@ -755,7 +755,7 @@ func (d *TopologyDispatcher) commandTargets(path im.ConcreteCommandPath, authori
 	var out []commandTarget
 	for _, ep := range d.resolveEndpoints(im.ConcreteAttributePath{}) {
 		for _, srv := range ClusterServers(ep) {
-			if srv == nil || srv.MatterClusterID() != path.Cluster {
+			if srv.MatterClusterID() != path.Cluster {
 				continue
 			}
 			if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), path.Command) {
@@ -1589,7 +1589,7 @@ func (d *TopologyDispatcher) auxiliaryAdvertised() bool {
 		return false
 	}
 	for _, srv := range ClusterServers(root) {
-		if srv == nil || srv.MatterClusterID() != 0x001F {
+		if srv.MatterClusterID() != 0x001F {
 			continue
 		}
 		v, ok := srv.MatterRead(0xFFFC)

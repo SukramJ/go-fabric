@@ -83,7 +83,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	mc := contract.MeasurementContext{EndpointID: ep.ID}
 	var inner []contract.ClusterServer
 	if ep.Source != nil {
-		inner = append([]contract.ClusterServer(nil), ep.Source.MatterClusterServers()...)
+		inner = ep.dropNilServers(ep.Source.MatterClusterServers())
 	}
 	// A measurement source's clusters follow the source's own: a sensor
 	// endpoint has no source servers, a host's endpoint with both has its
