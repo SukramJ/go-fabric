@@ -25,7 +25,7 @@ type gatedPresetStore struct {
 	release         chan struct{}
 }
 
-func (m *gatedPresetStore) LoadPresets(context.Context) ([]byte, []byte, bool, error) {
+func (m *gatedPresetStore) LoadPresets(context.Context) (presets, activeHandle []byte, ok bool, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.presets, m.active, m.saved, nil

@@ -92,15 +92,8 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	if err != nil {
 		return err
 	}
-	if len(checked) > 0 {
-		// The limits and setpoints on a candidate state first: their
-		// refusal must come before the preset setters store anything.
-		s.mu.RLock()
-		candidate := s.setpointState()
-		s.mu.RUnlock()
-		if _, err := candidate.applySet(checked); err != nil {
-			return err
-		}
+	if err := s.checkCandidate(checked); err != nil {
+		return err
 	}
 	if err := s.setPresetAttributes(presets); err != nil {
 		return err
@@ -187,6 +180,20 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		}
 	}
 	return nil
+}
+
+// checkCandidate judges the limits and setpoints of a SetAttributes on a
+// candidate state: their refusal must come before the preset setters
+// store anything (R2-P6-err-1560).
+func (s *ThermostatServer) checkCandidate(checked map[uint32]any) error {
+	if len(checked) == 0 {
+		return nil
+	}
+	s.mu.RLock()
+	candidate := s.setpointState()
+	s.mu.RUnlock()
+	_, err := candidate.applySet(checked)
+	return err
 }
 
 // setOptionalLocked stores the hold, its duration and the running state

@@ -119,7 +119,13 @@ var ErrTemperatureRefused = errors.New("thermo: the device cannot accept the cha
 type TemperatureControlServer struct {
 	*spec.Instance
 	cluster.AttributeChanges
-	hooks spec.Hooks
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([TemperatureControlServer.Handle]) ahead of the
+	// server's own logic (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -148,12 +154,12 @@ func NewTemperatureControl(cfg TemperatureControlConfig) (*TemperatureControlSer
 	if cfg.Setter == nil {
 		return nil, ErrNoTemperatureSetter
 	}
-	inst, err := spec.New(tc.Definition, spec.Options{Features: uint32(cfg.Features)})
+	s := &TemperatureControlServer{ext: cfg.DataVersion, cfg: cfg}
+	srv, err := newHeld(tc.Definition, spec.Options{Features: uint32(cfg.Features)}, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("thermo: %w", err)
 	}
-	s := &TemperatureControlServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
-	s.hooks.Init(inst)
+	s.Instance, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	s.cfg.SupportedTemperatureLevels = slices.Clone(cfg.SupportedTemperatureLevels)
 	if err := s.checkConfig(); err != nil {
 		return nil, err
@@ -266,7 +272,7 @@ func (s *TemperatureControlServer) MatterWrite(ctx context.Context, attrID uint3
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, spec.Stored(tc.Definition.Attribute(attrID).Type, v))
+	return s.veto.Check(ctx, attrID, spec.Stored(tc.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
@@ -282,9 +288,12 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("thermo: command 0x%02X is not supported", cmdID)
 	}
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own SetTemperature, which [spec.InvokeHeld] runs
+// when the host registered no handler.
+func (s *TemperatureControlServer) invoke(ctx context.Context, _ uint32, fields any) (any, error) {
 	req, ok := spec.RequestOf[tc.SetTemperatureRequest](fields)
 	if !ok {
 		return nil, invalidCommand(fmt.Sprintf("thermo: SetTemperature fields %T", fields))

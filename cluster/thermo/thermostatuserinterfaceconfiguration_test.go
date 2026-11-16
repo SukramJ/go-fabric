@@ -198,9 +198,9 @@ type flakySettings struct {
 	fail   bool
 }
 
-func (f *flakySettings) GetSetting(_ context.Context, key string) (string, bool, error) {
-	v, ok := f.values[key]
-	return v, ok, nil
+func (f *flakySettings) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
+	value, ok = f.values[key]
+	return value, ok, nil
 }
 
 func (f *flakySettings) SetSetting(_ context.Context, key, value string) error {

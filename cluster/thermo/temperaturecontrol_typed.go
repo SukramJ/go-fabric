@@ -13,8 +13,9 @@ import (
 	tc "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
 )
 
-// The typed server's optional interfaces over [spec.Hooks]; SetAttributes
-// is the setters'.
+// The typed server's optional interfaces: Handle ([spec.SelfHeld]), Emit
+// ([spec.Events]) and SetBeforeWrite ([spec.WriteVeto]); SetAttributes is
+// the setters'.
 var (
 	_ spec.AttributeSetter   = (*TemperatureControlServer)(nil)
 	_ spec.CommandRegistrar  = (*TemperatureControlServer)(nil)
@@ -62,18 +63,18 @@ func (s *TemperatureControlServer) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
-// Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
+// Handle implements [spec.CommandRegistrar] ([spec.SelfHeld.Handle]).
 func (s *TemperatureControlServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
-	return s.hooks.Handle(cmdID, fn)
+	return s.held.Handle(cmdID, fn)
 }
 
 // Emit implements [spec.EventEmitting]: TemperatureControl defines no
 // event, so every one is [spec.ErrNotEmitted].
 func (s *TemperatureControlServer) Emit(endpoint uint16, eventID uint32, data any) error {
-	return s.hooks.Emit(endpoint, eventID, data)
+	return s.events.Emit(s.Instance, endpoint, eventID, data)
 }
 
-// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.Hooks]).
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.WriteVeto]).
 func (s *TemperatureControlServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
-	s.hooks.SetBeforeWrite(fn)
+	s.veto.Set(fn)
 }
