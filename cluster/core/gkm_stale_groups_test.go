@@ -346,3 +346,111 @@ func TestGKMStaleGroupStateIsRetriedOnTheClock(t *testing.T) {
 		t.Errorf("%d reloads after MatterQuiesce, want none", got-attempts)
 	}
 }
+
+// gatedReloadStore fails the group state's key-set read while fail is set;
+// while gate is set the read first says it entered and waits for release.
+type gatedReloadStore struct {
+	*fakeStore
+	fail     atomic.Bool
+	gate     atomic.Bool
+	failed   atomic.Int32
+	entered  chan struct{}
+	release  chan struct{}
+	failList atomic.Bool
+}
+
+func (s *gatedReloadStore) ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]mstore.GroupKeySet, error) {
+	if s.gate.CompareAndSwap(true, false) {
+		s.entered <- struct{}{}
+		<-s.release
+	}
+	if s.fail.Load() {
+		s.failed.Add(1)
+		return nil, errors.New("injected reload failure")
+	}
+	return s.fakeStore.ListGroupKeySets(ctx, fabricIndex)
+}
+
+func (s *gatedReloadStore) ListFabrics(ctx context.Context) ([]mstore.FabricRecord, error) {
+	if s.failList.Load() {
+		return nil, errors.New("injected fabric listing failure")
+	}
+	return s.fakeStore.ListFabrics(ctx)
+}
+
+func newGatedGKM(t *testing.T, clk *clocktest.Fake) (*core.GroupKeyManagement, *gatedReloadStore, *groups.Manager) {
+	t.Helper()
+	fs := newFakeStore()
+	if _, err := fs.AddFabric(context.Background(), mstore.FabricRecord{FabricID: 0xA}); err != nil {
+		t.Fatal(err)
+	}
+	st := &gatedReloadStore{fakeStore: fs, entered: make(chan struct{}), release: make(chan struct{})}
+	mgr, err := groups.NewManager(st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gkm, err := core.NewGroupKeyManagement(fs, core.GroupKeyMgmtConfig{Groups: mgr, Clock: clk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return gkm, st, mgr
+}
+
+// MatterQuiesce while a retry's reload runs: the failing reload arms no
+// next retry (review II, R2-P6-err-1701 R3-a).
+func TestGKMRetryRunningAtQuiesceArmsNoNext(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	gkm, st, _ := newGatedGKM(t, clk)
+	st.fail.Store(true)
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(7)); err != nil {
+		t.Fatal(err)
+	}
+	st.gate.Store(true)
+	advanced := make(chan struct{})
+	go func() {
+		defer close(advanced)
+		clk.Advance(time.Second)
+	}()
+	<-st.entered
+	gkm.MatterQuiesce()
+	close(st.release)
+	<-advanced
+	before := st.failed.Load()
+	clk.Advance(time.Hour)
+	if got := st.failed.Load(); got != before {
+		t.Errorf("%d reloads after MatterQuiesce, want none: the running retry armed another", got-before)
+	}
+	if len(gkm.StaleGroupFabrics()) != 1 {
+		t.Errorf("stale fabrics = %v, want fabric 1 still marked", gkm.StaleGroupFabrics())
+	}
+}
+
+// A reload that succeeds whose re-announcement of the memberships fails
+// keeps the fabric marked and the retry owed; the retry that announces
+// unmarks it (review II, R2-P6-err-1701 R3-2).
+func TestGKMFailedReannounceKeepsTheFabricStale(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	gkm, st, _ := newGatedGKM(t, clk)
+	st.fail.Store(true)
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(7)); err != nil {
+		t.Fatal(err)
+	}
+	st.fail.Store(false)
+	st.failList.Store(true) // Load's listing of the fabrics fails
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x04, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := gkm.StaleGroupFabrics(); len(got) != 1 {
+		t.Fatalf("stale fabrics after a failed re-announcement = %v, want fabric 1", got)
+	}
+	st.failList.Store(false)
+	clk.Advance(staleRetryWindow)
+	if got := gkm.StaleGroupFabrics(); len(got) != 0 {
+		t.Errorf("stale fabrics after the retry = %v, want none", got)
+	}
+}
+
+// staleRetryWindow covers the first retries' waits (1 s, 2 s).
+const staleRetryWindow = 3 * time.Second

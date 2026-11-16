@@ -56,7 +56,11 @@ func (a *AccessControl) registerAuxiliaryProvider(ctx context.Context, src Auxil
 	src.OnGroupcastChanged(func(changeCtx context.Context, fabric uint8) {
 		a.mu.Lock()
 		batched := a.auxBatch > 0
-		if batched {
+		// Only a change a request made names a node: a change without one
+		// — GroupKeyManagement's retry of a stale group state, a forget —
+		// neither records a context nor displaces the one a request
+		// recorded (review II, R2-P6-err-1701 R3-1).
+		if _, _, request := im.LookupFabricFilter(changeCtx); batched && request {
 			if a.auxDeferred == nil {
 				a.auxDeferred = make(map[uint8]context.Context)
 			}

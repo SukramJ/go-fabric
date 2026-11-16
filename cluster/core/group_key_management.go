@@ -70,6 +70,12 @@ type GroupKeyManagement struct {
 	retryTimer  clock.Timer
 	retryDelay  time.Duration
 	clk         clock.Clock
+	// retrySeq names the armed retry: a callback whose number is not the
+	// armed one (stopped or superseded) does nothing. quiesceEpoch counts
+	// MatterQuiesce calls: a retry that was running when the server was
+	// quiesced arms no next one (review II, R2-P6-err-1701 R3-a).
+	retrySeq     uint64
+	quiesceEpoch uint64
 	// reloadMu serialises reloadGroups: a failed reload's forget never
 	// lands after a concurrent reload that succeeded and found nothing
 	// stale to re-announce (review II, R2-P6-err-1701 R2-a). It is taken
@@ -339,17 +345,19 @@ func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
 			g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
 		case was:
 			if lerr := g.groups.Load(ctx); lerr != nil {
+				// The memberships the forget withdrew are not announced
+				// yet: the fabric stays marked and the retry is owed
+				// (review II, R2-P6-err-1701 R3-2).
 				g.logger.Warn("matter.group_key_management.group_state_reannounce_failed",
 					slog.Int("fabric_index", int(fabric)), slog.Any("err", lerr))
+				g.mu.Lock()
+				g.markStaleLocked(ctx, fabric)
+				g.mu.Unlock()
 			}
 		}
 		return
 	}
-	if g.staleGroups == nil {
-		g.staleGroups = map[uint8]bool{}
-	}
-	g.staleGroups[fabric] = true
-	g.armRetryLocked()
+	g.markStaleLocked(ctx, fabric)
 	g.mu.Unlock()
 	g.logger.Warn("matter.group_key_management.group_state_stale",
 		slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
@@ -366,36 +374,68 @@ func (g *GroupKeyManagement) armRetryLocked() {
 	if g.retryDelay == 0 {
 		g.retryDelay = staleRetryFirst
 	}
-	g.retryTimer = g.clk.AfterFunc(g.retryDelay, g.retryStale)
+	g.retrySeq++
+	seq := g.retrySeq
+	g.retryTimer = g.clk.AfterFunc(g.retryDelay, func() { g.retryStale(seq) })
 }
 
-// stopRetryLocked disarms the retry and resets its backoff. g.mu is held.
+// stopRetryLocked disarms the retry and resets its backoff; a callback of
+// the disarmed retry that already fired finds its number superseded. g.mu
+// is held.
 func (g *GroupKeyManagement) stopRetryLocked() {
 	if g.retryTimer != nil {
 		g.retryTimer.Stop()
 		g.retryTimer = nil
 	}
+	g.retrySeq++
 	g.retryDelay = 0
 }
 
-// retryStale is the retry on the clock: it reloads every stale fabric and,
-// while one stays stale, arms the next retry with the doubled wait.
-func (g *GroupKeyManagement) retryStale() {
+// retryEpochKey marks the context of a retry with the quiesce epoch it
+// started in (reloadGroups arms no next retry once the epoch moved).
+type retryEpochKey struct{}
+
+// retryStale is the retry seq on the clock: it reloads every stale fabric
+// and, while one stays stale, the failed reload arms the next retry with
+// the doubled wait. A callback that is not the armed retry — stopped,
+// quiesced or superseded by a newer arm — does nothing, so it neither
+// clears a newer timer nor starts a chain of its own.
+func (g *GroupKeyManagement) retryStale(seq uint64) {
 	g.mu.Lock()
+	if seq != g.retrySeq || g.retryTimer == nil {
+		g.mu.Unlock()
+		return
+	}
 	g.retryTimer = nil
 	// A reload that fails again arms the next retry with the doubled wait.
 	g.retryDelay = min(2*g.retryDelay, staleRetryMax)
+	epoch := g.quiesceEpoch
 	g.mu.Unlock()
-	g.reloadStale(context.Background())
+	g.reloadStale(context.WithValue(context.Background(), retryEpochKey{}, epoch))
 }
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: the retry of a
-// stale group state is disarmed. The stale marks stay; the server's next
-// command or write reloads them and arms the retry again when that fails.
+// stale group state is disarmed, and a retry already running when it is
+// called arms no next one. The stale marks stay; the server's next command
+// or write reloads them and arms the retry again when that fails.
 func (g *GroupKeyManagement) MatterQuiesce() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.quiesceEpoch++
 	g.stopRetryLocked()
+}
+
+// markStaleLocked marks fabric stale and arms the retry — unless ctx is a
+// retry's that MatterQuiesce overtook. g.mu is held.
+func (g *GroupKeyManagement) markStaleLocked(ctx context.Context, fabric uint8) {
+	if g.staleGroups == nil {
+		g.staleGroups = map[uint8]bool{}
+	}
+	g.staleGroups[fabric] = true
+	if epoch, retry := ctx.Value(retryEpochKey{}).(uint64); retry && epoch != g.quiesceEpoch {
+		return
+	}
+	g.armRetryLocked() //nolint:contextcheck // the retry runs on the clock, outside any request; its context is its own (retryStale)
 }
 
 // reloadStale reloads every fabric syncGroups marked stale.
@@ -421,6 +461,7 @@ var (
 	_ contract.ClusterDataVersion             = (*GroupKeyManagement)(nil)
 	_ contract.ClusterCommandInvokePrivilege  = (*GroupKeyManagement)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*GroupKeyManagement)(nil)
+	_ contract.ClusterQuiescer                = (*GroupKeyManagement)(nil)
 )
 
 // MatterDataVersion implements [contract.ClusterDataVersion].

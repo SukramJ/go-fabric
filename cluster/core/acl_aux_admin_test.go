@@ -87,3 +87,30 @@ func TestAuxiliaryEventOfADeferredChangeNamesItsOwnNode(t *testing.T) {
 		t.Errorf("fabric 2's event names %v, want its own change's node %#x", a, adminB)
 	}
 }
+
+// A change signalled without a request — GroupKeyManagement's retry of a
+// stale group state — while a Groupcast command's batch is open does not
+// displace the context the command's own change recorded: the event still
+// names the command's node (review II, R2-P6-err-1701 R3-1).
+func TestAuxiliaryChangeWithoutARequestKeepsTheBatchsNode(t *testing.T) {
+	t.Parallel()
+	ac, err := core.NewAccessControl(newFakeStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev := &deferAuxEvents{got: map[uint8]*uint64{}}
+	ac.SetMatterEventEmitter(ev)
+	src := &deferAuxSource{}
+	ac.RegisterAuxiliaryProvider(context.Background(), src)
+	const adminA = 0xA1
+	ctxA := im.WithSubject(im.WithFabricFilter(context.Background(), false, 1), adminA, nil)
+	ac.BeginAuxiliaryBatch()
+	src.add(ctxA, 1, true)                 // the command's own change
+	src.add(context.Background(), 1, true) // a retry's notification
+	ac.EndAuxiliaryBatch(ctxA)
+	ev.mu.Lock()
+	defer ev.mu.Unlock()
+	if a := ev.got[1]; a == nil || *a != adminA {
+		t.Errorf("fabric 1's event names %v, want the command's node %#x", a, adminA)
+	}
+}
