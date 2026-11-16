@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/caseauth"
 )
@@ -271,6 +272,10 @@ var (
 	ErrNoImageSource = errors.New("core: OTA provider needs an image source")
 	ErrNoNodeID      = errors.New("core: OTA provider with BDX needs the node id lookup")
 )
+
+// The provider's in-progress entries and consents are fabric-scoped state
+// (owner decision 167).
+var _ contract.FabricScopedState = (*OTAProvider)(nil)
 
 // otaProviderInst is the definition the provider serves: no attribute but
 // the globals, the three commands and their responses.
@@ -825,6 +830,51 @@ func (p *OTAProvider) cancelUnlessSettled(peer OTAPeer, token []byte, version ui
 	}
 }
 
+// MatterDropFabric implements [contract.FabricScopedState]: a removed
+// fabric's in-progress entries leave (their cleanup run, outside p.mu) and
+// its consents with them, so a later fabric that receives the index
+// inherits neither (review II, R2-P6-bound-1206, owner decision 167).
+// matter.js keeps them until the peer's next lookup
+// (OtaSoftwareUpdateProviderServer.ts:556-557, :565-577 at db021da0).
+func (p *OTAProvider) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
+	p.mu.Lock()
+	var cleanups []func()
+	for key, d := range p.inProgress {
+		if d.peer.FabricIndex == fabricIndex {
+			if d.cleanup != nil {
+				cleanups = append(cleanups, d.cleanup)
+			}
+			delete(p.inProgress, key)
+		}
+	}
+	for peer := range p.consents {
+		if peer.FabricIndex == fabricIndex {
+			delete(p.consents, peer)
+		}
+	}
+	p.mu.Unlock()
+	for _, fn := range cleanups {
+		fn()
+	}
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the in-progress entries and of the consents, ascending.
+func (p *OTAProvider) MatterHeldFabrics() []uint8 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var out []uint8
+	for _, d := range p.inProgress {
+		out = append(out, d.peer.FabricIndex)
+	}
+	for peer := range p.consents {
+		out = append(out, peer.FabricIndex)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
 // otaStatusUpdate is what updateInProgressLocked leaves to do once p.mu is
 // released: the log, the status hook and the terminal entry's cleanup.
 type otaStatusUpdate struct {
@@ -862,12 +912,15 @@ func (p *OTAProvider) evictForLocked(fabric uint8) func() {
 }
 
 // otaInProgressPerFabric is the share of in-progress entries one fabric's
-// requestors hold. matter.js creates an entry for every token an
-// ApplyUpdateRequest names, one it never issued included, and drops none
-// at a fabric's removal (OtaSoftwareUpdateProviderServer.ts:421, :445,
-// :605-613, :636 at db021da0): its entries grow with the tokens a peer
-// invents. The number is the module's: room for that many concurrent
-// updates on one fabric (review II, R2-P6-bound-1206, decision 134).
+// requestors hold. matter.js keeps an entry for a token it never issued
+// when the peer holds a consent for the version
+// (OtaSoftwareUpdateProviderServer.ts:417-420, :444, :474-481, created
+// :605-614, stored :635 at db021da0); without one the entry is created and
+// deleted in the same call (:452-458, :644-647). It drops a peer's stale
+// entries on that peer's next lookup (:556-557, :565-577) and none at a
+// fabric's removal. The number is the module's: room for that many
+// concurrent updates on one fabric (review II, R2-P6-bound-1206, decision
+// 134).
 const otaInProgressPerFabric = 16
 
 // updateInProgressLocked is updateInProgress's write; p.mu is held.
