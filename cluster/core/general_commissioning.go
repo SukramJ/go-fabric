@@ -865,7 +865,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// The request's Breadcrumb is not taken: an armed fail-safe expires,
 		// and its expiry resets the Breadcrumb to 0; a fail-safe not armed
 		// is left without side effect. Mirrors matter.js
-		// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:100-104
+		// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:95-98
 		// (`if (expiryLengthSeconds === 0) return SuccessResponse` when not
 		// armed) and :92-97 → packages/protocol/src/common/FailsafeTimer.ts:61-65
 		// (an armed fail-safe expires) → FailsafeContext.ts:314
@@ -878,10 +878,16 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// A tentative terms acceptance of the window goes with it
 		// (general_commissioning_tc.go revertTermsLocked).
 		termsReverted := wasArmed && g.revertTermsLocked()
-		// Bump DataVersion on disarm so Apple's MTRDevice sees a version
-		// change and invalidates its cached DataVersion=0.
-		// Mirrors chip MarkAttributeDirty(Breadcrumb).
-		g.dataVersion.Bump()
+		// Only a disarm of an armed fail-safe changes an attribute (the
+		// Breadcrumb); a fail-safe that was not armed is left without side
+		// effect, its DataVersion included: neither matter.js
+		// (GeneralCommissioningServer.ts:95-98 at db021da0) nor
+		// connectedhomeip (GeneralCommissioningCluster.cpp:429-436,
+		// FailSafeContext.cpp:145-150 at 6170af84) changes anything there
+		// (review II, R2-P6-par-1020).
+		if wasArmed {
+			g.dataVersion.Bump()
+		}
 		// Release the cluster lock before firing the hook so
 		// OpCreds.OnFailSafeExpiry (which acquires its own lock to perform
 		// the AddNOC rollback) runs without our mutex held — matching the
