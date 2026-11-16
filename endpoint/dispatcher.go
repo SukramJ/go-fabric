@@ -1748,9 +1748,16 @@ func aclSubjectMatches(subjects []uint64, subjectNodeID uint64, subjectCATs []ui
 			}
 			continue
 		}
-		// Operational node id: exact match. Group ids cannot appear under
-		// AuthMode=CASE — chip src/access/AccessControl.cpp:492 enforces
-		// the AuthMode-vs-subject coupling; we conservatively drop them.
+		// Operational node id: exact match. A subject of another kind
+		// under AuthMode=CASE (a group id, say) matches no one here and the
+		// check goes on to the entry's other subjects and the other
+		// entries. chip ends the whole check instead — its
+		// VerifyOrReturnError(..., CHIP_ERROR_INCORRECT_STATE) at
+		// src/access/AccessControl.cpp:475, :484, :493 (and :498-502 for
+		// any other subject) at 6170af84 returns an error out of CheckACL,
+		// so no later entry is consulted; the subject grants nothing in
+		// either (R2-P6-doc-0445). The ACL write validation should never
+		// store such an entry.
 		if subjectNodeID != 0 && s == subjectNodeID {
 			return true
 		}
