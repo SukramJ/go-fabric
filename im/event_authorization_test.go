@@ -201,6 +201,10 @@ func TestEventPayloadFabricIndex(t *testing.T) {
 		{"nil pointer", (*fakeACEvent)(nil), 0, false},
 		{"no field", struct{ X int }{X: 5}, 0, false},
 		{"non-struct", "str", 0, false},
+		// A FabricIndex no fabric can have is none, never its low byte
+		// (review II, R2-P6-sec-0511).
+		{"wider than a fabric index", struct{ FabricIndex uint16 }{FabricIndex: 0x101}, 0, false},
+		{"wide field, a fabric's value", struct{ FabricIndex uint16 }{FabricIndex: 7}, 7, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

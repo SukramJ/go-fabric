@@ -879,7 +879,13 @@ func eventPayloadFabricIndex(payload any) (uint8, bool) {
 	}
 	switch f.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return uint8(f.Uint() & 0xFF), true
+		// A value no fabric index can take is no fabric: masking it would
+		// disclose the record to the fabric its low byte names (review
+		// II, R2-P6-sec-0511).
+		if f.Uint() > 0xFF {
+			return 0, false
+		}
+		return uint8(f.Uint()), true
 	default:
 		return 0, false
 	}
