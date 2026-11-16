@@ -117,9 +117,11 @@ func TestServedClusterRevisionAndFeatureMap(t *testing.T) {
 			}
 		}
 		for _, attr := range listed {
-			// The dispatcher answers the globals a server leaves out
-			// (synthesizeGlobalRead).
-			if attr >= cluster.AttrGlobalGeneratedCommandList {
+			// The dispatcher answers the three global lists itself
+			// (synthesizeGlobalRead); FeatureMap, ClusterRevision and a
+			// manufacturer-specific attribute it reads from the server.
+			switch attr {
+			case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
 				continue
 			}
 			if !answersRead(s.srv, attr) {

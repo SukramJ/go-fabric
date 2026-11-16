@@ -56,6 +56,12 @@ func TestAssertClusterServerContract(t *testing.T) {
 		{"tolerated and answered", listingServer{attrs: []uint32{0}, answers: []uint32{0}, featureMap: uint32(0)}, []uint32{0}, 1, nil},
 		{"reported, not listed", listingServer{attrs: []uint32{0}, answers: []uint32{0, 2}, reportable: []uint32{2}, featureMap: uint32(0)}, nil, 1, nil},
 		{"FeatureMap not a uint32", listingServer{attrs: []uint32{0}, answers: []uint32{0}, featureMap: uint8(0)}, nil, 1, nil},
+		// The global lists the dispatcher answers are not read; a listed
+		// FeatureMap and a manufacturer-specific attribute are (review II, phase 5b).
+		{"global lists", listingServer{attrs: []uint32{0, 0xFFF8, 0xFFF9, 0xFFFB, 0xFFFC, 0xFFFD}, answers: []uint32{0}, featureMap: uint32(0)}, nil, 0, nil},
+		{"FeatureMap listed, unanswered", listingServer{attrs: []uint32{0, 0xFFFC}, answers: []uint32{0}}, nil, 1, []uint32{0xFFFC}},
+		{"vendor attribute listed, unanswered", listingServer{attrs: []uint32{0, 0xFFF10001}, answers: []uint32{0}, featureMap: uint32(0)}, nil, 1, []uint32{0xFFF10001}},
+		{"vendor attribute answered", listingServer{attrs: []uint32{0, 0xFFF10001}, answers: []uint32{0, 0xFFF10001}, featureMap: uint32(0)}, nil, 0, nil},
 	} {
 		r := &recorder{TB: t}
 		missing := endpointtest.AssertClusterServerContract(r, c.srv, c.tolerate...)

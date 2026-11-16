@@ -18,8 +18,11 @@ import (
 // answers a read ok (MatterRead, or MatterReadFiltered for a
 // [contract.FabricScopedReader]); every attribute MatterReportable names is
 // one it lists; FeatureMap, when answered, is a uint32 and ClusterRevision a
-// uint16. The global attributes the dispatcher answers itself (AttributeList
-// and the two command lists) are not read.
+// uint16. The three global lists the dispatcher answers itself
+// (AttributeList, AcceptedCommandList, GeneratedCommandList) are not read;
+// every other listed attribute is — FeatureMap and ClusterRevision, which
+// the dispatcher reads from srv, and a manufacturer-specific attribute
+// included.
 //
 // tolerate lists the listed attributes srv knowingly answers no read of; a
 // tolerated attribute that answers fails tb too, so the list cannot outlive
@@ -50,7 +53,7 @@ func AssertClusterServerContract(tb testing.TB, srv contract.ClusterServer, tole
 	}
 	var unanswered []uint32
 	for _, attr := range listed {
-		if attr >= cluster.AttrGlobalGeneratedCommandList {
+		if dispatcherAnswered(attr) {
 			continue
 		}
 		if answersRead(srv, attr) {
@@ -77,4 +80,15 @@ func answersRead(srv contract.ClusterServer, attr uint32) bool {
 	}
 	_, ok := srv.MatterRead(attr)
 	return ok
+}
+
+// dispatcherAnswered reports whether the dispatcher answers a read of the
+// global attribute attr itself when the server lists it: the attribute
+// list and the two command lists, built from the server's listers.
+func dispatcherAnswered(attr uint32) bool {
+	switch attr {
+	case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
+		return true
+	}
+	return false
 }
