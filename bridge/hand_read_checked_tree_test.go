@@ -28,12 +28,14 @@ func TestHandReadRequestIgnoresAnUnknownContainerField(t *testing.T) {
 		inner     func(enc *tlv.Encoder)
 	}{
 		{
-			"UpdateFabricLabel", im.ConcreteCommandPath{Cluster: 0x003E, Command: 0x09, HasCluster: true, HasCommand: true},
+			"UpdateFabricLabel",
+			im.ConcreteCommandPath{Cluster: 0x003E, Command: 0x09, HasCluster: true, HasCommand: true},
 			func(enc *tlv.Encoder) { enc.PutUTF8(tlv.ContextTag(0), "ok") },
 			5, func(enc *tlv.Encoder) { enc.PutUTF8(tlv.ContextTag(0), long) },
 		},
 		{
-			"ArmFailSafe", im.ConcreteCommandPath{Cluster: 0x0030, Command: 0x00, HasCluster: true, HasCommand: true},
+			"ArmFailSafe",
+			im.ConcreteCommandPath{Cluster: 0x0030, Command: 0x00, HasCluster: true, HasCommand: true},
 			func(enc *tlv.Encoder) {
 				enc.PutUint(tlv.ContextTag(0), 60)
 				enc.PutUint(tlv.ContextTag(1), 1)
@@ -44,7 +46,8 @@ func TestHandReadRequestIgnoresAnUnknownContainerField(t *testing.T) {
 			},
 		},
 		{
-			"RemoveFabric", im.ConcreteCommandPath{Cluster: 0x003E, Command: 0x0A, HasCluster: true, HasCommand: true},
+			"RemoveFabric",
+			im.ConcreteCommandPath{Cluster: 0x003E, Command: 0x0A, HasCluster: true, HasCommand: true},
 			func(enc *tlv.Encoder) { enc.PutUint(tlv.ContextTag(0), 1) },
 			9, func(enc *tlv.Encoder) { enc.PutUint(tlv.ContextTag(0), 0) },
 		},
