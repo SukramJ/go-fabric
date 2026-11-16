@@ -202,6 +202,11 @@ type Server struct {
 	// (write_window.go).
 	holder *writeCommit
 	free   chan struct{}
+
+	// storedForTests and leftForTests, nil in production, let this
+	// package's tests stop a Set between its store and its notification
+	// and a write between leaving its window and advancing the version.
+	storedForTests, leftForTests func()
 }
 
 // Compile-time assertions.
@@ -439,6 +444,9 @@ func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any
 		return s.writeIn(context.WithValue(ctx, commitKey{}, c), attrID, value, c)
 	}()
 	settled = true
+	if s.leftForTests != nil {
+		s.leftForTests()
+	}
 	// What a Set inside the window changed is told now, after the window
 	// is released and the version advanced, so a listener that writes the
 	// server again does not wait for the window it was told from.
@@ -510,8 +518,12 @@ func (s *Server) writeIn(ctx context.Context, attrID uint32, value any, own *wri
 	// once the window is released. A joined write's store adds to the
 	// open commit instead ([Server.storeWith]).
 	if own == nil {
+		// A joined write's store: while the commit it joined is open,
+		// its notification joins that commit's ([Server.storeWith]).
 		all, notify := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil)
-		s.emit(notify)
+		if notify != nil {
+			notify()
+		}
 		return all, true, nil
 	}
 	s.mu.Lock()
@@ -698,25 +710,13 @@ func defaultOf(t Type, d any) (any, bool) {
 // ([Server.storeWith] without an earlier list).
 func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
 	all, notify := s.storeWith(origin, values, nil)
-	s.emit(notify)
+	if s.storedForTests != nil {
+		s.storedForTests()
+	}
+	if notify != nil {
+		notify()
+	}
 	return all
-}
-
-// emit tells a store's change to the listeners: at once, or — while a
-// controller write's commit is open — once that write left its window,
-// after the version advanced ([writeCommit]).
-func (s *Server) emit(notify func()) {
-	if notify == nil {
-		return
-	}
-	s.mu.Lock()
-	if open := s.commit; open != nil {
-		open.notifies = append(open.notifies, notify)
-		s.mu.Unlock()
-		return
-	}
-	s.mu.Unlock()
-	notify()
 }
 
 // storeWith is store for a commit whose list already holds earlier, the
@@ -732,6 +732,13 @@ func (s *Server) emit(notify func()) {
 // db021da0). A change of a quieter attribute goes to the change listeners
 // at once and to the report listeners when its throttle emits
 // ([Server.quietReport]); every other change is reported at once.
+//
+// notify tells the change; nil when nothing changed, or when a commit is
+// open: then the notification joins that commit's, in the same hold of
+// s.mu that adds the change to it, and is told once the write left its
+// window, after the version advanced. Decided later, a commit that closed
+// between the store and the notification would let a notification out
+// before the advance the commit makes for this change.
 func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32) (all []uint32, notify func()) {
 	type quietChange struct {
 		qa              *quietAttr
@@ -759,9 +766,32 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 		}
 		plain = append(plain, id)
 	}
+	slices.Sort(changed)
+	slices.Sort(plain)
+	if len(changed) > 0 {
+		notify = func() {
+			if len(plain) == len(changed) {
+				s.AttributeChanges.NotifyFrom(origin, changed...)
+				return
+			}
+			s.AttributeChanges.ChangedFrom(origin, changed...)
+			if len(plain) > 0 {
+				s.AttributeChanges.ReportFrom(origin, plain...)
+			}
+			for _, id := range changed {
+				if c, ok := quiets[id]; ok {
+					c.qa.q.Changed(c.wasNull, c.isNull)
+				}
+			}
+		}
+	}
 	open := s.commit
 	if open != nil {
 		open.changed = append(append(open.changed, changed...), earlier...)
+		if notify != nil {
+			open.notifies = append(open.notifies, notify)
+			notify = nil
+		}
 	}
 	s.mu.Unlock()
 	all = slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(changed), earlier...))))
@@ -771,26 +801,7 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 	if len(all) > 0 && open == nil {
 		s.tracker().Bump()
 	}
-	if len(changed) == 0 {
-		return all, nil
-	}
-	slices.Sort(changed)
-	slices.Sort(plain)
-	return all, func() {
-		if len(plain) == len(changed) {
-			s.AttributeChanges.NotifyFrom(origin, changed...)
-			return
-		}
-		s.AttributeChanges.ChangedFrom(origin, changed...)
-		if len(plain) > 0 {
-			s.AttributeChanges.ReportFrom(origin, plain...)
-		}
-		for _, id := range changed {
-			if c, ok := quiets[id]; ok {
-				c.qa.q.Changed(c.wasNull, c.isNull)
-			}
-		}
-	}
+	return all, notify
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command
