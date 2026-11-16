@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9069,
+  "entry_points": 9064,
   "entry_packages": [
     ".",
     "bdx",
@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18800,
-    "reachable": 12624,
-    "whitelisted": 6176,
+    "total_exported": 18802,
+    "reachable": 12622,
+    "whitelisted": 6180,
     "unreachable": 0
   },
   "by_package": [],
@@ -37989,6 +37989,13 @@
     },
     {
       "package": "secure/aesccm",
+      "identifier": "TestSealAndOpenRefuseAnAADBeyondTheTwoByteLengthForm",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/aesccm/aad_bound_test.go",
+      "line": 17
+    },
+    {
+      "package": "secure/aesccm",
       "identifier": "TestSealDeterministicForFixedInput",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/aesccm/aesccm_test.go",
@@ -38549,6 +38556,20 @@
     },
     {
       "package": "secure/mattercert",
+      "identifier": "TestDecodeRefusesAFieldOfAnotherTypeOrWidth",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/decode_field_shape_test.go",
+      "line": 94
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestDecodeTakesWellFormedOptionalExtensions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/decode_field_shape_test.go",
+      "line": 206
+    },
+    {
+      "package": "secure/mattercert",
       "identifier": "TestDecode_IsICA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
@@ -38717,34 +38738,6 @@
     },
     {
       "package": "secure/mattercert",
-      "identifier": "TestStripSignature_ErrorWhenSignatureAbsent",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "secure/mattercert/strip_test.go",
-      "line": 37
-    },
-    {
-      "package": "secure/mattercert",
-      "identifier": "TestStripSignature_NonStructureTop",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "secure/mattercert/strip_test.go",
-      "line": 58
-    },
-    {
-      "package": "secure/mattercert",
-      "identifier": "TestStripSignature_RemovesSigField",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "secure/mattercert/strip_test.go",
-      "line": 13
-    },
-    {
-      "package": "secure/mattercert",
-      "identifier": "TestStripSignature_TruncatedInput",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "secure/mattercert/strip_test.go",
-      "line": 49
-    },
-    {
-      "package": "secure/mattercert",
       "identifier": "TestTBSToDER_AppleHomePairing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/tbs_der_apple_test.go",
@@ -38791,6 +38784,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/crypto_parity_matterjs_test.go",
       "line": 52
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestAllocateIDAtAFullTableEvictsInsideTheFabricHoldingTheMost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_exhaustion_test.go",
+      "line": 75
     },
     {
       "package": "secure/operational",
@@ -39420,7 +39420,7 @@
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "secure/sigma/sigma.go",
-      "line": 437
+      "line": 441
     },
     {
       "package": "secure/sigma",
@@ -39470,6 +39470,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/zeroise_test.go",
       "line": 176
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestInitiatorRefusesASigma2WithoutAResumptionID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/decode_shape_test.go",
+      "line": 178
     },
     {
       "package": "secure/sigma",
@@ -39589,6 +39596,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_tlv_test.go",
       "line": 18
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiatorIgnoresAResumptionRecordOfTheWrongShape",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_record_shape_test.go",
+      "line": 99
     },
     {
       "package": "secure/sigma",
@@ -39837,6 +39851,13 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestResumeRecordOfTheWrongShapeIsAMiss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_record_shape_test.go",
+      "line": 54
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestResumptionKeysOverwritten",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/zeroise_test.go",
@@ -39970,6 +39991,13 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestSigmaDecodersRefuseANonStructureTopLevel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/decode_shape_test.go",
+      "line": 59
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestSigmaDecodersRefuseWrongFieldLengths",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/decoder_lengths_test.go",
@@ -40079,6 +40107,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
       "line": 293
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestTBE2RefusesAMissingOrMalformedMandatoryField",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/decode_shape_test.go",
+      "line": 104
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestTBE3RefusesAMissingOrMalformedMandatoryField",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/decode_shape_test.go",
+      "line": 148
     },
     {
       "package": "secure/sigma",
@@ -40474,6 +40516,13 @@
     },
     {
       "package": "secure/spake2",
+      "identifier": "TestPake2OutputYIsTheCallersCopy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/caller_trust_test.go",
+      "line": 16
+    },
+    {
+      "package": "secure/spake2",
       "identifier": "TestParityMatterJS_Spake2_Vectors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/parity_matterjs_test.go",
@@ -40492,6 +40541,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/spake2_test.go",
       "line": 140
+    },
+    {
+      "package": "secure/spake2",
+      "identifier": "TestProcessPake1RefusesAVerifierContextThatDoesNotFit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/caller_trust_test.go",
+      "line": 53
     },
     {
       "package": "secure/spake2",

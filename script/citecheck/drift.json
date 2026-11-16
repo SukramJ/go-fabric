@@ -3357,7 +3357,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 278,
+    "line": 280,
     "citation": "NodeSession.ts:437",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "logNew",
@@ -3366,7 +3366,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 313,
+    "line": 315,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
