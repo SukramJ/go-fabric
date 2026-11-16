@@ -32,11 +32,20 @@ func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	s.mu.Lock()
 	prev, gen := s.st, s.setGen
 	s.mu.Unlock()
+	s.endsScene = false
 	err := s.invoke(ctx, cmdID, fields)
 	if err != nil {
 		s.rollback(prev, gen)
+		return nil, err
 	}
-	return nil, err
+	// The scene ends with the command's success, never before it: a
+	// command that fails afterwards keeps the scene with the rest of the
+	// state its rollback restores, as LevelControl's
+	// transitionAndInvalidate does (R2-P6-err-1404).
+	if s.endsScene {
+		s.invalidateScenes()
+	}
+	return nil, nil
 }
 
 // rollback restores the state a failed command started from — its mode
@@ -269,7 +278,7 @@ func (s *ColorControlServer) moveToSaturation(ctx context.Context, fields any) e
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setColorMode(ctx, ColorModeHueSaturation); err != nil {
 		return err
 	}
@@ -348,7 +357,7 @@ func (s *ColorControlServer) moveToHueAndSaturation(ctx context.Context, fields 
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setColorMode(ctx, ColorModeHueSaturation); err != nil {
 		return err
 	}
@@ -405,7 +414,7 @@ func (s *ColorControlServer) enhancedMoveToHueAndSaturation(ctx context.Context,
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setEnhancedColorMode(ctx, ColorModeEnhancedHueSaturation); err != nil {
 		return err
 	}
@@ -422,7 +431,7 @@ func (s *ColorControlServer) moveToColor(ctx context.Context, fields any) error 
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setColorMode(ctx, ColorModeXY); err != nil {
 		return err
 	}
@@ -621,7 +630,7 @@ func (s *ColorControlServer) colorLoopSet(ctx context.Context, fields any) error
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	changed := false
 	if err := s.update(ctx, func(st *colorState) {
 		if r.UpdateFlags&ccdef.UpdateFlagsUpdateDirection != 0 && st.loopDirection != uint8(r.Direction) {

@@ -363,6 +363,9 @@ type ColorControlServer struct {
 	veto   spec.WriteVeto
 	// cmd serialises the commands.
 	cmd sync.Mutex
+	// endsScene is set by a command, under cmd, that ends the current
+	// scene when it succeeds ([ColorControlServer.endScene]).
+	endsScene bool
 	// commit serialises the changes of the colour state, which reach it
 	// from commands and from transition steps.
 	commit sync.Mutex
@@ -894,3 +897,8 @@ func (s *ColorControlServer) invalidateScenes() {
 		r.sc.MakeAllFabricSceneInfoEntriesInvalid()
 	}
 }
+
+// endScene marks the running command as one that ends the current scene
+// once it succeeds ([ColorControlServer.MatterInvoke]). The caller holds
+// cmd.
+func (s *ColorControlServer) endScene() { s.endsScene = true }
