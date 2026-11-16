@@ -207,24 +207,32 @@ func TestFailureReportOfAnotherInitiatorKeepsTheHold(t *testing.T) {
 
 // TestPaseClaimIsReadUnderTheLock: a claim racing the release of the slot
 // reads the slot's holder under the bridge's lock — run under -race
-// (review II, R2-P6-sec-0304, round 2).
+// (review II, R2-P6-sec-0304, round 2). Each claimer released its own
+// claim before it claims again, so a claim finds the slot free or the
+// other's, never its own; once both are done the slot is free.
 func TestPaseClaimIsReadUnderTheLock(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
 	a, other := HandshakeKey{InitiatorNodeID: 1, ExchangeID: 1}, HandshakeKey{InitiatorNodeID: 2, ExchangeID: 2}
+	claimAndRelease := func(key HandshakeKey) {
+		if got := b.claimPase(key); got == paseClaimRepeated {
+			t.Errorf("claim %v found its own released claim in the slot", key)
+		}
+		runtime.Gosched()
+		b.releasePaseInFlight(key)
+	}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for range 20000 {
-			b.claimPase(a)
-			runtime.Gosched()
-			b.releasePaseInFlight(a)
+			claimAndRelease(a)
 		}
 	}()
 	for range 20000 {
-		b.claimPase(other)
-		runtime.Gosched()
-		b.releasePaseInFlight(other)
+		claimAndRelease(other)
 	}
 	<-done
+	if got := b.claimPase(a); got != paseClaimTaken {
+		t.Fatalf("claim after both released = %v, want the slot free (taken)", got)
+	}
 }
