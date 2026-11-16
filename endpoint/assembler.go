@@ -412,8 +412,30 @@ func (a *Assembler) restoredState(spec *Spec) *endpointState {
 
 // assignOrReuseID looks up the existing endpoint_id for sourceKey;
 // allocates a fresh one otherwise. Updates device_type either way so
-// a profile change in the model side migrates cleanly.
+// a profile change in the model side migrates cleanly. A number outside
+// [Record]'s range [2, 65534] is an error naming the key.
 func (a *Assembler) assignOrReuseID(ctx context.Context, scope string, sourceKey SourceKey, deviceType uint16) (uint16, error) {
+	id, err := a.lookupOrAssignID(ctx, scope, sourceKey, deviceType)
+	if err != nil {
+		return 0, err
+	}
+	// A Store's number is held to [Record]'s range: 0 and 1 would put a
+	// second root or Aggregator into the topology, 65535 is reserved
+	// (R2-P6-store-0448).
+	if id < recordIDMin || id > recordIDMax {
+		return 0, fmt.Errorf("endpoint: store answered endpoint id %d for %q, outside [%d, %d]", id, sourceKey.String(), recordIDMin, recordIDMax)
+	}
+	return id, nil
+}
+
+// recordIDMin and recordIDMax bound a stored [Record.EndpointID].
+const (
+	recordIDMin uint16 = 2
+	recordIDMax uint16 = 65534
+)
+
+// lookupOrAssignID is [Assembler.assignOrReuseID] before the range check.
+func (a *Assembler) lookupOrAssignID(ctx context.Context, scope string, sourceKey SourceKey, deviceType uint16) (uint16, error) {
 	rec, err := a.store.GetEndpoint(ctx, sourceKey)
 	switch {
 	case err == nil:
