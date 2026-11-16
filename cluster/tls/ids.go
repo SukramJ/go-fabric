@@ -15,25 +15,20 @@ type idAllocator struct {
 }
 
 // allocate returns the next free id; false when every id below maxID is
-// taken (chip's CHIP_ERROR_ENDPOINT_POOL_FULL, :175).
+// taken (chip's CHIP_ERROR_ENDPOINT_POOL_FULL, :175). It looks at each of
+// the maxID ids once, so it returns from any position — a position past
+// maxID, which only a damaged record holds, starts again at 0
+// (R2-P6-store-1119).
 func (a *idAllocator) allocate(taken func(id uint16) bool) (uint16, bool) {
-	start := a.next
-	looped := false
-	for {
-		if a.next == start {
-			if looped {
-				return 0, false
-			}
-			looped = true
-		}
-		if a.next == a.maxID {
+	for range int(a.maxID) {
+		if a.next >= a.maxID {
 			a.next = 0
 		}
-		if !taken(a.next) {
-			id := a.next
-			a.next++
+		id := a.next
+		a.next++
+		if !taken(id) {
 			return id, true
 		}
-		a.next++
 	}
+	return 0, false
 }
