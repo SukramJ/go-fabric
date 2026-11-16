@@ -27,8 +27,9 @@ type memStore struct {
 	table   map[uint8]map[uint16]store.GroupTableEntry
 	gcast   map[uint8]map[uint16]store.GroupcastGroup
 	failPut error
-	// failList makes ListFabrics fail.
+	// failList makes ListFabrics fail; failGet makes GetFabric fail.
 	failList bool
+	failGet  error
 	// meta is the matter_metadata counter table; failMeta / failMetaSet
 	// make its reads / writes fail.
 	meta        map[string]uint64
@@ -48,6 +49,9 @@ func newMemStore() *memStore {
 func (s *memStore) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.failGet != nil {
+		return store.FabricRecord{}, s.failGet
+	}
 	r, ok := s.fabrics[idx]
 	if !ok {
 		return store.FabricRecord{}, store.ErrFabricNotFound

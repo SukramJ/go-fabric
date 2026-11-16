@@ -31,9 +31,11 @@ type OrderedHandler func(buf []byte, src *net.UDPAddr, release func())
 // ports — alone in a stream may fill the whole backlog; when it is full, a
 // datagram of a source holding fewer queued datagrams than the largest
 // holder takes the place of that holder's newest, so the genuine peer
-// keeps at least a 1/(sources+1) share against flooding addresses. A
-// party that also forges the peer's source address is not held off, and
-// the shared budget of maxConcurrentDispatch is not per source.
+// keeps at least a 1/(sources+1) share against a few flooding addresses.
+// Not held off: a party that forges the peer's source address, and a
+// party that changes its source address per datagram — addresses cost it
+// nothing on the link, and 256 of them leave the peer one place, more
+// none. The shared budget of maxConcurrentDispatch is not per source.
 const maxOrderedBacklog = 256
 
 // ServeOrdered is [Listener.Serve] for a protocol whose datagrams fall into

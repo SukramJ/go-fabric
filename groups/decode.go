@@ -413,8 +413,8 @@ func (m *Manager) completeMessage(msg *Message, c candidate) error {
 // the group senders one key set serves — senders that left (removed or
 // re-commissioned nodes) keep their places until the key goes — so the
 // number is chosen from memory, not from a reference: a window is a
-// counter, a 32-bit bitmap and a map entry, so 256 senders cost a few
-// kilobytes per key. connectedhomeip's CHIP_CONFIG_MAX_GROUP_DATA_PEERS
+// counter, a 32-bit bitmap and a map entry, so 256 senders cost tens of
+// kilobytes per key at most. connectedhomeip's CHIP_CONFIG_MAX_GROUP_DATA_PEERS
 // (15, src/lib/core/CHIPConfig.h:832-834 at 6170af84) is the size of an
 // LRU cache that evicts, not a cap, and is not the source of this one.
 const maxGroupSendersPerKey = 256
