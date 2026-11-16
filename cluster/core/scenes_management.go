@@ -193,6 +193,10 @@ func (st *ScenesState) reportIfChanged(before string) {
 	}
 }
 
+// logger is the state's logger: the default one, as the state carries no
+// configuration of its own.
+func (st *ScenesState) logger() *slog.Logger { return slog.Default() }
+
 // scenesPending is a consequence waiting for the table to load. A keyed
 // one replaces the earlier one of the same key — a global scene's store,
 // which the next one overwrites whole — so repeated consequences while the
@@ -262,7 +266,7 @@ func (st *ScenesState) validTable(table []SceneEntry) []SceneEntry {
 		out = append(out, e)
 	}
 	if duplicates+beyond+cut > 0 {
-		slog.Default().Warn("core: ScenesManagement: stored scene table held to the rules",
+		st.logger().Warn("core: ScenesManagement: stored scene table held to the rules",
 			"duplicates_dropped", duplicates, "beyond_table_size_dropped", beyond, "names_cut", cut)
 	}
 	return out
@@ -442,8 +446,8 @@ func (st *ScenesState) changeKeyed(ctx context.Context, command bool, fabric uin
 
 // addOrReplace is matter.js #addOrReplaceSceneEntry, stored with the
 // change ([ScenesState.change]). Caller holds mu.
-func (st *ScenesState) addOrReplace(ctx context.Context, command bool, e SceneEntry, existing int) im.StatusCode {
-	return st.change(ctx, command, e.FabricIndex, func() (im.StatusCode, bool) {
+func (st *ScenesState) addOrReplace(ctx context.Context, e SceneEntry, existing int) im.StatusCode {
+	return st.change(ctx, true, e.FabricIndex, func() (im.StatusCode, bool) {
 		if existing == -1 {
 			if st.remainingCapacity(st.countFor(e.FabricIndex)) == 0 {
 				return im.StatusResourceExhausted, false
@@ -689,7 +693,7 @@ func (s *ScenesManagement) RecallGlobalScene(ctx context.Context, fabricIndex ui
 	// stored global scene would be missed (review II, R2-P6-store-1203).
 	if !st.ensureLoaded(ctx) {
 		st.mu.Unlock()
-		slog.Default().Warn("core: ScenesManagement: OnWithRecallGlobalScene recalls nothing: the scene table does not load",
+		st.logger().Warn("core: ScenesManagement: OnWithRecallGlobalScene recalls nothing: the scene table does not load",
 			"fabric", fabricIndex)
 		return
 	}
@@ -1086,7 +1090,7 @@ func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSc
 	st := s.cfg.State
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	resp.Status = st.addOrReplace(ctx, true, SceneEntry{
+	resp.Status = st.addOrReplace(ctx, SceneEntry{
 		FabricIndex: fabric, GroupID: req.GroupID, SceneID: req.SceneID, Name: name,
 		TransitionTime: req.TransitionTime, Values: values,
 	}, st.indexOf(fabric, req.GroupID, req.SceneID))
@@ -1177,7 +1181,7 @@ func (s *ScenesManagement) storeScene(ctx context.Context, fabric uint8, req Sce
 		entry = st.table[i]
 		entry.Values = values
 	}
-	resp.Status = st.addOrReplace(ctx, true, entry, i)
+	resp.Status = st.addOrReplace(ctx, entry, i)
 	if resp.Status == im.StatusSuccess {
 		st.activate(fabric, req.GroupID, req.SceneID)
 	}
@@ -1246,7 +1250,7 @@ func (s *ScenesManagement) copyScene(ctx context.Context, fabric uint8, req Copy
 		}
 		for _, e := range from {
 			e.GroupID = req.GroupTo
-			if status := st.addOrReplace(ctx, true, e, st.indexOf(fabric, req.GroupTo, e.SceneID)); status != im.StatusSuccess {
+			if status := st.addOrReplace(ctx, e, st.indexOf(fabric, req.GroupTo, e.SceneID)); status != im.StatusSuccess {
 				resp.Status = status
 				return resp
 			}
@@ -1265,6 +1269,6 @@ func (s *ScenesManagement) copyScene(ctx context.Context, fabric uint8, req Copy
 	}
 	e := st.table[i]
 	e.GroupID, e.SceneID = req.GroupTo, req.SceneTo
-	resp.Status = st.addOrReplace(ctx, true, e, st.indexOf(fabric, req.GroupTo, req.SceneTo))
+	resp.Status = st.addOrReplace(ctx, e, st.indexOf(fabric, req.GroupTo, req.SceneTo))
 	return resp
 }

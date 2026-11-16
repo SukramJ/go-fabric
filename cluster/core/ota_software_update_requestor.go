@@ -735,7 +735,8 @@ func (r *OTASoftwareUpdateRequestor) deferAnnouncementLocked(a otaAnnouncement) 
 			q = slices.Delete(q, i, i+1)
 		}
 	}
-	r.announcedDuringQuery = append(q, a)
+	r.announcedDuringQuery = q
+	r.announcedDuringQuery = append(r.announcedDuringQuery, a)
 }
 
 // announceOtaProvider mirrors announceOtaProvider (:376-420).
@@ -889,6 +890,11 @@ func (r *OTASoftwareUpdateRequestor) markActiveOtaProviderNoUpdate(ctx context.C
 // at db021da0). An update in progress keeps its provider location: the
 // apply it names is already under way.
 func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
+	r.fabricRemoved(context.Background(), fabricIndex)
+}
+
+// fabricRemoved is FabricRemoved with ctx for the store.
+func (r *OTASoftwareUpdateRequestor) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	r.mu.Lock()
 	kept := r.defaults[:0:0]
 	for _, d := range r.defaults {
@@ -910,14 +916,14 @@ func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
 		r.changed(otadef.AttrDefaultOtaProviders)
 	}
 	if activeChanged {
-		r.persist(context.Background())
+		r.persist(ctx)
 	}
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]:
 // [OTASoftwareUpdateRequestor.FabricRemoved].
-func (r *OTASoftwareUpdateRequestor) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
-	r.FabricRemoved(fabricIndex)
+func (r *OTASoftwareUpdateRequestor) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	r.fabricRemoved(ctx, fabricIndex)
 	return nil
 }
 

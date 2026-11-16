@@ -57,7 +57,7 @@ func TestTimeSyncRefusedStoreKeepsTheValue(t *testing.T) {
 // readFailingSettings is a settings store whose reads fail.
 type readFailingSettings struct{ tsSettings }
 
-func (*readFailingSettings) GetSetting(context.Context, string) (string, bool, error) {
+func (*readFailingSettings) GetSetting(context.Context, string) (value string, ok bool, err error) {
 	return "", false, errors.New("the store cannot read")
 }
 
