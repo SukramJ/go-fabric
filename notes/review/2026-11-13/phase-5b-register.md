@@ -271,7 +271,7 @@ open; the statements a read found to hold are not rows.
 | 5b-F Q4 | — | parity: a recorded divergence, by_design `BD-chip-DoorLock-RecordSource`, `c45bf3b3`, `6fd9fde6` | `cluster/lock` — matter.js leaves it open; connectedhomeip answers null for a record not made through Matter |
 | 5b-F Q5 | — | phase 6: the final status after a store refusal in commit phase one partly untraced (the notes pass left it out) | `node/nonvolatile.go` — matter.js rolls back on a refused store; `BD-Matter-NonVolatileWrite-StoredBeforeApplied`'s cites hold |
 | 5b-H H1 | — | fixed `1f9960ad` | `controller/client/network.go` — one SubscriptionAlive per subscription going live, as matter.js |
-| 5b-H H2 | — | held back until its fix merges (owner decision 25) — phase 5b | — |
+| 5b-H H2 | — | fixed `728b3881`, `1789ab2b`, `c0ea5ada`, `edf78232` (wave H); the bitmap range is `BD-Matter-SessionParameters-BitmapRange` | fable-read-5b-H.md H2: the PASE session-parameters strictness on the matter.js side (PaseMessages.ts:30-54) — three gaps (type, range, non-context tag) and three as matter.js; the same item as 5a-2 F2, 5a-3 F2 and 5a-4 F2 |
 | 5b-H H3 | — | fixed `abb0bc37`, `de9399ca` (owner decision 95); `BD-Matter-Subscription-ReportsOverlap` retired, the row `F-db021da0-36` closed | `bridge/subscribe.go` — one report in flight per subscription, delivered by its StatusResponse |
 | 5b-H H4 | — | fixed `45767cff` (the order of authority; no owner question) | `im` — a wrong-typed integer field in a request answers FAILURE |
 | 5b-H H5 | — | fixed `1e75c43f`; the row `F-db021da0-1` is closed (`26a09ab6`) | `bridge` — the peer's MAX_TCP_MESSAGE_SIZE bounds every send on the server stack |
@@ -288,8 +288,8 @@ open; the statements a read found to hold are not rows.
 | 5b-notes C-208 | — | fixed `a4a66b4f`, `04048195` | `notes/parity/pin-lifts.md` — awaitChunkStatusResponseWithin lives in bridge/receive_dispatch.go |
 | 5b-fctl F1, F2 | low | fixed `a5d7c360` | `internal/attestids` — the citations of the lenient half and the attributes' names at the pin |
 | 5b-fctl O2 | low | open: findings row `F-db021da0-49` | `internal/attestids` — the vendor and product id are read from a string-typed DN value only; matter.js reads the raw bytes (pre-existing, inferred) |
-| 5b-wire F-H2-a | — | held back until its fix merges (owner decision 25) — phase 5b | — |
-| 5b-wire H2-n | — | held back until its fix merges (owner decision 25) — phase 5b | — |
+| 5b-wire F-H2-a | low | fixed `c0ea5ada` (wave H round 2); the round-2 read: closed | fable-read-5b-wire.md: the session-parameters member was not required to be a structure on Sigma1 / Sigma2 / Sigma2_Resume (secure/sigma/sigma.go:342, initiator.go:579, :634); matter.js TlvObject.ts:206-207 refuses |
+| 5b-wire H2-n | — | fixed `c0ea5ada`, `0205380a` (wave H round 2) | fable-read-5b-wire.md, noticed outside H2: the Sigma messages' own uint16 session-id members were taken masked with no type check — sigma.go:325 (InitiatorSessionID), initiator.go:569, :631 (ResponderSessionID), against TlvField(2 or 3, TlvUInt16) (CaseMessages.ts:31, :43, :54) |
 | 5b-wire F-H2-b | low | parity: a recorded divergence, by_design `BD-Matter-SessionParameters-BitmapRange`, `edf78232` | `secure/sessionparams` — a SUPPORTED_TRANSPORTS value above 16 bits is refused as connectedhomeip |
 | 5b-wire F-H3-a | low | parity: a recorded divergence, by_design `BD-Matter-Subscription-ThirdFailureClosesEveryKind`, `13eb50a8` | `bridge/subscribe.go` — the third failed update closes for every kind; matter.js for the communication failures only |
 | 5b-wire F-H3-b | low | fixed `de9399ca` | `bridge/subscribe.go` — a StatusResponse wait over a connection is bounded at 35 s |
@@ -442,8 +442,8 @@ to two units has one row (F-db021da0-19 and -34: `port` and `peer`).
 | F-db021da0-41 | port | open | fixed `73236af5` with R2-P5-port-04; the row stands in the findings register at this file's head ("Not placed") |
 | R2-P1-sec-02 | port | open | fixed `37ea286f` with R2-P5-port-12 |
 | D-fabric-2 | port | open | fixed `2169fe97` with R2-P5-port-13 |
-| TM R6.2 | — | — | held back until its fix merges (owner decision 25) — phase 5b |
-| N3-net-4 | — | — | held back until its fix merges (owner decision 25) — phase 5b |
+| TM R6.2 | port | open | fixed `c83a59e6`, `0f3cd37a`, `06e2b7cc`, `ae8e501f`, `4b524acf`, `1fdd35f0`, `831fe9fc` (owner decisions 116, 117, 116a; brief-dcl-trust.md) |
+| N3-net-4 | port | open | fixed `c83a59e6`, `06e2b7cc`, `63c749c9`, `4b524acf`, `831fe9fc` (owner decisions 116, 116a) |
 | D-store-4 | port | open | fixed `c8c1f660` with R2-P5-apinode-11 and R2-P5-port-16 (one rule: a refused store answers FAILURE and applies nothing) |
 | R2-P4-imwrite-01 | peer | open | fixed `4fd600da`, `7548edee` (owner decision 115); the row `F-db021da0-29` is closed (`26a09ab6`) |
 | F-db021da0-1 | peer | open | fixed `1e75c43f` (wave H, owner decision 94) with R2-P5-peer-05; the row is closed (`26a09ab6`) |
@@ -467,10 +467,10 @@ placed here.
 | owner decision 95 | fixed `abb0bc37`; `BD-Matter-Subscription-ReportsOverlap` retired (`b475dfd3`), the row `F-db021da0-36` closed (`26a09ab6`) |
 | owner decision 96 | fixed `81ccebca` (the node option), `9722c8a0`, `414763b3` (the daemon's flow and TC-DD-3.12, 3.13 ported) |
 | owner decision 97 | fixed `8e45fd78`, `48b98ae4` |
-| 5a-2 F2 | held back until its fix merges (owner decision 25) — phase 5b |
-| 5a-3 F2 | held back until its fix merges (owner decision 25) — phase 5b |
-| 5a-4 F2 | held back until its fix merges (owner decision 25) — phase 5b |
-| N5-rw2-1 | held back until its fix merges (owner decision 25) — phase 5b |
+| 5a-2 F2 | fixed `728b3881`, `1789ab2b`, `edf78232` (wave H, H2) |
+| 5a-3 F2 | fixed with 5a-2 F2 (wave H, H2) |
+| 5a-4 F2 | fixed with 5a-2 F2 and `c0ea5ada` (wave H, H2 and its round 2) |
+| N5-rw2-1 | fixed `cb9717bd`, `9df8d5a5`, `712980cd` (wave H, H6) |
 
 ## The units' questions
 
@@ -599,7 +599,7 @@ The 240 findings, by their first disposition:
 | disposition | units | diff review | rework | reference reads | all |
 | --- | --- | --- | --- | --- | --- |
 | fixed in part | 3 | 0 | 0 | 1 | 4 |
-| fixed | 83 | 19 | 4 | 75 | 181 |
+| fixed | 83 | 19 | 4 | 78 | 184 |
 | a recorded divergence | 0 | 0 | 0 | 12 | 12 |
 | decided | 0 | 0 | 0 | 3 | 3 |
 | closed by a later run | 0 | 1 | 0 | 0 | 1 |
@@ -607,21 +607,21 @@ The 240 findings, by their first disposition:
 | not a finding | 0 | 0 | 1 | 0 | 1 |
 | open: a findings row | 1 | 0 | 0 | 9 | 10 |
 | open: phase 6 | 1 | 6 | 2 | 4 | 13 |
-| held back | 1 | 1 | 2 | 6 | 10 |
+| held back | 1 | 1 | 2 | 3 | 7 |
 | all | 90 | 29 | 9 | 112 | 240 |
 
 By the severity their rows carry — units: 12 medium, 71 low, 6 note, 1 held
 back; diff review: 2 medium, 13 low, 11 note, 2 info, 1 held back; rework: 1
 medium, 3 low, 1 note, 2 info, 2 held back; reference reads: 1 high, 14
-medium, 54 low, 9 info, 28 without one, 6 held back.
+medium, 55 low, 9 info, 30 without one, 3 held back.
 
-Of the 185 fixed or fixed in part: 16 were corrected by an item of a later
-read, 7 name a `by_design` entry and 23 a findings row.
+Of the 188 fixed or fixed in part: 16 were corrected by an item of a later
+read, 8 name a `by_design` entry and 23 a findings row.
 
 What earlier phases handed to phase 5b: 64 rows for the units' carried items —
-3 fixed in part, 53 fixed, 1 decided, 1 closed before this phase, 1 struck, 2
-open: phase 6, 3 held back; and 16 rows phase 5a's register placed in 5b — 9
-fixed, 3 open: phase 6, 4 held back.
+3 fixed in part, 55 fixed, 1 decided, 1 closed before this phase, 1 struck, 2
+open: phase 6, 1 held back; and 16 rows phase 5a's register placed in 5b — 13
+fixed, 3 open: phase 6.
 
 The units' questions: 30 rows, 10 answered by the owner and 20 by the
 coordinator. The owner's decisions of this phase: 16 rows (105 to 119 and
@@ -630,12 +630,15 @@ coordinator. The owner's decisions of this phase: 16 rows (105 to 119 and
 The 16 noticed items: 1 fixed in part, 5 fixed, 1 struck, 1 open: a findings
 row, 1 open: other, 7 open: phase 6. Unread: 13 rows, all phase 6.
 
-**Held back: 17 rows, all for phase 5b's pull request** — 10 findings
-(R2-P5-redact-01, DR5b-F-01, RW-i2, RW-i3, 5b-H H2, 5b-wire F-H2-a, 5b-wire
-H2-n, 5b-dcl F6, 5b-dcl R7+R8, 5b-dcl R9), 3 carried items (TM R6.2, N3-net-4,
-N4-frsec-1) and 4 rows phase 5a held back (5a-2 F2, 5a-3 F2, 5a-4 F2,
-N5-rw2-1). The rows phases 3 and 4 hold back for phase 6 stay in their files
-as they were.
+**Held back: 8 rows** — 3 fixed by phase 5b's pull request (#534) that are
+published with the release that carries their fix (owner decision 126):
+R2-P5-redact-01, DR5b-F-01 and the carried item N4-frsec-1; and 5 findings
+still open, for phase 6: RW-i2, RW-i3, 5b-dcl F6, 5b-dcl R7+R8, 5b-dcl R9.
+Nine rows held back until #534 merged are in the tables since 2026-11-16
+(owner decision 126): 5b-H H2, 5b-wire F-H2-a, 5b-wire H2-n, TM R6.2,
+N3-net-4, 5a-2 F2, 5a-3 F2, 5a-4 F2, N5-rw2-1; the counts above include them.
+The rows phases 3 and 4 hold back for phase 6 stay in their files as they
+were.
 
 ## Not placed, not verified
 

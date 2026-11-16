@@ -169,3 +169,20 @@ Wizard rounds during phase 5b (2026-11-15); 116a refines 116 after a read of the
 | 116a | Decision 116 refined (owner, after a Fable read of the CRL point's scheme at the pins) | **CRL distribution points: http or https** (the schema allows both, device-attestation-revocation.ts:98-101; matter.js and chip fetch http); the destination guard applies to both; OTA downloads named by the ledger stay https-only. **Under an environment proxy**: the proxy stays usable; destination URLs whose host is an IP of the five refused classes or `localhost` are refused before hand-over and on every redirect; host names behind a proxy are the proxy's to resolve — documented limit |
 | 118 | The controller's secrets at rest (review of the phase-5b diff) | **`controller.Config.Sealer` takes the same `store.Sealer` as `node.Store.Sealer`** (opt-in, off by default): the CA and the controller's fabric keys, the CASE resumption records, the group key sets and the registry's kept onboarding codes and ICD keys are sealed; a clear database is sealed on open, as a node's |
 | 119 | The "attested" vendor/product pair the commissioner records | **Recorded only when the DAC chain was verified against the trust store and no error finding was accepted**; otherwise the pair stays empty and one log line names the reason |
+
+## 2026-11-16, phase 6
+
+Wizard round 1 at the start of phase 6; the plan and the options were written
+by Fable. 120 and 122 depart from the recommended option, the others take it.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 120 | The cut of phase 6 | **Two halves**, each a fresh coordinator session and its own pull request: **6a = W1–W3** (the request path and the cluster servers), **6b = W4–W6** (client, controller, facade, guards). The recommended three parts were not taken. 6a runs two review workflows of at most eight agents at one HEAD, then one verify |
+| 121 | Who reads in the full pass | **Decision 89 as it stands**: Fable reads the eight security-path units in full and the rest through three reference overlays; Opus reads the other sixteen units in full; Fable confirms every high and medium |
+| 122 | What phase 6 fixes | **Everything confirmed**, as in phases 0–5 (not the recommended high/medium and local lows). A low that needs an exported API move, a new port or a schema change goes to the half's second wizard round before it is fixed |
+| 123 | Decision 13, never carried out | **A unit `cite` in 6b**: a script and Opus check every range at `db021da0`, Fable reads every citation that is the reason for behaviour (decision 90), and decision 13's guard ratchets the citations at another commit towards zero |
+| 124 | The sealed store before its first release | **All three in 6a**, one fix unit after the security unit's read: the journal hardening (5b-seal F4), a persistent sealed-database marker, `store.Reseal` (N5b-seal-1) |
+| 125 | The next release | **After 6b merges, before phase 7**; the nested modules and examples onto `GATTPeripheral` (decision 114) and the `wifi/wpasupplicant` require (decision 100) go into that release's pull request, not into phase 6 |
+| 126 | Held-back rows #534 fixed | **Nine now**, in a notes pull request at the start of 6a; **the three of the disclosure class** (R2-P5-redact-01, N4-frsec-1, DR5b-F-01) with the release that carries their fix |
+| 127 | The parity backlog | **Placed rows worked** (fixed or recorded as a divergence); every other open entry of `matter_behaviour_findings.md` gets one verdict line from the Fable overlay of its package (true at the pin, stale, or a `by_design` candidate), no fix |
+| 128 | Decision 17 larger than decided (N5b-afacade-1) | **Confirmed as built**: `device.New` refuses what matter.js's init validation refuses; the CHANGELOG names every type |
