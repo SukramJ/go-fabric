@@ -241,6 +241,7 @@ func (b *Bridge) bindSessionRoute(sid uint16, dst net.Addr) {
 	if sess != nil {
 		b.sessionRouteOwners.Store(sid, sess)
 	}
+	noteSessionTraffic(dst)
 	var closeConn *connRoute
 	if !loaded || prevAddr != dst {
 		if r, ok := dst.(*connRoute); ok && r != nil {
@@ -255,6 +256,27 @@ func (b *Bridge) bindSessionRoute(sid uint16, dst net.Addr) {
 	}
 	b.routeBindMu.Unlock()
 	b.closeConnRoute(closeConn)
+}
+
+// sessionTrafficNoter is the capability of a connection whose listener
+// measures idleness by the host's notes of session traffic
+// (transport/tcp Conn.NoteSessionTraffic).
+type sessionTrafficNoter interface {
+	NoteSessionTraffic()
+}
+
+// noteSessionTraffic tells the connection behind route, when it takes the
+// note, that it just carried a secure session's message: every
+// authenticated message with a new counter binds its session's route
+// ([Bridge.bindSessionRoute]), and so does a session's establishment. The
+// TCP listener then keeps the connection's place at its bound by these
+// messages, not by any frame a peer sends (review II, N3-finnet-4).
+func noteSessionTraffic(route net.Addr) {
+	if r, ok := route.(*connRoute); ok && r != nil {
+		if n, ok := r.conn.(sessionTrafficNoter); ok {
+			n.NoteSessionTraffic()
+		}
+	}
 }
 
 // unbindSessionRoute forgets the route of secure session sid, which is

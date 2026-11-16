@@ -86,6 +86,11 @@ type Conn struct {
 	now         func() time.Duration
 	traffic     atomic.Bool
 	lastTraffic atomic.Int64
+	// sessionNoted is set by the first [Conn.NoteSessionTraffic];
+	// lastSession is the reading of the latest one. Once it is set, the
+	// listener measures the connection's idleness by lastSession alone.
+	sessionNoted atomic.Bool
+	lastSession  atomic.Int64
 
 	recoveredPanics *panicCounter
 }
@@ -172,9 +177,30 @@ func (c *Conn) markTraffic() {
 	c.traffic.Store(true)
 }
 
-// idleSince is the reading of the connection's last message received or
-// sent, and false when it carried none.
+// NoteSessionTraffic tells the accepting listener that the connection just
+// carried a message of a secure session — one the host authenticated. From
+// the first note on, the listener measures how long the connection has
+// been idle by these notes alone, not by every frame: a connection that
+// carries a session keeps its place at the total bound
+// ([MaxInboundConnections]) while its sessions carry messages within
+// [idleGrace], and a peer cannot keep it by sending any frame now and then.
+// A connection never noted keeps the measure of every message it received
+// or sent. A no-op on a dialed connection. Review II, N3-finnet-4.
+func (c *Conn) NoteSessionTraffic() {
+	if c.now == nil {
+		return
+	}
+	c.lastSession.Store(int64(c.now()))
+	c.sessionNoted.Store(true)
+}
+
+// idleSince is the reading of the connection's last session message
+// ([Conn.NoteSessionTraffic]) once one was noted, else of its last message
+// received or sent; false when it carried none.
 func (c *Conn) idleSince() (time.Duration, bool) {
+	if c.sessionNoted.Load() {
+		return time.Duration(c.lastSession.Load()), true
+	}
 	if !c.traffic.Load() {
 		return 0, false
 	}
