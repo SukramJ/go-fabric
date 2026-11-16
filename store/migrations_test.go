@@ -429,7 +429,7 @@ func TestMigrationV11KeepsKeyMapRows(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var out []uint16
+		out := make([]uint16, 0, len(maps))
 		for _, m := range maps {
 			out = append(out, m.GroupID)
 		}

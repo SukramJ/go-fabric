@@ -65,6 +65,9 @@ func (s *Store) UpsertIdentity(ctx context.Context, rec IdentityRecord) error {
 	if s.sealer != nil {
 		return s.inTx(ctx, "upsert identity", func(tx *sql.Tx) error { return s.upsertSealedIdentity(ctx, tx, rec) })
 	}
+	if err := s.refuseClearSecretWrite(ctx, s.db); err != nil {
+		return fmt.Errorf("store: upsert identity: %w", err)
+	}
 	res, err := s.db.ExecContext(
 		ctx, `
 INSERT INTO matter_node_identities

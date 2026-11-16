@@ -15,7 +15,7 @@ import (
 // resumptionRecordID is a resumption id distinct for each (fabric, peer).
 func resumptionRecordID(f uint8, peer uint64) store.ResumptionRecord {
 	rec := resumptionRec(f, peer, 0)
-	rec.ResumptionID[0], rec.ResumptionID[1], rec.ResumptionID[2] = f, byte(peer), byte(peer>>8)
+	rec.ResumptionID[0], rec.ResumptionID[1], rec.ResumptionID[2] = f, byte(peer&0xff), byte(peer>>8&0xff)
 	return rec
 }
 

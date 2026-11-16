@@ -385,8 +385,8 @@ func TestNewSealedSealsAClearDatabase(t *testing.T) {
 		}
 	}
 	var settings int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_settings WHERE sealed = 1`).Scan(&settings); err != nil || settings != 4 {
-		t.Errorf("sealed settings = %d, %v; want the Wi-Fi networks, the DoorLock key, the ICD key and the joint fabric record", settings, err)
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_settings WHERE sealed = 1`).Scan(&settings); err != nil || settings != 5 {
+		t.Errorf("sealed settings = %d, %v; want the Wi-Fi networks, the DoorLock key, the ICD key, the joint fabric record and the seal canary", settings, err)
 	}
 	// The pending update reads back and rolls back under the sealer.
 	if id, err := s.GetIdentity(ctx, w.fabric); err != nil || !bytes.Equal(id.PrivateKey, w.secrets["key 4"]) {
@@ -419,25 +419,26 @@ func TestNewSealedSealsAClearDatabase(t *testing.T) {
 		t.Error("a second NewSealed sealed a sealed key again")
 	}
 
-	// A clear row a Store without the sealer adds is refused by the sealed
-	// store and sealed by the next NewSealed.
+	// The database carries the seal canary now: a Store without the sealer
+	// writes no clear row into it (decision 130), a clear row planted in
+	// the file is refused by the sealed store and by the next NewSealed,
+	// which does not adopt it.
 	added := randomSecret(16)
-	if err := unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: w.fabric, GroupKeySetID: 2, EpochKey0: added, EpochStart0: 1}); err != nil {
+	if err := unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: w.fabric, GroupKeySetID: 2, EpochKey0: added, EpochStart0: 1}); !errors.Is(err, store.ErrNoSealer) {
+		t.Fatalf("a clear key set into the sealed database = %v, want ErrNoSealer", err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_group_keys (fabric_index, group_key_set_id, security_policy, epoch_key_0, epoch_start_0) VALUES (?, 2, 0, ?, 1)`, w.fabric, added); err != nil {
 		t.Fatal(err)
 	}
 	if ks, err := s.GetGroupKeySet(ctx, w.fabric, 2); !errors.Is(err, store.ErrUnseal) {
 		t.Errorf("a clear row under the sealer = %x, %v; want ErrUnseal", ks.EpochKey0, err)
 	}
-	next, err := store.NewSealed(ctx, db, testSealer(t, 3))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ks, err := next.GetGroupKeySet(ctx, w.fabric, 2); err != nil || !bytes.Equal(ks.EpochKey0, added) {
-		t.Errorf("the row after the next NewSealed = %x, %v", ks.EpochKey0, err)
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 3)); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("the next NewSealed over the planted row = %v, want ErrUnseal", err)
 	}
 	var n int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_group_keys WHERE sealed = 0`).Scan(&n); err != nil || n != 0 {
-		t.Errorf("clear key sets after the next NewSealed: %d, %v", n, err)
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_group_keys WHERE sealed = 0`).Scan(&n); err != nil || n != 1 {
+		t.Errorf("clear key sets after the refused NewSealed: %d, %v; want the planted one, as it was", n, err)
 	}
 }
 
@@ -708,10 +709,14 @@ func TestSealedStoreRefusesClearRows(t *testing.T) {
 		t.Errorf("GetSetting of a flipped mark = %q, %v; want ErrUnseal", v, err)
 	}
 
-	// Planted clear rows: a store without the sealer writes them.
+	// Planted clear rows: the seal canary deleted from the file (not tamper
+	// protection, decision 130), a store without the sealer writes them.
 	other := openTestDB(t)
 	sealed := sealedOver(t, other)
 	pw := writeSecrets(t, sealed)
+	if _, err := other.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, store.SettingSealCanary); err != nil {
+		t.Fatal(err)
+	}
 	unsealed := store.New(other)
 	for name, err := range map[string]error{
 		"UpsertGroupKeySet": unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: pw.fabric, GroupKeySetID: 1, EpochKey0: randomSecret(16), EpochStart0: 1}),
@@ -989,7 +994,7 @@ func TestNewSealedChecksTheKey(t *testing.T) {
 	if err := s.SetSetting(ctx, store.SettingICDKey, "k"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.New(db).SetSetting(ctx, "netcomm.wifi.networks", "[]"); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_settings (key, value, sealed) VALUES ('netcomm.wifi.networks', '[]', 0)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.NewSealed(ctx, db, testSealer(t, 2)); !errors.Is(err, store.ErrUnseal) {

@@ -6,11 +6,12 @@ package storetest
 
 import (
 	"context"
-	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -33,9 +34,12 @@ func fabricsAddBesideWriter(ctx context.Context, t *testing.T, p store.Port) {
 				return
 			default:
 			}
-			if err := p.SetSetting(ctx, "writer", fmt.Sprint(i)); err == nil {
+			if err := p.SetSetting(ctx, "writer", strconv.Itoa(i)); err == nil {
 				writes.Add(1)
 			}
+			// A pause, so the writer does not starve the AddFabric calls
+			// past their busy timeout: the case is about the lock upgrade.
+			time.Sleep(200 * time.Microsecond)
 		}
 	}()
 	failed := 0
@@ -67,7 +71,7 @@ func fabricsAddBesideWriter(ctx context.Context, t *testing.T, p store.Port) {
 func doorLocksConcurrent(ctx context.Context, t *testing.T, p store.Port) {
 	set := func(n byte) store.DoorLockAuth {
 		return store.DoorLockAuth{
-			Users:            []store.DoorLockUser{{UserIndex: uint16(n), UserName: fmt.Sprint(n), UserStatus: 1, Credentials: []store.DoorLockCredentialRef{{Type: 1, Index: uint16(n)}}}},
+			Users:            []store.DoorLockUser{{UserIndex: uint16(n), UserName: strconv.Itoa(int(n)), UserStatus: 1, Credentials: []store.DoorLockCredentialRef{{Type: 1, Index: uint16(n)}}}},
 			Credentials:      []store.DoorLockCredential{{Type: 1, Index: uint16(n), Data: []byte{n}}},
 			WeekDaySchedules: []store.DoorLockWeekDaySchedule{{WeekDayIndex: 1, UserIndex: uint16(n), DaysMask: n}},
 			YearDaySchedules: []store.DoorLockYearDaySchedule{{YearDayIndex: 1, UserIndex: uint16(n), LocalStartTime: uint32(n), LocalEndTime: uint32(n) + 1}},

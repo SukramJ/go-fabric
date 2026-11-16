@@ -46,6 +46,9 @@ func (s *Store) UpsertGroupKeySet(ctx context.Context, rec GroupKeySet) error {
 	if err != nil {
 		return fmt.Errorf("store: upsert group key set: %w", err)
 	}
+	if err := s.refuseClearSecretWrite(ctx, s.db); err != nil {
+		return fmt.Errorf("store: upsert group key set: %w", err)
+	}
 	var keys [3][]byte
 	for i, k := range [3][]byte{rec.EpochKey0, rec.EpochKey1, rec.EpochKey2} {
 		var err error

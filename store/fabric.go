@@ -446,6 +446,8 @@ WHERE fabric_index = ? AND pending = ?`, FabricPendingUpdate, fabricIndex, Fabri
 		if err := s.updateSealedCredentials(ctx, tx, fabricIndex, marked > 0, c); err != nil {
 			return err
 		}
+	} else if err := s.refuseClearSecretWrite(ctx, tx); err != nil {
+		return fmt.Errorf("store: update fabric credentials: %w", err)
 	} else if err := s.updateClearCredentials(ctx, tx, fabricIndex, marked > 0, c); err != nil {
 		return err
 	}

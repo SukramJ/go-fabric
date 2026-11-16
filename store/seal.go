@@ -25,7 +25,7 @@ import (
 // fabric's IPK or a resumption secret overwritten an hour ago is still in
 // the file; a key kept in the same file would be in every copy beside the
 // values it seals. [AESGCMSealer] is a correct default; how the key is
-// provisioned and rotated is the host's (the store rotates nothing).
+// provisioned is the host's, and [Reseal] moves a database to a new key.
 //
 // Seal and Open are called with the same aad for one value: the table, the
 // column and the row's key, so a sealed value moved to another row or
@@ -123,33 +123,42 @@ func (a *AESGCMSealer) Open(sealed, aad []byte) ([]byte, error) {
 // same row, written back, opens — there is no tamper or rollback
 // detection.
 //
-// db must carry schema v10 ([Apply] or [Migrations]). NewSealed first
-// opens one sealed value the database already holds (the first sealed
-// identity, else another sealed row or setting): a sealer under another
-// key — or that value changed outside the store — fails NewSealed with
-// [ErrUnseal] before anything is written; a database with no sealed value
-// opens. Before NewSealed returns it seals every row it finds in clear — a database a Store
-// without a sealer wrote — in one transaction, so a failure (a value that
-// does not open, a Seal error) leaves the database as it was; then it
-// rewrites the file and empties the -wal ([Scrub]), so the clear values do
-// not stay behind in free pages — measured in WAL mode, in the rollback
-// journal's DELETE (SQLite's default), TRUNCATE and PERSIST modes and under
-// locking_mode EXCLUSIVE, whose kept -journal Scrub truncates; copies taken
-// before the upgrade keep the clear values. A scrub that does not finish is
-// [ErrScrubIncomplete], and the next NewSealed tries again. A database
-// with no clear row is not written to.
+// db must carry schema v10 ([Apply] or [Migrations]).
 //
-// After that, while the store is open, it is strict: it writes no secret
-// in clear, and a secret row it reads without the seal mark — one whose
-// mark was edited, or a clear row planted or written by a Store without
-// the sealer — is refused with [ErrUnseal], never read as the secret. A
-// later NewSealed adopts every clear row it finds: it cannot tell such a
-// row from one a Store without a sealer wrote, and seals it. Every Store of one
-// database needs the sealer; a concurrent writer without it on the same
-// database is not supported. A Store without the sealer reads a sealed
-// value as [ErrNoSealer] and refuses a write that would leave a sealed row
-// half clear. Migration v10's Down refuses a database that holds a sealed
-// row.
+// The seal canary. The first NewSealed marks the database with one: a reserved
+// matter_settings row holds a known value sealed under s. Every later
+// NewSealed opens the canary first, so a sealer under another key fails with
+// [ErrUnseal] before anything is written — whether or not the database
+// holds a secret yet — and a database that carries the canary has a secret
+// row in clear refused with ErrUnseal instead of adopted. A Store without
+// a sealer ([New]) refuses to write a secret into a database that carries it
+// ([ErrNoSealer]). The canary is not tamper protection: whoever can write the
+// file can delete the row, and the database then counts as never sealed.
+// [Store.Erase] drops it with every other row — a factory reset is the way
+// back to a database without one — and [Reseal] moves it to a new sealer.
+//
+// The first NewSealed (no canary yet) checks the key on one sealed value the
+// database already holds, if any (the first sealed identity, else another
+// sealed row or setting), then seals every row it finds in clear — a
+// database a Store without a sealer wrote — and writes the canary, in one
+// transaction, so a failure (a value that does not open, a Seal error)
+// leaves the database as it was; then it rewrites the file and empties the
+// -wal ([Scrub]), so the clear values do not stay behind in free pages —
+// measured in WAL mode, in the rollback journal's DELETE (SQLite's default),
+// TRUNCATE and PERSIST modes and under locking_mode EXCLUSIVE, whose kept
+// -journal Scrub truncates; copies taken before the upgrade keep the clear
+// values. A scrub that does not finish (a full disk, a reader holding the
+// -wal) does not fail NewSealed: the rows are sealed, the Store is
+// returned, the scrub stays owed ([Store.ScrubOwed]) and every later
+// NewSealed tries it again.
+//
+// While the store is open it is strict: it writes no secret in clear, and
+// a secret row it reads without the seal mark — one whose mark was edited,
+// or a clear row planted — is refused with [ErrUnseal], never read as the
+// secret. Every Store of one database needs the sealer; a concurrent
+// writer without it on the same database is not supported. A Store without
+// the sealer reads a sealed value as [ErrNoSealer]. Migration v10's Down
+// refuses a database that holds a sealed row.
 func NewSealed(ctx context.Context, db *sql.DB, s Sealer) (*Store, error) {
 	if s == nil {
 		return nil, errors.New("store: NewSealed: nil Sealer")
@@ -163,9 +172,10 @@ func NewSealed(ctx context.Context, db *sql.DB, s Sealer) (*Store, error) {
 
 var (
 	// ErrNoSealer is a sealed secret a Store without a sealer read, or a
-	// write it refused because the row is sealed. The database was sealed
-	// by [NewSealed]: the host opens its store with NewSealed and the same
-	// sealer; there is no way back to a clear database.
+	// write it refused because the row is sealed or the database carries
+	// the seal canary. The database was sealed by [NewSealed]: the host
+	// opens its store with NewSealed and the same sealer; the way back to a
+	// clear database is a factory reset ([Store.Erase]).
 	ErrNoSealer = errors.New("store: the value is sealed and the store has no sealer (store.NewSealed)")
 	// ErrUnseal is a secret a sealed Store could not open: the sealer's key
 	// is not the one the value was sealed under, the value was moved from
@@ -395,15 +405,169 @@ var secretTables = []secretColumns{
 }
 
 // metadataKeySealScrubOwed marks a sealing whose [Scrub] has not finished:
-// set in the sealing's transaction, deleted once the scrub ran.
+// set in the sealing's (or [Reseal]'s) transaction, deleted once the scrub
+// ran ([Store.ScrubOwed]).
 const metadataKeySealScrubOwed = "store.seal_scrub_owed"
 
-// sealClearRows is [NewSealed]'s upgrade: every clear row sealed in one
-// transaction, then the scrub that removes the clear values' old pages.
+// settingSealCanary is the reserved matter_settings row that marks a
+// sealed database, the seal canary (decision 130): one known value sealed under the
+// sealer, with the aad of a setting of this key. The first [NewSealed]
+// writes it, NewSealed opens it first, [Reseal] moves it last, [Store.Erase]
+// drops it with every other row. The Settings methods do not write or
+// delete it.
+const settingSealCanary = "store.seal_canary"
+
+// sealCanaryPlain is the canary's value before sealing.
+var sealCanaryPlain = []byte("go-fabric/store/seal/canary/v1")
+
+// readCanary reads the seal canary on q: present is false on a database
+// without it.
+func readCanary(ctx context.Context, q sqlExecQuerier) (stored string, sealed, present bool, err error) {
+	err = q.QueryRowContext(ctx, `SELECT value, sealed FROM matter_settings WHERE key = ?`, settingSealCanary).Scan(&stored, &sealed)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, false, nil
+	}
+	if err != nil {
+		return "", false, false, fmt.Errorf("read the seal canary: %w", err)
+	}
+	return stored, sealed, true, nil
+}
+
+// openCanary opens the canary under the store's sealer: a canary not
+// sealed, one that does not open and one whose value is not the canary's are
+// [ErrUnseal].
+func (s *Store) openCanary(stored string, sealed bool) error {
+	if !sealed {
+		return fmt.Errorf("%w: the seal canary is not sealed", ErrUnseal)
+	}
+	plain, err := s.openSetting(settingSealCanary, stored, true)
+	if err != nil {
+		return err
+	}
+	if plain != string(sealCanaryPlain) {
+		return fmt.Errorf("%w: the seal canary holds another value", ErrUnseal)
+	}
+	return nil
+}
+
+// writeCanary writes the canary sealed under the store's sealer on tx.
+func (s *Store) writeCanary(ctx context.Context, tx *sql.Tx) error {
+	out, err := s.sealColumn(sealCanaryPlain, "matter_settings", "value", settingSealCanary)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_settings (key, value, sealed) VALUES (?, ?, 1)`,
+		settingSealCanary, base64.StdEncoding.EncodeToString(out)); err != nil {
+		return fmt.Errorf("write the seal canary: %w", err)
+	}
+	return nil
+}
+
+// refuseClearSecretWrite is the check a Store without a sealer makes on q
+// before it writes a secret in clear: a database that carries the canary
+// refuses it with [ErrNoSealer]. A Store with a sealer passes.
+func (s *Store) refuseClearSecretWrite(ctx context.Context, q sqlExecQuerier) error {
+	if s.sealer != nil {
+		return nil
+	}
+	_, _, marked, err := readCanary(ctx, q)
+	if err != nil {
+		return err
+	}
+	if marked {
+		return fmt.Errorf("%w: the database is sealed", ErrNoSealer)
+	}
+	return nil
+}
+
+// clearSecretTable names the first table of secretTables that holds a
+// secret row without the seal mark — a matter_settings row only for a key
+// [isSealedSetting] names — or "" when none does.
+func clearSecretTable(ctx context.Context, q interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+},
+) (string, error) {
+	for _, t := range secretTables {
+		if t.form != sealSettingText {
+			var one int
+			err := q.QueryRowContext(ctx, `SELECT 1 FROM `+t.table+` WHERE sealed = 0 LIMIT 1`).Scan(&one) //nolint:gosec // the package's constants
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return "", fmt.Errorf("inspect %s: %w", t.table, err)
+			}
+			return t.table, nil
+		}
+		rows, err := q.QueryContext(ctx, `SELECT key FROM matter_settings WHERE sealed = 0`)
+		if err != nil {
+			return "", fmt.Errorf("inspect matter_settings: %w", err)
+		}
+		found := ""
+		for rows.Next() {
+			var k string
+			if err := rows.Scan(&k); err != nil {
+				_ = rows.Close()
+				return "", err
+			}
+			if isSealedSetting(k) || k == settingSealCanary {
+				found = fmt.Sprintf("matter_settings %q", k)
+				break
+			}
+		}
+		if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+			return "", err
+		}
+		if found != "" {
+			return found, nil
+		}
+	}
+	return "", nil
+}
+
+// sealClearRows is [NewSealed]'s open. On a database with the canary:
+// the canary opened (the key check), a clear secret row refused, nothing
+// written. On one without: the key check of openOneSealed, then every clear
+// row sealed and the canary written in one transaction, which records the
+// scrub owed when it sealed a row. Then, while a scrub is owed, the scrub;
+// one that does not finish leaves the owed mark for the next open
+// ([Store.ScrubOwed]) and is no error.
 func (s *Store) sealClearRows(ctx context.Context) error {
 	if err := checkSealMarks(ctx, s.db, "NewSealed"); err != nil {
 		return err
 	}
+	stored, markSealed, marked, err := readCanary(ctx, s.db)
+	if err != nil {
+		return fmt.Errorf("store: NewSealed: %w", err)
+	}
+	if marked {
+		if err := s.openCanary(stored, markSealed); err != nil {
+			return fmt.Errorf("store: NewSealed: the sealer does not open the database's seal canary: %w", err)
+		}
+		if t, err := clearSecretTable(ctx, s.db); err != nil {
+			return fmt.Errorf("store: NewSealed: %w", err)
+		} else if t != "" {
+			return fmt.Errorf("store: NewSealed: %w: a %s row is not sealed in a sealed database", ErrUnseal, t)
+		}
+	} else if err := s.sealUnmarked(ctx); err != nil {
+		return err
+	}
+	if owed, err := s.ScrubOwed(ctx); err != nil || !owed {
+		return err
+	}
+	if err := Scrub(ctx, s.db); err != nil {
+		// Owed, and visible through ScrubOwed: the rows are sealed, and a
+		// full disk or a reader must not keep the node down (decision 132).
+		return nil //nolint:nilerr // the owed scrub is a state, not a failure
+	}
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM matter_metadata WHERE key = ?`, metadataKeySealScrubOwed)
+	return nil
+}
+
+// sealUnmarked seals a database without the canary: the key check, then
+// every clear row and the canary in one transaction.
+func (s *Store) sealUnmarked(ctx context.Context) error {
 	// The key check before the sealing: a wrong key must not seal the
 	// clear rows beside values it does not open.
 	if err := s.openOneSealed(ctx); err != nil {
@@ -440,6 +604,9 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 		}
 		sealed += n
 	}
+	if err := s.writeCanary(ctx, tx); err != nil {
+		return fmt.Errorf("store: NewSealed: %w", err)
+	}
 	if sealed > 0 {
 		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
 			return fmt.Errorf("store: NewSealed: %w", err)
@@ -448,16 +615,172 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("store: NewSealed: commit: %w", err)
 	}
-	if _, owed, err := s.GetMetadataCounter(ctx, metadataKeySealScrubOwed); err != nil {
-		return fmt.Errorf("store: NewSealed: %w", err)
-	} else if !owed {
-		return nil
+	return nil
+}
+
+// ScrubOwed reports whether the database owes the scrub of a sealing or a
+// [Reseal]: the values are sealed, but the clear (or old-key) bytes they
+// replaced may remain in the file's free pages, its -wal or a kept
+// -journal until a [Scrub] of the file finishes — a full disk or a reader
+// holding the -wal stops one. [NewSealed] retries the scrub on every open
+// while it is owed and opens the Store either way; a host that wants to
+// fail closed checks ScrubOwed after NewSealed and stops, and one that
+// does not logs it (the node logs one warning).
+func (s *Store) ScrubOwed(ctx context.Context) (bool, error) {
+	_, owed, err := s.GetMetadataCounter(ctx, metadataKeySealScrubOwed)
+	if err != nil {
+		return false, fmt.Errorf("store: scrub owed: %w", err)
 	}
-	if err := Scrub(ctx, s.db); err != nil {
-		return fmt.Errorf("store: NewSealed: the clear values are sealed: %w", err)
+	return owed, nil
+}
+
+// Reseal moves a sealed database from the sealer old to the sealer next —
+// the rotation of the host's key — in one transaction: the seal canary
+// opened under old (the key check), every sealed value of secretTables
+// opened under old and sealed under next, the canary last; then the
+// [Scrub] that removes the values sealed under old from the file, with
+// the mark of an owed scrub until it finished. A wrong old key or a value
+// that does not open under it is [ErrUnseal], and so is a secret row in
+// clear (the host opens the database with [NewSealed] under old first,
+// which seals it); either leaves the database as it was. A scrub that does
+// not finish is [ErrScrubIncomplete] after the commit: the values are
+// sealed under next, and the next NewSealed retries the scrub.
+//
+// No Store may be open on db while Reseal runs, and no other process may
+// write the file: a Store holds no sealer it could swap. db must carry
+// schema v10. There is no unseal: the way back to a clear database is a
+// restore or a factory reset. The rows of other modules' tables on the
+// same file (the controller's node registry, controller/client/sqlstore)
+// are not this store's and are not resealed.
+func Reseal(ctx context.Context, db *sql.DB, old, next Sealer) error {
+	if old == nil || next == nil {
+		return errors.New("store: Reseal: nil Sealer")
 	}
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
-		return fmt.Errorf("store: NewSealed: %w", err)
+	if err := checkSealMarks(ctx, db, "Reseal"); err != nil {
+		return err
+	}
+	from, to := &Store{db: db, sealer: old}, &Store{db: db, sealer: next}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: Reseal: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("store: Reseal: %w", err)
+	}
+	stored, markSealed, marked, err := readCanary(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("store: Reseal: %w", err)
+	}
+	if marked {
+		if err := from.openCanary(stored, markSealed); err != nil {
+			return fmt.Errorf("store: Reseal: the old sealer does not open the database's seal canary: %w", err)
+		}
+	}
+	if t, err := clearSecretTable(ctx, tx); err != nil {
+		return fmt.Errorf("store: Reseal: %w", err)
+	} else if t != "" {
+		return fmt.Errorf("store: Reseal: %w: a %s row is not sealed (store.NewSealed seals it)", ErrUnseal, t)
+	}
+	for _, t := range secretTables {
+		if err := resealTable(ctx, tx, from, to, t); err != nil {
+			return fmt.Errorf("store: Reseal: %s: %w", t.table, err)
+		}
+	}
+	if err := to.writeCanary(ctx, tx); err != nil {
+		return fmt.Errorf("store: Reseal: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("store: Reseal: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: Reseal: commit: %w", err)
+	}
+	if err := Scrub(ctx, db); err != nil {
+		return fmt.Errorf("store: Reseal: the values are sealed under the new sealer: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM matter_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("store: Reseal: %w", err)
+	}
+	return nil
+}
+
+// resealTable opens every sealed value of one table under from and seals
+// it under to, on tx; matter_settings' values in their base64 form. The
+// canary is left to the caller.
+func resealTable(ctx context.Context, tx *sql.Tx, from, to *Store, t secretColumns) error {
+	where := ` WHERE sealed = 1`
+	if t.form == sealSettingText {
+		where += ` AND key <> '` + settingSealCanary + `'`
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT `+strings.Join(t.keys, ", ")+`, `+strings.Join(t.secrets, ", ")+ //nolint:gosec // the package's constants
+		` FROM `+t.table+where)
+	if err != nil {
+		return err
+	}
+	type row struct {
+		key  []any
+		vals [][]byte
+	}
+	var held []row
+	for rows.Next() {
+		r := row{key: make([]any, len(t.keys)), vals: make([][]byte, len(t.secrets))}
+		dest := make([]any, 0, len(t.keys)+len(t.secrets))
+		for i := range r.key {
+			dest = append(dest, &r.key[i])
+		}
+		for i := range r.vals {
+			dest = append(dest, &r.vals[i])
+		}
+		if err := rows.Scan(dest...); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		held = append(held, r)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return err
+	}
+	set := make([]string, 0, len(t.secrets))
+	for _, c := range t.secrets {
+		set = append(set, c+" = ?")
+	}
+	cond := make([]string, 0, len(t.keys))
+	for _, k := range t.keys {
+		cond = append(cond, k+" = ?")
+	}
+	update := `UPDATE ` + t.table + ` SET ` + strings.Join(set, ", ") + ` WHERE ` + strings.Join(cond, " AND ") //nolint:gosec // the package's constants
+	for _, r := range held {
+		args := make([]any, 0, len(t.secrets)+len(t.keys))
+		for i, c := range t.secrets {
+			v := r.vals[i]
+			if v == nil {
+				args = append(args, nil)
+				continue
+			}
+			if t.form == sealSettingText {
+				if v, err = base64.StdEncoding.DecodeString(string(v)); err != nil {
+					return fmt.Errorf("%w: %s.%s: %w", ErrUnseal, t.table, c, err)
+				}
+			}
+			plain, err := from.openColumn(v, true, t.table, c, r.key...)
+			if err != nil {
+				return err
+			}
+			out, err := to.sealColumn(plain, t.table, c, r.key...)
+			if err != nil {
+				return err
+			}
+			if t.form == sealSettingText {
+				args = append(args, base64.StdEncoding.EncodeToString(out))
+			} else {
+				args = append(args, out)
+			}
+		}
+		args = append(args, r.key...)
+		if _, err := tx.ExecContext(ctx, update, args...); err != nil {
+			return err
+		}
 	}
 	return nil
 }

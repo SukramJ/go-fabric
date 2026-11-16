@@ -17,7 +17,7 @@ import (
 
 // descriptorDriven are the functions whose seal calls take the table and
 // column from secretTables itself rather than naming them.
-var descriptorDriven = []string{"sealTable", "openOneSealed"}
+var descriptorDriven = []string{"sealTable", "openOneSealed", "resealTable"}
 
 // TestSecretColumnsAreTheSealCallSites (R2-P6-store-0109) holds the class
 // "which columns are secrets is written in several places": every

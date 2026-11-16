@@ -157,9 +157,11 @@ opaque values.
 db, err := sql.Open("sqlite", "file:node.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 ```
 
-- `foreign_keys(1)` is required. Removing a fabric deletes its rows
-  through `ON DELETE CASCADE`, and SQLite ignores foreign keys silently
-  with the pragma off.
+- `foreign_keys(1)` is required: the schema refuses a row that names a
+  fabric the store does not hold, and cascades, only with it on.
+  `store.Apply` refuses a handle without it (`store.ErrForeignKeysOff`),
+  and with it `node.New`. Removing a fabric does not rest on it: the store
+  deletes every row the fabric owns itself.
 - `busy_timeout` makes a contended endpoint-number allocation wait
   instead of failing.
 - Both pragmas go in the DSN. A pragma set with a statement applies to
@@ -184,10 +186,10 @@ idempotent.
 | `matter_fabrics` | v1 (v0.1.0), columns added in v8 | each fabric: index, fabric id, node id, root certificate and key, vendor, label, compressed fabric id; since v8 its commit state (`pending`: 0 committed, 1 an uncommitted AddNOC, 2 an uncommitted UpdateNOC), its VID verification statement and VVSC, and while it is 2 the node id, vendor id and VID data the UpdateNOC replaced |
 | `matter_node_identities` | v1, columns added in v8 and v10 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it; since v8, while the fabric is a pending update, the NOC, ICAC and private key the UpdateNOC replaced (the prior key stored as the key is); since v10 the row's seal mark (`sealed`). The keys are in clear unless the store is `store.NewSealed`'s ([sealing at rest](../security.md#sealing-at-rest)) |
 | `matter_group_keys` | v1, a column added in v10 | group key sets per fabric, up to three epoch keys; since v10 the row's seal mark |
-| `matter_group_key_map` | v1, rebuilt in v3 | GroupKeyMap: group id to key set; since v3 without a foreign key, so an entry may name a key set not yet written |
+| `matter_group_key_map` | v1, rebuilt in v3, a column added in v11 | GroupKeyMap: group id to key set; since v3 without a foreign key, so an entry may name a key set not yet written; since v11 the entry's place in the order the map was written (`position`), the order it reads back in |
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
-| `matter_resumption` | v1, columns added in v9 and v10 | CASE resumption records with the peer's CATs; the record's shared secret is stored in clear, like the fabric's keys ([security model](../security.md#what-the-store-holds-in-clear)), unless the store seals it (v10's seal mark) |
-| `matter_diagnostics` | v1 | a single-row counter table, created and seeded but read by nothing (its typed API is removed in v0.10.0); the facade keeps its counters in `matter_settings` |
+| `matter_resumption` | v1, columns added in v9 and v10 | CASE resumption records with the peer's CATs, at most `store.ResumptionRecordsPerFabric` per fabric (the least recently written goes first); the record's shared secret is stored in clear, like the fabric's keys ([security model](../security.md#what-the-store-holds-in-clear)), unless the store seals it (v10's seal mark) |
+| `matter_diagnostics` | v1 | a single-row counter table, created and seeded but read by nothing (its typed API is removed in v0.10.0); the facade keeps its counters in `matter_settings`. `Erase` seeds its row again, as every row the schema seeds |
 | `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling`, and since v0.12.0 an ICD node's `icd_management.counter` |
 | `matter_settings` | v1, a column added in v10 | string key/value pairs (next section); since v10 the seal mark of a secret setting |
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |
@@ -219,7 +221,9 @@ keys that hold secrets — `netcomm.wifi.networks`, `door_lock.credential_key`,
 `icd_management.key`, the two `operational_credentials.pending_noc*` keys and
 every `jointfabric.datastore:` key — and marks their rows (`sealed`, v10);
 the other values stay as they are ([sealing at
-rest](../security.md#sealing-at-rest)).
+rest](../security.md#sealing-at-rest)). `store.seal_canary` is reserved:
+the seal canary `NewSealed` writes; the Settings methods neither write nor
+delete it.
 
 | Key | Written by | Holds |
 | --- | --- | --- |

@@ -543,6 +543,16 @@ func (n *Node) openStores(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			// A sealing whose scrub did not finish opens the store (decision
+			// 132): the rows are sealed, the old bytes may remain in the file
+			// until a later open scrubs it — said once here.
+			if sc.Sealer != nil {
+				if owed, err := st.ScrubOwed(ctx); err != nil || owed {
+					n.logger.Warn("matter.store.seal_scrub_owed",
+						slog.String("detail", "the sealed values' former bytes may remain in the database file until a later start scrubs it"),
+						slog.Any("err", err))
+				}
+			}
 			n.st = st
 			n.builtCredentials = true
 		}

@@ -679,13 +679,17 @@ type Store struct {
 	Endpoints endpoint.Store
 	// Sealer seals the secrets of the credential store the node builds on
 	// DB or Path (opt-in): New applies the schema (store.Apply) and opens
-	// the store with store.NewSealed, which seals the clear rows it finds
-	// and scrubs the file; New returns its error. The key must live
-	// outside the database (docs/security.md, "Sealing at rest"). Every
-	// later start needs the same sealer: under another key New fails
-	// with an error that wraps store.ErrUnseal (NewSealed opens one
-	// sealed value first); a store without one reads a sealed secret as
-	// store.ErrNoSealer. It excludes
+	// the store with store.NewSealed, which seals the clear rows it finds,
+	// marks the database with its seal canary and scrubs the file; New
+	// returns its error. A scrub that cannot finish (a full disk, a reader
+	// on the -wal) is no error: the node logs one warning and a later start
+	// scrubs (store.Store.ScrubOwed). The key must live outside the
+	// database (docs/security.md, "Sealing at rest"); store.Reseal moves the
+	// database to a new key while no node runs on it. Every later start
+	// needs the same sealer: under another key New fails with an error that
+	// wraps store.ErrUnseal (NewSealed opens the canary first); a store
+	// without one reads a sealed secret as store.ErrNoSealer and writes
+	// none. It excludes
 	// Credentials (an override is sealed by the host that built it).
 	Sealer store.Sealer
 }

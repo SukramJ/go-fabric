@@ -274,6 +274,14 @@ func (s *Store) SaveDoorLockAuth(ctx context.Context, endpointKey string, auth D
 		return fmt.Errorf("store: save door lock: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	for _, c := range auth.Credentials {
+		if c.Data != nil {
+			if err := s.refuseClearSecretWrite(ctx, tx); err != nil {
+				return fmt.Errorf("store: save door lock: %w", err)
+			}
+			break
+		}
+	}
 	for _, table := range []string{"matter_doorlock_users", "matter_doorlock_credentials", "matter_doorlock_schedules"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE endpoint_key = ?`, endpointKey); err != nil { //nolint:gosec // table is one of the three constants above
 			return fmt.Errorf("store: save door lock: clear %s: %w", table, err)

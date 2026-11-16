@@ -133,6 +133,9 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 	if _, err := tx.ExecContext(ctx, `DELETE FROM matter_resumption WHERE fabric_index = ? AND peer_node_id = ?`, rec.FabricIndex, peer); err != nil {
 		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
+	if err := s.refuseClearSecretWrite(ctx, tx); err != nil {
+		return fmt.Errorf("store: upsert resumption: %w", err)
+	}
 	if _, err := tx.ExecContext(
 		ctx, `
 INSERT INTO matter_resumption
