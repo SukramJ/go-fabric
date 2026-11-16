@@ -127,9 +127,10 @@ func TestEmitReachesTheEmitterOfADeclaredEvent(t *testing.T) {
 		t.Errorf("Emit(ValveStateChanged) = %v, want ErrNotEmitted", err)
 	}
 
-	bad := valve.NewServer(valve.Config{Source: fullyObservedHost(), Events: []uint32{0x99}})
-	if got := bad.MatterEvents(); len(got) != 0 {
-		t.Errorf("an unknown event id declared %v", got)
+	// An event id the definition lacks is refused with the valid ones
+	// beside it, not dropped with them (R2-P6-api-1588).
+	if _, err := valve.New(valve.Config{Source: fullyObservedHost(), Events: []uint32{valvedef.EventValveStateChanged, 0x99}}); !errors.Is(err, valve.ErrSelection) {
+		t.Errorf("an unknown event id: %v, want ErrSelection", err)
 	}
 }
 

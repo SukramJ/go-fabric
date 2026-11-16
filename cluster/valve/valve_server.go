@@ -104,15 +104,6 @@ const (
 	FeatureLevel = uint32(valvedef.FeatureLevel)
 )
 
-// featureMapNone is the FeatureMap of a valve that only opens and closes:
-// TS is conformance "desc" and LVL is optional, so zero is conformant.
-const featureMapNone uint32 = 0
-
-// instance is the definition bound to [featureMapNone] with no optional
-// element declared: the five mandatory attributes, Open and Close — what
-// [Server.MatterRead] answers the globals from.
-var instance, _ = spec.New(valvedef.Definition, spec.Options{Features: featureMapNone})
-
 // maxLevel is the full level, 100 %: the level of an Open without
 // TargetLevel and DefaultOpenLevel, and a level that complies with any
 // LevelStep (connectedhomeip kMaxLevelValuePercent).
@@ -120,8 +111,10 @@ const maxLevel uint8 = 100
 
 // ErrSelection reports a Config whose selection the server cannot serve on
 // its StateSource: a feature or optional attribute whose interface the
-// source lacks, TS without the node's time, or a selection the definition
-// refuses.
+// source lacks, or a selection the definition refuses — an event id it
+// does not define among them. A TS valve without the node's time is the
+// node's to refuse ([Server.RequiresMatterTime]), not New's
+// (R2-P6-doc-1589).
 var ErrSelection = errors.New("valve: selection not served")
 
 // State is the ValveStateEnum (enum8) a controller reads from
@@ -247,7 +240,8 @@ var (
 // server cannot serve is refused with [ErrSelection], naming the missing
 // interface: LVL without a [LevelSource], DefaultOpenLevel without a
 // [DefaultOpenLevelSource], a LevelStep outside 1 to 50, or a selection
-// the definition refuses. TS reads the node's Matter time, which the node
+// the definition refuses — an event id outside it too, as pump refuses one
+// (R2-P6-api-1588). TS reads the node's Matter time, which the node
 // hands the server as it joins the topology ([Server.AttachMatterTime]).
 func New(cfg Config) (*Server, error) {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
@@ -280,12 +274,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	inst, err := spec.New(valvedef.Definition, spec.Options{Features: cfg.Features, Attributes: cfg.Attributes, Events: cfg.Events})
 	if err != nil {
-		if len(cfg.Events) == 0 || cfg.Features != 0 || len(cfg.Attributes) != 0 {
-			return nil, fmt.Errorf("%w: %w", ErrSelection, err)
-		}
-		// An event id outside the definition leaves the EventList empty,
-		// as without Events.
-		inst = instance
+		return nil, fmt.Errorf("%w: %w", ErrSelection, err)
 	}
 	s.inst = inst
 	s.hooks.Init(s.inst)
