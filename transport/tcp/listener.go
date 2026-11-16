@@ -91,7 +91,11 @@ const reclaimAgeFloor = NewConnectionIdleTimeout / 5
 // longest of them (60 s). Its frames earn it nothing past that: a party
 // that never establishes a session cannot keep places by sending a frame
 // now and then, which before took two source addresses to hold all four
-// (review II, N3-finnet-4). Module's own.
+// (review II, N3-finnet-4). Module's own. What it does not bound: a party
+// that closes its connections and opens them again within the grace, one
+// frame on each, from two source addresses ([MaxConnectionsPerPeerIP] per
+// address, [MaxInboundConnections] in all) still holds every place; the
+// per-address cap and this grace are the whole bound against it.
 const sessionlessGrace = time.Minute
 
 // ErrListenerClosed is returned by [Listener.Serve] when it is called

@@ -794,7 +794,7 @@ func (b *Bridge) dispatchPase(
 			// the pairing the claim accepted, which ends it and counts
 			// — not answered, acknowledged by the MRP layer
 			// ([Bridge.endRepeatedPairing]).
-			b.endRepeatedPairing(src, key)
+			b.endRepeatedPairing(src, requestHdr, proto)
 			return nil
 		}
 		if claim == paseClaimBusy {
@@ -972,23 +972,38 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 	return paseClaimTaken
 }
 
-// endRepeatedPairing ends the PASE pairing of key after a further
+// endRepeatedPairing ends the PASE pairing after a further
 // PBKDFParamRequest arrived on it: one PASE failure is counted, the claim is
 // released, the handshake's replies are no longer retransmitted and its
-// hold on a connection ends; the request is acknowledged by the MRP layer
-// and not answered. matter.js's PASE server ignores a NEW exchange while a
+// hold on a connection ends. The request is answered with a StatusReport
+// InvalidParameter when the pairing's last reply was acknowledged, and only
+// acknowledged while that reply still waits for its acknowledgement — as
+// matter.js's cancelPairing sends its error unless the exchange's last
+// message is unacknowledged (PaseServer.ts:103-104, :210 at db021da0).
+// matter.js's PASE server ignores a NEW exchange while a
 // pairing runs (PaseServer.ts:80-86 at db021da0), but a further
 // PBKDFParamRequest on the accepted exchange reaches its typed read of the
 // next message, is an unexpected message (SecureChannelMessenger.ts:95-98),
 // and the pairing's catch counts it and cancels the pairing (PaseServer.ts
 // :94-95); review II, R2-P6-sec-0304 (decision 65).
-func (b *Bridge) endRepeatedPairing(src net.Addr, key HandshakeKey) {
+func (b *Bridge) endRepeatedPairing(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) {
+	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	b.logger.Info("matter.rx.sc.pase_request_repeated",
 		slog.String("src", srcString(src)),
 		slog.Int("exchange_id", int(key.ExchangeID)))
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	if tracker != nil && tracker.holdsUnsecuredExchange(key) {
+		b.abandonHandshakeReplies(key)
+	} else {
+		body := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
+		if err := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(nil, b.clk().Now())); err != nil {
+			b.logger.Debug("matter.rx.sc.pase_request_repeated.status_report_send_failed", slog.Any("err", err))
+		}
+	}
 	b.recordPaseFailure()
 	b.releasePaseInFlight(key)
-	b.abandonHandshakeReplies(key)
 	b.releaseHandshake(src, key)
 }
 
