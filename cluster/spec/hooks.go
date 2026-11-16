@@ -19,6 +19,14 @@ import (
 // of a controller's write and its comparison with the held value, and hands the endpoint's emitter on with
 // [Hooks.SetMatterEventEmitter] — promoted, or called from its own when
 // it keeps the emitter itself too.
+//
+// Deprecated: Hooks admits a request and checks a response without the
+// server's attributes, so a conformance naming one is not resolved. A
+// self-held server builds a [Server] over its own state — [ServerConfig]
+// Source answering its reads, Handlers its own commands — and routes
+// MatterInvoke through [InvokeHeld] over [NewSelfHeld]; its events and its
+// veto are an [Events] and a [WriteVeto] (review II, decision 154).
+// Removable in the next minor release.
 type Hooks struct {
 	inst     *Instance
 	handlers HostHandlers
