@@ -300,7 +300,13 @@ func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, co
 	}
 }
 
-// decodeInvokeResult takes the one response of a single-command invoke.
+// decodeInvokeResult takes the one response of a single-command invoke,
+// whatever path it names: the response is attributed to the one request,
+// as matter.js attributes the response of a single command by its
+// singleCommandRef and only logs its path
+// (packages/protocol/src/action/client/ClientInteraction.ts:513, :538-539
+// at db021da0). Comparing the path would be ahead of matter.js (review
+// II, R2-P6-err-0313).
 func decodeInvokeResult(payload []byte, commandID uint32) (*spec.Node, error) {
 	resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(payload), func(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
 		if !el.IsContainer {

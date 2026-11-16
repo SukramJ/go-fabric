@@ -173,6 +173,11 @@
 //     and those attribute changes reach no subscriber. The mDNS
 //     commissionable record does not depend on it:
 //     [Bridge.AnnounceCommissioning] publishes it from its own argument.
+//     The window by itself gates no PASE: the bridge refuses a
+//     PASE handshake only while no PASE acceptor is attached, so a host
+//     without the node facade detaches its acceptor when its window
+//     closes, or PASE stays open after the window (review II,
+//     R2-P6-doc-0311).
 //
 // Group communication — needed by any node with a Groups server, which
 // a node with lights or plugs has:
