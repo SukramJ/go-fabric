@@ -187,9 +187,13 @@ type Server struct {
 	*spec.Instance
 	cluster.AttributeChanges
 	hooks spec.Hooks
-	// cause is the contract.Origin of the changes a command makes
-	// (OriginCommand), zero outside one.
-	cause atomic.Uint32
+	// commands counts the commands whose handlers run: the changes made
+	// meanwhile are OriginCommand — the handler moves the state through
+	// the host setters, which take no context. A count, not a flag, so a
+	// command that ends does not clear another's (R2-P6-conc-1509); a host
+	// setter on another goroutine while a command runs is still counted
+	// as the command's.
+	commands atomic.Int32
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -489,8 +493,8 @@ func (s *Server) reported(attrIDs ...uint32) {
 // origin is where the change being reported comes from: a command's
 // while it runs, the device's own otherwise.
 func (s *Server) origin() contract.Origin {
-	if c := s.cause.Load(); c != 0 {
-		return contract.Origin(c) //nolint:gosec // only an Origin is stored
+	if s.commands.Load() > 0 {
+		return contract.OriginCommand
 	}
 	return contract.OriginHostSet
 }
@@ -570,8 +574,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
 		return resp, err
 	}
-	s.cause.Store(uint32(contract.OriginCommand))
-	defer s.cause.Store(0)
+	s.commands.Add(1)
+	defer s.commands.Add(-1)
 	if cmdID == sa.CmdSelectAreas {
 		req, ok := request[sa.SelectAreasRequest](fields)
 		if !ok {

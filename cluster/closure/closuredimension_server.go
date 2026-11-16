@@ -165,9 +165,13 @@ type DimensionServer struct {
 	*spec.Instance
 	cluster.AttributeChanges
 	hooks spec.Hooks
-	// cause is the contract.Origin of the changes a command makes
-	// (OriginCommand), zero outside one.
-	cause atomic.Uint32
+	// commands counts the commands whose handlers run: the changes made
+	// meanwhile are OriginCommand — the handler moves the state through
+	// the host setters, which take no context. A count, not a flag, so a
+	// command that ends does not clear another's (R2-P6-conc-1509); a host
+	// setter on another goroutine while a command runs is still counted
+	// as the command's.
+	commands atomic.Int32
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -358,8 +362,8 @@ func (s *DimensionServer) tracker() *cluster.DataVersionTracker {
 // command makes is the command's, any other the device's own report.
 func (s *DimensionServer) changed(attrIDs ...uint32) {
 	origin := contract.OriginHostSet
-	if c := s.cause.Load(); c != 0 {
-		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
+	if s.commands.Load() > 0 {
+		origin = contract.OriginCommand
 	}
 	s.tracker().Bump()
 	s.NotifyFrom(origin, attrIDs...)
@@ -474,8 +478,8 @@ func (s *DimensionServer) MatterInvoke(ctx context.Context, cmdID uint32, fields
 	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
 		return resp, err
 	}
-	s.cause.Store(uint32(contract.OriginCommand))
-	defer s.cause.Store(0)
+	s.commands.Add(1)
+	defer s.commands.Add(-1)
 	if cmdID == cd.CmdSetTarget {
 		req, ok := dimRequest[cd.SetTargetRequest](fields)
 		if !ok {

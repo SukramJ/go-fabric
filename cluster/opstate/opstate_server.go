@@ -447,10 +447,13 @@ type Server struct {
 	quiet    *cluster.Quieter
 	hooks    spec.HostHandlers
 	veto     spec.WriteVeto
-	// cause is the contract.Origin of the changes made while a command's
-	// handler runs (OriginCommand), zero outside one: the handler moves
-	// the state through the host setters, which take no context.
-	cause atomic.Uint32
+	// running counts the commands whose handlers run: the changes made
+	// meanwhile are OriginCommand — the handler moves the state through
+	// the host setters, which take no context. A count, not a flag, so a
+	// command that ends does not clear another's (R2-P6-conc-1509); a host
+	// setter on another goroutine while a command runs is still counted
+	// as the command's.
+	running atomic.Int32
 
 	// mu guards countdown, currentPhase, emitter, endpoint, opError, phases and state.
 	mu           sync.Mutex
@@ -696,8 +699,8 @@ func (s *Server) reported(attrs ...uint32) {
 // origin is where the change being reported comes from: a command's
 // while its handler runs, the host's otherwise.
 func (s *Server) origin() contract.Origin {
-	if c := s.cause.Load(); c != 0 {
-		return contract.Origin(c) //nolint:gosec // only an Origin is stored
+	if s.running.Load() > 0 {
+		return contract.OriginCommand
 	}
 	return contract.OriginHostSet
 }
@@ -826,9 +829,9 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if verdict != ErrorNoError || st == target {
 		return response(ErrorState{ID: verdict}), nil
 	}
-	s.cause.Store(uint32(contract.OriginCommand))
+	s.running.Add(1)
 	reply, err := s.handler.HandleOperationalCommand(ctx, cmd)
-	s.cause.Store(0)
+	s.running.Add(-1)
 	if err != nil {
 		return nil, fmt.Errorf("opstate: command 0x%02X: %w", cmdID, err)
 	}
