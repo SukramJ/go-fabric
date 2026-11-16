@@ -8,7 +8,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
+	"sync"
 )
+
+// schemaSeedRE matches one seeding statement of [Schema]: an INSERT OR
+// IGNORE up to its semicolon.
+var schemaSeedRE = regexp.MustCompile(`(?ms)^INSERT OR IGNORE INTO [^;]*;`)
+
+// schemaSeeds are the seeding statements of [Schema], in order: what
+// [Store.Erase] runs again after its deletes, so an erased store holds
+// what a freshly applied schema holds — a seed a later schema adds
+// included (TestEraseLeavesWhatAFreshSchemaHolds).
+var schemaSeeds = sync.OnceValue(func() []string { return schemaSeedRE.FindAllString(schemaDDL, -1) })
 
 // erasedTables are the matter_* tables of the schema (store/schema.sql),
 // every one the factory reset empties.
@@ -44,8 +56,9 @@ var erasedTables = []string{
 // erase with errors.Is.
 var ErrScrubIncomplete = errors.New("store: erased, but the scrub did not finish: the erased bytes may remain in the file")
 
-// Erase empties every matter_* table in one transaction and seeds the
-// next fabric index as the schema does ([Eraser]), then scrubs the file:
+// Erase empties every matter_* table in one transaction and seeds the rows
+// the schema seeds — every INSERT OR IGNORE of [Schema]: the next fabric
+// index and the diagnostics row ([Eraser]) — then scrubs the file:
 // a DELETE only unlinks rows, and their bytes — and those of every row a
 // plain delete removed earlier, RemoveFabric's among them — stay in the
 // database's free pages and in the write-ahead log. VACUUM rebuilds the
@@ -72,8 +85,10 @@ func (s *Store) Erase(ctx context.Context) error {
 			return fmt.Errorf("store: erase %s: %w", table, err)
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO matter_metadata (key, value) VALUES ('next_fabric_index', 1)`); err != nil {
-		return fmt.Errorf("store: erase: seed next fabric index: %w", err)
+	for _, seed := range schemaSeeds() {
+		if _, err := tx.ExecContext(ctx, seed); err != nil {
+			return fmt.Errorf("store: erase: seed: %w", err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("store: erase: %w", err)
