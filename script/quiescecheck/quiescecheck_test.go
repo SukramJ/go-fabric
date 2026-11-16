@@ -213,7 +213,7 @@ func analyze(base, root, modPrefix string) (map[string]*typeFacts, error) {
 				}
 				// A clock adapter's AfterFunc that hands the call on is a
 				// clock, not a timer user.
-				if d.Body != nil && !(d.Recv != nil && timerMethods[d.Name.Name]) {
+				if d.Body != nil && (d.Recv == nil || !timerMethods[d.Name.Name]) {
 					facts.timers = append(facts.timers, timersIn(d.Body)...)
 				}
 			case *ast.GenDecl:
@@ -333,7 +333,7 @@ func violations(types map[string]*typeFacts, exceptions map[string]string) []str
 			}
 			out = append(out, fmt.Sprintf("%s runs timers (%s) and has no MatterQuiesce: implement contract.ClusterQuiescer so the timers end with the server, or add an exception with the reason none outlives it", key, what))
 		case !needs && excepted:
-			out = append(out, fmt.Sprintf("%s is an exception but no longer needs one: delete the entry", key))
+			out = append(out, key+" is an exception but no longer needs one: delete the entry")
 		}
 	}
 	for key := range exceptions {
@@ -381,9 +381,10 @@ func TestTheGuardSeesEachGap(t *testing.T) {
 	}
 	got := violations(types, map[string]string{"gaps/helper.Throttle": "helper"})
 	want := []string{"gaps/holder.Server", "gaps/loop.Server", "gaps/twotypes.Second"}
-	var flagged []string
+	flagged := make([]string, 0, len(got))
 	for _, v := range got {
-		flagged = append(flagged, v[:strings.Index(v, " ")])
+		key, _, _ := strings.Cut(v, " ")
+		flagged = append(flagged, key)
 	}
 	if !slices.Equal(flagged, want) {
 		t.Errorf("flagged %v, want %v:\n%s", flagged, want, strings.Join(got, "\n"))
