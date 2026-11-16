@@ -10,10 +10,6 @@ import (
 )
 
 // WindowCoveringClusterID is the Matter cluster identifier for WindowCovering.
-//
-// Deprecated: use ClusterID of cluster/spec/windowcovering, the
-// generated id: one source of ids (review II, R2-P6-par-1262,
-// decision 140). Removable in the next minor release.
 const WindowCoveringClusterID uint32 = 0x0102
 
 // WindowCovering attribute IDs.

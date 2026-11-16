@@ -15,17 +15,7 @@ import (
 // packages/model/src/standard/elements/operational-state.element.ts,
 // rvc-operational-state.element.ts).
 const (
-	// OperationalStateClusterID duplicates a generated constant.
-	//
-	// Deprecated: use ClusterID of cluster/spec/operationalstate, the
-	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
-	OperationalStateClusterID uint32 = 0x0060
-	// RvcOperationalStateClusterID duplicates a generated constant.
-	//
-	// Deprecated: use ClusterID of cluster/spec/rvcoperationalstate, the
-	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	OperationalStateClusterID    uint32 = 0x0060
 	RvcOperationalStateClusterID uint32 = 0x0061
 )
 

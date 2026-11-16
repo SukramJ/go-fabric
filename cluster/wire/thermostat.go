@@ -5,17 +5,12 @@ package wire
 
 // Thermostat command IDs per Matter §4.3.9.
 const (
-	// ThermostatCmdSetpointRaiseLower duplicates a generated constant.
-	//
-	// Deprecated: use CmdSetpointRaiseLower of cluster/spec/thermostat, the
-	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
 	ThermostatCmdSetpointRaiseLower uint32 = 0x00
 	// ThermostatCmdSetWeeklySchedule names a command id.
 	//
 	// Deprecated: the command is not in the Matter model this module serves
-	// (parity/schema.json has no command 0x01 on Thermostat); nothing
-	// outside this package uses it (review II, R2-P6-api-1261, decision 140).
+	// (parity/schema.json has no command 0x01 on Thermostat); review II,
+	// R2-P6-api-1261, decision 140.
 	// Removable in the next minor release.
 	ThermostatCmdSetWeeklySchedule uint32 = 0x01
 	// ThermostatCmdGetWeeklySchedule names a command id.

@@ -227,7 +227,7 @@ func TestThermostatUnknownCommandIsUnsupported(t *testing.T) {
 	t.Parallel()
 	srv := newHeatCool()
 	_, err := srv.MatterInvoke(
-		context.Background(), clusterwire.ThermostatCmdSetWeeklySchedule, nil,
+		context.Background(), clusterwire.ThermostatCmdSetWeeklySchedule, nil, //nolint:staticcheck // a command id absent from the model, refused (R2-P6-api-1261)
 	)
 	var status im.StatusCodeError
 	if !errors.As(err, &status) {
