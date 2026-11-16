@@ -14,7 +14,10 @@ import (
 // Dialer opens outgoing Matter TCP connections — the client role of
 // matter.js TcpTransport (TcpTransport.ts:149-182 openChannel /
 // #connect). The connection uses the same framing and handler contract
-// as an inbound one. The zero value is usable.
+// as an inbound one — the bounded write of [Conn.Send] included — but
+// measures no traffic: only a [Listener] reads a connection's idleness,
+// to choose one to reclaim at its bound, and a dialled connection is no
+// listener's. The zero value is usable.
 type Dialer struct {
 	// MaxPayloadSize is the largest message a connection sends or
 	// receives, the length prefix not counted (TcpChannel.ts:37-41 at

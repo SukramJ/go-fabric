@@ -36,7 +36,8 @@ const MaxConnectionsPerPeerIP = 3
 // a new connection takes the place of the one that has been idle longest
 // — no message received or sent for the longest time, measured from its
 // accept when it carried none — among those that carried no traffic
-// within [idleGrace]; without one the new connection is closed (review
+// within [idleGrace] or, having carried none, are older than
+// [reclaimAgeFloor]; without one the new connection is closed (review
 // II, R2-P3-ctl-lan-03, R2-P3-dr-net-02). connectedhomeip reclaims, when
 // out of space, only a connection no message has claimed
 // (src/transport/raw/TCP.cpp:133-163); here a connection that delivered
@@ -68,6 +69,18 @@ const NewConnectionIdleTimeout = 10 * time.Second
 // carries no session the module still keeps alive.
 // TestIdleGraceIsTheSessionIdleTimeout holds the two equal.
 const idleGrace = 5 * time.Minute
+
+// reclaimAgeFloor is how long after its accept a connection that has not
+// carried a message keeps its place at the total bound: long enough for
+// the first message of a pairing or a session (PBKDFParamRequest,
+// Sigma1) to arrive, a fifth of [NewConnectionIdleTimeout], after which a
+// silent connection is closed anyway. Without it a party with source
+// addresses beyond the per-address cap — IPv6 gives it any number —
+// could replace every new connection before its first message with a
+// silent one of its own. Module's own: connectedhomeip reclaims a
+// connection no message claimed as soon as its table is full
+// (src/transport/raw/TCP.cpp:133-163 at 6170af84).
+const reclaimAgeFloor = NewConnectionIdleTimeout / 5
 
 // ErrListenerClosed is returned by [Listener.Serve] when it is called
 // on a closed listener.
@@ -417,7 +430,8 @@ func (l *Listener) Close() error {
 // idleLongestLocked is the open connection idle longest at now — its last
 // message received or sent, or its accept when it carried none, earliest,
 // the earlier accept first on a tie — among those that carried no traffic
-// within [idleGrace]; nil when every one did. l.mu is held.
+// within [idleGrace] and, when they carried none, were accepted at least
+// [reclaimAgeFloor] ago; nil when there is none. l.mu is held.
 func (l *Listener) idleLongestLocked(now time.Duration) *Conn {
 	var pick *Conn
 	var pickSince time.Duration
@@ -426,6 +440,9 @@ func (l *Listener) idleLongestLocked(now time.Duration) *Conn {
 		since, carried := c.idleSince()
 		if !carried {
 			since = adm.at
+			if now-since < reclaimAgeFloor {
+				continue
+			}
 		} else if now-since < idleGrace {
 			continue
 		}

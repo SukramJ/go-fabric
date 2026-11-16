@@ -19,6 +19,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
 
 // pipeFrom is one end of an in-memory connection whose remote address is
@@ -108,10 +110,11 @@ func TestListenerHoldsAtMostMaxInboundConnections(t *testing.T) {
 
 // TestListenerReclaimsAConnectionWithoutAMessageWhenFull: at the cap, a
 // new connection takes the place of the oldest one that has delivered no
-// message yet.
+// message yet and is past reclaimAgeFloor.
 func TestListenerReclaimsAConnectionWithoutAMessageWhenFull(t *testing.T) {
 	t.Parallel()
-	l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxPayloadSize: 64})
+	fake := clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC))
+	l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxPayloadSize: 64, Clock: fake})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +137,7 @@ func TestListenerReclaimsAConnectionWithoutAMessageWhenFull(t *testing.T) {
 		}
 		silent = append(silent, c)
 	}
+	fake.Advance(reclaimAgeFloor) // past the floor that spares a fresh connection
 	c, _ := acceptFrom(t, l, MaxInboundConnections, handler)
 	if c == nil {
 		t.Fatal("a new connection was refused while a held one had delivered no message")
