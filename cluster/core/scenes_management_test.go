@@ -5,6 +5,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
@@ -279,5 +280,63 @@ func TestScenesParityWithSchema(t *testing.T) {
 	}
 	if got := s.MatterGeneratedCommands(); !slices.Equal(got, []uint32{0, 1, 2, 3, 4, 6, 0x40}) {
 		t.Errorf("GeneratedCommandList %v", got)
+	}
+}
+
+// TestScenesRefusedStoreRestoresSceneInfo (review II, phase 5b): a
+// RemoveScene of the current, valid scene whose store the scene store
+// refuses answers FAILURE and leaves everything as it was — the scene
+// stored, FabricSceneInfo's current scene valid, and the scene still
+// monitored, so a change of a scene-able attribute invalidates it.
+// Before, the table came back but SceneValid stayed false and nothing
+// was monitored.
+func TestScenesRefusedStoreRestoresSceneInfo(t *testing.T) {
+	t.Parallel()
+	light := &sceneOnOff{on: true}
+	refuse := false
+	st := core.NewPersistedScenesState(
+		func(context.Context) ([]byte, error) { return nil, nil },
+		func(context.Context, []byte) error {
+			if refuse {
+				return errors.New("the store refuses")
+			}
+			return nil
+		})
+	s, err := core.NewScenesManagement(core.ScenesConfig{
+		State:      st,
+		Siblings:   func() []contract.ClusterServer { return []contract.ClusterServer{light} },
+		GroupKnown: func(_ context.Context, _ uint8, g uint16) bool { return g == 0x0101 },
+		Fabrics:    func(context.Context) []uint8 { return []uint8{1, 2} },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := invoke(t, s, 0x04, core.SceneRef{GroupID: 0x0101, SceneID: 1}).(core.SceneStatusResponse); r.Status != im.StatusSuccess {
+		t.Fatalf("StoreScene: %v", r.Status)
+	}
+	invoke(t, s, 0x05, core.RecallSceneRequest{GroupID: 0x0101, SceneID: 1})
+	info := func() core.SceneInfoStruct {
+		t.Helper()
+		v, _ := s.MatterReadFiltered(fabric1, 0x0002)
+		si, _ := v.([]core.SceneInfoStruct)
+		if len(si) != 1 {
+			t.Fatalf("FabricSceneInfo = %+v", v)
+		}
+		return si[0]
+	}
+	if si := info(); !si.SceneValid || si.SceneCount != 1 {
+		t.Fatalf("after the recall: %+v", si)
+	}
+	refuse = true
+	if r := invoke(t, s, 0x02, core.SceneRef{GroupID: 0x0101, SceneID: 1}).(core.SceneStatusResponse); r.Status != im.StatusFailure {
+		t.Fatalf("RemoveScene with the store refusing = %v, want FAILURE", r.Status)
+	}
+	if si := info(); !si.SceneValid || si.SceneCount != 1 || si.CurrentScene != 1 || si.CurrentGroup != 0x0101 {
+		t.Errorf("after the refused removal: %+v, want scene 1 of group 0x0101 current, valid and stored", si)
+	}
+	refuse = false
+	st.InvalidateCurrentScene()
+	if si := info(); si.SceneValid {
+		t.Errorf("the current scene is no longer monitored: still valid after a change, %+v", si)
 	}
 }

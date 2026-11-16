@@ -339,7 +339,9 @@ func (st *ScenesState) store(ctx context.Context, keep bool) bool {
 // change applies mutate to the loaded table and stores it when mutate
 // reports a change (or a refused store is owed). A command's
 // change (command true) the store refuses is undone: the previous table
-// comes back and the change answers FAILURE. A consequence's change
+// comes back, with fabric's scene info and the fabric whose current scene
+// is monitored as they were — a removal that invalidated the current
+// scene leaves it valid — and the change answers FAILURE. A consequence's change
 // (command false) is kept when the store refuses it, and reaches an
 // unloaded table as a pending change. Caller holds mu.
 func (st *ScenesState) change(ctx context.Context, command bool, fabric uint8, mutate func() (im.StatusCode, bool)) im.StatusCode {
@@ -351,12 +353,20 @@ func (st *ScenesState) change(ctx context.Context, command bool, fabric uint8, m
 		return im.StatusSuccess
 	}
 	prev := slices.Clone(st.table)
+	prevMonitor := st.monitor
+	prevInfo, hadInfo := SceneInfoStruct{}, false
+	if inf := st.info[fabric]; inf != nil {
+		prevInfo, hadInfo = *inf, true
+	}
 	status, changed := mutate()
 	if status != im.StatusSuccess || !changed && !st.dirty {
 		return status
 	}
 	if !st.store(ctx, command) && command {
-		st.table = prev
+		st.table, st.monitor = prev, prevMonitor
+		if hadInfo {
+			*st.info[fabric] = prevInfo
+		}
 		st.infoFor(fabric)
 		return im.StatusFailure
 	}
