@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9036,
+  "entry_points": 9042,
   "entry_packages": [
     ".",
     "bdx",
@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18785,
+    "total_exported": 18789,
     "reachable": 12621,
-    "whitelisted": 6164,
+    "whitelisted": 6168,
     "unreachable": 0
   },
   "by_package": [],
@@ -6188,6 +6188,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRouteWithoutPeerAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_addrless_test.go",
+      "line": 24
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRvcOperationalStateOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/appliance_clusters_wire_test.go",
@@ -6654,6 +6661,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_register_test.go",
       "line": 39
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStartBLERegistersWithoutTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_register_unlocked_test.go",
+      "line": 61
     },
     {
       "package": "bridge",
@@ -13850,6 +13864,13 @@
       "reason": "generic: the self-held servers call instantiations of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/selfheld.go",
       "line": 263
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "SetWindowHooksForTests",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/export_test.go",
+      "line": 10
     },
     {
       "package": "cluster/spec",
@@ -31412,7 +31433,7 @@
       "identifier": "TestNoWriteChangesOutsideEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_changes_guard_test.go",
-      "line": 20
+      "line": 26
     },
     {
       "package": "endpoint",
@@ -31987,6 +32008,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_gates_parity_matterjs_test.go",
       "line": 132
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestWriteRecordWalkStaysInTheModule",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/write_changes_guard_test.go",
+      "line": 46
     },
     {
       "package": "endpoint",
