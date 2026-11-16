@@ -2809,7 +2809,13 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 	}
 	if err := o.RemoveFabric(ctx, req.FabricIndex); err != nil {
 		// matter.js answers InvalidFabricIndex for a fabric it does not
-		// hold (OperationalCredentialsServer.ts:412-419).
+		// hold (OperationalCredentialsServer.ts:412-419). Any other error —
+		// the store could not remove a fabric it holds — is the command's
+		// FAILURE: the fabric exists, and the controller may retry (review
+		// II, R2-P6-err-1027).
+		if !errors.Is(err, store.ErrFabricNotFound) {
+			return nil, spec.Errorf(im.StatusFailure, "core: RemoveFabric %d: %v", req.FabricIndex, err)
+		}
 		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: req.FabricIndex}, nil

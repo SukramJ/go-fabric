@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"reflect"
 	"sync"
 	"testing"
@@ -168,5 +169,41 @@ func TestFabricScopedOpcredsCommandsWithoutFabricAreRefused(t *testing.T) {
 		if fabrics[i].Label != "" {
 			t.Errorf("fabric %d relabelled to %q", fabrics[i].FabricIndex, fabrics[i].Label)
 		}
+	}
+}
+
+// removeFabricFailStore fails the removal of a fabric it holds.
+type removeFabricFailStore struct {
+	*fakeStore
+}
+
+func (s *removeFabricFailStore) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
+	if _, err := s.GetFabric(ctx, fabricIndex); err != nil {
+		return err
+	}
+	return errors.New("injected RemoveFabric I/O failure")
+}
+
+// RemoveFabric answers InvalidFabricIndex only for a fabric the store does
+// not hold; a store failure on a fabric it holds is the command's FAILURE
+// (review II, R2-P6-err-1027).
+func TestRemoveFabricStoreFailureIsFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := &removeFabricFailStore{fakeStore: newFakeStore()}
+	oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddFabric(ctx, mstore.FabricRecord{FabricID: 1, RootPublicKey: []byte{4, 1}}); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := oc.MatterInvoke(fabricCtx(1), 0x0A, core.RemoveFabricRequest{FabricIndex: 1})
+	if got := spec.StatusOf(err); got != im.StatusFailure {
+		t.Errorf("RemoveFabric over a failing store = %#v, %v (status %v), want FAILURE", resp, err, got)
+	}
+	resp, err = oc.MatterInvoke(fabricCtx(1), 0x0A, core.RemoveFabricRequest{FabricIndex: 9})
+	if noc, ok := resp.(core.NOCResponse); err != nil || !ok || noc.StatusCode != core.NOCStatusInvalidFabricIndex {
+		t.Errorf("RemoveFabric of an unknown index = %#v, %v, want NOCResponse InvalidFabricIndex", resp, err)
 	}
 }
