@@ -113,6 +113,29 @@ func (v *GroupInfoMapStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GroupInfoMapStruct) Clone() GroupInfoMapStruct {
+	c := v
+	c.Endpoints = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.Endpoints)
+	c.GroupName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.GroupName)
+	return c
+}
+
 // GroupInfoMapStructDef describes GroupInfoMapStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -241,6 +264,52 @@ func (v *GroupKeySetStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GroupKeySetStruct) Clone() GroupKeySetStruct {
+	c := v
+	c.EpochKey0 = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EpochKey0.Value), Null: v.EpochKey0.Null}
+	c.EpochKey1 = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EpochKey1.Value), Null: v.EpochKey1.Null}
+	c.EpochKey2 = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EpochKey2.Value), Null: v.EpochKey2.Null}
+	c.GroupKeyMulticastPolicy = func(p *GroupKeyMulticastPolicyEnum) *GroupKeyMulticastPolicyEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.GroupKeyMulticastPolicy)
+	c.FabricIndex = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FabricIndex)
+	return c
+}
+
 // GroupKeySetStructDef describes GroupKeySetStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -274,6 +343,15 @@ func (v *KeySetWriteRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "KeySetWrite",
 		spec.Bind(0, "GroupKeySet", true, &v.GroupKeySet, spec.DecodeStruct[GroupKeySetStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v KeySetWriteRequest) Clone() KeySetWriteRequest {
+	c := v
+	c.GroupKeySet = v.GroupKeySet.Clone()
+	return c
 }
 
 // KeySetReadRequest is the KeySetRead command payload.
@@ -312,6 +390,15 @@ func (v *KeySetReadResponse) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "KeySetReadResponse",
 		spec.Bind(0, "GroupKeySet", true, &v.GroupKeySet, spec.DecodeStruct[GroupKeySetStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v KeySetReadResponse) Clone() KeySetReadResponse {
+	c := v
+	c.GroupKeySet = v.GroupKeySet.Clone()
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -369,6 +456,22 @@ func (v *KeySetReadAllIndicesResponse) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "KeySetReadAllIndicesResponse",
 		spec.Bind(0, "GroupKeySetIds", true, &v.GroupKeySetIds, spec.DecodeList(spec.DecodeUint[uint16](16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v KeySetReadAllIndicesResponse) Clone() KeySetReadAllIndicesResponse {
+	c := v
+	c.GroupKeySetIds = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.GroupKeySetIds)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

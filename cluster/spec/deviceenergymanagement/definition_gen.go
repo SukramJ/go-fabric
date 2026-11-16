@@ -150,6 +150,35 @@ func (v *ConstraintsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ConstraintsStruct) Clone() ConstraintsStruct {
+	c := v
+	c.NominalPower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.NominalPower)
+	c.MaximumEnergy = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaximumEnergy)
+	c.LoadControl = func(p *int8) *int8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LoadControl)
+	return c
+}
+
 // ConstraintsStructDef describes ConstraintsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -187,6 +216,21 @@ func (v *CostStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "DecimalPoints", true, &v.DecimalPoints, spec.DecodeUint[uint8](8)),
 		spec.Bind(3, "Currency", false, &v.Currency, spec.DecodeOptional(spec.DecodeUintIn[uint16](16, 0, 999))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CostStruct) Clone() CostStruct {
+	c := v
+	c.Currency = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Currency)
+	return c
 }
 
 // CostStructDef describes CostStruct.
@@ -335,6 +379,38 @@ func (v *ForecastStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ForecastStruct) Clone() ForecastStruct {
+	c := v
+	c.EarliestStartTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EarliestStartTime)
+	c.LatestEndTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LatestEndTime)
+	c.Slots = func(s []SlotStruct) []SlotStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]SlotStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.Slots)
+	return c
+}
+
 // ForecastStructDef describes ForecastStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -418,6 +494,114 @@ func (v *SlotStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(16, "MinDurationAdjustment", false, &v.MinDurationAdjustment, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 		spec.Bind(17, "MaxDurationAdjustment", false, &v.MaxDurationAdjustment, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SlotStruct) Clone() SlotStruct {
+	c := v
+	c.SlotIsPausable = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SlotIsPausable)
+	c.MinPauseDuration = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinPauseDuration)
+	c.MaxPauseDuration = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxPauseDuration)
+	c.ManufacturerEsaState = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ManufacturerEsaState)
+	c.NominalPower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.NominalPower)
+	c.MinPower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinPower)
+	c.MaxPower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxPower)
+	c.NominalEnergy = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.NominalEnergy)
+	c.Costs = func(p *[]CostStruct) *[]CostStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []CostStruct) []CostStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]CostStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.Costs)
+	c.MinPowerAdjustment = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinPowerAdjustment)
+	c.MaxPowerAdjustment = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxPowerAdjustment)
+	c.MinDurationAdjustment = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinDurationAdjustment)
+	c.MaxDurationAdjustment = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxDurationAdjustment)
+	return c
 }
 
 // SlotStructDef describes SlotStruct.
@@ -510,6 +694,22 @@ func (v *PowerAdjustCapabilityStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PowerAdjustCapabilityStruct) Clone() PowerAdjustCapabilityStruct {
+	c := v
+	c.PowerAdjustCapability = spec.Nullable[[]PowerAdjustStruct]{Value: func(s []PowerAdjustStruct) []PowerAdjustStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]PowerAdjustStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.PowerAdjustCapability.Value), Null: v.PowerAdjustCapability.Null}
+	return c
+}
+
 // PowerAdjustCapabilityStructDef describes PowerAdjustCapabilityStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -600,6 +800,21 @@ func (v *SlotAdjustmentStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "NominalPower", false, &v.NominalPower, spec.DecodeOptional(spec.DecodeInt[int64](64))),
 		spec.Bind(2, "Duration", true, &v.Duration, spec.DecodeUint[uint32](32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SlotAdjustmentStruct) Clone() SlotAdjustmentStruct {
+	c := v
+	c.NominalPower = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.NominalPower)
+	return c
 }
 
 // SlotAdjustmentStructDef describes SlotAdjustmentStruct.
@@ -733,6 +948,24 @@ func (v *ModifyForecastRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ModifyForecastRequestRequest) Clone() ModifyForecastRequestRequest {
+	c := v
+	c.SlotAdjustments = func(s []SlotAdjustmentStruct) []SlotAdjustmentStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]SlotAdjustmentStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.SlotAdjustments)
+	return c
+}
+
 // RequestConstraintBasedForecastRequest is the RequestConstraintBasedForecast command payload.
 type RequestConstraintBasedForecastRequest struct {
 	Constraints []ConstraintsStruct // 0: list[ConstraintsStruct], M, max 10
@@ -753,6 +986,24 @@ func (v *RequestConstraintBasedForecastRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Constraints", true, &v.Constraints, spec.DecodeListIn(spec.DecodeStruct[ConstraintsStruct], 0, 10)),
 		spec.Bind(1, "Cause", true, &v.Cause, spec.DecodeUint[AdjustmentCauseEnum](8)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RequestConstraintBasedForecastRequest) Clone() RequestConstraintBasedForecastRequest {
+	c := v
+	c.Constraints = func(s []ConstraintsStruct) []ConstraintsStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ConstraintsStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.Constraints)
+	return c
 }
 
 // CancelRequestRequest is the CancelRequest command payload.

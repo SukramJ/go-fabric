@@ -82,6 +82,28 @@ func (v *TLSCertStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TLSCertStruct) Clone() TLSCertStruct {
+	c := v
+	c.Certificate = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Certificate)
+	return c
+}
+
 // TLSCertStructDef describes TLSCertStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -119,6 +141,51 @@ func (v *TLSClientCertificateDetailStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TLSClientCertificateDetailStruct) Clone() TLSClientCertificateDetailStruct {
+	c := v
+	c.ClientCertificate = func(p *spec.Nullable[[]byte]) *spec.Nullable[[]byte] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.ClientCertificate)
+	c.IntermediateCertificates = func(p *[][]byte) *[][]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s [][]byte) [][]byte {
+			if s == nil {
+				return nil
+			}
+			out := make([][]byte, len(s))
+			for i := range s {
+				out[i] = func(s []byte) []byte {
+					if s == nil {
+						return nil
+					}
+					out := make([]byte, len(s))
+					copy(out, s)
+					return out
+				}(s[i])
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.IntermediateCertificates)
+	return c
+}
+
 // TLSClientCertificateDetailStructDef describes TLSClientCertificateDetailStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -149,6 +216,22 @@ func (v *ProvisionRootCertificateRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Certificate", true, &v.Certificate, spec.DecodeBytesIn(0, 3000)),
 		spec.Bind(1, "Caid", true, &v.Caid, spec.DecodeNullable(spec.DecodeUint[uint16](16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProvisionRootCertificateRequest) Clone() ProvisionRootCertificateRequest {
+	c := v
+	c.Certificate = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Certificate)
+	return c
 }
 
 // ProvisionRootCertificateResponse is the ProvisionRootCertificateResponse command payload.
@@ -213,6 +296,24 @@ func (v *FindRootCertificateResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v FindRootCertificateResponse) Clone() FindRootCertificateResponse {
+	c := v
+	c.CertificateDetails = func(s []TLSCertStruct) []TLSCertStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TLSCertStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.CertificateDetails)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (FindRootCertificateResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdFindRootCertificateResponse
@@ -235,6 +336,22 @@ func (v *LookupRootCertificateRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "LookupRootCertificate",
 		spec.Bind(0, "Fingerprint", true, &v.Fingerprint, spec.DecodeBytesIn(0, 64)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LookupRootCertificateRequest) Clone() LookupRootCertificateRequest {
+	c := v
+	c.Fingerprint = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Fingerprint)
+	return c
 }
 
 // LookupRootCertificateResponse is the LookupRootCertificateResponse command payload.
@@ -302,6 +419,22 @@ func (v *ClientCsrRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ClientCsrRequest) Clone() ClientCsrRequest {
+	c := v
+	c.Nonce = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Nonce)
+	return c
+}
+
 // ClientCsrResponse is the ClientCsrResponse command payload.
 type ClientCsrResponse struct {
 	Ccdid          uint16 // 0: TLSCCDID, M, 0 to 65534
@@ -325,6 +458,30 @@ func (v *ClientCsrResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Csr", true, &v.Csr, spec.DecodeBytesIn(0, 3000)),
 		spec.Bind(2, "NonceSignature", true, &v.NonceSignature, spec.DecodeBytesIn(0, 128)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ClientCsrResponse) Clone() ClientCsrResponse {
+	c := v
+	c.Csr = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Csr)
+	c.NonceSignature = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NonceSignature)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -355,6 +512,39 @@ func (v *ProvisionClientCertificateRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "ClientCertificate", true, &v.ClientCertificate, spec.DecodeBytesIn(0, 3000)),
 		spec.Bind(2, "IntermediateCertificates", true, &v.IntermediateCertificates, spec.DecodeListIn(spec.DecodeBytes, 0, 10)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProvisionClientCertificateRequest) Clone() ProvisionClientCertificateRequest {
+	c := v
+	c.ClientCertificate = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ClientCertificate)
+	c.IntermediateCertificates = func(s [][]byte) [][]byte {
+		if s == nil {
+			return nil
+		}
+		out := make([][]byte, len(s))
+		for i := range s {
+			out[i] = func(s []byte) []byte {
+				if s == nil {
+					return nil
+				}
+				out := make([]byte, len(s))
+				copy(out, s)
+				return out
+			}(s[i])
+		}
+		return out
+	}(v.IntermediateCertificates)
+	return c
 }
 
 // FindClientCertificateRequest is the FindClientCertificate command payload.
@@ -395,6 +585,24 @@ func (v *FindClientCertificateResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v FindClientCertificateResponse) Clone() FindClientCertificateResponse {
+	c := v
+	c.CertificateDetails = func(s []TLSClientCertificateDetailStruct) []TLSClientCertificateDetailStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TLSClientCertificateDetailStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.CertificateDetails)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (FindClientCertificateResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdFindClientCertificateResponse
@@ -417,6 +625,22 @@ func (v *LookupClientCertificateRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "LookupClientCertificate",
 		spec.Bind(0, "Fingerprint", true, &v.Fingerprint, spec.DecodeBytesIn(0, 64)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LookupClientCertificateRequest) Clone() LookupClientCertificateRequest {
+	c := v
+	c.Fingerprint = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Fingerprint)
+	return c
 }
 
 // LookupClientCertificateResponse is the LookupClientCertificateResponse command payload.

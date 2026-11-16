@@ -401,6 +401,43 @@ func (v *PresetStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PresetStruct) Clone() PresetStruct {
+	c := v
+	c.PresetHandle = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PresetHandle.Value), Null: v.PresetHandle.Null}
+	c.Name = func(p *spec.Nullable[string]) *spec.Nullable[string] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Name)
+	c.CoolingSetpoint = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CoolingSetpoint)
+	c.HeatingSetpoint = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.HeatingSetpoint)
+	return c
+}
+
 // PresetStructDef describes PresetStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -621,6 +658,53 @@ func (v *ScheduleStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ScheduleStruct) Clone() ScheduleStruct {
+	c := v
+	c.ScheduleHandle = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ScheduleHandle.Value), Null: v.ScheduleHandle.Null}
+	c.Name = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Name)
+	c.PresetHandle = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.PresetHandle)
+	c.Transitions = func(s []ScheduleTransitionStruct) []ScheduleTransitionStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ScheduleTransitionStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.Transitions)
+	return c
+}
+
 // ScheduleStructDef describes ScheduleStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -698,6 +782,49 @@ func (v *ScheduleTransitionStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(4, "CoolingSetpoint", false, &v.CoolingSetpoint, spec.DecodeOptional(spec.DecodeInt[int16](16))),
 		spec.Bind(5, "HeatingSetpoint", false, &v.HeatingSetpoint, spec.DecodeOptional(spec.DecodeInt[int16](16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ScheduleTransitionStruct) Clone() ScheduleTransitionStruct {
+	c := v
+	c.PresetHandle = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.PresetHandle)
+	c.SystemMode = func(p *SystemModeEnum) *SystemModeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SystemMode)
+	c.CoolingSetpoint = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CoolingSetpoint)
+	c.HeatingSetpoint = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.HeatingSetpoint)
+	return c
 }
 
 // ScheduleTransitionStructDef describes ScheduleTransitionStruct.
@@ -939,6 +1066,22 @@ func (v *ThermostatSuggestionStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ThermostatSuggestionStruct) Clone() ThermostatSuggestionStruct {
+	c := v
+	c.PresetHandle = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PresetHandle)
+	return c
+}
+
 // ThermostatSuggestionStructDef describes ThermostatSuggestionStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -1151,6 +1294,22 @@ func (v *SetActiveScheduleRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetActiveScheduleRequestRequest) Clone() SetActiveScheduleRequestRequest {
+	c := v
+	c.ScheduleHandle = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ScheduleHandle)
+	return c
+}
+
 // SetActivePresetRequestRequest is the SetActivePresetRequest command payload.
 type SetActivePresetRequestRequest struct {
 	PresetHandle spec.Nullable[[]byte] // 0: octstr, M, max 16, X
@@ -1168,6 +1327,22 @@ func (v *SetActivePresetRequestRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "SetActivePresetRequest",
 		spec.Bind(0, "PresetHandle", true, &v.PresetHandle, spec.DecodeNullable(spec.DecodeBytesIn(0, 16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetActivePresetRequestRequest) Clone() SetActivePresetRequestRequest {
+	c := v
+	c.PresetHandle = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PresetHandle.Value), Null: v.PresetHandle.Null}
+	return c
 }
 
 // AddThermostatSuggestionRequest is the AddThermostatSuggestion command payload.
@@ -1193,6 +1368,22 @@ func (v *AddThermostatSuggestionRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "EffectiveTime", true, &v.EffectiveTime, spec.DecodeNullable(spec.DecodeUint[uint32](32))),
 		spec.Bind(2, "ExpirationInMinutes", true, &v.ExpirationInMinutes, spec.DecodeUintIn[uint16](16, 30, 1440)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddThermostatSuggestionRequest) Clone() AddThermostatSuggestionRequest {
+	c := v
+	c.PresetHandle = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PresetHandle)
+	return c
 }
 
 // RemoveThermostatSuggestionRequest is the RemoveThermostatSuggestion command payload.
@@ -1239,6 +1430,29 @@ func (v *AtomicResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AtomicResponse) Clone() AtomicResponse {
+	c := v
+	c.AttributeStatus = func(s []AtomicResponseAttributeStatusEntry) []AtomicResponseAttributeStatusEntry {
+		if s == nil {
+			return nil
+		}
+		out := make([]AtomicResponseAttributeStatusEntry, len(s))
+		copy(out, s)
+		return out
+	}(v.AttributeStatus)
+	c.Timeout = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Timeout)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (AtomicResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdAtomicResponse
@@ -1269,6 +1483,29 @@ func (v *AtomicRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AtomicRequestRequest) Clone() AtomicRequestRequest {
+	c := v
+	c.AttributeRequests = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.AttributeRequests)
+	c.Timeout = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Timeout)
+	return c
+}
+
 // SystemModeChangeEvent is the SystemModeChange event payload.
 type SystemModeChangeEvent struct {
 	PreviousSystemMode *SystemModeEnum // 0: SystemModeEnum, O
@@ -1289,6 +1526,21 @@ func (v *SystemModeChangeEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "PreviousSystemMode", false, &v.PreviousSystemMode, spec.DecodeOptional(spec.DecodeUint[SystemModeEnum](8))),
 		spec.Bind(1, "CurrentSystemMode", true, &v.CurrentSystemMode, spec.DecodeUint[SystemModeEnum](8)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SystemModeChangeEvent) Clone() SystemModeChangeEvent {
+	c := v
+	c.PreviousSystemMode = func(p *SystemModeEnum) *SystemModeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PreviousSystemMode)
+	return c
 }
 
 // LocalTemperatureChangeEvent is the LocalTemperatureChange event payload.
@@ -1332,6 +1584,21 @@ func (v *OccupancyChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OccupancyChangeEvent) Clone() OccupancyChangeEvent {
+	c := v
+	c.PreviousOccupancy = func(p *OccupancyBitmap) *OccupancyBitmap {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PreviousOccupancy)
+	return c
+}
+
 // SetpointChangeEvent is the SetpointChange event payload.
 type SetpointChangeEvent struct {
 	SystemMode       SystemModeEnum   // 0: SystemModeEnum, M, heat, cool
@@ -1360,6 +1627,28 @@ func (v *SetpointChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetpointChangeEvent) Clone() SetpointChangeEvent {
+	c := v
+	c.Occupancy = func(p *OccupancyBitmap) *OccupancyBitmap {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Occupancy)
+	c.PreviousSetpoint = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PreviousSetpoint)
+	return c
+}
+
 // RunningStateChangeEvent is the RunningStateChange event payload.
 type RunningStateChangeEvent struct {
 	PreviousRunningState *RelayStateBitmap // 0: RelayStateBitmap, O
@@ -1380,6 +1669,21 @@ func (v *RunningStateChangeEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "PreviousRunningState", false, &v.PreviousRunningState, spec.DecodeOptional(spec.DecodeUint[RelayStateBitmap](16))),
 		spec.Bind(1, "CurrentRunningState", true, &v.CurrentRunningState, spec.DecodeUint[RelayStateBitmap](16)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RunningStateChangeEvent) Clone() RunningStateChangeEvent {
+	c := v
+	c.PreviousRunningState = func(p *RelayStateBitmap) *RelayStateBitmap {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PreviousRunningState)
+	return c
 }
 
 // RunningModeChangeEvent is the RunningModeChange event payload.
@@ -1404,6 +1708,21 @@ func (v *RunningModeChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RunningModeChangeEvent) Clone() RunningModeChangeEvent {
+	c := v
+	c.PreviousRunningMode = func(p *ThermostatRunningModeEnum) *ThermostatRunningModeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PreviousRunningMode)
+	return c
+}
+
 // ActiveScheduleChangeEvent is the ActiveScheduleChange event payload.
 type ActiveScheduleChangeEvent struct {
 	PreviousScheduleHandle *spec.Nullable[[]byte] // 0: octstr, O, max 16, X
@@ -1426,6 +1745,36 @@ func (v *ActiveScheduleChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ActiveScheduleChangeEvent) Clone() ActiveScheduleChangeEvent {
+	c := v
+	c.PreviousScheduleHandle = func(p *spec.Nullable[[]byte]) *spec.Nullable[[]byte] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.PreviousScheduleHandle)
+	c.CurrentScheduleHandle = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.CurrentScheduleHandle.Value), Null: v.CurrentScheduleHandle.Null}
+	return c
+}
+
 // ActivePresetChangeEvent is the ActivePresetChange event payload.
 type ActivePresetChangeEvent struct {
 	PreviousPresetHandle *spec.Nullable[[]byte] // 0: octstr, O, max 16, X
@@ -1446,6 +1795,36 @@ func (v *ActivePresetChangeEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "PreviousPresetHandle", false, &v.PreviousPresetHandle, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeBytesIn(0, 16)))),
 		spec.Bind(1, "CurrentPresetHandle", true, &v.CurrentPresetHandle, spec.DecodeNullable(spec.DecodeBytesIn(0, 16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ActivePresetChangeEvent) Clone() ActivePresetChangeEvent {
+	c := v
+	c.PreviousPresetHandle = func(p *spec.Nullable[[]byte]) *spec.Nullable[[]byte] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.PreviousPresetHandle)
+	c.CurrentPresetHandle = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.CurrentPresetHandle.Value), Null: v.CurrentPresetHandle.Null}
+	return c
 }
 
 func decodeSetpointRaiseLowerRequest(n spec.Node) (any, error) {

@@ -243,6 +243,22 @@ func (v *EndpointListStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EndpointListStruct) Clone() EndpointListStruct {
+	c := v
+	c.Endpoints = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.Endpoints)
+	return c
+}
+
 // EndpointListStructDef describes EndpointListStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -296,6 +312,21 @@ func (v *InstantActionRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v InstantActionRequest) Clone() InstantActionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
+}
+
 // InstantActionWithTransitionRequest is the InstantActionWithTransition command payload.
 type InstantActionWithTransitionRequest struct {
 	ActionId       uint16  // 0: uint16, M
@@ -321,6 +352,21 @@ func (v *InstantActionWithTransitionRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v InstantActionWithTransitionRequest) Clone() InstantActionWithTransitionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
+}
+
 // StartActionRequest is the StartAction command payload.
 type StartActionRequest struct {
 	ActionId uint16  // 0: uint16, M
@@ -341,6 +387,21 @@ func (v *StartActionRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "ActionId", true, &v.ActionId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "InvokeId", false, &v.InvokeId, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StartActionRequest) Clone() StartActionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
 }
 
 // StartActionWithDurationRequest is the StartActionWithDuration command payload.
@@ -368,6 +429,21 @@ func (v *StartActionWithDurationRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StartActionWithDurationRequest) Clone() StartActionWithDurationRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
+}
+
 // StopActionRequest is the StopAction command payload.
 type StopActionRequest struct {
 	ActionId uint16  // 0: uint16, M
@@ -390,6 +466,21 @@ func (v *StopActionRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StopActionRequest) Clone() StopActionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
+}
+
 // PauseActionRequest is the PauseAction command payload.
 type PauseActionRequest struct {
 	ActionId uint16  // 0: uint16, M
@@ -410,6 +501,21 @@ func (v *PauseActionRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "ActionId", true, &v.ActionId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "InvokeId", false, &v.InvokeId, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PauseActionRequest) Clone() PauseActionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
 }
 
 // PauseActionWithDurationRequest is the PauseActionWithDuration command payload.
@@ -437,6 +543,21 @@ func (v *PauseActionWithDurationRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PauseActionWithDurationRequest) Clone() PauseActionWithDurationRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
+}
+
 // ResumeActionRequest is the ResumeAction command payload.
 type ResumeActionRequest struct {
 	ActionId uint16  // 0: uint16, M
@@ -459,6 +580,21 @@ func (v *ResumeActionRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ResumeActionRequest) Clone() ResumeActionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
+}
+
 // EnableActionRequest is the EnableAction command payload.
 type EnableActionRequest struct {
 	ActionId uint16  // 0: uint16, M
@@ -479,6 +615,21 @@ func (v *EnableActionRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "ActionId", true, &v.ActionId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "InvokeId", false, &v.InvokeId, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EnableActionRequest) Clone() EnableActionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
 }
 
 // EnableActionWithDurationRequest is the EnableActionWithDuration command payload.
@@ -506,6 +657,21 @@ func (v *EnableActionWithDurationRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EnableActionWithDurationRequest) Clone() EnableActionWithDurationRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
+}
+
 // DisableActionRequest is the DisableAction command payload.
 type DisableActionRequest struct {
 	ActionId uint16  // 0: uint16, M
@@ -526,6 +692,21 @@ func (v *DisableActionRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "ActionId", true, &v.ActionId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "InvokeId", false, &v.InvokeId, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DisableActionRequest) Clone() DisableActionRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
 }
 
 // DisableActionWithDurationRequest is the DisableActionWithDuration command payload.
@@ -551,6 +732,21 @@ func (v *DisableActionWithDurationRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "InvokeId", false, &v.InvokeId, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 		spec.Bind(2, "Duration", true, &v.Duration, spec.DecodeUint[uint32](32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DisableActionWithDurationRequest) Clone() DisableActionWithDurationRequest {
+	c := v
+	c.InvokeId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.InvokeId)
+	return c
 }
 
 // StateChangedEvent is the StateChanged event payload.

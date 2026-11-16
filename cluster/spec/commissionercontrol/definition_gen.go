@@ -173,6 +173,21 @@ func (v *RequestCommissioningApprovalRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RequestCommissioningApprovalRequest) Clone() RequestCommissioningApprovalRequest {
+	c := v
+	c.Label = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Label)
+	return c
+}
+
 // CommissionNodeRequest is the CommissionNode command payload.
 type CommissionNodeRequest struct {
 	RequestId              uint64 // 0: uint64, M
@@ -224,6 +239,30 @@ func (v *ReverseOpenCommissioningWindowResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "Iterations", true, &v.Iterations, spec.DecodeUintIn[uint32](32, 1000, 100000)),
 		spec.Bind(4, "Salt", true, &v.Salt, spec.DecodeBytesIn(16, 32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ReverseOpenCommissioningWindowResponse) Clone() ReverseOpenCommissioningWindowResponse {
+	c := v
+	c.PakePasscodeVerifier = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PakePasscodeVerifier)
+	c.Salt = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Salt)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

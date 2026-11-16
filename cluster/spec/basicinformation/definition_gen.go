@@ -100,6 +100,42 @@ func (v *CapabilityMinimaStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CapabilityMinimaStruct) Clone() CapabilityMinimaStruct {
+	c := v
+	c.SimultaneousInvocationsSupported = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SimultaneousInvocationsSupported)
+	c.SimultaneousWritesSupported = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SimultaneousWritesSupported)
+	c.ReadPathsSupported = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ReadPathsSupported)
+	c.SubscribePathsSupported = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SubscribePathsSupported)
+	return c
+}
+
 // CapabilityMinimaStructDef describes CapabilityMinimaStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"

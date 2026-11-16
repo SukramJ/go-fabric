@@ -110,6 +110,35 @@ func (v *DimensionStateStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DimensionStateStruct) Clone() DimensionStateStruct {
+	c := v
+	c.Position = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Position)
+	c.Latch = func(p *spec.Nullable[bool]) *spec.Nullable[bool] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Latch)
+	c.Speed = func(p *ThreeLevelAutoEnum) *ThreeLevelAutoEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Speed)
+	return c
+}
+
 // DimensionStateStructDef describes DimensionStateStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -403,6 +432,35 @@ func (v *SetTargetRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetTargetRequest) Clone() SetTargetRequest {
+	c := v
+	c.Position = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Position)
+	c.Latch = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Latch)
+	c.Speed = func(p *ThreeLevelAutoEnum) *ThreeLevelAutoEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Speed)
+	return c
+}
+
 // StepRequest is the Step command payload.
 type StepRequest struct {
 	Direction     StepDirectionEnum   // 0: StepDirectionEnum, M
@@ -426,6 +484,21 @@ func (v *StepRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "NumberOfSteps", true, &v.NumberOfSteps, spec.DecodeUintIn[uint16](16, 1, 65535)),
 		spec.Bind(2, "Speed", false, &v.Speed, spec.DecodeOptional(spec.DecodeUint[ThreeLevelAutoEnum](8))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StepRequest) Clone() StepRequest {
+	c := v
+	c.Speed = func(p *ThreeLevelAutoEnum) *ThreeLevelAutoEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Speed)
+	return c
 }
 
 func decodeSetTargetRequest(n spec.Node) (any, error) { return spec.DecodeStruct[SetTargetRequest](n) }

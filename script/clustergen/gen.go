@@ -1059,6 +1059,22 @@ func (g *generator) writePayload(w *writer, p *payload, what string) {
 		w.p("}")
 	}
 	w.p("")
+	if payloadNeedsClone(p.fields) {
+		w.p("// Clone returns a deep copy of v: every list, octet string, optional")
+		w.p("// field and nested struct of the copy is its own, so a change to the")
+		w.p("// copy does not reach v. A field of type any is copied as it is.")
+		w.p("func (v %s) Clone() %s {", p.goName, p.goName)
+		w.p("\tc := v")
+		for _, f := range p.fields {
+			if !fieldNeedsClone(f) {
+				continue
+			}
+			w.p("\tc.%s = %s", f.goName, fieldCloneExpr(f, "v."+f.goName))
+		}
+		w.p("\treturn c")
+		w.p("}")
+		w.p("")
+	}
 	if p.response != nil {
 		w.p("// ResponseCommand implements spec.ResponsePayload.")
 		w.p("func (%s) ResponseCommand() (clusterID, commandID uint32) { return ClusterID, Cmd%s }", p.goName, exportName(p.response.Name))
@@ -2143,4 +2159,80 @@ func structDefault(t typeInfo) string {
 		return ""
 	}
 	return t.dt.goName + "{" + strings.Join(parts, ", ") + "}"
+}
+
+// payloadNeedsClone reports whether a struct of fields holds a slice or a
+// pointer at any depth: the structs clustergen gives a deep Clone
+// (decision 142, review II, R2-P6-err-1460's adoption is the servers').
+func payloadNeedsClone(fields []*fieldInfo) bool {
+	return slices.ContainsFunc(fields, fieldNeedsClone)
+}
+
+// fieldNeedsClone reports whether a struct field's value holds a slice or
+// a pointer: an optional field is a pointer itself.
+func fieldNeedsClone(f *fieldInfo) bool {
+	return !f.mandatory || typeNeedsClone(f.t, map[*dataInfo]bool{})
+}
+
+// typeNeedsClone reports whether a value of t holds a slice or a pointer
+// at any depth (a nullable wrapper holds what its value holds).
+func typeNeedsClone(t typeInfo, seen map[*dataInfo]bool) bool {
+	switch t.kind {
+	case kindBytes, kindList:
+		return true
+	case kindStruct:
+		if t.dt == nil || seen[t.dt] {
+			return false
+		}
+		seen[t.dt] = true
+		for _, f := range t.dt.fields {
+			if !f.mandatory || typeNeedsClone(f.t, seen) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+// fieldCloneExpr is the Go expression of a deep copy of the struct field
+// f's value src: an optional field's pointer copied with its value.
+func fieldCloneExpr(f *fieldInfo, src string) string {
+	if f.mandatory {
+		return valueCloneExpr(f.t, f.nullable, src)
+	}
+	inner := valueCloneExpr(f.t, f.nullable, "(*p)")
+	if inner == "(*p)" {
+		inner = "*p"
+	}
+	return fmt.Sprintf("func(p *%s) *%s { if p == nil { return nil }; x := %s; return &x }(%s)",
+		f.goType(), f.goType(), inner, src)
+}
+
+// valueCloneExpr is the Go expression of a deep copy of a value src of
+// type t (wrapped in spec.Nullable when nullable). A list keeps nil and
+// empty apart; a struct without a Clone, a scalar and a value of type any
+// are copied as they are.
+func valueCloneExpr(t typeInfo, nullable bool, src string) string {
+	if !typeNeedsClone(t, map[*dataInfo]bool{}) {
+		return src
+	}
+	if nullable {
+		return fmt.Sprintf("spec.Nullable[%s]{Value: %s, Null: %s.Null}", t.goType, valueCloneExpr(t, false, src+".Value"), src)
+	}
+	switch t.kind {
+	case kindBytes:
+		return fmt.Sprintf("func(s []byte) []byte { if s == nil { return nil }; out := make([]byte, len(s)); copy(out, s); return out }(%s)", src)
+	case kindList:
+		elem := valueCloneExpr(t.elem.t, t.elem.nullable, "s[i]")
+		if elem == "s[i]" {
+			return fmt.Sprintf("func(s %s) %s { if s == nil { return nil }; out := make(%s, len(s)); copy(out, s); return out }(%s)", t.goType, t.goType, t.goType, src)
+		}
+		return fmt.Sprintf("func(s %s) %s { if s == nil { return nil }; out := make(%s, len(s)); for i := range s { out[i] = %s }; return out }(%s)", t.goType, t.goType, t.goType, elem, src)
+	case kindStruct:
+		return src + ".Clone()"
+	default:
+		return src
+	}
 }

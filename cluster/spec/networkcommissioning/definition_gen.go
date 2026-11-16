@@ -128,6 +128,22 @@ func (v *NetworkInfoStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NetworkInfoStruct) Clone() NetworkInfoStruct {
+	c := v
+	c.NetworkId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NetworkId)
+	return c
+}
+
 // NetworkInfoStructDef describes NetworkInfoStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -199,6 +215,22 @@ func (v *ThreadInterfaceScanResultStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(6, "Rssi", true, &v.Rssi, spec.DecodeInt[int8](8)),
 		spec.Bind(7, "Lqi", true, &v.Lqi, spec.DecodeUint[uint8](8)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ThreadInterfaceScanResultStruct) Clone() ThreadInterfaceScanResultStruct {
+	c := v
+	c.ExtendedAddress = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ExtendedAddress)
+	return c
 }
 
 // ThreadInterfaceScanResultStructDef describes ThreadInterfaceScanResultStruct.
@@ -276,6 +308,44 @@ func (v *WiFiInterfaceScanResultStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v WiFiInterfaceScanResultStruct) Clone() WiFiInterfaceScanResultStruct {
+	c := v
+	c.Ssid = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Ssid)
+	c.Bssid = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Bssid)
+	c.WiFiBand = func(p *WiFiBandEnum) *WiFiBandEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WiFiBand)
+	c.Rssi = func(p *int8) *int8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Rssi)
+	return c
+}
+
 // WiFiInterfaceScanResultStructDef describes WiFiInterfaceScanResultStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -335,6 +405,35 @@ func (v *ScanNetworksRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ScanNetworksRequest) Clone() ScanNetworksRequest {
+	c := v
+	c.Ssid = func(p *spec.Nullable[[]byte]) *spec.Nullable[[]byte] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.Ssid)
+	c.Breadcrumb = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Breadcrumb)
+	return c
+}
+
 // ScanNetworksResponse is the ScanNetworksResponse command payload.
 type ScanNetworksResponse struct {
 	NetworkingStatus  NetworkCommissioningStatusEnum     // 0: NetworkCommissioningStatusEnum, M, desc
@@ -361,6 +460,53 @@ func (v *ScanNetworksResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "WiFiScanResults", false, &v.WiFiScanResults, spec.DecodeOptional(spec.DecodeList(spec.DecodeStruct[WiFiInterfaceScanResultStruct]))),
 		spec.Bind(3, "ThreadScanResults", false, &v.ThreadScanResults, spec.DecodeOptional(spec.DecodeList(spec.DecodeStruct[ThreadInterfaceScanResultStruct]))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ScanNetworksResponse) Clone() ScanNetworksResponse {
+	c := v
+	c.DebugText = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DebugText)
+	c.WiFiScanResults = func(p *[]WiFiInterfaceScanResultStruct) *[]WiFiInterfaceScanResultStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []WiFiInterfaceScanResultStruct) []WiFiInterfaceScanResultStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]WiFiInterfaceScanResultStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.WiFiScanResults)
+	c.ThreadScanResults = func(p *[]ThreadInterfaceScanResultStruct) *[]ThreadInterfaceScanResultStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ThreadInterfaceScanResultStruct) []ThreadInterfaceScanResultStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ThreadInterfaceScanResultStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.ThreadScanResults)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -393,6 +539,37 @@ func (v *AddOrUpdateWiFiNetworkRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddOrUpdateWiFiNetworkRequest) Clone() AddOrUpdateWiFiNetworkRequest {
+	c := v
+	c.Ssid = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Ssid)
+	c.Credentials = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Credentials)
+	c.Breadcrumb = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Breadcrumb)
+	return c
+}
+
 // AddOrUpdateThreadNetworkRequest is the AddOrUpdateThreadNetwork command payload.
 type AddOrUpdateThreadNetworkRequest struct {
 	OperationalDataset []byte  // 0: octstr, M, max 254
@@ -415,6 +592,29 @@ func (v *AddOrUpdateThreadNetworkRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddOrUpdateThreadNetworkRequest) Clone() AddOrUpdateThreadNetworkRequest {
+	c := v
+	c.OperationalDataset = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.OperationalDataset)
+	c.Breadcrumb = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Breadcrumb)
+	return c
+}
+
 // RemoveNetworkRequest is the RemoveNetwork command payload.
 type RemoveNetworkRequest struct {
 	NetworkId  []byte  // 0: octstr, M, 1 to 32
@@ -435,6 +635,29 @@ func (v *RemoveNetworkRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "NetworkId", true, &v.NetworkId, spec.DecodeBytesIn(1, 32)),
 		spec.Bind(1, "Breadcrumb", false, &v.Breadcrumb, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RemoveNetworkRequest) Clone() RemoveNetworkRequest {
+	c := v
+	c.NetworkId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NetworkId)
+	c.Breadcrumb = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Breadcrumb)
+	return c
 }
 
 // NetworkConfigResponse is the NetworkConfigResponse command payload.
@@ -460,6 +683,28 @@ func (v *NetworkConfigResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "DebugText", false, &v.DebugText, spec.DecodeOptional(spec.DecodeStringIn(0, 512))),
 		spec.Bind(2, "NetworkIndex", false, &v.NetworkIndex, spec.DecodeOptional(spec.DecodeUint[uint8](8))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NetworkConfigResponse) Clone() NetworkConfigResponse {
+	c := v
+	c.DebugText = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DebugText)
+	c.NetworkIndex = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.NetworkIndex)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -489,6 +734,29 @@ func (v *ConnectNetworkRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ConnectNetworkRequest) Clone() ConnectNetworkRequest {
+	c := v
+	c.NetworkId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NetworkId)
+	c.Breadcrumb = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Breadcrumb)
+	return c
+}
+
 // ConnectNetworkResponse is the ConnectNetworkResponse command payload.
 type ConnectNetworkResponse struct {
 	NetworkingStatus NetworkCommissioningStatusEnum // 0: NetworkCommissioningStatusEnum, M
@@ -512,6 +780,21 @@ func (v *ConnectNetworkResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "DebugText", false, &v.DebugText, spec.DecodeOptional(spec.DecodeString)),
 		spec.Bind(2, "ErrorValue", true, &v.ErrorValue, spec.DecodeNullable(spec.DecodeInt[int32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ConnectNetworkResponse) Clone() ConnectNetworkResponse {
+	c := v
+	c.DebugText = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DebugText)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -542,6 +825,29 @@ func (v *ReorderNetworkRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "NetworkIndex", true, &v.NetworkIndex, spec.DecodeUint[uint8](8)),
 		spec.Bind(2, "Breadcrumb", false, &v.Breadcrumb, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ReorderNetworkRequest) Clone() ReorderNetworkRequest {
+	c := v
+	c.NetworkId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NetworkId)
+	c.Breadcrumb = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Breadcrumb)
+	return c
 }
 
 func decodeScanNetworksRequest(n spec.Node) (any, error) {

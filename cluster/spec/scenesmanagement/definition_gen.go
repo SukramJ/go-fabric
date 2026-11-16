@@ -104,6 +104,70 @@ func (v *AttributeValuePairStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AttributeValuePairStruct) Clone() AttributeValuePairStruct {
+	c := v
+	c.ValueUnsigned8 = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueUnsigned8)
+	c.ValueSigned8 = func(p *int8) *int8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueSigned8)
+	c.ValueUnsigned16 = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueUnsigned16)
+	c.ValueSigned16 = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueSigned16)
+	c.ValueUnsigned32 = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueUnsigned32)
+	c.ValueSigned32 = func(p *int32) *int32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueSigned32)
+	c.ValueUnsigned64 = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueUnsigned64)
+	c.ValueSigned64 = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValueSigned64)
+	return c
+}
+
 // AttributeValuePairStructDef describes AttributeValuePairStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -158,6 +222,24 @@ func (v *ExtensionFieldSetStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ExtensionFieldSetStruct) Clone() ExtensionFieldSetStruct {
+	c := v
+	c.AttributeValueList = func(s []AttributeValuePairStruct) []AttributeValuePairStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AttributeValuePairStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.AttributeValueList)
+	return c
+}
+
 // ExtensionFieldSetStructDef describes ExtensionFieldSetStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -195,6 +277,31 @@ func (v *LogicalSceneTable) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "SceneTransitionTime", true, &v.SceneTransitionTime, spec.DecodeUintIn[uint32](32, 0, 60000000)),
 		spec.Bind(4, "ExtensionFields", true, &v.ExtensionFields, spec.DecodeList(spec.DecodeStruct[ExtensionFieldSetStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LogicalSceneTable) Clone() LogicalSceneTable {
+	c := v
+	c.SceneName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SceneName)
+	c.ExtensionFields = func(s []ExtensionFieldSetStruct) []ExtensionFieldSetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ExtensionFieldSetStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ExtensionFields)
+	return c
 }
 
 // LogicalSceneTableDef describes LogicalSceneTable.
@@ -369,6 +476,24 @@ func (v *AddSceneRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddSceneRequest) Clone() AddSceneRequest {
+	c := v
+	c.ExtensionFieldSetStructs = func(s []ExtensionFieldSetStruct) []ExtensionFieldSetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ExtensionFieldSetStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ExtensionFieldSetStructs)
+	return c
+}
+
 // AddSceneResponse is the AddSceneResponse command payload.
 type AddSceneResponse struct {
 	Status  Status // 0: status, M, desc
@@ -454,6 +579,44 @@ func (v *ViewSceneResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(4, "SceneName", false, &v.SceneName, spec.DecodeOptional(spec.DecodeStringIn(0, 16))),
 		spec.Bind(5, "ExtensionFieldSetStructs", false, &v.ExtensionFieldSetStructs, spec.DecodeOptional(spec.DecodeList(spec.DecodeStruct[ExtensionFieldSetStruct]))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ViewSceneResponse) Clone() ViewSceneResponse {
+	c := v
+	c.TransitionTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TransitionTime)
+	c.SceneName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SceneName)
+	c.ExtensionFieldSetStructs = func(p *[]ExtensionFieldSetStruct) *[]ExtensionFieldSetStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ExtensionFieldSetStruct) []ExtensionFieldSetStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ExtensionFieldSetStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.ExtensionFieldSetStructs)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -638,6 +801,21 @@ func (v *RecallSceneRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RecallSceneRequest) Clone() RecallSceneRequest {
+	c := v
+	c.TransitionTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TransitionTime)
+	return c
+}
+
 // GetSceneMembershipRequest is the GetSceneMembership command payload.
 type GetSceneMembershipRequest struct {
 	GroupId uint16 // 0: group-id, M
@@ -683,6 +861,28 @@ func (v *GetSceneMembershipResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
 		spec.Bind(3, "SceneList", false, &v.SceneList, spec.DecodeOptional(spec.DecodeList(spec.DecodeUint[uint8](8)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetSceneMembershipResponse) Clone() GetSceneMembershipResponse {
+	c := v
+	c.SceneList = func(p *[]uint8) *[]uint8 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint8) []uint8 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint8, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.SceneList)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

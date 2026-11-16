@@ -126,6 +126,30 @@ func (v *OpenCommissioningWindowRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OpenCommissioningWindowRequest) Clone() OpenCommissioningWindowRequest {
+	c := v
+	c.PakePasscodeVerifier = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PakePasscodeVerifier)
+	c.Salt = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Salt)
+	return c
+}
+
 // OpenBasicCommissioningWindowRequest is the OpenBasicCommissioningWindow command payload.
 type OpenBasicCommissioningWindowRequest struct {
 	CommissioningTimeout uint16 // 0: uint16, M, desc

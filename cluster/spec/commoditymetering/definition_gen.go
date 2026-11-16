@@ -60,6 +60,22 @@ func (v *MeteredQuantityStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MeteredQuantityStruct) Clone() MeteredQuantityStruct {
+	c := v
+	c.TariffComponentIds = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.TariffComponentIds)
+	return c
+}
+
 // MeteredQuantityStructDef describes MeteredQuantityStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"

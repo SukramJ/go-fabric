@@ -551,6 +551,30 @@ func (v *WiredFaultChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v WiredFaultChangeEvent) Clone() WiredFaultChangeEvent {
+	c := v
+	c.Current = func(s []WiredFaultEnum) []WiredFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]WiredFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Current)
+	c.Previous = func(s []WiredFaultEnum) []WiredFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]WiredFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Previous)
+	return c
+}
+
 // BatFaultChangeEvent is the BatFaultChange event payload.
 type BatFaultChangeEvent struct {
 	Current  []BatFaultEnum // 0: list[BatFaultEnum], M, max 8
@@ -573,6 +597,30 @@ func (v *BatFaultChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v BatFaultChangeEvent) Clone() BatFaultChangeEvent {
+	c := v
+	c.Current = func(s []BatFaultEnum) []BatFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]BatFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Current)
+	c.Previous = func(s []BatFaultEnum) []BatFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]BatFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Previous)
+	return c
+}
+
 // BatChargeFaultChangeEvent is the BatChargeFaultChange event payload.
 type BatChargeFaultChangeEvent struct {
 	Current  []BatChargeFaultEnum // 0: list[BatChargeFaultEnum], M, max 16
@@ -593,6 +641,30 @@ func (v *BatChargeFaultChangeEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Current", true, &v.Current, spec.DecodeListIn(spec.DecodeUint[BatChargeFaultEnum](8), 0, 16)),
 		spec.Bind(1, "Previous", true, &v.Previous, spec.DecodeListIn(spec.DecodeUint[BatChargeFaultEnum](8), 0, 16)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v BatChargeFaultChangeEvent) Clone() BatChargeFaultChangeEvent {
+	c := v
+	c.Current = func(s []BatChargeFaultEnum) []BatChargeFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]BatChargeFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Current)
+	c.Previous = func(s []BatChargeFaultEnum) []BatChargeFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]BatChargeFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Previous)
+	return c
 }
 
 func decodeWiredFaultChangeEvent(n spec.Node) (any, error) {

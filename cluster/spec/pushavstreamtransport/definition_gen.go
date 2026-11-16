@@ -124,6 +124,35 @@ func (v *CMAFContainerOptionsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CMAFContainerOptionsStruct) Clone() CMAFContainerOptionsStruct {
+	c := v
+	c.SessionGroup = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SessionGroup)
+	c.TrackName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TrackName)
+	c.MetadataEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MetadataEnabled)
+	return c
+}
+
 // CMAFContainerOptionsStructDef describes CMAFContainerOptionsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -194,6 +223,21 @@ func (v *ContainerOptionsStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "ContainerType", true, &v.ContainerType, spec.DecodeUint[ContainerFormatEnum](8)),
 		spec.Bind(1, "CmafContainerOptions", false, &v.CmafContainerOptions, spec.DecodeOptional(spec.DecodeStruct[CMAFContainerOptionsStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ContainerOptionsStruct) Clone() ContainerOptionsStruct {
+	c := v
+	c.CmafContainerOptions = func(p *CMAFContainerOptionsStruct) *CMAFContainerOptionsStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.CmafContainerOptions)
+	return c
 }
 
 // ContainerOptionsStructDef describes ContainerOptionsStruct.
@@ -318,6 +362,21 @@ func (v *TransportConfigurationStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TransportConfigurationStruct) Clone() TransportConfigurationStruct {
+	c := v
+	c.TransportOptions = func(p *TransportOptionsStruct) *TransportOptionsStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.TransportOptions)
+	return c
+}
+
 // TransportConfigurationStructDef describes TransportConfigurationStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -398,6 +457,65 @@ func (v *TransportOptionsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TransportOptionsStruct) Clone() TransportOptionsStruct {
+	c := v
+	c.VideoStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VideoStreamId)
+	c.AudioStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioStreamId)
+	c.TriggerOptions = v.TriggerOptions.Clone()
+	c.ContainerOptions = v.ContainerOptions.Clone()
+	c.ExpiryTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ExpiryTime)
+	c.VideoStreams = func(p *[]VideoStreamStruct) *[]VideoStreamStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []VideoStreamStruct) []VideoStreamStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]VideoStreamStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VideoStreams)
+	c.AudioStreams = func(p *[]AudioStreamStruct) *[]AudioStreamStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []AudioStreamStruct) []AudioStreamStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]AudioStreamStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.AudioStreams)
+	return c
+}
+
 // TransportOptionsStructDef describes TransportOptionsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -470,6 +588,51 @@ func (v *TransportTriggerOptionsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TransportTriggerOptionsStruct) Clone() TransportTriggerOptionsStruct {
+	c := v
+	c.MotionZones = func(p *spec.Nullable[[]TransportZoneOptionsStruct]) *spec.Nullable[[]TransportZoneOptionsStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]TransportZoneOptionsStruct]{Value: func(s []TransportZoneOptionsStruct) []TransportZoneOptionsStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TransportZoneOptionsStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.MotionZones)
+	c.MotionSensitivity = func(p *spec.Nullable[uint8]) *spec.Nullable[uint8] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MotionSensitivity)
+	c.MotionTimeControl = func(p *TransportMotionTriggerTimeControlStruct) *TransportMotionTriggerTimeControlStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MotionTimeControl)
+	c.MaxPreRollLen = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxPreRollLen)
+	return c
+}
+
 // TransportTriggerOptionsStructDef describes TransportTriggerOptionsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -522,6 +685,21 @@ func (v *TransportZoneOptionsStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Zone", true, &v.Zone, spec.DecodeNullable(spec.DecodeUint[uint16](16))),
 		spec.Bind(1, "Sensitivity", false, &v.Sensitivity, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 1, 10))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TransportZoneOptionsStruct) Clone() TransportZoneOptionsStruct {
+	c := v
+	c.Sensitivity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Sensitivity)
+	return c
 }
 
 // TransportZoneOptionsStructDef describes TransportZoneOptionsStruct.
@@ -642,6 +820,15 @@ func (v *AllocatePushTransportRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AllocatePushTransportRequest) Clone() AllocatePushTransportRequest {
+	c := v
+	c.TransportOptions = v.TransportOptions.Clone()
+	return c
+}
+
 // AllocatePushTransportResponse is the AllocatePushTransportResponse command payload.
 type AllocatePushTransportResponse struct {
 	TransportConfiguration TransportConfigurationStruct // 0: TransportConfigurationStruct, M
@@ -659,6 +846,15 @@ func (v *AllocatePushTransportResponse) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "AllocatePushTransportResponse",
 		spec.Bind(0, "TransportConfiguration", true, &v.TransportConfiguration, spec.DecodeStruct[TransportConfigurationStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AllocatePushTransportResponse) Clone() AllocatePushTransportResponse {
+	c := v
+	c.TransportConfiguration = v.TransportConfiguration.Clone()
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -705,6 +901,15 @@ func (v *ModifyPushTransportRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "ConnectionId", true, &v.ConnectionId, spec.DecodeUintIn[uint16](16, 0, 65534)),
 		spec.Bind(1, "TransportOptions", true, &v.TransportOptions, spec.DecodeStruct[TransportOptionsStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ModifyPushTransportRequest) Clone() ModifyPushTransportRequest {
+	c := v
+	c.TransportOptions = v.TransportOptions.Clone()
+	return c
 }
 
 // SetTransportStatusRequest is the SetTransportStatus command payload.
@@ -757,6 +962,35 @@ func (v *ManuallyTriggerTransportRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ManuallyTriggerTransportRequest) Clone() ManuallyTriggerTransportRequest {
+	c := v
+	c.TimeControl = func(p *TransportMotionTriggerTimeControlStruct) *TransportMotionTriggerTimeControlStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TimeControl)
+	c.UserDefined = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.UserDefined)
+	return c
+}
+
 // FindTransportRequest is the FindTransport command payload.
 type FindTransportRequest struct {
 	ConnectionId spec.Nullable[uint16] // 0: PushTransportConnectionID, M, X
@@ -795,6 +1029,24 @@ func (v *FindTransportResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v FindTransportResponse) Clone() FindTransportResponse {
+	c := v
+	c.TransportConfigurations = func(s []TransportConfigurationStruct) []TransportConfigurationStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TransportConfigurationStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.TransportConfigurations)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (FindTransportResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdFindTransportResponse
@@ -831,6 +1083,35 @@ func (v *PushTransportBeginEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PushTransportBeginEvent) Clone() PushTransportBeginEvent {
+	c := v
+	c.ActivationReason = func(p *TriggerActivationReasonEnum) *TriggerActivationReasonEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ActivationReason)
+	c.ContainerType = func(p *ContainerFormatEnum) *ContainerFormatEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ContainerType)
+	c.CmafSessionNumber = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CmafSessionNumber)
+	return c
+}
+
 // PushTransportEndEvent is the PushTransportEnd event payload.
 type PushTransportEndEvent struct {
 	ConnectionId      uint16               // 0: PushTransportConnectionID, M, 0 to 65534
@@ -854,6 +1135,28 @@ func (v *PushTransportEndEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "ContainerType", false, &v.ContainerType, spec.DecodeOptional(spec.DecodeUint[ContainerFormatEnum](8))),
 		spec.Bind(2, "CmafSessionNumber", false, &v.CmafSessionNumber, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PushTransportEndEvent) Clone() PushTransportEndEvent {
+	c := v
+	c.ContainerType = func(p *ContainerFormatEnum) *ContainerFormatEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ContainerType)
+	c.CmafSessionNumber = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CmafSessionNumber)
+	return c
 }
 
 func decodeAllocatePushTransportRequest(n spec.Node) (any, error) {

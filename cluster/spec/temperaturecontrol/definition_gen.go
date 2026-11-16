@@ -74,6 +74,28 @@ func (v *SetTemperatureRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetTemperatureRequest) Clone() SetTemperatureRequest {
+	c := v
+	c.TargetTemperature = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TargetTemperature)
+	c.TargetTemperatureLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TargetTemperatureLevel)
+	return c
+}
+
 func decodeSetTemperatureRequest(n spec.Node) (any, error) {
 	return spec.DecodeStruct[SetTemperatureRequest](n)
 }

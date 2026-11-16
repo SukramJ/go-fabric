@@ -143,6 +143,35 @@ func (v *MembershipStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MembershipStruct) Clone() MembershipStruct {
+	c := v
+	c.Endpoints = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Endpoints)
+	c.HasAuxiliaryAcl = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.HasAuxiliaryAcl)
+	return c
+}
+
 // MembershipStructDef describes MembershipStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -211,6 +240,57 @@ func (v *JoinGroupRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v JoinGroupRequest) Clone() JoinGroupRequest {
+	c := v
+	c.Endpoints = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.Endpoints)
+	c.Key = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Key)
+	c.UseAuxiliaryAcl = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.UseAuxiliaryAcl)
+	c.ReplaceEndpoints = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ReplaceEndpoints)
+	c.McastAddrPolicy = func(p *MulticastAddrPolicyEnum) *MulticastAddrPolicyEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.McastAddrPolicy)
+	return c
+}
+
 // LeaveGroupRequest is the LeaveGroup command payload.
 type LeaveGroupRequest struct {
 	GroupId   uint16    // 0: group-id, M
@@ -233,6 +313,28 @@ func (v *LeaveGroupRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LeaveGroupRequest) Clone() LeaveGroupRequest {
+	c := v
+	c.Endpoints = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Endpoints)
+	return c
+}
+
 // LeaveGroupResponse is the LeaveGroupResponse command payload.
 type LeaveGroupResponse struct {
 	GroupId   uint16   // 0: group-id, M
@@ -253,6 +355,22 @@ func (v *LeaveGroupResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "GroupId", true, &v.GroupId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "Endpoints", true, &v.Endpoints, spec.DecodeListIn(spec.DecodeUint[uint16](16), 0, 20)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LeaveGroupResponse) Clone() LeaveGroupResponse {
+	c := v
+	c.Endpoints = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.Endpoints)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -283,6 +401,28 @@ func (v *UpdateGroupKeyRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "KeySetId", true, &v.KeySetId, spec.DecodeUintIn[uint16](16, 1, 65535)),
 		spec.Bind(2, "Key", false, &v.Key, spec.DecodeOptional(spec.DecodeBytesIn(16, 16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UpdateGroupKeyRequest) Clone() UpdateGroupKeyRequest {
+	c := v
+	c.Key = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Key)
+	return c
 }
 
 // ConfigureAuxiliaryAclRequest is the ConfigureAuxiliaryAcl command payload.
@@ -329,6 +469,21 @@ func (v *GroupcastTestingRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GroupcastTestingRequest) Clone() GroupcastTestingRequest {
+	c := v
+	c.DurationSeconds = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DurationSeconds)
+	return c
+}
+
 // GroupcastTestingEvent is the GroupcastTesting event payload.
 type GroupcastTestingEvent struct {
 	SourceIpAddress      *[]byte                 // 0: ipv6adr, O, 16
@@ -370,6 +525,77 @@ func (v *GroupcastTestingEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(7, "GroupcastTestResult", true, &v.GroupcastTestResult, spec.DecodeUint[GroupcastTestResultEnum](8)),
 		spec.Bind(254, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GroupcastTestingEvent) Clone() GroupcastTestingEvent {
+	c := v
+	c.SourceIpAddress = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.SourceIpAddress)
+	c.DestinationIpAddress = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.DestinationIpAddress)
+	c.GroupId = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.GroupId)
+	c.EndpointId = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndpointId)
+	c.ClusterId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ClusterId)
+	c.ElementId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ElementId)
+	c.AccessAllowed = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AccessAllowed)
+	return c
 }
 
 func decodeJoinGroupRequest(n spec.Node) (any, error) { return spec.DecodeStruct[JoinGroupRequest](n) }

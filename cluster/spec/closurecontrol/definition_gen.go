@@ -202,6 +202,35 @@ func (v *OverallCurrentStateStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OverallCurrentStateStruct) Clone() OverallCurrentStateStruct {
+	c := v
+	c.Position = func(p *spec.Nullable[CurrentPositionEnum]) *spec.Nullable[CurrentPositionEnum] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Position)
+	c.Latch = func(p *spec.Nullable[bool]) *spec.Nullable[bool] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Latch)
+	c.Speed = func(p *ThreeLevelAutoEnum) *ThreeLevelAutoEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Speed)
+	return c
+}
+
 // OverallCurrentStateStructDef describes OverallCurrentStateStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -258,6 +287,35 @@ func (v *OverallTargetStateStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Latch", false, &v.Latch, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeBool))),
 		spec.Bind(2, "Speed", false, &v.Speed, spec.DecodeOptional(spec.DecodeUint[ThreeLevelAutoEnum](8))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OverallTargetStateStruct) Clone() OverallTargetStateStruct {
+	c := v
+	c.Position = func(p *spec.Nullable[TargetPositionEnum]) *spec.Nullable[TargetPositionEnum] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Position)
+	c.Latch = func(p *spec.Nullable[bool]) *spec.Nullable[bool] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Latch)
+	c.Speed = func(p *ThreeLevelAutoEnum) *ThreeLevelAutoEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Speed)
+	return c
 }
 
 // OverallTargetStateStructDef describes OverallTargetStateStruct.
@@ -331,6 +389,35 @@ func (v *MoveToRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MoveToRequest) Clone() MoveToRequest {
+	c := v
+	c.Position = func(p *TargetPositionEnum) *TargetPositionEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Position)
+	c.Latch = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Latch)
+	c.Speed = func(p *ThreeLevelAutoEnum) *ThreeLevelAutoEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Speed)
+	return c
+}
+
 // CalibrateRequest is the Calibrate command payload.
 type CalibrateRequest struct{}
 
@@ -360,6 +447,22 @@ func (v *OperationalErrorEvent) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "OperationalError",
 		spec.Bind(0, "ErrorState", true, &v.ErrorState, spec.DecodeListIn(spec.DecodeUint[ClosureErrorEnum](8), 1, 10)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OperationalErrorEvent) Clone() OperationalErrorEvent {
+	c := v
+	c.ErrorState = func(s []ClosureErrorEnum) []ClosureErrorEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]ClosureErrorEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.ErrorState)
+	return c
 }
 
 // MovementCompletedEvent is the MovementCompleted event payload.

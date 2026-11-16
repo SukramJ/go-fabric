@@ -111,6 +111,21 @@ func (v *LoginRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LoginRequest) Clone() LoginRequest {
+	c := v
+	c.Node = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Node)
+	return c
+}
+
 // LogoutRequest is the Logout command payload.
 type LogoutRequest struct {
 	Node *uint64 // 0: node-id, O
@@ -130,6 +145,21 @@ func (v *LogoutRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LogoutRequest) Clone() LogoutRequest {
+	c := v
+	c.Node = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Node)
+	return c
+}
+
 // LoggedOutEvent is the LoggedOut event payload.
 type LoggedOutEvent struct {
 	Node *uint64 // 0: node-id, O
@@ -147,6 +177,21 @@ func (v *LoggedOutEvent) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "LoggedOut",
 		spec.Bind(0, "Node", false, &v.Node, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LoggedOutEvent) Clone() LoggedOutEvent {
+	c := v
+	c.Node = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Node)
+	return c
 }
 
 func decodeGetSetupPinRequest(n spec.Node) (any, error) {

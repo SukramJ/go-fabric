@@ -271,6 +271,22 @@ func (v *GetGroupMembershipRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetGroupMembershipRequest) Clone() GetGroupMembershipRequest {
+	c := v
+	c.GroupList = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.GroupList)
+	return c
+}
+
 // GetGroupMembershipResponse is the GetGroupMembershipResponse command payload.
 type GetGroupMembershipResponse struct {
 	Capacity  spec.Nullable[uint8] // 0: uint8, M, X
@@ -291,6 +307,22 @@ func (v *GetGroupMembershipResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Capacity", true, &v.Capacity, spec.DecodeNullable(spec.DecodeUint[uint8](8))),
 		spec.Bind(1, "GroupList", true, &v.GroupList, spec.DecodeList(spec.DecodeUint[uint16](16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetGroupMembershipResponse) Clone() GetGroupMembershipResponse {
+	c := v
+	c.GroupList = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.GroupList)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

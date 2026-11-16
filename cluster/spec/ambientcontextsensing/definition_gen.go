@@ -80,6 +80,30 @@ func (v *AmbientContextTypeStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AmbientContextTypeStruct) Clone() AmbientContextTypeStruct {
+	c := v
+	c.AmbientContextSensed = func(p *[]Semtag) *[]Semtag {
+		if p == nil {
+			return nil
+		}
+		x := func(s []Semtag) []Semtag {
+			if s == nil {
+				return nil
+			}
+			out := make([]Semtag, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.AmbientContextSensed)
+	return c
+}
+
 // AmbientContextTypeStructDef describes AmbientContextTypeStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -113,6 +137,21 @@ func (v *Semtag) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "Tag", true, &v.Tag, spec.DecodeUint[uint8](8)),
 		spec.Bind(3, "Label", false, &v.Label, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeStringIn(0, 64)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v Semtag) Clone() Semtag {
+	c := v
+	c.Label = func(p *spec.Nullable[string]) *spec.Nullable[string] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Label)
+	return c
 }
 
 // SemtagDef describes semtag.
@@ -221,6 +260,35 @@ func (v *HoldTimeLimitsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v HoldTimeLimitsStruct) Clone() HoldTimeLimitsStruct {
+	c := v
+	c.HoldTimeMin = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.HoldTimeMin)
+	c.HoldTimeMax = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.HoldTimeMax)
+	c.HoldTimeDefault = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.HoldTimeDefault)
+	return c
+}
+
 // HoldTimeLimitsStructDef describes HoldTimeLimitsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -250,6 +318,28 @@ func (v *ObjectCountConfigStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "CountingObject", false, &v.CountingObject, spec.DecodeOptional(spec.DecodeStruct[Semtag])),
 		spec.Bind(1, "ObjectCountThreshold", false, &v.ObjectCountThreshold, spec.DecodeOptional(spec.DecodeUintIn[uint16](16, 1, 65535))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ObjectCountConfigStruct) Clone() ObjectCountConfigStruct {
+	c := v
+	c.CountingObject = func(p *Semtag) *Semtag {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.CountingObject)
+	c.ObjectCountThreshold = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ObjectCountThreshold)
+	return c
 }
 
 // ObjectCountConfigStructDef describes ObjectCountConfigStruct.
@@ -294,6 +384,65 @@ func (v *PredictedActivityStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PredictedActivityStruct) Clone() PredictedActivityStruct {
+	c := v
+	c.StartTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartTimestamp)
+	c.EndTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndTimestamp)
+	c.AmbientContextType = func(p *[]Semtag) *[]Semtag {
+		if p == nil {
+			return nil
+		}
+		x := func(s []Semtag) []Semtag {
+			if s == nil {
+				return nil
+			}
+			out := make([]Semtag, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.AmbientContextType)
+	c.CrowdDetected = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CrowdDetected)
+	c.CrowdCount = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CrowdCount)
+	c.Confidence = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Confidence)
+	return c
+}
+
 // PredictedActivityStructDef describes PredictedActivityStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -331,6 +480,35 @@ func (v *AmbientContextDetectStartedEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AmbientContextDetectStartedEvent) Clone() AmbientContextDetectStartedEvent {
+	c := v
+	c.AmbientContextDetected = func(p *AmbientContextTypeStruct) *AmbientContextTypeStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.AmbientContextDetected)
+	c.ObjectCountThresholdReached = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ObjectCountThresholdReached)
+	c.ObjectCount = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ObjectCount)
+	return c
+}
+
 // AmbientContextDetectEndedEvent is the AmbientContextDetectEnded event payload.
 type AmbientContextDetectEndedEvent struct {
 	EventStartTimePos *uint64 // 0: posix-ms, P, O.a
@@ -351,6 +529,28 @@ func (v *AmbientContextDetectEndedEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "EventStartTimePos", false, &v.EventStartTimePos, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 		spec.Bind(1, "EventStartTimeSys", false, &v.EventStartTimeSys, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AmbientContextDetectEndedEvent) Clone() AmbientContextDetectEndedEvent {
+	c := v
+	c.EventStartTimePos = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EventStartTimePos)
+	c.EventStartTimeSys = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EventStartTimeSys)
+	return c
 }
 
 func decodeAmbientContextDetectStartedEvent(n spec.Node) (any, error) {

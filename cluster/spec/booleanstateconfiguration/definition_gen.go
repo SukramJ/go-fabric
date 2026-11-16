@@ -159,6 +159,21 @@ func (v *AlarmsStateChangedEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AlarmsStateChangedEvent) Clone() AlarmsStateChangedEvent {
+	c := v
+	c.AlarmsSuppressed = func(p *AlarmModeBitmap) *AlarmModeBitmap {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AlarmsSuppressed)
+	return c
+}
+
 // SensorFaultEvent is the SensorFault event payload.
 type SensorFaultEvent struct {
 	SensorFault SensorFaultBitmap // 0: SensorFaultBitmap, M

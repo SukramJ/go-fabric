@@ -84,6 +84,28 @@ func (v *CommodityPriceComponentStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CommodityPriceComponentStruct) Clone() CommodityPriceComponentStruct {
+	c := v
+	c.Description = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Description)
+	c.TariffComponentId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TariffComponentId)
+	return c
+}
+
 // CommodityPriceComponentStructDef describes CommodityPriceComponentStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -170,6 +192,51 @@ func (v *CommodityPriceStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(4, "Description", false, &v.Description, spec.DecodeOptional(spec.DecodeStringIn(0, 32))),
 		spec.Bind(5, "Components", false, &v.Components, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[CommodityPriceComponentStruct], 0, 10))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CommodityPriceStruct) Clone() CommodityPriceStruct {
+	c := v
+	c.Price = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Price)
+	c.PriceLevel = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PriceLevel)
+	c.Description = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Description)
+	c.Components = func(p *[]CommodityPriceComponentStruct) *[]CommodityPriceComponentStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []CommodityPriceComponentStruct) []CommodityPriceComponentStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]CommodityPriceComponentStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.Components)
+	return c
 }
 
 // CommodityPriceStructDef describes CommodityPriceStruct.
@@ -271,6 +338,15 @@ func (v *GetDetailedPriceResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetDetailedPriceResponse) Clone() GetDetailedPriceResponse {
+	c := v
+	c.CurrentPrice = spec.Nullable[CommodityPriceStruct]{Value: v.CurrentPrice.Value.Clone(), Null: v.CurrentPrice.Null}
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (GetDetailedPriceResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdGetDetailedPriceResponse
@@ -314,6 +390,24 @@ func (v *GetDetailedForecastResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetDetailedForecastResponse) Clone() GetDetailedForecastResponse {
+	c := v
+	c.PriceForecast = func(s []CommodityPriceStruct) []CommodityPriceStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]CommodityPriceStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.PriceForecast)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (GetDetailedForecastResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdGetDetailedForecastResponse
@@ -336,6 +430,15 @@ func (v *PriceChangeEvent) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "PriceChange",
 		spec.Bind(0, "CurrentPrice", true, &v.CurrentPrice, spec.DecodeNullable(spec.DecodeStruct[CommodityPriceStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PriceChangeEvent) Clone() PriceChangeEvent {
+	c := v
+	c.CurrentPrice = spec.Nullable[CommodityPriceStruct]{Value: v.CurrentPrice.Value.Clone(), Null: v.CurrentPrice.Null}
+	return c
 }
 
 func decodeGetDetailedPriceRequestRequest(n spec.Node) (any, error) {

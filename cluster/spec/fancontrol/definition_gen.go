@@ -220,6 +220,28 @@ func (v *StepRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StepRequest) Clone() StepRequest {
+	c := v
+	c.Wrap = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Wrap)
+	c.LowestOff = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LowestOff)
+	return c
+}
+
 func decodeStepRequest(n spec.Node) (any, error) { return spec.DecodeStruct[StepRequest](n) }
 
 // Definition is the FanControl cluster definition.

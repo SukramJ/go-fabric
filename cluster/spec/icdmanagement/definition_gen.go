@@ -111,6 +111,28 @@ func (v *MonitoringRegistrationStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MonitoringRegistrationStruct) Clone() MonitoringRegistrationStruct {
+	c := v
+	c.Key = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Key)
+	return c
+}
+
 // MonitoringRegistrationStructDef describes MonitoringRegistrationStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -222,6 +244,36 @@ func (v *RegisterClientRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RegisterClientRequest) Clone() RegisterClientRequest {
+	c := v
+	c.Key = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Key)
+	c.VerificationKey = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VerificationKey)
+	return c
+}
+
 // RegisterClientResponse is the RegisterClientResponse command payload.
 type RegisterClientResponse struct {
 	IcdCounter uint32 // 0: uint32, M
@@ -267,6 +319,28 @@ func (v *UnregisterClientRequest) DecodeTLV(n spec.Node) error {
 		// VerificationKey: the constraint "16" is the server's to judge (matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at db021da0).
 		spec.Bind(1, "VerificationKey", false, &v.VerificationKey, spec.DecodeOptional(spec.DecodeBytes)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UnregisterClientRequest) Clone() UnregisterClientRequest {
+	c := v
+	c.VerificationKey = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VerificationKey)
+	return c
 }
 
 // StayActiveRequestRequest is the StayActiveRequest command payload.

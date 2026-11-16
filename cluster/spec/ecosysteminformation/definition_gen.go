@@ -106,6 +106,58 @@ func (v *EcosystemDeviceStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EcosystemDeviceStruct) Clone() EcosystemDeviceStruct {
+	c := v
+	c.DeviceName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DeviceName)
+	c.DeviceNameLastEdit = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DeviceNameLastEdit)
+	c.BridgedEndpoint = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.BridgedEndpoint)
+	c.OriginalEndpoint = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OriginalEndpoint)
+	c.DeviceTypes = func(s []DeviceTypeStruct) []DeviceTypeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DeviceTypeStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.DeviceTypes)
+	c.UniqueLocationIds = func(s []string) []string {
+		if s == nil {
+			return nil
+		}
+		out := make([]string, len(s))
+		copy(out, s)
+		return out
+	}(v.UniqueLocationIds)
+	return c
+}
+
 // EcosystemDeviceStructDef describes EcosystemDeviceStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"

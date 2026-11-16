@@ -263,6 +263,56 @@ func (v *NetworkInterface) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NetworkInterface) Clone() NetworkInterface {
+	c := v
+	c.HardwareAddress = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.HardwareAddress)
+	c.IPv4Addresses = func(s [][]byte) [][]byte {
+		if s == nil {
+			return nil
+		}
+		out := make([][]byte, len(s))
+		for i := range s {
+			out[i] = func(s []byte) []byte {
+				if s == nil {
+					return nil
+				}
+				out := make([]byte, len(s))
+				copy(out, s)
+				return out
+			}(s[i])
+		}
+		return out
+	}(v.IPv4Addresses)
+	c.IPv6Addresses = func(s [][]byte) [][]byte {
+		if s == nil {
+			return nil
+		}
+		out := make([][]byte, len(s))
+		for i := range s {
+			out[i] = func(s []byte) []byte {
+				if s == nil {
+					return nil
+				}
+				out := make([]byte, len(s))
+				copy(out, s)
+				return out
+			}(s[i])
+		}
+		return out
+	}(v.IPv6Addresses)
+	return c
+}
+
 // NetworkInterfaceDef describes NetworkInterface.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -326,6 +376,22 @@ func (v *TestEventTriggerRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "EnableKey", true, &v.EnableKey, spec.DecodeBytesIn(16, 16)),
 		spec.Bind(1, "EventTrigger", true, &v.EventTrigger, spec.DecodeUint[uint64](64)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TestEventTriggerRequest) Clone() TestEventTriggerRequest {
+	c := v
+	c.EnableKey = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EnableKey)
+	return c
 }
 
 // TimeSnapshotRequest is the TimeSnapshot command payload.
@@ -394,6 +460,22 @@ func (v *PayloadTestRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PayloadTestRequestRequest) Clone() PayloadTestRequestRequest {
+	c := v
+	c.EnableKey = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EnableKey)
+	return c
+}
+
 // PayloadTestResponse is the PayloadTestResponse command payload.
 type PayloadTestResponse struct {
 	Payload []byte // 0: octstr, M, max 2048
@@ -411,6 +493,22 @@ func (v *PayloadTestResponse) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "PayloadTestResponse",
 		spec.Bind(0, "Payload", true, &v.Payload, spec.DecodeBytesIn(0, 2048)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PayloadTestResponse) Clone() PayloadTestResponse {
+	c := v
+	c.Payload = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Payload)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -440,6 +538,30 @@ func (v *HardwareFaultChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v HardwareFaultChangeEvent) Clone() HardwareFaultChangeEvent {
+	c := v
+	c.Current = func(s []HardwareFaultEnum) []HardwareFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]HardwareFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Current)
+	c.Previous = func(s []HardwareFaultEnum) []HardwareFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]HardwareFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Previous)
+	return c
+}
+
 // RadioFaultChangeEvent is the RadioFaultChange event payload.
 type RadioFaultChangeEvent struct {
 	Current  []RadioFaultEnum // 0: list[RadioFaultEnum], M, max 7
@@ -462,6 +584,30 @@ func (v *RadioFaultChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RadioFaultChangeEvent) Clone() RadioFaultChangeEvent {
+	c := v
+	c.Current = func(s []RadioFaultEnum) []RadioFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]RadioFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Current)
+	c.Previous = func(s []RadioFaultEnum) []RadioFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]RadioFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Previous)
+	return c
+}
+
 // NetworkFaultChangeEvent is the NetworkFaultChange event payload.
 type NetworkFaultChangeEvent struct {
 	Current  []NetworkFaultEnum // 0: list[NetworkFaultEnum], M, max 4
@@ -482,6 +628,30 @@ func (v *NetworkFaultChangeEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Current", true, &v.Current, spec.DecodeListIn(spec.DecodeUint[NetworkFaultEnum](8), 0, 4)),
 		spec.Bind(1, "Previous", true, &v.Previous, spec.DecodeListIn(spec.DecodeUint[NetworkFaultEnum](8), 0, 4)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NetworkFaultChangeEvent) Clone() NetworkFaultChangeEvent {
+	c := v
+	c.Current = func(s []NetworkFaultEnum) []NetworkFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Current)
+	c.Previous = func(s []NetworkFaultEnum) []NetworkFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Previous)
+	return c
 }
 
 // BootReasonEvent is the BootReason event payload.

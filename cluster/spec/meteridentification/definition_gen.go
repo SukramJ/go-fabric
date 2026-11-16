@@ -90,6 +90,28 @@ func (v *PowerThresholdStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PowerThresholdStruct) Clone() PowerThresholdStruct {
+	c := v
+	c.PowerThreshold = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PowerThreshold)
+	c.ApparentPowerThreshold = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ApparentPowerThreshold)
+	return c
+}
+
 // PowerThresholdStructDef describes PowerThresholdStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"

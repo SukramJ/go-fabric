@@ -142,6 +142,21 @@ func (v *BlockChannelStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v BlockChannelStruct) Clone() BlockChannelStruct {
+	c := v
+	c.Identifier = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Identifier)
+	return c
+}
+
 // BlockChannelStructDef describes BlockChannelStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -201,6 +216,21 @@ func (v *RatingNameStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "RatingName", true, &v.RatingName, spec.DecodeStringIn(0, 8)),
 		spec.Bind(1, "RatingNameDesc", false, &v.RatingNameDesc, spec.DecodeOptional(spec.DecodeStringIn(0, 64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RatingNameStruct) Clone() RatingNameStruct {
+	c := v
+	c.RatingNameDesc = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.RatingNameDesc)
+	return c
 }
 
 // RatingNameStructDef describes RatingNameStruct.
@@ -307,6 +337,22 @@ func (v *TimeWindowStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "DayOfWeek", true, &v.DayOfWeek, spec.DecodeUint[DayOfWeekBitmap](8)),
 		spec.Bind(2, "TimePeriod", true, &v.TimePeriod, spec.DecodeList(spec.DecodeStruct[TimePeriodStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TimeWindowStruct) Clone() TimeWindowStruct {
+	c := v
+	c.TimePeriod = func(s []TimePeriodStruct) []TimePeriodStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TimePeriodStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.TimePeriod)
+	return c
 }
 
 // TimeWindowStructDef describes TimeWindowStruct.
@@ -422,6 +468,21 @@ func (v *AddBonusTimeRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddBonusTimeRequest) Clone() AddBonusTimeRequest {
+	c := v
+	c.PinCode = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PinCode)
+	return c
+}
+
 // SetScreenDailyTimeRequest is the SetScreenDailyTime command payload.
 type SetScreenDailyTimeRequest struct {
 	ScreenTime uint32 // 0: elapsed-s, M, max 86400
@@ -526,6 +587,24 @@ func (v *AddBlockChannelsRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddBlockChannelsRequest) Clone() AddBlockChannelsRequest {
+	c := v
+	c.Channels = func(s []BlockChannelStruct) []BlockChannelStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]BlockChannelStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.Channels)
+	return c
+}
+
 // RemoveBlockChannelsRequest is the RemoveBlockChannels command payload.
 type RemoveBlockChannelsRequest struct {
 	ChannelIndexes []uint16 // 0: list[uint16], M
@@ -543,6 +622,22 @@ func (v *RemoveBlockChannelsRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "RemoveBlockChannels",
 		spec.Bind(0, "ChannelIndexes", true, &v.ChannelIndexes, spec.DecodeList(spec.DecodeUint[uint16](16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RemoveBlockChannelsRequest) Clone() RemoveBlockChannelsRequest {
+	c := v
+	c.ChannelIndexes = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.ChannelIndexes)
+	return c
 }
 
 // AddBlockApplicationsRequest is the AddBlockApplications command payload.
@@ -564,6 +659,22 @@ func (v *AddBlockApplicationsRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddBlockApplicationsRequest) Clone() AddBlockApplicationsRequest {
+	c := v
+	c.Applications = func(s []AppInfoStruct) []AppInfoStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AppInfoStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Applications)
+	return c
+}
+
 // RemoveBlockApplicationsRequest is the RemoveBlockApplications command payload.
 type RemoveBlockApplicationsRequest struct {
 	Applications []AppInfoStruct // 0: list[AppInfoStruct], M
@@ -581,6 +692,22 @@ func (v *RemoveBlockApplicationsRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "RemoveBlockApplications",
 		spec.Bind(0, "Applications", true, &v.Applications, spec.DecodeList(spec.DecodeStruct[AppInfoStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RemoveBlockApplicationsRequest) Clone() RemoveBlockApplicationsRequest {
+	c := v
+	c.Applications = func(s []AppInfoStruct) []AppInfoStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AppInfoStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Applications)
+	return c
 }
 
 // SetBlockContentTimeWindowRequest is the SetBlockContentTimeWindow command payload.
@@ -602,6 +729,15 @@ func (v *SetBlockContentTimeWindowRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetBlockContentTimeWindowRequest) Clone() SetBlockContentTimeWindowRequest {
+	c := v
+	c.TimeWindow = v.TimeWindow.Clone()
+	return c
+}
+
 // RemoveBlockContentTimeWindowRequest is the RemoveBlockContentTimeWindow command payload.
 type RemoveBlockContentTimeWindowRequest struct {
 	TimeWindowIndexes []uint16 // 0: list[uint16], M
@@ -619,6 +755,22 @@ func (v *RemoveBlockContentTimeWindowRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "RemoveBlockContentTimeWindow",
 		spec.Bind(0, "TimeWindowIndexes", true, &v.TimeWindowIndexes, spec.DecodeList(spec.DecodeUint[uint16](16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RemoveBlockContentTimeWindowRequest) Clone() RemoveBlockContentTimeWindowRequest {
+	c := v
+	c.TimeWindowIndexes = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(v.TimeWindowIndexes)
+	return c
 }
 
 // RemainingScreenTimeExpiredEvent is the RemainingScreenTimeExpired event payload.

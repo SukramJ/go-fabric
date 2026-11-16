@@ -196,6 +196,28 @@ func (v *AnnounceOtaProviderRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AnnounceOtaProviderRequest) Clone() AnnounceOtaProviderRequest {
+	c := v
+	c.MetadataForNode = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.MetadataForNode)
+	return c
+}
+
 // StateTransitionEvent is the StateTransition event payload.
 type StateTransitionEvent struct {
 	PreviousState         UpdateStateEnum       // 0: UpdateStateEnum, M

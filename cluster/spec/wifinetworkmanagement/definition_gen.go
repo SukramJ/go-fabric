@@ -75,6 +75,22 @@ func (v *NetworkPassphraseResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NetworkPassphraseResponse) Clone() NetworkPassphraseResponse {
+	c := v
+	c.Passphrase = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Passphrase)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (NetworkPassphraseResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdNetworkPassphraseResponse

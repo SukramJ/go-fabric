@@ -86,6 +86,42 @@ func (v *CumulativeEnergyResetStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CumulativeEnergyResetStruct) Clone() CumulativeEnergyResetStruct {
+	c := v
+	c.ImportedResetTimestamp = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ImportedResetTimestamp)
+	c.ExportedResetTimestamp = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ExportedResetTimestamp)
+	c.ImportedResetSystime = func(p *spec.Nullable[uint64]) *spec.Nullable[uint64] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ImportedResetSystime)
+	c.ExportedResetSystime = func(p *spec.Nullable[uint64]) *spec.Nullable[uint64] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ExportedResetSystime)
+	return c
+}
+
 // CumulativeEnergyResetStructDef describes CumulativeEnergyResetStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -131,6 +167,56 @@ func (v *EnergyMeasurementStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(5, "ApparentEnergy", false, &v.ApparentEnergy, spec.DecodeOptional(spec.DecodeIntIn[int64](64, 0, 9223372036854775807))),
 		spec.Bind(6, "ReactiveEnergy", false, &v.ReactiveEnergy, spec.DecodeOptional(spec.DecodeIntIn[int64](64, 0, 9223372036854775807))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EnergyMeasurementStruct) Clone() EnergyMeasurementStruct {
+	c := v
+	c.StartTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartTimestamp)
+	c.EndTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndTimestamp)
+	c.StartSystime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartSystime)
+	c.EndSystime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndSystime)
+	c.ApparentEnergy = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ApparentEnergy)
+	c.ReactiveEnergy = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ReactiveEnergy)
+	return c
 }
 
 // EnergyMeasurementStructDef describes EnergyMeasurementStruct.
@@ -226,6 +312,24 @@ func (v *MeasurementAccuracyStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MeasurementAccuracyStruct) Clone() MeasurementAccuracyStruct {
+	c := v
+	c.AccuracyRanges = func(s []MeasurementAccuracyRangeStruct) []MeasurementAccuracyRangeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]MeasurementAccuracyRangeStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.AccuracyRanges)
+	return c
+}
+
 // MeasurementAccuracyStructDef describes MeasurementAccuracyStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -277,6 +381,56 @@ func (v *MeasurementAccuracyRangeStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MeasurementAccuracyRangeStruct) Clone() MeasurementAccuracyRangeStruct {
+	c := v
+	c.PercentMax = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PercentMax)
+	c.PercentMin = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PercentMin)
+	c.PercentTypical = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PercentTypical)
+	c.FixedMax = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FixedMax)
+	c.FixedMin = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FixedMin)
+	c.FixedTypical = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FixedTypical)
+	return c
+}
+
 // MeasurementAccuracyRangeStructDef describes MeasurementAccuracyRangeStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -313,6 +467,28 @@ func (v *CumulativeEnergyMeasuredEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CumulativeEnergyMeasuredEvent) Clone() CumulativeEnergyMeasuredEvent {
+	c := v
+	c.EnergyImported = func(p *EnergyMeasurementStruct) *EnergyMeasurementStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.EnergyImported)
+	c.EnergyExported = func(p *EnergyMeasurementStruct) *EnergyMeasurementStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.EnergyExported)
+	return c
+}
+
 // PeriodicEnergyMeasuredEvent is the PeriodicEnergyMeasured event payload.
 type PeriodicEnergyMeasuredEvent struct {
 	EnergyImported *EnergyMeasurementStruct // 0: EnergyMeasurementStruct, PERE & IMPE
@@ -333,6 +509,28 @@ func (v *PeriodicEnergyMeasuredEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "EnergyImported", false, &v.EnergyImported, spec.DecodeOptional(spec.DecodeStruct[EnergyMeasurementStruct])),
 		spec.Bind(1, "EnergyExported", false, &v.EnergyExported, spec.DecodeOptional(spec.DecodeStruct[EnergyMeasurementStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PeriodicEnergyMeasuredEvent) Clone() PeriodicEnergyMeasuredEvent {
+	c := v
+	c.EnergyImported = func(p *EnergyMeasurementStruct) *EnergyMeasurementStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.EnergyImported)
+	c.EnergyExported = func(p *EnergyMeasurementStruct) *EnergyMeasurementStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.EnergyExported)
+	return c
 }
 
 func decodeCumulativeEnergyMeasuredEvent(n spec.Node) (any, error) {
