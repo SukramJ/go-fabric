@@ -406,9 +406,6 @@ func TestReceiveOverReliableServesUnsecuredDropsGroup(t *testing.T) {
 	if len(c.sent) != sentBefore {
 		t.Fatalf("%d replies to a dropped group message", len(c.sent)-sentBefore)
 	}
-	if isUnsecuredUnicast([]byte{0}) {
-		t.Fatal("short buffer read as unsecured")
-	}
 }
 
 // TestBindSessionRouteNeverSwitchesTransport: matter.js replaces a

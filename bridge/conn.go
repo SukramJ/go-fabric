@@ -5,7 +5,6 @@ package bridge
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,7 +17,6 @@ import (
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport"
-	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -593,18 +591,6 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 		// (ExchangeManager.ts:634-648).
 	}
 	return b.dispatch(ctx, buf, route)
-}
-
-// isUnsecuredUnicast reports whether buf is a message of the unsecured
-// session (unicast session type, session id 0).
-func isUnsecuredUnicast(buf []byte) bool {
-	if len(buf) < 4 {
-		return false
-	}
-	if message.SessionType(buf[3]&secFlagSessionTypeBits) != message.SessionUnsecured {
-		return false
-	}
-	return binary.LittleEndian.Uint16(buf[1:3]) == 0
 }
 
 // handleTCPMessage is the TCP listener's handler: the dispatch context
