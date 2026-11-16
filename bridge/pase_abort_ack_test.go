@@ -74,3 +74,35 @@ func TestPASEAbortReportIsAcknowledged(t *testing.T) {
 		}
 	}
 }
+
+// TestSecureStatusReportDoesNotAbortPASE: a failure StatusReport on a
+// secure session names no handshake, so it does not end the PASE handshake
+// in flight even when its exchange id and source node id are the
+// handshake's (R2-P6-test-0821); the same report on the unsecured session
+// does.
+func TestSecureStatusReportDoesNotAbortPASE(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	key := HandshakeKey{InitiatorNodeID: 0x5A5C, ExchangeID: 0x0102}
+	if !b.claimPaseInFlight(key) {
+		t.Fatal("the PASE claim was refused")
+	}
+	inFlight := func() bool {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return !b.paseInFlightSince.IsZero() && b.paseInFlight == key
+	}
+	failure := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
+	proto := message.ProtocolHeader{ProtocolID: mrp.SecureChannelProtocolID, Opcode: mrp.SCOpcodeStatusReport, ExchangeID: key.ExchangeID}
+	secure := &message.Header{SessionID: 0x0901, MessageCounter: 7, HasSourceNodeID: true, SourceNodeID: key.InitiatorNodeID}
+	if b.abortPaseOnStatusReport(loopbackSrc(), secure, proto, failure) {
+		t.Error("a secure session's report was taken as the PASE handshake's")
+	}
+	if !inFlight() {
+		t.Fatal("a secure session's failure report ended the PASE handshake in flight")
+	}
+	unsecured := &message.Header{SessionID: 0, MessageCounter: 8, HasSourceNodeID: true, SourceNodeID: key.InitiatorNodeID}
+	if !b.abortPaseOnStatusReport(loopbackSrc(), unsecured, proto, failure) || inFlight() {
+		t.Fatal("the unsecured failure report did not end the PASE handshake")
+	}
+}

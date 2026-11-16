@@ -242,3 +242,33 @@ func TestAdaptersNameTheirEstablishedSession(t *testing.T) {
 		t.Fatalf("PASE adapter established %#x %v", sid, ok)
 	}
 }
+
+// TestSuccessStatusReportKeepsTheHandshakeHold: on the unsecured session
+// only a failure StatusReport ends the TCP hold of the handshake it names
+// (R2-P6-test-0821) — a success report (the initiator's after Sigma2_Resume
+// or Sigma3 is answered) is no end of the peer's interest in the
+// connection.
+func TestSuccessStatusReportKeepsTheHandshakeHold(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
+	route := b.routeFor(&fakeConn{})
+	r, ok := route.(*connRoute)
+	if !ok {
+		t.Fatalf("route %T", route)
+	}
+	held := func() int {
+		b.routeBindMu.Lock()
+		defer b.routeBindMu.Unlock()
+		return r.liveHandshakesLocked(time.Now())
+	}
+	key := HandshakeKey{InitiatorNodeID: 0x5A5B, ExchangeID: 4}
+	b.holdHandshake(route, key, false)
+	hdr := &message.Header{SessionID: 0, MessageCounter: 9, HasSourceNodeID: true, SourceNodeID: key.InitiatorNodeID}
+	success := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)
+	if err := b.dispatchSecureChannel(route, hdr, scProto(mrp.SCOpcodeStatusReport, key.ExchangeID, false, 0), success); err != nil {
+		t.Fatal(err)
+	}
+	if n := held(); n != 1 {
+		t.Fatalf("%d holds after the peer's success report, want 1", n)
+	}
+}
