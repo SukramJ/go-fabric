@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 	"sync"
 
@@ -487,12 +486,6 @@ func (n *ThreadNetworkCommissioning) scanNetworks(ctx context.Context, req netco
 	return netcommdef.ScanNetworksResponse{NetworkingStatus: status, ThreadScanResults: &results}, nil
 }
 
-// threadRevertFailed logs a revert of the border router's dataset that did
-// not land; nothing retries it (OnFailSafeExpired).
-func threadRevertFailed(err error) {
-	slog.Default().Warn("matter.netcomm.thread.revert_failed", slog.Any("err", err))
-}
-
 // scanResult is the ThreadInterfaceScanResult of a commissioned active
 // dataset, read through chip's view; its extended address is the
 // border router's own (8 zero bytes until known).
@@ -665,9 +658,7 @@ func (n *ThreadNetworkCommissioning) reattachReverted(ctx context.Context, windo
 	}
 	staging := slices.Clone(n.staging)
 	n.mu.Unlock()
-	if err := n.br.SetActiveDataset(ctx, staging); err != nil {
-		threadRevertFailed(err)
-	}
+	_ = n.br.SetActiveDataset(ctx, staging) // as the expiry's own revert: attempted once
 	enabled, connected := n.probe(ctx, staging)
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -694,7 +685,8 @@ func (n *ThreadNetworkCommissioning) OnCommissioningComplete(context.Context) {
 // backup goes either way.
 //
 // The revert is attempted once. When the border router refuses it or
-// cannot be reached, the failure is logged and nothing retries it: the
+// cannot be reached, nothing retries or reports it (the server has no
+// logger): the
 // border router stays on the dataset of the commissioning the fail-safe
 // rolled back, the server holds the backup as its staged network, and
 // Networks reports it not connected (review II, R2-P6-err-1002; chip
@@ -734,9 +726,7 @@ func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	staging := slices.Clone(n.staging)
 	n.mu.Unlock()
 	if backup != nil {
-		if err := n.br.SetActiveDataset(ctx, backup); err != nil {
-			threadRevertFailed(err)
-		}
+		_ = n.br.SetActiveDataset(ctx, backup) // attempted once, see the doc
 	}
 	enabled, connected := n.probe(ctx, staging)
 	n.mu.Lock()

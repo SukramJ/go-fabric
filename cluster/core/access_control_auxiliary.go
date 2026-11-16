@@ -156,7 +156,7 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred m
 		var admin *uint64
 		switch own, ok := deferred[fabric]; {
 		case ok:
-			admin = adminNodeIDOf(own)
+			admin = adminNodeIDOf(own) //nolint:contextcheck // own is the deferred change's request context, read for its subject only
 		case accessing == fabric:
 			admin = adminNodeIDOf(ctx)
 		}

@@ -823,6 +823,61 @@ func keySetWriteFields(fields any) (gks GroupKeySetStruct, start1Set, start2Set,
 	return GroupKeySetStruct{}, false, false, false
 }
 
+// validateKeySet is KeySetWrite's key and start-time validation of gks,
+// whose disabled slots (MAX_64BIT_TIME) are already cleared; start1Set and
+// start2Set say that a start time is not null.
+func validateKeySet(gks GroupKeySetStruct, start1Set, start2Set bool) error {
+	// EpochKey length constraint: each non-nil key must be exactly 16 bytes.
+	// Mirrors chip src/app/clusters/group-key-mgmt-server/
+	// GroupKeyManagementCluster.cpp: VerifyOrExit(epochKey.size() == 16,
+	// err = CHIP_ERROR_INVALID_ARGUMENT), answered as
+	// Status::ConstraintError: the error below carries that status.
+	const epochKeyLen = 16
+	if len(gks.EpochKey0) > 0 && len(gks.EpochKey0) != epochKeyLen {
+		return spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
+	}
+	if len(gks.EpochKey1) > 0 && len(gks.EpochKey1) != epochKeyLen {
+		return spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
+	}
+	if len(gks.EpochKey2) > 0 && len(gks.EpochKey2) != epochKeyLen {
+		return spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
+	}
+
+	if len(gks.EpochKey0) == 0 || gks.EpochStartTime0 == 0 {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
+	}
+	if gks.EpochStartTime0 <= ipkDefaultEpochStartTime {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
+	}
+
+	if len(gks.EpochKey1) > 0 && (gks.EpochStartTime1 == 0 || gks.EpochStartTime1 <= gks.EpochStartTime0) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
+	}
+	// A null key with a start time that is not null — 0 included — is
+	// refused, as matter.js refuses it (GroupKeyManagementServer.ts:335-337,
+	// :351-353 at db021da0); a request in the module's own struct carries
+	// no null, and there a start time of 0 reads as absent (review II,
+	// R2-P6-par-1013).
+	if len(gks.EpochKey1) == 0 && (start1Set || gks.EpochStartTime1 != 0) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
+	}
+
+	if len(gks.EpochKey2) > 0 && len(gks.EpochKey1) == 0 {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
+	}
+	if len(gks.EpochKey2) > 0 && (gks.EpochStartTime2 == 0 || gks.EpochStartTime1 == 0 || gks.EpochStartTime2 <= gks.EpochStartTime1) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
+	}
+	if len(gks.EpochKey2) == 0 && (start2Set || gks.EpochStartTime2 != 0) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
+	}
+
+	if store.SecurityPolicy(gks.GroupKeySecurityPolicy) != store.SecurityPolicyTrustFirst {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
+	}
+	return nil
+}
+
 // nullableBytes is v's bytes, nil for null.
 func nullableBytes(v spec.Nullable[[]byte]) []byte {
 	if v.Null {
@@ -1008,53 +1063,8 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 		start2Set = false
 	}
 
-	// EpochKey length constraint: each non-nil key must be exactly 16 bytes.
-	// Mirrors chip src/app/clusters/group-key-mgmt-server/
-	// GroupKeyManagementCluster.cpp: VerifyOrExit(epochKey.size() == 16,
-	// err = CHIP_ERROR_INVALID_ARGUMENT), answered as
-	// Status::ConstraintError: the error below carries that status.
-	const epochKeyLen = 16
-	if len(gks.EpochKey0) > 0 && len(gks.EpochKey0) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
-	}
-	if len(gks.EpochKey1) > 0 && len(gks.EpochKey1) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
-	}
-	if len(gks.EpochKey2) > 0 && len(gks.EpochKey2) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
-	}
-
-	if len(gks.EpochKey0) == 0 || gks.EpochStartTime0 == 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
-	}
-	if gks.EpochStartTime0 <= ipkDefaultEpochStartTime {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
-	}
-
-	if len(gks.EpochKey1) > 0 && (gks.EpochStartTime1 == 0 || gks.EpochStartTime1 <= gks.EpochStartTime0) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
-	}
-	// A null key with a start time that is not null — 0 included — is
-	// refused, as matter.js refuses it (GroupKeyManagementServer.ts:335-337,
-	// :351-353 at db021da0); a request in the module's own struct carries
-	// no null, and there a start time of 0 reads as absent (review II,
-	// R2-P6-par-1013).
-	if len(gks.EpochKey1) == 0 && (start1Set || gks.EpochStartTime1 != 0) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
-	}
-
-	if len(gks.EpochKey2) > 0 && len(gks.EpochKey1) == 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
-	}
-	if len(gks.EpochKey2) > 0 && (gks.EpochStartTime2 == 0 || gks.EpochStartTime1 == 0 || gks.EpochStartTime2 <= gks.EpochStartTime1) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
-	}
-	if len(gks.EpochKey2) == 0 && (start2Set || gks.EpochStartTime2 != 0) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
-	}
-
-	if store.SecurityPolicy(gks.GroupKeySecurityPolicy) != store.SecurityPolicyTrustFirst {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
+	if err := validateKeySet(gks, start1Set, start2Set); err != nil {
+		return nil, err
 	}
 	// GroupKeyMulticastPolicy (field 8) is accepted whatever its value and
 	// never stored — matter.js 452d6f5c dropped the PerGroupID-only check

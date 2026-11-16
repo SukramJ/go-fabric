@@ -53,7 +53,7 @@ type extLoadFailStore struct {
 	*fakeStore
 }
 
-func (s *extLoadFailStore) GetSetting(ctx context.Context, key string) (string, bool, error) {
+func (s *extLoadFailStore) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
 	if strings.HasSuffix(key, ".extension.1") {
 		return "", false, errors.New("injected settings read failure")
 	}

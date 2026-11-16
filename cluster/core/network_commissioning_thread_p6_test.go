@@ -25,12 +25,12 @@ type gatedBorderRouter struct {
 }
 
 func (g *gatedBorderRouter) SetActiveDataset(ctx context.Context, ds []byte) error {
-	g.simBorderRouter.mu.Lock()
+	g.mu.Lock()
 	gate := !g.used && bytes.Equal(ds, g.hold)
 	if gate {
 		g.used = true
 	}
-	g.simBorderRouter.mu.Unlock()
+	g.mu.Unlock()
 	if gate {
 		close(g.entered)
 		<-g.release
