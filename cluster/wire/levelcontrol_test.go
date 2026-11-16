@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -64,14 +63,17 @@ func TestDecodeMoveToLevelNullTransitionTime(t *testing.T) {
 }
 
 // TestDecodeMoveToLevelOmitsTransitionTime verifies that a payload with
-// the TransitionTime context tag 1 entirely ABSENT (not TLV Null) is
-// refused INVALID_COMMAND: TransitionTime is mandatory and nullable
-// (level-control.element.ts:74), so a controller sends null, not nothing.
-// Mirrors matter.js: decode leaves the member unset (TlvObject.ts:205-251),
-// then requestTlv.validate (CommandInvokeResponse.ts:486) throws
-// ValidationMandatoryFieldMissingError (TlvObject.ts:257-261), answered
-// INVALID_COMMAND (CommandInvokeResponse.ts:529-535 at db021da0); the
-// generated decoder refuses it the same (review II, R2-P6-wire-1209).
+// the TransitionTime context tag 1 entirely ABSENT (not TLV Null) decodes
+// and leaves TransitionTime nil: absent is read as null, as the bridge's
+// definition path fills it (BD-Matter-LevelControl-LenientDecoders; review
+// II, R2-P6-wire-1209, decision 168). connectedhomeip accepts the shape as
+// null: its decoder has no presence check
+// (zzz_generated/app-common/clusters/LevelControl/Commands.ipp:44-73) and
+// the cluster reads the field with a fallback (LevelControlCluster.cpp:371,
+// Step :517, at 6170af84). matter.js refuses it: the request's validate
+// (CommandInvokeResponse.ts:486) answers a missing mandatory field
+// INVALID_COMMAND (:529-535 at db021da0). No capture of a controller that
+// sends this shape is on record.
 func TestDecodeMoveToLevelOmitsTransitionTime(t *testing.T) {
 	t.Parallel()
 	payload := buildPayload(t, func(e *tlv.Encoder) {
@@ -80,9 +82,21 @@ func TestDecodeMoveToLevelOmitsTransitionTime(t *testing.T) {
 		e.PutUint(tlv.ContextTag(2), 1) // OptionsMask
 		e.PutUint(tlv.ContextTag(3), 0) // OptionsOverride
 	})
-	_, err := wire.DecodeMoveToLevel(payload)
-	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusInvalidCommand {
-		t.Fatalf("err = %v, want INVALID_COMMAND", err)
+	got, err := wire.DecodeMoveToLevel(payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Level != 77 {
+		t.Errorf("Level = %d, want 77", got.Level)
+	}
+	if got.TransitionTime != nil {
+		t.Errorf("TransitionTime = %v, want nil for absent tag", *got.TransitionTime)
+	}
+	if got.OptionsMask != 1 {
+		t.Errorf("OptionsMask = %d, want 1", got.OptionsMask)
+	}
+	if got.OptionsOverride != 0 {
+		t.Errorf("OptionsOverride = %d, want 0", got.OptionsOverride)
 	}
 }
 
@@ -207,9 +221,10 @@ func TestDecodeStepNullTransitionTime(t *testing.T) {
 
 // TestDecodeStepOmitsTransitionTime verifies that a Step / StepWithOnOff
 // payload with the TransitionTime context tag 2 entirely ABSENT (not TLV
-// Null) is refused INVALID_COMMAND, as matter.js refuses it
-// (level-control.element.ts:91, mandatory and nullable; the validation of
-// TestDecodeMoveToLevelOmitsTransitionTime; review II, R2-P6-wire-1209).
+// Null) decodes and leaves TransitionTime nil: absent is read as null, as
+// [TestDecodeMoveToLevelOmitsTransitionTime] states with the references
+// (BD-Matter-LevelControl-LenientDecoders; review II, R2-P6-wire-1209,
+// decision 168).
 func TestDecodeStepOmitsTransitionTime(t *testing.T) {
 	t.Parallel()
 	payload := buildPayload(t, func(e *tlv.Encoder) {
@@ -219,9 +234,24 @@ func TestDecodeStepOmitsTransitionTime(t *testing.T) {
 		e.PutUint(tlv.ContextTag(3), 1) // OptionsMask
 		e.PutUint(tlv.ContextTag(4), 0) // OptionsOverride
 	})
-	_, err := wire.DecodeStep(payload)
-	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusInvalidCommand {
-		t.Fatalf("err = %v, want INVALID_COMMAND", err)
+	got, err := wire.DecodeStep(payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.StepMode != wire.LevelStepModeUp {
+		t.Errorf("StepMode = %d, want %d (Up)", got.StepMode, wire.LevelStepModeUp)
+	}
+	if got.StepSize != 25 {
+		t.Errorf("StepSize = %d, want 25", got.StepSize)
+	}
+	if got.TransitionTime != nil {
+		t.Errorf("TransitionTime = %v, want nil for absent tag", *got.TransitionTime)
+	}
+	if got.OptionsMask != 1 {
+		t.Errorf("OptionsMask = %d, want 1", got.OptionsMask)
+	}
+	if got.OptionsOverride != 0 {
+		t.Errorf("OptionsOverride = %d, want 0", got.OptionsOverride)
 	}
 }
 

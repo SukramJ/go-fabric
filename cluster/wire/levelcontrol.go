@@ -74,16 +74,14 @@ type StopRequest struct {
 
 // DecodeMoveToLevel parses MoveToLevel / MoveToLevelWithOnOff payloads.
 // A field of the wrong type or outside its width is refused ([fieldUint]);
-// a payload without one of its four fields — TransitionTime included, a
-// mandatory nullable field — is refused INVALID_COMMAND. Mirrors matter.js:
-// decode leaves the member unset (TlvObject.ts:205-251), then
-// requestTlv.validate (CommandInvokeResponse.ts:486) throws
-// ValidationMandatoryFieldMissingError (TlvObject.ts:257-261), answered
-// INVALID_COMMAND (CommandInvokeResponse.ts:529-535 at db021da0); review
-// II, R2-P6-wire-1209.
+// a payload without Level, OptionsMask or OptionsOverride is refused
+// INVALID_COMMAND. An absent TransitionTime decodes as null (nil), as the
+// bridge's definition path fills it (BD-Matter-LevelControl-LenientDecoders;
+// the references, on TestDecodeMoveToLevelOmitsTransitionTime; review II,
+// R2-P6-wire-1209, decision 168).
 func DecodeMoveToLevel(payload []byte) (MoveToLevelRequest, error) {
 	var req MoveToLevelRequest
-	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 1, 2, 3}, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 2, 3}, func(tag uint32, el tlv.Element) (err error) {
 		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
@@ -125,12 +123,14 @@ func DecodeMove(payload []byte) (MoveRequest, error) {
 	return req, err
 }
 
-// DecodeStep parses Step / StepWithOnOff payloads. A payload without one
-// of its five fields — TransitionTime included — is refused
-// INVALID_COMMAND, as [DecodeMoveToLevel] (R2-P6-wire-1209).
+// DecodeStep parses Step / StepWithOnOff payloads. A payload without
+// StepMode, StepSize, OptionsMask or OptionsOverride is refused
+// INVALID_COMMAND; an absent TransitionTime decodes as null (nil), as
+// [DecodeMoveToLevel] (BD-Matter-LevelControl-LenientDecoders; review II,
+// R2-P6-wire-1209, decision 168).
 func DecodeStep(payload []byte) (StepRequest, error) {
 	var req StepRequest
-	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 1, 2, 3, 4}, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 1, 3, 4}, func(tag uint32, el tlv.Element) (err error) {
 		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:

@@ -5,6 +5,7 @@ package wire_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -46,33 +47,45 @@ var rawDecoders = []struct {
 	raw     func([]byte) error
 	def     *spec.Cluster
 	command uint32
+	// lenient are the mandatory tags the raw decoder accepts absent:
+	// TransitionTime, read as null as the bridge's definition path fills
+	// it (BD-Matter-LevelControl-LenientDecoders; R2-P6-wire-1209,
+	// decision 168).
+	lenient []uint8
 }{
-	{"MoveToLevel", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMoveToLevel(b); return err }, lvldef.Definition, lvldef.CmdMoveToLevel},
-	{"Move", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMove(b); return err }, lvldef.Definition, lvldef.CmdMove},
-	{"Step", []uint8{0, 1, 2, 3, 4}, func(b []byte) error { _, err := wire.DecodeStep(b); return err }, lvldef.Definition, lvldef.CmdStep},
-	{"Stop", []uint8{0, 1}, func(b []byte) error { _, err := wire.DecodeStop(b); return err }, lvldef.Definition, lvldef.CmdStop},
-	{"MoveToLevelWithOnOff", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMoveToLevel(b); return err }, lvldef.Definition, lvldef.CmdMoveToLevelWithOnOff},
-	{"MoveWithOnOff", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMove(b); return err }, lvldef.Definition, lvldef.CmdMoveWithOnOff},
-	{"StepWithOnOff", []uint8{0, 1, 2, 3, 4}, func(b []byte) error { _, err := wire.DecodeStep(b); return err }, lvldef.Definition, lvldef.CmdStepWithOnOff},
-	{"StopWithOnOff", []uint8{0, 1}, func(b []byte) error { _, err := wire.DecodeStop(b); return err }, lvldef.Definition, lvldef.CmdStopWithOnOff},
-	{"OffWithEffect", []uint8{0, 1}, func(b []byte) error { _, err := wire.DecodeOffWithEffect(b); return err }, onoffdef.Definition, onoffdef.CmdOffWithEffect},
-	{"OnWithTimedOff", []uint8{0, 1, 2}, func(b []byte) error { _, err := wire.DecodeOnWithTimedOff(b); return err }, onoffdef.Definition, onoffdef.CmdOnWithTimedOff},
+	{"MoveToLevel", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMoveToLevel(b); return err }, lvldef.Definition, lvldef.CmdMoveToLevel, []uint8{1}},
+	{"Move", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMove(b); return err }, lvldef.Definition, lvldef.CmdMove, nil},
+	{"Step", []uint8{0, 1, 2, 3, 4}, func(b []byte) error { _, err := wire.DecodeStep(b); return err }, lvldef.Definition, lvldef.CmdStep, []uint8{2}},
+	{"Stop", []uint8{0, 1}, func(b []byte) error { _, err := wire.DecodeStop(b); return err }, lvldef.Definition, lvldef.CmdStop, nil},
+	{"MoveToLevelWithOnOff", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMoveToLevel(b); return err }, lvldef.Definition, lvldef.CmdMoveToLevelWithOnOff, []uint8{1}},
+	{"MoveWithOnOff", []uint8{0, 1, 2, 3}, func(b []byte) error { _, err := wire.DecodeMove(b); return err }, lvldef.Definition, lvldef.CmdMoveWithOnOff, nil},
+	{"StepWithOnOff", []uint8{0, 1, 2, 3, 4}, func(b []byte) error { _, err := wire.DecodeStep(b); return err }, lvldef.Definition, lvldef.CmdStepWithOnOff, []uint8{2}},
+	{"StopWithOnOff", []uint8{0, 1}, func(b []byte) error { _, err := wire.DecodeStop(b); return err }, lvldef.Definition, lvldef.CmdStopWithOnOff, nil},
+	{"OffWithEffect", []uint8{0, 1}, func(b []byte) error { _, err := wire.DecodeOffWithEffect(b); return err }, onoffdef.Definition, onoffdef.CmdOffWithEffect, nil},
+	{"OnWithTimedOff", []uint8{0, 1, 2}, func(b []byte) error { _, err := wire.DecodeOnWithTimedOff(b); return err }, onoffdef.Definition, onoffdef.CmdOnWithTimedOff, nil},
 }
 
 // TestRawDecodersRefuseWhatTheGeneratedOnesRefuse (review II,
 // R2-P6-wire-1209): each raw decoder refuses a payload that lacks a field
 // exactly when the generated decoder of its command does — a mandatory
-// field — and answers the generated decoders' INVALID_COMMAND. The
+// field — and answers the generated decoders' INVALID_COMMAND, except an
+// absent TransitionTime (lenient, decision 168). The
 // standing guard of the class: a raw decoder that drifts from the
 // generated definition's mandatory fields fails here.
 func TestRawDecodersRefuseWhatTheGeneratedOnesRefuse(t *testing.T) {
 	t.Parallel()
 	for _, d := range rawDecoders {
 		cmd := d.def.Command(d.command, spec.Request)
-		check := func(label string, tags []uint8) {
+		check := func(label string, tags []uint8, lenient bool) {
 			b := rawPayload(t, tags, nil)
 			_, genErr := cmd.Decode(spectest.Decode(t, b))
 			rawErr := d.raw(b)
+			if lenient {
+				if rawErr != nil || genErr == nil {
+					t.Errorf("%s %s: raw %v, generated %v; want the raw decoder lenient where the generated one refuses", d.name, label, rawErr, genErr)
+				}
+				return
+			}
 			if (genErr == nil) != (rawErr == nil) {
 				t.Errorf("%s %s: raw %v, generated %v", d.name, label, rawErr, genErr)
 				return
@@ -82,11 +95,11 @@ func TestRawDecodersRefuseWhatTheGeneratedOnesRefuse(t *testing.T) {
 				t.Errorf("%s %s: raw %v, want INVALID_COMMAND", d.name, label, rawErr)
 			}
 		}
-		check("whole", d.tags)
-		check("empty", nil)
+		check("whole", d.tags, false)
+		check("empty", nil, false)
 		for i, tag := range d.tags {
 			rest := append(append([]uint8{}, d.tags[:i]...), d.tags[i+1:]...)
-			check("without "+string(rune('0'+tag)), rest)
+			check("without "+string(rune('0'+tag)), rest, slices.Contains(d.lenient, tag))
 		}
 	}
 }
