@@ -27,6 +27,14 @@ func TestEnergyStateIsHandedOutAsDeepCopies(t *testing.T) {
 	if got := *d.Forecast().Slots[0].NominalPower; got == 1 {
 		t.Error("the DEM forecast changed through Forecast()")
 	}
+	handed := d.Forecast()
+	if err := d.SetForecast(handed); err != nil {
+		t.Fatal(err)
+	}
+	handed.Slots[0].SlotIsPausable = nil // after the store took it
+	if d.Forecast().Slots[0].SlotIsPausable == nil {
+		t.Error("the DEM forecast changed through the forecast SetForecast took")
+	}
 
 	e, _, _ := newEvse(t, energy.EvseFeatureChargingPreferences|energy.EvseFeatureSoCReporting)
 	fifty := uint8(50)

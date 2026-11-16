@@ -366,7 +366,10 @@ func (c *demoCamera) build() error {
 	speakerCaps := audioCaps
 	no, yes := false, true
 	snapshotCaps := []csdef.SnapshotCapabilitiesStruct{
-		{Resolution: minViewport, MaxFrameRate: camSnapshotFrameRate, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: false, RequiresHardwareEncoder: &no},
+		// RequiresHardwareEncoder is "RequiresEncodedPixels == true"
+		// (review II, R2-P6-par-1304): the capability without encoded
+		// pixels names no encoder.
+		{Resolution: minViewport, MaxFrameRate: camSnapshotFrameRate, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: false},
 		{Resolution: csdef.VideoResolutionStruct{Width: cam720Width, Height: cam720Height}, MaxFrameRate: camSnapshotFrameRate, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: true, RequiresHardwareEncoder: &yes},
 	}
 	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView, csdef.StreamUsageRecording}

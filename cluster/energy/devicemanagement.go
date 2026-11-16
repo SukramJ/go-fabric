@@ -396,7 +396,7 @@ func (s *DeviceEnergyManagementServer) SetPowerAdjustmentCapability(c *PowerAdju
 	if c == nil {
 		return s.set(dem.AttrPowerAdjustmentCapability, nil)
 	}
-	return s.set(dem.AttrPowerAdjustmentCapability, *c)
+	return s.set(dem.AttrPowerAdjustmentCapability, c.Clone()) // the store keeps no list of the caller's
 }
 
 // SetForecast records the forecast; nil is null (DelegateImpl.cpp:
@@ -473,7 +473,7 @@ func (s *DeviceEnergyManagementServer) setForecastLocked(f *Forecast) error {
 	if f == nil {
 		return s.setLocked(dem.AttrForecast, nil)
 	}
-	return s.setLocked(dem.AttrForecast, *f)
+	return s.setLocked(dem.AttrForecast, f.Clone()) // the store keeps no list of the caller's
 }
 
 // setCapabilityCauseLocked is SetPowerAdjustmentCapabilityPowerAdjustReason
@@ -789,6 +789,9 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 	if f == nil { // :426-431
 		return nil, demFailure("Forecast is null")
 	}
+	// Kept as the guard it is in chip: the command needs STA, under which
+	// both fields are "STA" and the store refuses a forecast without them
+	// (review II, R2-P6-par-1304), so no stored forecast reaches it.
 	if f.EarliestStartTime == nil || f.LatestEndTime == nil { // :436-440
 		return nil, demFailure("EarliestStartTime / LatestEndTime absent")
 	}
@@ -870,6 +873,9 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 	}
 	slot := f.Slots[active]
 	switch {
+	// Kept as the guard it is in chip: the command needs PAU, under which
+	// the store refuses a slot without these fields (review II,
+	// R2-P6-par-1304), so no stored forecast reaches it.
 	case slot.SlotIsPausable == nil, slot.MinPauseDuration == nil, slot.MaxPauseDuration == nil: // :562-578
 		return nil, demFailure("slot %d lacks SlotIsPausable, MinPauseDuration or MaxPauseDuration", active)
 	case !*slot.SlotIsPausable: // :580-584

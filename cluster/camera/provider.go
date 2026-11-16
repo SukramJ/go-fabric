@@ -355,6 +355,12 @@ type offerRequest struct {
 // checkConstraints is the data model validation both offers open with
 // (SolicitOffer :597-643, ProvideOffer :858-901): the usage, one stream
 // field at least, the ICE servers and the transport policy.
+// Mirrors chip WebRTCTransportProviderCluster.cpp:866-872 and :982-988: a ProvideOffer naming none
+// of VideoStreamID, AudioStreamID, VideoStreams, AudioStreams is INVALID_COMMAND. matter.js has no provider
+// server (WebRtcTransportProviderServer.ts:14).
+// The server so builds no session without a stream, and one the port
+// returns without one fails CurrentSessions' "O.a+" and is not stored
+// (FAILURE; review II, R2-P6-par-1304).
 func checkConstraints(r offerRequest) error {
 	switch {
 	case r.usage > usageLiveView: // :601-605, :859-863

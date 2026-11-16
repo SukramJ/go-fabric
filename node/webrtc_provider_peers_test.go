@@ -135,11 +135,13 @@ func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 	// The session, registered on both sides by the hosts.
 	if err := prov.UpsertSession(camera.ProviderSession{
 		Id: 1, PeerNodeId: ctlFabric.NodeID, PeerEndpointId: ctlEp, FabricIndex: camFabric.FabricIndex, StreamUsage: wpdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", review II R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := req.UpsertSession(camera.WebRTCSession{
 		Id: 1, PeerNodeId: camFabric.NodeID, PeerEndpointId: camEp, FabricIndex: ctlFabric.FabricIndex, StreamUsage: wrdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", review II R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -215,12 +217,14 @@ func TestCameraProviderLargeSignalOverTCP(t *testing.T) {
 	prov := cam.Server(wpdef.ClusterID).(*camera.Provider)
 	if err := prov.UpsertSession(camera.ProviderSession{
 		Id: 1, PeerNodeId: ctlFabric.NodeID, PeerEndpointId: ctlEp, FabricIndex: camFabric.FabricIndex, StreamUsage: wpdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", review II R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}
 	req := ctl.Server(wrdef.ClusterID).(*camera.Requestor)
 	if err := req.UpsertSession(camera.WebRTCSession{
 		Id: 1, PeerNodeId: camFabric.NodeID, PeerEndpointId: camEp, FabricIndex: ctlFabric.FabricIndex, StreamUsage: wrdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", review II R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}

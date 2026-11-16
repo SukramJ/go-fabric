@@ -376,16 +376,17 @@ func tariffDayEntry(id uint32, start, duration uint16) ct.DayEntryStruct {
 // tariffSampleComponent is one sample tariff component: a Standard price,
 // no friendly credit, auxiliary load 1 Off, a Low peak of 1, a Contract
 // power threshold (CommodityTariffSamples.h:143-177, :278-329).
-func tariffSampleComponent(id uint32, price int64, level int16, power, apparent int64, threshold spec.Nullable[int64], label string) ct.TariffComponentStruct {
+func tariffSampleComponent(id uint32, price int64, level int16, power int64, threshold spec.Nullable[int64], label string) ct.TariffComponentStruct {
 	return ct.TariffComponentStruct{
 		TariffComponentId: id,
 		Price:             ptr(spec.ValueOf(ct.TariffPriceStruct{PriceType: ct.TariffPriceTypeStandard, Price: &price, PriceLevel: &level})),
 		FriendlyCredit:    ptr(false),
 		AuxiliaryLoad:     &ct.AuxiliaryLoadSwitchSettingsStruct{Number: 1, RequiredState: ct.AuxiliaryLoadSettingOff},
 		PeakPeriod:        &ct.PeakPeriodStruct{Severity: ct.PeakPeriodSeverityLow, PeakPeriod: 1},
+		// PowerThreshold and ApparentPowerThreshold are a choice of one,
+		// "O.b" (review II, R2-P6-par-1304; chip's sample sets both).
 		PowerThreshold: &ct.PowerThresholdStruct{
-			PowerThreshold: &power, ApparentPowerThreshold: &apparent,
-			PowerThresholdSource: spec.ValueOf(ct.PowerThresholdSourceContract),
+			PowerThreshold: &power, PowerThresholdSource: spec.ValueOf(ct.PowerThresholdSourceContract),
 		},
 		Threshold: threshold,
 		Label:     ptr(spec.ValueOf(label)),
@@ -431,8 +432,8 @@ func tariffSample1() ct.Patch {
 	t.CalendarPeriods = &[]ct.CalendarPeriodStruct{{StartDate: spec.ValueOf(uint32(0)), DayPatternIds: []uint32{0, 1}}} // :136-137
 	t.IndividualDays = &[]ct.DayStruct{{Date: 1745427104, DayType: ct.DayTypeHoliday, DayEntryIds: []uint32{30}}}       // :139-141
 	t.TariffComponents = &[]ct.TariffComponentStruct{                                                                   // :143-178
-		tariffSampleComponent(10, 15, 1, 2400000, 120, spec.NullOf[int64](), "Tariff Component 1"),
-		tariffSampleComponent(20, 20, 0, 4800000, 240, spec.NullOf[int64](), "Tariff Component 2"),
+		tariffSampleComponent(10, 15, 1, 2400000, spec.NullOf[int64](), "Tariff Component 1"),
+		tariffSampleComponent(20, 20, 0, 4800000, spec.NullOf[int64](), "Tariff Component 2"),
 	}
 	t.TariffPeriods = &[]ct.TariffPeriodStruct{ // :180-207
 		tariffSamplePeriod("Period 1", []uint32{10, 14, 21, 25}, 10),
@@ -460,11 +461,11 @@ func tariffSample2() ct.Patch {
 	}
 	t.DayPatterns = &[]ct.DayPatternStruct{{DayPatternId: 0, DaysOfWeek: 0x7F, DayEntryIds: []uint32{10, 11, 12, 13, 14, 15, 16}}} // :266-268
 	t.CalendarPeriods = &[]ct.CalendarPeriodStruct{{StartDate: spec.ValueOf(uint32(0)), DayPatternIds: []uint32{0}}}               // :273-275
-	third := tariffSampleComponent(30, 50, 0, 3200000, 320, spec.ValueOf(int64(320)), "Tariff Component 3")                        // :313-329
+	third := tariffSampleComponent(30, 50, 0, 3200000, spec.ValueOf(int64(320)), "Tariff Component 3")                             // :313-329
 	third.FriendlyCredit, third.Predicted = ptr(true), ptr(true)
 	t.TariffComponents = &[]ct.TariffComponentStruct{ // :278-330
-		tariffSampleComponent(10, 15, 1, 2400000, 120, spec.ValueOf(int64(120)), "Tariff Component 1"),
-		tariffSampleComponent(20, 20, 0, 4800000, 240, spec.ValueOf(int64(240)), "Tariff Component 2"),
+		tariffSampleComponent(10, 15, 1, 2400000, spec.ValueOf(int64(120)), "Tariff Component 1"),
+		tariffSampleComponent(20, 20, 0, 4800000, spec.ValueOf(int64(240)), "Tariff Component 2"),
 		third,
 	}
 	t.TariffPeriods = &[]ct.TariffPeriodStruct{ // :332-350

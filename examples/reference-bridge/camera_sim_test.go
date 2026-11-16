@@ -254,10 +254,15 @@ func TestCameraSimAudioAndSnapshotStreams(t *testing.T) {
 // stream's again after a restart (camera.go build).
 func TestCameraSimRestoresItsAllocations(t *testing.T) {
 	t.Parallel()
+	off := false
 	kept := csdef.Patch{
-		AllocatedVideoStreams:    &[]csdef.VideoStreamStruct{camVideo(2, cam60fps, camMaxVideoFrameRate, cam720Width, cam720Height, camMaxWidth, camMaxHeight)},
-		AllocatedAudioStreams:    &[]csdef.AudioStreamStruct{{AudioStreamId: 3, StreamUsage: csdef.StreamUsageLiveView, AudioCodec: csdef.AudioCodecOpus, ChannelCount: 8, SampleRate: 48000, BitRate: 64000, BitDepth: 24}},
-		AllocatedSnapshotStreams: &[]csdef.SnapshotStreamStruct{{SnapshotStreamId: 4, ImageCodec: csdef.ImageCodecJpeg, FrameRate: 30, MinResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, Quality: 90}},
+		AllocatedVideoStreams: &[]csdef.VideoStreamStruct{camVideo(2, cam60fps, camMaxVideoFrameRate, cam720Width, cam720Height, camMaxWidth, camMaxHeight)},
+		AllocatedAudioStreams: &[]csdef.AudioStreamStruct{{AudioStreamId: 3, StreamUsage: csdef.StreamUsageLiveView, AudioCodec: csdef.AudioCodecOpus, ChannelCount: 8, SampleRate: 48000, BitRate: 64000, BitDepth: 24}},
+		AllocatedSnapshotStreams: &[]csdef.SnapshotStreamStruct{{
+			SnapshotStreamId: 4, ImageCodec: csdef.ImageCodecJpeg, FrameRate: 30, MinResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480},
+			MaxResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, Quality: 90,
+			WatermarkEnabled: &off, OsdEnabled: &off, // "WMARK", "OSD" (review II, R2-P6-par-1304)
+		}},
 	}
 	raw, err := json.Marshal(kept)
 	if err != nil {
@@ -362,24 +367,27 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 // simConnections are three kept push transports of fabric 1: 1 continuous,
 // 2 motion-triggered, 3 command-triggered, all CMAF and Inactive.
 func simConnections() json.RawMessage {
+	noPreRoll := uint16(0) // MaxPreRollLen is "TriggerType == Command | TriggerType == Motion" (R2-P6-par-1304)
 	conn := func(id uint16, trigger padef.TransportTriggerOptionsStruct) padef.TransportConfigurationStruct {
 		return padef.TransportConfigurationStruct{
 			ConnectionId: id, TransportStatus: padef.TransportStatusInactive, FabricIndex: 1,
 			TransportOptions: &padef.TransportOptionsStruct{
 				StreamUsage: padef.StreamUsageRecording, TlsEndpointId: 1, Url: "https://camera.example/push/",
 				TriggerOptions: trigger, IngestMethod: padef.IngestMethodsCmafIngest,
-				ContainerOptions: padef.ContainerOptionsStruct{ContainerType: padef.ContainerFormatCmaf},
+				// CMAF options are "ContainerType == CMAF" (review II, R2-P6-par-1304).
+				ContainerOptions: padef.ContainerOptionsStruct{ContainerType: padef.ContainerFormatCmaf, CmafContainerOptions: &padef.CMAFContainerOptionsStruct{SegmentDuration: 4000, ChunkDuration: 1000}},
 			},
 		}
 	}
 	motion := padef.TransportTriggerOptionsStruct{
 		TriggerType:       padef.TransportTriggerTypeMotion,
 		MotionTimeControl: &padef.TransportMotionTriggerTimeControlStruct{InitialDuration: 4, AugmentationDuration: 4, MaxDuration: 7, BlindDuration: 3},
+		MaxPreRollLen:     &noPreRoll,
 	}
 	raw, _ := json.Marshal(padef.Patch{CurrentConnections: &[]padef.TransportConfigurationStruct{
 		conn(1, padef.TransportTriggerOptionsStruct{TriggerType: padef.TransportTriggerTypeContinuous}),
 		conn(2, motion),
-		conn(3, padef.TransportTriggerOptionsStruct{TriggerType: padef.TransportTriggerTypeCommand}),
+		conn(3, padef.TransportTriggerOptionsStruct{TriggerType: padef.TransportTriggerTypeCommand, MaxPreRollLen: &noPreRoll}),
 	}})
 	return raw
 }

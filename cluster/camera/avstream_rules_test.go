@@ -232,7 +232,7 @@ func TestAvStreamHostRules(t *testing.T) {
 	}
 	// A new sensor in the same change is the one the rule reads.
 	if err := a.SetAttributes(map[uint32]any{
-		csdef.AttrVideoSensorParams: csdef.VideoSensorParamsStruct{SensorWidth: 1280, SensorHeight: 960, MaxFps: 30},
+		csdef.AttrVideoSensorParams: csdef.VideoSensorParamsStruct{SensorWidth: 1280, SensorHeight: 960, MaxFps: 30, MaxHdrfps: ptr(uint16(30))}, // MaxHDRFPS is "HDR" (R2-P6-par-1304)
 		csdef.AttrViewport:          csdef.ViewportStruct{X2: 1280, Y2: 960},
 	}); err != nil {
 		t.Fatalf("4:3 sensor: %v", err)

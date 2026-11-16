@@ -91,6 +91,7 @@ func signalProvider(t *testing.T) (*camera.Provider, *fakePeers) {
 	p.AttachPeerConnector(peers)
 	if err := p.UpsertSession(camera.ProviderSession{
 		Id: 5, PeerNodeId: sigPeerNode, PeerEndpointId: sigPeerEndpoint, FabricIndex: sigPeerFabric, StreamUsage: wpdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}

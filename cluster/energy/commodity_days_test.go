@@ -147,7 +147,9 @@ func TestCommodityTariffNoRandomization(t *testing.T) {
 		t.Error("DefaultRandomizationType served without RNDM")
 	}
 	tariff := sample2()
-	tariff.DayEntries[0].RandomizationType = nil
+	for i := range tariff.DayEntries { // both are "[RNDM]" (review II, R2-P6-par-1304)
+		tariff.DayEntries[i].RandomizationType, tariff.DayEntries[i].RandomizationOffset = nil, nil
+	}
 	if err := srv.UpdateTariff(tariff); err != nil {
 		t.Errorf("an entry without randomization under no RNDM: %v", err)
 	}
