@@ -231,6 +231,9 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	if err := d.attachHooks(s); err != nil {
 		return nil, err
 	}
+	if err := d.checkDeclaredCommands(s); err != nil {
+		return nil, err
+	}
 	d.hosted = make(map[uint32]bool, len(s.servers))
 	for id := range s.servers {
 		d.hosted[id] = true
@@ -468,7 +471,49 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	fillSelectDefaults(def, srv)
+	s.generated[r.ID] = srv
 	return srv, nil
+}
+
+// checkDeclaredCommands refuses a device whose declaration names an
+// optional command (the Declare's Commands, or the elements a declaration
+// states) for a cluster the generated
+// default server serves, and that command ends without a handler once the
+// declarations' hooks are attached (attachHooks): the generated server is
+// the generated behavior, which leaves a command without a handler out of
+// AcceptedCommandList, so the declaration would have no effect and nothing
+// would say so. It is the rule spec.NewServer applies outside the
+// generated behavior ([spec.ErrMissingHandler]). A kit server carries its
+// declared commands out through its port, and a host's own server
+// (HostServer) is the host's to keep: neither is checked. A command the
+// conformance makes mandatory is the generated behavior's unimplemented
+// one ([spec.Server.UnimplementedMandatoryCommands]), reported by the
+// device-type validator, not here.
+func (d *Device) checkDeclaredCommands(s *settings) error {
+	var missing []error
+	for _, id := range slices.Sorted(maps.Keys(s.generated)) {
+		srv := s.generated[id]
+		if d.Server(id) != contract.ClusterServer(srv) {
+			continue
+		}
+		stubs := srv.UnimplementedMandatoryCommands()
+		// A generated Declare's commands are its implied elements; a
+		// declaration of elements alone states them in elements.
+		declared := append(slices.Clone(s.implied[id].Commands), s.elements[id].Commands...)
+		slices.Sort(declared)
+		for _, cmd := range slices.Compact(declared) {
+			if !srv.Instance.Accepts(cmd) || srv.Handles(cmd) || slices.Contains(stubs, cmd) {
+				continue
+			}
+			name := fmt.Sprintf("0x%02X", cmd)
+			if c := srv.Definition().Command(cmd, spec.Request); c != nil {
+				name = fmt.Sprintf("%s (0x%02X)", c.Name, cmd)
+			}
+			missing = append(missing, fmt.Errorf("%w: %s %s: the declaration selects command %s and nothing handles it; set its Handle field, or leave it out of Commands",
+				ErrConfiguration, d.typ.Name, srv.Definition().Name, name))
+		}
+	}
+	return errors.Join(missing...)
 }
 
 // selection is the feature selection of r's default server: the device
