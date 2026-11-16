@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"runtime"
@@ -13,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -297,4 +299,39 @@ func TestRespondedExchangeEndsWhenItsMessageIsGivenUp(t *testing.T) {
 	tr.mu.Unlock()
 	r.dev.br.tickOutboundReliable(tr, now.Add(time.Hour))
 	r.responderEnded(t)
+}
+
+// TestRespondedExchangeIsNeverStoredUnbound: a peer's first BDX message on a
+// session id the lookup does not hold at the delivery's first look opens no
+// exchange, even when a later look — the peer's resolution — finds a
+// session under the id: an exchange without the session object it belongs
+// to would take any later session's messages (review II, R2-P6-sec-0302,
+// round 2).
+func TestRespondedExchangeIsNeverStoredUnbound(t *testing.T) {
+	t.Parallel()
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := channel.New(channel.Config{EncryptKey: bytes.Repeat([]byte{0xAA}, 16), DecryptKey: bytes.Repeat([]byte{0xBB}, 16), LocalNodeID: 1, PeerNodeID: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	looks := 0
+	b.AttachSessionLookup(sessionLookupFunc(func(uint16) (*channel.Session, bool) {
+		looks++
+		if looks == 1 {
+			return nil, false // the session is not installed yet at the first look
+		}
+		return sess, true
+	}))
+	b.AttachBDXResponder(newEndingResponder())
+	const sid, xid = uint16(0x0303), uint16(0x0404)
+	init := message.ProtocolHeader{Initiator: true, ExchangeID: xid, ProtocolID: bdx.ProtocolID, Opcode: uint8(bdx.MessageReceiveInit)}
+	if b.deliverRespondedBDX(context.Background(), &message.Header{SessionID: sid}, init, []byte{0x00}) {
+		t.Error("a BDX init on a session the delivery did not find was taken")
+	}
+	if _, held := b.bdx.exchanges.Load(secureExchangeKey{sessionID: sid, exchangeID: xid}); held {
+		t.Fatal("an exchange was stored without its session")
+	}
 }
