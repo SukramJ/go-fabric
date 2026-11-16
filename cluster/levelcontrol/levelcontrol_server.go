@@ -1459,8 +1459,8 @@ func optionalBitmap(name string, m map[uint8]any, tag uint8, field string) (uint
 // uint64 and signed ones as int64 (bridge/attribute_value_reader.go
 // primitiveAttributeValue), so a strict assertion on uint8 would reject
 // every value that actually arrives. Out-of-range and negative values
-// are rejected rather than wrapped — [cluster.AsUint8] narrows silently,
-// which would turn level 300 into level 44.
+// are rejected rather than wrapped, which would turn level 300 into
+// level 44.
 func asUint8(v any) (uint8, bool) {
 	n, ok := asInt64(v)
 	if !ok || n < 0 || n > 0xFF {

@@ -40,3 +40,32 @@ func TestAsUintMaxChecksRangeInsteadOfWrapping(t *testing.T) {
 		}
 	}
 }
+
+// TestNarrowingCoercionsRefuseOutOfRange holds AsUint8 and AsInt16 to the
+// width they narrow to: a value outside it, a uint64 beyond int64 and a
+// float outside it or with a fraction are refused, not wrapped. Before,
+// AsInt16(int64(65541)) was 5 and passed the thermostat's int8 check, and
+// AsUint8(258) was 2 (review II, R2-P6-api-1310).
+func TestNarrowingCoercionsRefuseOutOfRange(t *testing.T) {
+	t.Parallel()
+	for _, v := range []any{int64(256), int(258), int64(-1), uint64(1 << 63), uint64(1<<64 - 1), float64(256), float64(1.5), float64(-0.5)} {
+		if got, ok := AsUint8(v); ok {
+			t.Errorf("AsUint8(%T %v) = (%d, true); want a rejection", v, v, got)
+		}
+	}
+	for _, v := range []any{int64(65541), int64(32768), int64(-32769), uint64(1<<64 - 1), uint64(40000), float64(1e9), float64(2.5)} {
+		if got, ok := AsInt16(v); ok {
+			t.Errorf("AsInt16(%T %v) = (%d, true); want a rejection", v, v, got)
+		}
+	}
+	for v, want := range map[any]uint8{uint64(255): 255, int64(0): 0, float64(7): 7} {
+		if got, ok := AsUint8(v); !ok || got != want {
+			t.Errorf("AsUint8(%T %v) = (%d, %v); want (%d, true)", v, v, got, ok, want)
+		}
+	}
+	for v, want := range map[any]int16{int64(-32768): -32768, uint64(32767): 32767, float64(-5): -5} {
+		if got, ok := AsInt16(v); !ok || got != want {
+			t.Errorf("AsInt16(%T %v) = (%d, %v); want (%d, true)", v, v, got, ok, want)
+		}
+	}
+}
