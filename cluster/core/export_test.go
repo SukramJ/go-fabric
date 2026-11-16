@@ -66,3 +66,8 @@ func (o *OperationalCredentials) FailCSRBuild(err error) {
 	o.csrBuilder = func(*ecdsa.PrivateKey) ([]byte, error) { return nil, err }
 	o.nocMu.Unlock()
 }
+
+// BeginAuxiliaryBatch and EndAuxiliaryBatch expose the batch a Groupcast
+// command holds open (review II, R2-P6-conc-1007).
+func (a *AccessControl) BeginAuxiliaryBatch()                  { a.beginAuxiliaryBatch() }
+func (a *AccessControl) EndAuxiliaryBatch(ctx context.Context) { a.endAuxiliaryBatch(ctx) }

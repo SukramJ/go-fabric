@@ -89,6 +89,15 @@ type AccessControl struct {
 	// sources in a row, so it is evaluated once, as matter.js derives once
 	// per command transaction.
 	auxBatch int
+	// auxDeferred is the context of each source change a batch deferred,
+	// per fabric: the event of that fabric names the node behind its own
+	// change, never the node of the command that closes the batch (review
+	// II, R2-P6-conc-1007).
+	auxDeferred map[uint8]context.Context
+	// auxSyncMu makes one synchronisation's read of the source and its
+	// apply one step, so two never apply in the other order than they read.
+	// It is taken before mu, never under it.
+	auxSyncMu sync.Mutex
 
 	// limits is what [AccessControl.SetLimits] set; a zero field is the constant.
 	limits AccessControlLimits
