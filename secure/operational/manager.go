@@ -807,7 +807,10 @@ func (m *Manager) AllocateStake() (Stake, error) {
 // most live sessions (PASE sessions and those not yet on a fabric count
 // as fabric 0); between fabrics of equal size, the least recently active
 // of all of them. nil when no live session exists. The order inside a
-// fabric is [lessRecentlyActive]'s.
+// fabric is [lessRecentlyActive]'s. Each session's fabric index is read
+// once: [Manager.AdoptFabricIndex] changes it under the entry's lock, not
+// the manager's, so a second read could count a session on one fabric
+// and filter it on another.
 //
 // matter.js's findOldestInactiveSession filters by no fabric
 // (SessionManager.ts:564-572, #leastRecentlyUsedSession :553-562 at
@@ -818,11 +821,20 @@ func (m *Manager) AllocateStake() (Stake, error) {
 // final tie-break (src/transport/SecureSessionTable.cpp:228-337,
 // DefaultEvictionPolicy, Key1 :239-244, Key6 :333-335 at 6170af84), in a
 // pool sized for three CASE sessions per fabric (src/lib/core/CHIPConfig.h:808-821);
-// matter.js bounds sessions per peer only (packages/protocol/src/session/SessionManager.ts:201-205
-// at db021da0). This choice takes chip's first and last key only; its
-// keys 2-5 (the hinted fabric and peer, the peer holding the most, the
-// session state) are not applied. Caller holds m.mu.
+// it counts by GetFabricIndex() equality, sessions without a fabric
+// included (SecureSessionTable.cpp:149-151). matter.js bounds sessions per
+// peer only (packages/protocol/src/session/SessionManager.ts:201-205 at
+// db021da0; MAX_SESSIONS_PER_PEER, :205, is that file's only cap). This
+// choice takes chip's first and last key only; Key2 :246-257 (the hint's
+// fabric), Key3 :259-265 (the peer holding the most), Key4 :286-303 (the
+// hinted peer) and Key5 :305-330 (the session state) are not applied.
+// Caller holds m.mu.
 func (m *Manager) leastRecentlyActiveLocked() *Entry {
+	type live struct {
+		e      *Entry
+		fabric uint8
+	}
+	sessions := make([]live, 0, len(m.sessions))
 	held := make(map[uint8]int)
 	most := 0
 	for _, e := range m.sessions {
@@ -830,16 +842,17 @@ func (m *Manager) leastRecentlyActiveLocked() *Entry {
 			continue
 		}
 		f := e.FabricIndex()
+		sessions = append(sessions, live{e, f})
 		held[f]++
 		most = max(most, held[f])
 	}
 	var oldest *Entry
-	for _, e := range m.sessions {
-		if e.Session == nil || held[e.FabricIndex()] != most {
+	for _, l := range sessions {
+		if held[l.fabric] != most {
 			continue
 		}
-		if oldest == nil || lessRecentlyActive(e, oldest) {
-			oldest = e
+		if oldest == nil || lessRecentlyActive(l.e, oldest) {
+			oldest = l.e
 		}
 	}
 	return oldest
