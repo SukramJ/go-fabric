@@ -25,7 +25,7 @@
 // position-aware feature has no position: UpOrOpen and DownOrClose set
 // its movement in OperationalStatus, StopMotion stops it, as matter.js's
 // WindowCoveringServer does (WindowCoveringServer.ts:123-141, :487-504,
-// :518-560 at 862ad75f). GoToLiftPercentage and GoToTiltPercentage decode through
+// :518-560 at db021da0). GoToLiftPercentage and GoToTiltPercentage decode through
 // the definition; the position arithmetic and the travel are the server's.
 package cover
 
@@ -92,7 +92,7 @@ var ErrEnumValue = errors.New("cover: Type or EndProductType not allowed under t
 // Mover is the optional host port: the device that moves. It is the Go
 // form of a matter.js host overriding handleMovement / handleStopMovement
 // (packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338,
-// :487 at matter.js 0ceb202d; "do not invoke super.handleMovement()",
+// :487 at matter.js db021da0; "do not invoke super.handleMovement()",
 // :328): the server validates the command, infers the target (UpOrOpen
 // open, DownOrClose closed — on every served axis, :521-535, :545-559 —
 // GoToLiftPercentage / GoToTiltPercentage the percentage on its axis,
@@ -145,7 +145,7 @@ func servedOptional(features uint32) []uint32 {
 // GoToLiftPercentage on a Lift axis without position awareness ("LF &
 // PA_LF, [LF]") and GoToTiltPercentage likewise, which matter.js's
 // WindowCoveringServer implements for every axis, so its ValidatedElements
-// lists them as supported (WindowCoveringServer.ts:576-618 at 862ad75f;
+// lists them as supported (WindowCoveringServer.ts:576-618 at db021da0;
 // W3-club1-04).
 func servedOptionalCommands(features uint32) []uint32 {
 	var out []uint32
@@ -162,7 +162,7 @@ func servedOptionalCommands(features uint32) []uint32 {
 // awareness: 0 is UpOrOpen, any other value DownOrClose, each moving every
 // served axis as those commands do. Mirrors matter.js
 // packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:586-590,
-// :608-612 at 862ad75f (W3-club1-04).
+// :608-612 at db021da0 (W3-club1-04).
 func openOrClose(pct uint16, both func(uint16) command) command {
 	if pct == 0 {
 		return both(0)
@@ -319,7 +319,7 @@ const (
 // globalStatus is the OperationalStatus bitmap for the given lift and
 // tilt movement: global tracks lift while it moves, otherwise tilt
 // (matter.js #handleOperationalStatusChanging,
-// WindowCoveringServer.ts:203-214 at 0ceb202d).
+// WindowCoveringServer.ts:203-214 at db021da0).
 func globalStatus(lift, tilt uint8) uint8 {
 	global := tilt
 	if lift != movementStopped {
@@ -359,7 +359,7 @@ func (s *WindowCoveringServer) OnAttributeChange(cb func(change contract.Change)
 // (PositionAwareTilt) but not Lift (Tilt) is refused with [ErrFeatureMap]:
 // advertising it would list attributes or commands the server does not
 // serve, or break the features' conformance (PA_LF "LF", PA_TL "TL",
-// window-covering-cluster.element.ts at 862ad75f). A Mover together with
+// window-covering-cluster.element.ts at db021da0). A Mover together with
 // a non-zero MoveStep is refused with [ErrMoverWithMoveStep], a Type or
 // EndProductType the FeatureMap disallows with [ErrEnumValue].
 func New(cfg Config) (*WindowCoveringServer, error) {
@@ -557,7 +557,7 @@ var _ im.StatusCodeError = windowCoveringConstraintErr{}
 // a Mode outside "max 15" — the four ModeBitmap bits — CONSTRAINT_ERROR.
 //
 // A Mode that passes is synced as matter.js #handleModeChanging does
-// (WindowCoveringServer.ts:162-200 at 0ceb202d): MaintenanceMode takes
+// (WindowCoveringServer.ts:162-200 at db021da0): MaintenanceMode takes
 // priority over CalibrationMode, which is cleared beside it; a
 // CalibrationMode left set is CONSTRAINT_ERROR, as matter.js answers
 // without supportsCalibration (its default, :73, :620) — the server has no
@@ -644,7 +644,7 @@ type command struct {
 
 // parseCommand validates cmdID and fields and infers the targets:
 // UpOrOpen 0 and DownOrClose 10000 on every served axis
-// (WindowCoveringServer.ts:521-535, :545-559 at matter.js 0ceb202d),
+// (WindowCoveringServer.ts:521-535, :545-559 at matter.js db021da0),
 // GoToLiftPercentage / GoToTiltPercentage the value on its axis
 // (:576-584, :598-606), StopMotion a stop (:566-570). A GoTo command of
 // an unserved axis is not in AcceptedCommandList and is refused here too.
@@ -724,7 +724,7 @@ func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, f
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if c.stop {
-		// matter.js handleStopMovement (:487-504 at 862ad75f): each
+		// matter.js handleStopMovement (:487-504 at db021da0): each
 		// position-aware axis stops where it is, and the target follows the
 		// position; with no position-aware axis every movement is Stopped.
 		anyAware := false
@@ -835,7 +835,7 @@ func (s *WindowCoveringServer) SetCurrentPosition(lift, tilt *uint16) {
 // SetTargetPosition records a target the host infers from the device's
 // own movement — a covering a wall button or a programme started, which
 // matter.js has no command for: there every movement starts with a target
-// write (WindowCoveringServer.ts:524, :548, :580, :602 at 0ceb202d) and a
+// write (WindowCoveringServer.ts:524, :548, :580, :602 at db021da0) and a
 // stop snaps the target to the position (:491-496). lift is
 // TargetPositionLiftPercent100ths, tilt TargetPositionTiltPercent100ths;
 // nil leaves an axis unchanged, an unserved axis is ignored, a value
@@ -897,7 +897,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 
 // SetOperationalStatus records the OperationalStatus bitmap the device
 // reports (global in bits 0-1, lift in bits 2-3, tilt in bits 4-5 —
-// window-covering-cluster.element.ts:128-131 at matter.js 0ceb202d),
+// window-covering-cluster.element.ts:128-131 at matter.js db021da0),
 // stored without the [Mover] and reported through the change notifier.
 // Bits above the attribute's "max 63" (:55-56) are dropped and logged.
 func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
@@ -924,7 +924,7 @@ func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
 	if !a.aware {
 		// An axis without a position moves in the command's direction
 		// until StopMotion (matter.js #prepareMovement sets the axis's
-		// OperationalStatus, :420-446 at 862ad75f; handleMovement moves
+		// OperationalStatus, :420-446 at db021da0; handleMovement moves
 		// no position, :336-356).
 		dir := movementOpening
 		if target != 0 {

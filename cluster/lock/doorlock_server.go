@@ -4,7 +4,7 @@
 // Package lock contains the DoorLock cluster server (0x0101): a semantic
 // port of matter.js DoorLockBaseServer (packages/node/src/behaviors/
 // door-lock/DoorLockServer.ts, LockAuth.ts and LockSchedule.ts at
-// 862ad75f).
+// db021da0).
 //
 // The cluster's identity is the generated definition (cluster/spec/
 // doorlock, ADR 0013): ids, revision, the enums, the attribute, command
@@ -794,7 +794,7 @@ func (s *DoorLockServer) SetLockState(state lockdef.LockStateEnum) error {
 // (#handleDoorStateChange, the doorState$Changed reactor :179). A state
 // equal to the stored one is no change: matter.js's $Changed does not
 // fire for it (packages/node/src/behavior/state/managed/Datasource.ts:823-825
-// at 862ad75f), so nothing is emitted or counted (W3-clua2-03).
+// at db021da0), so nothing is emitted or counted (W3-clua2-03).
 func (s *DoorLockServer) SetDoorState(state lockdef.DoorStateEnum) error {
 	if v, ok := s.Value(lockdef.AttrDoorState); ok && v == uint8(state) {
 		return nil

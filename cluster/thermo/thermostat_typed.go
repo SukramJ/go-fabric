@@ -63,7 +63,7 @@ var setpointKeys = map[uint32]struct {
 // it may come together (R2-P6-err-1561). A combination the reconcile
 // cannot fit is refused and nothing is stored. A changed occupied (unoccupied) setpoint ends the active
 // preset in effect, as a local direct change does (ThermostatServer.ts:744-768
-// at 862ad75f).
+// at db021da0).
 //
 // Presets and ActivePresetHandle, which the host owns too, go through
 // [ThermostatServer.SetPresets] and [ThermostatServer.SetActivePresetHandle]

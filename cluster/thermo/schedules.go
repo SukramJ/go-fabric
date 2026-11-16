@@ -21,7 +21,7 @@ import (
 // programs, the active one, SetActiveScheduleRequest and the atomic write
 // of Schedules. matter.js does not implement it ("MatterScheduleConfiguration:
 // This feature is not implemented yet", packages/node/src/behaviors/
-// thermostat/ThermostatServer.ts:82 at 862ad75f); the behaviour follows
+// thermostat/ThermostatServer.ts:82 at db021da0); the behaviour follows
 // connectedhomeip's ThermostatSchedules
 // (src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp at
 // 645b267a — the harness image's CHIP commit 6170af84 has no schedules

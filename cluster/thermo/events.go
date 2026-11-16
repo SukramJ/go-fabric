@@ -128,8 +128,12 @@ func (s *ThermostatServer) emitChanges(ctx context.Context, before, after eventS
 // queueSetpointEventLocked queues the SetpointChange of a setpoint
 // commitSetpoints moved from was to is: ThermostatSetpointsBase::
 // GenerateSetpointEvent (ThermostatClusterSetpointsBase.cpp:63-85), Heat
-// or Cool with Occupied for an occupied setpoint and no occupancy for an
-// unoccupied one, and nothing for a user limit (no case in its switch).
+// or Cool with Occupied for an occupied setpoint and an empty Occupancy
+// bitmap — the field present, value 0 — for an unoccupied one, and nothing
+// for a user limit (no case in its switch). Mirrors connectedhomeip
+// ThermostatClusterSetpointsBase.cpp:75, :81 (BitMask<OccupancyBitmap>())
+// and ThermostatClusterEvents.cpp:109-120 at 645b267a
+// (event.occupancy = MakeOptional(occupancy)).
 // The caller holds s.mu; [ThermostatServer.flushSetpointEvents] emits the
 // queue once it let go.
 func (s *ThermostatServer) queueSetpointEventLocked(attrID uint32, was, is int16) {
