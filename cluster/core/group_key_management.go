@@ -334,26 +334,29 @@ func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
 	g.mu.Lock()
 	was := g.staleGroups[fabric]
 	switch {
-	case err == nil, errors.Is(err, groups.ErrNoFabric):
-		delete(g.staleGroups, fabric)
-		if len(g.staleGroups) == 0 {
-			g.stopRetryLocked()
-		}
+	case err == nil && was:
+		// The memberships the forget withdrew are announced again; the
+		// fabric is unmarked — and the retry stopped and its backoff reset
+		// — only once that succeeded. A failed announcement keeps the mark
+		// and the retry owed, its backoff going on (review II,
+		// R2-P6-err-1701 R3-2, R4-1).
 		g.mu.Unlock()
-		switch {
-		case err != nil:
+		lerr := g.groups.Load(ctx)
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		if lerr != nil {
+			g.logger.Warn("matter.group_key_management.group_state_reannounce_failed",
+				slog.Int("fabric_index", int(fabric)), slog.Any("err", lerr))
+			g.markStaleLocked(ctx, fabric)
+			return
+		}
+		g.unmarkLocked(fabric)
+		return
+	case err == nil, errors.Is(err, groups.ErrNoFabric):
+		g.unmarkLocked(fabric)
+		g.mu.Unlock()
+		if err != nil {
 			g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
-		case was:
-			if lerr := g.groups.Load(ctx); lerr != nil {
-				// The memberships the forget withdrew are not announced
-				// yet: the fabric stays marked and the retry is owed
-				// (review II, R2-P6-err-1701 R3-2).
-				g.logger.Warn("matter.group_key_management.group_state_reannounce_failed",
-					slog.Int("fabric_index", int(fabric)), slog.Any("err", lerr))
-				g.mu.Lock()
-				g.markStaleLocked(ctx, fabric)
-				g.mu.Unlock()
-			}
 		}
 		return
 	}
@@ -362,6 +365,15 @@ func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
 	g.logger.Warn("matter.group_key_management.group_state_stale",
 		slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
 	g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
+}
+
+// unmarkLocked unmarks fabric and, with no fabric stale any more, stops
+// the retry and resets its backoff. g.mu is held.
+func (g *GroupKeyManagement) unmarkLocked(fabric uint8) {
+	delete(g.staleGroups, fabric)
+	if len(g.staleGroups) == 0 {
+		g.stopRetryLocked()
+	}
 }
 
 // armRetryLocked arms the retry of the stale fabrics unless one is armed:

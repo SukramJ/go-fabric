@@ -371,6 +371,7 @@ type gatedReloadStore struct {
 	entered  chan struct{}
 	release  chan struct{}
 	failList atomic.Bool
+	onList   func() // set before use: counts the re-announcement's listing
 }
 
 func (s *gatedReloadStore) ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]mstore.GroupKeySet, error) {
@@ -386,6 +387,9 @@ func (s *gatedReloadStore) ListGroupKeySets(ctx context.Context, fabricIndex uin
 }
 
 func (s *gatedReloadStore) ListFabrics(ctx context.Context) ([]mstore.FabricRecord, error) {
+	if s.onList != nil {
+		s.onList()
+	}
 	if s.failList.Load() {
 		return nil, errors.New("injected fabric listing failure")
 	}
@@ -468,3 +472,34 @@ func TestGKMFailedReannounceKeepsTheFabricStale(t *testing.T) {
 
 // staleRetryWindow covers the first retries' waits (1 s, 2 s).
 const staleRetryWindow = 3 * time.Second
+
+// A sole stale fabric whose reload succeeds and whose re-announcement keeps
+// failing is retried with the backoff going on — after 1 s, 2 s, 4 s —
+// not every second (review II, R2-P6-err-1701 R4-1).
+func TestGKMFailedReannounceKeepsTheBackoff(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	gkm, st, _ := newGatedGKM(t, clk)
+	var loads atomic.Int32
+	st.onList = func() { loads.Add(1) }
+	st.fail.Store(true)
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(7)); err != nil {
+		t.Fatal(err)
+	}
+	st.fail.Store(false)
+	st.failList.Store(true) // every re-announcement fails
+	for i, wait := range []time.Duration{time.Second, 2 * time.Second, 4 * time.Second} {
+		before := loads.Load()
+		clk.Advance(wait - time.Millisecond)
+		if got := loads.Load(); got != before {
+			t.Fatalf("retry %d ran before its wait of %v", i+1, wait)
+		}
+		clk.Advance(time.Millisecond)
+		if got := loads.Load(); got == before {
+			t.Fatalf("retry %d did not run after %v", i+1, wait)
+		}
+	}
+	if got := gkm.StaleGroupFabrics(); len(got) != 1 {
+		t.Errorf("stale fabrics = %v, want fabric 1 still marked", got)
+	}
+}
