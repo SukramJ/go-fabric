@@ -96,7 +96,7 @@ func TestInvokeChangesCompareByValue(t *testing.T) {
 
 	invoke := func(cmd uint32) int {
 		t.Helper()
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(im.WithAuthModePASE(t.Context()), 5*time.Second)
 		defer cancel()
 		req := im.InvokeRequest{Invokes: []im.CommandInvocation{{
 			Path: im.ConcreteCommandPath{Endpoint: 7, Cluster: 0x0104, Command: cmd, HasEndpoint: true, HasCluster: true, HasCommand: true},

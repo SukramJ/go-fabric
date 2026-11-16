@@ -103,7 +103,7 @@ func TestReadParity_InvalidAttributePathRoundtrip(t *testing.T) {
 			{Endpoint: 1, HasEndpoint: true, Cluster: 0x07, HasCluster: true, Attribute: 1, HasAttribute: true},
 		},
 	}
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	// chip: delegate.mNumAttributeResponse == 0 (no data reports).
 	// We express the same invariant: the single report must be a
 	// status-only entry with UnsupportedCluster.
@@ -136,7 +136,7 @@ func TestReadParity_ReadWildcard(t *testing.T) {
 			{}, // full wildcard
 		},
 	}
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if len(rd.Reports) != 1 {
 		t.Fatalf("reports=%d, want 1", len(rd.Reports))
 	}
@@ -169,7 +169,7 @@ func TestReadParity_DataVersionFilterHit(t *testing.T) {
 			{Endpoint: 1, Cluster: 0x0006, DataVersion: clusterVersion},
 		},
 	}
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	// Filter matched — attribute must be suppressed.
 	if len(rd.Reports) != 0 {
 		t.Fatalf("DataVersionFilter hit: expected 0 reports, got %d", len(rd.Reports))
@@ -200,7 +200,7 @@ func TestReadParity_DataVersionFilterMiss(t *testing.T) {
 			{Endpoint: 1, Cluster: 0x0007, DataVersion: clusterVersion},
 		},
 	}
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if len(rd.Reports) != 1 {
 		t.Fatalf("DataVersionFilter miss: expected 1 report, got %d", len(rd.Reports))
 	}

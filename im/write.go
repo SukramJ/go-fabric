@@ -341,7 +341,7 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	pase := IsPASEFromContext(ctx)
-	aclChecker, hasACL := d.(ACLChecker)
+	aclChecker, hasACL := aclCheckerOf(d), true
 	privProvider, hasPrivProvider := d.(AttributeWritePrivilegeProvider)
 	authWriter, hasAuthWriter := d.(AuthorizingWriter)
 	dvReader, hasDV := d.(DataVersionReader)

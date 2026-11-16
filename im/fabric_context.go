@@ -187,6 +187,35 @@ func checkSubjectACL(ctx context.Context, c ACLChecker, fabricIndex uint8, subje
 	return c.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
 }
 
+// aclCheckerOf returns d's [ACLChecker], or one that denies every location
+// when d has none ([ACLChecker]; review II, R2-P6-sec-0560).
+func aclCheckerOf(d Dispatcher) ACLChecker {
+	if c, ok := d.(ACLChecker); ok {
+		return c
+	}
+	return denyingACL{}
+}
+
+// denyingACL is the access check of a [Dispatcher] without an
+// [ACLChecker]: nothing is granted.
+type denyingACL struct{}
+
+func (denyingACL) CheckACL(context.Context, uint8, uint64, []uint32, uint16, uint32, uint8) StatusCode {
+	return StatusUnsupportedAccess
+}
+
+// deniedReads is the dispatcher a read of a [Dispatcher] without an
+// [ACLChecker] runs against: nothing is read, a concrete path is denied and
+// a wildcard selects nothing.
+type deniedReads struct{ Dispatcher }
+
+func (deniedReads) Read(_ context.Context, path ConcreteAttributePath) []ReadResult {
+	if path.HasEndpoint && path.HasCluster && path.HasAttribute {
+		return []ReadResult{{Path: path, Status: StatusUnsupportedAccess}}
+	}
+	return nil
+}
+
 // HasAccessingFabric reports whether fabricIndex names a fabric — the one
 // reading of "no accessing fabric" every gate of this package uses: the
 // subject's access check, the fabric-scoped write and invoke gates, the

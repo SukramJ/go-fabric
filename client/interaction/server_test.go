@@ -63,6 +63,12 @@ func (d *fakeDispatcher) Write(ctx context.Context, p im.ConcreteAttributePath, 
 	return []im.WriteResult{{Path: p, Status: im.StatusSuccess}}
 }
 
+// CheckACL grants: the role's ACL is not what these tests are about, and
+// a dispatcher without a checker denies (review II, R2-P6-sec-0560).
+func (*fakeDispatcher) CheckACL(context.Context, uint8, uint64, []uint32, uint16, uint32, uint8) im.StatusCode {
+	return im.StatusSuccess
+}
+
 func (d *fakeDispatcher) Invoke(ctx context.Context, p im.ConcreteCommandPath, _ any) im.InvokeResult {
 	d.mu.Lock()
 	d.timed = append(d.timed, timedOf(ctx))

@@ -86,7 +86,7 @@ func TestWriteParity_Handler_Success(t *testing.T) {
 			},
 		},
 	}
-	wr := HandleWriteRequest(context.Background(), d, req)
+	wr := HandleWriteRequest(unchecked(), d, req)
 	if len(wr.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(wr.Responses))
 	}
@@ -123,7 +123,7 @@ func TestWriteParity_Handler_VersionMatch(t *testing.T) {
 			},
 		},
 	}
-	wr := HandleWriteRequest(context.Background(), d, req)
+	wr := HandleWriteRequest(unchecked(), d, req)
 	if len(wr.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(wr.Responses))
 	}
@@ -158,7 +158,7 @@ func TestWriteParity_Handler_VersionMismatch(t *testing.T) {
 			},
 		},
 	}
-	wr := HandleWriteRequest(context.Background(), d, req)
+	wr := HandleWriteRequest(unchecked(), d, req)
 	if len(wr.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(wr.Responses))
 	}
@@ -267,7 +267,7 @@ func TestWriteParity_InvalidMessage_EmptyWriteRequest(t *testing.T) {
 	t.Parallel()
 	d := &fakeDispatcher{}
 	req := WriteRequest{Writes: nil}
-	wr := HandleWriteRequest(context.Background(), d, req)
+	wr := HandleWriteRequest(unchecked(), d, req)
 	if len(wr.Responses) != 0 {
 		t.Fatalf("responses=%d for empty write, want 0", len(wr.Responses))
 	}
@@ -315,7 +315,7 @@ func TestWriteParity_DataVersion_WildcardEndpoint_Ignored(t *testing.T) {
 			},
 		},
 	}
-	wr := HandleWriteRequest(context.Background(), d, req)
+	wr := HandleWriteRequest(unchecked(), d, req)
 	if len(wr.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(wr.Responses))
 	}
@@ -376,7 +376,7 @@ func TestWriteParity_ClusterStatus_NonSuccess_ClampedToFailure(t *testing.T) {
 			},
 		},
 	}
-	wr := HandleWriteRequest(context.Background(), d, req)
+	wr := HandleWriteRequest(unchecked(), d, req)
 	if len(wr.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(wr.Responses))
 	}

@@ -112,7 +112,7 @@ func TestClosedSessionReleasesItsChunkedWrites(t *testing.T) {
 				if tx == nil {
 					return 0, false
 				}
-				resp := im.HandleWriteRequest(im.WithWriteTransaction(t.Context(), tx), holdDispatcher{}, im.WriteRequest{
+				resp := im.HandleWriteRequest(im.WithWriteTransaction(im.WithAuthModePASE(t.Context()), tx), holdDispatcher{}, im.WriteRequest{
 					MoreChunkedMessages: more,
 					Writes:              []im.AttributeWrite{{Path: p, Value: im.AttributeValue{Value: "x"}}},
 				})
@@ -133,7 +133,7 @@ func TestClosedSessionReleasesItsChunkedWrites(t *testing.T) {
 			late := mrp.ExchangeKey{SessionID: sid, ExchangeID: 1}
 			lateTx := b.routing.writeTransaction(late, true, now)
 			tc.close(b, sid)
-			im.HandleWriteRequest(im.WithWriteTransaction(t.Context(), lateTx), holdDispatcher{}, im.WriteRequest{
+			im.HandleWriteRequest(im.WithWriteTransaction(im.WithAuthModePASE(t.Context()), lateTx), holdDispatcher{}, im.WriteRequest{
 				MoreChunkedMessages: true,
 				Writes:              []im.AttributeWrite{{Path: attr(100), Value: im.AttributeValue{Value: "x"}}},
 			})

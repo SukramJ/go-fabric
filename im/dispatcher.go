@@ -35,11 +35,18 @@ type DataVersionReader interface {
 	CurrentDataVersion(ctx context.Context, endpoint uint16, clusterID uint32) (uint32, bool)
 }
 
-// ACLChecker is an optional interface a [Dispatcher] implementation may
-// provide to gate Write and Invoke calls against the AccessControl cluster's
-// ACL table. When nil / not implemented, all writes and invokes are allowed
-// (permissive default — preserves v1.0 behaviour for callers that have not
-// wired an ACL store).
+// ACLChecker is the interface a [Dispatcher] implementation provides to
+// gate Read, Write and Invoke calls against the AccessControl cluster's
+// ACL table. A Dispatcher without one denies every request of a session
+// that is not PASE (UNSUPPORTED_ACCESS), as the group path and
+// [AuthorityAt] deny: a privilege nobody could verify is not held, and
+// matter.js judges every peer's request by an access control that grants
+// nothing without an entry (packages/node/src/behavior/context/server/
+// RemoteActorContext.ts:86-87, packages/protocol/src/interaction/
+// FabricAccessControl.ts:186-205 at db021da0). A node that means to run
+// without access control says so with a checker that grants —
+// endpoint.UnenforcedACL. Review II, R2-P6-sec-0560, owner decision 136;
+// it was permissive.
 //
 // Mirrors connectedhomeip src/access/AccessControl.cpp:359-554 at 6170af84
 // (Check, CheckACL) and the

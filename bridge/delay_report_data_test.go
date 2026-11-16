@@ -50,8 +50,8 @@ func TestInvokeDelayReportDataDefersSubscriptions(t *testing.T) {
 	}
 	// A command that cannot be dispatched — endpoint 8 serves no OnOff
 	// here — defers nothing (im.DispatchEndpoints).
-	b.deferReportsFor(context.Background(), deferDispatcher{}, toggle(8))
-	b.deferReportsFor(context.Background(), deferDispatcher{}, toggle(7))
+	b.deferReportsFor(im.WithAuthModePASE(context.Background()), deferDispatcher{}, toggle(8))
+	b.deferReportsFor(im.WithAuthModePASE(context.Background()), deferDispatcher{}, toggle(7))
 	mgr.OnAttributeChanged(path(7))
 	mgr.OnAttributeChanged(path(8))
 	mgr.Tick(context.Background(), start.Add(500*time.Millisecond))

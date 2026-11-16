@@ -42,7 +42,7 @@ func TestDispatchWriteRequest_StampsTheTimedWindow(t *testing.T) {
 	req := im.WriteRequest{Writes: []im.AttributeWrite{{Path: im.ConcreteAttributePath{
 		Endpoint: 1, Cluster: 0x0006, Attribute: 0x4001, HasEndpoint: true, HasCluster: true, HasAttribute: true,
 	}, Value: im.AttributeValue{Value: uint16(5)}}}}
-	_ = b.dispatchWriteRequest(context.Background(), src, &message.Header{}, message.ProtocolHeader{ExchangeID: 7}, d, req)
+	_ = b.dispatchWriteRequest(im.WithAuthModePASE(context.Background()), src, &message.Header{}, message.ProtocolHeader{ExchangeID: 7}, d, req)
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if len(d.known) != 1 || !d.known[0] || d.timed[0] {

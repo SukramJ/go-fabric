@@ -84,7 +84,7 @@ func (x holdExchange) write(more bool, writes ...holdWrite) []StatusCode {
 	for _, w := range writes {
 		req.Writes = append(req.Writes, AttributeWrite{Path: w.path, Value: AttributeValue{Value: w.value}})
 	}
-	resp := HandleWriteRequest(WithWriteTransaction(context.Background(), x.tx), x.d, req)
+	resp := HandleWriteRequest(WithWriteTransaction(unchecked(), x.tx), x.d, req)
 	out := make([]StatusCode, 0, len(resp.Responses))
 	for _, r := range resp.Responses {
 		out = append(out, r.Status.Status)

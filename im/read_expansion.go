@@ -412,7 +412,7 @@ func NewReadReports(ctx context.Context, d Dispatcher, req ReadRequest) *ReadRep
 	}
 	_, r.fabricIndex = FabricFilterFromContext(ctx)
 	r.subjectNodeID, r.subjectCATs = SubjectFromContext(ctx)
-	r.aclChecker, r.hasACL = d.(ACLChecker)
+	r.aclChecker, r.hasACL = aclCheckerOf(d), true
 	r.privProvider, r.hasPriv = d.(AttributeReadPrivilegeProvider)
 	// The subject's access check rides with the request, so a dispatcher
 	// authorises each location before it reads the server there
@@ -425,6 +425,12 @@ func NewReadReports(ctx context.Context, d Dispatcher, req ReadRequest) *ReadRep
 		})
 	}
 	r.ctx = ctx
+	if _, checked := d.(ACLChecker); !checked && !r.pase {
+		// Nothing is granted ([ACLChecker]), so nothing is read: a
+		// concrete path answers its denial, a wildcard selects nothing
+		// (review II, R2-P6-sec-0560).
+		d = deniedReads{d}
+	}
 	r.exp = NewAttributeExpansion(ctx, d, req.AttributeRequests)
 	// Every status of a concrete path precedes the first value
 	// ([AttributeExpansion.StatusesFirst]).

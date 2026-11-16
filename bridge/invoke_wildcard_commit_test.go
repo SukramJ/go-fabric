@@ -77,7 +77,7 @@ func TestWildcardAndGroupInvokeChangesReachASubscriber(t *testing.T) {
 			d := &wildcardInvoker{targets: []uint16{7}}
 			path := im.ConcreteCommandPath{Endpoint: 7, Cluster: 0x0030, Command: 0x00, HasEndpoint: mode == "concrete", HasCluster: true, HasCommand: true}
 			req := im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: path}}}
-			ctx := im.WithSubject(im.WithFabricFilter(context.Background(), false, 1), 1, nil)
+			ctx := im.WithAuthModePASE(im.WithSubject(im.WithFabricFilter(context.Background(), false, 1), 1, nil))
 			switch mode {
 			case "group":
 				gctx := im.WithGroupSubject(im.WithFabricFilter(ctx, false, 1), im.GroupSubject{GroupID: 1, HasValidMapping: true, Endpoints: []uint16{7}})
@@ -117,7 +117,7 @@ func TestInvokeCommitAdvancesWithoutAManager(t *testing.T) {
 	d := &invokeChangeDispatcher{}
 	req := im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: im.ConcreteCommandPath{Endpoint: 7, Cluster: 0x0030, HasEndpoint: true, HasCluster: true, HasCommand: true}}}}
 	before := b.snapshotInvokedClusters(context.Background(), d, req)
-	_ = im.HandleInvokeRequest(context.Background(), d, req)
+	_ = im.HandleInvokeRequest(im.WithAuthModePASE(context.Background()), d, req)
 	b.AttachSubscriptionManager(nil)
 	b.reportInvokeChanges(context.Background(), d, before)
 	if v := topoEP.ClusterDataVersion(0x0030); v == v0 {

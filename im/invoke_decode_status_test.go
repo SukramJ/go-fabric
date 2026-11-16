@@ -95,7 +95,7 @@ func TestInvokeRequest_TypedFieldsRejectBecomesPerCommandStatus(t *testing.T) {
 	}
 
 	d := &invokeCountingDispatcher{}
-	resp := HandleInvokeRequest(context.Background(), d, req)
+	resp := HandleInvokeRequest(unchecked(), d, req)
 	if d.invokes != 1 {
 		t.Errorf("dispatcher.Invoke called %d times, want 1 (the rejected command must not execute)", d.invokes)
 	}

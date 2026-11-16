@@ -56,7 +56,7 @@ func TestWriteParity_DataVersionZeroIsCompared(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			d := &versionedRecorder{version: c.current}
-			wr := HandleWriteRequest(context.Background(), d, WriteRequest{Writes: []AttributeWrite{{
+			wr := HandleWriteRequest(unchecked(), d, WriteRequest{Writes: []AttributeWrite{{
 				Path: path, Value: AttributeValue{Value: "x"}, DataVersion: c.named, HasDataVersion: true,
 			}}})
 			if len(wr.Responses) != 1 || wr.Responses[0].Status.Status != c.want {

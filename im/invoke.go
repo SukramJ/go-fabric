@@ -796,7 +796,7 @@ func newInvokeGate(ctx context.Context, d Dispatcher) *invokeGate {
 	_, g.fabricIndex = FabricFilterFromContext(ctx)
 	g.subjectNodeID, g.subjectCATs = SubjectFromContext(ctx)
 	g.pase = IsPASEFromContext(ctx)
-	g.aclChecker, g.hasACL = d.(ACLChecker)
+	g.aclChecker, g.hasACL = aclCheckerOf(d), true
 	g.privProvider, g.hasPrivProvider = d.(CommandInvokePrivilegeProvider)
 	g.pathChecker, g.hasPathChecker = d.(CommandPathChecker)
 	g.timedProvider, g.hasTimed = d.(TimedCommandProvider)

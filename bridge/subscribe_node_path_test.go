@@ -170,7 +170,7 @@ func TestSubscriptionNamingAnotherNodeReportsNoChange(t *testing.T) {
 func TestReadPathNamingAnotherNode(t *testing.T) {
 	t.Parallel()
 	d := &wideCountingDispatcher{endpoints: 2, attrs: 2}
-	ctx := im.WithLocalNodeID(context.Background(), 0x77)
+	ctx := im.WithLocalNodeID(im.WithAuthModePASE(context.Background()), 0x77)
 	concrete := im.ConcreteAttributePath{Node: 0x78, Endpoint: 1, Cluster: 0x0006, Attribute: 1, HasNode: true, HasEndpoint: true, HasCluster: true, HasAttribute: true}
 	rd := im.HandleReadRequest(ctx, d, im.ReadRequest{AttributeRequests: []im.ConcreteAttributePath{
 		concrete,
