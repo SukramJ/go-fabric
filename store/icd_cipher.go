@@ -55,8 +55,11 @@ func (s *Store) icdAEAD(ctx context.Context, q sqlExecQuerier) (cipher.AEAD, err
 		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO matter_settings (key, value) VALUES (?, ?)`, SettingICDKey, hex.EncodeToString(key)); err != nil {
 			return nil, fmt.Errorf("store: icd key: %w", err)
 		}
-		if v, ok, err = read(); err != nil || !ok {
+		switch v, ok, err = read(); {
+		case err != nil:
 			return nil, fmt.Errorf("store: icd key: not stored: %w", err)
+		case !ok:
+			return nil, fmt.Errorf("store: icd key: %q not stored after its insert", SettingICDKey)
 		}
 	}
 	key, err := hex.DecodeString(v)
