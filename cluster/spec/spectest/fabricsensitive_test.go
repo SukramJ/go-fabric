@@ -96,6 +96,12 @@ func TestCheckWithheld(t *testing.T) {
 		{"no entry", icd, list(t), list(t), 2, "", 0},
 		{"sensitive list leaves the owner out", sensitive[0], list(t, entry{{1, 1}, {254, 1}}), list(t), 2, "", 1},
 		{"sensitive list lists the owner", sensitive[0], list(t, entry{{1, 1}, {254, 1}}), list(t, entry{{254, 1}}), 2, "lists 1 entries of fabric 1, matter.js 0", 1},
+		// A fabric-sensitive list lists the reader's entries alone: a third
+		// fabric's is reported though it carries no sensitive field
+		// (review II, R2-P6-test-1364).
+		{"sensitive list lists a third fabric", sensitive[0], list(t, entry{{1, 1}, {254, 1}}), list(t, entry{{254, 3}}), 2, "entry 0 of fabric 3: a fabric-sensitive list", 1},
+		{"sensitive list lists an entry to a session without a fabric", sensitive[0], list(t, entry{{1, 1}, {254, 1}}), list(t, entry{{254, 3}}), 0, "entry 0 of fabric 3: a fabric-sensitive list", 1},
+		{"sensitive list lists the reader's own", sensitive[0], list(t, entry{{1, 1}, {254, 1}}), list(t, entry{{1, 4}, {254, 2}}), 2, "", 1},
 		{"entry without FabricIndex", icd, own, list(t, entry{{4, 1}}), 2, "carries no FabricIndex", 1},
 		{"own read of another fabric", icd, list(t, entry{{254, 2}}), list(t), 2, "lists an entry of fabric 2", 0},
 		{"own read not a list", icd, []byte{0x04, 0x00}, list(t), 2, "not a list", 0},
