@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9053,
+  "entry_points": 9066,
   "entry_packages": [
     ".",
     "bdx",
@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18794,
-    "reachable": 12622,
-    "whitelisted": 6172,
+    "total_exported": 18800,
+    "reachable": 12625,
+    "whitelisted": 6175,
     "unreachable": 0
   },
   "by_package": [],
@@ -40603,7 +40603,14 @@
       "identifier": "Eraser",
       "reason": "the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself",
       "file": "store/port.go",
-      "line": 323
+      "line": 332
+    },
+    {
+      "package": "store",
+      "identifier": "FabricOwnedTables",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "store/export_test.go",
+      "line": 15
     },
     {
       "package": "store",
@@ -40614,10 +40621,24 @@
     },
     {
       "package": "store",
+      "identifier": "SettingSealCanary",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "store/export_test.go",
+      "line": 18
+    },
+    {
+      "package": "store",
       "identifier": "TestErasedTablesAreTheSchemasTables",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "store/erase_tables_internal_test.go",
       "line": 18
+    },
+    {
+      "package": "store",
+      "identifier": "TestSecretColumnsAreTheSealCallSites",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "store/seal_columns_internal_test.go",
+      "line": 29
     },
     {
       "package": "store/memstore",
