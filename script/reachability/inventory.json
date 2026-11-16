@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9492,
+  "entry_points": 9519,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19098,
-    "reachable": 12643,
-    "whitelisted": 6455,
+    "total_exported": 19126,
+    "reachable": 12644,
+    "whitelisted": 6482,
     "unreachable": 0
   },
   "by_package": [],
@@ -3023,7 +3023,14 @@
       "identifier": "TestDeliveredReportRestartsTheFailedUpdateCount",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 345
+      "line": 350
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDeniedSubscriberDrivesNoServerRead",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_read_authority_test.go",
+      "line": 20
     },
     {
       "package": "bridge",
@@ -3755,6 +3762,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFlaggedReportReadsTheConfigurationVersionOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_flag_reads_test.go",
+      "line": 32
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestFlaggedSubscriptionChangeReportOmitsSkippedPaths",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_flag_reads_test.go",
+      "line": 57
+    },
+    {
+      "package": "bridge",
       "identifier": "TestFlushChunkWaitEndsWithItsContext",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/flush_chunk_ctx_test.go",
@@ -4038,14 +4059,14 @@
       "identifier": "TestHandleSubscribeRequest_EmptyRequest_RejectsInvalidAction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_reject_test.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "bridge",
       "identifier": "TestHandleSubscribeRequest_ManagerRejection_SendsStatusResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_reject_test.go",
-      "line": 173
+      "line": 174
     },
     {
       "package": "bridge",
@@ -4059,7 +4080,14 @@
       "identifier": "TestHandleSubscribeRequest_NoMatchingPaths_RejectsInvalidAction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_reject_test.go",
-      "line": 135
+      "line": 136
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHandleSubscribeRequest_NoMatchingPaths_TerminatesNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_reject_test.go",
+      "line": 223
     },
     {
       "package": "bridge",
@@ -4273,6 +4301,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInvokeAnsweredWithNothingSendsNoResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_no_response_test.go",
+      "line": 28
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInvokeCarriesTheExchangeMaxPayload",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/invoke_max_payload_test.go",
@@ -4346,7 +4381,14 @@
       "identifier": "TestKeepAliveWaitsForItsStatusResponseParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 465
+      "line": 476
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestKeepSubscriptionsFalseForgetsThePeersFormerRows",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_persistence_bound_test.go",
+      "line": 82
     },
     {
       "package": "bridge",
@@ -4598,7 +4640,7 @@
       "identifier": "TestOneReportInFlightUntilItsStatusResponseParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 400
+      "line": 411
     },
     {
       "package": "bridge",
@@ -4759,7 +4801,7 @@
       "identifier": "TestOutboundReliableRemembersAnAbandonedMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/report_abandoned_before_record_test.go",
-      "line": 71
+      "line": 73
     },
     {
       "package": "bridge",
@@ -5302,6 +5344,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPersistSubscriptionSkipsUnattributableTargets",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_persistence_bound_test.go",
+      "line": 133
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPersistedRowsAreCappedPerFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_persistence_bound_test.go",
+      "line": 107
+    },
+    {
+      "package": "bridge",
       "identifier": "TestPiggybackedAckReleasesTheReplyRoute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_route_release_test.go",
@@ -5708,6 +5764,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestReestablishStopsAtInvalidSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_reestablish_node_test.go",
+      "line": 138
+    },
+    {
+      "package": "bridge",
       "identifier": "TestReestablishStopsWithTheBridge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_reestablish_order_test.go",
@@ -5719,6 +5782,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_reestablish_order_test.go",
       "line": 112
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReestablishedPrimingSuppressesEventPathStatuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_reestablish_node_test.go",
+      "line": 81
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReestablishedRecordAnswersForThisNodeOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_reestablish_node_test.go",
+      "line": 25
     },
     {
       "package": "bridge",
@@ -5739,7 +5816,14 @@
       "identifier": "TestRefusedReportEndsTheSubscriptionParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 438
+      "line": 449
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRefusedReportIsClosedByItsWaiterOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_refused_once_test.go",
+      "line": 18
     },
     {
       "package": "bridge",
@@ -5747,6 +5831,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_teardown_order_test.go",
       "line": 23
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRegisterSubscription_KeepSubscriptionsFalse_ReplacesThePeersOthers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_dispatch_test.go",
+      "line": 346
     },
     {
       "package": "bridge",
@@ -5925,10 +6016,10 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestReportWhoseEventsAreAllFilteredLeavesTheKeepAliveDue",
+      "identifier": "TestReportWhoseEventsAreAllFilteredGoesOutEmpty",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_filtered_events_keepalive_test.go",
-      "line": 37
+      "line": 39
     },
     {
       "package": "bridge",
@@ -6947,6 +7038,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubjectReadsNothingLeavesNoEntryForAClosedSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_reads_nothing_test.go",
+      "line": 284
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubjectReadsNothingTakesTwoObservationsOfOneACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_reads_nothing_test.go",
@@ -7017,6 +7115,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscriptionCloseEndsAnOngoingReportWait",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_stop_unanswered_chunk_test.go",
+      "line": 81
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscriptionCloseEndsItsPrimingWait",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
@@ -7055,63 +7160,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 933
+      "line": 950
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 959
+      "line": 976
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 822
+      "line": 839
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 976
+      "line": 993
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 890
+      "line": 907
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 732
+      "line": 749
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 740
+      "line": 757
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 1002
+      "line": 1019
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 855
+      "line": 872
     },
     {
       "package": "bridge",
@@ -11703,7 +11808,7 @@
       "identifier": "TestThreadBreadcrumbListenerMayReadTheServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_thread_p6_test.go",
-      "line": 105
+      "line": 111
     },
     {
       "package": "cluster/core",
@@ -11752,7 +11857,7 @@
       "identifier": "TestThreadSecondConnectIsBusy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_thread_p6_test.go",
-      "line": 131
+      "line": 137
     },
     {
       "package": "cluster/core",
@@ -11836,7 +11941,7 @@
       "identifier": "TestWiFiNetworkCommissioningBreadcrumbOutsideTheLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_lock_test.go",
-      "line": 20
+      "line": 21
     },
     {
       "package": "cluster/core",
@@ -11850,7 +11955,7 @@
       "identifier": "TestWiFiNetworkCommissioningConnectAfterExpiryIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_lock_test.go",
-      "line": 87
+      "line": 88
     },
     {
       "package": "cluster/core",
@@ -26533,7 +26638,7 @@
     },
     {
       "package": "contract",
-      "identifier": "TestDataVersionTracker_Bump_WrapAround",
+      "identifier": "TestDataVersionTracker_Bump_WrapsToZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "contract/dataversion_internal_test.go",
       "line": 19
@@ -35563,6 +35668,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestAttributeDataIsDecodedWithTheFinalPath",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/attribute_data_order_test.go",
+      "line": 16
+    },
+    {
+      "package": "im",
       "identifier": "TestAttributeExpansionAscendingSortsEachPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_expansion_test.go",
@@ -35629,7 +35741,7 @@
       "identifier": "TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_authorization_test.go",
-      "line": 225
+      "line": 229
     },
     {
       "package": "im",
@@ -35745,6 +35857,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestClientEventReportIBNeedsExactlyOneMember",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/attribute_data_order_test.go",
+      "line": 86
+    },
+    {
+      "package": "im",
       "identifier": "TestClientReportDataRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/client_parity_matterjs_test.go",
@@ -35833,6 +35952,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_dispatch_endpoints_test.go",
       "line": 84
+    },
+    {
+      "package": "im",
+      "identifier": "TestDispatcherWithoutACLCheckerDenies",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/no_acl_checker_test.go",
+      "line": 37
     },
     {
       "package": "im",
@@ -36147,14 +36273,14 @@
       "identifier": "TestHandleInvokeRequest_TimedFromProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_timed_provider_test.go",
-      "line": 32
+      "line": 31
     },
     {
       "package": "im",
       "identifier": "TestHandleInvokeRequest_TimedSchemaFallback",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_timed_provider_test.go",
-      "line": 67
+      "line": 66
     },
     {
       "package": "im",
@@ -36550,6 +36676,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestNoResponseLeavesTheCommandOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/no_acl_checker_test.go",
+      "line": 82
+    },
+    {
+      "package": "im",
       "identifier": "TestNonvolatileEventStoreClear",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/nonvolatile_event_store_parity_matterjs_test.go",
@@ -36742,7 +36875,7 @@
       "identifier": "TestReadParity_DataVersionFilterForAnotherNodeIgnored",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_dataversion_filter_parity_matterjs_test.go",
-      "line": 45
+      "line": 44
     },
     {
       "package": "im",
@@ -36763,7 +36896,7 @@
       "identifier": "TestReadParity_DataVersionFilterOnEveryVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_dataversion_filter_parity_matterjs_test.go",
-      "line": 17
+      "line": 16
     },
     {
       "package": "im",
@@ -36942,6 +37075,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestStructureDecodersSkipAnUnknownMemberWhole",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/unknown_member_test.go",
+      "line": 25
+    },
+    {
+      "package": "im",
       "identifier": "TestSubscribeRequestRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/im_test.go",
@@ -36988,6 +37128,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/status_response_decode_test.go",
       "line": 16
+    },
+    {
+      "package": "im",
+      "identifier": "TestUnmarshalStatusResponseTLV_WrongType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/status_response_decode_test.go",
+      "line": 75
     },
     {
       "package": "im",
@@ -37148,14 +37295,14 @@
       "identifier": "TestWriteFabricScopedAttributeNeedsAccessingFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_fabric_scoped_parity_matterjs_test.go",
-      "line": 127
+      "line": 134
     },
     {
       "package": "im",
       "identifier": "TestWriteFabricScopedGateOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_fabric_scoped_parity_matterjs_test.go",
-      "line": 163
+      "line": 170
     },
     {
       "package": "im",
@@ -37267,7 +37414,7 @@
       "identifier": "TestWriteRequestWithoutClusterOrAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_version_check_test.go",
-      "line": 164
+      "line": 173
     },
     {
       "package": "im",
@@ -37278,10 +37425,24 @@
     },
     {
       "package": "im/subscription",
+      "identifier": "BenchmarkTakeDirtyOfALargeSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/dirty_order_test.go",
+      "line": 59
+    },
+    {
+      "package": "im/subscription",
       "identifier": "HoldReporting",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/export_test.go",
       "line": 8
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestClaimReportWakesWhenTheReportEnds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/claim_report_test.go",
+      "line": 21
     },
     {
       "package": "im/subscription",
@@ -37296,6 +37457,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/event_watermark_parity_matterjs_test.go",
       "line": 19
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestFailedUpdateIsOwedNotDue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/failed_update_test.go",
+      "line": 20
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestFlushAfterAFailedReportInFlightSendsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/failed_update_test.go",
+      "line": 44
     },
     {
       "package": "im/subscription",
@@ -37341,10 +37516,24 @@
     },
     {
       "package": "im/subscription",
+      "identifier": "TestPeerSubscription_KeepsWildcardPathFlags",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_test.go",
+      "line": 229
+    },
+    {
+      "package": "im/subscription",
       "identifier": "TestPrimedEventsAreNotReportedAgain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/primed_events_test.go",
       "line": 21
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestRestore_BoundsThePersistedSendInterval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_test.go",
+      "line": 264
     },
     {
       "package": "im/subscription",
