@@ -74,9 +74,12 @@ func (r *unsecuredRig) nextMessage(t *testing.T, what string) (message.Header, m
 	buf := make([]byte, 1500)
 	for {
 		_ = r.peer.SetReadDeadline(time.Now().Add(3 * time.Second))
-		n, _, err := r.peer.ReadFromUDP(buf)
+		n, from, err := r.peer.ReadFromUDP(buf)
 		if err != nil {
 			t.Fatalf("%s: nothing reached the peer: %v", what, err)
+		}
+		if !unsecuredFromBridge(r.b, from, buf[:n]) {
+			continue
 		}
 		hdr, hl, err := message.UnmarshalHeader(buf[:n])
 		if err != nil {

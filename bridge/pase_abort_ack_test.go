@@ -51,9 +51,12 @@ func TestPASEAbortReportIsAcknowledged(t *testing.T) {
 	buf := make([]byte, 1500)
 	for {
 		_ = commissioner.conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-		n, _, err := commissioner.conn.ReadFromUDP(buf)
+		n, from, err := commissioner.conn.ReadFromUDP(buf)
 		if err != nil {
 			t.Fatalf("the commissioner's failure StatusReport (counter %d) was not acknowledged: %v", reportCounter, err)
+		}
+		if !unsecuredFromBridge(r.b, from, buf[:n]) {
+			continue
 		}
 		_, hl, err := message.UnmarshalHeader(buf[:n])
 		if err != nil {

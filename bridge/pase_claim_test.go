@@ -45,9 +45,12 @@ func (p *pipelinePeer) none(d time.Duration, what string) {
 	deadline := time.Now().Add(d)
 	for {
 		_ = p.conn.SetReadDeadline(deadline)
-		n, _, err := p.conn.ReadFromUDP(buf)
+		n, from, err := p.conn.ReadFromUDP(buf)
 		if err != nil {
 			return
+		}
+		if !unsecuredFromBridge(p.b, from, buf[:n]) {
+			continue
 		}
 		_, hl, err := message.UnmarshalHeader(buf[:n])
 		if err != nil {
