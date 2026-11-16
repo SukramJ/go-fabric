@@ -135,7 +135,10 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// subscription on either, as on any other error status (:947);
 	// nothing else ever would, because the report itself was
 	// MRP-acked and the reply refreshes the session's activity.
-	if !status.IsSuccess() && !proto.Initiator {
+	// A reporter that waits for this answer got it and ends the
+	// subscription itself (closeRefusedSubscription): only an answer nobody
+	// waits for ends it here, once (review II, DR5b-c1-04).
+	if !waited && !status.IsSuccess() && !proto.Initiator {
 		b.closeSubscriptionByExchange(requestHdr.SessionID, proto.ExchangeID, status)
 	}
 	b.logger.Debug("matter.rx.im.status_ack",
