@@ -2238,12 +2238,12 @@ connectedhomeip at the pin (`DeviceEnergyManagementCluster.cpp`,
 `EnergyEvseDelegateImpl.cpp`, `EnergyEvseTargetsStore.cpp`), each rule
 with its line. The places where the Go code knowingly differs from, or
 tightens, the transcription are commented where they occur:
-`devicemanagement.go:467-468` (chip dereferences a capability unchecked; a
-null one is left null here), `:488` (chip's INVALID_VALUE is answered
-as CONSTRAINT_ERROR, the IM status the spec names), `:864-865` (the
+`devicemanagement.go:485-486` (chip dereferences a capability unchecked; a
+null one is left null here), `:507-509` `checkOptOut` (chip's INVALID_VALUE is answered
+as CONSTRAINT_ERROR, the IM status the spec names), `:920-928` `pauseFailureLocked` (the
 power-adjustment timer is cancelled in the pause failure path, transcribed
-as written), `:998` (only the first constraint's fields are checked,
-as chip does); `evse.go:369`, `:387-388`, `:792`, `:863`, `:1294-1300`.
+as written), `:1060-1062` `requestConstraintBasedForecast` (only the first constraint's fields are checked,
+as chip does) — `devicemanagement.go` lines at `1a0d8ba9` (review II, phase 6a, R2-P6-doc-1620); `evse.go:369`, `:387-388`, `:792`, `:863`, `:1294-1300`.
 PowerRangeAdjustment (DEM feature bit 7) is not served: it exists at the
 chip pin but not in the matter.js snapshot nor the 1.6.1 data model
 (DEM/2.11 stays class (b)). Families DEM, DEMM, EEVSE, EEVSEM pass or are
@@ -2383,6 +2383,8 @@ one place: with Positioning it requires exactly one of Translation,
 Rotation and Modulation (`[PS].b`), where chip's server accepts at most
 one. Family CLDIM passes (#46). The daemon's ClosurePanel shares
 `BD-Matter-ClosureWithoutTagList`.
+
+Review II, phase 6a (R2-P6-fsm-1581, -1582, -1587; owner decision 150): three of chip's outcomes are kept though they break a module guarantee. SetTarget rounds the Position to the Resolution grid after the 100.00 % check and does not bound the result (`src/app/clusters/closure-dimension-server/ClosureDimensionCluster.cpp:496-505` at `6170af84`); with a Resolution that does not divide 10000 a Position near the top rounds above it, the handler runs (`:555`) and `SetTargetState` refuses (`:343-350`), FAILURE (`:557`). Step clamps only (`:607-653`) and never grids the target, so a StepValue, current Position or ceiling off the Resolution grid makes `SetTargetState` refuse after the handler (`:656`, `:659`, grid check `:347-350`). Step's LimitRange clamp binds one bound per direction (`:632-646`). `cluster/closure` documents all three on `DimensionHandler` and `DimensionConfig`; a Resolution that divides 10000 and a StepValue on its grid avoid the first two.
 
 ### BD-chip-SoilMeasurement-PullRefusal — a reading outside the limits is dropped at read time rather than refused at set time
 
@@ -3071,6 +3073,8 @@ this shape in phase 20 (brief BX2: an `op` queue held across its hooks,
 delegate model (ports called under the state lock, the host must not
 call the server from them — `cluster/energy/evse.go`, `EvseEnergyMeter`) and is the
 one documented exception until gate 2.
+
+Since review II, phase 6a a command that stores after its port call re-reads the state under the lock and re-checks or merges: thermo SetActiveScheduleRequest, BooleanStateConfiguration's EnableDisableAlarm and SuppressAlarm, ServiceArea's SelectAreas, ClosureDimension's SetTarget and Step (R2-P6-conc-1510, -1585); the command still wins the attribute it sets, and a host change to anything else survives. ClosureControl's commands run one at a time (R2-P6-conc-1511); the wait takes no context, so a second command waits as long as the mover holds the first. The command's origin is `BD-Matter-CommandOrigin-PerServerFlag`.
 
 ### BD-Matter-Thermostat-CompanionsAfterSink — the thermostat re-runs the reconcile after the Sink and logs companions that moved
 
@@ -4884,30 +4888,9 @@ Reasoning: a queue without an owner that stops it is a goroutine leak; a
 change before the device is part of a node has no controller and no
 report, and the inline `OnChanged` still sees it (phase 20c, brief BU-a).
 
-### BD-Matter-CommandOrigin-PerServerFlag — a change made while a server runs a command is reported as the command's, a concurrent host `Set` included
+### BD-Matter-CommandOrigin-PerServerFlag — a change made while a server runs a command is reported as the command's (a count of running commands since review II, phase 6a), a concurrent host `Set` included
 
-matter.js knows a change's origin from the transaction that commits it:
-a command runs under an `ActionContext` that carries the transaction
-every state change needs (`packages/node/src/behavior/context/ActionContext.ts:25`
-at `862ad75f`), and the `$Changed` notification is pushed with that
-transaction's session (`behavior/state/managed/Datasource.ts:1488-1491`
-at `db021da0`),
-so a host's handler override writes state as the command, and a write
-from elsewhere commits in its own transaction with its own session. The
-module's setter path has no ambient context: a self-held server marks
-the command's origin in a per-server flag held while the handler runs
-(the `cause` field of `cluster/opstate/opstate_server.go`,
-`cluster/energy`, `cluster/servicearea`, `cluster/light`'s ColorControl, …; the dispatcher stamps `contract.OriginCommand` on
-the context, `endpoint/dispatcher.go`), and every change reported while
-the flag is set — the handler's own `Set`, which matter.js reports the
-same way, and a host `Set` racing the command from another goroutine,
-which matter.js would report as the host's — carries
-`contract.OriginCommand`. Reasoning: the alternative is a context
-parameter on every setter of the facade for one racing case; a host that
-needs its own origin for a concurrent `Set` serialises it with the
-command through `OnChangedAsync`'s per-device queue (phase 20c, brief
-BU-b).
-
+matter.js knows a change's origin from the transaction that commits it: a command runs under an `ActionContext` that carries the transaction every state change needs (`packages/node/src/behavior/context/ActionContext.ts:25` at `862ad75f`), and the `$Changed` notification is pushed with that transaction's session (`packages/node/src/behavior/state/managed/Datasource.ts:1488-1491` at `db021da0`, `[newval, oldval, this.#session]`), so a host's handler override writes state as the command, and a write from elsewhere commits in its own transaction with its own session (inferred). connectedhomeip carries no origin at all: a change is `NotifyAttributeChanged(attributeId, type)` (`src/app/server-cluster/DefaultServerCluster.cpp:98-103` at `6170af84`). The module's setter path has no ambient context: a self-held server counts the commands whose handlers run (`running` in `cluster/opstate/opstate_server.go`, `commands` in `cluster/servicearea` and in `cluster/closure`'s ClosureDimension; `cluster/energy`'s DeviceEnergyManagement and `cluster/light`'s ColorControl still keep a per-server `cause`; the dispatcher stamps `contract.OriginCommand` on the context, `endpoint/dispatcher.go`), and every change reported while the count is above zero — the handler's own `Set`, which matter.js reports the same way, and a host `Set` racing a command from another goroutine, which matter.js would report as the host's — carries `contract.OriginCommand`. A count, not a flag, since review II, phase 6a: a command that ends no longer clears another's origin (R2-P6-conc-1509, held by `cluster/command_origin_guard_test.go`). What remains is visible to the host alone: no controller sees it — the bridge separates `OriginControllerWrite` from every other origin and treats `OriginHostSet` and `OriginCommand` alike (`bridge/subscribe.go`) — but a host listener that filters on `OriginHostSet` (`examples/host-view/main.go`) takes its own racing `Set` for the command's. Reasoning: the alternative is a context parameter on every setter of the facade for one racing case seen only by the host that raced; a host that needs its own origin for a concurrent `Set` serialises it with the command through `OnChangedAsync`'s per-device queue (phase 20c, brief BU-b).
 ### BD-Matter-Quieter-ClockMovedBack — a quieter whose clock moved back reports at once
 
 matter.js's `QuietObservable` throttles on readings of one global clock:
@@ -5516,7 +5499,7 @@ the Schedules branch of `atomic.go`) follows connectedhomeip's
 `ThermostatSchedules` at `645b267a` — the harness commit `6170af84` has no
 schedules server — with chip's `TestThermostatClusterSchedules.cpp` cases
 ported in `schedules_chip_test.go` and `schedules_write_chip_test.go`
-(brief CO, issue #273). Four choices inside it are recorded here rather
+(brief CO, issue #273). Five choices inside it are recorded here rather
 than as rows of their own. (1) A Schedules write from a peer that does not
 hold the atomic write is INVALID_IN_STATE, whether no write is open or
 another peer holds it (`ThermostatClusterSchedules.cpp:572-575`; chip's
@@ -5536,7 +5519,7 @@ is the same — the five "CommitWrite of more than one attribute" cases of
 Presets commit refuses to drop a preset a schedule or a transition names,
 INVALID_IN_STATE (`ThermostatClusterPresets.cpp:708-724`; unverified: the
 file at `6170af84` holds no schedule check, and `645b267a` was not read);
-matter.js has no schedules to check. Hosts serve MSCH behind a flag, off by default,
+matter.js has no schedules to check. (5) The staged Presets a Schedules write is checked against may be another peer's: the atomic writes follow matter.js (one per peer and attribute), the check follows chip's `IsPresetHandlePresentInPresetsOrPending` (`ThermostatClusterPresets.cpp:480-491` at `645b267a`), and chip has one atomic state per endpoint (a second client's begin is RESOURCE_EXHAUSTED, `ThermostatClusterAtomic.cpp:360-363`; `InAtomicWrite` asks no originator, `:172-191`), so the cross-peer case does not arise there. No reference defines it; a removal the other peer later commits is INVALID_IN_STATE while a schedule names the handle (review II, phase 6a, R2-P6-par-1565). Hosts serve MSCH behind a flag, off by default,
 until a live pairing with Apple Home is verified (owner decision
 2026-10-26; the reference bridge's `--thermostat-schedules`). Retire the
 register row when matter.js implements the feature; then reconcile onto
@@ -9123,3 +9106,15 @@ Neither reference refuses a read from inside a cluster: matter.js decides by `se
 ### BD-Matter-Spec-HostPatchJudgedWhole — a host `SetAttributes` is judged against the state its whole patch makes
 
 matter.js validates each assigned property alone against the siblings assigned before it (`packages/node/src/behavior/state/managed/values/StructManager.ts:278-291` at `db021da0`), so it accepts an incoherent patch in a suitable order that this module refuses, and refuses a coherent one in an unsuitable order. Here a host `SetAttributes` types each value against the stored siblings and judges the bounds, "in" constraints and conformance against the pending state the whole patch makes, order-free (`cluster/spec/server.go` `check`, `checkInState`); `NewServer` judges the initial values by the same rule. Review II, R2-P6-fsm-1303. Reason: a patch is one change of the host's model; the order of its fields is the map's, not the host's.
+
+### BD-Matter-DoorLock-PhysicalOutcomeOnSaveFailure — a lock operation whose records cannot be saved answers FAILURE and keeps what the hardware did
+
+matter.js moves the hardware inside the command (`packages/node/src/behaviors/door-lock/DoorLockServer.ts:1033-1041` at `db021da0`) and saves at the transaction commit after it (`packages/protocol/src/action/server/CommandInvokeResponse.ts:493`); a failed commit answers FAILURE (`:509-520`) with the state rolled back (`packages/node/src/behavior/state/managed/Datasource.ts:1331-1341`; that the lock's state is that datasource is inferred) while the LockOperation event already emitted stays. go-fabric answers FAILURE too but keeps the physical outcome: the records keep what the operation did (a DisposableUser stays disabled), the auto-relock follows the lock, the save error is logged (`matter.doorlock.records_not_saved`), and the next commit saves the records (`cluster/lock/doorlock_server.go` `commitMoved`). Chosen because the door moved: a rolled-back DisposableUser would open it again, and matter.js's armed relock cannot fire on a rolled-back Locked state (`DoorLockServer.ts:971`), leaving the door unlocked. Review II, R2-P6-err-1504. Pinned by `cluster/lock:TestRecordsNotSavedAreSavedByTheNextCommit`.
+
+### BD-Matter-Thermostat-HostWiresSiblings — the thermostat does not couple itself to a sibling endpoint's temperature or occupancy; the host wires them
+
+matter.js couples its Thermostat to a sibling TemperatureMeasurement and OccupancySensing endpoint named in its state (`packages/node/src/behaviors/thermostat/ThermostatServer.ts:168`, `:177-182`, `:467`, `:480-484`, `:539`, `:552-553`, `:577-579` at `db021da0`). go-fabric leaves both couplings to the host — `SetMeasuredTemperature` and `SetOccupied` (`cluster/thermo/thermostat_server.go`) — because which data point feeds which attribute is the host's (rich model, dumb bridge); a typed device in `device/` can offer the wiring later without a server change. Review II, F-db021da0-21, owner decision 147.
+
+### BD-chip-ColorControl-MoveColorTemperatureStop — MoveColorTemperature with MoveMode Stop ends every colour movement, as connectedhomeip
+
+matter.js stops hue and saturation only (`packages/node/src/behaviors/color-control/ColorControlServer.ts:1273-1276` at `db021da0`), so a controller's Stop would not stop the colour-temperature move it names. connectedhomeip ends every colour movement (`src/app/clusters/color-control-server/codegen/color-control-server.cpp:2704-2707` at `6170af84`: `stopAllColorTransitions`, then the kStop return; `stopAllColorTransitions` `:470-477` ends every transition), and this module follows it (`cluster/light/colorcontrol_commands.go` `moveColorTemperature`). The divergence is the set of movements stopped, nothing else: the colour-mode switch before the Stop branch stays matter.js's (`ColorControlServer.ts:1273`; chip returns before its `handleModeSwitch`, `:2726`), and RemainingTime reads 0 afterwards because the engine is idle — go-fabric's value, chip leaves the last one; neither reports it. TC-CC-6.2 checks bounds only (`src/app/tests/suites/certification/Test_TC_CC_6_2.yaml:312-360`). Review II, R2-P6-par-1413, owner decision 149. Upstream note for matter.js: MoveMode Stop calls `stopHueAndSaturationMovement` only; `stopAllColorMovement` (`ColorControlServer.ts:843`) would stop the move. Retire when matter.js stops every movement there.
