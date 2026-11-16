@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -237,6 +239,21 @@ func TestEndpointHasDeviceType(t *testing.T) {
 	root := &Endpoint{ID: 0}
 	agg := &Endpoint{ID: 1, Aggregator: true}
 	bridged := &Endpoint{ID: 5, DeviceType: 0x0100} // OnOffLight
+	// R2-P6-acl-0443: a composed endpoint lists further device types in
+	// its Descriptor (here Power Source, 0x0011); a target naming one of
+	// them matches, as both references match the endpoint's whole list.
+	composed := &Endpoint{ID: 6, DeviceType: 0x0100, DeviceTypes: []uint16{0x0011}}
+	part := &Endpoint{ID: 7, Part: true, DeviceType: 0x0100, DeviceTypes: []uint16{0x0011}}
+	// A root whose attached Descriptor lists more than RootNode (OTA
+	// Requestor, 0x0012): the ACL answers from that list.
+	rootDesc, err := mattercore.NewDescriptor([]mattercore.DeviceTypeStruct{
+		{DeviceType: deviceTypeRootNode, Revision: 1}, {DeviceType: 0x0012, Revision: 1},
+	}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootListed := &Endpoint{ID: 0}
+	rootListed.PublishClusterServers([]contract.ClusterServer{rootDesc})
 
 	cases := []struct {
 		name       string
@@ -252,6 +269,15 @@ func TestEndpointHasDeviceType(t *testing.T) {
 		{"bridged matches BridgedNode", bridged, matterDeviceTypeBridgedNode, true},
 		{"bridged denies an unrelated type", bridged, 0x0102, false},
 		{"nil endpoint denies", nil, deviceTypeRootNode, false},
+		{"composed matches a further listed type", composed, 0x0011, true},
+		{"composed matches its primary type", composed, 0x0100, true},
+		{"composed matches BridgedNode", composed, matterDeviceTypeBridgedNode, true},
+		{"composed denies an unlisted type", composed, 0x0102, false},
+		{"part matches a further listed type", part, 0x0011, true},
+		{"part denies BridgedNode", part, matterDeviceTypeBridgedNode, false},
+		{"root matches its Descriptor's further type", rootListed, 0x0012, true},
+		{"root with a Descriptor matches RootNode", rootListed, deviceTypeRootNode, true},
+		{"root with a Descriptor denies an unlisted type", rootListed, 0x0013, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

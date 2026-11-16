@@ -11,7 +11,9 @@ import (
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
@@ -1732,24 +1734,54 @@ func matchesCATSubject(entryCAT uint32, subjectCATs []uint32) bool {
 // its Descriptor DeviceTypeList — the resolver behind device-type ACL
 // targets (chip AccessControl.h:53 DeviceTypeResolver /
 // ProviderDeviceTypeResolver.h:34, backed by the data model's
-// per-endpoint device-type list). The list mirrors what the Descriptor
-// cluster serves: RootNode for EP 0, Aggregator for EP 1, and the
-// primary device type + BridgedNode for bridged endpoints (see
-// materialize.go DeviceTypeList assembly).
+// per-endpoint device-type list). It answers from the endpoint's whole
+// list, not its primary device type alone (R2-P6-acl-0443): a bridged
+// endpoint or a part from [listedDeviceTypes], the one function its
+// Descriptor is built from, so the two cannot disagree; the root, the
+// Aggregator and a bare endpoint from the DeviceTypeList of the
+// Descriptor published on them, and — when none is published — RootNode,
+// Aggregator or the endpoint's own device type.
 func endpointHasDeviceType(ep *Endpoint, deviceType uint32) bool {
 	if ep == nil {
 		return false
 	}
-	switch {
-	case ep.IsRoot():
-		return deviceType == deviceTypeRootNode
-	case ep.IsAggregator():
-		return deviceType == deviceTypeAggregator
-	case ep.Part:
-		return deviceType == uint32(ep.DeviceType)
-	default:
-		return deviceType == uint32(ep.DeviceType) || deviceType == matterDeviceTypeBridgedNode
+	if ep.IsRoot() || ep.IsAggregator() || ep.IsBare() {
+		if listed, ok := attachedDescriptorDeviceTypes(ep); ok {
+			for _, dt := range listed {
+				if dt.DeviceType == deviceType {
+					return true
+				}
+			}
+			return false
+		}
+		switch {
+		case ep.IsRoot():
+			return deviceType == deviceTypeRootNode
+		case ep.IsAggregator():
+			return deviceType == deviceTypeAggregator
+		default:
+			return deviceType == uint32(ep.DeviceType)
+		}
 	}
+	return deviceType <= 0xFFFF && slices.Contains(listedDeviceTypes(ep), uint16(deviceType))
+}
+
+// attachedDescriptorDeviceTypes returns the DeviceTypeList of the
+// Descriptor published on ep, false when none is published.
+func attachedDescriptorDeviceTypes(ep *Endpoint) ([]mattercore.DeviceTypeStruct, bool) {
+	for _, srv := range ep.AttachedClusterServers() {
+		desc, ok := srv.(*mattercore.Descriptor)
+		if !ok {
+			continue
+		}
+		v, ok := desc.MatterRead(descdef.AttrDeviceTypeList)
+		if !ok {
+			return nil, false
+		}
+		list, ok := v.([]mattercore.DeviceTypeStruct)
+		return list, ok
+	}
+	return nil, false
 }
 
 // aclTargetMatches reports whether an ACL entry's target list covers
