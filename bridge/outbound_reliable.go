@@ -4,7 +4,6 @@
 package bridge
 
 import (
-	"context"
 	"errors"
 	"math/rand/v2"
 	"net"
@@ -18,14 +17,10 @@ import (
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// ErrAckWaitTimeout is returned by [outboundReliableTracker.WaitForAck]
-// when the deadline expires before the peer ACKs the tracked counter.
-// Subscribe-initial chunking uses this to enforce Matter §10.6.6's
-// per-chunk handshake: the sender must wait for a `StatusResponse(SUCCESS)`
-// (which piggybacks an MRP ACK on the chunk's counter) before shipping
-// the next chunk. matter.js mirrors the same flow with
-// `await this.waitForSuccess("DataReport")` in
-// `InteractionMessenger.ts:721`.
+// ErrAckWaitTimeout named a wait for an outbound message's acknowledgement
+// that ended without it. No function of the module returns it any more:
+// the tracker's wait for an acknowledgement, which had no caller outside
+// its tests, was removed in review II.
 var ErrAckWaitTimeout = errors.New("bridge: outbound ack wait: timeout")
 
 // outboundReliableTracker bookkeeps reliable outbound messages the
@@ -52,7 +47,7 @@ type outboundKey struct {
 }
 
 type outboundReliableTracker struct {
-	// mu guards pending, waiters and rtt; it is not held while Tick sends.
+	// mu guards pending and rtt; it is not held while Tick sends.
 	mu      sync.Mutex
 	pending map[outboundKey]*outboundEntry
 	// unsecured holds the keys of session 0's entries in pending, in the
@@ -65,12 +60,6 @@ type outboundReliableTracker struct {
 	// exchange's one entry ([outboundReliableTracker.track]).
 	secureOrder      map[uint16][]uint16
 	secureByExchange map[secureSlot]outboundKey
-	// waiters lets callers block on Ack via [WaitForAck] — used by the
-	// Subscribe-initial chunked send path so the bridge mirrors
-	// matter.js's per-chunk handshake (one ReportData → wait for
-	// StatusResponse(SUCCESS) → next ReportData). Closed by [Ack] /
-	// [Tick] when the entry is resolved or abandoned.
-	waiters map[outboundKey]chan error
 	// abandoned remembers, for a secure session, the messages [Tick] gave
 	// up on, each until the instant it may be forgotten: a caller that
 	// learns a message's counter only after the send — the subscription
@@ -170,7 +159,6 @@ func newOutboundReliableTracker(baseIntervalFor func(sessionID uint16, now time.
 	return &outboundReliableTracker{
 		clock:            clock.Or(clk),
 		pending:          make(map[outboundKey]*outboundEntry),
-		waiters:          make(map[outboundKey]chan error),
 		abandoned:        make(map[outboundKey]time.Time),
 		secureOrder:      make(map[uint16][]uint16),
 		secureByExchange: make(map[secureSlot]outboundKey),
@@ -368,7 +356,7 @@ const unsecuredEntryLimit = 16
 
 // unsecuredEntryLifetime is how long a message on the unsecured session may
 // wait for its acknowledgement. An entry normally ends sooner — with its
-// acknowledgement, or when its handshake moves past it or fails
+// acknowledgement, or when its handshake moves past it or is ended from outside
 // ([outboundReliableTracker.AbandonUnsecuredExchange]) — but three kinds
 // are bounded by no handshake timeout: the StatusReport that ends a
 // handshake, which is retransmitted after the handshake is over and paced
@@ -409,20 +397,10 @@ const unsecuredEntryLifetime = 60 * time.Second
 // exchange tables too.
 const secureExchangeLimit = 30
 
-var (
-	// errUnsecuredEntryEvicted is what a [outboundReliableTracker.WaitForAck]
-	// caller gets when its unsecured-session entry lost its place to a
-	// newer one ([unsecuredEntryLimit]).
-	errUnsecuredEntryEvicted = errors.New("bridge: outbound retransmit: evicted from the unsecured session's table")
-	// errUnsecuredEntryExpired is [outboundReliableTracker.Tick]'s report
-	// of an unsecured-session entry dropped after
-	// [unsecuredEntryLifetime].
-	errUnsecuredEntryExpired = errors.New("bridge: outbound retransmit: the handshake's time is over")
-	// errSecureExchangeEvicted is what a [outboundReliableTracker.WaitForAck]
-	// caller gets when its secure-session entry lost its place
-	// ([secureExchangeLimit]).
-	errSecureExchangeEvicted = errors.New("bridge: outbound retransmit: evicted from the session's table")
-)
+// errUnsecuredEntryExpired is [outboundReliableTracker.Tick]'s report
+// of an unsecured-session entry dropped after
+// [unsecuredEntryLifetime].
+var errUnsecuredEntryExpired = errors.New("bridge: outbound retransmit: the handshake's time is over")
 
 // secureEviction is one secure-session entry that lost its place, reported
 // after the tracker's mutex is released.
@@ -430,11 +408,10 @@ type secureEviction struct {
 	key        outboundKey
 	exchangeID uint16
 	superseded bool
-	waiter     chan error
 }
 
-// evictSecureLocked drops the entry at key, a secure session's, and takes
-// its waiter. Caller holds t.mu.
+// evictSecureLocked drops the entry at key, a secure session's. Caller
+// holds t.mu.
 func (t *outboundReliableTracker) evictSecureLocked(key outboundKey, superseded bool) (secureEviction, bool) {
 	e, ok := t.pending[key]
 	if !ok {
@@ -442,10 +419,6 @@ func (t *outboundReliableTracker) evictSecureLocked(key outboundKey, superseded 
 	}
 	ev := secureEviction{key: key, exchangeID: e.exchangeID, superseded: superseded}
 	t.dropLocked(key)
-	if ch, has := t.waiters[key]; has {
-		delete(t.waiters, key)
-		ev.waiter = ch
-	}
 	return ev, true
 }
 
@@ -477,14 +450,10 @@ func (t *outboundReliableTracker) placeSecureLocked(key outboundKey, exchangeID 
 	return out
 }
 
-// reportSecureEvictions wakes the waiters of entries that lost their place
-// and tells the hook. Called without t.mu.
+// reportSecureEvictions tells the hook of the entries that lost their
+// place. Called without t.mu.
 func (t *outboundReliableTracker) reportSecureEvictions(evs []secureEviction) {
 	for _, ev := range evs {
-		if ev.waiter != nil {
-			ev.waiter <- errSecureExchangeEvicted // buffered, see WaitForAck
-			close(ev.waiter)
-		}
 		if t.secureEvicted != nil {
 			t.secureEvicted(ev.key.sessionID, ev.exchangeID, ev.key.counter, ev.superseded)
 		}
@@ -501,9 +470,8 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 	key := outboundKey{sessionID, counter}
 	var (
-		oldest       *outboundEntry
-		oldestWaiter chan error
-		secureGone   []secureEviction
+		oldest     *outboundEntry
+		secureGone []secureEviction
 	)
 	t.mu.Lock()
 	if sessionID != 0 && role != exchangeRoleUnnamed {
@@ -527,10 +495,6 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 			first := t.unsecured[0]
 			oldest = t.pending[first]
 			t.dropLocked(first)
-			if ch, has := t.waiters[first]; has {
-				delete(t.waiters, first)
-				oldestWaiter = ch
-			}
 		}
 		t.unsecured = append(t.unsecured, key)
 	}
@@ -549,10 +513,6 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 		role:       role,
 	}
 	t.mu.Unlock()
-	if oldestWaiter != nil {
-		oldestWaiter <- errUnsecuredEntryEvicted // buffered, see WaitForAck
-		close(oldestWaiter)
-	}
 	if oldest != nil && t.evicted != nil {
 		t.evicted(oldest.exchangeID, oldest.counter)
 	}
@@ -617,26 +577,31 @@ func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
 
 // AbandonUnsecuredExchange drops every entry of the unsecured session of the
 // handshake hk — its initiator and its exchange — that still waits for its
-// acknowledgement, and wakes any [WaitForAck]
-// caller blocked on them with [ErrAckWaitTimeout]. It returns the number
-// of entries cleared.
+// acknowledgement. It returns the number of entries cleared.
 //
 // Called when the handshake moves past what it sent (the peer's next
 // message arrived: a Sigma2 still retransmitted after Sigma3 is wasted at
 // best, and Apple iOS drops it with "Dropping message without piggyback ack
-// when we are waiting for an ack") and when it ends without one — it
-// failed, timed out, or its responder was reaped — as connectedhomeip
-// clears an exchange's entry when the exchange is aborted
-// (src/messaging/ExchangeContext.cpp:241-246 and :277-287 at 6170af84,
-// `DoClose(true)` → `ClearRetransTable(this)`). The caller abandons
-// *before* it sends the StatusReport that ends the handshake, so that
-// report stays tracked: a pairing session that is cleared aborts its
-// exchange only while that still waits on a response, "otherwise the
-// exchange layer finishes closing it"
-// (src/protocols/secure_channel/PairingSession.cpp:285-290), and matter.js
-// keeps retransmitting an unacknowledged message of an exchange that is
-// being closed (packages/protocol/src/protocol/MessageExchange.ts:1165-1190
-// at db021da0).
+// when we are waiting for an ack") — before the report of a completed
+// handshake is sent, so that report stays tracked — and when the handshake
+// is ended from outside while it waits for the peer: its responder was
+// reaped or evicted, its handler was replaced or is gone. connectedhomeip
+// aborts the exchange of a pairing session that is cleared while it still
+// waits for a response, and clears its retransmission entry with it
+// (src/messaging/ExchangeHolder.h:133-139, src/messaging/ExchangeContext.cpp:277-287
+// and :241-246 at 6170af84, `Abort` → `DoClose(true)` →
+// `ClearRetransTable(this)`). A handshake that fails on a message does not
+// call it: what it sent goes on being retransmitted
+// ([Bridge.sendHandshakeFailureReport], owner decision 173). Neither
+// reference drops at its own timeout: connectedhomeip's response timeout
+// clears the response-expected flag before the pairing session is cleared,
+// so the exchange is closed, not aborted, and keeps its entry
+// (ExchangeContext.cpp:470-475, :499-509, :261-270), and matter.js's PASE
+// pairing timeout closes the exchange without a cause, which goes on
+// retransmitting a message whose send still waits for its acknowledgement
+// (packages/protocol/src/session/pase/PaseServer.ts:127-131, :207-221;
+// packages/protocol/src/protocol/MessageExchange.ts:1165-1193, :937-943 at
+// db021da0).
 //
 // Session 0 only, and that initiator's only: exchange ids are the
 // initiator's choice, so an entry of a secure session whose peer happened
@@ -646,41 +611,21 @@ func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
 // :401 at db021da0).
 func (t *outboundReliableTracker) AbandonUnsecuredExchange(hk HandshakeKey) int {
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	cleared := 0
-	wakers := make([]chan error, 0)
 	for _, key := range slices.Clone(t.unsecured) {
 		if e := t.pending[key]; e.exchangeID != hk.ExchangeID || e.initiator != hk.InitiatorNodeID {
 			continue
 		}
 		t.dropLocked(key)
-		if ch, has := t.waiters[key]; has {
-			delete(t.waiters, key)
-			wakers = append(wakers, ch)
-		}
 		cleared++
-	}
-	t.mu.Unlock()
-	// Wake outside the lock — channel sends may otherwise stall.
-	for _, ch := range wakers {
-		// Send abandon marker; ignore if no receiver (best-effort).
-		select {
-		case ch <- ErrAckWaitTimeout:
-		default:
-			close(ch)
-		}
 	}
 	return cleared
 }
 
-// errOutboundSessionClosed wakes a [outboundReliableTracker.WaitForAck]
-// caller whose entry went with its session ([outboundReliableTracker.DropSession]).
-var errOutboundSessionClosed = errors.New("bridge: outbound retransmit: the session closed")
-
 // DropSession drops every entry of the secure session sessionID — the
 // session closed, so nothing it sent is retransmitted or acknowledged any
-// more — and wakes any [outboundReliableTracker.WaitForAck] caller blocked
-// on one with errOutboundSessionClosed. It returns the number of entries
-// dropped. Session 0 (the unsecured session) is left alone: its entries
+// more. It returns the number of entries dropped. Session 0 (the unsecured session) is left alone: its entries
 // belong to handshakes, which end on their own clock. matter.js stops
 // retransmitting when the send fails with SessionClosedError
 // (MessageExchange.ts:1008-1014 at db021da0, the lines
@@ -691,8 +636,8 @@ func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
 		return 0
 	}
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	dropped := 0
-	var wakers []chan error
 	for key := range t.pending {
 		if key.sessionID != sessionID {
 			continue
@@ -705,23 +650,11 @@ func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
 			delete(t.abandoned, key)
 		}
 	}
-	for key, ch := range t.waiters {
-		if key.sessionID == sessionID {
-			delete(t.waiters, key)
-			wakers = append(wakers, ch)
-		}
-	}
-	t.mu.Unlock()
-	for _, ch := range wakers {
-		ch <- errOutboundSessionClosed // buffered (WaitForAck); one send per channel
-		close(ch)
-	}
 	return dropped
 }
 
 // Ack removes the pending entry for (sessionID, acked). Returns true
-// when an entry was found, false on stray / duplicate ACK. Wakes any
-// [WaitForAck] caller blocked on the same key. sessionID comes from
+// when an entry was found, false on stray / duplicate ACK. sessionID comes from
 // the received message header — an ACK is only valid within its own
 // session (see the outboundKey rationale).
 func (t *outboundReliableTracker) Ack(sessionID uint16, acked uint32) bool {
@@ -730,7 +663,7 @@ func (t *outboundReliableTracker) Ack(sessionID uint16, acked uint32) bool {
 
 // ack is [outboundReliableTracker.Ack] for key; belongs, when set, must
 // accept the pending entry, or the acknowledgement is not its and leaves
-// it (and any waiter on it) in place.
+// it in place.
 func (t *outboundReliableTracker) ack(key outboundKey, belongs func(*outboundEntry) bool) bool {
 	t.mu.Lock()
 	if e, ok := t.pending[key]; ok && belongs != nil && (e == nil || !belongs(e)) {
@@ -739,16 +672,7 @@ func (t *outboundReliableTracker) ack(key outboundKey, belongs func(*outboundEnt
 	}
 	if _, ok := t.pending[key]; !ok {
 		// A stray ACK: the duplicate ack of a retransmission after the
-		// entry was cleared. [WaitForAck] installs a waiter only after
-		// [Track], so a waiter found here outlived its entry (one
-		// [Untrack] dropped without waking it); release it rather than
-		// leave it to its deadline.
-		if ch, has := t.waiters[key]; has {
-			delete(t.waiters, key)
-			t.mu.Unlock()
-			close(ch)
-			return false
-		}
+		// entry was cleared.
 		t.mu.Unlock()
 		return false
 	}
@@ -763,14 +687,7 @@ func (t *outboundReliableTracker) ack(key outboundKey, belongs func(*outboundEnt
 	if entry != nil && entry.retries == 0 && !entry.sentWall.IsZero() {
 		t.rtt.record(clock.Since(t.clock, entry.sentWall))
 	}
-	ch, has := t.waiters[key]
-	if has {
-		delete(t.waiters, key)
-	}
 	t.mu.Unlock()
-	if has {
-		close(ch)
-	}
 	return true
 }
 
@@ -799,50 +716,6 @@ func (t *outboundReliableTracker) RTTStats() MRPRTTStats {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.rtt.stats()
-}
-
-// WaitForAck blocks until the peer ACKs `counter`, the context is
-// cancelled, or the entry is abandoned by [Tick] after exceeding the
-// retransmit cap. Caller must invoke this AFTER [Track] (otherwise the
-// channel is created but never resolved).
-//
-// Returns nil on ACK; ctx.Err() on context cancellation;
-// [ErrAckWaitTimeout] if the deadline elapses without movement; the
-// abandon-error (typically [mrp.ErrMaxRetransmissionsReached]) when
-// Tick gives up.
-func (t *outboundReliableTracker) WaitForAck(ctx context.Context, sessionID uint16, counter uint32) error {
-	key := outboundKey{sessionID, counter}
-	t.mu.Lock()
-	if _, pending := t.pending[key]; !pending {
-		t.mu.Unlock()
-		return nil // already acked / never tracked
-	}
-	ch, exists := t.waiters[key]
-	if !exists {
-		ch = make(chan error, 1)
-		t.waiters[key] = ch
-	}
-	t.mu.Unlock()
-
-	select {
-	case err, ok := <-ch:
-		if !ok {
-			return nil
-		}
-		return err
-	case <-ctx.Done():
-		t.mu.Lock()
-		// Best-effort cleanup so a cancelled wait doesn't leak the
-		// waiter channel forever — the next Ack/abandon for this
-		// key would otherwise leave a stranded entry. Only delete
-		// our own channel; if the wait raced with another caller
-		// installing a fresh chan we don't touch theirs.
-		if cur, has := t.waiters[key]; has && cur == ch {
-			delete(t.waiters, key)
-		}
-		t.mu.Unlock()
-		return ctx.Err()
-	}
 }
 
 // Abandoned reports whether [Tick] gave up on the message (sessionID,
@@ -917,11 +790,6 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// is dropped, due or not: [unsecuredEntryLifetime].
 		if key.sessionID == 0 && now.Sub(p.trackedAt) >= unsecuredEntryLifetime {
 			t.dropLocked(key)
-			if ch, has := t.waiters[key]; has {
-				delete(t.waiters, key)
-				ch <- errUnsecuredEntryExpired
-				close(ch)
-			}
 			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: errUnsecuredEntryExpired})
 			continue
 		}
@@ -932,11 +800,6 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 			t.dropLocked(key)
 			if key.sessionID != 0 {
 				t.abandoned[key] = now.Add(now.Sub(p.trackedAt))
-			}
-			if ch, has := t.waiters[key]; has {
-				delete(t.waiters, key)
-				ch <- mrp.ErrMaxRetransmissionsReached
-				close(ch)
 			}
 			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
 			continue

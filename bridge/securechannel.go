@@ -971,11 +971,16 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 	b.paseInFlightSince = now
 	b.mu.Unlock()
 	if held {
-		// The handshake that held the slot ran out: its replies stop
-		// waiting for an acknowledgement with it, and it counts as a
-		// failed pairing. Outside b.mu — the tracker resolves a
-		// session's interval through the bridge.
-		b.abandonHandshakeReplies(expired)
+		// The handshake that held the slot ran out and counts as a failed
+		// pairing. What it sent goes on being retransmitted until it is
+		// acknowledged, spent or [unsecuredEntryLifetime] old (owner decision
+		// 173) — unless the same initiator takes the slot again on the same
+		// exchange: its old replies would read as the new handshake's.
+		// Outside b.mu — the tracker resolves a session's interval through
+		// the bridge.
+		if expired == key {
+			b.abandonHandshakeReplies(expired)
+		}
 		if b.logger != nil {
 			b.logger.Info("matter.rx.sc.pase_claim_expired",
 				slog.Int("exchange_id", int(expired.ExchangeID)),
@@ -1357,10 +1362,9 @@ func (b *Bridge) handlePase(
 		if !isStateReplay {
 			key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 			b.releasePaseInFlight(key)
-			// And its replies stop waiting for an acknowledgement — all
-			// but the StatusReport above, which was sent after them
-			// ([Bridge.sendHandshakeFailureReport]); a failure that sent
-			// none (no handler wired) drops them here.
+			// Its replies go on waiting for their acknowledgement (owner
+			// decision 173); only a failure for want of a handler drops
+			// them — nobody is left to answer.
 			if isMissing {
 				b.abandonHandshakeReplies(key)
 			}
@@ -1450,9 +1454,10 @@ func (b *Bridge) handleCase(
 				caseFailureProtocolCode(err),
 				nil,
 			)
-			// The handshake is over: a Sigma2 still waiting for its
-			// acknowledgement is not retransmitted to a peer whose
-			// Sigma3 was refused; the report that tells it so is.
+			// The handshake is over. While the Sigma2 still waits for its
+			// acknowledgement no report is sent and the Sigma2 goes on
+			// being retransmitted (owner decision 173); otherwise the
+			// report is sent reliably.
 			if replyUnacked {
 				b.endHandshakeUnreported(handshakeKeyOf(requestHdr, proto.ExchangeID), stage)
 			} else if sendErr := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(handler, rxAt)); sendErr != nil {
@@ -1491,9 +1496,13 @@ func (b *Bridge) handleCase(
 // unreported ([Bridge.endHandshakeUnreported]; review II, F-db021da0-7),
 // and that message is not dropped but goes on being retransmitted until it
 // is acknowledged or its retransmissions are spent (owner decision 173) —
-// matter.js keeps retransmitting the unacknowledged message of an exchange
-// it closes (packages/protocol/src/protocol/MessageExchange.ts:1170-1190,
-// :943 at db021da0), and connectedhomeip leaves it in the retransmit table
+// in both references the message that fails here does not reach the
+// handshake, which goes on and keeps its reply in retransmission (matter.js
+// packages/protocol/src/protocol/MessageExchange.ts:521-525 at db021da0;
+// connectedhomeip src/messaging/ExchangeContext.cpp:585-595 at 6170af84),
+// and matter.js goes on retransmitting a message whose send still waits for
+// its acknowledgement when its exchange is closed without a cause
+// (MessageExchange.ts:1165-1193, :937-943), and connectedhomeip leaves it in the retransmit table
 // unless the exchange is aborted (src/messaging/ExchangeContext.cpp:219-252,
 // :261-270, src/messaging/ExchangeHolder.h:122-139 at 6170af84). The ACK
 // pump's ticks are what retransmit, so it ends with [Bridge.Stop] too. A

@@ -4,10 +4,7 @@
 package bridge
 
 import (
-	"context"
-	"errors"
 	"net"
-	"runtime"
 	"testing"
 	"time"
 )
@@ -22,7 +19,7 @@ func statedForever(uint16, time.Time) time.Duration {
 // TestSecureRetransmitTableIsBoundedPerSession: a secure session's messages
 // waiting for their acknowledgement belong to at most secureExchangeLimit
 // exchanges; the exchange tracked least recently loses its message's
-// retransmissions to a newer one, its waiter learns why, the hook hears of
+// retransmissions to a newer one, the hook hears of
 // it, and another session's entries stay (review II, R2-P6-bound-0303).
 func TestSecureRetransmitTableIsBoundedPerSession(t *testing.T) {
 	t.Parallel()
@@ -39,11 +36,6 @@ func TestSecureRetransmitTableIsBoundedPerSession(t *testing.T) {
 	dst := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5540}
 	tr.Track(1, 0x0099, 0x0001, []byte{0x01}, dst, now) // another session
 	tr.Track(1, 0x0042, 0x1000, []byte{0x01}, dst, now)
-	waited := make(chan error, 1)
-	go func() { waited <- tr.WaitForAck(context.Background(), 0x0042, 1) }()
-	for !tr.hasWaiter(0x0042, 1) {
-		runtime.Gosched()
-	}
 	const n = 1000
 	for i := range n {
 		tr.Track(uint32(i+2), 0x0042, uint16(0x2000+i), []byte{0x01}, dst, now)
@@ -58,9 +50,6 @@ func TestSecureRetransmitTableIsBoundedPerSession(t *testing.T) {
 		if !tr.isPending(0x0042, uint32(i+2)) {
 			t.Fatalf("the entry of exchange %#x, among the %d tracked last, is gone", 0x2000+i, secureExchangeLimit)
 		}
-	}
-	if err := <-waited; !errors.Is(err, errSecureExchangeEvicted) {
-		t.Fatalf("the evicted entry's waiter got %v, want errSecureExchangeEvicted", err)
 	}
 	if len(evictions) != n+1-secureExchangeLimit || evictions[0] != (eviction{0x0042, 0x1000, false}) {
 		t.Fatalf("the hook heard %d evictions, first %+v; want %d, first of exchange 0x1000", len(evictions), evictions[0], n+1-secureExchangeLimit)
@@ -111,12 +100,5 @@ func (t *outboundReliableTracker) isPending(sessionID uint16, counter uint32) bo
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	_, ok := t.pending[outboundKey{sessionID, counter}]
-	return ok
-}
-
-func (t *outboundReliableTracker) hasWaiter(sessionID uint16, counter uint32) bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	_, ok := t.waiters[outboundKey{sessionID, counter}]
 	return ok
 }
