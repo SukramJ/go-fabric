@@ -568,6 +568,15 @@ func (s *Session) processSendQueueLocked() error {
 		}
 		if s.role == RoleCentral {
 			// Unique data restarts the central's idle timer (:495-502).
+			// It is the "Central Device Idle Timer" (:48): a peripheral
+			// session runs none, so a central that completed the
+			// handshake and then goes silent is not bounded here. Above
+			// this package the bridge bounds it — a BLE connection that
+			// carries neither a secure session nor a PASE handshake in
+			// flight is dropped every ConnRspTimeout (bridge/ble.go
+			// watchBLEPASE) — and once a secure session runs, the
+			// session's own idle timeout and the commissioning window's
+			// fail-safe do (review II, R2-P6-fsm-0212).
 			s.idleTimer.start()
 		}
 		if isEnding {

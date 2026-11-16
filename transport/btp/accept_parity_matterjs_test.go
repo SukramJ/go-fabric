@@ -237,22 +237,22 @@ func TestAcceptRefusesSubscribeBeforeHandshakeParityMatterJS(t *testing.T) {
 }
 
 // TestAcceptRefusesSecondSessionParityMatterJS: a second handshake and
-// subscription on a running session start no second one (:292-296), and
-// the kept second request restarted the handshake timer (:256-258), which
-// the refused subscription did not stop (the throw at :292-296 comes
-// before the stop at :297): matter.js drops the connection when it ends
-// (:413-416; its TODO at :264).
+// subscription on a running session start no second one (:292-296). In
+// matter.js the kept second request restarts the handshake timer
+// (:256-258), which the refused subscription does not stop (the throw at
+// :292-296 comes before the stop at :297), so it drops the connection
+// when the timer ends (:413-416; its TODO at :264). Here a request starts
+// no timer (review II, R2-P6-fsm-0206, ahead of matter.js): the
+// established session keeps its connection.
 //
 // The session's own timers are kept out of the way so that the handshake
-// timer is the only cause left: the central acknowledges the handshake
-// response at once, which stops the acknowledgement timer that would
-// otherwise end the session at the same 15 s, and the second request
-// comes one second later, so its timer ends at 16 s — before the 20 s at
-// which the peripheral's standalone acknowledgement (sent at 5 s) would
-// go unanswered. The control case is the same sequence without the second
-// request, and its connection stays. The server closes on another
-// goroutine than the one that notices (accept.go disconnect), so the
-// drop is waited for, never read at once.
+// timer would be the only cause left: the central acknowledges the
+// handshake response at once, which stops the acknowledgement timer that
+// would otherwise end the session at the same 15 s, and the second
+// request comes one second later, so matter.js's timer would end at 16 s
+// — before the 20 s at which the peripheral's standalone acknowledgement
+// (sent at 5 s) would go unanswered. The control case is the same
+// sequence without the second request.
 func TestAcceptRefusesSecondSessionParityMatterJS(t *testing.T) {
 	for _, second := range []bool{false, true} {
 		name := "control without a second request"
@@ -287,41 +287,35 @@ func TestAcceptRefusesSecondSessionParityMatterJS(t *testing.T) {
 				t.Fatalf("%d indications at 15 s, want the handshake response and the standalone acknowledgement", n)
 			}
 			clk.Advance(time.Second)
-			if !second {
-				if f.isGone() {
-					t.Fatal("an established session without a second request lost its connection at 16 s")
-				}
-				return
-			}
-			select {
-			case <-f.Disconnected():
-			case <-deadline(t).Done():
-				t.Fatal("a handshake request on a running session left the connection after the timeout")
+			if f.isGone() {
+				t.Fatalf("an established session lost its connection at 16 s (second request: %v)", second)
 			}
 			if o.count() != 1 {
-				t.Fatalf("%d sessions after the timeout, want 1", o.count())
+				t.Fatalf("%d sessions at 16 s, want 1", o.count())
 			}
 		})
 	}
 }
 
 // TestAcceptHandshakeTimeoutParityMatterJS: a central that does not
-// subscribe within BTP_CONN_RSP_TIMEOUT (15 s, BleConsts.ts:56) after its
-// handshake request is disconnected (:148-150, :258, :413-416); a second
-// request restarts the timer.
+// subscribe within BTP_CONN_RSP_TIMEOUT (15 s, BleConsts.ts:56) is
+// disconnected (:148-150, :413-416). matter.js counts from the handshake
+// request and restarts on a second one (:258); here the bound counts from
+// the accept and a second request does not extend it (review II,
+// R2-P1-req-07, R2-P6-fsm-0205).
 func TestAcceptHandshakeTimeoutParityMatterJS(t *testing.T) {
 	clk := newFakeClock()
 	f, o := acceptFake(t, clk)
 	f.write(handshakeRequest(100))
 	clk.Advance(10 * time.Second)
 	f.write(handshakeRequest(100))
-	clk.Advance(10 * time.Second)
+	clk.Advance(5*time.Second - time.Millisecond)
 	if f.isGone() {
-		t.Fatal("disconnected 10 s after the second request")
+		t.Fatal("disconnected before the accept timer ended")
 	}
-	clk.Advance(5 * time.Second)
+	clk.Advance(time.Millisecond)
 	if !f.isGone() {
-		t.Fatal("still connected 15 s after the handshake request")
+		t.Fatal("still connected 15 s after the accept, a second request in between")
 	}
 	f.subscribe(100)
 	if o.count() != 0 {
@@ -464,26 +458,4 @@ func (c *heldClock) fn(i int) func() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.fns[i]
-}
-
-// TestAcceptStaleTimerKeepsTheNewOne: the callback of a handshake timer
-// that fired while a repeated request restarted the timer (it waited on
-// the lock) leaves the new timer armed, which then drops the connection.
-func TestAcceptStaleTimerKeepsTheNewOne(t *testing.T) {
-	clk := &heldClock{fakeClock: newFakeClock()}
-	g := newFakeGATT()
-	if err := Accept(g, (&opened{}).open, Options{TimeSource: clk}); err != nil {
-		t.Fatal(err)
-	}
-	// fn(0) is the accept timer's callback (accept.go acceptTimeout).
-	g.write(handshakeRequest(100)) // timer A
-	g.write(handshakeRequest(100)) // timer B replaces A
-	clk.fn(1)()                    // A's callback, stale
-	if g.isGone() {
-		t.Fatal("the stale timer dropped the connection")
-	}
-	clk.fn(2)() // B fires
-	if !g.isGone() {
-		t.Fatal("the new timer did not drop the connection after the stale one ran")
-	}
 }

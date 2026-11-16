@@ -73,3 +73,93 @@ func TestAcceptRefusedHandshakeIsDisconnected(t *testing.T) {
 		t.Fatalf("the refused handshake left the central connected (after the accept timer too: gone=%v)", f.isGone())
 	}
 }
+
+// TestAcceptUnconfirmedResponseIsDisconnected holds R2-P6-fsm-0204: a
+// central that subscribes C2 and never confirms the handshake response's
+// indication is disconnected when the accept timer ends. Before, the
+// subscription held the server's lock across the indication and the
+// timer's callback waited for it, so the bound did not hold.
+func TestAcceptUnconfirmedResponseIsDisconnected(t *testing.T) {
+	clk := newFakeClock()
+	f, o := acceptFake(t, clk)
+	f.mu.Lock()
+	f.hold = make(chan struct{}) // never closed: the central never confirms
+	f.mu.Unlock()
+	f.write(handshakeRequest(100))
+	subscribed := make(chan struct{})
+	go func() {
+		defer close(subscribed)
+		f.subscribe(100)
+	}()
+	waitFor(t, func() bool { return len(f.indicated()) == 1 })
+	advanced := make(chan struct{})
+	go func() {
+		defer close(advanced)
+		clk.Advance(ConnRspTimeout)
+	}()
+	select {
+	case <-advanced:
+	case <-deadline(t).Done():
+		f.goneOnce.Do(func() { close(f.gone) })
+		t.Fatal("the handshake timer's callback is blocked behind the indication")
+	}
+	if !f.isGone() {
+		t.Fatalf("a central that never confirmed the response is still connected %v after the accept", ConnRspTimeout)
+	}
+	select {
+	case <-subscribed:
+	case <-deadline(t).Done():
+		t.Fatal("the subscription kept waiting after the connection dropped")
+	}
+	if o.count() != 0 {
+		t.Fatal("an unconfirmed response opened a session")
+	}
+}
+
+// TestAcceptRepeatedRequestDoesNotExtendTheBound holds R2-P6-fsm-0205: a
+// central that repeats its handshake request and never subscribes is
+// disconnected ConnRspTimeout after the accept — a request does not start
+// the timer again. Only one timer is ever armed.
+func TestAcceptRepeatedRequestDoesNotExtendTheBound(t *testing.T) {
+	clk := &heldClock{fakeClock: newFakeClock()}
+	f := newFakeGATT()
+	if err := Accept(f, (&opened{}).open, Options{TimeSource: clk}); err != nil {
+		t.Fatal(err)
+	}
+	for range 5 {
+		f.write(handshakeRequest(100))
+		clk.Advance(ConnRspTimeout / 5)
+	}
+	clk.mu.Lock()
+	armed := len(clk.fns)
+	clk.mu.Unlock()
+	if armed != 1 {
+		t.Fatalf("%d handshake timers armed for one accept and five requests, want 1", armed)
+	}
+	clk.fn(0)()
+	if !f.isGone() {
+		t.Fatal("the accept timer did not drop a central that only repeated its request")
+	}
+}
+
+// TestAcceptRequestOnOpenSessionKeepsTheConnection holds R2-P6-fsm-0206: a
+// handshake request written on an established session arms no timer, so
+// it does not close the session's connection ConnRspTimeout later.
+func TestAcceptRequestOnOpenSessionKeepsTheConnection(t *testing.T) {
+	clk := newFakeClock()
+	f, o := acceptFake(t, clk)
+	f.write(handshakeRequest(100))
+	f.subscribe(100)
+	if o.count() != 1 {
+		t.Fatal("no session")
+	}
+	f.write(mustEncode(t, Packet{
+		Header:  Header{HasAckNumber: true, IsBeginningSegment: true, IsEndingSegment: true},
+		Payload: Payload{AckNumber: u8(0), SequenceNumber: 0, MessageLength: u16(1), SegmentPayload: []byte{1}},
+	}))
+	f.write(handshakeRequest(100))
+	clk.Advance(ConnRspTimeout + time.Second)
+	if f.isGone() {
+		t.Fatal("a stray handshake request on an open session dropped its connection")
+	}
+}

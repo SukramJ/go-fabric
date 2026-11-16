@@ -53,16 +53,25 @@ var ErrNoConnection = errors.New("btp: nil GATT connection or open function")
 //     handshake request, :258), so a central that never writes holds the
 //     connection; review II, R2-P1-req-07, owner decision 31.
 //   - A C1 write of a handshake request (a 9-byte value starting 0x65 0x6C)
-//     is kept, and [ConnRspTimeout] starts: the central must subscribe C2
-//     before it ends, or the connection is dropped (:251-264, :148-150,
-//     :413-416; BleConsts.ts:56). Any other C1 write feeds the session; one
-//     without a session is refused (:265-275).
+//     is kept (:251-264); the central must subscribe C2 before the timer
+//     the accept started ends, or the connection is dropped (:148-150,
+//     :413-416; BleConsts.ts:56). A request does not start the timer
+//     again, so a central that repeats it does not extend the bound, and
+//     one written on an open session — kept as matter.js keeps it (its
+//     TODO at :264) — arms no timer that would close the session's
+//     connection (review II, R2-P6-fsm-0205, R2-P6-fsm-0206). Any other C1
+//     write feeds the session; one without a session is refused
+//     (:265-275).
 //   - The C2 subscription starts the session from the kept request, its
 //     segment size bounded by the ATT_MTU less the 3-byte ATT header
 //     (:288-323) — refused before a handshake request and while a
 //     session runs (:289-296). The session's handshake response and
 //     every later packet go out as indications, each complete once the
-//     central confirmed it (:304-310, :329-336).
+//     central confirmed it (:304-310, :329-336). The server's lock is
+//     not held while the handshake response waits for its confirmation,
+//     so the accept timer still drops a central that never confirms it
+//     (review II, R2-P6-fsm-0204); a C1 write that arrives meanwhile
+//     waits for the session.
 //     A kept request that states a window of 0 starts no session and
 //     drops the connection — connectedhomeip's rule, not matter.js's
 //     ([NewPeripheral]).
@@ -88,9 +97,10 @@ func Accept(c GATTConnection, open func(conn *Conn) (handle func(msg []byte)), o
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &gattServer{c: c, open: open, opts: opts, clock: clock.Or(opts.TimeSource), log: opts.Logger, ctx: ctx, cancel: cancel}
-	// The handshake timer runs from the accept; the subscription that
-	// starts the session stops it, and its generation keeps a callback
-	// that raced the stop out of the session (startTimerLocked).
+	s.settled = sync.NewCond(&s.mu)
+	// The handshake timer runs from the accept, once; the subscription
+	// that starts the session stops it, and its generation keeps a
+	// callback that raced the stop out of the session (startTimerLocked).
 	s.mu.Lock()
 	s.startTimerLocked()
 	s.mu.Unlock()
@@ -114,17 +124,22 @@ type gattServer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// mu guards handshake, timer, timerGen, session, handle and closing.
-	// It is held while the session is created, so a C1 write that races
-	// the subscription cannot pass for a second request or find no
-	// session.
-	mu        sync.Mutex
-	handshake []byte
-	timer     clock.Timer
-	timerGen  uint64
-	session   *Session
-	handle    func(msg []byte)
-	closing   bool
+	// mu guards handshake, timer, timerGen, session, handle, closing and
+	// subscribing. It is not held while the session is created — its
+	// handshake response waits for the central's confirmation, and the
+	// accept timer must be able to drop a central that never gives it —
+	// so subscribing marks that span: a C1 write waits on settled until
+	// it ends, and cannot find no session for data the central sent right
+	// after the confirmed response.
+	mu          sync.Mutex
+	settled     *sync.Cond
+	handshake   []byte
+	timer       clock.Timer
+	timerGen    uint64
+	session     *Session
+	handle      func(msg []byte)
+	closing     bool
+	subscribing bool
 }
 
 // isHandshakeRequest is matter.js's test for a handshake request on C1:
@@ -137,15 +152,18 @@ func isHandshakeRequest(data []byte) bool {
 func (s *gattServer) handleC1Write(data []byte) {
 	data = append([]byte(nil), data...)
 	s.mu.Lock()
+	for s.subscribing && !s.closing {
+		s.settled.Wait()
+	}
 	if s.closing {
 		s.mu.Unlock()
 		return
 	}
 	if isHandshakeRequest(data) {
-		// A handshake request (re)starts the timer and is kept until the
-		// subscription; one that arrives on an open session is kept too,
-		// as matter.js does (its TODO at :264).
-		s.startTimerLocked()
+		// A handshake request is kept until the subscription; one that
+		// arrives on an open session is kept too, as matter.js does (its
+		// TODO at :264). Neither starts the timer: the bound counts from
+		// the accept (matter.js restarts its timer here, :258).
 		s.handshake = data
 		s.mu.Unlock()
 		s.log.Debug("matter.btp.handshake_request", slog.String("peer", s.c.Remote()))
@@ -171,31 +189,49 @@ func (s *gattServer) handleC2Subscribe(attMTU int) {
 	}
 }
 
-// subscribe is handleC2Subscribe under s.mu; false when the handshake
-// opened no session and the connection is to be dropped.
+// subscribe is handleC2Subscribe; false when the handshake opened no
+// session and the connection is to be dropped. s.mu is released while
+// the session is created (subscribing marks the span), so the handshake
+// response's indication, which waits for the central's confirmation,
+// does not keep the accept timer from dropping the connection.
 func (s *gattServer) subscribe(attMTU int) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.closing {
+		s.mu.Unlock()
 		return true
 	}
 	if s.handshake == nil {
+		s.mu.Unlock()
 		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received before handshake Request"}))
 		return true
 	}
-	if s.session != nil {
+	if s.session != nil || s.subscribing {
+		s.mu.Unlock()
 		s.log.Warn("matter.btp.c2_refused", slog.String("peer", s.c.Remote()),
 			slog.Any("err", &FlowError{Message: "Subscription request received but BTP session already initialized. Cannot handle two sessions!"}))
 		return true
 	}
+	handshake := s.handshake
+	s.subscribing = true
+	s.mu.Unlock()
 	// matter.js takes min(Bleno.mtu - 3, maxValueSize) (:300): the ATT_MTU
 	// less the ATT header is both.
-	session, err := NewPeripheral(attMTU-3, s.handshake, Callbacks{
+	session, err := NewPeripheral(attMTU-3, handshake, Callbacks{
 		Write:      s.indicate,
 		Disconnect: s.disconnect,
 		Message:    s.deliver,
 	}, s.opts)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.subscribing = false
+	s.settled.Broadcast()
+	if err == nil && s.closing {
+		// The timer or the connection's drop ended the server while the
+		// response waited; the session goes with it.
+		go func() { _ = session.Close() }()
+		return true
+	}
 	if err != nil {
 		// No session: the connection goes, and the accept timer with it
 		// (review II, R2-P1-dr-req-03). matter.js stops its timer before
@@ -278,6 +314,7 @@ func (s *gattServer) close() {
 	}
 	s.closing = true
 	s.stopTimerLocked()
+	s.settled.Broadcast()
 	session := s.session
 	s.mu.Unlock()
 	if err := s.c.Disconnect(); err != nil {
@@ -296,6 +333,7 @@ func (s *gattServer) watch() {
 	s.mu.Lock()
 	s.closing = true
 	s.stopTimerLocked()
+	s.settled.Broadcast()
 	session := s.session
 	s.mu.Unlock()
 	if session != nil {
@@ -303,16 +341,16 @@ func (s *gattServer) watch() {
 	}
 }
 
-// startTimerLocked (re)starts the handshake timer (:258; and at the
-// accept, [Accept]): when it fires before the subscription, the
-// connection is dropped (:413-416).
+// startTimerLocked starts the handshake timer at the accept ([Accept];
+// matter.js starts it at each handshake request, :258): when it fires
+// before the subscription, the connection is dropped (:413-416).
 func (s *gattServer) startTimerLocked() {
 	s.stopTimerLocked()
 	gen := s.timerGen
 	s.timer = s.clock.AfterFunc(ConnRspTimeout, func() {
 		s.mu.Lock()
-		// A callback of a timer replaced meanwhile (it fired while a
-		// repeated request restarted the timer) leaves the new one alone.
+		// A callback of a timer stopped meanwhile (it fired while the
+		// subscription started the session) does nothing.
 		fired := s.timerGen == gen
 		if fired {
 			s.timer = nil
