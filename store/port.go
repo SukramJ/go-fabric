@@ -188,13 +188,15 @@ type GroupKeys interface {
 	RemoveGroupKeyMapping(ctx context.Context, fabricIndex uint8, groupID uint16) error
 	// ReplaceGroupKeyMappings swaps the fabric's key map for mappings in
 	// one atomic write, as ReplaceACL swaps an ACL: the rows are written
-	// in input order and read back by GroupID ascending; each mapping's
+	// in input order and read back in it; each mapping's
 	// FabricIndex is ignored (the rows are fabricIndex's). A GroupID twice
 	// in mappings is refused, and so is a non-empty map for a fabric the
 	// store does not hold; a refusal changes nothing.
 	ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, mappings []GroupKeyMapping) error
-	// ListGroupKeyMappings returns the fabric's key map by GroupID
-	// ascending.
+	// ListGroupKeyMappings returns the fabric's key map in the order it
+	// was written: ReplaceGroupKeyMappings' input order, a GroupID
+	// SetGroupKeyMapping adds after the rest, a GroupID it rewrites in its
+	// place.
 	ListGroupKeyMappings(ctx context.Context, fabricIndex uint8) ([]GroupKeyMapping, error)
 }
 

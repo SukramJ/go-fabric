@@ -73,11 +73,12 @@ type tables struct {
 	identities map[uint8]store.IdentityRecord
 	// priors are the values an uncommitted UpdateNOC replaced, by fabric:
 	// SQLite's prior_* columns, held while the row is FabricPendingUpdate.
-	priors     map[uint8]fabricPrior
-	acl        map[uint8][]store.ACLEntry
-	aclNextID  int64
-	keySets    map[uint8]map[uint16]store.GroupKeySet
-	keyMap     map[uint8]map[uint16]store.GroupKeyMapping
+	priors    map[uint8]fabricPrior
+	acl       map[uint8][]store.ACLEntry
+	aclNextID int64
+	keySets   map[uint8]map[uint16]store.GroupKeySet
+	// keyMap is each fabric's key map in the order it was written.
+	keyMap     map[uint8][]store.GroupKeyMapping
 	groupTable map[uint8]map[uint16]store.GroupTableEntry
 	groupcast  map[uint8]map[uint16]store.GroupcastGroup
 	resumption map[resumptionKey]store.ResumptionRecord
@@ -141,7 +142,7 @@ func newTables() tables {
 		acl:               map[uint8][]store.ACLEntry{},
 		aclNextID:         1,
 		keySets:           map[uint8]map[uint16]store.GroupKeySet{},
-		keyMap:            map[uint8]map[uint16]store.GroupKeyMapping{},
+		keyMap:            map[uint8][]store.GroupKeyMapping{},
 		groupTable:        map[uint8]map[uint16]store.GroupTableEntry{},
 		groupcast:         map[uint8]map[uint16]store.GroupcastGroup{},
 		resumption:        map[resumptionKey]store.ResumptionRecord{},
@@ -620,11 +621,9 @@ func (s *Store) ListGroupKeySets(_ context.Context, fabricIndex uint8) ([]store.
 func (s *Store) RemoveGroupKeySet(_ context.Context, fabricIndex uint8, groupKeySetID uint16) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for g, m := range s.keyMap[fabricIndex] {
-		if m.GroupKeySetID == groupKeySetID {
-			delete(s.keyMap[fabricIndex], g)
-		}
-	}
+	s.keyMap[fabricIndex] = slices.DeleteFunc(s.keyMap[fabricIndex], func(m store.GroupKeyMapping) bool {
+		return m.GroupKeySetID == groupKeySetID
+	})
 	delete(s.keySets[fabricIndex], groupKeySetID)
 	return nil
 }
@@ -646,7 +645,12 @@ func (s *Store) SetGroupKeyMapping(_ context.Context, m store.GroupKeyMapping) e
 	if !s.hasFabric(m.FabricIndex) {
 		return fmt.Errorf("memstore: set group key mapping: %w %d", errUnknownFabric, m.FabricIndex)
 	}
-	inner(s.keyMap, m.FabricIndex)[m.GroupID] = m
+	held := s.keyMap[m.FabricIndex]
+	if i := slices.IndexFunc(held, func(h store.GroupKeyMapping) bool { return h.GroupID == m.GroupID }); i >= 0 {
+		held[i] = m
+		return nil
+	}
+	s.keyMap[m.FabricIndex] = append(held, m)
 	return nil
 }
 
@@ -658,13 +662,15 @@ func (s *Store) ReplaceGroupKeyMappings(_ context.Context, fabricIndex uint8, ma
 	if len(mappings) > 0 && !s.hasFabric(fabricIndex) {
 		return fmt.Errorf("memstore: replace group key mappings: %w %d", errUnknownFabric, fabricIndex)
 	}
-	next := make(map[uint16]store.GroupKeyMapping, len(mappings))
+	next := make([]store.GroupKeyMapping, 0, len(mappings))
+	seen := make(map[uint16]bool, len(mappings))
 	for i, m := range mappings {
-		if _, dup := next[m.GroupID]; dup {
+		if seen[m.GroupID] {
 			return fmt.Errorf("memstore: replace group key mappings: mapping %d: group %d twice", i, m.GroupID)
 		}
+		seen[m.GroupID] = true
 		m.FabricIndex = fabricIndex
-		next[m.GroupID] = m
+		next = append(next, m)
 	}
 	if len(next) == 0 {
 		delete(s.keyMap, fabricIndex)
@@ -678,15 +684,16 @@ func (s *Store) ReplaceGroupKeyMappings(_ context.Context, fabricIndex uint8, ma
 func (s *Store) RemoveGroupKeyMapping(_ context.Context, fabricIndex uint8, groupID uint16) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.keyMap[fabricIndex], groupID)
+	s.keyMap[fabricIndex] = slices.DeleteFunc(s.keyMap[fabricIndex], func(m store.GroupKeyMapping) bool { return m.GroupID == groupID })
 	return nil
 }
 
-// ListGroupKeyMappings implements [store.GroupKeys].
+// ListGroupKeyMappings implements [store.GroupKeys]: the map in the order
+// it was written.
 func (s *Store) ListGroupKeyMappings(_ context.Context, fabricIndex uint8) ([]store.GroupKeyMapping, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return sortedValues(s.keyMap[fabricIndex], identity[store.GroupKeyMapping]), nil
+	return slices.Clone(s.keyMap[fabricIndex]), nil
 }
 
 // --- Groups ---

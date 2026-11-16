@@ -81,6 +81,7 @@ var cases = []testCase{
 	{"group-keys", groupKeysCase},
 	{"group-keys/ordering", groupKeysOrdering},
 	{"group-keys/replace-mappings", groupKeysReplaceMappingsCase},
+	{"group-keys/map-order", groupKeyMapOrder},
 	{"key-lengths", keyLengthsCase},
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
@@ -547,9 +548,9 @@ func groupKeysCase(ctx context.Context, t *testing.T, p store.Port) {
 	maps, err := p.ListGroupKeyMappings(ctx, f)
 	must(t, err)
 	wantEqual(t, "ListGroupKeyMappings", maps, []store.GroupKeyMapping{
+		{FabricIndex: f, GroupID: 0x30, GroupKeySetID: 2},
 		{FabricIndex: f, GroupID: 0x10, GroupKeySetID: 1},
 		{FabricIndex: f, GroupID: 0x20, GroupKeySetID: 1},
-		{FabricIndex: f, GroupID: 0x30, GroupKeySetID: 2},
 	})
 
 	// Removing a set takes the map entries naming it along, and only those.

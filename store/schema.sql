@@ -128,10 +128,14 @@ CREATE TABLE IF NOT EXISTS matter_group_keys (
 -- that name the removed set explicitly (store.RemoveGroupKeySet). A
 -- database created with the earlier foreign key is rebuilt by
 -- store.Upgrade, which store.Apply runs.
+--
+-- position keeps the order the map was written in (migration v11):
+-- ListGroupKeyMappings reads by position, then group_id.
 CREATE TABLE IF NOT EXISTS matter_group_key_map (
     fabric_index        INTEGER NOT NULL,
     group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 0 AND 65535),
     group_key_set_id    INTEGER NOT NULL,
+    position            INTEGER NOT NULL DEFAULT 0 CHECK(position >= 0),
     PRIMARY KEY(fabric_index, group_id),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );

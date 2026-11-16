@@ -60,3 +60,32 @@ func resumptionCapPerFabric(ctx context.Context, t *testing.T, p store.Port) {
 		}
 	}
 }
+
+// groupKeyMapOrder (F-38, decision 148): the key map reads back in the
+// order it was written — ReplaceGroupKeyMappings' input order;
+// SetGroupKeyMapping appends a GroupID the map does not hold and rewrites
+// one it holds in its place; a removal keeps the others' order.
+func groupKeyMapOrder(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
+	ids := func() []uint16 {
+		maps, err := p.ListGroupKeyMappings(ctx, f)
+		must(t, err)
+		out := make([]uint16, 0, len(maps))
+		for _, m := range maps {
+			out = append(out, m.GroupID)
+		}
+		return out
+	}
+	must(t, p.ReplaceGroupKeyMappings(ctx, f, []store.GroupKeyMapping{
+		{GroupID: 0x0300, GroupKeySetID: 1}, {GroupID: 0x0100, GroupKeySetID: 1}, {GroupID: 0x0200, GroupKeySetID: 2},
+	}))
+	wantEqual(t, "the order a replace wrote", ids(), []uint16{0x0300, 0x0100, 0x0200})
+	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 0x0050, GroupKeySetID: 3}))
+	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 0x0300, GroupKeySetID: 4}))
+	wantEqual(t, "the order after a set of a new and of a held GroupID", ids(), []uint16{0x0300, 0x0100, 0x0200, 0x0050})
+	must(t, p.RemoveGroupKeyMapping(ctx, f, 0x0100))
+	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 0x0100, GroupKeySetID: 1}))
+	wantEqual(t, "the order after a removal and a set", ids(), []uint16{0x0300, 0x0200, 0x0050, 0x0100})
+	must(t, p.RemoveGroupKeySet(ctx, f, 2))
+	wantEqual(t, "the order after a key set's entries went", ids(), []uint16{0x0300, 0x0050, 0x0100})
+}

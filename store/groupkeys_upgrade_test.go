@@ -128,12 +128,12 @@ CREATE TABLE matter_group_keys (
 	s := store.New(db)
 	insertLegacyFabric(t, db, 1, 1)
 	insertLegacyKeySet(t, db, 1, 5)
-	if err := s.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: 1, GroupID: 0x0101, GroupKeySetID: 5}); err != nil {
+	if err := insertLegacyMapping(t, db, 1, 0x0101, 5); err != nil {
 		t.Fatal(err)
 	}
 	// The defect the upgrade removes: the legacy table refuses a mapping
 	// to a key set that does not exist.
-	if err := s.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: 1, GroupID: 0x0202, GroupKeySetID: 9}); err == nil {
+	if err := insertLegacyMapping(t, db, 1, 0x0202, 9); err == nil {
 		t.Fatal("legacy table accepted a mapping to a missing key set — the fixture does not reproduce the old schema")
 	}
 
@@ -233,4 +233,24 @@ INSERT INTO matter_group_keys (fabric_index, group_key_set_id, security_policy, 
 VALUES (?, ?, 0, ?, 1)`, fabricIndex, id, epochKey(byte(id))); err != nil {
 		t.Fatalf("insert legacy key set %d: %v", id, err)
 	}
+}
+
+// insertLegacyMapping writes a key-map entry with the columns every schema
+// step has: the release's Store names v11's position, which a database
+// before v11 lacks.
+func insertLegacyMapping(t *testing.T, db *sql.DB, fabricIndex uint8, groupID, keySetID uint16) error {
+	t.Helper()
+	_, err := db.ExecContext(t.Context(), `
+INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id) VALUES (?, ?, ?)`, fabricIndex, groupID, keySetID)
+	return err
+}
+
+// legacyMappings counts the fabric's key-map entries and returns the set
+// of the first, read with the columns every schema step has.
+func legacyMappings(t *testing.T, db *sql.DB, fabricIndex uint8) (n int, firstSet uint16) {
+	t.Helper()
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*), COALESCE(MIN(group_key_set_id), 0) FROM matter_group_key_map WHERE fabric_index = ?`, fabricIndex).Scan(&n, &firstSet); err != nil {
+		t.Fatal(err)
+	}
+	return n, firstSet
 }

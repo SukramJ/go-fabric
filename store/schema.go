@@ -113,6 +113,8 @@ var ErrForeignKeysOff = errors.New("store: the database handle has PRAGMA foreig
 //     and the DoorLock users and credentials their record source, each
 //     column its table lacks, with v10's statements, in one transaction.
 //     Upgrade seals nothing under a [Sealer]: [NewSealed] seals the clear rows.
+//   - matter_group_key_map gains migration v11's position, with v11's
+//     statement; the rows it holds take 0 and read by GroupID as before.
 //   - matter_icd_registrations' icd_key, stored in clear before v0.12.1,
 //     is sealed under the store's ICD key ([SettingICDKey]); the schema is
 //     unchanged, so the step has no migration of its own. It runs last,
@@ -132,6 +134,9 @@ func Upgrade(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	if err := addMigrationColumns(ctx, db, "v10"); err != nil {
+		return fmt.Errorf("store: upgrade: %w", err)
+	}
+	if err := addMigrationColumns(ctx, db, "v11"); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	// After v10: the ICD key's setting is read with its seal mark.
