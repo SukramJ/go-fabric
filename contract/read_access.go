@@ -23,8 +23,12 @@ import "context"
 // FeatureMap, …) are asked too; a server that serves them to everyone
 // answers true for them.
 //
-// MatterReadAllowed answers from memory, as MatterRead does, and must be
-// safe for concurrent use.
+// It covers attribute reads and reports only: the server's events go out
+// under the access control list alone, and a subscription whose every path
+// the server refuses is still accepted — its priming carries the statuses.
+//
+// MatterReadAllowed answers from memory where it can, as MatterRead does,
+// and must be safe for concurrent use.
 type ReadAccessDeclarer interface {
 	MatterReadAllowed(ctx context.Context, attrID uint32) bool
 }

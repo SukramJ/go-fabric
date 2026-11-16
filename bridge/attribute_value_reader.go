@@ -121,13 +121,18 @@ func overlongBeforeIS1(path im.ConcreteAttributePath, el tlv.Element) (im.Attrib
 		def.Name, a.Name, el.RawLength, a.Constraint.Max.Int)}}, true
 }
 
-// undecodedValue stands in for a structured write value its generated
-// decoder refused — a label longer than its "max 16", a field of the
-// wrong type. It is neither a list nor a struct with the attribute's
-// fields, so the server's write check answers it CONSTRAINT_ERROR
-// (spec.Instance.ValidateWrite), the status matter.js answers a value its
-// TlvSchema rejects with (AttributeWriteResponse.ts #decodeWithSchema),
-// without failing the rest of the write request.
+// undecodedValue stands in for a write value of the attribute's type its
+// generated decoder refused for another reason than the type — a label
+// longer than its "max 16", a struct missing a mandatory field. It is
+// neither a list nor a struct with the attribute's fields, so the
+// definition's check answers it CONSTRAINT_ERROR on its path
+// (spec.CheckWritten, spec.Instance.ValidateWrite), and the rest of the
+// write request goes on. A value of another type than the attribute's is
+// an [im.UndecodableValue] instead ([refusedValue], owner decision 161):
+// matter.js AttributeWriteResponse.ts:429, :452-459 and
+// InteractionMessenger.ts:425-459: a value the attribute's schema cannot
+// decode (TlvNumber.ts:124-131, TlvObject.ts:205-207) is not a per-path
+// status; the write interaction is answered StatusResponse FAILURE.
 type undecodedValue struct{ err error }
 
 // refusedValue is the write value of a decode the definition refused. An

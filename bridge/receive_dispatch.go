@@ -1226,9 +1226,18 @@ func selfReportedAttributes(topo *endpointpkg.Topology, key invokedCluster) map[
 
 // readCluster reads every attribute of one cluster instance and captures
 // each value for comparison.
-func readCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[uint32]attributeReading {
+//
+// The snapshot is the bridge's own and is never delivered, so it reads
+// without the request behind the command: a request-free read sees every
+// attribute whole — no access check, no read-access refusal, no fabric
+// filter — and a change the command makes is seen whoever invoked it; each
+// subscriber's report stays filtered by its own request (fable-read-6a-gate
+// §6).
+func readCluster(_ context.Context, d im.Dispatcher, key invokedCluster) map[uint32]attributeReading {
 	out := map[uint32]attributeReading{}
-	for _, r := range d.Read(ctx, im.ConcreteAttributePath{Endpoint: key.endpoint, Cluster: key.cluster, HasEndpoint: true, HasCluster: true}) {
+	path := im.ConcreteAttributePath{Endpoint: key.endpoint, Cluster: key.cluster, HasEndpoint: true, HasCluster: true}
+	//nolint:contextcheck // the snapshot reads without the request behind the command (above)
+	for _, r := range d.Read(context.Background(), path) {
 		if r.Status == im.StatusSuccess {
 			out[r.Path.Attribute] = readingOf(r.Value)
 		}

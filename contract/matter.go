@@ -82,7 +82,10 @@ type ClusterServer interface {
 	// an accessing fabric; one without is refused before the server is
 	// called. The value the server receives is that fabric's entries
 	// alone, each with its FabricIndex field set to the accessing fabric
-	// by the dispatcher, whatever the request wrote (for an append: the
+	// by the dispatcher (the Go field named FabricIndex, of type uint8 or
+	// *uint8, of a struct entry or a pointer to one — the name every
+	// generated struct gives field 254; an entry type without such a field
+	// is handed on as written), whatever the request wrote (for an append: the
 	// fabric's current entries and the new one). It replaces that
 	// fabric's entries; the other fabrics' entries are not in the value
 	// and stay as the server holds them. The accessing fabric is also in

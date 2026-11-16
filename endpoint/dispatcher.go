@@ -301,10 +301,14 @@ func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.Co
 	case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
 		return im.StatusSuccess
 	}
-	// The existence statuses come before the access check (matter.js
-	// AttributeReadResponse.ts:255-270 before :272); an attribute the
-	// server does not list is known only by reading it, which a refused
-	// request does not get to do.
+	// matter.js answers the existence statuses before the attribute's
+	// read-level check (AttributeReadResponse.ts:255-270 before :272).
+	// Here a listed attribute is known to exist and the access checks
+	// decide; an attribute the server does not list is known only by
+	// reading it, which a refused request does not get to do — so a
+	// refused requester is answered UNSUPPORTED_ACCESS for an attribute
+	// that may not exist, where matter.js answers UNSUPPORTED_ATTRIBUTE.
+	// Fail-closed; recorded (fable-read-6a-gate §1).
 	listed := false
 	if lister, ok := srv.(contract.ClusterAttributeLister); ok {
 		listed = slices.Contains(lister.MatterAttributes(), path.Attribute)
@@ -1788,7 +1792,7 @@ func aclSubjectMatches(subjects []uint64, subjectNodeID uint64, subjectCATs []ui
 		// check goes on to the entry's other subjects and the other
 		// entries. chip ends the whole check instead — its
 		// VerifyOrReturnError(..., CHIP_ERROR_INCORRECT_STATE) at
-		// src/access/AccessControl.cpp:475, :484, :493 (and :498-502 for
+		// src/access/AccessControl.cpp:475, :484, :493 (and :500-504 for
 		// any other subject) at 6170af84 returns an error out of CheckACL,
 		// so no later entry is consulted; the subject grants nothing in
 		// either (R2-P6-doc-0445). The ACL write validation should never
