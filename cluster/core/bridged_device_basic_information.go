@@ -70,6 +70,9 @@ type BridgedDeviceBasicInformation struct {
 	partNumber        string
 	serialNumber      string
 	uniqueID          string
+	// nodeLabelServed is whether NodeLabel is served: the host stated it
+	// (BridgedConfig.NodeLabelStated) or gave a label.
+	nodeLabelServed bool
 
 	// Mutable.
 	nodeLabel string
@@ -168,7 +171,13 @@ type BridgedConfig struct {
 	SerialNumber       string
 	UniqueID           string
 	NodeLabel          string
-	Reachable          bool
+	// NodeLabelStated reports that the host stated NodeLabel, an empty
+	// label included. NodeLabel is served when it is not empty or the host
+	// stated it; otherwise the attribute is not served — not listed, not
+	// read, a write answers UNSUPPORTED_ATTRIBUTE (review II,
+	// F-db021da0-28, decision 143).
+	NodeLabelStated bool
+	Reachable       bool
 	// ConfigurationVersion is the bridged device's ConfigurationVersion;
 	// zero serves 1, matter.js's initial value
 	// (BridgedDeviceBasicInformationServer.ts / BasicInformationServer.ts
@@ -192,28 +201,18 @@ type BridgedConfig struct {
 }
 
 // NewBridgedDeviceBasicInformation constructs the cluster from cfg.
-// UniqueID is mandatory; NodeLabel may be empty.
+// UniqueID is mandatory.
 //
-// When SerialNumber comes in empty we backfill it from UniqueID so the
-// attribute does not surface as `(nil, false)` (= UnsupportedAttribute)
-// on every read — Apple's HAP-service mapper logs
-// `could not find cached attribute values` for the empty field and
-// silently downgrades the bridged endpoint. UniqueID is mandatory and
-// non-empty, so this is a safe per-endpoint distinct fallback that
-// satisfies chip's MTRBaseClusters non-null expectation while staying
-// matter.js-compatible (matter.js's bridge sample sets SerialNumber
-// to the same address it sets uniqueId to). VendorName / ProductName
-// stay empty if the caller passed them empty — matter.js does the
-// same and Apple tolerates their absence; only SerialNumber is the
-// observed Apple HAP-mapper requirement.
+// SerialNumber and NodeLabel are served only when the host stated them. Mirrors matter.js
+// packages/node/src/behavior/cluster/ValidatedElements.ts:252-278 (an optional attribute is listed only
+// when its state holds a value) and BridgedDeviceBasicInformationServer.ts:39-43 (only uniqueId is
+// backfilled). A SerialNumber equal to UniqueID is what matter.js warns about
+// (basic-information-validators.ts:42-44), so none is derived from it.
 func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInformation, error) {
 	if cfg.UniqueID == "" {
 		return nil, errors.New("core: BridgedDeviceBasicInformation Config.UniqueID must be non-empty")
 	}
 	serialNumber := cfg.SerialNumber
-	if serialNumber == "" {
-		serialNumber = cfg.UniqueID
-	}
 	// Reachable is taken from cfg so the bridge can advertise the
 	// underlying host device's live availability at construction time
 	// (materialize.go reads dev.Available() per dispatch). A dead device
@@ -241,29 +240,32 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		serialNumber:      serialNumber,
 		uniqueID:          cfg.UniqueID,
 		nodeLabel:         cfg.NodeLabel,
+		nodeLabelServed:   cfg.NodeLabel != "" || cfg.NodeLabelStated,
 		reachable:         reachable,
 		onNodeLabelWrite:  cfg.OnNodeLabelWrite,
 		saveNodeLabel:     cfg.SaveNodeLabel,
 		configVersion:     max(cfg.ConfigurationVersion, 1),
 	}
-	validateBridgedBasicInfoAttributes(cfg, serialNumber, b.log)
+	validateBridgedBasicInfoAttributes(cfg, b.log)
 	b.def = mustInstance(bdbidef.Definition, b.instanceOptions())
 	return b, nil
 }
 
 // instanceOptions declares the optional attributes this instance serves:
-// NodeLabel (writable, persisted through OnNodeLabelWrite), UniqueID ("Rev >= v4, O") and ConfigurationVersion ("[Rev >= v6]")
-// always, every other optional one only when the host set it — Apple
+// UniqueID ("Rev >= v4, O") and ConfigurationVersion ("[Rev >= v6]")
+// always, NodeLabel (writable, persisted through OnNodeLabelWrite) and
+// every other optional one only when the host set it — Apple
 // Home's HAP service mapper validates per-attribute constraints (e.g.
 // ManufacturingDate min=8) against every attribute the cluster
 // advertises, even if it would surface as the empty string; matter.js's
 // bridged sample owns an attribute only when the application set it.
 func (b *BridgedDeviceBasicInformation) instanceOptions() spec.Options {
-	opts := spec.Options{Attributes: []uint32{bridgedBasicInfoAttrNodeLabel, bridgedBasicInfoAttrUniqueID, bridgedBasicInfoAttrConfigurationVersion}}
+	opts := spec.Options{Attributes: []uint32{bridgedBasicInfoAttrUniqueID, bridgedBasicInfoAttrConfigurationVersion}}
 	for _, o := range []struct {
 		set  bool
 		attr uint32
 	}{
+		{b.nodeLabelServed, bridgedBasicInfoAttrNodeLabel},
 		{b.vendorName != "", bridgedBasicInfoAttrVendorName},
 		{b.vendorID != 0, bridgedBasicInfoAttrVendorID},
 		{b.productName != "", bridgedBasicInfoAttrProductName},
@@ -298,14 +300,10 @@ func (b *BridgedDeviceBasicInformation) inst() *spec.Instance {
 // validateBridgedBasicInfoAttributes emits slog warnings for suspicious
 // BridgedConfig values caught at construction time. All checks are
 // defensive diagnostics; none block construction.
-func validateBridgedBasicInfoAttributes(cfg BridgedConfig, resolvedSerial string, log *slog.Logger) {
-	// When SerialNumber was not set by the caller it is backfilled from
-	// UniqueID (see constructor). Warn when the two fields collide so
-	// operators can identify over-reused identifiers in multi-device setups.
-	// The warning fires only when the caller explicitly supplied SerialNumber
-	// (cfg.SerialNumber != "") and it happens to equal UniqueID — the
-	// intentional backfill path (cfg.SerialNumber == "") is silent.
-	if cfg.SerialNumber != "" && resolvedSerial == cfg.UniqueID {
+func validateBridgedBasicInfoAttributes(cfg BridgedConfig, log *slog.Logger) {
+	// Warn when a stated SerialNumber equals UniqueID, so operators can
+	// identify over-reused identifiers in multi-device setups.
+	if cfg.SerialNumber != "" && cfg.SerialNumber == cfg.UniqueID {
 		log.Warn(
 			"matter.bridged_device_basic_information.validate",
 			slog.String("field", "SerialNumber"),
@@ -387,6 +385,9 @@ func (b *BridgedDeviceBasicInformation) MatterRead(attrID uint32) (any, bool) { 
 		}
 		return b.productID, true
 	case bridgedBasicInfoAttrNodeLabel:
+		if !b.nodeLabelServed {
+			return nil, false
+		}
 		return b.nodeLabel, true
 	case bridgedBasicInfoAttrHardwareVersion:
 		if b.hardwareVersion == 0 {
@@ -479,9 +480,10 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(ctx context.Context, attrID 
 // field, Datasource.ts:1406-1407 and :1479). A hook that writes NodeLabel
 // to this server again deadlocks.
 func (b *BridgedDeviceBasicInformation) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
-	if attrID != bridgedBasicInfoAttrNodeLabel {
+	if attrID != bridgedBasicInfoAttrNodeLabel || !b.nodeLabelServed {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
-		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
+		// UNSUPPORTED_ATTRIBUTE otherwise — a NodeLabel the host did not
+		// state included — as the definition judges them.
 		_, err := b.inst().ValidateWrite(attrID, value, nil)
 		return false, refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBridgedBasicInfoUnknown, attrID), status: err}
 	}
@@ -537,6 +539,9 @@ func (b *BridgedDeviceBasicInformation) MatterInvoke(_ context.Context, cmdID ui
 // MatterReportable returns the list of subscribe-able attributes.
 // Reachable is the primary one — controllers watch it to gate UX.
 func (b *BridgedDeviceBasicInformation) MatterReportable() []uint32 {
+	if !b.nodeLabelServed {
+		return []uint32{bridgedBasicInfoAttrReachable}
+	}
 	return []uint32{bridgedBasicInfoAttrReachable, bridgedBasicInfoAttrNodeLabel}
 }
 

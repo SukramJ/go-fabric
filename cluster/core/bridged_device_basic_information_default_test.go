@@ -11,37 +11,32 @@ import (
 
 // TestBridgedBasicInfo_SerialEqualsUniqueIDIsValid verifies that a
 // BridgedConfig where SerialNumber equals UniqueID still constructs
-// successfully (the validation only warns, it never blocks). This also
-// confirms that the backfill path (SerialNumber="") is silent.
+// successfully (the validation only warns, it never blocks), and that no
+// SerialNumber is derived from UniqueID when the host states none
+// (decision 143).
 func TestBridgedBasicInfo_SerialEqualsUniqueIDIsValid(t *testing.T) {
 	t.Parallel()
 	// Case 1: explicit SerialNumber == UniqueID — constructor must succeed.
 	cfg := core.BridgedConfig{
-		UniqueID:     "HM-01:1",
+		UniqueID:     "dev-01:1",
 		NodeLabel:    "Test",
-		SerialNumber: "HM-01:1",
+		SerialNumber: "dev-01:1",
 	}
-	b, err := core.NewBridgedDeviceBasicInformation(cfg)
-	if err != nil {
+	if _, err := core.NewBridgedDeviceBasicInformation(cfg); err != nil {
 		t.Fatalf("NewBridgedDeviceBasicInformation with Serial==UniqueID: %v", err)
 	}
-	_ = b
 
-	// Case 2: backfill path (SerialNumber="") — no warning, serial is UniqueID.
+	// Case 2: no SerialNumber stated — none is served.
 	cfg2 := core.BridgedConfig{
-		UniqueID:  "HM-02:1",
+		UniqueID:  "dev-02:1",
 		NodeLabel: "Test2",
 	}
 	b2, err := core.NewBridgedDeviceBasicInformation(cfg2)
 	if err != nil {
 		t.Fatalf("NewBridgedDeviceBasicInformation with empty serial: %v", err)
 	}
-	v, ok := b2.MatterRead(0x000F) // SerialNumber attr
-	if !ok {
-		t.Fatal("MatterRead(SerialNumber): ok=false after backfill")
-	}
-	if v.(string) != "HM-02:1" {
-		t.Errorf("SerialNumber = %q after backfill, want UniqueID %q", v.(string), "HM-02:1")
+	if v, ok := b2.MatterRead(0x000F); ok {
+		t.Errorf("SerialNumber = %v served although the host stated none", v)
 	}
 }
 

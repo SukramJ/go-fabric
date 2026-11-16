@@ -7,6 +7,7 @@ package device
 
 import (
 	"fmt"
+
 	"github.com/SukramJ/go-fabric/schema"
 )
 

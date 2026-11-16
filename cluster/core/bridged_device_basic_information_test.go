@@ -50,12 +50,15 @@ func TestBridgedBasicInfo_ValidationEmptyUniqueID(t *testing.T) {
 // "reachable" attribute" (BridgedDeviceBasicInformationServer.ts:20 at
 // 862ad75f); the attribute's conformance is "O"
 // (bridged-device-basic-information.element.ts:30).
-// A device without a name serves the empty string (until 2026-10-30 the
-// constructor refused it, and the bridged endpoint lost its Descriptor).
+// A device whose host stated an empty name serves the empty string (until
+// 2026-10-30 the constructor refused it, and the bridged endpoint lost its
+// Descriptor); one whose host stated none serves no NodeLabel (decision
+// 143, TestBridgedBasicInfoServesNodeLabelAndSerialNumberOnlyWhenStated).
 func TestBridgedBasicInfo_EmptyNodeLabelAccepted(t *testing.T) {
 	t.Parallel()
 	cfg := validBridgedConfig()
 	cfg.NodeLabel = ""
+	cfg.NodeLabelStated = true
 	b, err := core.NewBridgedDeviceBasicInformation(cfg)
 	if err != nil {
 		t.Fatalf("empty NodeLabel refused: %v", err)

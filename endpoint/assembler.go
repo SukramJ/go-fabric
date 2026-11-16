@@ -374,6 +374,9 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		Scope:          scope,
 		DeviceAddress:  spec.DeviceAddress,
 		VendorName:     spec.VendorName,
+		// What the host states of the bridged device's basic information
+		// (R2-P5-apidev-02).
+		BridgedBasicInformation: spec.BridgedBasicInformation,
 		// Reuse the state bound to this stable source key so the
 		// endpoint's per-cluster version and Identify server survive
 		// reassembly.

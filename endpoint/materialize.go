@@ -15,6 +15,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -142,18 +143,12 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	//   hardwareVersion, softwareVersion, hardwareVersionString,
 	//   softwareVersionString, nodeLabel, reachable, serialNumber
 	//
-	// SerialNumber surfaces the human-readable hardware address (HmIP/
-	// BidCos device serial, e.g. "0001D8A991F2DC"). UniqueID stays the
-	// opaque 32-char hash. Keeping the two distinct mirrors matter.js's
-	// `basic-information-validators.ts:26` invariant — that validator
-	// warns when `uniqueId === serialNumber`, and Apple Home's HAP-
-	// service mapper appears to treat the equality as a duplicate-
-	// accessory signal: MTRDevice tears the CASE session down ~10 s
-	// after Subscribe-Initial, and the bridge surfaces as "added but
-	// not supported". With the address as SerialNumber, the two fields
-	// carry orthogonal information (physical hardware ID vs. stable
-	// fabric-level UID) the way matter.js's own bridged-device pattern
-	// uses them.
+	// What the host stated of the device ([Endpoint.BridgedBasicInformation],
+	// the typed declaration's Initial) is served ahead of every fallback
+	// below. SerialNumber and NodeLabel are served only when the host
+	// stated them: no SerialNumber is derived from the device's address
+	// (review II, R2-P5-apidev-02, F-db021da0-28, decision 143).
+	stated := ep.BridgedBasicInformation
 	productName := ""
 	address := ep.DeviceAddress
 	if address != "" {
@@ -207,7 +202,24 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	if ep.Availability != nil {
 		reachable = ep.Availability()
 	}
-	bridged, err := mattercore.NewBridgedDeviceBasicInformation(mattercore.BridgedConfig{
+	productLabel := productName
+	vendorName := bridgedVendorName(ep)
+	if stated.ProductName != nil {
+		productName = *stated.ProductName
+	}
+	if stated.ProductLabel != nil {
+		productLabel = *stated.ProductLabel
+	}
+	if stated.VendorName != nil {
+		vendorName = truncateLabel(*stated.VendorName)
+	}
+	if stated.VendorId != nil {
+		vendorID = *stated.VendorId
+	}
+	if stated.ProductId != nil {
+		productID = *stated.ProductId
+	}
+	cfg := mattercore.BridgedConfig{
 		// Apple's HMHome layer successfully projects HMCharacteristic values
 		// from the MTRDevice cache only when the bridged endpoint carries
 		// non-empty VendorName + ProductName + VendorID + ProductID.
@@ -218,16 +230,16 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		// device-specific ProductName (= Address for unique per-endpoint
 		// identification). Without these fields Apple shows the sensors
 		// in the Home app as "not available".
-		VendorName:   bridgedVendorName(ep),
+		VendorName:   vendorName,
 		VendorID:     vendorID,
 		ProductName:  productName,
 		ProductID:    productID,
-		ProductLabel: productName,
-		SerialNumber: address,
+		ProductLabel: productLabel,
 		// A label a controller writes is stored first
 		// (Config.Persistence), then outlives this per-dispatch server in
 		// the endpoint's state (Endpoint.NodeLabel).
 		NodeLabel:            ep.NodeLabel(),
+		NodeLabelStated:      stated.NodeLabel != nil,
 		SaveNodeLabel:        ep.nodeLabelSaver(),
 		OnNodeLabelWrite:     ep.nodeLabelWriter(),
 		ConfigurationVersion: ep.ConfigurationVersion(),
@@ -238,7 +250,9 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		// the bridge fires the §9.13.6 ReachableChanged event on each flip
 		// via Bridge.NotifyDeviceReachable so commissioners are notified.
 		Reachable: reachable,
-	})
+	}
+	applyStatedBridgedInfo(&cfg, stated)
+	bridged, err := mattercore.NewBridgedDeviceBasicInformation(cfg)
 	if err != nil {
 		// Only an empty UniqueID is refused, and uniqueIDFor never
 		// returns one; should it ever fail, the endpoint keeps its
@@ -567,6 +581,41 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 // neither — the attribute is then not served, matter.js's default for a
 // bridged device (vendorName is optional, and its bridge example sets
 // none).
+// applyStatedBridgedInfo copies the attributes the host stated that have
+// no fallback of their own onto cfg (R2-P5-apidev-02).
+func applyStatedBridgedInfo(cfg *mattercore.BridgedConfig, st bdbidef.Patch) {
+	if st.SerialNumber != nil {
+		cfg.SerialNumber = *st.SerialNumber
+	}
+	if st.HardwareVersion != nil {
+		cfg.HardwareVersion = *st.HardwareVersion
+	}
+	if st.HardwareVersionString != nil {
+		cfg.HardwareVersionStr = *st.HardwareVersionString
+	}
+	if st.SoftwareVersion != nil {
+		cfg.SoftwareVersion = *st.SoftwareVersion
+	}
+	if st.SoftwareVersionString != nil {
+		cfg.SoftwareVersionStr = *st.SoftwareVersionString
+	}
+	if st.ManufacturingDate != nil {
+		cfg.ManufacturingDate = *st.ManufacturingDate
+	}
+	if st.PartNumber != nil {
+		cfg.PartNumber = *st.PartNumber
+	}
+	if st.ProductUrl != nil {
+		cfg.ProductURL = *st.ProductUrl
+	}
+	if pa := st.ProductAppearance; pa != nil {
+		cfg.ProductAppearance = mattercore.ProductAppearanceStruct{Finish: uint8(pa.Finish), PrimaryColor: mattercore.PrimaryColorAbsent}
+		if !pa.PrimaryColor.Null {
+			cfg.ProductAppearance.PrimaryColor = uint8(pa.PrimaryColor.Value)
+		}
+	}
+}
+
 func bridgedVendorName(ep *Endpoint) string {
 	name := ep.VendorName
 	if name == "" {

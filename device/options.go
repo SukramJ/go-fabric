@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
@@ -121,6 +122,9 @@ func (deviceOption) ClusterDeclaration() spec.ClusterDeclaration { return spec.C
 
 // settings is what the declarations of one New call collected.
 type settings struct {
+	// bridgedInfo is what a bridgeddevicebasicinformationdef Declare
+	// states of the bridged device (declareBridgedBasicInformation).
+	bridgedInfo *bdbidef.Patch
 	// candidates are the surface candidates compose judged; New
 	// records the server-internal elements against them.
 	candidates []surface.Element
@@ -230,6 +234,9 @@ func (s *settings) declare(d Declaration) error {
 	s.typed[id] = true
 	if id == identifyClusterID {
 		return s.declareIdentify(d, decl)
+	}
+	if id == bdbidef.ClusterID {
+		return s.declareBridgedBasicInformation(d, decl)
 	}
 	if len(decl.Initial) == 0 {
 		// An empty Initial states nothing: the declaration's hooks may

@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 )
@@ -144,6 +145,9 @@ type Endpoint struct {
 	// VendorName is the bridged device's own manufacturer
 	// ([Spec.VendorName]); empty falls back to BridgeVendorName.
 	VendorName string
+	// BridgedBasicInformation is [Spec.BridgedBasicInformation]: what the
+	// host states of the bridged device's BridgedDeviceBasicInformation.
+	BridgedBasicInformation bdbidef.Patch
 
 	// ParentEndpointID is the Matter endpoint ID of the parent
 	// endpoint in the bridge hierarchy. For bridged endpoints (ID ≥ 2)
