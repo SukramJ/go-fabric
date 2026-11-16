@@ -25,6 +25,7 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/memstore"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -63,67 +64,49 @@ func AssertDeviceTypeConformance(tb testing.TB, topology *endpoint.Topology, tol
 	return found
 }
 
-// FakeStore is an in-memory implementation of [endpoint.Store]. It is
-// concurrency-naive — callers must not race it — and carries only the state
-// the bridge's startup and reassembly paths read back.
+// FakeStore is an in-memory implementation of [endpoint.Store]: the
+// module's own in-memory store, [memstore.Store], under the name the tests
+// know. It numbers as every implementation of the port must — a number
+// stored for a source wins over the one a re-stated record carries, the
+// counter never rewinds, wraps to 2 after 65534 and skips the numbers
+// still held, and [FakeStore.ListEndpoints] lists ascending by number — so
+// a test on the fake holds the bridge to the behaviour the real stores
+// have (review II, R2-P6-test-0612). Safe for concurrent use.
 type FakeStore struct {
-	rows   map[endpoint.SourceKey]endpoint.Record
-	nextID uint16
+	s *memstore.Store
 }
 
-// NewFakeStore returns a fresh [FakeStore] with an empty row map and the
-// next-id counter initialised at 2: endpoint 0 is the root and endpoint 1
-// the aggregator, so bridged endpoints start at 2.
+// NewFakeStore returns a fresh, empty [FakeStore]: endpoint 0 is the root
+// and endpoint 1 the aggregator, so bridged endpoints start at 2.
 func NewFakeStore() *FakeStore {
-	return &FakeStore{
-		rows:   make(map[endpoint.SourceKey]endpoint.Record),
-		nextID: 2,
-	}
+	return &FakeStore{s: memstore.New()}
 }
 
 // GetEndpoint implements [endpoint.Store].
-func (s *FakeStore) GetEndpoint(_ context.Context, key endpoint.SourceKey) (endpoint.Record, error) {
-	rec, ok := s.rows[key]
-	if !ok {
-		return endpoint.Record{}, endpoint.ErrNotFound
-	}
-	return rec, nil
+func (s *FakeStore) GetEndpoint(ctx context.Context, key endpoint.SourceKey) (endpoint.Record, error) {
+	return s.s.GetEndpoint(ctx, key)
 }
 
 // UpsertEndpointAssigning implements [endpoint.Store].
-func (s *FakeStore) UpsertEndpointAssigning(_ context.Context, rec endpoint.Record) (uint16, error) {
-	if rec.EndpointID == 0 {
-		rec.EndpointID = s.nextID
-		s.nextID++
-	}
-	s.rows[rec.Key] = rec
-	return rec.EndpointID, nil
+func (s *FakeStore) UpsertEndpointAssigning(ctx context.Context, rec endpoint.Record) (uint16, error) {
+	return s.s.UpsertEndpointAssigning(ctx, rec)
 }
 
 // ListEndpoints implements [endpoint.Store]. An empty scope matches every
 // row.
-func (s *FakeStore) ListEndpoints(_ context.Context, scope string) ([]endpoint.Record, error) {
-	var out []endpoint.Record
-	for _, rec := range s.rows {
-		if scope == "" || rec.Scope == scope {
-			out = append(out, rec)
-		}
-	}
-	return out, nil
+func (s *FakeStore) ListEndpoints(ctx context.Context, scope string) ([]endpoint.Record, error) {
+	return s.s.ListEndpoints(ctx, scope)
 }
 
 // RemoveEndpoint implements [endpoint.Store].
-func (s *FakeStore) RemoveEndpoint(_ context.Context, key endpoint.SourceKey) error {
-	delete(s.rows, key)
-	return nil
+func (s *FakeStore) RemoveEndpoint(ctx context.Context, key endpoint.SourceKey) error {
+	return s.s.RemoveEndpoint(ctx, key)
 }
 
 // EraseEndpoints implements [endpoint.Store]: every row goes and the
 // next-id counter restarts at 2.
-func (s *FakeStore) EraseEndpoints(context.Context) error {
-	clear(s.rows)
-	s.nextID = 2
-	return nil
+func (s *FakeStore) EraseEndpoints(ctx context.Context) error {
+	return s.s.EraseEndpoints(ctx)
 }
 
 // Identity the test assembler stamps on the root endpoint. Any non-zero
