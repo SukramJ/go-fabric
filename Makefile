@@ -107,14 +107,14 @@ build-32bit: ## compile for linux/armv7 and vet for linux/386 — an int is 32 b
 	CGO_ENABLED=0 GOOS=linux GOARCH=386 $(GO) vet ./...
 
 # The packages that parse wire input with hand-argued length and integer
-# arithmetic (tlv/ and secure/ hold most of the G115 suppressions outside
-# controller/), and transport/, where an int(uint32) of a frame length was
+# arithmetic (tlv/, secure/ and controller/ hold most of the G115
+# suppressions; mdns/ parses DNS records off the wire), and transport/, where an int(uint32) of a frame length was
 # a pre-authentication crash on a 32-bit int (R2-P1-req-02,
 # transport/tcp/frame.go). Their tests run on linux/386, where an int is
 # 32 bits. The test binaries are static (CGO_ENABLED=0) and run directly
 # on a linux/amd64 host; darwin has no 386 port, so the target refuses a
 # host that is not Linux rather than failing on the first exec.
-TEST_32BIT_PKGS ?= ./tlv/... ./transport/... ./im/... ./secure/... ./bdx/...
+TEST_32BIT_PKGS ?= ./tlv/... ./transport/... ./im/... ./secure/... ./bdx/... ./controller/... ./mdns/...
 
 .PHONY: test-32bit
 test-32bit: ## run the wire-parsing packages' tests on linux/386, where an int is 32 bits (a linux/amd64 host)
