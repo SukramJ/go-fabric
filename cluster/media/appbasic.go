@@ -6,6 +6,7 @@ package media
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
@@ -40,9 +41,15 @@ func (st AppBasicState) values() map[uint32]any {
 	}
 }
 
+// clone is a deep copy of st: the generated ApplicationStruct holds two
+// values and has no Clone, so a copy of it shares nothing; a snapshot that
+// gives it a list fails appBasicClone's CheckClone guard.
 func (st AppBasicState) clone() AppBasicState {
-	st.Application = clonePtr(st.Application)
-	st.AllowedVendorList = cloneSlice(st.AllowedVendorList)
+	if st.Application != nil {
+		a := *st.Application
+		st.Application = &a
+	}
+	st.AllowedVendorList = slices.Clone(st.AllowedVendorList)
 	return st
 }
 

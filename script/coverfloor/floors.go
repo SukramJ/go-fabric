@@ -172,8 +172,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
-		min: 81,
-		why: "Review II phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
+		min: 84,
+		why: "Review II phase 6a post pass: measured 84.8 once TestEveryFabricListsEveryIndex drives EveryFabric (decision 158). Phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
