@@ -266,7 +266,7 @@ findings on from 5a-3's (F5 to F7) and repeats F2.
 | 5a-1 F10 | — | fixed `4fc23cd5` | `cluster/core/group_key_management_failure_test.go` — the epoch-key length refusals assert CONSTRAINT_ERROR (the first now with its fabric set), the slot ordering INVALID_COMMAND; W6-test-17 |
 | 5a-1 F11 | — | fixed `176cfec3` | `cluster/core/operational_credentials_test.go` — the nonce tests name InvalidCommand the handler's status and CONSTRAINT_ERROR matter.js's wire answer |
 | 5a-2 F1 | low | fixed `31ad4620`, `bb3dc5ee`, `d8e1a17f` | `secure/spake2/wire.go` — as DR5a-code-01 |
-| 5a-2 F2 | — | held back until its fix merges (owner decision 25) — 5b wave H | — |
+| 5a-2 F2 | low | phase 5b: wave H; fixed by #534 (`phase-5b-register.md`) | `secure/sessionparams/sessionparams.go` — `secure/sessionparams.DecodeFields`, which reads tag 5 of every PASE message, ignores a member with a non-context tag, checks no TLV type and masks the widths (`& 0xFFFF`, `& 0xFFFFFFFF`): an interval sent with another type reads as 0, a wider one is cut. matter.js's TlvSessionParameters throws on both (read 5a-3, `PaseMessages.ts:30-54`, `TlvNumber.ts:124-131`, `:154-155`). Go side read, not probed; what a peer gains from it was not judged |
 | 5a-2 F3 | low | fixed `31ad4620` | `secure/spake2` — the PaseMessages.ts cites name :85 and :89-92 |
 | 5a-2 F4 | low | fixed `750b783e` | `cluster/core/operational_credentials.go` — the OperationalCredentialsServer.ts cites name :121-123, :160-164 and :456-469 |
 | 5a-2 F5 | low | fixed `750b783e` | `controller/tcp.go`, `bridge/request_boolean_fields_test.go` — the retry closes the UDP socket; the matter.js test sentence names a statusless error |
@@ -276,14 +276,14 @@ findings on from 5a-3's (F5 to F7) and repeats F2.
 | 5a-2 A3-9 | — | struck: acceptable as written (the reader's) | the three CONSTRAINT_ERROR comments state the wire answer without the read's 'inferred from the path' |
 | 5a-2 A3-x | — | fixed `3a9d2b8b` | `im/field.go`, `im/mandatory_field_parity_matterjs_test.go` — the mandatory-field throw is cited at TlvObject.ts:261 |
 | 5a-3 F1 | medium | fixed `d8e1a17f` | `secure/spake2/wire.go` — the five PASE decoders and PBKDFParameters refuse a member whose tag is not context-specific; the skip's doc says what matter.js skips and what it refuses |
-| 5a-3 F2 | — | held back until its fix merges (owner decision 25) — 5b wave H | — |
+| 5a-3 F2 | low | phase 5b: wave H; fixed by #534 (`phase-5b-register.md`) | `secure/sessionparams/sessionparams.go` — the same as 5a-2 F2: the decoder of the PASE session parameters stays lenient about tag forms, types and widths |
 | 5a-3 F3 | low | fixed `c0bebd0d` | `bridge/handlers.go` — a refused PASE step drops the adapter's transcript with its verifier |
 | 5a-3 F4 | note | struck: nothing to fix (the reader's) | `secure/spake2/wire.go` — the skip is iterative and bounded by the message |
 | 5a-3 S-5 | — | phase 6: unverified, not a finding (the reader's) | `secure/spake2` — bytes after a PASE message's closing end are accepted; whether matter.js checks for a remainder was not read |
 | 5a-4 F5 | low | fixed `5d1095d8`, `87cfa898` | `bridge/handlers.go` — a Pake3 refused because no Pake1 preceded it ends the PASE transcript too; completes 5a-3 F3 |
 | 5a-4 F6 | low | fixed in part `5d1095d8`, `87cfa898`; one case stays with N5-rw2-1 | `bridge/handlers.go` — every exit of Pake3, a confirmed one included, ends the PASE transcript with its verifier. N5-rw2-2 |
 | 5a-4 F7 | note | fixed `5d1095d8`, `87cfa898` | `secure/spake2/wire_strict_test.go`, `CHANGELOG.md` — the test doc names where matter.js throws for an implicit tag; the entries say what is skipped and what was counted |
-| 5a-4 F2 | — | held back until its fix merges (owner decision 25) — 5b wave H | — |
+| 5a-4 F2 | low | phase 5b: wave H; fixed by #534 (`phase-5b-register.md`) | `secure/sessionparams/sessionparams.go` — unchanged after the rework: 5a-3 F2, the one nested declared structure of the PASE messages the non-context refusal does not reach |
 
 ## What earlier phases handed to phase 5a
 
@@ -327,8 +327,8 @@ belong to 5b; they appear by id only.
 | N-rw2-2 | tflake | not looked at | phase 6 (the register editor's): one unexplained race failure in client/interaction; the fix note does not name it |
 | N3-coord-2 | tflake | not looked at | phase 6 (the register editor's): TestClientNodeTcpParity picks a port and binds it again |
 | N4-d4gate-2 | tflake | not looked at | phase 6 (the register editor's): TestBleScannerDeduplicationAndAging fails under load |
-| TM R6.2 | — | — | held back until its fix merges (owner decision 25) — 5b |
-| N3-net-4 | — | — | held back until its fix merges (owner decision 25) — 5b |
+| TM R6.2 | — | — | phase 5b; fixed by #534 (`phase-5b-register.md`) |
+| N3-net-4 | — | — | phase 5b; fixed by #534 (`phase-5b-register.md`) |
 | N4-frsec-1 | — | — | held back until its fix merges (owner decision 25) — 5b |
 
 ## The owner's decisions of this phase
@@ -391,7 +391,7 @@ register's (`N5-<group>-<n>`, the group being the fix note's).
 | N5-rwcode-1 | `fix-rwcode.md` | a PASE member whose tag is not context-specific was skipped whole; matter.js may refuse it | fixed `d8e1a17f` — 5a-3 F1 | `secure/spake2/wire.go` |
 | N5-rwci-1 | `fix-rwci.md` | measured: zizmor's dangerous-triggers audit flags the auto-merge workflow's `pull_request_target`, so `workflow lint` is red at its first run | decided and done: owner decision 98 (an inline exception with its reason) `04756ba3` — suppress with the recorded reason, or restructure | `.github/workflows/dependabot-auto-merge.yml` |
 | N5-rwci-2 | `fix-rwci.md` | no test of the nested release check's exit 2 (it needs a proxy outage) | phase 6 | `script/nested-release-check.sh` |
-| N5-rw2-1 | — | — | held back until its fix merges (owner decision 25) — 5b wave H | — |
+| N5-rw2-1 | `fix-rw2.md` | where a host wires one PASE adapter through `AttachPaseHandler` and no provider, `resolvePaseContinuation` (`bridge/securechannel.go:333-343`) hands a Pake1 or Pake3 to it although no PBKDFParamRequest of that exchange holds the PASE claim; with a provider such a message is dropped. The adapter answers a failure StatusReport and counts the attempt. Not measured: whether a stranger's Pake1 on another exchange can end a commissioner's handshake that is under way | phase 5b: wave H — drop it as the provider path does (the fix note's question); fixed by #534 (`phase-5b-register.md`) | `bridge/securechannel.go`, `bridge/handlers.go` |
 | N5-rw2-2 | `fix-rw2.md` | after a successful Pake3 the adapter kept the handshake's transcript | fixed `5d1095d8` — 5a-4 F6 | `bridge/handlers.go` |
 
 ## Unread
@@ -429,9 +429,8 @@ The 162 findings, by their first disposition:
 | fixed in part | 2 | 0 | 0 | 1 | 3 |
 | struck | 5 | 1 | 0 | 2 | 8 |
 | decided by the owner (98–104) | 0 | 1 | 0 | 0 | 1 |
-| open: phase 5b | 0 | 1 | 0 | 2 | 3 |
+| open: phase 5b | 0 | 1 | 0 | 5 | 6 |
 | open: phase 6 | 2 | 0 | 0 | 4 | 6 |
-| held back | 0 | 0 | 0 | 3 | 3 |
 | all | 106 | 21 | 5 | 30 | 162 |
 
 By the severity their rows carry — units: 3 high, 13 medium, 77 low, 13 note;
@@ -443,21 +442,23 @@ read, and 6 leave a part open in their disposition (R2-P5-tassert-05,
 R2-P5-tmut-13, R2-P5-tmut-18, R2-P5-sup-04, R2-P5-sup-07, 5a-4 F6).
 
 What earlier phases handed to phase 5a: 33 rows — 13 fixed, 2 fixed in part, 1
-struck, 5 closed before this phase, 4 open: phase 5b, 5 open: phase 6, 3 held
+struck, 5 closed before this phase, 6 open: phase 5b, 5 open: phase 6, 1 held
 back.
 
 The 39 noticed items: 13 fixed, 2 struck, 6 decided by the owner at the end of
-5a (decisions 98 to 104, two of them done in `04756ba3`), 4 open: phase 5b, 13
-open: phase 6, 1 held back.
+5a (decisions 98 to 104, two of them done in `04756ba3`), 5 open: phase 5b, 13
+open: phase 6.
 
 Unread: 10 rows, all phase 6. The owner's decisions: 7 rows (91 to 97), and
 the seven of the wizard at the end of 5a (98 to 104) in `decisions.md`.
 
-**Held back: 4 rows of this phase** — 3 of the Fable reads (5a-2 F2, 5a-3 F2,
-5a-4 F2), one item read three times, and 1 noticed item (N5-rw2-1), all for
-phase 5b; and the 3 rows earlier phases held back and handed to phase 5, by id
-only (TM R6.2, N3-net-4, N4-frsec-1), also 5b. The rows phases 3 and 4 hold
-back for phase 6 stay in their files as they were.
+**Held back: 1 row** — N4-frsec-1, handed from an earlier phase by id only,
+fixed by phase 5b's pull request (#534) and published with the release that
+carries its fix (owner decision 126). The four rows of this phase held back
+until #534 merged (5a-2 F2, 5a-3 F2, 5a-4 F2, N5-rw2-1) and the handed rows
+TM R6.2 and N3-net-4 are in the tables since 2026-11-16 (owner decision
+126), at their state of phase 5a; the counts above include them. The rows
+phases 3 and 4 hold back for phase 6 stay in their files as they were.
 
 ## Not placed, not verified
 
