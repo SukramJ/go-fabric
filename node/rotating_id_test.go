@@ -16,7 +16,9 @@ import (
 // rotatingID is the commissionable record's RI value; ok false without
 // the key or without the record.
 func rotatingID(adv *mdns.Noop) (string, bool) {
-	for _, svc := range adv.Active() {
+	services := adv.Active()
+	for i := range services {
+		svc := &services[i]
 		if svc.ServiceType != mdns.ServiceTypeCommissionable {
 			continue
 		}

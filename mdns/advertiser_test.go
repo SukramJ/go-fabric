@@ -240,8 +240,9 @@ func TestNoop_Active_PublishOrder(t *testing.T) {
 		t.Fatalf("Withdraw: %v", err)
 	}
 	want = slices.DeleteFunc(want, func(s string) bool { return s == "inst-10" })
-	var got []string
-	for _, s := range n.Active() {
+	active := n.Active()
+	got := make([]string, 0, len(active))
+	for _, s := range active {
 		got = append(got, s.InstanceName)
 	}
 	if !slices.Equal(got, want) {

@@ -26,7 +26,7 @@ func TestListenerSparesAFreshConnectionFromReclaim(t *testing.T) {
 	t.Cleanup(func() { _ = l.Close() })
 	handler := func(_ *Conn, _ []byte, release func()) { release() }
 
-	var silent []*Conn
+	silent := make([]*Conn, 0, MaxInboundConnections)
 	for i := range MaxInboundConnections {
 		c, _ := acceptFrom(t, l, i, handler)
 		if c == nil {

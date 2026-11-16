@@ -203,12 +203,18 @@ func TestWaitIdleWaitsForRunningHandlers(t *testing.T) {
 // fills the backlog; the genuine peer's datagrams then take the places of
 // the flooder's newest, up to maxOrderedBacklogPerSource of them.
 func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
-	block := make(chan struct{})
-	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) { <-block }}
+	block, started := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) {
+		once.Do(func() { close(started) })
+		<-block
+	}}
 	l := &Listener{}
 	flooder := &net.UDPAddr{IP: net.ParseIP("fe80::bad"), Port: 5540}
 	peer := &net.UDPAddr{IP: net.ParseIP("fe80::1"), Port: 5540}
-	for range maxOrderedBacklog + 50 {
+	o.enqueue(l, 1, []byte{1}, flooder)
+	<-started // the first one runs; the rest queue behind it
+	for range maxOrderedBacklog + 49 {
 		o.enqueue(l, 1, []byte{1}, flooder)
 	}
 	o.mu.Lock()
