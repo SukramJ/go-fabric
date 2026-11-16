@@ -5,7 +5,9 @@ package spec_test
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -24,14 +26,29 @@ var unlistedCluster = &spec.Cluster{
 }
 
 // TestOptionalCommandListedOnlyWithHandler: an optional command the server
-// declares (spec.Options.Commands) without a handler and without
-// ServerConfig.Unimplemented is in neither AcceptedCommandList nor —
-// its response — GeneratedCommandList and answers UNSUPPORTED_COMMAND,
-// until Handle registers it; nil takes it out again. It is no unimplemented
-// mandatory command (R2-P5-apispec-04).
+// declares (spec.Options.Commands) without a handler is refused at
+// construction, naming the command, unless the server is the generated
+// behavior (ServerConfig.Unimplemented) — before, it dropped out of
+// AcceptedCommandList with no word (review II, phase 5b). With
+// Unimplemented it is in neither AcceptedCommandList nor — its response —
+// GeneratedCommandList and answers UNSUPPORTED_COMMAND, until Handle
+// registers it; nil takes it out again. It is no unimplemented mandatory
+// command (R2-P5-apispec-04).
 func TestOptionalCommandListedOnlyWithHandler(t *testing.T) {
-	srv, err := spec.NewServer(unlistedCluster, spec.Options{Commands: []uint32{1}}, spec.ServerConfig{
+	_, err := spec.NewServer(unlistedCluster, spec.Options{Commands: []uint32{1}}, spec.ServerConfig{
 		Handlers: map[uint32]spec.CommandHandler{0: noop},
+	})
+	if !errors.Is(err, spec.ErrMissingHandler) || !strings.Contains(err.Error(), "Optional (0x01)") {
+		t.Errorf("an optional command selected without a handler = %v, want ErrMissingHandler naming Optional (0x01)", err)
+	}
+	if _, err := spec.NewServer(unlistedCluster, spec.Options{Commands: []uint32{1}}, spec.ServerConfig{
+		Handlers: map[uint32]spec.CommandHandler{0: noop, 1: noop},
+	}); err != nil {
+		t.Errorf("an optional command selected with its handler: %v", err)
+	}
+	srv, err := spec.NewServer(unlistedCluster, spec.Options{Commands: []uint32{1}}, spec.ServerConfig{
+		Handlers:      map[uint32]spec.CommandHandler{0: noop},
+		Unimplemented: true,
 	})
 	if err != nil {
 		t.Fatal(err)

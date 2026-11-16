@@ -35,8 +35,10 @@ var (
 	// ErrNotEmitted: an event the instance's EventList does not hold.
 	ErrNotEmitted = errors.New("spec: event not in EventList")
 	// ErrMissingHandler: a command the conformance makes mandatory for
-	// the feature selection has no handler in [ServerConfig.Handlers].
-	ErrMissingHandler = errors.New("spec: mandatory command has no handler")
+	// the feature selection, or an optional one [Options.Commands]
+	// selects, has no handler in [ServerConfig.Handlers] (and
+	// [ServerConfig.Unimplemented] is not set).
+	ErrMissingHandler = errors.New("spec: accepted command has no handler")
 	// ErrNotMounted: an event emitted while the server is not in the
 	// topology — before it knows its endpoint or has an emitter, or after
 	// the bridge withdrew its emitter ([Server.EmitEvent]).
@@ -115,13 +117,15 @@ type ServerConfig struct {
 	// [Server.Set] checks a value.
 	Initial map[uint32]any
 	// Handlers holds the command handlers, by request command id. Every
-	// command the conformance makes mandatory for the feature selection
-	// must have one, or construction fails with [ErrMissingHandler];
-	// an optional command's handler may also be registered later with
-	// [Server.Handle]. An accepted command without a handler is left out of
-	// AcceptedCommandList (and its response out of GeneratedCommandList)
-	// until [Server.Handle] registers one: the lists name the commands the
-	// server implements.
+	// command the conformance makes mandatory for the feature selection,
+	// and every optional one [Options.Commands] selects, must have one, or
+	// construction fails with [ErrMissingHandler] naming each command that
+	// has none: a selected command that nothing implements would otherwise
+	// drop out of AcceptedCommandList with no word. With
+	// [ServerConfig.Unimplemented] an accepted command without a handler is
+	// allowed and left out of AcceptedCommandList (and its response out of
+	// GeneratedCommandList) until [Server.Handle] registers one: the lists
+	// name the commands the server implements.
 	Handlers map[uint32]CommandHandler
 	// Clock is the time source of the quieter attributes' report throttles
 	// ([Attribute.QuietInterval]); nil is [clock.System].
@@ -272,15 +276,24 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	// Every mandatory command without a handler is named, not the first
 	// alone: matter.js records a fatal error per command and reports them
 	// together (ValidatedElements.ts:357-372 #validateRequiredCommands,
-	// report :154-180 at 862ad75f).
+	// report :154-180 at 862ad75f). An optional command the selection
+	// names without a handler is refused too, unless the server is the
+	// generated behavior (Unimplemented): it would be left out of
+	// AcceptedCommandList, so the selection would have no effect and
+	// nothing would say so.
 	var missing []error
 	for _, id := range inst.accepted {
+		required := slices.Contains(inst.required, id)
 		switch {
-		case s.handlers[id] != nil, !slices.Contains(inst.required, id):
+		case s.handlers[id] != nil:
 		case cfg.Unimplemented:
-			s.stubs = append(s.stubs, id)
-		default:
+			if required {
+				s.stubs = append(s.stubs, id)
+			}
+		case required:
 			missing = append(missing, fmt.Errorf("%w: %s command %s (0x%02X)", ErrMissingHandler, def.Name, def.Command(id, Request).Name, id))
+		default:
+			missing = append(missing, fmt.Errorf("%w: %s optional command %s (0x%02X), selected by Options.Commands", ErrMissingHandler, def.Name, def.Command(id, Request).Name, id))
 		}
 	}
 	if err := errors.Join(missing...); err != nil {
