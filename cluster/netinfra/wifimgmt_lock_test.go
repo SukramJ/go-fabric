@@ -6,7 +6,6 @@ package netinfra_test
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -24,20 +23,12 @@ func TestCredentialChangeCallbackReadsTheServer(t *testing.T) {
 		_ = s.Passphrase()
 	})
 	defer unsub()
-	done := make(chan error, 2)
-	go func() {
-		done <- s.SetNetworkCredentials([]byte("home"), []byte("passphrase-1"))
-		done <- s.ClearNetworkCredentials()
-	}()
-	for range 2 {
-		select {
-		case err := <-done:
-			if err != nil {
-				t.Fatal(err)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("a change callback that reads the server deadlocks")
-		}
+	// A deadlock hangs these calls (the test binary's timeout reports it).
+	if err := s.SetNetworkCredentials([]byte("home"), []byte("passphrase-1")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ClearNetworkCredentials(); err != nil {
+		t.Fatal(err)
 	}
 	if len(seen) == 0 || !bytes.Equal(seen[0], []byte("home")) {
 		t.Fatalf("the callback saw %q", seen)

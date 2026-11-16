@@ -10,10 +10,10 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tcmdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
@@ -91,16 +91,9 @@ func TestProvisionRootReplaceRacesRemove(t *testing.T) {
 			tcmdef.ProvisionRootCertificateRequest{Certificate: testCertificate(t, 2), Caid: spec.ValueOf(caid)})
 	}()
 	wantStatus(t, "replace of a removed CAID", err, im.StatusNotFound)
-	done := make(chan struct{})
-	go func() {
-		c.MatterReadFiltered(peer(testFabric), tcmdef.AttrProvisionedRootCertificates)
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("the server's lock is held after the replace")
-	}
+	// A lock the replace stranded hangs this read (the test binary's
+	// timeout reports it).
+	c.MatterReadFiltered(peer(testFabric), tcmdef.AttrProvisionedRootCertificates)
 }
 
 // TestProvisionRootRechecksAfterThePort (R2-P6-conc-1109): a second
@@ -316,12 +309,15 @@ func TestRemoveRootAndProvisionEndpointInterleave(t *testing.T) {
 				_, err := c.MatterInvoke(peer(testFabric), tcmdef.CmdRemoveRootCertificate, tcmdef.RemoveRootCertificateRequest{Caid: caid})
 				removed <- err
 			}()
-			// The remove either finishes here (the provision is not
-			// atomic) or waits for the provision to end.
-			select {
-			case <-removed:
-				removed <- nil
-			case <-time.After(200 * time.Millisecond):
+			// Wait until the remove has hidden the certificate: its mark
+			// (it then waits in its dependency check for the provision to
+			// end) or, without one, its delete (the provision then inserts
+			// an endpoint naming a removed certificate).
+			for {
+				if _, ok := c.RootCertificate(testFabric, caid); !ok {
+					break
+				}
+				runtime.Gosched()
 			}
 		}
 		_, _ = m.MatterInvoke(peer(testFabric), tcldef.CmdProvisionEndpoint, provisionRequest(caid))
