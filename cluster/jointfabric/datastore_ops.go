@@ -342,8 +342,8 @@ func reservedCAT(cat spec.Nullable[uint16]) bool {
 
 // AddGroup adds a group: a group id already held, or the administrator or
 // anchor CAT, is a ConstraintError; a GroupList at MaxGroups is refused
-// (ErrNoMemory), as the datastore's other lists are — connectedhomeip's
-// AddGroup has no bound (R2-P6-bound-1113). Mirrors :1360-1385.
+// (ErrNoMemory), as the datastore's other lists are — the module's bound
+// (R2-P6-bound-1113). Mirrors :1360-1385 otherwise.
 func (d *Datastore) AddGroup(ctx context.Context, req AddGroupRequest) error {
 	return d.update(ctx, func() error { return d.addGroupLocked(req, true) })
 }

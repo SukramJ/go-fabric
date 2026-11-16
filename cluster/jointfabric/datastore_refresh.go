@@ -175,7 +175,7 @@ func (d *Datastore) refreshEndpointsLocked(nodeID uint64, endpoints []EndpointEn
 // endpoint the node no longer has (:368-412). Memberships that would
 // carry the list past MaxGroups, the bound AddGroupIDToEndpointForNode
 // holds (:1684), are ErrNoMemory before anything changes
-// (R2-P6-bound-1113; connectedhomeip's merge has no bound).
+// (R2-P6-bound-1113, the module's bound).
 func (d *Datastore) mergeGroupsLocked(nodeID uint64, ep uint16, groups []GroupEntry) error {
 	added := 0
 	for _, g := range groups {
@@ -257,7 +257,7 @@ func isCommitError(err error) bool {
 // node. Bindings that would carry the list past MaxGroups, the bound
 // AddBindingToEndpointForNode holds (:1930), are ErrNoMemory before
 // anything changes — the refresh then writes no truncated list to the
-// node (R2-P6-bound-1113; connectedhomeip's merge has no bound).
+// node (R2-P6-bound-1113, the module's bound).
 func (d *Datastore) mergeBindingsLocked(nodeID uint64, ep uint16, bindings []EndpointBindingEntry) error {
 	added := 0
 	for _, b := range bindings {
@@ -444,7 +444,7 @@ func (d *Datastore) syncKeySets(ctx context.Context) error {
 // the node no longer has (:923-984). Entries that would carry the list
 // past MaxACLs, the bound AddACLToNode holds (:2122), are ErrNoMemory
 // before anything changes — the refresh then writes no truncated list to
-// the node (R2-P6-bound-1113; connectedhomeip's merge has no bound).
+// the node (R2-P6-bound-1113, the module's bound).
 func (d *Datastore) mergeACLsLocked(nodeID uint64, acls []ACLEntry) error {
 	added := 0
 	for _, a := range acls {

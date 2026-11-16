@@ -392,8 +392,8 @@ func (a *Administrator) administratorFabricIndex() uint8 {
 }
 
 // accessing is the accessing fabric and whether the invoke arrived over
-// CASE: chip's `authMode == Access::AuthMode::kCase`
-// (joint-fabric-administrator-server.cpp:322, :366). The bridge stamps
+// CASE (the checks at joint-fabric-administrator-server.cpp:322, :366 the
+// handlers cite). The bridge stamps
 // the session's fabric and subject on every request and marks a PASE
 // session and a group message (im.IsPASEFromContext,
 // im.GroupSubjectFromContext); a CASE request is one with a fabric and a
