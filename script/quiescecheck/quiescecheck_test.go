@@ -73,7 +73,6 @@ var exceptions = map[string]string{
 	"cluster/core.otaHTTPSWriter":     "holds otaIdleTimer: the OTA download's idle timeout",
 	// Found by the per-type rule (R2-P6-test-1508) and not read here for
 	// whether the timer outlives the server: each is its owner unit's.
-	"cluster/camera.PushTransport":            "pushtransport.go: the per-connection expiry timers (N-clumisc-4; unit appinfra)",
 	"cluster/core.GeneralCommissioning":       "general_commissioning.go: the fail-safe watch timer (unit coresys)",
 	"cluster/core.Identify":                   "identify.go: the IdentifyTime countdown ticker (unit coresys)",
 	"cluster/core.OTASoftwareUpdateRequestor": "ota_requestor_query.go: the query timer and the update delay (unit coresys)",
