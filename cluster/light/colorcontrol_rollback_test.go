@@ -22,12 +22,15 @@ func (p *rbScenes) MakeAllFabricSceneInfoEntriesInvalid()    { p.invalidated.Add
 func (p *rbScenes) StoreGlobalScene(context.Context, uint8)  {}
 func (p *rbScenes) RecallGlobalScene(context.Context, uint8) {}
 
+// errDeviceRefused is the refusal of rbWriter.
+var errDeviceRefused = errors.New("device refused")
+
 // rbWriter refuses every colour while refuse is set.
 type rbWriter struct{ refuse atomic.Bool }
 
 func (w *rbWriter) SetColor(context.Context, Color) error {
 	if w.refuse.Load() {
-		return errors.New("device refused")
+		return errDeviceRefused
 	}
 	return nil
 }
@@ -63,8 +66,8 @@ func TestFailedColorCommandKeepsTheScene(t *testing.T) {
 			s.SetScenes(sc)
 			s.SetColorWriter(w)
 			w.refuse.Store(true)
-			if _, err := s.MatterInvoke(context.Background(), tc.cmd, tc.fields); err == nil {
-				t.Fatal("the refused command succeeded")
+			if _, err := s.MatterInvoke(context.Background(), tc.cmd, tc.fields); !errors.Is(err, errDeviceRefused) {
+				t.Fatalf("err = %v, want the device's refusal", err)
 			}
 			if n := sc.invalidated.Load(); n != 0 {
 				t.Errorf("a failed %s invalidated the scene %d time(s); the rollback keeps it", tc.name, n)

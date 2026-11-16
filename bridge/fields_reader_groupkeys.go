@@ -85,7 +85,7 @@ func decodeKeySetWriteByDefinition(dec *tlv.Decoder) (any, error) {
 	}
 	cmd := gkmdef.Definition.Command(gkmdef.CmdKeySetWrite, spec.Request)
 	if cmd == nil || cmd.Decode == nil {
-		return nil, errors.New("KeySetWrite: no generated decoder")
+		return nil, errors.New("bridge: KeySetWrite: no generated decoder")
 	}
 	return cmd.DecodeRequest(n)
 }

@@ -12,6 +12,9 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 )
 
+// errTunerRefused is the refusal of cloneChannels.
+var errTunerRefused = errors.New("tuner refused")
+
 // cloneChannels is a Channel port that edits the state it is handed in
 // place, through its pointers and lists, and then refuses the command.
 type cloneChannels struct{}
@@ -24,7 +27,7 @@ func (cloneChannels) ChangeChannelByNumber(_ context.Context, st *ChannelState, 
 	st.CurrentChannel.MajorNumber = req.MajorNumber
 	st.ChannelList[0].MajorNumber = req.MajorNumber
 	*st.ChannelList[0].Name = "refused"
-	return errors.New("tuner refused")
+	return errTunerRefused
 }
 
 func (cloneChannels) SkipChannel(context.Context, *ChannelState, channeldef.SkipChannelRequest) error {
@@ -51,8 +54,8 @@ func TestRefusedCommandLeavesTheCommittedState(t *testing.T) {
 		t.Fatal(err)
 	}
 	v0 := s.MatterDataVersion()
-	if _, err := s.MatterInvoke(context.Background(), channeldef.CmdChangeChannelByNumber, channeldef.ChangeChannelByNumberRequest{MajorNumber: 7}); err == nil {
-		t.Fatal("the refused command succeeded")
+	if _, err := s.MatterInvoke(context.Background(), channeldef.CmdChangeChannelByNumber, channeldef.ChangeChannelByNumberRequest{MajorNumber: 7}); !errors.Is(err, errTunerRefused) {
+		t.Fatalf("err = %v, want the tuner's refusal", err)
 	}
 	check := func(when string) {
 		t.Helper()
