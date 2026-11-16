@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -40,8 +41,9 @@ type Binding struct {
 	mu       sync.RWMutex
 	bindings []TargetStruct
 	save     func([]TargetStruct) error
-	// fabrics is BindingConfig.Fabrics; writeMu guards it with save.
-	fabrics FabricSource
+	// fabrics is BindingConfig.Fabrics or SetFabricSource's source, set
+	// without writeMu (fabricSourceBox).
+	fabrics atomic.Pointer[fabricSourceBox]
 
 	// obsMu guards observers.
 	obsMu     sync.Mutex
@@ -204,7 +206,7 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 	}
 	b.save = cfg.Save
 	if cfg.Fabrics != nil {
-		b.fabrics = cfg.Fabrics
+		b.fabrics.Store(&fabricSourceBox{cfg.Fabrics})
 	}
 	b.mu.Lock()
 	before := b.bindings
@@ -225,9 +227,21 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 // a source refuses every request write — fail closed (review II,
 // R2-P6-store-1010, decision 158).
 func (b *Binding) SetFabricSource(src FabricSource) {
-	b.writeMu.Lock()
-	b.fabrics = src
-	b.writeMu.Unlock()
+	b.fabrics.Store(&fabricSourceBox{src})
+}
+
+// fabricSourceBox holds a [FabricSource] for an atomic.Pointer: the
+// assembler sets it on every ClusterServers call, and it must not wait
+// behind a write's store call (review II, R2-P6-store-1010 round 4).
+type fabricSourceBox struct{ src FabricSource }
+
+// fabricSource is the source the server checks writes against, nil for
+// none.
+func (b *Binding) fabricSource() FabricSource {
+	if box := b.fabrics.Load(); box != nil {
+		return box.src
+	}
+	return nil
 }
 
 // OnAttributeChange implements [contract.AttributeChangeNotifier]: fn
@@ -670,10 +684,11 @@ var errBindingWriteRefused = errors.New("core: Binding write refused")
 // gave one — refuses every request write, persisted or not. writeMu is
 // held.
 func (b *Binding) fabricGoneLocked(ctx context.Context, fabric uint8) error {
-	if b.fabrics == nil {
+	src := b.fabricSource()
+	if src == nil {
 		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: "core: Binding: no fabric source to check the write's fabric against"}
 	}
-	listed, err := fabricListed(ctx, b.fabrics, fabric)
+	listed, err := fabricListed(ctx, src, fabric)
 	if err != nil {
 		return bindingStatusError{code: im.StatusFailure, msg: fmt.Sprintf("core: Binding: list fabrics: %v", err)}
 	}

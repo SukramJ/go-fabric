@@ -7,6 +7,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
@@ -136,4 +137,38 @@ func sourcedBinding() *core.Binding {
 	b := core.NewBinding()
 	b.SetFabricSource(everyFabric)
 	return b
+}
+
+// TestSetFabricSourceDoesNotWaitForAStore (review II, R2-P6-store-1010
+// round 4): the assembler hands the source on every ClusterServers call;
+// it must not wait behind a write whose store call is under way.
+func TestSetFabricSourceDoesNotWaitForAStore(t *testing.T) {
+	t.Parallel()
+	entered, release := make(chan struct{}), make(chan struct{})
+	b := core.NewBinding()
+	if err := b.Persist(core.BindingConfig{Fabrics: everyFabric, Save: func([]core.TargetStruct) error {
+		close(entered)
+		<-release
+		return nil
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		_ = b.MatterWrite(fabricCtx(1), 0x0000, []core.TargetStruct{{Node: 7, Endpoint: 1, EndpointPresent: true}})
+	}()
+	<-entered
+	set := make(chan struct{})
+	go func() {
+		b.SetFabricSource(everyFabric)
+		close(set)
+	}()
+	limit, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	select {
+	case <-set:
+	case <-limit.Done():
+		t.Error("SetFabricSource waited behind the store call")
+	}
+	close(release)
+	<-set
 }
