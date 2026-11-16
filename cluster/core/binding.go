@@ -140,6 +140,15 @@ const (
 // packages/model/src/standard/elements/binding.element.ts:23 at db021da0).
 const bindingMaxEntries = 4 * 16
 
+// bindingMaxEntriesPerFabric bounds one fabric's share of the list, beside
+// the total: a fabric's Manage subject that filled the whole table would
+// leave every other fabric's write ResourceExhausted. Neither reference
+// bounds a fabric's share — connectedhomeip checks the table's total
+// alone (BindingCluster.cpp:79-80), matter.js has no bound — so this is
+// ahead of both (owner decision 134; review II, R2-P6-bound-1008). A
+// quarter of the table: four fabrics at their full share fill it.
+const bindingMaxEntriesPerFabric = bindingMaxEntries / 4
+
 // bindingInst is the definition (cluster/spec/binding, ADR 0013, from
 // matter.js binding.element.ts): the attribute list and the status of a
 // write to anything but Binding come from it, and a write of the
@@ -422,6 +431,22 @@ func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value a
 			return nil, bindingStatusError{
 				code: im.StatusResourceExhausted,
 				msg:  fmt.Sprintf("core: Binding: %d entries exceed the table's %d", len(after), bindingMaxEntries),
+			}
+		}
+		// A request's write is held to its fabric's share as well, when it
+		// grows that share (bindingMaxEntriesPerFabric).
+		if request && len(list) > bindingMaxEntriesPerFabric {
+			held := 0
+			for _, t := range before {
+				if t.FabricIndex == fabric {
+					held++
+				}
+			}
+			if len(list) > held {
+				return nil, bindingStatusError{
+					code: im.StatusResourceExhausted,
+					msg:  fmt.Sprintf("core: Binding: %d entries exceed a fabric's %d", len(list), bindingMaxEntriesPerFabric),
+				}
 			}
 		}
 		return after, nil
