@@ -1,15 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package commissioning orchestrates Matter on-network commissioning
-// from the PASE handshake through NOC installation.
+// Package commissioning is a second, standalone implementation of the
+// commissionee's side of Matter commissioning: a PASE responder, the
+// AttestationResponse and CSRResponse payloads and a DAC chain check.
+// Nothing in this module uses it — the node serves commissioning through
+// its commissioning window (bridge, node) and the OperationalCredentials
+// server of cluster/core — and it differs from that served path: its
+// PASE responder takes the trivial passcodes secure/setup refuses, its
+// attestation timestamp is the Unix time where the node writes 0, and
+// its CSR has an empty subject where the node's says O=CSR (review II,
+// R2-P6-sec-0104, R2-P6-par-0105).
 //
-// go-fabric is the *commissionee* — the device being added to a
-// fabric. The commissioner (Apple Home, Google Home, chip-tool, …)
-// drives the protocol; this package is the bridge-side state machine
-// that responds to each phase.
+// Deprecated: the node's commissioning window and
+// cluster/core.OperationalCredentials serve commissioning, and
+// controller/attestation checks a device's attestation; each exported
+// identifier names its replacement. Removable in the next minor release.
 //
-// Phases (Matter Core Spec §5):
+// The phases of commissioning (Matter Core Spec §5); the package covers
+// the first three:
 //
 //  1. PASE establishment — Spake2+ handshake using the operator-
 //     supplied passcode. Produces a PASE [secure/channel.Session]

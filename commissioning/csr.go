@@ -28,10 +28,20 @@ const (
 // Errors.
 var (
 	// ErrCSRNonce is returned when the supplied nonce is not 32 bytes.
+	//
+	// Deprecated: use cluster/core.OperationalCredentials
+	// (core.NewOperationalCredentials), which answers CSRRequest on the node;
+	// secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
+	// the next minor release.
 	ErrCSRNonce = errors.New("commissioning: CSR nonce must be 32 bytes")
 )
 
 // CSRInput drives [BuildCSR].
+//
+// Deprecated: use cluster/core.OperationalCredentials
+// (core.NewOperationalCredentials), which answers CSRRequest on the node;
+// secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
+// the next minor release.
 type CSRInput struct {
 	// CSRNonce is the 32-byte nonce from the commissioner's
 	// CSRRequest.
@@ -45,6 +55,11 @@ type CSRInput struct {
 
 // CSRResult bundles the CSR private key, the TLV-encoded NOCSRElements,
 // and the ECDSA signature over (elements ‖ challenge).
+//
+// Deprecated: use cluster/core.OperationalCredentials
+// (core.NewOperationalCredentials), which answers CSRRequest on the node;
+// secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
+// the next minor release.
 type CSRResult struct {
 	// PrivateKey is the freshly generated P-256 private key. The
 	// caller persists it via the OperationalCredentials cluster's
@@ -62,7 +77,14 @@ type CSRResult struct {
 // BuildCSR generates a new P-256 keypair and produces a Matter
 // NOCSRElements payload + signature. The commissioner extracts the
 // embedded PKCS#10 CSR, signs it with the fabric ICAC, and returns
-// the resulting NOC via AddNOC.
+// the resulting NOC via AddNOC. The request's subject is empty, where
+// secure/mattercert.CreateCSR, which the node's own CSRResponse uses,
+// writes O=CSR (R2-P6-par-0105).
+//
+// Deprecated: use cluster/core.OperationalCredentials
+// (core.NewOperationalCredentials), which answers CSRRequest on the node;
+// secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
+// the next minor release.
 func BuildCSR(in CSRInput) (*CSRResult, error) {
 	if len(in.CSRNonce) != 32 {
 		return nil, fmt.Errorf("%w: got %d", ErrCSRNonce, len(in.CSRNonce))
