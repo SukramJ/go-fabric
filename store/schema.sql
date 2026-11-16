@@ -229,6 +229,7 @@ CREATE TABLE IF NOT EXISTS matter_resumption (
     supported_transports INTEGER NOT NULL DEFAULT 0 CHECK(supported_transports BETWEEN 0 AND 65535),
     max_tcp_message_size INTEGER NOT NULL DEFAULT 0 CHECK(max_tcp_message_size BETWEEN 0 AND 4294967295),
     sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1)),
+    write_seq INTEGER NOT NULL DEFAULT 0 CHECK(write_seq >= 0),
     PRIMARY KEY(fabric_index, peer_node_id),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );

@@ -220,7 +220,7 @@ type Groups interface {
 type Resumption interface {
 	// UpsertResumption refuses a ResumptionID that is not 16 bytes and a
 	// SharedSecret that is not 32. A fabric keeps at most
-	// [ResumptionRecordsPerFabric] records: the write of one more peer's
+	// 16 records: the write of one more peer's
 	// evicts the fabric's record written least recently (a rewrite counts
 	// as a write), and never another fabric's.
 	UpsertResumption(ctx context.Context, rec ResumptionRecord) error

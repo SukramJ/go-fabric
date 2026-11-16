@@ -12,6 +12,10 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
+// resumptionCap is the port's per-fabric cap on resumption records
+// (store/port.go, Resumption): the number every backend keeps.
+const resumptionCap = 16
+
 // resumptionRecordID is a resumption id distinct for each (fabric, peer).
 func resumptionRecordID(f uint8, peer uint64) store.ResumptionRecord {
 	rec := resumptionRec(f, peer, 0)
@@ -20,11 +24,11 @@ func resumptionRecordID(f uint8, peer uint64) store.ResumptionRecord {
 }
 
 // resumptionCapPerFabric (R2-P6-bound-0106): a fabric holds at most
-// [store.ResumptionRecordsPerFabric] resumption records; the record written
+// resumptionCap resumption records (store/port.go, Resumption); the record written
 // least recently goes when one more peer's is written, a rewritten record
 // counts as just written, and another fabric's records are not touched.
 func resumptionCapPerFabric(ctx context.Context, t *testing.T, p store.Port) {
-	const n = store.ResumptionRecordsPerFabric
+	const n = resumptionCap
 	one, two := addFabric(ctx, t, p, 1), addFabric(ctx, t, p, 2)
 	for peer := range uint64(n) {
 		must(t, p.UpsertResumption(ctx, resumptionRecordID(two, peer)))

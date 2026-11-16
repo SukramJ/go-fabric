@@ -757,7 +757,7 @@ func (s *Store) ListGroupcastGroups(_ context.Context, fabricIndex uint8) ([]sto
 
 // UpsertResumption implements [store.Resumption]. A resumption id is unique
 // across the table, as SQLite's index on it makes it; a fabric keeps at
-// most [store.ResumptionRecordsPerFabric] records, the least recently
+// most resumptionRecordsPerFabric records, the least recently
 // written evicted first.
 func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
@@ -788,8 +788,13 @@ func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) 
 	return nil
 }
 
+// resumptionRecordsPerFabric is the port's per-fabric cap on resumption
+// records (store/port.go, Resumption); storetest's resumption/cap-per-fabric
+// holds it to the SQLite store's.
+const resumptionRecordsPerFabric = 16
+
 // evictResumptions deletes the fabric's records beyond
-// [store.ResumptionRecordsPerFabric], the least recently written first, as
+// resumptionRecordsPerFabric, the least recently written first, as
 // SQLite's UpsertResumption does; the caller holds mu.
 func (s *Store) evictResumptions(fabricIndex uint8) {
 	for {
@@ -804,7 +809,7 @@ func (s *Store) evictResumptions(fabricIndex uint8) {
 				oldest = k
 			}
 		}
-		if n <= store.ResumptionRecordsPerFabric {
+		if n <= resumptionRecordsPerFabric {
 			return
 		}
 		delete(s.resumption, oldest)

@@ -86,23 +86,25 @@ func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
 // and every read.
 const resumptionSecretSize = 32
 
-// ResumptionRecordsPerFabric is how many resumption records the store
-// keeps for one fabric: [Resumption]'s UpsertResumption of one more peer's
+// resumptionRecordsPerFabric is how many resumption records the store
+// keeps for one fabric ([Resumption]): UpsertResumption of one more peer's
 // record evicts the fabric's record written least recently. The cap is per
 // fabric, so a fabric's administrator, who mints the node ids its peers
 // authenticate with, cannot grow the table for every fabric or evict
-// another fabric's records.
-const ResumptionRecordsPerFabric = 16
+// another fabric's records. store/memstore keeps the same number, and
+// storetest's resumption/cap-per-fabric holds both to 16.
+const resumptionRecordsPerFabric = 16
 
 // ErrResumptionNotFound is returned when a lookup misses.
 var ErrResumptionNotFound = errors.New("store: resumption record not found")
 
 // UpsertResumption replaces the resumption row for (fabric_index,
-// peer_node_id) — the old row deleted and the new one inserted, so its
-// last_used_at and its place among the fabric's rows are the newest — and
-// then deletes the fabric's rows beyond [ResumptionRecordsPerFabric], the
-// least recently written first (last_used_at, then the row's insertion
-// order within one timestamp), in one transaction. CASEAuthTags is
+// peer_node_id) in one transaction: the old row deleted, the new one
+// inserted with a write sequence one above the table's highest (write_seq,
+// the store's own count — not the clock, which may step back), and then the
+// fabric's rows beyond resumptionRecordsPerFabric deleted, the lowest write
+// sequence first. The row just written holds the highest, so it is never
+// the one evicted. CASEAuthTags is
 // serialised as JSON; nil and empty slice both persist as '[]'.
 func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
@@ -139,8 +141,9 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 	if _, err := tx.ExecContext(
 		ctx, `
 INSERT INTO matter_resumption
-    (`+resumptionColumns+`, last_used_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))`,
+    (`+resumptionColumns+`, last_used_at, write_seq)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'),
+    (SELECT COALESCE(MAX(write_seq), 0) + 1 FROM matter_resumption))`,
 		rec.FabricIndex, peer, rec.ResumptionID, secret, catsJSON,
 		p.SessionIdleInterval, p.SessionActiveInterval, p.SessionActiveThreshold,
 		p.DataModelRevision, p.InteractionModelRevision, p.SpecificationVersion,
@@ -149,10 +152,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f
 		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
-DELETE FROM matter_resumption WHERE fabric_index = ? AND rowid NOT IN (
-    SELECT rowid FROM matter_resumption WHERE fabric_index = ?
-    ORDER BY last_used_at DESC, rowid DESC LIMIT ?)`,
-		rec.FabricIndex, rec.FabricIndex, ResumptionRecordsPerFabric); err != nil {
+DELETE FROM matter_resumption WHERE fabric_index = ? AND peer_node_id NOT IN (
+    SELECT peer_node_id FROM matter_resumption WHERE fabric_index = ?
+    ORDER BY write_seq DESC LIMIT ?)`,
+		rec.FabricIndex, rec.FabricIndex, resumptionRecordsPerFabric); err != nil {
 		return fmt.Errorf("store: upsert resumption: evict: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
