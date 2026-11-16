@@ -85,6 +85,7 @@ var cases = []testCase{
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
 	{"resumption/session-parameters", resumptionSessionParametersCase},
+	{"resumption/cap-per-fabric", resumptionCapPerFabric},
 	{"server-subscriptions", serverSubscriptionsCase},
 	{"server-subscriptions/save-order", serverSubscriptionsSaveOrder},
 	{"settings", settingsCase},

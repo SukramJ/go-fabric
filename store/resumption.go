@@ -86,12 +86,24 @@ func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
 // and every read.
 const resumptionSecretSize = 32
 
+// ResumptionRecordsPerFabric is how many resumption records the store
+// keeps for one fabric: [Resumption]'s UpsertResumption of one more peer's
+// record evicts the fabric's record written least recently. The cap is per
+// fabric, so a fabric's administrator, who mints the node ids its peers
+// authenticate with, cannot grow the table for every fabric or evict
+// another fabric's records.
+const ResumptionRecordsPerFabric = 16
+
 // ErrResumptionNotFound is returned when a lookup misses.
 var ErrResumptionNotFound = errors.New("store: resumption record not found")
 
-// UpsertResumption inserts or replaces the resumption row for
-// (fabric_index, peer_node_id). CASEAuthTags is serialised as JSON;
-// nil and empty slice both persist as '[]'.
+// UpsertResumption replaces the resumption row for (fabric_index,
+// peer_node_id) — the old row deleted and the new one inserted, so its
+// last_used_at and its place among the fabric's rows are the newest — and
+// then deletes the fabric's rows beyond [ResumptionRecordsPerFabric], the
+// least recently written first (last_used_at, then the row's insertion
+// order within one timestamp), in one transaction. CASEAuthTags is
+// serialised as JSON; nil and empty slice both persist as '[]'.
 func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
 		return fmt.Errorf("store: resumption_id length=%d (want 16)", len(rec.ResumptionID))
@@ -113,32 +125,35 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 	if err != nil {
 		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
-	if _, err := s.db.ExecContext(
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: upsert resumption: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM matter_resumption WHERE fabric_index = ? AND peer_node_id = ?`, rec.FabricIndex, peer); err != nil {
+		return fmt.Errorf("store: upsert resumption: %w", err)
+	}
+	if _, err := tx.ExecContext(
 		ctx, `
 INSERT INTO matter_resumption
-    (`+resumptionColumns+`)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(fabric_index, peer_node_id) DO UPDATE SET
-    resumption_id              = excluded.resumption_id,
-    shared_secret              = excluded.shared_secret,
-    case_authenticated_tags    = excluded.case_authenticated_tags,
-    session_idle_interval      = excluded.session_idle_interval,
-    session_active_interval    = excluded.session_active_interval,
-    session_active_threshold   = excluded.session_active_threshold,
-    data_model_revision        = excluded.data_model_revision,
-    interaction_model_revision = excluded.interaction_model_revision,
-    specification_version      = excluded.specification_version,
-    max_paths_per_invoke       = excluded.max_paths_per_invoke,
-    supported_transports       = excluded.supported_transports,
-    max_tcp_message_size       = excluded.max_tcp_message_size,
-    sealed                     = excluded.sealed,
-    last_used_at               = CURRENT_TIMESTAMP`,
+    (`+resumptionColumns+`, last_used_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))`,
 		rec.FabricIndex, peer, rec.ResumptionID, secret, catsJSON,
 		p.SessionIdleInterval, p.SessionActiveInterval, p.SessionActiveThreshold,
 		p.DataModelRevision, p.InteractionModelRevision, p.SpecificationVersion,
 		p.MaxPathsPerInvoke, p.SupportedTransports, p.MaxTCPMessageSize, s.sealer != nil,
 	); err != nil {
 		return fmt.Errorf("store: upsert resumption: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+DELETE FROM matter_resumption WHERE fabric_index = ? AND rowid NOT IN (
+    SELECT rowid FROM matter_resumption WHERE fabric_index = ?
+    ORDER BY last_used_at DESC, rowid DESC LIMIT ?)`,
+		rec.FabricIndex, rec.FabricIndex, ResumptionRecordsPerFabric); err != nil {
+		return fmt.Errorf("store: upsert resumption: evict: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: upsert resumption: commit: %w", err)
 	}
 	return nil
 }

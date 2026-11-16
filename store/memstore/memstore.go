@@ -81,14 +81,18 @@ type tables struct {
 	groupTable map[uint8]map[uint16]store.GroupTableEntry
 	groupcast  map[uint8]map[uint16]store.GroupcastGroup
 	resumption map[resumptionKey]store.ResumptionRecord
-	otaDefault map[uint8][]store.OTAProviderLocation
-	icd        map[uint8][]store.ICDRegistration
-	subs       map[uint32]subscription
-	subsSeq    uint64
-	settings   map[string]string
-	metadata   map[string]uint64
-	presets    map[string]presetRow
-	locks      map[string]store.DoorLockAuth
+	// resumptionWritten is each record's write sequence (resumptionSeq at
+	// its last UpsertResumption), the order the per-fabric cap evicts in.
+	resumptionWritten map[resumptionKey]uint64
+	resumptionSeq     uint64
+	otaDefault        map[uint8][]store.OTAProviderLocation
+	icd               map[uint8][]store.ICDRegistration
+	subs              map[uint32]subscription
+	subsSeq           uint64
+	settings          map[string]string
+	metadata          map[string]uint64
+	presets           map[string]presetRow
+	locks             map[string]store.DoorLockAuth
 	// owed are the fabric events a RollbackFabric recorded, by ID
 	// ascending; owedLastID is the last ID given, never given again.
 	owed       []store.OwedFabricEvent
@@ -131,23 +135,24 @@ func New() *Store {
 // hold the next-fabric-index counter at 1.
 func newTables() tables {
 	return tables{
-		fabrics:    map[uint8]store.FabricRecord{},
-		identities: map[uint8]store.IdentityRecord{},
-		priors:     map[uint8]fabricPrior{},
-		acl:        map[uint8][]store.ACLEntry{},
-		aclNextID:  1,
-		keySets:    map[uint8]map[uint16]store.GroupKeySet{},
-		keyMap:     map[uint8]map[uint16]store.GroupKeyMapping{},
-		groupTable: map[uint8]map[uint16]store.GroupTableEntry{},
-		groupcast:  map[uint8]map[uint16]store.GroupcastGroup{},
-		resumption: map[resumptionKey]store.ResumptionRecord{},
-		otaDefault: map[uint8][]store.OTAProviderLocation{},
-		icd:        map[uint8][]store.ICDRegistration{},
-		subs:       map[uint32]subscription{},
-		settings:   map[string]string{},
-		metadata:   map[string]uint64{metadataKeyNextFabricIndex: 1},
-		presets:    map[string]presetRow{},
-		locks:      map[string]store.DoorLockAuth{},
+		fabrics:           map[uint8]store.FabricRecord{},
+		identities:        map[uint8]store.IdentityRecord{},
+		priors:            map[uint8]fabricPrior{},
+		acl:               map[uint8][]store.ACLEntry{},
+		aclNextID:         1,
+		keySets:           map[uint8]map[uint16]store.GroupKeySet{},
+		keyMap:            map[uint8]map[uint16]store.GroupKeyMapping{},
+		groupTable:        map[uint8]map[uint16]store.GroupTableEntry{},
+		groupcast:         map[uint8]map[uint16]store.GroupcastGroup{},
+		resumption:        map[resumptionKey]store.ResumptionRecord{},
+		resumptionWritten: map[resumptionKey]uint64{},
+		otaDefault:        map[uint8][]store.OTAProviderLocation{},
+		icd:               map[uint8][]store.ICDRegistration{},
+		subs:              map[uint32]subscription{},
+		settings:          map[string]string{},
+		metadata:          map[string]uint64{metadataKeyNextFabricIndex: 1},
+		presets:           map[string]presetRow{},
+		locks:             map[string]store.DoorLockAuth{},
 	}
 }
 
@@ -477,6 +482,7 @@ func (s *Store) removeResumptions(fabricIndex uint8) {
 	for k := range s.resumption {
 		if k.fabric == fabricIndex {
 			delete(s.resumption, k)
+			delete(s.resumptionWritten, k)
 		}
 	}
 }
@@ -743,7 +749,9 @@ func (s *Store) ListGroupcastGroups(_ context.Context, fabricIndex uint8) ([]sto
 // --- Resumption ---
 
 // UpsertResumption implements [store.Resumption]. A resumption id is unique
-// across the table, as SQLite's index on it makes it.
+// across the table, as SQLite's index on it makes it; a fabric keeps at
+// most [store.ResumptionRecordsPerFabric] records, the least recently
+// written evicted first.
 func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
 		return fmt.Errorf("memstore: resumption_id length=%d (want 16)", len(rec.ResumptionID))
@@ -767,7 +775,34 @@ func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) 
 		rec.CASEAuthTags = []uint32{}
 	}
 	s.resumption[key] = rec
+	s.resumptionSeq++
+	s.resumptionWritten[key] = s.resumptionSeq
+	s.evictResumptions(rec.FabricIndex)
 	return nil
+}
+
+// evictResumptions deletes the fabric's records beyond
+// [store.ResumptionRecordsPerFabric], the least recently written first, as
+// SQLite's UpsertResumption does; the caller holds mu.
+func (s *Store) evictResumptions(fabricIndex uint8) {
+	for {
+		n := 0
+		var oldest resumptionKey
+		for k := range s.resumption {
+			if k.fabric != fabricIndex {
+				continue
+			}
+			n++
+			if n == 1 || s.resumptionWritten[k] < s.resumptionWritten[oldest] {
+				oldest = k
+			}
+		}
+		if n <= store.ResumptionRecordsPerFabric {
+			return
+		}
+		delete(s.resumption, oldest)
+		delete(s.resumptionWritten, oldest)
+	}
 }
 
 // GetResumptionByID implements [store.Resumption].
@@ -801,6 +836,7 @@ func (s *Store) RemoveResumption(_ context.Context, fabricIndex uint8, peerNodeI
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.resumption, resumptionKey{fabricIndex, peerNodeID})
+	delete(s.resumptionWritten, resumptionKey{fabricIndex, peerNodeID})
 	return nil
 }
 
