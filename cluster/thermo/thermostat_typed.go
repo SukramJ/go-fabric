@@ -170,16 +170,23 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
 	if setpoints {
-		for _, id := range moved {
-			switch id {
-			case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint:
-				s.clearActivePresetOnDirectWrite(context.Background(), false)
-			case thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint:
-				s.clearActivePresetOnDirectWrite(context.Background(), true)
-			}
-		}
+		s.clearActivePresetAfterSet(moved)
 	}
 	return nil
+}
+
+// clearActivePresetAfterSet ends the active preset in effect for each
+// occupied or unoccupied setpoint a SetAttributes moved, as a local
+// direct change does.
+func (s *ThermostatServer) clearActivePresetAfterSet(moved []uint32) {
+	for _, id := range moved {
+		switch id {
+		case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint:
+			s.clearActivePresetOnDirectWrite(context.Background(), false)
+		case thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint:
+			s.clearActivePresetOnDirectWrite(context.Background(), true)
+		}
+	}
 }
 
 // checkCandidate judges the limits and setpoints of a SetAttributes on a
