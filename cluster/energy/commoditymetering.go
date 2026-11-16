@@ -177,11 +177,12 @@ func (s *CommodityMeteringServer) MatterRead(attrID uint32) (any, bool) {
 	return commodityRead(s.Server.MatterRead(attrID))
 }
 
-// MeteredQuantity returns MeteredQuantity; nil while null.
+// MeteredQuantity returns MeteredQuantity; nil while null. It is a deep
+// copy, which the caller may change.
 func (s *CommodityMeteringServer) MeteredQuantity() []MeteredQuantity {
 	v, _ := s.Value(commtr.AttrMeteredQuantity)
-	q, _ := v.([]MeteredQuantity)
-	return q
+	q, _ := listOf[MeteredQuantity](v)
+	return cloneAll(q)
 }
 
 // MeteredQuantityTimestamp returns MeteredQuantityTimestamp; nil while
