@@ -6,6 +6,7 @@ package jointfabric
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 
@@ -618,5 +619,109 @@ func TestPushAfterTheWipeCallsNoPort(t *testing.T) {
 	_ = d.UpdateGroupKeySetEntry(ctx, GroupKeySet{GroupKeySetId: 5, GroupKeySecurityPolicy: dsdef.DatastoreGroupKeySecurityPolicyTrustFirst, EpochKey0: spec.Nullable[[]byte]{Value: key2}})
 	if w.calls != 1 {
 		t.Fatalf("%d SyncGroupKeySet calls; the push after the wipe reached the port", w.calls)
+	}
+}
+
+// refusingWipe is an anchored datastore with a node whose store refuses
+// every save from now on, wiped once (refused).
+func refusingWipe(t *testing.T) (*Datastore, *switchStore) {
+	t.Helper()
+	ctx := t.Context()
+	st := &switchStore{}
+	d, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 4))
+	mustOK(t, d.AddPendingNode(ctx, 9, "n"))
+	st.fmu.Lock()
+	st.fail = true
+	st.fmu.Unlock()
+	if err := d.MatterDropFabric(ctx, 4); !errors.Is(err, ErrStore) {
+		t.Fatalf("wipe over a refusing store: %v", err)
+	}
+	return d, st
+}
+
+// TestRefusedWipeSurvivesLaterRefusedSaves (Fable REWORK-6): after a
+// wipe whose save was refused, a later change whose save is refused too —
+// the administrator's forward of the same removal, the host's
+// SetFriendlyName — restores the wiped tables, not the stale record.
+func TestRefusedWipeSurvivesLaterRefusedSaves(t *testing.T) {
+	ctx := t.Context()
+	wiped := func(t *testing.T, d *Datastore, after string) {
+		t.Helper()
+		if len(d.NodeList()) != 0 || d.AnchorFabricIndex() != 0 {
+			t.Fatalf("after %s: nodes %d, anchor %d", after, len(d.NodeList()), d.AnchorFabricIndex())
+		}
+	}
+	t.Run("the forward", func(t *testing.T) {
+		d, _ := refusingWipe(t)
+		d.OnFabricRemoved(ctx, 4)
+		wiped(t, d, "OnFabricRemoved(4)")
+	})
+	t.Run("the administrator's forward", func(t *testing.T) {
+		d, _ := refusingWipe(t)
+		fx := newAdminFixture(t, AdministratorConfig{Datastore: d})
+		fx.a.OnFabricRemoved(ctx, 4)
+		wiped(t, d, "Administrator.OnFabricRemoved(4)")
+	})
+	t.Run("another change", func(t *testing.T) {
+		d, st := refusingWipe(t)
+		if err := d.SetFriendlyName(ctx, "x"); !errors.Is(err, ErrStore) {
+			t.Fatalf("SetFriendlyName over a refusing store: %v", err)
+		}
+		wiped(t, d, "SetFriendlyName")
+		st.fmu.Lock()
+		st.fail = false
+		st.fmu.Unlock()
+		mustOK(t, d.SetFriendlyName(ctx, "y"))
+		d2, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+		mustOK(t, err)
+		wiped(t, d2, "the store took a save")
+	})
+}
+
+// TestEveryAttributeIsWithheld (Fable RECORD-11): a request the datastore
+// does not admit reads no attribute of the generated definition as the
+// server holds it — deny by default, an attribute a later schema adds
+// included — while the universal globals pass.
+func TestEveryAttributeIsWithheld(t *testing.T) {
+	ctx := t.Context()
+	d := newStore(t, nil)
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
+	if len(dsdef.Definition.Attributes) != len(allAttrs) || len(allAttrs) == 0 {
+		t.Fatalf("definition %d attributes, allAttrs %d", len(dsdef.Definition.Attributes), len(allAttrs))
+	}
+	for _, a := range dsdef.Definition.Attributes {
+		got, ok := d.MatterReadFiltered(peerOf(2), a.ID)
+		want, known := withheld(a.ID)
+		if !ok || !known || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s (0x%04X) of fabric 2: %#v %v", a.Name, a.ID, got, ok)
+		}
+	}
+	if v, ok := withheld(0x00FE); !ok || v != nil {
+		t.Errorf("an attribute the switch does not know: %v %v, want withheld (null)", v, ok)
+	}
+	for id := uint32(0xFFF8); id <= 0xFFFD; id++ {
+		if _, ok := withheld(id); ok {
+			t.Errorf("global 0x%04X withheld", id)
+		}
+	}
+}
+
+// TestAnchorChangeReportsEveryAttribute (Fable RECORD-12): recording the
+// anchor changes who may read every attribute, so it advances the data
+// version; recording the same anchor again changes nothing.
+func TestAnchorChangeReportsEveryAttribute(t *testing.T) {
+	ctx := t.Context()
+	d := newStore(t, nil)
+	dv := d.MatterDataVersion()
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
+	if d.MatterDataVersion() == dv {
+		t.Fatal("the anchor's recording reported nothing")
+	}
+	dv = d.MatterDataVersion()
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
+	if d.MatterDataVersion() != dv {
+		t.Fatal("the same anchor again reported a change")
 	}
 }

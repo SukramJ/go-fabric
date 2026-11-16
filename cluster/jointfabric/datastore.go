@@ -224,16 +224,23 @@ type Datastore struct {
 	t     tables
 	dirty map[uint32]struct{}
 	// saved is the record the store holds: an update saves only when the
-	// tables differ from it, and a failed save restores them from it.
+	// tables differ from it.
 	saved []byte
+	// restore is what a refused save restores the tables to: the last
+	// saved record, or the empty record once a wipe ran — whether or not
+	// the wipe's own save went through — so a wipe stays a wipe across
+	// every later refused save until the store takes the empty record
+	// (R2-P6-conc-1107, Fable REWORK-6).
+	restore []byte
 	// gen counts the wipes of the tables; a refresh or a push started
 	// before one calls no port and commits nothing after it
 	// (R2-P6-conc-1107).
 	gen uint64
-	// keepUnsaved keeps a change in memory when its save fails (a wipe).
-	keepUnsaved bool
-	refreshing  uint64 // 0: no refresh (kUndefinedNodeId)
-	inRefresh   bool
+	// wiping marks the update that wipes: its attributes are reported even
+	// when its save is refused (the tables are wiped either way).
+	wiping     bool
+	refreshing uint64 // 0: no refresh (kUndefinedNodeId)
+	inRefresh  bool
 
 	// pushes are the pushes the commands started.
 	pushes sync.WaitGroup
@@ -331,6 +338,7 @@ func NewDatastore(ctx context.Context, cfg DatastoreConfig) (*Datastore, error) 
 		if d.saved, err = json.Marshal(d.t); err != nil {
 			return nil, fmt.Errorf("%w: encode %s: %w", ErrStore, d.key, err)
 		}
+		d.restore = d.saved
 	}
 	handlers := map[uint32]spec.CommandHandler{}
 	for id, h := range d.commands() {
@@ -383,7 +391,7 @@ func (d *Datastore) update(ctx context.Context, fn func() error) error {
 	ids := d.takeDirtyLocked()
 	if d.store != nil {
 		if serr := d.persistLocked(ctx); serr != nil {
-			if !d.keepUnsaved {
+			if !d.wiping {
 				ids = nil
 			}
 			if err == nil {
@@ -391,7 +399,7 @@ func (d *Datastore) update(ctx context.Context, fn func() error) error {
 			}
 		}
 	}
-	d.keepUnsaved = false
+	d.wiping = false
 	d.mu.Unlock()
 	if len(ids) > 0 && d.srv != nil {
 		_ = d.srv.MarkChanged(ids...)
@@ -400,12 +408,12 @@ func (d *Datastore) update(ctx context.Context, fn func() error) error {
 }
 
 // persistLocked writes the tables to the store when they differ from the
-// record it holds; a failed write restores the tables from that record —
-// except a wipe's ([Datastore.MatterDropFabric] sets keepUnsaved), which
-// stays wiped in memory: the store keeps the stale record until the next
-// change saves the empty one, and after a restart the reconcile wipes the
-// stale record, whose anchor the fabric table no longer holds. The caller
-// holds d.mu.
+// record it holds; a failed write restores the tables to restore — the
+// last saved record, or the empty one after a wipe
+// ([Datastore.MatterDropFabric]). A wipe therefore stays a wipe in memory
+// across refused saves; the store keeps the stale record until a save
+// goes through, and after a restart the reconcile wipes the stale record,
+// whose anchor the fabric table no longer holds. The caller holds d.mu.
 func (d *Datastore) persistLocked(ctx context.Context) error {
 	b, err := json.Marshal(d.t)
 	if err == nil && bytes.Equal(b, d.saved) {
@@ -414,17 +422,15 @@ func (d *Datastore) persistLocked(ctx context.Context) error {
 	if err == nil {
 		err = d.store.SetSetting(context.WithoutCancel(ctx), d.key, string(b))
 		if err == nil {
-			d.saved = b
+			d.saved, d.restore = b, b
 			return nil
 		}
 		err = fmt.Errorf("%w: save %s: %w", ErrStore, d.key, err)
 	} else {
 		err = fmt.Errorf("%w: encode %s: %w", ErrStore, d.key, err)
 	}
-	if !d.keepUnsaved {
-		d.t = tables{}
-		_ = json.Unmarshal(d.saved, &d.t)
-	}
+	d.t = tables{}
+	_ = json.Unmarshal(d.restore, &d.t)
 	return err
 }
 
@@ -800,6 +806,12 @@ func (d *Datastore) recordAnchor(ctx context.Context, f store.FabricRecord) erro
 // datastore to that fabric's peers.
 func (d *Datastore) SetAnchorFabricIndex(ctx context.Context, fabricIndex uint8) error {
 	return d.update(ctx, func() error {
+		if d.t.AnchorFabricIndex != fabricIndex {
+			// Who may read every attribute changed: each is reported, so
+			// a subscriber of the admitted fabric gets the tables (Fable
+			// RECORD-12).
+			d.markLocked(allAttrs...)
+		}
 		d.t.AnchorFabricIndex = fabricIndex
 		return nil
 	})
@@ -850,14 +862,21 @@ func (d *Datastore) MatterDropFabric(ctx context.Context, fabricIndex uint8) err
 		}
 		d.t = tables{}
 		d.gen++
-		d.keepUnsaved = true
-		d.markLocked(dsdef.AttrAnchorRootCa, dsdef.AttrAnchorNodeId, dsdef.AttrAnchorVendorId, dsdef.AttrFriendlyName,
-			dsdef.AttrGroupKeySetList, dsdef.AttrGroupList, dsdef.AttrNodeList, dsdef.AttrAdminList, dsdef.AttrStatus,
-			dsdef.AttrEndpointGroupIdList, dsdef.AttrEndpointBindingList, dsdef.AttrNodeKeySetList, dsdef.AttrNodeAclList,
-			dsdef.AttrNodeEndpointList)
+		d.wiping = true
+		d.restore, _ = json.Marshal(tables{})
+		d.markLocked(allAttrs...)
 		return nil
 	})
 }
+
+// allAttrs are the cluster's attributes, from the generated definition.
+var allAttrs = func() []uint32 {
+	out := make([]uint32, 0, len(dsdef.Definition.Attributes))
+	for _, a := range dsdef.Definition.Attributes {
+		out = append(out, a.ID)
+	}
+	return out
+}()
 
 // admits reports whether a request of fabric reaches the datastore: the
 // recorded anchor fabric's alone, none while no anchor is recorded.
@@ -882,8 +901,16 @@ func (d *Datastore) MatterReadFiltered(ctx context.Context, attrID uint32) (any,
 	return d.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read
 }
 
-// withheld is what a request the datastore does not admit reads of attrID.
+// withheld is what a request the datastore does not admit reads of attrID:
+// every attribute but the universal globals (0xFFF8-0xFFFD, the rule of
+// im/read.go isGlobalAttributeID), so an attribute a later schema adds is
+// withheld too — deny by default. A list reads empty, another attribute
+// of today's definition its zero value; an attribute this switch does not
+// know yet reads null (R2-P6-sec-1103, Fable RECORD-11).
 func withheld(attrID uint32) (any, bool) {
+	if attrID >= 0xFFF8 && attrID <= 0xFFFD {
+		return nil, false
+	}
 	switch attrID {
 	case dsdef.AttrAnchorRootCa:
 		return []byte{}, true
@@ -914,7 +941,7 @@ func withheld(attrID uint32) (any, bool) {
 	case dsdef.AttrNodeEndpointList:
 		return spec.List[EndpointEntry]{}, true
 	}
-	return nil, false
+	return nil, true
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the anchor
