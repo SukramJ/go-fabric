@@ -36,8 +36,13 @@ type FabricScope struct {
 // scope the model states — nor declare one for a manufacturer-specific
 // attribute it adds to such a cluster, which is not scoped. The scope applies whatever the server returns,
 // from [ClusterServer.MatterRead] or [FabricScopedReader.MatterReadFiltered];
-// a server returns every fabric's entries whole and leaves the scoping to
-// the dispatcher.
+// a server returns every fabric's entries whole (a filtered
+// MatterReadFiltered the accessing fabric's alone) and leaves the scoping
+// to the dispatcher. A list-append write of a scoped list appends to the
+// accessing fabric's entries: the dispatcher reads each entry's
+// FabricIndex from the entry's own encoding, so a declared list whose
+// entries do not encode themselves takes an append only through a
+// [FabricScopedReader].
 type FabricScopeDeclarer interface {
 	MatterFabricScope(attrID uint32) (scope FabricScope, ok bool)
 }

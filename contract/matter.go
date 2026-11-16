@@ -113,15 +113,25 @@ type ClusterServer interface {
 // whatever the server returns: on a request it filters a fabric-scoped
 // list's entries and withholds another fabric's fabric-sensitive fields
 // ([FabricScope]; for a cluster outside the model, [FabricScopeDeclarer]).
-// A server returns every fabric's entries whole, from MatterRead or from
-// MatterReadFiltered alike. FabricScopedReader is for a value that depends
-// on the reader in another way than that projection.
+// A server returns every fabric's entries whole from MatterRead and from an
+// unfiltered MatterReadFiltered, and the accessing fabric's entries alone
+// from a filtered one; the dispatcher's scope applies on top of either.
+// A list-append write of a fabric-scoped list appends to the accessing
+// fabric's entries, and the dispatcher reads them with a filtered
+// MatterReadFiltered: for an entry that encodes itself (an
+// EncodeTLV(*tlv.Encoder, tlv.Tag) method, as every generated struct has)
+// it keeps the entries whose FabricIndex names that fabric whatever the
+// read returns; an entry that does not encode itself is taken as the
+// filtered read returns it, and without a FabricScopedReader such an
+// append answers FAILURE. FabricScopedReader is also for a value that
+// depends on the reader in another way than that projection.
 type FabricScopedReader interface {
 	// MatterReadFiltered resolves an attribute value with awareness of
 	// the FabricFiltered flag. ctx carries the filter, which
-	// [AccessingFabric] reads; when filtered is true and fabricIndex is
-	// not 0, implementations return only the entries that belong to
-	// fabricIndex.
+	// [AccessingFabric] reads; when filtered is true,
+	// implementations return only the entries that belong to
+	// fabricIndex — none for fabricIndex 0 — and when it is false every
+	// fabric's entries.
 	//
 	// (nil, false) hands the attribute to MatterRead — except on an
 	// Interaction Model request for an attribute whose access is

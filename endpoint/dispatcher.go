@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // clusterDataVersion returns the current DataVersion for srv by
@@ -1830,6 +1831,13 @@ func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
 // as an append to the current list the same way. A value that is not a
 // one-element list of the attribute's element type is a CONSTRAINT_ERROR.
 //
+// A list-append write of a fabric-scoped list appends to the accessing
+// fabric's entries: on a request the dispatcher hands the server that
+// fabric's entries with the new element, whatever the server's read
+// returns ([writersEntries]). Mirrors matter.js, whose write context is
+// always fabric-filtered (InteractionServer.ts:484-489, ListManager.ts:609-620,
+// AttributeWriteResponse.ts:437-449 at db021da0).
+//
 // An attribute whose value is not a list — a slice other than an octet
 // string — answers INVALID_ACTION. Mirrors matter.js
 // packages/protocol/src/action/server/AttributeWriteResponse.ts:436-443 at
@@ -1840,7 +1848,8 @@ func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
 func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (im.AttributeValue, im.StatusCode) {
 	var current any
 	var ok bool
-	if fr, isFR := srv.(contract.FabricScopedReader); isFR {
+	fr, isFR := srv.(contract.FabricScopedReader)
+	if isFR {
 		_, fabric := im.FabricFilterFromContext(ctx)
 		current, ok = fr.MatterReadFiltered(im.WithFabricFilter(ctx, true, fabric), attrID)
 	} else {
@@ -1859,8 +1868,69 @@ func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uin
 	if list.Kind() != reflect.Slice || list.Type() != item.Type() {
 		return value, im.StatusConstraintError
 	}
+	if scope := fabricScopeFor(ctx, srv, attrID); scope != nil {
+		var status im.StatusCode
+		if list, status = writersEntries(list, scope.Fabric, isFR); status != im.StatusSuccess {
+			return value, status
+		}
+	}
 	merged := reflect.MakeSlice(list.Type(), 0, list.Len()+1)
 	merged = reflect.AppendSlice(merged, list)
 	merged = reflect.Append(merged, item.Index(0))
 	return im.AttributeValue{Value: merged.Interface()}, im.StatusSuccess
+}
+
+// writersEntries is the entries of list, the current value of a
+// fabric-scoped list, that fabric owns: the list a list-append write of
+// that fabric appends to. An entry's owner is the FabricIndex (field 254)
+// of its own encoding — an entry that encodes itself ([spec.Encodable], as
+// every generated struct and a [spec.Instance]'s value do) — judged as a
+// fabric-filtered read judges it ([im.MaskFabricScoped]): an entry another
+// fabric owns is left out, and one without a valid owner answers FAILURE,
+// as the read of the list does. A list whose entries do not encode
+// themselves is the server's fabric-filtered read when the server is a
+// [contract.FabricScopedReader] (filtered, which returns the accessing
+// fabric's entries alone), and answers FAILURE otherwise: the dispatcher
+// cannot tell whose entry it is, and hands the server no entry it does not
+// know to be the writer's. An empty list has no entry to judge.
+func writersEntries(list reflect.Value, fabric uint8, filteredRead bool) (reflect.Value, im.StatusCode) {
+	if list.Len() == 0 {
+		return list, im.StatusSuccess
+	}
+	entries := make([]spec.Encodable, list.Len())
+	for i := range list.Len() {
+		el := list.Index(i)
+		if (el.Kind() == reflect.Pointer || el.Kind() == reflect.Interface) && el.IsNil() {
+			return list, im.StatusFailure
+		}
+		e, ok := el.Interface().(spec.Encodable)
+		if !ok {
+			if filteredRead {
+				return list, im.StatusSuccess
+			}
+			return list, im.StatusFailure
+		}
+		entries[i] = e
+	}
+	scope := im.FabricScope{Fabric: fabric, Filtered: true}
+	out := reflect.MakeSlice(list.Type(), 0, list.Len())
+	for i, e := range entries {
+		enc := tlv.NewEncoder()
+		enc.StartArray(tlv.AnonymousTag())
+		e.EncodeTLV(enc, tlv.AnonymousTag())
+		_ = enc.EndContainer()
+		encoded, err := enc.Bytes()
+		if err != nil {
+			return list, im.StatusFailure
+		}
+		masked, ok := im.MaskFabricScoped(encoded, scope)
+		if !ok {
+			return list, im.StatusFailure
+		}
+		// The array's opener and end alone: the entry is another fabric's.
+		if len(masked) > 2 {
+			out = reflect.Append(out, list.Index(i))
+		}
+	}
+	return out, im.StatusSuccess
 }

@@ -387,7 +387,8 @@ request, whatever the server returns ([ports](ports.md)).
 
 | Before | Now |
 | --- | --- |
-| a server that withheld another fabric's fabric-sensitive fields itself (a `Redacted` entry, a field left nil, an entry reduced to its `FabricIndex`) | returns every fabric's entries whole from `MatterRead` and `MatterReadFiltered`; the `Redacted` fields of `cluster/core` are deprecated and still honoured by the bridge's writer |
+| a server that withheld another fabric's fabric-sensitive fields itself (a `Redacted` entry, a field left nil, an entry reduced to its `FabricIndex`) | returns every fabric's entries whole from `MatterRead` and an unfiltered `MatterReadFiltered`, the reading fabric's alone from a filtered one; the `Redacted` fields of `cluster/core` are deprecated and still honoured by the bridge's writer |
+| a list-append write of a fabric-scoped list handed the server's whole list with the new element | handed the writing fabric's entries with the new element: the dispatcher keeps an entry that encodes itself (`EncodeTLV`) by its `FabricIndex`; an entry that does not is taken from the server's filtered `MatterReadFiltered`, and without a `contract.FabricScopedReader` the append answers `FAILURE` |
 | a server of a vendor cluster with a fabric-scoped list | declares the scope with `contract.FabricScopeDeclarer`; a server built on a `spec.Instance` declares its definition's |
 | an entry of a fabric-scoped list without a `FabricIndex`, or with one outside 1 to 254 | the request is answered `FAILURE` for the attribute's path: give every entry its owning fabric |
 | fabric-sensitive events gated per cluster | gated per event from the generated table (`schema.EventReadScope`), with the event's own read privilege |
