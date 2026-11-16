@@ -228,7 +228,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 196,
+    "line": 217,
     "citation": "ExchangeManager.ts:638-650",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sessionsOnChannel",
@@ -237,7 +237,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 244,
+    "line": 265,
     "citation": "ExchangeManager.ts:674-681",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#closeTcpChannelIfLastSession",
@@ -246,7 +246,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 268,
+    "line": 289,
     "citation": "ExchangeManager.ts:634-648",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sessionsOnChannel",
@@ -255,7 +255,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 557,
+    "line": 578,
     "citation": "ExchangeManager.ts:242-265",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "createUnsecuredSession",
@@ -367,7 +367,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 342,
+    "line": 345,
     "citation": "ExchangeManager.ts:554",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "createdAt",
@@ -524,7 +524,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 68,
+    "line": 69,
     "citation": "MRP.ts:100-108",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "at": "db021da0",
@@ -534,7 +534,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1473,
+    "line": 1481,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -543,7 +543,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2095,
+    "line": 2103,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -552,7 +552,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2171,
+    "line": 2179,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -1581,7 +1581,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 539,
+    "line": 554,
     "citation": "ScenesManagementServer.ts:77-80",
     "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
     "identifier": "OnOff",
@@ -1590,7 +1590,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 550,
+    "line": 565,
     "citation": "OnOffServer.ts:114-117",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1984,7 +1984,7 @@
   },
   {
     "file": "contract/matter.go",
-    "line": 890,
+    "line": 900,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -2228,7 +2228,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 153,
+    "line": 154,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -2237,7 +2237,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 492,
+    "line": 493,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -2246,7 +2246,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 516,
+    "line": 517,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -2255,7 +2255,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 725,
+    "line": 726,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",
@@ -2445,7 +2445,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 672,
+    "line": 717,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -2472,7 +2472,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 514,
+    "line": 515,
     "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "at": "db021da0",
@@ -2482,7 +2482,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 1024,
+    "line": 1025,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -2939,7 +2939,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1568,
+    "line": 1578,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",

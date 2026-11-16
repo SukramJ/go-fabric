@@ -64,21 +64,24 @@ const (
 // chunkStatusResponseTimeout bounds how long a chunk loop (Subscribe-
 // Initial and Read-response) waits for the peer's IM StatusResponse on
 // one ReportData chunk before abandoning the interaction — the ongoing
-// report and the read and initial-report chunks. Mirrors matter.js
-// MRP.maxPeerResponseTimeOf for a UDP/MRP session (MRP.ts:100-108 at
-// db021da0): the worst-case time until the peer received our last
-// retransmission and its answer came back — the peer's retransmission
-// schedule, plus this node's own schedule on its own session intervals,
-// active at first and idle once the wait passes its active threshold, with
-// its sender-side pad (maxResponseTimeOf, :198-224) — plus the default
-// expected processing time and the response buffer (review II,
-// R2-P1-req2-12).
+// report and the read and initial-report chunks. Takes matter.js's bound
+// for this wait — MRP.maxPeerResponseTimeOf for a UDP/MRP session
+// (MRP.ts:100-108 at db021da0): this node's own retransmission schedule on
+// its own session intervals, active at first and idle once the wait passes
+// its active threshold, with its sender-side pad (maxResponseTimeOf,
+// :198-224), plus the default expected processing time and the response
+// buffer — and adds the formula's peer term, the peer's retransmission
+// schedule, which matter.js leaves at 0 for this wait
+// (MessageExchange.ts:875-886 passes no includeMaximumSendingTime, :882;
+// MessageChannel.ts:240): the module's one timer runs from the send, not
+// from the report's acknowledgement (notes/parity/by_design.md,
+// BD-Matter-Subscription-ReportWaitBound; review II, R2-P1-req2-12).
 //
 // The peer's schedule is summed on the base interval the session lookup
 // resolves for it now (the spec idle default when it resolves none) and
 // does not switch from the peer's active to its idle interval past the
-// peer's active threshold, as matter.js's does: the session port names one
-// base interval, not the peer's three parameters.
+// peer's active threshold, as matter.js's formula does: the session port
+// names one base interval, not the peer's three parameters.
 //
 // Over a reliable connection (TCP, BLE) no retransmission runs: the bound
 // is max(30 s, the expected processing time) plus the response buffer,
