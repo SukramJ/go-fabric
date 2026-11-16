@@ -178,7 +178,7 @@ func NewTimeSynchronizationWith(cfg TimeSynchronizationConfig) (*TimeSynchroniza
 // R2-P6-store-1267).
 func (t *TimeSynchronization) loadedTimeZone(list []timesyncdef.TimeZoneStruct) []timesyncdef.TimeZoneStruct {
 	if len(list) > timeZoneListMaxSize {
-		t.logger().Warn("matter.timesync.stored_list_cut", slog.String("what", "TimeZone"), slog.Int("stored", len(list)), slog.Int("kept", timeZoneListMaxSize))
+		t.logger().Warn("matter.timesync.stored_list_cut", slog.String("what", "TimeZone"), slog.Int("stored", len(list)), slog.Int("max", timeZoneListMaxSize))
 		list = list[:timeZoneListMaxSize]
 	}
 	for i, tz := range list {
@@ -195,7 +195,7 @@ func (t *TimeSynchronization) loadedTimeZone(list []timesyncdef.TimeZoneStruct) 
 // refuses it; either is logged (review II, R2-P6-store-1267).
 func (t *TimeSynchronization) loadedDSTOffset(list []timesyncdef.DSTOffsetStruct) []timesyncdef.DSTOffsetStruct {
 	if len(list) > dstOffsetListMaxSize {
-		t.logger().Warn("matter.timesync.stored_list_cut", slog.String("what", "DSTOffset"), slog.Int("stored", len(list)), slog.Int("kept", dstOffsetListMaxSize))
+		t.logger().Warn("matter.timesync.stored_list_cut", slog.String("what", "DSTOffset"), slog.Int("stored", len(list)), slog.Int("max", dstOffsetListMaxSize))
 		list = list[:dstOffsetListMaxSize]
 	}
 	if err := validDSTOffsets(list); err != nil {

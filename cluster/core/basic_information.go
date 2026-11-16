@@ -474,7 +474,7 @@ func SoftwareVersionFromString(version string) uint32 {
 		}
 		if n > 999 {
 			slog.Default().Warn("matter.basic_information.software_version_clamped", //nolint:forbidigo // a package function without a component logger
-				slog.String("version", version), slog.Uint64("component", n))
+				slog.String("version", version), slog.Uint64("value", n))
 			n = 999
 		}
 		parts[i] = uint32(n)

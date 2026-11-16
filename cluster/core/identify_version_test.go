@@ -57,12 +57,14 @@ func TestIdentifyWaitForTheQueueHonoursTheContext(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() { _, err := i.MatterInvoke(ctx, 0x00, uint16(7)); done <- err }()
+	limit, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
 	select {
 	case err := <-done:
 		if !errors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("err %v, want the context's", err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-limit.Done():
 		t.Error("the waiting request ignored its context")
 	}
 	close(h.release)
