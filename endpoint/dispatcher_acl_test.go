@@ -205,6 +205,22 @@ func TestTopologyDispatcher_CheckACL(t *testing.T) {
 			[]uint32{catNocOpsV1},
 			onOff, privOperate, im.StatusSuccess,
 		},
+		// R2-P6-acl-0408: a granted set, not a rank. ProxyView brings
+		// View; Operate, Manage and Administer do not bring ProxyView, and
+		// View does not either (matter.js FabricAccessControl.ts:148-173,
+		// #addGrantedPrivilege).
+		{"Operate does not grant ProxyView", fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeOperate, nil)}}, 1, 0, nil, onOff, uint8(store.PrivilegeProxyView), im.StatusUnsupportedAccess},
+		{"Administer does not grant ProxyView", fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeAdminister, nil)}}, 1, 0, nil, onOff, uint8(store.PrivilegeProxyView), im.StatusUnsupportedAccess},
+		{"View does not grant ProxyView", fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeView, nil)}}, 1, 0, nil, onOff, uint8(store.PrivilegeProxyView), im.StatusUnsupportedAccess},
+		{"ProxyView grants ProxyView", fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeProxyView, nil)}}, 1, 0, nil, onOff, uint8(store.PrivilegeProxyView), im.StatusSuccess},
+		{"ProxyView grants View", fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeProxyView, nil)}}, 1, 0, nil, onOff, privView, im.StatusSuccess},
+		{"ProxyView does not grant Operate", fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeProxyView, nil)}}, 1, 0, nil, onOff, privOperate, im.StatusUnsupportedAccess},
+		{
+			"ProxyView beside Operate keeps ProxyView",
+			fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeProxyView, nil), caseEntry(1, store.PrivilegeOperate, nil)}},
+			1, 0, nil, onOff, uint8(store.PrivilegeProxyView), im.StatusSuccess,
+		},
+		{"Manage grants Operate", fakeACLLister{entries: []store.ACLEntry{caseEntry(1, store.PrivilegeManage, nil)}}, 1, 0, nil, onOff, privOperate, im.StatusSuccess},
 	}
 
 	for _, tt := range tests {

@@ -1553,7 +1553,7 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		}
 		return checkGroupACL(entries, group, ep, endpoint, clusterID, requiredPrivilege, auxEnabled)
 	}
-	var best store.Privilege
+	var granted privilegeSet
 	for _, e := range entries {
 		// Operational unicast sessions are CASE-authenticated; only CASE
 		// entries apply (Group = multicast, PASE = commissioning).
@@ -1566,11 +1566,9 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		if !aclTargetMatches(e.Targets, ep, endpoint, clusterID) {
 			continue
 		}
-		if e.Privilege > best {
-			best = e.Privilege
-		}
+		granted |= grantedBy(e.Privilege)
 	}
-	if privilegeRank(uint8(best)) >= privilegeRank(requiredPrivilege) {
+	if granted.grants(requiredPrivilege) {
 		return im.StatusSuccess
 	}
 	return im.StatusUnsupportedAccess
@@ -1622,7 +1620,8 @@ func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint
 	if !group.HasValidMapping {
 		return im.StatusUnsupportedAccess
 	}
-	var best store.Privilege
+	var granted privilegeSet
+	sawAdminister := false
 	for _, e := range entries {
 		if e.AuthMode != store.AuthModeGroup {
 			continue
@@ -1636,14 +1635,15 @@ func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint
 		if !aclTargetMatches(e.Targets, ep, endpoint, clusterID) {
 			continue
 		}
-		if e.Privilege > best {
-			best = e.Privilege
+		if e.Privilege == store.PrivilegeAdminister {
+			sawAdminister = true
 		}
+		granted |= grantedBy(e.Privilege)
 	}
-	if best == store.PrivilegeAdminister {
+	if sawAdminister {
 		return im.StatusUnsupportedAccess
 	}
-	if privilegeRank(uint8(best)) >= privilegeRank(requiredPrivilege) {
+	if granted.grants(requiredPrivilege) {
 		return im.StatusSuccess
 	}
 	return im.StatusUnsupportedAccess
@@ -1810,22 +1810,38 @@ func aclTargetMatches(targets []store.ACLTarget, ep *Endpoint, endpoint uint16, 
 	return false
 }
 
-// privilegeRank maps a Matter privilege to its hierarchy rank so a higher
-// privilege satisfies a lower requirement (Administer > Manage > Operate >
-// View; ProxyView grants View-level access). Matter §9.10.5.3.
-func privilegeRank(p uint8) int {
-	switch store.Privilege(p) {
-	case store.PrivilegeAdminister:
-		return 4
-	case store.PrivilegeManage:
-		return 3
+// privilegeSet is the set of privileges an access check granted, one bit
+// per [store.Privilege] value.
+type privilegeSet uint8
+
+// grantedBy returns the privileges an entry of privilege p grants: each
+// one the privileges it subsumes, as a set rather than a rank because
+// ProxyView sits beside the hierarchy — it brings View, and Operate,
+// Manage and Administer do not bring it (R2-P6-acl-0408; matter.js
+// packages/protocol/src/interaction/FabricAccessControl.ts:148-173,
+// #addGrantedPrivilege). An unknown value grants nothing.
+func grantedBy(p store.Privilege) privilegeSet {
+	bit := func(q store.Privilege) privilegeSet { return 1 << q }
+	switch p {
+	case store.PrivilegeView:
+		return bit(store.PrivilegeView)
+	case store.PrivilegeProxyView:
+		return bit(store.PrivilegeProxyView) | bit(store.PrivilegeView)
 	case store.PrivilegeOperate:
-		return 2
-	case store.PrivilegeView, store.PrivilegeProxyView:
-		return 1
+		return bit(store.PrivilegeOperate) | bit(store.PrivilegeView)
+	case store.PrivilegeManage:
+		return bit(store.PrivilegeManage) | bit(store.PrivilegeOperate) | bit(store.PrivilegeView)
+	case store.PrivilegeAdminister:
+		return bit(store.PrivilegeAdminister) | bit(store.PrivilegeManage) | bit(store.PrivilegeOperate) | bit(store.PrivilegeView)
 	default:
 		return 0
 	}
+}
+
+// grants reports whether the set holds the required privilege. A
+// requirement outside the five privileges is satisfied by nothing.
+func (s privilegeSet) grants(required uint8) bool {
+	return required >= uint8(store.PrivilegeView) && required <= uint8(store.PrivilegeAdminister) && s&(1<<required) != 0
 }
 
 // CurrentDataVersion implements [im.DataVersionReader]. It looks up the
