@@ -1240,10 +1240,15 @@ var reportAnswerBoundForTests time.Duration
 // up) — or aborted by the engine's stop. An answer's standalone ack goes
 // out at once: nothing of ours follows on the exchange to piggyback it on.
 func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-chan im.StatusCode, op string) (status im.StatusCode, answered, aborted bool) {
-	// One timer from the send: an upper bound never shorter than
-	// matter.js's, whose wait starts at the report's acknowledgement
-	// (MessageExchange.ts:822-830 at db021da0) — the peer's retransmission
-	// term covers the time before it.
+	// One timer from the send, on [Bridge.chunkStatusResponseTimeout]'s
+	// bound: over UDP the sum of two schedule terms — this node's own
+	// retransmissions (with its sender pad) and the peer's, summed on one
+	// base interval and without a sender pad — plus the expected
+	// processing time and the response buffer; over a reliable connection
+	// 35 s. It differs from matter.js's bound in where the clock starts and
+	// in the peer term (notes/parity/by_design.md,
+	// BD-Matter-Subscription-ReportWaitBound); whether it can come out
+	// shorter than matter.js's is not established.
 	timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
 	if reportAnswerBoundForTests > 0 && b.chunkStatusResponseTimeoutOverride == 0 {
 		timeout = reportAnswerBoundForTests
