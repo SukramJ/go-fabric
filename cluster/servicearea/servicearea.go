@@ -186,7 +186,13 @@ var (
 type Server struct {
 	*spec.Instance
 	cluster.AttributeChanges
-	hooks spec.Hooks
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([Server.Handle]) ahead of the server's own logic
+	// (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
 	// commands counts the commands whose handlers run: the changes made
 	// meanwhile are OriginCommand — the handler moves the state through
 	// the host setters, which take no context. A count, not a flag, so a
@@ -251,12 +257,12 @@ func New(cfg Config) (*Server, error) {
 	if cfg.InitialCurrentArea != nil && !cfg.CurrentArea {
 		return nil, fmt.Errorf("%w: InitialCurrentArea without CurrentArea", ErrConfig)
 	}
-	inst, err := spec.New(sa.Definition, opts)
+	s := &Server{ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
+	srv, err := newHeld(sa.Definition, opts, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("servicearea: %w", err)
 	}
-	s := &Server{Instance: inst, ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
-	s.hooks.Init(inst)
+	s.Instance, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	s.quiet = &cluster.Quieter{Report: func() { s.reported(sa.AttrEstimatedEndTime) }, Clock: cfg.Clock}
 	if len(cfg.SupportedMaps) > 0 && !s.Serves(sa.AttrSupportedMaps) {
 		return nil, fmt.Errorf("%w: SupportedMaps without MAPS", ErrConfig)
@@ -556,7 +562,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, spec.Stored(sa.Definition.Attribute(attrID).Type, v))
+	return s.veto.Check(ctx, attrID, spec.Stored(sa.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
@@ -571,9 +577,12 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("servicearea: command 0x%02X is not supported", cmdID)
 	}
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own SelectAreas and SkipArea, which
+// [spec.InvokeHeld] runs when the host registered no handler.
+func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	s.commands.Add(1)
 	defer s.commands.Add(-1)
 	if cmdID == sa.CmdSelectAreas {
