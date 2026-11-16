@@ -281,8 +281,8 @@ func DefaultColorControlServerConfig() ColorControlServerConfig {
 // ([ColorControlServerConfig.InitialMireds],
 // [ColorControlServerConfig.StartUpColorTemperatureMireds]), which the
 // host applies itself. Implementations translate the cropped mired
-// value into the device's native unit — HM exposes COLOR_TEMPERATURE in
-// Kelvin (mireds = 1_000_000 / Kelvin) — and push it to the device. A
+// value into the device's native unit — a device that takes Kelvin gets
+// 1_000_000 / mireds — and push it to the device. A
 // write error fails the command, or ends the transition, and leaves the
 // in-process ColorTemperatureMireds attribute unchanged, so the reported
 // state never claims a value the device did not accept.

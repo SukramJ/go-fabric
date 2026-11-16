@@ -142,8 +142,8 @@ func TestElectricalValuesDecodeThroughTheGeneratedCodecs(t *testing.T) {
 	f := stubFloatSrc(12.5)
 	v, ok := NewElectricalPowerServer(f).MatterRead(epmdef.AttrAccuracy)
 	list, isList := v.([]AccuracyStruct)
-	if !ok || !isList || len(list) != 1 {
-		t.Fatalf("ElectricalPowerMeasurement Accuracy = %T (%v)", v, ok)
+	if !ok || !isList || len(list) != 4 {
+		t.Fatalf("ElectricalPowerMeasurement Accuracy = %T (%v), want an entry per served measurement type", v, ok)
 	}
 	if _, err := epmdef.Definition.Attribute(epmdef.AttrAccuracy).Decode(spectest.Decode(t, spectest.Encode(t, AccuracyList(list)))); err != nil {
 		t.Errorf("ElectricalPowerMeasurement Accuracy does not decode: %v", err)

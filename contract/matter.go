@@ -783,9 +783,24 @@ const (
 	WiredCurrentDC
 )
 
+// BatteryReplaceability is how a battery-powered device's battery is
+// replaced: the PowerSource cluster's BatReplaceability.
+type BatteryReplaceability uint8
+
+// The battery replaceabilities; the zero value is a battery the user
+// replaces.
+const (
+	BatteryUserReplaceable BatteryReplaceability = iota
+	BatteryNotReplaceable
+	BatteryFactoryReplaceable
+	// BatteryReplaceabilityUnspecified states that the device does not
+	// say.
+	BatteryReplaceabilityUnspecified
+)
+
 // PowerSourceSelection is what a device's power source serves of the
-// PowerSource cluster. The zero value is a battery, its reading the
-// source's [BoolMeasurementSource] (low battery) or
+// PowerSource cluster. The zero value is a battery the user replaces, its
+// reading the source's [BoolMeasurementSource] (low battery) or
 // [FloatMeasurementSource] (percentage remaining).
 type PowerSourceSelection struct {
 	// Wired is a mains-powered device: the Wired feature in place of
@@ -794,6 +809,10 @@ type PowerSourceSelection struct {
 	Wired bool
 	// WiredCurrent is the current a wired source draws; zero is AC.
 	WiredCurrent WiredCurrent
+	// BatteryReplaceability is how a battery source's battery is
+	// replaced; the zero value is [BatteryUserReplaceable]. A wired source
+	// serves no battery attribute and ignores it.
+	BatteryReplaceability BatteryReplaceability
 }
 
 // PowerSourceSelectionSource is the optional capability of a

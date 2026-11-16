@@ -77,3 +77,41 @@ func TestPowerSourceProjectionWired(t *testing.T) {
 		t.Errorf("the zero selection: FeatureMap %v, want BAT", fm)
 	}
 }
+
+// replaceableBattery is a battery reading that states its battery's
+// replaceability.
+type replaceableBattery struct {
+	fakeBool
+	r contract.BatteryReplaceability
+}
+
+func (b replaceableBattery) MatterPowerSourceSelection() contract.PowerSourceSelection {
+	return contract.PowerSourceSelection{BatteryReplaceability: b.r}
+}
+
+// TestPowerSourceBatteryReplaceability holds R2-P6-doc-1465 (decision
+// 141): BatReplaceability is the host's statement on its selection, user
+// replaceable when it states none — the value every battery was served
+// with before.
+func TestPowerSourceBatteryReplaceability(t *testing.T) {
+	t.Parallel()
+	mc := contract.MeasurementContext{EndpointID: 7}
+	for _, c := range []struct {
+		src  any
+		want psdef.BatReplaceabilityEnum
+	}{
+		{fakeBool{class: contract.MeasurementBattery}, psdef.BatReplaceabilityUserReplaceable},
+		{lowBattery{fakeBool{class: contract.MeasurementBattery}}, psdef.BatReplaceabilityUserReplaceable},
+		{replaceableBattery{fakeBool{class: contract.MeasurementBattery}, contract.BatteryNotReplaceable}, psdef.BatReplaceabilityNotReplaceable},
+		{replaceableBattery{fakeBool{class: contract.MeasurementBattery}, contract.BatteryFactoryReplaceable}, psdef.BatReplaceabilityFactoryReplaceable},
+		{replaceableBattery{fakeBool{class: contract.MeasurementBattery}, contract.BatteryReplaceabilityUnspecified}, psdef.BatReplaceabilityUnspecified},
+	} {
+		srvs := measurement.FromMeasurementClass(contract.MeasurementBattery, c.src, mc)
+		if len(srvs) != 1 {
+			t.Fatalf("%T: %d servers, want 1", c.src, len(srvs))
+		}
+		if v, _ := srvs[0].MatterRead(psdef.AttrBatReplaceability); v != uint8(c.want) {
+			t.Errorf("%T %+v: BatReplaceability %v, want %d", c.src, c.src, v, c.want)
+		}
+	}
+}

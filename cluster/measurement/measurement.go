@@ -139,16 +139,29 @@ const (
 	pwrStatusActive  = uint8(psdef.PowerSourceStatusActive)
 	batChargeOK      = uint8(psdef.BatChargeLevelOk)
 	batChargeWarning = uint8(psdef.BatChargeLevelWarning)
-	// batReplaceUserReplaceable — HM batteries are always
-	// user-replaceable.
-	batReplaceUserReplaceable = uint8(psdef.BatReplaceabilityUserReplaceable)
 )
+
+// batReplaceability is the BatReplaceability a host's
+// [contract.BatteryReplaceability] serves; the zero value, the default, is
+// user-replaceable (R2-P6-doc-1465, decision 141).
+func batReplaceability(r contract.BatteryReplaceability) uint8 {
+	switch r {
+	case contract.BatteryNotReplaceable:
+		return uint8(psdef.BatReplaceabilityNotReplaceable)
+	case contract.BatteryFactoryReplaceable:
+		return uint8(psdef.BatReplaceabilityFactoryReplaceable)
+	case contract.BatteryReplaceabilityUnspecified:
+		return uint8(psdef.BatReplaceabilityUnspecified)
+	default:
+		return uint8(psdef.BatReplaceabilityUserReplaceable)
+	}
+}
 
 // pwrFeatureBAT is the FeatureMap of a battery-backed source. RECHG and
 // REPLC stay clear because each makes attributes mandatory that a
-// LOWBAT-driven projection cannot fill — REPLC requires
+// low-battery projection cannot fill — REPLC requires
 // BatReplacementDescription (0x13) and BatQuantity (0x19), neither of
-// which the CCU reports. BatReplaceability (0x10) is served under the BAT
+// which the contract carries. BatReplaceability (0x10) is served under the BAT
 // feature: matter.js records its conformance as "BAT", not "REPLC".
 const pwrFeatureBAT = uint32(psdef.FeatureBattery)
 
@@ -165,26 +178,27 @@ const (
 
 // ElectricalEnergyMeasurement (0x0091) attribute IDs.
 // CumulativeEnergyExported (0x0002) is deliberately absent: matter.js
-// gates it on "EXPE & CUME" and HM metering hardware has no exported-energy
-// path, so serving it would advertise an attribute whose feature is clear.
+// gates it on "EXPE & CUME" and [contract.ElectricalReadings] carries no
+// exported energy, so serving it would advertise an attribute whose
+// feature is clear.
 const (
 	attrElEnAccuracy           = eemdef.AttrAccuracy
 	attrElEnCumulativeImported = eemdef.AttrCumulativeEnergyImported // int64 mWh, struct EnergyMeasurementStruct.energy
 )
 
 // elPwrFeatureAltC is the ElectricalPower FeatureMap: only the ALTC
-// (Alternating-Current) feature is advertised for HmIP-PSM and similar
-// mains-AC switch-meters; DIRC is off because HM has no DC measurement
-// hardware.
+// (Alternating-Current) feature is advertised, a mains-AC meter's; DIRC
+// stays off because [contract.ElectricalReadings] does not say that a
+// meter measures direct current.
 const elPwrFeatureAltC = uint32(epmdef.FeatureAlternatingCurrent)
 
 // ElectricalEnergy FeatureMap bits. Both IMPE and CUME are advertised: the
 // imported/exported pair and the cumulative/periodic pair form two
 // separate at-least-one-required choice groups, and
 // CumulativeEnergyImported — the only value-bearing attribute the bridge
-// serves — has conformance "IMPE & CUME". EXPE stays clear because HM
-// metering hardware has no exported-energy path, PERE because no periodic
-// accumulator exists.
+// serves — has conformance "IMPE & CUME". EXPE stays clear because
+// [contract.ElectricalReadings] carries no exported energy, PERE because
+// it carries no periodic accumulator.
 const (
 	elEnFeatureIMPE = uint32(eemdef.FeatureImportedEnergy)
 	elEnFeatureCUME = uint32(eemdef.FeatureCumulativeEnergy)
@@ -196,8 +210,7 @@ const (
 // RangeMin(0) int64, RangeMax(1) int64, FixedMax(5) uint64. PercentMax(2)
 // and FixedMax form an at-least-one-required choice group, so one of the
 // two has to be present for the struct to be conformant; we carry
-// FixedMax because HM meters quantise, they do not specify a relative
-// error.
+// FixedMax because the contract states no relative error of a meter.
 type AccuracyRangeStruct struct {
 	RangeMin int64
 	RangeMax int64
@@ -218,7 +231,7 @@ type AccuracyRangeStruct struct {
 // conformance-M attribute of both clusters.
 //
 // The spec requires at least one AccuracyStruct in the Accuracy list and
-// at least one range inside it. HM hardware publishes no manufacturer
+// at least one range inside it. The contract carries no manufacturer
 // uncertainty specification, so the entry mirrors the placeholder shape
 // matter.js itself demonstrates in its measuring-socket template: the
 // full permitted measurement range with a one-unit fixed accuracy.
@@ -237,7 +250,8 @@ type AccuracyStruct struct {
 const (
 	accuracyRangeMin int64 = -(1 << 62)
 	accuracyRangeMax int64 = 1 << 62
-	// accuracyFixedMax claims a one-unit (mW / mWh) absolute error. It is
+	// accuracyFixedMax claims a one-unit (mV, mA, mW, mHz, mWh) absolute
+	// error. It is
 	// the smallest non-vacuous claim that satisfies the PercentMax/FixedMax
 	// choice group; matter.js uses the same placeholder.
 	accuracyFixedMax uint64 = 1
@@ -294,7 +308,7 @@ func (s *TemperatureServer) MatterClusterID() uint32 { return ClusterTemperature
 func (s *TemperatureServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case attrMeasuredValue:
-		// Value temporarily unavailable (e.g. CCU circuit-breaker open): return
+		// Value temporarily unavailable (e.g. the host lost the device): return
 		// (nil, true) so the dispatcher encodes TLV null + Success. Apple Home
 		// tolerates null as "transiently unknown" and continues building the HAP
 		// service. (nil, false) would signal UnsupportedAttribute and abort the
@@ -690,7 +704,7 @@ func (s *BooleanStateServer) MatterRead(attrID uint32) (any, bool) {
 		// `zzz_generated/app-common/clusters/BooleanState/Attributes.h`.
 		// Encoding TLV-null for a non-nullable bool causes strict-validator
 		// rejection (chip CHIP Error 0x26). Default to false (not active)
-		// before the first CCU push, matching the safe-state convention used
+		// before the host's first report, matching the safe-state convention used
 		// by OnOffServer for non-nullable bool attributes.
 		v, _ := s.ObservedStateValue()
 		return v, true
@@ -986,8 +1000,8 @@ func NewElectricalPowerServer(src contract.FloatMeasurementSource) *ElectricalPo
 }
 
 // NewElectricalPowerServerFromReadings wraps a consolidated electrical group,
-// so all four ElectricalPowerMeasurement readings the CCU provides reach the
-// cluster instead of only ActivePower.
+// so all four ElectricalPowerMeasurement readings the host provides reach
+// the cluster instead of only ActivePower.
 // fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 func NewElectricalPowerServerFromReadings(r ElectricalReadingsSource) *ElectricalPowerServer {
 	return &ElectricalPowerServer{src: r, readings: r}
@@ -1025,26 +1039,13 @@ func (s *ElectricalPowerServer) OnMatterValueChanged(cb func()) func() {
 func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case attrElPwrPowerMode:
-		// 0=Unknown, 1=DC, 2=AC. HM-PSM is mains-AC.
+		// 0=Unknown, 1=DC, 2=AC: AC, the ALTC feature the server
+		// advertises ([elPwrFeatureAltC]).
 		return uint8(2), true
 	case attrElPwrNumberOfMeasurementTypes:
-		return uint8(1), true
+		return uint8(len(elPwrAccuracy())), true
 	case attrElPwrAccuracy:
-		// Matter §2.13.5.2 requires AccuracyRanges to have at least ONE
-		// AccuracyRangeStruct; an empty list is schema-invalid
-		// and strict validators (chip CHIP Error 0x26) reject it.
-		// See [AccuracyStruct] for the stub-entry rationale.
-		return []AccuracyStruct{{
-			MeasurementType:  uint16(epmdef.MeasurementTypeActivePower), // 0x05; 0x08 is RmsVoltage
-			Measured:         true,
-			MinMeasuredValue: accuracyRangeMin,
-			MaxMeasuredValue: accuracyRangeMax,
-			AccuracyRanges: []AccuracyRangeStruct{{
-				RangeMin: accuracyRangeMin,
-				RangeMax: accuracyRangeMax,
-				FixedMax: accuracyFixedMax,
-			}},
-		}}, true
+		return elPwrAccuracy(), true
 	case attrElPwrActivePower:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
@@ -1119,6 +1120,34 @@ var _ contract.ClusterEventLister = (*ElectricalPowerServer)(nil)
 // (packages/node/src/node/integration/ProtocolService.ts:529-532). An event
 // path on the cluster selects nothing (review II, R2-P4-nw-05).
 func (s *ElectricalPowerServer) MatterEvents() []uint32 { return electricalPowerInst.MatterEvents() }
+
+// elPwrAccuracy is ElectricalPowerMeasurement's Accuracy: one entry per
+// measurement type the server serves (electricalPowerInst: Voltage,
+// ActiveCurrent and Frequency beside ActivePower), in MeasurementType
+// order, each over its attribute's constraint — the cluster's model text
+// asks for "an entry for ActivePower, as well as any other measurement
+// types implemented by this server", and NumberOfMeasurementTypes is the
+// count (R2-P6-par-1466). Every AccuracyRanges carries one range, as
+// Matter requires; see [AccuracyStruct] for the stub-entry rationale. Each
+// read builds its own list, so no reader shares another's.
+func elPwrAccuracy() []AccuracyStruct {
+	return []AccuracyStruct{
+		elPwrAccuracyOf(epmdef.MeasurementTypeVoltage, accuracyRangeMin, accuracyRangeMax),
+		elPwrAccuracyOf(epmdef.MeasurementTypeActiveCurrent, accuracyRangeMin, accuracyRangeMax),
+		elPwrAccuracyOf(epmdef.MeasurementTypeActivePower, accuracyRangeMin, accuracyRangeMax),
+		elPwrAccuracyOf(epmdef.MeasurementTypeFrequency, 0, elPwrFrequencyMax),
+	}
+}
+
+func elPwrAccuracyOf(t epmdef.MeasurementTypeEnum, lo, hi int64) AccuracyStruct {
+	return AccuracyStruct{
+		MeasurementType:  uint16(t),
+		Measured:         true,
+		MinMeasuredValue: lo,
+		MaxMeasuredValue: hi,
+		AccuracyRanges:   []AccuracyRangeStruct{{RangeMin: lo, RangeMax: hi, FixedMax: accuracyFixedMax}},
+	}
+}
 
 // The constraints of the readings ElectricalPowerMeasurement serves:
 // "-2^62 to 2^62" for Voltage, ActiveCurrent and ActivePower, "0 to
@@ -1590,7 +1619,7 @@ func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10Concen
 // --- PowerSource (0x002F) — battery or mains --------------------------
 
 // PowerSourceServer projects either a [contract.BoolMeasurementSource]
-// (typically the LOWBAT binary parameter) or a
+// (a device's low-battery flag) or a
 // [contract.FloatMeasurementSource] (a derived battery-percentage
 // sensor, e.g. OperatingVoltageLevelSensor) onto a battery-flavoured
 // Matter PowerSource cluster. A server instance wraps exactly one of
@@ -1602,8 +1631,8 @@ func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10Concen
 //	false → BatChargeLevel = OK (0)
 //	true  → BatChargeLevel = Warning (1)
 //
-// HM has no Critical-level signal; devices that go fully critical
-// disconnect from the network instead.
+// The contract carries no Critical-level signal: a low-battery flag is
+// Warning at most.
 //
 // Float source drives BatPercentRemaining (conformance [BAT], optional
 // — matter.js power-source-cluster.element.ts:68-71, id 0xc, uint8,
@@ -1633,6 +1662,9 @@ type PowerSourceServer struct {
 	// feature WIRED, current its WiredCurrentType.
 	wired   bool
 	current contract.WiredCurrent
+	// replaceability is the battery's, from the host's
+	// [contract.PowerSourceSelection]; the zero value is user-replaceable.
+	replaceability contract.BatteryReplaceability
 	// endpoint is the Matter endpoint this power source feeds, stamped
 	// post-construction by the endpoint assembler via [SetEndpoint] so
 	// EndpointList (0x001F) can name it. Zero means "unspecified", which
@@ -1643,7 +1675,7 @@ type PowerSourceServer struct {
 // Compile-time assertion: PowerSourceServer satisfies MatterClusterDataVersion.
 var _ contract.ClusterDataVersion = (*PowerSourceServer)(nil)
 
-// NewPowerSourceServer wraps a boolean LOWBAT-style source. Serves
+// NewPowerSourceServer wraps a boolean low-battery source. Serves
 // BatChargeLevel; BatPercentRemaining is not advertised (optional
 // conformance [BAT] — a bool source has no percentage to report).
 func NewPowerSourceServer(src contract.BoolMeasurementSource) *PowerSourceServer {
@@ -1653,7 +1685,7 @@ func NewPowerSourceServer(src contract.BoolMeasurementSource) *PowerSourceServer
 // NewPowerSourceServerFromFloat wraps a derived battery-percentage
 // source (e.g. OperatingVoltageLevelSensor). Serves BatPercentRemaining
 // from it; BatChargeLevel still reports OK — there is no boolean
-// LOWBAT signal to derive Warning from, mirroring MatterRead's
+// low-battery signal to derive Warning from, mirroring MatterRead's
 // no-observation fallback for the bool path.
 func NewPowerSourceServerFromFloat(src contract.FloatMeasurementSource) *PowerSourceServer {
 	return &PowerSourceServer{floatSrc: src}
@@ -1742,7 +1774,7 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 			return nil, false
 		}
 		// s.src is nil on a float-constructed instance (see
-		// [NewPowerSourceServerFromFloat]) — there is no boolean LOWBAT
+		// [NewPowerSourceServerFromFloat]) — there is no boolean low-battery
 		// signal to derive Warning from, so it falls back to OK the same
 		// way an unobserved bool source does.
 		if s.src == nil {
@@ -1787,7 +1819,7 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 		if s.wired {
 			return nil, false
 		}
-		return batReplaceUserReplaceable, true
+		return batReplaceability(s.replaceability), true
 	case attrPwrEndpointList:
 		// EndpointList names the endpoints this power source feeds. We mount
 		// one power source per bridged device endpoint, so the list is the

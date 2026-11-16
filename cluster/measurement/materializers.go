@@ -135,7 +135,7 @@ func airQualityServers(class contract.MeasurementClass, build func(contract.Floa
 // after construction: the assembler rebuilds these servers on every
 // dispatch, so a stamp applied further out would not survive.
 //
-// Two source shapes project onto PowerSource: a LOWBAT bool
+// Two source shapes project onto PowerSource: a low-battery bool
 // (BatChargeLevel) or a derived battery-percentage float (e.g. an
 // operating-voltage-level sensor — BatPercentRemaining). Checked in this
 // order because both interfaces are structurally possible on a source
@@ -161,6 +161,7 @@ func powerSourceServers(src any, mc contract.MeasurementContext) []contract.Clus
 	if ps == nil {
 		return nil
 	}
+	ps.replaceability = sel.BatteryReplaceability
 	ps.SetEndpoint(mc.EndpointID)
 	return []contract.ClusterServer{ps}
 }
