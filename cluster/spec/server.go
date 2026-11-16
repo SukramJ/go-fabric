@@ -676,7 +676,7 @@ func (s *Server) checkInState(attrID uint32, v any, peers Peers) error {
 	if a == nil {
 		return fmt.Errorf("%w: %s attribute 0x%04X is not defined", ErrInvalidValue, s.def.Name, attrID)
 	}
-	if _, err := s.CheckValue(attrID, v, peers); err != nil {
+	if _, err := s.checkValueIn(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(v), peers, nameScope{peers: peers, bits: attrID != featureMapAttributeID, conformance: true, enums: true}); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidValue, err)
 	}
 	if err := s.checkIn(attrID, v, peers); err != nil {

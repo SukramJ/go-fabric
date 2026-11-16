@@ -4,12 +4,14 @@
 package camera_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -21,7 +23,8 @@ import (
 func TestAvSettingsPresetsHeldToMaxPresets(t *testing.T) {
 	t.Parallel()
 	a := newAvSettings(t, func(c *camera.AvSettingsConfig) { c.MaxPresets = 2 })
-	three := []camera.MPTZPreset{{PresetId: 1, Name: "a"}, {PresetId: 2, Name: "b"}, {PresetId: 3, Name: "c"}}
+	at := camera.MPTZ{Pan: ptr(int16(0)), Tilt: ptr(int16(0)), Zoom: ptr(uint8(1))}
+	three := []camera.MPTZPreset{{PresetId: 1, Name: "a", Settings: at}, {PresetId: 2, Name: "b", Settings: at}, {PresetId: 3, Name: "c", Settings: at}}
 	if err := a.SetAttributes(map[uint32]any{avdef.AttrMptzPresets: three}); !errors.Is(err, spec.ErrInvalidValue) {
 		t.Errorf("3 presets with MaxPresets 2: %v, want ErrInvalidValue", err)
 	}
@@ -69,7 +72,7 @@ func TestCameraTablesAreHandedOutAsDeepCopies(t *testing.T) {
 
 	a := newAvSettings(t)
 	pan := int16(5)
-	if err := a.SetAttributes(map[uint32]any{avdef.AttrMptzPresets: []camera.MPTZPreset{{PresetId: 1, Name: "a", Settings: camera.MPTZ{Pan: &pan}}}}); err != nil {
+	if err := a.SetAttributes(map[uint32]any{avdef.AttrMptzPresets: []camera.MPTZPreset{{PresetId: 1, Name: "a", Settings: camera.MPTZ{Pan: &pan, Tilt: ptr(int16(0)), Zoom: ptr(uint8(1))}}}}); err != nil {
 		t.Fatal(err)
 	}
 	pan = 6
@@ -81,4 +84,71 @@ func TestCameraTablesAreHandedOutAsDeepCopies(t *testing.T) {
 	if got := a.Position().Pan; got != nil && *got == 7 {
 		t.Error("MPTZPosition changed through Position()")
 	}
+}
+
+// TestAvSettingsHostChangesAreAllOrNothing: a host change the store
+// refuses after CheckSet accepted it — a preset without the Tilt MTILT
+// makes mandatory, a field conformance CheckSet does not judge — leaves
+// every attribute of the change and the server's own state as they were.
+// Before, the state took the change and the publication's error was
+// dropped (review II, R2-P6-err-1611, with R2-P6-par-1304's check).
+func TestAvSettingsHostChangesAreAllOrNothing(t *testing.T) {
+	t.Parallel()
+	a := newAvSettings(t)
+	panMin := readAv[int16](t, a, avdef.AttrPanMin)
+	bad := []camera.MPTZPreset{{PresetId: 1, Name: "door", Settings: camera.MPTZ{Pan: ptr(int16(5))}}}
+	if err := a.SetAttributes(map[uint32]any{avdef.AttrPanMin: int16(-10), avdef.AttrMptzPresets: bad}); err == nil {
+		t.Fatal("a preset without Tilt stored under MTILT")
+	}
+	if got := readAv[int16](t, a, avdef.AttrPanMin); got != panMin {
+		t.Errorf("PanMin %d after a refused SetAttributes, want %d", got, panMin)
+	}
+	if len(a.Presets()) != 0 {
+		t.Errorf("Presets() = %+v after a refused SetAttributes", a.Presets())
+	}
+	if id := a.NextPresetID(); id != 1 {
+		t.Errorf("NextPresetID %d after a refused SetAttributes, want 1", id)
+	}
+}
+
+// streamlessProvider is a provider port whose session names no stream.
+type streamlessProvider struct{ *mockProvider }
+
+func (s streamlessProvider) SolicitOffer(ctx context.Context, args camera.OfferArgs) (session camera.ProviderSession, deferred bool, err error) {
+	session, deferred, err = s.mockProvider.SolicitOffer(ctx, args)
+	session.VideoStreams, session.AudioStreams = nil, nil
+	return session, deferred, err
+}
+
+// TestProviderStoresNoStreamlessSession: a session the port returns
+// without VideoStreams and AudioStreams fails CurrentSessions' "O.a+" and
+// is not stored — the command answers FAILURE and the table stays empty.
+// A request naming no stream is INVALID_COMMAND before the port runs
+// (TestSolicitOfferRules, "no stream field"), so the server builds no such
+// session itself (review II, R2-P6-par-1304 row 8, R2-P6-err-1611).
+func TestProviderStoresNoStreamlessSession(t *testing.T) {
+	t.Parallel()
+	p, _ := newProvider(t, cameraStreams(), func(c *camera.ProviderConfig) {
+		c.Port = streamlessProvider{&mockProvider{}}
+	})
+	_, err := p.MatterInvoke(peer(1, 0x55), wpdef.CmdSolicitOffer, solicit(wpdef.StreamUsageLiveView))
+	if statusOf(err) != im.StatusFailure {
+		t.Fatalf("SolicitOffer with a streamless session: %v, want FAILURE", err)
+	}
+	if n := len(p.Sessions()); n != 0 {
+		t.Errorf("%d sessions stored", n)
+	}
+	if l := readList[camera.ProviderSession](t, p, wpdef.AttrCurrentSessions); len(l) != 0 {
+		t.Errorf("CurrentSessions = %+v", l)
+	}
+}
+
+func readList[T spec.Encodable](t *testing.T, srv interface{ MatterRead(uint32) (any, bool) }, attrID uint32) spec.List[T] {
+	t.Helper()
+	v, ok := srv.MatterRead(attrID)
+	if !ok {
+		t.Fatalf("attribute 0x%04X not readable", attrID)
+	}
+	l, _ := v.(spec.List[T])
+	return l
 }
