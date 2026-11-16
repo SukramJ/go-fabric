@@ -77,6 +77,17 @@ type ClusterServer interface {
 	// MatterWrite applies an attribute write. The bridge has already
 	// decoded the TLV; `value` carries the cluster-native type.
 	//
+	// A write of a fabric-scoped list — an attribute the schema or the
+	// server's [FabricScopeDeclarer] scopes — comes from a request with
+	// an accessing fabric; one without is refused before the server is
+	// called. The value the server receives is that fabric's entries
+	// alone, each with its FabricIndex field set to the accessing fabric
+	// by the dispatcher, whatever the request wrote (for an append: the
+	// fabric's current entries and the new one). It replaces that
+	// fabric's entries; the other fabrics' entries are not in the value
+	// and stay as the server holds them. The accessing fabric is also in
+	// ctx ([AccessingFabric]).
+	//
 	// The southbound urgency is not a parameter: every write reaching
 	// a cluster server comes from a controller acting on a user's
 	// behalf, so implementations queue it at one fixed priority rather

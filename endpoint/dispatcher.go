@@ -582,6 +582,25 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					// just that one as Added).
 					writeCtx = im.WithListAppendWrite(ctx)
 				}
+				// A fabric-scoped attribute is written by the accessing
+				// fabric alone: a request without one is refused here for
+				// every server, a declarer's attribute included — im's gate
+				// knows only the snapshot's (RW-i3) — and every entry of
+				// the written value carries the accessing fabric, whatever
+				// the request wrote (R2-P6-acl-0402). matter.js injects
+				// the accessing fabric into every decoded write value
+				// ("We always inject the current fabricIndex for writes",
+				// packages/protocol/src/action/server/AttributeWriteResponse.ts:466-473
+				// at db021da0) before the behaviour sees it.
+				if scope := fabricScopeFor(ctx, srv, attrID); scope != nil {
+					if !im.HasAccessingFabric(scope.Fabric) {
+						if !wildcardEndpoint && path.HasAttribute {
+							results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedAccess})
+						}
+						continue
+					}
+					v.Value = stampAccessingFabric(v.Value, scope.Fabric)
+				}
 				// The written value against the cluster's definition,
 				// before any server runs (owner decision 64): what
 				// matter.js validates as the value enters the behavior's
@@ -1991,4 +2010,82 @@ func writersEntries(list reflect.Value, fabric uint8, filteredRead bool) (reflec
 		}
 	}
 	return out, im.StatusSuccess
+}
+
+// stampAccessingFabric returns value with the FabricIndex of every entry
+// set to fabric: a list (or a single struct) whose element is a struct, or
+// a pointer to one, with a field FabricIndex of type uint8 or *uint8 —
+// the name every generated struct gives field 254 (cluster/spec/*/
+// definition_gen.go), and the module's hand-decoded entry types. The
+// result is a copy: the request's value, which a group write hands every
+// resolved location, is not changed. A value of any other shape is
+// returned as it is.
+func stampAccessingFabric(value any, fabric uint8) any {
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() {
+		return value
+	}
+	switch rv.Kind() {
+	case reflect.Slice:
+		if _, octets := value.([]byte); octets || !stampable(rv.Type().Elem()) {
+			return value
+		}
+		out := reflect.MakeSlice(rv.Type(), rv.Len(), rv.Len())
+		for i := range rv.Len() {
+			out.Index(i).Set(stampedCopy(rv.Index(i), fabric))
+		}
+		return out.Interface()
+	case reflect.Struct, reflect.Pointer:
+		if !stampable(rv.Type()) {
+			return value
+		}
+		return stampedCopy(rv, fabric).Interface()
+	default:
+		return value
+	}
+}
+
+// stampable reports whether t is a struct, or a pointer to one, with a
+// settable FabricIndex field of type uint8 or *uint8.
+func stampable(t reflect.Type) bool {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+	f, ok := t.FieldByName("FabricIndex")
+	if !ok || !f.IsExported() || len(f.Index) != 1 {
+		return false
+	}
+	u8 := reflect.TypeFor[uint8]()
+	return f.Type == u8 || (f.Type.Kind() == reflect.Pointer && f.Type.Elem() == u8)
+}
+
+// stampedCopy returns a copy of the struct (or of the struct behind the
+// pointer) el with FabricIndex set to fabric; a nil pointer stays nil.
+func stampedCopy(el reflect.Value, fabric uint8) reflect.Value {
+	if el.Kind() == reflect.Pointer {
+		if el.IsNil() {
+			return el
+		}
+		cp := reflect.New(el.Type().Elem())
+		cp.Elem().Set(el.Elem())
+		setFabricIndex(cp.Elem(), fabric)
+		return cp
+	}
+	cp := reflect.New(el.Type()).Elem()
+	cp.Set(el)
+	setFabricIndex(cp, fabric)
+	return cp
+}
+
+func setFabricIndex(st reflect.Value, fabric uint8) {
+	f := st.FieldByName("FabricIndex")
+	if f.Kind() == reflect.Pointer {
+		v := fabric
+		f.Set(reflect.ValueOf(&v))
+		return
+	}
+	f.SetUint(uint64(fabric))
 }
