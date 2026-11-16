@@ -534,7 +534,7 @@ func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, err
 		s.setAutoClose(at)
 		s.tracker().Bump()
 		return nil, nil
-	case CmdClose:
+	default: // Close, the one other command [spec.InvokeHeld] hands over
 		if s.src == nil {
 			return nil, errNoSource("Close")
 		}
@@ -546,8 +546,6 @@ func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, err
 		s.setAutoClose(nil)
 		s.tracker().Bump()
 		return nil, nil
-	default:
-		return nil, im.UnsupportedCommandf("valve: unknown command 0x%02X", cmdID)
 	}
 }
 

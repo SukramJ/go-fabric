@@ -61,9 +61,6 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 			state, _ = v.(uint32)
 			setState = true
 		default: // a TemperatureAlarm threshold, the only other served attribute
-			if !slices.Contains(thresholdAttrs, id) {
-				return fmt.Errorf("%w: attribute 0x%04X is not a served threshold", ErrThresholds, id)
-			}
 			t, _ := v.(int16)
 			thresholds[id] = t
 		}

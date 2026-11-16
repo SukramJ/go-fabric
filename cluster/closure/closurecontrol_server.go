@@ -382,15 +382,6 @@ func (s *ControlServer) MatterWriteChanged(ctx context.Context, attrID uint32, v
 	return false, s.MatterWrite(ctx, attrID, value)
 }
 
-// closureUnsupportedCommandErr is a typed [im.StatusCodeError] for a
-// command the advertised feature set does not include.
-type closureUnsupportedCommandErr struct{ msg string }
-
-func (e closureUnsupportedCommandErr) Error() string { return e.msg }
-func (closureUnsupportedCommandErr) MatterStatusCode() im.StatusCode {
-	return im.StatusUnsupportedCommand
-}
-
 // closureInvalidCommandErr is a typed [im.StatusCodeError] for a MoveTo
 // that carries none of its fields.
 type closureInvalidCommandErr struct{ msg string }
@@ -408,7 +399,6 @@ func (closureConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusC
 
 // Compile-time assertions.
 var (
-	_ im.StatusCodeError = closureUnsupportedCommandErr{}
 	_ im.StatusCodeError = closureConstraintErr{}
 )
 
@@ -431,18 +421,17 @@ func (s *ControlServer) MatterInvoke(
 func (s *ControlServer) invoke(ctx context.Context, cmdID uint32, fields any) (response any, err error) {
 	s.op <- struct{}{}
 	defer func() { <-s.op }()
+	// [spec.InvokeHeld] hands over an accepted command only: MoveTo,
+	// Calibrate with CL, and Stop, whose "!IS" conformance withdraws it
+	// with the Instantaneous feature (the instance answers that
+	// UNSUPPORTED_COMMAND before this runs).
 	switch cmdID {
 	case closuredef.CmdMoveTo:
 		return nil, s.invokeMoveTo(ctx, fields)
-	case closuredef.CmdStop:
-		if s.has(wire.ClosureControlFeatureInstantaneous) {
-			return nil, closureUnsupportedCommandErr{"closure: Stop is withdrawn by the Instantaneous feature"}
-		}
-		return nil, s.invokeStop(ctx)
 	case closuredef.CmdCalibrate:
 		return nil, s.invokeCalibrate(ctx)
-	default:
-		return nil, im.UnsupportedCommandf("closure: unknown command 0x%02X", cmdID)
+	default: // Stop
+		return nil, s.invokeStop(ctx)
 	}
 }
 
@@ -629,12 +618,11 @@ func (s *ControlServer) drive(ctx context.Context, target *wire.ClosureTargetPos
 // had the command (that report stands) — the drive reports Stopped when
 // it is done. matter.js has
 // no Calibrate logic (ClosureControlServer.ts:17, the empty subclass).
+//
+// Without the Calibration feature the instance does not accept Calibrate
+// ("CL"), and [spec.InvokeHeld] answers UNSUPPORTED_COMMAND before this
+// runs.
 func (s *ControlServer) invokeCalibrate(ctx context.Context) error {
-	if !s.has(wire.ClosureControlFeatureCalibration) {
-		return closureUnsupportedCommandErr{
-			"closure: Calibrate requires the Calibration feature, which this server does not advertise",
-		}
-	}
 	s.mu.RLock()
 	state, stateReports := s.mainState, s.stateReports
 	s.mu.RUnlock()

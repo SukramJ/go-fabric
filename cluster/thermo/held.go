@@ -24,11 +24,11 @@ func (h heldSource) MatterAttribute(attrID uint32) (any, bool) { return h(attrID
 // request is admitted, and the response checked, with the server's
 // attributes resolving the names their conformance takes.
 func newHeld(def *spec.Cluster, opts spec.Options, read func(uint32) (any, bool), invoke func(ctx context.Context, cmdID uint32, fields any) (any, error)) (*spec.Server, error) {
+	// Every command id of the definition: a response id is never
+	// dispatched (the instance accepts requests only), and one that shares
+	// a request's id maps to the same handler.
 	handlers := map[uint32]spec.CommandHandler{}
 	for i := range def.Commands {
-		if def.Commands[i].Direction != spec.Request {
-			continue
-		}
 		id := def.Commands[i].ID
 		handlers[id] = func(ctx context.Context, fields any) (any, error) { return invoke(ctx, id, fields) }
 	}
