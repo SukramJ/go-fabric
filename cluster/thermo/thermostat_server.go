@@ -57,6 +57,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -980,7 +982,7 @@ func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 		}
 		return bytes.Clone(s.activePresetHandle), true
 	case tdef.AttrPresets:
-		return spec.List[Preset](clonePresets(s.presets)), true
+		return spec.List[Preset](deepcopy.Each(s.presets)), true
 	case tdef.AttrThermostatRunningMode:
 		return s.runningMode, true
 	case thermoAttrControlSequenceOfOperation:
@@ -1027,7 +1029,7 @@ func (s *ThermostatServer) readOptionalLocked(attrID uint32) (any, bool) {
 		}
 		return bytes.Clone(s.activeScheduleHandle), true
 	case tdef.AttrSchedules:
-		return spec.List[Schedule](cloneSchedules(s.schedules)), true
+		return spec.List[Schedule](deepcopy.Each(s.schedules)), true
 	}
 	return s.readSuggestionLocked(attrID)
 }
@@ -1046,9 +1048,9 @@ func (s *ThermostatServer) MatterReadFiltered(ctx context.Context, attrID uint32
 	if v, ok := s.pendingAtomicValue(ctx, attrID); ok {
 		switch staged := v.(type) {
 		case []Preset:
-			return spec.List[Preset](clonePresets(staged)), true
+			return spec.List[Preset](deepcopy.Each(staged)), true
 		case []Schedule:
-			return spec.List[Schedule](cloneSchedules(staged)), true
+			return spec.List[Schedule](deepcopy.Each(staged)), true
 		}
 	}
 	return s.MatterRead(attrID)
@@ -1191,7 +1193,7 @@ func (s *ThermostatServer) writePresets(ctx context.Context, v any) error {
 	if err != nil {
 		return err
 	}
-	presets = clonePresets(presets)
+	presets = deepcopy.Each(presets)
 	return s.writeAtomicAttribute(ctx, tdef.AttrPresets, presets, func(any) error {
 		s.mu.RLock()
 		old, rules := s.presets, s.presetRules()

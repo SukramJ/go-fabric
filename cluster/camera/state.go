@@ -24,24 +24,3 @@ func serial(op *sync.Mutex, fn spec.CommandHandler) spec.CommandHandler {
 		return fn(ctx, fields)
 	}
 }
-
-// cloner is a generated struct with its deep Clone (clustergen, decision
-// 142): the lists, octet strings and optional fields of the copy share
-// nothing with the original.
-type cloner[T any] interface{ Clone() T }
-
-// cloneAll is a deep copy of a list of generated structs: every entry
-// through its generated Clone, nil kept nil. The servers hand their
-// tables out and take them in through it, so neither a caller's edit of
-// a returned entry nor a later edit of a list it handed in reaches the
-// state the server serves.
-func cloneAll[T cloner[T]](in []T) []T {
-	if in == nil {
-		return nil
-	}
-	out := make([]T, len(in))
-	for i, v := range in {
-		out[i] = v.Clone()
-	}
-	return out
-}

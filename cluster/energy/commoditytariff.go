@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -170,22 +172,22 @@ func (t *Tariff) values() [len(tariffAttrs)]any {
 		v[4] = t.TariffInfo.Clone()
 	}
 	if t.DayEntries != nil {
-		v[5] = cloneAll(t.DayEntries)
+		v[5] = deepcopy.Each(t.DayEntries)
 	}
 	if t.DayPatterns != nil {
-		v[6] = cloneAll(t.DayPatterns)
+		v[6] = deepcopy.Each(t.DayPatterns)
 	}
 	if t.TariffComponents != nil {
-		v[7] = cloneAll(t.TariffComponents)
+		v[7] = deepcopy.Each(t.TariffComponents)
 	}
 	if t.TariffPeriods != nil {
-		v[8] = cloneAll(t.TariffPeriods)
+		v[8] = deepcopy.Each(t.TariffPeriods)
 	}
 	if t.IndividualDays != nil {
-		v[9] = cloneAll(t.IndividualDays)
+		v[9] = deepcopy.Each(t.IndividualDays)
 	}
 	if t.CalendarPeriods != nil {
-		v[10] = cloneAll(t.CalendarPeriods)
+		v[10] = deepcopy.Each(t.CalendarPeriods)
 	}
 	return v
 }

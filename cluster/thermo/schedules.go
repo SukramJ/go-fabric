@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
@@ -56,18 +58,6 @@ type SchedulePort = tdef.SchedulePort
 // server refuses: ScheduleTypes or a count outside its constraints, or
 // configured schedules without a unique handle.
 var ErrSchedules = errors.New("thermo: schedule configuration refused")
-
-// cloneSchedules deep-copies schedules.
-func cloneSchedules(in []Schedule) []Schedule {
-	if in == nil {
-		return nil
-	}
-	out := make([]Schedule, len(in))
-	for i := range in {
-		out[i] = in[i].Clone() // the generated deep copy (decision 142)
-	}
-	return out
-}
 
 // schedulesValue is a Schedules value as the server handles it: the
 // bridge decodes a write as spec.List, a host may pass a plain slice.
@@ -138,7 +128,7 @@ func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 // (ThermostatClusterSchedules.h:74-83); the handle rule is what its
 // SetActiveSchedule and PrecommitSchedules need of it.
 func (s *ThermostatServer) hostSchedules(list []Schedule) ([]Schedule, error) {
-	out := cloneSchedules(list)
+	out := deepcopy.Each(list)
 	if out == nil {
 		out = []Schedule{}
 	}
@@ -220,7 +210,7 @@ func (s *ThermostatServer) SetActiveScheduleHandle(handle []byte) error {
 func (s *ThermostatServer) Schedules() []Schedule {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return cloneSchedules(s.schedules)
+	return deepcopy.Each(s.schedules)
 }
 
 // ActiveScheduleHandle returns the ActiveScheduleHandle, nil for null.

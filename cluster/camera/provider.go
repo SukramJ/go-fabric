@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
@@ -143,7 +145,7 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 func (p *Provider) Sessions() []ProviderSession {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return cloneAll(p.sessions)
+	return deepcopy.Each(p.sessions)
 }
 
 // UpsertSession implements [wpdef.Host]. Mirrors chip UpsertSession

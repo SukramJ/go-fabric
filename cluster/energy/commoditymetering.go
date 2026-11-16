@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
@@ -187,7 +189,7 @@ func (s *CommodityMeteringServer) MatterRead(attrID uint32) (any, bool) {
 func (s *CommodityMeteringServer) MeteredQuantity() []MeteredQuantity {
 	v, _ := s.Value(commtr.AttrMeteredQuantity)
 	q, _ := listOf[MeteredQuantity](v)
-	return cloneAll(q)
+	return deepcopy.Each(q)
 }
 
 // MeteredQuantityTimestamp returns MeteredQuantityTimestamp; nil while

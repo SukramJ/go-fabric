@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	messagesdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
@@ -193,7 +195,7 @@ func (m *Messages) MatterRead(attrID uint32) (any, bool) {
 	defer m.mu.Unlock()
 	switch attrID {
 	case messagesdef.AttrMessages:
-		return spec.List[messagesdef.MessageStruct](cloneEach(m.messages)), true
+		return spec.List[messagesdef.MessageStruct](deepcopy.Each(m.messages)), true
 	case messagesdef.AttrActiveMessageIds:
 		return activeIDs(m.active), true
 	}

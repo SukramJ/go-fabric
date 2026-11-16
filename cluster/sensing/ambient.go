@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -171,7 +173,7 @@ type acState struct {
 // mutation that works on the copy and is not committed leaves st as it
 // was (R2-P6-api-1461, decision 142).
 func (st acState) clone() acState {
-	st.supported = cloneEach(st.supported)
+	st.supported = deepcopy.Each(st.supported)
 	if st.detections != nil {
 		ds := make([]detection, len(st.detections))
 		for i, d := range st.detections {
@@ -180,22 +182,9 @@ func (st acState) clone() acState {
 		}
 		st.detections = ds
 	}
-	st.predicted = cloneEach(st.predicted)
+	st.predicted = deepcopy.Each(st.predicted)
 	st.occ = st.occ.Clone()
 	return st
-}
-
-// cloneEach copies l entry by entry with each entry's generated Clone; nil
-// stays nil.
-func cloneEach[T interface{ Clone() T }](l []T) []T {
-	if l == nil {
-		return nil
-	}
-	out := make([]T, len(l))
-	for i := range l {
-		out[i] = l[i].Clone()
-	}
-	return out
 }
 
 // event is an event a mutation emits once it is committed.
@@ -291,7 +280,7 @@ func NewAmbientContext(cfg AmbientContextConfig) (*AmbientContext, error) {
 		if err := c.checkSupported(cfg.AmbientContextTypeSupported); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrAmbientContextConfig, err)
 		}
-		c.st.supported = cloneEach(cfg.AmbientContextTypeSupported)
+		c.st.supported = deepcopy.Each(cfg.AmbientContextTypeSupported)
 	}
 	if cfg.ObjectCountConfig != nil && counting {
 		if _, err := srv.CheckSet(def.AttrObjectCountConfig, *cfg.ObjectCountConfig, nil); err != nil {
@@ -398,7 +387,7 @@ func attr(st *acState, id uint32) any {
 		}
 		return list
 	case def.AttrAmbientContextTypeSupported:
-		return spec.List[SemanticTag](cloneEach(st.supported))
+		return spec.List[SemanticTag](deepcopy.Each(st.supported))
 	case def.AttrObjectCountThresholdReached:
 		return st.reached
 	case def.AttrObjectCount:
@@ -409,7 +398,7 @@ func attr(st *acState, id uint32) any {
 		lo, hi, dflt := st.limits[0], st.limits[1], st.limits[2]
 		return HoldTimeLimits{HoldTimeMin: &lo, HoldTimeMax: &hi, HoldTimeDefault: &dflt}
 	case def.AttrPredictedActivity:
-		return spec.List[PredictedActivity](cloneEach(st.predicted))
+		return spec.List[PredictedActivity](deepcopy.Each(st.predicted))
 	}
 	return nil
 }
@@ -754,7 +743,7 @@ func (c *AmbientContext) AddDetection(d Detection) error {
 		var hold time.Duration
 		if existing < 0 { // :251-267
 			info := d.Clone()
-			cl := cloneEach(tags)
+			cl := deepcopy.Each(tags)
 			info.AmbientContextSensed = &cl
 			item = detection{info: info, start: now, startEpoch: epochMS(now)}
 			hold = time.Duration(st.holdTime) * time.Second
@@ -879,7 +868,7 @@ func (c *AmbientContext) set(st *acState, id uint32, v any) error {
 		if err := c.checkSupported(list); err != nil {
 			return err
 		}
-		st.supported = cloneEach(list)
+		st.supported = deepcopy.Each(list)
 	case def.AttrObjectCountConfig:
 		cfg, ok := v.(ObjectCountConfig)
 		if !ok {
@@ -910,7 +899,7 @@ func (c *AmbientContext) set(st *acState, id uint32, v any) error {
 		if err := c.checkPredicted(list); err != nil {
 			return err
 		}
-		st.predicted = cloneEach(list)
+		st.predicted = deepcopy.Each(list)
 	}
 	return nil
 }

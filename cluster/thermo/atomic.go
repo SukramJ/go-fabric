@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
@@ -394,7 +396,7 @@ func (s *ThermostatServer) beginWrite(ctx context.Context, req tdef.AtomicReques
 	// 645b267a) — so a CommitWrite without a write commits what is there.
 	if st.holds(tdef.AttrSchedules) {
 		s.mu.RLock()
-		st.stage(tdef.AttrSchedules, cloneSchedules(s.schedules))
+		st.stage(tdef.AttrSchedules, deepcopy.Each(s.schedules))
 		s.mu.RUnlock()
 	}
 	s.atomic.add(st)
@@ -479,8 +481,8 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 // caller holds s.op.
 func (s *ThermostatServer) commitAll(ctx context.Context, st *atomicWriteState, attrs []uint32, statuses []tdef.AtomicResponseAttributeStatusEntry) bool {
 	s.mu.RLock()
-	prevPresets := clonePresets(s.presets)
-	prevSchedules := cloneSchedules(s.schedules)
+	prevPresets := deepcopy.Each(s.presets)
+	prevSchedules := deepcopy.Each(s.schedules)
 	s.mu.RUnlock()
 	var committed []uint32
 	for _, attr := range attrs {
@@ -524,7 +526,7 @@ func (s *ThermostatServer) revertAtomic(ctx context.Context, attr uint32, preset
 		s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrPresets)
 	case tdef.AttrSchedules:
 		if s.schedulePort != nil {
-			err = s.schedulePort.CommitSchedules(ctx, cloneSchedules(schedules))
+			err = s.schedulePort.CommitSchedules(ctx, deepcopy.Each(schedules))
 		}
 		s.mu.Lock()
 		changed := !schedulesTLVEqual(s.schedules, schedules)
@@ -565,7 +567,7 @@ func (s *ThermostatServer) precommitAtomic(attr uint32, v any) error {
 	switch attr {
 	case tdef.AttrPresets:
 		staged, _ := v.([]Preset) // writePresets stages a []Preset
-		next := clonePresets(staged)
+		next := deepcopy.Each(staged)
 		issued := map[string]bool{}
 		if err := s.presetRules().validatePresetWrite(next, s.presets, false, issued); err != nil {
 			return err

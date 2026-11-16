@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -499,7 +501,7 @@ func (s *EvseServer) IsPluggedIn() bool {
 func (s *EvseServer) Targets() []ChargingTargetSchedule {
 	s.lock()
 	defer s.unlock()
-	return nonNilSchedules(cloneAll(s.targets))
+	return nonNilSchedules(deepcopy.Each(s.targets))
 }
 
 // nonNilSchedules is an empty list for none.
@@ -1328,7 +1330,7 @@ func (s *EvseServer) setTargets(_ context.Context, fields any) (any, error) {
 // chip's; a stored schedule cannot lose all its days — its days inside the
 // new ones are the replaced case).
 func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSchedule, error) {
-	list := nonNilSchedules(cloneAll(current))
+	list := nonNilSchedules(deepcopy.Each(current))
 	for _, n := range updates {
 		newMask := uint8(n.DayOfWeekForSequence) & evseDayOfWeekMask // :271-272
 		found := false
@@ -1337,7 +1339,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 			cur := uint8(c.DayOfWeekForSequence) & evseDayOfWeekMask // :285-286
 			a, b := cur&newMask, cur&^newMask                        // :293-294
 			if cur == a {                                            // :298-314
-				next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: TargetDays(a), ChargingTargets: cloneAll(n.ChargingTargets)})
+				next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: TargetDays(a), ChargingTargets: deepcopy.Each(n.ChargingTargets)})
 				found = true
 				continue
 			}
@@ -1358,7 +1360,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 func (s *EvseServer) getTargets(_ context.Context, _ any) (any, error) {
 	s.lock()
 	defer s.unlock()
-	return evse.GetTargetsResponse{ChargingTargetSchedules: nonNilSchedules(cloneAll(s.targets))}, nil
+	return evse.GetTargetsResponse{ChargingTargetSchedules: nonNilSchedules(deepcopy.Each(s.targets))}, nil
 }
 
 // clearTargets is HandleClearTargets (EvseCluster.cpp:600-604) over

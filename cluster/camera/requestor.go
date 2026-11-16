@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -120,7 +122,7 @@ func NewRequestor(cfg RequestorConfig) (*Requestor, error) {
 func (r *Requestor) Sessions() []WebRTCSession {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return cloneAll(r.sessions)
+	return deepcopy.Each(r.sessions)
 }
 
 // UpsertSession registers or updates a session the host initiated with a

@@ -62,6 +62,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -164,6 +166,11 @@ type Config struct {
 	EstimatedEndTime bool
 
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Clock paces the EstimatedEndTime quieter; nil is [clock.System].
 	Clock clock.Clock
@@ -286,22 +293,8 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.selected = slices.Clone(cfg.SelectedAreas)
 	s.current = clonePtr(cfg.InitialCurrentArea)
-	s.progress = cloneProgress(cfg.Progress)
+	s.progress = deepcopy.Each(cfg.Progress)
 	return s, nil
-}
-
-// cloneProgress deep-copies a Progress list with the generated Clone, so
-// a list handed in or out shares no field with the one the server holds
-// (decision 142).
-func cloneProgress(in []Progress) []Progress {
-	if in == nil {
-		return nil
-	}
-	out := make([]Progress, len(in))
-	for i := range in {
-		out[i] = in[i].Clone()
-	}
-	return out
 }
 
 func clonePtr[T any](p *T) *T {
@@ -558,7 +551,7 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 		return nullable(s.endTime), true
 	}
 	// Progress, the last attribute Serves admits.
-	return spec.List[Progress](cloneProgress(s.progress)), true
+	return spec.List[Progress](deepcopy.Each(s.progress)), true
 }
 
 // nullable is a nullable uint32 in its read form: nil for null.
@@ -806,7 +799,7 @@ func (s *Server) SetProgress(progress []Progress) error {
 		s.mu.Unlock()
 		return err
 	}
-	s.progress = cloneProgress(progress)
+	s.progress = deepcopy.Each(progress)
 	s.mu.Unlock()
 	s.changed(sa.AttrProgress)
 	return nil

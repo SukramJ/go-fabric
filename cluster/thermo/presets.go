@@ -13,6 +13,8 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
@@ -90,20 +92,6 @@ func asStatus(err error) (im.StatusCode, bool) {
 		return spec.StatusOf(err), true
 	}
 	return 0, false
-}
-
-// clonePresets deep-copies presets: a write normalises the presets it is
-// given, and the caller's slice is the caller's (matter.js deepCopy,
-// ThermostatServer.ts:49-51).
-func clonePresets(in []Preset) []Preset {
-	if in == nil {
-		return nil
-	}
-	out := make([]Preset, len(in))
-	for i := range in {
-		out[i] = in[i].Clone() // the generated deep copy (decision 142)
-	}
-	return out
 }
 
 // presetsValue is a Presets value as the server handles it: the bridge
@@ -387,7 +375,7 @@ func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) e
 // the Presets setter stores for a command (:1687-1690,
 // AtomicWriteHandler.ts:299). The caller holds s.op.
 func (s *ThermostatServer) commitPresets(ctx context.Context, staged []Preset) error {
-	return s.applyPresets(ctx, clonePresets(staged))
+	return s.applyPresets(ctx, deepcopy.Each(staged))
 }
 
 // SetPresets is a local write of the Presets attribute — matter.js
@@ -405,7 +393,7 @@ func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) err
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.applyPresets(ctx, clonePresets(presets))
+	return s.applyPresets(ctx, deepcopy.Each(presets))
 }
 
 // Presets returns a copy of the stored presets (matter.js
@@ -413,7 +401,7 @@ func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) err
 func (s *ThermostatServer) Presets() []Preset {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return clonePresets(s.presets)
+	return deepcopy.Each(s.presets)
 }
 
 // ActivePresetHandle returns the ActivePresetHandle, nil for null.
@@ -626,7 +614,7 @@ func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 		}
 	}
 	if !loaded {
-		presets = clonePresets(cfg.Presets)
+		presets = deepcopy.Each(cfg.Presets)
 		if presets == nil {
 			presets = []Preset{}
 		}

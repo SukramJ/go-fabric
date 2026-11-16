@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	timesyncdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
@@ -317,7 +319,7 @@ func (t *TimeSynchronization) updateTimeZoneStateLocked(ctx context.Context) tim
 	if active == 0 {
 		return timeStateActive
 	}
-	t.state.timeZone = cloneEach(tz[active:])
+	t.state.timeZone = deepcopy.Each(tz[active:])
 	if err := t.save(ctx, timeSyncKeyTimeZone, t.state.timeZone); err != nil {
 		return timeStateInvalid
 	}
@@ -456,7 +458,7 @@ func (t *TimeSynchronization) readFeatureLocked(attrID uint32) (any, bool) {
 		}
 		return *t.state.defaultNTP, true
 	case timesyncdef.AttrTimeZone:
-		return spec.List[timesyncdef.TimeZoneStruct](cloneEach(t.state.timeZone)), true
+		return spec.List[timesyncdef.TimeZoneStruct](deepcopy.Each(t.state.timeZone)), true
 	case timesyncdef.AttrDstOffset:
 		return spec.List[timesyncdef.DSTOffsetStruct](slices.Clone(t.state.dstOffset)), true
 	case timesyncdef.AttrTimeZoneDatabase:
@@ -640,7 +642,7 @@ func (t *TimeSynchronization) handleSetTimeZone(ctx context.Context, fields any)
 		t.mu.Unlock()
 		t.flush(contract.OriginFrom(ctx), &p)
 	}()
-	saved := cloneEach(t.state.timeZone)
+	saved := deepcopy.Each(t.state.timeZone)
 	statusChanged, err := t.setTimeZoneLocked(ctx, req.TimeZone, &p)
 	if err != nil {
 		t.state.timeZone = saved

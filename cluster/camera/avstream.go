@@ -12,6 +12,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
@@ -249,7 +251,7 @@ func NewAvStream(cfg AvStreamConfig) (*AvStream, error) {
 	if a.priorities == nil {
 		a.priorities = a.supportedStreamUsages()
 	}
-	a.videos = cloneAll(cfg.AllocatedVideoStreams)
+	a.videos = deepcopy.Each(cfg.AllocatedVideoStreams)
 	for i := range a.videos {
 		a.videos[i].ReferenceCount = 0
 	}
@@ -257,7 +259,7 @@ func NewAvStream(cfg AvStreamConfig) (*AvStream, error) {
 	for i := range a.audios {
 		a.audios[i].ReferenceCount = 0
 	}
-	a.snapshots = cloneAll(cfg.AllocatedSnapshotStreams)
+	a.snapshots = deepcopy.Each(cfg.AllocatedSnapshotStreams)
 	for i := range a.snapshots {
 		a.snapshots[i].ReferenceCount = 0
 	}
@@ -454,8 +456,8 @@ type avStreamState struct {
 // saveLocked is a deep copy of the state; the caller holds a.mu.
 func (a *AvStream) saveLocked() avStreamState {
 	return avStreamState{
-		videos: cloneAll(a.videos), audios: slices.Clone(a.audios), // AudioStreamStruct holds no list or pointer
-		snapshots: cloneAll(a.snapshots), priorities: slices.Clone(a.priorities),
+		videos: deepcopy.Each(a.videos), audios: slices.Clone(a.audios), // AudioStreamStruct holds no list or pointer
+		snapshots: deepcopy.Each(a.snapshots), priorities: slices.Clone(a.priorities),
 	}
 }
 
@@ -639,7 +641,7 @@ func (a *AvStream) checkViewportWith(vp csdef.ViewportStruct, pending map[uint32
 func (a *AvStream) VideoStreams() []VideoStream {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return cloneAll(a.videos)
+	return deepcopy.Each(a.videos)
 }
 
 // AudioStreams returns AllocatedAudioStreams.
@@ -653,7 +655,7 @@ func (a *AvStream) AudioStreams() []AudioStream {
 func (a *AvStream) SnapshotStreams() []SnapshotStream {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return cloneAll(a.snapshots)
+	return deepcopy.Each(a.snapshots)
 }
 
 // StreamUsagePriorities returns the ranked stream usages.

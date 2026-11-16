@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -183,7 +185,7 @@ func NewPushTransport(cfg PushTransportConfig) (*PushTransport, error) {
 		port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clk, timers: map[uint16]*expiry{},
 		tlsEP: cfg.TLSEndpoints, tlsCerts: cfg.TLSCertificates,
 	}
-	p.conns = cloneAll(cfg.Connections)
+	p.conns = deepcopy.Each(cfg.Connections)
 	handlers := map[uint32]spec.CommandHandler{
 		padef.CmdAllocatePushTransport:    serial(&p.op, p.allocate),
 		padef.CmdDeallocatePushTransport:  serial(&p.op, p.deallocate),
@@ -213,7 +215,7 @@ func NewPushTransport(cfg PushTransportConfig) (*PushTransport, error) {
 func (p *PushTransport) Connections() []TransportConfiguration {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return cloneAll(p.conns)
+	return deepcopy.Each(p.conns)
 }
 
 // AttachTLS hands the server the node's TLS servers: each lookup the

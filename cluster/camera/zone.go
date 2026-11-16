@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
@@ -157,8 +159,8 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 		}
 		z.sensitivity = cfg.Sensitivity
 	}
-	z.zones = cloneAll(cfg.Zones)
-	z.triggers = cloneAll(cfg.Triggers)
+	z.zones = deepcopy.Each(cfg.Zones)
+	z.triggers = deepcopy.Each(cfg.Triggers)
 	z.userDefined = min(countUserZones(z.zones), int(cfg.MaxUserDefinedZones)) // :135-136
 	handlers := map[uint32]spec.CommandHandler{
 		zmdef.CmdCreateTwoDCartesianZone: serial(&z.op, z.createTwoDCartesianZone),
@@ -209,7 +211,7 @@ func countUserZones(zones []Zone) int {
 func (z *Zones) ZoneList() []Zone {
 	z.mu.Lock()
 	defer z.mu.Unlock()
-	return cloneAll(z.zones)
+	return deepcopy.Each(z.zones)
 }
 
 // MaxZones returns MaxZones.
@@ -219,7 +221,7 @@ func (z *Zones) MaxZones() uint8 { return z.cfg.MaxZones }
 func (z *Zones) TriggerList() []ZoneTrigger {
 	z.mu.Lock()
 	defer z.mu.Unlock()
-	return cloneAll(z.triggers)
+	return deepcopy.Each(z.triggers)
 }
 
 // TriggerFor returns the trigger of a zone (chip GetTriggerForZone,
@@ -319,7 +321,7 @@ func (z *Zones) change(attrID uint32, edit func(*zoneTables)) error {
 	z.pub.Lock()
 	defer z.pub.Unlock()
 	z.mu.Lock()
-	t := zoneTables{zones: cloneAll(z.zones), triggers: cloneAll(z.triggers), userDefined: z.userDefined}
+	t := zoneTables{zones: deepcopy.Each(z.zones), triggers: deepcopy.Each(z.triggers), userDefined: z.userDefined}
 	z.mu.Unlock()
 	edit(&t)
 	var v any = spec.List[Zone](nonNil(t.zones))

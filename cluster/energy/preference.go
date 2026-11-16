@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ep "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
@@ -122,12 +124,12 @@ func NewEnergyPreference(cfg PreferenceConfig) (*PreferenceServer, error) {
 	}
 	initial := map[uint32]any{}
 	if inst.Serves(ep.AttrEnergyBalances) {
-		initial[ep.AttrEnergyBalances] = spec.List[Balance](cloneAll(cfg.EnergyBalances))
+		initial[ep.AttrEnergyBalances] = spec.List[Balance](deepcopy.Each(cfg.EnergyBalances))
 		initial[ep.AttrEnergyPriorities] = priorityList(slices.Clone(cfg.EnergyPriorities))
 		initial[ep.AttrCurrentEnergyBalance] = cfg.CurrentEnergyBalance
 	}
 	if inst.Serves(ep.AttrLowPowerModeSensitivities) {
-		initial[ep.AttrLowPowerModeSensitivities] = spec.List[Balance](cloneAll(cfg.LowPowerModeSensitivities))
+		initial[ep.AttrLowPowerModeSensitivities] = spec.List[Balance](deepcopy.Each(cfg.LowPowerModeSensitivities))
 		initial[ep.AttrCurrentLowPowerModeSensitivity] = cfg.CurrentLowPowerModeSensitivity
 	}
 	for _, id := range []uint32{ep.AttrCurrentEnergyBalance, ep.AttrCurrentLowPowerModeSensitivity} {

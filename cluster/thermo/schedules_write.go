@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
@@ -372,7 +374,7 @@ func (r scheduleRules) validateTransitionsPerDay(sc Schedule) error {
 // normalised list.
 func (r scheduleRules) pendingSchedules(stored, list []Schedule) ([]Schedule, error) {
 	pending := make([]Schedule, 0, len(list))
-	for _, sc := range cloneSchedules(list) {
+	for _, sc := range deepcopy.Each(list) {
 		n, err := r.appendPending(stored, pending, sc)
 		if err != nil {
 			return nil, err
@@ -460,12 +462,12 @@ func schedulesTLVEqual(a, b []Schedule) bool {
 // 645b267a), whose error fails the commit — and the list is stored and
 // reported. The caller holds s.op.
 func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedule) error {
-	list := cloneSchedules(staged)
+	list := deepcopy.Each(staged)
 	if err := issueScheduleHandles(list); err != nil {
 		return err
 	}
 	if s.schedulePort != nil {
-		if err := s.schedulePort.CommitSchedules(ctx, cloneSchedules(list)); err != nil {
+		if err := s.schedulePort.CommitSchedules(ctx, deepcopy.Each(list)); err != nil {
 			return err
 		}
 	}

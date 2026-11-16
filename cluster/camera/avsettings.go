@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
@@ -254,7 +256,7 @@ func NewAvSettings(cfg AvSettingsConfig) (*AvSettings, error) {
 	if len(cfg.MptzPresets) > int(a.maxPresets) {
 		return nil, fmt.Errorf("%w: %d MPTZPresets, MaxPresets %d", ErrAvSettingsConfig, len(cfg.MptzPresets), a.maxPresets)
 	}
-	a.mptzPresets = cloneAll(cfg.MptzPresets)
+	a.mptzPresets = deepcopy.Each(cfg.MptzPresets)
 	a.dptzStreams = slices.Clone(cfg.DptzStreams)
 	a.skipTakenPresetID()
 	a.movement = MovementIdle // :68
@@ -326,7 +328,7 @@ func (a *AvSettings) saveLocked() avSettingsState {
 		panMin: a.panMin, panMax: a.panMax, tiltMin: a.tiltMin, tiltMax: a.tiltMax, zoomMax: a.zoomMax,
 		position: a.position.Clone(), movement: a.movement,
 		targetPan: a.targetPan, targetTilt: a.targetTilt, targetZoom: a.targetZoom, // replaced, never written through
-		mptzPresets: cloneAll(a.mptzPresets), dptzStreams: slices.Clone(a.dptzStreams), currentPresetID: a.currentPresetID,
+		mptzPresets: deepcopy.Each(a.mptzPresets), dptzStreams: slices.Clone(a.dptzStreams), currentPresetID: a.currentPresetID,
 	}
 }
 
@@ -426,7 +428,7 @@ func (a *AvSettings) MovementState() PhysicalMovement {
 func (a *AvSettings) Presets() []MPTZPreset {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return cloneAll(a.mptzPresets)
+	return deepcopy.Each(a.mptzPresets)
 }
 
 // Streams returns DPTZStreams.
@@ -946,7 +948,7 @@ func (a *AvSettings) setAttributesLocked(checked map[uint32]any) {
 				a.setPosition(p.Pan, p.Tilt, p.Zoom)
 			}
 		case avdef.AttrMptzPresets:
-			a.mptzPresets = cloneAll(listOf[MPTZPreset](v))
+			a.mptzPresets = deepcopy.Each(listOf[MPTZPreset](v))
 			a.skipTakenPresetID()
 		case avdef.AttrDptzStreams:
 			a.dptzStreams = listOf[DPTZStream](v)
