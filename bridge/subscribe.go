@@ -2011,7 +2011,7 @@ func (b *Bridge) subscribeWith(
 	var events func() []im.EventReport
 	if len(primingReq.EventRequests) > 0 {
 		events = func() []im.EventReport {
-			primed.EventReports = b.primingEvents(subCtx, dispatcher, primingReq)
+			primed.EventReports = b.primingEvents(subCtx, dispatcher, primingReq, false)
 			return primed.EventReports
 		}
 	}

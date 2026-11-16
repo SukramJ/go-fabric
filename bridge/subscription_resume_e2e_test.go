@@ -194,6 +194,8 @@ type reportSeen struct {
 	subID     uint32
 	sessionID uint16
 	attrs     int
+	// payload is the ReportData's TLV, for a test that reads more.
+	payload []byte
 }
 
 // fakeController plays the controller: a subscriber over a CASE session,
@@ -317,7 +319,7 @@ func (c *fakeController) handle(datagram []byte) {
 			sr, _ := EncodeStatusResponse(im.StatusResponse{Status: answer})
 			c.sendSecureAck(proto, hdr.MessageCounter, im.OpcodeStatusResponse, sr)
 		}
-		c.reports <- reportSeen{subID: subID, sessionID: hdr.SessionID, attrs: attrs}
+		c.reports <- reportSeen{subID: subID, sessionID: hdr.SessionID, attrs: attrs, payload: slices.Clone(payload)}
 	case im.OpcodeSubscribeResponse:
 		subID, _ := decodeReportSummary(payload) // SubscriptionId is tag 0 in both
 		c.subResp <- subID

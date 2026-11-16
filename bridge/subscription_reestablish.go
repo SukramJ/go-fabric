@@ -302,14 +302,15 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 	// The report is generated chunk by chunk, as a Subscribe's priming
 	// report (review II, decision 44). `suppressStatusReports`:
 	// re-establishment simulates a subscription that never went away, so
-	// per-path errors are not reported again.
+	// per-path errors are not reported again — the event paths' as the
+	// attribute paths' (R2-P6-wire-0510).
 	attributes := b.newPrimingSource(readCtx, dispatcher, primingReq)
 	attributes.suppressStatuses = true
 	var report im.ReportData
 	var events func() []im.EventReport
 	if len(primingReq.EventRequests) > 0 {
 		events = func() []im.EventReport {
-			report.EventReports = b.primingEvents(readCtx, dispatcher, primingReq)
+			report.EventReports = b.primingEvents(readCtx, dispatcher, primingReq, attributes.suppressStatuses)
 			return report.EventReports
 		}
 	}

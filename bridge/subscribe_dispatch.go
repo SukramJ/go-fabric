@@ -37,7 +37,7 @@ func (b *Bridge) buildInitialReport(
 	matched := src.matched
 	if len(req.EventRequests) > 0 {
 		matched += b.primingEventPaths(subCtx, dispatcher, req)
-		report.EventReports = b.primingEvents(subCtx, dispatcher, req)
+		report.EventReports = b.primingEvents(subCtx, dispatcher, req, false)
 	}
 	return report, matched
 }
@@ -344,11 +344,20 @@ func eventPathsForThisNode(ctx context.Context, paths []im.ConcreteEventPath) []
 // subject sees no AccessControl events (Matter §8.4.3.2 / §9.10.7.1).
 // Mirrors matter.js EventReadResponse.ts #readAllowedEvents; subCtx
 // carries the requesting fabric + subject.
-func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) []im.EventReport {
+//
+// suppressStatuses leaves the concrete event paths' statuses out, as a
+// re-established subscription's priming report leaves its attribute
+// statuses out ([primingSource.suppressStatuses]): matter.js suppresses
+// both with one flag (ServerSubscription.ts:681-684 beside :647-650 at
+// db021da0; review II, R2-P6-wire-0510, N-rw3req-2).
+func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest, suppressStatuses bool) []im.EventReport {
 	raw := im.BuildEventReports(eventPathsForThisNode(subCtx, req.EventRequests), b.eventLog, req.EventFilters)
 	auth := b.primingEventAuthorizer(subCtx, dispatcher)
-	return append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests),
-		im.AuthorizeEventReports(subCtx, auth, raw)...)
+	allowed := im.AuthorizeEventReports(subCtx, auth, raw)
+	if suppressStatuses {
+		return allowed
+	}
+	return append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests), allowed...)
 }
 
 // primingMatches reports whether req establishes a subscription: one of
