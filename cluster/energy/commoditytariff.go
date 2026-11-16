@@ -235,9 +235,12 @@ type CommodityTariffServer struct {
 	// ahead of the node's Matter time.
 	declared bool
 
-	// mu guards active, assigned, pending and syncTimer.
+	// mu guards active, assigned, pending, syncTimer and quiesced.
 	mu        sync.Mutex
 	syncTimer clock.Timer
+	// quiesced is set by a MatterQuiesce that stopped the sync;
+	// SetEndpoint starts it again.
+	quiesced bool
 	// active is a tariff the current attributes are derived from —
 	// mServerTariffAttrsCtx.mTariffProvider != nullptr (Server.cpp:896-904).
 	active bool
@@ -479,6 +482,11 @@ func (s *CommodityTariffServer) ClearTariff() error {
 func (s *CommodityTariffServer) SyncTime() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.syncTimeLocked()
+}
+
+// syncTimeLocked is [CommodityTariffServer.SyncTime]; the caller holds mu.
+func (s *CommodityTariffServer) syncTimeLocked() error {
 	now, ok := s.nowEpoch()
 	if !ok { // UpdateCurrentAttrs, :928-934
 		return ErrNoTime

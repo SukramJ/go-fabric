@@ -9,6 +9,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/energy"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
 	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
 )
 
@@ -71,5 +73,44 @@ func TestDEMQuiesceStopsItsTimers(t *testing.T) {
 	clk.Advance(time.Second)
 	if ids := ev.ids(); len(ids) != 2 || srv.EsaState() != energy.EsaStateOnline {
 		t.Fatalf("after the remount: events %v, ESAState %d", ids, srv.EsaState())
+	}
+}
+
+// TestTariffRemountResumesTheTimeSync: a CommodityTariff quiesced and put
+// back (SetEndpoint) derives its clock-driven attributes again at once and
+// on the clock afterwards: a delayed tariff whose StartDate passed while
+// the server was out activates at the remount. Before, the sync stayed
+// stopped until the host's next UpdateTariff (review II, R2-P6-fsm-1607,
+// R2-P1-dr-rest-03 rest).
+func TestTariffRemountResumesTheTimeSync(t *testing.T) {
+	t.Parallel()
+	const interval = 30 * time.Second
+	clk := clocktest.New(time.Unix(1748736000, 0))
+	srv, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{Features: allTariffFeatures, Clock: clk, SyncInterval: interval})
+	if err != nil {
+		t.Fatal(err)
+	}
+	delayed := sample2()
+	start := uint32(1748736000-946684800) + 45
+	delayed.StartDate = &start
+	delayed.CalendarPeriods = []energy.TariffCalendarPeriod{{StartDate: spec.ValueOf(start), DayPatternIds: []uint32{0}}}
+	if err := srv.UpdateTariff(delayed); err != nil {
+		t.Fatal(err)
+	}
+	srv.MatterQuiesce()
+	clk.Advance(2 * interval)
+	if v := read(t, srv, ct.AttrStartDate); v != nil {
+		t.Fatalf("StartDate = %v while quiesced, want the update pending", v)
+	}
+	srv.SetEndpoint(1)
+	if v := read(t, srv, ct.AttrStartDate); v != start {
+		t.Errorf("StartDate = %v at the remount, want %d", v, start)
+	}
+	if n := clk.Pending(); n != 1 {
+		t.Errorf("armed timers = %d after the remount, want the sync", n)
+	}
+	srv.SetEndpoint(1) // a second remount arms no second sync
+	if n := clk.Pending(); n != 1 {
+		t.Errorf("armed timers = %d after a second SetEndpoint", n)
 	}
 }
