@@ -73,15 +73,15 @@ type swapDuringSigma1Handler struct {
 	next CaseHandler
 }
 
-func (h *swapDuringSigma1Handler) ProcessSigma1([]byte) (uint8, []byte, error) {
+func (h *swapDuringSigma1Handler) ProcessSigma1([]byte) (opcode uint8, payload []byte, err error) {
 	h.b.AttachCaseHandler(h.next)
 	return mrp.SCOpcodeSigma2, []byte{0xD1}, nil
 }
 
-func (h *swapDuringSigma1Handler) ProcessSigma3([]byte) (uint8, []byte, error) {
+func (h *swapDuringSigma1Handler) ProcessSigma3([]byte) (opcode uint8, payload []byte, err error) {
 	return 0, nil, errHandshakeNotBegun
 }
 
-func (h *swapDuringSigma1Handler) ProcessSigma2Resume([]byte) (uint8, []byte, error) {
+func (h *swapDuringSigma1Handler) ProcessSigma2Resume([]byte) (opcode uint8, payload []byte, err error) {
 	return 0, nil, errHandshakeNotBegun
 }

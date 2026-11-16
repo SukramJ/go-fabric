@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"strconv"
 	"time"
@@ -1559,7 +1560,7 @@ func (b *Bridge) endHandshakeOfReplacedHandler(key HandshakeKey, hash [32]byte) 
 // Sigma3 was then acknowledged and not answered (review II, U4-fr-sec-1).
 func (b *Bridge) holdCompletedRecord(key HandshakeKey) (release func()) {
 	b.mu.Lock()
-	if rec, ok := b.sigma1Replied[key]; ok {
+	if rec, ok := b.sigma1Replied[key]; ok && rec.resending < math.MaxUint8 {
 		rec.resending++
 		b.sigma1Replied[key] = rec
 	}
@@ -1619,13 +1620,15 @@ type sigma1Record struct {
 	// bySingleton is set once the Sigma1 began a handshake the singleton
 	// handler runs, not a provider's ([Bridge.AttachCaseHandler]).
 	bySingleton bool
+	// resending counts the success reports being sent again for the
+	// handshake ([Bridge.holdCompletedRecord]); the record does not end
+	// while it is positive. A byte, beside bySingleton, so the record
+	// stays the size it was; one Sigma3's retransmissions at a time come
+	// nowhere near 255.
+	resending uint8
 	// judged is the hash of a Sigma1 of other bytes while it is judged
 	// over this record ([Bridge.markSigma1Replied]), else nil.
 	judged *[32]byte
-	// resending counts the success reports being sent again for the
-	// handshake ([Bridge.holdCompletedRecord]); the record does not end
-	// while it is positive.
-	resending int
 	// answeredAt is when the Sigma1 began the handshake, overConn whether
 	// it arrived over a connection, and sigma2AckedAt when its Sigma2 was
 	// acknowledged: the wait for Sigma3 runs from them
