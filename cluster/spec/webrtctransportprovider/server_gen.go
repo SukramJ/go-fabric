@@ -245,7 +245,12 @@ type OfferArgs struct {
 // camera in standby that sends its offer later. The session is
 // stored as the port returns it — its Id, PeerNodeId and FabricIndex
 // are the port's to keep to the OfferArgs — and only when the schema
-// admits it (FAILURE otherwise). The server bounds sessions by the
+// admits it. Other than chip, which stores the delegate's session
+// unconditionally (WebRTCTransportProviderCluster.cpp:811, :1111), a
+// session the schema refuses — one naming no stream ("O.a+") — is
+// not stored and the command answers FAILURE; the port has then
+// started a session the server does not list, and ends it itself.
+// The server bounds sessions by the
 // id space alone; a per-fabric or total bound is the port's
 // (RESOURCE_EXHAUSTED), and so is ending a session whose requestor
 // is gone: the server ends sessions on EndSession, on the host's

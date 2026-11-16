@@ -310,11 +310,15 @@ type TLSCredentials struct {
 // CameraAvStreamManagement, the motion zones against its
 // ZoneManagement, the segment, bandwidth and pre-roll rules.
 // ModifyPushTransport, as connectedhomeip's HandleModifyPushTransport
-// (PushAVStreamTransportLogic.cpp:1291, :1326-1332, :1334 at
-// 6170af84), is checked for the transport options and the streams
-// only: the port receives its TLSEndpointID, URL, usage and zones
-// unchecked, and resolves a TLS endpoint within the connection's
-// fabric (fabricIndex of AllocatePushTransport). TransportBusy reports a
+// (PushAVStreamTransportLogic.cpp:1291, :1326-1332, :1335 at
+// 6170af84), runs the transport options' constraint checks and the
+// stream checks only. What AllocatePushTransport checks beyond them is
+// not checked: the TLS endpoint is not looked up, the URL's form, the
+// stream usage against the supported ones, the zone ids against
+// ZoneManagement, the segment duration and the pre-roll length are not
+// validated, and ValidateBandwidthLimit is not called. The port
+// resolves a TLS endpoint within the connection's fabric (fabricIndex
+// of AllocatePushTransport). TransportBusy reports a
 // connection that uploads now; ValidateBandwidthLimit refuses a
 // transport the network cannot carry; CMAFSessionNumber is the CMAF
 // session number of the events. An error answers its status,

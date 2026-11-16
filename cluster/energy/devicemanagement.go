@@ -1096,7 +1096,7 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 			}
 		}
 	}
-	// The overlap check adds in uint32, as chip's (:776-777): a start near
+	// The overlap check adds in uint32, as chip's (:778-779): a start near
 	// 2^32 wraps (R2-P6-wire-1617, kept as chip's).
 	for i := 1; i < len(r.Constraints); i++ { // :767-793
 		prev, c := r.Constraints[i-1], r.Constraints[i]
