@@ -13,9 +13,11 @@
 //   - Single- and double-precision floats.
 //   - UTF-8 strings and octet strings (1/2/4/8-byte length prefixes).
 //   - Containers: Structure, Array, List.
-//   - All seven tag classes: Anonymous, Context-specific, Common
+//   - The eight tag forms: Anonymous, Context-specific, Common
 //     Profile (2/4-byte), Implicit Profile (2/4-byte), Fully-Qualified
-//     (6/8-byte).
+//     (6/8-byte). The encoder writes all eight; the decoder refuses an
+//     Implicit Profile tag with [ErrImplicitProfileTag], because the
+//     package sets no implicit profile to resolve it against.
 //
 // The package is dependency-free Go stdlib; it is consumed by the
 // Interaction Model layer ([..]/im/) and by every cluster server
@@ -27,8 +29,13 @@
 //	enc.StartStruct(tlv.AnonymousTag())
 //	enc.PutBool(tlv.ContextTag(0), true)
 //	enc.PutUint(tlv.ContextTag(1), 42)
-//	enc.EndContainer()
-//	wire := enc.Bytes()
+//	if err := enc.EndContainer(); err != nil {
+//	    return err
+//	}
+//	wire, err := enc.Bytes()
+//	if err != nil {
+//	    return err
+//	}
 //
 // Decoding pattern:
 //

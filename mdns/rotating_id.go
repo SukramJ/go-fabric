@@ -55,17 +55,17 @@ func GenerateRotatingID(uniqueID []byte, lifetimeCounter uint16) string {
 	if len(uniqueID) < RotatingIDUniqueIDLength {
 		return ""
 	}
-	var counterBE [2]byte
-	binary.LittleEndian.PutUint16(counterBE[:], lifetimeCounter)
+	var counterLE [2]byte
+	binary.LittleEndian.PutUint16(counterLE[:], lifetimeCounter)
 
 	h := sha256.New()
 	h.Write(uniqueID)
-	h.Write(counterBE[:])
+	h.Write(counterLE[:])
 	digest := h.Sum(nil)
 
 	const total = 2 + rotatingIDSuffixLength
 	var binBuf [total]byte
-	copy(binBuf[:2], counterBE[:])
+	copy(binBuf[:2], counterLE[:])
 	copy(binBuf[2:], digest[len(digest)-rotatingIDSuffixLength:])
 
 	out := make([]byte, total*2)

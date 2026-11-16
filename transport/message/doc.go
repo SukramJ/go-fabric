@@ -29,7 +29,7 @@
 //	+------------------+
 //
 // This package handles the *unencrypted* framing only — the form used
-// by PASE / CASE session establishment and by the Unsecured Session
-// (group multicast / commissioning). Encrypted framing layers MIC +
-// payload encryption on top via the [..]/secure package (M2).
+// by the Unsecured Session (PASE / CASE session establishment).
+// Encrypted framing — unicast secure sessions and group sessions alike —
+// layers MIC + payload encryption on top via the [..]/secure package.
 package message
