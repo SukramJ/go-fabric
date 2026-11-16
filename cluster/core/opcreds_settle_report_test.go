@@ -225,3 +225,26 @@ func TestCSRBuildFailureDropsTheDrawnKeyPair(t *testing.T) {
 		t.Error("the fail-safe context holds a key pair no CSR was issued for")
 	}
 }
+
+// The fail-safe's rollback removes a pending AddNOC row whatever fabric the
+// expiry names — 0 included, as for an AddNOC the expiry overtook before
+// it re-stamped the fail-safe (review II, R2-P6-fsm-1024).
+func TestFailSafeExpiryRollsBackThePendingRowWhateverFabricItNames(t *testing.T) {
+	t.Parallel()
+	for _, named := range []uint8{0, 1, 7} {
+		ctx := context.Background()
+		st := newFakeStore()
+		oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{SupportedFabrics: 5})
+		if err != nil {
+			t.Fatal(err)
+		}
+		idx, err := st.AddFabric(ctx, mstore.FabricRecord{FabricID: 2, RootPublicKey: []byte{4, 2}, Pending: mstore.FabricPendingAdd})
+		if err != nil {
+			t.Fatal(err)
+		}
+		oc.OnFailSafeExpiry(ctx, named)
+		if _, err := st.GetFabric(ctx, idx); !errors.Is(err, mstore.ErrFabricNotFound) {
+			t.Errorf("expiry naming fabric %d: the pending row %d stays (%v)", named, idx, err)
+		}
+	}
+}
