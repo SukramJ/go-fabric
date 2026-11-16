@@ -476,15 +476,24 @@ func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 	if len(s.pendingDirty) == 0 {
 		return nil
 	}
-	out := make([]im.ConcreteAttributePath, 0, len(s.pendingDirty))
+	// Each path's first request-path index is taken once per drain, not in
+	// every comparison: the sort runs under s.mu, which every markDirty
+	// waits on, and a linear scan per comparison cost tens of
+	// milliseconds for a large subscription (review II, R2-P6-bound-0507).
+	type ranked struct {
+		path  im.ConcreteAttributePath
+		index int
+	}
+	rs := make([]ranked, 0, len(s.pendingDirty))
 	for p := range s.pendingDirty {
-		out = append(out, p)
+		rs = append(rs, ranked{path: p, index: s.requestPathIndex(p)})
 	}
 	s.pendingDirty = nil
-	slices.SortFunc(out, func(a, b im.ConcreteAttributePath) int {
-		if c := cmp.Compare(s.requestPathIndex(a), s.requestPathIndex(b)); c != 0 {
+	slices.SortFunc(rs, func(x, y ranked) int {
+		if c := cmp.Compare(x.index, y.index); c != 0 {
 			return c
 		}
+		a, b := x.path, y.path
 		if c := cmp.Compare(a.Endpoint, b.Endpoint); c != 0 {
 			return c
 		}
@@ -493,6 +502,10 @@ func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 		}
 		return im.CompareAttributeIDs(a.Cluster, a.Attribute, b.Attribute)
 	})
+	out := make([]im.ConcreteAttributePath, len(rs))
+	for i, r := range rs {
+		out[i] = r.path
+	}
 	return out
 }
 

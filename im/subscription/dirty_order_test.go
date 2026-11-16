@@ -50,3 +50,24 @@ func TestTakeDirtyOrderFollowsThePrimingReport(t *testing.T) {
 		}
 	}
 }
+
+// BenchmarkTakeDirtyOfALargeSubscription is the cost guard of review II
+// R2-P6-bound-0507: 200 changed paths of a subscription with 10 000
+// concrete request paths are sorted under s.mu, which every markDirty
+// waits on. Each path's request-path index is taken once per drain; a
+// scan per comparison cost about 28 ms a drain.
+func BenchmarkTakeDirtyOfALargeSubscription(b *testing.B) {
+	paths := make([]im.ConcreteAttributePath, 10_000)
+	for i := range paths {
+		paths[i] = im.ConcreteAttributePath{Endpoint: uint16(i / 100), Cluster: 6, Attribute: uint32(i % 100), HasEndpoint: true, HasCluster: true, HasAttribute: true} //nolint:gosec // i < 10 000
+	}
+	sub := &Subscription{AttributePaths: paths}
+	for b.Loop() {
+		for i := range 200 {
+			sub.markDirty(paths[len(paths)-1-i*7])
+		}
+		sub.mu.Lock()
+		_ = sub.takeDirtyLocked()
+		sub.mu.Unlock()
+	}
+}
