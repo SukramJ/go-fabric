@@ -388,7 +388,9 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		}
 	}
 	sessionID := init.Initiator.SessionID()
-	b.sessionPeerAddrs.Store(sessionID, addr)
+	// Bound as every session is bound, its owner recorded, so it never
+	// moves between transports (review II, R2-P6-conc-0314).
+	b.bindSessionRoute(sessionID, addr)
 	b.recordSessionsOpen()
 	b.logger.Info("matter.case.initiator.established",
 		slog.String("peer", addr.String()),
