@@ -319,8 +319,11 @@ and `sqlstore.Apply`:
 | `matter_client_values`, cluster `0xFFFFFFFC` | a node's onboarding code, when kept (`Config.KeepOnboardingCodes`) or attached: the code, its source, the time, the checks it passed — a secret, like the keys above |
 
 The two `controller.ca` keys are `ca.SettingStore`'s default; another
-`Key` moves both. Controller-side CASE resumption records are kept in
-memory only, so the first command of a run makes a full CASE handshake.
+`Key` moves both. The controller keeps one CASE resumption record per node
+in `matter_resumption`, so a restarted controller resumes instead of
+running full CASE. With `controller.Config.Sealer` the CA, the fabric, the
+resumption records, the group key sets, the kept onboarding codes and the
+ICD keys are sealed ([security](../security.md#sealing-at-rest)).
 
 *Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:34-44`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
 
@@ -334,7 +337,8 @@ Each schema ships three ways:
   `matter_group_key_map`, v8's added columns) and moves data an earlier
   release kept elsewhere (the VID settings into `matter_fabrics`). A host
   that runs `Migrations()` with its own tool calls `store.Upgrade` once
-  after it, for the moves.
+  after it, for the moves. `sqlstore.Apply` likewise runs
+  `sqlstore.Upgrade`, which adds v2's seal mark to `matter_client_values`.
 - **`Migrations()`** returns the same schema as versioned steps (`v1`,
   `v2`, …), each with `Up` and `Down`, for a host that runs its own
   migration tool. A released step never changes. Pin
@@ -356,7 +360,7 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-125`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
 
 ## Backup
 

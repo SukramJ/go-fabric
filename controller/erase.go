@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 )
 
 // Erase is the controller's factory reset: it closes the controller and
@@ -62,7 +60,7 @@ func (c *Controller) Erase(ctx context.Context) error {
 		}
 		c.stopping = nil
 	}
-	nodes := sqlstore.New(c.db)
+	nodes := c.nodeStore
 	ids, err := nodes.NodeIDs() //nolint:contextcheck // sqlstore's node API carries no context
 	if err != nil {
 		errs = append(errs, fmt.Errorf("controller: erase: list nodes: %w", err))

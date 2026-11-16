@@ -153,18 +153,21 @@ type Config struct {
 	// secret — with it and a factory reset anyone can commission the
 	// device — and the database then holds one per node.
 	KeepOnboardingCodes bool
-	// Sealer seals the secrets of the controller's store on DB (opt-in, off
-	// by default), as node.Store.Sealer seals a node's: New opens the
-	// store with store.NewSealed, which seals the clear rows it finds and
-	// scrubs the file, and returns its error. What it seals here: the CASE
-	// resumption records and the group key sets the controller keeps.
-	// The key must live outside the database (docs/security.md, "Sealing
-	// at rest"). Every later New needs the same sealer: under another key
-	// New fails with an error that wraps store.ErrUnseal (NewSealed opens
-	// one sealed value first); a store without one reads a sealed secret as
-	// store.ErrNoSealer. The CA's settings and the node registry are not
-	// sealed by it: ca.Config.RootSigner (Config.CAKey) keeps the root key
-	// out of the database.
+	// Sealer seals the secrets of the controller's database at rest
+	// (opt-in, off by default), the same sealer node.Store.Sealer takes.
+	// New opens the store with store.NewSealed and the node registry with
+	// sqlstore.NewSealed: what is sealed is the CA (controller.ca, with
+	// its root and ICAC key), the controller's fabric (controller.ca.fabric,
+	// with its IPK and operational key), the CASE resumption records, the
+	// group key sets, and in the registry the kept onboarding codes and the
+	// ICD Check-In keys. The rest — certificates, fabric and node ids, the
+	// nodes' attribute values — stays readable. A database written without
+	// a sealer is sealed on the way in and its file scrubbed, as a node's
+	// store is (store.NewSealed). The key must live outside the database
+	// (docs/security.md, "Sealing at rest"). Every later New needs the
+	// same sealer: under another key New fails with an error that wraps
+	// store.ErrUnseal (the stores open one sealed value first); without
+	// one, New fails reading the sealed CA with store.ErrNoSealer.
 	Sealer store.Sealer
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
@@ -306,8 +309,11 @@ type Controller struct {
 	db *sql.DB
 	// st is the controller's store on db, sealed with Config.Sealer when
 	// one is set: every read and write of the store tables goes through it.
-	st  *store.Store
-	log *slog.Logger
+	st *store.Store
+	// nodeStore is the node registry's store on db, sealed with
+	// Config.Sealer when one is set.
+	nodeStore *sqlstore.Store
+	log       *slog.Logger
 	// keepCodes is Config.KeepOnboardingCodes.
 	keepCodes bool
 	clock     clock.Clock
@@ -445,7 +451,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if err := errors.Join(store.Apply(ctx, cfg.DB), sqlstore.Apply(ctx, cfg.DB)); err != nil {
 		return nil, err
 	}
-	if c.st, err = openStore(ctx, cfg); err != nil {
+	if c.st, c.nodeStore, err = openStores(ctx, cfg); err != nil {
 		return nil, err
 	}
 	keep := ca.SettingStore{Settings: c.st} // "controller.ca" and "controller.ca.fabric"
@@ -549,7 +555,7 @@ func (c *Controller) openRegistry(cfg Config, fabrics []*commissioner.Fabric, cl
 	var err error
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
-		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
+		Store: c.nodeStore, Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
 		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: nodeCfg, HooksFor: hooksFor, AutoStart: !cfg.ManualStart,
 		MaxImageBytesPerNode: cfg.MaxImageBytesPerNode,
 	}); err != nil {
@@ -584,18 +590,21 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 	return c.retireOwnNode(ctx, c.st, c.log)
 }
 
-// openStore builds the controller's store on cfg.DB, sealed with
-// cfg.Sealer when one is set (store.NewSealed; the schema is applied),
-// as node's openCredentials does.
-func openStore(ctx context.Context, cfg Config) (*store.Store, error) {
+// openStores builds the controller's store and node registry on cfg.DB,
+// sealed with cfg.Sealer when one is set — store.NewSealed, then
+// sqlstore.NewSealed, the schemas applied — as node's openCredentials
+// opens a node's credential store (node/node.go).
+func openStores(ctx context.Context, cfg Config) (st *store.Store, nodes *sqlstore.Store, err error) {
 	if cfg.Sealer == nil {
-		return store.New(cfg.DB), nil
+		return store.New(cfg.DB), sqlstore.New(cfg.DB), nil
 	}
-	st, err := store.NewSealed(ctx, cfg.DB, cfg.Sealer)
-	if err != nil {
-		return nil, fmt.Errorf("controller: open the sealed store: %w", err)
+	if st, err = store.NewSealed(ctx, cfg.DB, cfg.Sealer); err != nil {
+		return nil, nil, fmt.Errorf("controller: open the sealed store: %w", err)
 	}
-	return st, nil
+	if nodes, err = sqlstore.NewSealed(ctx, cfg.DB, cfg.Sealer); err != nil {
+		return nil, nil, fmt.Errorf("controller: open the sealed node registry: %w", err)
+	}
+	return st, nodes, nil
 }
 
 // openTransports builds the network profiles and opens the network over

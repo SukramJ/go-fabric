@@ -261,14 +261,19 @@ func clearRowUnderSealer(table string) error {
 // network_commissioning_wifi.go wifiNetworksKey,
 // operational_credentials_pending.go pendingNOCSettingKey and
 // pendingNOCUpdateSettingKey; cluster/jointfabric datastore.go
-// settingPrefix); TestSealedSettingsNameTheirSources holds the copies to
-// them.
+// settingPrefix); the controller's CA keys are controller/ca's
+// SettingStore defaults (persist.go DefaultSettingKey, and FabricKey's
+// ".fabric") — the CA with its root (and ICAC) key, and the controller's
+// fabric with its IPK and operational key. TestSealedSettingsNameTheirSources
+// holds the copies to them.
 var sealedSettings = map[string]bool{
 	SettingDoorLockCredentialKey:                 true,
 	SettingICDKey:                                true,
 	"netcomm.wifi.networks":                      true,
 	"operational_credentials.pending_noc":        true,
 	"operational_credentials.pending_noc_update": true,
+	"controller.ca":                              true,
+	"controller.ca.fabric":                       true,
 }
 
 // sealedSettingPrefixes seal every key that starts with one of them; the

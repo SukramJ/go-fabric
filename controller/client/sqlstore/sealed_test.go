@@ -1,0 +1,204 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package sqlstore_test
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
+	"github.com/SukramJ/go-fabric/store"
+)
+
+const (
+	onboardingCluster = 0xFFFF_FFFC // controller/client onboarding.go
+	icdCluster        = 0xFFFF_FFFD // controller/client icd.go
+)
+
+func sealerOf(t *testing.T, b byte) store.Sealer {
+	t.Helper()
+	s, err := store.NewAESGCMSealer(bytes.Repeat([]byte{b}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// value is the value Load returns for the node's endpoint 0 cluster's
+// attribute.
+func value(t *testing.T, s *sqlstore.Store, cluster, attr uint32) []byte {
+	t.Helper()
+	eps, err := s.Load("n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ep := range eps {
+		for _, c := range ep.Clusters {
+			if ep.Number == 0 && c.ID == cluster {
+				return c.Values[attr]
+			}
+		}
+	}
+	return nil
+}
+
+// TestSealedStoreSealsTheSecretValues: under NewSealed the onboarding code
+// and the ICD keys are sealed in the file and read back, the other values
+// of their clusters stay clear; a restart under the same key reads them; a
+// store without the sealer reads a sealed value as store.ErrNoSealer and
+// may not overwrite one; NewSealed under another key fails with
+// store.ErrUnseal before writing; a sealed value moved to another row does
+// not open.
+func TestSealedStoreSealsTheSecretValues(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openTestDB(t)
+	code, key, pending := []byte("MT:SECRETCODE0000"), bytes.Repeat([]byte{0xA1}, 16), bytes.Repeat([]byte{0xB2}, 16)
+	s, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Save("n", 0, onboardingCluster, map[uint32][]byte{0: code, 1: {0x04, 0x01}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Save("n", 0, icdCluster, map[uint32][]byte{0: key, 1: pending, 2: {0x07}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.QueryContext(ctx, `SELECT cluster, attribute, value, sealed FROM matter_client_values`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var cluster, attr uint32
+		var v []byte
+		var sealed bool
+		if err := rows.Scan(&cluster, &attr, &v, &sealed); err != nil {
+			t.Fatal(err)
+		}
+		secret := cluster == onboardingCluster && attr == 0 || cluster == icdCluster && attr <= 1
+		if sealed != secret {
+			t.Errorf("0x%X/%d: sealed %v, want %v", cluster, attr, sealed, secret)
+		}
+		for _, plain := range [][]byte{code, key, pending} {
+			if bytes.Contains(v, plain) {
+				t.Errorf("0x%X/%d holds a secret in clear", cluster, attr)
+			}
+		}
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := value(t, s, onboardingCluster, 0); !bytes.Equal(got, code) {
+		t.Errorf("the code reads back as %q", got)
+	}
+
+	again, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7))
+	if err != nil {
+		t.Fatalf("NewSealed under the same key: %v", err)
+	}
+	if got := value(t, again, icdCluster, 1); !bytes.Equal(got, pending) {
+		t.Errorf("the pending key after a restart reads %x", got)
+	}
+	plain := sqlstore.New(db)
+	if _, err := plain.Load("n"); !errors.Is(err, store.ErrNoSealer) {
+		t.Errorf("Load without the sealer: %v, want store.ErrNoSealer", err)
+	}
+	if err := plain.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:CLEAR")}, nil); !errors.Is(err, store.ErrNoSealer) {
+		t.Errorf("a clear overwrite of a sealed value: %v, want store.ErrNoSealer", err)
+	}
+	if _, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 8)); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("NewSealed under another key: %v, want store.ErrUnseal", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE matter_client_values SET node_id = 'm' WHERE cluster = ? AND attribute = 0`, onboardingCluster); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := again.Load("m"); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("a sealed value moved to another node: %v, want store.ErrUnseal", err)
+	}
+}
+
+// TestNewSealedSealsAClearRegistry: a registry a store without a sealer
+// wrote — v1 rows, then Apply — opens under NewSealed, which seals its
+// clear secret values and scrubs the file, as store.NewSealed does for the
+// device's store; under the sealer a secret value planted in clear is
+// refused with store.ErrUnseal; v2's Down refuses a sealed row.
+func TestNewSealedSealsAClearRegistry(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "client.db")
+	db, err := store.OpenSQLite(path, "journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	v1 := sqlstore.Migrations()[0]
+	if _, err := db.ExecContext(ctx, v1.Up); err != nil {
+		t.Fatal(err)
+	}
+	code := []byte("MT:CLEARCODE00000")
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_client_values(node_id, endpoint, cluster, attribute, value) VALUES('n', 0, ?, 0, ?)`, onboardingCluster, code); err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlstore.Apply(ctx, db); err != nil {
+		t.Fatalf("Apply on a v1 database: %v", err)
+	}
+	s, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sealed bool
+	var raw []byte
+	if err := db.QueryRowContext(ctx, `SELECT value, sealed FROM matter_client_values WHERE cluster = ?`, onboardingCluster).Scan(&raw, &sealed); err != nil {
+		t.Fatal(err)
+	}
+	if !sealed || bytes.Contains(raw, code) {
+		t.Errorf("the clear code was not sealed: sealed %v, %x", sealed, raw)
+	}
+	if got := value(t, s, onboardingCluster, 0); !bytes.Equal(got, code) {
+		t.Errorf("the adopted code reads back as %q", got)
+	}
+	for _, f := range []string{path, path + "-wal"} {
+		b, err := os.ReadFile(f)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			t.Fatal(err)
+		}
+		if bytes.Contains(b, code) {
+			t.Errorf("%s still holds the clear code after NewSealed", filepath.Base(f))
+		}
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_client_values(node_id, endpoint, cluster, attribute, value) VALUES('p', 0, ?, 0, ?)`, icdCluster, []byte{1, 2}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Load("p"); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("a clear secret value under the sealer: %v, want store.ErrUnseal", err)
+	}
+	if _, err := db.ExecContext(ctx, sqlstore.Migrations()[1].Down); err == nil {
+		t.Error("v2's Down dropped the seal mark of a sealed row")
+	}
+}
+
+// TestSealedValuesNameTheirSource holds the store's copies of the client
+// package's ids of its secret values to their declarations.
+func TestSealedValuesNameTheirSource(t *testing.T) {
+	t.Parallel()
+	for file, decls := range map[string][]string{
+		"onboarding.go": {"onboardingCluster uint32 = 0xFFFF_FFFC", "onbCode     uint32 = 0"},
+		"icd.go":        {"icdCluster uint32 = 0xFFFF_FFFD", "icdFieldKey              uint32 = 0", "icdFieldPendingKey       uint32 = 1"},
+	} {
+		b, err := os.ReadFile(filepath.Join("..", file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range decls {
+			if !bytes.Contains(b, []byte(d)) {
+				t.Errorf("controller/client/%s no longer declares %q: update sqlstore's secret values", file, d)
+			}
+		}
+	}
+}

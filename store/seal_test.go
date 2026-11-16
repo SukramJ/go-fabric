@@ -562,6 +562,15 @@ func TestSealedSettingsNameTheirSources(t *testing.T) {
 	if !bytes.Contains(b, []byte(`const pendingNOCUpdateSettingKey = "operational_credentials.pending_noc_update"`)) {
 		t.Error("cluster/core no longer declares pendingNOCUpdateSettingKey as the store seals it")
 	}
+	b, err = os.ReadFile(filepath.Join("..", "controller", "ca", "persist.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, decl := range []string{`const DefaultSettingKey = "controller.ca"`, `func (s SettingStore) FabricKey() string { return s.key() + ".fabric" }`} {
+		if !bytes.Contains(b, []byte(decl)) {
+			t.Errorf("controller/ca no longer declares %s: update store's sealedSettings", decl)
+		}
+	}
 }
 
 // failingSealer seals with an AES-GCM sealer until fail is set, then

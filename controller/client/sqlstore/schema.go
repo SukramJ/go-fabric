@@ -41,10 +41,31 @@ func Apply(ctx context.Context, db *sql.DB) error {
 }
 
 // Upgrade rewrites what an idempotent CREATE TABLE cannot reach in a
-// database an earlier release created. The first release has no such
-// step; a host that runs [Schema] through its own tool still calls it
-// after, so a later step arrives with the dependency bump.
-func Upgrade(context.Context, *sql.DB) error { return nil }
+// database an earlier release created; a host that runs [Schema] through
+// its own tool still calls it after, so a later step arrives with the
+// dependency bump. Steps:
+//
+//   - matter_client_values gains migration v2's seal mark when it lacks
+//     it, with v2's statement.
+func Upgrade(ctx context.Context, db *sql.DB) error {
+	var tables, columns int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'matter_client_values'`).Scan(&tables); err != nil {
+		return fmt.Errorf("sqlstore: upgrade: %w", err)
+	}
+	if tables == 0 {
+		return nil
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('matter_client_values') WHERE name = 'sealed'`).Scan(&columns); err != nil {
+		return fmt.Errorf("sqlstore: upgrade: %w", err)
+	}
+	if columns > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, mustMigrationFile("v2.up.sql")); err != nil {
+		return fmt.Errorf("sqlstore: upgrade: v2: %w", err)
+	}
+	return nil
+}
 
 // Migration is one versioned step of the matter_client_* schema, for a
 // host that runs its own migration tool — the shape of store.Migration,
@@ -63,7 +84,7 @@ type Migration struct {
 // migrationVersions are the steps, in order:
 //
 //   - v1 — matter_client_values and matter_client_versions (brief AL §8).
-var migrationVersions = []string{"v1"}
+var migrationVersions = []string{"v1", "v2"}
 
 // Migrations returns the schema's steps in order. Applied one after the
 // other to an empty database they produce the schema [Apply] produces —

@@ -21,9 +21,8 @@ Two facts govern everything below:
    sealer whose key lives outside the database (`store.NewSealed`,
    `node.Store.Sealer`, `controller.Config.Sealer`; [sealing at
    rest](#sealing-at-rest)); without one the database is protected by
-   nothing beyond the file. The controller's CA key is not sealed by it
-   (`Config.CAKey` keeps it out of the database). File location,
-   permissions and the sealing key are the host's.
+   nothing beyond the file. File location, permissions and the sealing key
+   are the host's.
 
 ## Device side
 
@@ -154,13 +153,31 @@ sealer reads a sealed secret as `store.ErrNoSealer`. Provisioning and rotating
 the key are the host's; the module rotates nothing.
 
 The controller takes the same sealer as `controller.Config.Sealer` (opt-in,
-off by default): `New` opens its store with `store.NewSealed`, under the
-same rules — another key fails `New` with `store.ErrUnseal`, a store without
-the sealer reads a sealed secret as `store.ErrNoSealer`. It seals the CASE
-resumption records and the group key sets the controller keeps; its CA
-settings and its node records (the registry, kept onboarding codes
-included) are not sealed — `Config.CAKey` (`ca.Config.RootSigner`) keeps the
-root key out of the database.
+off by default): `New` opens its store with `store.NewSealed` and its node
+registry with `sqlstore.NewSealed`, under the same rules — a database
+written without a sealer is sealed on the way in and its file scrubbed,
+another key fails `New` with `store.ErrUnseal`, and a store without the
+sealer reads a sealed secret as `store.ErrNoSealer` (so `New` without it
+fails reading the sealed CA). What a controller's database holds, sealed or
+not:
+
+| Sealed under `Config.Sealer` | Where |
+| --- | --- |
+| the CA: root (and ICAC) private key with its certificates | `matter_settings`, key `controller.ca` |
+| the controller's fabric: IPK and operational private key with its NOC | `matter_settings`, key `controller.ca.fabric` |
+| the CASE resumption records: one shared secret per node | `matter_resumption`, column `shared_secret` |
+| the group key sets the controller writes to its nodes | `matter_group_keys` |
+| a node's kept onboarding code (its setup passcode) | `matter_client_values`, cluster `0xFFFFFFFC`, attribute 0 |
+| the controller's ICD Check-In key and pending key on a node | `matter_client_values`, cluster `0xFFFFFFFD`, attributes 0 and 1 |
+
+| Not sealed | Where |
+| --- | --- |
+| the nodes' attribute values and versions, their commissioning records, the onboarding code's source, time and checks, an ICD registration's counters, subject and client type | `matter_client_values`, `matter_client_versions` |
+| the DCL trust store a host keeps there (`controller.dcl.trust`) and every other setting | `matter_settings` |
+| a CA kept under another `ca.SettingStore.Key` than the default | `matter_settings` |
+
+With `Config.CAKey` (`ca.Config.RootSigner`) the root key is not in the
+database at all.
 
 *Source: `store/seal.go` (`Sealer`, `AESGCMSealer`, `NewSealed`;
 `TestSealedStoreLeavesNoClearSecret`, `TestNewSealedSealsAClearDatabase`,

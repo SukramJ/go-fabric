@@ -44,9 +44,14 @@
 // DoorLock credential data, and, in the settings table, the committed
 // Wi-Fi networks with their credentials, which cluster/core's Wi-Fi
 // NetworkCommissioning server writes under netcomm.wifi.networks. A
-// controller's database (controller.New) holds its CASE resumption records
-// in the same table, with [New], or with [NewSealed] when the host sets
-// controller.Config.Sealer.
+// controller's database (controller.New) holds, in the same tables, its
+// CASE resumption records and group key sets and, in the settings table,
+// its CA (controller.ca, with the root and ICAC keys) and its fabric
+// (controller.ca.fabric, with the IPK and the operational key); it opens
+// them with [New], or with [NewSealed] when the host sets
+// controller.Config.Sealer, which then seals all of these. The node
+// registry's secrets beside them (controller/client/sqlstore) are sealed
+// by sqlstore.NewSealed under the same sealer.
 //
 // A Store from [New] keeps them as they are, except two kinds it or its
 // caller seals under a key kept as a setting of the same database: the ICD
