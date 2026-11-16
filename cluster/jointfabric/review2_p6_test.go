@@ -839,3 +839,72 @@ func TestAnUncomparableTableIsAdmitted(t *testing.T) {
 		}
 	}
 }
+
+// flakyTable answers its first GetFabric with an error.
+type flakyTable struct {
+	*fakeFabrics
+	mu    sync.Mutex
+	fails int
+}
+
+func (f *flakyTable) GetFabric(ctx context.Context, idx uint8) (store.FabricRecord, error) {
+	f.mu.Lock()
+	fail := f.fails > 0
+	if fail {
+		f.fails--
+	}
+	f.mu.Unlock()
+	if fail {
+		return store.FabricRecord{}, errors.New("store busy")
+	}
+	return f.fakeFabrics.GetFabric(ctx, idx)
+}
+
+// TestATableErrorDoesNotLockTheAnchorOut (Fable REWORK-7): one GetFabric
+// error refuses that request only; the next request of the anchor fabric
+// is admitted, with no update between.
+func TestATableErrorDoesNotLockTheAnchorOut(t *testing.T) {
+	d := newStore(t, nil)
+	table := &flakyTable{fakeFabrics: tableOf(4, 0xA)}
+	d.AttachNode(table, nil)
+	mustOK(t, d.SetAnchorFabricIndex(t.Context(), 4))
+	table.mu.Lock()
+	table.fails = 1
+	table.mu.Unlock()
+	if d.admits(peerOf(4), 4) {
+		t.Fatal("admitted on a table error")
+	}
+	if _, err := d.MatterInvoke(peerOf(4), dsdef.CmdAddPendingNode, dsdef.AddPendingNodeRequest{NodeId: 9, FriendlyName: "n"}); err != nil {
+		t.Fatalf("the anchor after a table error: %v", err)
+	}
+}
+
+// TestIdentityAdoptionReports (Fable REWORK-8): adopting the anchor's
+// identity changes who may read every attribute, so the data version
+// moves; with a refusing store the adoption is rolled back and the
+// anchor is not confirmed.
+func TestIdentityAdoptionReports(t *testing.T) {
+	ctx := t.Context()
+	d := newStore(t, nil)
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 4))
+	mustOK(t, d.SetFriendlyName(ctx, "x"))
+	dv := d.MatterDataVersion()
+	d.AttachNode(tableOf(4, 0xA), nil)
+	if d.MatterDataVersion() == dv {
+		t.Fatal("the adoption reported nothing")
+	}
+	if v, _ := d.MatterReadFiltered(peerOf(4), dsdef.AttrFriendlyName); v != "x" {
+		t.Fatalf("the anchor reads FriendlyName %q", v)
+	}
+
+	st := &switchStore{}
+	d2, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
+	mustOK(t, d2.SetAnchorFabricIndex(ctx, 4))
+	st.fmu.Lock()
+	st.fail = true
+	st.fmu.Unlock()
+	if got := d2.checkAnchor(ctx, tableOf(4, 0xA)); got != 0 {
+		t.Fatalf("checkAnchor confirmed %d over a refused adoption", got)
+	}
+}

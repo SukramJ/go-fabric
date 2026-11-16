@@ -859,6 +859,13 @@ func (d *Datastore) SetAnchorFabricIndex(ctx context.Context, fabricIndex uint8)
 // calls as the endpoint joins the topology (a host that wires the
 // datastore outside the node calls it itself; without a table no peer is
 // admitted). It then checks the recorded anchor ([Datastore.checkAnchor]).
+// The admission compares the accessing fabric with the table once and
+// caches the verdict until the next change of the datastore: the node
+// forwards every fabric removal and every install of an index to it
+// ([Datastore.MatterDropFabric]), and a host that wires the datastore
+// outside the node must forward them too, or a fabric that took the
+// anchor's index after a removal it did not forward is held against the
+// cached verdict (Fable RECORD-16).
 func (d *Datastore) AttachNode(fabrics FabricTable, _ wire.WindowController) {
 	d.mu.Lock()
 	d.fabrics, d.checked = fabrics, false
@@ -904,14 +911,17 @@ func (d *Datastore) checkAnchor(ctx context.Context, table FabricTable) uint8 {
 	switch {
 	case len(rpk) == 0:
 		adopted := false
-		_ = d.update(ctx, func() error {
+		err := d.update(ctx, func() error {
 			if d.t.AnchorFabricIndex == anchor && len(d.t.AnchorRootPublicKey) == 0 {
 				d.t.AnchorRootPublicKey, d.t.AnchorFabricID = slices.Clone(f.RootPublicKey), f.FabricID
+				// Who may read every attribute changed: each is reported
+				// (Fable REWORK-8).
+				d.markLocked(allAttrs...)
 				adopted = true
 			}
 			return nil
 		})
-		if adopted {
+		if adopted && err == nil { // a refused save rolled the adoption back
 			return anchor
 		}
 		return 0
@@ -1007,7 +1017,10 @@ func (d *Datastore) admits(ctx context.Context, fabric uint8) bool {
 	f, err := table.GetFabric(ctx, anchor)
 	ok := err == nil && bytes.Equal(f.RootPublicKey, rpk) && f.FabricID == fid
 	d.mu.Lock()
-	if d.version == version {
+	// A table that answered an error decides nothing: the verdict is
+	// cached only for an answer, so a busy store or a cancelled request
+	// does not lock the anchor out until the next update (Fable REWORK-7).
+	if d.version == version && err == nil {
 		d.checked, d.admitted = true, ok
 	}
 	d.mu.Unlock()
