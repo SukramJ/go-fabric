@@ -167,10 +167,23 @@ func readAttributeWrites(dec *tlv.Decoder, valueReader AttributeValueReader) ([]
 	}
 }
 
+// readAttributeData reads one AttributeDataIB after its opener. Its
+// members are taken by tag in any order, and the Data is decoded once the
+// structure has ended, against the final path: the bridge's value reader
+// picks its decoder by the path, so a Data member ahead of its Path used
+// to be decoded against the zero path (review II, R2-P6-wire-0505).
+// matter.js takes the fields by id and keeps the Data as raw TLV, decoded
+// later with the path (packages/types/src/tlv/TlvObject.ts:215-233,
+// packages/types/src/protocol/types/TlvAttributeData.ts:19 TlvAny,
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:428 at db021da0). The
+// Data member is replayed from a copy of the decoder taken before it —
+// a [tlv.Decoder] is its buffer and a read position.
 func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (AttributeWrite, error) {
 	var w AttributeWrite
 	var hasPath, hasData bool
+	var dataAt tlv.Decoder
 	for {
+		mark := *dec
 		el, err := dec.Next()
 		if err != nil {
 			return AttributeWrite{}, err
@@ -186,6 +199,21 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			case !hasData:
 				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagAttributeDataValue, "AttributeDataIB.Data"))
 			}
+			if valueReader == nil {
+				// Without a cluster-aware reader the element tree cannot
+				// become a Go value: the downstream Dispatcher.Write sees
+				// a nil Value and answers UnsupportedWrite.
+				return w, nil
+			}
+			data, err := dataAt.Next()
+			if err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: value: %w", ErrInvalidWriteRequest, err)
+			}
+			v, err := valueReader(w.Path, data, &dataAt)
+			if err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: value: %w", ErrInvalidWriteRequest, err)
+			}
+			w.Value = v
 			return w, nil
 		}
 		if err := contextMember(el); err != nil {
@@ -211,25 +239,11 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			w.Path = p
 			hasPath = true
 		case tagAttributeDataValue:
-			hasData = true
-			if valueReader == nil {
-				// Without a cluster-aware reader we cannot turn the
-				// element tree into a Go value. Drain the container so
-				// the surrounding decoder loop continues — the
-				// downstream Dispatcher.Write will see a nil Value and
-				// answer UnsupportedWrite.
-				if el.IsContainer {
-					if err := skipContainer(dec); err != nil {
-						return AttributeWrite{}, fmt.Errorf("%w: drain value: %w", ErrInvalidWriteRequest, err)
-					}
-				}
-				continue
+			// Read once the structure ends, with the final path.
+			hasData, dataAt = true, mark
+			if err := skipField(dec, el); err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: drain value: %w", ErrInvalidWriteRequest, err)
 			}
-			v, err := valueReader(w.Path, el, dec)
-			if err != nil {
-				return AttributeWrite{}, fmt.Errorf("%w: value: %w", ErrInvalidWriteRequest, err)
-			}
-			w.Value = v
 		default:
 			if err := skipField(dec, el); err != nil {
 				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)

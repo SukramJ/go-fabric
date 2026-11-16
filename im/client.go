@@ -489,16 +489,29 @@ func readAttributeReport(dec *tlv.Decoder, valueReader AttributeValueReader) (At
 }
 
 // readAttributeReportData reads an AttributeDataIB after its opener into
-// rep. The path precedes the data on the wire (TlvAttributeReportData.ts
-// field order), so the reader sees the path.
+// rep. Its members are taken in any order; the Data is read once the
+// structure ends, so the reader sees the final path whatever the order on
+// the wire, as the server's write decoder ([readAttributeData]; review
+// II, R2-P6-wire-0505).
 func readAttributeReportData(dec *tlv.Decoder, rep *AttributeReport, valueReader AttributeValueReader) error {
+	var dataAt tlv.Decoder
+	hasData := false
 	for {
+		mark := *dec
 		el, err := dec.Next()
 		if err != nil {
 			return err
 		}
 		if el.IsEndContainer {
-			return nil
+			if !hasData || valueReader == nil {
+				return nil
+			}
+			data, err := dataAt.Next()
+			if err != nil {
+				return err
+			}
+			rep.Value, err = valueReader(rep.Path, data, &dataAt)
+			return err
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
 			if err := skipElement(dec, el); err != nil {
@@ -522,13 +535,8 @@ func readAttributeReportData(dec *tlv.Decoder, rep *AttributeReport, valueReader
 				return err
 			}
 		case tagAttributeDataValue:
-			if valueReader == nil {
-				if err := skipElement(dec, el); err != nil {
-					return err
-				}
-				continue
-			}
-			if rep.Value, err = valueReader(rep.Path, el, dec); err != nil {
+			hasData, dataAt = true, mark
+			if err := skipElement(dec, el); err != nil {
 				return err
 			}
 		default:
