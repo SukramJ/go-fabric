@@ -338,3 +338,45 @@ func TestStreamInitialReportChunks_ChunkBudgetSplit(t *testing.T) {
 		t.Errorf("total reports across chunks=%d, want %d (no report lost in split)", totalReports, reportCount)
 	}
 }
+
+// TestRegisterSubscription_KeepSubscriptionsFalse_ReplacesThePeersOthers
+// (review II, R2-P6-fsm-0805): a second SubscribeRequest on the same CASE
+// session with KeepSubscriptions=false ends the first, established one —
+// the manager no longer holds it.
+func TestRegisterSubscription_KeepSubscriptionsFalse_ReplacesThePeersOthers(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	b.AttachSessionLookup(fabricResolvingLookup{fabricMap: map[uint16]uint8{42: 1}})
+	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	b.AttachSubscriptionManager(mgr)
+	hdr := &message.Header{SessionID: 42, SourceNodeID: 0xA1B2C3D4, HasSourceNodeID: true}
+	proto := message.ProtocolHeader{ExchangeID: 1}
+	req := func(cluster uint32) im.SubscribeRequest {
+		return im.SubscribeRequest{
+			AttributeRequests: []im.ConcreteAttributePath{
+				{HasEndpoint: true, Endpoint: 1, HasCluster: true, Cluster: cluster, HasAttribute: true, Attribute: 0x0000},
+			},
+			MaxIntervalCeiling: 60,
+		}
+	}
+	var report im.ReportData
+	subID1, err := b.registerSubscription(loopbackSrc(), hdr, proto, req(0x0006), &report)
+	if err != nil || subID1 == 0 {
+		t.Fatalf("registerSubscription (first): %d, %v", subID1, err)
+	}
+	first, err := mgr.Get(subID1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.EndPriming(time.Now()) // established
+	subID2, err := b.registerSubscription(loopbackSrc(), hdr, proto, req(0x0008), &report)
+	if err != nil || subID2 == 0 {
+		t.Fatalf("registerSubscription (second): %d, %v", subID2, err)
+	}
+	if _, err := mgr.Get(subID1); err == nil {
+		t.Errorf("first subscription %d survived a KeepSubscriptions=false request on its session", subID1)
+	}
+	if _, err := mgr.Get(subID2); err != nil {
+		t.Errorf("second subscription %d not live: %v", subID2, err)
+	}
+}
