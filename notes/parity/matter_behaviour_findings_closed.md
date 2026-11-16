@@ -373,6 +373,16 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   again. (Triage 2026-10-29: wave H1, the device IM and write path.)
   Struck 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): the reference statement is false at `db021da0` — a server datasource draws `entropy.randomUint32` at construction and takes a store's version only from an `ExternallyMutableStore`, the client-side cache (`packages/node/src/behavior/state/managed/Datasource.ts:597`, `:796-803`, `:291-294`; no hit for `ExternallyMutableStore` or `.version` under `packages/node/src/storage/server`); it contradicted F-db021da0-17 of the open register.
 
+- **No generic sanitisation of fabric-scoped data on fabric removal.**
+  matter.js strips every fabric-scoped list entry of a removed fabric from
+  every behavior's state (`ServerEnvironment.ts:187-195`,
+  `limitNodeDataToAllowedFabrics`); Go drops it only in servers that
+  implement `MatterFabricRemoved` (`bridge/bridge.go:1317-1322`), and the
+  WebRTC Transport Provider (`cluster/camera/provider.go`) keeps a removed
+  fabric's `CurrentSessions` (ServerNodeTest.ts:1549-1580 "removes the
+  entries of a removed fabric from a fabric-sensitive list" stays missing).
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-1707): the WebRTC Transport Provider drops a removed fabric's sessions (`cluster/camera/fabric_state.go`, `Provider.MatterDropFabric`, since `8c9088ee`), and the removal path is `contract.FabricScopedState`, which each server that holds fabric state implements — the per-server form of matter.js's generic strip (`packages/node/src/node/server/ServerEnvironment.ts:187-196` at `db021da0`), recorded as `BD-Matter-FabricState-ReconciledWithoutFabrics`.
+
 ## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
 
 - **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
@@ -387,7 +397,7 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   bound only a bigint states" and its value tests at 2^53 ± 1 and 2^62 ± 1).
   No served attribute states such a bound at the pin. Route: compare integers as integers (uint64/int64 or
   math/big) where the type is a 64-bit integer.
-  Closed 2026-11-16 (review II, phase 6a, R2-P6-par-1306): integer values compare exactly (`cluster/spec/write.go` `satisfiesInt`, `bound_expr.go` `evalBoundExact` / `exactOp`). The sentence "No served attribute states such a bound at the pin" was false: ElectricalEnergyMeasurement's served energy fields state "0 to 2^62" (the snapshot holds "-2^62 to 2^62" 18 times, "0 to 2^62" three times, "max (2^62) - 1" once). matter.js takes a BigInt power when the result exceeds `Number.MAX_SAFE_INTEGER`, for a whole base and a whole exponent ≥ 0 (`packages/model/src/aspects/Constraint.ts:1049-1058` at `db021da0`), and "+", "-", "*" propagate a BigInt (`:989-1024`); its "/" with a BigInt operand is `undefined` (numbers only) and a division by zero ±Infinity (`:1027-1034`), where this module divides exactly and refuses a division by zero — no such bound at the pin.
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-par-1306): integer values compare exactly (`cluster/spec/write.go` `satisfiesInt`, `bound_expr.go` `evalBoundExact` / `exactOp`). The sentence "No served attribute states such a bound at the pin" was false: ElectricalEnergyMeasurement's served energy fields state "0 to 2^62" (the snapshot's definition texts hold "-2^62 to 2^62" 18 times — 29 string values with the `constraint` copies —, "0 to 2^62" three times, "max (2^62) - 1" once). matter.js takes a BigInt power when the result exceeds `Number.MAX_SAFE_INTEGER`, for a whole base and a whole exponent ≥ 0 (`packages/model/src/aspects/Constraint.ts:1049-1058` at `db021da0`), and "+", "-", "*" propagate a BigInt (`:989-1027`); its "/" with a BigInt operand is `undefined` (numbers only) and a division by zero ±Infinity (`:1029-1036`), where this module divides exactly and refuses a division by zero — no such bound at the pin.
 
 ## matter.js pin db021da0 — open items (pin lift 2026-11-06)
 
