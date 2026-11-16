@@ -50,18 +50,27 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 		}
 		checked[id] = v
 	}
-	st := s.State()
-	level, enabled, active, suppressed := st.CurrentSensitivityLevel, st.AlarmsEnabled, st.AlarmsActive, st.AlarmsSuppressed
+	for _, id := range ids {
+		switch id {
+		case def.AttrSupportedSensitivityLevels, def.AttrDefaultSensitivityLevel, def.AttrAlarmsSupported:
+			if fixed, _ := s.srv.Value(id); !sameUint8(checked[id], fixed) {
+				return fmt.Errorf("%w: boolcfg: attribute 0x%04X is fixed at %v", spec.ErrNotHeld, id, fixed)
+			}
+		}
+	}
+	// The state is read, judged and stored under one hold of s.mu, so a
+	// command's change that lands meanwhile is neither reverted by a value
+	// this call did not name nor judged against a stale one
+	// (R2-P6-conc-1586).
+	s.mu.Lock()
+	level, enabled, active, suppressed := s.current, s.enabled, s.active, s.suppressed
 	var fault *SensorFault
 	for _, id := range ids {
 		switch v := checked[id]; id {
-		case def.AttrSupportedSensitivityLevels, def.AttrDefaultSensitivityLevel, def.AttrAlarmsSupported:
-			if fixed, _ := s.srv.Value(id); !sameUint8(v, fixed) {
-				return fmt.Errorf("%w: boolcfg: attribute 0x%04X is fixed at %v", spec.ErrNotHeld, id, fixed)
-			}
 		case def.AttrCurrentSensitivityLevel:
 			level, _ = v.(uint8)
 			if level >= s.supported {
+				s.mu.Unlock()
 				return fmt.Errorf("%w: CurrentSensitivityLevel %d ≥ %d", ErrInvalidConfig, level, s.supported)
 			}
 		case def.AttrAlarmsEnabled:
@@ -76,38 +85,58 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 			fault = &f
 		}
 	}
-	if _, set := checked[def.AttrAlarmsEnabled]; set {
-		if enabled&^s.alarmsSup != 0 {
-			return fmt.Errorf("%w: AlarmsEnabled 0x%02X outside AlarmsSupported 0x%02X", ErrInvalidConfig, enabled, s.alarmsSup)
-		}
-		if _, a := checked[def.AttrAlarmsActive]; !a {
-			active &= enabled
-		}
-		if _, sp := checked[def.AttrAlarmsSuppressed]; !sp {
-			suppressed &= enabled
-		}
+	if err := s.checkAlarms(checked, &enabled, &active, &suppressed); err != nil {
+		s.mu.Unlock()
+		return err
 	}
-	if active&^enabled != 0 {
-		return fmt.Errorf("%w: 0x%02X (enabled 0x%02X)", ErrNotEnabled, active, enabled)
-	}
-	if suppressed&^active != 0 {
-		return fmt.Errorf("%w: AlarmsSuppressed 0x%02X outside AlarmsActive 0x%02X", ErrInvalidConfig, suppressed, active)
-	}
-	s.mu.Lock()
 	alarmsMoved := s.active != active || s.suppressed != suppressed
 	s.current, s.enabled, s.active, s.suppressed = level, enabled, active, suppressed
 	s.mu.Unlock()
-	s.publish(contract.OriginHostSet, map[uint32]any{
+	// Only what the call named, and the alarms an AlarmsEnabled moves.
+	stored := map[uint32]any{
 		def.AttrCurrentSensitivityLevel: level,
 		def.AttrAlarmsEnabled:           enabled,
 		def.AttrAlarmsActive:            active,
 		def.AttrAlarmsSuppressed:        suppressed,
-	})
+	}
+	_, enabledSet := checked[def.AttrAlarmsEnabled]
+	for id := range stored {
+		_, named := checked[id]
+		derived := enabledSet && (id == def.AttrAlarmsActive || id == def.AttrAlarmsSuppressed)
+		if !named && !derived {
+			delete(stored, id)
+		}
+	}
+	s.publish(contract.OriginHostSet, stored)
 	if alarmsMoved && s.hasAlarms() {
 		s.alarmsStateChanged()
 	}
 	if fault != nil {
 		s.SetSensorFault(*fault)
+	}
+	return nil
+}
+
+// checkAlarms applies the AlarmsEnabled rule to the alarm values of a
+// SetAttributes and checks the three against each other; the caller holds
+// s.mu.
+func (s *Server) checkAlarms(checked map[uint32]any, enabled, active, suppressed *AlarmMode) error {
+	if _, set := checked[def.AttrAlarmsEnabled]; set {
+		if *enabled&^s.alarmsSup != 0 {
+			return fmt.Errorf("%w: AlarmsEnabled 0x%02X outside AlarmsSupported 0x%02X", ErrInvalidConfig, *enabled, s.alarmsSup)
+		}
+		if _, a := checked[def.AttrAlarmsActive]; !a {
+			*active &= *enabled
+		}
+		if _, sp := checked[def.AttrAlarmsSuppressed]; !sp {
+			*suppressed &= *enabled
+		}
+	}
+	if *active&^*enabled != 0 {
+		return fmt.Errorf("%w: 0x%02X (enabled 0x%02X)", ErrNotEnabled, *active, *enabled)
+	}
+	if *suppressed&^*active != 0 {
+		return fmt.Errorf("%w: AlarmsSuppressed 0x%02X outside AlarmsActive 0x%02X", ErrInvalidConfig, *suppressed, *active)
 	}
 	return nil
 }

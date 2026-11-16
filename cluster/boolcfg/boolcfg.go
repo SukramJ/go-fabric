@@ -425,7 +425,11 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 				return nil, delegateError("AlarmsActive", err)
 			}
 		}
+		// Re-read under the lock: an alarm the host raised or cleared while
+		// the delegate ran stays; the command clears the disabled modes
+		// (R2-P6-conc-1510).
 		s.mu.Lock()
+		next = s.active &^ disable
 		s.active = next
 		s.mu.Unlock()
 		s.publish(contract.OriginCommand, map[uint32]any{def.AttrAlarmsActive: next})
@@ -439,6 +443,7 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 			}
 		}
 		s.mu.Lock()
+		next = s.suppressed &^ disable // re-read, as AlarmsActive
 		s.suppressed = next
 		s.mu.Unlock()
 		s.publish(contract.OriginCommand, map[uint32]any{def.AttrAlarmsSuppressed: next})
@@ -477,8 +482,16 @@ func (s *Server) suppressAlarm(ctx context.Context, fields any) (any, error) {
 			return nil, delegateError("AlarmsSuppressed", err)
 		}
 	}
-	next := suppressed | alarms
+	// Re-check under the lock: an alarm the host cleared while the
+	// delegate ran is not suppressed, and a suppression the host recorded
+	// meanwhile stays (R2-P6-conc-1510).
 	s.mu.Lock()
+	if alarms&^s.active != 0 {
+		active := s.active
+		s.mu.Unlock()
+		return nil, statusErr(im.StatusInvalidInState, "SuppressAlarm 0x%02X is no longer active (0x%02X)", alarms, active)
+	}
+	next := s.suppressed | alarms
 	s.suppressed = next
 	s.mu.Unlock()
 	s.publish(contract.OriginCommand, map[uint32]any{def.AttrAlarmsSuppressed: next})

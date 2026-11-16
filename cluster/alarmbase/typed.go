@@ -29,9 +29,14 @@ var (
 // stays active, and a changed State emits Notify. The TemperatureAlarm
 // thresholds are [Server.SetThresholds]'. Supported and Latch are the
 // configuration's: a different value is refused ([spec.ErrNotHeld]). No
-// Delegate is asked.
+// Delegate is asked. The call holds the command queue from its first read
+// of Mask and State to its last store, so a command cannot move them
+// between the check and the change, and every value is checked before any
+// is stored (R2-P6-conc-1586).
 func (s *Server) SetAttributes(values map[uint32]any) error {
 	ids := slices.Sorted(maps.Keys(values))
+	s.op.Lock()
+	defer s.op.Unlock()
 	mask, state := s.Mask(), s.State()
 	var setMask, setState bool
 	thresholds := map[uint32]int16{}
@@ -56,6 +61,9 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 			state, _ = v.(uint32)
 			setState = true
 		default: // a TemperatureAlarm threshold, the only other served attribute
+			if !slices.Contains(thresholdAttrs, id) {
+				return fmt.Errorf("%w: attribute 0x%04X is not a served threshold", ErrThresholds, id)
+			}
 			t, _ := v.(int16)
 			thresholds[id] = t
 		}
@@ -63,13 +71,13 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 	if mask&^s.supported != 0 || (setState && state&^mask != 0) {
 		return fmt.Errorf("%w: Mask 0x%X, State 0x%X, Supported 0x%X", ErrNotSupported, mask, state, s.supported)
 	}
+	// The thresholds first, all or nothing in the store; Mask and State,
+	// checked above under the queue, cannot be refused after them.
 	if len(thresholds) > 0 {
 		if err := s.SetThresholds(thresholds); err != nil {
 			return err
 		}
 	}
-	s.op.Lock()
-	defer s.op.Unlock()
 	if setMask {
 		if err := s.setMask(contract.OriginHostSet, mask); err != nil {
 			return err
