@@ -42,7 +42,7 @@ type OnWithTimedOffRequest struct {
 // of the wrong type or outside its width is refused ([fieldUint]).
 func DecodeOffWithEffect(payload []byte) (OffWithEffectRequest, error) {
 	var req OffWithEffectRequest
-	err := walkContext(payload, ErrOnOffMalformed, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrOnOffMalformed, []uint32{0, 1}, func(tag uint32, el tlv.Element) (err error) {
 		switch tag {
 		case 0:
 			req.EffectIdentifier, err = fieldUint8(el, ErrOnOffMalformed)
@@ -57,7 +57,7 @@ func DecodeOffWithEffect(payload []byte) (OffWithEffectRequest, error) {
 // DecodeOnWithTimedOff parses the OnWithTimedOff command payload.
 func DecodeOnWithTimedOff(payload []byte) (OnWithTimedOffRequest, error) {
 	var req OnWithTimedOffRequest
-	err := walkContext(payload, ErrOnOffMalformed, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrOnOffMalformed, []uint32{0, 1, 2}, func(tag uint32, el tlv.Element) (err error) {
 		switch tag {
 		case 0:
 			req.OnOffControl, err = fieldUint8(el, ErrOnOffMalformed)

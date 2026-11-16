@@ -469,7 +469,7 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		// VendorID left at zero (no resolver wired, or one that answers
 		// 0) is what the bridge controller surfaces as AdminVendorIsNull.
 		params.AdminFabricIndex = fabIdx
-		if fabIdx != 0 && vr != nil && params.AdminVendorID == 0 {
+		if vr != nil && params.AdminVendorID == 0 {
 			params.AdminVendorID = vr(ctx, fabIdx)
 		}
 		// Determine whether the bridge is uncommissioned (FabricCount == 0)

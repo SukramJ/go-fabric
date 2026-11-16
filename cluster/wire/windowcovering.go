@@ -53,7 +53,7 @@ type GoToTiltValueRequest struct {
 // DecodeGoToLiftValue parses GoToLiftValue payloads.
 func DecodeGoToLiftValue(payload []byte) (GoToLiftValueRequest, error) {
 	var req GoToLiftValueRequest
-	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) (err error) {
+	if err := walkContext(payload, ErrWindowCoveringMalformed, []uint32{0}, func(tag uint32, el tlv.Element) (err error) {
 		if tag == 0 {
 			req.LiftValue, err = fieldUint16(el, ErrWindowCoveringMalformed)
 		}
@@ -67,7 +67,7 @@ func DecodeGoToLiftValue(payload []byte) (GoToLiftValueRequest, error) {
 // DecodeGoToTiltValue parses GoToTiltValue payloads.
 func DecodeGoToTiltValue(payload []byte) (GoToTiltValueRequest, error) {
 	var req GoToTiltValueRequest
-	if err := walkContext(payload, ErrWindowCoveringMalformed, func(tag uint32, el tlv.Element) (err error) {
+	if err := walkContext(payload, ErrWindowCoveringMalformed, []uint32{0}, func(tag uint32, el tlv.Element) (err error) {
 		if tag == 0 {
 			req.TiltValue, err = fieldUint16(el, ErrWindowCoveringMalformed)
 		}

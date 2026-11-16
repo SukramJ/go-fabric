@@ -61,7 +61,7 @@ type DoorLockRequest struct {
 // valid and yields an empty request.
 func DecodeDoorLockRequest(payload []byte) (DoorLockRequest, error) {
 	var req DoorLockRequest
-	if err := walkContext(payload, ErrDoorLockMalformed, func(tag uint32, el tlv.Element) error {
+	if err := walkContext(payload, ErrDoorLockMalformed, nil, func(tag uint32, el tlv.Element) error {
 		if tag != 0 || el.IsNull {
 			return nil
 		}

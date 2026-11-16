@@ -70,7 +70,12 @@ func TestParityMatterJS_DecoderFieldBounds(t *testing.T) {
 		}
 	}
 	// The widest value still decodes.
-	got, err := wire.DecodeMoveToLevel(buildPayload(t, func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(0), 254); e.PutUint(tlv.ContextTag(1), 65535) }))
+	got, err := wire.DecodeMoveToLevel(buildPayload(t, func(e *tlv.Encoder) {
+		e.PutUint(tlv.ContextTag(0), 254)
+		e.PutUint(tlv.ContextTag(1), 65535)
+		e.PutUint(tlv.ContextTag(2), 0)
+		e.PutUint(tlv.ContextTag(3), 0)
+	}))
 	if err != nil || got.Level != 254 || got.TransitionTime == nil || *got.TransitionTime != 65535 {
 		t.Errorf("MoveToLevel 254 / 65535: %+v, %v", got, err)
 	}

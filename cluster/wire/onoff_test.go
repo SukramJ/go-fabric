@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -35,26 +36,18 @@ func TestDecodeOnWithTimedOffRoundTrip(t *testing.T) {
 	}
 }
 
-// TestDecodeOnWithTimedOffMissingFields verifies that absent fields
-// default to their zero values without error.
+// TestDecodeOnWithTimedOffMissingFields verifies that a payload without
+// the mandatory OnTime and OffWaitTime is refused INVALID_COMMAND, as the
+// generated decoder refuses it (review II, R2-P6-wire-1209).
 func TestDecodeOnWithTimedOffMissingFields(t *testing.T) {
 	t.Parallel()
 	// Encode only field 0; fields 1 and 2 are absent.
 	payload := buildPayload(t, func(e *tlv.Encoder) {
 		e.PutUint(tlv.ContextTag(0), 3)
 	})
-	got, err := wire.DecodeOnWithTimedOff(payload)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.OnOffControl != 3 {
-		t.Errorf("OnOffControl = %d, want 3", got.OnOffControl)
-	}
-	if got.OnTime != 0 {
-		t.Errorf("OnTime = %d, want 0 (zero-value)", got.OnTime)
-	}
-	if got.OffWaitTime != 0 {
-		t.Errorf("OffWaitTime = %d, want 0 (zero-value)", got.OffWaitTime)
+	_, err := wire.DecodeOnWithTimedOff(payload)
+	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusInvalidCommand || !errors.Is(err, wire.ErrOnOffMalformed) {
+		t.Fatalf("err = %v, want ErrOnOffMalformed with INVALID_COMMAND", err)
 	}
 }
 
@@ -116,6 +109,7 @@ func TestDecodeOnWithTimedOffIgnoresNonContextTags(t *testing.T) {
 	e := tlv.NewEncoder()
 	e.StartStruct(tlv.AnonymousTag())
 	e.PutUint(tlv.CommonTag(99), 0xFF) // non-context tag → must be ignored
+	e.PutUint(tlv.ContextTag(0), 0)
 	e.PutUint(tlv.ContextTag(1), 50)
 	e.PutUint(tlv.ContextTag(2), 75)
 	if err := e.EndContainer(); err != nil {

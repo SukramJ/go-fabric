@@ -57,19 +57,19 @@ func fieldUint(el tlv.Element, maxValue uint64, sentinel error) (uint64, error) 
 // fieldUint8 is [fieldUint] bounded by the uint8 range.
 func fieldUint8(el tlv.Element, sentinel error) (uint8, error) {
 	v, err := fieldUint(el, math.MaxUint8, sentinel)
-	if err != nil || v > math.MaxUint8 {
+	if err != nil {
 		return 0, err
 	}
-	return uint8(v), nil
+	return uint8(v), nil //nolint:gosec // fieldUint refused anything above math.MaxUint8
 }
 
 // fieldUint16 is [fieldUint] bounded by the uint16 range.
 func fieldUint16(el tlv.Element, sentinel error) (uint16, error) {
 	v, err := fieldUint(el, math.MaxUint16, sentinel)
-	if err != nil || v > math.MaxUint16 {
+	if err != nil {
 		return 0, err
 	}
-	return uint16(v), nil
+	return uint16(v), nil //nolint:gosec // fieldUint refused anything above math.MaxUint16
 }
 
 // nullableUint16 is a nullable [fieldUint16]: nil for null.
