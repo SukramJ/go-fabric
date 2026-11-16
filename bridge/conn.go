@@ -310,7 +310,7 @@ func (b *Bridge) unbindSessionRoute(sid uint16) {
 // loops at :709-710), so #closeTcpChannelIfLastSession (:739-746) keeps a
 // connection that carries a handshake. A handshake's own end closes
 // nothing: only a secure session's removal schedules the check
-// (#deleteSession :691-708; #addSession :678-689 observes NodeSessions
+// (#deleteSession :761-779; #addSession :748-759 observes NodeSessions
 // only).
 func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
 	r.sessions--
