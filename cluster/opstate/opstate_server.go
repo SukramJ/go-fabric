@@ -194,8 +194,13 @@ const (
 	ErrorNavigationSensorObscured  = ErrorID(rvcdef.ErrorStateNavigationSensorObscured) // RVC
 )
 
-// StateEntry is one OperationalStateList entry. Label is sent for a
-// manufacturer-specific id (0x80-0xBF) only.
+// StateEntry is one OperationalStateList entry. Label belongs to a
+// manufacturer-specific id (0x80-0xBF): it is sent for one, an empty one
+// as an empty string, and refused for any other id at construction with
+// [spec.ErrInvalidValue] — the OperationalStateLabel conformance
+// "OperationalStateID >= 128 & OperationalStateID <= 191" (matter.js
+// operational-state.element.ts:94-97 at db021da0), where it was dropped
+// silently (R2-P6-par-1567).
 type StateEntry struct {
 	ID    State
 	Label string
@@ -575,6 +580,9 @@ func checkStates(v variant, cfg Config) error {
 		}
 		if len(e.Label) > LabelMaxBytes || !utf8.ValidString(e.Label) {
 			return fmt.Errorf("%w: label of state 0x%02X", ErrTooLong, uint8(e.ID))
+		}
+		if e.Label != "" && (e.ID < 0x80 || e.ID > 0xBF) {
+			return fmt.Errorf("%w: opstate: a label for the standard state 0x%02X", spec.ErrInvalidValue, uint8(e.ID))
 		}
 		seen[e.ID] = true
 	}

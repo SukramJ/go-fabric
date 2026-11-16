@@ -32,7 +32,10 @@ var (
 // [Server.SetOperationalError] (a value other than NoError moves the state
 // to Error and emits the OperationalError event), OperationalState
 // [Server.SetOperationalState] (applied after OperationalError, so leaving
-// Error clears it), PhaseList and CurrentPhase [Server.SetPhaseList] and
+// Error clears it; an OperationalError other than NoError beside an
+// OperationalState other than Error is refused with [spec.ErrInvalidValue],
+// since the state would clear the error the event just announced —
+// R2-P6-fsm-1568), PhaseList and CurrentPhase [Server.SetPhaseList] and
 // [Server.SetCurrentPhase], CountdownTime [Server.SetCountdownTime].
 // OperationalStateList is the configuration's ([spec.ErrNotHeld]).
 func (s *Server) SetAttributes(values map[uint32]any) error {
@@ -125,6 +128,9 @@ func (s *Server) checkSet(st State, setState bool, es ErrorState, setErr bool, p
 		if err := s.checkErrorState(es); err != nil {
 			return err
 		}
+	}
+	if setErr && setState && es.ID != ErrorNoError && st != StateError {
+		return fmt.Errorf("%w: opstate: OperationalError 0x%02X with OperationalState 0x%02X: an error holds the state at Error", spec.ErrInvalidValue, uint8(es.ID), uint8(st))
 	}
 	switch {
 	case setPhases:
