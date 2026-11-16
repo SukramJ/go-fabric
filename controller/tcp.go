@@ -13,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
@@ -169,12 +170,34 @@ func (c *Controller) serveTCP(ctx context.Context, l *tcp.Listener) {
 		// Serve retries a failed accept and returns nil on its close, so
 		// an error means TCP is not served: the host must see it (review
 		// II, R2-P3-ctl-lan-04).
-		if err := l.Serve(serveCtx, func(conn *tcp.Conn, msg []byte, _ func()) { mgr.HandleChannelMessage(conn, msg) }, nil); err != nil {
+		if err := l.Serve(serveCtx, inboundTCPHandler(mgr), nil); err != nil {
 			c.log.Warn("matter.tcp.serve.exit", slog.Any("err", err))
 		}
 	}()
 	c.tcpAddr = l.Addr()
 	c.stopTCP = func() { cancel(); _ = l.Close(); <-served }
+}
+
+// inboundTCPHandler is the TCP listener's handler: the message goes to the
+// exchange manager, and a message that names a secure session bound to the
+// connection it arrived on is noted as session traffic
+// ([tcp.Conn.NoteSessionTraffic]), as the bridge notes its sessions'
+// messages, so the listener keeps the place of a connection by its
+// sessions' messages and not by any frame (review II, N3-finnet-4). A
+// session is bound to a connection once it was established over it; a
+// frame on that connection comes from the peer the session authenticated,
+// whose connection it is.
+func inboundTCPHandler(mgr *exchange.Manager) tcp.Handler {
+	return func(conn *tcp.Conn, msg []byte, _ func()) {
+		mgr.HandleChannelMessage(conn, msg)
+		hdr, _, err := message.UnmarshalHeader(msg)
+		if err != nil || hdr.SessionID == 0 {
+			return
+		}
+		if s := mgr.Session(hdr.SessionID); s != nil && s.IsSecure() && s.Channel() == exchange.Channel(conn) {
+			conn.NoteSessionTraffic()
+		}
+	}
 }
 
 // TCPAddr is the controller's TCP listener address, nil without
