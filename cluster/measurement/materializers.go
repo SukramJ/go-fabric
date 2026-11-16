@@ -114,10 +114,10 @@ func boolServer(build func(contract.BoolMeasurementSource) contract.ClusterServe
 	}
 }
 
-// airQualityServers pairs a concentration cluster with the mandatory
-// AirQualityServer, in that order: the ServerList the assembler derives
-// preserves it, and the AirQuality cluster is the one the device type
-// requires.
+// airQualityServers pairs the mandatory AirQualityServer with a
+// concentration cluster, AirQuality first: the ServerList the assembler
+// derives preserves the order, and the AirQuality cluster is the one the
+// device type requires (R2-P6-doc-1464: the comment named the reverse).
 func airQualityServers(class contract.MeasurementClass, build func(contract.FloatMeasurementSource) contract.ClusterServer) contract.MeasurementMaterializer {
 	return func(src any, _ contract.MeasurementContext) []contract.ClusterServer {
 		f, ok := src.(contract.FloatMeasurementSource)

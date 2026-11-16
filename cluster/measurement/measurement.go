@@ -1287,12 +1287,17 @@ const ElectricalEnergyEventCumulativeMeasured = eemdef.EventCumulativeEnergyMeas
 // cumulative energy imported (the server binds no ExportedEnergy).
 type CumulativeEnergyMeasuredEvent = eemdef.CumulativeEnergyMeasuredEvent
 
+// whToMilliWattHours converts a reading in Wh to the attribute's mWh,
+// saturated at int64's bounds. float64(math.MaxInt64) is 2^63, one above
+// the bound, so the upper check is >= (R2-P6-wire-1417); converting 2^63
+// is implementation-defined. A NaN reading is the caller's: it reads
+// null.
 func whToMilliWattHours(wh float64) int64 {
 	v := math.Round(wh * 1000)
-	if v > math.MaxInt64 {
+	if v >= math.MaxInt64 {
 		return math.MaxInt64
 	}
-	if v < math.MinInt64 {
+	if v <= math.MinInt64 {
 		return math.MinInt64
 	}
 	return int64(v)
