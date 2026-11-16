@@ -159,8 +159,8 @@ db, err := sql.Open("sqlite", "file:node.db?_pragma=foreign_keys(1)&_pragma=busy
 
 - `foreign_keys(1)` is required: the schema refuses a row that names a
   fabric the store does not hold, and cascades, only with it on.
-  `store.Apply` refuses a handle without it (`store.ErrForeignKeysOff`),
-  and with it `node.New`. Removing a fabric does not rest on it: the store
+  `store.Apply` and `store.Upgrade` refuse a handle without it
+  (`store.ErrForeignKeysOff`), and with them `node.New`. Removing a fabric does not rest on it: the store
   deletes every row the fabric owns itself.
 - `busy_timeout` makes a contended endpoint-number allocation wait
   instead of failing.

@@ -74,7 +74,8 @@ func fabricRowsLeft(t *testing.T, db *sql.DB, f uint8) map[string]int {
 // the rollback of a pending AddNOC delete every fabric-owned row
 // themselves, so a handle without PRAGMA foreign_keys(1) — on which the
 // schema's cascade does nothing — keeps none of a removed fabric's key
-// material; the other fabric's rows stay. Apply refuses such a handle.
+// material; the other fabric's rows stay. Apply and Upgrade refuse such a
+// handle.
 func TestFabricRemovalWithoutForeignKeys(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -90,6 +91,9 @@ func TestFabricRemovalWithoutForeignKeys(t *testing.T) {
 	db := openWithoutForeignKeys(t, path)
 	if err := store.Apply(ctx, db); !errors.Is(err, store.ErrForeignKeysOff) {
 		t.Errorf("Apply on a handle without foreign keys = %v, want ErrForeignKeysOff", err)
+	}
+	if err := store.Upgrade(ctx, db); !errors.Is(err, store.ErrForeignKeysOff) {
+		t.Errorf("Upgrade on a handle without foreign keys = %v, want ErrForeignKeysOff", err)
 	}
 	s := store.New(db)
 	removed, err := s.AddFabric(ctx, newFabricRecord(0, 1))

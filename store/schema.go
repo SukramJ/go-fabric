@@ -58,12 +58,8 @@ func Schema() string { return schemaDDL }
 // After the DDL it runs [Upgrade], which brings a database created by an
 // earlier release of this package in line with the current schema.
 func Apply(ctx context.Context, db *sql.DB) error {
-	var fk int
-	if err := db.QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&fk); err != nil {
-		return fmt.Errorf("store: apply schema: read foreign_keys: %w", err)
-	}
-	if fk == 0 {
-		return ErrForeignKeysOff
+	if err := requireForeignKeys(ctx, db); err != nil {
+		return fmt.Errorf("store: apply schema: %w", err)
 	}
 	if _, err := db.ExecContext(ctx, schemaDDL); err != nil {
 		return fmt.Errorf("store: apply schema: %w", err)
@@ -71,7 +67,21 @@ func Apply(ctx context.Context, db *sql.DB) error {
 	return Upgrade(ctx, db)
 }
 
-// ErrForeignKeysOff is [Apply]'s refusal of a handle whose connections
+// requireForeignKeys reads PRAGMA foreign_keys on one pooled connection
+// and refuses 0 with [ErrForeignKeysOff]: a DSN sets the pragma for every
+// connection or for none.
+func requireForeignKeys(ctx context.Context, db *sql.DB) error {
+	var fk int
+	if err := db.QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&fk); err != nil {
+		return fmt.Errorf("read foreign_keys: %w", err)
+	}
+	if fk == 0 {
+		return ErrForeignKeysOff
+	}
+	return nil
+}
+
+// ErrForeignKeysOff is [Apply]'s and [Upgrade]'s refusal of a handle whose connections
 // have PRAGMA foreign_keys off — SQLite's default. The host opens its
 // database with the pragma on every pooled connection (`_pragma=foreign_keys(1)`
 // in a modernc.org/sqlite DSN; [OpenSQLite] sets it).
@@ -84,7 +94,9 @@ var ErrForeignKeysOff = errors.New("store: the database handle has PRAGMA foreig
 // otherwise, so Upgrade is safe on every boot and on a fresh database.
 //
 // [Apply] runs it. A host that feeds [Schema] through its own migration
-// tool calls it once after that tool has run.
+// tool calls it once after that tool has run. Like Apply it refuses a
+// handle with PRAGMA foreign_keys off ([ErrForeignKeysOff]) before it
+// writes anything.
 //
 // Steps:
 //
@@ -123,6 +135,9 @@ var ErrForeignKeysOff = errors.New("store: the database handle has PRAGMA foreig
 //     after the settings have their seal mark, which it reads with the
 //     key.
 func Upgrade(ctx context.Context, db *sql.DB) error {
+	if err := requireForeignKeys(ctx, db); err != nil {
+		return fmt.Errorf("store: upgrade: %w", err)
+	}
 	if err := dropGroupKeyMapKeySetForeignKey(ctx, db); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
