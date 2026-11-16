@@ -303,6 +303,13 @@ func (s *ThermostatServer) handleSetActiveScheduleRequest(ctx context.Context, f
 		}
 	}
 	s.mu.Lock()
+	// SetSchedules takes no op: a list the host stored while the port ran
+	// may have dropped the handle, and a dangling one is never stored
+	// (R2-P6-conc-1510).
+	if _, ok := scheduleWithHandle(s.schedules, handle); !ok {
+		s.mu.Unlock()
+		return spec.Errorf(im.StatusInvalidCommand, "thermo: schedule handle %s was removed while the device switched to it", handleKey(handle))
+	}
 	previous := s.activeScheduleHandle
 	s.activeScheduleHandle = handle
 	s.mu.Unlock()
