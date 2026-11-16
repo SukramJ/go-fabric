@@ -396,3 +396,44 @@ func TestStrictValidationSetAfterStartJudgesEveryEndpointAsAdded(t *testing.T) {
 		t.Error("the refused topology replaced the served one")
 	}
 }
+
+// TestReassembleQueuedAcrossStopTakesNoSnapshot: a Reassemble that waited
+// for the assembly slot while a Stop ended the run returns ErrNotStarted
+// without calling the host's Snapshotter (review II, R2-P6-conc-0603).
+func TestReassembleQueuedAcrossStopTakesNoSnapshot(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	firstSnapped, releaseFirst := make(chan struct{}), make(chan struct{})
+	snap := func(ctx context.Context) (*endpoint.Topology, error) {
+		if calls.Add(1) == 2 { // the first Reassemble; 1 is Start's
+			close(firstSnapped)
+			<-releaseFirst
+		}
+		return wbEmptySnapshotter(ctx)
+	}
+	b, err := New(snap, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := b.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	firstDone, secondDone := make(chan error, 1), make(chan error, 1)
+	go func() { firstDone <- b.Reassemble(context.Background()) }()
+	<-firstSnapped
+	second := &doneWatchingContext{Context: context.Background(), asked: make(chan struct{})}
+	go func() { secondDone <- b.Reassemble(second) }()
+	<-second.asked // waiting for the slot
+	if err := b.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	close(releaseFirst)
+	for i, done := range []chan error{firstDone, secondDone} {
+		if err := <-done; !errors.Is(err, ErrNotStarted) {
+			t.Errorf("Reassemble %d across Stop: %v, want ErrNotStarted", i+1, err)
+		}
+	}
+	if got := calls.Load(); got != 2 {
+		t.Errorf("snapshots taken = %d, want 2 (the queued Reassemble takes none)", got)
+	}
+}

@@ -1232,7 +1232,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 // topology is always the newest snapshot the Snapshotter returned, and
 // [Bridge.DeviceTypeViolations] describes it. A Reassemble waits for the
 // one in progress until ctx ends, and returns ctx's error then (review
-// II, R2-P6-conc-0603).
+// II, R2-P6-conc-0603). The Snapshotter and the registration and
+// unregistration of the host's notifiers run inside it: neither may wait
+// for a Reassemble. One that waited across a [Bridge.Stop] returns
+// [ErrNotStarted] without calling the Snapshotter.
 //
 // A Reassemble that overlaps a [Bridge.Stop] — it passed this check
 // before the Stop ran — swaps nothing in and leaves no host listener
@@ -1401,6 +1404,14 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 		return err
 	}
 	defer releaseAssembly()
+	// A Reassemble that waited for the slot across a Stop takes no
+	// snapshot of the host's for a run that is over.
+	b.mu.RLock()
+	queuedPastStop := b.runEndedLocked(run)
+	b.mu.RUnlock()
+	if queuedPastStop {
+		return ErrNotStarted
+	}
 	topology, err := b.snapshotter(ctx)
 	if err != nil {
 		return fmt.Errorf("bridge: assemble: %w", err)
