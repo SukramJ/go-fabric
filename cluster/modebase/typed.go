@@ -12,7 +12,7 @@ import (
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite
-// come from the embedded [spec.Hooks]; SetAttributes is
+// come from the embedded [spec.SelfHeld]; SetAttributes is
 // [Server.SetCurrentMode]'s.
 var (
 	_ spec.AttributeSetter   = (*Server)(nil)

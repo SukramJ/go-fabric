@@ -19,8 +19,9 @@
 //
 //   - SupportedModes: no label and no mode value twice
 //     (ModeUtils.assertSupportedModes), plus the derivation's required
-//     tags — RvcRunMode at least one Idle and one Cleaning mode, Idle,
-//     Cleaning and Mapping never together in one mode; RvcCleanMode at
+//     tags — RvcRunMode at least one Idle and one Cleaning mode, and no
+//     mode with two or more of Idle, Cleaning and Mapping (the refusal's
+//     text, [ErrExclusiveTags], is matter.js's own); RvcCleanMode at
 //     least one Vacuum or Mop mode; LaundryWasherMode and DishwasherMode
 //     at least one Normal mode; OvenMode at least one Bake mode;
 //     RefrigeratorAndTemperatureControlledCabinetMode at least one Auto
@@ -432,20 +433,43 @@ func checkDeviceEnergyManagement(modes []ModeOption) error {
 }
 
 // Server implements [contract.ClusterServer] for one ModeBase derivation.
+//
+// Its state — SupportedModes and CurrentMode — is its own; the generated
+// store beside it ([spec.SelfHeld]) reads that state through a source and
+// carries the typed server's command path: a ChangeToMode is admitted
+// against the definition with the state's values as peers, a host's
+// handler or the server's own logic runs, and the response is checked
+// ([spec.InvokeHeld], decision 154).
 type Server struct {
 	cluster.AttributeChanges
-	spec.Hooks
+	spec.SelfHeld
 
 	k        kind
 	inst     *spec.Instance
+	srv      *spec.Server
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
 	changer  ModeChanger
 	modes    []ModeOption
 
+	// cmd serialises ChangeToMode: the read of CurrentMode, its checks,
+	// the host's change and the store are one step (R2-P6-conc-1414).
+	cmd sync.Mutex
 	// mu guards current.
 	mu      sync.Mutex
 	current uint8
+}
+
+// modeSource answers the store's reads from the server's own state.
+type modeSource struct{ s *Server }
+
+// MatterAttribute implements [spec.Source].
+func (m modeSource) MatterAttribute(attrID uint32) (any, bool) {
+	switch attrID {
+	case AttrSupportedModes, AttrCurrentMode:
+		return m.s.MatterRead(attrID)
+	}
+	return nil, false
 }
 
 // Compile-time assertions.
@@ -498,7 +522,8 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
 	}
-	if cfg.Changer == nil && inst.Accepts(CmdChangeToMode) {
+	accepts := inst.Accepts(CmdChangeToMode)
+	if cfg.Changer == nil && accepts {
 		return nil, ErrNoChanger
 	}
 	tagMin, tagMax := modeTagBounds(k.def)
@@ -512,8 +537,16 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	for i, m := range cfg.SupportedModes {
 		modes[i] = ModeOption{Label: m.Label, Mode: m.Mode, Tags: slices.Clone(m.Tags)}
 	}
-	s := &Server{k: k, inst: inst, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, current: cfg.CurrentMode}
-	s.Init(inst)
+	s := &Server{k: k, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, current: cfg.CurrentMode}
+	sc := spec.ServerConfig{DataVersion: s.tracker(), Source: modeSource{s}}
+	if accepts {
+		sc.Handlers = map[uint32]spec.CommandHandler{CmdChangeToMode: s.changeToMode}
+	}
+	srv, err := spec.NewServer(k.def, spec.Options{Features: uint32(cfg.Features)}, sc)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
+	}
+	s.srv, s.inst, s.SelfHeld = srv, srv.Instance, spec.NewSelfHeld(srv)
 	// The mode servers' initialize: ModeUtils.assertMode(supportedModes,
 	// currentMode).
 	if !s.supports(cfg.CurrentMode) {
@@ -683,18 +716,21 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 }
 
 // MatterInvoke answers ChangeToMode with a ChangeToModeResponse where the
-// definition accepts it (MicrowaveOvenMode's does not).
+// definition accepts it (MicrowaveOvenMode's does not): the request held
+// to the definition, then a host's handler ([spec.SelfHeld.Handle]) or
+// the server's own logic, the response checked ([spec.InvokeHeld]).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	if cmdID != CmdChangeToMode || !s.inst.Accepts(cmdID) {
-		return nil, im.UnsupportedCommandf("modebase: command 0x%02X is not supported", cmdID)
-	}
-	if resp, handled, err := s.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
+}
+
+// changeToMode is the server's own ChangeToMode.
+func (s *Server) changeToMode(ctx context.Context, fields any) (any, error) {
 	newMode, ok := changeToModeRequest(fields)
 	if !ok {
 		return nil, statusError{im.StatusInvalidCommand, fmt.Sprintf("modebase: ChangeToMode fields %T", fields)}
 	}
+	s.cmd.Lock()
+	defer s.cmd.Unlock()
 	s.mu.Lock()
 	current := s.current
 	s.mu.Unlock()
