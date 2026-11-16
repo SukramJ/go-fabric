@@ -141,6 +141,18 @@ type ResumptionRecord struct {
 // ResumptionRecord and nil when the id is known; it must return nil
 // record and a non-nil error when the id is unknown so the responder can
 // fall through to Full Sigma. Implementations must be safe for concurrent use.
+// sharedSecretSize is the length of a P-256 ECDH shared secret, the
+// only secret a [ResumptionRecord] can carry.
+const sharedSecretSize = 32
+
+// wellFormed reports whether r has the shape a record of a finished CASE
+// session has: a 32-byte shared secret and a 16-byte resumption id. A
+// record of another shape is treated as absent on both sides of the
+// handshake.
+func (r *ResumptionRecord) wellFormed() bool {
+	return r != nil && len(r.SharedSecret) == sharedSecretSize && len(r.ResumptionID) == ResumptionIDSize
+}
+
 type ResumptionStore interface {
 	GetByID(resumptionID []byte) (*ResumptionRecord, error)
 }
@@ -582,6 +594,13 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 		// propagating would turn a transient store error into a failed
 		// CASE establishment.
 		return Sigma1ProcessResult{}, false, nil //nolint:nilerr // miss is non-fatal; caller retries with full Sigma
+	}
+	// A record of another shape is no record: with an empty or short
+	// secret the resume MICs are computable from the public random and
+	// resumption id. The module's store checks the shape on write and
+	// read; a [ResumptionStore] of another kind may not (R2-P6-sec-0113).
+	if !rec.wellFormed() {
+		return Sigma1ProcessResult{}, false, nil
 	}
 
 	// KDFSR1: peerResumeKey = HKDF(sharedSecret,
