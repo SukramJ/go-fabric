@@ -57,8 +57,9 @@ const ClusterRevision = wcdef.Revision
 // selection makes mandatory — TargetPositionLiftPercent100ths and
 // CurrentPositionLiftPercent100ths are "LF & PA_LF" — plus the optional
 // CurrentPositionLiftPercentage ("[LF & PA_LF]") and SafetyStatus ("O").
-// Lift without PositionAwareLift would disallow the two position
-// attributes the server serves, so an axis is always position-aware here.
+// Lift without PositionAwareLift disallows the two position attributes;
+// the server serves that selection too ([Config.FeatureMap]), without
+// them.
 const ServedFeatureMap = uint32(wcdef.FeatureLift | wcdef.FeaturePositionAwareLift)
 
 // ServedTiltFeatureMap is the tilt-only FeatureMap: Tilt and
@@ -361,7 +362,10 @@ func (s *WindowCoveringServer) OnAttributeChange(cb func(change contract.Change)
 // serve, or break the features' conformance (PA_LF "LF", PA_TL "TL",
 // window-covering-cluster.element.ts at db021da0). A Mover together with
 // a non-zero MoveStep is refused with [ErrMoverWithMoveStep], a Type or
-// EndProductType the FeatureMap disallows with [ErrEnumValue].
+// EndProductType the FeatureMap disallows with [ErrEnumValue], and an
+// initial position of a position-aware axis above 10000 with
+// [spec.ErrInvalidValue] (R2-P6-err-1562), as a host's report is held to
+// the attribute's "max 10000".
 func New(cfg Config) (*WindowCoveringServer, error) {
 	features := cfg.FeatureMap
 	if features == 0 {
@@ -392,6 +396,21 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	}{{wcdef.AttrType, cfg.Type}, {wcdef.AttrEndProductType, cfg.EndProductType}} {
 		if _, err := inst.CheckValue(v.attr, uint64(v.value), nil); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrEnumValue, err)
+		}
+	}
+	for _, p := range []struct {
+		attr    uint32
+		value   uint16
+		unknown bool
+	}{
+		{wcdef.AttrCurrentPositionLiftPercent100ths, cfg.InitialPositionPercent100ths, cfg.InitialPositionUnknown},
+		{wcdef.AttrCurrentPositionTiltPercent100ths, cfg.InitialTiltPositionPercent100ths, cfg.InitialTiltPositionUnknown},
+	} {
+		if !inst.Serves(p.attr) || p.unknown {
+			continue
+		}
+		if _, err := inst.CheckValue(p.attr, uint64(p.value), nil); err != nil {
+			return nil, fmt.Errorf("%w: cover: initial position: %w", spec.ErrInvalidValue, err)
 		}
 	}
 	s := &WindowCoveringServer{
@@ -548,7 +567,10 @@ func (e windowCoveringConstraintErr) Error() string                 { return e.m
 func (windowCoveringConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
 // Compile-time assertion.
-var _ im.StatusCodeError = windowCoveringConstraintErr{}
+var (
+	_ im.StatusCodeError       = windowCoveringConstraintErr{}
+	_ contract.ClusterQuiescer = (*WindowCoveringServer)(nil)
+)
 
 // MatterWrite accepts Mode (0x0017), the one writable attribute ("RW VM");
 // all others are controlled via commands. The definition checks the write
@@ -969,6 +991,20 @@ func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
 	a.move = m
 }
 
+// MatterQuiesce implements [contract.ClusterQuiescer]: a travel in
+// progress stops where it is — its step timer stopped, nothing reported,
+// the position and OperationalStatus as the last step left them — and
+// the next movement command starts again (R2-P6-conc-1507).
+func (s *WindowCoveringServer) MatterQuiesce() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, a := range []*axis{s.lift, s.tilt} {
+		if a != nil {
+			s.stopLocked(a)
+		}
+	}
+}
+
 // stopLocked ends a running movement of the axis. Caller holds s.mu.
 func (s *WindowCoveringServer) stopLocked(a *axis) {
 	if a.move != nil {
@@ -1005,7 +1041,15 @@ func (s *WindowCoveringServer) tick(a *axis, m *movement) {
 		a.move = nil
 		changed = append(changed, wire.WindowCoveringAttrOperationalStatus)
 	} else {
-		a.current = uint16(int(a.current) + m.increment) //nolint:gosec // six increments of a 0-10000 span stay inside it
+		// A host report during the travel moves the base the steps add to
+		// (SetCurrentPosition does not stop it): a step never passes the
+		// target and never leaves the attribute's 0..10000
+		// (R2-P6-fsm-1502).
+		next := int(a.current) + m.increment
+		if (m.increment > 0 && next > int(m.target)) || (m.increment < 0 && next < int(m.target)) {
+			next = int(m.target)
+		}
+		a.current = uint16(min(max(next, 0), 10000)) //nolint:gosec // clamped to 0..10000
 		m.timer.Reset(s.moveStep)
 	}
 	s.mu.Unlock()
