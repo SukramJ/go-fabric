@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"slices"
 
@@ -393,6 +394,13 @@ func (m *Manager) completeMessage(msg *Message, c candidate) error {
 
 	w, ok := m.receptionWindow(c.epoch.key, msg.SourceNodeID)
 	if !ok {
+		if m.firstRefusal(c.epoch.key) {
+			m.logger.Warn("groups.reception.full",
+				slog.Int("fabric_index", int(msg.FabricIndex)),
+				slog.Int("group_id", int(msg.GroupID)),
+				slog.Uint64("source_node_id", msg.SourceNodeID),
+				slog.Int("max", maxGroupSendersPerKey))
+		}
 		return fmt.Errorf("%w: source node %#016x, group %#04x", errReceptionFull, msg.SourceNodeID, msg.GroupID)
 	}
 	msg.Duplicate = !w.Accept(msg.Header.MessageCounter)
@@ -400,15 +408,34 @@ func (m *Manager) completeMessage(msg *Message, c candidate) error {
 }
 
 // maxGroupSendersPerKey bounds the source node ids an operational key
-// holds reception state for. The number is connectedhomeip's
-// CHIP_CONFIG_MAX_GROUP_DATA_PEERS (src/lib/core/CHIPConfig.h:832-834 at
-// 6170af84), which bounds the senders per fabric; the rule at the bound
-// is the module's own ([Manager.receptionWindow]).
-const maxGroupSendersPerKey = 15
+// holds reception state for. Because a sender beyond it is refused for as
+// long as the key is held ([Manager.receptionWindow]), it is a hard cap on
+// the group senders one key set serves — senders that left (removed or
+// re-commissioned nodes) keep their places until the key goes — so the
+// number is chosen from memory, not from a reference: a window is a
+// counter, a 32-bit bitmap and a map entry, so 256 senders cost a few
+// kilobytes per key. connectedhomeip's CHIP_CONFIG_MAX_GROUP_DATA_PEERS
+// (15, src/lib/core/CHIPConfig.h:832-834 at 6170af84) is the size of an
+// LRU cache that evicts, not a cap, and is not the source of this one.
+const maxGroupSendersPerKey = 256
 
 // errReceptionFull refuses the message of a sender the key's reception
 // state does not hold, at [maxGroupSendersPerKey].
 var errReceptionFull = errors.New("groups: the operational key's reception state holds its bound of senders")
+
+// firstRefusal reports whether key has refused no sender at its bound
+// before, and marks it: the refusal is logged once per key, until the
+// key's reception state is dropped (forgetUnreferenced).
+func (m *Manager) firstRefusal(key []byte) bool {
+	k := hex.EncodeToString(key)
+	m.receptionMu.Lock()
+	defer m.receptionMu.Unlock()
+	if m.receptionFull[k] {
+		return false
+	}
+	m.receptionFull[k] = true
+	return true
+}
 
 // receptionWindow returns the reception state for (key, source node),
 // creating it on first use; ok is false when the key holds no window for

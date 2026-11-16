@@ -4,8 +4,11 @@
 package groups
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
+	"log/slog"
+	"strings"
 	"testing"
 )
 
@@ -14,13 +17,16 @@ import (
 // maxGroupSendersPerKey source node ids. A sender beyond it that the table
 // does not hold yet is refused — its message dropped, no state created —
 // and nobody is evicted, so every held sender keeps its replay protection
-// whole; another key's senders are not counted against this one, and the
-// places come back with the key's teardown.
+// whole; the first refusal of a key is logged at warn, once; another key's
+// senders are not counted against this one, and the places come back with
+// the key's teardown.
 func TestReceptionStateIsBoundedPerKey(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	op, sid := opKeyOf(t, 0xA1)
 	m, _ := newTestManager(t)
+	var logged bytes.Buffer
+	m.logger = slog.New(slog.NewTextHandler(&logged, nil))
 	first := make([][]byte, maxGroupSendersPerKey)
 	for s := range first {
 		first[s] = sealGroup(t, op, sid, 0x0101, uint64(s+1), 7, true, []byte("toggle"))
@@ -33,6 +39,9 @@ func TestReceptionStateIsBoundedPerKey(t *testing.T) {
 		if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, beyond, counter, true, []byte("toggle"))); err == nil {
 			t.Fatalf("sender %d beyond the bound was taken (duplicate %v)", beyond, msg.Duplicate)
 		}
+	}
+	if n := strings.Count(logged.String(), "groups.reception.full"); n != 1 || !strings.Contains(logged.String(), "level=WARN") {
+		t.Fatalf("the refusals were logged %d times, want once at warn:\n%s", n, logged.String())
 	}
 	if got := receptionEntries(m, op); got != maxGroupSendersPerKey {
 		t.Fatalf("%d reception windows, want the bound %d", got, maxGroupSendersPerKey)

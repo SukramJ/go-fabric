@@ -135,6 +135,9 @@ type Manager struct {
 	// In memory only, as in matter.js.
 	receptionMu sync.Mutex
 	reception   map[string]map[uint64]*mrp.Window
+	// receptionFull marks the keys that refused a sender at
+	// maxGroupSendersPerKey, so the refusal is logged once per key.
+	receptionFull map[string]bool
 
 	// observersMu guards observers and tableObservers.
 	observersMu        sync.Mutex
@@ -187,6 +190,8 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		maxGroups: DefaultMaxGroupsPerFabric,
 		fabrics:   make(map[uint8]*fabricGroups),
 		reception: make(map[string]map[uint64]*mrp.Window),
+
+		receptionFull: make(map[string]bool),
 
 		counterRandom: randomCounterStart,
 		senders:       make(map[senderKey]*Sender),
@@ -512,6 +517,11 @@ func (m *Manager) forgetUnreferenced() {
 	for k := range m.reception {
 		if _, ok := live[k]; !ok {
 			delete(m.reception, k)
+		}
+	}
+	for k := range m.receptionFull {
+		if _, ok := live[k]; !ok {
+			delete(m.receptionFull, k)
 		}
 	}
 	m.receptionMu.Unlock()
