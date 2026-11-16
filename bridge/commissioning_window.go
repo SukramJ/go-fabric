@@ -290,13 +290,17 @@ func (w *CommissioningWindow) SetPaseVerifierInstaller(i PaseVerifierInstaller) 
 	w.mu.Unlock()
 }
 
-// Discriminator returns the 12-bit discriminator of the currently-open
-// window (0 when closed). Used by the daemon's transition hook to build
-// the CM=2 commissionable advertisement for an Enhanced Commissioning
-// Window.
+// Discriminator returns the 12-bit discriminator of the open
+// administrator's window: 0 when no window is open, and during the node's
+// own window, which an administrator did not open (review II,
+// R2-P6-api-0309). Used by the daemon's transition hook to build the CM=2
+// commissionable advertisement for an Enhanced Commissioning Window.
 func (w *CommissioningWindow) Discriminator() uint16 {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
+	if !w.open || w.own {
+		return 0
+	}
 	return w.discriminator
 }
 
@@ -450,6 +454,14 @@ func (w *CommissioningWindow) SetBlocked(ctx context.Context, err error) {
 func (w *CommissioningWindow) blockedErr() error {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
+	return w.blockedLocked()
+}
+
+// blockedLocked is [CommissioningWindow.blockedErr] for a caller that holds
+// w.mu: the open paths read it again in the critical section that sets
+// open, so a block set while they called out — the fabric counter, the
+// fail-safe check — still refuses them (review II, R2-P6-fsm-0305).
+func (w *CommissioningWindow) blockedLocked() error {
 	if w.blocked == nil {
 		return nil
 	}
@@ -498,6 +510,13 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 		w.mu.Unlock()
 		return ErrStopped
 	}
+	// The block is read again where the window opens: a SetBlocked since
+	// the check above found no window to revoke (review II,
+	// R2-P6-fsm-0305).
+	if err := w.blockedLocked(); err != nil {
+		w.mu.Unlock()
+		return err
+	}
 	if w.open && !w.own {
 		w.mu.Unlock()
 		return ErrAdministratorWindowOpen
@@ -534,33 +553,36 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 }
 
 // adminOpenRefusedLocked is why an administrator's window cannot open
-// now: the bridge stopped ([ErrStopped]) or an administrator's window is
-// open (Busy); nil when it can. Caller holds w.mu.
+// now: the bridge stopped ([ErrStopped]), commissioning is blocked
+// ([ErrCommissioningBlocked], read again here, R2-P6-fsm-0305) or an
+// administrator's window is open (Busy); nil when it can. Caller holds
+// w.mu.
 func (w *CommissioningWindow) adminOpenRefusedLocked() error {
 	switch {
 	case w.stopped:
 		return ErrStopped
+	case w.blocked != nil:
+		return w.blockedLocked()
 	case w.open && !w.own:
 		return wire.ErrAdmCommBusy
 	}
 	return nil
 }
 
-// stopTimer stops the window's expiry timer, own or administrator, without
-// closing the window or firing its hooks: [Bridge.Stop] calls it so no
-// timer stays armed on the bridge's clock after Stop (ADR 0026 P5). A
-// window open at Stop keeps its state, and an expiry it would have had is
-// not run. The bridge is single-run: from then on OpenOwnWindow and
-// OpenWindow return [ErrStopped] and arm nothing (review II,
-// R2-P2-stop-02).
+// stopTimer stops the window's expiry timer, own or administrator, and
+// clears the window's state without firing its hooks or its restore:
+// [Bridge.Stop] calls it so no timer stays armed on the bridge's clock
+// after Stop (ADR 0026 P5), and no reader sees an open window on a stopped
+// bridge (review II, N-life-3). An expiry the window would have had is not
+// run. The bridge is single-run: from then on OpenOwnWindow and OpenWindow
+// return [ErrStopped] and arm nothing (review II, R2-P2-stop-02).
 func (w *CommissioningWindow) stopTimer() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.stopped = true
-	if w.closeTimer != nil {
-		w.closeTimer.Stop()
-		w.closeTimer = nil // a callback already running sees it is stale
-	}
+	// closeLocked stops the timer (a callback already running sees it is
+	// stale); what it returns for the transition is not run.
+	_, _ = w.closeLocked()
 }
 
 // closeLocked closes the window and returns what the transition fires:
@@ -758,7 +780,12 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		if err != nil {
 			// The window is useless without the acceptor — revoke to avoid a
 			// dangling open state, then surface the error to the cluster
-			// handler.
+			// handler. No lock spans the open and this revoke: a PASE
+			// session established against the window meanwhile — the
+			// commissioner's fail-safe was checked before the open, outside
+			// w.mu — is closed by the revoke, as an administrator's
+			// RevokeCommissioning closes it; nobody gains a session the
+			// failed open promised (review II, N-noc-5).
 			_ = w.RevokeWindow(ctx)
 			return fmt.Errorf("install PASE verifier: %w", err)
 		}
