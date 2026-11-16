@@ -60,7 +60,7 @@ func (s *Store) GetSetting(ctx context.Context, key string) (value string, ok bo
 }
 
 // errReservedSetting is a Settings write of the seal canary's key.
-var errReservedSetting = errors.New("the key is the store's seal canary (reserved)")
+var errReservedSetting = errors.New("store: the key is the store's seal canary (reserved)")
 
 // checkSettingWrite refuses a write of the seal canary's key, and a secret
 // setting a Store without a sealer would write in clear into a sealed
