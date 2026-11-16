@@ -217,12 +217,12 @@ func TestSettleHandshake_BindsUDPSessionAtEstablishment(t *testing.T) {
 	dev := startResumeDevice(t, newMemSubscriptionStore(), nil)
 	src := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 47000}
 	ok := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil)
-	dev.br.settleHandshake(src, 0x51, establishedReporter(0x0D01), mrp.SCOpcodeStatusReport, ok, nil)
+	dev.br.settleHandshake(src, onExchange(0x51), establishedReporter(0x0D01), mrp.SCOpcodeStatusReport, ok, nil)
 	if got := dev.br.resolveSessionPeerAddr(0x0D01); got == nil || got.String() != src.String() {
 		t.Fatalf("peer address of the established UDP session = %v, want %v", got, src)
 	}
 	// A failed or unfinished step binds nothing.
-	dev.br.settleHandshake(src, 0x52, establishedReporter(0x0D02), mrp.SCOpcodeSigma2, []byte{1}, nil)
+	dev.br.settleHandshake(src, onExchange(0x52), establishedReporter(0x0D02), mrp.SCOpcodeSigma2, []byte{1}, nil)
 	if got := dev.br.resolveSessionPeerAddr(0x0D02); got != nil {
 		t.Errorf("a Sigma2 bound session 0x0D02 to %v", got)
 	}

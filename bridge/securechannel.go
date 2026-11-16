@@ -140,7 +140,7 @@ func (noopAckHandler) Discharge(uint16, uint16, bool) bool { return false }
 // Calling this twice replaces the previous handler.
 //
 // The handler is shared across every PASE exchange. The bridge admits
-// one PASE handshake at a time (claimPaseInFlight), so commissioners
+// one PASE handshake at a time ([Bridge.claimPase]), so commissioners
 // pair one after another; a handler scoped to one handshake — its
 // initiator and exchange — comes from [Bridge.AttachPaseHandlerProvider]
 // instead, and when a provider is wired the singleton handler is
@@ -595,7 +595,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 			// The peer ended a handshake on this exchange with a failure:
 			// it no longer holds a connection open.
 			if general, _, _, ok := decodeStatusReport(payload); ok && general != mrp.SCStatusGeneralSuccess {
-				b.releaseHandshake(src, proto.ExchangeID)
+				b.releaseHandshake(src, handshakeKeyOf(requestHdr, proto.ExchangeID))
 			}
 		}
 		if b.abortPaseOnStatusReport(src, requestHdr, proto, payload) {
@@ -762,7 +762,17 @@ func (b *Bridge) dispatchPase(
 	}
 	switch proto.Opcode {
 	case mrp.SCOpcodePBKDFParamRequest:
-		if !b.claimPaseInFlight(key) {
+		claim := b.claimPase(key)
+		if claim == paseClaimRepeated {
+			// The handshake asks again on its live claim: a state
+			// refusal, acknowledged by the MRP layer and not answered;
+			// the claim's time is not renewed.
+			b.logger.Debug("matter.rx.sc.pase_request_repeated",
+				slog.String("src", srcString(src)),
+				slog.Int("exchange_id", int(proto.ExchangeID)))
+			return nil
+		}
+		if claim == paseClaimBusy {
 			// Single-active-PASE (Matter §4.13.1): a second
 			// commissioner's PBKDFParamRequest while a handshake is in
 			// progress is IGNORED — matter.js PaseServer.ts:80-86
@@ -876,30 +886,63 @@ const (
 	paseLockoutMaxCooldown = 4 * time.Hour
 )
 
-// claimPaseInFlight attempts to claim the single-active-PASE slot for
-// the handshake key. Returns true when the claim succeeds: the slot was
-// idle, expired, or already owned by the SAME handshake
-// (PBKDFParamRequest retransmit). Mirrors matter.js PaseServer.ts:80-86
-// onNewExchange.
-func (b *Bridge) claimPaseInFlight(key HandshakeKey) bool {
+// paseClaim is the outcome of [Bridge.claimPase].
+type paseClaim int
+
+const (
+	// paseClaimTaken: the slot was idle or its claim had run out; key
+	// holds it now, for [pasePairingTimeout] from this request.
+	paseClaimTaken paseClaim = iota
+	// paseClaimBusy: another handshake holds the slot.
+	paseClaimBusy
+	// paseClaimRepeated: key holds the slot already — a further
+	// PBKDFParamRequest of the handshake, not its retransmission (the
+	// unsecured reception window drops that before dispatch).
+	paseClaimRepeated
+)
+
+// claimPase attempts to claim the single-active-PASE slot for the
+// handshake key, for a PBKDFParamRequest. The claim runs
+// [pasePairingTimeout] from the request that took it and is not renewed: a
+// further PBKDFParamRequest of the same handshake is refused as a state
+// error (acknowledged, not answered), so whoever keeps asking cannot hold
+// the slot past its time. A claim that ran out without its handshake ending
+// counts one PASE failure when the slot is taken again — by anybody, the
+// same initiator included — so twenty abandoned claims engage the lockout
+// twenty failed passcode attempts engage ([Bridge.recordPaseFailure]).
+// matter.js runs the timer once per pairing (PaseServer.ts:127-131 at
+// db021da0), ignores every new exchange while it runs (:80-86), and counts
+// every error of the pairing it accepted (:94-110); review II,
+// R2-P6-sec-0304.
+func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 	b.mu.Lock()
 	now := b.clk().Now()
-	idle := b.paseInFlightSince.IsZero() || now.Sub(b.paseInFlightSince) > pasePairingTimeout
-	if !idle && b.paseInFlight != key {
+	held := !b.paseInFlightSince.IsZero()
+	if held && now.Sub(b.paseInFlightSince) <= pasePairingTimeout {
 		b.mu.Unlock()
-		return false
+		if b.paseInFlight == key {
+			return paseClaimRepeated
+		}
+		return paseClaimBusy
 	}
-	timedOut, expired := !b.paseInFlightSince.IsZero() && b.paseInFlight != key, b.paseInFlight
+	expired := b.paseInFlight
 	b.paseInFlight = key
 	b.paseInFlightSince = now
 	b.mu.Unlock()
-	if timedOut {
-		// The handshake that held the slot timed out: its replies stop
-		// waiting for an acknowledgement with it. Outside b.mu — the
-		// tracker resolves a session's interval through the bridge.
+	if held {
+		// The handshake that held the slot ran out: its replies stop
+		// waiting for an acknowledgement with it, and it counts as a
+		// failed pairing. Outside b.mu — the tracker resolves a
+		// session's interval through the bridge.
 		b.abandonHandshakeReplies(expired)
+		if b.logger != nil {
+			b.logger.Info("matter.rx.sc.pase_claim_expired",
+				slog.Int("exchange_id", int(expired.ExchangeID)),
+				slog.Duration("timeout", pasePairingTimeout))
+		}
+		b.recordPaseFailure()
 	}
-	return true
+	return paseClaimTaken
 }
 
 // paseSessionIDLister is the optional capability of a [SessionRegistry] to
@@ -1142,7 +1185,7 @@ func (b *Bridge) handlePase(
 		// the next exchange.
 		b.releasePaseInFlight(handshakeKeyOf(requestHdr, proto.ExchangeID))
 	}
-	b.settleHandshake(src, proto.ExchangeID, handler, respOpcode, respPayload, err)
+	b.settleHandshake(src, handshakeKeyOf(requestHdr, proto.ExchangeID), handler, respOpcode, respPayload, err)
 	if err != nil {
 		// Missing-handler is a routine pre-PASE-wiring condition
 		// (commissioner pings before the daemon's PASE port is up);
@@ -1244,7 +1287,7 @@ func (b *Bridge) handleCase(
 ) error {
 	rxAt := b.clk().Now()
 	respOpcode, respPayload, err := process(payload)
-	b.settleHandshake(src, proto.ExchangeID, handler, respOpcode, respPayload, err)
+	b.settleHandshake(src, handshakeKeyOf(requestHdr, proto.ExchangeID), handler, respOpcode, respPayload, err)
 	if err != nil {
 		// Most "case_err"s on a healthy pair are MRP retransmissions of
 		// an already-processed sigma message: the per-exchange responder

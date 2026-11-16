@@ -337,15 +337,20 @@ func (b *Bridge) holdHandshake(src net.Addr, key HandshakeKey, pase bool) {
 	r.handshakes[key.ExchangeID] = handshakeHold{pase: pase, initiator: key.InitiatorNodeID, since: b.clk().Now()}
 }
 
-// releaseHandshake ends the hold of the handshake on exchangeID over src.
-// It never closes the connection — see [Bridge.releaseConnRouteLocked].
-func (b *Bridge) releaseHandshake(src net.Addr, exchangeID uint16) {
+// releaseHandshake ends the hold of the handshake key over src: a hold on
+// key's exchange id of another initiator stays, so a message sent under
+// another source node id ends no handshake's hold (review II,
+// R2-P6-sec-0304, N3-fixrrdev-2). It never closes the connection — see
+// [Bridge.releaseConnRouteLocked].
+func (b *Bridge) releaseHandshake(src net.Addr, key HandshakeKey) {
 	r, ok := src.(*connRoute)
 	if !ok || r == nil {
 		return
 	}
 	b.routeBindMu.Lock()
-	delete(r.handshakes, exchangeID)
+	if h, held := r.handshakes[key.ExchangeID]; held && h.initiator == key.InitiatorNodeID {
+		delete(r.handshakes, key.ExchangeID)
+	}
 	b.routeBindMu.Unlock()
 }
 
@@ -392,7 +397,7 @@ type establishedSessionReporter interface {
 // authenticated message yet still has an address for its CloseSession on
 // fabric removal or NOC rotation; the session's first authenticated
 // message rebinds it as before (receive.go). Only a connection is held.
-func (b *Bridge) settleHandshake(src net.Addr, exchangeID uint16, h any, respOpcode uint8, respPayload []byte, err error) {
+func (b *Bridge) settleHandshake(src net.Addr, key HandshakeKey, h any, respOpcode uint8, respPayload []byte, err error) {
 	if !isConnRoute(src) {
 		if src != nil && err == nil && establishedBy(respOpcode, respPayload) {
 			b.bindEstablishedSession(src, h)
@@ -413,7 +418,7 @@ func (b *Bridge) settleHandshake(src net.Addr, exchangeID uint16, h any, respOpc
 	default:
 		return // PBKDFParamResponse, Pake2, Sigma2: the handshake goes on
 	}
-	b.releaseHandshake(src, exchangeID)
+	b.releaseHandshake(src, key)
 }
 
 // establishedBy reports whether a handshake reply establishes the session:

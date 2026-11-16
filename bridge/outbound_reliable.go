@@ -308,7 +308,7 @@ func (t *outboundReliableTracker) trackUnsecured(counter uint32, key HandshakeKe
 //
 // Why 16: under eviction the size has to cover the handshakes of honest
 // peers that wait for an acknowledgement at the same moment — one PASE
-// (the single-active slot, [Bridge.claimPaseInFlight]) and the CASE
+// (the single-active slot, [Bridge.claimPase]) and the CASE
 // handshakes of the controllers that reconnect together — and nothing
 // more: a flood evicts at any size a device would choose, so a larger
 // table buys memory, not protection. An entry is one datagram and its
