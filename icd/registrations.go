@@ -44,11 +44,16 @@ type Registrations struct {
 	regs []Registration
 }
 
-// All returns a copy of the registrations (FabricIcd.ts:45-47).
+// All returns a copy of the registrations (FabricIcd.ts:45-47); each
+// Key is copied too, so the caller may write to what it gets.
 func (r *Registrations) All() []Registration {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return slices.Clone(r.regs)
+	out := slices.Clone(r.regs)
+	for i := range out {
+		out[i].Key = slices.Clone(out[i].Key)
+	}
+	return out
 }
 
 // Set adds a registration or replaces the one of the same CheckInNodeID in
