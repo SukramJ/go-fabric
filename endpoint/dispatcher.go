@@ -618,11 +618,12 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 	return results
 }
 
-// Invoke implements [im.Dispatcher]. CommandPath has no wildcard
-// fields in our supported subset (Matter §10.6.7 lets EndpointID
-// wildcard for InvokeRequest only when the cluster is universally
-// addressable — none of ours are), so this is always a concrete
-// dispatch returning exactly one [im.InvokeResult].
+// Invoke implements [im.Dispatcher]. It dispatches a concrete command
+// path and returns exactly one [im.InvokeResult]; a path without an
+// endpoint is answered UnsupportedEndpoint here. A wildcard-endpoint
+// command — a group command's only shape — goes through
+// [TopologyDispatcher.InvokeAuthorized] instead, which dispatches it to
+// every endpoint that hosts the cluster (R2-P6-doc-0407).
 func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields any) im.InvokeResult {
 	if !path.HasEndpoint {
 		return im.InvokeResult{Path: path, Status: im.StatusUnsupportedEndpoint}
@@ -964,8 +965,9 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	}
 	// Cluster did not handle the read. Try synthesising the value if
 	// it is a global-attribute ID — this lets every cluster expose
-	// AttributeList / AcceptedCommandList / GeneratedCommandList /
-	// EventList automatically. The cluster-internal MatterRead still
+	// AttributeList / AcceptedCommandList / GeneratedCommandList
+	// automatically (EventList is not synthesised, see
+	// [synthesizeGlobalRead]). The cluster-internal MatterRead still
 	// wins when it returns a value (so clusters that want a richer
 	// AcceptedCommandList can override).
 	if synth, synthOK := synthesizeGlobalRead(srv, path.Attribute); synthOK {
@@ -1057,8 +1059,9 @@ func fabricScopedReadFailed(ctx context.Context, srv contract.ClusterServer, att
 func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool) {
 	switch attrID {
 	case cluster.AttrGlobalAttributeList:
-		// EventList (0xFFFA) intentionally omitted — see comment in
-		// expandWildcardForCluster. Apple's iOS Matter SDK rejects the
+		// EventList (0xFFFA) intentionally omitted — see the EventList
+		// arm below and [TopologyDispatcher.attributesFor], which leaves
+		// it out of a wildcard read's expansion. Apple's iOS Matter SDK rejects the
 		// whole ReportData stream when AttributeList advertises
 		// EventList but the SDK lacks the Matter 1.4 schema for it.
 		seen := map[uint32]struct{}{
@@ -1110,9 +1113,12 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 		// other value) makes Apple drop the whole ReportData stream
 		// with `MTRErrorDomain Code=12 "No known schema for decoding
 		// attribute value."` and abort the pair via HAPErrorDomain
-		// Code=14. Treat the attribute as unsupported (return false)
-		// so the dispatcher emits StatusUnsupportedAttribute, which
-		// Apple's IM-Decoder handles cleanly. matter.js / chip-tool
+		// Code=14. Treat the attribute as unsupported (return false):
+		// a concrete read of it is answered StatusUnsupportedAttribute,
+		// which Apple's IM-Decoder handles cleanly; a wildcard read never
+		// names it (attributesFor leaves it out), and an attribute a
+		// wildcard endpoint cannot serve is skipped, not reported
+		// (N4-read-1). matter.js / chip-tool
 		// tolerate the absence; re-enable once Apple advances to
 		// Matter 1.4 SDK schema.
 		return nil, false
@@ -1617,6 +1623,10 @@ func (d *TopologyDispatcher) auxiliaryAdvertised() bool {
 // (FabricAccessControl #getGrantedPrivileges: "Group subjects cannot grant
 // access to Endpoint 0 when Auxiliary feature is enabled").
 func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint, endpoint uint16, clusterID uint32, requiredPrivilege uint8, auxEnabled bool) im.StatusCode {
+	// The module's one producer of a GroupSubject always sets the mapping
+	// (bridge/group_messaging.go from groups.Message), so this branch has
+	// no case in its own wiring; it is the fail-closed default of a
+	// public type whose zero value must deny (N4-w3gc-1).
 	if !group.HasValidMapping {
 		return im.StatusUnsupportedAccess
 	}

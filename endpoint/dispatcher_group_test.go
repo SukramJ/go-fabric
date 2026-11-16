@@ -41,6 +41,9 @@ func TestCheckACLForAGroupMessage(t *testing.T) {
 		{"Operate does not cover Manage", []store.ACLEntry{groupEntry(1, store.PrivilegeOperate, nil, nil)}, group(0x0101, true), privManage, im.StatusUnsupportedAccess},
 		{"a CASE entry does not apply to a group message", []store.ACLEntry{caseEntry(1, store.PrivilegeAdminister, nil)}, group(0x0101, true), privView, im.StatusUnsupportedAccess},
 		{"no valid key mapping matches nothing", []store.ACLEntry{groupEntry(1, store.PrivilegeOperate, nil, nil)}, group(0x0101, false), privView, im.StatusUnsupportedAccess},
+		// N4-w3gc-1: the zero value of the public im.GroupSubject denies,
+		// even against an entry that matches every group.
+		{"the zero GroupSubject matches nothing", []store.ACLEntry{groupEntry(1, store.PrivilegeOperate, nil, nil)}, im.WithGroupSubject(context.Background(), im.GroupSubject{}), privView, im.StatusUnsupportedAccess},
 		{"a Group entry may never grant Administer", []store.ACLEntry{groupEntry(1, store.PrivilegeAdminister, nil, nil)}, group(0x0101, true), privView, im.StatusUnsupportedAccess},
 		{"targets still apply", []store.ACLEntry{groupEntry(1, store.PrivilegeOperate, nil, []store.ACLTarget{{Endpoint: &ep3, Cluster: &onOff}})}, group(0x0101, true), privOperate, im.StatusSuccess},
 		{"a target elsewhere does not", []store.ACLEntry{groupEntry(1, store.PrivilegeOperate, nil, []store.ACLTarget{{Cluster: &onOff}})}, group(0x0101, true), privOperate, im.StatusUnsupportedAccess},
