@@ -202,7 +202,11 @@ func DecodeFloat32(n Node) (float32, error) {
 	return float32(f), nil
 }
 
-// DecodeFloat64 decodes a double-precision float.
+// DecodeFloat64 decodes a double-precision float. A NaN is decoded as it
+// arrives — matter.js's TlvNumber has no NaN check either (review II,
+// R2-P6-wire-1313) — and refused where a value is held to its type
+// ([Instance.CheckValue]); a request field is held to it by the request
+// gate, which refuses only for a command stating a [RequestCheck.Refusal].
 func DecodeFloat64(n Node) (float64, error) {
 	if n.El.Type != tlv.TypeFloat4 && n.El.Type != tlv.TypeFloat8 {
 		return 0, invalid("value is not a float (type 0x%02X)", n.El.Type)
@@ -365,7 +369,11 @@ func Bind[T any](id uint32, name string, mandatory bool, dst *T, d Decoder[T]) F
 
 // DecodeFields decodes a structure node into fields: each context-tagged
 // member whose tag is a field id, members it does not know skipped, and a
-// mandatory field that is absent rejected.
+// mandatory field that is absent rejected. A field whose tag occurs twice
+// is decoded twice and the last one wins, as matter.js's TlvObject decodes
+// it (a repeat throws only with preserveDataOrdering,
+// packages/types/src/tlv/TlvObject.ts:229-232 at db021da0; review II,
+// R2-P6-wire-1313).
 func DecodeFields(n Node, what string, fields ...FieldSpec) error {
 	if n.El.Type != tlv.TypeStructure {
 		return invalid("%s: payload is not a structure (type 0x%02X)", what, n.El.Type)

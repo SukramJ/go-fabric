@@ -381,6 +381,13 @@ func memberOf(m map[string]any, f *Field) (key string, value any, ok bool) {
 
 // encodeAny is CustomArgumentParser::Put (CustomArgument.h:47-111).
 //
+// An object key is parsed with its base prefix, so "1", "01" and "0x1"
+// name one context tag, and a tag named twice is encoded twice: chip-tool
+// parses the key with std::stoul(id, nullptr, 0) and has no repeated-tag
+// check (connectedhomeip examples/chip-tool/commands/clusters/
+// CustomArgument.h:133-138 at 6170af84; review II, R2-P6-wire-1365). The
+// device answers the struct as it decodes one ([DecodeFields]).
+//
 //nolint:cyclop // one case per JSON shape
 func encodeAny(tag tlv.Tag, v any, path string) (Node, error) {
 	switch x := v.(type) {
