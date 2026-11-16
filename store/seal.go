@@ -354,11 +354,44 @@ func (s *Store) readSetting(ctx context.Context, q sqlExecQuerier, key string) (
 	return value, true, nil
 }
 
-// sealedTables are the tables with a seal mark; [NewSealed] needs it on
-// each.
-var sealedTables = []string{
-	"matter_node_identities", "matter_group_keys", "matter_resumption",
-	"matter_settings", "matter_doorlock_credentials", "matter_icd_registrations",
+// sealForm is how a table keeps its secret columns.
+type sealForm int
+
+const (
+	// sealBlob: a BLOB column, the sealed bytes under a sealer, the clear
+	// value without one.
+	sealBlob sealForm = iota
+	// sealICD: as sealBlob under a sealer; without one the key sealed under
+	// [SettingICDKey] (icdAEAD), or 16 clear bytes from before v0.12.1.
+	sealICD
+	// sealSettingText: matter_settings' TEXT value, the sealed bytes in
+	// base64; only the keys [isSealedSetting] names are secrets.
+	sealSettingText
+)
+
+// secretColumns is one table that holds a secret: the key columns of each
+// value's aad ([sealAAD]), in order, and the secret columns.
+type secretColumns struct {
+	table   string
+	keys    []string
+	secrets []string
+	form    sealForm
+}
+
+// secretTables is the one list of the secret columns: [NewSealed]'s schema
+// check, its key check (the first secret column of each table, in order)
+// and its upgrade, and [Reseal], iterate it; every sealColumn and
+// openColumn call names one of its columns
+// (TestSecretColumnsAreTheSealCallSites). The order is the upgrade's: the
+// ICD keys before the settings, because a clear ICD row's key may be sealed
+// under SettingICDKey, which is still a clear setting then.
+var secretTables = []secretColumns{
+	{identityTable, []string{"fabric_index"}, []string{"private_key", "ipk", "prior_private_key"}, sealBlob},
+	{"matter_group_keys", []string{"fabric_index", "group_key_set_id"}, groupEpochKeyColumns[:], sealBlob},
+	{"matter_resumption", []string{"fabric_index", "peer_node_id"}, []string{"shared_secret"}, sealBlob},
+	{doorLockCredentialTable, []string{"endpoint_key", "credential_type", "credential_index"}, []string{"credential_data"}, sealBlob},
+	{"matter_icd_registrations", []string{"fabric_index", "check_in_node_id", "monitored_subject"}, []string{"icd_key"}, sealICD},
+	{"matter_settings", []string{"key"}, []string{"value"}, sealSettingText},
 }
 
 // metadataKeySealScrubOwed marks a sealing whose [Scrub] has not finished:
@@ -368,14 +401,8 @@ const metadataKeySealScrubOwed = "store.seal_scrub_owed"
 // sealClearRows is [NewSealed]'s upgrade: every clear row sealed in one
 // transaction, then the scrub that removes the clear values' old pages.
 func (s *Store) sealClearRows(ctx context.Context) error {
-	for _, table := range sealedTables {
-		var n int
-		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = 'sealed'`, table).Scan(&n); err != nil {
-			return fmt.Errorf("store: NewSealed: inspect %s: %w", table, err)
-		}
-		if n == 0 {
-			return fmt.Errorf("store: NewSealed: %s has no seal mark: the database needs schema v10 (store.Apply or store.Migrations)", table)
-		}
+	if err := checkSealMarks(ctx, s.db, "NewSealed"); err != nil {
+		return err
 	}
 	// The key check before the sealing: a wrong key must not seal the
 	// clear rows beside values it does not open.
@@ -393,33 +420,26 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 		return fmt.Errorf("store: NewSealed: %w", err)
 	}
 	sealed := 0
-	for _, t := range []struct {
-		table         string
-		keys, secrets []string
-	}{
-		{"matter_node_identities", []string{"fabric_index"}, []string{"private_key", "ipk", "prior_private_key"}},
-		{"matter_group_keys", []string{"fabric_index", "group_key_set_id"}, []string{"epoch_key_0", "epoch_key_1", "epoch_key_2"}},
-		{"matter_resumption", []string{"fabric_index", "peer_node_id"}, []string{"shared_secret"}},
-		{"matter_doorlock_credentials", []string{"endpoint_key", "credential_type", "credential_index"}, []string{"credential_data"}},
-	} {
-		n, err := s.sealTable(ctx, tx, t.table, t.keys, t.secrets)
+	for _, t := range secretTables {
+		var (
+			n   int
+			err error
+		)
+		switch t.form {
+		case sealBlob:
+			n, err = s.sealTable(ctx, tx, t)
+		case sealICD:
+			// sealClearICDRows reads SettingICDKey as a store without a
+			// sealer: the settings come after it in secretTables.
+			n, err = s.sealClearICDRows(ctx, tx)
+		case sealSettingText:
+			n, err = s.sealClearSettings(ctx, tx)
+		}
 		if err != nil {
 			return fmt.Errorf("store: NewSealed: %s: %w", t.table, err)
 		}
 		sealed += n
 	}
-	// The ICD keys before the settings: a clear row's key may be sealed
-	// under SettingICDKey, which is still a clear setting here
-	// (sealClearICDRows reads it as a store without a sealer).
-	n, err := s.sealClearICDRows(ctx, tx)
-	if err != nil {
-		return fmt.Errorf("store: NewSealed: matter_icd_registrations: %w", err)
-	}
-	sealed += n
-	if n, err = s.sealClearSettings(ctx, tx); err != nil {
-		return fmt.Errorf("store: NewSealed: matter_settings: %w", err)
-	}
-	sealed += n
 	if sealed > 0 {
 		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
 			return fmt.Errorf("store: NewSealed: %w", err)
@@ -442,18 +462,19 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 	return nil
 }
 
-// sealedProbes are the secret columns [Store.openOneSealed] tries, in
-// order, with the key columns of their aad: the identity's private key
-// first, then the other sealed tables'.
-var sealedProbes = []struct {
-	table, column string
-	keys          []string
-}{
-	{identityTable, "private_key", []string{"fabric_index"}},
-	{"matter_group_keys", "epoch_key_0", []string{"fabric_index", "group_key_set_id"}},
-	{"matter_resumption", "shared_secret", []string{"fabric_index", "peer_node_id"}},
-	{doorLockCredentialTable, "credential_data", []string{"endpoint_key", "credential_type", "credential_index"}},
-	{"matter_icd_registrations", "icd_key", []string{"fabric_index", "check_in_node_id", "monitored_subject"}},
+// checkSealMarks is the schema check of [NewSealed] and [Reseal]: every
+// table of secretTables carries the seal mark of migration v10.
+func checkSealMarks(ctx context.Context, db *sql.DB, op string) error {
+	for _, t := range secretTables {
+		var n int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = 'sealed'`, t.table).Scan(&n); err != nil {
+			return fmt.Errorf("store: %s: inspect %s: %w", op, t.table, err)
+		}
+		if n == 0 {
+			return fmt.Errorf("store: %s: %s has no seal mark: the database needs schema v10 (store.Apply or store.Migrations)", op, t.table)
+		}
+	}
+	return nil
 }
 
 // openOneSealed is [NewSealed]'s key check: it opens one sealed value the
@@ -464,7 +485,14 @@ var sealedProbes = []struct {
 // A database with no sealed value passes. The key parts are read as the
 // driver returns them, as sealTable seals them.
 func (s *Store) openOneSealed(ctx context.Context) error {
-	for _, p := range sealedProbes {
+	for _, t := range secretTables {
+		if t.form == sealSettingText {
+			continue
+		}
+		p := struct {
+			table, column string
+			keys          []string
+		}{t.table, t.secrets[0], t.keys}
 		cols := strings.Join(p.keys, ", ")
 		key := make([]any, len(p.keys))
 		dest := make([]any, 0, len(key)+1)
@@ -502,8 +530,9 @@ func (s *Store) openOneSealed(ctx context.Context) error {
 
 // sealTable seals the clear rows of one table: each non-NULL secret column
 // sealed under its row's key columns, and the row marked. It returns how
-// many rows it sealed. table and the columns are the package's constants.
-func (s *Store) sealTable(ctx context.Context, tx *sql.Tx, table string, keys, secrets []string) (int, error) {
+// many rows it sealed. The table and the columns are secretTables'.
+func (s *Store) sealTable(ctx context.Context, tx *sql.Tx, t secretColumns) (int, error) {
+	table, keys, secrets := t.table, t.keys, t.secrets
 	rows, err := tx.QueryContext(ctx, `SELECT `+strings.Join(keys, ", ")+`, `+strings.Join(secrets, ", ")+ //nolint:gosec // the package's constants
 		` FROM `+table+` WHERE sealed = 0`)
 	if err != nil {
