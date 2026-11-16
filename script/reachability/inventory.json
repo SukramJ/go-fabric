@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9299,
+  "entry_points": 9289,
   "entry_packages": [
     ".",
     "bdx",
@@ -292,9 +292,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18980,
-    "reachable": 12633,
-    "whitelisted": 6347,
+    "total_exported": 18962,
+    "reachable": 12628,
+    "whitelisted": 6334,
     "unreachable": 0
   },
   "by_package": [],
@@ -38816,10 +38816,24 @@
     },
     {
       "package": "node",
+      "identifier": "TestCASEInitiatorWhoseStakeWasTakenOverOpensNoSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_stake_lost_internal_test.go",
+      "line": 90
+    },
+    {
+      "package": "node",
       "identifier": "TestCASEResponderRefusesASessionOfARemovedFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_removed_internal_test.go",
       "line": 108
+    },
+    {
+      "package": "node",
+      "identifier": "TestCASEResponderWhoseStakeWasTakenOverOpensNoSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_stake_lost_internal_test.go",
+      "line": 40
     },
     {
       "package": "node",
@@ -40395,6 +40409,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/internal_test.go",
       "line": 152
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestOpenWithAStakeInstallsInPlaceOfItsPlaceholder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_stake_install_test.go",
+      "line": 195
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestOpenWithAStakeThatLostItsIDInstallsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_stake_install_test.go",
+      "line": 77
     },
     {
       "package": "secure/operational",
@@ -42159,6 +42187,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "store/seal_columns_internal_test.go",
       "line": 29
+    },
+    {
+      "package": "store",
+      "identifier": "TestSecretsAddedAfterV11ShipAnUpgradeStep",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "store/seal_upgrade_steps_internal_test.go",
+      "line": 99
     },
     {
       "package": "store/memstore",
