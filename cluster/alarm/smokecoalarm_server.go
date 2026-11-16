@@ -349,6 +349,13 @@ type Server struct {
 	inst     *spec.Instance
 	hooks    spec.Hooks
 
+	// refresh serialises Refresh: held across reading the source, swapping
+	// the baseline and handing the events over, so two overlapping calls
+	// cannot swap in the older state last (R2-P6-conc-1503). A one-slot
+	// channel, so that a waiter is durably blocked for a testing/synctest
+	// bubble.
+	refresh chan struct{}
+
 	// mu guards emitter, endpoint, last and lastExpr.
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
@@ -408,6 +415,7 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("alarm: %w", err)
 	}
 	s := &Server{
+		refresh:  make(chan struct{}, 1),
 		inst:     inst,
 		src:      cfg.Source,
 		ext:      cfg.DataVersion,
@@ -806,7 +814,10 @@ type pendingEvent struct {
 // Refresh reads the host's state and emits the events its change since
 // the previous Refresh calls for. The baseline before the first Refresh
 // is the matter.js initial state, so an alarm that is already sounding
-// when the bridge starts is reported once.
+// when the bridge starts is reported once. Overlapping calls run one
+// after the other, each from its own read of the source, so the baseline
+// never falls back to an older state (R2-P6-conc-1503); the source's
+// SmokeCOState must not call Refresh itself.
 //
 // Each rule is the specification's, as matter.js carries it in
 // smoke-co-alarm-cluster.resource.ts: SmokeAlarm / CoAlarm / LowBattery /
@@ -821,6 +832,8 @@ type pendingEvent struct {
 // Without an emitter the baseline still advances: a change nobody could
 // be told about is not replayed later as if it had just happened.
 func (s *Server) Refresh() {
+	s.refresh <- struct{}{}
+	defer func() { <-s.refresh }()
 	st := s.state()
 	expr := s.expressedOf(st)
 
