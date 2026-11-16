@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -59,6 +60,56 @@ func TestWriteTransactionTTLIsIdleTime(t *testing.T) {
 		r.writeTransaction(sweep, true, at)
 		if got := r.writeTransaction(a, true, at); got != first {
 			t.Fatalf("chunk %d after %v got a fresh transaction", i+1, time.Duration(i)*step)
+		}
+	}
+}
+
+// TestChunkedWriteCapIsPerSession: the bound on open chunked writes counts
+// one session's writes only (R2-P6-test-0802) — a session at
+// [maxChunkedWritesPerSession] does not take another session's places.
+func TestChunkedWriteCapIsPerSession(t *testing.T) {
+	t.Parallel()
+	var r exchangeRouting
+	now := time.Unix(1000, 0)
+	for i := range uint16(maxChunkedWritesPerSession) {
+		if r.writeTransaction(mrp.ExchangeKey{SessionID: 1, ExchangeID: 10 + i}, true, now) == nil {
+			t.Fatalf("chunked write %d of session 1 refused", i)
+		}
+	}
+	if r.writeTransaction(mrp.ExchangeKey{SessionID: 1, ExchangeID: 99}, true, now) != nil {
+		t.Fatal("session 1 opened one more than its bound")
+	}
+	if r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 10}, true, now) == nil {
+		t.Fatal("session 2's first chunked write refused while session 1 is at its bound")
+	}
+}
+
+// TestSessionCloseEndsOnlyItsChunkedWrites: dropping a session's chunked
+// writes leaves another session's open writes in the table
+// (R2-P6-test-0802).
+func TestSessionCloseEndsOnlyItsChunkedWrites(t *testing.T) {
+	t.Parallel()
+	var r exchangeRouting
+	now := time.Unix(1000, 0)
+	a := []mrp.ExchangeKey{{SessionID: 1, ExchangeID: 10}, {SessionID: 1, ExchangeID: 11}}
+	b := []mrp.ExchangeKey{{SessionID: 2, ExchangeID: 10}, {SessionID: 2, ExchangeID: 11}}
+	held := map[mrp.ExchangeKey]*im.WriteTransaction{}
+	for _, k := range append(append([]mrp.ExchangeKey(nil), a...), b...) {
+		tx := r.writeTransaction(k, true, now)
+		if tx == nil {
+			t.Fatalf("%+v refused", k)
+		}
+		held[k] = tx
+	}
+	r.dropSessionWriteTxs(1)
+	for _, k := range a {
+		if _, ok := r.writeTxs.Load(k); ok {
+			t.Errorf("%+v survived its session's close", k)
+		}
+	}
+	for _, k := range b {
+		if r.writeTransaction(k, true, now) != held[k] {
+			t.Errorf("%+v lost its transaction to another session's close", k)
 		}
 	}
 }

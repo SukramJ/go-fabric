@@ -93,3 +93,31 @@ func TestTimedRequestsOfOneSessionAreBounded(t *testing.T) {
 		t.Errorf("pending timed requests of another session = %d, want 0", n)
 	}
 }
+
+// TestExpiredTimedDeadlinesDoNotCountTowardTheCap: the bound counts timed
+// windows still running (R2-P6-bound-0804) — a session whose
+// [maxPendingTimedRequests] windows all lapsed, not yet swept, gets its
+// next TimedRequest answered Success.
+func TestExpiredTimedDeadlinesDoNotCountTowardTheCap(t *testing.T) {
+	t.Parallel()
+	const sessionID uint16 = 96
+	b := newStartedBridge(t)
+	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+	lapsed := b.clk().Now().Add(-time.Second)
+	for i := range uint16(maxPendingTimedRequests) {
+		b.routing.timedDeadlines.Store(timedKey{sessionID: sessionID, exchangeID: 0x3000 + i}, lapsed)
+	}
+	datagram := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
+		Opcode: im.OpcodeTimedRequest, ExchangeID: 0x3100, Initiator: true,
+	}, encodeReliabilityTestTimedRequest(t, 30_000))
+	if err := b.dispatch(context.Background(), datagram, peerAddr); err != nil {
+		t.Fatal(err)
+	}
+	_, body, ok := readOneIMDatagram(t, peerConn, peerSess, time.Second)
+	if !ok {
+		t.Fatal("the TimedRequest was not answered")
+	}
+	if got := decodeStatusResponsePayload(t, body); got != im.StatusSuccess {
+		t.Fatalf("TimedRequest after %d lapsed windows answered %v, want Success", maxPendingTimedRequests, got)
+	}
+}
