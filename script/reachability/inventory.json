@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9088,
+  "entry_points": 9091,
   "entry_packages": [
     ".",
     "bdx",
@@ -292,9 +292,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18820,
+    "total_exported": 18822,
     "reachable": 12623,
-    "whitelisted": 6197,
+    "whitelisted": 6199,
     "unreachable": 0
   },
   "by_package": [],
@@ -12307,6 +12307,13 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "TestATableErrorDoesNotLockTheAnchorOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 866
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "TestAccessingIsCASE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
@@ -12612,6 +12619,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
       "line": 283
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestIdentityAdoptionReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 886
     },
     {
       "package": "cluster/jointfabric",
