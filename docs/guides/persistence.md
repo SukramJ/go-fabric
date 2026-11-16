@@ -218,8 +218,8 @@ key renders, the row is orphaned and the source gets a new endpoint number.
 `matter_settings` holds the controller-written attribute values and the
 facade's own state. A store from `store.NewSealed` seals the values of the
 keys that hold secrets — `netcomm.wifi.networks`, `door_lock.credential_key`,
-`icd_management.key`, the two `operational_credentials.pending_noc*` keys and
-every `jointfabric.datastore:` key — and marks their rows (`sealed`, v10);
+`icd_management.key`, the two `operational_credentials.pending_noc*` keys,
+`commissioning.rotating_device_id.unique_id` and every `jointfabric.datastore:` key — and marks their rows (`sealed`, v10);
 the other values stay as they are ([sealing at
 rest](../security.md#sealing-at-rest)). `store.seal_canary` is reserved:
 the seal canary `NewSealed` writes; the Settings methods neither write nor
@@ -230,7 +230,7 @@ delete it.
 | `basic_information.node_label`, `basic_information.location` | the facade | the root's NodeLabel and Location as a controller wrote them, the NodeLabel also as `Node.SetNodeLabel` set it; both in one write |
 | `basic_information.configuration_version` | the facade | the root's ConfigurationVersion |
 | `basic_information.unique_id` | the facade | UniqueID, derived on the first boot and pinned |
-| `commissioning.rotating_device_id.unique_id` | the facade | with `Commissioning.RotatingDeviceID`: the Rotating Device Identifier's unique id, 16 random bytes in hex, drawn at the first advertised window; its lifetime counter is the `matter_metadata` counter `rotating_device_id_lifetime_counter` |
+| `commissioning.rotating_device_id.unique_id` | the facade | with `Commissioning.RotatingDeviceID`: the Rotating Device Identifier's unique id, 16 random bytes in hex, drawn at the first advertised window, sealed under `store.NewSealed`; its lifetime counter is the `matter_metadata` counter `rotating_device_id_lifetime_counter` |
 | `bridged_node_label.<key>` | the facade | a bridged endpoint's NodeLabel |
 | `bridged_configuration_version.<key>` | the facade | a bridged endpoint's ConfigurationVersion |
 | `scenes.<key>` | the facade | a bridged endpoint's scene table |

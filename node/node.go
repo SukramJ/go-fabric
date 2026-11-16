@@ -631,8 +631,9 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 }
 
 // The Rotating Device Identifier's two values in the node's store: the
-// unique id (hex, drawn once) as a setting and the lifetime counter as a
-// metadata counter ([Commissioning].RotatingDeviceID).
+// unique id (hex, drawn once) as a setting — sealed under store.NewSealed
+// (store's sealedSettings holds a copy of the key) — and the lifetime
+// counter as a metadata counter ([Commissioning].RotatingDeviceID).
 const (
 	settingRotatingIDUniqueID          = "commissioning.rotating_device_id.unique_id"
 	metadataKeyRotatingLifetimeCounter = "rotating_device_id_lifetime_counter"

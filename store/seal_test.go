@@ -12,6 +12,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -578,6 +579,13 @@ func TestSealedSettingsNameTheirSources(t *testing.T) {
 		if !bytes.Contains(b, []byte(decl)) {
 			t.Errorf("controller/ca no longer declares %s: update store's sealedSettings", decl)
 		}
+	}
+	b, err = os.ReadFile(filepath.Join("..", "node", "node.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`settingRotatingIDUniqueID\s+= "commissioning\.rotating_device_id\.unique_id"`).Match(b) {
+		t.Error("node no longer declares settingRotatingIDUniqueID as the store seals it")
 	}
 }
 

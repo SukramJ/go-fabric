@@ -282,8 +282,10 @@ func clearRowUnderSealer(table string) error {
 // settingPrefix); the controller's CA keys are controller/ca's
 // SettingStore defaults (persist.go DefaultSettingKey, and FabricKey's
 // ".fabric") — the CA with its root (and ICAC) key, and the controller's
-// fabric with its IPK and operational key. TestSealedSettingsNameTheirSources
-// holds the copies to them.
+// fabric with its IPK and operational key; the node's Rotating Device
+// Identifier unique id is node's settingRotatingIDUniqueID (node.go) — not
+// a key, but whoever reads it computes every RI the node advertises.
+// TestSealedSettingsNameTheirSources holds the copies to them.
 var sealedSettings = map[string]bool{
 	SettingDoorLockCredentialKey:                 true,
 	SettingICDKey:                                true,
@@ -292,6 +294,7 @@ var sealedSettings = map[string]bool{
 	"operational_credentials.pending_noc_update": true,
 	"controller.ca":                              true,
 	"controller.ca.fabric":                       true,
+	"commissioning.rotating_device_id.unique_id": true,
 }
 
 // sealedSettingPrefixes seal every key that starts with one of them; the
