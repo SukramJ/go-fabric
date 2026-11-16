@@ -176,9 +176,10 @@ type BindingConfig struct {
 	Save func([]TargetStruct) error
 	// Fabrics is the node's fabric list, the source AccessControl checks
 	// a write's fabric against ([FabricSource]; the node passes its
-	// store). A persisted list (Save set) takes a request's write only for
-	// a fabric it lists, and refuses every request write without it —
-	// fail closed (review II, R2-P6-store-1010, decision 158).
+	// store). The server takes a request's write only for a fabric it
+	// lists — also when Save is nil — and a persisted one (Save set)
+	// refuses every request write without it, fail closed (review II,
+	// R2-P6-store-1010, decision 158).
 	Fabrics FabricSource
 }
 
@@ -646,15 +647,19 @@ func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, er
 // refused.
 var errBindingWriteRefused = errors.New("core: Binding write refused")
 
-// fabricGoneLocked refuses a request's write of fabric to a persisted
-// list when the node's fabric list does not hold the fabric — removed
-// while the write was on its way, its removal's clear already run — or
-// when no fabric source was given or it cannot list (fail closed): the
-// write would otherwise be stored under a removed index (review II,
-// R2-P6-store-1010, decision 158). A list that is not persisted stores
-// nothing and is not checked. writeMu is held.
+// fabricGoneLocked refuses a request's write of fabric when the node's
+// fabric list does not hold the fabric — removed while the write was on
+// its way, its removal's clear already run — or when the list cannot be
+// read (fail closed): the write would otherwise be kept under a removed
+// index (review II, R2-P6-store-1010, decision 158). A server given a
+// source is checked whether or not it persists; a persisted one without a
+// source refuses every request write. A server neither persisted nor
+// given a source — [NewBinding] as the endpoint assembler mounts it on a
+// host without the node — is not checked: nothing there can hand it the
+// node's fabric list, and refusing would end every Binding write of such a
+// host; its list leaves with the fabric's MatterDropFabric. writeMu is held.
 func (b *Binding) fabricGoneLocked(ctx context.Context, fabric uint8) error {
-	if b.save == nil {
+	if b.fabrics == nil && b.save == nil {
 		return nil
 	}
 	if b.fabrics == nil {

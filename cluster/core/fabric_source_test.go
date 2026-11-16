@@ -84,3 +84,30 @@ func TestICDRegistrationOfARemovedFabricStoresNothing(t *testing.T) {
 		t.Errorf("registrations %+v stored for a removed fabric", regs)
 	}
 }
+
+// TestFabricChecksFailClosedWithoutASource (review II, R2-P6-store-1010,
+// decision 158, round 2): a Binding given a source is checked although it
+// persists nothing, and an ICD Management without a Store refuses a
+// registration UNSUPPORTED_ACCESS, nothing kept. (A Binding neither
+// persisted nor given a source stays unchecked: see fabricGoneLocked.)
+func TestFabricChecksFailClosedWithoutASource(t *testing.T) {
+	t.Parallel()
+	entry := core.TargetStruct{Node: 7, Endpoint: 1, EndpointPresent: true}
+	withSource := core.NewBinding()
+	if err := withSource.Persist(core.BindingConfig{Fabrics: fabricList{1}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := withSource.MatterWrite(fabricCtx(2), 0x0000, []core.TargetStruct{entry}); statusOf(err) != im.StatusUnsupportedAccess {
+		t.Errorf("in-memory Binding with a source, removed fabric 2: %v, want UNSUPPORTED_ACCESS", err)
+	}
+	if err := withSource.MatterWrite(fabricCtx(1), 0x0000, []core.TargetStruct{entry}); err != nil {
+		t.Errorf("in-memory Binding with a source, fabric 1: %v", err)
+	}
+
+	s := newICDServer(t, core.ICDManagementConfig{})
+	_, err := s.MatterInvoke(icdInvokeCtx(1, privAdminister), icddef.CmdRegisterClient,
+		icddef.RegisterClientRequest{CheckInNodeId: 9, MonitoredSubject: 9, Key: icdKey(1)})
+	if icdStatus(err) != im.StatusUnsupportedAccess {
+		t.Errorf("ICD without a Store: %v, want UNSUPPORTED_ACCESS", err)
+	}
+}
