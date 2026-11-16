@@ -622,9 +622,10 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// bandwidth at best and confuse Apple iOS's MRP layer at worst (it
 	// drops a late Sigma2 with `Dropping message without piggyback ack
 	// when we are waiting for an ack`, then aborts the handshake).
-	// Before the handler runs, as the Pake3 case does, so the reply to
-	// Sigma3 itself — the StatusReport that ends the handshake — stays
-	// tracked and is retransmitted until the initiator acknowledges it:
+	// Once the handler took the Sigma3 and before its reply is sent
+	// (processSigma3 below), so the reply to Sigma3 itself — the
+	// StatusReport that ends the handshake — stays tracked and is
+	// retransmitted until the initiator acknowledges it:
 	// matter.js sends it as an ordinary reliable message and waits for
 	// its acknowledgement (packages/protocol/src/session/case/CaseServer.ts:332,
 	// packages/protocol/src/securechannel/SecureChannelMessenger.ts:209-232,
@@ -634,7 +635,11 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// src/messaging/ExchangeMessageDispatch.cpp:54-75 at 6170af84).
 	// Dropped after the handler, the report went out once: lost, it
 	// left the initiator waiting out its timeout for a session this
-	// node had already installed.
+	// node had already installed. A Sigma3 the handler did not take — one
+	// that reached it after it established its session, a garbage one
+	// racing the completing Sigma3 included — abandons nothing: the
+	// success report it sent stays tracked (review II, N3-fixrrdev-1,
+	// N4-rwsub-3).
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	if done, ok := b.completedHandshake(key); ok {
 		return b.handleSigma3OfCompleted(src, requestHdr, proto, payload, key, done)
@@ -643,13 +648,15 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	if !begun {
 		return b.dropHandshakeNotBegun(src, proto)
 	}
-	b.abandonHandshakeReplies(key)
 	// The session's route is bound, and its establishment recorded,
 	// for the one Sigma3 that established it ([sigma3Step]).
 	step := &sigma3Step{handler: ch}
 	processSigma3 := func(p []byte) (uint8, []byte, error) {
 		op, reply, outcome, err := processSigma3With(ch, p)
 		step.outcome = outcome
+		if outcome != sigma3OfCompleted {
+			b.abandonHandshakeReplies(key)
+		}
 		if outcome == sigma3OfCompleted {
 			// The handler had established a session before this Sigma3
 			// reached it — another handshake's, which took over the
