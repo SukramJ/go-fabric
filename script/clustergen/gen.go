@@ -1958,6 +1958,22 @@ func (g *generator) test() ([]byte, error) {
 		}
 		w.p("}")
 	}
+	if clones := g.clones(); len(clones) > 0 {
+		w.p("")
+		w.p("// TestCloneIsDeep holds every generated Clone to a deep copy")
+		w.p("// (decision 142): spectest.CheckClone fills a value to every depth,")
+		w.p("// clones it and overwrites the clone through its lists and pointers.")
+		w.p("func TestCloneIsDeep(t *testing.T) {")
+		w.p("\tt.Parallel()")
+		w.p("\tfor _, check := range []func(testing.TB){")
+		for _, name := range clones {
+			w.p("\t\tspectest.CheckClone[%s],", name)
+		}
+		w.p("\t} {")
+		w.p("\t\tcheck(t)")
+		w.p("\t}")
+		w.p("}")
+	}
 	if g.definitionOnly {
 		g.stateTest(w)
 	} else {
@@ -2008,6 +2024,26 @@ func (g *generator) roundTrips() []string {
 		trips = append(trips, fmt.Sprintf("\tspectest.RoundTripAttribute(t, Definition, Attr%s, %s)", exportName(a.Name), sample))
 	}
 	return trips
+}
+
+// clones names every struct and payload writePayload gives a Clone, in
+// the order source() writes them: the body of the generated
+// TestCloneIsDeep (decision 142).
+func (g *generator) clones() []string {
+	var names []string
+	for _, di := range g.dataList {
+		if di.kind == kindStruct && payloadNeedsClone(di.fields) {
+			names = append(names, di.goName)
+		}
+	}
+	for _, ps := range [][]*payload{g.anon, g.payloads} {
+		for _, p := range ps {
+			if payloadNeedsClone(p.fields) {
+				names = append(names, p.goName)
+			}
+		}
+	}
+	return names
 }
 
 // sample is a Go expression of a populated value of p: every optional
