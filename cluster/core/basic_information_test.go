@@ -191,10 +191,8 @@ func TestBasicInfo_ReadAllAttributes(t *testing.T) {
 func TestBasicInfo_OptionalAttributesAbsentWhenUnset(t *testing.T) {
 	t.Parallel()
 	// Contract: optional attributes return (nil, false) when the
-	// Config field is empty/zero — except SerialNumber, which
-	// always returns a value (when no SerialNumber is configured,
-	// the UniqueID-derived fallback is served so Apple's HAP-mapper
-	// cache is pre-populated), and ProductLabel, which defaults to the
+	// Config field is empty/zero — SerialNumber included (no value is
+	// derived, decision 166) — except ProductLabel, which defaults to the
 	// ProductName as matter.js's (TestParityMatterJS_BasicInfoServer_InitializeDefaults).
 	optionalIDs := []uint32{
 		0x000B, // ManufacturingDate
@@ -1205,14 +1203,14 @@ func TestBasicInfo_SoftwareVersionDerivedFromVersionString(t *testing.T) {
 }
 
 // TestBasicInfo_UniqueIDSurvivesNodeLabelWrite pins Matter §11.1.5.13
-// quality F on UniqueID (0x0012) and on the SerialNumber (0x000F)
-// fallback derived from it: a controller renaming the bridge writes
+// quality F on UniqueID (0x0012): a controller renaming the bridge writes
 // NodeLabel with Manage privilege, and the node's identity must not move
-// under the controller's cache when it does.
+// under the controller's cache when it does. SerialNumber (0x000F), not
+// configured here, stays unserved before and after.
 func TestBasicInfo_UniqueIDSurvivesNodeLabelWrite(t *testing.T) {
 	t.Parallel()
 	cfg := validBasicInfoConfig()
-	cfg.SerialNumber = "" // force the UniqueID-derived SerialNumber fallback
+	cfg.SerialNumber = "" // none configured: none served (decision 166)
 	b, err := core.NewBasicInformation(cfg)
 	if err != nil {
 		t.Fatalf("NewBasicInformation: %v", err)
@@ -1240,13 +1238,13 @@ func TestBasicInfo_UniqueIDSurvivesNodeLabelWrite(t *testing.T) {
 // TestBasicInfo_UniqueIDSurvivesRestoredNodeLabel covers the boot path a
 // MatterWrite test cannot reach: the daemon constructs the cluster from
 // the configured label and only afterwards restores the commissioner-
-// written NodeLabel it persisted on an earlier run. UniqueID (and the
-// SerialNumber fallback derived from it) must not move when it does —
-// both carry quality F (Matter §11.1.5.13).
+// written NodeLabel it persisted on an earlier run. UniqueID must not move
+// when it does — it carries quality F (Matter §11.1.5.13); SerialNumber,
+// not configured here, is not served (decision 166).
 func TestBasicInfo_UniqueIDSurvivesRestoredNodeLabel(t *testing.T) {
 	t.Parallel()
 	cfg := validBasicInfoConfig()
-	cfg.SerialNumber = "" // force the UniqueID-derived SerialNumber fallback
+	cfg.SerialNumber = "" // none configured: none served (decision 166)
 	b, err := core.NewBasicInformation(cfg)
 	if err != nil {
 		t.Fatalf("NewBasicInformation: %v", err)
