@@ -27,10 +27,24 @@ func TestClaimReportWakesWhenTheReportEnds(t *testing.T) {
 		sub.reporting.Store(true) // a report is in flight
 		return sub
 	}
+	// claim starts the flush's claim and returns once it waits on the
+	// report's end.
 	claim := func(sub *Subscription) <-chan bool {
 		got := make(chan bool, 1)
 		go func() { got <- m.claimReport(context.Background(), sub) }()
-		return got
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			sub.mu.Lock()
+			waiting := sub.reportEnded != nil
+			sub.mu.Unlock()
+			if waiting {
+				return got
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("the flush does not wait on the report's end")
+			}
+			time.Sleep(time.Millisecond)
+		}
 	}
 	wait := func(got <-chan bool, what string) bool {
 		select {

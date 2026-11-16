@@ -8,5 +8,5 @@ package subscription
 func HoldReporting(sub *Subscription) func() {
 	for !sub.reporting.CompareAndSwap(false, true) {
 	}
-	return func() { sub.reporting.Store(false) }
+	return func() { sub.endReport() }
 }
