@@ -45,10 +45,20 @@ var (
 
 	// ErrNoPeer is returned when a [SubscriptionTarget] carries no peer
 	// address, which leaves the reports nowhere to go.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrNoPeer = errors.New("bridgetest: subscription target has no peer address")
 
 	// ErrNoSubscriptionID is returned for subscription ID 0, which the
 	// bridge uses as "no subscription" and therefore never routes.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrNoSubscriptionID = errors.New("bridgetest: subscription id 0")
 
 	// ErrNoPeerCounter is returned when a [SubscriptionTarget] names a
@@ -68,16 +78,31 @@ var (
 	// no peer node id to key the window on, or the window had already
 	// recorded that counter — none of which is the untouched
 	// post-handshake state this models.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrPeerCounterNotAnchored = errors.New("bridgetest: peer receive window not anchored")
 
 	// ErrNotEstablished is returned when the bridge accepted the call but
 	// no route is in place afterwards.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrNotEstablished = errors.New("bridgetest: subscription target not established")
 )
 
 // SubscriptionTarget describes the peer that a subscription's ongoing
 // ReportData datagrams travel to: the values a SubscribeRequest would have
 // carried in its message and protocol headers.
+//
+// Deprecated: taken only by [EstablishSubscriptionTarget], which is
+// deprecated; subscribe through a [Session] of the test [Commissioner]
+// instead ([Session.Subscribe]). Removable in the next minor release
+// (review II, N-ctr-5, owner decision 172).
 type SubscriptionTarget struct {
 	// Peer is the address reports are sent to. Required.
 	Peer *net.UDPAddr
