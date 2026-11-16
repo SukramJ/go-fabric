@@ -50,13 +50,10 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 	if path.ListAppend {
 		return listItemValue(path, el, dec)
 	}
+	if read := coreListWrite(path, el); read != nil {
+		return read(el, dec, false)
+	}
 	switch {
-	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrAcl && el.IsContainer:
-		return aclWriteValue(el, dec, false)
-	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrExtension && el.IsContainer:
-		return extensionWriteValue(el, dec, false)
-	case path.Cluster == gkmdef.ClusterID && path.Attribute == gkmdef.AttrGroupKeyMap && el.IsContainer:
-		return groupKeyMapWriteValue(el, dec, false)
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, false)
 	case path.Cluster == bindingdef.ClusterID && path.Attribute == bindingdef.AttrBinding && el.IsContainer:
@@ -176,6 +173,23 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 // width, read as 0 or dropped (R2-P6-acl-0441, R2-P6-wire-1703). The
 // FabricIndex is the placeholder [generatedAttributeValue] stamps; the
 // dispatcher assigns the accessing fabric.
+
+// coreListWrite is the decoder of a container written to one of the three
+// lists above, nil for any other path or value.
+func coreListWrite(path im.ConcreteAttributePath, el tlv.Element) func(tlv.Element, *tlv.Decoder, bool) (im.AttributeValue, error) {
+	if !el.IsContainer {
+		return nil
+	}
+	switch {
+	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrAcl:
+		return aclWriteValue
+	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrExtension:
+		return extensionWriteValue
+	case path.Cluster == gkmdef.ClusterID && path.Attribute == gkmdef.AttrGroupKeyMap:
+		return groupKeyMapWriteValue
+	}
+	return nil
+}
 
 // aclWriteValue decodes an ACL write: the whole list, or for a list-append
 // write (item) one entry.
@@ -324,13 +338,10 @@ func skipContainerTLV(dec *tlv.Decoder) error {
 // appends (Matter §10.6.4.3.1); chip's TestOnlyWriteAttributeWithLegacyList
 // and matter.js's AttributeWriteResponse both produce and accept them.
 func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
+	if read := coreListWrite(path, el); read != nil {
+		return read(el, dec, true)
+	}
 	switch {
-	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrAcl && el.IsContainer:
-		return aclWriteValue(el, dec, true)
-	case path.Cluster == acldef.ClusterID && path.Attribute == acldef.AttrExtension && el.IsContainer:
-		return extensionWriteValue(el, dec, true)
-	case path.Cluster == gkmdef.ClusterID && path.Attribute == gkmdef.AttrGroupKeyMap && el.IsContainer:
-		return groupKeyMapWriteValue(el, dec, true)
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, true)
 	case path.Cluster == bindingdef.ClusterID && path.Attribute == bindingdef.AttrBinding && el.IsContainer:

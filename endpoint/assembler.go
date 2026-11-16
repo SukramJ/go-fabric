@@ -391,6 +391,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		OptIn:               append([]uint32(nil), spec.OptIn...),
 		groups:              a.cfg.Groups,
 		persistence:         a.cfg.persistence(),
+		log:                 a.logger,
 	}, nil
 }
 

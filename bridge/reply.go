@@ -1232,6 +1232,10 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	}
 }
 
+// valueWriterLogger is the logger of the attribute value writer, a free
+// function the IM codec calls with no bridge at hand: the process default.
+func valueWriterLogger() *slog.Logger { return slog.Default() }
+
 // unencodableTypes holds the Go types [warnUnencodableValue] has logged.
 var unencodableTypes sync.Map
 
@@ -1245,7 +1249,7 @@ func warnUnencodableValue(v any) {
 	if _, seen := unencodableTypes.LoadOrStore(typ, struct{}{}); seen {
 		return
 	}
-	slog.Default().Warn("matter.attribute.unencodable_value",
+	valueWriterLogger().Warn("matter.attribute.unencodable_value",
 		slog.String("go_type", typ),
 		slog.String("served_as", map[bool]string{true: "empty list", false: "null"}[typ == "[]interface {}"]))
 }

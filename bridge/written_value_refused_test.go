@@ -94,7 +94,7 @@ func TestContainerWrittenToAScalarIsRefused(t *testing.T) {
 func TestAccessControlWritesDecodeThroughTheirDefinitions(t *testing.T) {
 	t.Parallel()
 	acl := attrPath(0x001F, 0x0000)
-	entry := func(enc *tlv.Encoder, privilege uint64, subject func(*tlv.Encoder), target func(*tlv.Encoder)) {
+	entry := func(enc *tlv.Encoder, privilege uint64, subject, target func(*tlv.Encoder)) {
 		enc.StartStruct(tlv.AnonymousTag())
 		enc.PutUint(tlv.ContextTag(1), privilege)
 		enc.PutUint(tlv.ContextTag(2), 2)

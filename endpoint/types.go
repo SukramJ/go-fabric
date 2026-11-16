@@ -275,6 +275,9 @@ type Endpoint struct {
 	// persistence is [Config.Persistence] (or the deprecated hooks it
 	// adapts); nil keeps the label and the scene table in memory.
 	persistence Persistence
+	// log is the Assembler's logger for an endpoint it built; nil logs on
+	// the process default ([Endpoint.logger]).
+	log *slog.Logger
 }
 
 // PublishClusterServers publishes servers as this endpoint's attached
@@ -311,7 +314,7 @@ func (e *Endpoint) dropNilServers(servers []contract.ClusterServer) []contract.C
 		}
 	}
 	if len(out) != len(servers) && e.endpointState().nilServerLogged.CompareAndSwap(false, true) {
-		slog.Default().Warn("endpoint: nil cluster server dropped from the endpoint's server list",
+		e.logger().Warn("endpoint: nil cluster server dropped from the endpoint's server list",
 			"endpoint", e.ID, "dropped", len(servers)-len(out))
 	}
 	return out
@@ -328,6 +331,15 @@ func (e *Endpoint) AttachedClusterServers() []contract.ClusterServer {
 		return nil
 	}
 	return append([]contract.ClusterServer(nil), *published...)
+}
+
+// logger is the endpoint's logger: the Assembler's for an endpoint it
+// built, the process default for one composed by hand.
+func (e *Endpoint) logger() *slog.Logger {
+	if e.log != nil {
+		return e.log
+	}
+	return slog.Default()
 }
 
 // endpointState returns (lazily creating) the state bound to this

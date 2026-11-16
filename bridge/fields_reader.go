@@ -151,7 +151,7 @@ func definedFields(n spec.Node, cmd *spec.Command) spec.Node {
 		if c.El.Tag.Kind != tlv.TagKindContext {
 			continue
 		}
-		if slices.ContainsFunc(cmd.Fields, func(f spec.Field) bool { return f.ID == uint32(c.El.Tag.Number) }) {
+		if slices.ContainsFunc(cmd.Fields, func(f spec.Field) bool { return f.ID == c.El.Tag.Number }) {
 			out.Children = append(out.Children, c)
 		}
 	}
