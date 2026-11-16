@@ -2477,7 +2477,7 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 	if len(attrIDs) == 0 {
 		return
 	}
-	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || advance && b.holdWritten(mgr, ep, clusterID, attrIDs)) {
+	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || b.holdWritten(mgr, ep, clusterID, attrIDs, !advance)) {
 		if hook := b.onAttributeChange.Load(); hook != nil {
 			(*hook)(ep.ID, clusterID, change)
 		}
@@ -2487,9 +2487,6 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 		ep.BumpDataVersionOf(clusterID)
 	}
 	for _, attr := range attrIDs {
-		if changesOmittedAttribute(clusterID, attr) {
-			continue
-		}
 		mgr.OnAttributeChanged(im.ConcreteAttributePath{
 			Endpoint: ep.ID, Cluster: clusterID, Attribute: attr,
 			HasEndpoint: true, HasCluster: true, HasAttribute: true,
@@ -2505,7 +2502,18 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 // settles it against the write's record, so a change the host made from
 // inside the write — reported with its own origin — is not advanced and
 // reported beside the write's commit (review II, R2-P5-write-03).
-func (b *Bridge) holdWritten(mgr *subscription.Manager, ep *endpointpkg.Endpoint, cluster uint32, attrs []uint32) bool {
+//
+// markOnly is a server's report view, which advances nothing: its mark
+// waits for the write's end too, so a report built meanwhile cannot carry
+// the change with the version from before the write's commit — a
+// generated server on the root advances its version only at the write's
+// own store, after its Sink's Set reported the sibling (review II, Fable
+// read 5b-write R3). The settle marks such a path and advances nothing
+// for it.
+func (b *Bridge) holdWritten(mgr *subscription.Manager, ep *endpointpkg.Endpoint, cluster uint32, attrs []uint32, markOnly bool) bool {
+	if markOnly {
+		return b.writeHolds.holdMarks(ep, mgr, cluster, attrs)
+	}
 	paths := make([]im.ConcreteAttributePath, len(attrs))
 	for i, a := range attrs {
 		paths[i] = attributeOf(ep.ID, cluster, a)
@@ -2698,20 +2706,6 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 			}
 		}
 	}))
-}
-
-// changesOmittedAttribute reports whether the attribute's definition gives
-// it the changes-omitted quality ("C"): its change advances the version
-// and is reported to no subscriber, as matter.js leaves the suppressed
-// names out of the broadcast (ServerBehaviorBacking.ts:163-168 at
-// db021da0). A cluster no definition is registered for has none.
-func changesOmittedAttribute(clusterID, attrID uint32) bool {
-	def := spec.Lookup(clusterID)
-	if def == nil {
-		return false
-	}
-	a := def.Attribute(attrID)
-	return a != nil && a.Quality.ChangesOmitted
 }
 
 // quieterAttribute reports whether the attribute's definition gives it the

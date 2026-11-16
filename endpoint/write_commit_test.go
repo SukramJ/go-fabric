@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -107,5 +108,32 @@ func TestAttributePathStatusAnswersAsReadDoes(t *testing.T) {
 		if got != c.want || len(read) != 1 || read[0].Status != got {
 			t.Errorf("%s: status %v, Read %+v; want %v from both", c.name, got, read, c.want)
 		}
+	}
+}
+
+// TestTwoAttributeDataOfOneClusterAdvanceTwice (review II, Fable read
+// 5b-write, F1's granularity): one WriteRequest whose two attribute data
+// change two attributes of one cluster advances its DataVersion twice —
+// one commit per attribute data, each advancing once for what it changed
+// (matter.js AttributeWriteResponse.ts:433-435; Datasource.ts:1456-1457
+// at db021da0).
+func TestTwoAttributeDataOfOneClusterAdvanceTwice(t *testing.T) {
+	t.Parallel()
+	light, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, Bridged: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := gateDispatcher(t, store.PrivilegeAdminister, light)
+	before, _ := d.CurrentDataVersion(context.Background(), 2, onoff.ClusterID)
+	out := im.HandleWrite(caseCtx(false), d, im.WriteRequest{Writes: []im.AttributeWrite{
+		writeOf(concreteAttrPath(2, onoff.ClusterID, onoff.AttrOnTime), uint16(7)),
+		writeOf(concreteAttrPath(2, onoff.ClusterID, onoff.AttrOffWaitTime), uint16(9)),
+	}})
+	if len(out.Results) != 2 || out.Results[0].Status != im.StatusSuccess || out.Results[1].Status != im.StatusSuccess {
+		t.Fatalf("results %+v", out.Results)
+	}
+	after, _ := d.CurrentDataVersion(context.Background(), 2, onoff.ClusterID)
+	if after-before != 2 {
+		t.Fatalf("DataVersion %d → %d, want two advances for two changing attribute data", before, after)
 	}
 }

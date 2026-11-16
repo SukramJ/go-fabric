@@ -300,7 +300,12 @@ func TestWriteReportsTheAttributesItsCommitNames(t *testing.T) {
 // conditionSink is a host's write port that moves Condition when
 // LastChangedTime is written, reporting it with the host's origin from
 // inside the controller's write.
-type conditionSink struct{ srv *spec.Server }
+type conditionSink struct {
+	srv *spec.Server
+	// after, when set, runs once the Sink moved Condition, still inside
+	// the write.
+	after func()
+}
 
 func (s *conditionSink) MatterWriteAttribute(_ context.Context, attrID uint32, _ any) error {
 	if attrID != hepadef.AttrLastChangedTime {
@@ -308,7 +313,11 @@ func (s *conditionSink) MatterWriteAttribute(_ context.Context, attrID uint32, _
 	}
 	v, _ := s.srv.MatterRead(hepadef.AttrCondition)
 	c, _ := v.(uint8)
-	return s.srv.Set(hepadef.AttrCondition, c+1)
+	err := s.srv.Set(hepadef.AttrCondition, c+1)
+	if s.after != nil {
+		s.after()
+	}
+	return err
 }
 
 // TestHostChangeInsideAWriteAdvancesOnce: a host that moves a sibling
@@ -470,6 +479,21 @@ func TestHostChangeInsideARootWriteAdvancesOnce(t *testing.T) {
 	sh.allowAll()
 	h := &appHarness{secureHarness: sh, endpoints: map[uint16]uint16{}}
 	w := watchCluster(t, h, 0, hepadef.ClusterID)
+	// A report built while the write runs — after the Sink moved
+	// Condition, before the write's commit advanced the version — carries
+	// nothing: the sibling's mark waits for the write's end (Fable read
+	// 5b-write R3).
+	var inside int
+	sink.after = func() {
+		w.now = w.now.Add(time.Minute)
+		w.mgr.Tick(context.Background(), w.now)
+		w.spy.mu.Lock()
+		for _, call := range w.spy.calls {
+			inside += len(call)
+		}
+		w.spy.calls = nil
+		w.spy.mu.Unlock()
+	}
 	version := srv.MatterDataVersion()
 	for i, v := range []uint64{1000, 2000} {
 		if st := h.writeAttribute(0, hepadef.ClusterID, hepadef.AttrLastChangedTime, uintValue(v)); st != 0 {
@@ -493,40 +517,8 @@ func TestHostChangeInsideARootWriteAdvancesOnce(t *testing.T) {
 			t.Errorf("write %d: the server's DataVersion advanced %d, LastChangedTime reported %d times, Condition %d; want 1, 1, 1",
 				i+1, advanced, reports[hepadef.AttrLastChangedTime], reports[hepadef.AttrCondition])
 		}
-	}
-}
-
-// TestWrittenChangesOmittedAttributeIsNotReported (review II, Fable read
-// 5b-write F6): a write whose commit names a changes-omitted attribute
-// ("C", GroupKeyManagement.GroupKeyMap) marks it for no subscriber; a
-// plain attribute in the same results is marked. matter.js filters the
-// suppressed names out before broadcastChanges
-// (ServerBehaviorBacking.ts:163-168 at db021da0).
-func TestWrittenChangesOmittedAttributeIsNotReported(t *testing.T) {
-	t.Parallel()
-	ep := &endpointpkg.Endpoint{ID: 7, DeviceType: 0x010A, SourceKey: endpointpkg.StringKey("c"), Scope: "s", DeviceAddress: "d"}
-	b := newReachabilityBridge(t, ep)
-	spy := &reachAttrReporterSpy{}
-	mgr := subscription.NewManager(subscription.Config{}, spy.report, nil)
-	at := func(cluster, attr uint32) im.ConcreteAttributePath {
-		return im.ConcreteAttributePath{Endpoint: 0, Cluster: cluster, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
-	}
-	groupKeyMap, nodeLabel := at(0x003F, 0x0000), at(0x0028, 0x0005)
-	if _, err := mgr.Subscribe(subscription.SubscribeArgs{
-		PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
-		AttributePaths: []im.ConcreteAttributePath{groupKeyMap, nodeLabel},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	b.AttachSubscriptionManager(mgr)
-	b.reportWrittenAttributes([]im.WriteResult{
-		{Path: groupKeyMap, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{0x0000}}},
-		{Path: nodeLabel, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{0x0005}}},
-	})
-	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
-	spy.mu.Lock()
-	defer spy.mu.Unlock()
-	if len(spy.calls) != 1 || len(spy.calls[0]) != 1 || spy.calls[0][0] != nodeLabel {
-		t.Fatalf("reported %+v, want NodeLabel alone", spy.calls)
+		if inside != 0 {
+			t.Errorf("write %d: %d path(s) reported while the write ran, before its commit advanced the version", i+1, inside)
+		}
 	}
 }

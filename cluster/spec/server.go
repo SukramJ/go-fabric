@@ -195,9 +195,17 @@ type Server struct {
 
 	// commit, guarded by mu, collects while a controller's write runs its
 	// host veto and Sink the attributes a Set made meanwhile changed: they
-	// are the write's commit ([writeCommit]).
-	commit *writeCommit
+	// are the write's commit ([writeCommit]). writeMu holds the commit
+	// window: one write's at a time, so the write that opened it closes
+	// it; a write its veto or Sink makes with the ctx it was handed joins
+	// it instead (commitKey).
+	commit  *writeCommit
+	writeMu sync.Mutex
 }
+
+// commitKey carries the open [writeCommit] in the ctx a controller
+// write's veto and Sink are handed.
+type commitKey struct{}
 
 // writeCommit is the change list of one controller write: the attributes
 // a Set changed while the write's veto and Sink ran. Its store advances
@@ -207,7 +215,15 @@ type Server struct {
 // and hands the whole list on (:1319). A Set another goroutine makes
 // while the write runs is folded into the commit too: the server cannot
 // tell it from one its Sink makes.
+//
+// One commit window is open per server at a time: a second controller
+// write of the server waits for the first's veto, Sink and store, as
+// matter.js serialises a datasource's transactions. A veto or Sink that
+// writes the server again passes the ctx it was handed — such a write
+// joins the open commit; one with another ctx would wait for the window
+// it runs in.
 type writeCommit struct {
+	server  *Server
 	changed []uint32
 }
 
@@ -449,52 +465,59 @@ func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any
 	if s.holds(attrID, v) {
 		return []uint32{}, nil
 	}
+	// A write the veto or the Sink of an open write of this server makes,
+	// with the ctx it was handed, is part of that write's commit.
+	if outer, nested := ctx.Value(commitKey{}).(*writeCommit); nested && outer.server == s {
+		if err := s.runWriteHooks(ctx, attrID, v); err != nil {
+			return nil, err
+		}
+		return s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil), nil
+	}
 	// The veto and the Sink run inside the write's commit: an attribute
 	// a Set changes meanwhile — a sibling the Sink moves — is named by
-	// the write and advances the version with it, once.
-	c := &writeCommit{}
+	// the write and advances the version with it, once. One commit is
+	// open per server at a time (writeMu), so each write closes exactly
+	// its own.
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	c := &writeCommit{server: s}
 	s.mu.Lock()
-	veto := s.beforeWrite
-	outer := s.commit
 	s.commit = c
 	s.mu.Unlock()
 	err = func() error {
-		if veto != nil {
-			if err := veto(ctx, attrID, v); err != nil {
-				return err
-			}
-		}
-		if s.sink != nil {
-			return s.sink.MatterWriteAttribute(ctx, attrID, v)
-		}
-		return nil
+		defer func() {
+			s.mu.Lock()
+			s.commit = nil
+			s.mu.Unlock()
+		}()
+		return s.runWriteHooks(context.WithValue(ctx, commitKey{}, c), attrID, v)
 	}()
-	s.mu.Lock()
-	s.commit = outer
-	s.mu.Unlock()
 	if err != nil {
 		// The write is refused; what a Set changed meanwhile stays
 		// changed and advances the version once.
-		s.settleCommit(c.changed, outer)
+		if len(c.changed) > 0 {
+			s.tracker().Bump()
+		}
 		return nil, err
 	}
 	return s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, c.changed), nil
 }
 
-// settleCommit advances the version once for changed — the list of a
-// write that stored nothing of its own — unless an outer write's commit
-// takes it.
-func (s *Server) settleCommit(changed []uint32, outer *writeCommit) {
-	if len(changed) == 0 {
-		return
+// runWriteHooks runs the host's veto and the Sink of a controller's write
+// of attrID, in that order; the first error refuses the write.
+func (s *Server) runWriteHooks(ctx context.Context, attrID uint32, v any) error {
+	s.mu.Lock()
+	veto := s.beforeWrite
+	s.mu.Unlock()
+	if veto != nil {
+		if err := veto(ctx, attrID, v); err != nil {
+			return err
+		}
 	}
-	if outer != nil {
-		s.mu.Lock()
-		outer.changed = append(outer.changed, changed...)
-		s.mu.Unlock()
-		return
+	if s.sink != nil {
+		return s.sink.MatterWriteAttribute(ctx, attrID, v)
 	}
-	s.tracker().Bump()
+	return nil
 }
 
 // holds reports whether the server holds v for attrID: its stored value

@@ -142,6 +142,9 @@ type heldPath struct {
 	// quieter attribute's, by its throttle): the hold settles its
 	// cluster's version and marks nothing.
 	advanceOnly bool
+	// markOnly is a change whose version advanced elsewhere (a server's
+	// report view): the hold marks it and advances nothing.
+	markOnly bool
 }
 
 // writeScope is the endpoints one write message names.
@@ -234,6 +237,25 @@ func (t *writeHoldTable) holdAdvance(ep *endpointpkg.Endpoint, cluster uint32, a
 	h := t.entry(ep.ID)
 	for _, a := range attrs {
 		h.paths = append(h.paths, heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true})
+	}
+	return true
+}
+
+// holdMarks holds the marks of attrs of cluster on ep — a report view's,
+// which advances nothing — while a write to ep is applied and reports
+// true; false when none is.
+func (t *writeHoldTable) holdMarks(ep *endpointpkg.Endpoint, mgr *subscription.Manager, cluster uint32, attrs []uint32) bool {
+	if len(attrs) == 0 {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.holding(ep.ID) {
+		return false
+	}
+	h := t.entry(ep.ID)
+	for _, a := range attrs {
+		h.paths = append(h.paths, heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true})
 	}
 	return true
 }
@@ -362,11 +384,11 @@ func (b *Bridge) settleWrite(scope writeScope, rec writeRecord) {
 			if h.record.changedAt(hp.path) {
 				continue
 			}
-			if _, done := advanced[hp.path.Cluster]; !done {
+			if _, done := advanced[hp.path.Cluster]; !done && !hp.markOnly {
 				hp.ep.BumpDataVersionOf(hp.path.Cluster)
 				advanced[hp.path.Cluster] = struct{}{}
 			}
-			if !hp.advanceOnly && !changesOmittedAttribute(hp.path.Cluster, hp.path.Attribute) {
+			if !hp.advanceOnly {
 				marks = append(marks, hp)
 			}
 		}
