@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9293,
+  "entry_points": 9320,
   "entry_packages": [
     ".",
     "bdx",
@@ -293,9 +293,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18967,
+    "total_exported": 18962,
     "reachable": 12628,
-    "whitelisted": 6339,
+    "whitelisted": 6334,
     "unreachable": 0
   },
   "by_package": [],
@@ -9945,7 +9945,7 @@
       "identifier": "AlarmSeverityEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
-      "line": 797
+      "line": 815
     },
     {
       "package": "cluster/alarm",
@@ -10016,6 +10016,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
       "line": 282
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "TestHeldServerReadsTheServersState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/alarm/held_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/appliance",
@@ -10407,21 +10414,21 @@
       "identifier": "DimensionFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 79
+      "line": 87
     },
     {
       "package": "cluster/closure",
       "identifier": "DimensionHandler",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 118
+      "line": 133
     },
     {
       "package": "cluster/closure",
       "identifier": "DimensionState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 82
+      "line": 90
     },
     {
       "package": "cluster/closure",
@@ -10435,14 +10442,14 @@
       "identifier": "LatchControlModes",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 92
+      "line": 100
     },
     {
       "package": "cluster/closure",
       "identifier": "LimitRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 86
+      "line": 94
     },
     {
       "package": "cluster/closure",
@@ -10470,21 +10477,28 @@
       "identifier": "StepDirection",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 90
+      "line": 98
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "TestHeldServerReadsTheServersState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/closure/held_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/closure",
       "identifier": "ThreeLevelAuto",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 88
+      "line": 96
     },
     {
       "package": "cluster/closure",
       "identifier": "UnitRange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closuredimension_server.go",
-      "line": 84
+      "line": 92
     },
     {
       "package": "cluster/core",
@@ -12108,56 +12122,56 @@
       "identifier": "AirflowDirection",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 151
+      "line": 153
     },
     {
       "package": "cluster/fan",
       "identifier": "FanMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/fan",
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 88
+      "line": 90
     },
     {
       "package": "cluster/fan",
       "identifier": "RockBitmap",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 131
+      "line": 133
     },
     {
       "package": "cluster/fan",
       "identifier": "Sequence",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 117
+      "line": 119
     },
     {
       "package": "cluster/fan",
       "identifier": "StateSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 227
+      "line": 229
     },
     {
       "package": "cluster/fan",
       "identifier": "Stepper",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 258
+      "line": 260
     },
     {
       "package": "cluster/fan",
       "identifier": "WindBitmap",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/fan/fancontrol_server.go",
-      "line": 141
+      "line": 143
     },
     {
       "package": "cluster/filter",
@@ -13088,7 +13102,7 @@
       "identifier": "Feature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/lock/doorlock_server.go",
-      "line": 59
+      "line": 60
     },
     {
       "package": "cluster/measurement",
@@ -13732,14 +13746,14 @@
       "identifier": "TestErrorStateOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/typed_coverage_internal_test.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/opstate",
       "identifier": "TestFieldOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/typed_coverage_internal_test.go",
-      "line": 104
+      "line": 106
     },
     {
       "package": "cluster/opstate",
@@ -13753,21 +13767,21 @@
       "identifier": "TestStringOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/typed_coverage_internal_test.go",
-      "line": 126
+      "line": 128
     },
     {
       "package": "cluster/opstate",
       "identifier": "TestStringsOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/typed_coverage_internal_test.go",
-      "line": 164
+      "line": 166
     },
     {
       "package": "cluster/opstate",
       "identifier": "TestUintOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/typed_coverage_internal_test.go",
-      "line": 76
+      "line": 78
     },
     {
       "package": "cluster/pump",
@@ -13992,6 +14006,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/servicearea/servicearea.go",
       "line": 139
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "TestHeldServerReadsTheServersState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/servicearea/held_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/servicearea",
@@ -25947,7 +25968,7 @@
       "identifier": "KeypadLockout",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "cluster/thermo",
@@ -25989,7 +26010,7 @@
       "identifier": "ScheduleProgrammingVisibility",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "cluster/thermo",
@@ -26010,14 +26031,14 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 332
+      "line": 334
     },
     {
       "package": "cluster/thermo",
       "identifier": "SettingStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 98
+      "line": 99
     },
     {
       "package": "cluster/thermo",
@@ -26038,7 +26059,7 @@
       "identifier": "TemperatureDisplayMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 48
+      "line": 49
     },
     {
       "package": "cluster/thermo",
@@ -26060,6 +26081,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/setpoints_internal_test.go",
       "line": 21
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestHeldServerReadsTheServersState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/held_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/thermo",
@@ -26150,35 +26178,42 @@
       "identifier": "DefaultOpenLevelSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 179
+      "line": 172
     },
     {
       "package": "cluster/valve",
       "identifier": "LevelSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 174
+      "line": 167
     },
     {
       "package": "cluster/valve",
       "identifier": "OpenRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 152
+      "line": 145
     },
     {
       "package": "cluster/valve",
       "identifier": "State",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 129
+      "line": 122
     },
     {
       "package": "cluster/valve",
       "identifier": "StateSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/valve/valve_server.go",
-      "line": 170
+      "line": 163
+    },
+    {
+      "package": "cluster/valve",
+      "identifier": "TestHeldServerReadsTheServersState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/valve/held_internal_test.go",
+      "line": 18
     },
     {
       "package": "cluster/wire",
