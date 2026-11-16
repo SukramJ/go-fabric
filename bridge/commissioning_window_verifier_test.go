@@ -202,3 +202,38 @@ func TestCommissioningWindow_InstallError_RevokesAndReturnsError(t *testing.T) {
 		t.Errorf("Status after install error = %v, want Closed", snap.Status)
 	}
 }
+
+// TestEnhancedWindowIsNotJointFabricUnlessAsked holds which window reports
+// IsJointFabric (the CM=3 advertisement) (R2-P6-wire-0808): an enhanced
+// window with a verifier is joint only when the opener asks for it, and a
+// basic window never is, asked or not.
+func TestEnhancedWindowIsNotJointFabricUnlessAsked(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name  string
+		basic bool
+		joint bool
+		want  bool
+	}{
+		{name: "enhanced, not asked", joint: false, want: false},
+		{name: "enhanced, asked", joint: true, want: true},
+		{name: "basic, asked", basic: true, joint: true, want: false},
+		{name: "basic, not asked", basic: true, joint: false, want: false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			w := bridge.NewCommissioningWindow()
+			w.SetPaseVerifierInstaller(&fakePaseVerifierInstaller{})
+			p := wire.OpenWindowParams{CommissioningTimeoutSeconds: 600, IsBasicWindow: c.basic, JointFabric: c.joint}
+			if !c.basic {
+				p.PAKEPasscodeVerifier, p.Iterations, p.Salt = newTestVerifier(), 1000, newTestSalt()
+			}
+			if err := w.OpenWindow(context.Background(), p); err != nil {
+				t.Fatal(err)
+			}
+			if got := w.IsJointFabric(); got != c.want {
+				t.Fatalf("IsJointFabric() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
