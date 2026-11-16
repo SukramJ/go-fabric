@@ -310,6 +310,8 @@ changes are the rows marked *changed*.
 | `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` | none on the node (no node method returns them); `bridge.CommissioningWindowOpener` returns the `bridge` values |
 | `store.ErrScrubIncomplete`, `store.ErrFabricNotFound`, `dcl.ErrOTAImageTooLarge`, `dcl.DefaultMaxImageSize` compared from a node host | `node.ErrScrubIncomplete`, `node.ErrFabricNotFound`, `node.ErrOTAImageTooLarge`, `node.DCLDefaultMaxImageSize` (the same values) |
 | a host's `SetOnFabricRemoved`, `SetOnFabricUpdated`, `SetOnCommissioningComplete` or the window's `SetTransitionHook` replaced the facade's handler | *changed:* it adds a handler that runs after the facade's |
+| *changed:* a server built with `spec.NewServer` and an optional command in `Options.Commands` without a handler | `NewServer` refuses it (`spec.ErrMissingHandler`): pass the handler in `ServerConfig.Handlers`, or set `Unimplemented` to register it later with `Handle` |
+| *changed:* a `Declare{Commands: […]}` on a cluster the device serves with its generated default server, without the command's `Handle<Command>` field | `device.New` refuses it (`ErrConfiguration`); set the handler — on a kit server, the declared port carries it |
 | `bridge.Bridge.AttachRootPartsListProvider`, `AttachAggregatorPartsListProvider` | not needed: `Bridge.Start` installs the live PartsList of both itself; the two stay as overrides |
 | `bridge.Bridge.AttachPaseHandler`, `AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` with a provider that returns the one handler for every handshake |
 | `bridge.Bridge.SubscriptionPersistenceEnabled`, `FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence(b)` in a test |
