@@ -244,6 +244,10 @@ func (l *dtLookups) requirementApplicability(r *schema.DeviceTypeRequirement, tr
 // Conditional, which is not judged.
 func (l *dtLookups) applicabilityOf(r *schema.DeviceTypeRequirement, trueNames map[string]bool, s reqScope) spec.Applicability {
 	all, features := l.knownNames(s.dt, s.cluster, s.hasCluster)
+	for n := range s.unknown {
+		delete(all, n)
+		delete(features, n)
+	}
 	a := l.requirementApplicability(r, trueNames, all)
 	if a == spec.ApplicabilityNone && l.requirementApplicability(r, trueNames, features) != spec.ApplicabilityNone {
 		return spec.ApplicabilityConditional
@@ -258,6 +262,10 @@ type reqScope struct {
 	dt         *schema.DeviceTypeDefinition
 	cluster    uint32
 	hasCluster bool
+	// unknown are names the endpoint's scope cannot answer yet: left out
+	// of the known names, so a conformance naming one is conditional
+	// (review II, R2-P6-err-0661).
+	unknown map[string]bool
 }
 
 // scopeNames are the declared names of every condition in a device type's
