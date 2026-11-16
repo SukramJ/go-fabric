@@ -132,11 +132,27 @@ func (i *Instance) patchStruct(ctx FeatureContext, name string, s *Struct, v ref
 		return v, false, nil
 	}
 	rt := v.Type()
+	// A [MapFields] type names its Go fields through its map, as the
+	// checks read it ([mappedField]); any other through the generator's
+	// names (review II, R2-P6-api-1314).
+	fieldMap, mapped := mappedType(rt)
+	goName := func(f *Field) string {
+		if mapped {
+			return fieldMap[f.Name]
+		}
+		return goFieldName(f.Name)
+	}
 	declared := make(map[string]*Field, len(s.Fields))
 	for fi := range s.Fields {
 		f := &s.Fields[fi]
-		declared[goFieldName(f.Name)] = f
-		declared[goFieldName(f.Name)+"Field"] = f
+		n := goName(f)
+		if n == "" {
+			continue
+		}
+		declared[n] = f
+		if !mapped {
+			declared[n+"Field"] = f
+		}
 	}
 	for n := range rt.NumField() {
 		if sf := rt.Field(n); sf.IsExported() && declared[sf.Name] == nil {
@@ -148,7 +164,11 @@ func (i *Instance) patchStruct(ctx FeatureContext, name string, s *Struct, v ref
 	changed := false
 	for fi := range s.Fields {
 		f := &s.Fields[fi]
-		fv := out.FieldByName(goFieldName(f.Name))
+		n := goName(f)
+		if n == "" {
+			continue
+		}
+		fv := out.FieldByName(n)
 		if !fv.IsValid() || !fv.CanSet() {
 			continue
 		}
