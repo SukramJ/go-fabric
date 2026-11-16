@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9306,
+  "entry_points": 9309,
   "entry_packages": [
     ".",
     "bdx",
@@ -292,9 +292,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18977,
-    "reachable": 12632,
-    "whitelisted": 6345,
+    "total_exported": 18980,
+    "reachable": 12633,
+    "whitelisted": 6347,
     "unreachable": 0
   },
   "by_package": [],
@@ -13094,28 +13094,28 @@
       "identifier": "BooleanStateChangeEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/definitions.go",
-      "line": 142
+      "line": 149
     },
     {
       "package": "cluster/measurement",
       "identifier": "CumulativeEnergyMeasuredEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/measurement.go",
-      "line": 1317
+      "line": 1347
     },
     {
       "package": "cluster/measurement",
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1014
+      "line": 1034
     },
     {
       "package": "cluster/measurement",
       "identifier": "EnergyMeasurementStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/definitions.go",
-      "line": 137
+      "line": 144
     },
     {
       "package": "cluster/measurement",
@@ -13129,21 +13129,28 @@
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1006
+      "line": 1026
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1942
+      "line": 1972
     },
     {
       "package": "cluster/measurement",
       "identifier": "OccupancyChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/measurement/measurement.go",
-      "line": 934
+      "line": 937
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestElectricalPowerCurrentKind",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/electrical_current_test.go",
+      "line": 31
     },
     {
       "package": "cluster/measurement",
@@ -13602,10 +13609,17 @@
     },
     {
       "package": "cluster/modebase",
+      "identifier": "TestDeprecatedHooksKeepTheirBehaviour",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/modebase/held_internal_test.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/modebase",
       "identifier": "TestStoreReadsTheServersValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/modebase/held_internal_test.go",
-      "line": 22
+      "line": 25
     },
     {
       "package": "cluster/modeselect",
