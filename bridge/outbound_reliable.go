@@ -59,6 +59,12 @@ type outboundReliableTracker struct {
 	// order they were tracked; [unsecuredEntryLimit] bounds it, and its
 	// first key is the entry a full table evicts.
 	unsecured []outboundKey
+	// secureOrder holds, per secure session, the exchanges that have an
+	// entry in pending, the one tracked least recently first;
+	// [secureExchangeLimit] bounds it. secureByExchange is each such
+	// exchange's one entry ([outboundReliableTracker.track]).
+	secureOrder      map[uint16][]uint16
+	secureByExchange map[secureSlot]outboundKey
 	// waiters lets callers block on Ack via [WaitForAck] — used by the
 	// Subscribe-initial chunked send path so the bridge mirrors
 	// matter.js's per-chunk handshake (one ReportData → wait for
@@ -98,6 +104,19 @@ type outboundReliableTracker struct {
 	// it itself, so no call site can track at a full table unnoticed. Set
 	// once after construction; called without the mutex.
 	evicted func(exchangeID uint16, counter uint32)
+	// secureEvicted, when set, is told of a secure-session entry that lost
+	// its place: to a newer message of its exchange (superseded), or to a
+	// newer exchange of its session ([secureExchangeLimit]). Set once after
+	// construction; called without the mutex.
+	secureEvicted func(sessionID, exchangeID uint16, counter uint32, superseded bool)
+}
+
+// secureSlot names one exchange of a secure session in the retransmit
+// table. The exchange id alone, without the role: an exchange this node
+// opened and one the peer opened that share an id share the slot.
+type secureSlot struct {
+	sessionID  uint16
+	exchangeID uint16
 }
 
 // outboundEntry captures one in-flight reliable datagram and the
@@ -147,10 +166,12 @@ type outboundEntry struct {
 func newOutboundReliableTracker(baseIntervalFor func(sessionID uint16, now time.Time) time.Duration, clk clock.Clock) *outboundReliableTracker {
 	return &outboundReliableTracker{
 		clock:           clock.Or(clk),
-		pending:         make(map[outboundKey]*outboundEntry),
-		waiters:         make(map[outboundKey]chan error),
-		abandoned:       make(map[outboundKey]time.Time),
-		baseIntervalFor: baseIntervalFor,
+		pending:          make(map[outboundKey]*outboundEntry),
+		waiters:          make(map[outboundKey]chan error),
+		abandoned:        make(map[outboundKey]time.Time),
+		secureOrder:      make(map[uint16][]uint16),
+		secureByExchange: make(map[secureSlot]outboundKey),
+		baseIntervalFor:  baseIntervalFor,
 	}
 }
 
@@ -326,6 +347,24 @@ const unsecuredEntryLimit = 16
 // rule itself is this module's own.
 const unsecuredEntryLifetime = 60 * time.Second
 
+// secureExchangeLimit bounds the exchanges of one secure session that have
+// a message waiting for its acknowledgement, and each exchange has one
+// such message: a message tracked on an exchange that holds one takes its
+// place, and a message of a new exchange past the limit takes the place of
+// the exchange tracked least recently. The message that loses its place
+// loses its retransmissions, nothing else — the rule session 0 has
+// ([unsecuredEntryLimit]). Without it a peer that holds a session and
+// never acknowledges adds an entry per request, each paced by the
+// intervals it stated (up to a uint32 of milliseconds), for as long as the
+// session lives, in memory of the whole node (review II, R2-P6-bound-0303).
+//
+// The number is matter.js's: at most 30 non-closed exchanges per secure
+// session, the least recently active closed beyond it
+// (packages/protocol/src/protocol/ExchangeManager.ts:63, :578-595 at
+// db021da0), the bound [maxExchangesPerSession] keeps on the bridge's
+// exchange tables too.
+const secureExchangeLimit = 30
+
 var (
 	// errUnsecuredEntryEvicted is what a [outboundReliableTracker.WaitForAck]
 	// caller gets when its unsecured-session entry lost its place to a
@@ -335,7 +374,78 @@ var (
 	// of an unsecured-session entry dropped after
 	// [unsecuredEntryLifetime].
 	errUnsecuredEntryExpired = errors.New("bridge: outbound retransmit: the handshake's time is over")
+	// errSecureExchangeEvicted is what a [outboundReliableTracker.WaitForAck]
+	// caller gets when its secure-session entry lost its place
+	// ([secureExchangeLimit]).
+	errSecureExchangeEvicted = errors.New("bridge: outbound retransmit: evicted from the session's table")
 )
+
+// secureEviction is one secure-session entry that lost its place, reported
+// after the tracker's mutex is released.
+type secureEviction struct {
+	key        outboundKey
+	exchangeID uint16
+	superseded bool
+	waiter     chan error
+}
+
+// evictSecureLocked drops the entry at key, a secure session's, and takes
+// its waiter. Caller holds t.mu.
+func (t *outboundReliableTracker) evictSecureLocked(key outboundKey, superseded bool) (secureEviction, bool) {
+	e, ok := t.pending[key]
+	if !ok {
+		return secureEviction{}, false
+	}
+	ev := secureEviction{key: key, exchangeID: e.exchangeID, superseded: superseded}
+	t.dropLocked(key)
+	if ch, has := t.waiters[key]; has {
+		delete(t.waiters, key)
+		ev.waiter = ch
+	}
+	return ev, true
+}
+
+// placeSecureLocked makes room for the entry key of exchangeID on a secure
+// session ([secureExchangeLimit]) and records it; it returns the entries
+// that lost their place. Caller holds t.mu, and key is not in pending.
+func (t *outboundReliableTracker) placeSecureLocked(key outboundKey, exchangeID uint16) []secureEviction {
+	var out []secureEviction
+	slot := secureSlot{key.sessionID, exchangeID}
+	if prev, ok := t.secureByExchange[slot]; ok {
+		if ev, ok := t.evictSecureLocked(prev, true); ok {
+			out = append(out, ev)
+		}
+	}
+	for len(t.secureOrder[key.sessionID]) >= secureExchangeLimit {
+		first := t.secureOrder[key.sessionID][0]
+		prev, ok := t.secureByExchange[secureSlot{key.sessionID, first}]
+		if !ok {
+			// Not reachable: every exchange in the order has its entry.
+			t.secureOrder[key.sessionID] = t.secureOrder[key.sessionID][1:]
+			continue
+		}
+		if ev, ok := t.evictSecureLocked(prev, false); ok {
+			out = append(out, ev)
+		}
+	}
+	t.secureOrder[key.sessionID] = append(t.secureOrder[key.sessionID], exchangeID)
+	t.secureByExchange[slot] = key
+	return out
+}
+
+// reportSecureEvictions wakes the waiters of entries that lost their place
+// and tells the hook. Called without t.mu.
+func (t *outboundReliableTracker) reportSecureEvictions(evs []secureEviction) {
+	for _, ev := range evs {
+		if ev.waiter != nil {
+			ev.waiter <- errSecureExchangeEvicted // buffered, see WaitForAck
+			close(ev.waiter)
+		}
+		if t.secureEvicted != nil {
+			t.secureEvicted(ev.key.sessionID, ev.exchangeID, ev.key.counter, ev.superseded)
+		}
+	}
+}
 
 func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, initiator uint64, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming) {
 	cp := make([]byte, len(datagram))
@@ -349,11 +459,15 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	var (
 		oldest       *outboundEntry
 		oldestWaiter chan error
+		secureGone   []secureEviction
 	)
 	t.mu.Lock()
 	// A key tracked again takes a fresh place.
 	t.dropLocked(key)
 	delete(t.abandoned, key)
+	if sessionID != 0 {
+		secureGone = t.placeSecureLocked(key, exchangeID)
+	}
 	if sessionID == 0 {
 		if len(t.unsecured) >= unsecuredEntryLimit {
 			// The table is full: the entry tracked first loses its
@@ -389,6 +503,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	if oldest != nil && t.evicted != nil {
 		t.evicted(oldest.exchangeID, oldest.counter)
 	}
+	t.reportSecureEvictions(secureGone)
 	if t.wake != nil {
 		t.wake() // after the unlock: the entry is in pending first
 	}
@@ -398,7 +513,8 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 // session's order; every removal from pending goes through it. Caller
 // holds t.mu.
 func (t *outboundReliableTracker) dropLocked(key outboundKey) {
-	if _, ok := t.pending[key]; !ok {
+	e, ok := t.pending[key]
+	if !ok {
 		return
 	}
 	delete(t.pending, key)
@@ -406,6 +522,21 @@ func (t *outboundReliableTracker) dropLocked(key outboundKey) {
 		if i := slices.Index(t.unsecured, key); i >= 0 {
 			t.unsecured = slices.Delete(t.unsecured, i, i+1)
 		}
+		return
+	}
+	slot := secureSlot{key.sessionID, e.exchangeID}
+	if t.secureByExchange[slot] != key {
+		return
+	}
+	delete(t.secureByExchange, slot)
+	order := t.secureOrder[key.sessionID]
+	if i := slices.Index(order, e.exchangeID); i >= 0 {
+		order = slices.Delete(order, i, i+1)
+	}
+	if len(order) == 0 {
+		delete(t.secureOrder, key.sessionID)
+	} else {
+		t.secureOrder[key.sessionID] = order
 	}
 }
 

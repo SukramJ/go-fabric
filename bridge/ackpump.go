@@ -68,6 +68,7 @@ func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
 		b.outboundReliable = newOutboundReliableTracker(b.outboundBaseInterval, b.clk())
 		b.outboundReliable.wake = b.wakeAckPump
 		b.outboundReliable.evicted = b.unsecuredEntryEvicted
+		b.outboundReliable.secureEvicted = b.secureEntryEvicted
 		b.outboundReliable.fixedBackoff.Store(b.icd.fixedBackoff.Load())
 	}
 	b.mu.Unlock()
@@ -84,6 +85,24 @@ func (b *Bridge) unsecuredEntryEvicted(exchangeID uint16, counter uint32) {
 		slog.Int("exchange_id", int(exchangeID)),
 		slog.Uint64("counter", uint64(counter)),
 		slog.Int("max", unsecuredEntryLimit))
+}
+
+// secureEntryEvicted is the outbound tracker's report of a secure-session
+// message that lost its retransmissions ([secureExchangeLimit]): to a newer
+// message of its exchange, which an exchange that waits for one
+// acknowledgement at a time does not produce, or to a newer exchange past
+// thirty of the session's — what a peer that never acknowledges looks like.
+func (b *Bridge) secureEntryEvicted(sessionID, exchangeID uint16, counter uint32, superseded bool) {
+	level := slog.LevelWarn
+	if superseded {
+		level = slog.LevelDebug
+	}
+	b.logger.Log(context.Background(), level, "matter.tx.reliable.secure_evicted",
+		slog.Int("session_id", int(sessionID)),
+		slog.Int("exchange_id", int(exchangeID)),
+		slog.Uint64("counter", uint64(counter)),
+		slog.Bool("superseded", superseded),
+		slog.Int("max", secureExchangeLimit))
 }
 
 // outboundBaseInterval resolves the peer-appropriate MRP base
