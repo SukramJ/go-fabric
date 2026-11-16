@@ -192,6 +192,10 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-TcpSendBounded | `NodeJsTcpConnection.ts:105-115` and `TcpChannel.ts:125` at `db021da0`: a send awaits the socket's write with no timeout (presence) | `packages/nodejs/src/net/NodeJsTcpConnection.ts`<br>`packages/protocol/src/transport/tcp/TcpChannel.ts` | `"            this.#socket.write(Bytes.of(data), error => {"`<br>`"        await this.#socket.send(frame);"` | this module's own bound (review II, R2-P6-bound-0202): a frame not handed to the socket within 30 s fails its send and closes the connection | no |
 | BD-Matter-ResumptionRecordsPerFabric | `SessionManager.ts:910-914` at `db021da0`: `#rememberResumptionRecord` keeps one record per peer with no cap (presence, the two `set` at `:912-913`) | `packages/protocol/src/session/SessionManager.ts` | `"        this.#resumptionRecords.set(address, record);"` | neither reference: connectedhomeip caps the node at `CHIP_CONFIG_CASE_SESSION_RESUME_CACHE_SIZE` records in one index and drops its head when full (`src/lib/core/CHIPConfig.h:1336-1343`, `src/protocols/secure_channel/DefaultSessionResumptionStorage.cpp:55-90`, `:95-99` at `6170af84`); 16 per fabric here (owner decision 134) | no |
 | BD-Matter-ReadAccessCapability | `AttributeReadResponse.ts:468` at `db021da0`: a read's only access decision is `session.authorityAt` (presence); the value is a state lookup (`:301`) and the file has no try/catch, so no cluster refuses a read of its own | `packages/protocol/src/action/server/AttributeReadResponse.ts` | `"        const permission = session.authorityAt(level, location);"` | this module's own capability (owner decision 152), answered as both references' access check answers: UNSUPPORTED_ACCESS on a concrete path, the attribute left out of a wildcard (`AttributeReadResponse.ts:272`, `:473-475`, `:406-413`; connectedhomeip `src/app/reporting/Engine.cpp:81-88` at `6170af84`) | no |
+| BD-Matter-Messages-IdPerFabric | `MessagesServer.ts:14` at `db021da0` is the empty subclass (absence: the class line) | `packages/node/src/behaviors/messages/MessagesServer.ts` | `"export class MessagesServer extends MessagesBehavior {}"` | this module's own fence (owner decision 129), ahead of connectedhomeip, whose example looks a MessageID up by the id alone (`examples/tv-app/tv-common/clusters/messages/MessagesManager.cpp:73-87` at `6170af84`) | no |
+| BD-Matter-OTARequestor-ProvidersPerFabric | `OtaSoftwareUpdateRequestorServer.ts:423-438` at `db021da0`: `#addActiveOtaProvider` pushes a new provider with no count (presence, `:434`) | `packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts` | `"            this.state.activeOtaProviders.push(activeProviderEntry);"` | this module's own bound (owner decision 134): 4 active providers and 4 deferred announcements per fabric | no |
+| BD-Matter-OTARequestor-FabricRemoval | `OtaSoftwareUpdateRequestorServer.ts:109-116` at `db021da0`: `activeOtaProviders` is node-wide state of quality N with no fabric-removal handling (presence, `:112`) | `packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts` | `"        { name: \"activeOtaProviders\", type: \"list\", quality: \"N\", conformance: \"M\" },"` | this module's own rule (review II, R2-P6-store-1204): a removed fabric's providers, selection and deferred announcements go | no |
+| BD-Matter-OTAProvider-InProgressPerFabric | `OtaSoftwareUpdateProviderServer.ts:605-614` at `db021da0`: an in-progress entry is created for the token an ApplyUpdateRequest or NotifyUpdateApplied names (presence) | `packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts` | `"        const details: OtaUpdateInProgressDetails = origDetails ?? {"` | this module's own bound (owner decisions 134, 167): 16 entries per fabric, a removed fabric's entries and consents dropped | no |
 
 ---
 
@@ -499,12 +503,14 @@ commit: unverified). go-fabric's live
 `Decoder.Next()` (`tlv/`) enforces these only via the
 opt-in `Validate()`, which the Sigma/PASE decoders do not call.
 
-**Rationale (corrected 2026-07):** go-fabric is a pure Matter
+**Rationale (corrected 2026-07; review II, phase 6a):** go-fabric is a pure Matter
 **responder** — but the permissive command-field decode path is NOT dead
-defensive code: it is load-bearing controller interop. Google Home's
-brightness slider omits the mandatory-but-nullable TransitionTime field
-ENTIRELY (absent context tag, not TLV Null) in LevelControl MoveToLevel /
-MoveToLevelWithOnOff / Step, so the bridge's generated LevelControl
+defensive code. No capture of a controller that omits TransitionTime is on
+record (the claim that Google Home's brightness slider omits it came with
+the extraction commit `f2f65e6a`); the lenient decode follows chip,
+BD-Matter-LevelControl-LenientDecoders: when the mandatory-but-nullable
+TransitionTime field of LevelControl MoveToLevel / MoveToLevelWithOnOff /
+Step is absent (an absent context tag, not TLV Null), the bridge's generated LevelControl
 decoder fills the omitted field with its fallback, null
 (`bridge/fields_definition.go` `requestFallbacks`, BD-Matter-LevelControl-LenientDecoders),
 and `cluster/wire/levelcontrol.go` `DecodeMoveToLevel` / `DecodeStep` keep
@@ -514,10 +520,9 @@ member leniently (`packages/types/src/tlv/TlvObject.ts:205`
 rejection (`ValidationMandatoryFieldMissingError`, `TlvObject.ts:261`)
 lives only in the separate `validate()` step, invoked at command-invoke
 time by `packages/protocol/src/action/server/CommandInvokeResponse.ts:486`
-— so stock matter.js HEAD would reject Google Home's field-absent shape at
-its invoke validate step, and matter.js-based bridges have to relax exactly
-that check for Google Home's LevelControl commands. go-fabric therefore
-deliberately diverges from stock matter.js strictness here. The earlier
+— so stock matter.js HEAD rejects the field-absent shape at its invoke
+validate step with INVALID_COMMAND (`CommandInvokeResponse.ts:529-535`), and
+go-fabric deliberately diverges from matter.js's strictness here. The earlier
 claim that "real controllers emit spec-valid TLV, so the permissive path is
 never reached on the wire" is WRONG for command fields and is withdrawn.
 
@@ -527,9 +532,9 @@ The wire shape is pinned by regression tests:
 `TestDecodeMoveToLevelRequest_AbsentTransitionTime`,
 `TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime`,
 `TestCommandFieldsReader_LevelControlStepAbsentTransitionTime`
-(bridge). Any future strict-validation refactor MUST keep tolerating
-absent LevelControl TransitionTime tags or it silently breaks Google Home
-dimming. Sigma/PASE container/tag strictness remains a fuzz/robustness
+(bridge). A strict-validation refactor keeps tolerating absent
+LevelControl TransitionTime tags until the entry is retired (owner
+decision 168). Sigma/PASE container/tag strictness remains a fuzz/robustness
 backlog item (parity audit CHIP L9-01..04), not an interop gap. The crypto
 core (HKDF salts/info/nonces, Sigma TLV tags, status codes, control octets)
 IS byte-verbatim with connectedhomeip HEAD.
@@ -3620,6 +3625,7 @@ names one of these IDs is stale.
 | BD-Matter-OTAProvider-ACLEveryFabric | 2026-11-14 (review II, phase 4, owner decision 74) | Closed: the entry read `fabricAuthority.fabrics[0]` as "the first fabric". It is the first fabric the node's own authority controls, by root certificate (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:116-124`; `packages/protocol/src/fabric/FabricAuthority.ts:112-114`, `:126-128` at `db021da0`), matter.js writes the provider's Operate/CASE entry into that fabric's ACL only (`OtaSoftwareUpdateProviderServer.ts:126-154`), and into none while there is none. The node no longer writes the entry into every fabric; what it does instead is `BD-Matter-OTAProvider-ACLGrantedFabrics`. |
 | BD-Matter-Subscription-ReportsOverlap | 2026-11-16 (review II, phase 5b, owner decision 95) | Closed: a subscription has one report in flight. The bridge's reporter returns only once the peer's StatusResponse settled the update (`deliverOngoingReport`, `bridge/subscribe.go`), the engine starts no report of a subscription while its reporter runs, and what changes meanwhile leaves in the next report, as matter.js's `#triggerSendUpdate` (`packages/node/src/node/server/ServerSubscription.ts:520-529` at `db021da0`). Reports no longer overlap; the overlap numbering went with it. Pinned by `bridge:TestOneReportInFlightUntilItsStatusResponseParity` and `im/subscription:TestChangesDuringAReportInFlightLeaveInOneNextReport`. |
 | BD-Matter-GroupReceptionUnbounded | 2026-11-16 (review II, phase 6a, owner decision 133) | Replaced: the reception state is bounded per operational key, a further sender refused and nobody evicted; the entry is now `BD-Matter-GroupReceptionBoundedPerKey`, which keeps this entry's record. |
+| BD-Matter-BasicInfo-SerialNumberAlwaysServed | 2026-11-16 (review II, phase 6a, owner decisions 143 and 166) | Closed: the root BasicInformation and every BridgedDeviceBasicInformation serve SerialNumber only when the host stated it, as matter.js — the root's server defaults no serialNumber (`packages/node/src/behaviors/basic-information/BasicInformationServer.ts:54-75`, `:89-91` at `db021da0`), the bridged one backfills only `uniqueId` (`BridgedDeviceBasicInformationServer.ts:39-43`), and an optional attribute is listed only when its state holds a value (`ValidatedElements.ts:252`, `:270-278`); no SerialNumber is derived from UniqueID any more (`c292e9cb` bridged, `6f23be6c` root). The Apple Home reason the entry gave was not confirmed at the pins; only an Apple Home run settles it. |
 
 ### BD-Matter-LevelControl-LenientDecoders — LevelControl's omitted request fields take a fallback
 
@@ -3629,21 +3635,34 @@ definition decodes first, gate 1 G1-2), but a mandatory field that is
 absent from the payload decodes as its fallback instead of failing:
 TransitionTime (MoveToLevel, Step and their WithOnOff forms) and Rate
 (Move, MoveWithOnOff) as null, OptionsMask and OptionsOverride (all eight)
-as 0 (`bridge/fields_definition.go` `requestFallbacks`). matter.js has the
+as 0 (`bridge/fields_definition.go` `requestFallbacks`). The raw decoders
+`cluster/wire` `DecodeMoveToLevel` / `DecodeStep` read an absent
+TransitionTime as null the same (owner decision 168). matter.js refuses the
+shape: decode leaves the member unset (`packages/types/src/tlv/TlvObject.ts:205-251`
+at `db021da0`), then `requestTlv.validate`
+(`packages/protocol/src/action/server/CommandInvokeResponse.ts:486`) throws
+`ValidationMandatoryFieldMissingError` (`TlvObject.ts:257-261`), answered
+INVALID_COMMAND (`CommandInvokeResponse.ts:529-535`); it has the
 mechanism — a mandatory `TlvField` may carry a fallback that populates the
-field "when devices omit" it (`packages/types/src/tlv/TlvObject.ts:236-249`,
-`:398-404` at `db021da0`) — but declares none for LevelControl, so it validates the
-request and answers a missing mandatory field with INVALID_COMMAND
-(`CommandInvokeResponse.ts`, `ValidationMandatoryFieldMissingError`).
-Google Home omits the mandatory-but-nullable TransitionTime entirely (the
-permissive command-field decoding above), and the strict decoder would
-refuse its MoveToLevel and Step. `levelcontrol.Server` reads the fallbacks
-as matter.js reads a null TransitionTime and zero options. A missing Level,
-MoveMode, StepMode or StepSize still answers INVALID_COMMAND. Pinned by
-`TestCommandFieldsReader_LevelControlStepAbsentTransitionTime` and
-`TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime`. Retire
-when the controllers in the field send the mandatory fields.
-
+field "when devices omit" it (`TlvObject.ts:236-249`, `:398-404`) — but
+declares none for LevelControl. connectedhomeip accepts it: its generated
+decoder has no presence check
+(`zzz_generated/app-common/clusters/LevelControl/Commands.ipp:44-73` at
+`6170af84`) and the cluster reads the field with a fallback
+(`src/app/clusters/level-control/LevelControlCluster.cpp:371`, Step `:517`);
+that the absent field is null is inferred. This module follows chip here. No
+capture of a controller that omits the field is on record (the Google Home
+claim came with the extraction commit `f2f65e6a`). `levelcontrol.Server`
+reads the fallbacks as a null TransitionTime and zero options. A missing
+Level, MoveMode, StepMode or StepSize still answers INVALID_COMMAND. Pinned
+by `TestDecodeMoveToLevelOmitsTransitionTime`,
+`TestDecodeStepOmitsTransitionTime` and the lenient column of
+`TestRawDecodersRefuseWhatTheGeneratedOnesRefuse` (cluster/wire),
+`TestDecodeMoveToLevelRequest_AbsentTransitionTime`,
+`TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime` and
+`TestCommandFieldsReader_LevelControlStepAbsentTransitionTime` (bridge).
+Retire when a decision to follow matter.js's refusal is taken. Review II,
+R2-P6-wire-1209, owner decision 168.
 ### BD-Matter-AdminCommissioning-OpenWindowParams — OpenCommissioningWindow keeps its hand-written decoder
 
 `cluster/wire.AdministratorCommissioning` is built on its generated
@@ -4639,19 +4658,6 @@ The seed-kind cases are `missing` under this entry. Report BH (phase 16,
 
 By design. Test roots enter through `attestation.Trust`'s own option
 (`BD-Matter-DCL-OptIn`), never through the snapshot a release ships.
-
-### BD-Matter-BasicInfo-SerialNumberAlwaysServed — SerialNumber is always present
-
-matter.js's `BasicInformationServer` serves SerialNumber only when the
-host sets it; its MockServerNode has none and AttributeReadResponseTest.ts
-(at `862ad75f`) reads it as UNSUPPORTED_ATTRIBUTE.
-`cluster/core/basic_information.go:675-689` serves it always, falling back to a
-value derived from UniqueID (`TestParityMatterJS_BasicInfoServer_SerialNumberFallback`),
-because Apple Home's HAP build asks for it. The full-wildcard read cases
-assert the Go composition as it is. Report BI (phase 16, 2026-10-19).
-
-By design. The fallback stays until the interop record says Apple Home no
-longer needs it.
 
 ### BD-Matter-Switch-LockAsMutexAndOutbox — the switch state lock is a mutex with a deferred apply
 
@@ -9137,3 +9143,23 @@ matter.js couples its Thermostat to a sibling TemperatureMeasurement and Occupan
 ### BD-chip-ColorControl-MoveColorTemperatureStop — MoveColorTemperature with MoveMode Stop ends every colour movement, as connectedhomeip
 
 matter.js stops hue and saturation only (`packages/node/src/behaviors/color-control/ColorControlServer.ts:1273-1276` at `db021da0`), so a controller's Stop would not stop the colour-temperature move it names. connectedhomeip ends every colour movement (`src/app/clusters/color-control-server/codegen/color-control-server.cpp:2704-2707` at `6170af84`: `stopAllColorTransitions`, then the kStop return; `stopAllColorTransitions` `:470-477` ends every transition), and this module follows it (`cluster/light/colorcontrol_commands.go` `moveColorTemperature`). The divergence is the set of movements stopped, nothing else: the colour-mode switch before the Stop branch stays matter.js's (`ColorControlServer.ts:1273`; chip returns before its `handleModeSwitch`, `:2726`), and RemainingTime reads 0 afterwards because the engine is idle — go-fabric's value, chip leaves the last one; neither reports it. TC-CC-6.2 checks bounds only (`src/app/tests/suites/certification/Test_TC_CC_6_2.yaml:312-360`). Review II, R2-P6-par-1413, owner decision 149. Upstream note for matter.js: MoveMode Stop calls `stopHueAndSaturationMovement` only; `stopAllColorMovement` (`ColorControlServer.ts:843`) would stop the move. Retire when matter.js stops every movement there.
+
+### BD-Matter-Messages-IdPerFabric — a MessageID belongs to the fabric that presented it
+
+matter.js's `MessagesServer` is the empty class (`packages/node/src/behaviors/messages/MessagesServer.ts` at `db021da0`). connectedhomeip's example looks a MessageID up by the id alone and replaces the queued one whichever fabric presented it (`examples/tv-app/tv-common/clusters/messages/MessagesManager.cpp:73-87`, `FindCachedMessage(messageId)` `:76`, matching the id alone `:187-191`; the fabric reaches the delegate only as an argument, `src/app/clusters/messages-server/messages-server.cpp:393`; its cancel is not fenced either, `MessagesManager.cpp:98-120`, at `6170af84`). The module keeps an id to the fabric that presented it — queued, being presented or being cancelled — and refuses another fabric's present of it with ALREADY_EXISTS, the module's choice of status: neither reference answers one here; the code exists in both (`src/protocols/interaction_model/StatusCodeList.h:79`, `packages/types/src/globals/Status.ts:249`). A present whose fabric is removed meanwhile is not queued (UNSUPPORTED_ACCESS), and the presenter's `CancelMessage` takes it down (`cluster/core/messages.go`). Review II, R2-P6-sec-1201, owner decision 129. Register row above.
+
+### BD-Matter-OTARequestor-ProvidersPerFabric — the OTA requestor holds each fabric to 4 active providers and 4 deferred announcements
+
+matter.js bounds neither the active provider list — `#addActiveOtaProvider` pushes (`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:423-438` at `db021da0`) — nor a queue of announcements, which it handles inline (`:376-420`). The module holds each fabric to 4 active providers and 4 deferred announcements, the latest per provider (`cluster/core/ota_software_update_requestor.go` `otaActiveProvidersPerFabric`). Review II, R2-P6-bound-1205 (U3-net-1), owner decision 134. Register row above.
+
+### BD-Matter-OTARequestor-FabricRemoval — a removed fabric's OTA providers leave the requestor
+
+matter.js keeps `activeOtaProviders` node-wide and persisted (quality N) with no fabric-removal handling (`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:109-116`, `:1354` at `db021da0`; it is no fabric-scoped attribute, so the fabric-scoped data handler skips it — inferred); its `#online` re-adds the defaults (`:221-228`). The module drops a removed fabric's active providers, selection and deferred announcements and stores the state (`cluster/core/ota_software_update_requestor.go`). Review II, R2-P6-store-1204. Register row above.
+
+### BD-Matter-OTAProvider-InProgressPerFabric — the OTA provider holds each fabric to 16 in-progress entries and drops them with the fabric
+
+matter.js keeps an entry for a token it never issued when the peer holds a consent for the version (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:417-420`, `:444`, `:474-481`, created `:605-614`, stored `:635` at `db021da0`); without one the entry is created and deleted in the same call (`:452-458`, `:644-647`). It drops a peer's stale entries on that peer's next lookup (`:556-557`, `:565-577`) and none at a fabric's removal. The module holds each fabric to 16 entries (`cluster/core/ota_provider.go` `otaInProgressPerFabric`) and drops a removed fabric's entries and consents and withdraws its transfer scope (`OTAProvider.MatterDropFabric`, a `contract.FabricScopedState`; the node's removal fan-out reaches it). Review II, R2-P6-bound-1206, owner decisions 134 and 167. Register row above.
+
+### BD-chip-TimeSync-StateBeforePersist — a time-zone or DST transition moves the state before it is stored, as connectedhomeip
+
+Under the Ahead row of `BD-chip-TimeSynchronization-Features`. On the read path a time-zone or DST transition moves the state before it is stored, and a failed store leaves the stored list behind and the transition unreported, as connectedhomeip moves the state first and answers kInvalid on a failed store (`src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp:936`, `:940-945` time zone — `StoreTimeZone` `:944`; `:998-1004` DST — `StoreDSTOffset` `:1002`, at `6170af84`). Kept: chip's order (`cluster/core/time_synchronization_features.go`). Review II, R2-P6-store-1266.
