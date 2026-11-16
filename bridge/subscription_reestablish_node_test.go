@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/store/memstore"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -127,5 +128,57 @@ func TestReestablishedPrimingSuppressesEventPathStatuses(t *testing.T) {
 	}
 	if len(rd.Reports) == 0 {
 		t.Fatal("re-established priming carries no attribute data")
+	}
+}
+
+// TestReestablishStopsAtInvalidSubscription (review II, R2-P6-fsm-0807):
+// a peer that answers its newest former subscription's priming report
+// InvalidSubscription has dropped its state for this node, so its older
+// ones are not attempted; any other error status goes on with the next.
+func TestReestablishStopsAtInvalidSubscription(t *testing.T) {
+	for _, tc := range []struct {
+		answer im.StatusCode
+		want   []uint32
+	}{
+		{im.StatusInvalidSubscription, []uint32{0x702}},
+		{im.StatusBusy, []uint32{0x702, 0x701}},
+	} {
+		fab := newResumeFabric(t)
+		st := memstore.New()
+		ctrl := newFakeController(t, fab)
+		for _, id := range []uint32{0x701, 0x702} { // the older first
+			payload, err := subscription.MarshalPeerSubscription(subscription.PeerSubscription{
+				SubscriptionID: id, FabricIndex: resumeFabricIndex, PeerNodeID: resumeCtrlNode,
+				AttributeRequests: []im.ConcreteAttributePath{accessControlACLPath()},
+				IsFabricFiltered:  true, MaxIntervalCeiling: 120, MaxInterval: 120, SendInterval: 60 * time.Second,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = st.SaveServerSubscription(context.Background(), id, resumeFabricIndex, resumeCtrlNode, payload)
+		}
+		ctrl.mu.Lock()
+		ctrl.answer = tc.answer
+		ctrl.mu.Unlock()
+		dev := startResumeDevice(t, st, func(br *Bridge, sessions *operational.Manager) {
+			br.AttachCaseInitiatorProvider(resumeInitiatorProvider(fab, sessions))
+			br.AttachOperationalResolver(staticResolver{addr: ctrl.addr})
+		})
+		ctrl.setBridge(dev.addr(t))
+		if res := dev.br.ReestablishFormerSubscriptions(context.Background()); len(res.Reestablished) != 0 {
+			t.Fatalf("%v: re-established %v", tc.answer, res.Reestablished)
+		}
+		var tried []uint32
+		for done := false; !done; {
+			select {
+			case r := <-ctrl.reports:
+				tried = append(tried, r.subID)
+			default:
+				done = true
+			}
+		}
+		if !slices.Equal(tried, tc.want) {
+			t.Errorf("answered %v: priming reports for %#x, want %#x", tc.answer, tried, tc.want)
+		}
 	}
 }

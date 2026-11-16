@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/store/memstore"
@@ -121,5 +122,39 @@ func TestPersistedRowsAreCappedPerFabric(t *testing.T) {
 	b.resumption.mu.Unlock()
 	if got, want := persistedIDs(t, st), []uint32{live, 0x204, 0x205, 0x301}; !slices.Equal(got, want) {
 		t.Fatalf("rows after the cap = %#x, want %#x", got, want)
+	}
+}
+
+// TestPersistSubscriptionSkipsUnattributableTargets (review II,
+// R2-P6-store-0806): a subscription that cannot be re-established as the
+// peer's — a PASE session's, one without a fabric or with an index the
+// bridge could not resolve, one without a subject — is not persisted; a
+// CASE subscription is.
+func TestPersistSubscriptionSkipsUnattributableTargets(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		target  subTarget
+		persist bool
+	}{
+		{"CASE", subTarget{fabricIndex: 1, subjectNodeID: 0xA1}, true},
+		{"PASE", subTarget{pase: true, fabricIndex: 1, subjectNodeID: 0xA1}, false},
+		{"fabric 0", subTarget{fabricIndex: 0, subjectNodeID: 0xA1}, false},
+		{"unresolvable fabric", subTarget{fabricIndex: endpoint.FabricIndexUnresolvable, subjectNodeID: 0xA1}, false},
+		{"subject 0", subTarget{fabricIndex: 1, subjectNodeID: 0}, false},
+	} {
+		b, m, st := boundTestBridge(t)
+		sub, err := m.Subscribe(subscription.SubscribeArgs{
+			FabricIndex: 1, PeerNodeID: 0xA1, SessionID: 0x10, MinIntervalFloor: 1, MaxIntervalCeiling: 60,
+			KeepSubscriptions: true, AttributePaths: []im.ConcreteAttributePath{{}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.routing.subTargets.Store(sub.ID, tc.target)
+		b.persistSubscription(context.Background(), sub.ID)
+		if got := persistedIDs(t, st); (len(got) == 1) != tc.persist {
+			t.Errorf("%s: store holds %#x, persisted want %v", tc.name, got, tc.persist)
+		}
 	}
 }

@@ -315,11 +315,13 @@ func (c *fakeController) handle(datagram []byte) {
 		c.mu.Lock()
 		answer := c.answer
 		c.mu.Unlock()
+		// Seen before it is answered: once the bridge has the answer, the
+		// report is in the channel.
+		c.reports <- reportSeen{subID: subID, sessionID: hdr.SessionID, attrs: attrs, payload: slices.Clone(payload)}
 		if !reportSuppressesResponse(payload) && answer != silentAnswer {
 			sr, _ := EncodeStatusResponse(im.StatusResponse{Status: answer})
 			c.sendSecureAck(proto, hdr.MessageCounter, im.OpcodeStatusResponse, sr)
 		}
-		c.reports <- reportSeen{subID: subID, sessionID: hdr.SessionID, attrs: attrs, payload: slices.Clone(payload)}
 	case im.OpcodeSubscribeResponse:
 		subID, _ := decodeReportSummary(payload) // SubscriptionId is tag 0 in both
 		c.subResp <- subID
