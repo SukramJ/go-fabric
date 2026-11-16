@@ -5,8 +5,11 @@ package modebase
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 )
 
 type heldChanger struct{}
@@ -39,5 +42,46 @@ func TestStoreReadsTheServersValues(t *testing.T) {
 	}
 	if changed, err := s.MatterWriteChanged(context.Background(), AttrCurrentMode, uint8(0)); changed || err == nil {
 		t.Errorf("a write of CurrentMode: changed %v, err %v; want a refusal that changes nothing", changed, err)
+	}
+}
+
+// TestDeprecatedHooksKeepTheirBehaviour: the Hooks surface kept for its
+// deprecation window (decision 154) behaves as before — a handler
+// registered with Handle runs through Invoke and through MatterInvoke, and
+// CheckWrite runs the veto SetBeforeWrite installed.
+func TestDeprecatedHooksKeepTheirBehaviour(t *testing.T) {
+	s, err := NewRvcRunMode(Config{Changer: heldChanger{}, SupportedModes: []ModeOption{
+		{Label: "Idle", Mode: 0, Tags: []ModeTag{{Value: RvcRunTagIdle}}},
+		{Label: "Cleaning", Mode: 1, Tags: []ModeTag{{Value: RvcRunTagCleaning}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	if err := s.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { calls++; return nil, nil }); err != nil {
+		t.Fatal(err)
+	}
+	req := rvcrunmode.ChangeToModeRequest{NewMode: 1}
+	if _, handled, err := s.Invoke(context.Background(), CmdChangeToMode, req); !handled || err != nil {
+		t.Errorf("Invoke: handled %v, err %v; want the host's handler", handled, err)
+	}
+	if _, err := s.MatterInvoke(context.Background(), CmdChangeToMode, req); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Errorf("the host's handler ran %d times, want 2", calls)
+	}
+	veto := errors.New("vetoed")
+	s.SetBeforeWrite(func(context.Context, uint32, any) error { return veto })
+	if err := s.CheckWrite(context.Background(), AttrCurrentMode, uint8(1)); !errors.Is(err, veto) {
+		t.Errorf("CheckWrite = %v, want the veto", err)
+	}
+	s.Init(s.inst)
+	// ModeBase defines no event: both emit paths refuse, endpoint and
+	// emitter set or not.
+	s.SetEndpoint(3)
+	s.SetMatterEventEmitter(nil)
+	if s.Emit(3, 0, nil) == nil || s.EmitEvent(0, nil) == nil {
+		t.Error("an event ModeBase does not define was emitted")
 	}
 }

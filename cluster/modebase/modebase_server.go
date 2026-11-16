@@ -443,6 +443,19 @@ func checkDeviceEnergyManagement(modes []ModeOption) error {
 type Server struct {
 	cluster.AttributeChanges
 	spec.SelfHeld
+	// Hooks is the command path the server had before decision 154, kept
+	// for the deprecation window: the server binds it to its instance and
+	// mirrors into it every host handler ([Server.Handle]), write veto
+	// ([Server.SetBeforeWrite]), endpoint and emitter, so its promoted
+	// methods behave as before. MatterInvoke no longer runs through it,
+	// and a handler registered on the field itself (srv.Hooks.Handle)
+	// reaches only the field.
+	//
+	// Deprecated: the command path is [spec.SelfHeld] with
+	// [spec.InvokeHeld] (decision 154): register a host handler with
+	// [Server.Handle] and invoke with [Server.MatterInvoke]. Removable in
+	// the next minor release.
+	spec.Hooks //nolint:staticcheck // the deprecated field kept for its window
 
 	k        kind
 	inst     *spec.Instance
@@ -458,6 +471,81 @@ type Server struct {
 	// mu guards current.
 	mu      sync.Mutex
 	current uint8
+}
+
+// Handle implements [spec.CommandRegistrar]: the host's handler of cmdID
+// replaces the server's own ChangeToMode on the command path
+// ([spec.SelfHeld.Handle]); it is mirrored into the deprecated
+// [Server.Hooks] so that [Server.Invoke] runs it as before.
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	if err := s.SelfHeld.Handle(cmdID, fn); err != nil {
+		return err
+	}
+	return s.Hooks.Handle(cmdID, fn) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// Emit implements [spec.EventEmitting] ([spec.SelfHeld.Emit]); ModeBase
+// defines no event.
+func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.SelfHeld.Emit(endpoint, eventID, data)
+}
+
+// EmitEvent emits on the endpoint the server is mounted on
+// ([spec.SelfHeld.EmitEvent]).
+func (s *Server) EmitEvent(eventID uint32, data any) error {
+	return s.SelfHeld.EmitEvent(eventID, data)
+}
+
+// SetEndpoint implements [contract.EndpointReceiver] for the store and the
+// deprecated [Server.Hooks].
+func (s *Server) SetEndpoint(endpoint uint16) {
+	s.SelfHeld.SetEndpoint(endpoint)
+	s.Hooks.SetEndpoint(endpoint) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// SetMatterEventEmitter implements [contract.EventReceiver] for the store
+// and the deprecated [Server.Hooks].
+func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
+	s.SelfHeld.SetMatterEventEmitter(emitter)
+	s.Hooks.SetMatterEventEmitter(emitter) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter]; the served
+// attributes are read-only, so no controller write reaches the veto. It
+// is mirrored into the deprecated [Server.Hooks] for [Server.CheckWrite].
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.SelfHeld.SetBeforeWrite(fn)
+	s.Hooks.SetBeforeWrite(fn) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// Init binds the deprecated [Server.Hooks] to inst, as before; the server
+// binds it at construction.
+//
+// Deprecated: the server's command path needs no binding (decision 154).
+// Removable in the next minor release.
+func (s *Server) Init(inst *spec.Instance) {
+	s.Hooks.Init(inst) //nolint:staticcheck // the deprecated field
+}
+
+// Invoke admits the request against the instance [Server.Init] bound and
+// runs the host's handler of cmdID, as before ([spec.Hooks.Invoke]);
+// handled is false without one.
+//
+// Deprecated: use [Server.MatterInvoke], which admits the request and
+// checks the response with the server's values as peers (decision 154).
+// Removable in the next minor release.
+func (s *Server) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
+	return s.Hooks.Invoke(ctx, cmdID, fields) //nolint:staticcheck // the deprecated field
+}
+
+// CheckWrite runs the host's write veto ([Server.SetBeforeWrite]) on a
+// value, as before ([spec.Hooks.CheckWrite]).
+//
+// Deprecated: the served attributes are read-only, so no controller write
+// reaches a veto; the server has no write path that calls it. Removable in
+// the next minor release.
+func (s *Server) CheckWrite(ctx context.Context, attrID uint32, value any) error {
+	return s.Hooks.CheckWrite(ctx, attrID, value) //nolint:staticcheck // the deprecated field
 }
 
 // modeSource answers the store's reads from the server's own state.
@@ -547,6 +635,7 @@ func newServer(k kind, cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
 	}
 	s.srv, s.inst, s.SelfHeld = srv, srv.Instance, spec.NewSelfHeld(srv)
+	s.Hooks.Init(srv.Instance) //nolint:staticcheck // the deprecated field, bound as before
 	// The mode servers' initialize: ModeUtils.assertMode(supportedModes,
 	// currentMode).
 	if !s.supports(cfg.CurrentMode) {
