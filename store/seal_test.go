@@ -820,13 +820,14 @@ func sealedOver(t *testing.T, db *sql.DB) *store.Store {
 }
 
 // TestNewSealedLeavesNoClearSecretPerJournalMode (Fable F4, sec Q2): the
-// sealing upgrade's residue claim in every journal mode that keeps a file:
+// sealing upgrade's and Reseal's residue claims in the journal modes:
 // WAL (TestNewSealedSealsAClearDatabase too), the rollback journal's DELETE
-// (SQLite's default), TRUNCATE and PERSIST forms, and the rollback journal
-// under locking_mode(EXCLUSIVE), which keeps the -journal between
-// transactions as PERSIST does: after NewSealed over a clear database, no
-// clear secret is in any file of the directory, the handle open and after
-// Close. An EXCLUSIVE handle is one connection: the lock it holds keeps
+// (SQLite's default), TRUNCATE, PERSIST, MEMORY and OFF forms, and under
+// locking_mode(EXCLUSIVE), which keeps a rollback -journal between
+// transactions as PERSIST does, the default, PERSIST, TRUNCATE, WAL and
+// MEMORY forms: after NewSealed over a clear database no clear secret, and
+// after Reseal no value sealed under the old key, is in any file of the
+// directory, the handle open and after Close. An EXCLUSIVE handle is one connection: the lock it holds keeps
 // every other connection of a pool out.
 func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 	t.Parallel()
@@ -836,8 +837,12 @@ func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 		{"journal_mode(TRUNCATE)"},
 		{"journal_mode(PERSIST)"},
 		{walMode},
+		{"journal_mode(MEMORY)"}, {"journal_mode(OFF)"},
 		{"locking_mode(EXCLUSIVE)"},
 		{"locking_mode(EXCLUSIVE)", "journal_mode(PERSIST)"},
+		{"locking_mode(EXCLUSIVE)", "journal_mode(TRUNCATE)"},
+		{"locking_mode(EXCLUSIVE)", walMode},
+		{"locking_mode(EXCLUSIVE)", "journal_mode(MEMORY)"},
 	} {
 		name := strings.Join(mode, ",")
 		if name == "" {
@@ -875,11 +880,30 @@ func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 			if hits := clearSecretsIn(t, dir, w.secrets); len(hits) > 0 {
 				t.Errorf("clear secrets on disk after NewSealed, handle open: %v", hits)
 			}
+			// Reseal in the same mode: no value sealed under the old key is
+			// left in any file (decision 131).
+			var oldKey, oldSecret []byte
+			if err := db.QueryRowContext(ctx, `SELECT private_key FROM matter_node_identities`).Scan(&oldKey); err != nil {
+				t.Fatal(err)
+			}
+			if err := db.QueryRowContext(ctx, `SELECT shared_secret FROM matter_resumption`).Scan(&oldSecret); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Reseal(ctx, db, testSealer(t, 6), testSealer(t, 7)); err != nil {
+				t.Fatal(err)
+			}
+			old := map[string][]byte{"old sealed key": oldKey, "old sealed resumption": oldSecret}
+			if hits := clearSecretsIn(t, dir, old); len(hits) > 0 {
+				t.Errorf("old-key values on disk after Reseal, handle open: %v", hits)
+			}
 			if err := db.Close(); err != nil {
 				t.Fatal(err)
 			}
 			if hits := clearSecretsIn(t, dir, w.secrets); len(hits) > 0 {
 				t.Errorf("clear secrets on disk after NewSealed and Close: %v", hits)
+			}
+			if hits := clearSecretsIn(t, dir, old); len(hits) > 0 {
+				t.Errorf("old-key values on disk after Reseal and Close: %v", hits)
 			}
 		})
 	}
