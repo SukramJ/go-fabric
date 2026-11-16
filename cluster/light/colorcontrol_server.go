@@ -900,5 +900,8 @@ func (s *ColorControlServer) invalidateScenes() {
 
 // endScene marks the running command as one that ends the current scene
 // once it succeeds ([ColorControlServer.MatterInvoke]). The caller holds
-// cmd.
+// cmd. A scene recall that runs ColorLoopSet directly
+// (MatterApplySceneValues) marks too; nothing reads that mark, and the
+// next MatterInvoke resets it — the recall does not end the scene it
+// applies.
 func (s *ColorControlServer) endScene() { s.endsScene = true }

@@ -175,6 +175,8 @@ func TestMoveColorTemperatureReadsPartWay(t *testing.T) {
 // branch, which ends the colour temperature move with every other colour
 // movement, as connectedhomeip's MoveColorTemperature does — the
 // deliberate divergence from matter.js of R2-P6-par-1413 (decision 149).
+// RemainingTime reading 0 after the Stop is go-fabric's own (the engine is
+// idle); chip leaves the last value.
 func TestMoveColorTemperatureRateAndStop(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, _ := managedCT(true)

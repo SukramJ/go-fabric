@@ -42,7 +42,7 @@ func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	// command that fails afterwards keeps the scene with the rest of the
 	// state its rollback restores, as LevelControl's
 	// transitionAndInvalidate does (R2-P6-err-1404).
-	// matter.js invalidates at the same place (ColorControlServer.ts:597) inside the command's
+	// matter.js invalidates where the command marks (ColorControlServer.ts:597), inside the command's
 	// transaction, whose rollback (CommandInvokeResponse.ts:516) restores state, sceneValid included
 	// (ScenesManagementServer.ts:972; inferred, not run).
 	if s.endsScene {
@@ -575,11 +575,15 @@ func (s *ColorControlServer) moveToColorTemperatureLogic(target, transitionTime 
 // the bound the command names (0 is the physical one), a zero Rate
 // refused. Stop ends every colour movement, the colour temperature move
 // included, as connectedhomeip's MoveColorTemperature does
-// (src/app/clusters/color-control-server/codegen/color-control-server.cpp:2703-2706
+// (src/app/clusters/color-control-server/codegen/color-control-server.cpp:2704-2707
 // at 6170af84: stopAllColorTransitions, then done for kStop). matter.js
 // ends the hue and saturation movements only, which leaves a controller's
 // Stop without effect on the move it names; this is a deliberate
-// divergence (R2-P6-par-1413, decision 149).
+// divergence, limited to the set of movements Stop ends (R2-P6-par-1413,
+// decision 149). The colour mode switch before it stays matter.js's (chip
+// returns before its mode switch), and RemainingTime reads 0 afterwards
+// because the engine is idle — go-fabric's value; chip leaves the last
+// value, and neither reports it.
 func (s *ColorControlServer) moveColorTemperature(ctx context.Context, fields any) error {
 	r, err := moveColorTemperatureFields(fields)
 	if err != nil {
