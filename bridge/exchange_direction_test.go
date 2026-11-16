@@ -46,7 +46,7 @@ func TestInitiatedExchangeIgnoresPeerInitiatedCollision(t *testing.T) {
 		t.Errorf("the peer's BDX exchange received protocol %#x opcode %#x", msg.ProtocolID, msg.Opcode)
 	case err := <-r.responder.ended:
 		t.Errorf("the peer's BDX exchange ended: %v", err)
-	case <-time.After(50 * time.Millisecond):
+	default: // the hooks deliver before they return: nothing to wait for
 	}
 
 	// The exchange this node opened: a message on its id with the I flag
@@ -86,7 +86,7 @@ func TestInitiatedExchangeIgnoresPeerInitiatedCollision(t *testing.T) {
 	case <-r.responder.got:
 	case err := <-r.responder.ended:
 		t.Errorf("the peer's BDX exchange ended: %v", err)
-	case <-time.After(5 * time.Second):
+	case <-ctx2.Done():
 		t.Error("the peer's BDX exchange did not receive the peer's message")
 	}
 }
@@ -116,6 +116,6 @@ func TestInitiatedHandshakeIgnoresPeerInitiatedCollision(t *testing.T) {
 	select {
 	case err := <-h.done:
 		t.Fatalf("the handshake ended on a message that was not its: %v", err)
-	case <-time.After(50 * time.Millisecond):
+	default: // the hook hands over before it returns: nothing to wait for
 	}
 }
