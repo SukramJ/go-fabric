@@ -42,7 +42,7 @@ var (
 	// ErrNotMounted: an event emitted while the server is not in the
 	// topology — before it knows its endpoint or has an emitter, or after
 	// the bridge withdrew its emitter ([Server.EmitEvent]).
-	ErrNotMounted = errors.New("spec: the server does not know its endpoint yet")
+	ErrNotMounted = errors.New("spec: the server is not mounted (no endpoint, or no event emitter)")
 )
 
 // Source is the optional read port for attributes the device owns: a

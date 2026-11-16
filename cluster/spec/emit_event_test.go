@@ -5,6 +5,7 @@ package spec_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -56,6 +57,10 @@ func TestEmitEventNeedsTheEndpoint(t *testing.T) {
 	srv.SetMatterEventEmitter(nil)
 	if err := srv.EmitEvent(bsdef.EventStateChange, bsdef.StateChangeEvent{}); !errors.Is(err, spec.ErrNotMounted) {
 		t.Errorf("EmitEvent after the emitter was withdrawn: %v, want ErrNotMounted", err)
+	} else if !strings.Contains(err.Error(), "no event emitter") {
+		// The text names this cause too, not only the unknown endpoint
+		// (review II, phase 5b).
+		t.Errorf("EmitEvent after the emitter was withdrawn: %q does not name the missing emitter", err)
 	}
 	if err := srv.Emit(4, bsdef.EventStateChange, bsdef.StateChangeEvent{}); err != nil { //nolint:staticcheck // the deprecated Emit's behaviour
 		t.Errorf("Emit after the emitter was withdrawn: %v", err)
