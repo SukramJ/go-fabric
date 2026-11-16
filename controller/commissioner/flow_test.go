@@ -750,9 +750,14 @@ func TestFlowReconnectAbort(t *testing.T) {
 	t.Run("a deadline that passes in the step", func(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: info}
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-		defer cancel()
-		f, logged := rig(t, dev.handle, waitForContext)
+		// The deadline passes as the reconnect's wait begins, not after a
+		// wall-clock budget the arming before it may use up on a slow host
+		// (20 ms did, on emulated linux/386).
+		ctx := newStepDeadline()
+		f, logged := rig(t, dev.handle, func(c context.Context, f *flow) error {
+			ctx.expire()
+			return waitForContext(c, f)
+		})
 		err := f.execute(ctx)
 		if !errors.Is(err, ErrOperativeConnectionFailed) || !errors.Is(err, context.DeadlineExceeded) || !slices.Equal(dev.armed(), []uint16{60, 320, 0}) {
 			t.Fatalf("error %v, arms %v, want ErrOperativeConnectionFailed caused by context.DeadlineExceeded and [60 320 0]", err, dev.armed())
@@ -912,5 +917,31 @@ func TestEnsureFailsafeTimerFor(t *testing.T) {
 	_, err := f.armFailsafe(ctx, 0)
 	if !errors.Is(err, ErrCommissioning) || err.Error() != `commissioner: Commission error for "armFailSafe": BusyWithOtherAdmin (4)` {
 		t.Fatalf("ArmFailSafe error %v", err)
+	}
+}
+
+// stepDeadline is a context whose deadline passes when the test says so:
+// Done closes and Err is context.DeadlineExceeded, as a timer's would be.
+// A context derived from it is cancelled with that error.
+type stepDeadline struct {
+	context.Context
+	done chan struct{}
+	once sync.Once
+}
+
+func newStepDeadline() *stepDeadline {
+	return &stepDeadline{Context: context.Background(), done: make(chan struct{})}
+}
+
+func (d *stepDeadline) expire() { d.once.Do(func() { close(d.done) }) }
+
+func (d *stepDeadline) Done() <-chan struct{} { return d.done }
+
+func (d *stepDeadline) Err() error {
+	select {
+	case <-d.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
 	}
 }
