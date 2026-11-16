@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9081,
+  "entry_points": 9085,
   "entry_packages": [
     ".",
     "bdx",
@@ -292,9 +292,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18814,
+    "total_exported": 18817,
     "reachable": 12623,
-    "whitelisted": 6191,
+    "whitelisted": 6194,
     "unreachable": 0
   },
   "by_package": [],
@@ -12303,7 +12303,7 @@
       "identifier": "TestAccessingIsCASE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 364
+      "line": 365
     },
     {
       "package": "cluster/jointfabric",
@@ -12338,7 +12338,7 @@
       "identifier": "TestAddGroupAndMergesAreBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 307
+      "line": 308
     },
     {
       "package": "cluster/jointfabric",
@@ -12394,21 +12394,28 @@
       "identifier": "TestAdministratorFabricIndexAfterRemoval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 164
+      "line": 165
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAdministratorFabricIndexAfterRestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 202
+      "line": 203
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestAnchorChangeReportsEveryAttribute",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 714
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAnchorIsRecordedBeforeTheAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 498
+      "line": 499
     },
     {
       "package": "cluster/jointfabric",
@@ -12422,7 +12429,7 @@
       "identifier": "TestAnchoredDatastoreIsNeverRepointed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 530
+      "line": 531
     },
     {
       "package": "cluster/jointfabric",
@@ -12443,7 +12450,7 @@
       "identifier": "TestAnnouncementClearsOnlyItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 407
+      "line": 408
     },
     {
       "package": "cluster/jointfabric",
@@ -12471,14 +12478,14 @@
       "identifier": "TestDatastoreCommandsAreTheAnchorFabrics",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestDatastoreIsFabricScopedState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 139
+      "line": 140
     },
     {
       "package": "cluster/jointfabric",
@@ -12492,7 +12499,7 @@
       "identifier": "TestDatastoreReadsAreTheAnchorFabrics",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 445
+      "line": 446
     },
     {
       "package": "cluster/jointfabric",
@@ -12545,6 +12552,13 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "TestEveryAttributeIsWithheld",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 687
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "TestFailSafeAsyncReadUseAfterFree",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/commissionee_chip_test.go",
@@ -12555,7 +12569,7 @@
       "identifier": "TestFailedWipeStaysWiped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 560
+      "line": 561
     },
     {
       "package": "cluster/jointfabric",
@@ -12597,7 +12611,7 @@
       "identifier": "TestNextListIDAtTheTop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 346
+      "line": 347
     },
     {
       "package": "cluster/jointfabric",
@@ -12639,7 +12653,7 @@
       "identifier": "TestPushAfterTheWipeCallsNoPort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 605
+      "line": 606
     },
     {
       "package": "cluster/jointfabric",
@@ -12674,7 +12688,7 @@
       "identifier": "TestRefreshAfterTheWipe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 115
+      "line": 116
     },
     {
       "package": "cluster/jointfabric",
@@ -12695,7 +12709,7 @@
       "identifier": "TestRefreshEndsOnARefusedSave",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 286
+      "line": 287
     },
     {
       "package": "cluster/jointfabric",
@@ -12716,7 +12730,7 @@
       "identifier": "TestRefreshKeepsTheDatastoresKeys",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 87
+      "line": 88
     },
     {
       "package": "cluster/jointfabric",
@@ -12741,10 +12755,17 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "TestRefusedWipeSurvivesLaterRefusedSaves",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 648
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "TestRemovalReachesTheDatastoreIdempotently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/review2_p6_test.go",
-      "line": 244
+      "line": 245
     },
     {
       "package": "cluster/jointfabric",
