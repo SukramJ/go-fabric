@@ -70,9 +70,12 @@ func listOf[T spec.Encodable](v any) ([]T, bool) {
 	return nil, false
 }
 
-// SetAttributes implements [spec.AttributeSetter]: the host's own change,
-// all or nothing — every value is checked against the definition and the
-// rules of its setter before any is applied — through
+// SetAttributes implements [spec.AttributeSetter]: the host's own change.
+// Every value is checked against the definition and the rules of its
+// setter before any is applied, so a value either check refuses changes
+// nothing; the setters then run in attribute-id order, and a value the
+// store still refuses stops there with the earlier ones applied (review
+// II, R2-P6-err-1612). The setters are
 // [CommodityPriceServer.SetTariffUnit], [CommodityPriceServer.SetCurrency],
 // [CommodityPriceServer.SetCurrentPrice] (which emits PriceChange) and
 // [CommodityPriceServer.SetForecast].
@@ -135,8 +138,12 @@ func (s *CommodityPriceServer) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
-// SetAttributes implements [spec.AttributeSetter]: the host's own change,
-// all or nothing, through [GridConditionsServer.SetLocalGenerationAvailable],
+// SetAttributes implements [spec.AttributeSetter]: the host's own change.
+// Every value is checked against the definition and its setter's rules
+// before any is applied; the setters then run in attribute-id order, and a
+// value the store still refuses stops there with the earlier ones applied
+// (review II, R2-P6-err-1612). The setters are
+// [GridConditionsServer.SetLocalGenerationAvailable],
 // [GridConditionsServer.SetCurrentConditions] (which emits
 // CurrentConditionsChanged) and [GridConditionsServer.SetForecastConditions].
 func (s *GridConditionsServer) SetAttributes(values map[uint32]any) error {

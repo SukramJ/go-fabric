@@ -1240,8 +1240,10 @@ func (s *DeviceEnergyManagementServer) command(fn spec.CommandHandler) spec.Comm
 }
 
 // SetAttributes implements [spec.AttributeSetter]: the device's own
-// change, all or nothing — every value is checked against the definition
-// before any is applied — through the setters: EsaState
+// change. Every value is checked against the definition before any is
+// applied; the setters then run in attribute-id order, and a value the
+// store still refuses stops there with the earlier ones applied (review
+// II, R2-P6-err-1612). The setters are EsaState
 // ([DeviceEnergyManagementServer.SetEsaState]), AbsMinPower and
 // AbsMaxPower, PowerAdjustmentCapability and Forecast (nil for null), and
 // OptOutState ([DeviceEnergyManagementServer.SetOptOutState], which
