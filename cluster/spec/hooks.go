@@ -15,7 +15,7 @@ import (
 // Emit ([Events]) and SetBeforeWrite ([WriteVeto]); the server writes
 // SetAttributes over its own setters. The server embeds it, calls
 // [Hooks.Init] with its instance when it is built, runs [Hooks.Invoke]
-// first in its MatterInvoke and [Hooks.CheckWrite] after its own checks
+// first in its MatterInvoke (the request gate, then the host's handler) and [Hooks.CheckWrite] after its own checks
 // of a controller's write and its comparison with the held value, and hands the endpoint's emitter on with
 // [Hooks.SetMatterEventEmitter] — promoted, or called from its own when
 // it keeps the emitter itself too.
@@ -36,10 +36,20 @@ func (h *Hooks) Handle(cmdID uint32, fn CommandHandler) error {
 	return h.handlers.Register(h.inst, cmdID, fn)
 }
 
-// Invoke runs the host's handler of cmdID, its response held to the
-// definition ([HostHandlers.Invoke]); handled is false when the host
-// registered none, and the server's own logic runs.
+// Invoke holds the request to the definition first, as [InvokeHeld] and
+// [Server.MatterInvoke] do — a request it refuses answers the command's
+// [RequestCheck.Refusal] with handled true, so neither the host's handler
+// nor the server's own logic runs — then runs the host's handler of cmdID,
+// its response held to the definition ([HostHandlers.Invoke]); handled is
+// false when the host registered none, and the server's own logic runs.
+// The hooks hold no read of the server's state: a request or response
+// conformance naming one of the cluster's attributes is not resolved.
 func (h *Hooks) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
+	if h.inst != nil {
+		if err := h.inst.admitRequest(ctx, cmdID, fields, nil); err != nil {
+			return nil, true, err
+		}
+	}
 	return h.handlers.Invoke(ctx, cmdID, fields)
 }
 
