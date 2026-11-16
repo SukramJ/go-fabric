@@ -116,9 +116,11 @@ func TestSubscriptionCloseEndsAnOngoingReportWait(t *testing.T) {
 	if err := mgr.Close(sub.ID); err != nil {
 		t.Fatal(err)
 	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
 	select {
 	case <-returned:
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("the reporter still waits on an unanswered chunk 5 s after its subscription closed")
 	}
 }
