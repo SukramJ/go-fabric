@@ -98,7 +98,7 @@ import (
 // groups/decode.go was rewritten with net's groups fixes, and the two of
 // schema/fabric_scoped.go went with the hand-written tables the generated
 // fabric-scope tables replaced.
-const citecheckDriftRatchet = 377
+const citecheckDriftRatchet = 373
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

@@ -124,7 +124,8 @@ func conformanceProbeDefinition() *spec.Cluster {
 // refused on every path into the state. Before, the controller's write was
 // refused and the host's Set and Initial stored, served and reported the
 // field (review II, R2-P6-par-1304). matter.js runs every field's
-// validator on each validate of a struct (ValueValidator.ts:406-441) and
+// validator on each validate of a struct
+// (packages/node/src/behavior/state/validation/ValueValidator.ts:406-441) and
 // the assignment calls it unless acceptInvalid (StructManager.ts:278-291).
 func TestHostValuesAreHeldToFieldConformance(t *testing.T) {
 	t.Parallel()

@@ -172,7 +172,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 862,
+    "line": 872,
     "citation": "ExchangeManager.ts:480-486",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "at": "db021da0",
@@ -182,7 +182,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1762,
+    "line": 1772,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -191,7 +191,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1764,
+    "line": 1774,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -200,7 +200,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1801,
+    "line": 1811,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -209,7 +209,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1824,
+    "line": 1834,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -228,7 +228,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 217,
+    "line": 215,
     "citation": "ExchangeManager.ts:638-650",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#sessionsOnChannel",
@@ -237,25 +237,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 265,
-    "citation": "ExchangeManager.ts:674-681",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "#closeTcpChannelIfLastSession",
-    "nearest": 739,
-    "occurrences": 2
-  },
-  {
-    "file": "bridge/conn.go",
-    "line": 289,
-    "citation": "ExchangeManager.ts:634-648",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "#sessionsOnChannel",
-    "nearest": 699,
-    "occurrences": 3
-  },
-  {
-    "file": "bridge/conn.go",
-    "line": 578,
+    "line": 607,
     "citation": "ExchangeManager.ts:242-265",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "createUnsecuredSession",
@@ -310,16 +292,6 @@
     "occurrences": 1
   },
   {
-    "file": "bridge/fields_reader.go",
-    "line": 249,
-    "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487",
-    "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
-    "at": "db021da0",
-    "identifier": "TlvSchema",
-    "nearest": 549,
-    "occurrences": 2
-  },
-  {
     "file": "bridge/fields_reader_range_test.go",
     "line": 23,
     "citation": "packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487",
@@ -331,7 +303,7 @@
   },
   {
     "file": "bridge/fields_reader_test.go",
-    "line": 953,
+    "line": 951,
     "citation": "LevelControlServer.ts:596",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "ExecuteIfOff",
@@ -349,7 +321,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 1166,
+    "line": 1206,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -367,7 +339,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 345,
+    "line": 377,
     "citation": "ExchangeManager.ts:554",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "createdAt",
@@ -394,7 +366,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 227,
+    "line": 220,
     "citation": "MessageExchange.ts:428-433",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -403,7 +375,7 @@
   },
   {
     "file": "bridge/receive.go",
-    "line": 283,
+    "line": 276,
     "citation": "MessageCodec.ts:377",
     "resolved": "packages/protocol/src/codec/MessageCodec.ts",
     "identifier": "protocolId",
@@ -469,7 +441,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2065,
+    "line": 2243,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -478,7 +450,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2209,
+    "line": 2387,
     "citation": "ExchangeManager.ts:696-713",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#deleteSession",
@@ -534,7 +506,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1481,
+    "line": 1483,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -543,7 +515,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2103,
+    "line": 2105,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -552,7 +524,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2179,
+    "line": 2181,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -1332,7 +1304,7 @@
   },
   {
     "file": "cluster/camera/requestor.go",
-    "line": 238,
+    "line": 246,
     "citation": "packages/node/src/behavior/state/managed/values/ListManager.ts:461-478",
     "resolved": "packages/node/src/behavior/state/managed/values/ListManager.ts",
     "identifier": "createProxy",
@@ -1358,17 +1330,8 @@
     "occurrences": 3
   },
   {
-    "file": "cluster/core/basic_information_parity_test.go",
-    "line": 534,
-    "citation": "basic-information.element.ts:51",
-    "resolved": "packages/model/src/standard/elements/basic-information.element.ts",
-    "identifier": "SerialNumber",
-    "nearest": 75,
-    "occurrences": 1
-  },
-  {
     "file": "cluster/core/basic_information_test.go",
-    "line": 655,
+    "line": 639,
     "citation": "packages/model/src/standard/elements/basic-information.element.ts:165-169",
     "resolved": "packages/model/src/standard/elements/basic-information.element.ts",
     "identifier": "CapabilityMinima",
@@ -1377,7 +1340,7 @@
   },
   {
     "file": "cluster/core/binding.go",
-    "line": 106,
+    "line": 110,
     "citation": "packages/node/src/behaviors/binding/BindingManager.ts:714-718",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "entryKey",
@@ -1508,7 +1471,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 323,
+    "line": 335,
     "citation": "Fabric.ts:548",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -1517,7 +1480,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 446,
+    "line": 458,
     "citation": "OperationalCredentialsServer.ts:247-252",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "addNoc",
@@ -1526,7 +1489,7 @@
   },
   {
     "file": "cluster/core/operational_credentials.go",
-    "line": 1770,
+    "line": 1782,
     "citation": "OperationalCredentialsServer.ts:110",
     "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
     "identifier": "AttestationNonce",
@@ -1563,7 +1526,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 666,
+    "line": 674,
     "citation": "SoftwareUpdateManager.ts:1219-1232",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "NotifyUpdateApplied",
@@ -1581,7 +1544,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 554,
+    "line": 626,
     "citation": "ScenesManagementServer.ts:77-80",
     "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
     "identifier": "OnOff",
@@ -1590,7 +1553,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 565,
+    "line": 637,
     "citation": "OnOffServer.ts:114-117",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1617,7 +1580,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_parity_matterjs_test.go",
-    "line": 365,
+    "line": 364,
     "citation": "window-covering-cluster.element.ts:72",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "GoToLiftPercentage",
@@ -1626,7 +1589,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_payload_shapes_test.go",
-    "line": 116,
+    "line": 115,
     "citation": "window-covering-cluster.element.ts:71",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "LiftPercent100thsValue",
@@ -1635,7 +1598,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_payload_shapes_test.go",
-    "line": 201,
+    "line": 200,
     "citation": "window-covering-cluster.element.ts:71",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "CurrentPositionLiftPercentage",
@@ -1647,7 +1610,7 @@
     "line": 27,
     "citation": "WindowCoveringServer.ts:123-141",
     "resolved": "packages/node/src/behaviors/window-covering/WindowCoveringServer.ts",
-    "at": "862ad75f",
+    "at": "db021da0",
     "identifier": "OperationalStatus",
     "nearest": 203,
     "occurrences": 1
@@ -1663,7 +1626,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 900,
+    "line": 923,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -1690,7 +1653,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 228,
+    "line": 267,
     "citation": "LevelControlServer.ts:186-195",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "MoveMode",
@@ -1699,7 +1662,7 @@
   },
   {
     "file": "cluster/levelcontrol/native.go",
-    "line": 428,
+    "line": 468,
     "citation": "LevelControlServer.ts:624-627",
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "targetValue",
@@ -1745,7 +1708,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 347,
+    "line": 349,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "occupiedHeatingSetpoint",
@@ -1754,7 +1717,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 361,
+    "line": 363,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "systemMode",
@@ -1763,7 +1726,7 @@
   },
   {
     "file": "cluster/matter_negative_write_parity_test.go",
-    "line": 679,
+    "line": 681,
     "citation": "thermostat-cluster.element.ts:511",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1781,7 +1744,7 @@
   },
   {
     "file": "cluster/measurement/measurement.go",
-    "line": 1847,
+    "line": 1914,
     "citation": "packages/model/src/standard/elements/power-source-cluster.element.ts:135",
     "resolved": "packages/model/src/standard/elements/power-source-cluster.element.ts",
     "at": "db021da0",
@@ -1791,7 +1754,7 @@
   },
   {
     "file": "cluster/media/playback.go",
-    "line": 48,
+    "line": 42,
     "citation": "media-playback.element.ts:96-98",
     "resolved": "packages/model/src/standard/elements/media-playback.element.ts",
     "identifier": "MediaPlayback",
@@ -1809,7 +1772,7 @@
   },
   {
     "file": "cluster/onoff/server.go",
-    "line": 631,
+    "line": 636,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -1855,7 +1818,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_parity_test.go",
-    "line": 200,
+    "line": 199,
     "citation": "packages/model/src/standard/elements/thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1900,7 +1863,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 260,
+    "line": 263,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-603",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1910,7 +1873,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 311,
+    "line": 314,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "SetpointRaiseLower",
@@ -1919,17 +1882,17 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1202,
+    "line": 1216,
     "citation": "ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
-    "at": "0ceb202d",
+    "at": "db021da0",
     "identifier": "systemMode",
     "nearest": 781,
     "occurrences": 2
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1495,
+    "line": 1509,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1938,17 +1901,17 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1634,
+    "line": 1651,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
-    "at": "0ceb202d",
+    "at": "db021da0",
     "identifier": "SetpointRaiseLower",
     "nearest": 185,
     "occurrences": 1
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1810,
+    "line": 1827,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -1957,7 +1920,7 @@
   },
   {
     "file": "cluster/wire/fancontrol.go",
-    "line": 11,
+    "line": 15,
     "citation": "fan-control.element.ts:69-74",
     "resolved": "packages/model/src/standard/elements/fan-control.element.ts",
     "identifier": "FanControl",
@@ -1975,7 +1938,7 @@
   },
   {
     "file": "cluster/wire/operationalstate.go",
-    "line": 22,
+    "line": 32,
     "citation": "operational-state.element.ts:57-80",
     "resolved": "packages/model/src/standard/elements/operational-state.element.ts",
     "identifier": "OperationalState",
@@ -1984,7 +1947,7 @@
   },
   {
     "file": "contract/matter.go",
-    "line": 900,
+    "line": 944,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -2445,7 +2408,7 @@
   },
   {
     "file": "device/device.go",
-    "line": 717,
+    "line": 727,
     "citation": "packages/node/src/endpoints/bridged-node.ts:39-73",
     "resolved": "packages/node/src/endpoints/bridged-node.ts",
     "identifier": "BridgedNode",
@@ -2472,8 +2435,8 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 515,
-    "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247",
+    "line": 584,
+    "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:243-251",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "at": "db021da0",
     "identifier": "writeValue",
@@ -2482,7 +2445,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 1025,
+    "line": 1132,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -2492,7 +2455,7 @@
   },
   {
     "file": "endpoint/materialize.go",
-    "line": 555,
+    "line": 569,
     "citation": "OnOffServer.ts:97-122",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -2501,7 +2464,7 @@
   },
   {
     "file": "endpoint/types.go",
-    "line": 817,
+    "line": 867,
     "citation": "OnOffServer.ts:97-100",
     "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
     "identifier": "OnOff",
@@ -2929,7 +2892,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1677,
+    "line": 1682,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
