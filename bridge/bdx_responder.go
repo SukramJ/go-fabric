@@ -224,7 +224,11 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 		return false
 	}
 	responder := b.bdxResponder()
-	if responder == nil {
+	if responder == nil || !live || sess == nil {
+		// No session under the id at this look: no exchange is opened,
+		// so none is ever stored without the session object it belongs
+		// to ([initiatedSecureExchange.boundTo] would take it as bound to
+		// any session; R2-P6-sec-0302).
 		return false
 	}
 	peer, ok := b.bdxPeer(hdr.SessionID)
