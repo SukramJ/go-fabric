@@ -241,8 +241,8 @@ func UnmarshalStatusIBTLV(dec *tlv.Decoder) (StatusIB, error) {
 			}
 			return sib, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return StatusIB{}, fmt.Errorf("%w: %w", ErrInvalidStatusIB, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagStatusIBStatus:
@@ -257,6 +257,10 @@ func UnmarshalStatusIBTLV(dec *tlv.Decoder) (StatusIB, error) {
 				return StatusIB{}, fmt.Errorf("%w: %w", ErrInvalidStatusIB, err)
 			}
 			sib.HasClusterStatus = true
+		default:
+			if err := skipField(dec, el); err != nil {
+				return StatusIB{}, fmt.Errorf("%w: %w", ErrInvalidStatusIB, err)
+			}
 		}
 	}
 }

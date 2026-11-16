@@ -162,8 +162,8 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 			}
 			return req, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagSubReqKeepSubscriptions:

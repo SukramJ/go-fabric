@@ -57,6 +57,11 @@ func readDataVersionFilterArray(dec *tlv.Decoder) ([]DataVersionFilter, error) {
 			return filters, nil
 		}
 		if !el.IsContainer || el.Type != tlv.TypeStructure {
+			// Not a DataVersionFilterIB: skipped whole, so its members
+			// are not read as the array's (R2-P6-wire-0504).
+			if err := skipField(dec, el); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		f, err := readDataVersionFilterFields(dec)
@@ -94,11 +99,8 @@ func readDataVersionFilterFields(dec *tlv.Decoder) (DataVersionFilter, error) {
 			}
 			return f, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			if err := skipField(dec, el); err != nil {
-				return DataVersionFilter{}, err
-			}
-			continue
+		if err := contextMember(el); err != nil {
+			return DataVersionFilter{}, err
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0: // Path (ClusterPathIB — a List)
@@ -246,13 +248,8 @@ func readEventFilterFields(dec *tlv.Decoder) (EventMinimumNumber, error) {
 			}
 			return f, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			if el.IsContainer {
-				if skipErr := skipContainer(dec); skipErr != nil {
-					return EventMinimumNumber{}, skipErr
-				}
-			}
-			continue
+		if err := contextMember(el); err != nil {
+			return EventMinimumNumber{}, err
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagEventFilterNodeID:

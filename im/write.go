@@ -102,8 +102,8 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 			}
 			return req, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagWriteReqSuppressResponse:
@@ -188,8 +188,8 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			}
 			return w, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagAttributeDataDataVersion:
@@ -230,6 +230,10 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 				return AttributeWrite{}, fmt.Errorf("%w: value: %w", ErrInvalidWriteRequest, err)
 			}
 			w.Value = v
+		default:
+			if err := skipField(dec, el); err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
+			}
 		}
 	}
 }

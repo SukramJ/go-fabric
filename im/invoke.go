@@ -229,8 +229,8 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 			}
 			return req, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagInvokeReqSuppressResponse:
@@ -317,8 +317,8 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			}
 			return inv, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return CommandInvocation{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagCmdDataPath:
@@ -342,6 +342,10 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			}
 			inv.CommandRef = ref
 			inv.HasCommandRef = true
+		default:
+			if err := skipField(dec, el); err != nil {
+				return CommandInvocation{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
+			}
 		}
 	}
 }

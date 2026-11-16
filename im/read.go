@@ -132,8 +132,8 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 			}
 			return req, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagReadReqAttributeRequests:

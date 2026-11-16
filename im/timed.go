@@ -83,8 +83,8 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 		if el.IsEndContainer {
 			break
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return TimedRequest{}, fmt.Errorf("%w: %w", ErrInvalidTimedRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagTimedReqTimeout:
@@ -95,9 +95,13 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 			if req.TimeoutMs, err = uint16Field(el); err != nil {
 				return TimedRequest{}, fmt.Errorf("%w: %w", ErrInvalidTimedRequest, err)
 			}
-		case tagTimedReqInteractionModelRevision:
-			// Decoded but not retained — the IM-revision field is
-			// informational; we always reply with our own revision.
+		default:
+			// InteractionModelRevision is decoded but not retained — the
+			// field is informational; we always reply with our own
+			// revision. Unknown fields are skipped whole.
+			if err := skipField(dec, el); err != nil {
+				return TimedRequest{}, fmt.Errorf("%w: %w", ErrInvalidTimedRequest, err)
+			}
 		}
 	}
 	// Timeout is mandatory: matter.js
@@ -142,13 +146,8 @@ func UnmarshalStatusResponseTLV(dec *tlv.Decoder) (StatusResponse, error) {
 		if el.IsEndContainer {
 			break
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			if el.IsContainer {
-				if err := skipContainer(dec); err != nil {
-					return sr, fmt.Errorf("%w: %w", ErrInvalidStatusResponse, err)
-				}
-			}
-			continue
+		if err := contextMember(el); err != nil {
+			return sr, fmt.Errorf("%w: %w", ErrInvalidStatusResponse, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagStatusResponseStatus:
