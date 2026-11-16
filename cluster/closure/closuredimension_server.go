@@ -361,12 +361,17 @@ func (s *DimensionServer) tracker() *cluster.DataVersionTracker {
 // changed advances the data version and reports attrIDs: a change a
 // command makes is the command's, any other the device's own report.
 func (s *DimensionServer) changed(attrIDs ...uint32) {
-	origin := contract.OriginHostSet
-	if s.commands.Load() > 0 {
-		origin = contract.OriginCommand
-	}
 	s.tracker().Bump()
-	s.NotifyFrom(origin, attrIDs...)
+	s.NotifyFrom(s.origin(), attrIDs...)
+}
+
+// origin is where a change comes from: a command's while one runs, the
+// device's own otherwise.
+func (s *DimensionServer) origin() contract.Origin {
+	if s.commands.Load() > 0 {
+		return contract.OriginCommand
+	}
+	return contract.OriginHostSet
 }
 
 // Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
@@ -660,8 +665,14 @@ func (s *DimensionServer) TargetState() *DimensionState {
 // its rules (:210-222, :247-316): at once when CurrentState or its
 // Position changes to or from null, when the Position reaches the
 // target's, when Latch or Speed changes; any other Position change at
-// most once every 5 s. A change held back is stored and read, but neither
-// bumps the data version nor is reported.
+// most once every 5 s. A change held back is stored and read, and advances
+// the data version — the change listeners are told — but is not reported,
+// then or later: chip's quiet change (R2-P6-wire-1583). Mirrors
+// connectedhomeip ClosureDimensionCluster.cpp:320-321 at 6170af84, which
+// notifies a held-back Position with kQuiet, and DefaultServerCluster.cpp:100-102,
+// which increases the data version for every notification type
+// (AttributeChangeListener.h:42-48: kQuiet is visible on a read, not
+// reported).
 func (s *DimensionServer) SetCurrentState(st *DimensionState) error {
 	if st != nil {
 		if err := s.checkState(*st, false); err != nil {
@@ -697,6 +708,9 @@ func (s *DimensionServer) SetCurrentState(st *DimensionState) error {
 	s.mu.Unlock()
 	if dirty {
 		s.changed(cd.AttrCurrentState)
+	} else {
+		s.tracker().Bump()
+		s.ChangedFrom(s.origin(), cd.AttrCurrentState)
 	}
 	return nil
 }
