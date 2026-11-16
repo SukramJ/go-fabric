@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18793,
+    "total_exported": 18794,
     "reachable": 12622,
-    "whitelisted": 6171,
+    "whitelisted": 6172,
     "unreachable": 0
   },
   "by_package": [],
@@ -25035,14 +25035,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1064
+      "line": 1067
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1060
+      "line": 1063
     },
     {
       "package": "controller",
@@ -27780,6 +27780,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
       "line": 98
+    },
+    {
+      "package": "controller/client/sqlstore",
+      "identifier": "SealWithoutScrub",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/export_test.go",
+      "line": 15
     },
     {
       "package": "controller/commissioner",
