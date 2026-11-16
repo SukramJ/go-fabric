@@ -104,10 +104,15 @@ func PrivacyMask(privacyKey []byte, sessionID uint16, mic []byte) ([]byte, error
 	return PrivacyKeystream(privacyKey, sessionID, mic, PrivacyKeySize)
 }
 
+// maxPrivacyKeystreamLen is the longest keystream [PrivacyKeystream]
+// derives: 0xFFFF blocks, the reach of its 16-bit block counter.
+const maxPrivacyKeystreamLen = 0xFFFF * PrivacyKeySize
+
 // PrivacyKeystream returns the AES-CTR keystream [PrivacyMask] describes,
 // long enough to cover n bytes: as many whole counter blocks as n needs
 // (at least one), counter values 1, 2, … in the AES-CCM counter-block
-// layout. [ApplyPrivacyMask] XORs only as far as the region reaches.
+// layout. [ApplyPrivacyMask] XORs only as far as the region reaches. An
+// n beyond the 0xFFFF blocks the 16-bit counter reaches is refused.
 //
 // The protected region is not bounded by one block: with both a Source
 // Node ID and a 64-bit Destination Node ID present it is 20 bytes
@@ -127,6 +132,12 @@ func PrivacyKeystream(privacyKey []byte, sessionID uint16, mic []byte, n int) ([
 	if n < 0 {
 		return nil, fmt.Errorf("channel: privacy keystream length %d is negative", n)
 	}
+	// The block counter is 16 bits and starts at 1: it covers 0xFFFF
+	// blocks. A longer keystream would repeat after the counter wraps
+	// (R2-P6-api-0115).
+	if n > maxPrivacyKeystreamLen {
+		return nil, fmt.Errorf("channel: privacy keystream length %d exceeds %d", n, maxPrivacyKeystreamLen)
+	}
 	tag := mic[len(mic)-privacyMICLength:]
 	cipher, err := aes.NewCipher(privacyKey)
 	if err != nil {
@@ -143,7 +154,7 @@ func PrivacyKeystream(privacyKey []byte, sessionID uint16, mic []byte, n int) ([
 	}
 	stream := make([]byte, blocks*PrivacyKeySize)
 	for i := range blocks {
-		//nolint:gosec // i+1 ≤ 2 in practice; the region is at most 20 bytes
+		//nolint:gosec // i+1 ≤ 0xFFFF: n is bounded by maxPrivacyKeystreamLen above
 		binary.BigEndian.PutUint16(block[PrivacyKeySize-2:], uint16(i+1))
 		cipher.Encrypt(stream[i*PrivacyKeySize:], block)
 	}
