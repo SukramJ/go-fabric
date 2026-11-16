@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -20,6 +21,9 @@ type hostOwnValue struct{ A int }
 // writer cannot encode is still served as null (a non-empty []any as an
 // empty list), and the writer says so once per Go type at Warn.
 func TestUnencodableValueIsLoggedOnce(t *testing.T) {
+	// The once is per process: a repeated run (-count) starts with the
+	// type unlogged again.
+	unencodableTypes.Delete(fmt.Sprintf("%T", hostOwnValue{}))
 	var buf bytes.Buffer
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
