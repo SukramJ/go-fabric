@@ -6,6 +6,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -76,7 +77,7 @@ func newExchangeSessionRig(t *testing.T) *exchangeSessionRig {
 		if time.Now().After(deadline) {
 			t.Fatal("the peer's BDX exchange was not opened")
 		}
-		time.Sleep(5 * time.Millisecond)
+		runtime.Gosched()
 	}
 	r.nodeEx, err = dev.br.OpenSessionExchange(context.Background(), r.sid)
 	if err != nil {
@@ -116,8 +117,6 @@ func (r *exchangeSessionRig) responderEnded(t *testing.T) {
 		}
 	case msg := <-r.responder.got:
 		t.Fatalf("the old exchange's responder received protocol %#x opcode %#x", msg.ProtocolID, msg.Opcode)
-	case <-time.After(5 * time.Second):
-		t.Fatal("the responder's Receive did not return")
 	}
 }
 

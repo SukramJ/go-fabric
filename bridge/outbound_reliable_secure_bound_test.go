@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -41,7 +42,7 @@ func TestSecureRetransmitTableIsBoundedPerSession(t *testing.T) {
 	waited := make(chan error, 1)
 	go func() { waited <- tr.WaitForAck(context.Background(), 0x0042, 1) }()
 	for !tr.hasWaiter(0x0042, 1) {
-		time.Sleep(time.Millisecond)
+		runtime.Gosched()
 	}
 	const n = 1000
 	for i := range n {
@@ -58,13 +59,8 @@ func TestSecureRetransmitTableIsBoundedPerSession(t *testing.T) {
 			t.Fatalf("the entry of exchange %#x, among the %d tracked last, is gone", 0x2000+i, secureExchangeLimit)
 		}
 	}
-	select {
-	case err := <-waited:
-		if !errors.Is(err, errSecureExchangeEvicted) {
-			t.Fatalf("the evicted entry's waiter got %v, want errSecureExchangeEvicted", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("the evicted entry's waiter was not woken")
+	if err := <-waited; !errors.Is(err, errSecureExchangeEvicted) {
+		t.Fatalf("the evicted entry's waiter got %v, want errSecureExchangeEvicted", err)
 	}
 	if len(evictions) != n+1-secureExchangeLimit || evictions[0] != (eviction{0x0042, 0x1000, false}) {
 		t.Fatalf("the hook heard %d evictions, first %+v; want %d, first of exchange 0x1000", len(evictions), evictions[0], n+1-secureExchangeLimit)

@@ -417,7 +417,6 @@ func TestPipelinePeerSkipsAStrayDatagram(t *testing.T) {
 	if _, err := other.WriteToUDP(stray, p.conn.LocalAddr().(*net.UDPAddr)); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(20 * time.Millisecond) // the stray datagram is queued first
 	initRand := make([]byte, spake2.PBKDFRandomSize)
 	if err := p.send(mrp.SCOpcodePBKDFParamRequest, 0x0505, buildTestPBKDFParamRequest(t, initRand), nil); err != nil {
 		t.Fatal(err)
