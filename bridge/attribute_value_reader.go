@@ -6,7 +6,6 @@ package bridge
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -93,7 +92,59 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 	if v, over := overlongBeforeIS1(path, el); over {
 		return v, nil
 	}
+	if wrong := scalarOfAnotherType(path, el); wrong != nil {
+		// A value, not a decode error: the interaction ends where it
+		// would be written (im.UndecodableValue).
+		return im.AttributeValue{Value: im.UndecodableValue{Err: wrong}}, nil //nolint:nilerr // the refusal travels as the value
+	}
 	return primitiveAttributeValue(el, dec)
+}
+
+// scalarOfAnotherType is the refusal of a scalar written with another TLV
+// type than its attribute's — a string, a boolean, a float or a signed
+// integer to an unsigned attribute, and the reverse — by the attribute's
+// definition and the strict decoders (class [spec.ErrWrongType]); nil for
+// a value of the right type (its range is the definition's check on the
+// path), a null (its nullability likewise), a container (decoded above or
+// refused by [primitiveAttributeValue]) and an attribute no registered
+// definition types. matter.js decodes a written value strictly — the
+// integer relaxation is the client's alone — and throws for another type,
+// which ends the write interaction (owner decision 161; TlvNumber.ts:124-131,
+// TlvString.ts:58, TlvBoolean.ts:23 at db021da0, fable-read-6a-gate re-read §2).
+func scalarOfAnotherType(path im.ConcreteAttributePath, el tlv.Element) error {
+	if el.IsNull || el.IsContainer {
+		return nil
+	}
+	def := spec.Lookup(path.Cluster)
+	if def == nil {
+		return nil
+	}
+	a := def.Attribute(path.Attribute)
+	if a == nil {
+		return nil
+	}
+	n := spec.Node{El: el}
+	var err error
+	switch a.Type.Kind {
+	case spec.KindBool:
+		_, err = spec.DecodeBool(n)
+	case spec.KindUint, spec.KindEnum, spec.KindBitmap:
+		_, err = spec.DecodeUint[uint64](64)(n)
+	case spec.KindInt:
+		_, err = spec.DecodeInt[int64](64)(n)
+	case spec.KindFloat32, spec.KindFloat64:
+		_, err = spec.DecodeFloat64(n)
+	case spec.KindString:
+		_, err = spec.DecodeString(n)
+	case spec.KindBytes:
+		_, err = spec.DecodeBytes(n)
+	default:
+		return nil
+	}
+	if errors.Is(err, spec.ErrWrongType) {
+		return fmt.Errorf("%s.%s: %w", def.Name, a.Name, err)
+	}
+	return nil
 }
 
 // overlongBeforeIS1 refuses a character string the decoder cut at its
@@ -137,16 +188,15 @@ type undecodedValue struct{ err error }
 
 // refusedValue is the write value of a decode the definition refused. An
 // element of another type than the attribute's — a list element that is
-// not a structure, a string where a number belongs: the decoder's
-// INVALID_COMMAND refusals that say "is not a …" (cluster/spec codec.go,
-// decode_value.go) — is an [im.UndecodableValue], which ends the write
+// not a structure, a string where a number belongs: the decoder's refusals
+// of class [spec.ErrWrongType] — is an [im.UndecodableValue], which ends the write
 // interaction with FAILURE (owner decision 161, R2-P6-wire-1703). Every
 // other refusal — a value outside its constraint, a struct missing a
 // mandatory field (node:TestUserLabelServerParity pins CONSTRAINT_ERROR
 // for it), a string that is not UTF-8 — is an [undecodedValue], answered
 // CONSTRAINT_ERROR on its path.
 func refusedValue(def *spec.Cluster, err error) any {
-	if fe, ok := errors.AsType[*spec.FieldError](err); ok && fe.Status == im.StatusInvalidCommand && strings.Contains(fe.Msg, "is not a") {
+	if errors.Is(err, spec.ErrWrongType) {
 		return im.UndecodableValue{Err: fmt.Errorf("%s: %w", def.Name, err)}
 	}
 	return undecodedValue{err}
@@ -162,10 +212,11 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 	n, err := spec.ReadContainer(dec, el)
 	if errors.Is(err, spec.ErrArrayElementTag) {
 		// A value its schema does not decode, read through to its end:
-		// the server's write check answers it, as any other such value
-		// (matter.js packages/types/src/tlv/TlvArray.ts:77-78 at db021da0
-		// throws for an array element with a tag).
-		return im.AttributeValue{Value: undecodedValue{fmt.Errorf("%s: %w", def.Name, err)}}, nil
+		// undecodable, the write interaction ends with FAILURE (owner
+		// decision 161), as matter.js's TlvArray throws for an array
+		// element with a tag (packages/types/src/tlv/TlvArray.ts:78 at
+		// db021da0, the class of G3).
+		return im.AttributeValue{Value: im.UndecodableValue{Err: fmt.Errorf("%s: %w", def.Name, err)}}, nil
 	}
 	if err != nil {
 		return im.AttributeValue{}, fmt.Errorf("%s: %w", def.Name, err)

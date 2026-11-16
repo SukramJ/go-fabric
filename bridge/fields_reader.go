@@ -104,7 +104,15 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 	if err != nil {
 		return nil, fieldsReadError(fmt.Sprintf("%s command 0x%02X", def.Name, path.Command), err)
 	}
-	if cmd := def.Command(path.Command, spec.Request); cmd != nil && cmd.Decode != nil {
+	cmd := def.Command(path.Command, spec.Request)
+	if cmd != nil && cmd.Decode == nil {
+		// A command the definition knows but cannot check: the hand
+		// reader's own checks are gone (R2-P6-test-0811), so it is not
+		// read unchecked — refused, fail-closed. No command of the
+		// hand-read clusters is such today (40 of 40 have a decoder).
+		return nil, &spec.FieldError{Status: im.StatusInvalidCommand, Msg: fmt.Sprintf("%s.%s: no request decoder to hold the request to", def.Name, cmd.Name)}
+	}
+	if cmd != nil {
 		if _, err := cmd.DecodeRequest(n); err != nil {
 			return nil, err
 		}
@@ -116,17 +124,20 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 		// reaches a reader that would descend into it and read its inner
 		// tags as the command's own (R2-P6-wire-0440).
 		n = definedFields(n, cmd)
-	}
-	sub, _, err := reopen(n)
-	if err != nil {
-		return nil, err
-	}
-	fields, ok, err := read(path, sub)
-	if ok {
-		return fields, consumed(err)
-	}
-	if err != nil {
-		return nil, consumed(err)
+		// Only a request its definition checked reaches a hand reader: a
+		// command the definition does not know goes on to the salvage
+		// below, and the dispatcher answers its path.
+		sub, _, err := reopen(n)
+		if err != nil {
+			return nil, err
+		}
+		fields, ok, err := read(path, sub)
+		if ok {
+			return fields, consumed(err)
+		}
+		if err != nil {
+			return nil, consumed(err)
+		}
 	}
 	sub, open, err := reopen(n)
 	if err != nil {
@@ -138,7 +149,7 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 	if sub, _, err = reopen(n); err != nil {
 		return nil, err
 	}
-	fields, err = decodeGenericTagMap(sub)
+	fields, err := decodeGenericTagMap(sub)
 	return fields, consumed(err)
 }
 
