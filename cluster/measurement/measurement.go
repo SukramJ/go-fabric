@@ -186,11 +186,14 @@ const (
 	attrElEnCumulativeImported = eemdef.AttrCumulativeEnergyImported // int64 mWh, struct EnergyMeasurementStruct.energy
 )
 
-// elPwrFeatureAltC is the ElectricalPower FeatureMap: only the ALTC
-// (Alternating-Current) feature is advertised, a mains-AC meter's; DIRC
-// stays off because [contract.ElectricalReadings] does not say that a
-// meter measures direct current.
-const elPwrFeatureAltC = uint32(epmdef.FeatureAlternatingCurrent)
+// elPwrFeatureAltC and elPwrFeatureDirC are the ElectricalPower
+// FeatureMaps: ALTC (Alternating-Current) for a meter that states no kind
+// of current or alternating current, DIRC (Direct-Current) for one that
+// states direct current ([contract.ElectricalCurrentSource], decision 163).
+const (
+	elPwrFeatureAltC = uint32(epmdef.FeatureAlternatingCurrent)
+	elPwrFeatureDirC = uint32(epmdef.FeatureDirectCurrent)
+)
 
 // ElectricalEnergy FeatureMap bits. Both IMPE and CUME are advertised: the
 // imported/exported pair and the cumulative/periodic pair form two
@@ -987,6 +990,23 @@ type ElectricalPowerServer struct {
 	// readings is nil for a single-parameter source; when set it answers
 	// Voltage / ActiveCurrent / Frequency as well.
 	readings contract.ElectricalReadings
+	// dc is a direct-current meter's server: DIRC, PowerMode DC, no
+	// Frequency ([contract.ElectricalCurrentSource]).
+	dc bool
+}
+
+// directCurrent reports whether src states direct current.
+func directCurrent(src any) bool {
+	c, ok := src.(contract.ElectricalCurrentSource)
+	return ok && c.MatterElectricalCurrent() == contract.WiredCurrentDC
+}
+
+// inst is the server's instance: ALTC, or DIRC for a direct-current meter.
+func (s *ElectricalPowerServer) inst() *spec.Instance {
+	if s.dc {
+		return electricalPowerInstDC
+	}
+	return electricalPowerInst
 }
 
 // Compile-time assertion: ElectricalPowerServer satisfies MatterClusterDataVersion.
@@ -996,7 +1016,7 @@ var _ contract.ClusterDataVersion = (*ElectricalPowerServer)(nil)
 // read as null — use [NewElectricalPowerServerFromReadings] for a source that
 // carries them.
 func NewElectricalPowerServer(src contract.FloatMeasurementSource) *ElectricalPowerServer {
-	return &ElectricalPowerServer{src: src}
+	return &ElectricalPowerServer{src: src, dc: directCurrent(src)}
 }
 
 // NewElectricalPowerServerFromReadings wraps a consolidated electrical group,
@@ -1004,7 +1024,7 @@ func NewElectricalPowerServer(src contract.FloatMeasurementSource) *ElectricalPo
 // the cluster instead of only ActivePower.
 // fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 func NewElectricalPowerServerFromReadings(r ElectricalReadingsSource) *ElectricalPowerServer {
-	return &ElectricalPowerServer{src: r, readings: r}
+	return &ElectricalPowerServer{src: r, readings: r, dc: directCurrent(r)}
 }
 
 // ElectricalReadingsSource is a consolidated electrical group: the typed
@@ -1039,13 +1059,16 @@ func (s *ElectricalPowerServer) OnMatterValueChanged(cb func()) func() {
 func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case attrElPwrPowerMode:
-		// 0=Unknown, 1=DC, 2=AC: AC, the ALTC feature the server
-		// advertises ([elPwrFeatureAltC]).
-		return uint8(2), true
+		// The kind of current the feature names: DC under DIRC, AC under
+		// ALTC.
+		if s.dc {
+			return uint8(epmdef.PowerModeDc), true
+		}
+		return uint8(epmdef.PowerModeAc), true
 	case attrElPwrNumberOfMeasurementTypes:
-		return uint8(len(elPwrAccuracy())), true //nolint:gosec // four entries
+		return uint8(len(elPwrAccuracy(s.dc))), true //nolint:gosec // at most four entries
 	case attrElPwrAccuracy:
-		return elPwrAccuracy(), true
+		return elPwrAccuracy(s.dc), true
 	case attrElPwrActivePower:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
@@ -1064,16 +1087,19 @@ func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 		// reference stack, which types it UnitOfElectricCurrent.MILLIAMPERE.
 		return s.scaled(func() (float64, bool) { return s.readings.Current() }, 1, -elPwrReadingBound, elPwrReadingBound), true
 	case attrElPwrFrequency:
+		if s.dc { // "[ALTC]": not served under DIRC
+			return nil, false
+		}
 		return s.scaled(func() (float64, bool) { return s.readings.Frequency() }, 1000, 0, elPwrFrequencyMax), true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
-		return electricalPowerInst.ReadGlobal(attrID)
+		return s.inst().ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
 // MatterWrite refuses the write as the definition answers it (see refuseWrite): the Electrical Power Measurement cluster is read-only at the wire layer.
 func (s *ElectricalPowerServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	return refuseWrite(electricalPowerInst, attrID, value)
+	return refuseWrite(s.inst(), attrID, value)
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
@@ -1103,7 +1129,7 @@ func (s *ElectricalPowerServer) MatterReportable() []uint32 {
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
 func (s *ElectricalPowerServer) MatterAttributes() []uint32 {
-	return electricalPowerInst.MatterAttributes()
+	return s.inst().MatterAttributes()
 }
 
 // Compile-time assertion: ElectricalPowerServer lists its events.
@@ -1119,24 +1145,28 @@ var _ contract.ClusterEventLister = (*ElectricalPowerServer)(nil)
 // so its cluster type carries no event
 // (packages/node/src/node/integration/ProtocolService.ts:529-532). An event
 // path on the cluster selects nothing (review II, R2-P4-nw-05).
-func (s *ElectricalPowerServer) MatterEvents() []uint32 { return electricalPowerInst.MatterEvents() }
+func (s *ElectricalPowerServer) MatterEvents() []uint32 { return s.inst().MatterEvents() }
 
 // elPwrAccuracy is ElectricalPowerMeasurement's Accuracy: one entry per
-// measurement type the server serves (electricalPowerInst: Voltage,
+// measurement type the server serves (its instance: Voltage,
 // ActiveCurrent and Frequency beside ActivePower), in MeasurementType
 // order, each over its attribute's constraint — the cluster's model text
 // asks for "an entry for ActivePower, as well as any other measurement
 // types implemented by this server", and NumberOfMeasurementTypes is the
 // count (R2-P6-par-1466). Every AccuracyRanges carries one range, as
 // Matter requires; see [AccuracyStruct] for the stub-entry rationale. Each
-// read builds its own list, so no reader shares another's.
-func elPwrAccuracy() []AccuracyStruct {
-	return []AccuracyStruct{
+// read builds its own list, so no reader shares another's. A
+// direct-current meter (dc) serves no Frequency and lists none.
+func elPwrAccuracy(dc bool) []AccuracyStruct {
+	list := []AccuracyStruct{
 		elPwrAccuracyOf(epmdef.MeasurementTypeVoltage, accuracyRangeMin, accuracyRangeMax),
 		elPwrAccuracyOf(epmdef.MeasurementTypeActiveCurrent, accuracyRangeMin, accuracyRangeMax),
 		elPwrAccuracyOf(epmdef.MeasurementTypeActivePower, accuracyRangeMin, accuracyRangeMax),
-		elPwrAccuracyOf(epmdef.MeasurementTypeFrequency, 0, elPwrFrequencyMax),
 	}
+	if !dc {
+		list = append(list, elPwrAccuracyOf(epmdef.MeasurementTypeFrequency, 0, elPwrFrequencyMax))
+	}
+	return list
 }
 
 func elPwrAccuracyOf(t epmdef.MeasurementTypeEnum, lo, hi int64) AccuracyStruct {

@@ -684,6 +684,17 @@ type ElectricalReadings interface {
 	HasEnergy() bool
 }
 
+// ElectricalCurrentSource is the optional capability of an
+// [ElectricalReadings], or of the [FloatMeasurementSource] of a power
+// reading, that states the kind of current the meter measures: the
+// ElectricalPowerMeasurement cluster's PowerMode and its
+// alternating-current or direct-current feature. A source without it is an
+// alternating-current meter ([WiredCurrentAC], the zero value). The kind
+// is part of the endpoint's surface: a host that changes it reassembles.
+type ElectricalCurrentSource interface {
+	MatterElectricalCurrent() WiredCurrent
+}
+
 // MeasurementSource is implemented by Generic / Calculated DPs
 // that project to a single Matter measurement cluster. The endpoint
 // assembler uses this to decide whether to build a standalone sensor

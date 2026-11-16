@@ -56,6 +56,13 @@ var (
 		Attributes: []uint32{epmdef.AttrVoltage, epmdef.AttrActiveCurrent, epmdef.AttrFrequency},
 	})
 
+	// DIRC, a direct-current meter's (contract.ElectricalCurrentSource):
+	// Voltage and ActiveCurrent; Frequency is "[ALTC]".
+	electricalPowerInstDC = mustInstance(epmdef.Definition, spec.Options{
+		Features:   elPwrFeatureDirC,
+		Attributes: []uint32{epmdef.AttrVoltage, epmdef.AttrActiveCurrent},
+	})
+
 	// IMPE | CUME: Accuracy and CumulativeEnergyImported.
 	electricalEnergyInst = mustInstance(eemdef.Definition, spec.Options{Features: elEnFeatureIMPE | elEnFeatureCUME})
 )
