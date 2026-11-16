@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
+	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -188,5 +190,74 @@ func TestAccessControlWritesDecodeThroughTheirDefinitions(t *testing.T) {
 	}))
 	if want := []mattercore.GroupKeyMapStruct{{GroupID: 0x0101, GroupKeySetID: 7, FabricIndex: 1}}; !reflect.DeepEqual(gkmOK.Value, want) {
 		t.Errorf("a well-formed GroupKeyMap decoded to %#v, want %#v", gkmOK.Value, want)
+	}
+}
+
+// TestCoreListWriteChoosesByClusterAndAttribute: the three hand-mapped list
+// decoders are chosen by cluster and attribute together, and only for a
+// container — another attribute of AccessControl or GroupKeyManagement,
+// the same attribute id on another cluster, and a scalar get none
+// (R2-P6-test-0812).
+func TestCoreListWriteChoosesByClusterAndAttribute(t *testing.T) {
+	t.Parallel()
+	container := tlv.Element{IsContainer: true}
+	fn := func(f func(tlv.Element, *tlv.Decoder, bool) (im.AttributeValue, error)) uintptr {
+		if f == nil {
+			return 0
+		}
+		return reflect.ValueOf(f).Pointer()
+	}
+	for _, c := range []struct {
+		name string
+		path im.ConcreteAttributePath
+		el   tlv.Element
+		want uintptr
+	}{
+		{"ACL", attrPath(acldef.ClusterID, acldef.AttrAcl), container, fn(aclWriteValue)},
+		{"Extension", attrPath(acldef.ClusterID, acldef.AttrExtension), container, fn(extensionWriteValue)},
+		{"GroupKeyMap", attrPath(gkmdef.ClusterID, gkmdef.AttrGroupKeyMap), container, fn(groupKeyMapWriteValue)},
+		{"ACL, a scalar", attrPath(acldef.ClusterID, acldef.AttrAcl), tlv.Element{}, 0},
+		{"AccessControl, another attribute", attrPath(acldef.ClusterID, 0x0002), container, 0},
+		{"GroupKeyManagement, another attribute", attrPath(gkmdef.ClusterID, 0x0001), container, 0},
+		{"the Extension id on another cluster", attrPath(gkmdef.ClusterID, acldef.AttrExtension), container, 0},
+		{"the ACL id on another cluster", attrPath(0x0006, acldef.AttrAcl), container, 0},
+		{"the GroupKeyMap id on another cluster", attrPath(acldef.ClusterID+0x0100, gkmdef.AttrGroupKeyMap), container, 0},
+	} {
+		if got := fn(coreListWrite(c.path, c.el)); got != c.want {
+			t.Errorf("%s: decoder %#x, want %#x", c.name, got, c.want)
+		}
+	}
+}
+
+// TestACLEmptyListsDecodeAsNull: an ACL entry's empty Subjects or Targets
+// list decodes as a null one — nil, which matches every subject or target
+// (R2-P6-test-0812).
+func TestACLEmptyListsDecodeAsNull(t *testing.T) {
+	t.Parallel()
+	for _, empty := range []bool{true, false} {
+		av := writeValueOf(t, attrPath(acldef.ClusterID, acldef.AttrAcl), func(enc *tlv.Encoder) {
+			enc.StartArray(tlv.AnonymousTag())
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutUint(tlv.ContextTag(1), 5)
+			enc.PutUint(tlv.ContextTag(2), 2)
+			for _, tag := range []uint8{3, 4} {
+				if empty {
+					enc.StartArray(tlv.ContextTag(tag))
+					_ = enc.EndContainer()
+				} else {
+					enc.PutNull(tlv.ContextTag(tag))
+				}
+			}
+			enc.PutUint(tlv.ContextTag(254), 1)
+			_ = enc.EndContainer()
+			_ = enc.EndContainer()
+		})
+		l, ok := av.Value.([]mattercore.AccessControlEntryStruct)
+		if !ok || len(l) != 1 {
+			t.Fatalf("empty=%v: decoded to %#v", empty, av.Value)
+		}
+		if l[0].Subjects != nil || l[0].Targets != nil {
+			t.Errorf("empty=%v: Subjects %#v, Targets %#v; want both nil", empty, l[0].Subjects, l[0].Targets)
+		}
 	}
 }
