@@ -198,10 +198,10 @@ func TestWaitIdleWaitsForRunningHandlers(t *testing.T) {
 }
 
 // TestOrderedBacklogLeavesRoomForAnotherSource holds R2-P6-bound-0211: the
-// stream key is read before any decryption, so a party that floods forged
-// datagrams carrying an active session's id from its own address takes at
-// most maxOrderedBacklogPerSource places of that stream's backlog — the
-// genuine peer's next datagram still finds room.
+// stream key is read before any decryption, so a party may flood forged
+// datagrams carrying an active session's id from its own address. Alone it
+// fills the backlog; the genuine peer's datagrams then take the places of
+// the flooder's newest, up to maxOrderedBacklogPerSource of them.
 func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 	block := make(chan struct{})
 	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) { <-block }}
@@ -211,7 +211,17 @@ func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 	for range maxOrderedBacklog + 50 {
 		o.enqueue(l, 1, []byte{1}, flooder)
 	}
-	o.enqueue(l, 1, []byte{1, 2}, peer)
+	o.mu.Lock()
+	alone := len(o.queues[1].items)
+	o.mu.Unlock()
+	if alone != maxOrderedBacklog {
+		t.Fatalf("a source alone queued %d, want the whole backlog %d", alone, maxOrderedBacklog)
+	}
+	const peerSends = 3
+	for range peerSends {
+		o.enqueue(l, 1, []byte{1, 2}, peer)
+		o.enqueue(l, 1, []byte{1}, flooder)
+	}
 	o.mu.Lock()
 	var fromPeer, fromFlooder int
 	for _, it := range o.queues[1].items {
@@ -223,10 +233,16 @@ func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 	}
 	o.mu.Unlock()
 	close(block)
-	if fromPeer != 1 {
-		t.Fatalf("the peer's datagram was dropped behind %d forged ones", fromFlooder)
+	if fromPeer != peerSends {
+		t.Fatalf("%d of the peer's %d datagrams queued behind %d forged ones", fromPeer, peerSends, fromFlooder)
 	}
-	if fromFlooder > maxOrderedBacklogPerSource {
-		t.Fatalf("one source holds %d places of the backlog, want at most %d", fromFlooder, maxOrderedBacklogPerSource)
+	if fromPeer+fromFlooder != maxOrderedBacklog {
+		t.Fatalf("backlog %d, want %d", fromPeer+fromFlooder, maxOrderedBacklog)
+	}
+	o.mu.Lock()
+	pending := o.pending
+	o.mu.Unlock()
+	if pending != maxOrderedBacklog+1 { // the queued ones and the one running
+		t.Fatalf("pending %d after displacements, want %d", pending, maxOrderedBacklog+1)
 	}
 }

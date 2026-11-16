@@ -38,7 +38,7 @@ type Queue struct {
 	// one warning per episode, not one per dropped callback.
 	overflowing bool
 	// log is the queue's logger; nil logs through slog.Default().
-	log *slog.Logger
+	log     *slog.Logger
 	running bool
 	stopped chan struct{} // closed when the goroutine of this run exits
 	// group, when set, is the in-flight group a callback counts in from

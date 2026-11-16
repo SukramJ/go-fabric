@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"slices"
 	"sync"
 )
 
@@ -22,14 +23,17 @@ type OrderedHandler func(buf []byte, src *net.UDPAddr, release func())
 // a datagram is dropped, as the unordered pool drops one when saturated.
 const maxOrderedBacklog = 256
 
-// maxOrderedBacklogPerSource bounds the places one source address and
-// port takes in one stream's backlog. The stream key is the cleartext
+// maxOrderedBacklogPerSource is the share of one stream's backlog a
+// source address and port is sure of. The stream key is the cleartext
 // session id, read before any decryption, so a party on the link that
 // floods forged datagrams carrying an active session's id from its own
 // address would otherwise fill the stream's backlog and the genuine peer's
-// datagrams of that session would be dropped. A party that also forges the
-// peer's source address is not held off by this (review II,
-// R2-P6-bound-0211).
+// datagrams of that session would be dropped. A source alone in a stream
+// may fill the whole backlog; when the backlog is full, a datagram of a
+// source holding less than this share takes the place of the newest
+// queued datagram of the source holding more (there is at most one). A
+// party that also forges the peer's source address is not held off by
+// this (review II, R2-P6-bound-0211).
 const maxOrderedBacklogPerSource = maxOrderedBacklog / 2
 
 // ServeOrdered is [Listener.Serve] for a protocol whose datagrams fall into
@@ -101,7 +105,9 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 		o.queues[key] = q
 	}
 	from := sourceOf(src)
-	if len(q.items) >= maxOrderedBacklog || q.bySource[from] >= maxOrderedBacklogPerSource || o.pending >= maxConcurrentDispatch {
+	if len(q.items) >= maxOrderedBacklog && q.bySource[from] < maxOrderedBacklogPerSource && o.displaceLocked(l, q) {
+		// A place was freed: fall through and queue the datagram.
+	} else if len(q.items) >= maxOrderedBacklog || o.pending >= maxConcurrentDispatch {
 		if len(q.items) == 0 && !q.running {
 			delete(o.queues, key)
 		}
@@ -118,6 +124,25 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 		q.running = true
 		go o.drain(l, key, q)
 	}
+}
+
+// displaceLocked drops the newest queued datagram of the source that holds
+// more than [maxOrderedBacklogPerSource] of q's backlog, freeing its place
+// and its budget; false when no source does. o.mu is held.
+func (o *orderedDispatch) displaceLocked(l *Listener, q *orderedQueue) bool {
+	for i := len(q.items) - 1; i >= 0; i-- {
+		from := sourceOf(q.items[i].src)
+		if q.bySource[from] <= maxOrderedBacklogPerSource {
+			continue
+		}
+		q.items = slices.Delete(q.items, i, i+1)
+		q.bySource[from]--
+		o.pending--
+		l.inflight.Done()
+		l.done()
+		return true
+	}
+	return false
 }
 
 // drain hands the stream's datagrams to the handler one at a time. Each
