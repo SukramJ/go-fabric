@@ -1027,13 +1027,31 @@ func (d *Datastore) admits(ctx context.Context, fabric uint8) bool {
 	return ok
 }
 
+// MatterReadAllowed implements [contract.ReadAccessDeclarer]: a request
+// reads the cluster's attributes only from the fabric the datastore
+// admits ([Datastore.admits]); the universal globals (0xFFF8-0xFFFD) are
+// every request's. The endpoint dispatcher asks it before the read and
+// every subscription report, and answers a refused concrete path
+// UNSUPPORTED_ACCESS and leaves the attribute out of a wildcard (decision
+// 152, R2-P6-sec-1103). A read without a request — the host's — is
+// admitted.
+func (d *Datastore) MatterReadAllowed(ctx context.Context, attrID uint32) bool {
+	_, fabric, request := im.LookupFabricFilter(ctx)
+	if !request || (attrID >= 0xFFF8 && attrID <= 0xFFFD) {
+		return true
+	}
+	return d.admits(ctx, fabric)
+}
+
 // MatterReadFiltered implements [contract.FabricScopedReader]: a request
 // of a fabric the datastore does not admit ([Datastore.admits]) reads
-// every list empty and every other attribute at its zero value — the
-// endpoint dispatcher serves a reader's (value, true) as it is, for a
-// read and a subscription alike. No attribute of the cluster is
-// nullable. Owner decision 129, R2-P6-sec-1103; the status a read should
-// carry needs a contract seam the owner decides.
+// every list empty and every other attribute at its zero value. Behind the
+// endpoint dispatcher such a request never gets here
+// ([Datastore.MatterReadAllowed] refuses it first); the empty values are
+// the fallback for a dispatcher that does not ask a
+// [contract.ReadAccessDeclarer] — no attribute content leaves either way.
+// No attribute of the cluster is nullable. Owner decision 129,
+// R2-P6-sec-1103.
 func (d *Datastore) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	if _, fabric, request := im.LookupFabricFilter(ctx); request && !d.admits(ctx, fabric) {
 		if v, ok := withheld(attrID); ok {

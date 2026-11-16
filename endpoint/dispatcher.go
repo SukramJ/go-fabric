@@ -301,10 +301,41 @@ func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.Co
 	case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
 		return im.StatusSuccess
 	}
-	if lister, ok := srv.(contract.ClusterAttributeLister); ok && slices.Contains(lister.MatterAttributes(), path.Attribute) {
+	// The existence statuses come before the access check (matter.js
+	// AttributeReadResponse.ts:255-270 before :272); an attribute the
+	// server does not list is known only by reading it, which a refused
+	// request does not get to do.
+	listed := false
+	if lister, ok := srv.(contract.ClusterAttributeLister); ok {
+		listed = slices.Contains(lister.MatterAttributes(), path.Attribute)
+	}
+	if !readAllowed(ctx, srv, path.Attribute) {
+		return im.StatusUnsupportedAccess
+	}
+	if listed {
 		return im.StatusSuccess
 	}
 	return readOne(ctx, ep, srv, path).Status
+}
+
+// readAllowed asks a [contract.ReadAccessDeclarer] whether the request
+// behind ctx may read attrID, before the server's read runs (decision
+// 152, R2-P6-sec-1103's read half). A read without a request behind it
+// — a local caller ([im.LookupFabricFilter]) — and a server that
+// declares nothing are allowed. The refusal is answered as the access
+// check's: UNSUPPORTED_ACCESS on a fully concrete path, the attribute
+// skipped under a wildcard — matter.js AttributeReadResponse.ts:272 with
+// :473-475 (concrete path: UNSUPPORTED_ACCESS) and :406-413 (wildcard:
+// the attribute is skipped), and chip src/app/reporting/Engine.cpp:81-88.
+func readAllowed(ctx context.Context, srv contract.ClusterServer, attrID uint32) bool {
+	decl, ok := srv.(contract.ReadAccessDeclarer)
+	if !ok {
+		return true
+	}
+	if _, _, request := im.LookupFabricFilter(ctx); !request {
+		return true
+	}
+	return decl.MatterReadAllowed(ctx, attrID)
 }
 
 // ExpansionEndpoints implements [im.EndpointExpander]: the ids of the
@@ -356,6 +387,7 @@ func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.C
 		}
 		return append(results, im.ReadResult{Path: ePath, Status: im.StatusUnsupportedCluster})
 	}
+	concrete := path.HasEndpoint && path.HasCluster && path.HasAttribute
 	for _, srv := range servers {
 		cPath := ePath
 		cPath.Cluster = srv.MatterClusterID()
@@ -366,6 +398,12 @@ func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.C
 			aPath := cPath
 			aPath.Attribute = attrID
 			aPath.HasAttribute = true
+			if !readAllowed(ctx, srv, attrID) {
+				if concrete {
+					results = append(results, im.ReadResult{Path: aPath, Status: im.StatusUnsupportedAccess})
+				}
+				continue
+			}
 			res := readOne(ctx, ep, srv, aPath)
 			if wildcardEndpoint && res.Status != im.StatusSuccess {
 				continue
