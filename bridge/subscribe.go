@@ -435,19 +435,20 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	if dispatcher := b.Dispatcher(); dispatcher != nil && len(paths) > 0 {
 		report.Reports = b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths)
 	}
-	if len(report.EventReports) == 0 && len(report.Reports) == 0 {
-		// Nothing of the report is for this subscriber: no message is
-		// sent, and the engine is told, so that the pass does not count
-		// as the subscription's last report and the keep-alive due with
-		// it is sent ([subscription.Subscription.NothingSent]; review II,
-		// R2-P0-rv-A03). matter.js sends the DataReport empty here
-		// (packages/node/src/node/server/ServerSubscription.ts:921-936 at
-		// db021da0: `suppressEmptyReport: onlyWithData`, which is false
-		// for the pass a change or the send interval starts, :198-200;
-		// its TODO at :923-925 names the case).
-		sub.NothingSent()
-		return
-	}
+	// A pass whose data is all filtered for this subscriber — the access
+	// check, a fabric-sensitive event of another fabric — sends the
+	// ReportData empty and counts as the subscription's report, as the
+	// attribute path does: one rule, both references' (owner decision 169,
+	// which replaced decision 145; review II, F-db021da0-8). matter.js
+	// sends the DataReport empty here
+	// (packages/node/src/node/server/ServerSubscription.ts:921-936 at
+	// db021da0, `suppressEmptyReport: onlyWithData`, false for the pass a
+	// change or the send interval starts, :198-200; the messenger omits it
+	// only with that flag set, InteractionMessenger.ts:794-796), and so
+	// does connectedhomeip for a dirtied subscription whose pass encodes
+	// nothing, restarting both the min and the max interval
+	// (src/app/reporting/Engine.cpp:818-853, src/app/ReadHandler.cpp:352-362,
+	// src/app/reporting/ReportScheduler.h:141-147 at 6170af84).
 
 	// The engine's stop ends the wait for a chunk's answer (W2-conc-06),
 	// and so does the subscription's close (R2-P6-fsm-0513).
