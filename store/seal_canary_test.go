@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/store"
@@ -288,5 +289,107 @@ func TestReseal(t *testing.T) {
 	}
 	if _, err := store.SealedWithoutCheck(db, next).GetIdentity(ctx, w.fabric); err != nil {
 		t.Errorf("the identity after a refused Reseal does not open under the current key: %v", err)
+	}
+}
+
+// TestSealCanaryAndResealRefusals: the refusals around the seal canary
+// and Reseal — a canary edited to clear or to another value fails
+// NewSealed with ErrUnseal; Reseal refuses a schema before v10 and a nil
+// new sealer, fails with a sealer that cannot seal and leaves the database
+// as it was, refuses a sealed setting whose value is not base64, and
+// reseals a sealed database that carries no canary (one Erase emptied and
+// a sealed store then wrote to), marking it; ScrubOwed and Reseal on a
+// closed handle return an error.
+func TestSealCanaryAndResealRefusals(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	db := openTestDB(t)
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE matter_settings SET sealed = 0 WHERE key = ?`, store.SettingSealCanary); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 1)); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("NewSealed over a clear canary = %v, want ErrUnseal", err)
+	}
+	other := openTestDB(t)
+	s2, err := store.NewSealed(ctx, other, testSealer(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A sealed setting value moved onto the canary's row: it opens under
+	// the key only with its own aad, so the canary does not open.
+	if err := s2.SetSetting(ctx, "netcomm.wifi.networks", "[]"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := other.ExecContext(ctx, `UPDATE matter_settings SET value = (SELECT value FROM matter_settings WHERE key = 'netcomm.wifi.networks') WHERE key = ?`, store.SettingSealCanary); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.NewSealed(ctx, other, testSealer(t, 1)); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("NewSealed over a canary holding another value = %v, want ErrUnseal", err)
+	}
+
+	v9 := openEmptyDB(t)
+	applyUp(t, v9, "v9")
+	if err := store.Reseal(ctx, v9, testSealer(t, 1), testSealer(t, 2)); err == nil || !strings.Contains(err.Error(), "v10") {
+		t.Errorf("Reseal on a v9 database = %v; want the schema named", err)
+	}
+	fresh := openTestDB(t)
+	if err := store.Reseal(ctx, fresh, testSealer(t, 1), nil); err == nil {
+		t.Error("Reseal with a nil new sealer succeeded")
+	}
+
+	// A sealed database without the canary: Erase, then a sealed store's
+	// writes. Reseal opens every value under the old key and marks it.
+	unmarked := openTestDB(t)
+	s3, err := store.NewSealed(ctx, unmarked, testSealer(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s3.Erase(ctx); err != nil {
+		t.Fatal(err)
+	}
+	w := writeSecrets(t, s3)
+	down := &failingSealer{inner: testSealer(t, 2), fail: true}
+	if err := store.Reseal(ctx, unmarked, testSealer(t, 1), down); !errors.Is(err, errSealerDown) {
+		t.Errorf("Reseal with a new sealer that cannot seal = %v, want its error", err)
+	}
+	if present, _, _ := canaryRow(t, unmarked); present {
+		t.Error("a failed Reseal wrote the canary")
+	}
+	checkSecretsRead(t, s3, w)
+	if err := store.Reseal(ctx, unmarked, testSealer(t, 1), testSealer(t, 2)); err != nil {
+		t.Fatal(err)
+	}
+	if present, _, sealed := canaryRow(t, unmarked); !present || !sealed {
+		t.Error("Reseal of a database without the canary did not mark it")
+	}
+	s4, err := store.NewSealed(ctx, unmarked, testSealer(t, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkSecretsRead(t, s4, w)
+
+	// A sealed setting whose value is not base64.
+	if _, err := unmarked.ExecContext(ctx, `UPDATE matter_settings SET value = '%%%' WHERE key = 'netcomm.wifi.networks'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Reseal(ctx, unmarked, testSealer(t, 2), testSealer(t, 3)); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("Reseal over a sealed setting that is not base64 = %v, want ErrUnseal", err)
+	}
+
+	closed := openTestDB(t)
+	cs, err := store.NewSealed(ctx, closed, testSealer(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = closed.Close()
+	if _, err := cs.ScrubOwed(ctx); err == nil {
+		t.Error("ScrubOwed on a closed handle: want an error")
+	}
+	if err := store.Reseal(ctx, closed, testSealer(t, 1), testSealer(t, 2)); err == nil {
+		t.Error("Reseal on a closed handle: want an error")
 	}
 }

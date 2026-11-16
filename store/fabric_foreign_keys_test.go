@@ -161,3 +161,45 @@ WHERE m.type = 'table' AND f."table" = 'matter_fabrics' ORDER BY m.name`)
 		t.Errorf("fabric-owned tables = %v; the schema's foreign keys into matter_fabrics = %v", owned, fks)
 	}
 }
+
+// TestFabricRemovalRollsBackAFailedDelete: when one fabric-owned table
+// cannot be deleted from, RemoveFabric and the rollback of a pending add
+// fail and change nothing — the fabric row stays with its other rows.
+func TestFabricRemovalRollsBackAFailedDelete(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	s := store.New(db)
+	idx, err := s.AddFabric(ctx, newFabricRecord(0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pendingRec := newFabricRecord(0, 2)
+	pendingRec.Pending = store.FabricPendingAdd
+	pending, err := s.AddFabric(ctx, pendingRec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []uint8{idx, pending} {
+		if err := s.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{1}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, `DROP TABLE matter_icd_registrations`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RemoveFabric(ctx, idx); err == nil {
+		t.Error("RemoveFabric with a fabric-owned table gone succeeded")
+	}
+	if _, err := s.RollbackFabric(ctx, pending); err == nil {
+		t.Error("RollbackFabric of a pending add with a fabric-owned table gone succeeded")
+	}
+	for _, f := range []uint8{idx, pending} {
+		if _, err := s.GetFabric(ctx, f); err != nil {
+			t.Errorf("fabric %d after the failed removal: %v", f, err)
+		}
+		if acl, err := s.ListACL(ctx, f); err != nil || len(acl) != 1 {
+			t.Errorf("fabric %d's ACL after the failed removal = %d entries, %v", f, len(acl), err)
+		}
+	}
+}
