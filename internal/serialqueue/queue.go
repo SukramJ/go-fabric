@@ -97,8 +97,8 @@ func (q *Queue) Enqueue(fn func()) {
 		if !q.overflowing {
 			q.overflowing = true
 			q.logger().Warn("matter.callbacks.dropped",
-				slog.Int("bound", Bound),
-				slog.Uint64("dropped_total", q.dropped))
+				slog.Int("max", Bound),
+				slog.Uint64("dropped", q.dropped))
 		}
 	}
 	q.items = append(q.items, it)
