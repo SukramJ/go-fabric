@@ -2253,7 +2253,16 @@ classified (#46, #47); TC-EEVSE-2.3 runs since phase 30
 Review II, phase 4 (2026-11-14): connectedhomeip's example files
 `DeviceEnergyManagementDelegateImpl.cpp`, `EnergyEvseDelegateImpl.cpp` and
 `EnergyEvseTargetsStore.cpp` are outside the exports the review read and
-were not re-read; what this entry says of them is unverified.
+were not re-read; what this entry says of them is unverified, except the
+lines the phase 6a paragraph below names, which were read at `6170af84`.
+
+Review II, phase 6a (owner decision 150: chip's behaviour mirrored and named here though it breaks a module guarantee). Read at `6170af84`:
+- (R2-P6-fsm-1603) The EVSE restores the State and SupplyState saved at a fault when the fault clears, whatever the hardware did meanwhile: an EV unplugged during the fault reads PluggedInCharging with ChargingEnabled and no session after the clear, as chip's HwSetState drives the state machine during a fault (`EnergyEvseDelegateImpl.cpp:609-619`; `HandleEVNotDetectedEvent` `:910-929` has no fault check) and HandleFaultCleared restores `mStateBeforeFault` (`:1192-1214`) — `cluster/energy/evse.go` `faultClearedLocked`.
+- (R2-P6-fsm-1604) SetTargets: a stored schedule whose days lie inside a new schedule's takes the new targets on its own days and the new schedule is not appended, so the new days no stored schedule covered are dropped (Monday stored, then Monday+Tuesday: Tuesday stored nowhere), line for line chip's `EnergyEvseTargetsStore.cpp` SetTargets (`found` set at `:298-314`, the `!found` append `:343-345`) — `evse.go` `mergeTargets`.
+- (R2-P6-fsm-1615) SessionEnergyCharged and SessionEnergyDischarged read 0 for every session: chip's delegate calls StartSession and StopSession with meter values 0 (`EnergyEvseDelegateImpl.cpp:900`, `:925`) and UpdateEnergyCharged/Discharged only from StopSession (`:1795-1796`); the host's EvseEnergyMeter feeds the EnergyTransferStarted/Stopped events only — `evse.go` `stopSessionLocked`.
+- (R2-P6-fsm-1616) EnableCharging on a faulted EVSE or one in diagnostics stores ChargingEnabledUntil, the command's limit and MinimumChargeCurrent and recomputes MaximumChargeCurrent before the fault check answers FAILURE (`EnergyEvseDelegateImpl.cpp:72-117`, check `:1010-1016`); EnableDischarging likewise stores DischargingEnabledUntil and its limit and recomputes MaximumDischargeCurrent (`:148-156`, check `:1072-1076`) — `evse.go` `enableCharging`.
+- (R2-P6-wire-1617) DEM's start-time and constraint checks add controller-supplied uint32 times without an overflow check and a host forecast's `EndTime - StartTime` underflows, as chip's (`DeviceEnergyManagementCluster.cpp:462`, `:470`, `:778-779`) — `devicemanagement.go`.
+- (R2-P6-fsm-1623) A PauseRequest refused by the host during a power adjustment stops the adjustment's timer and leaves `powerAdjustInProgress` set (chip `DeviceEnergyManagementDelegateImpl.cpp:499-509`, the timer cancelled at `:501`): the adjustment never ends by itself — no PowerAdjustEnd, the capability's cause stays — CancelPowerAdjustRequest answers INVALID_IN_STATE for the ESAState Online the failure sets, and a new PowerAdjustRequest recovers (`devicemanagement.go` `pauseFailureLocked`, `cancelPowerAdjustRequest`, `powerAdjustRequest`). chip's consequence is inferred.
 
 ### BD-chip-EnergyReporting-FakeReadings — the reference daemon's grid meter answers the EnergyReporting test event triggers
 
@@ -2500,6 +2509,10 @@ differences, each a deliberate choice:
   (phase 19, brief BR).
 
 Families SETRF and COMMTR pass (#47). Retire an item when chip defines it.
+
+Review II, phase 6a (owner decision 150), read at `6170af84`:
+- (R2-P6-wire-1624) CommodityTariff's GetTariffComponent cuts the joined label at byte 128 (chip's `memcpy`, `commodity-tariff-server.cpp:1151-1157`; 128 is `CommodityTariffConsts.h:24`); a cut inside a multi-byte character answers an invalid UTF-8 string — `commoditytariff.go` `getTariffComponent`.
+- (R2-P6-wire-1613) ElectricalGridConditions' SetForecastConditions holds the entries to the definition (carbon level enum, 56 entries) but not to SetCurrentConditions' period rule, as chip's setter stores the list as given (`electrical-grid-conditions-server.cpp:165-174`).
 
 ### BD-Matter-OTARequestor-OnSpecInstance — the OTA requestor is built on `spec.Instance`, and the host's applier checks the image further than matter.js's `validateUpdateFile`
 
@@ -5674,6 +5687,8 @@ chip's seventeen unit cases are ported (`avsettings_chip_test.go`; the four
 `TestMigrate…` cases are chip's storage migration). Retire when matter.js's
 server gains the rules.
 
+Review II, phase 6a (R2-P6-fsm-1614, owner decision 150): PhysicalMovementComplete is taken whatever MovementState is and the target stays after it; no timeout ends a movement, as chip's OnPhysicalMovementComplete (`CameraAvSettingsUserLevelManagementLogic.cpp:1265-1283` at `6170af84`).
+
 ### BD-Matter-WebRtcRequestor-ACLThroughNode — the requestor's Operate ACL entry is installed by the node, not inside the server
 
 matter.js's `WebRtcTransportRequestorServer` installs one Operate/CASE
@@ -6304,6 +6319,8 @@ Review II, phase 4 (2026-11-14): connectedhomeip's
 is outside the exports the review read and was not re-read; what this entry
 says of it is unverified.
 
+Review II, phase 6a (R2-P6-bound-1610, R2-P6-sec-1622; owner decision 150): the Provider bounds sessions by the id space only and stores the session the port returns as it is (Id, PeerNodeId, FabricIndex unchecked); a per-fabric or total bound and the end of a session whose requestor's CASE session closed are the port's, as chip's cluster (`WebRTCTransportProviderCluster.cpp:376-397`, `:803-811`, `:1111` at `6170af84`) leaves them to the camera app's delegate (`webrtc-provider-manager.cpp:39`, `:472-476`). Other than chip, which stores the delegate's session unconditionally (`:811`, `:1111`), a session the schema refuses — one naming no stream ("O.a+") — is not stored and the command answers FAILURE; the port is not told and keeps a session the server does not list.
+
 ### BD-chip-PushAvStreamTransport-RulesInServer — push transports follow connectedhomeip behind the `PushTransportPort`; ExpiryTime is taken as seconds until deallocation
 
 matter.js's `PushAvStreamTransportServer.ts:14` at `862ad75f` is the
@@ -6335,6 +6352,8 @@ are entries of the relaxation table (`script/clustergen/relaxed.go:124-139`,
 `cluster/camera:TestPushTransportCertificationSteps` (TC-PAVST-2.3 step 25,
 2.4 step 5, 2.6 step 8, 2.11 step 21a — by unit test, not run against the
 certification cases).
+
+Review II, phase 6a (R2-P6-sec-1602, owner decision 150): ModifyPushTransport runs the transport options' constraint checks and the stream checks only, as chip's HandleModifyPushTransport (`PushAVStreamTransportLogic.cpp:1291`, `:1326-1332`, delegate `:1335` at `6170af84`): Allocate's TLS-endpoint lookup, URL-form, stream-usage, zone-id, segment-duration, bandwidth and pre-roll checks (`:1005`, `:1016`, `:1074`, `:1088`, `:1124`, `:1159`, `:1173`) are not run on the new options; the connection keeps its fabric. The port doc says so (`PushTransportPort`, generated from `script/clustergen/ports_camera.go`).
 
 ### BD-matterjs-server-CameraStreamManagement — the controller manages a camera's streams and WebRTC sessions, ahead of matter.js
 
