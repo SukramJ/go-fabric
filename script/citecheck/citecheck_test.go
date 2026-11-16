@@ -89,7 +89,11 @@ import (
 // its citation holds: the sentence names a word the cited range does not
 // carry — the construct of a neighbouring citation, the function the range
 // lies in, or a model name the source writes in another case.
-const citecheckDriftRatchet = 381
+//
+// 380 after review II, phase 6a (unit secure): the #evictExcessSessionsFor
+// citation of secure/operational/manager.go re-cited at the pin
+// (R2-P6-doc-0116).
+const citecheckDriftRatchet = 380
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

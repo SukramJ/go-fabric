@@ -3177,7 +3177,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 969,
+    "line": 1002,
     "citation": "NodeSession.ts:403",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -3186,7 +3186,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 971,
+    "line": 1004,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -3195,7 +3195,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1128,
+    "line": 1161,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -3204,7 +3204,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1154,
+    "line": 1187,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -3213,7 +3213,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1219,
+    "line": 1252,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -3222,16 +3222,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1487,
-    "citation": "packages/protocol/src/session/SessionManager.ts:647-680",
-    "resolved": "packages/protocol/src/session/SessionManager.ts",
-    "identifier": "#evictExcessSessionsFor",
-    "nearest": 697,
-    "occurrences": 2
-  },
-  {
-    "file": "secure/operational/manager.go",
-    "line": 1680,
+    "line": 1715,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -3366,7 +3357,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 266,
+    "line": 278,
     "citation": "NodeSession.ts:437",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "logNew",
@@ -3375,7 +3366,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 301,
+    "line": 313,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -3384,7 +3375,7 @@
   },
   {
     "file": "secure/sigma/sigma.go",
-    "line": 245,
+    "line": 249,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
