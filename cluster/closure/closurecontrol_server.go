@@ -924,13 +924,22 @@ func reachedTarget(pos wire.ClosureCurrentPosition, target wire.ClosureTargetPos
 	return false
 }
 
+// reportMainStateLocked is every host report of MainState — SetMainState,
+// ReportError and SetEngaged: it stores the state and counts the report,
+// so a MoveTo or Calibrate the mover holds keeps it rather than
+// overwriting it with Moving or Calibrating (R2-P6-fsm-1580). The caller
+// holds s.mu.
+func (s *ControlServer) reportMainStateLocked(state wire.ClosureMainState) {
+	s.mainState = state
+	s.stateReports++
+}
+
 // SetMainState overrides the operational state. A motion that ends —
 // Moving to Stopped — emits MovementCompleted (conformance !IS).
 func (s *ControlServer) SetMainState(state wire.ClosureMainState) {
 	s.mu.Lock()
 	prev := s.mainState
-	s.mainState = state
-	s.stateReports++
+	s.reportMainStateLocked(state)
 	s.mu.Unlock()
 	if prev != state {
 		s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState)

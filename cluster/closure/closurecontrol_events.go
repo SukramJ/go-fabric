@@ -129,7 +129,7 @@ func (s *ControlServer) ReportError(errs wire.ClosureErrorList) {
 	copy(list, errs)
 	s.mu.Lock()
 	s.errorList = list
-	s.mainState = wire.ClosureMainStateError
+	s.reportMainStateLocked(wire.ClosureMainStateError)
 	s.mu.Unlock()
 	s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState, wire.ClosureControlAttrCurrentErrorList)
 	s.emit([]pendingEvent{{closuredef.EventOperationalError, OperationalErrorEvent{ErrorState: list}, s.inst.EventPriority(closuredef.EventOperationalError)}})
@@ -146,9 +146,9 @@ func (s *ControlServer) SetEngaged(engaged bool) {
 	was := s.mainState != wire.ClosureMainStateDisengaged
 	switch {
 	case !engaged:
-		s.mainState = wire.ClosureMainStateDisengaged
+		s.reportMainStateLocked(wire.ClosureMainStateDisengaged)
 	case s.mainState == wire.ClosureMainStateDisengaged:
-		s.mainState = wire.ClosureMainStateStopped
+		s.reportMainStateLocked(wire.ClosureMainStateStopped)
 	}
 	s.mu.Unlock()
 	s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState)
