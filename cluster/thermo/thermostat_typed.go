@@ -4,6 +4,7 @@
 package thermo
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -56,8 +57,11 @@ var setpointKeys = map[uint32]struct {
 // limits as a write is and runs the reconcile a write runs (matter.js #reconcileSetpoints on the attribute's $Changing),
 // so a companion may move with it and is reported too; an absolute limit
 // is held to the user limits as [ThermostatServer.SetAbsoluteSetpointLimit]
-// holds it. A combination the reconcile cannot fit is refused and nothing
-// is stored. A changed occupied (unoccupied) setpoint ends the active
+// holds it. The call is one change: each value's constraint is judged
+// against the call's own values ahead of the stored ones, and the limits
+// are applied before the setpoints, so a lower limit and a setpoint inside
+// it may come together (R2-P6-err-1561). A combination the reconcile
+// cannot fit is refused and nothing is stored. A changed occupied (unoccupied) setpoint ends the active
 // preset in effect, as a local direct change does (ThermostatServer.ts:744-768
 // at 862ad75f).
 //
@@ -67,7 +71,10 @@ var setpointKeys = map[uint32]struct {
 // [PresetStore] under the command queue — and then Schedules and
 // ActiveScheduleHandle through [ThermostatServer.SetSchedules] and
 // [ThermostatServer.SetActiveScheduleHandle], before the other attributes,
-// in that order: a refusal there leaves the attributes after it unset.
+// in that order. The limits and setpoints are judged on a candidate
+// state before any of these runs, so their refusal stores nothing
+// (R2-P6-err-1560); a refusal by a preset or schedule setter leaves the
+// attributes after it unset.
 // ControlSequenceOfOperation is derived from the features, and
 // MinSetpointDeadBand, PresetTypes, NumberOfPresets, ScheduleTypes and the
 // three schedule counts are the configuration's: [spec.ErrNotHeld] for a
@@ -84,6 +91,16 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	checked, presets, err := s.checkSet(values)
 	if err != nil {
 		return err
+	}
+	if len(checked) > 0 {
+		// The limits and setpoints on a candidate state first: their
+		// refusal must come before the preset setters store anything.
+		s.mu.RLock()
+		candidate := s.setpointState()
+		s.mu.RUnlock()
+		if _, err := candidate.applySet(checked); err != nil {
+			return err
+		}
 	}
 	if err := s.setPresetAttributes(presets); err != nil {
 		return err
@@ -260,8 +277,16 @@ func (s *ThermostatServer) setPresetAttributes(p presetValues) error {
 func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, presetValues, error) {
 	var presets presetValues
 	checked := make(map[uint32]any, len(values))
+	// A constraint naming a sibling reads the call's own value of it first:
+	// the call is one change (R2-P6-err-1561).
+	peers := func(id uint32) (any, bool) {
+		if v, ok := values[id]; ok {
+			return v, true
+		}
+		return s.MatterRead(id)
+	}
 	for _, id := range slices.Sorted(maps.Keys(values)) {
-		v, err := s.inst.CheckSet(id, values[id], s.MatterRead)
+		v, err := s.inst.CheckSet(id, values[id], peers)
 		if err != nil {
 			return nil, presets, err
 		}
@@ -308,11 +333,16 @@ func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, pres
 // holds onto st: each setpoint or user limit held to its limits as a
 // write is (#assertSetpointWithinLimits, #assertLimitWithinAbs) and
 // reconciled, the absolute limits held to the user limits
-// (#assertUserSetpointLimits). setpoints reports whether a setpoint or
-// user limit was given.
+// (#assertUserSetpointLimits). The limits go before the setpoints, so a
+// setpoint is held to the limits of the same call (R2-P6-err-1561).
+// setpoints reports whether a setpoint or user limit was given.
 func (st *setpointState) applySet(checked map[uint32]any) (setpoints bool, err error) {
 	absHeat, absCool := false, false
-	for _, id := range slices.Sorted(maps.Keys(checked)) {
+	ids := slices.Sorted(maps.Keys(checked))
+	slices.SortStableFunc(ids, func(a, b uint32) int {
+		return cmp.Compare(applyRank(a), applyRank(b))
+	})
+	for _, id := range ids {
 		n, isInt := checked[id].(int16)
 		switch id {
 		case thermoAttrAbsMinHeatSetpointLimit:
@@ -353,6 +383,15 @@ func (st *setpointState) applySet(checked map[uint32]any) (setpoints bool, err e
 		}
 	}
 	return setpoints, nil
+}
+
+// applyRank orders applySet: the user setpoint limits before the
+// setpoints, every other attribute in its id order.
+func applyRank(id uint32) int {
+	if k, ok := setpointKeys[id]; ok && !k.limit {
+		return 1
+	}
+	return 0
 }
 
 func equalTemperature(a, b *int16) bool {
