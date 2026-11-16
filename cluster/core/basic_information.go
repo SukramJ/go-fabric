@@ -434,13 +434,16 @@ func (b *BasicInformation) inst() *spec.Instance {
 // `setDefault("softwareVersionString", state.softwareVersion.toString())`)
 // so the pair can never diverge. This bridge's authoritative version is
 // the build string, so the same "one release, two renderings" invariant
-// is held by deriving in the opposite direction with a stable,
-// monotonic encoding:
+// is held by deriving in the opposite direction with a stable encoding:
 //
 //	numeric = major*1_000_000 + minor*1_000 + patch
 //
 // with each component clamped to 999 ("0.32.1" → 32_001, "1.2.3" →
-// 1_002_003). Semver pre-release / build-metadata suffixes are dropped
+// 1_002_003). The encoding is monotonic only inside the domain 0-999 per
+// component: past it distinct versions collapse onto one number
+// ("0.999.0" and "0.1000.0" both 999_000), so a release whose component
+// passes 999 advertises no newer SoftwareVersion; a clamp is logged
+// (review II, R2-P6-api-1269). Semver pre-release / build-metadata suffixes are dropped
 // before parsing ("0.32.0-rc.1" → 32_000): a uint32 cannot express
 // pre-release ordering and controllers only compare the numeric for
 // update detection. A leading "v"/"V" is tolerated. Strings without a
@@ -470,6 +473,8 @@ func SoftwareVersionFromString(version string) uint32 {
 			break
 		}
 		if n > 999 {
+			slog.Default().Warn("matter.basic_information.software_version_clamped", //nolint:forbidigo // a package function without a component logger
+				slog.String("version", version), slog.Uint64("component", n))
 			n = 999
 		}
 		parts[i] = uint32(n)
@@ -496,9 +501,13 @@ func validateBasicInfoAttributes(cfg Config, log *slog.Logger) {
 			slog.String("reason", "pinned UniqueID equals SerialNumber — controller caches key on the pair, so they should differ"))
 	}
 	if cfg.SerialNumber != "" && cfg.SerialNumber == fmt.Sprintf("%04X-%04X", cfg.VendorID, cfg.ProductID) {
+		// The check compares SerialNumber with the VendorID-ProductID
+		// class identifier, not with UniqueID: a serial number that names
+		// the product class is the same for every unit (review II,
+		// R2-P6-doc-1265).
 		log.Debug("matter.basic_information.validate",
-			slog.String("field", "UniqueID/SerialNumber"),
-			slog.String("reason", "UniqueID and SerialNumber are identical — they should differ for controller caches"))
+			slog.String("field", "SerialNumber"),
+			slog.String("reason", "SerialNumber looks like a class identifier (VendorID-ProductID) — it should name the unit"))
 	}
 	if strings.TrimSpace(cfg.VendorName) == "" {
 		log.Debug("matter.basic_information.validate",
