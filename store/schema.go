@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -46,18 +47,35 @@ func Schema() string { return schemaDDL }
 // Every statement is idempotent (`IF NOT EXISTS`, `INSERT OR IGNORE`), so
 // calling this on every boot is the intended use rather than a first-run
 // special case. It does not open a database and does not set pragmas: the
-// cascade deletes in the schema need `PRAGMA foreign_keys(1)` on every
-// pooled connection, which is a property of the DSN the host opened and
-// cannot be fixed up from here.
+// schema's foreign keys — the refusal of a row that names a fabric the
+// store does not hold, and the cascades — need `PRAGMA foreign_keys(1)` on
+// every pooled connection, which is a property of the DSN the host opened
+// ([OpenSQLite] sets it) and cannot be fixed up from here. Apply reads the
+// pragma first and refuses a handle that has it off with
+// [ErrForeignKeysOff], before it writes anything. It reads one pooled
+// connection: a DSN sets the pragma for every connection or for none.
 //
 // After the DDL it runs [Upgrade], which brings a database created by an
 // earlier release of this package in line with the current schema.
 func Apply(ctx context.Context, db *sql.DB) error {
+	var fk int
+	if err := db.QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&fk); err != nil {
+		return fmt.Errorf("store: apply schema: read foreign_keys: %w", err)
+	}
+	if fk == 0 {
+		return ErrForeignKeysOff
+	}
 	if _, err := db.ExecContext(ctx, schemaDDL); err != nil {
 		return fmt.Errorf("store: apply schema: %w", err)
 	}
 	return Upgrade(ctx, db)
 }
+
+// ErrForeignKeysOff is [Apply]'s refusal of a handle whose connections
+// have PRAGMA foreign_keys off — SQLite's default. The host opens its
+// database with the pragma on every pooled connection (`_pragma=foreign_keys(1)`
+// in a modernc.org/sqlite DSN; [OpenSQLite] sets it).
+var ErrForeignKeysOff = errors.New("store: the database handle has PRAGMA foreign_keys off; open it with foreign_keys(1) on every connection")
 
 // Upgrade rewrites the parts of an existing database that an idempotent
 // `CREATE TABLE IF NOT EXISTS` cannot reach: a table created by an earlier

@@ -23,8 +23,9 @@ import "context"
 //     before it or after it.
 //   - Removing a fabric removes everything that fabric owns: its identity,
 //     group key sets and key map, group table, groupcast groups, ACL,
-//     resumption records, default OTA providers and ICD registrations.
-//     Server subscriptions,
+//     resumption records, default OTA providers and ICD registrations —
+//     the SQLite [Store] deletes each itself, so a handle without foreign
+//     keys removes them too. Server subscriptions,
 //     thermostat presets, door-lock records, owed fabric events, settings
 //     and counters are not fabric-owned rows and stay (the bridge deletes a
 //     fabric's subscriptions itself).

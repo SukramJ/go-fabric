@@ -663,7 +663,10 @@ type Store struct {
 	Path string
 	// DB is a SQLite database the host opened and keeps: the node applies
 	// both schemas to it and opens its stores on it; [Node.FactoryReset]
-	// scrubs it ([store.Scrub]) after the erase. It excludes Path.
+	// scrubs it ([store.Scrub]) after the erase. It excludes Path. Every
+	// pooled connection needs PRAGMA foreign_keys(1) on its DSN
+	// (store.OpenSQLite sets it): store.Apply refuses a handle without it
+	// ([store.ErrForeignKeysOff]), and New returns that error.
 	DB *sql.DB
 	// Credentials overrides the credential store built from DB or Path.
 	// [Node.FactoryReset] erases it through [store.Eraser]; the erase of a

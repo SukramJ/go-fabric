@@ -204,7 +204,7 @@ var memoryDBs atomic.Int64
 // TimeSynchronization with or without the row's features.
 func measureTimeSynchronization(t *testing.T, row string, with bool) surface.Cluster {
 	t.Helper()
-	db, err := sql.Open("sqlite", fmt.Sprintf("file:aheadcheck-%d?mode=memory&cache=shared", memoryDBs.Add(1)))
+	db, err := sql.Open("sqlite", fmt.Sprintf("file:aheadcheck-%d?mode=memory&cache=shared&_pragma=foreign_keys(1)", memoryDBs.Add(1)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestSurfaceColumnMeasured(t *testing.T) {
 // terms-and-conditions requirement (node.Commissioning.TermsAndConditions).
 func measureGeneralCommissioning(t *testing.T, row string, with bool) surface.Cluster {
 	t.Helper()
-	db, err := sql.Open("sqlite", fmt.Sprintf("file:aheadcheck-%d?mode=memory&cache=shared", memoryDBs.Add(1)))
+	db, err := sql.Open("sqlite", fmt.Sprintf("file:aheadcheck-%d?mode=memory&cache=shared&_pragma=foreign_keys(1)", memoryDBs.Add(1)))
 	if err != nil {
 		t.Fatal(err)
 	}
