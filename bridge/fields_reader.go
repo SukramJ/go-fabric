@@ -266,40 +266,6 @@ func operationalCredentialsFieldsReader(path im.ConcreteCommandPath, dec *tlv.De
 	return f, true, err
 }
 
-// fieldConstraintError is the typed reject for a command field whose
-// wire value does not fit the field's schema type. It carries
-// ConstraintError so [im.HandleInvokeRequest] answers the command with
-// a CommandStatusIB instead of executing a truncated value — matter.js
-// validates every request against its TlvSchema before the invoker runs
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487 at db021da0)
-// and TlvNumber.ts:151-156 validateBoundaries throws a ValidationError,
-// whose default code is Status.ConstraintError
-// (packages/types/src/common/ValidationError.ts:16-22).
-type fieldConstraintError struct{ msg string }
-
-func (e fieldConstraintError) Error() string { return e.msg }
-
-// MatterStatusCode implements [im.StatusCodeError].
-func (fieldConstraintError) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
-
-// fieldUint8 narrows el to a uint8 field, rejecting a wider wire value
-// (matter.js TlvUInt8, TlvNumber.ts:270-275: max UINT8_MAX).
-func fieldUint8(cmd, field string, el tlv.Element) (uint8, error) {
-	if el.Uint > 0xFF {
-		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d > uint8 max", cmd, field, el.Uint)}
-	}
-	return uint8(el.Uint), nil
-}
-
-// fieldUint16 narrows el to a uint16 field, rejecting a wider wire value
-// (matter.js TlvUInt16, TlvNumber.ts:277-282: max UINT16_MAX).
-func fieldUint16(cmd, field string, el tlv.Element) (uint16, error) {
-	if el.Uint > 0xFFFF {
-		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d > uint16 max", cmd, field, el.Uint)}
-	}
-	return uint16(el.Uint), nil
-}
-
 // decodeGenericTagMap drains the current container into a
 // map[uint8]any keyed by context-tag number, preserving the field
 // payload for cluster servers that don't yet have a typed decoder.
@@ -366,9 +332,7 @@ func decodeArmFailSafeRequest(dec *tlv.Decoder) (mattercore.ArmFailSafeRequest, 
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			if req.ExpiryLengthSeconds, err = fieldUint16("ArmFailSafe", "ExpiryLengthSeconds", el); err != nil {
-				return req, err
-			}
+			req.ExpiryLengthSeconds = uint16(el.Uint) //nolint:gosec // the definition held the width
 		case 1:
 			req.Breadcrumb = el.Uint
 		}
@@ -393,9 +357,7 @@ func decodeSetRegulatoryConfigRequest(dec *tlv.Decoder) (mattercore.SetRegulator
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			if req.NewRegulatoryConfig, err = fieldUint8("SetRegulatoryConfig", "NewRegulatoryConfig", el); err != nil {
-				return req, err
-			}
+			req.NewRegulatoryConfig = uint8(el.Uint) //nolint:gosec // the definition held the width
 		case 1:
 			// CountryCode is a `TlvUTF8String` (char-string[2] per
 			// §11.10.7.4). TLV decoder lands UTF8 in `el.String`,
@@ -453,9 +415,7 @@ func decodeCertificateChainRequest(dec *tlv.Decoder) (mattercore.CertificateChai
 			continue
 		}
 		if uint8(el.Tag.Number&0xFF) == 0 {
-			if req.CertificateType, err = fieldUint8("CertificateChainRequest", "CertificateType", el); err != nil {
-				return req, err
-			}
+			req.CertificateType = uint8(el.Uint) //nolint:gosec // the definition held the width
 		}
 	}
 }
@@ -510,9 +470,7 @@ func decodeAddNOCRequest(dec *tlv.Decoder) (mattercore.AddNOCRequest, error) {
 		case 3:
 			req.CaseAdminSubject = el.Uint
 		case 4:
-			if req.AdminVendorID, err = fieldUint16("AddNOC", "AdminVendorID", el); err != nil {
-				return req, err
-			}
+			req.AdminVendorID = uint16(el.Uint) //nolint:gosec // the definition held the width
 		}
 	}
 }
@@ -589,9 +547,7 @@ func decodeRemoveFabricRequest(dec *tlv.Decoder) (mattercore.RemoveFabricRequest
 			continue
 		}
 		if uint8(el.Tag.Number&0xFF) == 0 {
-			if req.FabricIndex, err = fieldUint8("RemoveFabric", "FabricIndex", el); err != nil {
-				return req, err
-			}
+			req.FabricIndex = uint8(el.Uint) //nolint:gosec // the definition held the width
 		}
 	}
 }
@@ -641,20 +597,12 @@ func decodeSetVidVerificationStatementRequest(dec *tlv.Decoder) (mattercore.SetV
 		}
 		switch el.Tag.Number {
 		case 0:
-			if req.VendorID, err = fieldUint16(cmd, "VendorID", el); err != nil {
-				return req, err
-			}
+			req.VendorID = uint16(el.Uint) //nolint:gosec // the definition held the width
 			req.HasVendorID = true
 		case 1:
-			if len(el.Octets) > 85 {
-				return req, fieldConstraintError{fmt.Sprintf("%s: VIDVerificationStatement of %d bytes exceeds 85", cmd, len(el.Octets))}
-			}
 			req.VidVerificationStatement = append([]byte{}, el.Octets...)
 			req.HasVidVerificationStatement = true
 		case 2:
-			if len(el.Octets) > 400 {
-				return req, fieldConstraintError{fmt.Sprintf("%s: VVSC of %d bytes exceeds 400", cmd, len(el.Octets))}
-			}
 			req.Vvsc = append([]byte{}, el.Octets...)
 			req.HasVvsc = true
 		default:
@@ -671,16 +619,12 @@ func decodeSetVidVerificationStatementRequest(dec *tlv.Decoder) (mattercore.SetV
 func decodeSignVidVerificationRequest(dec *tlv.Decoder) (mattercore.SignVidVerificationRequest, error) {
 	const cmd = "SignVIDVerificationRequest"
 	var req mattercore.SignVidVerificationRequest
-	var hasIndex, hasChallenge bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return req, fmt.Errorf("%s: %w", cmd, err)
 		}
 		if el.IsEndContainer {
-			if !hasIndex || !hasChallenge {
-				return req, fieldInvalidCommandError{msg: cmd + ": mandatory field missing", consumed: true}
-			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -691,16 +635,9 @@ func decodeSignVidVerificationRequest(dec *tlv.Decoder) (mattercore.SignVidVerif
 		}
 		switch el.Tag.Number {
 		case 0:
-			if req.FabricIndex, err = fieldUint8(cmd, "FabricIndex", el); err != nil {
-				return req, err
-			}
-			hasIndex = true
+			req.FabricIndex = uint8(el.Uint) //nolint:gosec // the definition held the width
 		case 1:
-			if len(el.Octets) != 32 {
-				return req, fieldConstraintError{fmt.Sprintf("%s: ClientChallenge of %d bytes, want 32", cmd, len(el.Octets))}
-			}
 			req.ClientChallenge = append([]byte(nil), el.Octets...)
-			hasChallenge = true
 		default:
 			if err := skipValue(dec, el); err != nil {
 				return req, err

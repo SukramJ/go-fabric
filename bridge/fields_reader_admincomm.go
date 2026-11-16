@@ -48,25 +48,18 @@ func decodeOpenCommissioningWindowRequest(dec *tlv.Decoder) (wire.OpenWindowPara
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			if p.CommissioningTimeoutSeconds, err = fieldUint16(cmd, "CommissioningTimeout", el); err != nil {
-				return p, err
-			}
+			p.CommissioningTimeoutSeconds = uint16(el.Uint) //nolint:gosec // the definition held the width
 		case 1:
 			p.PAKEPasscodeVerifier = append([]byte(nil), el.Octets...)
 		case 2:
-			if p.Discriminator, err = fieldUint16(cmd, "Discriminator", el); err != nil {
-				return p, err
-			}
+			p.Discriminator = uint16(el.Uint) //nolint:gosec // the definition held the width
 			// A discriminator above 0xFFF is the handler's
 			// INVALID_COMMAND after the Busy checks (matter.js
 			// AdministratorCommissioningServer.ts:92-97 at db021da0,
 			// Discriminator with constraint "none" :42), not a
 			// constraint error here.
 		case 3:
-			if el.Uint > 0xFFFFFFFF {
-				return p, fieldConstraintError{fmt.Sprintf("%s: Iterations %d > uint32 max", cmd, el.Uint)}
-			}
-			p.Iterations = uint32(el.Uint)
+			p.Iterations = uint32(el.Uint) //nolint:gosec // the definition held the width
 		case 4:
 			p.Salt = append([]byte(nil), el.Octets...)
 		}

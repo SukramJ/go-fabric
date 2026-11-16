@@ -10,46 +10,8 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
-
-// fieldInvalidCommandError is the typed reject for a command payload that
-// does not match the command's schema: a mandatory field is missing, or a
-// field carries the wrong TLV type. matter.js decodes every request with
-// the command's TlvSchema before the handler runs and answers a payload
-// that does not match with InvalidCommand — a decode failure directly
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:
-// #decodeWithSchema → StatusResponse.InvalidCommandError), a failed
-// requestTlv.validate (ValidationMandatoryFieldMissingError /
-// ValidationDatatypeMismatchError carry InvalidAction, which
-// #invokeCommand rewrites to InvalidCommand for a ValidationError).
-//
-// consumed marks a reject found at the fields container's EndContainer
-// (a missing mandatory field): the reader has read past it already, so
-// the IM layer must not drain the container again.
-type fieldInvalidCommandError struct {
-	msg      string
-	consumed bool
-}
-
-func (e fieldInvalidCommandError) Error() string { return e.msg }
-
-// MatterStatusCode implements [im.StatusCodeError].
-func (fieldInvalidCommandError) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
-
-// FieldsContainerConsumed implements [im.FieldsContainerConsumed].
-func (e fieldInvalidCommandError) FieldsContainerConsumed() bool { return e.consumed }
-
-// isUnsignedInt reports whether el carries an unsigned integer.
-func isUnsignedInt(el tlv.Element) bool {
-	return el.Type >= tlv.TypeUnsignedInt1 && el.Type <= tlv.TypeUnsignedInt8
-}
-
-// isOctetString reports whether el carries an octet string.
-func isOctetString(el tlv.Element) bool {
-	return el.Type >= tlv.TypeOctetStr1 && el.Type <= tlv.TypeOctetStr8
-}
 
 // skipValue drains el when it opened a container, so a decoder that does
 // not consume a field leaves the stream positioned at the next sibling.
@@ -60,61 +22,41 @@ func skipValue(dec *tlv.Decoder, el tlv.Element) error {
 	return nil
 }
 
-// decodeUint16Field reads a mandatory uint16 command field, rejecting a
-// non-integer as InvalidCommand and a wider value as ConstraintError.
-func decodeUint16Field(cmd, field string, el tlv.Element) (uint16, error) {
-	if !isUnsignedInt(el) {
-		return 0, fieldInvalidCommandError{msg: fmt.Sprintf("%s: %s is not an unsigned integer (type=0x%02X)", cmd, field, el.Type)}
-	}
-	return fieldUint16(cmd, field, el)
-}
-
-// decodeSingleUint16Request reads a command whose only field is a
-// mandatory uint16 at context tag 0 — KeySetRead and KeySetRemove
-// (GroupKeySetID), Groups ViewGroup and RemoveGroup (GroupID).
-func decodeSingleUint16Request(dec *tlv.Decoder, cmd, field string) (uint16, error) {
-	var (
-		v       uint16
-		present bool
-	)
+// decodeSingleUint16Request reads a command whose only field is a uint16
+// at context tag 0 — KeySetRead and KeySetRemove (GroupKeySetID), Groups
+// ViewGroup and RemoveGroup (GroupID). The request passed its definition's
+// check (heldByDefinition): the field is present and a uint16
+// (R2-P6-test-0811).
+func decodeSingleUint16Request(dec *tlv.Decoder, cmd string) (uint16, error) {
+	var v uint16
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return 0, fmt.Errorf("%s: %w", cmd, err)
 		}
 		if el.IsEndContainer {
-			if !present {
-				return 0, fieldInvalidCommandError{msg: fmt.Sprintf("%s: mandatory field %s missing", cmd, field), consumed: true}
-			}
 			return v, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext || el.Tag.Number != 0 {
-			if err := skipValue(dec, el); err != nil {
-				return 0, fmt.Errorf("%s: %w", cmd, err)
-			}
-			continue
+		if el.Tag.Kind == tlv.TagKindContext && el.Tag.Number == 0 {
+			v = uint16(el.Uint) //nolint:gosec // the definition held the width
 		}
-		if v, err = decodeUint16Field(cmd, field, el); err != nil {
-			if el.IsContainer {
-				_ = drainContainer(dec)
-			}
-			return 0, err
+		if err := skipValue(dec, el); err != nil {
+			return 0, fmt.Errorf("%s: %w", cmd, err)
 		}
-		present = true
 	}
 }
 
 // decodeKeySetReadRequest reads GroupKeyManagement KeySetRead (Matter
 // §11.2.7.2): [0] uint16 GroupKeySetID.
 func decodeKeySetReadRequest(dec *tlv.Decoder) (mattercore.KeySetReadRequest, error) {
-	id, err := decodeSingleUint16Request(dec, "KeySetRead", "GroupKeySetID")
+	id, err := decodeSingleUint16Request(dec, "KeySetRead")
 	return mattercore.KeySetReadRequest{GroupKeySetID: id}, err
 }
 
 // decodeKeySetRemoveRequest reads GroupKeyManagement KeySetRemove (Matter
 // §11.2.7.4): [0] uint16 GroupKeySetID.
 func decodeKeySetRemoveRequest(dec *tlv.Decoder) (mattercore.KeySetRemoveRequest, error) {
-	id, err := decodeSingleUint16Request(dec, "KeySetRemove", "GroupKeySetID")
+	id, err := decodeSingleUint16Request(dec, "KeySetRemove")
 	return mattercore.KeySetRemoveRequest{GroupKeySetID: id}, err
 }
 

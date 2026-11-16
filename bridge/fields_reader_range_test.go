@@ -49,11 +49,11 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 		{"MoveToLevel.TransitionTime", 1, 0x10000, viaDefinition(0x0008, 0x00)},
 		{"MoveToLevel.OptionsMask", 2, 0x100, viaDefinition(0x0008, 0x00)},
 		{"MoveToLevel.OptionsOverride", 3, 0x100, viaDefinition(0x0008, 0x00)},
-		{"ArmFailSafe.ExpiryLengthSeconds", 0, 0x10000, func(d *tlv.Decoder) error { _, err := decodeArmFailSafeRequest(d); return err }},
-		{"SetRegulatoryConfig.NewRegulatoryConfig", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeSetRegulatoryConfigRequest(d); return err }},
-		{"CertificateChainRequest.CertificateType", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeCertificateChainRequest(d); return err }},
-		{"AddNOC.AdminVendorID", 4, 0x10000, func(d *tlv.Decoder) error { _, err := decodeAddNOCRequest(d); return err }},
-		{"RemoveFabric.FabricIndex", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeRemoveFabricRequest(d); return err }},
+		{"ArmFailSafe.ExpiryLengthSeconds", 0, 0x10000, viaFieldsReader(0x0030, 0x00)},
+		{"SetRegulatoryConfig.NewRegulatoryConfig", 0, 0x100, viaFieldsReader(0x0030, 0x02)},
+		{"CertificateChainRequest.CertificateType", 0, 0x100, viaFieldsReader(0x003E, 0x02)},
+		{"AddNOC.AdminVendorID", 4, 0x10000, viaFieldsReader(0x003E, 0x06)},
+		{"RemoveFabric.FabricIndex", 0, 0x100, viaFieldsReader(0x003E, 0x0A)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -70,6 +70,18 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 				t.Errorf("err = %v; want an error carrying StatusConstraintError", err)
 			}
 		})
+	}
+}
+
+// viaFieldsReader decodes the fields after the struct opener through
+// commandFieldsReader, the public path of a hand-read command: the
+// definition's check refuses an over-wide field before the hand reader
+// reads it (R2-P6-test-0811 — the readers' own width checks are gone).
+func viaFieldsReader(cluster, command uint32) func(*tlv.Decoder) error {
+	return func(d *tlv.Decoder) error {
+		path := im.ConcreteCommandPath{Cluster: cluster, Command: command, HasCluster: true, HasCommand: true}
+		_, err := commandFieldsReader(path, d, tlv.Element{Type: tlv.TypeStructure, IsContainer: true})
+		return err
 	}
 }
 

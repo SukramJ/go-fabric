@@ -4,8 +4,6 @@
 package bridge
 
 import (
-	"fmt"
-
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -58,22 +56,12 @@ func field(nodes []scenesNode, t uint64) (scenesNode, bool) {
 	return scenesNode{}, false
 }
 
-func scenesMissing(cmd, name string) error {
-	return fieldInvalidCommandError{msg: fmt.Sprintf("%s: mandatory field %s missing", cmd, name), consumed: true}
-}
-
-func sceneUint(cmd, name string, nodes []scenesNode, t, limit uint64) (uint64, error) {
-	n, ok := field(nodes, t)
-	if !ok {
-		return 0, scenesMissing(cmd, name)
-	}
-	if n.el.IsContainer || n.el.Type > tlv.TypeUnsignedInt8 {
-		return 0, fieldInvalidCommandError{msg: fmt.Sprintf("%s: %s is not a number", cmd, name), consumed: true}
-	}
-	if n.el.Uint > limit {
-		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d exceeds %d", cmd, name, n.el.Uint, limit)}
-	}
-	return n.el.Uint, nil
+// sceneUint is the unsigned field t of nodes. The request passed its
+// definition's check (heldByDefinition): a mandatory field is present and
+// every field has its type and width (R2-P6-test-0811).
+func sceneUint(nodes []scenesNode, t uint64) uint64 {
+	n, _ := field(nodes, t)
+	return n.el.Uint
 }
 
 // scenesFieldsReader decodes the ScenesManagement requests; ok is false for
@@ -86,101 +74,50 @@ func scenesFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder) (fields a
 	if err != nil {
 		return nil, true, err
 	}
-	cmdName := fmt.Sprintf("ScenesManagement command 0x%02X", path.Command)
-	ref := func() (mattercore.SceneRef, error) {
-		g, err := sceneUint(cmdName, "GroupId", nodes, 0, 0xFFFF)
-		if err != nil {
-			return mattercore.SceneRef{}, err
-		}
-		s, err := sceneUint(cmdName, "SceneId", nodes, 1, 0xFF)
-		return mattercore.SceneRef{GroupID: uint16(g), SceneID: uint8(s)}, err //nolint:gosec // bounded above
-	}
+	//nolint:gosec // the definition held every width
+	ref := mattercore.SceneRef{GroupID: uint16(sceneUint(nodes, 0)), SceneID: uint8(sceneUint(nodes, 1))}
 	switch path.Command {
 	case 0x00: // AddScene
-		r, err := ref()
-		if err != nil {
-			return nil, true, err
-		}
-		tt, err := sceneUint(cmdName, "TransitionTime", nodes, 2, 0xFFFFFFFF)
-		if err != nil {
-			return nil, true, err
-		}
-		nameNode, okName := field(nodes, 3)
-		if !okName {
-			return nil, true, scenesMissing(cmdName, "SceneName")
-		}
-		setsNode, okSets := field(nodes, 4)
-		if !okSets {
-			return nil, true, scenesMissing(cmdName, "ExtensionFieldSetStructs")
-		}
-		sets, err := decodeExtensionFieldSets(cmdName, setsNode)
+		nameNode, _ := field(nodes, 3)
+		setsNode, _ := field(nodes, 4)
 		return mattercore.AddSceneRequest{
-			GroupID: r.GroupID, SceneID: r.SceneID, TransitionTime: uint32(tt), //nolint:gosec // bounded above
-			SceneName: nameNode.el.String, ExtensionFieldSets: sets,
-		}, true, err
+			GroupID: ref.GroupID, SceneID: ref.SceneID, TransitionTime: uint32(sceneUint(nodes, 2)), //nolint:gosec // the definition held the width
+			SceneName: nameNode.el.String, ExtensionFieldSets: decodeExtensionFieldSets(setsNode),
+		}, true, nil
 	case 0x01, 0x02, 0x04: // ViewScene, RemoveScene, StoreScene
-		r, err := ref()
-		return r, true, err
+		return ref, true, nil
 	case 0x03, 0x06: // RemoveAllScenes, GetSceneMembership
-		g, err := sceneUint(cmdName, "GroupId", nodes, 0, 0xFFFF)
-		return mattercore.SceneGroupRequest{GroupID: uint16(g)}, true, err //nolint:gosec // bounded above
+		return mattercore.SceneGroupRequest{GroupID: ref.GroupID}, true, nil
 	case 0x05: // RecallScene
-		r, err := ref()
-		if err != nil {
-			return nil, true, err
-		}
-		req := mattercore.RecallSceneRequest{GroupID: r.GroupID, SceneID: r.SceneID}
+		req := mattercore.RecallSceneRequest{GroupID: ref.GroupID, SceneID: ref.SceneID}
 		if n, has := field(nodes, 2); has && !n.el.IsNull {
 			v := uint32(min(n.el.Uint, 0xFFFFFFFF)) //nolint:gosec // clamped
 			req.TransitionTime = &v
 		}
 		return req, true, nil
 	case 0x40: // CopyScene
-		mode, err := sceneUint(cmdName, "Mode", nodes, 0, 0xFF)
-		if err != nil {
-			return nil, true, err
-		}
-		gf, err := sceneUint(cmdName, "GroupIdentifierFrom", nodes, 1, 0xFFFF)
-		if err != nil {
-			return nil, true, err
-		}
-		sf, err := sceneUint(cmdName, "SceneIdentifierFrom", nodes, 2, 0xFF)
-		if err != nil {
-			return nil, true, err
-		}
-		gt, err := sceneUint(cmdName, "GroupIdentifierTo", nodes, 3, 0xFFFF)
-		if err != nil {
-			return nil, true, err
-		}
-		st, err := sceneUint(cmdName, "SceneIdentifierTo", nodes, 4, 0xFF)
+		//nolint:gosec // the definition held every width
 		return mattercore.CopySceneRequest{
-			CopyAllScenes: mode&1 != 0, GroupFrom: uint16(gf), SceneFrom: uint8(sf), //nolint:gosec // bounded above
-			GroupTo: uint16(gt), SceneTo: uint8(st), //nolint:gosec // bounded above
-		}, true, err
+			CopyAllScenes: sceneUint(nodes, 0)&1 != 0,
+			GroupFrom:     uint16(sceneUint(nodes, 1)), SceneFrom: uint8(sceneUint(nodes, 2)),
+			GroupTo: uint16(sceneUint(nodes, 3)), SceneTo: uint8(sceneUint(nodes, 4)),
+		}, true, nil
 	}
 	return nil, false, nil
 }
 
-// decodeExtensionFieldSets reads list<ExtensionFieldSetStruct>.
-func decodeExtensionFieldSets(cmd string, n scenesNode) ([]mattercore.ExtensionFieldSet, error) {
-	var out []mattercore.ExtensionFieldSet
+// decodeExtensionFieldSets reads list<ExtensionFieldSetStruct>; the
+// definition held its mandatory fields and types (R2-P6-test-0811).
+func decodeExtensionFieldSets(n scenesNode) []mattercore.ExtensionFieldSet {
+	var out []mattercore.ExtensionFieldSet //nolint:prealloc // nil for an empty list, as before
 	for _, s := range n.children {
-		cid, ok := field(s.children, 0)
-		if !ok {
-			return nil, scenesMissing(cmd, "ExtensionFieldSet.ClusterId")
-		}
-		list, ok := field(s.children, 1)
-		if !ok {
-			return nil, scenesMissing(cmd, "ExtensionFieldSet.AttributeValueList")
-		}
+		cid, _ := field(s.children, 0)
+		list, _ := field(s.children, 1)
 		set := mattercore.ExtensionFieldSet{ClusterID: uint32(cid.el.Uint)} //nolint:gosec // cluster ids are 32-bit
 		for _, p := range list.children {
 			pair := mattercore.AttributeValuePair{}
-			if a, has := field(p.children, 0); has {
-				pair.AttributeID = uint32(a.el.Uint) //nolint:gosec // attribute ids are 32-bit
-			} else {
-				return nil, scenesMissing(cmd, "AttributeValuePair.AttributeId")
-			}
+			a, _ := field(p.children, 0)
+			pair.AttributeID = uint32(a.el.Uint) //nolint:gosec // attribute ids are 32-bit
 			for _, v := range p.children {
 				if v.el.Tag.Kind != tlv.TagKindContext || v.el.Tag.Number < 1 || v.el.Tag.Number > 8 {
 					continue
@@ -196,7 +133,7 @@ func decodeExtensionFieldSets(cmd string, n scenesNode) ([]mattercore.ExtensionF
 		}
 		out = append(out, set)
 	}
-	return out, nil
+	return out
 }
 
 // encodeScenesResponse writes the ScenesManagement responses
