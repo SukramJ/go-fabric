@@ -59,6 +59,16 @@ type scheduleRules struct {
 // IsPresetHandlePresentInPresetsOrPending (ThermostatClusterPresets.cpp:480-491
 // at 645b267a); without PRES no handle is present
 // (ThermostatClusterBase.h:99-103).
+//
+// The staged presets may be another peer's: the atomic writes follow
+// matter.js, several peers each holding their own attribute, while chip
+// has one atomic state per endpoint (ThermostatClusterAtomic.cpp:360-363,
+// :172-191 at 645b267a), so there the case cannot arise. A peer's
+// Schedules write is therefore judged against the Presets another peer
+// staged and has not committed; a removal that peer later commits is
+// refused while a stored or staged schedule names the handle
+// (presetsInUseBySchedules). No reference defines the cross-peer answer
+// (R2-P6-par-1565).
 func (s *ThermostatServer) scheduleRules() scheduleRules {
 	presets := s.presets
 	if st := s.atomic.forAttribute(s.clk.Now(), tdef.AttrPresets); st != nil {

@@ -147,6 +147,11 @@ func (s *DoorLockServer) handleSetWeekDaySchedule(ctx context.Context, fields an
 }
 
 // setWeekDayScheduleLocked mirrors matter.js DoorLockServer.ts:653-692.
+// As there — and in connectedhomeip (door-lock-server/CodegenIntegration.cpp:1051-1135
+// at 6170af84) — the user is checked to exist, not to be the accessing
+// fabric's: an administrator of another fabric with the command's
+// privilege sets and clears a user's schedules (R2-P6-acl-1566;
+// matter.js's #requireValidUser, DoorLockServer.ts:1365-1373 at db021da0).
 func (s *DoorLockServer) setWeekDayScheduleLocked(ctx context.Context, req lockdef.SetWeekDayScheduleRequest) error {
 	maxSchedules, _ := s.uint8Attr(lockdef.AttrNumberOfWeekDaySchedulesSupportedPerUser)
 	if req.WeekDayIndex < 1 || req.WeekDayIndex > maxSchedules {
