@@ -110,7 +110,7 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 }
 
 // startOTA retires a former own node and starts the manager.
-func (c *Controller) startOTA(ctx context.Context, cfg Config) error {
+func (c *Controller) startOTA(ctx context.Context) error {
 	if err := c.retireOwnNode(ctx, c.st, c.log); err != nil {
 		return err
 	}

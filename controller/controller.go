@@ -577,7 +577,7 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 		return err
 	}
 	if cfg.OTA != nil {
-		return c.startOTA(ctx, cfg)
+		return c.startOTA(ctx)
 	}
 	// A database that ran the own node is migrated whether or not the
 	// controller serves OTA (review II, R2-P1-ctl-03).
