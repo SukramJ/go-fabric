@@ -722,6 +722,15 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
 	if tracker != nil {
 		tracker.TrackWithMargin(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load()))
+		// The session may have closed since the check above, its entries
+		// dropped by the purge before this one was tracked: the entry is
+		// taken back and the exchange ends, so none of a closed session
+		// stays under its bare id (R2-P6-sec-0302).
+		if now, live := b.sessionNow(e.sessionID); e.session != nil && (!live || now != e.session) {
+			tracker.Untrack(e.sessionID, hdr.MessageCounter)
+			e.fail(errExchangeSessionGone)
+			return e.closedErr()
+		}
 	}
 	if err := e.b.sendRouted(listener, dest, e.sessionID, datagram); err != nil {
 		if tracker != nil {
