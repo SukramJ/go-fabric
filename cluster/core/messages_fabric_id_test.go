@@ -115,3 +115,100 @@ func TestMessagesRefusesAnIDAnotherFabricIsPresenting(t *testing.T) {
 		t.Errorf("Messages %+v", l)
 	}
 }
+
+// gatedDisplay blocks PresentMessage or CancelMessage while its gate for
+// the call is set, and records the cancels.
+type gatedDisplay struct {
+	mu                    sync.Mutex
+	holdPresent, holdCanc bool
+	entered               chan struct{}
+	release               chan struct{}
+	cancelled             [][]byte
+}
+
+func (g *gatedDisplay) wait(hold bool) {
+	if hold {
+		g.entered <- struct{}{}
+		<-g.release
+	}
+}
+
+func (g *gatedDisplay) PresentMessage(context.Context, messagesdef.MessageStruct) error {
+	g.mu.Lock()
+	hold := g.holdPresent
+	g.mu.Unlock()
+	g.wait(hold)
+	return nil
+}
+
+func (g *gatedDisplay) CancelMessage(_ context.Context, id []byte) error {
+	g.mu.Lock()
+	hold := g.holdCanc
+	g.cancelled = append(g.cancelled, id)
+	g.mu.Unlock()
+	g.wait(hold)
+	return nil
+}
+
+// TestMessagesPresentOfARemovedFabricIsNotQueued (review II, R2-P6-sec-1201
+// round 2): a present whose fabric is removed while the presenter has it
+// is not queued under the removed index; the presenter is told to take it
+// down and the request answers UNSUPPORTED_ACCESS.
+func TestMessagesPresentOfARemovedFabricIsNotQueued(t *testing.T) {
+	t.Parallel()
+	g := &gatedDisplay{holdPresent: true, entered: make(chan struct{}, 1), release: make(chan struct{})}
+	m, err := core.NewMessages(core.MessagesConfig{Presenter: g})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := messageID(8)
+	done := make(chan error, 1)
+	go func() {
+		done <- decodeAndInvoke(t, m, msgCtx(1, true), messagesdef.CmdPresentMessagesRequest, presentRequest(id, "x"))
+	}()
+	<-g.entered
+	m.RemoveFabric(1)
+	close(g.release)
+	wantCoreStatus(t, <-done, im.StatusUnsupportedAccess)
+	if v, _ := m.MatterRead(messagesdef.AttrMessages); len(v.(spec.List[messagesdef.MessageStruct])) != 0 {
+		t.Errorf("Messages %+v queued under a removed fabric", v)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if len(g.cancelled) != 1 || !bytes.Equal(g.cancelled[0], id) {
+		t.Errorf("presenter cancels %v, want the shown id", g.cancelled)
+	}
+}
+
+// TestMessagesCancelHoldsTheID (review II, R2-P6-sec-1201 round 2): while a
+// fabric's cancel of an id runs at the presenter, another fabric cannot
+// present that id — even when the host completed it in the meantime — so
+// the cancel never takes the other fabric's display down.
+func TestMessagesCancelHoldsTheID(t *testing.T) {
+	t.Parallel()
+	g := &gatedDisplay{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	m, err := core.NewMessages(core.MessagesConfig{Presenter: g})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := messageID(9)
+	if err := decodeAndInvoke(t, m, msgCtx(1, true), messagesdef.CmdPresentMessagesRequest, presentRequest(id, "x")); err != nil {
+		t.Fatal(err)
+	}
+	m.Presented(id)
+	g.mu.Lock()
+	g.holdCanc = true
+	g.mu.Unlock()
+	done := make(chan error, 1)
+	go func() {
+		done <- decodeAndInvoke(t, m, msgCtx(1, true), messagesdef.CmdCancelMessagesRequest, messagesdef.CancelMessagesRequestRequest{MessageIds: [][]byte{id}})
+	}()
+	<-g.entered
+	m.Complete(id, core.MessageOutcome{})
+	err = decodeAndInvoke(t, m, msgCtx(2, true), messagesdef.CmdPresentMessagesRequest, presentRequest(id, "y"))
+	close(g.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	wantCoreStatus(t, err, im.StatusAlreadyExists)
+}
