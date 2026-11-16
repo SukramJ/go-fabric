@@ -64,8 +64,15 @@ type bleRuntime struct {
 	// serveCancel ends the GATT service's Serve, nil once asked to end;
 	// serveDone closes when Serve returned and stays set until then, so
 	// the next StartBLE waits for the old Serve rather than racing it.
+	// Both are set while the service registers too: serveCancel then
+	// ends the registration, and serveDone closes once a registration
+	// that did not lead to a Serve ended.
 	serveCancel context.CancelFunc
 	serveDone   chan struct{}
+	// registering is set while a StartBLE calls the host's
+	// RegisterService, which runs without mu held; it closes when the
+	// registration ended, and another StartBLE waits for it.
+	registering chan struct{}
 	// advCancel ends the advertisement's schedule, nil once asked to end;
 	// advDone closes when it stopped advertising and stays set until
 	// then. adv is what it advertises.
@@ -124,7 +131,10 @@ func (b *Bridge) setBLERunning(on bool) {
 // registration happens inside Serve, which reports a refusal on its own
 // goroutine, logged as matter.ble.serve). A service the platform withdraws
 // later ends the advertisement as well, and the next StartBLE registers
-// the service again.
+// the service again. The host's registration runs without the BLE side's
+// lock held: a [Bridge.StopBLE] or [Bridge.Stop] meanwhile ends it
+// (RegisterService's ctx ends) and StartBLE answers an error, and the
+// host's registration may call back into the bridge.
 //
 // A service or advertisement still ending after a [Bridge.StopBLE] that
 // gave up waiting is waited for first, until ctx ends. The bridge must be
@@ -146,7 +156,9 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 			return ErrNotStarted
 		}
 		ending := b.ble.serveDone
-		if b.ble.serveCancel != nil || ending == nil {
+		if reg := b.ble.registering; reg != nil {
+			ending = reg
+		} else if b.ble.serveCancel != nil || ending == nil {
 			break // locked
 		}
 		b.ble.mu.Unlock()
@@ -160,16 +172,9 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 		// The service first: a refusal is this call's error, and no
 		// advertisement announces a service that is not there (review II,
 		// R2-P5-apidev-05, decision 114).
-		svc, err := p.RegisterService(ctx, nil)
-		if err != nil {
-			b.ble.mu.Unlock()
-			return fmt.Errorf("bridge: BLE: register the Matter GATT service: %w", err)
+		if err := b.registerBLELocked(ctx, p); err != nil {
+			return err
 		}
-		serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-		done := make(chan struct{})
-		b.ble.serveCancel, b.ble.serveDone = cancel, done
-		go b.serveBLE(serveCtx, cancel, done, svc)
-		b.logger.Info("matter.ble.serving")
 	}
 	if b.ble.advCancel != nil && b.ble.adv == want {
 		b.ble.mu.Unlock()
@@ -204,6 +209,69 @@ func (b *Bridge) StartBLE(ctx context.Context, adv CommissioningAdvertisement) e
 		}
 		b.advertiseBLE(advCtx, p, want)
 	}()
+	return nil
+}
+
+// errBLEStoppedWhileRegistering is StartBLE's answer when StopBLE ended
+// the BLE side while the host registered the Matter GATT service.
+var errBLEStoppedWhileRegistering = errors.New("bridge: BLE: stopped while the Matter GATT service registered")
+
+// registerBLELocked registers the Matter GATT service on p and starts
+// serving it. It is called with b.ble.mu held and no service, and calls
+// the host's RegisterService without the lock: the registration is marked
+// in progress (registering, with serveCancel and serveDone set), so
+// [Bridge.StopBLE] and [Bridge.Stop] end it — its ctx ends with ctx or
+// with their cancel — instead of waiting for the lock, the advertisement's
+// cleanup is not held up, another StartBLE waits for it to end, and a
+// host whose RegisterService calls back into the bridge's BLE surface
+// does not deadlock (a StopBLE from inside it waits for the registration
+// it runs in, until its own ctx ends). A service registered after StopBLE
+// or Stop took the BLE side is served on its ended context, which
+// unregisters it ([contract.GATTService.Serve]), and StartBLE answers
+// [ErrNotStarted] or errBLEStoppedWhileRegistering. On success it returns
+// with the lock held; on an error, released.
+func (b *Bridge) registerBLELocked(ctx context.Context, p contract.GATTPeripheral) error {
+	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	done := make(chan struct{})
+	registered := make(chan struct{})
+	b.ble.serveCancel, b.ble.serveDone, b.ble.registering = cancel, done, registered
+	b.ble.mu.Unlock()
+
+	regCtx, endReg := context.WithCancel(ctx)
+	stopWatch := context.AfterFunc(serveCtx, endReg)
+	svc, err := p.RegisterService(regCtx, nil)
+	stopWatch()
+	endReg()
+
+	b.ble.mu.Lock()
+	b.ble.registering = nil
+	close(registered)
+	running := b.ble.running
+	if err != nil {
+		if b.ble.serveDone == done {
+			b.ble.serveCancel, b.ble.serveDone = nil, nil
+		}
+		b.ble.mu.Unlock()
+		cancel()
+		close(done)
+		return fmt.Errorf("bridge: BLE: register the Matter GATT service: %w", err)
+	}
+	if serveCtx.Err() != nil || !running {
+		// Registered after the BLE side was taken down: Serve on the
+		// ended context unregisters the service and closes done.
+		if b.ble.serveDone == done {
+			b.ble.serveCancel = nil
+		}
+		b.ble.mu.Unlock()
+		cancel()
+		go b.serveBLE(serveCtx, cancel, done, svc)
+		if !running {
+			return ErrNotStarted
+		}
+		return errBLEStoppedWhileRegistering
+	}
+	go b.serveBLE(serveCtx, cancel, done, svc)
+	b.logger.Info("matter.ble.serving")
 	return nil
 }
 
