@@ -38,7 +38,7 @@ func handler[T any](name string, run func(ctx context.Context, req T) error) spe
 // not fenced.
 func (d *Datastore) anchorOnly(h spec.CommandHandler) spec.CommandHandler {
 	return func(ctx context.Context, fields any) (any, error) {
-		if _, fabric, request := im.LookupFabricFilter(ctx); request && !d.admits(fabric) {
+		if _, fabric, request := im.LookupFabricFilter(ctx); request && !d.admits(ctx, fabric) {
 			return nil, spec.Errorf(im.StatusUnsupportedAccess, "JointFabricDatastore: fabric %d is not the anchor fabric", fabric)
 		}
 		return h(ctx, fields)

@@ -16,6 +16,7 @@ import (
 	jfdsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/surface"
 )
 
@@ -123,8 +124,11 @@ func TestJointFabricSimSyncReachesNoNode(t *testing.T) {
 	// records fabric 1 as the host would.
 	if d, ok := ds.(*jointfabric.Datastore); !ok {
 		t.Fatalf("the datastore server is %T", ds)
-	} else if err := d.SetAnchorFabricIndex(ctx, 1); err != nil {
-		t.Fatal(err)
+	} else {
+		d.AttachNode(oneFabric{store.FabricRecord{FabricIndex: 1, FabricID: 1, RootPublicKey: []byte{4, 1}}}, nil)
+		if err := d.SetAnchorFabricIndex(ctx, 1); err != nil {
+			t.Fatal(err)
+		}
 	}
 	invoke := func(cmdID uint32, req any) im.StatusCode {
 		_, err := ds.MatterInvoke(im.WithFabricFilter(ctx, true, 1), cmdID, req)
@@ -159,4 +163,22 @@ func TestJointFabricSimSyncReachesNoNode(t *testing.T) {
 	if ks, err := s.FetchGroupKeySet(ctx, 7, 1); err != nil || ks.GroupKeySetId != 0 {
 		t.Fatalf("FetchGroupKeySet = %+v, %v; want nothing", ks, err)
 	}
+}
+
+// oneFabric is a fabric table of one fabric.
+type oneFabric struct{ f store.FabricRecord }
+
+func (o oneFabric) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, error) {
+	if idx == o.f.FabricIndex {
+		return o.f, nil
+	}
+	return store.FabricRecord{}, store.ErrFabricNotFound
+}
+
+func (o oneFabric) ListFabrics(context.Context) ([]store.FabricRecord, error) {
+	return []store.FabricRecord{o.f}, nil
+}
+
+func (oneFabric) GetIdentity(context.Context, uint8) (store.IdentityRecord, error) {
+	return store.IdentityRecord{}, store.ErrIdentityNotFound
 }

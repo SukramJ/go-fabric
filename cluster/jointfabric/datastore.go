@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
@@ -162,21 +163,26 @@ func (a aclEntry) encode() ACLEntry {
 // :562-577): the anchor, the status and the lists. They are the persisted
 // record.
 type tables struct {
-	AnchorRootCA      []byte                 `json:"anchorRootCA,omitempty"`
-	AnchorNodeID      uint64                 `json:"anchorNodeID,omitempty"`
-	AnchorVendorID    uint16                 `json:"anchorVendorID,omitempty"`
-	AnchorFabricIndex uint8                  `json:"anchorFabricIndex,omitempty"`
-	FriendlyName      string                 `json:"friendlyName,omitempty"`
-	Status            StatusEntry            `json:"status"`
-	Nodes             []NodeEntry            `json:"nodes,omitempty"`
-	GroupKeySets      []GroupKeySet          `json:"groupKeySets,omitempty"`
-	Admins            []AdminEntry           `json:"admins,omitempty"`
-	Groups            []GroupEntry           `json:"groups,omitempty"`
-	EndpointGroupIDs  []EndpointGroupIDEntry `json:"endpointGroupIDs,omitempty"`
-	Bindings          []EndpointBindingEntry `json:"bindings,omitempty"`
-	NodeKeySets       []NodeKeySetEntry      `json:"nodeKeySets,omitempty"`
-	ACLs              []aclEntry             `json:"acls,omitempty"`
-	Endpoints         []EndpointEntry        `json:"endpoints,omitempty"`
+	AnchorRootCA      []byte `json:"anchorRootCA,omitempty"`
+	AnchorNodeID      uint64 `json:"anchorNodeID,omitempty"`
+	AnchorVendorID    uint16 `json:"anchorVendorID,omitempty"`
+	AnchorFabricIndex uint8  `json:"anchorFabricIndex,omitempty"`
+	// AnchorRootPublicKey and AnchorFabricID are the anchor fabric's
+	// identity as the node's fabric table holds it: an index alone names
+	// whichever fabric holds it now (R2-P6 RECORD-13).
+	AnchorRootPublicKey []byte                 `json:"anchorRootPublicKey,omitempty"`
+	AnchorFabricID      uint64                 `json:"anchorFabricID,omitempty"`
+	FriendlyName        string                 `json:"friendlyName,omitempty"`
+	Status              StatusEntry            `json:"status"`
+	Nodes               []NodeEntry            `json:"nodes,omitempty"`
+	GroupKeySets        []GroupKeySet          `json:"groupKeySets,omitempty"`
+	Admins              []AdminEntry           `json:"admins,omitempty"`
+	Groups              []GroupEntry           `json:"groups,omitempty"`
+	EndpointGroupIDs    []EndpointGroupIDEntry `json:"endpointGroupIDs,omitempty"`
+	Bindings            []EndpointBindingEntry `json:"bindings,omitempty"`
+	NodeKeySets         []NodeKeySetEntry      `json:"nodeKeySets,omitempty"`
+	ACLs                []aclEntry             `json:"acls,omitempty"`
+	Endpoints           []EndpointEntry        `json:"endpoints,omitempty"`
 }
 
 // settingPrefix keys the persisted record, followed by the device's
@@ -203,8 +209,12 @@ const settingPrefix = "jointfabric.datastore:"
 // a server to refuse a read with a status). While no anchor is recorded,
 // every peer is refused so: a Datastore without an [Administrator], or
 // one whose anchor fabric's NOC lacks the administrator and anchor CATs,
-// serves a peer only after the host's [Datastore.SetAnchorFabricIndex]. A
-// call of the host carries no request and is not fenced.
+// serves a peer only after the host's [Datastore.SetAnchorFabricIndex]. The
+// anchor is its fabric index and that fabric's identity (root public key,
+// fabric id) in the node's fabric table, which the node attaches
+// ([Datastore.AttachNode]); without a table no peer is admitted, and a
+// reused index with another identity is not the anchor. A call of the
+// host carries no request and is not fenced.
 //
 // A command answers when its change is in the tables; the push to the
 // node runs after the answer, as connectedhomeip's delegate completes
@@ -236,6 +246,17 @@ type Datastore struct {
 	// before one calls no port and commits nothing after it
 	// (R2-P6-conc-1107).
 	gen uint64
+	// fabrics is the node's fabric table ([Datastore.AttachNode]); the
+	// anchor's identity is read from it. checked/admitted cache the last
+	// comparison; every update and every AttachNode clears it.
+	fabrics  FabricTable
+	checked  bool
+	admitted bool
+	// version counts the updates and the AttachNode calls: a comparison
+	// made outside mu is cached only when nothing moved meanwhile (the
+	// table is an interface a host may implement with an uncomparable
+	// type).
+	version uint64
 	// wiping marks the update that wipes: its attributes are reported even
 	// when its save is refused (the tables are wiped either way).
 	wiping     bool
@@ -400,6 +421,8 @@ func (d *Datastore) update(ctx context.Context, fn func() error) error {
 		}
 	}
 	d.wiping = false
+	d.checked = false
+	d.version++
 	d.mu.Unlock()
 	if len(ids) > 0 && d.srv != nil {
 		_ = d.srv.MarkChanged(ids...)
@@ -785,6 +808,7 @@ func (d *Datastore) recordAnchor(ctx context.Context, f store.FabricRecord) erro
 			return fmt.Errorf("%w: the datastore's anchor is fabric %d", ErrInvalidArgument, d.t.AnchorFabricIndex)
 		}
 		d.t.AnchorFabricIndex = f.FabricIndex
+		d.t.AnchorRootPublicKey, d.t.AnchorFabricID = slices.Clone(f.RootPublicKey), f.FabricID
 		if len(f.RootCert) < maxDERCertLength {
 			d.t.AnchorRootCA = slices.Clone(f.RootCert)
 			d.markLocked(dsdef.AttrAnchorRootCa)
@@ -803,18 +827,99 @@ func (d *Datastore) recordAnchor(ctx context.Context, f store.FabricRecord) erro
 
 // SetAnchorFabricIndex records the Joint Fabric's index on this node, so
 // that its removal wipes the datastore (:316-317), and opens the
-// datastore to that fabric's peers.
+// datastore to that fabric's peers. The fabric's identity (root public
+// key, fabric id) is taken from the fabric table — now, when one is
+// attached, else at [Datastore.AttachNode]; until then no peer is
+// admitted.
 func (d *Datastore) SetAnchorFabricIndex(ctx context.Context, fabricIndex uint8) error {
-	return d.update(ctx, func() error {
+	err := d.update(ctx, func() error {
 		if d.t.AnchorFabricIndex != fabricIndex {
 			// Who may read every attribute changed: each is reported, so
 			// a subscriber of the admitted fabric gets the tables (Fable
 			// RECORD-12).
 			d.markLocked(allAttrs...)
+			d.t.AnchorRootPublicKey, d.t.AnchorFabricID = nil, 0
 		}
 		d.t.AnchorFabricIndex = fabricIndex
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	d.mu.Lock()
+	table := d.fabrics
+	d.mu.Unlock()
+	if table != nil {
+		d.checkAnchor(ctx, table)
+	}
+	return nil
+}
+
+// AttachNode hands the datastore the node's fabric table, which the node
+// calls as the endpoint joins the topology (a host that wires the
+// datastore outside the node calls it itself; without a table no peer is
+// admitted). It then checks the recorded anchor ([Datastore.checkAnchor]).
+func (d *Datastore) AttachNode(fabrics FabricTable, _ wire.WindowController) {
+	d.mu.Lock()
+	d.fabrics, d.checked = fabrics, false
+	d.version++
+	d.mu.Unlock()
+	if fabrics != nil {
+		d.checkAnchor(context.Background(), fabrics)
+	}
+}
+
+// checkAnchor holds the recorded anchor against the fabric table and
+// returns the anchor's index while the table holds that fabric with the
+// recorded identity, else 0:
+//   - no anchor, or the table does not hold its index: 0 (a removed
+//     anchor fabric's record is the reconcile's to wipe);
+//   - an anchor recorded without its identity — a record of an earlier
+//     build, or the host's SetAnchorFabricIndex before a table was
+//     attached: the identity of the fabric the table holds at that index
+//     is adopted. Re-deriving rather than treating the record as
+//     unanchored keeps an earlier build's registry with its anchor; the
+//     node's reconcile, which runs before the topology's AttachNode,
+//     already wiped a record whose index the table no longer holds, so
+//     what is adopted is the fabric that held the index when the record
+//     was written, unless the index was handed out again while the
+//     datastore's endpoint was absent — a window that exists only for a
+//     record written before this build;
+//   - the table holds the index with another identity: the anchor
+//     fabric is gone and its index handed out again while the datastore
+//     did not hear of it (an endpoint absent at the removal and at the
+//     reuse) — the datastore is wiped, as the removal would have
+//     (R2-P6 RECORD-13).
+func (d *Datastore) checkAnchor(ctx context.Context, table FabricTable) uint8 {
+	d.mu.Lock()
+	anchor, rpk, fid := d.t.AnchorFabricIndex, slices.Clone(d.t.AnchorRootPublicKey), d.t.AnchorFabricID
+	d.mu.Unlock()
+	if anchor == 0 {
+		return 0
+	}
+	f, err := table.GetFabric(ctx, anchor)
+	if err != nil {
+		return 0
+	}
+	switch {
+	case len(rpk) == 0:
+		adopted := false
+		_ = d.update(ctx, func() error {
+			if d.t.AnchorFabricIndex == anchor && len(d.t.AnchorRootPublicKey) == 0 {
+				d.t.AnchorRootPublicKey, d.t.AnchorFabricID = slices.Clone(f.RootPublicKey), f.FabricID
+				adopted = true
+			}
+			return nil
+		})
+		if adopted {
+			return anchor
+		}
+		return 0
+	case bytes.Equal(rpk, f.RootPublicKey) && fid == f.FabricID:
+		return anchor
+	}
+	_ = d.MatterDropFabric(ctx, anchor)
+	return 0
 }
 
 // SetFriendlyName sets the datastore's friendly name; one of 32 bytes or
@@ -879,10 +984,34 @@ var allAttrs = func() []uint32 {
 }()
 
 // admits reports whether a request of fabric reaches the datastore: the
-// recorded anchor fabric's alone, none while no anchor is recorded.
-func (d *Datastore) admits(fabric uint8) bool {
-	anchor := d.AnchorFabricIndex()
-	return anchor != 0 && fabric == anchor
+// recorded anchor fabric's alone — its index and its identity (root
+// public key, fabric id) as the attached fabric table holds that index —
+// none while no anchor is recorded or no table is attached. The
+// comparison is cached until the next update or AttachNode, the only
+// ways the anchor or the table's view can change under the datastore
+// (a fabric's removal or install of the index reaches it as
+// MatterDropFabric, an update).
+func (d *Datastore) admits(ctx context.Context, fabric uint8) bool {
+	d.mu.Lock()
+	anchor, rpk, fid, table, version := d.t.AnchorFabricIndex, slices.Clone(d.t.AnchorRootPublicKey), d.t.AnchorFabricID, d.fabrics, d.version
+	if anchor == 0 || fabric != anchor || table == nil || len(rpk) == 0 {
+		d.mu.Unlock()
+		return false
+	}
+	if d.checked {
+		ok := d.admitted
+		d.mu.Unlock()
+		return ok
+	}
+	d.mu.Unlock()
+	f, err := table.GetFabric(ctx, anchor)
+	ok := err == nil && bytes.Equal(f.RootPublicKey, rpk) && f.FabricID == fid
+	d.mu.Lock()
+	if d.version == version {
+		d.checked, d.admitted = true, ok
+	}
+	d.mu.Unlock()
+	return ok
 }
 
 // MatterReadFiltered implements [contract.FabricScopedReader]: a request
@@ -893,7 +1022,7 @@ func (d *Datastore) admits(fabric uint8) bool {
 // nullable. Owner decision 129, R2-P6-sec-1103; the status a read should
 // carry needs a contract seam the owner decides.
 func (d *Datastore) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
-	if _, fabric, request := im.LookupFabricFilter(ctx); request && !d.admits(fabric) {
+	if _, fabric, request := im.LookupFabricFilter(ctx); request && !d.admits(ctx, fabric) {
 		if v, ok := withheld(attrID); ok {
 			return v, true
 		}

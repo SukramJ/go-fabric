@@ -4,9 +4,11 @@
 package jointfabric
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 
@@ -16,6 +18,20 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
+
+// tableOf is a fabric table holding one fabric of index idx whose root
+// public key is root.
+func tableOf(idx uint8, root byte) *fakeFabrics {
+	return &fakeFabrics{fabrics: []store.FabricRecord{{FabricIndex: idx, FabricID: 0xF0 + uint64(idx), RootPublicKey: []byte{4, root}}}}
+}
+
+// anchorAt attaches a fabric table holding idx and records idx as the
+// anchor, its identity taken from the table.
+func anchorAt(t *testing.T, d *Datastore, idx uint8) {
+	t.Helper()
+	d.AttachNode(tableOf(idx, 0xA), nil)
+	mustOK(t, d.SetAnchorFabricIndex(t.Context(), idx))
+}
 
 // peerOf is a request of a node of the fabric over CASE.
 func peerOf(fabric uint8) context.Context {
@@ -36,7 +52,7 @@ func TestDatastoreCommandsAreTheAnchorFabrics(t *testing.T) {
 			t.Errorf("command 0x%02X without an anchor: %v", id, err)
 		}
 	}
-	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
+	anchorAt(t, d, 1)
 	for id := range d.commandTable() {
 		if _, err := d.MatterInvoke(peerOf(2), id, nil); statusOf(err) != im.StatusUnsupportedAccess {
 			t.Errorf("command 0x%02X of fabric 2: %v", id, err)
@@ -460,7 +476,7 @@ func TestDatastoreReadsAreTheAnchorFabrics(t *testing.T) {
 	if n := keySets(peerOf(2)); n != 0 {
 		t.Fatalf("without an anchor fabric 2 read %d key sets", n)
 	}
-	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
+	anchorAt(t, d, 1)
 	if n := keySets(peerOf(2)); n != 0 {
 		t.Fatalf("fabric 2 read %d key sets", n)
 	}
@@ -723,5 +739,103 @@ func TestAnchorChangeReportsEveryAttribute(t *testing.T) {
 	mustOK(t, d.SetAnchorFabricIndex(ctx, 1))
 	if d.MatterDataVersion() != dv {
 		t.Fatal("the same anchor again reported a change")
+	}
+}
+
+// TestAReusedIndexIsNotTheAnchor (R2-P6 RECORD-13, round 4): the anchor is
+// its fabric index and that fabric's identity. A datastore that never
+// heard of the anchor fabric's removal — its endpoint absent at the
+// removal and at the index's reuse — finds the index held by a fabric of
+// another root when the node attaches it: the stale registry is wiped and
+// the new fabric is no anchor. A table that changes under an attached
+// datastore is held against the recorded identity at the next request.
+func TestAReusedIndexIsNotTheAnchor(t *testing.T) {
+	ctx := t.Context()
+	st := &memStore{}
+	d, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
+	d.AttachNode(tableOf(4, 0xA), nil)
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 4))
+	mustOK(t, d.AddPendingNode(ctx, 9, "n"))
+	if _, err := d.MatterInvoke(peerOf(4), dsdef.CmdAddPendingNode, dsdef.AddPendingNodeRequest{NodeId: 10, FriendlyName: "m"}); err != nil {
+		t.Fatalf("the anchor fabric: %v", err)
+	}
+
+	// Restart: index 4 now holds a fabric of another root.
+	d2, err := NewDatastore(ctx, DatastoreConfig{Store: st, Key: "dev"})
+	mustOK(t, err)
+	d2.AttachNode(tableOf(4, 0xB), nil)
+	if len(d2.NodeList()) != 0 || d2.AnchorFabricIndex() != 0 {
+		t.Fatalf("the reused index kept the registry: nodes %d, anchor %d", len(d2.NodeList()), d2.AnchorFabricIndex())
+	}
+	if _, err := d2.MatterInvoke(peerOf(4), dsdef.CmdAddPendingNode, dsdef.AddPendingNodeRequest{NodeId: 11}); statusOf(err) != im.StatusUnsupportedAccess {
+		t.Fatalf("the reused index's command: %v", err)
+	}
+
+	// An attached table whose index changes owner: the request is held
+	// against the identity.
+	d3 := newStore(t, nil)
+	table := tableOf(4, 0xA)
+	d3.AttachNode(table, nil)
+	mustOK(t, d3.SetAnchorFabricIndex(ctx, 4))
+	if !d3.admits(peerOf(4), 4) {
+		t.Fatal("the anchor fabric not admitted")
+	}
+	table.fabrics[0].RootPublicKey = []byte{4, 0xB}
+	mustOK(t, d3.SetFriendlyName(ctx, "x"))
+	if v, _ := d3.MatterReadFiltered(peerOf(4), dsdef.AttrFriendlyName); v != "" {
+		t.Fatalf("a fabric of another root read FriendlyName %q", v)
+	}
+}
+
+// TestAnAnchorWithoutIdentityAdoptsTheTables (round 4): a record of an
+// earlier build carries the anchor's index alone; at AttachNode it takes
+// the identity of the fabric the table holds at that index (re-derived,
+// not treated as unanchored, so the registry keeps its anchor), and the
+// anchor fabric is admitted. Without a table no peer is.
+func TestAnAnchorWithoutIdentityAdoptsTheTables(t *testing.T) {
+	ctx := t.Context()
+	d := newStore(t, nil)
+	mustOK(t, d.SetAnchorFabricIndex(ctx, 4))
+	mustOK(t, d.AddPendingNode(ctx, 9, "n"))
+	if d.admits(peerOf(4), 4) {
+		t.Fatal("admitted without a fabric table")
+	}
+	d.AttachNode(tableOf(4, 0xA), nil)
+	if !d.admits(peerOf(4), 4) || len(d.NodeList()) != 1 {
+		t.Fatalf("after AttachNode: admitted %v, nodes %d", d.admits(peerOf(4), 4), len(d.NodeList()))
+	}
+	d.mu.Lock()
+	rpk := slices.Clone(d.t.AnchorRootPublicKey)
+	d.mu.Unlock()
+	if !bytes.Equal(rpk, []byte{4, 0xA}) {
+		t.Fatalf("adopted root %X", rpk)
+	}
+}
+
+// sliceTable is a fabric table of an uncomparable type, as a host may
+// write one.
+type sliceTable []store.FabricRecord
+
+func (s sliceTable) GetFabric(ctx context.Context, idx uint8) (store.FabricRecord, error) {
+	return (&fakeFabrics{fabrics: s}).GetFabric(ctx, idx)
+}
+
+func (s sliceTable) ListFabrics(context.Context) ([]store.FabricRecord, error) { return s, nil }
+
+func (sliceTable) GetIdentity(context.Context, uint8) (store.IdentityRecord, error) {
+	return store.IdentityRecord{}, store.ErrIdentityNotFound
+}
+
+// TestAnUncomparableTableIsAdmitted (round 4): the admission cache does
+// not compare the table (an uncomparable host type panicked there).
+func TestAnUncomparableTableIsAdmitted(t *testing.T) {
+	d := newStore(t, nil)
+	d.AttachNode(sliceTable(tableOf(4, 0xA).fabrics), nil)
+	mustOK(t, d.SetAnchorFabricIndex(t.Context(), 4))
+	for range 2 { // the comparison, then the cache
+		if !d.admits(peerOf(4), 4) {
+			t.Fatal("the anchor fabric not admitted")
+		}
 	}
 }

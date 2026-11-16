@@ -205,7 +205,8 @@ func (a *Administrator) restoreFabricIndex(ctx context.Context, fabrics FabricTa
 
 // takeAnchor sets a null AdministratorFabricIndex from the anchor. With a
 // Datastore that records an anchor, that fabric, when the fabric table
-// still holds it — an anchored datastore is never re-pointed to another
+// still holds it with the recorded identity (a reused index with another
+// root wipes the datastore, [Datastore.checkAnchor]) — an anchored datastore is never re-pointed to another
 // fabric, whatever CATs its NOC carries; its stale anchor is the
 // reconcile's to wipe. With a Datastore that records none, the fabric
 // whose NOC carries the administrator and anchor CATs, recorded in the
@@ -215,10 +216,13 @@ func (a *Administrator) restoreFabricIndex(ctx context.Context, fabrics FabricTa
 func (a *Administrator) takeAnchor(ctx context.Context, fabrics FabricTable) {
 	d := a.datastore
 	if d != nil {
-		if anchor := d.AnchorFabricIndex(); anchor != 0 {
-			if _, err := fabrics.GetFabric(ctx, anchor); err == nil {
-				_ = a.srv.SetAttributes(map[uint32]any{jfadef.AttrAdministratorFabricIndex: anchor})
-			}
+		// The anchor is held against the table — its index and identity;
+		// a stale anchor of a reused index is wiped there (checkAnchor).
+		if anchor := d.checkAnchor(ctx, fabrics); anchor != 0 {
+			_ = a.srv.SetAttributes(map[uint32]any{jfadef.AttrAdministratorFabricIndex: anchor})
+			return
+		}
+		if d.AnchorFabricIndex() != 0 {
 			return
 		}
 	}

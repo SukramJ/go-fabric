@@ -218,7 +218,7 @@ var hostCases = map[uint32]hostCase{
 	// getters are what Get reads, OnFabricRemoved and the Attach and
 	// fail-safe methods the node's wiring.
 	h_jfds.ClusterID: {kit: kitOf[*jointfabric.Datastore](), host: hostOf[h_jfds.Host](h_jfds.Wrap), covered: []string{
-		"AdminList", "AnchorNodeID", "AnchorRootCA", "AnchorVendorID", "EndpointBindingList", "EndpointGroupIDList", "FriendlyName",
+		"AdminList", "AnchorNodeID", "AnchorRootCA", "AnchorVendorID", "AttachNode", "EndpointBindingList", "EndpointGroupIDList", "FriendlyName",
 		"GroupKeySetList", "GroupList", "NodeACLList", "NodeEndpointList", "NodeKeySetList", "NodeList", "OnFabricRemoved", "Status",
 	}},
 	h_jfa.ClusterID: {kit: kitOf[*jointfabric.Administrator](), host: hostOf[h_jfa.Host](h_jfa.Wrap), covered: []string{
