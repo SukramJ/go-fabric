@@ -6,6 +6,7 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -107,6 +108,14 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 		if _, err := cmd.DecodeRequest(n); err != nil {
 			return nil, err
 		}
+		// The hand reader reads the checked request: the top-level fields
+		// the definition defines, each the element the check judged. A
+		// member the definition does not know — skipped whole by its
+		// decoder, as matter.js skips an unknown field
+		// (packages/types/src/tlv/TlvObject.ts:215-217 at db021da0) — never
+		// reaches a reader that would descend into it and read its inner
+		// tags as the command's own (R2-P6-wire-0440).
+		n = definedFields(n, cmd)
 	}
 	sub, _, err := reopen(n)
 	if err != nil {
@@ -131,6 +140,22 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 	}
 	fields, err = decodeGenericTagMap(sub)
 	return fields, consumed(err)
+}
+
+// definedFields returns the request tree n with only the top-level members
+// whose context tag is one of cmd's fields; anonymous and profile-tagged
+// members, and context tags the command does not define, are left out.
+func definedFields(n spec.Node, cmd *spec.Command) spec.Node {
+	out := spec.Node{El: n.El, Children: make([]spec.Node, 0, len(n.Children))}
+	for _, c := range n.Children {
+		if c.El.Tag.Kind != tlv.TagKindContext {
+			continue
+		}
+		if slices.ContainsFunc(cmd.Fields, func(f spec.Field) bool { return f.ID == uint32(c.El.Tag.Number) }) {
+			out.Children = append(out.Children, c)
+		}
+	}
+	return out
 }
 
 // fieldsReadError is the refusal of command fields [spec.ReadContainer]
