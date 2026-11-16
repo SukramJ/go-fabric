@@ -666,6 +666,17 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	return nil
 }
 
+// allConcreteInvokes reports whether every command of a request names its
+// endpoint.
+func allConcreteInvokes(invokes []im.CommandInvocation) bool {
+	for _, inv := range invokes {
+		if !inv.Path.HasEndpoint {
+			return false
+		}
+	}
+	return true
+}
+
 // Timed interactions, as matter.js splits them: the interaction-level gate
 // compares the request's own Timed flag with the exchange's timed window
 // (a mismatch either way is TIMED_REQUEST_MISMATCH, an expired window
@@ -786,6 +797,21 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// HandleInvokeRequest; we only elide the wire reply and send the owed
 	// MRP ack (the controller opted out of the StatusResponse handshake, so the
 	// Standalone Ack is all it expects; [Bridge.ackUnansweredRequest]).
+	// Every command of the request was answered with nothing — a handler
+	// returned [im.NoResponse], which leaves its command out: no
+	// InvokeResponse is sent, only the owed acknowledgement (review II,
+	// R2-P6-fsm-1001, F-db021da0-10; the NetworkCommissioning server's
+	// ConnectNetwork that outlived its fail-safe, as connectedhomeip). A
+	// concrete command always leaves an entry otherwise, so the test is
+	// exact for a request of concrete commands; a wildcard one that
+	// targets nothing is answered as before.
+	if len(resp.Responses) == 0 && len(req.Invokes) > 0 && allConcreteInvokes(req.Invokes) {
+		b.ackUnansweredRequest(requestHdr, proto)
+		b.logger.Debug("matter.rx.im.invoke.no_response",
+			slog.String("src", srcString(src)),
+			slog.Int("commands", len(req.Invokes)))
+		return nil
+	}
 	if req.SuppressResponse && !resp.HasCommandData() {
 		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.suppressed",

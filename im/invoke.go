@@ -702,7 +702,12 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 			ir.Responses = append(ir.Responses, pathStatusEntry(inv, inv.DecodeStatus))
 			continue
 		}
-		ir.Responses = append(ir.Responses, resultEntry(inv, d.Invoke(ctx, inv.Path, inv.Fields)))
+		res := d.Invoke(ctx, inv.Path, inv.Fields)
+		if res.Status == StatusSuccess && isNoResponse(res.Response) {
+			// The handler answers the command with nothing ([NoResponse]).
+			continue
+		}
+		ir.Responses = append(ir.Responses, resultEntry(inv, res))
 	}
 	return ir
 }

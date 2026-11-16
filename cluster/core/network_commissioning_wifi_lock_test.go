@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/im"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 )
 
@@ -103,15 +104,21 @@ func TestWiFiNetworkCommissioningConnectAfterExpiryIsDropped(t *testing.T) {
 		t.Fatal(err)
 	}
 	done := make(chan struct{})
+	var resp any
+	var respErr error
 	go func() {
 		defer close(done)
-		_, _ = w.MatterInvoke(ctx, netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("lab"), Breadcrumb: bc(9)})
+		resp, respErr = w.MatterInvoke(ctx, netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("lab"), Breadcrumb: bc(9)})
 	}()
 	<-d.entered
 	armed = false
 	w.OnFailSafeExpired()
 	close(d.release)
 	<-done
+	// Answered with nothing, as chip (R2-P6-fsm-1001, F-db021da0-10).
+	if _, ok := resp.(im.NoResponse); !ok || respErr != nil {
+		t.Errorf("the late ConnectNetwork answered %#v, %v; want im.NoResponse", resp, respErr)
+	}
 	if len(crumbs) != 0 {
 		t.Errorf("the late ConnectNetwork wrote Breadcrumb %v into a disarmed GeneralCommissioning", crumbs)
 	}

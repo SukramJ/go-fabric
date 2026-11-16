@@ -68,9 +68,11 @@ func TestThreadConnectOutlivesFailSafe(t *testing.T) {
 	}
 	statusBefore, _ := n.MatterRead(netcommAttrLastNetworkingStatus)
 	done := make(chan struct{})
+	var resp any
+	var respErr error
 	go func() {
 		defer close(done)
-		_, _ = n.MatterInvoke(ctx, netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: threadExtPANID, Breadcrumb: bc(7)})
+		resp, respErr = n.MatterInvoke(ctx, netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: threadExtPANID, Breadcrumb: bc(7)})
 	}()
 	<-br.entered
 	armed = false
@@ -78,6 +80,10 @@ func TestThreadConnectOutlivesFailSafe(t *testing.T) {
 	crumbsAtExpiry := len(crumbs)
 	close(br.release)
 	<-done
+	// Answered with nothing, as chip (R2-P6-fsm-1001, F-db021da0-10).
+	if _, ok := resp.(im.NoResponse); !ok || respErr != nil {
+		t.Errorf("the abandoned ConnectNetwork answered %#v, %v; want im.NoResponse", resp, respErr)
+	}
 	sim.mu.Lock()
 	final := bytes.Clone(sim.active)
 	sim.mu.Unlock()

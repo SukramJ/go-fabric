@@ -619,12 +619,20 @@ func (n *ThreadNetworkCommissioning) connect(ctx context.Context, req netcommdef
 	if n.expiries != window {
 		// The fail-safe that admitted the command expired while the border
 		// router attached, and OnFailSafeExpired reverted the staged
-		// network: the result writes no attribute and no Breadcrumb, and
-		// the reverted dataset is attached again, since this attach may
-		// have landed after the expiry's revert.
+		// network: the result writes no attribute and no Breadcrumb, the
+		// reverted dataset is attached again, since this attach may have
+		// landed after the expiry's revert, and the command is answered
+		// with nothing ([im.NoResponse]; review II, R2-P6-fsm-1001,
+		// F-db021da0-10). Follows connectedhomeip
+		// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
+		// at 6170af84, whose one class serves Wi-Fi and Thread: the
+		// fail-safe expiry reverts the driver and releases the pending
+		// command handle (:1001-1002), and a driver result that arrives
+		// afterwards returns before it adds a ConnectNetworkResponse
+		// (:845-857).
 		n.mu.Unlock()
 		n.reattachReverted(context.WithoutCancel(ctx), window)
-		return resp, nil
+		return im.NoResponse{}, nil
 	}
 	defer func() {
 		if statusOK(status) {

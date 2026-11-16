@@ -69,3 +69,21 @@ func TestDispatcherWithoutACLCheckerDenies(t *testing.T) {
 		t.Errorf("PASE invoke: %+v, want SUCCESS", ir)
 	}
 }
+
+// noResponseDispatcher answers every command with [NoResponse].
+type noResponseDispatcher struct{ noACLDispatcher }
+
+func (*noResponseDispatcher) Invoke(_ context.Context, p ConcreteCommandPath, _ any) InvokeResult {
+	return InvokeResult{Path: p, Status: StatusSuccess, Response: NoResponse{}}
+}
+
+// TestNoResponseLeavesTheCommandOut (review II, R2-P6-fsm-1001): a command
+// whose handler answers [NoResponse] has no entry in the InvokeResponse.
+func TestNoResponseLeavesTheCommandOut(t *testing.T) {
+	t.Parallel()
+	cmd := ConcreteCommandPath{Endpoint: 0, Cluster: 0x0031, Command: 0x06, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	ir := HandleInvokeRequest(unchecked(), &noResponseDispatcher{}, InvokeRequest{Invokes: []CommandInvocation{{Path: cmd}}})
+	if len(ir.Responses) != 0 {
+		t.Fatalf("responses = %+v, want none", ir.Responses)
+	}
+}

@@ -1295,19 +1295,18 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	if w.expiries != window {
 		// The fail-safe that admitted the command expired while the driver
 		// ran, and OnFailSafeExpired reverted the networks: the result
-		// touches neither the reverted state nor the Breadcrumb.
-		// connectedhomeip releases the pending command on the expiry
-		// (NetworkCommissioningCluster.cpp:1002 at 6170af84) and its
-		// OnResult returns on the released handle (:850-857) (review II,
-		// R2-P1-core-06). The answer differs: chip sends nothing for the
-		// command (src/app/CommandHandlerImpl.cpp:481-488, :1000;
-		// src/app/CommandResponseSender.cpp:82-102 at 6170af84), this
-		// server answers the driver's result (F-db021da0-10).
+		// touches neither the reverted state nor the Breadcrumb, and the
+		// command is answered with nothing ([im.NoResponse]; review II,
+		// R2-P1-core-06, R2-P6-fsm-1001, F-db021da0-10).
+		// Follows connectedhomeip
+		// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
+		// at 6170af84: the fail-safe expiry reverts the driver and releases
+		// the pending command handle (:1001-1002), and a driver result that
+		// arrives afterwards returns before it writes LastNetworkID,
+		// LastNetworkingStatus, LastConnectErrorValue or the Breadcrumb and
+		// before it adds a ConnectNetworkResponse (:845-857).
 		w.mu.Unlock()
-		if !statusOK(status) {
-			resp.ErrorValue = spec.Nullable[int32]{Value: errValue}
-		}
-		return resp, nil
+		return im.NoResponse{}, nil
 	}
 	if statusOK(status) {
 		w.lastConnectErr = nil
