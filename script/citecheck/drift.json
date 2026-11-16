@@ -761,7 +761,7 @@
   },
   {
     "file": "client/exchange/exchange_test.go",
-    "line": 234,
+    "line": 235,
     "citation": "MessageExchange.ts:662-665",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "StatusReport",
@@ -770,7 +770,7 @@
   },
   {
     "file": "client/exchange/exchange_test.go",
-    "line": 391,
+    "line": 392,
     "citation": "MessageExchange.ts:834-860",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "PeerMessageMissingError",
