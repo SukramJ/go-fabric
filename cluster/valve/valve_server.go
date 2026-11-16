@@ -207,7 +207,13 @@ type Server struct {
 	ext      *cluster.DataVersionTracker
 	src      StateSource
 	inst     *spec.Instance // the definition with the selection and Config.Events
-	hooks    spec.Hooks
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([Server.Handle]) ahead of the server's own logic
+	// (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
 
 	level     LevelSource            // nil without LVL
 	defaults  DefaultOpenLevelSource // nil without DefaultOpenLevel
@@ -272,12 +278,11 @@ func New(cfg Config) (*Server, error) {
 			return nil, fmt.Errorf("%w: LevelStep %d is outside 1 to 50", ErrSelection, s.levelStep)
 		}
 	}
-	inst, err := spec.New(valvedef.Definition, spec.Options{Features: cfg.Features, Attributes: cfg.Attributes, Events: cfg.Events})
+	srv, err := newHeld(valvedef.Definition, spec.Options{Features: cfg.Features, Attributes: cfg.Attributes, Events: cfg.Events}, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSelection, err)
 	}
-	s.inst = inst
-	s.hooks.Init(s.inst)
+	s.inst, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	return s, nil
 }
 
@@ -430,9 +435,9 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 		return false, err
 	}
 	// The host's veto hears a change only, after the comparison with the
-	// value in effect ([spec.Hooks.CheckWrite]).
+	// value in effect ([spec.WriteVeto.Check]).
 	veto := func() error {
-		return s.hooks.CheckWrite(ctx, attrID, spec.Stored(valvedef.Definition.Attribute(attrID).Type, v))
+		return s.veto.Check(ctx, attrID, spec.Stored(valvedef.Definition.Attribute(attrID).Type, v))
 	}
 	if attrID == valvedef.AttrDefaultOpenLevel {
 		return s.writeDefaultOpenLevel(ctx, v, veto)
@@ -502,9 +507,12 @@ func (s *Server) compliesWithLevelStep(level uint8) bool {
 // nothing in the port says a refusal came from a valve fault, and
 // claiming one would put a diagnosis on the wire that was never measured.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own Open and Close, which [spec.InvokeHeld] runs
+// when the host registered no handler.
+func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case CmdOpen:
 		req, err := openRequestFrom(fields)
