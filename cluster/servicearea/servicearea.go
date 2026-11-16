@@ -632,6 +632,18 @@ func (s *Server) selectAreas(ctx context.Context, newAreas []uint32) (any, error
 	}
 	changed := []uint32{sa.AttrSelectedAreas}
 	s.mu.Lock()
+	// The host's setters take no command lock: re-check the selection on
+	// the areas as they are after the port, so a selection never names an
+	// area the host removed meanwhile (R2-P6-conc-1510).
+	for _, id := range validated {
+		if !s.supported(id) {
+			s.mu.Unlock()
+			return sa.SelectAreasResponse{
+				Status:     SelectAreasUnsupportedArea,
+				StatusText: fmt.Sprintf("AreaID %d left the supported areas list while the device took the selection", id),
+			}, nil
+		}
+	}
 	s.selected = validated
 	if s.Serves(sa.AttrProgress) && len(validated) > 0 {
 		progress := make([]Progress, 0, len(validated))
