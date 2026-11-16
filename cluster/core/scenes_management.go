@@ -660,8 +660,19 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		return st.tableSize, true
 	case scenesAttrFabricSceneInfo:
 		// A table not loaded yet is loaded for the read; one the store
-		// still refuses reads as empty, and stays unloaded.
-		st.ready(ctx)
+		// still refuses fails the read and stays unloaded — answered
+		// FAILURE on a request ([contract.FabricScopedReader]'s (nil,
+		// false)), not SceneCount 0 with the whole capacity free, which
+		// the commands' FAILURE would contradict. Mirrors connectedhomeip
+		// src/app/clusters/scenes-server/ScenesManagementCluster.cpp:425-436
+		// at 6170af84 (the FabricSceneInfo encoder returns the scene
+		// table's GetRemainingCapacity error) and
+		// src/app/storage/FabricTableImpl.ipp:578-581, :596-597 (a storage
+		// error is returned; only NOT_FOUND reads as an empty fabric).
+		// matter.js models no unloaded table.
+		if !st.ready(ctx) {
+			return nil, false
+		}
 		filtered, fabric, _ := im.LookupFabricFilter(ctx)
 		// Every fabric of the node has an entry, created on read
 		// (infoFor), also one that never stored a scene. matter.js holds

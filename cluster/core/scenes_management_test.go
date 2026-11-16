@@ -340,3 +340,48 @@ func TestScenesRefusedStoreRestoresSceneInfo(t *testing.T) {
 		t.Errorf("the current scene is no longer monitored: still valid after a change, %+v", si)
 	}
 }
+
+// TestScenesInfoReadFailsWhileTheTableDoesNotLoad (review II, phase 5b):
+// while the scene store refuses to load the table, a FabricSceneInfo read
+// fails ((nil, false), which the dispatcher answers FAILURE on a request)
+// instead of serving SceneCount 0 with the whole capacity free; once the
+// table loads, the read serves it. SceneTableSize needs no table and is
+// served throughout. Before, the failed load was ignored and the read
+// served an empty fabric.
+func TestScenesInfoReadFailsWhileTheTableDoesNotLoad(t *testing.T) {
+	t.Parallel()
+	refuse := true
+	stored := []byte(`[{"f":1,"g":257,"s":1}]`)
+	st := core.NewPersistedScenesState(
+		func(context.Context) ([]byte, error) {
+			if refuse {
+				return nil, errors.New("the store refuses")
+			}
+			return stored, nil
+		},
+		func(context.Context, []byte) error { return nil })
+	s, err := core.NewScenesManagement(core.ScenesConfig{
+		State:      st,
+		Siblings:   func() []contract.ClusterServer { return nil },
+		GroupKnown: func(context.Context, uint8, uint16) bool { return true },
+		Fabrics:    func(context.Context) []uint8 { return []uint8{1} },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, ok := s.MatterReadFiltered(fabric1, 0x0002); ok || v != nil {
+		t.Errorf("FabricSceneInfo with the table unloadable = %+v, %v; want (nil, false)", v, ok)
+	}
+	if _, ok := s.MatterRead(0x0002); ok {
+		t.Error("FabricSceneInfo without a request is served with the table unloadable")
+	}
+	if _, ok := s.MatterReadFiltered(fabric1, 0x0001); !ok {
+		t.Error("SceneTableSize is not served while the table does not load")
+	}
+	refuse = false
+	v, ok := s.MatterReadFiltered(fabric1, 0x0002)
+	si, _ := v.([]core.SceneInfoStruct)
+	if !ok || len(si) != 1 || si[0].SceneCount != 1 {
+		t.Errorf("FabricSceneInfo once the table loads = %+v, %v; want fabric 1 with its stored scene", v, ok)
+	}
+}
