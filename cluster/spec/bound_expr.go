@@ -6,6 +6,7 @@ package spec
 import (
 	"encoding/json"
 	"math"
+	"math/big"
 	"sync"
 )
 
@@ -84,9 +85,9 @@ func parseBoundNode(raw json.RawMessage) *boundExpr {
 // only (Constraint.ts:14-36, Functions.extreme), a reference resolved by
 // name (NameResolver) and anything else undefined. matter.js computes a
 // power beyond 2^53 as a BigInt (Constraint.ts:1049-1058); the bounds here
-// are float64 like every other bound of [Instance.satisfies], exact for the
-// ±2^62 the snapshot states, while 2^62 - 1 rounds to 2^62 — a value within
-// float64's spacing there (1024) of the bound compares as the bound.
+// are float64, for a float, a length and a count ([Instance.satisfies]); an
+// integer value is held to [Instance.evalBoundExact] instead, where
+// 2^62 - 1 stays 2^62 - 1.
 func (i *Instance) evalBound(e *boundExpr, peers Peers) (float64, bool) {
 	switch e.op {
 	case "num":
@@ -137,4 +138,76 @@ func (i *Instance) evalBound(e *boundExpr, peers Peers) (float64, bool) {
 		return out, found
 	}
 	return 0, false
+}
+
+// maxExactExponent bounds the exponent evalBoundExact raises exactly; a
+// larger one, a negative or a fractional one is computed as float64 (the
+// snapshot states none beyond 64).
+const maxExactExponent = 256
+
+// evalBoundExact is [Instance.evalBound] computed in exact rationals, for
+// an integer value ([Instance.satisfiesInt]): "+", "-", "*" and "/" exactly,
+// "^" exactly for an integer base and a whole exponent up to
+// maxExactExponent — matter.js computes a power beyond 2^53 as a BigInt
+// (Constraint.ts:1049-1058) — and maxOf / minOf over the numeric
+// arguments only. What evalBound leaves without a number has none here.
+func (i *Instance) evalBoundExact(e *boundExpr, peers Peers) (*big.Rat, bool) {
+	switch e.op {
+	case "num":
+		if math.IsNaN(e.num) || math.IsInf(e.num, 0) {
+			return nil, false
+		}
+		return new(big.Rat).SetFloat64(e.num), true
+	case "ref":
+		v, ok := i.resolveName(e.name, peers)
+		if !ok {
+			return nil, false
+		}
+		return ratOf(v)
+	case "+", "-", "*", "/", "^":
+		l, okL := i.evalBoundExact(e.lhs, peers)
+		r, okR := i.evalBoundExact(e.rhs, peers)
+		if !okL || !okR {
+			return nil, false
+		}
+		switch e.op {
+		case "+":
+			return new(big.Rat).Add(l, r), true
+		case "-":
+			return new(big.Rat).Sub(l, r), true
+		case "*":
+			return new(big.Rat).Mul(l, r), true
+		case "/":
+			if r.Sign() == 0 {
+				return nil, false
+			}
+			return new(big.Rat).Quo(l, r), true
+		}
+		if l.IsInt() && r.IsInt() && r.Sign() >= 0 && r.Num().IsInt64() && r.Num().Int64() <= maxExactExponent {
+			// Constraint.ts:1038-1061: -a^b is -(|a|^b).
+			p := new(big.Int).Exp(new(big.Int).Abs(l.Num()), r.Num(), nil)
+			if l.Sign() < 0 {
+				p.Neg(p)
+			}
+			return new(big.Rat).SetInt(p), true
+		}
+		f, ok := i.evalBound(e, peers)
+		if !ok || math.IsNaN(f) || math.IsInf(f, 0) {
+			return nil, false
+		}
+		return new(big.Rat).SetFloat64(f), true
+	case "maxOf", "minOf":
+		var out *big.Rat
+		for _, a := range e.args {
+			v, ok := i.evalBoundExact(a, peers)
+			if !ok {
+				continue
+			}
+			if out == nil || (e.op == "maxOf" && v.Cmp(out) > 0) || (e.op == "minOf" && v.Cmp(out) < 0) {
+				out = v
+			}
+		}
+		return out, out != nil
+	}
+	return nil, false
 }
