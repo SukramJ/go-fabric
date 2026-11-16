@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"sync"
 )
 
@@ -20,6 +21,16 @@ type OrderedHandler func(buf []byte, src *net.UDPAddr, release func())
 // maxOrderedBacklog bounds the datagrams queued behind one key; beyond it
 // a datagram is dropped, as the unordered pool drops one when saturated.
 const maxOrderedBacklog = 256
+
+// maxOrderedBacklogPerSource bounds the places one source address and
+// port takes in one stream's backlog. The stream key is the cleartext
+// session id, read before any decryption, so a party on the link that
+// floods forged datagrams carrying an active session's id from its own
+// address would otherwise fill the stream's backlog and the genuine peer's
+// datagrams of that session would be dropped. A party that also forges the
+// peer's source address is not held off by this (review II,
+// R2-P6-bound-0211).
+const maxOrderedBacklogPerSource = maxOrderedBacklog / 2
 
 // ServeOrdered is [Listener.Serve] for a protocol whose datagrams fall into
 // streams that must be handled in arrival order — the messages of one
@@ -44,6 +55,18 @@ type orderedItem struct {
 type orderedQueue struct {
 	items   []orderedItem
 	running bool
+	// bySource counts items by source (sourceOf), for
+	// maxOrderedBacklogPerSource.
+	bySource map[netip.AddrPort]int
+}
+
+// sourceOf is the key of src's share of a backlog; a nil source (the
+// engine's own call, tests) is one source.
+func sourceOf(src *net.UDPAddr) netip.AddrPort {
+	if src == nil {
+		return netip.AddrPort{}
+	}
+	return src.AddrPort()
 }
 
 // orderedDispatch runs one drain goroutine per stream with pending
@@ -74,10 +97,11 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 	defer o.mu.Unlock()
 	q := o.queues[key]
 	if q == nil {
-		q = &orderedQueue{}
+		q = &orderedQueue{bySource: map[netip.AddrPort]int{}}
 		o.queues[key] = q
 	}
-	if len(q.items) >= maxOrderedBacklog || o.pending >= maxConcurrentDispatch {
+	from := sourceOf(src)
+	if len(q.items) >= maxOrderedBacklog || q.bySource[from] >= maxOrderedBacklogPerSource || o.pending >= maxConcurrentDispatch {
 		if len(q.items) == 0 && !q.running {
 			delete(o.queues, key)
 		}
@@ -89,6 +113,7 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 	// queued behind a running one.
 	l.inflight.Add(1)
 	q.items = append(q.items, orderedItem{buf: buf, src: src})
+	q.bySource[from]++
 	if !q.running {
 		q.running = true
 		go o.drain(l, key, q)
@@ -108,7 +133,13 @@ func (o *orderedDispatch) drain(l *Listener, key uint32, q *orderedQueue) {
 			return
 		}
 		it := q.items[0]
+		q.items[0] = orderedItem{}
 		q.items = q.items[1:]
+		if from := sourceOf(it.src); q.bySource[from] <= 1 {
+			delete(q.bySource, from)
+		} else {
+			q.bySource[from]--
+		}
 		o.mu.Unlock()
 
 		turn := make(chan struct{})

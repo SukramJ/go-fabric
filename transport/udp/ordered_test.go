@@ -196,3 +196,37 @@ func TestWaitIdleWaitsForRunningHandlers(t *testing.T) {
 		t.Fatalf("WaitIdle after the handler returned: %v", err)
 	}
 }
+
+// TestOrderedBacklogLeavesRoomForAnotherSource holds R2-P6-bound-0211: the
+// stream key is read before any decryption, so a party that floods forged
+// datagrams carrying an active session's id from its own address takes at
+// most maxOrderedBacklogPerSource places of that stream's backlog — the
+// genuine peer's next datagram still finds room.
+func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
+	block := make(chan struct{})
+	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) { <-block }}
+	l := &Listener{}
+	flooder := &net.UDPAddr{IP: net.ParseIP("fe80::bad"), Port: 5540}
+	peer := &net.UDPAddr{IP: net.ParseIP("fe80::1"), Port: 5540}
+	for range maxOrderedBacklog + 50 {
+		o.enqueue(l, 1, []byte{1}, flooder)
+	}
+	o.enqueue(l, 1, []byte{1, 2}, peer)
+	o.mu.Lock()
+	var fromPeer, fromFlooder int
+	for _, it := range o.queues[1].items {
+		if it.src == peer {
+			fromPeer++
+		} else {
+			fromFlooder++
+		}
+	}
+	o.mu.Unlock()
+	close(block)
+	if fromPeer != 1 {
+		t.Fatalf("the peer's datagram was dropped behind %d forged ones", fromFlooder)
+	}
+	if fromFlooder > maxOrderedBacklogPerSource {
+		t.Fatalf("one source holds %d places of the backlog, want at most %d", fromFlooder, maxOrderedBacklogPerSource)
+	}
+}
