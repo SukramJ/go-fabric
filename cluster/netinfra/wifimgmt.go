@@ -18,6 +18,7 @@ import (
 	wdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/caseauth"
 )
 
 // WiFiNetworkManagement (0x0451) after connectedhomeip
@@ -243,23 +244,9 @@ func (s *WiFiManagementServer) networkPassphraseRequest(ctx context.Context, _ a
 }
 
 // isCASE reports whether a request arrived over a CASE session: chip's
-// `subjectDescriptor.authMode == Access::AuthMode::kCase` (:130). The
-// bridge stamps the session's fabric and subject on every request and
-// marks a PASE session and a group message (bridge/receive_dispatch.go:
-// 511-515, bridge/group_messaging.go:339-350; im.IsPASEFromContext,
-// im.GroupSubjectFromContext); a CASE request is one with a fabric and a
-// node subject that is neither, as cluster/core's OTA provider tells it.
-func isCASE(ctx context.Context) bool {
-	if im.IsPASEFromContext(ctx) {
-		return false
-	}
-	if _, group := im.GroupSubjectFromContext(ctx); group {
-		return false
-	}
-	_, fabric := im.FabricFilterFromContext(ctx)
-	node, _ := im.SubjectFromContext(ctx)
-	return fabric != 0 && node != 0
-}
+// `subjectDescriptor.authMode == Access::AuthMode::kCase` (:130), the
+// module's one rule ([caseauth.IsCASE]).
+func isCASE(ctx context.Context) bool { return caseauth.IsCASE(ctx) }
 
 // SetAttributes implements [spec.AttributeSetter]: Ssid and
 // PassphraseSurrogate are the credentials' ([spec.ErrNotHeld] for a value

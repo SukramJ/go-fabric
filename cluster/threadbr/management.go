@@ -18,6 +18,7 @@ import (
 	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/caseauth"
 	"github.com/SukramJ/go-fabric/thread"
 )
 
@@ -493,22 +494,9 @@ func (s *ManagementServer) setPendingDataset(ctx context.Context, fields any) (a
 }
 
 // isCASE reports whether a request arrived over a CASE session: chip's
-// `GetSubjectDescriptor().authMode != Access::AuthMode::kCase` (:151). The
-// bridge stamps the session's fabric and subject and marks a PASE session
-// and a group message; a CASE request is one with a fabric and a node
-// subject that is neither, the rule cluster/netinfra's isCASE and
-// cluster/core's OTA provider apply.
-func isCASE(ctx context.Context) bool {
-	if im.IsPASEFromContext(ctx) {
-		return false
-	}
-	if _, group := im.GroupSubjectFromContext(ctx); group {
-		return false
-	}
-	_, fabric := im.FabricFilterFromContext(ctx)
-	node, _ := im.SubjectFromContext(ctx)
-	return fabric != 0 && node != 0
-}
+// `GetSubjectDescriptor().authMode != Access::AuthMode::kCase` (:151), the
+// module's one rule ([caseauth.IsCASE]).
+func isCASE(ctx context.Context) bool { return caseauth.IsCASE(ctx) }
 
 // SetAttributes implements [spec.AttributeSetter]: every attribute is the
 // border router's ([spec.ErrNotHeld] for a value other than the one
