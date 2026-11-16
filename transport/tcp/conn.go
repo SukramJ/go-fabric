@@ -120,8 +120,9 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 // [ErrConnClosed] after the connection closed. Mirrors matter.js
 // TcpChannel.ts:119-133 send.
 //
-// The write is bounded: a frame not handed to the socket within 30 s
-// (a peer that stopped reading, its receive window full) fails the Send
+// The write is bounded by an absolute deadline: a frame not handed to the
+// socket within 30 s of the Send (a peer that stopped reading, its receive
+// window full) fails the Send
 // with an error that wraps [os.ErrDeadlineExceeded] and closes the
 // connection, whose stream may then hold part of a frame. The wait for
 // writeMu — a Send queued behind a stuck one — is bounded by the same
@@ -150,7 +151,7 @@ func (c *Conn) Send(msg []byte) error {
 				slog.String("peer", c.remote.String()),
 				slog.Duration("timeout", c.sendTimeout))
 			c.close(err)
-			return fmt.Errorf("tcp: write %s: no progress within %v, connection closed: %w", c.remote, c.sendTimeout, err)
+			return fmt.Errorf("tcp: write %s: not handed to the socket within %v, connection closed: %w", c.remote, c.sendTimeout, err)
 		}
 		if c.isClosed() {
 			return ErrConnClosed

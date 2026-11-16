@@ -199,9 +199,10 @@ func TestWaitIdleWaitsForRunningHandlers(t *testing.T) {
 
 // TestOrderedBacklogLeavesRoomForAnotherSource holds R2-P6-bound-0211: the
 // stream key is read before any decryption, so a party may flood forged
-// datagrams carrying an active session's id from its own address. Alone it
-// fills the backlog; the genuine peer's datagrams then take the places of
-// the flooder's newest, up to maxOrderedBacklogPerSource of them.
+// datagrams carrying an active session's id from its own address — here
+// from two ports, which count as one source. Alone it fills the backlog;
+// the genuine peer's datagrams then take the places of the flooder's
+// newest (the longest sub-queue's).
 func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 	block, started := make(chan struct{}), make(chan struct{})
 	var once sync.Once
@@ -210,12 +211,12 @@ func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 		<-block
 	}}
 	l := &Listener{}
-	flooder := &net.UDPAddr{IP: net.ParseIP("fe80::bad"), Port: 5540}
+	flooder := []*net.UDPAddr{{IP: net.ParseIP("fe80::bad"), Port: 5540}, {IP: net.ParseIP("fe80::bad"), Port: 5541}}
 	peer := &net.UDPAddr{IP: net.ParseIP("fe80::1"), Port: 5540}
-	o.enqueue(l, 1, []byte{1}, flooder)
+	o.enqueue(l, 1, []byte{1}, flooder[0])
 	<-started // the first one runs; the rest queue behind it
-	for range maxOrderedBacklog + 49 {
-		o.enqueue(l, 1, []byte{1}, flooder)
+	for i := range maxOrderedBacklog + 49 {
+		o.enqueue(l, 1, []byte{1}, flooder[i%2])
 	}
 	o.mu.Lock()
 	alone := len(o.queues[1].items)
@@ -224,9 +225,9 @@ func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 		t.Fatalf("a source alone queued %d, want the whole backlog %d", alone, maxOrderedBacklog)
 	}
 	const peerSends = 3
-	for range peerSends {
+	for i := range peerSends {
 		o.enqueue(l, 1, []byte{1, 2}, peer)
-		o.enqueue(l, 1, []byte{1}, flooder)
+		o.enqueue(l, 1, []byte{1}, flooder[i%2])
 	}
 	o.mu.Lock()
 	var fromPeer, fromFlooder int

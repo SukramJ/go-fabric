@@ -77,7 +77,9 @@ const idleGrace = 5 * time.Minute
 // silent connection is closed anyway. Without it a party with source
 // addresses beyond the per-address cap — IPv6 gives it any number —
 // could replace every new connection before its first message with a
-// silent one of its own. Module's own: connectedhomeip reclaims a
+// silent one of its own. The floor has a cost: a party that renews silent
+// connections inside it holds every place no session holds, and a new
+// connection is then refused. Module's own: connectedhomeip reclaims a
 // connection no message claimed as soon as its table is full
 // (src/transport/raw/TCP.cpp:133-163 at 6170af84).
 const reclaimAgeFloor = NewConnectionIdleTimeout / 5
