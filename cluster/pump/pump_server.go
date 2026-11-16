@@ -558,7 +558,7 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	if heldEquals(s.src.PumpState(), attrID, v) {
 		return false, nil
 	}
-	if err := s.veto.Check(ctx, attrID, storedForm(attrID, v)); err != nil {
+	if err := s.veto.Check(ctx, attrID, spec.Stored(pumpdef.Definition.Attribute(attrID).Type, v)); err != nil {
 		return false, err
 	}
 	n, _ := v.(uint64) // an enum8 or a counter per ValidateWrite; nil for null
@@ -602,20 +602,6 @@ func heldEquals(st State, attrID uint32, v any) bool {
 // sameCounter reports whether two nullable counters are the same value.
 func sameCounter(a, b *uint32) bool {
 	return (a == nil) == (b == nil) && (a == nil || *a == *b)
-}
-
-// storedForm is a value [spec.Instance.ValidateWrite] normalised, in the
-// stored form a write veto receives: the two modes as their enum8 (a
-// uint8), a lifetime counter as a uint32, nil for null.
-func storedForm(attrID uint32, v any) any {
-	if attrID == AttrOperationMode || attrID == AttrControlMode {
-		n, _ := v.(uint64)
-		return uint8(n) //nolint:gosec // an enum8 per ValidateWrite
-	}
-	if c := counter(v); c != nil {
-		return *c
-	}
-	return nil
 }
 
 // counter is a validated nullable lifetime counter: nil for null.

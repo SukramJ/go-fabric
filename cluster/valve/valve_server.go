@@ -442,7 +442,9 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	}
 	// The host's veto hears a change only, after the comparison with the
 	// value in effect ([spec.Hooks.CheckWrite]).
-	veto := func() error { return s.hooks.CheckWrite(ctx, attrID, v) }
+	veto := func() error {
+		return s.hooks.CheckWrite(ctx, attrID, spec.Stored(valvedef.Definition.Attribute(attrID).Type, v))
+	}
 	if attrID == valvedef.AttrDefaultOpenLevel {
 		return s.writeDefaultOpenLevel(ctx, v, veto)
 	}

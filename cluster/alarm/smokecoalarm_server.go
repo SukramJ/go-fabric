@@ -689,7 +689,7 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 		return false, nil
 	}
 	// The host's veto hears a change only ([spec.Hooks.CheckWrite]).
-	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
+	if err := s.hooks.CheckWrite(ctx, attrID, spec.Stored(sdef.Definition.Attribute(attrID).Type, v)); err != nil {
 		return false, err
 	}
 	setter, _ := s.src.(SensitivitySetter) // guaranteed by NewServer

@@ -499,7 +499,9 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (st
 	}
 	// The host's veto hears a change only: each case below compares with
 	// the held value first ([spec.WriteVeto.Check]).
-	veto := func() error { return s.veto.Check(ctx, attrID, storedForm(v)) }
+	veto := func() error {
+		return s.veto.Check(ctx, attrID, spec.Stored(fandef.Definition.Attribute(attrID).Type, v))
+	}
 	n, isNum := v.(uint64) // per ValidateWrite: nil only for a nullable null
 	switch attrID {
 	case AttrPercentSetting:
@@ -672,7 +674,7 @@ func (s *Server) writeFanMode(ctx context.Context, value any) (stored bool, err 
 	if s.src.FanState().FanMode == m {
 		return false, nil
 	}
-	if err := s.veto.Check(ctx, AttrFanMode, m); err != nil {
+	if err := s.veto.Check(ctx, AttrFanMode, spec.Stored(fandef.Definition.Attribute(AttrFanMode).Type, m)); err != nil {
 		return false, err
 	}
 	return true, s.apply(ctx, "FanMode write", s.fanModeSettings(m))
@@ -921,17 +923,6 @@ func fromStepRequest(v fandef.StepRequest) clusterwire.FanStepRequest {
 		req.LowestOff = *v.LowestOff
 	}
 	return req
-}
-
-// storedForm is a value [spec.Instance.ValidateWrite] normalised, in the
-// stored form a write veto receives: FanControl's writable attributes are
-// all 8 bits wide (percent, uint8, the two map8 bitmaps, an enum8), and
-// nil is a nullable null.
-func storedForm(v any) any {
-	if n, ok := v.(uint64); ok {
-		return uint8(n) //nolint:gosec // an 8-bit attribute per ValidateWrite
-	}
-	return v
 }
 
 // SetAttributes implements [spec.AttributeSetter]. The values are checked

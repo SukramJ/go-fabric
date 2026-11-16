@@ -456,7 +456,7 @@ func (s *DimensionServer) MatterWrite(ctx context.Context, attrID uint32, value 
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, v)
+	return s.hooks.CheckWrite(ctx, attrID, spec.Stored(cd.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every

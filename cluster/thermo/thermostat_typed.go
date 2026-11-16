@@ -434,26 +434,3 @@ func (s *ThermostatServer) SetMatterEventEmitter(emitter contract.EventEmitter) 
 func (s *ThermostatServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
 	s.veto.Set(fn)
 }
-
-// storedWrite is a value [spec.Instance.ValidateWrite] normalised (uint64,
-// int64) in the Go type of its attribute's width, the form the write veto
-// sees.
-func storedWrite(attrID uint32, v any) any {
-	a := tdef.Definition.Attribute(attrID)
-	if a == nil {
-		return v
-	}
-	switch n := v.(type) {
-	case int64:
-		if a.Type.Bits > 0 && a.Type.Bits <= 8 {
-			return int8(n) //nolint:gosec // within the width per ValidateWrite
-		}
-		return int16(n) //nolint:gosec // within the width per ValidateWrite
-	case uint64:
-		if a.Type.Bits > 0 && a.Type.Bits <= 8 {
-			return uint8(n) //nolint:gosec // within the width per ValidateWrite
-		}
-		return uint16(n) //nolint:gosec // within the width per ValidateWrite
-	}
-	return v
-}

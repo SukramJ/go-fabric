@@ -597,7 +597,9 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 	if held {
 		return false, nil
 	}
-	if err := s.veto.Check(ctx, attrID, uint8(n)); err != nil { //nolint:gosec // ≤ 15 per ValidateWrite
+	// The veto hears the Mode the write stores — normalised, the value a
+	// read answers after it (R2-P6-api-1505).
+	if err := s.veto.Check(ctx, attrID, spec.Stored(wcdef.Definition.Attribute(attrID).Type, mode)); err != nil {
 		return false, err
 	}
 	s.mu.Lock()

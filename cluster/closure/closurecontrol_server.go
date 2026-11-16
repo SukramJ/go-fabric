@@ -324,7 +324,7 @@ func (s *ControlServer) MatterWrite(ctx context.Context, attrID uint32, value an
 	if err != nil {
 		return err
 	}
-	return s.CheckWrite(ctx, attrID, v)
+	return s.CheckWrite(ctx, attrID, spec.Stored(closuredef.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every

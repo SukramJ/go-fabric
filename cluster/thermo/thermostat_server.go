@@ -944,7 +944,9 @@ func (s *ThermostatServer) readLocked(attrID uint32) (any, bool) {
 	case thermoAttrAbsMaxCoolSetpointLimit:
 		return s.absMaxCool, true
 	case thermoAttrLocalTemperatureCalibration:
-		return s.localTempCalib, true
+		// The stored form of an int8 attribute, as the veto hears it
+		// (R2-P6-api-1505); the field is int16 for the sums it takes part in.
+		return int8(s.localTempCalib), true //nolint:gosec // an int8 per the definition and every setter
 	case thermoAttrOccupiedCoolingSetpoint:
 		return s.occupCool, true
 	case thermoAttrOccupiedHeatingSetpoint:
@@ -1090,7 +1092,7 @@ func (s *ThermostatServer) MatterWriteChanged(ctx context.Context, attrID uint32
 	// The host's veto hears a change only: a write of the value the server
 	// answers reaches no veto ([spec.WriteVeto.Check]); the write goes on
 	// as before and changes nothing.
-	if stored := storedWrite(attrID, v); !s.answers(attrID, stored) {
+	if stored := spec.Stored(tdef.Definition.Attribute(attrID).Type, v); !s.answers(attrID, stored) {
 		if err := s.veto.Check(ctx, attrID, stored); err != nil {
 			return false, err
 		}

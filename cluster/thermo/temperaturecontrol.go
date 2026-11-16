@@ -266,7 +266,7 @@ func (s *TemperatureControlServer) MatterWrite(ctx context.Context, attrID uint3
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, v)
+	return s.hooks.CheckWrite(ctx, attrID, spec.Stored(tc.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every

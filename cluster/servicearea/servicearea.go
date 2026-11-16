@@ -552,7 +552,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, v)
+	return s.hooks.CheckWrite(ctx, attrID, spec.Stored(sa.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
