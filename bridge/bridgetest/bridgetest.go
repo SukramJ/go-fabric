@@ -55,6 +55,11 @@ var (
 	// secure session but leaves PeerCounter at 0. See
 	// [SubscriptionTarget.PeerCounter] for why the value cannot be derived
 	// and why a secure target without it is only half-established.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, decision 140).
 	ErrNoPeerCounter = errors.New("bridgetest: subscription target on a secure session has no peer counter")
 
 	// ErrPeerCounterNotAnchored is returned when the peer's receive window
@@ -116,6 +121,12 @@ type SubscriptionTarget struct {
 	// leaving the window unanchored. Setting it there anchors that
 	// per-source window anyway, and then needs HasPeerNodeID with a
 	// non-zero PeerNodeID to key on.
+	//
+	// Deprecated: read only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]), whose real SubscribeRequest anchors
+	// the window itself. Removable in the next minor release (review II,
+	// N-ctr-5, decision 140).
 	PeerCounter uint32
 
 	// FabricFiltered mirrors the SubscribeRequest's FabricFiltered flag.
@@ -156,6 +167,12 @@ type SubscriptionTarget struct {
 // arrive in order or lose one to the duplicate path. So the anchor happens
 // here too, from [SubscriptionTarget.PeerCounter] — the one value of the
 // modelled handshake that the caller has to supply.
+//
+// Deprecated: no test outside this package calls it. Subscribe through a
+// [Session] of the test [Commissioner] instead ([Session.Subscribe]): a
+// real SubscribeRequest establishes both halves of the subscription and
+// anchors the peer's window with its own counter. Removable in the next
+// minor release (review II, N-ctr-5, decision 140).
 func EstablishSubscriptionTarget(b *bridge.Bridge, subID uint32, target SubscriptionTarget) error {
 	switch {
 	case b == nil:
