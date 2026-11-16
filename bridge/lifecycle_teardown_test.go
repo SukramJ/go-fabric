@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -39,6 +40,19 @@ func (*quiesceCounter) MatterInvoke(context.Context, uint32, any) (any, error) {
 func (*quiesceCounter) MatterReportable() []uint32                             { return nil }
 func (*quiesceCounter) MatterAttributes() []uint32                             { return nil }
 func (q *quiesceCounter) MatterQuiesce()                                       { q.quiesced.Add(1) }
+
+// doneWatchingContext closes asked the first time its Done channel is
+// asked for: a wait on the context has begun.
+type doneWatchingContext struct {
+	context.Context
+	once  sync.Once
+	asked chan struct{}
+}
+
+func (c *doneWatchingContext) Done() <-chan struct{} {
+	c.once.Do(func() { close(c.asked) })
+	return c.Context.Done()
+}
 
 // withBridgedEndpoint is the empty fleet plus one bridged endpoint, 2.
 func withBridgedEndpoint(ctx context.Context) (*endpoint.Topology, error) {
@@ -81,12 +95,15 @@ func TestReassembleInstallsTheNewestSnapshot(t *testing.T) {
 	firstDone, secondDone := make(chan error, 1), make(chan error, 1)
 	go func() { firstDone <- b.Reassemble(context.Background()) }()
 	<-firstSnapped
-	go func() { secondDone <- b.Reassemble(context.Background()) }()
-	// Unserialised, the second runs to its end now; serialised, it waits.
+	second := &doneWatchingContext{Context: context.Background(), asked: make(chan struct{})}
+	go func() { secondDone <- b.Reassemble(second) }()
+	// Serialised, the second waits for the first's assembly — it asks for
+	// its context's Done channel to wait on; unserialised, it runs to its
+	// end beside the first.
 	select {
+	case <-second.asked:
 	case err := <-secondDone:
 		secondDone <- err
-	case <-time.After(300 * time.Millisecond):
 	}
 	close(releaseFirst)
 	for _, done := range []chan error{firstDone, secondDone} {
