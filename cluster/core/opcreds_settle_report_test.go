@@ -5,6 +5,11 @@ package core_test
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -61,5 +66,54 @@ func TestSettleReportRunsWithoutNOCLock(t *testing.T) {
 				t.Error("the fabric-removed hook of the settle ran with nocMu held")
 			}
 		})
+	}
+}
+
+// A fail-safe that ends between AddTrustedRootCertificate's fail-safe
+// check and its store of the root waits for the command (nocMu) and then
+// clears the root: no root outlives the window that admitted it (review
+// II, R2-P6-conc-1005).
+func TestAddTrustedRootExpiryInBetweenLeavesNoRoot(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootRaw := buildCoreSignedCert(t, rootPriv, true, rootPriv)
+	expired := make(chan struct{})
+	var once sync.Once
+	oc.SetFailSafe(func() (uint8, bool) {
+		first := false
+		once.Do(func() { first = true })
+		if !first {
+			return 0, true
+		}
+		// The window ends while the command is at its fail-safe check: the
+		// rollback either waits for the command (it holds nocMu) or runs
+		// to its end before the command goes on.
+		waits := make(chan struct{})
+		oc.OnRollbackWaitsForNOC(func() { close(waits) })
+		go func() {
+			oc.OnFailSafeExpiry(ctx, 0)
+			close(expired)
+		}()
+		select {
+		case <-waits:
+		case <-expired:
+		}
+		return 0, true
+	})
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw}); err != nil {
+		t.Fatal(err)
+	}
+	<-expired
+	v, _ := oc.MatterRead(0x0004)
+	if roots := reflect.ValueOf(v); roots.Len() != 0 {
+		t.Errorf("TrustedRootCertificates after the window ended = %d entries, want none", roots.Len())
 	}
 }

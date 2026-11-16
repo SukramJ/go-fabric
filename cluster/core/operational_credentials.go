@@ -119,7 +119,8 @@ type OperationalCredentials struct {
 	pendingFabric uint8
 
 	// nocMu serialises AddNOC, UpdateNOC, CSRRequest's draw and record of
-	// the fail-safe's key pair, RemoveFabric's store removal, the
+	// the fail-safe's key pair, AddTrustedRootCertificate from its
+	// fail-safe check to its store of the root, RemoveFabric's store removal, the
 	// fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
 	// its rollback ([OperationalCredentials.OnFailSafeExpiry]): a fail-safe
 	// that ends while a NOC command is between its fail-safe check and its
@@ -2906,6 +2907,14 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(ctx context.Con
 	// operational-credentials-server.cpp ~line 612
 	// (HandleAddTrustedRootCertificate VerifyOrExit on IsFailSafeArmed);
 	// armed for the accessing fabric, chip :760 (failSafeRequired).
+	//
+	// From the fail-safe check to the store of the root, one with the NOC
+	// commands, the commit and the rollback (nocMu), as CSRRequest: a
+	// fail-safe that ends in between rolls back after the root is stored
+	// and clears it, and a second command sees the first one's root
+	// (review II, R2-P6-conc-1005).
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	if o.failSafeRequired(ctx) {
 		return nil, errOpcredsFailsafeRequired
 	}
