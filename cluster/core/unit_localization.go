@@ -55,6 +55,15 @@ func NewUnitLocalization(cfg UnitLocalizationConfig) (*spec.Server, error) {
 	if len(supported) == 0 {
 		supported = []unitdef.TempUnitEnum{unitdef.TempUnitCelsius, unitdef.TempUnitFahrenheit}
 	}
+	// Each unit once: the model's text for the attribute, "Each entry in
+	// the list shall be unique" (matter.js unit-localization.resource.ts:43-45
+	// at db021da0); neither matter.js's constraint ("2 to 3",
+	// unit-localization.element.ts:30-31) nor connectedhomeip
+	// (UnitLocalizationCluster.cpp:52-66 at 6170af84, the size alone)
+	// checks it (review II, R2-P6-err-1268).
+	if sorted := slices.Sorted(slices.Values(supported)); len(slices.Compact(sorted)) != len(supported) {
+		return nil, fmt.Errorf("%w: UnitLocalization: SupportedTemperatureUnits %v lists a unit twice", ErrLocalizationConfig, supported)
+	}
 	if !slices.Contains(supported, unit) {
 		return nil, fmt.Errorf("%w: UnitLocalization: TemperatureUnit %d not in SupportedTemperatureUnits %v", ErrLocalizationConfig, unit, supported)
 	}
