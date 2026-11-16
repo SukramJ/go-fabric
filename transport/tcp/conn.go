@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -33,6 +34,13 @@ type Handler func(c *Conn, msg []byte, release func())
 // (TcpChannel.ts:81-82).
 const maxInFlightPerConn = 64
 
+// defaultSendTimeout bounds the write of one [Conn.Send]: a peer that
+// reads nothing for this long, so that the frame cannot be handed to the
+// socket, loses the connection. Module's own: a blocked write holds a
+// goroutine — and every Send queued behind it on the connection — where
+// an asynchronous runtime parks a promise.
+const defaultSendTimeout = 30 * time.Second
+
 // readChunkSize is the size of one socket read. A Go detail with no
 // matter.js counterpart; the assembler accepts chunks of any size.
 const readChunkSize = 16 * 1024
@@ -49,6 +57,8 @@ type Conn struct {
 
 	// writeMu serialises frame writes on nc.
 	writeMu sync.Mutex
+	// sendTimeout bounds one Send's write (defaultSendTimeout).
+	sendTimeout time.Duration
 
 	closeOnce sync.Once
 	closed    chan struct{}
@@ -100,6 +110,7 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 		closed:          make(chan struct{}),
 		served:          make(chan struct{}),
 		recoveredPanics: panics,
+		sendTimeout:     defaultSendTimeout,
 	}
 }
 
@@ -107,6 +118,13 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 // Returns [ErrMessageTooLarge] above [Conn.MaxMessageSize] and
 // [ErrConnClosed] after the connection closed. Mirrors matter.js
 // TcpChannel.ts:119-133 send.
+//
+// The write is bounded: a frame not handed to the socket within 30 s
+// (a peer that stopped reading, its receive window full) fails the Send
+// with an error that wraps [os.ErrDeadlineExceeded] and closes the
+// connection, whose stream may then hold part of a frame. The wait for
+// writeMu — a Send queued behind a stuck one — is bounded by the same
+// close.
 func (c *Conn) Send(msg []byte) error {
 	if c.isClosed() {
 		return ErrConnClosed
@@ -117,7 +135,20 @@ func (c *Conn) Send(msg []byte) error {
 	}
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if c.isClosed() {
+		return ErrConnClosed
+	}
+	if c.sendTimeout > 0 {
+		_ = c.nc.SetWriteDeadline(time.Now().Add(c.sendTimeout))
+	}
 	if _, err := c.nc.Write(frame); err != nil {
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			c.logger.Warn("matter.tcp.send_timeout",
+				slog.String("peer", c.remote.String()),
+				slog.Duration("timeout", c.sendTimeout))
+			c.close(err)
+			return fmt.Errorf("tcp: write %s: no progress within %v, connection closed: %w", c.remote, c.sendTimeout, err)
+		}
 		if c.isClosed() {
 			return ErrConnClosed
 		}
