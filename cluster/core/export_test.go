@@ -46,3 +46,14 @@ func (o *OperationalCredentials) CSRKeyPending() bool {
 func (g *GroupKeyManagement) CheckGroupKeyMapping(ctx context.Context, fabric uint8, groupID, keySetID uint16) error {
 	return g.checkGroupKeyMapping(ctx, fabric, groupID, keySetID)
 }
+
+// NOCLockFree reports whether nocMu is free: a hook that runs it observes
+// whether the command that called it still holds the lock (review II,
+// R2-P6-conc-1003).
+func (o *OperationalCredentials) NOCLockFree() bool {
+	if o.nocMu.TryLock() {
+		o.nocMu.Unlock()
+		return true
+	}
+	return false
+}

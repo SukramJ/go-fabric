@@ -2122,9 +2122,15 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		return nil, opcredsInvalidCommandErr{msg: fmt.Sprintf("core: AdminVendorId 0x%04X is reserved", req.AdminVendorID)}
 	}
 	// From the fail-safe check to the last write, one with the commit and
-	// the rollback (nocMu).
+	// the rollback (nocMu). The rollbacks the command settles at its entry
+	// are reported after nocMu is released, as the rule at nocMu says: the
+	// report runs the host's fabric hooks (review II, R2-P6-conc-1003).
+	var settledAdded, settledUpdated []store.FabricRecord
 	o.nocMu.Lock()
-	defer o.nocMu.Unlock()
+	defer func() {
+		o.nocMu.Unlock()
+		o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	}()
 	// Matter §11.18.6.8 requires Status::FailsafeRequired when AddNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:399 and matter.js
@@ -2148,8 +2154,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// succeeded in it): an earlier rollback could not land. It goes first,
 	// so the TableFull guard and the conflict check below see the table as
 	// it is once it landed (review II, R2-P1-rw-01).
-	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
-	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	settledAdded, settledUpdated, _ = o.rollbackPendingLocked(ctx)
 	// Mirrors matter.js db021da0 packages/node/src/behaviors/
 	// operational-credentials/OperationalCredentialsServer.ts:233-260 and
 	// FailsafeContext.ts:236-240 / Fabric.ts:614-624. Guard order: trust
@@ -2545,9 +2550,14 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 		return nil, fmt.Errorf("%w: UpdateNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
 	// From the fail-safe check to the write, one with the commit and the
-	// rollback (nocMu).
+	// rollback (nocMu); the settled rollbacks are reported after it is
+	// released, as in AddNOC (R2-P6-conc-1003).
+	var settledAdded, settledUpdated []store.FabricRecord
 	o.nocMu.Lock()
-	defer o.nocMu.Unlock()
+	defer func() {
+		o.nocMu.Unlock()
+		o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	}()
 	// Matter §11.18.6.9 requires Status::FailsafeRequired when UpdateNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:HandleUpdateNOC FailSafe check.
@@ -2575,8 +2585,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// As AddNOC: a row an earlier rollback could not land goes first, so
 	// the fabric this update reads is the restored one (review II,
 	// R2-P1-rw-01).
-	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
-	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	settledAdded, settledUpdated, _ = o.rollbackPendingLocked(ctx)
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
 	}
