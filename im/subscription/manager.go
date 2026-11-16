@@ -753,7 +753,20 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 		if !match(sub) || sub.IsClosed() || sub.isPriming() {
 			continue
 		}
-		if !m.claimReport(ctx, sub) {
+		failed := sub.failedUpdateCount()
+		claimed, waited := m.claimReport(ctx, sub)
+		if !claimed {
+			continue
+		}
+		if waited && sub.failedUpdateCount() != failed {
+			// The report the flush waited for failed: nothing more is
+			// sent, as matter.js returns from a closed subscription's
+			// failed update without a further report
+			// (packages/node/src/node/server/ServerSubscription.ts:557-562
+			// at db021da0; its #flush, :753-763, from #cancel only, :825,
+			// only notes the next update while one is in flight,
+			// :520-525). Review II, R2-P6-par-0702.
+			sub.endReport()
 			continue
 		}
 		work, due := sub.drainDue(now, m.eventSourceOf(), true)
@@ -781,23 +794,26 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 // It wakes when the report ends ([Subscription.endReport]) — it polled
 // the flag every millisecond, some ten thousand wake-ups for a report
 // that waits out its answer (review II, R2-P6-bound-0517).
-func (m *Manager) claimReport(ctx context.Context, sub *Subscription) bool {
+//
+// waited reports whether a report was in flight when the claim began.
+func (m *Manager) claimReport(ctx context.Context, sub *Subscription) (claimed, waited bool) {
 	for {
 		if sub.reporting.CompareAndSwap(false, true) {
-			return true
+			return true, waited
 		}
+		waited = true
 		ended := sub.reportEndedCh()
 		// Taken after the channel: an end between the first attempt and
 		// the channel's creation is not missed.
 		if sub.reporting.CompareAndSwap(false, true) {
-			return true
+			return true, waited
 		}
 		if sub.IsClosed() {
-			return false
+			return false, waited
 		}
 		select {
 		case <-ctx.Done():
-			return false
+			return false, waited
 		case <-ended:
 		}
 	}

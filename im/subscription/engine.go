@@ -152,7 +152,11 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 			sub.offerDuePaths(work.paths)
 			eventReporter(ctx, sub, work.events)
 			if left := sub.TakeDuePaths(); len(left) > 0 {
-				sub.RequeueAttributes(left)
+				// Not a failed update: the paths the event reporter left
+				// are still due.
+				for _, p := range left {
+					sub.markDirty(p)
+				}
 			}
 			if !sub.takeSentNothing() {
 				return

@@ -33,7 +33,7 @@ func TestClaimReportWakesWhenTheReportEnds(t *testing.T) {
 		// claim starts the flush's claim and returns once it is blocked.
 		claim := func(sub *Subscription) <-chan bool {
 			got := make(chan bool, 1)
-			go func() { got <- m.claimReport(context.Background(), sub) }()
+			go func() { ok, _ := m.claimReport(context.Background(), sub); got <- ok }()
 			synctest.Wait()
 			select {
 			case <-got:

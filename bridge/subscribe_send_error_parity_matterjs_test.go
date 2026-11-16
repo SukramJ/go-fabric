@@ -82,7 +82,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		t0 := time.Now()
 		r.m.OnAttributeChanged(attrPath)
 		r.m.Tick(context.Background(), t0)
-		r.m.Tick(context.Background(), t0.Add(time.Second))
+		r.m.Tick(context.Background(), t0.Add(r.sub.SendInterval())) // the next report: the send interval's (F-db021da0-3)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		if len(r.paths) != 2 {
@@ -99,7 +99,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		t0 := time.Now()
 		r.b.EmitEvent(1, 0x003B, 0x01, uint8(1), contract.EventPriority(im.EventPriorityInfo))
 		r.m.Tick(context.Background(), t0)
-		r.m.Tick(context.Background(), t0.Add(time.Second))
+		r.m.Tick(context.Background(), t0.Add(r.sub.SendInterval())) // the next report: the send interval's (F-db021da0-3)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		if len(r.events) != 2 {
@@ -119,7 +119,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		r.m.Tick(context.Background(), t0)
 		// The failed report took the path with its event; both are owed
 		// again and leave together in the retry.
-		r.m.Tick(context.Background(), t0.Add(time.Second))
+		r.m.Tick(context.Background(), t0.Add(r.sub.SendInterval())) // the next report: the send interval's (F-db021da0-3)
 		// What the failed retry owes again, read through a flush.
 		var owedEvents []im.EventReport
 		var owedPaths []im.ConcreteAttributePath
@@ -321,6 +321,11 @@ func TestUndeliveredReportIsOneFailedUpdateParity(t *testing.T) {
 	r := newUndeliveredReportRig(t, 0x1401)
 	r.report(t)
 	for failed := 1; failed <= 3; failed++ {
+		if failed > 1 {
+			// The failed update's data is owed, not due: a change starts
+			// the next update, which carries it (F-db021da0-3).
+			r.dev.subs.OnAttributeChanged(undeliveredReportPath)
+		}
 		r.pending(t)
 		r.exhaust()
 		r.sessionsKept(t, fmt.Sprintf("after %d failed updates", failed))
@@ -349,6 +354,9 @@ func TestDeliveredReportRestartsTheFailedUpdateCount(t *testing.T) {
 	for range 2 {
 		r.pending(t)
 		r.exhaust()
+		// The failed update's data is owed, not due: a change starts
+		// the next update (F-db021da0-3).
+		r.dev.subs.OnAttributeChanged(undeliveredReportPath)
 	}
 	counter := r.pending(t)
 	if !r.outbound.Ack(r.reportSID, counter) {
@@ -364,9 +372,12 @@ func TestDeliveredReportRestartsTheFailedUpdateCount(t *testing.T) {
 		return !counted
 	})
 	r.report(t)
-	for range 2 {
+	for i := range 2 {
 		r.pending(t)
 		r.exhaust()
+		if i == 0 {
+			r.dev.subs.OnAttributeChanged(undeliveredReportPath)
+		}
 	}
 	if _, err := r.dev.subs.Get(r.sub.ID); err != nil {
 		t.Fatalf("subscription ended after two failed updates following a delivered one: %v", err)

@@ -91,6 +91,13 @@ type Subscription struct {
 	// held.
 	deferredUntil time.Time
 	pendingDirty  map[im.ConcreteAttributePath]struct{}
+	// owedPaths are the attribute paths of a failed update
+	// ([Subscription.RequeueAttributes]): owed to the next report, which
+	// they do not ask for (review II, F-db021da0-3).
+	owedPaths map[im.ConcreteAttributePath]struct{}
+	// failedUpdates counts the requeues of failed updates: a flush that
+	// waited for a report in flight sees whether it failed.
+	failedUpdates uint64
 	// The events the subscription owes are one number, not a queue: the
 	// lowest unreported event number (eventsMin, valid while
 	// eventsPending) and whether one of them asks for a report
@@ -310,6 +317,7 @@ func (s *Subscription) Close() {
 	s.mu.Lock()
 	s.closed = true
 	s.pendingDirty = nil
+	s.owedPaths = nil
 	s.wakeReportWaitersLocked()
 	s.mu.Unlock()
 }
@@ -490,6 +498,14 @@ func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (wor
 	}
 	if takeData {
 		work.events = s.takeEventsLocked(src)
+		// The data of a failed update leaves with this report.
+		for p := range s.owedPaths {
+			if s.pendingDirty == nil {
+				s.pendingDirty = make(map[im.ConcreteAttributePath]struct{}, len(s.owedPaths))
+			}
+			s.pendingDirty[p] = struct{}{}
+		}
+		s.owedPaths = nil
 		work.paths = s.takeDirtyLocked()
 	}
 	if len(work.events) == 0 && len(work.paths) == 0 && !work.keepAlive {
@@ -618,25 +634,28 @@ func (s *Subscription) eventUrgency(path im.ConcreteEventPath) (selected, urgent
 
 // RequeueEvents owes the subscriber every selected event from number
 // fromNumber on again: the reporter calls it when a report carrying
-// them could not be sent. Mirrors matter.js ServerSubscription.ts:582-584
-// at db021da0 ("newer number are always higher, so we can just set it").
-// The events ask for a report again, urgent or not, so the retry goes out
-// once MinIntervalFloor has elapsed since the failed report — as the
-// paths of [Subscription.RequeueAttributes] do, and as both did before
-// events were reported by urgency. matter.js schedules nothing there
-// (:569-584 never calls #prepareDataUpdate): its retry waits for the next
-// change, urgent event or send interval.
+// them could not be sent. The events are owed, not due: they leave with
+// the next report another cause starts — a change, an urgent event, the
+// send interval — as [Subscription.RequeueAttributes]'s paths do.
+// Mirrors matter.js at db021da0: after a failed update it puts the
+// attribute filter back through #addOutstandingAttributes, which only
+// fills the set (packages/node/src/node/server/ServerSubscription.ts:571-581,
+// :346-357), sets the event number back (:582-584) and schedules nothing
+// — #prepareDataUpdate is called by the change handler (:380-382), an
+// urgent event (:396-398) and the send-interval timer (:480-484), not
+// there. It reported the retry once MinIntervalFloor had elapsed since the
+// failed report (review II, F-db021da0-3).
 func (s *Subscription) RequeueEvents(fromNumber uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return
 	}
+	s.failedUpdates++
 	if !s.eventsPending || fromNumber < s.eventsMin {
 		s.eventsMin = fromNumber
 	}
 	s.eventsPending = true
-	s.eventsUrgent = true
 	if s.eventsHaveReported && s.eventsReported >= fromNumber {
 		if fromNumber == 0 {
 			s.eventsHaveReported = false
@@ -646,13 +665,29 @@ func (s *Subscription) RequeueEvents(fromNumber uint64) {
 	}
 }
 
-// RequeueAttributes marks paths dirty again: the reporter calls it when
-// a report carrying them could not be sent, so the next report retries
-// them. Mirrors matter.js ServerSubscription.ts:567-577, which puts the
-// attribute filter back with #addOutstandingAttributes.
+// failedUpdateCount is the number of failed updates requeued so far.
+func (s *Subscription) failedUpdateCount() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.failedUpdates
+}
+
+// RequeueAttributes owes paths to the next report again: the reporter
+// calls it when a report carrying them could not be sent. They do not ask
+// for a report — the next one another cause starts takes them
+// ([Subscription.RequeueEvents]; review II, F-db021da0-3).
 func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.failedUpdates++
 	for _, p := range paths {
-		s.markDirty(p)
+		if s.owedPaths == nil {
+			s.owedPaths = make(map[im.ConcreteAttributePath]struct{})
+		}
+		s.owedPaths[p] = struct{}{}
 	}
 }
 
