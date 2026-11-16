@@ -429,7 +429,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `node`: an owed fabric removal runs at Start only when the store answers that the fabric is gone; a lookup that fails otherwise leaves the event owed for the next start (review II).
 - `bridge.StartBLE` no longer holds the BLE lock while the host's `RegisterService` runs: StopBLE and Stop end a pending registration, and a call back from it no longer deadlocks (review II).
 - A host Set during a controller write's window is told after the write's data-version advance (review II).
-- A scene command whose store is refused restores FabricSceneInfo's current-scene validity with the table (review II).
+- `cluster/core`: a scene command refused by the scene store is undone completely — the table, FabricSceneInfo's current-scene validity and the monitor; a fabric's first command no longer leaves a FabricSceneInfo entry behind (review II).
 - `endpointtest.AssertClusterServerContract` reads FeatureMap, ClusterRevision and manufacturer-specific attributes it skipped (review II).
 - `spec.ErrNotMounted`'s text names a withdrawn emitter beside a missing endpoint (review II).
 - `ble/bluez`: the driver's D-Bus exports are serialised. godbus's export reads its object map without the lock its writers take (`export.go:396`, `:406` at v5.2.4), so the GATT application's export from `Serve` and the advertisement's from `Advertise` — two goroutines in the bridge — could end the process with `fatal error: concurrent map read and map write` at the start of a BLE commissioning window (seen once in the BLE certification leg, TC-CNET-4.15). In the nested module `ble/bluez`.
