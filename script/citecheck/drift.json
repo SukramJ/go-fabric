@@ -2967,7 +2967,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 837,
+    "line": 844,
     "citation": "CaseServer.ts:210",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "SessionManager",
@@ -3140,7 +3140,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 664,
+    "line": 665,
     "citation": "packages/protocol/src/session/SessionManager.ts:213",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "#nextSessionId",
@@ -3149,7 +3149,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1061,
+    "line": 1065,
     "citation": "NodeSession.ts:403",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -3158,7 +3158,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1063,
+    "line": 1067,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -3167,7 +3167,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1220,
+    "line": 1256,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -3176,7 +3176,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1246,
+    "line": 1282,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -3185,7 +3185,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1311,
+    "line": 1347,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -3194,7 +3194,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1774,
+    "line": 1836,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
