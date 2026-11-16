@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	matterlock "github.com/SukramJ/go-fabric/cluster/lock"
@@ -934,10 +935,11 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// parse as "missing", whereas an empty array is a present,
 		// empty value.
 		enc.StartArray(tag)
-		for range x {
-			// Cannot encode arbitrary `any` items without per-type
-			// branches; the typical use case is the empty-extension
-			// surface where the list is always 0-length.
+		// Arbitrary `any` items are not encoded; the typical use case is
+		// the empty-extension surface where the list is always 0-length.
+		// A non-empty one is served empty and said once (R2-P6-err-0447).
+		if len(x) > 0 {
+			warnUnencodableValue(x)
 		}
 		_ = enc.EndContainer()
 	case []uint32:
@@ -1222,9 +1224,30 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// general slice rule above. Emit null so the reply still
 		// parses on the controller side; the cluster server should
 		// either downcast to a primitive in MatterRead or supply its
-		// own writer in a future iteration.
+		// own writer in a future iteration. Said once per Go type, so
+		// a host server's value that serves null is not silent
+		// (R2-P6-err-0447).
+		warnUnencodableValue(v.Value)
 		enc.PutNull(tag)
 	}
+}
+
+// unencodableTypes holds the Go types [warnUnencodableValue] has logged.
+var unencodableTypes sync.Map
+
+// warnUnencodableValue logs, once per Go type for the process, that a
+// cluster server returned a value the attribute writer cannot encode —
+// served as null, or a non-empty []any served as an empty list. The
+// value types a server may return are [contract.ClusterServer]'s
+// MatterRead contract.
+func warnUnencodableValue(v any) {
+	typ := fmt.Sprintf("%T", v)
+	if _, seen := unencodableTypes.LoadOrStore(typ, struct{}{}); seen {
+		return
+	}
+	slog.Default().Warn("matter.attribute.unencodable_value",
+		slog.String("go_type", typ),
+		slog.String("served_as", map[bool]string{true: "empty list", false: "null"}[typ == "[]interface {}"]))
 }
 
 // defaultCommandFieldsWriter is the wire writer the bridge plugs
