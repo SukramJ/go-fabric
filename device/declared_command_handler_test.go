@@ -65,7 +65,7 @@ func TestDeclaredCommandNeedsAHandler(t *testing.T) {
 
 	// The kit's opstate server takes Pause with Resume, and a state list
 	// with the error state.
-	states := []opdef.OperationalStateStruct{}
+	states := make([]opdef.OperationalStateStruct, 0, 4)
 	for _, id := range []opdef.OperationalStateEnum{0, 1, 2, 3} {
 		states = append(states, opdef.OperationalStateStruct{OperationalStateId: id})
 	}
