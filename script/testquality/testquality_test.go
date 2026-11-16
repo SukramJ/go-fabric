@@ -171,8 +171,6 @@ var environmentSkips = map[string]int{
 	"internal/chipdm/levels_test.go:TestChipDataModelLevels":                   1,
 	"internal/chiptool/controller_test.go:resolveChipTool":                     1,
 	"internal/chiptool/matterjs_test.go:startMatterJSController":               2,
-	"schema/fabric_scoped_test.go:TestFabricScopedInvokeMatchesMatterJS":       1,
-	"schema/invoke_privilege_test.go:TestInvokePrivilegeMatchesMatterJS":       1,
 	"schema/staleness_test.go:TestMatterJSSchemaStalenessAgainstLiveCheckout":  2,
 	"schema/timed_test.go:TestTimedInvokeParity":                               1,
 	"script/aheadcheck/aheadcheck_test.go:TestAheadcheckRegisterHoldsAtThePin": 2,
