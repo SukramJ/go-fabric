@@ -132,18 +132,6 @@ var notRequired = []decision{
 			"the required gate job needs it and fails a release pull request unless it passed.",
 	},
 	{
-		"ci.yml", "test (linux/386)", pending,
-		"a guard (R2-P5-sup-02) that \"enters the protection after its first green run\" (the comment over the job in " +
-			"ci.yml): whether the hosted runner executes the 386 test binaries was not measurable where it was written " +
-			"(darwin has no 386 port). Adding it to the branch protection is the owner's.",
-	},
-	{
-		"ci.yml", "workflow lint", pending,
-		"a guard (R2-P5-sup-15) that \"enters the branch protection after a green run\" (the comment over the job in " +
-			"ci.yml): neither actionlint nor zizmor ran where it was written, so its first run's findings are not known. " +
-			"Adding it to the branch protection is the owner's.",
-	},
-	{
 		"pages.yml", "build", sharesName,
 		"no entry of its own in the branch protection: the job (mkdocs build --strict, path-filtered to the " +
 			"documentation) shares the name `build` with ci.yml's job. What GitHub does with two check " +

@@ -20,10 +20,9 @@ const (
 )
 
 // EnergyEvseType returns the EnergyEvse device type, matter.js's packages/node/src/devices/energy-evse.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#energyevse. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func EnergyEvseType() *Type { return &typeEnergyEvse }
+// its cluster requirements are listed in docs/reference/device-types.md#energyevse. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func EnergyEvseType() *Type { return typeEnergyEvse.clone() }
 
 // typeEnergyEvse holds [EnergyEvseType]'s cluster requirements.
 var typeEnergyEvse = Type{

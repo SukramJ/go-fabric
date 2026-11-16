@@ -23,11 +23,14 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // Store is a [client.Store] over a database the schema was applied to. It
@@ -35,13 +38,202 @@ import (
 // writers.
 type Store struct {
 	db *sql.DB
+	// sealer seals the secret values ([NewSealed]); nil keeps them clear.
+	sealer store.Sealer
 }
 
 var _ client.Store = (*Store)(nil)
 
 // New returns the store over db, which [Apply] (or the host's migration
-// of [Migrations]) prepared.
+// of [Migrations]) prepared. It keeps every value as it is; a sealed
+// value it reads is [store.ErrNoSealer], and it refuses to overwrite one
+// with a clear value.
 func New(db *sql.DB) *Store { return &Store{db: db} }
+
+// The secret values the store seals, each its own row: a node's kept
+// onboarding code — the QR or manual pairing code, which holds the
+// device's setup passcode (controller/client onboarding.go
+// onboardingCluster, onbCode) — and the controller's ICD Check-In key and
+// pending key on a node (controller/client icd.go icdCluster, icdFieldKey,
+// icdFieldPendingKey). TestSealedValuesNameTheirSource holds the copies to
+// them. The other values of those clusters — the code's source, time and
+// checks, the registration's counters, subject and client type — are not
+// secret and stay clear.
+const (
+	onboardingCluster   uint32 = 0xFFFF_FFFC
+	onboardingCodeValue uint32 = 0
+	icdCluster          uint32 = 0xFFFF_FFFD
+	icdKeyValue         uint32 = 0
+	icdPendingKeyValue  uint32 = 1
+)
+
+// isSecret reports whether the value of cluster's attribute is sealed.
+func isSecret(cluster, attribute uint32) bool {
+	switch cluster {
+	case onboardingCluster:
+		return attribute == onboardingCodeValue
+	case icdCluster:
+		return attribute == icdKeyValue || attribute == icdPendingKeyValue
+	}
+	return false
+}
+
+// sealAAD is the aad of one sealed value, binding it to its table, column
+// and row, so a value moved to another row does not open; each part is
+// length-prefixed, as store's sealAAD builds its own.
+func sealAAD(nodeID string, ep uint16, cluster, attribute uint32) []byte {
+	b := []byte("go-fabric/controller/client/sqlstore/seal/v1")
+	add := func(p []byte) {
+		b = binary.AppendUvarint(b, uint64(len(p)))
+		b = append(b, p...)
+	}
+	add([]byte("matter_client_values"))
+	add([]byte("value"))
+	add([]byte(nodeID))
+	add(binary.BigEndian.AppendUint16(nil, ep))
+	add(binary.BigEndian.AppendUint32(nil, cluster))
+	add(binary.BigEndian.AppendUint32(nil, attribute))
+	return b
+}
+
+// NewSealed returns the store over db with its secret values sealed under
+// s — the kept onboarding codes and the ICD Check-In keys ([isSecret]);
+// every other value stays clear. db must carry migration v2 ([Apply]). It
+// does what [store.NewSealed] does for the device's store
+// (store/seal.go, NewSealed and sealClearRows): it first opens one sealed
+// value the database already holds, so a sealer under another key fails
+// with [store.ErrUnseal] before anything is written; then it seals every
+// secret value it finds in clear in one transaction, which also records
+// that a scrub of the file is owed; and while one is owed it rewrites the
+// file and empties the -wal ([store.Scrub]), so the clear values do not
+// stay behind in free pages, and then deletes the record. A scrub that does
+// not finish — a reader holds the -wal — is [store.ErrScrubIncomplete],
+// and so is the next NewSealed's until one finishes; a process that ends
+// between the sealing and the scrub leaves the scrub to the next
+// NewSealed. While the store is open it writes no secret value in clear,
+// and a secret value it reads without the seal mark is refused with
+// [store.ErrUnseal].
+func NewSealed(ctx context.Context, db *sql.DB, s store.Sealer) (*Store, error) {
+	if s == nil {
+		return nil, errors.New("sqlstore: NewSealed: nil Sealer")
+	}
+	st := &Store{db: db, sealer: s}
+	var (
+		nodeID        string
+		ep            uint16
+		cluster, attr uint32
+		value         []byte
+	)
+	err := db.QueryRowContext(ctx, `SELECT node_id, endpoint, cluster, attribute, value FROM matter_client_values WHERE sealed = 1 LIMIT 1`).Scan(&nodeID, &ep, &cluster, &attr, &value)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+	case err != nil:
+		return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
+	default:
+		if _, err := s.Open(value, sealAAD(nodeID, ep, cluster, attr)); err != nil {
+			return nil, fmt.Errorf("sqlstore: open sealed store: %w: %w", store.ErrUnseal, err)
+		}
+	}
+	if _, err := st.sealClearValues(ctx); err != nil {
+		return nil, err
+	}
+	var owed int
+	switch err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed).Scan(&owed); {
+	case err != nil:
+		return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
+	case owed == 0:
+		return st, nil
+	}
+	if err := store.Scrub(ctx, db); err != nil {
+		return nil, fmt.Errorf("sqlstore: open sealed store: the clear values are sealed: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
+	}
+	return st, nil
+}
+
+// metadataKeySealScrubOwed marks a sealing whose [store.Scrub] has not
+// finished: set in the sealing's transaction, deleted once the scrub ran
+// (store's metadataKeySealScrubOwed, in the registry's own table).
+const metadataKeySealScrubOwed = "sqlstore.seal_scrub_owed"
+
+// sealClearValues seals every secret value held in clear, in one
+// transaction that also records the scrub it owes
+// ([metadataKeySealScrubOwed]), and returns how many it sealed.
+func (s *Store) sealClearValues(ctx context.Context) (int, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("sqlstore: seal: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	// A write first, so the transaction holds the write lock before it
+	// reads, as store's sealClearRows takes it.
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_client_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return 0, fmt.Errorf("sqlstore: seal: %w", err)
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT node_id, endpoint, cluster, attribute, value FROM matter_client_values WHERE sealed = 0 AND cluster IN (?, ?)`, onboardingCluster, icdCluster)
+	if err != nil {
+		return 0, fmt.Errorf("sqlstore: seal: %w", err)
+	}
+	type row struct {
+		nodeID        string
+		ep            uint16
+		cluster, attr uint32
+		value         []byte
+	}
+	var plain []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.nodeID, &r.ep, &r.cluster, &r.attr, &r.value); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("sqlstore: seal: %w", err)
+		}
+		if isSecret(r.cluster, r.attr) {
+			plain = append(plain, r)
+		}
+	}
+	if err := closeRows(rows); err != nil {
+		return 0, fmt.Errorf("sqlstore: seal: %w", err)
+	}
+	for _, r := range plain {
+		v, err := s.sealer.Seal(r.value, sealAAD(r.nodeID, r.ep, r.cluster, r.attr))
+		if err != nil {
+			return 0, fmt.Errorf("sqlstore: seal: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE matter_client_values SET value = ?, sealed = 1 WHERE node_id = ? AND endpoint = ? AND cluster = ? AND attribute = ?`, v, r.nodeID, r.ep, r.cluster, r.attr); err != nil {
+			return 0, fmt.Errorf("sqlstore: seal: %w", err)
+		}
+	}
+	if len(plain) > 0 {
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_client_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
+			return 0, fmt.Errorf("sqlstore: seal: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("sqlstore: seal: %w", err)
+	}
+	return len(plain), nil
+}
+
+// readValue is the stored value of one row as the store reads it: a
+// sealed value opened, or [store.ErrNoSealer] without a sealer; a secret
+// value in clear under a sealer is [store.ErrUnseal].
+func (s *Store) readValue(nodeID string, ep uint16, cluster, attr uint32, value []byte, sealed bool) ([]byte, error) {
+	switch {
+	case sealed && s.sealer == nil:
+		return nil, store.ErrNoSealer
+	case sealed:
+		v, err := s.sealer.Open(value, sealAAD(nodeID, ep, cluster, attr))
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", store.ErrUnseal, err)
+		}
+		return v, nil
+	case s.sealer != nil && isSecret(cluster, attr):
+		return nil, fmt.Errorf("%w: a secret value in clear under a sealer", store.ErrUnseal)
+	}
+	return value, nil
+}
 
 type clusterKey struct {
 	ep      uint16
@@ -62,7 +254,7 @@ func (s *Store) Load(nodeID string) ([]client.StoredEndpoint, error) {
 		}
 		return c
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT endpoint, cluster, attribute, value FROM matter_client_values WHERE node_id = ?`, nodeID)
+	rows, err := s.db.QueryContext(ctx, `SELECT endpoint, cluster, attribute, value, sealed FROM matter_client_values WHERE node_id = ?`, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("sqlstore: load %q: %w", nodeID, err)
 	}
@@ -70,7 +262,12 @@ func (s *Store) Load(nodeID string) ([]client.StoredEndpoint, error) {
 		var k clusterKey
 		var attr uint32
 		var value []byte
-		if err := rows.Scan(&k.ep, &k.cluster, &attr, &value); err != nil {
+		var sealed bool
+		if err := rows.Scan(&k.ep, &k.cluster, &attr, &value, &sealed); err != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("sqlstore: load %q: %w", nodeID, err)
+		}
+		if value, err = s.readValue(nodeID, k.ep, k.cluster, attr, value, sealed); err != nil {
 			_ = rows.Close()
 			return nil, fmt.Errorf("sqlstore: load %q: %w", nodeID, err)
 		}
@@ -141,8 +338,7 @@ func (s *Store) Save(nodeID string, ep uint16, cluster uint32, values map[uint32
 		if v == nil {
 			_, err = tx.ExecContext(ctx, `DELETE FROM matter_client_values WHERE node_id = ? AND endpoint = ? AND cluster = ? AND attribute = ?`, nodeID, ep, cluster, attr)
 		} else {
-			_, err = tx.ExecContext(ctx, `INSERT INTO matter_client_values(node_id, endpoint, cluster, attribute, value) VALUES(?, ?, ?, ?, ?)
-				ON CONFLICT(node_id, endpoint, cluster, attribute) DO UPDATE SET value = excluded.value`, nodeID, ep, cluster, attr, v)
+			err = s.writeValue(ctx, tx, nodeID, ep, cluster, attr, v)
 		}
 		if err != nil {
 			return fmt.Errorf("sqlstore: save %q: %w", nodeID, err)
@@ -158,6 +354,32 @@ func (s *Store) Save(nodeID string, ep uint16, cluster uint32, values map[uint32
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("sqlstore: save %q: %w", nodeID, err)
+	}
+	return nil
+}
+
+// writeValue writes one value: a secret one sealed under a sealer; without
+// one, in clear, and a sealed row it would overwrite is refused with
+// [store.ErrNoSealer] (nothing is written).
+func (s *Store) writeValue(ctx context.Context, tx *sql.Tx, nodeID string, ep uint16, cluster, attr uint32, v []byte) error {
+	if s.sealer != nil && isSecret(cluster, attr) {
+		sealedValue, err := s.sealer.Seal(v, sealAAD(nodeID, ep, cluster, attr))
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO matter_client_values(node_id, endpoint, cluster, attribute, value, sealed) VALUES(?, ?, ?, ?, ?, 1)
+			ON CONFLICT(node_id, endpoint, cluster, attribute) DO UPDATE SET value = excluded.value, sealed = 1`, nodeID, ep, cluster, attr, sealedValue)
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `INSERT INTO matter_client_values(node_id, endpoint, cluster, attribute, value, sealed) VALUES(?, ?, ?, ?, ?, 0)
+		ON CONFLICT(node_id, endpoint, cluster, attribute) DO UPDATE SET value = excluded.value WHERE matter_client_values.sealed = 0`, nodeID, ep, cluster, attr, v)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return store.ErrNoSealer
 	}
 	return nil
 }

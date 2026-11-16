@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
@@ -32,8 +33,9 @@ import (
 // packages/model/src/standard/elements/general-diagnostics.element.ts
 // :178-198 at db021da0.
 type NetworkInterfaceStruct struct {
-	// Name is a non-empty UTF-8 label (max 32 chars). Matches the OS
-	// interface name ("en0", "eth0", …).
+	// Name is a non-empty UTF-8 label of at most 32 bytes: the OS
+	// interface name ("en0", "eth0", …), cut to the field's "max 32"
+	// ([interfaceName]).
 	Name string
 	// IsOperational is true for an interface the node is reached on: every
 	// one, or the advertised ones when the advertiser is restricted
@@ -1184,7 +1186,7 @@ func enumerateNetworkInterfaces(rules networkInterfaceRules) []NetworkInterfaceS
 			continue
 		}
 		entry := NetworkInterfaceStruct{
-			Name:            iface.Name,
+			Name:            interfaceName(iface.Name),
 			IsOperational:   rules.operational(iface.Name),
 			InterfaceType:   rules.typeOf(),
 			HardwareAddress: append([]byte(nil), iface.HardwareAddr...),
@@ -1617,4 +1619,30 @@ func (g *GeneralDiagnostics) logger() *slog.Logger {
 		return l
 	}
 	return slog.Default()
+}
+
+// maxInterfaceName is the NetworkInterfaceStruct Name field's maximum
+// length in bytes, read from its constraint in the generated definition
+// ("max 32", parity/schema.json).
+var maxInterfaceName = func() int {
+	for i := range gendiagdef.NetworkInterfaceDef.Fields {
+		if f := &gendiagdef.NetworkInterfaceDef.Fields[i]; f.Name == "Name" && f.Constraint.Max != nil {
+			return int(f.Constraint.Max.Int)
+		}
+	}
+	panic("generaldiagnostics: NetworkInterface.Name states no maximum length")
+}()
+
+// interfaceName is the OS interface name cut to [maxInterfaceName] bytes,
+// never inside a rune: a longer name keeps its longest prefix that fits
+// and ends on a rune boundary.
+func interfaceName(name string) string {
+	if len(name) <= maxInterfaceName {
+		return name
+	}
+	cut := maxInterfaceName
+	for cut > 0 && !utf8.RuneStart(name[cut]) {
+		cut--
+	}
+	return name[:cut]
 }

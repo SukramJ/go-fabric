@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // Vendor ID verification (Matter 1.4.2 §6.4.10, OperationalCredentials
@@ -92,16 +93,16 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 		}
 	}
 	// The data is part of the fabric row (store.Fabrics
-	// UpdateFabricVIDVerification): on a row a pending UpdateNOC marked, it
-	// belongs to that update and leaves with its rollback (TC-OPCREDS-3.8
-	// step 24).
+	// UpdateFabricVendorVerification): on a row a pending UpdateNOC marked,
+	// it belongs to that update and leaves with its rollback (TC-OPCREDS-3.8
+	// step 24). The vendor id and the data land in one write, so a refused
+	// write changes neither.
+	u := store.FabricVendorUpdate{SetVIDData: req.HasVidVerificationStatement || req.HasVvsc, Statement: d.statement, VVSC: d.vvsc}
 	if req.HasVendorID {
-		if err := o.store.UpdateFabricVendorID(ctx, fabricIndex, req.VendorID); err != nil {
-			return nil, fmt.Errorf("core: SetVIDVerificationStatement: vendor id: %w", err)
-		}
+		u.VendorID = &req.VendorID
 	}
-	if req.HasVidVerificationStatement || req.HasVvsc {
-		if err := o.store.UpdateFabricVIDVerification(ctx, fabricIndex, d.statement, d.vvsc); err != nil {
+	if u.VendorID != nil || u.SetVIDData {
+		if err := o.store.UpdateFabricVendorVerification(ctx, fabricIndex, u); err != nil {
 			return nil, fmt.Errorf("core: SetVIDVerificationStatement: persist: %w", err)
 		}
 	}

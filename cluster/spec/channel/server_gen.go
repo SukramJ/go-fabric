@@ -138,53 +138,67 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleChangeChannel registers fn for the ChangeChannel command; nil removes the handler;
+// HandleChangeChannel registers fn for the ChangeChannel command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleChangeChannel is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleChangeChannel(fn func(ctx context.Context, req ChangeChannelRequest) (ChangeChannelResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdChangeChannel, fn)
 }
 
-// HandleChangeChannelByNumber registers fn for the ChangeChannelByNumber command; nil removes the handler;
+// HandleChangeChannelByNumber registers fn for the ChangeChannelByNumber command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleChangeChannelByNumber is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleChangeChannelByNumber(fn func(ctx context.Context, req ChangeChannelByNumberRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdChangeChannelByNumber, fn)
 }
 
-// HandleSkipChannel registers fn for the SkipChannel command; nil removes the handler;
+// HandleSkipChannel registers fn for the SkipChannel command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSkipChannel is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSkipChannel(fn func(ctx context.Context, req SkipChannelRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSkipChannel, fn)
 }
 
-// HandleGetProgramGuide registers fn for the GetProgramGuide command; nil removes the handler;
+// HandleGetProgramGuide registers fn for the GetProgramGuide command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetProgramGuide is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetProgramGuide(fn func(ctx context.Context, req GetProgramGuideRequest) (ProgramGuideResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetProgramGuide, fn)
 }
 
-// HandleRecordProgram registers fn for the RecordProgram command; nil removes the handler;
+// HandleRecordProgram registers fn for the RecordProgram command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleRecordProgram is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleRecordProgram(fn func(ctx context.Context, req RecordProgramRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdRecordProgram, fn)
 }
 
-// HandleCancelRecordProgram registers fn for the CancelRecordProgram command; nil removes the handler;
+// HandleCancelRecordProgram registers fn for the CancelRecordProgram command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleCancelRecordProgram is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleCancelRecordProgram(fn func(ctx context.Context, req CancelRecordProgramRequest) (struct{}, error)) error {
@@ -227,9 +241,17 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
+	// Where the device serves the cluster with the generated server
+	// (no kit server for the selection), a command declared here
+	// without its Handle field is refused when the device is built
+	// (device.New), not left out of AcceptedCommandList unannounced.
 	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -271,7 +293,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	if d.HandleChangeChannel != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdChangeChannel)
@@ -296,6 +318,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleCancelRecordProgram != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdCancelRecordProgram)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

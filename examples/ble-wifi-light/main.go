@@ -133,8 +133,8 @@ func run(ctx context.Context, o options, out io.Writer) error {
 // newNode builds the node on o's storage with the BLE radio and the Wi-Fi
 // driver (none: the Ethernet NetworkCommissioning), and adds the light,
 // unstarted.
-func newNode(ctx context.Context, o options, network node.Network, radio contract.BLEPeripheral, wifi contract.WiFiDriver) (*node.Node, error) {
-	network.BLE = radio
+func newNode(ctx context.Context, o options, network node.Network, radio contract.BLEPeripheral, wifi contract.WiFiDriver) (*node.Node, error) { //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
+	network.BLE = radio //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
 	if wifi != nil {
 		network.WiFi = &node.WiFi{Driver: wifi}
 	}

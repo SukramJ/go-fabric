@@ -260,3 +260,63 @@ func TestEraseDuringAnotherClose(t *testing.T) {
 		t.Fatalf("stored nodes after the Erase: %v (%v), want none", ids, err)
 	}
 }
+
+// TestSecondCloseWaitsForTheNodesStop (R2-P5-apinode-14): a Close after one
+// that returned with a node still stopping waits for that stop within its
+// own ctx — ctx's error while the node's hook holds its queue, nil once it
+// returned. Before, every later Close returned nil at once.
+func TestSecondCloseWaitsForTheNodesStop(t *testing.T) {
+	t.Parallel()
+	var armed atomic.Bool
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	releaseOnce := sync.OnceFunc(func() { close(release) })
+	site, dev, c, _ := sitePair(t, fabrictest.Topology{}, func(cfg *controller.Config) {
+		cfg.Node.FlushInterval = time.Hour
+		cfg.HooksFor = func(string) client.Hooks {
+			return client.Hooks{Changed: func() {
+				if !armed.Load() {
+					return
+				}
+				select {
+				case entered <- struct{}{}:
+					<-release
+				default:
+				}
+			}}
+		}
+	})
+	t.Cleanup(releaseOnce)
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	armed.Store(true)
+	renameDevice(t, dev)
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		select {
+		case <-entered:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}); err != nil {
+		t.Fatalf("the report's hook never ran: %v", err)
+	}
+	ended, end := context.WithCancel(t.Context())
+	end()
+	if err := c.Close(ended); err == nil {
+		t.Fatal("the first Close with the node still stopping returned nil")
+	}
+	// The first Close has returned: a second one with time left waits
+	// for the stop, and returns its context's error when the stop does
+	// not come.
+	short, cancelShort := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancelShort()
+	if err := c.Close(short); err == nil {
+		t.Fatal("a second Close with the node still stopping returned nil")
+	}
+	releaseOnce()
+	if err := site.Run(ctx, c.Close); err != nil {
+		t.Fatalf("a Close after the node's hook returned: %v", err)
+	}
+}

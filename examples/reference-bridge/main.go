@@ -96,7 +96,7 @@ type flags struct {
 	attestationDir, metricsExpvar                  string
 	wifiSimSSIDs                                   string
 	otbr                                           string
-	passcode, discriminator                        uint
+	passcode, discriminator, customFlow            uint
 	iterations                                     int
 	advertise, osHostName, otaHarness, wifi        bool
 	wifiSim                                        bool
@@ -121,6 +121,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.label, "label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
 	flag.UintVar(&f.passcode, "passcode", 20202021, "Matter setup passcode (8 digits, not trivially guessable)")
 	flag.UintVar(&f.discriminator, "discriminator", 3840, "12-bit commissioning discriminator")
+	flag.UintVar(&f.customFlow, "custom-flow", 0, "the commissioning flow the onboarding payload states: 0 Standard, 1 User-Intent, 2 Custom (node.Commissioning.Flow; flow 1 and 2 print the long manual code with vendor and product id). Under 1 an uncommissioned daemon opens no commissioning window by itself (node.Commissioning.WindowOnDemand): it is not commissionable until the app pipe's UserIntentCommissioningStart opens the window, the user action the flow stands for; see control.go")
 	flag.IntVar(&f.iterations, "pbkdf-iterations", 1000, "SPAKE2+ PBKDF2 iteration count")
 	flag.StringVar(&f.salt, "pbkdf-salt", "go-fabric-ref-salt", "SPAKE2+ salt (16-32 bytes; change it for anything real)")
 	flag.BoolVar(&f.advertise, "advertise", true, "publish the commissionable mDNS record (false = no discovery, direct address only)")
@@ -176,6 +177,9 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	passcode = uint32(f.passcode)
 	if err := node.ValidateSetupPIN(passcode); err != nil {
 		return 0, 0, fmt.Errorf("--passcode: %w", err)
+	}
+	if f.customFlow > uint(node.FlowCustom) {
+		return 0, 0, fmt.Errorf("--custom-flow %d is not 0 (Standard), 1 (User-Intent) or 2 (Custom)", f.customFlow)
 	}
 	if f.iterations < node.PBKDFIterationsMin || f.iterations > node.PBKDFIterationsMax {
 		return 0, 0, fmt.Errorf("--pbkdf-iterations %d is outside [%d, %d]", f.iterations, node.PBKDFIterationsMin, node.PBKDFIterationsMax)
@@ -469,6 +473,9 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 	if eps, err = addAll(ctx, agg, eps, cfg.Logger); err != nil {
 		return nil, err
 	}
+	// The app pipe's UserIntentCommissioningStart opens the node's own
+	// window: the user action --custom-flow 1 waits for.
+	devices.openWindow = func(ctx context.Context) error { return n.OpenOwnWindow(ctx, 0) }
 	// The app pipe's SimulateConfigurationVersionChange raises every
 	// bridged device's ConfigurationVersion, persisted by the node.
 	devices.configChange = func() error { //nolint:contextcheck // an app-pipe command, long after the assembly's ctx
@@ -506,6 +513,11 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 			// --tc-required: GeneralCommissioning's TermsAndConditions
 			// feature, behind the extension surfacePolicies enables.
 			TermsAndConditions: termsAndConditions(f),
+			// --custom-flow: the flow the payload states, and under
+			// User-Intent the window left to the app pipe's
+			// UserIntentCommissioningStart (commissioningFlow).
+			Flow:           commissioningFlow(f.customFlow),
+			WindowOnDemand: commissioningFlow(f.customFlow) == node.FlowUserIntent,
 		},
 		ProductDescription: node.ProductDescription{VendorID: testVendorID, ProductID: testProductID},
 		BasicInformation: node.BasicInformation{
@@ -539,6 +551,24 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		nodeseam.UseOTAHarness(&cfg)
 	}
 	return cfg
+}
+
+// commissioningFlow is the --custom-flow value as the node's field;
+// checkFlags refused a value above node.FlowCustom, and one is Standard
+// here, never a wrapped uint8.
+//
+// Only the User-Intent flow leaves the window to the host: the flow
+// states what the payload says (node.Commissioning.Flow), the window is
+// node.Commissioning.WindowOnDemand, and a Custom-flow product may well
+// be commissionable from its start.
+func commissioningFlow(v uint) node.CommissioningFlow {
+	switch v {
+	case uint(node.FlowUserIntent):
+		return node.FlowUserIntent
+	case uint(node.FlowCustom):
+		return node.FlowCustom
+	}
+	return node.FlowStandard
 }
 
 // mdnsConfig is the advertiser the node builds: none under

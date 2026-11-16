@@ -176,6 +176,9 @@ func generate(snap *snapshot, name string) (out *output, err error) {
 	if err := g.relax(); err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
 	}
+	if err := g.checkQuiet(); err != nil {
+		return nil, fmt.Errorf("%s: %w", c.Name, err)
+	}
 	src, err := g.source()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", c.Name, err)
@@ -568,12 +571,22 @@ func (g *generator) source() ([]byte, error) {
 	w.p("// bridge decodes the cluster's request payloads.")
 	w.p("package %s", g.pkg)
 	w.p("")
-	if g.encodes() {
+	switch {
+	case g.quieter():
+		w.p("import (")
+		w.p("\t\"time\"")
+		w.p("")
+		w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
+		if g.encodes() {
+			w.p("\t\"github.com/SukramJ/go-fabric/tlv\"")
+		}
+		w.p(")")
+	case g.encodes():
 		w.p("import (")
 		w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
 		w.p("\t\"github.com/SukramJ/go-fabric/tlv\"")
 		w.p(")")
-	} else {
+	default:
 		w.p("import \"github.com/SukramJ/go-fabric/cluster/spec\"")
 	}
 	w.p("")
@@ -1333,9 +1346,14 @@ func (g *generator) writeAttribute(w *writer, a *element) {
 	}
 	if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
 		w.p("\t\t\tDefault: %s,", lit)
+	} else if lit := structDefault(t); lit != "" {
+		w.p("\t\t\tDefault: %s,", lit)
 	}
 	if r := g.attrRelaxed[a.ID]; r != "" {
 		w.p("\t\t\tRelaxed: %q,", r)
+	}
+	if d := g.quietInterval(a); d > 0 {
+		w.p("\t\t\tQuietInterval: %s,", durationLiteral(d))
 	}
 	if g.attrDecoder(a) != "" {
 		w.p("\t\t\tDecode: decodeAttr%s,", exportName(a.Name))
@@ -2075,4 +2093,54 @@ func sortedClusterNames(s *snapshot) []string {
 		out = append(out, c.Name)
 	}
 	return out
+}
+
+// structDefault is the default of a struct-typed element that states none
+// of its own, built from the defaults its fields state. matter.js builds an
+// object's default from every conformant child that has one
+// (packages/model/src/logic/DefaultValue.ts:153-179 at db021da0, reached
+// through ClusterDerivation.ts:144 and SelectDefaultValue.ts:144); for
+// OperationalError, whose ErrorStateStruct.ErrorStateId has `default: 0`
+// (operational-state.element.ts:110-111), that is {errorStateId: 0}. This
+// generator narrows it: the literal is the generated struct with each
+// mandatory, non-nullable field whose stated default is a number, a bool or
+// a string set to it; empty when the type is no struct or no such field
+// states a default. matter.js's wider rule also gives partial objects to
+// four nullable attributes (CommodityTariff CurrentDayEntry/NextDayEntry,
+// DeviceEnergyManagement Forecast, CommodityPrice CurrentPrice) that this
+// generator leaves without a default.
+func structDefault(t typeInfo) string {
+	if t.kind != kindStruct || t.dt == nil {
+		return ""
+	}
+	var parts []string
+	for _, f := range t.dt.fields {
+		if f.v == nil || !f.mandatory || f.nullable || len(f.v.Default) == 0 {
+			continue
+		}
+		var x any
+		if json.Unmarshal(f.v.Default, &x) != nil {
+			continue
+		}
+		switch d := x.(type) {
+		case float64:
+			switch f.t.kind {
+			case kindUint, kindInt, kindEnum, kindBitmap, kindFloat32, kindFloat64:
+				parts = append(parts, fmt.Sprintf("%s: %s", f.goName, strconv.FormatFloat(d, 'g', -1, 64)))
+			default:
+			}
+		case bool:
+			if f.t.kind == kindBool {
+				parts = append(parts, fmt.Sprintf("%s: %t", f.goName, d))
+			}
+		case string:
+			if f.t.kind == kindString {
+				parts = append(parts, fmt.Sprintf("%s: %q", f.goName, d))
+			}
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return t.dt.goName + "{" + strings.Join(parts, ", ") + "}"
 }

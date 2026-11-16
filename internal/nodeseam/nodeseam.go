@@ -18,6 +18,7 @@
 package nodeseam
 
 import (
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -27,6 +28,14 @@ import (
 // node.New; the client stack closes what it returns on Stop. Reports false
 // when cfg is not a *node.Config or open is nil.
 var UseClientListener func(cfg any, open func() (*udp.Listener, error)) bool
+
+// UsePeerClient puts the client stack the node n (a *node.Node, as any)
+// builds for its own peer path — when its configuration has no client
+// stack — onto a site: names is the DNS-SD cache its peers are looked up
+// in, and its socket is opened with open, or bound to listen when open is
+// nil. Called after node.New, before the stack is built at its first use.
+// Reports false when n is not a *node.Node.
+var UsePeerClient func(n any, names *discovery.Names, listen string, open func() (*udp.Listener, error)) bool
 
 // UseOTAHarness puts the OTA requestor of cfg (a *node.Config whose OTA is
 // set) into harness mode: an image is applied in place and its version

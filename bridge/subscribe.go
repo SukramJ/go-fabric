@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	clusterpkg "github.com/SukramJ/go-fabric/cluster"
@@ -51,34 +52,51 @@ var (
 // (packages/protocol/src/protocol/MRP.ts:55 DEFAULT_EXPECTED_PROCESSING_TIME,
 // :61 PEER_RESPONSE_TIME_BUFFER); the third term is the summed MRP
 // retransmission backoff, see [Bridge.chunkStatusResponseTimeout].
+// chunkStatusResponseReliable is the term that replaces the backoff over a
+// reliable connection (TCP, BLE): matter.js takes max(30 s, expected
+// processing time) there (MRP.ts:90-92, :111-113 at db021da0).
 const (
 	chunkStatusResponseExpectedProcessing = 2 * time.Second
 	chunkStatusResponseBuffer             = 5 * time.Second
+	chunkStatusResponseReliable           = 30 * time.Second
 )
 
 // chunkStatusResponseTimeout bounds how long a chunk loop (Subscribe-
 // Initial and Read-response) waits for the peer's IM StatusResponse on
-// one ReportData chunk before abandoning the interaction. Mirrors matter.js
-// MRP.maxPeerResponseTimeOf for a UDP/MRP session (MRP.ts:100-108 at
-// db021da0): the worst-case time until the peer received our last
-// retransmission and its answer came back — the peer's retransmission
-// schedule, plus this node's own schedule on its own session intervals,
-// active at first and idle once the wait passes its active threshold, with
-// its sender-side pad (maxResponseTimeOf, :198-224) — plus the default
-// expected processing time and the response buffer (review II,
-// R2-P1-req2-12).
+// one ReportData chunk before abandoning the interaction — the ongoing
+// report and the read and initial-report chunks. Takes matter.js's bound
+// for this wait — MRP.maxPeerResponseTimeOf for a UDP/MRP session
+// (MRP.ts:100-108 at db021da0): this node's own retransmission schedule on
+// its own session intervals, active at first and idle once the wait passes
+// its active threshold, with its sender-side pad (maxResponseTimeOf,
+// :198-224), plus the default expected processing time and the response
+// buffer — and adds the formula's peer term, the peer's retransmission
+// schedule, which matter.js leaves at 0 for this wait
+// (MessageExchange.ts:875-886 passes no includeMaximumSendingTime, :882;
+// MessageChannel.ts:240): the module's one timer runs from the send, not
+// from the report's acknowledgement (notes/parity/by_design.md,
+// BD-Matter-Subscription-ReportWaitBound; review II, R2-P1-req2-12).
 //
 // The peer's schedule is summed on the base interval the session lookup
 // resolves for it now (the spec idle default when it resolves none) and
 // does not switch from the peer's active to its idle interval past the
-// peer's active threshold, as matter.js's does: the session port names one
-// base interval, not the peer's three parameters.
+// peer's active threshold, as matter.js's formula does: the session port
+// names one base interval, not the peer's three parameters.
+//
+// Over a reliable connection (TCP, BLE) no retransmission runs: the bound
+// is max(30 s, the expected processing time) plus the response buffer,
+// 35 s, as matter.js's maxPeerResponseTimeOf for such a channel (MRP.ts:90-92,
+// :111-113 at db021da0). route is where the wait's message went (nil: a
+// UDP peer).
 //
 // A test may pin the bound through chunkStatusResponseTimeoutOverride;
 // zero means derive it.
-func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
+func (b *Bridge) chunkStatusResponseTimeout(route net.Addr, sessionID uint16) time.Duration {
 	if b.chunkStatusResponseTimeoutOverride > 0 {
 		return b.chunkStatusResponseTimeoutOverride
+	}
+	if r, ok := route.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
+		return max(chunkStatusResponseReliable, chunkStatusResponseExpectedProcessing) + chunkStatusResponseBuffer
 	}
 	base := b.outboundBaseInterval(sessionID, b.clk().Now())
 	if base <= 0 {
@@ -439,27 +457,10 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// (ExchangeManager.ts:496-507 at db021da0), which the MRP layer here
 	// would then mistake for delivery. Ongoing server reports are always
 	// fresh server-initiated exchanges (ServerSubscription.ts:900).
-	seq := b.beginUpdate(sub.ID)
-	counters, freshExch, err := b.sendInitiatedReport(target, report)
-	if err != nil {
-		// Owe the same events and attribute changes again, so the next
-		// report retries them; the third consecutive failure reaps the
-		// subscription. Mirrors matter.js
-		// packages/node/src/node/server/ServerSubscription.ts:569-584 at
-		// db021da0 (puts the attribute filter and
-		// #outstandingEventsMinNumber back while #sendUpdateErrorCounter
-		// <= 2).
-		sub.RequeueEvents(events[0].Number)
-		sub.RequeueAttributes(paths)
-		if errors.Is(err, errChunkWaitAborted) {
-			return // the engine stopped; the peer did nothing wrong
-		}
-		b.noteSubscriptionSendError(sub.ID, seq, "event_report", err)
+	freshExch, sent := b.deliverOngoingReport(sub, target, report, &owedReport{paths: paths, eventsFrom: events[0].Number, hasEvents: true}, "event_report")
+	if !sent {
 		return
 	}
-	b.noteReportSent(ctx, sub.ID, target.sessionID, counters, owedReport{seq: seq, paths: paths, eventsFrom: events[0].Number, hasEvents: true})
-	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
-	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.event_report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("events", len(events)),
@@ -640,34 +641,18 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 	// An empty report is a max-interval keep-alive (nothing changed, or
 	// every dirty path was dropped by the ACL gate). It asks for the peer's
 	// StatusResponse like a report with data — SuppressResponse stays
-	// false — so the peer's INVALID_SUBSCRIPTION answer is read and ends
-	// the subscription ([Bridge.closeSubscriptionByExchange]); a keep-alive
-	// that is never acknowledged is a failed update as any other report
-	// ([Bridge.noteReportUndelivered]). Mirrors matter.js
-	// packages/node/src/node/server/ServerSubscription.ts:909-920 at
-	// db021da0 (the keep-alive branch of #sendUpdateMessage,
-	// `suppressResponse: false` at :914, "Requested so the peer's
-	// INVALID_SUBSCRIPTION answer (Core § 8.5) is read on every
-	// transport", :913) and :938-950 (an error status ends it).
-
-	seq := b.beginUpdate(sub.ID)
-	counters, freshExch, err := b.sendInitiatedReport(target, report)
-	if err != nil {
-		// Mark the drained paths dirty again, so the next report
-		// retries them; the third consecutive failure reaps the
-		// subscription. Mirrors matter.js
-		// packages/node/src/node/server/ServerSubscription.ts:566-577
-		// (#addOutstandingAttributes while #sendUpdateErrorCounter <= 2).
-		sub.RequeueAttributes(paths)
-		if errors.Is(err, errChunkWaitAborted) {
-			return // the engine stopped; the peer did nothing wrong
-		}
-		b.noteSubscriptionSendError(sub.ID, seq, "report", err)
+	// false — and waits for it as a report with data does
+	// ([Bridge.deliverOngoingReport]), so the peer's INVALID_SUBSCRIPTION
+	// answer ends the subscription and a keep-alive left unanswered is a
+	// failed update. Mirrors matter.js
+	// packages/node/src/node/server/ServerSubscription.ts:913-914 at
+	// db021da0 (the keep-alive's `suppressResponse: false`, "Requested so
+	// the peer's INVALID_SUBSCRIPTION answer (Core § 8.5) is read on every
+	// transport") and :938-950 (an error status ends it).
+	freshExch, sent := b.deliverOngoingReport(sub, target, report, &owedReport{paths: paths}, "report")
+	if !sent {
 		return
 	}
-	b.noteReportSent(ctx, sub.ID, target.sessionID, counters, owedReport{seq: seq, paths: paths})
-	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
-	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("paths", len(paths)),
@@ -928,7 +913,7 @@ func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im
 			if rr.Status != im.StatusSuccess {
 				continue
 			}
-			reports = append(reports, im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion, Value: rr.Value})
+			reports = append(reports, im.AttributeReport{Path: rr.Path, DataVersion: rr.DataVersion, Value: rr.Value, FabricScope: rr.FabricScope})
 		}
 	}
 	return reports
@@ -974,7 +959,6 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	// removal's ctx bound the whole flush however many chunks it takes
 	// (review II, R2-P2-dr-req-01).
 	target.abort = ctx.Done()
-	seq := b.beginUpdate(sub.ID)
 	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
 		if len(events) > 0 {
@@ -989,13 +973,13 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 			// II, R2-P2-rr-dev-05).
 			return
 		}
-		b.noteSubscriptionSendError(sub.ID, seq, "flush", err)
+		b.noteSubscriptionSendError(sub.ID, "flush", err)
 		return
 	}
 	// The flushed chunks are untracked, so no counter comes back and no
 	// counter→subscription entry is owed: nothing retransmits them, and
 	// their acks find no entry (outboundReliableTracker.Ack is a no-op).
-	b.noteUpdateDelivered(sub.ID, seq)
+	b.noteUpdateDelivered(sub.ID)
 	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.releaseReportOfClosed(sub)
 	b.logger.Debug("matter.tx.subscribe.flush",
@@ -1008,9 +992,10 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 
 // sendErrorRetryLimit is how many consecutive failed updates an ongoing
 // report path tolerates before the subscription is reaped: the third
-// ends it. Mirrors matter.js
-// packages/node/src/node/server/ServerSubscription.ts:569 at db021da0
-// (`#sendUpdateErrorCounter <= 2` requeues, the third gives up, :585-603).
+// ends it. matter.js requeues while `#sendUpdateErrorCounter <= 2`
+// (packages/node/src/node/server/ServerSubscription.ts:569 at db021da0);
+// at the third it closes for a communication failure only (:590-603) —
+// here every kind closes ([Bridge.noteSubscriptionSendError]).
 const sendErrorRetryLimit = 2
 
 // noteSubscriptionSendError records one failed ongoing report for subID
@@ -1022,25 +1007,26 @@ const sendErrorRetryLimit = 2
 // only by captureSubTarget on a fresh SubscribeRequest — once dropped,
 // nothing recreates it and every later report silently returns at the
 // subTargets lookup, keep-alives included. A peer that truly vanished
-// is still reaped. Both kinds of failed update count here: a send that
-// fails at once, and a report the peer never acknowledges
-// ([Bridge.noteReportUndelivered]).
-//
-// seq is the report's number from [Bridge.beginUpdate]; zero counts the
-// failure whatever went before it. A report begun before the last outcome
-// taken for the subscription — the last counted failure, or a delivered
-// report of a later number — overlapped that outcome, and its failure is
-// not counted again: matter.js sends no next update while one is in
-// progress (packages/node/src/node/server/ServerSubscription.ts:520-529 at
-// db021da0, #triggerSendUpdate returns while #currentUpdatePromise is
-// set) and an update lasts until its message is acknowledged or given up
-// (:553-557 awaits #sendUpdateMessage), so the reports this engine sends
-// meanwhile are part of the next update there, and three failed updates
-// take three retransmission windows one after the other (:563-603). What
-// such a report carried is owed again all the same.
+// is still reaped; its sessions are left alone. Every kind of failed
+// update counts here: a send that fails at once, a report whose
+// StatusResponse does not come within the wait, and one whose last
+// message ran out of retransmissions ([Bridge.noteReportUndelivered]).
+// A subscription has one report in flight ([Bridge.deliverOngoingReport]),
+// so its failures arrive in order, one per update. matter.js counts every
+// failed update and owes its data again while the count is at most 2
+// (packages/node/src/node/server/ServerSubscription.ts:564, :569-584 at
+// db021da0); at the third it closes the subscription, leaving the session
+// alone, only when the failure is one of its four communication classes
+// (:590-603) — no answer, retransmissions run out, the session closed, a
+// network error — and otherwise keeps the subscription with the update's
+// data dropped (:605). Here the third failure closes the subscription
+// whatever its kind: the communication kinds as matter.js, the local ones
+// (an encode or chunking failure, a message above the TCP limit, a missing
+// listener, an encryption failure) by the module's own rule, so that a
+// subscriber is not left with data it will never receive.
 //
 // op names the reporter for the log line ("report" / "event_report").
-func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, err error) {
+func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 	b.subUpdateMu.Lock()
 	if _, live := b.routing.subTargets.Load(subID); !live {
 		// Closed while the report was being sent: nothing is left to
@@ -1050,21 +1036,6 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, 
 		// release has reset it.
 		b.subUpdateMu.Unlock()
 		return
-	}
-	order := b.subUpdateSeq[subID]
-	if seq != 0 && order != nil && seq <= order.resolved {
-		b.subUpdateMu.Unlock()
-		if b.logger != nil {
-			b.logger.Debug("matter.tx.subscribe."+op,
-				slog.Int("subscription_id", int(subID)),
-				slog.String("hint", "report overlapped an update already counted; not counted again"),
-				slog.Any("err", err))
-		}
-		return
-	}
-	if order != nil {
-		// Every report begun so far overlapped this failed update.
-		order.resolved = order.started
 	}
 	var failures int
 	if raw, ok := b.subSendErrorCount.Load(subID); ok {
@@ -1081,7 +1052,6 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, 
 		// nothing.
 		b.routing.subTargets.Delete(subID)
 		b.subSendErrorCount.Delete(subID)
-		delete(b.subUpdateSeq, subID)
 	}
 	b.subUpdateMu.Unlock()
 	if failures <= sendErrorRetryLimit {
@@ -1109,166 +1079,240 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, seq uint64, op string, 
 	}
 }
 
-// resetFailedUpdates drops subID's count of failed updates and the
-// numbering of its reports: the subscription ended. Every change of the
-// count is taken under subUpdateMu, so a reset is never overwritten by a
-// failed update counted from another goroutine at the same moment — the
-// reporter, the ACK pump and the inbound acknowledgement each change it.
+// resetFailedUpdates drops subID's count of failed updates: the
+// subscription ended. Every change of the count is taken under
+// subUpdateMu, so a reset is never overwritten by a failed update counted
+// from another goroutine at the same moment — the reporter and the ACK
+// pump each change it.
 func (b *Bridge) resetFailedUpdates(subID uint32) {
 	b.subUpdateMu.Lock()
 	b.subSendErrorCount.Delete(subID)
-	delete(b.subUpdateSeq, subID)
 	b.subUpdateMu.Unlock()
 }
 
-// updateOrder numbers a subscription's ongoing reports
-// ([Bridge.beginUpdate]) so that their outcomes, which arrive from the
-// reporter, the ACK pump and the inbound acknowledgement in any order, are
-// counted as matter.js counts its updates ([Bridge.noteSubscriptionSendError]).
-type updateOrder struct {
-	// started is the number of the last report begun.
-	started uint64
-	// resolved is the highest number whose outcome is taken: a failure
-	// counted for a report sets it to started, a delivered report to its
-	// own number when that is higher. A report numbered up to it
-	// overlapped that outcome.
-	resolved uint64
-}
-
-// beginUpdate numbers the ongoing report of subID about to be sent; the
-// first is 1. A subscription whose routing target is gone is released
-// and gets no number (0): numbered, it would keep its entry for the
-// process lifetime, since its release reset it already. The target is
-// read under subUpdateMu, which every release takes after it drops the
-// target ([Bridge.resetFailedUpdates]).
-func (b *Bridge) beginUpdate(subID uint32) uint64 {
-	b.subUpdateMu.Lock()
-	defer b.subUpdateMu.Unlock()
-	if _, live := b.routing.subTargets.Load(subID); !live {
-		return 0
-	}
-	if b.subUpdateSeq == nil {
-		b.subUpdateSeq = make(map[uint32]*updateOrder)
-	}
-	order := b.subUpdateSeq[subID]
-	if order == nil {
-		order = &updateOrder{}
-		b.subUpdateSeq[subID] = order
-	}
-	order.started++
-	return order.started
-}
-
-// noteUpdateDelivered takes report seq of subID as delivered: the count of
-// failed updates starts again — matter.js ServerSubscription.ts:554-557 at
-// db021da0 resets #sendUpdateErrorCounter once #sendUpdateMessage returns,
-// after the report's acknowledgement — and a failure of an earlier report
-// is no longer counted.
-func (b *Bridge) noteUpdateDelivered(subID uint32, seq uint64) {
+// noteUpdateDelivered takes an update of subID as delivered: the count of
+// failed updates starts again — matter.js ServerSubscription.ts:555-557 at
+// db021da0 resets #sendUpdateErrorCounter once #sendUpdateMessage
+// returned, which is after the peer's Success StatusResponse.
+func (b *Bridge) noteUpdateDelivered(subID uint32) {
 	b.subUpdateMu.Lock()
 	defer b.subUpdateMu.Unlock()
 	b.subSendErrorCount.Delete(subID)
-	if order := b.subUpdateSeq[subID]; order != nil && seq > order.resolved {
-		order.resolved = seq
-	}
 }
 
 // owedReport is what an ongoing report owes its subscription until the
-// peer acknowledges the report's last message: the attribute paths it
-// carried and, when it carried events, the number of its first one.
-// Recorded in [Bridge.reportCounterOwner] under that message's counter.
+// update is settled: the attribute paths it carried and, when it carried
+// events, the number of its first one. Recorded in
+// [Bridge.reportCounterOwner] under the report's last message's counter
+// while its reporter waits ([Bridge.deliverOngoingReport]).
 type owedReport struct {
 	subID      uint32
-	seq        uint64 // the report's number ([Bridge.beginUpdate])
+	exchangeID uint16 // the report's exchange, whose wait the ACK pump ends
 	paths      []im.ConcreteAttributePath
 	eventsFrom uint64
 	hasEvents  bool
+	// settled is taken by whoever settles the update — the reporter at
+	// the end of its wait, or the ACK pump when the report's last message
+	// ran out of retransmissions — so it is counted and owed again once.
+	settled atomic.Bool
 }
 
-// noteReportSent records an ongoing report of subID that went out as the
-// tracked messages counters on sessionID: the last one's acknowledgement
-// is the delivered update ([Bridge.releaseReportCounter]), its exhaustion
-// a failed one ([Bridge.noteReportUndelivered]). The messages before the
-// last were answered by the peer's StatusResponse before the next was
-// sent ([Bridge.sendReportChunksNotify]). A report without a tracked
-// message (no tracker, a reliable connection) counts as delivered when it
-// is sent. An acknowledgement handled before the record was stored is
-// taken here, and so is an exhaustion: a message the tracker abandoned
-// before the record existed is a failed update all the same, as matter.js
-// awaits the report's delivery inside the update and requeues on its
-// failure (packages/node/src/node/server/ServerSubscription.ts:553-603 at
-// db021da0; review II, R2-P4-nv-07).
-func (b *Bridge) noteReportSent(ctx context.Context, subID uint32, sessionID uint16, counters []uint32, owed owedReport) {
+// requeue owes what the report carried again: the next report of sub
+// carries it. Mirrors matter.js
+// packages/node/src/node/server/ServerSubscription.ts:569-584 at db021da0
+// (the attribute filter and #outstandingEventsMinNumber put back while
+// #sendUpdateErrorCounter <= 2).
+func (o *owedReport) requeue(sub *subscription.Subscription) {
+	if o.hasEvents {
+		sub.RequeueEvents(o.eventsFrom)
+	}
+	sub.RequeueAttributes(o.paths)
+}
+
+// deliverOngoingReport sends report, an ongoing report of sub that owes
+// owed, on a fresh exchange and returns once the update is settled, so a
+// subscription has one report in flight: the engine starts no report of
+// sub while its reporter runs, and what changes meanwhile stays owed on
+// the subscription — one set of attribute paths and the lowest event
+// number — for the next report to carry together
+// ([subscription.Manager] tick). The update is settled by the peer's
+// StatusResponse to the report's last message: Success delivers it; any
+// other status ends the subscription at once; none within the wait — or
+// the last message's retransmissions running out, or the session's close
+// — is a failed update, its data owed again and the third in a row
+// ending the subscription ([Bridge.noteSubscriptionSendError]). The wait
+// is bounded as a chunk's ([Bridge.chunkStatusResponseTimeout]) and by
+// the engine's stop, which owes the data again without counting. A
+// keep-alive waits as a report with data does. It returns the report's
+// exchange and whether the report was delivered.
+//
+// Mirrors matter.js at db021da0: #triggerSendUpdate sends no update while
+// one is in flight and only notes the next as due
+// (packages/node/src/node/server/ServerSubscription.ts:520-529); changes
+// meanwhile join one outstanding attribute set and one minimum event
+// number (:346-357, :392-394), which the next report takes whole
+// (:537-543, :610-622); #sendUpdateMessage sends with
+// `suppressResponse: false`, the keep-alive included (:913-914, :928),
+// and sendDataReport then awaits waitForSuccess
+// (packages/protocol/src/interaction/InteractionMessenger.ts:838-845,
+// :221-227); an error status ends the subscription
+// (ServerSubscription.ts:938-950), a missing answer is a failed update
+// (:558-608).
+func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target subTarget, report im.ReportData, owed *owedReport, op string) (exchangeID uint16, delivered bool) {
+	owed.subID = sub.ID
+	counters, exch, wait, err := b.sendInitiatedReportArmed(target, report, true)
+	if err != nil {
+		switch {
+		case errors.Is(err, errChunkWaitAborted):
+			owed.requeue(sub) // the engine stopped; the peer did nothing wrong
+		case errors.Is(err, errChunkRejected):
+			// An error status to a chunk ends the subscription as one to
+			// the last message does.
+			b.closeRefusedSubscription(sub.ID, 0, err)
+		default:
+			// Counted before the data is owed again: the report the
+			// requeue starts is the next update.
+			b.noteSubscriptionSendError(sub.ID, op, err)
+			owed.requeue(sub)
+		}
+		return 0, false
+	}
+	owed.exchangeID = exch
+	b.rememberReportExchange(sub.ID, target.sessionID, exch)
+	key := b.recordOngoingReport(target.sessionID, counters, owed)
+	status, answered, aborted := b.awaitReportAnswer(target, exch, wait, op)
+	if key != 0 {
+		b.reportCounterOwner.CompareAndDelete(key, owed)
+	}
+	if !owed.settled.CompareAndSwap(false, true) {
+		// The ACK pump settled it: the last message ran out of
+		// retransmissions.
+		b.releaseReportOfClosed(sub)
+		return exch, false
+	}
+	switch {
+	case aborted:
+		owed.requeue(sub)
+	case answered && status.IsSuccess():
+		b.noteUpdateDelivered(sub.ID)
+		b.releaseReportOfClosed(sub)
+		return exch, true
+	case answered:
+		b.closeRefusedSubscription(sub.ID, exch, fmt.Errorf("%w: %s", errChunkRejected, status))
+	default:
+		b.noteSubscriptionSendError(sub.ID, op, fmt.Errorf("%w: exchange %d", errChunkUnanswered, exch))
+		owed.requeue(sub)
+	}
+	b.releaseReportOfClosed(sub)
+	return exch, false
+}
+
+// recordOngoingReport records owed under the last of the report's
+// tracked messages counters on sessionID, for the ACK pump to settle the
+// update should that message run out of retransmissions
+// ([Bridge.noteReportUndelivered]), and returns the record's key (0: no
+// tracked message — no tracker, a reliable connection). A message the
+// pump gave up before the record existed is settled here as it would have
+// been then (review II, R2-P4-nv-07).
+func (b *Bridge) recordOngoingReport(sessionID uint16, counters []uint32, owed *owedReport) uint64 {
 	if len(counters) == 0 {
-		b.noteUpdateDelivered(subID, owed.seq)
-		return
+		return 0
 	}
 	last := counters[len(counters)-1]
-	owed.subID = subID
-	b.reportCounterOwner.Store(reportCounterKey(sessionID, last), &owed)
-	if b.awaitsAck(ctx, sessionID, last) {
-		return
-	}
+	key := reportCounterKey(sessionID, last)
+	b.reportCounterOwner.Store(key, owed)
 	b.mu.RLock()
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
 	if tracker.Abandoned(sessionID, last) {
-		// The pump's noteReportUndelivered found no record, or took it:
-		// LoadAndDelete makes the second call a no-op.
 		b.noteReportUndelivered(sessionID, last)
-		return
 	}
-	b.releaseReportCounter(sessionID, last)
+	return key
 }
 
-// awaitsAck reports whether the outbound-reliable tracker still waits for
-// the peer's acknowledgement of (sessionID, counter): it neither saw the
-// acknowledgement nor gave up on the message.
-func (b *Bridge) awaitsAck(ctx context.Context, sessionID uint16, counter uint32) bool {
-	b.mu.RLock()
-	tracker := b.outboundReliable
-	b.mu.RUnlock()
-	if tracker == nil {
-		return false
+// reportAnswerBoundForTests, when set, replaces the bound of
+// [Bridge.awaitReportAnswer] — set by this package's tests only, so the
+// many that leave a report unanswered do not wait out the production bound.
+// Zero in production.
+var reportAnswerBoundForTests time.Duration
+
+// awaitReportAnswer waits for the peer's StatusResponse to an ongoing
+// report's last message, armed by [Bridge.sendInitiatedReportArmed]:
+// answered with its status, or not — the wait ran out, or it was disarmed
+// without an answer (the session's close, the ACK pump giving the message
+// up) — or aborted by the engine's stop. An answer's standalone ack goes
+// out at once: nothing of ours follows on the exchange to piggyback it on.
+func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-chan im.StatusCode, op string) (status im.StatusCode, answered, aborted bool) {
+	// One timer from the send, on [Bridge.chunkStatusResponseTimeout]'s
+	// bound: over UDP the sum of two schedule terms — this node's own
+	// retransmissions (with its sender pad) and the peer's, summed on one
+	// base interval and without a sender pad — plus the expected
+	// processing time and the response buffer; over a reliable connection
+	// 35 s. It differs from matter.js's bound in where the clock starts and
+	// in the peer term (notes/parity/by_design.md,
+	// BD-Matter-Subscription-ReportWaitBound); whether it can come out
+	// shorter than matter.js's is not established.
+	timeout := b.chunkStatusResponseTimeout(target.src, target.sessionID)
+	if reportAnswerBoundForTests > 0 && b.chunkStatusResponseTimeoutOverride == 0 {
+		timeout = reportAnswerBoundForTests
 	}
-	// A wait that may not block: nil when the entry is gone, the
-	// context's error while it is pending.
-	done, cancel := context.WithCancel(ctx)
-	cancel()
-	return tracker.WaitForAck(done, sessionID, counter) != nil
+	timer := b.clk().NewTimer(timeout)
+	defer timer.Stop()
+	defer b.disarmStatusResponseWait(target.sessionID, exchangeID, true)
+	select {
+	case st, ok := <-wait:
+		if !ok {
+			b.logger.Debug("matter.tx.subscribe."+op+".unanswered",
+				slog.Int("exchange_id", int(exchangeID)),
+				slog.String("hint", "wait ended without an answer"))
+			return 0, false, false
+		}
+		b.expediteDuplicateAck(target.sessionID, exchangeID, true)
+		b.RunAckPumpOnce(b.clk().Now())
+		return st, true, false
+	case <-target.abort:
+		return 0, false, true
+	case <-timer.C():
+		b.logger.Debug("matter.tx.subscribe."+op+".unanswered",
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.String("timeout", timeout.String()))
+		return 0, false, false
+	}
 }
 
 // noteReportUndelivered is called by the ACK pump when a message of
 // sessionID ran out of retransmissions. When it is the last message of an
-// ongoing report, the report is one failed update of its subscription:
-// what it carried is owed again and the failure is counted, the third in
-// a row ending the subscription ([Bridge.noteSubscriptionSendError]). It
-// is no peer loss — the peer's sessions stay. Mirrors matter.js
+// ongoing report whose update is not settled yet, the report is one failed
+// update of its subscription: the failure is counted, the third in a row
+// ending the subscription ([Bridge.noteSubscriptionSendError]), what it
+// carried is owed again, and its reporter's wait ends. It is no peer
+// loss — the peer's sessions stay. Mirrors matter.js
 // packages/node/src/node/server/InteractionServer.ts:96-97 at db021da0
 // ("a report we cannot push does not prove they are" gone:
 // SUBSCRIPTION_EXCHANGE_OPTIONS = { suppressPeerLoss: true }, the options
-// of every report exchange, :785-797) and ServerSubscription.ts:563-603
-// (the failed update requeued while #sendUpdateErrorCounter <= 2, the
-// subscription given up after the third, "The session is left alone").
+// of every report exchange, :785-797) and ServerSubscription.ts:569-584,
+// :590-603 (the failed update requeued while #sendUpdateErrorCounter <= 2;
+// at the third, a failure of this communication kind gives the
+// subscription up, "The session is left alone").
 func (b *Bridge) noteReportUndelivered(sessionID uint16, counter uint32) {
 	raw, ok := b.reportCounterOwner.LoadAndDelete(reportCounterKey(sessionID, counter))
 	if !ok {
 		return
 	}
 	owed, ok := raw.(*owedReport)
-	if !ok || owed.subID == 0 {
+	if !ok || owed.subID == 0 || !owed.settled.CompareAndSwap(false, true) {
 		return
 	}
 	// Counted before the data is owed again: the report the requeue
-	// starts is begun after this failure, the next update.
-	b.noteSubscriptionSendError(owed.subID, owed.seq, "report_undelivered", mrp.ErrMaxRetransmissionsReached)
+	// starts is the next update.
+	b.noteSubscriptionSendError(owed.subID, "report_undelivered", mrp.ErrMaxRetransmissionsReached)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		if sub, err := m.Get(owed.subID); err == nil {
-			if owed.hasEvents {
-				sub.RequeueEvents(owed.eventsFrom)
-			}
-			sub.RequeueAttributes(owed.paths)
+			owed.requeue(sub)
 		}
+	}
+	if owed.exchangeID != 0 {
+		b.disarmStatusResponseWait(sessionID, owed.exchangeID, true)
 	}
 }
 
@@ -1276,7 +1320,8 @@ func (b *Bridge) noteReportUndelivered(sessionID uint16, counter uint32) {
 // rides the bridge-initiated exchange (sessionID, exchangeID), replacing
 // the record of the previous report so the table holds one entry per
 // live subscription. Consulted by [Bridge.closeSubscriptionByExchange]
-// when the peer answers on that exchange.
+// when the peer answers on that exchange after its reporter stopped
+// waiting.
 func (b *Bridge) rememberReportExchange(subID uint32, sessionID, exchangeID uint16) {
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true}
 	if prev, loaded := b.subReportExchange.Swap(subID, key); loaded {
@@ -1313,14 +1358,11 @@ func (b *Bridge) forgetReportExchange(subID uint32) {
 
 // closeSubscriptionByExchange ends the subscription whose latest ongoing
 // report rode the bridge-initiated exchange (sessionID, exchangeID),
-// because the peer answered that report with the error status given.
-// A report exchange nobody remembers (an initial-report chunk, a
-// timed-request reply, a subscription already reaped) is ignored.
-// Mirrors matter.js ServerSubscription.ts:938-950 at db021da0: every
-// error status the peer answers a report with marks the subscription
-// terminated (:947; InvalidSubscription and Failure differ from the
-// others only in the log line, :939-944), and #closeFromUpdate cancels
-// it (:950).
+// because the peer answered that report with the error status given —
+// after the report's reporter stopped waiting, which ends it itself
+// otherwise ([Bridge.deliverOngoingReport]). A report exchange nobody
+// remembers (an initial-report chunk, a timed-request reply, a
+// subscription already reaped) is ignored.
 func (b *Bridge) closeSubscriptionByExchange(sessionID, exchangeID uint16, status im.StatusCode) {
 	raw, ok := b.reportExchangeOwner.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
 	if !ok {
@@ -1330,6 +1372,16 @@ func (b *Bridge) closeSubscriptionByExchange(sessionID, exchangeID uint16, statu
 	if !ok || subID == 0 {
 		return
 	}
+	b.closeRefusedSubscription(subID, exchangeID, fmt.Errorf("%w: %s", errChunkRejected, status))
+}
+
+// closeRefusedSubscription ends subID because the peer answered one of
+// its reports with an error status (cause): at once, without a retry.
+// Mirrors matter.js ServerSubscription.ts:938-950 at db021da0: every error
+// status the peer answers a report with marks the subscription terminated
+// (:947; InvalidSubscription and Failure differ from the others only in
+// the log line, :939-944), and #closeFromUpdate cancels it (:950).
+func (b *Bridge) closeRefusedSubscription(subID uint32, exchangeID uint16, cause error) {
 	b.routing.subTargets.Delete(subID)
 	b.resetFailedUpdates(subID)
 	b.forgetReportExchange(subID)
@@ -1340,29 +1392,22 @@ func (b *Bridge) closeSubscriptionByExchange(sessionID, exchangeID uint16, statu
 		b.logger.Info("matter.subscribe.peer_rejected",
 			slog.Int("subscription_id", int(subID)),
 			slog.Int("exchange_id", int(exchangeID)),
-			slog.String("status", status.String()),
+			slog.Any("err", cause),
 			slog.String("hint", "peer answered an ongoing report with an error status; subscription closed"))
 	}
 }
 
 // releaseReportCounter takes the peer's acknowledgement of (sessionID,
-// counter): when it is the last message of an ongoing report the update
-// is delivered, and the count of failed updates of its subscription
-// starts again — matter.js ServerSubscription.ts:554-557 at db021da0
-// resets #sendUpdateErrorCounter once #sendUpdateMessage returns, after
-// the report's acknowledgement. Caller is the inbound HasAck pipeline,
+// counter): the last message of an ongoing report reached the peer, so
+// its retransmissions cannot run out and the ACK pump has nothing to
+// settle; the update itself is settled by the peer's StatusResponse
+// ([Bridge.deliverOngoingReport]). Caller is the inbound HasAck pipeline,
 // which supplies the session from the received message header.
 func (b *Bridge) releaseReportCounter(sessionID uint16, counter uint32) {
 	if counter == 0 {
 		return
 	}
-	raw, ok := b.reportCounterOwner.LoadAndDelete(reportCounterKey(sessionID, counter))
-	if !ok {
-		return
-	}
-	if owed, ok := raw.(*owedReport); ok {
-		b.noteUpdateDelivered(owed.subID, owed.seq)
-	}
+	b.reportCounterOwner.Delete(reportCounterKey(sessionID, counter))
 }
 
 // reportCounterKey composes (sessionID, counter) into the
@@ -1472,16 +1517,38 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 	if target.flush {
 		op = "subscribe.flush"
 	}
+	leg := chunkLeg{
+		op: op, src: target.src,
+		sessionID: target.sessionID, exchangeID: target.exchangeID, role: ourRole,
+		send: func(i int, body []byte) (uint32, error) {
+			if i > 0 {
+				// Chunk N+1 piggybacks the ack of the peer's StatusResponse
+				// to chunk N. chip's ReliableMessageMgr drops it otherwise
+				// ("Dropping message without piggyback ack when we are
+				// waiting for an ack") — the same rule a reply's chunks
+				// honour ([Bridge.replyChunkLeg]). matter.js gets it for
+				// free: its MessageExchange piggybacks the pending ack on
+				// the next send (packages/protocol/src/protocol/MessageExchange.ts:711-716
+				// at db021da0, the pending ack taken for the message).
+				target = b.piggybackOwedAck(target, ourRole)
+			}
+			return b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
+		},
+		abort: target.abort,
+	}
+	if target.flush {
+		leg.timeout = flushStatusResponseTimeout
+	}
 	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			debugReplyError(b.logger, "encode_ongoing_report", target.src, err)
 			return nil, nil, err
 		}
-		var waitCh <-chan im.StatusCode
+		wait := chunkNoWait
 		switch {
 		case chunk.MoreChunkedMessages:
-			waitCh = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+			wait = chunkWaitHere
 		case armFinal:
 			// The last chunk's answer is awaited too, by the caller:
 			// matter.js's sendDataReportMessage waits for the Success to
@@ -1490,38 +1557,19 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			// interaction/InteractionMessenger.ts:799-844, :844 at
 			// db021da0). Armed before the send, so the answer cannot land
 			// before the waiter exists.
-			finalWait = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+			wait = chunkWaitCaller
 		}
-		if i > 0 {
-			// Chunk N+1 piggybacks the ack of the peer's StatusResponse
-			// to chunk N. chip's ReliableMessageMgr drops it otherwise
-			// ("Dropping message without piggyback ack when we are
-			// waiting for an ack") — the same rule
-			// [Bridge.streamInitialReportChunks] honours through
-			// refreshAckCounter. matter.js gets it for free: its
-			// MessageExchange piggybacks the pending ack on the next send
-			// (packages/protocol/src/protocol/MessageExchange.ts:679 send).
-			target = b.piggybackOwedAck(target, ourRole)
-		}
-		counter, err := b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
-		if err != nil {
-			if waitCh != nil || finalWait != nil {
-				b.disarmStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
-			}
+		res, err := b.sendChunk(leg, i, body, chunk, wait)
+		if !res.sent {
 			return nil, nil, err
 		}
-		if counter != 0 {
-			counters = append(counters, counter)
+		if res.counter != 0 {
+			counters = append(counters, res.counter)
 		}
-		if waitCh != nil {
-			timeout := b.chunkStatusResponseTimeout(target.sessionID)
-			if target.flush {
-				timeout = flushStatusResponseTimeout
-			}
-			if err := b.awaitChunkStatusResponseWithin(timeout, nil, target.abort, waitCh, op, target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
-				return counters, nil, err
-			}
+		if err != nil {
+			return counters, nil, err
 		}
+		finalWait = res.armed
 	}
 	return counters, finalWait, nil
 }
@@ -1743,7 +1791,7 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	if track {
 		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, b.clk().Now())
 	}
-	if err := sendVia(listener, dest, datagram); err != nil {
+	if err := b.sendRouted(listener, dest, target.sessionID, datagram); err != nil {
 		if track {
 			tracker.Untrack(target.sessionID, counter)
 		}
@@ -2310,7 +2358,9 @@ func runUnsubscribers(unsubs []func()) {
 // own advances that itself, so nothing is advanced twice — and then marks
 // the attributes dirty so subscribers get a report. A fire while a command
 // runs against the cluster does neither: the command advances the version
-// once when it ends (invokeCommitTable). Mirrors the reactive state
+// once when it ends (invokeCommitTable); a fire while a controller's write
+// is applied to the root is held and settled when the write ends
+// (writeHoldTable). Mirrors the reactive state
 // matter.js keeps for root behaviors. The caller holds no bridge lock.
 func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
 	root := topology.FindByID(0)
@@ -2335,6 +2385,12 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 			// A command running against the cluster advances the
 			// version once when it ends (invokeCommitTable).
 			if b.invokeCommits.hold(root.ID, clusterID, attrs) {
+				return
+			}
+			// A controller's write being applied to the root settles
+			// them when it ends (writeHoldTable): one commit, one
+			// advance (review II, R2-P5-write-03).
+			if len(paths) > 0 && len(b.writeHolds.holdPaths(root, mgr, paths)) == 0 {
 				return
 			}
 			// The version first, so the report carries the post-change
@@ -2420,13 +2476,20 @@ func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Mana
 // held there. A controller's write is one commit with one advance, the
 // dispatcher's (endpoint/dispatcher.go WriteAuthorized), so the change the
 // write itself reports does not advance it again (matter.js
-// Datasource.ts:1446-1457 at db021da0, advanceVersion once per commit).
+// Datasource.ts:1446-1457 at db021da0, advanceVersion once per commit),
+// and a change with another origin made while a write to the endpoint is
+// applied is held and settled against the write's record when it ends
+// ([Bridge.holdWritten]).
 func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.Endpoint, clusterID uint32, change contract.Change, advance bool) {
 	attrIDs := change.Attributes
 	if len(attrIDs) == 0 {
 		return
 	}
-	if change.Origin != contract.OriginControllerWrite && b.invokeCommits.hold(ep.ID, clusterID, attrIDs) {
+	// A report view's mark waits for a write applied meanwhile, the
+	// write's own change included: the write's report marks it after the
+	// dispatcher's advance (Fable read 5b-write R3).
+	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || b.holdWritten(mgr, ep, clusterID, attrIDs, !advance)) ||
+		change.Origin == contract.OriginControllerWrite && !advance && b.holdWritten(mgr, ep, clusterID, attrIDs, true) {
 		if hook := b.onAttributeChange.Load(); hook != nil {
 			(*hook)(ep.ID, clusterID, change)
 		}
@@ -2444,6 +2507,30 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 	if hook := b.onAttributeChange.Load(); hook != nil {
 		(*hook)(ep.ID, clusterID, change)
 	}
+}
+
+// holdWritten holds a change of attrs of cluster on ep while a
+// controller's write to ep is applied ([writeHoldTable]): the write's end
+// settles it against the write's record, so a change the host made from
+// inside the write — reported with its own origin — is not advanced and
+// reported beside the write's commit (review II, R2-P5-write-03).
+//
+// markOnly is a server's report view, which advances nothing: its mark
+// waits for the write's end too, so a report built meanwhile cannot carry
+// the change with the version from before the write's commit — a
+// generated server on the root advances its version only at the write's
+// own store, after its Sink's Set reported the sibling (review II, Fable
+// read 5b-write R3). The settle marks such a path and advances nothing
+// for it.
+func (b *Bridge) holdWritten(mgr *subscription.Manager, ep *endpointpkg.Endpoint, cluster uint32, attrs []uint32, markOnly bool) bool {
+	if markOnly {
+		return b.writeHolds.holdMarks(ep, mgr, cluster, attrs)
+	}
+	paths := make([]im.ConcreteAttributePath, len(attrs))
+	for i, a := range attrs {
+		paths[i] = attributeOf(ep.ID, cluster, a)
+	}
+	return len(b.writeHolds.holdPaths(ep, mgr, paths)) == 0
 }
 
 // quieterChanged advances the DataVersion of a cluster whose server
@@ -2478,6 +2565,12 @@ func (b *Bridge) quieterChanged(ep *endpointpkg.Endpoint, clusterID uint32, chan
 		return
 	}
 	if settle != nil && !settle(change.Attributes) {
+		return
+	}
+	// A controller's write being applied to the endpoint settles the
+	// advance when it ends (writeHoldTable); the report waits for the
+	// throttle as before.
+	if b.writeHolds.holdAdvance(ep, clusterID, change.Attributes) {
 		return
 	}
 	ep.BumpDataVersionOf(clusterID)

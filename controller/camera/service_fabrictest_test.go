@@ -6,6 +6,7 @@ package camera_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -47,11 +48,13 @@ func TestServiceOnTheFabric(t *testing.T) {
 	}
 	port := cam.Port()
 	dev := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{cam.Device()}, Configure: func(cfg *node.Config) {
-		cfg.Network.TCP = node.TCPConfig{Incoming: true}
+		// Both TCP roles: after its restart the camera opens its own TCP
+		// session for its signals, Large Message commands (docs/adr/0032).
+		cfg.Network.TCP = node.TCPConfig{Incoming: true, Outgoing: true}
 	}})
 	cfg := site.ControllerConfig(fabrictest.ControllerOptions{})
 	cfg.Camera = &controller.CameraConfig{}
-	cfg.TCP = controller.TCPConfig{Outgoing: true}
+	cfg.TCP = controller.TCPConfig{Incoming: true, Outgoing: true}
 	var reports camera.Reports
 	reports.Install(&cfg)
 	run := func(fn func(ctx context.Context) error) {
@@ -295,8 +298,8 @@ func TestServiceOnTheFabric(t *testing.T) {
 	})
 
 	// After a camera restart — the node disabled so the registry does not
-	// reopen a session — the camera's next signal opens CASE to RootNodeID
-	// and reaches the session.
+	// reopen a session — the camera's next signal opens CASE over TCP to
+	// RootNodeID and reaches the session.
 	run(n.Disable)
 	run(dev.Restart)
 	run(func(ctx context.Context) error {
@@ -305,10 +308,17 @@ func TestServiceOnTheFabric(t *testing.T) {
 	if sig := next(t, solicited.Signals()); sig.Kind != camera.SignalICECandidates {
 		t.Fatalf("after the restart %+v", sig)
 	}
+	// The controller's peer set adopts the session the camera opened as it
+	// is added, which may follow the signal's delivery by a moment.
 	inbound := false
-	for _, p := range c.Peers().Peers() {
-		for _, s := range p.Sessions() {
-			inbound = inbound || !c.Peers().Initiated(s)
+	for deadline := time.Now().Add(5 * time.Second); !inbound && time.Now().Before(deadline); {
+		for _, p := range c.Peers().Peers() {
+			for _, s := range p.Sessions() {
+				inbound = inbound || !c.Peers().Initiated(s)
+			}
+		}
+		if !inbound {
+			runtime.Gosched()
 		}
 	}
 	if !inbound {

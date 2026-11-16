@@ -146,8 +146,17 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleDisableActionWithDuration(func(context.Context, DisableActionWithDurationRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleDisableActionWithDuration: a command the server does not accept was registered")
 	}
-	_ = s.EmitStateChanged(0, StateChangedEvent{}) // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitStateChanged(0, StateChangedEvent{})      // not in the empty definition's EventList: refused
+	_ = s.RecordStateChanged(StateChangedEvent{})       // the same, through EmitEvent
+	if err := bare.RecordStateChanged(StateChangedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordStateChanged on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitActionFailed(0, ActionFailedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordActionFailed(ActionFailedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordActionFailed(ActionFailedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordActionFailed on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

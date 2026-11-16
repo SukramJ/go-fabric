@@ -125,8 +125,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
-		min: 54,
-		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
+		min: 57,
+		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9; review II 5b (the blob streamer and the attested-identity line): 57.9. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/controller/topology", min: 95},
@@ -144,7 +144,7 @@ var floors = []packageFloor{
 	// exercises rather than this module's own tests. The floor records
 	// where it stands; whether it should be raised is a separate decision
 	// about what deserves a test, not a ratchet setting.
-	{pkg: "github.com/SukramJ/go-fabric/contract", min: 87, why: "the host-facing vocabulary; see the note above this entry"},
+	{pkg: "github.com/SukramJ/go-fabric/contract", min: 97, why: "the host-facing vocabulary; see the note above this entry. Review II phase 5b wave A2: 97.1 once TestAccessingFabric, TestEligibilityStateString and TestMetricNames cover the request's fabric, the eligibility tokens and the metric names (81.2 with WithAccessingFabric/AccessingFabric added untested, 87 before)"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/client/exchange",
 		min: 92,
@@ -172,8 +172,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
-		min: 77,
-		why: "wave W8 (#457): measured 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
+		min: 81,
+		why: "Review II phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
@@ -213,6 +213,7 @@ var floors = []packageFloor{
 	// go BELOW the observed minimum, not at the typical measurement -- a
 	// gate that fails on a good day teaches people to re-run it.
 	{pkg: "github.com/SukramJ/go-fabric/im/subscription", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/internal/attestids", min: 99},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/bridgeseam",
 		min:          0,
@@ -245,9 +246,11 @@ var floors = []packageFloor{
 		why:          "declaration-only seam (phase 32): a function variable client/exchange installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/fabrictestseam", min: 0, unmeasurable: true, why: "function variables only: fabrictest installs them, the module's tests call them (review 2026-11 W5-ex-12)"},
+	{pkg: "github.com/SukramJ/go-fabric/internal/facadeseam", min: 0, unmeasurable: true, why: "function variables only: cluster/core and bridge install them, package node calls them (Review II phase 5b, R2-P5-apinode-07)"},
 	{pkg: "github.com/SukramJ/go-fabric/internal/forward", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/inflight", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/netwatch", min: 92},
+	{pkg: "github.com/SukramJ/go-fabric/internal/reportchunk", min: 84},
 	{pkg: "github.com/SukramJ/go-fabric/internal/serialqueue", min: 97},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/deviceseam",
@@ -331,8 +334,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/attestation",
-		min: 84,
-		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %); phase 32: 84.8 with the product-id tests",
+		min: 83,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %); phase 32: 84.8 with the product-id tests; review II 5b (R2-P5-port-12): 83.2, the fully covered id parser moved to internal/attestids (100 %), no test or uncovered statement changed",
 	},
 	{
 		pkg:    "github.com/SukramJ/go-fabric/secure/channel",
@@ -354,8 +357,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 97},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/sigma",
-		min: 86,
-		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (89.1 % to 86.7 %)",
+		min: 89,
+		why: "raised to 89 in review II phase 5b (wave H round 2): the session members' strict decoding moved the package's coverage up; 86 before, set when Go 1.27.2 counted statements per cover block differently (89.1 % to 86.7 % without a code change)",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure/spake2", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/secure/sessionparams", min: 100},

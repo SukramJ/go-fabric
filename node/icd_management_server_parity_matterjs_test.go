@@ -36,6 +36,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
@@ -403,7 +404,7 @@ func TestIcdManagementServer(t *testing.T) {
 		t.Run("disables subscription persistence on an ICD node", func(t *testing.T) {
 			t.Parallel()
 			_, pair := icdPair(t, icdSetup{})
-			if pair.Device.Node().Bridge().SubscriptionPersistenceEnabled() {
+			if enabled, _, err := bridgetest.SubscriptionPersistence(pair.Device.Node().Bridge()); err != nil || enabled {
 				t.Fatal("persistence enabled")
 			}
 		})

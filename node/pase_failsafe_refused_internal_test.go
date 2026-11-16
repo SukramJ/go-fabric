@@ -36,7 +36,7 @@ func TestPASESessionWhoseFailSafeArmIsRefusedIsClosed(t *testing.T) {
 	// The rollback ends the PASE sessions (the bridge wires its PASE
 	// close here); this one names none, as a close whose list was taken
 	// before the new session existed.
-	gc.SetOnFailSafeRolledBack(func(context.Context) {})
+	gc.SetOnFailSafeRolledBack(func(context.Context) {}) //nolint:staticcheck // the deprecated close, kept for its window
 	ctx := context.Background()
 	if err := gc.ArmFailSafeFor(ctx, 1, 0); err != nil {
 		t.Fatal(err)

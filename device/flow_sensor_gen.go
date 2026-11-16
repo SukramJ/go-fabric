@@ -18,10 +18,9 @@ const (
 )
 
 // FlowSensorType returns the FlowSensor device type, matter.js's packages/node/src/devices/flow-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#flowsensor. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func FlowSensorType() *Type { return &typeFlowSensor }
+// its cluster requirements are listed in docs/reference/device-types.md#flowsensor. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func FlowSensorType() *Type { return typeFlowSensor.clone() }
 
 // typeFlowSensor holds [FlowSensorType]'s cluster requirements.
 var typeFlowSensor = Type{

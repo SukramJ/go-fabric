@@ -60,8 +60,11 @@ type WiFiNetworkCommissioning struct {
 	scanMax       uint8
 	connectMax    uint8
 	store         store.Settings
-	logger        *slog.Logger
-	clk           clock.Clock
+	// loadErr is the store's error reading the stored networks at
+	// construction; while set, no list is stored (saveLocked).
+	loadErr error
+	logger  *slog.Logger
+	clk     clock.Clock
 
 	interfaceEnabled bool
 	// networks is the staged list, committed the list a CommissioningComplete
@@ -93,6 +96,10 @@ type WiFiNetworkCommissioning struct {
 	rejoining    bool
 	rejoinCancel context.CancelFunc
 	rejoinDone   chan struct{}
+	// disconnectOnFailedRejoin: the fail-safe's revert left the radio on
+	// a network it removed; a failed rejoin then takes the radio off it
+	// (contract.WiFiDisconnector).
+	disconnectOnFailedRejoin bool
 	// expiries counts the fail-safe expiries (OnFailSafeExpired): a
 	// ConnectNetwork whose driver call outlives the window that admitted it
 	// sees it moved and drops its result.
@@ -198,7 +205,7 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 	if w.connectMax == 0 {
 		w.connectMax = 20
 	}
-	w.committed = w.loadCommitted(context.Background()) //nolint:contextcheck // the constructor takes no context; it reads the store once
+	w.committed, w.loadErr = w.loadCommitted(context.Background()) //nolint:contextcheck // the constructor takes no context; it reads the store once
 	w.networks = slices.Clone(w.committed)
 	w.dataVersion.Bump()
 	return w, nil
@@ -206,22 +213,29 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 
 // loadCommitted reads the stored committed networks (Init, :77-128): none
 // without a store, a stored value or one that decodes; at most
-// MaxNetworks of them.
-func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) []wifiNetwork {
+// MaxNetworks of them. A store that cannot read the setting — a sealed
+// value that does not open (store.ErrUnseal), a store without the sealer
+// (store.ErrNoSealer), an I/O error — is its error: the server then
+// starts with no network in force and refuses to store a list
+// ([WiFiNetworkCommissioning.StoreNetworks]), so the stored value is
+// never overwritten with one built over a list it could not read (review
+// II, seal F5).
+func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) ([]wifiNetwork, error) {
 	if w.store == nil {
-		return nil
+		return nil, nil
 	}
 	raw, ok, err := w.store.GetSetting(ctx, wifiNetworksKey)
-	if err != nil || !ok {
-		if err != nil {
-			w.log().Warn("netcomm.wifi.load_failed", slog.Any("err", err))
-		}
-		return nil
+	if err != nil {
+		w.log().Error("netcomm.wifi.load_failed", slog.Any("err", err))
+		return nil, fmt.Errorf("core: WiFiNetworkCommissioning: read the stored networks: %w", err)
+	}
+	if !ok {
+		return nil, nil
 	}
 	var stored []storedWiFiNetwork
 	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
 		w.log().Warn("netcomm.wifi.load_failed", slog.Any("err", err))
-		return nil
+		return nil, nil
 	}
 	var list []wifiNetwork
 	for _, n := range stored {
@@ -230,7 +244,7 @@ func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) []wifiNetw
 		}
 		list = append(list, wifiNetwork{ssid: n.SSID, credentials: n.Credentials})
 	}
-	return list
+	return list, nil
 }
 
 // saveCommittedLocked stores the committed networks (CommitConfiguration,
@@ -246,6 +260,11 @@ func (w *WiFiNetworkCommissioning) saveCommittedLocked(ctx context.Context) {
 func (w *WiFiNetworkCommissioning) saveLocked(ctx context.Context, list []wifiNetwork) error {
 	if w.store == nil {
 		return nil
+	}
+	if w.loadErr != nil {
+		// The stored list could not be read: writing would replace it
+		// with one built without it (seal F5).
+		return fmt.Errorf("core: WiFiNetworkCommissioning: the stored networks could not be read, not overwriting them: %w", w.loadErr)
 	}
 	stored := make([]storedWiFiNetwork, 0, len(list))
 	for _, n := range list {
@@ -339,6 +358,12 @@ func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
 	w.mu.Lock()
 	w.life = ctx
 	context.AfterFunc(ctx, w.stopRejoin)
+	if watcher, ok := w.driver.(contract.WiFiLinkWatcher); ok {
+		// The radio's own link changes, for the node's lifetime
+		// (R2-P5-port-09); a loss starts no rejoin here — the driver's
+		// radio rejoins by itself.
+		go watcher.WatchLink(ctx, w.linkChanged)
+	}
 	if len(w.committed) == 0 || !w.interfaceEnabled {
 		w.mu.Unlock()
 		return
@@ -376,11 +401,91 @@ func (w *WiFiNetworkCommissioning) runAttempt(attempt context.Context, target wi
 	switch {
 	case ok:
 		w.rejoinDelay = 0
+		w.disconnectOnFailedRejoin = false
 	case cancelled:
 		w.armRejoinLocked(max(w.rejoinDelay, wifiRejoinFirstDelay))
 	default:
+		if w.disconnectOnFailedRejoin && !w.onCommittedLocked() {
+			// The fail-safe's revert left the radio on a network it
+			// removed, and the committed one could not be rejoined: the
+			// radio leaves the reverted network (R2-P5-port-10).
+			w.disconnectOnFailedRejoin = false
+			w.armDisconnectLocked()
+		}
 		w.backoffLocked()
 	}
+}
+
+// onCommittedLocked reports whether the link is on a committed network.
+// w.mu is held.
+func (w *WiFiNetworkCommissioning) onCommittedLocked() bool {
+	return len(w.link) > 0 && slices.ContainsFunc(w.committed, func(n wifiNetwork) bool { return bytes.Equal(n.ssid, w.link) })
+}
+
+// linkChanged is a [contract.WiFiLinkWatcher] report: the link, the
+// connected flags and the last networking status, network id and connect
+// error follow the radio, and the change is reported. It starts no rejoin
+// (R2-P5-port-09).
+func (w *WiFiNetworkCommissioning) linkChanged(c contract.WiFiLinkChange) {
+	w.mu.Lock()
+	switch {
+	case c.Connected:
+		w.link = bytes.Clone(c.SSID)
+	case len(c.SSID) == 0 || bytes.Equal(c.SSID, w.link):
+		w.link = nil
+	}
+	w.markConnectedLocked()
+	if len(c.SSID) > 0 {
+		w.lastNetworkID = bytes.Clone(c.SSID)
+	}
+	if c.ErrorValue != nil {
+		v := *c.ErrorValue
+		w.lastConnectErr = &v
+	} else {
+		w.lastConnectErr = nil
+	}
+	w.setStatusLocked(netcommdef.NetworkCommissioningStatusEnum(c.Status))
+	w.dataVersion.Bump()
+	w.mu.Unlock()
+	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
+}
+
+// armDisconnectLocked takes the radio off its network on the clock, with a
+// [contract.WiFiDisconnector] driver; nothing without one or once the
+// lifetime ended. w.mu is held.
+func (w *WiFiNetworkCommissioning) armDisconnectLocked() {
+	if _, ok := w.driver.(contract.WiFiDisconnector); !ok || w.life.Err() != nil {
+		return
+	}
+	w.clk.AfterFunc(0, w.disconnect)
+}
+
+// disconnect calls the driver's DisconnectNetwork, bounded by
+// ConnectMaxTimeSeconds, and records the radio as on no network once it
+// left.
+func (w *WiFiNetworkCommissioning) disconnect() {
+	d, ok := w.driver.(contract.WiFiDisconnector)
+	if !ok {
+		return
+	}
+	w.mu.Lock()
+	life := w.life
+	w.mu.Unlock()
+	if life.Err() != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(life, time.Duration(w.connectMax)*time.Second)
+	defer cancel()
+	if err := d.DisconnectNetwork(ctx); err != nil {
+		w.log().Warn("matter.wifi.disconnect", slog.Any("err", err))
+		return
+	}
+	w.mu.Lock()
+	w.link = nil
+	w.markConnectedLocked()
+	w.dataVersion.Bump()
+	w.mu.Unlock()
+	w.changes.Notify(netcommAttrNetworks)
 }
 
 // joinCommitted joins target, bounded by ConnectMaxTimeSeconds, and
@@ -1219,7 +1324,11 @@ func (w *WiFiNetworkCommissioning) OnCommissioningComplete(ctx context.Context) 
 // restores its record only (RevertConfiguration,
 // src/platform/Linux/NetworkCommissioningWiFiDriver.cpp:169-173 at
 // 6170af84); the Thread server here restores its dataset
-// (network_commissioning_thread.go) (review II, R2-P3-net-02).
+// (network_commissioning_thread.go) (review II, R2-P3-net-02). With a
+// [contract.WiFiDisconnector] driver the radio leaves the network it is
+// on when no committed network is left, and when it is on a network the
+// revert removed and the rejoin of the committed network failed
+// (R2-P5-port-10).
 func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.mu.Lock()
 	w.expiries++
@@ -1236,6 +1345,16 @@ func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 		w.lastNetworkID, w.lastConnectErr, w.lastStatus = nil, nil, nil
 	}
 	w.dataVersion.Bump()
+	switch {
+	case len(w.committed) == 0:
+		// Nothing committed: the radio leaves whatever the commissioning
+		// joined (R2-P5-port-10).
+		w.armDisconnectLocked()
+	case len(w.link) > 0 && !w.onCommittedLocked():
+		// On a network the revert removed: the rejoin below runs, and
+		// when it fails the radio leaves that network.
+		w.disconnectOnFailedRejoin = true
+	}
 	w.rejoinNowLocked()
 	w.mu.Unlock()
 	w.changes.Notify(netcommAttrNetworks, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)

@@ -57,9 +57,18 @@ func (b *Bridge) FailSafeExpired(ctx context.Context) {
 	b.closePASESessions(ctx, 0, nil)
 }
 
+// failSafeSessionsClosed is [Bridge.FailSafeExpired] that names the PASE
+// sessions it closes: the root's GeneralCommissioning's session closer
+// (core.GeneralCommissioning.SetFailSafeSessionCloser), so an arm for a PASE
+// session opened after the close is not refused (review II,
+// R2-P2-comm-11).
+func (b *Bridge) failSafeSessionsClosed(ctx context.Context) []uint16 {
+	return b.closePASESessions(ctx, 0, nil)
+}
+
 // wireFailSafeExpiry has the root's GeneralCommissioning clear the PASE
 // sessions when its fail-safe expires — the bridge's own hook, beside the
-// host's (core.GeneralCommissioning.SetOnFailSafeRolledBack). Before, the
+// host's (core.GeneralCommissioning.SetFailSafeSessionCloser). Before, the
 // close was the host's call from its fail-safe-expiry hook, and a host
 // that wired the bridge without the node facade and did not make it kept
 // the commissioning channel's implicit Administer open (review II,
@@ -70,7 +79,7 @@ func (b *Bridge) FailSafeExpired(ctx context.Context) {
 func (b *Bridge) wireFailSafeExpiry(servers []contract.ClusterServer) {
 	for _, s := range servers {
 		if gc, ok := s.(*core.GeneralCommissioning); ok {
-			gc.SetOnFailSafeRolledBack(b.FailSafeExpired)
+			gc.SetFailSafeSessionCloser(b.failSafeSessionsClosed)
 		}
 	}
 }
@@ -139,11 +148,11 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(ctx context.Context, r
 // grace is not this fail-safe context's and stays (matter.js closes the
 // PASE session it finds when the hook runs, FailsafeContext.ts:187-192 at
 // db021da0, closePaseSession). closing, when set, runs with the named ids
-// just before they close.
-func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration, closing func(ids []uint16)) {
+// just before they close. It returns the named ids.
+func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration, closing func(ids []uint16)) []uint16 {
 	closeNow, ids := b.paseSessionsCloser()
 	if closeNow == nil {
-		return
+		return nil
 	}
 	if closing != nil {
 		closeIDs := closeNow
@@ -159,6 +168,7 @@ func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration, clo
 	if !im.DeferAfterResponse(ctx, run) {
 		run()
 	}
+	return ids
 }
 
 // paseSessionsCloser names the PASE sessions open now and returns what

@@ -11,10 +11,11 @@ import (
 )
 
 // FieldError is a request-decode error that names the IM status it
-// answers: InvalidAction for a field of the wrong TLV type or a missing
-// mandatory field, ConstraintError for an integer outside its type's
+// answers: Failure for an integer field of the wrong TLV type,
+// InvalidAction for a boolean field of the wrong TLV type on the response
+// side ([boolField]), ConstraintError for an integer outside its type's
 // range. It is an [StatusCodeError], so the bridge's decode-error reply
-// answers its status rather than Failure.
+// answers its status.
 type FieldError struct {
 	// Status is the IM status the request is answered with.
 	Status StatusCode
@@ -58,8 +59,7 @@ func missingField(tag uint8, name string) error {
 }
 
 // boolField returns el's value when el is a boolean, and an InvalidAction
-// [FieldError] otherwise (chip src/app/MessageDef/Parser.h:113-123, as
-// for [uintField]).
+// [FieldError] otherwise (chip src/app/MessageDef/Parser.h:113-123).
 func boolField(el tlv.Element) (bool, error) {
 	if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
 		return false, &FieldError{Status: StatusInvalidAction, Tag: fieldTag(el), Reason: fmt.Sprintf("TLV type 0x%02X, want a boolean", uint8(el.Type))}
@@ -96,18 +96,22 @@ func requestBoolField(el tlv.Element, name string) (bool, error) {
 // maxValue. A path or header integer is never masked into range: an
 // out-of-range value would become a different, valid path.
 //
-// The range check mirrors matter.js
-// packages/types/src/tlv/TlvNumber.ts:151-155 (out of bounds →
-// ValidationOutOfBoundsError, a ValidationError = ConstraintError); the
-// type check mirrors chip src/app/MessageDef/Parser.h:113-123
-// (GetSimpleValue → CHIP_ERROR_WRONG_TLV_TYPE) as
-// src/app/MessageDef/AttributePathIB.cpp:220-275 turns it into
-// InvalidAction.
+// Mirrors matter.js at db021da0, which decodes a request with
+// schema.decode and no relaxed number checks
+// (packages/protocol/src/interaction/InteractionMessenger.ts:360,
+// packages/types/src/tlv/TlvSchema.ts:49). A wrong TLV type — a signed
+// integer included — throws UnexpectedDataError
+// (packages/types/src/tlv/TlvNumber.ts:124-131), which is no
+// StatusResponseError (packages/general/src/MatterError.ts:188), so
+// handleRequest answers Failure (InteractionMessenger.ts:425-460, :431).
+// A value out of bounds throws ValidationOutOfBoundsError
+// (TlvNumber.ts:145-155), a ValidationError whose code is ConstraintError
+// (packages/types/src/common/ValidationError.ts:16-29).
 func uintField(el tlv.Element, maxValue uint64) (uint64, error) {
 	switch el.Type {
 	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
 	default:
-		return 0, &FieldError{Status: StatusInvalidAction, Tag: fieldTag(el), Reason: fmt.Sprintf("TLV type 0x%02X, want an unsigned integer", uint8(el.Type))}
+		return 0, &FieldError{Status: StatusFailure, Tag: fieldTag(el), Reason: fmt.Sprintf("TLV type 0x%02X, want an unsigned integer", uint8(el.Type))}
 	}
 	if el.Uint > maxValue {
 		return 0, &FieldError{Status: StatusConstraintError, Tag: fieldTag(el), Reason: fmt.Sprintf("%d exceeds %d", el.Uint, maxValue)}

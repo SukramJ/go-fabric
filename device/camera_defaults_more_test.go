@@ -53,15 +53,15 @@ func TestCameraDefaultsFromTheDeclaration(t *testing.T) {
 
 	// MechanicalPan without a MechanicalPTZ port: the server refuses the
 	// configuration and the kit keeps the generated server.
-	_, err = device.NewCamera(device.Options{StableKey: device.StringKey("ptz-none"), Name: "cam"},
-		avdef.Declare{Features: avdef.FeatureMechanicalPan})
+	_, err = device.NewCamera(device.Options{StableKey: device.StringKey("ptz-none"), Name: "cam"}, required("Camera",
+		avdef.Declare{Features: avdef.FeatureMechanicalPan})...)
 	if err != nil && !errors.Is(err, device.ErrSelectionNotServed) {
 		t.Fatalf("camera without a PTZ port: %v", err)
 	}
 
 	size := uint8(4)
 	n, err := device.NewNetworkInfrastructureManager(device.Options{StableKey: device.StringKey("nim"), Name: "nim"},
-		tdirdef.Declare{Initial: tdirdef.Patch{ThreadNetworkTableSize: &size}})
+		required("NetworkInfrastructureManager", tdirdef.Declare{Initial: tdirdef.Patch{ThreadNetworkTableSize: &size}})...)
 	if err != nil {
 		t.Fatal(err)
 	}

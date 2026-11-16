@@ -18,6 +18,15 @@ var registry sync.Map // uint32 → *Cluster
 
 // Register adds definitions to the registry; a later registration of the
 // same cluster id replaces the earlier one.
+//
+// A hand-written definition (a vendor cluster) is supported beside the
+// generated ones. Its request commands' Decode turns a payload into its
+// request type, holding the types and constraints its decoder is written
+// to hold, as a generated decoder holds the ones the generator renders;
+// the server then holds the decoded request to the definition before any
+// handler ([Instance.CheckRequest], [Server.MatterInvoke], [InvokeHeld]):
+// a command whose [RequestCheck] states a Refusal answers a request that
+// does not fit with it, every other command logs the failure and runs.
 func Register(defs ...*Cluster) {
 	for _, d := range defs {
 		registry.Store(d.ID, d)

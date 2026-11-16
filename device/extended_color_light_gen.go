@@ -22,10 +22,9 @@ const (
 )
 
 // ExtendedColorLightType returns the ExtendedColorLight device type, matter.js's packages/node/src/devices/extended-color-light.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#extendedcolorlight. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func ExtendedColorLightType() *Type { return &typeExtendedColorLight }
+// its cluster requirements are listed in docs/reference/device-types.md#extendedcolorlight. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func ExtendedColorLightType() *Type { return typeExtendedColorLight.clone() }
 
 // typeExtendedColorLight holds [ExtendedColorLightType]'s cluster requirements.
 var typeExtendedColorLight = Type{

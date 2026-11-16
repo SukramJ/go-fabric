@@ -468,17 +468,15 @@ func (p *demoPump) reportEvent(event uint32) error {
 	if dev == nil {
 		return fmt.Errorf("pump %s is not built yet", p.name)
 	}
-	endpoint, ok := dev.EndpointNumber()
-	if !ok {
-		return fmt.Errorf("pump %s is not mounted yet", p.name)
-	}
+	// Record<Event> emits on the endpoint the pump is mounted on and answers
+	// spec.ErrNotMounted before it is.
 	slog.Info("pump.event", slog.String("device", p.name), slog.Int("event", int(event)))
 	srv := dev.PumpConfigurationAndControl()
 	switch event {
 	case pumpdef.EventDryRunning:
-		return srv.EmitDryRunning(endpoint, pumpdef.DryRunningEvent{})
+		return srv.RecordDryRunning(pumpdef.DryRunningEvent{})
 	case pumpdef.EventPumpBlocked:
-		return srv.EmitPumpBlocked(endpoint, pumpdef.PumpBlockedEvent{})
+		return srv.RecordPumpBlocked(pumpdef.PumpBlockedEvent{})
 	default:
 		return errors.New("the pump declares no such event")
 	}

@@ -14,6 +14,8 @@
 package energyevse
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -820,26 +822,29 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrSessionDuration, Name: "SessionDuration",
-			Type:        spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
-			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, NonVolatile: true, Quieter: true},
+			Type:          spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
+			Conformance:   spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, NonVolatile: true, Quieter: true},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrSessionEnergyCharged, Name: "SessionEnergyCharged",
-			Type:        spec.Type{Name: "energy-mWh", Kind: spec.KindInt, Bits: 64},
-			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, NonVolatile: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "min 0", Min: &spec.Bound{Int: 0}},
+			Type:          spec.Type{Name: "energy-mWh", Kind: spec.KindInt, Bits: 64},
+			Conformance:   spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, NonVolatile: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "min 0", Min: &spec.Bound{Int: 0}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrSessionEnergyDischarged, Name: "SessionEnergyDischarged",
-			Type:        spec.Type{Name: "energy-mWh", Kind: spec.KindInt, Bits: 64},
-			Conformance: spec.Conformance{Text: "V2X", Op: spec.ConfName, Name: "V2X"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, NonVolatile: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "min 0", Min: &spec.Bound{Int: 0}},
+			Type:          spec.Type{Name: "energy-mWh", Kind: spec.KindInt, Bits: 64},
+			Conformance:   spec.Conformance{Text: "V2X", Op: spec.ConfName, Name: "V2X"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, NonVolatile: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "min 0", Min: &spec.Bound{Int: 0}},
+			QuietInterval: time.Second,
 		},
 	},
 	Commands: []spec.Command{

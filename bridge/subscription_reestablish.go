@@ -189,6 +189,12 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 				slog.Int("subscription_id", int(rec.SubscriptionID)))
 			continue
 		}
+		// A stopped bridge sends no first chunk of another record: the
+		// re-establishment lives as long as the bridge (its handler
+		// context, which Stop cancels), not as long as ctx.
+		if b.handlerContext().Err() != nil {
+			return ok
+		}
 		err := b.establishFormerSubscription(ctx, rec, link)
 		if err == nil {
 			ok = append(ok, rec.SubscriptionID)
@@ -204,6 +210,9 @@ func (b *Bridge) reestablishPeer(ctx context.Context, k peerKey, recs []subscrip
 			// Report sends do not declare peer loss, so nothing else would
 			// stop this loop from spending a full MRP window on each of the
 			// peer's remaining subscriptions.
+			return ok
+		case errors.Is(err, errChunkWaitAborted):
+			// The bridge stopped while a chunk's answer was awaited.
 			return ok
 		case errors.As(err, &rejected) && rejected.status == im.StatusInvalidSubscription:
 			// The peer dropped its state for us; another of its
@@ -321,10 +330,28 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 // exchange, one at a time — the next generated only once the peer
 // answered the last — waiting for the peer's IM StatusResponse to each — matter.js
 // InteractionMessenger.sendDataReport with its default waitForAck. Each
-// chunk after the first piggybacks the acknowledgement of the peer's
-// previous StatusResponse.
+// chunk piggybacks the acknowledgement the bridge owes on the exchange.
+// A send that fails, a chunk left unanswered and a wait the session's
+// close disarmed are [errPeerGone]; an error status is a
+// [chunkStatusError]. The wait lives as long as the bridge: it ends with
+// [errChunkWaitAborted] when the bridge's handler context ends — Stop
+// cancels it — and not with the context the re-establishment was called
+// under, which a host may bound to its start-up (node.Start derives the
+// node's lifetime from its ctx WithoutCancel).
 func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) error {
-	chunk, have, err := chunker.next()
+	leg := chunkLeg{
+		op: "subscribe.reestablish", src: target.src,
+		sessionID: target.sessionID, exchangeID: target.exchangeID, role: true,
+		send: func(_ int, body []byte) (uint32, error) {
+			chunkTarget := target
+			if counter, ok := b.takeOwedAck(target.sessionID, target.exchangeID, true); ok {
+				chunkTarget.hasAck, chunkTarget.ackCounter = true, counter
+			}
+			return b.sendUnsolicitedIM(chunkTarget, im.OpcodeReportData, body)
+		},
+		done: b.handlerContext().Done(),
+	}
+	chunk, have, err := chunker.Next()
 	if err != nil {
 		return err
 	}
@@ -333,33 +360,20 @@ func (b *Bridge) sendPrimingReport(target subTarget, chunker *reportChunker) err
 		if err != nil {
 			return err
 		}
-		chunkTarget := target
-		if counter, ok := b.takeOwedAck(target.sessionID, target.exchangeID, true); ok {
-			chunkTarget.hasAck, chunkTarget.ackCounter = true, counter
-		}
-		waitCh := b.armStatusResponseWait(target.sessionID, target.exchangeID, true)
-		if _, err := b.sendUnsolicitedIM(chunkTarget, im.OpcodeReportData, body); err != nil {
-			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
+		res, err := b.sendChunk(leg, i, body, chunk, chunkWaitHere)
+		var rejected *chunkRejectedError
+		switch {
+		case err == nil:
+		case !res.sent:
 			return fmt.Errorf("%w: %w", errPeerGone, err)
+		case errors.As(err, &rejected):
+			return &chunkStatusError{status: rejected.status}
+		case errors.Is(err, errChunkUnanswered), errors.Is(err, errChunkWaitDisarmed):
+			return fmt.Errorf("%w: chunk %d: %w", errPeerGone, i, err)
+		default:
+			return err
 		}
-		timeout := b.chunkStatusResponseTimeout(target.sessionID)
-		timer := b.clk().NewTimer(timeout)
-		select {
-		case status, ok := <-waitCh:
-			timer.Stop()
-			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
-			if !ok {
-				// Disarmed without an answer: the session closed.
-				return fmt.Errorf("%w: chunk %d: session closed", errPeerGone, i)
-			}
-			if !status.IsSuccess() {
-				return &chunkStatusError{status: status}
-			}
-		case <-timer.C():
-			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
-			return fmt.Errorf("%w: chunk %d unanswered after %s", errPeerGone, i, timeout)
-		}
-		if chunk, have, err = chunker.next(); err != nil {
+		if chunk, have, err = chunker.Next(); err != nil {
 			return err
 		}
 	}

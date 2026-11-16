@@ -17,15 +17,15 @@ const (
 )
 
 // FloodlightCameraType returns the FloodlightCamera device type, matter.js's packages/node/src/devices/floodlight-camera.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#floodlightcamera. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func FloodlightCameraType() *Type { return &typeFloodlightCamera }
+// its cluster requirements are listed in docs/reference/device-types.md#floodlightcamera. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func FloodlightCameraType() *Type { return typeFloodlightCamera.clone() }
 
 // typeFloodlightCamera holds [FloodlightCameraType]'s cluster requirements.
 var typeFloodlightCamera = Type{
 	ID: FloodlightCameraID, Name: "FloodlightCamera", Revision: FloodlightCameraRevision,
 	Classification: "simple", Composition: schema.CompositionTree,
+	components: []schema.DeviceTypeID{OnOffLightID, CameraID},
 }
 
 // FloodlightCamera is an endpoint of the FloodlightCamera device type, a composite: its
@@ -44,7 +44,7 @@ func NewFloodlightCamera(opts Options, onOffLight *OnOffLight, camera *Camera, d
 	if onOffLight == nil || camera == nil {
 		return nil, fmt.Errorf("%w: FloodlightCamera needs its components OnOffLight and Camera", ErrComposition)
 	}
-	d, err := FromSpec(Spec{Type: FloodlightCameraID, Options: opts, Declarations: decls})
+	d, err := newOfSpec(Spec{Type: FloodlightCameraID, Options: opts, Declarations: decls})
 	if d == nil {
 		return nil, err
 	}

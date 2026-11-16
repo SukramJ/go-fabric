@@ -13,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -34,10 +35,20 @@ func TestFacadeErrorsAreTheBridges(t *testing.T) {
 		{"CommissioningBlocked", node.ErrCommissioningBlocked, bridge.ErrCommissioningBlocked},
 		{"CommissioningWindowAlreadyOpen", node.ErrCommissioningWindowAlreadyOpen, bridge.ErrCommissioningWindowAlreadyOpen},
 		{"CommissioningWindowNotConfigured", node.ErrCommissioningWindowNotConfigured, bridge.ErrCommissioningWindowNotConfigured},
+		{"ScrubIncomplete", node.ErrScrubIncomplete, store.ErrScrubIncomplete},
+		{"FabricNotFound", node.ErrFabricNotFound, store.ErrFabricNotFound},
+		{"OTAImageTooLarge", node.ErrOTAImageTooLarge, dcl.ErrOTAImageTooLarge},
 	} {
 		if c.facade == nil || !errors.Is(c.facade, c.base) || !errors.Is(c.base, c.facade) {
 			t.Errorf("%s: node's %v is not bridge's %v", c.name, c.facade, c.base)
 		}
+	}
+}
+
+// The OTA download bound is the ledger client's (R2-P5-apinode-08).
+func TestFacadeDCLBound(t *testing.T) {
+	if node.DCLDefaultMaxImageSize != dcl.DefaultMaxImageSize {
+		t.Fatalf("node.DCLDefaultMaxImageSize %d, want dcl's %d", node.DCLDefaultMaxImageSize, dcl.DefaultMaxImageSize)
 	}
 }
 

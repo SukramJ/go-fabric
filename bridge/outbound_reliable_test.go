@@ -386,7 +386,9 @@ func TestCloseSubscriptionByCounter_IsSessionScoped(t *testing.T) {
 // TestSubscription_ReleaseCounterOnPeerAck verifies that a
 // peer-piggybacked ACK clears the counter→subID mapping so a later
 // max-retries event on a different counter doesn't accidentally
-// reap the same subscription.
+// reap the same subscription. The acknowledgement delivers no update:
+// the peer's StatusResponse does ([Bridge.deliverOngoingReport];
+// F-db021da0-36).
 func TestSubscription_ReleaseCounterOnPeerAck(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
@@ -400,9 +402,8 @@ func TestSubscription_ReleaseCounterOnPeerAck(t *testing.T) {
 	if _, ok := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); ok {
 		t.Error("counter mapping still present after release")
 	}
-	// A delivered update starts the count of failed ones again.
-	if _, counted := b.subSendErrorCount.Load(uint32(42)); counted {
-		t.Error("failed updates still counted after a delivered one")
+	if raw, _ := b.subSendErrorCount.Load(uint32(42)); raw != 2 {
+		t.Errorf("failed updates after the acknowledgement: %v, want still 2", raw)
 	}
 }
 

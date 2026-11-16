@@ -28,10 +28,9 @@ import (
 // openGroups composes the manager and gives it the controller's socket,
 // or [Config.GroupTransport].
 func (c *Controller) openGroups(ctx context.Context, cfg Config, log *slog.Logger) error {
-	st := store.New(cfg.DB)
-	if err := c.ensureFabricRow(ctx, st); err != nil {
-		return err
-	}
+	// The own fabric row the key sets hang on is settled in New, before the
+	// socket opens (ensureFabricRow).
+	st := c.st
 	m, err := groups.NewManager(st, log)
 	if err != nil {
 		return err
@@ -73,6 +72,15 @@ func (c *Controller) ensureFabricRow(ctx context.Context, st *store.Store) error
 	case rec.FabricID != c.fabric.FabricID:
 		return fmt.Errorf("%w: the database holds another fabric at index %d", ErrConfiguration, idx)
 	case rec.NodeID != c.fabric.RootNodeID:
+		// The row's resumption records were made under the former own
+		// node's id; the controller's CASE client reads this table
+		// (handshake.StoreResumption), and a resumption with one of them
+		// would hand the peer a session it takes for that node. They go
+		// with the take-over, as a node deletes a fabric's records when its
+		// identity on the fabric changes (review II, Fable P-4).
+		if err := st.RemoveResumptionsByFabric(ctx, idx); err != nil {
+			return err
+		}
 		return st.UpdateFabricNodeID(ctx, idx, c.fabric.RootNodeID)
 	}
 	return nil
@@ -90,7 +98,9 @@ func (c *Controller) Groups() *groups.Manager {
 // groupID to it — what KeySetWrite and a GroupKeyMap write do on a
 // member node — so that [Groups] can send to the group. The caller writes
 // the same key set to the members. On a closed controller it writes
-// nothing and returns [ErrConfiguration].
+// nothing and returns [ErrConfiguration]. An invalid key set — EpochKey0
+// not 16 bytes, or EpochKey1 / EpochKey2 present and not 16 bytes — is
+// refused by the store and nothing is written.
 func (c *Controller) SetGroupKey(ctx context.Context, keySet store.GroupKeySet, groupID uint16) error {
 	// Close takes closeMu before it lets the group manager go, so the
 	// manager stays for the whole call (review II, R2-P1-ctl-06).
@@ -99,7 +109,7 @@ func (c *Controller) SetGroupKey(ctx context.Context, keySet store.GroupKeySet, 
 	if c.closed || c.groups == nil {
 		return errClosed
 	}
-	st := store.New(c.db)
+	st := c.st
 	keySet.FabricIndex = c.fabricIndex()
 	if err := st.UpsertGroupKeySet(ctx, keySet); err != nil {
 		return err

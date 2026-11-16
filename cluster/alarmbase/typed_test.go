@@ -30,6 +30,7 @@ func TestTypedAlarmBaseServer(t *testing.T) {
 	}
 	em := &emitter{}
 	srv.SetMatterEventEmitter(em)
+	srv.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 	s := dwa.Wrap(srv)
 	var changed [][]uint32
 	defer s.OnChanged(func(_ dwa.State, change contract.Change) { ids := change.Attributes; changed = append(changed, ids) })()
@@ -71,7 +72,8 @@ func TestTypedAlarmBaseServer(t *testing.T) {
 		t.Errorf("handed back: %v, State %v", err, s.Get().State)
 	}
 
-	if err := s.EmitNotify(7, dwa.NotifyEvent{Active: 0x1}); err != nil {
+	srv.SetEndpoint(7) // Record<Event> emits on the endpoint the server is mounted on
+	if err := s.RecordNotify(dwa.NotifyEvent{Active: 0x1}); err != nil {
 		t.Fatal(err)
 	}
 	if last := em.events[len(em.events)-1]; last.endpoint != 7 || last.event != dwa.EventNotify {

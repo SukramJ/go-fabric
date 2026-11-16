@@ -448,6 +448,7 @@ func TestContentControl(t *testing.T) {
 	}
 	ev := &emitted{}
 	srv.SetMatterEventEmitter(ev)
+	srv.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 	if err := srv.EmitRemainingScreenTimeExpired(); err != nil {
 		t.Fatal(err)
 	}

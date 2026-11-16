@@ -137,8 +137,23 @@ func TestTypedServer(t *testing.T) {
 	}); err == nil {
 		t.Error("HandleFindTransport: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})        // no EmitEvent
 	_ = s.EmitPushTransportBegin(0, PushTransportBeginEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitPushTransportEnd(0, PushTransportEndEvent{})     // not in the empty definition's EventList: refused
+	_ = s.RecordPushTransportBegin(PushTransportBeginEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPushTransportBegin(PushTransportBeginEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPushTransportBegin on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitPushTransportEnd(0, PushTransportEndEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordPushTransportEnd(PushTransportEndEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPushTransportEnd(PushTransportEndEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPushTransportEnd on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

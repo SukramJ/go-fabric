@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -33,6 +34,12 @@ import (
 // or an AnnounceOTAProvider) and cluster/camera's WebRTC provider (the
 // requestor that opened a session, issue #351), and no peer is reached
 // that a controller did not name.
+//
+// Since ADR 0032 a node composes its peer path itself: a live session of
+// this bridge is reused through [Bridge.LivePeerSession] (never a
+// handshake), and a new one is established on the node's client stack.
+// [Bridge.ConnectPeer] and [Bridge.ConnectOtaProvider], which still
+// establish through the ADR 0008 initiator, are deprecated.
 
 // peerConnectTimeout bounds reaching a peer: matter.js
 // PeerTimingParameters.defaultConnectionTimeout (packages/protocol/src/peer/
@@ -60,12 +67,12 @@ var ErrExchangeClosed = errors.New("bridge: exchange closed")
 // of the session it would go over: over UDP [exchangeMaxPayloadSize], over
 // a TCP connection the connection's largest message, bounded by the
 // MaxTcpMessageSize the session's peer stated
-// ([initiatedSecureExchange.MaxPayloadSize]). connectedhomeip's
-// camera sends its WebRTC signals with TransportPayloadCapability::
-// kLargePayload, which establishes the session over TCP
-// (webrtc-provider-manager.cpp:860-942 at 6170af84); this node initiates
-// CASE over UDP only and reuses the newest live session of the peer, so a
-// large payload reaches the peer when the peer came in over TCP. It is
+// ([initiatedSecureExchange.MaxPayloadSize]); and a request for a session
+// that carries large messages ([PeerSessionRequirement]) on one that does
+// not. [Bridge.ConnectPeer] initiates CASE over UDP only and reuses the
+// newest live session of any transport, so a large payload reaches the
+// peer only when the peer came in over TCP; a node's peer path selects a
+// TCP session for a Large Message command (docs/adr/0032). It is
 // [camera.ErrPayloadTooLarge], the value a camera host — which signals
 // through camera.Provider — recognises with cluster/camera alone.
 var ErrPayloadTooLarge = camera.ErrPayloadTooLarge
@@ -74,6 +81,13 @@ var ErrPayloadTooLarge = camera.ErrPayloadTooLarge
 // secure session with the provider (matter.js
 // OtaSoftwareUpdateRequestorServer.ts:553-565 #connectOtaProviderFor →
 // ServerNode.peers.forAddress → Peer.connect) — [Bridge.ConnectPeer].
+//
+// Deprecated: a node reaches its OTA provider over its peer path, which
+// reuses a session of the server stack ([Bridge.LivePeerSession]) or
+// establishes one on the client stack (docs/adr/0032); a host that runs
+// the bridge without a node attaches its own [core.OtaProviderConnector].
+// ConnectOtaProvider keeps its behaviour and is removable in the next minor
+// release.
 func (b *Bridge) ConnectOtaProvider(ctx context.Context, fabricIndex uint8, providerNodeID uint64) (core.OtaProviderSession, error) {
 	s, err := b.ConnectPeer(ctx, fabricIndex, providerNodeID)
 	if err != nil {
@@ -92,6 +106,13 @@ func (b *Bridge) ConnectOtaProvider(ctx context.Context, fabricIndex uint8, prov
 // servers that answer a controller on a peer the controller named: the OTA
 // requestor ([Bridge.ConnectOtaProvider]) and the camera's
 // WebRtcTransportProvider (node wires it as the camera.PeerConnector).
+//
+// Deprecated: a node's peer path reuses a live session of the bridge
+// through [Bridge.LivePeerSession] and establishes a new one on its client
+// stack, which carries TCP for a Large Message command (docs/adr/0032).
+// ConnectPeer keeps its behaviour — the newest live session of any
+// transport, else CASE over UDP through the ADR 0008 initiator — and is
+// removable in the next minor release.
 func (b *Bridge) ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*PeerSession, error) {
 	ctx, cancel := clock.WithTimeout(ctx, b.clk(), peerConnectTimeout)
 	defer cancel()
@@ -102,12 +123,86 @@ func (b *Bridge) ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 	return &PeerSession{b: b, link: link}, nil
 }
 
-// PeerSession is a secure session with a peer this node reached as the
-// initiator ([Bridge.ConnectPeer]). It implements core.OtaProviderSession
+// PeerSessionRequirement is what a session with a peer must offer to carry
+// a request: the zero value is any live session.
+type PeerSessionRequirement struct {
+	// LargeMessage requires a session that carries Large Messages — one
+	// bound to a TCP connection — for a command with the Large Message
+	// quality (schema.CommandLargeMessage). A required transport is the
+	// only one a session is taken from (matter.js
+	// packages/protocol/src/peer/Peer.ts:369-376, :440-448 at db021da0).
+	LargeMessage bool
+}
+
+// LivePeerSession returns the live secure session with the node nodeID on
+// the fabric fabricIndex that meets req — of any opener, this node's or the
+// peer's — the one the peer sent on last; false when there is none. It
+// never starts a handshake: a node establishes a missing session on its
+// client stack (docs/adr/0032). Mirrors matter.js Peer.connect's reuse of
+// newestSession (packages/protocol/src/peer/Peer.ts:440-460, :582-602 at
+// db021da0), whose peer holds every session of the fabric whoever opened it
+// (packages/protocol/src/peer/PeerSet.ts:104, :108-110, :116-125).
+func (b *Bridge) LivePeerSession(fabricIndex uint8, nodeID uint64, req PeerSessionRequirement) (*PeerSession, bool) {
+	link, ok := b.livePeerLink(fabricIndex, nodeID, req)
+	if !ok {
+		return nil, false
+	}
+	return &PeerSession{b: b, link: link, req: req}, true
+}
+
+// PeerSession is a secure session with a peer of this node's server stack:
+// one this node reached as the initiator ([Bridge.ConnectPeer]) or one
+// [Bridge.LivePeerSession] found. It implements core.OtaProviderSession
 // and camera.PeerSession.
 type PeerSession struct {
 	b    *Bridge
 	link peerLink
+	// req is what the session was selected for ([Bridge.LivePeerSession]).
+	req PeerSessionRequirement
+}
+
+// peerActivityReader is the optional [SessionRegistry] capability that
+// reads a session's entry (secure/operational.Manager.Get).
+type peerActivityReader interface {
+	Get(sessionID uint16) (*operational.Entry, error)
+}
+
+// LastActivityMonotonic is when the peer last sent on the session, on the
+// clock's monotonic reading (operational.Entry.LastPeerActivityMonotonic):
+// the order [Bridge.LivePeerSession] selects by, comparable with another
+// stack's reading on the same clock as a wall time is not across a
+// wall-clock step. False when the session is gone or the registry does not
+// keep it.
+func (s *PeerSession) LastActivityMonotonic() (time.Duration, bool) {
+	s.b.mu.RLock()
+	reg := s.b.sessionRegistry
+	s.b.mu.RUnlock()
+	r, ok := reg.(peerActivityReader)
+	if !ok {
+		return 0, false
+	}
+	e, err := r.Get(s.link.sessionID)
+	if err != nil || e == nil {
+		return 0, false
+	}
+	return e.LastPeerActivityMonotonic()
+}
+
+// transport is the network of the session's route as [net.Addr.Network]
+// names it: "udp" for a session over the bridge's UDP socket, "tcp" for one
+// bound to a TCP connection — the one transport that carries Large
+// Messages.
+func (s *PeerSession) transport() string {
+	if s.link.addr == nil {
+		return ""
+	}
+	if r, ok := s.link.addr.(*connRoute); ok {
+		if r == nil {
+			return ""
+		}
+		return connNetwork(r.conn)
+	}
+	return s.link.addr.Network()
 }
 
 // invokeStatusError is a command the peer answered with a status other
@@ -136,6 +231,9 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 // ([im.StatusCodeError]). A request larger than one message of the
 // session is [ErrPayloadTooLarge] and is not sent.
 func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, commandID uint32, fields spec.Encodable) (*spec.Node, error) {
+	if s.req.LargeMessage && !routeCarriesLargeMessages(s.link.addr) {
+		return nil, fmt.Errorf("%w: command 0x%02x needs a session that carries large messages", ErrPayloadTooLarge, commandID)
+	}
 	ex, err := s.b.openInitiatedExchange(s.link)
 	if err != nil {
 		return nil, err
@@ -164,7 +262,7 @@ func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, co
 	if err := ex.Send(ctx, im.InteractionModelProtocolID, im.OpcodeInvokeRequest, payload); err != nil {
 		return nil, err
 	}
-	waitCtx, cancel := clock.WithTimeout(ctx, s.b.clk(), s.b.chunkStatusResponseTimeout(s.link.sessionID))
+	waitCtx, cancel := clock.WithTimeout(ctx, s.b.clk(), s.b.chunkStatusResponseTimeout(ex.route(), s.link.sessionID))
 	defer cancel()
 	for {
 		msg, err := ex.Receive(waitCtx)
@@ -537,7 +635,7 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	if tracker != nil {
 		tracker.TrackWithMargin(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load()))
 	}
-	if err := sendVia(listener, dest, datagram); err != nil {
+	if err := e.b.sendRouted(listener, dest, e.sessionID, datagram); err != nil {
 		if tracker != nil {
 			tracker.Untrack(e.sessionID, hdr.MessageCounter)
 		}
@@ -583,47 +681,20 @@ func (e *initiatedSecureExchange) MaxPayloadSize() int {
 	return e.b.invokeMaxPayloadSize(e.route(), e.sessionID)
 }
 
-// routeMaxPayloadSize is the largest payload one message on route carries:
-// over a TCP connection the connection's largest message less the message
-// overhead, otherwise [exchangeMaxPayloadSize] — matter.js
-// MessageExchange.maxPayloadSize (packages/protocol/src/protocol/MessageExchange.ts:465-469
-// at db021da0).
-func routeMaxPayloadSize(route net.Addr) int {
-	if r, ok := route.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
-		if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
-			if n := m.MaxMessageSize() - matterMessageOverhead; n > exchangeMaxPayloadSize {
-				return n
-			}
-		}
-	}
-	return exchangeMaxPayloadSize
-}
-
 // invokeMaxPayloadSize is the largest payload one message of a request's
 // exchange carries, for the invoke context ([im.WithMaxPayloadSize]) and
 // for an exchange of the session this node opens or answers on
-// ([initiatedSecureExchange.MaxPayloadSize]): as
-// [routeMaxPayloadSize], over TCP also bounded by the MaxTcpMessageSize the
-// session's peer stated — matter.js MessageChannel.maxPayloadSize, the
-// channel's maximum and over TCP `Math.min(channelMax,
-// this.session.peerMaxTcpMessageSize)`
-// (packages/protocol/src/protocol/MessageChannel.ts:86-92 at db021da0),
-// less MATTER_MESSAGE_OVERHEAD (MessageExchange.ts:465-469); never below
-// the UDP bound, as [Bridge.chunkLimitsFor].
+// ([initiatedSecureExchange.MaxPayloadSize]): the route's message limit
+// ([Bridge.connMessageLimit] — over TCP the connection's maximum bounded
+// by the peer's, matter.js MessageChannel.maxPayloadSize) less
+// MATTER_MESSAGE_OVERHEAD (packages/protocol/src/protocol/MessageExchange.ts:465-469
+// at db021da0), and [exchangeMaxPayloadSize] over UDP; never below that.
 func (b *Bridge) invokeMaxPayloadSize(route net.Addr, sessionID uint16) int {
-	n := routeMaxPayloadSize(route)
-	if n == exchangeMaxPayloadSize {
-		return n
+	size, ok := b.connMessageLimit(route, sessionID)
+	if !ok {
+		return exchangeMaxPayloadSize
 	}
-	b.mu.RLock()
-	lookup := b.sessions
-	b.mu.RUnlock()
-	if res, ok := lookup.(SessionTransportResolver); ok {
-		if _, peerMax, known := res.TransportParametersFor(sessionID); known && peerMax > 0 && int(peerMax)-matterMessageOverhead < n {
-			n = max(int(peerMax)-matterMessageOverhead, exchangeMaxPayloadSize)
-		}
-	}
-	return n
+	return max(size-matterMessageOverhead, exchangeMaxPayloadSize)
 }
 
 // Close implements [bdx.Exchange]: the exchange stops receiving, and an

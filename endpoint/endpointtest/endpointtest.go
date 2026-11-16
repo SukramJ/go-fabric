@@ -3,8 +3,9 @@
 
 // Package endpointtest provides the endpoint-level scaffolding a test needs
 // to stand a bridge up: an in-memory [endpoint.Store] and a snapshotter over
-// an empty fleet — and [AssertDeviceTypeConformance], which holds a host's
-// assembled topology to its device types.
+// an empty fleet — [AssertDeviceTypeConformance], which holds a host's
+// assembled topology to its device types, and [AssertClusterServerContract],
+// which holds a host's cluster server to the read contract.
 //
 // It is the test-support counterpart of package endpoint, in the shape
 // net/http/httptest has to net/http, and it is separate from

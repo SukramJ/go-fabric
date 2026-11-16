@@ -19,14 +19,14 @@ module's consumers call:
 
 | Area | Holds | Consumers |
 | --- | --- | --- |
-| `store.Fabrics` | the fabric table; `AddFabric` allocates the index | OperationalCredentials, the node's CASE identities and commissioning window, the group manager |
+| `store.Fabrics` | the fabric table; `AddFabric` allocates the index; the hooks a rollback owes (`OwedFabricEvents`, `AckOwedFabricEvent`) | OperationalCredentials, the node's CASE identities, commissioning window and start, the group manager |
 | `store.Identity` | per fabric: NOC, ICAC, operational key, IPK | OperationalCredentials, the node's CASE identities |
 | `store.ACL` | the AccessControl list per fabric | AccessControl, the bridge's access checks |
-| `store.GroupKeys` | key sets and the GroupKeyMap | GroupKeyManagement, OperationalCredentials (the IPK set), the group manager |
+| `store.GroupKeys` | key sets and the GroupKeyMap; `ReplaceGroupKeyMappings` swaps a fabric's whole map at once | GroupKeyManagement, OperationalCredentials (the IPK set), the group manager |
 | `store.Groups` | the group table and the Groupcast groups (`groups.Store` embeds it) | the group manager |
-| `store.Resumption` | CASE resumption records | the operational session manager, the node's CASE initiator |
+| `store.Resumption` | CASE resumption records, one per (fabric, peer) for both roles; a record carries the peer's session parameters (zero is absent) | the operational session manager, the node's CASE initiator |
 | `store.ServerSubscriptions` | the subscriptions of active CASE sessions | the bridge's subscription persistence |
-| `store.Settings` | string settings and counters; `SetSettings` writes several keys at once, all or none | the facade, AccessControl's Extension, VID verification, the group counter, the event-number ceiling |
+| `store.Settings` | string settings and counters; `SetSettings` writes several keys at once and `DeleteSettings` deletes several, all or none; `DeleteSettingsWithPrefix` deletes every key under a root ending in `.` | the facade, AccessControl's Extension, the terms acceptance, the group counter, the event-number ceiling |
 | `store.OTA` | the OTA requestor's DefaultOTAProviders and state | the OTA requestor |
 | `store.ThermostatPresets` | a Thermostat endpoint's presets | the Thermostat server (`store.NewThermostatPresetStore`) |
 | `store.DoorLocks` | a lock endpoint's users, credentials and schedules | the DoorLock server |
@@ -41,7 +41,10 @@ wires every consumer, holds a `store.Port`.
 - `store.New(db)`, SQLite. `Config.Store.Path` and `Config.Store.DB` build
   it; `Config.Store.Credentials` takes one you built. The factory reset
   erases the stores the node used — an override as it is, whether the node
-  still runs or was stopped before.
+  still runs or was stopped before. An endpoint-store override
+  (`Config.Store.Endpoints`) is erased row by row and not scrubbed: when it
+  keeps its records in a database file of the host's own, scrubbing that
+  file is the host's (`store.Scrub`).
 - `memstore.New()` (`store/memstore`), in memory, for tests and for a small
   daemon that accepts losing its state on restart: a process that exits
   forgets every fabric, and each controller has to commission the node
@@ -60,12 +63,21 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   `ReplaceDefaultOTAProviders`, `SaveDoorLockAuth`, `RemoveGroupKeySet`,
   `RemoveFabric`, …) applies whole or not at all, and a refused write
   changes nothing. The port has no transaction across methods; a change
-  that spans several settings keys is one `SetSettings` call, which writes
-  every key or none (the SQLite store in one transaction).
+  that spans several settings keys is one `SetSettings` or `DeleteSettings`
+  call, which writes every key or none (the SQLite store in one
+  transaction), a GroupKeyMap write is one `ReplaceGroupKeyMappings`, and
+  a SetVIDVerificationStatement one `UpdateFabricVendorVerification` (the
+  vendor id and the VID data together). `DeleteSettingsWithPrefix` refuses
+  a prefix that does not end in `.`, so `scenes.ab.` never takes
+  `scenes.abc.…`.
+- **A closed backend.** After the backend is closed every method returns
+  a non-nil error and changes nothing; the node and the controller call
+  no method after their `Stop` or `Close` returned.
 - **The fabric cascade.** `RemoveFabric` removes everything the fabric
   owns: its identity, key sets, key map, group table, Groupcast groups,
   ACL, resumption records, default OTA providers and ICD registrations. Server
-  subscriptions, presets, lock records, settings and counters stay; the
+  subscriptions, presets, lock records, owed fabric events, settings and
+  counters stay; the
   bridge deletes a removed fabric's subscriptions itself. A row naming a
   fabric the store does not hold is refused. What a cluster server keeps
   for a fabric under its own settings key — the AccessControl Extension
@@ -87,7 +99,14 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   marks the row; a second update before the commit keeps the first prior.
   `CommitFabric` commits and erases the prior values;
   `RollbackFabric` deletes a pending add with everything it owns, or moves
-  a pending update's prior values back, and returns the state it found.
+  a pending update's prior values back and deletes the fabric's resumption
+  records, and returns the state it found. In the same write it records
+  the hook the rollback owes — the fabric's removal or its update — with
+  the fabric's identity as the row held it (`store.OwedFabricEvent`);
+  `OwedFabricEvents` lists them by ID and `AckOwedFabricEvent` removes one.
+  The node runs the owed hooks at its start and acknowledges each after
+  them, so a crash between a rollback and its hooks delivers them at the
+  next start: at least once.
   While an update is pending, `UpdateFabricVendorID`, `UpdateFabricNodeID`
   and `UpdateFabricVIDVerification` change the live values only. Each of
   these is one atomic write, and the state is on disk with the row, so a
@@ -163,22 +182,22 @@ idempotent.
 | Table | Since | Holds |
 | --- | --- | --- |
 | `matter_fabrics` | v1 (v0.1.0), columns added in v8 | each fabric: index, fabric id, node id, root certificate and key, vendor, label, compressed fabric id; since v8 its commit state (`pending`: 0 committed, 1 an uncommitted AddNOC, 2 an uncommitted UpdateNOC), its VID verification statement and VVSC, and while it is 2 the node id, vendor id and VID data the UpdateNOC replaced |
-| `matter_node_identities` | v1, columns added in v8 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it; since v8, while the fabric is a pending update, the NOC, ICAC and private key the UpdateNOC replaced (the prior key stored as the key is, in clear) |
-| `matter_group_keys` | v1 | group key sets per fabric, up to three epoch keys |
+| `matter_node_identities` | v1, columns added in v8 and v10 | per fabric: NOC, ICAC, the private key, the IPK as the commissioner sent it; since v8, while the fabric is a pending update, the NOC, ICAC and private key the UpdateNOC replaced (the prior key stored as the key is); since v10 the row's seal mark (`sealed`). The keys are in clear unless the store is `store.NewSealed`'s ([sealing at rest](../security.md#sealing-at-rest)) |
+| `matter_group_keys` | v1, a column added in v10 | group key sets per fabric, up to three epoch keys; since v10 the row's seal mark |
 | `matter_group_key_map` | v1, rebuilt in v3 | GroupKeyMap: group id to key set; since v3 without a foreign key, so an entry may name a key set not yet written |
 | `matter_acl_entries` | v1 | the AccessControl list per fabric, in order |
-| `matter_resumption` | v1 | CASE resumption records with the peer's CATs; the record's shared secret is stored in clear, like the fabric's keys ([security model](../security.md#what-the-store-holds-in-clear)) |
+| `matter_resumption` | v1, columns added in v9 and v10 | CASE resumption records with the peer's CATs; the record's shared secret is stored in clear, like the fabric's keys ([security model](../security.md#what-the-store-holds-in-clear)), unless the store seals it (v10's seal mark) |
 | `matter_diagnostics` | v1 | a single-row counter table, created and seeded but read by nothing (its typed API is removed in v0.10.0); the facade keeps its counters in `matter_settings` |
 | `matter_metadata` | v1 | integer counters: `next_fabric_index`, `event_number_ceiling`, and since v0.12.0 an ICD node's `icd_management.counter` |
-| `matter_settings` | v1 | string key/value pairs (next section) |
+| `matter_settings` | v1, a column added in v10 | string key/value pairs (next section); since v10 the seal mark of a secret setting |
 | `matter_persistent_subscriptions` | v1 | unused since v0.3.0; kept so old and new databases have the same schema |
 | `matter_group_table` | v2 (v0.2.0) | GroupTable: the endpoints of each group |
 | `matter_groupcast_groups` | v2 | the Groupcast cluster's per-group properties |
 | `matter_server_subscriptions` | v2, a column added in v8 | the subscriptions of active CASE sessions, to re-establish after a restart; since v8 the exact order they were saved in (`save_seq`), which the re-establishment walks newest first |
 | `matter_ota_default_providers` | v4 (v0.3.0) | the OTA requestor's DefaultOTAProviders |
 | `matter_thermostat_presets` | v5 (v0.8.3) | a Thermostat endpoint's presets and active preset handle |
-| `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4) | a lock endpoint's users, credentials (encrypted) and schedules |
-| `matter_icd_registrations` | v7 (v0.12.0) | an ICD node's registered Check-In clients per fabric: check-in node id, monitored subject, key, client type; removed with the fabric. Since v0.12.1 the key is sealed at rest (AES-128-GCM under `icd_management.key`, bound to its row); `store.Upgrade` seals the keys an earlier release stored in clear |
+| `matter_doorlock_users`, `matter_doorlock_credentials`, `matter_doorlock_schedules` | v6 (v0.8.4), columns added in v10 | a lock endpoint's users, credentials (encrypted) and schedules; since v10 whether a Matter command created a user or credential and made its last change (`created_through_matter`, `modified_through_matter`: GetUser and GetCredentialStatus answer its fabric indexes only then; a record seeded through `DoorLockConfig.Initial` answers them null, a row from before v10 takes 1), and a credential row's seal mark |
+| `matter_icd_registrations` | v7 (v0.12.0) | an ICD node's registered Check-In clients per fabric: check-in node id, monitored subject, key, client type; removed with the fabric. Since v0.12.1 the key is sealed at rest (AES-128-GCM under `icd_management.key`, bound to its row); `store.Upgrade` seals the keys an earlier release stored in clear. Since v10 the row's seal mark: under `store.NewSealed` the host's sealer seals the key instead |
 
 ### Tables of `endpoint/sqlitestore`
 
@@ -190,12 +209,17 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:18-390`, `store/migrations.go:43-62`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
+*Source: `store/schema.sql:25-412`, `store/migrations.go:43-67`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
 
 ### Settings keys
 
 `matter_settings` holds the controller-written attribute values and the
-facade's own state.
+facade's own state. A store from `store.NewSealed` seals the values of the
+keys that hold secrets — `netcomm.wifi.networks`, `door_lock.credential_key`,
+`icd_management.key`, the two `operational_credentials.pending_noc*` keys and
+every `jointfabric.datastore:` key — and marks their rows (`sealed`, v10);
+the other values stay as they are ([sealing at
+rest](../security.md#sealing-at-rest)).
 
 | Key | Written by | Holds |
 | --- | --- | --- |
@@ -212,8 +236,8 @@ facade's own state.
 | `gendiag.reboot_count` | the facade | RebootCount: 0 on a database's first boot, then one more per boot |
 | `gendiag.operational_ms` | the facade | accumulated operational time (`gendiag.operational_hours` is read once as its legacy form) |
 | `ota_requestor.state` | `store` | the OTA requestor's state |
-| `door_lock.credential_key` | `cluster/lock` | the key the DoorLock server encrypts credential data with |
-| `icd_management.key` (`store.SettingICDKey`) | `store` | the key `store.Store` seals the ICD registrations' keys with; created with the first registration |
+| `door_lock.credential_key` | `cluster/lock` | the key the DoorLock server encrypts credential data with; sealed under `store.NewSealed` |
+| `icd_management.key` (`store.SettingICDKey`) | `store` | the key a store without a sealer seals the ICD registrations' keys with; created with the first registration. A store from `store.NewSealed` creates none (its sealer seals the ICD keys) and seals one an earlier store left |
 | `door_lock.saved:<key>` | `store` | a lock endpoint's records were saved at least once |
 | `access_control.extension.<fabric>` | `cluster/core` | AccessControl's Extension list per fabric |
 | `matter.fabric.<fabric>.vid.statement`, `matter.fabric.<fabric>.vid.vvsc` | `cluster/core` (releases before v8) | the VID verification statement and VVSC per fabric, hex, as releases before v8 kept them; the data now lives in `matter_fabrics` (`UpdateFabricVIDVerification`), `store.Upgrade` moves every such key into its fabric's columns and deletes it, and nothing writes the keys any more |
@@ -223,15 +247,33 @@ facade's own state.
 | `endpoint_number_reserved.<key>` | the facade | a removed endpoint's reservation: the stable keys of its tree, whose numbers stay held until `Forget` |
 | `timesync.trusted_time_source`, `timesync.default_ntp`, `timesync.time_zone`, `timesync.dst_offset` | `cluster/core` | TimeSynchronization's TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset, under connectedhomeip's key names; the offset of the node's UTC over its clock is not stored |
 | `general_commissioning.tc_acceptance` (`store.SettingTermsAcceptance`) | `cluster/core` | the committed terms-and-conditions acceptance (`<version>:<bits>`) of GeneralCommissioning's TC feature (`node.Commissioning.TermsAndConditions`); written at CommissioningComplete or by a SetTCAcknowledgements outside a fail-safe window, deleted with the last fabric, erased by the factory reset |
-| `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`), before the fabric is committed: a store that refuses it fails CommissioningComplete with nothing committed, and a fabric commit that fails after it writes the previous list back. The credentials are stored in clear, like the fabric's keys: whoever reads the database reads the Wi-Fi passphrase ([security model](../security.md#what-the-store-holds-in-clear)) |
+| `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`), before the fabric is committed: a store that refuses it fails CommissioningComplete with nothing committed, and a fabric commit that fails after it writes the previous list back. The credentials are stored in clear, like the fabric's keys, unless the store seals them: whoever reads the database reads the Wi-Fi passphrase ([security model](../security.md#what-the-store-holds-in-clear)) |
 | `thermostat_user_interface_configuration.keypad_lockout` (`thermo.DefaultKeypadLockoutSetting`) | `cluster/thermo` | ThermostatUserInterfaceConfiguration's KeypadLockout, when the server is given `Settings`; `ThermostatUIConfig.SettingKey` names another key, which a second endpoint with the cluster needs |
 | `tls.certificates:<key>`, `tls.endpoints:<key>` | `cluster/tls` | the certificate tables of TlsCertificateManagement and the provisioned endpoints of TlsClientManagement, when the servers are given a `Store`; `<key>` is the server's `Key` |
-| `jointfabric.datastore:<key>` | `cluster/jointfabric` | the JointFabricDatastore server's record, when it is given a `Store`; `<key>` is the server's `Key` |
+| `jointfabric.datastore:<key>` | `cluster/jointfabric` | the JointFabricDatastore server's record, when it is given a `Store`; `<key>` is the server's `Key`. It carries the joint fabric's group key sets; sealed under `store.NewSealed` |
 
 `<key>` is the endpoint's stable key in `String()` form, the same identity
-endpoint numbers are kept under. A host that keeps scenes and labels
-itself sets `Config.EndpointPersistence`, and the `scenes.` and
+endpoint numbers are kept under. `Aggregator.Forget` deletes, in one
+`DeleteSettings` write, every key above kept under a forgotten key — the
+NodeLabel, the ConfigurationVersion, the scene table, the Binding list,
+the UserLabel list, the surface digest and the nonvolatile values — so a
+device added under the key afterwards starts from its declaration. A host
+that keeps scenes and labels itself sets `Config.EndpointState`
+(`node.NewEndpointState` is the facade's own), and the `scenes.` and
 `bridged_node_label.` keys are then not written.
+
+### Store errors
+
+A change a controller causes is stored with the change: the store write
+comes first, and a refused store answers FAILURE and applies nothing — an
+attribute write, a scene command's change of the table, a bridged
+endpoint's NodeLabel. A scene table the store could not read stays
+unloaded: every scene command answers FAILURE and nothing is stored over
+the stored table until a read succeeds. The consequences of a change — the
+OTA requestor's progress, the scenes a group's or a fabric's removal takes
+along — are applied whatever the store answers, logged when it refuses,
+and stored with the next change. The rule is stated once, in the package
+documentation of `store`.
 
 A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
@@ -258,7 +300,7 @@ build while the key is not in a table of this page.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:274-280`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:286-292`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
 
 ## The controller database
 
@@ -275,10 +317,14 @@ and `sqlstore.Apply`:
 | `matter_client_versions` | each stored cluster's DataVersion |
 | `matter_client_values`, cluster `0xFFFFFFFD` | each node's ICD Check-In registration: key, pending key, counter state, monitored subject, client type |
 | `matter_client_values`, cluster `0xFFFFFFFC` | a node's onboarding code, when kept (`Config.KeepOnboardingCodes`) or attached: the code, its source, the time, the checks it passed — a secret, like the keys above |
+| `matter_client_metadata` | the registry's marks: `sqlstore.seal_scrub_owed` while a sealing's scrub of the file has not finished (`sqlstore.NewSealed`) |
 
 The two `controller.ca` keys are `ca.SettingStore`'s default; another
-`Key` moves both. Controller-side CASE resumption records are kept in
-memory only, so the first command of a run makes a full CASE handshake.
+`Key` moves both. The controller keeps one CASE resumption record per node
+in `matter_resumption`, so a restarted controller resumes instead of
+running full CASE. With `controller.Config.Sealer` the CA, the fabric, the
+resumption records, the group key sets, the kept onboarding codes and the
+ICD keys are sealed ([security](../security.md#sealing-at-rest)).
 
 *Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:34-44`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
 
@@ -292,7 +338,8 @@ Each schema ships three ways:
   `matter_group_key_map`, v8's added columns) and moves data an earlier
   release kept elsewhere (the VID settings into `matter_fabrics`). A host
   that runs `Migrations()` with its own tool calls `store.Upgrade` once
-  after it, for the moves.
+  after it, for the moves. `sqlstore.Apply` likewise runs
+  `sqlstore.Upgrade`, which adds v2's seal mark to `matter_client_values`.
 - **`Migrations()`** returns the same schema as versioned steps (`v1`,
   `v2`, …), each with `Up` and `Down`, for a host that runs its own
   migration tool. A released step never changes. Pin
@@ -314,16 +361,19 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-106`, `store/migrations.go:22-128`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-104`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-125`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
 
 ## Backup
 
 The module ships no backup tool. What a backup has to respect:
 
 - **The file holds private keys.** The node's operational keys and the
-  controller's CA key are stored unencrypted. The store's documentation
-  leaves file-system protection to the operator. Protect the database and
-  every copy of it like the keys.
+  controller's CA key are stored unencrypted, unless the node's store
+  seals them (`store.NewSealed`, [sealing at
+  rest](../security.md#sealing-at-rest)); the controller's are never
+  sealed. The store's documentation leaves file-system protection to the
+  operator. Protect the database and every copy of it like the keys — and,
+  under a sealer, keep the sealing key out of the backup.
 - **Copy a consistent state.** Stop the node first, or use SQLite's own
   online mechanisms (`VACUUM INTO`, the backup API). Copying the file of a
   running node can catch a write half-done.
@@ -331,5 +381,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-39`, `store/schema.sql:64-78`, `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go:38-69`, `store/schema.sql:71-86`, `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
 

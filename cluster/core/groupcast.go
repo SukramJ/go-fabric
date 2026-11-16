@@ -123,9 +123,10 @@ type GroupcastTestingRequest struct {
 	DurationSeconds *uint16
 }
 
-// GroupcastMembershipStruct is one Membership entry (MembershipStruct). A
-// nil KeySetID is the fabric-sensitive field withheld from a session of
-// another fabric.
+// GroupcastMembershipStruct is one Membership entry (MembershipStruct). The
+// server sets KeySetID on every entry; the dispatcher withholds it — a
+// fabric-sensitive field — from a request of another fabric. A nil
+// KeySetID is left out by the bridge's writer.
 type GroupcastMembershipStruct struct {
 	GroupID         uint16
 	Endpoints       []uint16
@@ -359,8 +360,8 @@ func (g *Groupcast) MatterRead(attrID uint32) (any, bool) {
 
 // MatterReadFiltered implements [contract.FabricScopedReader] for the
 // fabric-scoped Membership: a fabric-filtered read sees the accessing
-// fabric's entries, an unfiltered one every fabric's with KeySetId (access
-// "S") withheld from the others' — matter.js ListManager / StructManager.
+// fabric's entries, an unfiltered one every fabric's, whole — the
+// dispatcher withholds KeySetId (access "S") from the others'.
 func (g *Groupcast) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	filtered, fabric := im.FabricFilterFromContext(ctx)
 	return g.read(ctx, attrID, filtered, fabric, false)
@@ -382,10 +383,8 @@ func (g *Groupcast) read(ctx context.Context, attrID uint32, filtered bool, fabr
 				GroupID: m.GroupID, Endpoints: m.Endpoints, HasAuxiliaryACL: m.HasAuxiliaryACL,
 				McastAddrPolicy: m.McastAddrPolicy, FabricIndex: m.FabricIndex,
 			}
-			if local || m.FabricIndex == fabric {
-				ks := m.KeySetID
-				e.KeySetID = &ks
-			}
+			ks := m.KeySetID
+			e.KeySetID = &ks
 			out = append(out, e)
 		}
 		return out, true

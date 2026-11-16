@@ -145,6 +145,10 @@ func (noopAckHandler) Discharge(uint16, uint16, bool) bool { return false }
 // initiator and exchange — comes from [Bridge.AttachPaseHandlerProvider]
 // instead, and when a provider is wired the singleton handler is
 // ignored.
+//
+// Deprecated: wire PASE through [Bridge.AttachPaseHandlerProvider]; a
+// provider that returns one handler for every handshake is this
+// method's shape. Removable in the next minor release.
 func (b *Bridge) AttachPaseHandler(h PaseHandler) {
 	// A fresh acceptor marks a commissioning-window boundary; give the new
 	// window its own PASE brute-force budget and a free
@@ -326,21 +330,64 @@ func (b *Bridge) resolveCaseContinuation(key HandshakeKey) (h CaseHandler, provi
 }
 
 // resolvePaseContinuation is [Bridge.resolvePaseHandler] for a Pake1 or
-// Pake3: with a provider wired, a handshake that does not hold the
-// single-active-PASE claim — no PBKDFParamRequest began it — has no
-// handler — begun is false — and the provider is not asked. matter.js
-// routes only a PbkdfParamRequest that opens an exchange to its PASE server
-// (SecureChannelProtocol.ts:129 at db021da0).
+// Pake3: a handshake that does not hold the single-active-PASE claim — no
+// PBKDFParamRequest began it — has no handler — begun is false — whatever
+// the wiring: the provider is not asked, and the singleton handler of
+// [Bridge.AttachPaseHandler] is not handed a message of a handshake it does
+// not run (review II, N5-rw2-1). matter.js routes only a PbkdfParamRequest
+// that opens an exchange to its PASE server (SecureChannelProtocol.ts:129
+// at db021da0).
 func (b *Bridge) resolvePaseContinuation(key HandshakeKey) (h PaseHandler, begun bool) {
 	b.mu.RLock()
 	begun = !b.paseInFlightSince.IsZero() && b.paseInFlight == key &&
 		b.clk().Now().Sub(b.paseInFlightSince) <= pasePairingTimeout
-	provider := b.paseProvider
 	b.mu.RUnlock()
-	if provider != nil && !begun {
+	if !begun {
 		return nil, false
 	}
 	return b.resolvePaseHandler(key), true
+}
+
+// paseWindowClosed reports whether a PBKDFParamRequest meets a closed
+// commissioning window: a window is attached ([Bridge.AttachCommissioningWindow])
+// and closed, and no PASE acceptor is — neither a provider nor a singleton
+// handler, as a node detaches its acceptor when its window closes. A
+// bridge without a window, or with an acceptor attached, is not in that
+// state: an unattached PASE port stays the fail-closed noop, and an
+// attached acceptor runs the handshake.
+func (b *Bridge) paseWindowClosed() bool {
+	b.mu.RLock()
+	provider, singleton, win := b.paseProvider, b.paseHandler, b.commissioningWindow
+	b.mu.RUnlock()
+	if provider != nil || win == nil {
+		return false
+	}
+	if _, noop := singleton.(noopPaseHandler); !noop {
+		return false
+	}
+	return !win.IsOpen()
+}
+
+// refusePaseWindowClosed answers a PBKDFParamRequest that meets a closed
+// commissioning window ([Bridge.paseWindowClosed]) with a failure report
+// (GeneralFailure, InvalidParameter). matter.js sends InvalidParam when no
+// PASE server is set (SecureChannelProtocol.ts:129-137 at db021da0; review
+// II, owner decision 97). It begins no handshake: the single-active-PASE claim
+// is not taken and no PASE failure is counted.
+func (b *Bridge) refusePaseWindowClosed(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) error {
+	b.logger.Info("matter.rx.sc.pase_window_closed",
+		slog.String("src", srcString(src)),
+		slog.Int("exchange_id", int(proto.ExchangeID)))
+	body := mrp.EncodeStatusReport(
+		mrp.SCStatusGeneralFailure,
+		uint32(mrp.SecureChannelProtocolID),
+		mrp.SCStatusProtocolInvalidParameter,
+		nil,
+	)
+	if err := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(nil, b.clk().Now())); err != nil {
+		b.logger.Debug("matter.rx.sc.pase_window_closed.status_report_send_failed", slog.Any("err", err))
+	}
+	return nil
 }
 
 // dropHandshakeNotBegun ends the handling of a Pake1, Pake3, Sigma3 or
@@ -379,6 +426,10 @@ func (b *Bridge) dropHandshakeNotBegun(src net.Addr, proto message.ProtocolHeade
 // longer retransmitted, and its Sigma3 is acknowledged and not answered, as
 // one no Sigma1 began, instead of reaching a handler that never saw its
 // Sigma1 (review II, R2-P4-rr-sec-02).
+//
+// Deprecated: wire CASE through [Bridge.AttachCaseHandlerProvider]; a
+// provider that returns one handler for every handshake is this
+// method's shape. Removable in the next minor release.
 func (b *Bridge) AttachCaseHandler(h CaseHandler) {
 	var unfinished []HandshakeKey
 	b.mu.Lock()
@@ -672,6 +723,14 @@ func (b *Bridge) dispatchPase(
 	proto message.ProtocolHeader,
 	payload []byte,
 ) error {
+	if proto.Opcode == mrp.SCOpcodePBKDFParamRequest && b.paseWindowClosed() {
+		// Before the PASE-session gate: the window's timer closes the
+		// window without closing a PASE session that is still alive
+		// (CommissioningWindow.closeLocked), and with no PASE server set
+		// matter.js answers whatever sessions remain
+		// (SecureChannelProtocol.ts:129-137 at db021da0).
+		return b.refusePaseWindowClosed(src, requestHdr, proto)
+	}
 	if b.paseSessionExists() {
 		// An established PASE session that is not closing: no new PASE
 		// exchange is accepted until it ends. matter.js ignores the
@@ -2299,7 +2358,7 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 		return
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
-	if err := sendVia(listener, dst, datagram); err != nil {
+	if err := b.sendRouted(listener, dst, sessionID, datagram); err != nil {
 		b.logger.Debug("matter.tx.sc.close_session.send",
 			slog.Int("session_id", int(sessionID)),
 			slog.Any("err", err))

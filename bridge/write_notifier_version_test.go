@@ -364,7 +364,8 @@ func TestControllerWriteAdvancesOnceBesideAHostNotifier(t *testing.T) {
 
 // TestWriteHoldScope: a write holds the notifications of the endpoints it
 // names and of every endpoint when a path names none; its end returns what
-// was held for its own endpoints and leaves another write's hold open.
+// was held for the endpoints no write holds any longer and leaves another
+// write's hold open.
 func TestWriteHoldScope(t *testing.T) {
 	t.Parallel()
 	ep2, ep3 := &endpoint.Endpoint{ID: 2}, &endpoint.Endpoint{ID: 3}
@@ -385,7 +386,7 @@ func TestWriteHoldScope(t *testing.T) {
 	if got := tbl.holdPaths(ep3, nil, path(3)); len(got) != 0 {
 		t.Fatal("a path of the other endpoint being written was not held")
 	}
-	if held := tbl.end(to2); len(held) != 1 || held[2] == nil || len(held[2].paths) != 1 {
+	if held := tbl.end(to2, writeRecord{}); len(held) != 1 || held[2] == nil || len(held[2].paths) != 1 {
 		t.Fatalf("the write to endpoint 2 ended with %+v, want its one held path", held)
 	}
 	if got := tbl.holdPaths(ep2, nil, path(2)); len(got) != 1 {
@@ -396,10 +397,54 @@ func TestWriteHoldScope(t *testing.T) {
 	if got := tbl.holdPaths(ep2, nil, path(2)); len(got) != 0 {
 		t.Fatal("a write naming no endpoint did not hold endpoint 2")
 	}
-	if held := tbl.end(wild); len(held) != 2 {
-		t.Fatalf("the wildcard write ended with %d endpoints held, want 2", len(held))
+	if held := tbl.end(wild, writeRecord{}); len(held) != 1 || held[2] == nil {
+		t.Fatalf("the wildcard write ended with %+v, want endpoint 2's alone: the write to endpoint 3 still holds it", held)
 	}
-	if held := tbl.end(to3); len(held) != 0 {
-		t.Fatalf("the write to endpoint 3 ended with %+v, taken by the wildcard write before", held)
+	if held := tbl.end(to3, writeRecord{}); len(held) != 1 || held[3] == nil || len(held[3].paths) != 1 {
+		t.Fatalf("the write to endpoint 3 ended with %+v, want its one held path", held)
+	}
+}
+
+// TestOverlappingWritesSettleTheHoldOnce: two writes to one endpoint
+// overlap, and a notification of the change the second one made arrives
+// while both run. The first write's end hands out nothing; the second's
+// settles the held change against both writes' records, so the cluster's
+// DataVersion advances once — the dispatcher's advance for the write that
+// changed it — and the held path is not marked again (review II,
+// R2-P5-write-05).
+func TestOverlappingWritesSettleTheHoldOnce(t *testing.T) {
+	t.Parallel()
+	ep := &endpoint.Endpoint{ID: 3}
+	p := im.ConcreteAttributePath{Endpoint: 3, Cluster: onoff.ClusterID, Attribute: onoff.AttrOnTime, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	spy := &reachAttrReporterSpy{}
+	mgr := subscription.NewManager(subscription.Config{}, spy.report, nil)
+	if _, err := mgr.Subscribe(subscription.SubscribeArgs{
+		PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 600,
+		AttributePaths: []im.ConcreteAttributePath{p},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b := &Bridge{}
+	first := writeScope{endpoints: []uint16{3}}
+	second := writeScope{endpoints: []uint16{3}}
+	b.writeHolds.begin(first)
+	b.writeHolds.begin(second)
+	if left := b.writeHolds.holdPaths(ep, mgr, []im.ConcreteAttributePath{p}); len(left) != 0 {
+		t.Fatal("the notification was not held")
+	}
+	before := ep.ClusterDataVersion(onoff.ClusterID)
+	// The first write changed nothing of the endpoint.
+	b.settleWrite(first, recordOf([]im.WriteResult{{Path: p, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{}}}}))
+	// The second changed OnTime; its dispatcher advanced the cluster.
+	ep.BumpClusterDataVersion(onoff.ClusterID)
+	b.settleWrite(second, recordOf([]im.WriteResult{{Path: p, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{onoff.AttrOnTime}}}}))
+	if got := ep.ClusterDataVersion(onoff.ClusterID) - before; got != 1 {
+		t.Errorf("DataVersion advanced %d times, want once", got)
+	}
+	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
+	spy.mu.Lock()
+	defer spy.mu.Unlock()
+	if len(spy.calls) != 0 {
+		t.Errorf("the held change was marked again: %+v", spy.calls)
 	}
 }

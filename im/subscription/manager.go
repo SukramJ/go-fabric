@@ -699,9 +699,14 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // the session (ServerSubscription.ts:753-763 #flush, one
 // #triggerSendUpdate), so the Leave event the node emitted a moment
 // before reaches the subscribers while the fabric still admits them. A
-// subscription whose report is in flight carries what it drained and is
-// skipped; a priming one owes nothing yet. Without a [FlushReporter]
-// nothing is drained or sent.
+// subscription whose report is in flight is waited for, not skipped
+// ([Manager.claimReport]): the flush takes it once that report ended —
+// its reporter returned, which the bridge's does once the peer answered
+// the report's last message or the wait for that answer gave up — or the
+// subscription closed or ctx ended, and then reports what arrived after
+// that report drained the queues. The flush so lasts as long as that
+// wait, within ctx. A priming subscription owes nothing yet. Without a
+// [FlushReporter] nothing is drained or sent.
 //
 // Unlike matter.js, whose subscription is marked closed before its flush
 // (ServerSubscription.ts:776-788 #close, :800-809 #markClosed),

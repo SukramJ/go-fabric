@@ -4,10 +4,12 @@
 package bridge
 
 import (
+	"net"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/transport"
 )
 
 // TestChunkStatusResponseTimeoutSumsBothDirections (review II,
@@ -39,10 +41,30 @@ func TestChunkStatusResponseTimeoutSumsBothDirections(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := b.chunkStatusResponseTimeout(0)
+			got := b.chunkStatusResponseTimeout(nil, 0)
 			if diff := got - tc.want; diff < -time.Millisecond || diff > time.Millisecond {
 				t.Fatalf("chunk StatusResponse bound = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestChunkStatusResponseTimeoutOverAConnection: over a reliable connection
+// (TCP, BLE) the bound is max(30 s, 2 s) + 5 s = 35 s whatever the session
+// intervals, as matter.js's maxPeerResponseTimeOf for such a channel
+// (packages/protocol/src/protocol/MRP.ts:90-92, :111-113 at db021da0); a UDP
+// peer keeps the retransmission sum.
+func TestChunkStatusResponseTimeoutOverAConnection(t *testing.T) {
+	t.Parallel()
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c transport.Conn = &sizedConn{size: 64_000}
+	if got := b.chunkStatusResponseTimeout(b.routeFor(c), 1); got != 35*time.Second {
+		t.Fatalf("bound over a connection = %v, want 35s", got)
+	}
+	if got := b.chunkStatusResponseTimeout(&net.UDPAddr{IP: net.IPv6loopback, Port: 5540}, 1); got == 35*time.Second {
+		t.Fatal("a UDP peer took the connection's bound")
 	}
 }

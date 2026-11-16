@@ -208,6 +208,19 @@ type Result struct {
 	// FabricIndexOnPeer is the fabric index the node assigned us, 0 when
 	// unknown.
 	FabricIndexOnPeer uint8
+	// AttestedVendorID and AttestedProductID are the node's
+	// BasicInformation VendorID and ProductID when device attestation
+	// validated them — [attestation.Validate] returned no error, so the
+	// Certification Declaration's vendor_id is that VendorID and its
+	// product_id_array holds that ProductID — and the DAC chain was
+	// verified against the trust store and no error finding stands. Both
+	// nil otherwise, also when the OnAttestationFailure policy let
+	// commissioning go on: an error of Validate, a check that did not run
+	// for want of a trust store (attestation.DclServiceUnavailable), an
+	// accepted attestation.LevelError finding; the commissioning log names
+	// the reason (matter.controller.commissioning.attested_identity_not_recorded).
+	// client.Record keeps them (review II decisions 105 and 119).
+	AttestedVendorID, AttestedProductID *uint16
 }
 
 // PASEOptions configures [Commissioner.EstablishPASE] — matter.js
@@ -642,7 +655,12 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 	}
 	// The device's commissioning window is closed now (:721-723).
 	c.forgetCommissioned(opts)
-	return Result{Address: address, FabricIndexOnPeer: f.data.fabricIndex}, nil
+	res := Result{Address: address, FabricIndexOnPeer: f.data.fabricIndex}
+	if a := f.attested; a != nil {
+		vid, pid := a[0], a[1]
+		res.AttestedVendorID, res.AttestedProductID = &vid, &pid
+	}
+	return res, nil
 }
 
 // forgetCommissioned is #forgetCommissionedDevice (:321-341): every

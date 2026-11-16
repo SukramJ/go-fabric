@@ -4212,13 +4212,13 @@
       "role": "dut"
     },
     "DD/3.12": {
-      "steps": 8,
+      "steps": 7,
       "stepsSkipped": 5,
       "source": "TC-DD-3.12.test.ts",
       "role": "dut"
     },
     "DD/3.13": {
-      "steps": 8,
+      "steps": 7,
       "stepsSkipped": 5,
       "source": "TC-DD-3.13.test.ts",
       "role": "dut"

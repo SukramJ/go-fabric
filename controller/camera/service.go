@@ -225,8 +225,12 @@ func (s *Service) wire() {
 // Close ends every session this service holds, stops its sweeps and
 // detaches it from the controller. A raw provider command in flight is
 // waited for; an offer of one answered once Close began ends its session
-// instead of keeping it (review II, R2-P2-stop-03). A second Close
-// returns once the first has, or with ctx's error when ctx ends first.
+// instead of keeping it (review II, R2-P2-stop-03). The wait for those
+// commands is bounded by ctx: a Close whose ctx ends first returns ctx's
+// error and leaves the service closing — the rest of the teardown runs
+// once the commands returned — and a later Close waits for it again. A
+// second Close returns once the teardown finished, or with ctx's error
+// when ctx ends first.
 func (s *Service) Close(ctx context.Context) error {
 	s.mu.Lock()
 	if s.closed {
@@ -240,8 +244,8 @@ func (s *Service) Close(ctx context.Context) error {
 		}
 	}
 	s.closed = true
-	s.closeDone = make(chan struct{})
-	defer close(s.closeDone)
+	done := make(chan struct{})
+	s.closeDone = done
 	s.ps.close()
 	s.mu.Unlock()
 	if s.cfg.Reports != nil {
@@ -250,7 +254,28 @@ func (s *Service) Close(ctx context.Context) error {
 	// The EndSessions need the camera connections, so the sessions end
 	// before the service lets go of the controller.
 	s.m.shutdown(ctx)
-	s.ending.Wait()
+	go func() {
+		defer close(done)
+		s.ending.Wait()
+		s.finishClose()
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		select {
+		case <-done:
+			return nil
+		default:
+		}
+		return ctx.Err()
+	}
+}
+
+// finishClose is the teardown after the raw provider commands returned:
+// the service lets go of the controller, its sweeps stop and its sessions
+// close.
+func (s *Service) finishClose() {
 	if s.unsub != nil {
 		s.unsub()
 	}
@@ -265,7 +290,6 @@ func (s *Service) Close(ctx context.Context) error {
 	for _, sess := range open {
 		sess.box.close()
 	}
-	return nil
 }
 
 // enter counts a raw provider command in with ending, false once Close

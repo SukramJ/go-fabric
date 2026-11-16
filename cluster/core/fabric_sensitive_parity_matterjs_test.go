@@ -8,7 +8,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -28,7 +27,8 @@ import (
 // accessing fabric 1's entry is whole and fabric 2's carries no
 // fabric-sensitive field — and for a session without a fabric no entry
 // does (AccessControl.ts:347-349 at db021da0). The assertions are on the
-// wire bytes the bridge writes.
+// wire bytes of the dispatcher's read: each server returns every entry
+// whole, the dispatcher scopes it ([readWire]).
 
 // fabricIndexOnly is an entry as another fabric reads it when every field
 // but FabricIndex is fabric-sensitive.
@@ -40,13 +40,9 @@ func (f fabricIndexOnly) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	_ = enc.EndContainer()
 }
 
-// wantWire holds v, as the bridge writes it, to the list of want.
-func wantWire(t *testing.T, what string, v any, want ...spec.Encodable) {
+// wantWire holds got, a list on the wire, to the list of want.
+func wantWire(t *testing.T, what string, got []byte, want ...spec.Encodable) {
 	t.Helper()
-	got, err := bridge.AttributeValueTLV(v)
-	if err != nil {
-		t.Fatalf("%s: %v", what, err)
-	}
 	enc := tlv.NewEncoder()
 	spec.List[spec.Encodable](want).EncodeTLV(enc, tlv.AnonymousTag())
 	exp, err := enc.Bytes()
@@ -75,12 +71,9 @@ func TestParityMatterJS_MessagesEntryOfAnotherFabricWithoutSensitiveFields(t *te
 	if len(whole) != 2 || whole[1].FabricIndex != 1 {
 		t.Fatalf("local read %+v", whole)
 	}
-	v, _ := m.MatterReadFiltered(msgCtx(1, false), messagesdef.AttrMessages)
-	wantWire(t, "unfiltered read by fabric 1", v, fabricIndexOnly(2), whole[1])
-	v, _ = m.MatterReadFiltered(msgCtx(0, false), messagesdef.AttrMessages)
-	wantWire(t, "unfiltered read without a fabric", v, fabricIndexOnly(2), fabricIndexOnly(1))
-	v, _ = m.MatterReadFiltered(msgCtx(1, true), messagesdef.AttrMessages)
-	wantWire(t, "filtered read by fabric 1", v, whole[1])
+	wantWire(t, "unfiltered read by fabric 1", readWire(msgCtx(1, false), t, m, messagesdef.AttrMessages), fabricIndexOnly(2), whole[1])
+	wantWire(t, "unfiltered read without a fabric", readWire(msgCtx(0, false), t, m, messagesdef.AttrMessages), fabricIndexOnly(2), fabricIndexOnly(1))
+	wantWire(t, "filtered read by fabric 1", readWire(msgCtx(1, true), t, m, messagesdef.AttrMessages), whole[1])
 }
 
 // sceneInfoWire is a FabricSceneInfo entry on the wire; redacted leaves
@@ -122,12 +115,9 @@ func TestParityMatterJS_FabricSceneInfoOfAnotherFabricWithoutSensitiveFields(t *
 		t.Fatalf("local read %+v", whole)
 	}
 	one, two := whole[0], whole[1]
-	v, _ := s.MatterReadFiltered(msgCtx(2, false), 0x0002)
-	wantWire(t, "unfiltered read by fabric 2", v, sceneInfoWire{one, true}, sceneInfoWire{two, false})
-	v, _ = s.MatterReadFiltered(msgCtx(0, false), 0x0002)
-	wantWire(t, "unfiltered read without a fabric", v, sceneInfoWire{one, true}, sceneInfoWire{two, true})
-	v, _ = s.MatterReadFiltered(msgCtx(1, true), 0x0002)
-	wantWire(t, "filtered read by fabric 1", v, sceneInfoWire{one, false})
+	wantWire(t, "unfiltered read by fabric 2", readWire(msgCtx(2, false), t, s, 0x0002), sceneInfoWire{one, true}, sceneInfoWire{two, false})
+	wantWire(t, "unfiltered read without a fabric", readWire(msgCtx(0, false), t, s, 0x0002), sceneInfoWire{one, true}, sceneInfoWire{two, true})
+	wantWire(t, "filtered read by fabric 1", readWire(msgCtx(1, true), t, s, 0x0002), sceneInfoWire{one, false})
 }
 
 // TestParityMatterJS_RegisteredClientOfAnotherFabricWithoutSensitiveFields:
@@ -149,10 +139,7 @@ func TestParityMatterJS_RegisteredClientOfAnotherFabricWithoutSensitiveFields(t 
 		}
 	}
 	own := icddef.MonitoringRegistrationStruct{CheckInNodeId: 0x10, MonitoredSubject: 0x10, ClientType: icddef.ClientTypeEphemeral, FabricIndex: 1}
-	v, _ := s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 1), icddef.AttrRegisteredClients)
-	wantWire(t, "unfiltered read by fabric 1", v, fabricIndexOnly(2), own)
-	v, _ = s.MatterReadFiltered(im.WithFabricFilter(context.Background(), false, 0), icddef.AttrRegisteredClients)
-	wantWire(t, "unfiltered read without a fabric", v, fabricIndexOnly(2), fabricIndexOnly(1))
-	v, _ = s.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 1), icddef.AttrRegisteredClients)
-	wantWire(t, "filtered read by fabric 1", v, own)
+	wantWire(t, "unfiltered read by fabric 1", readWire(im.WithFabricFilter(context.Background(), false, 1), t, s, icddef.AttrRegisteredClients), fabricIndexOnly(2), own)
+	wantWire(t, "unfiltered read without a fabric", readWire(im.WithFabricFilter(context.Background(), false, 0), t, s, icddef.AttrRegisteredClients), fabricIndexOnly(2), fabricIndexOnly(1))
+	wantWire(t, "filtered read by fabric 1", readWire(im.WithFabricFilter(context.Background(), true, 1), t, s, icddef.AttrRegisteredClients), own)
 }

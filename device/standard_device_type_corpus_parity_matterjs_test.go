@@ -3,18 +3,22 @@
 
 // A port of matter.js
 // packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts at
-// 862ad75f: every standard device type built with the state its server
-// needs and judged, carrying only the violations the corpus pins.
+// db021da0 (every line below at that pin): every standard device type
+// built with the state its server needs and judged, carrying only the
+// violations the corpus pins.
 //
 // matter.js adds each generated endpoint type to a node's root (a
 // BridgedNode under an Aggregator, RootNode as the node's own root) with
-// the per-type state of its fixtures table (:52-172); here each committed
-// kit type is built with the host's statements of the device package's
-// fixtures (conformance_test.go, the same state in Go form) but without
+// the per-type state of its fixtures table (the shared state :52-169, the
+// table :171-273); here each committed kit type is built with
+// the host's statements of the device package's fixtures
+// (conformance_test.go, and the required values of initial_values_test.go,
+// each cited to its line of that table) but without
 // the parts those fixtures add — the corpus judges a type as generated,
 // its components the developer's — assembled as a bridged device below
 // the Aggregator, and judged (endpoint.ValidateDeviceTypes). The
-// violations it may carry are matter.js's pinnedViolations (:314-364),
+// violations it may carry are matter.js's pinnedViolations (the table
+// ending :360),
 // a mandatory server the type cannot construct by itself because its
 // mandated features are no legal selection (unimplementedMandatoryServers,
 // :366-384), and the ones the Go fixture tolerates with its reason. A name
@@ -59,7 +63,7 @@ var standardDeviceTypeNames = []string{
 }
 
 // pinnedViolations is the corpus's pinnedViolations
-// (StandardDeviceTypeCorpusTest.ts:314-364), as "<kind> <deviceType>
+// (StandardDeviceTypeCorpusTest.ts, the table ending :360), as "<kind> <deviceType>
 // <requirement>": the components a developer adds.
 var pinnedViolations = map[string][]string{
 	"BatteryStorage":   {"instanceCount BatteryStorage device:ElectricalSensor", "instanceCount BatteryStorage device:PowerSource", "instanceCount BatteryStorage device:DeviceEnergyManagement"},
@@ -184,7 +188,7 @@ func TestStandardDeviceTypeCorpusParityMatterJS(t *testing.T) {
 		// validator refuses the endpoint, a warn-mode one reports it. With the
 		// tags matter.js's fixture gives it (ClosureTag.Door) nothing is owed.
 		t.Run("refuses a Closure endpoint without the tags its Descriptor TagList requires", func(t *testing.T) {
-			bare, err := New(ClosureType(), Options{StableKey: endpoint.StringKey("test:bare"), Name: "bare"}, testWith(t, "Closure")...)
+			bare, err := newWith(ClosureType(), Options{StableKey: endpoint.StringKey("test:bare"), Name: "bare"}, testWith(t, "Closure")...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -206,7 +210,7 @@ func TestStandardDeviceTypeCorpusParityMatterJS(t *testing.T) {
 				t.Errorf("warn-mode validation refused: %v", err)
 			}
 
-			tagged, err := New(ClosureType(), Options{StableKey: endpoint.StringKey("test:tagged"), Name: "tagged", Tags: []SemanticTag{closureDoorTag}}, testWith(t, "Closure")...)
+			tagged, err := newWith(ClosureType(), Options{StableKey: endpoint.StringKey("test:tagged"), Name: "tagged", Tags: []SemanticTag{closureDoorTag}}, testWith(t, "Closure")...)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -173,7 +173,7 @@ func TestFailSafeExpiryThroughTheBridgeClosesThePASESessions(t *testing.T) {
 		// the ArmFailSafe that armed it, an interaction long answered.
 		r := newFailSafeRig(t)
 		hostRan := make(chan struct{}, 1)
-		r.gc.SetOnFailSafeExpired(func(ctx context.Context, _ uint8) {
+		r.gc.SetOnFailSafeExpired(func(ctx context.Context, _ uint8) { //nolint:staticcheck // the deprecated host hook, kept for its window
 			r.b.FailSafeExpired(ctx)
 			hostRan <- struct{}{}
 		})

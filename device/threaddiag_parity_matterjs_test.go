@@ -17,7 +17,7 @@ import (
 // AttributeList.
 func threadDiagAttributes(t *testing.T, key string, decl tndef.Declare) []uint32 {
 	t.Helper()
-	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey(key), Name: key}, decl)
+	d, err := device.NewThreadBorderRouter(device.Options{StableKey: device.StringKey(key), Name: key}, required("ThreadBorderRouter", decl)...)
 	if err != nil {
 		t.Fatal(err)
 	}

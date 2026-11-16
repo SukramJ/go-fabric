@@ -17,12 +17,14 @@ import (
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// This file is the bridge's CASE *initiator*. It exists for exactly one
-// caller — re-establishing former subscriptions after a restart
+// This file is the bridge's CASE *initiator*. It exists for one caller —
+// re-establishing former subscriptions after a restart
 // ([Bridge.ReestablishFormerSubscriptions], docs/adr/0008) — and reaches
 // only a peer that already held a subscription here, on a fabric this node
 // is on. It is not a controller role: there is no API that opens a session
-// to an arbitrary node.
+// to an arbitrary node. Until their removal the deprecated
+// [Bridge.ConnectPeer] and [Bridge.ConnectOtaProvider] reach it too; a node
+// establishes its other peer sessions on its client stack (docs/adr/0032).
 
 // Errors of the initiator path.
 var (
@@ -57,8 +59,9 @@ type CaseInitiation struct {
 }
 
 // CaseInitiatorProvider prepares a CASE handshake towards peerNodeID on the
-// fabric at fabricIndex. It is consulted only to re-establish former
-// subscriptions; ctx bounds the attempt.
+// fabric at fabricIndex. It is consulted to re-establish former
+// subscriptions, and by the deprecated [Bridge.ConnectPeer] until its
+// removal; ctx bounds the attempt.
 type CaseInitiatorProvider func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*CaseInitiation, error)
 
 // OperationalResolver finds the addresses of a peer's operational instance
@@ -171,33 +174,72 @@ func abandon(init *CaseInitiation) {
 	}
 }
 
+// newestPeerSessionFinder is the optional [SessionRegistry] capability
+// that names the live session of a peer the peer sent on last
+// (secure/operational.Manager.NewestSessionForPeer has it). Its contract,
+// which livePeerLink relies on: usable is asked newest first and not
+// again after its first true, whose id is the one returned.
+type newestPeerSessionFinder interface {
+	NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usable func(id uint16) bool) (uint16, bool)
+}
+
 // existingPeerSession returns the newest live session with the peer whose
-// address is known — matter.js Peer.connect returns `newestSession()`
-// before it considers a new handshake.
+// address is known, of any transport — matter.js Peer.connect returns
+// `newestSession()` before it considers a new handshake.
 func (b *Bridge) existingPeerSession(fabricIndex uint8, peerNodeID uint64) (peerLink, bool) {
+	return b.livePeerLink(fabricIndex, peerNodeID, PeerSessionRequirement{})
+}
+
+// livePeerLink returns the live session with the peer that meets req and
+// whose route is known, the one the peer sent on last — matter.js
+// newestSession, the highest activeTimestamp among the sessions neither
+// closing nor peer-lost, optionally of one channel type
+// (packages/protocol/src/peer/Peer.ts:582-602 at db021da0), the
+// requirement being that channel type: a required transport is the only
+// one considered (:369-376, :440-448). A registry without the activity
+// order falls back to the highest live id.
+func (b *Bridge) livePeerLink(fabricIndex uint8, peerNodeID uint64, req PeerSessionRequirement) (peerLink, bool) {
 	b.mu.RLock()
 	reg := b.sessionRegistry
 	lookup := b.sessions
 	b.mu.RUnlock()
+	if lookup == nil {
+		return peerLink{}, false
+	}
+	var link peerLink
+	usable := func(id uint16) bool {
+		if _, live := lookup.Lookup(id); !live {
+			return false
+		}
+		raw, known := b.sessionPeerAddrs.Load(id)
+		addr, isAddr := raw.(net.Addr)
+		if !known || !isAddr || isNilRoute(addr) {
+			return false
+		}
+		// A Large Message request needs a session that carries it: one
+		// bound to a TCP connection (connectedhomeip attaches only to a
+		// session with the wanted payload capability,
+		// src/app/OperationalSessionSetup.cpp:75-94 at 6170af84).
+		if req.LargeMessage && !routeCarriesLargeMessages(addr) {
+			return false
+		}
+		link = peerLink{sessionID: id, addr: addr}
+		return true
+	}
+	if f, ok := reg.(newestPeerSessionFinder); ok {
+		if _, found := f.NewestSessionForPeer(fabricIndex, peerNodeID, usable); found {
+			return link, true
+		}
+		return peerLink{}, false
+	}
 	lister, ok := reg.(peerSessionLister)
-	if !ok || lookup == nil {
+	if !ok {
 		return peerLink{}, false
 	}
 	ids := lister.SessionIDsForPeer(fabricIndex, peerNodeID)
 	for i := len(ids) - 1; i >= 0; i-- {
-		id := ids[i]
-		if _, live := lookup.Lookup(id); !live {
-			continue
-		}
-		// A session bound to a TCP connection is reused like one on UDP:
-		// matter.js Peer.connect takes the newest live session of the
-		// peer, of any channel type when no transport is required
-		// (packages/protocol/src/peer/Peer.ts:439-459, newestSession
-		// :581-601).
-		raw, known := b.sessionPeerAddrs.Load(id)
-		addr, isAddr := raw.(net.Addr)
-		if known && isAddr && !isNilRoute(addr) {
-			return peerLink{sessionID: id, addr: addr}, true
+		if usable(ids[i]) {
+			return link, true
 		}
 	}
 	return peerLink{}, false

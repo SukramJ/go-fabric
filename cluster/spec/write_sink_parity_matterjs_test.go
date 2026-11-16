@@ -8,6 +8,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/contract"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 )
@@ -64,5 +66,114 @@ func TestSinkHearsNoWriteOfTheHeldValue(t *testing.T) {
 	}
 	if !slices.Equal(sk2.writes, []any{uint32(5), uint32(5)}) {
 		t.Errorf("with a Source answering 9, the Sink heard %#v; want both writes of 5", sk2.writes)
+	}
+}
+
+// TestWriteCommitNamesTheChangedAttribute: Server's change naming
+// (contract.ChangeNamingWriter) names the written attribute when its
+// stored value moved and nothing for a write of the held value, the same
+// verdict MatterWriteChanged gives; a refused write names nothing and
+// carries its error. matter.js notes a name in a commit's change list only
+// when its value differs (Datasource.ts:1476-1484 at db021da0).
+func TestWriteCommitNamesTheChangedAttribute(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := hepaServer(t, spec.ServerConfig{})
+	for i, c := range []struct {
+		value any
+		want  []uint32
+	}{
+		{uint64(1000), []uint32{hepa.AttrLastChangedTime}},
+		{uint32(1000), []uint32{}},
+		{nil, []uint32{hepa.AttrLastChangedTime}},
+	} {
+		got, err := srv.MatterWriteCommit(ctx, hepa.AttrLastChangedTime, c.value)
+		if err != nil || got == nil || !slices.Equal(got, c.want) {
+			t.Errorf("write %d of %#v: %v, %v; want %v", i+1, c.value, got, err, c.want)
+		}
+	}
+	if got, err := srv.MatterWriteCommit(ctx, hepa.AttrLastChangedTime, "not a number"); err == nil || len(got) != 0 {
+		t.Errorf("a refused write: %v, %v; want an error and no names", got, err)
+	}
+}
+
+// siblingSink moves Condition when LastChangedTime is written, through
+// the server's Set, from inside the write.
+type siblingSink struct{ srv *spec.Server }
+
+func (k *siblingSink) MatterWriteAttribute(_ context.Context, attrID uint32, _ any) error {
+	if attrID != hepa.AttrLastChangedTime {
+		return nil
+	}
+	v, _ := k.srv.MatterRead(hepa.AttrCondition)
+	c, _ := v.(uint8)
+	return k.srv.Set(hepa.AttrCondition, c+1)
+}
+
+// TestWriteCommitNamesTheSiblingItsSinkMoves (review II, Fable read
+// 5b-write F1): a sibling the Sink sets inside a controller's write is
+// part of the write's commit — named beside the written attribute — and
+// the server's version advances once for the write, not once per Set.
+// matter.js advances a datasource's version once per transaction for every
+// field it noted (Datasource.ts:1456-1457, :1476-1484 at db021da0).
+func TestWriteCommitNamesTheSiblingItsSinkMoves(t *testing.T) {
+	t.Parallel()
+	sk := &siblingSink{}
+	srv := hepaServer(t, spec.ServerConfig{Sink: sk})
+	sk.srv = srv
+	v0 := srv.MatterDataVersion()
+	got, err := srv.MatterWriteCommit(context.Background(), hepa.AttrLastChangedTime, uint64(1000))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []uint32{hepa.AttrCondition, hepa.AttrLastChangedTime}; !slices.Equal(got, want) {
+		t.Errorf("the write named %v, want %v", got, want)
+	}
+	if d := srv.MatterDataVersion() - v0; d != 1 {
+		t.Errorf("the version advanced %d times for one write, want once", d)
+	}
+}
+
+type panickingSiblingSink struct{ srv *spec.Server }
+
+func (k *panickingSiblingSink) MatterWriteAttribute(_ context.Context, attrID uint32, _ any) error {
+	if attrID != hepa.AttrLastChangedTime {
+		return nil
+	}
+	if err := k.srv.Set(hepa.AttrCondition, uint8(7)); err != nil {
+		return err
+	}
+	panic("sink fails after it moved a sibling")
+}
+
+// TestWriteCommitSettlesWhenTheSinkPanics (review II, Fable read
+// 5b-write T3): a Sink that sets a sibling and then panics leaves the
+// sibling changed — the version advances once and the change listener
+// is told before the panic goes on.
+func TestWriteCommitSettlesWhenTheSinkPanics(t *testing.T) {
+	t.Parallel()
+	sk := &panickingSiblingSink{}
+	srv := hepaServer(t, spec.ServerConfig{Sink: sk})
+	sk.srv = srv
+	var told []uint32
+	srv.OnAttributeChange(func(ch contract.Change) { told = append(told, ch.Attributes...) })
+	v0 := srv.MatterDataVersion()
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = srv.MatterWriteCommit(context.Background(), hepa.AttrLastChangedTime, uint64(1000))
+	}()
+	if d := srv.MatterDataVersion() - v0; d != 1 {
+		t.Errorf("the version advanced %d times, want once", d)
+	}
+	if !slices.Contains(told, hepa.AttrCondition) {
+		t.Errorf("the listener was told %v, want the sibling", told)
+	}
+	// The window is open again: a Set outside any write advances.
+	v1 := srv.MatterDataVersion()
+	if err := srv.Set(hepa.AttrCondition, uint8(9)); err != nil {
+		t.Fatal(err)
+	}
+	if srv.MatterDataVersion() == v1 {
+		t.Error("a Set after the panic advanced no version: the window stayed open")
 	}
 }

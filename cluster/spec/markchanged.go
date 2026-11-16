@@ -39,7 +39,7 @@ type ChangeMarker interface {
 // definition does not define is not one either — and when an attribute's
 // quality is changes omitted ("C"), whose changes the specification does
 // not report, or quieter ("Q"), whose report goes through its throttle
-// ([cluster.Quieter]) rather than directly ([ErrNotReportable]).
+// ([Server.MarkQuietChanged]) rather than directly ([ErrNotReportable]).
 //
 // Mirrors matter.js
 // packages/node/src/behavior/internal/ServerBehaviorBacking.ts:186-221 at
@@ -62,7 +62,7 @@ func (s *Server) MarkChanged(attrIDs ...uint32) error {
 		case a.Quality.ChangesOmitted:
 			return fmt.Errorf("%w: %s cannot report %s; the specification omits change reporting for it", ErrNotReportable, s.def.Name, a.Name)
 		case a.Quality.Quieter:
-			return fmt.Errorf("%w: %s cannot report %s directly; report its change through its quieter so its throttle applies", ErrNotReportable, s.def.Name, a.Name)
+			return fmt.Errorf("%w: %s cannot report %s directly; report it with MarkQuietChanged so its throttle applies", ErrNotReportable, s.def.Name, a.Name)
 		}
 	}
 	ids := slices.Compact(slices.Sorted(slices.Values(attrIDs)))

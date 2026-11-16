@@ -28,7 +28,7 @@ const allAirQualityFeatures = aqdef.FeatureFair | aqdef.FeatureModerate | aqdef.
 
 func airQualitySensor(t *testing.T, features aqdef.Feature) *device.AirQualitySensor {
 	t.Helper()
-	d, err := device.NewAirQualitySensor(device.Options{StableKey: endpoint.StringKey("aq"), Name: "aq"}, aqdef.Declare{Features: features})
+	d, err := device.NewAirQualitySensor(device.Options{StableKey: endpoint.StringKey("aq"), Name: "aq"}, required("AirQualitySensor", aqdef.Declare{Features: features})...)
 	if err != nil {
 		t.Fatal(err)
 	}

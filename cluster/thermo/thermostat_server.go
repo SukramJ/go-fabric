@@ -52,6 +52,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"reflect"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -695,9 +696,12 @@ func (s *ThermostatServer) MatterClusterID() uint32 { return ThermostatClusterID
 // nullable). Pass nil to set null (sensor unavailable). With LTNE the
 // value is kept for the server's own use and the attribute reads null
 // (ThermostatServer.ts:516-519 at 862ad75f). The value is
-// stored as given — no range check, no log — and not announced through
-// the change notifier: LocalTemperature is in [ThermostatServer.MatterReportable].
-// With TEVT a changed value emits LocalTemperatureChange (events.go).
+// stored as given — no calibration, no range check, no log — and not
+// announced through the change notifier: LocalTemperature is in
+// [ThermostatServer.MatterReportable]. With TEVT a changed value emits
+// LocalTemperatureChange (events.go). A host that reports what its sensor
+// measured calls [ThermostatServer.SetMeasuredTemperature], which applies
+// LocalTemperatureCalibration.
 func (s *ThermostatServer) SetLocalTemperature(t *int16) {
 	s.mu.Lock()
 	before := s.eventStateLocked()
@@ -705,6 +709,43 @@ func (s *ThermostatServer) SetLocalTemperature(t *int16) {
 	after := s.eventStateLocked()
 	s.mu.Unlock()
 	s.emitChanges(context.Background(), before, after)
+}
+
+// SetMeasuredTemperature reports what the host's sensor measured, in
+// 0.01 °C: a non-null value is calibrated — LocalTemperatureCalibration,
+// in 0.1 °C, times 10 is added — and stored as LocalTemperature, which
+// reads null with LTNE while the server keeps the value; nil sets
+// LocalTemperature to null. A calibrated value outside int16 is not
+// stored (logged). Otherwise it is [ThermostatServer.SetLocalTemperature]
+// of the calibrated value.
+//
+// Mirrors matter.js ThermostatServer's external measurement input
+// (externalMeasuredIndoorTemperature, packages/node/src/behaviors/
+// thermostat/ThermostatServer.ts:497-501 at db021da0) and its handler
+// #handleMeasuredTemperatureChange (:511-527): the calibration added to a
+// non-null value (:512-514), the attribute written unless
+// LocalTemperatureNotExposed (:516-519; the guard :517), a null
+// measurement setting the attribute null (:518) and leaving the internal
+// value (:523). The internal value that
+// handler keeps beside the attribute (:522-526) feeds matter.js's
+// automatic mode handling, which this server does not implement, so the
+// server keeps none apart from the attribute.
+func (s *ThermostatServer) SetMeasuredTemperature(t *int16) {
+	if t == nil {
+		s.SetLocalTemperature(nil)
+		return
+	}
+	s.mu.RLock()
+	calib := s.localTempCalib
+	s.mu.RUnlock()
+	v := int32(*t) + int32(calib)*10
+	if v < math.MinInt16 || v > math.MaxInt16 {
+		s.logger().Warn("matter.thermostat.measured_temperature_ignored",
+			slog.Int("value", int(*t)), slog.Int("result", int(v)))
+		return
+	}
+	c := int16(v)
+	s.SetLocalTemperature(&c)
 }
 
 // SetSystemMode records a SystemMode the device took on itself: stored and
@@ -1015,6 +1056,17 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 	return err
 }
 
+// answers reports whether the server reads stored — a written value in its
+// stored form — for attrID: the comparison in front of the host's veto.
+func (s *ThermostatServer) answers(attrID uint32, stored any) bool {
+	cur, ok := s.MatterRead(attrID)
+	if !ok || cur == nil || stored == nil {
+		return ok && cur == nil && stored == nil
+	}
+	c, ok := spec.Convert(cur, reflect.TypeOf(stored))
+	return ok && reflect.DeepEqual(c.Interface(), stored)
+}
+
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
 // write of [ThermostatServer.MatterWrite], changed when it moved an
 // attribute — the comparisons that decide the change report. A staged
@@ -1024,8 +1076,13 @@ func (s *ThermostatServer) MatterWriteChanged(ctx context.Context, attrID uint32
 	if err != nil {
 		return false, err
 	}
-	if err := s.veto.Check(ctx, attrID, storedWrite(attrID, v)); err != nil {
-		return false, err
+	// The host's veto hears a change only: a write of the value the server
+	// answers reaches no veto ([spec.WriteVeto.Check]); the write goes on
+	// as before and changes nothing.
+	if stored := storedWrite(attrID, v); !s.answers(attrID, stored) {
+		if err := s.veto.Check(ctx, attrID, stored); err != nil {
+			return false, err
+		}
 	}
 	// Presets and Schedules are staged in their atomic write; the
 	// attribute changes when the write commits, through its command.

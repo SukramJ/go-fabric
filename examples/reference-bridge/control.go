@@ -165,6 +165,10 @@ func (f *fleet) applyCameraPipeCommand(line string) error {
 	return f.camera.apply(cmd)
 }
 
+// userIntentWindowTimeout bounds UserIntentCommissioningStart's opening
+// of the window (its DNS-SD announcement included).
+const userIntentWindowTimeout = 10 * time.Second
+
 // errUnknownPipeCommand reports a command this daemon does not implement.
 var errUnknownPipeCommand = errors.New("not a command this daemon implements")
 
@@ -210,6 +214,19 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 			return errors.New("SimulateConfigurationVersionChange: no bridge wired")
 		}
 		return f.configChange()
+	case "UserIntentCommissioningStart":
+		// The user action of the User-Intent flow (--custom-flow 1): the
+		// node's own commissioning window opens with the configured
+		// credentials, CM=1, for its default duration (node.OpenOwnWindow
+		// with timeout 0); while a window is open it restarts the own
+		// window. An administrator's open window, a commissioning block or
+		// a stopped node is the error OpenOwnWindow returns.
+		if f.openWindow == nil {
+			return errors.New("UserIntentCommissioningStart: no node wired")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), userIntentWindowTimeout)
+		defer cancel()
+		return f.openWindow(ctx)
 	case "SetBooleanState":
 		if cmd.NewState == nil {
 			return errors.New("SetBooleanState needs NewState")

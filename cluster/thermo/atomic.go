@@ -672,8 +672,29 @@ func (s *ThermostatServer) pendingAtomicValue(ctx context.Context, attrID uint32
 
 // MatterFabricRemoved closes the atomic writes of fabricIndex's peers —
 // matter.js AtomicWriteHandler observes FabricManager.events.deleting
-// (AtomicWriteHandler.ts:75, :378-388). The bridge calls it for every
-// cluster server of a device endpoint when a fabric is removed.
+// (AtomicWriteHandler.ts:75, :378-388). The node reaches it through
+// [ThermostatServer.MatterDropFabric], the [contract.FabricScopedState]
+// port it calls on every server when a fabric is removed.
 func (s *ThermostatServer) MatterFabricRemoved(fabricIndex uint8) {
 	s.atomic.closeFabric(fabricIndex, s.logger())
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]: the atomic
+// writes of fabricIndex's peers close ([ThermostatServer.MatterFabricRemoved]).
+// They live in memory only, so it never fails.
+func (s *ThermostatServer) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
+	s.MatterFabricRemoved(fabricIndex)
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// whose peers hold an atomic write open.
+func (s *ThermostatServer) MatterHeldFabrics() []uint8 {
+	var out []uint8
+	for _, st := range s.atomic.live(s.clk.Now()) {
+		if !slices.Contains(out, st.peer.fabricIndex) {
+			out = append(out, st.peer.fabricIndex)
+		}
+	}
+	return out
 }

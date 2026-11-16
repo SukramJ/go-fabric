@@ -246,6 +246,7 @@ func TestWaterHeaterSetAttributes(t *testing.T) {
 	srv := newWaterHeater(t, energy.WaterHeaterFeatureEnergyManagement|energy.WaterHeaterFeatureTankPercent, host)
 	em := &emitter{}
 	srv.SetMatterEventEmitter(em)
+	srv.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 
 	before := srv.MatterDataVersion()
 	if err := srv.SetAttributes(map[uint32]any{

@@ -35,20 +35,65 @@
 // Cascade-delete on fabric removal is handled at the schema level
 // (FOREIGN KEY ... ON DELETE CASCADE).
 //
-// The operational private key and the fabric records persist in clear,
-// and so do the group key sets, the shared secrets of the CASE resumption
-// records (matter_resumption) and, in the settings table, the committed
+// # Secrets at rest
+//
+// The store holds the node's secrets: the operational private key (and,
+// while an UpdateNOC is uncommitted, the key it replaced), the IPK, the
+// group epoch keys, the shared secrets of the CASE resumption records
+// (matter_resumption), the ICDToken keys of the ICD registrations, the
+// DoorLock credential data, and, in the settings table, the committed
 // Wi-Fi networks with their credentials, which cluster/core's Wi-Fi
-// NetworkCommissioning server writes under netcomm.wifi.networks. Whoever
-// can read the database, or a copy of it, reads them; file-system level
-// protection is the operator's responsibility. Two kinds of secret are
-// sealed at rest: the keys of the ICD registrations, which the store
-// seals under SettingICDKey (icd_cipher.go, ADR 0029), and DoorLock
+// NetworkCommissioning server writes under netcomm.wifi.networks. A
+// controller's database (controller.New) holds, in the same tables, its
+// CASE resumption records and group key sets and, in the settings table,
+// its CA (controller.ca, with the root and ICAC keys) and its fabric
+// (controller.ca.fabric, with the IPK and the operational key); it opens
+// them with [New], or with [NewSealed] when the host sets
+// controller.Config.Sealer, which then seals all of these. The node
+// registry's secrets beside them (controller/client/sqlstore) are sealed
+// by sqlstore.NewSealed under the same sealer.
+//
+// A Store from [New] keeps them as they are, except two kinds it or its
+// caller seals under a key kept as a setting of the same database: the ICD
+// keys, under [SettingICDKey] (icd_cipher.go, ADR 0029), and DoorLock
 // credential data, which cluster/lock encrypts before the store sees it
-// (SettingDoorLockCredentialKey). Both sealing keys are settings of the
-// same database. Whether the store should seal every secret uniformly is
-// an open architecture question of the 2026-11 review; this list is what
-// holds today.
+// ([SettingDoorLockCredentialKey]). That keeps them out of a read of one
+// table, not out of a copy of the file: whoever can read the database, or a
+// copy of it, reads every secret, and file-system level protection is the
+// operator's responsibility.
+//
+// A Store from [NewSealed] seals every secret column under a [Sealer] the
+// host supplies, whose key lives outside the database — only then are the
+// secrets a copy of the file holds, the old ones in its free pages and its
+// -wal included, unreadable without that key; the non-secret columns stay
+// readable. Each sealed value is bound to its table, column and row; each
+// row carries its seal mark (schema v10), and a sealed store refuses a
+// secret row without it ([ErrUnseal]). Sealing protects the confidentiality
+// of a copy of the database; it gives no integrity or rollback protection —
+// an older sealed value of the same row, written back, opens. [NewSealed]
+// names the columns and the settings (the JointFabricDatastore record
+// under jointfabric.datastore: among them), fails with [ErrUnseal] when
+// its sealer does not open a sealed value the database holds, and seals a
+// clear database on the way in; [AESGCMSealer] is the stdlib sealer. The key's provisioning
+// and rotation are the host's.
+//
+// # Store errors
+//
+// One rule decides what a refused store write does to state the node
+// serves. Every change a controller causes — an attribute write, a
+// command's change of a table such as a scene, a NodeLabel — is stored
+// with the change: the store write comes first, and a refused store
+// answers FAILURE and applies nothing, so nothing a controller was told
+// failed is served or comes back after a restart. matter.js hands a change
+// to its store in the commit's first phase (Datasource.ts:1224-1262 at
+// db021da0); the rollback on a refused store is the entry
+// BD-Matter-NonVolatileWrite-StoredBeforeApplied of
+// notes/parity/by_design.md. The internal consequences of a change — the
+// OTA requestor's progress, what a removal takes along (a removed group's
+// or fabric's scenes), the controller role's node cache — are applied
+// whatever the store answers, logged when it refuses, and stored again
+// with the next change. endpoint.Persistence states the rule for a bridged
+// endpoint's NodeLabel and scene table.
 //
 // The factory reset ([Store.Erase]) deletes every matter_* row and then
 // rewrites the file (VACUUM) and empties the write-ahead log

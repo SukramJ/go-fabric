@@ -123,7 +123,7 @@ func TestDeniedEventPathStatusesExistence(t *testing.T) {
 	if len(got) != 1 || got[0].Status.Status != StatusUnsupportedEndpoint || got[0].Path.Endpoint != 3 {
 		t.Fatalf("statuses %+v", got)
 	}
-	if !isFabricSensitiveEventCluster(matterMessagesClusterID) || eventReadPrivilege(matterAccountLoginClusterID) != 5 {
+	if !eventScope(0x0097, 0x00).Sensitive || eventScope(0x050E, 0x00).ReadPrivilege != 5 {
 		t.Fatal("Messages / AccountLogin not fabric-sensitive")
 	}
 }

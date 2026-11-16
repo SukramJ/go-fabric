@@ -26,7 +26,7 @@ import (
 // and of src/app/clusters/general-commissioning-server/tests/
 // TestGeneralCommissioningCluster.cpp, ported by meaning onto the server.
 
-// settingsFake is an in-memory store.Settings with DeleteSetting.
+// settingsFake is an in-memory store.Settings.
 type settingsFake struct {
 	mu   sync.Mutex
 	kv   map[string]string
@@ -64,11 +64,20 @@ func (f *settingsFake) SetSettings(_ context.Context, values map[string]string) 
 	return nil
 }
 
-func (f *settingsFake) DeleteSetting(_ context.Context, key string) error {
+func (f *settingsFake) DeleteSettings(_ context.Context, keys ...string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	delete(f.kv, key)
-	return f.fail
+	if f.fail != nil {
+		return f.fail
+	}
+	for _, key := range keys {
+		delete(f.kv, key)
+	}
+	return nil
+}
+
+func (f *settingsFake) DeleteSettingsWithPrefix(context.Context, string) error {
+	return errors.New("settingsFake: no prefix delete")
 }
 
 func (f *settingsFake) GetMetadataCounter(context.Context, string) (value uint64, ok bool, err error) {

@@ -30,3 +30,37 @@ func TestDefaultValueParityMatterJS(t *testing.T) {
 		}
 	}
 }
+
+// TestStructDefaultFromItsFields: a struct-typed attribute without a
+// default of its own gets the one its fields state — OperationalState's
+// OperationalError starts as {errorStateId: 0}
+// (operational-state.element.ts:110-111 at db021da0) — and only a
+// mandatory, non-nullable field with a scalar default enters it — this
+// generator's narrowing of matter.js's rule (DefaultValue.ts:153-179 at
+// db021da0 takes every conformant child with a default).
+func TestStructDefaultFromItsFields(t *testing.T) {
+	t.Parallel()
+	mk := func(name string, k kind, mandatory, nullable bool, def string) *fieldInfo {
+		f := &fieldInfo{name: name, goName: name, t: typeInfo{kind: k}, mandatory: mandatory, nullable: nullable, v: &value{}}
+		if def != "" {
+			f.v.Default = []byte(def)
+		}
+		return f
+	}
+	st := &dataInfo{goName: "ErrorStateStruct", kind: kindStruct, fields: []*fieldInfo{
+		mk("ErrorStateId", kindEnum, true, false, "0"),
+		mk("ErrorStateLabel", kindString, false, false, `"x"`),
+		mk("Nullable", kindUint, true, true, "1"),
+		mk("NoDefault", kindUint, true, false, ""),
+		mk("Flag", kindBool, true, false, "true"),
+	}}
+	if got, want := structDefault(typeInfo{kind: kindStruct, dt: st}), "ErrorStateStruct{ErrorStateId: 0, Flag: true}"; got != want {
+		t.Errorf("structDefault = %q, want %q", got, want)
+	}
+	if got := structDefault(typeInfo{kind: kindUint}); got != "" {
+		t.Errorf("a scalar: %q", got)
+	}
+	if got := structDefault(typeInfo{kind: kindStruct, dt: &dataInfo{goName: "Empty", kind: kindStruct}}); got != "" {
+		t.Errorf("a struct without field defaults: %q", got)
+	}
+}

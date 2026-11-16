@@ -44,6 +44,7 @@ import (
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock"
@@ -152,6 +153,25 @@ type Config struct {
 	// secret — with it and a factory reset anyone can commission the
 	// device — and the database then holds one per node.
 	KeepOnboardingCodes bool
+	// Sealer seals the secrets of the controller's database at rest
+	// (opt-in, off by default), the same sealer node.Store.Sealer takes.
+	// New opens the store with store.NewSealed and the node registry with
+	// sqlstore.NewSealed: what is sealed is the CA (controller.ca, with
+	// its root and ICAC key), the controller's fabric (controller.ca.fabric,
+	// with its IPK and operational key), the CASE resumption records, the
+	// group key sets, and in the registry the kept onboarding codes and the
+	// ICD Check-In keys. The rest — certificates, fabric and node ids, the
+	// nodes' attribute values — stays readable. A database written without
+	// a sealer is sealed on the way in and its file scrubbed, as a node's
+	// store is (store.NewSealed): each store records the scrub it owes with
+	// its sealing, and a scrub that did not finish (store.ErrScrubIncomplete
+	// from New, or a process that ended first) is run by the next New. The
+	// key must live outside the database
+	// (docs/security.md, "Sealing at rest"). Every later New needs the
+	// same sealer: under another key New fails with an error that wraps
+	// store.ErrUnseal (the stores open one sealed value first); without
+	// one, New fails reading the sealed CA with store.ErrNoSealer.
+	Sealer store.Sealer
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
 	Names func(*slog.Logger) (*discovery.Names, error)
@@ -289,8 +309,14 @@ type Config struct {
 // fixed at New, keep answering, and Erase is the reset that runs after a
 // Close.
 type Controller struct {
-	db  *sql.DB
-	log *slog.Logger
+	db *sql.DB
+	// st is the controller's store on db, sealed with Config.Sealer when
+	// one is set: every read and write of the store tables goes through it.
+	st *store.Store
+	// nodeStore is the node registry's store on db, sealed with
+	// Config.Sealer when one is set.
+	nodeStore *sqlstore.Store
+	log       *slog.Logger
 	// keepCodes is Config.KeepOnboardingCodes.
 	keepCodes bool
 	clock     clock.Clock
@@ -428,7 +454,10 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if err := errors.Join(store.Apply(ctx, cfg.DB), sqlstore.Apply(ctx, cfg.DB)); err != nil {
 		return nil, err
 	}
-	keep := ca.SettingStore{Settings: store.New(cfg.DB)} // "controller.ca" and "controller.ca.fabric"
+	if c.st, c.nodeStore, err = openStores(ctx, cfg); err != nil {
+		return nil, err
+	}
+	keep := ca.SettingStore{Settings: c.st} // "controller.ca" and "controller.ca.fabric"
 	authority, err := ca.New(ca.Config{Store: keep, Clock: clk, RootSigner: cfg.CAKey})
 	if err != nil {
 		return nil, err
@@ -446,11 +475,24 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.fabric, err = commissioner.NewFabricAuthority(authority, log).DefaultFabric(fcfg, true); err != nil {
 		return nil, err
 	}
+	// The own fabric row before the socket opens and the CASE responder is
+	// registered: a row the former own node left is taken over with its
+	// resumption records gone, so no peer resumes with one of them in the
+	// start-up window (review II, Fable P-4a).
+	if err := c.ensureFabricRow(ctx, c.st); err != nil {
+		return nil, err
+	}
 	networks, err := c.openTransports(ctx, cfg, listen, openNames, clk, log)
 	if err != nil {
 		return nil, err
 	}
-	resumption := &peer.MemoryResumptionStore{}
+	// One resumption record per peer, kept in the database: a controller
+	// restarted resumes with a node instead of a full CASE (review II,
+	// R2-P5-port-06, F-db021da0-19). The records hang on the controller's
+	// own fabric row, which ensureFabricRow settled above, before the
+	// socket opened and before the peer set and the CASE responder below
+	// read the table.
+	resumption := handshake.NewStoreResumption(c.st)
 	fabrics := []*commissioner.Fabric{c.fabric}
 	pctx := peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks,
@@ -516,7 +558,7 @@ func (c *Controller) openRegistry(cfg Config, fabrics []*commissioner.Fabric, cl
 	var err error
 	//nolint:contextcheck // as commissioner.New
 	if c.reg, err = client.NewRegistry(client.RegistryConfig{
-		Store: sqlstore.New(cfg.DB), Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
+		Store: c.nodeStore, Commissioner: c.com, Peers: c.peers, Exchanges: c.mgr,
 		Fabrics: fabrics, Subscriptions: c.subs, Logger: log, Clock: clk, Node: nodeCfg, HooksFor: hooksFor, AutoStart: !cfg.ManualStart,
 		MaxImageBytesPerNode: cfg.MaxImageBytesPerNode,
 	}); err != nil {
@@ -544,11 +586,28 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 		return err
 	}
 	if cfg.OTA != nil {
-		return c.startOTA(ctx, cfg)
+		return c.startOTA(ctx)
 	}
 	// A database that ran the own node is migrated whether or not the
 	// controller serves OTA (review II, R2-P1-ctl-03).
-	return c.retireOwnNode(ctx, store.New(cfg.DB), c.log)
+	return c.retireOwnNode(ctx, c.st, c.log)
+}
+
+// openStores builds the controller's store and node registry on cfg.DB,
+// sealed with cfg.Sealer when one is set — store.NewSealed, then
+// sqlstore.NewSealed, the schemas applied — as node's openCredentials
+// opens a node's credential store (node/node.go).
+func openStores(ctx context.Context, cfg Config) (st *store.Store, nodes *sqlstore.Store, err error) {
+	if cfg.Sealer == nil {
+		return store.New(cfg.DB), sqlstore.New(cfg.DB), nil
+	}
+	if st, err = store.NewSealed(ctx, cfg.DB, cfg.Sealer); err != nil {
+		return nil, nil, fmt.Errorf("controller: open the sealed store: %w", err)
+	}
+	if nodes, err = sqlstore.NewSealed(ctx, cfg.DB, cfg.Sealer); err != nil {
+		return nil, nil, fmt.Errorf("controller: open the sealed node registry: %w", err)
+	}
+	return st, nodes, nil
 }
 
 // openTransports builds the network profiles and opens the network over
@@ -655,11 +714,14 @@ func (c *Controller) keepStopping(reg *client.Registry) {
 // subscriptions, the commissioner, the peers, the commissioner record,
 // the exchanges, the socket, DNS-SD. The database stays open. It is
 // idempotent: a second Close waits for the first to return, within ctx
-// (ctx's error when ctx ends first), and returns nil.
+// (ctx's error when ctx ends first). When the first returned an error
+// with nodes still stopping, a later Close waits for those stops within
+// its own ctx and returns their error — nil once every node stopped, the
+// way a node's Stop finishes its work on the next call; nil otherwise.
 func (c *Controller) Close(ctx context.Context) error {
 	done, first := c.beginClose()
 	if !first {
-		return awaitClose(ctx, done)
+		return c.awaitLaterClose(ctx, done)
 	}
 	defer close(done)
 	var errs []error
@@ -742,6 +804,31 @@ func (c *Controller) Close(ctx context.Context) error {
 	// ends first): the gauge reads none once the stack is down.
 	c.gauge(MetricSessionsOpen, 0)
 	return errors.Join(errs...)
+}
+
+// awaitLaterClose is a Close after the first: it waits for the first to
+// return, then for the nodes that Close left stopping.
+func (c *Controller) awaitLaterClose(ctx context.Context, done <-chan struct{}) error {
+	if err := awaitClose(ctx, done); err != nil {
+		return err
+	}
+	return c.awaitStopping(ctx)
+}
+
+// awaitStopping waits, within ctx, for the nodes a Close left stopping
+// (keepStopping) and forgets them once they stopped; nil without any.
+func (c *Controller) awaitStopping(ctx context.Context) error {
+	c.eraseMu.Lock()
+	defer c.eraseMu.Unlock()
+	reg := c.stopping
+	if reg == nil {
+		return nil
+	}
+	if err := reg.Close(ctx); err != nil {
+		return fmt.Errorf("controller: nodes still stopping: %w", err)
+	}
+	c.stopping = nil
+	return nil
 }
 
 // beginClose sets closed under the gate. first is true for the Close

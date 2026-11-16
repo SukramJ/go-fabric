@@ -29,6 +29,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/secure/aesccm"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/store"
@@ -585,5 +586,57 @@ func TestStopGroupNetworkingLeavesWithoutTheLock(t *testing.T) {
 	}
 	if got := fake.addresses(); len(got) != 0 {
 		t.Fatalf("stop left %v joined", got)
+	}
+}
+
+// TestGroupWriteReachesASubscriber (review II, Fable read 5b-write F2): a
+// group write is reported to subscribers as a unicast write is — the
+// attribute a member endpoint's commit changed is marked for the
+// subscription that covers it, and a non-member's is not. matter.js writes
+// a group path through the same commit as any write and broadcasts its
+// change list (AttributeWriteResponse.ts:75-78, :125-149, :278-296,
+// :326-361 → :433-435; Datasource.ts:1456-1457, :1319 at db021da0).
+func TestGroupWriteReachesASubscriber(t *testing.T) {
+	t.Parallel()
+	gh := newGroupsHarness(t, 2)
+	member := &fakeMulticastMember{joined: map[string]bool{}}
+	gh.bridge.startGroupNetworking(member)
+	gh.bridge.AttachGroupMessaging(gh.groups)
+	lamps := gh.lampIDs()
+	key := bytes.Repeat([]byte{0xA2}, 16)
+	gh.provisionGroup(t, 0x01A2, key, 0x0102, "Hall", lamps[0])
+	if err := gh.store.ReplaceACL(context.Background(), gh.fabric, []store.ACLEntry{
+		{FabricIndex: gh.fabric, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE, Subjects: []uint64{harnessControllerNodeID}},
+		{FabricIndex: gh.fabric, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeGroup, Subjects: []uint64{0x0102}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	identifyTime := func(ep uint16) im.ConcreteAttributePath {
+		return im.ConcreteAttributePath{Endpoint: ep, Cluster: 0x0003, Attribute: 0x0000, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	}
+	spy := &reachAttrReporterSpy{}
+	mgr := subscription.NewManager(subscription.Config{}, spy.report, nil)
+	if _, err := mgr.Subscribe(subscription.SubscribeArgs{
+		PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
+		AttributePaths: []im.ConcreteAttributePath{identifyTime(lamps[0]), identifyTime(lamps[1])},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gh.bridge.AttachSubscriptionManager(mgr)
+
+	gh.deliver(newGroupSender(t, key).seal(0x0102, im.OpcodeWriteRequest, groupWriteIdentifyTime(t, 30, true)))
+	gh.expectSilence(t)
+	if gh.identifyTime(t, lamps[0]) == 0 {
+		t.Fatal("the group write did not reach the member")
+	}
+	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
+	spy.mu.Lock()
+	defer spy.mu.Unlock()
+	var got []im.ConcreteAttributePath
+	for _, call := range spy.calls {
+		got = append(got, call...)
+	}
+	if !slices.Equal(got, []im.ConcreteAttributePath{identifyTime(lamps[0])}) {
+		t.Fatalf("reported %+v, want the member's IdentifyTime alone", got)
 	}
 }

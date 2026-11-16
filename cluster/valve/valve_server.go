@@ -440,11 +440,11 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	if err != nil {
 		return false, err
 	}
-	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
-		return false, err
-	}
+	// The host's veto hears a change only, after the comparison with the
+	// value in effect ([spec.Hooks.CheckWrite]).
+	veto := func() error { return s.hooks.CheckWrite(ctx, attrID, v) }
 	if attrID == valvedef.AttrDefaultOpenLevel {
-		return s.writeDefaultOpenLevel(ctx, v)
+		return s.writeDefaultOpenLevel(ctx, v, veto)
 	}
 	var seconds *uint32
 	if n, ok := v.(uint64); ok {
@@ -461,6 +461,9 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	if cur, known := s.src.DefaultOpenDuration(); (seconds == nil && !known) || (seconds != nil && known && cur == *seconds) {
 		return false, nil
 	}
+	if err := veto(); err != nil {
+		return false, err
+	}
 	if err := s.src.SetDefaultOpenDuration(ctx, seconds); err != nil {
 		return false, fmt.Errorf("valve: DefaultOpenDuration write: %w", err)
 	}
@@ -473,7 +476,7 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 // one a successful no-op. Mirrors connectedhomeip
 // src/app/clusters/valve-configuration-and-control-server/ValveConfigurationAndControlCluster.cpp:175-192
 // at 6170af84.
-func (s *Server) writeDefaultOpenLevel(ctx context.Context, v any) (changed bool, err error) {
+func (s *Server) writeDefaultOpenLevel(ctx context.Context, v any, veto func() error) (changed bool, err error) {
 	n, _ := v.(uint64)
 	level := uint8(n) //nolint:gosec // percent, 1 to 100 per ValidateWrite
 	if !s.compliesWithLevelStep(level) {
@@ -481,6 +484,9 @@ func (s *Server) writeDefaultOpenLevel(ctx context.Context, v any) (changed bool
 	}
 	if s.defaults.DefaultOpenLevel() == level {
 		return false, nil
+	}
+	if err := veto(); err != nil {
+		return false, err
 	}
 	if err := s.defaults.SetDefaultOpenLevel(ctx, level); err != nil {
 		return false, fmt.Errorf("valve: DefaultOpenLevel write: %w", err)

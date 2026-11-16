@@ -35,10 +35,16 @@ type (
 	AttributeSetter interface {
 		SetAttributes(values map[uint32]any) error
 	}
-	// CommandRegistrar is a server that takes command handlers: the
-	// host's handler replaces the server's own handling of the command,
-	// nil hands it back, and a command the server does not accept is
-	// refused ([ErrNotAccepted]) — [Server.Handle], [HostHandlers].
+	// CommandRegistrar is a server that takes command handlers. The
+	// host's handler is the whole command method: once registered, the
+	// server runs nothing of its own for the command — no gate, no scene
+	// invalidation, no transition — and holds only the handler's response
+	// to the definition (FAILURE on a broken one); a host that wants the
+	// server's logic with its own effect implements the server's port
+	// instead. A scene recall never reaches the handler: it goes to the
+	// server's logic. nil hands the command back, and a command the server
+	// does not accept is refused ([ErrNotAccepted]) — [Server.Handle],
+	// [HostHandlers].
 	CommandRegistrar interface {
 		Handle(cmdID uint32, fn CommandHandler) error
 	}
@@ -47,8 +53,11 @@ type (
 	EventEmitting interface {
 		Emit(endpoint uint16, eventID uint32, data any) error
 	}
-	// BeforeWriteSetter is a server that takes a write veto
-	// ([Server.SetBeforeWrite]).
+	// BeforeWriteSetter is a server that takes the host's write veto
+	// ([Server.SetBeforeWrite]): consulted behind the server's own rules
+	// and its comparison with the held value, so a write of the held value
+	// never reaches it, and never replacing the server's own rule
+	// ([ServerConfig.WriteRule]).
 	BeforeWriteSetter interface {
 		SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error)
 	}
@@ -204,7 +213,8 @@ func OnChangedAsyncOf[S any, P interface {
 
 // OnWriteOf installs a typed write veto on srv ([ServerConfig.BeforeWrite]):
 // fn receives the State S of srv with the written value in place of the
-// attribute's, and the attribute id; nil removes the veto.
+// attribute's, and the attribute id; nil removes the veto. The server's own
+// rule ([ServerConfig.WriteRule]) stays in place either way.
 // [ErrNoWriteVeto] for a server that is no [BeforeWriteSetter].
 // fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func OnWriteOf[S any, P interface {
@@ -241,6 +251,10 @@ func HandleOn[Req, Resp any](srv contract.ClusterServer, cmdID uint32, fn func(c
 
 // EmitOn emits the event eventID with data on endpoint through srv's own
 // Emit; [ErrNoEvents] for a server that is no [EventEmitting].
+//
+// Deprecated: use the server's EmitEvent ([Server.EmitEvent]) — the
+// generated typed server's Record<Event> — which emits on the endpoint the
+// server is mounted on. Removable in the next minor release.
 func EmitOn(srv contract.ClusterServer, endpoint uint16, eventID uint32, data any) error {
 	em, ok := srv.(EventEmitting)
 	if !ok {

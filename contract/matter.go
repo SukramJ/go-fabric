@@ -11,12 +11,11 @@ import (
 // EndpointSource is implemented by a host data source that materialises
 // as its own bridged endpoint.
 //
-// The endpoint assembler walks the
-// model and creates one Matter endpoint per implementer. The bridge
-// owns no DP-specific code — it iterates the model and dispatches via
-// this interface and [ClusterServer]. See ADR 0012 §"Source
-// surface" for the rich-model / dumb-bridge rationale, and
-// SPECIFICATION.md §6.2 / §6.3.
+// The endpoint assembler walks the host's model and creates one Matter
+// endpoint per implementer. The bridge owns no device-specific code — it
+// iterates the model and dispatches via this interface and
+// [ClusterServer]: the device model stays the host's, the wire format
+// the module's.
 type EndpointSource interface {
 	// MatterDeviceType reports the Matter Device Type ID
 	// (e.g., 0x010A OnOffPlugInUnit, 0x0301 Thermostat) the bridged
@@ -45,10 +44,26 @@ type ClusterServer interface {
 	// (e.g., 0x0006 OnOff, 0x0008 LevelControl, 0x0102 WindowCovering).
 	MatterClusterID() uint32
 
-	// MatterRead resolves an attribute value at read time. The
-	// returned value uses the cluster's native Go type. Returns
-	// (nil, false) when the underlying DP has not been observed yet
-	// — the bridge maps that to a stale-data Matter status response.
+	// MatterRead resolves an attribute value at read time:
+	//
+	//   - (value, true) serves the value;
+	//   - (nil, true) serves the null of a nullable attribute — a value
+	//     the server has not observed yet is a null when the attribute
+	//     is nullable;
+	//   - (nil, false) means the server does not serve the attribute: the
+	//     read answers UNSUPPORTED_ATTRIBUTE (the dispatcher synthesises
+	//     the global attributes only), so such an attribute must not be
+	//     listed by [ClusterAttributeLister]. An attribute the server
+	//     lists always answers ok.
+	//
+	// The value's Go type is the attribute's: bool; the unsigned or
+	// signed integer of the attribute's width (uint8 … uint64,
+	// int8 … int64) for integers, enums and bitmaps — FeatureMap is a
+	// uint32 and ClusterRevision a uint16; float32 or float64; string
+	// for a character string; []byte for an octet string; and for a
+	// struct or a list a value with the method
+	// EncodeTLV(*tlv.Encoder, tlv.Tag), as the generated types of
+	// cluster/spec have. A value of another type is encoded as null.
 	//
 	// It takes no context on purpose: a read answers from memory —
 	// the value the server holds or its source last observed — and
@@ -74,8 +89,10 @@ type ClusterServer interface {
 	// for the response, or nil for status-only commands.
 	MatterInvoke(ctx context.Context, cmdID uint32, fields any) (response any, err error)
 
-	// MatterReportable lists attribute IDs that emit Matter reports
-	// when the underlying DP fires OnEvent. Empty slice = none.
+	// MatterReportable lists the attributes whose change the server
+	// reports to subscribers itself (through the bridge's change
+	// notification) when the host's value changes. Every attribute in
+	// it is one [ClusterAttributeLister] lists. Empty slice = none.
 	MatterReportable() []uint32
 }
 
@@ -84,23 +101,37 @@ type ClusterServer interface {
 // (Matter §7.5.2 — fabric-scoped fields). When a cluster server
 // implements this interface the endpoint dispatcher calls
 // MatterReadFiltered instead of MatterRead so that the FabricFiltered
-// flag + the requesting FabricIndex (both stamped into the context by
-// [im.WithFabricFilter]) can be honoured.
+// flag + the requesting FabricIndex (both carried by the request's
+// context, read with [AccessingFabric]) can be honoured.
 //
 // Mirrors matter.js's OnlineContext.forFabricFilteredRead pattern in
 // packages/protocol/src/interaction/InteractionServer.ts:startReadInteraction
 // — the context carries the filter rather than propagating via a
 // separate call-stack argument.
 //
-// Cluster servers that do NOT implement FabricScopedReader return their
-// full attribute value from MatterRead — the safe default that matches
-// the FabricFiltered=false path.
+// The dispatcher scopes every fabric-scoped attribute of the model,
+// whatever the server returns: on a request it filters a fabric-scoped
+// list's entries and withholds another fabric's fabric-sensitive fields
+// ([FabricScope]; for a cluster outside the model, [FabricScopeDeclarer]).
+// A server returns every fabric's entries whole from MatterRead and from an
+// unfiltered MatterReadFiltered, and the accessing fabric's entries alone
+// from a filtered one; the dispatcher's scope applies on top of either.
+// A list-append write of a fabric-scoped list appends to the accessing
+// fabric's entries, and the dispatcher reads them with a filtered
+// MatterReadFiltered: for an entry that encodes itself (an
+// EncodeTLV(*tlv.Encoder, tlv.Tag) method, as every generated struct has)
+// it keeps the entries whose FabricIndex names that fabric whatever the
+// read returns; an entry that does not encode itself is taken as the
+// filtered read returns it, and without a FabricScopedReader such an
+// append answers FAILURE. FabricScopedReader is also for a value that
+// depends on the reader in another way than that projection.
 type FabricScopedReader interface {
 	// MatterReadFiltered resolves an attribute value with awareness of
-	// the FabricFiltered flag. ctx carries the filter via
-	// [im.FabricFilterFromContext]; implementations extract it and, when
-	// filtered=true and fabricIndex != 0, return only the entries that
-	// belong to fabricIndex.
+	// the FabricFiltered flag. ctx carries the filter, which
+	// [AccessingFabric] reads; when filtered is true,
+	// implementations return only the entries that belong to
+	// fabricIndex — none for fabricIndex 0 — and when it is false every
+	// fabric's entries.
 	//
 	// (nil, false) hands the attribute to MatterRead — except on an
 	// Interaction Model request for an attribute whose access is
@@ -201,6 +232,10 @@ type ClusterDataVersion interface {
 // A type that embeds a server implementing this and declares its own
 // MatterWrite declares its own MatterWriteChanged as well: the promoted
 // method would apply the write without the type's MatterWrite.
+//
+// The verdict is one for the cluster and is recorded under the written
+// attribute; a server whose write moves another attribute names what it
+// changed with [ChangeNamingWriter], which the dispatcher prefers.
 type ChangeReportingWriter interface {
 	// MatterWriteChanged applies the write as MatterWrite does and
 	// reports whether it changed any attribute of the cluster — the
@@ -236,6 +271,19 @@ type ClusterEventLister interface {
 	MatterEvents() []uint32
 }
 
+// The Matter privileges (Matter §9.10.4.4) the privilege capabilities
+// below return.
+const (
+	// PrivilegeView reads (1).
+	PrivilegeView = 1
+	// PrivilegeOperate writes and invokes what an operator may (3).
+	PrivilegeOperate = 3
+	// PrivilegeManage writes and invokes what configures the device (4).
+	PrivilegeManage = 4
+	// PrivilegeAdminister administers the node (5).
+	PrivilegeAdminister = 5
+)
+
 // ClusterAttributeReadPrivilege is the optional capability a
 // [ClusterServer] can implement when one or more of its attributes
 // require a read privilege higher than View (1). The IM read layer
@@ -257,7 +305,8 @@ type ClusterAttributeReadPrivilege interface {
 	// required to read the given attribute. Return 1 (View) when the
 	// attribute has no elevated requirement (which is the common case
 	// and matches the default read behaviour). The privilege constants
-	// mirror Matter §9.10.4.4: 1=View, 3=Operate, 4=Manage, 5=Administer.
+	// mirror Matter §9.10.4.4: [PrivilegeView] (1), [PrivilegeOperate]
+	// (3), [PrivilegeManage] (4), [PrivilegeAdminister] (5).
 	MinReadPrivilege(attrID uint32) uint8
 }
 
@@ -267,7 +316,9 @@ type ClusterAttributeReadPrivilege interface {
 // default. The IM write layer calls MinWritePrivilege for the attribute
 // ID before dispatching the write; the ACLChecker is consulted with the
 // returned privilege, resulting in UnsupportedAccess (0x7e) for
-// insufficiently privileged sessions.
+// insufficiently privileged sessions. The dispatcher takes the data
+// model's write privilege of the attribute as the floor; a server's
+// answer can only raise it, never lower it.
 //
 // Example: AccessControl (0x001F) attributes ACL (0x0000) and Extension
 // (0x0001) require Administer (5) per Matter §9.10.5.3 (access "RW … A");
@@ -279,7 +330,8 @@ type ClusterAttributeWritePrivilege interface {
 	// required to write the given attribute. Return 3 (Operate) when the
 	// attribute has no elevated requirement (the common case, matching
 	// the default write behaviour). Constants mirror Matter §9.10.4.4:
-	// 1=View, 3=Operate, 4=Manage, 5=Administer.
+	// [PrivilegeView] (1), [PrivilegeOperate] (3), [PrivilegeManage] (4),
+	// [PrivilegeAdminister] (5).
 	MinWritePrivilege(attrID uint32) uint8
 }
 
@@ -289,7 +341,9 @@ type ClusterAttributeWritePrivilege interface {
 // IM invoke layer calls MinInvokePrivilege for the command ID before
 // dispatching; the ACLChecker is consulted with the returned privilege,
 // resulting in UnsupportedAccess (0x7e) for insufficiently privileged
-// sessions.
+// sessions. The dispatcher takes the data model's invoke privilege of
+// the command as the floor; a server's answer can only raise it, never
+// lower it.
 //
 // Example: OperationalCredentials (0x003E) commands (AddNOC, UpdateNOC,
 // RemoveFabric, …) and AdministratorCommissioning (0x003C)
@@ -301,7 +355,8 @@ type ClusterCommandInvokePrivilege interface {
 	// required to invoke the given command. Return 3 (Operate) when the
 	// command has no elevated requirement (the common case, matching the
 	// default invoke behaviour). Constants mirror Matter §9.10.4.4:
-	// 1=View, 3=Operate, 4=Manage, 5=Administer.
+	// [PrivilegeView] (1), [PrivilegeOperate] (3), [PrivilegeManage] (4),
+	// [PrivilegeAdminister] (5).
 	MinInvokePrivilege(cmdID uint32) uint8
 }
 
@@ -320,11 +375,10 @@ type TimedCommander interface {
 	IsTimedCommand(cmdID uint32) bool
 }
 
-// MeasurementClass classifies Generic.Sensor / BinarySensor and
-// Calculated DP instances by Matter cluster without name-matching at
-// publish time. The model layer computes this once at materialisation
-// from the same parameter classifier that already drives MQTT payload
-// routing; the bridge consumes it.
+// MeasurementClass classifies a host sensor — a scalar or a boolean
+// measurement, observed or calculated — by the Matter cluster that
+// serves it, without matching names at publish time. The host computes
+// it once when it builds the source; the bridge consumes it.
 //
 // The set is open: the constants below are the kinds this library
 // ships with, and [RegisterMeasurementKind] adds host-defined ones
@@ -605,7 +659,8 @@ func builtinMeasurementKinds() map[MeasurementClass]MeasurementKind {
 // current, frequency and an energy counter as separate values, while Matter
 // groups the first four into ElectricalPowerMeasurement (0x0090) attributes
 // and the fifth into ElectricalEnergyMeasurement (0x0091) — both on one
-// ElectricalSensor endpoint. Implemented by [generic.ElectricalGroup].
+// ElectricalSensor endpoint. Implemented by the host's electrical
+// meter.
 //
 // Every accessor returns (value, false) when the device does not report that
 // parameter, which the cluster layer renders as a Matter null rather than as
@@ -643,8 +698,8 @@ type MeasurementSource interface {
 
 // FloatMeasurementSource is the typed read surface for scalar
 // measurement classes (Temperature, Humidity, Illuminance, Pressure,
-// Flow, SoilMoisture and the ten concentration classes). Implemented by Generic.Sensor[float64] and the
-// equivalent calculated-DP types.
+// Flow, SoilMoisture and the ten concentration classes). Implemented by
+// a host's scalar sensor, observed or calculated.
 //
 // MatterFloatValue returns the current observed value in the model's
 // native unit (°C for temperature, % RH for humidity, lux for
@@ -663,8 +718,8 @@ type FloatMeasurementSource interface {
 }
 
 // BoolMeasurementSource is the typed read surface for boolean
-// measurement classes (Contact, Leak, Occupancy). Implemented by
-// Generic.BinarySensor.
+// measurement classes (Contact, Leak, Occupancy). Implemented by a
+// host's binary sensor.
 //
 // MatterBoolValue returns the current observed boolean state.
 // `observed` is false until the first event arrives.
@@ -952,6 +1007,11 @@ type SelfReportedAttributeLister interface {
 // no timer outlives the bridge's use of the server. MatterQuiesce ends
 // that activity without reporting it; the server stays usable, and a
 // later command starts it again.
+//
+// A quiesced server may be mounted again, and nothing tells it: what
+// MatterQuiesce ended stays ended — an activity stops where it is, a
+// value a cancelled timer was to store is not stored — until a later
+// command, or a report of the server's source, moves it again.
 type ClusterQuiescer interface {
 	MatterQuiesce()
 }
@@ -970,12 +1030,13 @@ const (
 	EventPriorityCritical EventPriority = 2
 )
 
-// EventEmitter is the bridge-side hook a cluster server (or
-// model-package-side cluster server) calls when its underlying DP
-// fires an event that should surface to subscribers. The bridge wires
-// this to [subscription.Manager.OnEventFired], fanning the event out
-// to every subscription whose EventPaths cover the (endpoint, cluster,
-// event) triple.
+// EventEmitter is the bridge-side hook a cluster server — the module's
+// or a host's — calls when an event should surface to subscribers. The
+// bridge records the event in its event log and fans it out to every
+// subscription whose EventPaths cover the (endpoint, cluster, event)
+// triple. MatterEmitEvent is safe for concurrent use and does not block
+// on the network: it records the event and returns, and the reports go
+// out on the subscriptions' own schedule.
 //
 // `data` is the cluster-native event payload (struct, scalar, …).
 // `priority` is the priority the event is recorded and reported with. It
@@ -992,7 +1053,10 @@ type EventEmitter interface {
 // EventReceiver is implemented by cluster servers that emit
 // events. The bridge calls SetMatterEventEmitter at endpoint-assembly
 // time so the cluster can fire events at any later moment without
-// holding a reference to the bridge.
+// holding a reference to the bridge, and withdraws it with
+// SetMatterEventEmitter(nil) when the server leaves the served topology —
+// a reassembly that drops its endpoint or replaces it — so an event the
+// server emits afterwards reaches no event log.
 type EventReceiver interface {
 	SetMatterEventEmitter(emitter EventEmitter)
 }
@@ -1015,9 +1079,9 @@ const (
 	// when the operator enables it.
 	EligibilityMappable
 	// EligibilityPartial means a partial projection exists —
-	// some clusters map, some features stay MQTT-only (e.g. siren
-	// tones, light effect playlists). UI shows ⚠ with the reason; the
-	// toggle remains active.
+	// some clusters map, some features stay with the host's own
+	// interfaces (e.g. siren tones, light effect playlists). UI shows ⚠
+	// with the reason; the toggle remains active.
 	EligibilityPartial
 )
 
@@ -1060,7 +1124,7 @@ type EligibilityVerdict struct {
 // Unmappable by the eligibility classifier — the model then must
 // either implement EndpointSource / MeasurementSource
 // (and inherit the default) or surface explicitly as Unmappable
-// (textdisplay.TextDisplay, valve.Irrigation, etc.).
+// (a text display or an irrigation valve, say).
 type EligibilitySource interface {
 	MatterEligibility() EligibilityVerdict
 }

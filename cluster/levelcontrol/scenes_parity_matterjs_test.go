@@ -152,22 +152,14 @@ func TestHandOffCommandsInvalidateTheScene(t *testing.T) {
 	}
 }
 
-// TestReplacedCommandInvalidatesTheScene: a command the host replaced
-// through Handle ends the current scene when its handler succeeds, so the
-// server's claim to invalidate (MatterInvalidatesScenes, which keeps the
-// endpoint's own invalidation off) holds for it too; a refused one leaves
-// the scene valid. matter.js invalidates in the command method before it
-// calls the logic a host overrides (moveToLevel :276 before
-// moveToLevelLogic :277, packages/node/src/behaviors/level-control/LevelControlServer.ts
-// at db021da0); Handle drops the gate with the checks, so, as for a
-// host's port, a command the handler accepts counts as executed.
-func TestReplacedCommandInvalidatesTheScene(t *testing.T) {
+// TestReplacedCommandIsTheWholeCommand: a command the host replaced
+// through Handle is the host's handler alone (spec.CommandRegistrar,
+// decision 112): neither an accepted nor a refused one invalidates the
+// scene — the server runs nothing of its own for it (R2-P5-apispec-05).
+func TestReplacedCommandIsTheWholeCommand(t *testing.T) {
 	srv := engineServer(newDevice(100, true), nil)
 	port := &scenesPort{}
 	srv.SetScenes(port)
-	if !srv.MatterInvalidatesScenes() {
-		t.Fatal("with a scenes port the server does not claim the invalidation")
-	}
 	refusal := errors.New("not now")
 	var refuse bool
 	if err := srv.Handle(levelcontrol.CmdMoveToLevel, func(context.Context, any) (any, error) {
@@ -181,8 +173,11 @@ func TestReplacedCommandInvalidatesTheScene(t *testing.T) {
 	if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 50, TransitionTime: u16(0)}); err != nil {
 		t.Fatal(err)
 	}
-	if n := port.take(); n != 1 {
-		t.Errorf("a MoveToLevel the host's handler accepted invalidated the scene %d times, want 1", n)
+	if n := port.take(); n != 0 {
+		t.Errorf("a MoveToLevel the host's handler accepted invalidated the scene %d times, want 0", n)
+	}
+	if l := level(t, srv); l != 100 {
+		t.Errorf("the server moved the level of a replaced command to %d", l)
 	}
 	refuse = true
 	if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 60, TransitionTime: u16(0)}); !errors.Is(err, refusal) {

@@ -19,7 +19,8 @@ import (
 // removedFabric is the fabric the cases remove; pairFabric stays.
 const removedFabric = 2
 
-// lockUser is an occupied user of the given creator and last modifier.
+// lockUser is an occupied user a Matter command made, of the given creator
+// and last modifier.
 func lockUser(index uint16, creator, modifier uint8, creds ...store.DoorLockCredentialRef) store.DoorLockUser {
 	return store.DoorLockUser{
 		UserIndex:               index,
@@ -29,6 +30,8 @@ func lockUser(index uint16, creator, modifier uint8, creds ...store.DoorLockCred
 		Credentials:             append([]store.DoorLockCredentialRef{}, creds...),
 		CreatorFabricIndex:      creator,
 		LastModifiedFabricIndex: modifier,
+		CreatedThroughMatter:    true,
+		ModifiedThroughMatter:   true,
 	}
 }
 
@@ -47,6 +50,7 @@ func fabricRecords(auth *memoryAuth) func(*lock.DoorLockConfig) {
 		c.Initial.Credentials = append(c.Initial.Credentials, store.DoorLockCredential{
 			Type: uint8(lockdef.CredentialTypePin), Index: 2, Data: pin("5678"),
 			CreatorFabricIndex: removedFabric, LastModifiedFabricIndex: removedFabric,
+			CreatedThroughMatter: true, ModifiedThroughMatter: true,
 		})
 		c.Initial.WeekDaySchedules = []store.DoorLockWeekDaySchedule{{
 			WeekDayIndex: 1, UserIndex: 2, DaysMask: 1, StartHour: 8, EndHour: 18,

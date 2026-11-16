@@ -275,12 +275,8 @@ func (g *GeneralCommissioning) LastFabricRemoved(ctx context.Context) error {
 	}
 	g.tcCommitted, g.tcTemporal, g.tcTouched = nil, nil, false
 	var err error
-	if d, ok := g.tcSettings.(interface {
-		DeleteSetting(ctx context.Context, key string) error
-	}); ok && g.tcSettings != nil {
-		err = d.DeleteSetting(ctx, store.SettingTermsAcceptance)
-	} else if g.tcSettings != nil {
-		err = g.tcSettings.SetSetting(ctx, store.SettingTermsAcceptance, "")
+	if g.tcSettings != nil {
+		err = g.tcSettings.DeleteSettings(ctx, store.SettingTermsAcceptance)
 	}
 	g.dataVersion.Bump()
 	g.mu.Unlock()

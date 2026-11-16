@@ -6,6 +6,8 @@ package im
 import (
 	"context"
 	"slices"
+
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // GroupSubject is the Incoming Subject Descriptor of a group message: the
@@ -130,7 +132,18 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 		if timedRequired != nil && timedRequired(clusterID, commandID) {
 			return StatusNeedsTimedInteraction
 		}
-		return authorize(endpoint, clusterID, invokePrivilegeOf(d, endpoint, clusterID, commandID))
+		if status := authorize(endpoint, clusterID, invokePrivilegeOf(d, endpoint, clusterID, commandID)); !status.IsSuccess() {
+			return status
+		}
+		// A group session carries no large messages: a Large Message
+		// command is left out after the authority check, as a wildcard
+		// path leaves it out — matter.js runs a group invoke through the
+		// wildcard expansion (CommandInvokeResponse.ts:136-160 at db021da0)
+		// and #wildcardTargetOf (:384-386).
+		if schema.CommandLargeMessage(clusterID, commandID) {
+			return StatusInvalidTransportType
+		}
+		return StatusSuccess
 	}
 	if !inv.DecodeStatus.IsSuccess() {
 		// Fields that do not decode fail the command on every endpoint
@@ -195,6 +208,35 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 // REPLACE and ADDs, as matter.js's own client does by default, would
 // otherwise be left empty.
 func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) StatusCode {
+	return HandleGroupWrite(ctx, d, req).Status
+}
+
+// GroupWriteOutcome is what [HandleGroupWrite] returns: the status of the
+// group interaction and the dispatcher's results behind it.
+type GroupWriteOutcome struct {
+	// Status is what [HandleGroupWriteRequest] returns.
+	Status StatusCode
+	// Results are the results the dispatcher returned for the writes it
+	// applied, every member endpoint's, in the order it returned them,
+	// each with the write's verdict ([WriteResult.Commit]).
+	Results []WriteResult
+}
+
+// HandleGroupWrite is [HandleGroupWriteRequest] that returns the
+// dispatcher's results with the status: a group write's changes are
+// reported to subscribers as a unicast write's are ([HandleWrite]) —
+// matter.js writes a group path through the same commit as any other
+// (AttributeWriteResponse.ts:75-78, :125-149, :278-296, :326-361 →
+// :433-435 at db021da0).
+func HandleGroupWrite(ctx context.Context, d Dispatcher, req WriteRequest) GroupWriteOutcome {
+	var out GroupWriteOutcome
+	out.Status = handleGroupWrite(ctx, d, req, func(rs []WriteResult) { out.Results = append(out.Results, rs...) })
+	return out
+}
+
+// handleGroupWrite runs the group write, handing every dispatcher result
+// to record.
+func handleGroupWrite(ctx context.Context, d Dispatcher, req WriteRequest, record func([]WriteResult)) StatusCode { //nolint:gocyclo // the group write's per-path gates in matter.js order
 	if req.MoreChunkedMessages && req.SuppressResponse {
 		return StatusInvalidAction
 	}
@@ -261,13 +303,13 @@ func HandleGroupWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest
 		// written ([listIndexGate]).
 		if w.Path.HasListIndex && !w.Path.ListAppend {
 			var indexGate listIndexGate
-			writer.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(groupAuthorize))
+			record(writer.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(groupAuthorize)))
 			if indexGate.reached {
 				return StatusInvalidAction
 			}
 			continue
 		}
-		writer.WriteAuthorized(ctx, w.Path, w.Value, groupAuthorize)
+		record(writer.WriteAuthorized(ctx, w.Path, w.Value, groupAuthorize))
 	}
 	return StatusSuccess
 }

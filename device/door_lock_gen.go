@@ -18,10 +18,9 @@ const (
 )
 
 // DoorLockType returns the DoorLock device type, matter.js's packages/node/src/devices/door-lock.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#doorlock. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func DoorLockType() *Type { return &typeDoorLock }
+// its cluster requirements are listed in docs/reference/device-types.md#doorlock. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func DoorLockType() *Type { return typeDoorLock.clone() }
 
 // typeDoorLock holds [DoorLockType]'s cluster requirements.
 var typeDoorLock = Type{

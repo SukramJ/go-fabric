@@ -152,25 +152,20 @@ func (a *Actions) SetEndpoint(endpoint uint16) {
 	a.mu.Lock()
 	a.endpoint = endpoint
 	a.mu.Unlock()
-}
-
-func (a *Actions) eventEndpoint() uint16 {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.endpoint
+	a.Server.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // EmitStateChanged emits StateChanged for actionID with the InvokeID the
 // command carried (Matter: 0 when it carried none).
 func (a *Actions) EmitStateChanged(actionID uint16, invokeID uint32, state actionsdef.ActionStateEnum) error {
-	return a.Emit(a.eventEndpoint(), actionsdef.EventStateChanged, actionsdef.StateChangedEvent{
+	return a.EmitEvent(actionsdef.EventStateChanged, actionsdef.StateChangedEvent{
 		ActionId: actionID, InvokeId: invokeID, NewState: state,
 	})
 }
 
 // EmitActionFailed emits ActionFailed for actionID.
 func (a *Actions) EmitActionFailed(actionID uint16, invokeID uint32, state actionsdef.ActionStateEnum, cause actionsdef.ActionErrorEnum) error {
-	return a.Emit(a.eventEndpoint(), actionsdef.EventActionFailed, actionsdef.ActionFailedEvent{
+	return a.EmitEvent(actionsdef.EventActionFailed, actionsdef.ActionFailedEvent{
 		ActionId: actionID, InvokeId: invokeID, NewState: state, Error: cause,
 	})
 }
@@ -185,7 +180,7 @@ func (a *Actions) EndpointListsChanged() { a.changed(actionsdef.AttrEndpointList
 
 func (a *Actions) changed(attrID uint32) {
 	a.dv.Bump()
-	a.Notify(attrID)
+	a.AttributeChanges.Notify(attrID)
 }
 
 // invoke validates one command as DECODE_AND_VALIDATE does (:152-161) and

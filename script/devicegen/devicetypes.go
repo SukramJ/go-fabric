@@ -4,27 +4,26 @@
 package main
 
 // committed lists the device types whose generated files are committed
-// under device/: the device types in scope of
-// docs/history/concept-matter-1.6.1-and-device-layer.md Appendix F.3 — every
-// snapshot device type the appendix does not name, less the three whose
-// mandatory clusters are the excluded camera and media families (owner's
-// decision, 2026-10-11) — with OtaRequestor, which ADR 0018 ("Decisions
-// taken at the start of wave 6", 1) takes in since the requestor joined in
-// wave 5 (ADR 0019), and the eleven controller device types ADR 0020's
-// stage 5 takes in (brief AO): their client clusters are what the binding
-// manager selects for a Binding entry. Sorted by name.
-// wave 5 (ADR 0019), SecondaryNetworkInterface, which concept v2 §B.4
-// takes in with the WiFiNetworkDiagnostics server (brief AM), and
-// OtaProvider, which ADR 0021 takes in with the OTA Software Update
-// Provider server (brief AQ), and the three media device types
-// (BasicVideoPlayer, CastingVideoPlayer, ContentApp), which ADR 0022 takes
-// in with the media and content clusters (brief AR), and the camera and
-// infrastructure device types (Camera, SnapshotCamera, AudioDoorbell,
+// under device/, sorted by name. The scope is
+// docs/history/concept-matter-1.6.1-and-device-layer.md Appendix F.3 —
+// every snapshot device type the appendix does not name, less the three
+// whose mandatory clusters are the excluded camera and media families
+// (owner's decision, 2026-10-11) — and the types taken in since:
+// OtaRequestor (ADR 0018, "Decisions taken at the start of wave 6", 1;
+// the requestor joined in wave 5, ADR 0019); the eleven controller device
+// types of ADR 0020's stage 5 (brief AO), whose client clusters are what
+// the binding manager selects for a Binding entry;
+// SecondaryNetworkInterface (concept v2 §B.4, with the
+// WiFiNetworkDiagnostics server, brief AM); OtaProvider (ADR 0021, with
+// the OTA Software Update Provider server, brief AQ); the three media
+// device types BasicVideoPlayer, CastingVideoPlayer and ContentApp (ADR
+// 0022, with the media and content clusters, brief AR); the camera and
+// infrastructure device types Camera, SnapshotCamera, AudioDoorbell,
 // Intercom, Chime, CameraController, ThreadBorderRouter,
-// NetworkInfrastructureManager, JointFabricAdministrator), which brief CL
-// takes in with the generated servers of their clusters (owner decision,
-// 2026-10-25), and CastingVideoClient, which wave 27-C2 takes in (owner
-// decision, 2026-10-29). Sorted by name.
+// NetworkInfrastructureManager and JointFabricAdministrator (brief CL,
+// with the generated servers of their clusters, owner decision
+// 2026-10-25); and CastingVideoClient (wave 27-C2, owner decision
+// 2026-10-29).
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",

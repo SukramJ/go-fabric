@@ -18,10 +18,9 @@ const (
 )
 
 // CastingVideoClientType returns the CastingVideoClient device type, matter.js's packages/node/src/devices/casting-video-client.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#castingvideoclient. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func CastingVideoClientType() *Type { return &typeCastingVideoClient }
+// its cluster requirements are listed in docs/reference/device-types.md#castingvideoclient. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func CastingVideoClientType() *Type { return typeCastingVideoClient.clone() }
 
 // typeCastingVideoClient holds [CastingVideoClientType]'s cluster requirements.
 var typeCastingVideoClient = Type{

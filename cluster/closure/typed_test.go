@@ -90,7 +90,8 @@ func TestControlTyped(t *testing.T) {
 	if err := typed.Set(closuredef.Patch{OverallTargetState: &target}); !errors.Is(err, spec.ErrNotHeld) {
 		t.Errorf("Set of OverallTargetState: %v, want ErrNotHeld", err)
 	}
-	if err := typed.EmitMovementCompleted(1, closuredef.MovementCompletedEvent{}); err != nil {
+	srv.SetEndpoint(1) // Record<Event> emits on the endpoint the server is mounted on
+	if err := typed.RecordMovementCompleted(closuredef.MovementCompletedEvent{}); err != nil {
 		t.Errorf("EmitMovementCompleted: %v", err)
 	}
 	if err := typed.HandleStop(func(context.Context, closuredef.StopRequest) (struct{}, error) { return struct{}{}, nil }); err != nil {
@@ -201,7 +202,7 @@ func TestDimensionTyped(t *testing.T) {
 	if err := typed.OnWrite(func(context.Context, cd.State, uint32) error { return nil }); err != nil {
 		t.Errorf("OnWrite: %v", err)
 	}
-	if err := spec.EmitOn(srv, 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
+	if err := srv.Emit(1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("Emit: %v, want ErrNotEmitted", err)
 	}
 }

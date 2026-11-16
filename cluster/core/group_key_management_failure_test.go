@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/store/memstore"
 )
 
 // errStoreDown stands in for a persistence layer that cannot answer.
@@ -28,6 +29,7 @@ type brokenGroupStore struct {
 	failRemoveSet    bool
 	failSetMapping   bool
 	failRemoveMap    bool
+	failReplaceMap   bool
 	failListMappings bool
 
 	// mappings is the state a non-failing ListGroupKeyMappings returns.
@@ -78,6 +80,13 @@ func (s *brokenGroupStore) SetGroupKeyMapping(context.Context, mstore.GroupKeyMa
 
 func (s *brokenGroupStore) RemoveGroupKeyMapping(context.Context, uint8, uint16) error {
 	if s.failRemoveMap {
+		return errStoreDown
+	}
+	return nil
+}
+
+func (s *brokenGroupStore) ReplaceGroupKeyMappings(context.Context, uint8, []mstore.GroupKeyMapping) error {
+	if s.failReplaceMap {
 		return errStoreDown
 	}
 	return nil
@@ -268,27 +277,72 @@ func TestGKMSurfacesStoreFailures(t *testing.T) {
 			t.Fatalf("err = %v, want it to wrap %v", err, errStoreDown)
 		}
 	})
-	t.Run("GroupKeyMap write set fails", func(t *testing.T) {
+	t.Run("GroupKeyMap write replace fails", func(t *testing.T) {
 		t.Parallel()
-		gkm := newBrokenGKM(t, &brokenGroupStore{failSetMapping: true})
-		err := gkm.MatterWrite(ctx, 0x0000, []core.GroupKeyMapStruct{{GroupID: 1, GroupKeySetID: 2}})
-		if !errors.Is(err, errStoreDown) {
-			t.Fatalf("err = %v, want it to wrap %v", err, errStoreDown)
-		}
-	})
-	t.Run("GroupKeyMap write remove fails", func(t *testing.T) {
-		t.Parallel()
-		// One binding exists and the write omits it, so the replace
-		// semantics have to delete it — and that delete fails.
 		gkm := newBrokenGKM(t, &brokenGroupStore{
-			failRemoveMap: true,
-			mappings:      []mstore.GroupKeyMapping{{FabricIndex: 1, GroupID: 9, GroupKeySetID: 2}},
+			failReplaceMap: true,
+			mappings:       []mstore.GroupKeyMapping{{FabricIndex: 1, GroupID: 9, GroupKeySetID: 2}},
 		})
 		err := gkm.MatterWrite(ctx, 0x0000, []core.GroupKeyMapStruct{{GroupID: 1, GroupKeySetID: 2}})
 		if !errors.Is(err, errStoreDown) {
 			t.Fatalf("err = %v, want it to wrap %v", err, errStoreDown)
 		}
 	})
+}
+
+// midReplaceStore is a memstore whose key-map writes fail after the
+// first one: the piecewise write a GroupKeyMap write used to make
+// (SetGroupKeyMapping per entry, RemoveGroupKeyMapping per dropped one)
+// lands its sets and fails its removal, and the one atomic replace fails
+// whole.
+type midReplaceStore struct {
+	*memstore.Store
+}
+
+func (midReplaceStore) RemoveGroupKeyMapping(context.Context, uint8, uint16) error {
+	return errStoreDown
+}
+
+func (midReplaceStore) ReplaceGroupKeyMappings(context.Context, uint8, []mstore.GroupKeyMapping) error {
+	return errStoreDown
+}
+
+// TestGKMGroupKeyMapWriteFailingMidReplaceKeepsTheOldMap: a store that
+// refuses the GroupKeyMap write part-way leaves the map the fabric held,
+// served under the same DataVersion, and the write fails (FAILURE) —
+// the map is one store write (store.GroupKeys ReplaceGroupKeyMappings;
+// review II, R2-P5-port-04).
+func TestGKMGroupKeyMapWriteFailingMidReplaceKeepsTheOldMap(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mem := memstore.New()
+	idx, err := mem.AddFabric(ctx, mstore.FabricRecord{FabricID: 1, NodeID: 2, RootPublicKey: []byte{4, 1}, VendorID: 0xFFF1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mem.SetGroupKeyMapping(ctx, mstore.GroupKeyMapping{FabricIndex: idx, GroupID: 9, GroupKeySetID: 2}); err != nil {
+		t.Fatal(err)
+	}
+	gkm, err := core.NewGroupKeyManagement(midReplaceStore{mem}, core.GroupKeyMgmtConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gkm.SetCurrentFabric(idx)
+	before := gkm.MatterDataVersion()
+	err = gkm.MatterWrite(ctx, 0x0000, []core.GroupKeyMapStruct{{GroupID: 1, GroupKeySetID: 2}})
+	if !errors.Is(err, errStoreDown) {
+		t.Fatalf("err = %v, want it to wrap %v", err, errStoreDown)
+	}
+	got, err := mem.ListGroupKeyMappings(ctx, idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].GroupID != 9 || got[0].GroupKeySetID != 2 {
+		t.Errorf("stored GroupKeyMap after the refused write = %+v, want only group 9 -> set 2", got)
+	}
+	if after := gkm.MatterDataVersion(); after != before {
+		t.Errorf("DataVersion %d -> %d after a refused write", before, after)
+	}
 }
 
 // TestGKMGroupKeyMapWriteRejectsTheWrongValueType covers the type guard

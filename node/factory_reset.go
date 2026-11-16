@@ -33,9 +33,11 @@ import (
 // records included — remain in it. A scrub that does not finish (another
 // connection's reader blocks the checkpoint, a full disk fails the VACUUM)
 // does not undo the reset: every other step completes, the fresh UniqueID
-// included, and the error wraps [store.ErrScrubIncomplete] — the rows are
+// included, and the error wraps [ErrScrubIncomplete] — the rows are
 // gone, their bytes may remain in the file until a later [store.Scrub] of
-// it succeeds.
+// it succeeds. A [Store].Endpoints override is erased row by row and
+// not scrubbed: when it keeps its records in a file of the host's own,
+// scrubbing that file is the host's ([store.Scrub]).
 //
 // A Go node is single-use — [Node.Stop] ends it, as [ErrStopped] says —
 // so the reset does not bring the node back: the host comes back by
@@ -44,7 +46,7 @@ import (
 // The new node starts uncommissioned, with a fresh random UniqueID pinned
 // (unless UniqueID rotation is on) and a device-type validation that
 // reports every endpoint again. A host's own
-// [Config].EndpointPersistence is the host's to erase.
+// [Config].EndpointState (or EndpointPersistence) is the host's to erase.
 //
 // A reset whose stop does not complete — its context ends while a bridge
 // Start or Stop the host runs holds the bridge's lifecycle — erases and
@@ -52,14 +54,18 @@ import (
 // the node is not stopped and keeps its store, and a later FactoryReset
 // finishes the reset.
 //
-// FactoryReset is serialised with Start and Stop. Mirrors matter.js
+// FactoryReset is serialised with Start and Stop: it waits for one in
+// progress until ctx ends, and then returns an error wrapping ctx.Err()
+// without resetting anything. Mirrors matter.js
 // ServerNode.erase / eraseWithMutex (packages/node/src/node/ServerNode.ts:
 // 159-200: go offline, reset, erase the storage, come back online if the
 // node was) and resetStorage (:242-256, peers first, then the sessions,
 // fabrics, occurrences, credentials and the node store); the node that
 // comes back is a new one here (BD-Matter-FactoryResetEndsTheNode).
 func (n *Node) FactoryReset(ctx context.Context) error {
-	n.lifecycle <- struct{}{}
+	if err := n.enterLifecycle(ctx); err != nil {
+		return err
+	}
 	defer n.leaveLifecycle()
 	var errs []error
 	if !n.stopped {

@@ -184,6 +184,9 @@ type CommissioningWindow struct {
 	// — typically wired to the AdministratorCommissioning cluster's
 	// SubscriptionEventReporter so subscribers see WindowStatus flip.
 	onTransition func()
+	// facadeOnTransition is the node facade's slot of the transition
+	// hook (internal/facadeseam), run before the host's.
+	facadeOnTransition func()
 	// onStateChanged is the bridge's own transition hook: it reports the
 	// AdministratorCommissioning attributes to subscribers
 	// (Bridge.AttachCommissioningWindow). Called with the caller's
@@ -354,7 +357,9 @@ func (w *CommissioningWindow) HasSuppliedVerifier() bool {
 }
 
 // SetTransitionHook wires the optional callback fired on Open / Close.
-// Pass nil to detach. Safe to call concurrently.
+// Pass nil to detach. Safe to call concurrently. The node facade wires a
+// handler of its own in a separate slot, which runs first; this one is
+// the host's and replacing it leaves the facade's in place.
 func (w *CommissioningWindow) SetTransitionHook(fn func()) {
 	w.mu.Lock()
 	w.onTransition = fn
@@ -1188,17 +1193,21 @@ func (w *CommissioningWindow) FabricRemoved(fabricIndex uint8) {
 	}
 }
 
-// transitionHooks returns the hooks a transition fires — the host's
-// SetTransitionHook and the bridge's attribute reporting — as one func, or
-// nil when neither is set. Caller holds w.mu.
+// transitionHooks returns the hooks a transition fires — the bridge's
+// attribute reporting, the node facade's slot and the host's
+// SetTransitionHook, in that order — as one func, or nil when none is set.
+// Caller holds w.mu.
 func (w *CommissioningWindow) transitionHooks() func() {
-	host, own := w.onTransition, w.onStateChanged
-	if host == nil && own == nil {
+	host, facade, own := w.onTransition, w.facadeOnTransition, w.onStateChanged
+	if host == nil && facade == nil && own == nil {
 		return nil
 	}
 	return func() {
 		if own != nil {
 			own()
+		}
+		if facade != nil {
+			facade()
 		}
 		if host != nil {
 			host()

@@ -222,7 +222,7 @@ type fakeRoot struct {
 func newFakeDCL(t *testing.T) *fakeDCL {
 	t.Helper()
 	f := &fakeDCL{t: t, hits: map[string]int{}, routes: map[string]func(http.ResponseWriter, *http.Request){}, failPath: map[string]int{}}
-	f.srv = httptest.NewServer(http.HandlerFunc(f.serve))
+	f.srv = httptest.NewTLSServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.srv.Close)
 	return f
 }

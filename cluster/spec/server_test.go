@@ -66,6 +66,12 @@ func hepaServer(t *testing.T, cfg spec.ServerConfig) *spec.Server {
 			hepa.AttrReplacementProductList: products,
 		}
 	}
+	if cfg.Handlers[hepa.CmdResetCondition] == nil {
+		// ResetCondition is selected without a handler: the generated
+		// behavior's unimplemented command, which the tests that invoke
+		// it register with Handle.
+		cfg.Unimplemented = true
+	}
 	srv, err := spec.NewServer(hepa.Definition, spec.Options{
 		Features:   uint32(hepa.FeatureCondition | hepa.FeatureReplacementProductList),
 		Attributes: []uint32{hepa.AttrLastChangedTime},
@@ -322,7 +328,7 @@ func TestServerEvents(t *testing.T) {
 	srv, err := spec.NewServer(smokecoalarm.Definition, spec.Options{
 		Features: uint32(smokecoalarm.FeatureSmokeAlarm),
 		Commands: []uint32{smokecoalarm.CmdSelfTestRequest},
-	}, spec.ServerConfig{})
+	}, spec.ServerConfig{Unimplemented: true})
 	if err != nil {
 		t.Fatal(err)
 	}

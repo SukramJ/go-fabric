@@ -230,3 +230,26 @@ func TestSettingsAndTables_ClosedDB(t *testing.T) {
 		}
 	}
 }
+
+// TestPortGrowth_ClosedDB: the methods review II added to the port fail on
+// a closed database too (store/port.go: after the backend is closed every
+// method returns a non-nil error).
+func TestPortGrowth_ClosedDB(t *testing.T) {
+	t.Parallel()
+	s := closedStore(t)
+	ctx := context.Background()
+	vendor := uint16(1)
+	_, owedErr := s.OwedFabricEvents(ctx)
+	for name, err := range map[string]error{
+		"DeleteSettings":                 s.DeleteSettings(ctx, "a"),
+		"DeleteSettingsWithPrefix":       s.DeleteSettingsWithPrefix(ctx, "a."),
+		"ReplaceGroupKeyMappings":        s.ReplaceGroupKeyMappings(ctx, 1, nil),
+		"UpdateFabricVendorVerification": s.UpdateFabricVendorVerification(ctx, 1, mstore.FabricVendorUpdate{VendorID: &vendor}),
+		"OwedFabricEvents":               owedErr,
+		"AckOwedFabricEvent":             s.AckOwedFabricEvent(ctx, 1),
+	} {
+		if err == nil {
+			t.Errorf("%s on closed DB: want error, got nil", name)
+		}
+	}
+}

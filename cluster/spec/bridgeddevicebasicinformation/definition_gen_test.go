@@ -141,11 +141,38 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleKeepActive(func(context.Context, KeepActiveRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleKeepActive: a command the server does not accept was registered")
 	}
-	_ = s.EmitStartUp(0, StartUpEvent{})                   // not in the empty definition's EventList: refused
-	_ = s.EmitShutDown(0, ShutDownEvent{})                 // not in the empty definition's EventList: refused
-	_ = s.EmitLeave(0, LeaveEvent{})                       // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitStartUp(0, StartUpEvent{})                // not in the empty definition's EventList: refused
+	_ = s.RecordStartUp(StartUpEvent{})                 // the same, through EmitEvent
+	if err := bare.RecordStartUp(StartUpEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordStartUp on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitShutDown(0, ShutDownEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordShutDown(ShutDownEvent{})  // the same, through EmitEvent
+	if err := bare.RecordShutDown(ShutDownEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordShutDown on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLeave(0, LeaveEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLeave(LeaveEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLeave(LeaveEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLeave on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitReachableChanged(0, ReachableChangedEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitActiveChanged(0, ActiveChangedEvent{})       // not in the empty definition's EventList: refused
+	_ = s.RecordReachableChanged(ReachableChangedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordReachableChanged(ReachableChangedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordReachableChanged on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitActiveChanged(0, ActiveChangedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordActiveChanged(ActiveChangedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordActiveChanged(ActiveChangedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordActiveChanged on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

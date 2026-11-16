@@ -763,24 +763,40 @@ func (s *ColorControlServer) MatterWriteChanged(ctx context.Context, attrID uint
 			vetoed = uint8(n) //nolint:gosec // a bitmap8 ValidateWrite bounded
 		}
 	}
+	var (
+		options uint8
+		next    *uint16
+	)
+	if n, ok := v.(uint64); ok {
+		options = uint8(n) //nolint:gosec // a bitmap8 ValidateWrite bounded
+		m := uint16(n)     //nolint:gosec // within "1 to 65279" per ValidateWrite
+		next = &m
+	}
+	// holds reports whether the server holds the written value; under
+	// s.mu.
+	holds := func() bool {
+		if attrID == ccdef.AttrOptions {
+			return options == s.options
+		}
+		return equalMireds(s.startUpMireds, next)
+	}
+	// A write of the held value calls no veto and changes nothing; the
+	// host's veto is consulted behind the comparison, for a change only
+	// ([spec.WriteVeto.Check]).
+	s.mu.Lock()
+	held := holds()
+	s.mu.Unlock()
+	if held {
+		return false, nil
+	}
 	if err := s.veto.Check(ctx, attrID, vetoed); err != nil {
 		return false, err
 	}
-	changed := false
 	s.mu.Lock()
-	switch attrID {
-	case ccdef.AttrOptions:
-		n, _ := v.(uint64)
-		options := uint8(n) //nolint:gosec // a bitmap8 ValidateWrite bounded
-		changed = options != s.options
+	changed := !holds()
+	if attrID == ccdef.AttrOptions {
 		s.options = options
-	case ccdef.AttrStartUpColorTemperatureMireds:
-		var next *uint16
-		if n, ok := v.(uint64); ok {
-			m := uint16(n) //nolint:gosec // within "1 to 65279" per ValidateWrite
-			next = &m
-		}
-		changed = !equalMireds(s.startUpMireds, next)
+	} else {
 		s.startUpMireds = next
 	}
 	s.mu.Unlock()

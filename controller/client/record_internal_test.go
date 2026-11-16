@@ -31,6 +31,7 @@ func fullRecord() Record {
 		Hostname: "host", OperationalHost: "b25f4dcb247973d5.local", DiscoveredAt: at, CommissionedAt: at.Add(time.Second), FabricIndexOnPeer: 3, TTL: 90 * time.Second,
 		DeviceIdentifier: "ABCD", Discriminator: ptr(uint16(3840)), CommissioningMode: 2,
 		VendorID: ptr(uint16(0xFFF1)), ProductID: ptr(uint16(0x8001)), DeviceType: ptr(uint32(0x10A)), DeviceName: "plug",
+		AttestedVendorID: ptr(uint16(0xFFF2)), AttestedProductID: ptr(uint16(0x8002)),
 		RotatingIdentifier: "RI", PairingHint: ptr(uint32(33)), PairingInstructions: "press",
 		ReportedSessionParameters: &sessionparams.Parameters{SessionIdleInterval: 500, SessionActiveInterval: 300, DataModelRevision: 19, SpecificationVersion: 0x01040200},
 		AdvertisedIntervals:       &AdvertisedIntervals{IdleInterval: ptr(500 * time.Millisecond), ActiveThreshold: ptr(4 * time.Second)},
@@ -191,6 +192,48 @@ func TestRecordOperationalHost(t *testing.T) {
 	want.OperationalHost = ""
 	if !reflect.DeepEqual(legacy, want) || legacy.knownDescriptor().OperationalHost != "" {
 		t.Fatalf("legacy record\n got %+v\nwant %+v", legacy, want)
+	}
+}
+
+// TestRecordAttestedProduct: the attested pair is stored under its own
+// tag as one value; a record stored before the tag existed reads as
+// unknown; a half-set pair is not stored; a clone shares nothing.
+func TestRecordAttestedProduct(t *testing.T) {
+	t.Parallel()
+	in := fullRecord()
+	values, err := in.encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if values[recAttestedProduct] == nil {
+		t.Fatalf("field %d not stored", recAttestedProduct)
+	}
+	back, err := decodeRecord(values)
+	if err != nil || *back.AttestedVendorID != 0xFFF2 || *back.AttestedProductID != 0x8002 {
+		t.Fatalf("round trip %v/%v, %v", back.AttestedVendorID, back.AttestedProductID, err)
+	}
+	// Old bytes: the stored form of a record without the tag.
+	delete(values, recAttestedProduct)
+	legacy, err := decodeRecord(values)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.AttestedVendorID != nil || legacy.AttestedProductID != nil {
+		t.Fatalf("legacy record attested %v/%v, want unknown", legacy.AttestedVendorID, legacy.AttestedProductID)
+	}
+	want := fullRecord()
+	want.AttestedVendorID, want.AttestedProductID = nil, nil
+	if !reflect.DeepEqual(legacy, want) {
+		t.Fatalf("legacy record\n got %+v\nwant %+v", legacy, want)
+	}
+	half, err := Record{AttestedVendorID: ptr(uint16(1))}.encode()
+	if err != nil || half[recAttestedProduct] != nil {
+		t.Fatalf("a half-set pair stored %x, %v", half[recAttestedProduct], err)
+	}
+	c := in.clone()
+	*c.AttestedVendorID, *c.AttestedProductID = 0, 0
+	if *in.AttestedVendorID != 0xFFF2 || *in.AttestedProductID != 0x8002 {
+		t.Fatal("clone shares the attested pair")
 	}
 }
 

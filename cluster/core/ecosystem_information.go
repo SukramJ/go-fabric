@@ -15,7 +15,6 @@ import (
 	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // The bounds connectedhomeip holds an EcosystemInformation entry to
@@ -172,29 +171,16 @@ func (e *EcosystemInformation) read(ctx context.Context, attrID uint32, filtered
 	return nil, false
 }
 
-// scopeEntry decides how one entry owned by owner reads: as it is, as its
-// FabricIndex alone, or not at all (AttributeValueEncoder.h:96-107).
+// scopeEntry decides whether one entry owned by owner is listed: a
+// fabric-filtered request lists the accessing fabric's entries alone,
+// every other read lists the entry whole. The dispatcher withholds the
+// fabric-sensitive fields of another fabric's entry from a request, as it
+// scopes every fabric-scoped attribute of the model.
 func scopeEntry(v spec.Encodable, owner uint8, filtered bool, fabric uint8, scoped bool) (spec.Encodable, bool) {
-	switch {
-	case !scoped, owner == fabric && fabric != 0:
-		return v, true
-	case filtered:
+	if scoped && filtered && (owner != fabric || fabric == 0) {
 		return nil, false
-	default:
-		return redactedEntry{fabricIndex: owner}, true
 	}
-}
-
-// redactedEntry is another fabric's entry on an unfiltered read: every
-// field of both entry structs but FabricIndex is fabric-sensitive
-// (ecosystem-information.element.ts, "S"), so only FabricIndex is sent.
-type redactedEntry struct{ fabricIndex uint8 }
-
-// EncodeTLV implements [spec.Encodable].
-func (r redactedEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	spec.PutUint[uint8](enc, tlv.ContextTag(254), r.fabricIndex)
-	_ = enc.EndContainer()
+	return v, true
 }
 
 // validEcosystemDevice holds a device entry to

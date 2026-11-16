@@ -123,9 +123,9 @@ already draws that line for itself: `internal/` holds three kinds of
 package, and Go makes all of them unimportable from outside — the one-way
 seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
-`channelseam`, `coreseam`, `deviceseam`, `exchangeseam`, `fabrictestseam`,
+`channelseam`, `coreseam`, `deviceseam`, `exchangeseam`, `facadeseam`, `fabrictestseam`,
 `nodeseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
-internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`);
+internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`);
 and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
@@ -201,10 +201,33 @@ becomes permissible in:
 | `transport/mrp.NewWindowNoRollover` | `transport/mrp.NewWindowNoRolloverAt(0)` | `v0.23.0` |
 | `bridge.FailSafeArmer` | none; the fail-safe comes with the commissioner's ArmFailSafe or the arm of its PASE session | `v0.23.0` |
 | `bridge.CommissioningWindow.SetFailSafeArmer` | `CommissioningWindow.SetFailSafeExpirer` | `v0.23.0` |
-| `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseEstablished`, which returns the refusal of the arm | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession`, which returns the refusal of the arm and takes the session's id | `v0.23.0` |
 | `im/subscription.Manager.CloseEndpoint` | `Manager.Close` on each subscription to end; a Reassemble that removes an endpoint ends none | `v0.23.0` |
 | `bridge.MRPAckAdapter`, `bridge.NewMRPAckAdapter` | none; `Bridge.AttachAckTracker` wires the tracker, which a peer's acknowledgement does not discharge | `v0.23.0` |
 | `groups.NoKeyError` | `groups.DecodeError`, the outcome of a group message no candidate key passed; `Manager.Decode` no longer returns `NoKeyError` | `v0.23.0` |
+| `store.Store.DeleteSetting` | `Store.DeleteSettings`, which every `store.Settings` backend implements | `v0.23.0` |
+| `endpoint.Config.OnNodeLabelWritten`, `endpoint.Config.Scenes`, `endpoint.ScenesStore` | `endpoint.Config.Persistence` (`endpoint.Persistence`), whose saves and loads report the store's error | `v0.23.0` |
+| `node.EndpointPersistence`, `node.Config.EndpointPersistence`, `node.NewEndpointPersistence` | `node.EndpointState`, `node.Config.EndpointState`, `node.NewEndpointState` | `v0.23.0` |
+| `cluster/core.AccessControlEntryStruct.Redacted`, `AccessControlAuxiliaryEntryStruct.Redacted`, `AccessControlExtensionEntry.Redacted`, `SceneInfoStruct.Redacted` | none: return the entry whole; the dispatcher scopes every fabric-scoped attribute of the model | `v0.23.0` |
+| `node.Node.Persistence` | `Node.EndpointState`, which returns the new port | `v0.23.0` |
+| `cluster/spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule` for a server's own rule (no host veto replaces it); `Server.SetBeforeWrite` / the typed `OnWrite` for the host's veto | `v0.23.0` |
+| `cluster/spec.Server.Notify`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` | `Server.Set` for a held value, `Server.MarkChanged` (or `MarkQuietChanged` for a quieter attribute) for one the host computes on read | `v0.23.0` |
+| `cluster/spec.Server.Emit`, `cluster/spec.EmitOn`, `<cluster>def.Server.Emit<Event>` | `Server.EmitEvent`, `<cluster>def.Server.Record<Event>`: the event goes out on the endpoint the server is mounted on (`spec.ErrNotMounted` before) | `v0.23.0` |
+| `cluster/wire.ScenesManagement` | `cluster/core.ScenesManagement` (`core.NewScenesManagement`) | `v0.23.0` |
+| `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, the `Schedules*` constants | the Thermostat server's schedules (`cluster/thermo`, `docs/guides/thermostat.md`) | `v0.23.0` |
+| `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` | none to call: a node reaches its OTA provider and its camera's requestor over its own peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session without a handshake | `v0.23.0` |
+| `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` | none; `bridge.CommissioningWindowOpener` returns the `bridge` values | `v0.23.0` |
+| `node.Config.SupportedFabrics`, `node.Config.MaxPathsPerInvoke` | `Config.Limits.SupportedFabrics`, `Config.Limits.MaxPathsPerInvoke` | `v0.23.0` |
+| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` | `Hints` (`mdns.PairingHints`) | `v0.23.0` |
+| `bridge.Bridge.AttachPaseHandler`, `bridge.Bridge.AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` | `v0.23.0` |
+| `bridge.Bridge.SubscriptionPersistenceEnabled`, `bridge.Bridge.FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence` | `v0.23.0` |
+| `bridge.Bridge.ControllerRTT` | none | `v0.23.0` |
+| `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE` | `contract.GATTPeripheral`, `node.Network.GATT`, `bridge.Config.GATT` | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeExpired` | `GeneralCommissioning.SetOnFailSafeExpiry` | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeRolledBack` | `GeneralCommissioning.SetFailSafeSessionCloser` | `v0.23.0` |
+| `cluster/core.GeneralCommissioning.ArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession` | `v0.23.0` |
+| `device.NewRootNode` | none; the root endpoint is the node's (`node.Node.Root`) | `v0.23.0` |
+| `endpoint.WriteChanges`, `endpoint.WithWriteChanges` (`Unchanged`, `Changed`, `ChangedAttributes`) | `im.HandleWrite`, whose results carry each write's verdict in `im.WriteResult.Commit` | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

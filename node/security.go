@@ -554,8 +554,8 @@ func wireSecurity(
 func (s *security) start(ctx context.Context) {
 	s.subs.Start(ctx)
 	s.sessions.StartReaper(ctx, operational.SessionIdleTimeout, time.Minute)
-	s.pase.StartReaper(ctx, 30*time.Second, time.Minute)
-	s.casep.StartReaper(ctx, 30*time.Second, time.Minute)
+	s.pase.StartReaper(ctx, handshakeReapInterval, handshakeAdapterTTL)
+	s.casep.StartReaper(ctx, handshakeReapInterval, handshakeAdapterTTL)
 }
 
 // caseInitiatorProvider prepares the CASE handshakes the bridge opens to
@@ -618,7 +618,14 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 				if onOpened != nil {
 					onOpened(entry.SessionID)
 				}
-				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
+				rec := store.ResumptionRecord{
+					FabricIndex: fabricIndex, PeerNodeID: res.PeerNodeID, ResumptionID: res.ResumptionID,
+					SharedSecret: res.SharedSecret, CASEAuthTags: res.PeerCATs,
+				}
+				if p := res.PeerSessionParams; p != nil {
+					rec.SessionParameters = *p
+				}
+				if err := sessions.PersistResumptionRecord(ctx, rec); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.Any("err", err))
 				}
 				return nil
@@ -715,7 +722,7 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		// src/app/server/CommissioningWindowManager.cpp:240-242 at
 		// 6170af84, MarkForEviction and HandleFailedAttempt; review II,
 		// R2-P3-pase-03).
-		if err := root.GeneralCommissioning.ArmOnPaseEstablished(life); err != nil {
+		if err := root.GeneralCommissioning.ArmOnPaseSession(life, sessionID); err != nil {
 			_ = sessions.Close(sessionID)
 			return fmt.Errorf("node: the PASE session's fail-safe: %w", err)
 		}
@@ -867,7 +874,22 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		// carried) with the session's shared secret.
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
-				if err := sessions.PersistResumption(context.Background(), fabricIndex, peerNodeID, id, secret, peerCATs); err != nil {
+				// With the initiator's session parameters, as a CASE client
+				// that resumes from the same record keeps them (review II,
+				// Fable P-5). A resumed session keeps the parameters of the
+				// record it resumed from, the id alone renewed — matter.js
+				// re-saves the old record with the new id (CaseServer.ts:213,
+				// :219 at db021da0; Fable P-5a).
+				params, _ := resp.PeerSessionParameters()
+				if info := resp.ResumeInfo(); info.Resumed {
+					if prev, err := sessions.LookupResumption(context.Background(), info.PresentedResumptionID); err == nil {
+						params = prev.SessionParameters
+					}
+				}
+				if err := sessions.PersistResumptionRecord(context.Background(), store.ResumptionRecord{
+					FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
+					CASEAuthTags: peerCATs, SessionParameters: params,
+				}); err != nil {
 					logger.Warn("case.resumption.persist_failed", slog.Any("err", err))
 				}
 			}
@@ -913,3 +935,14 @@ func operationalResolver(logger *slog.Logger, c clock.Clock) *mdns.OperationalRe
 	r.SetClock(c)
 	return r
 }
+
+// handshakeAdapterTTL is how long an idle PASE or CASE handshake adapter
+// lives before the reaper drops it; handshakeReapInterval is how often the
+// reaper looks, a quarter of the TTL as the providers' StartReaper
+// recommends (bridge.PerExchangePaseProvider.StartReaper). Named so the
+// three reaper calls cannot swap the two durations (review II,
+// R2-P5-apinode-16).
+const (
+	handshakeAdapterTTL   = time.Minute
+	handshakeReapInterval = handshakeAdapterTTL / 4
+)

@@ -21,8 +21,7 @@ import (
 // package. Both sides that embed it reach it from here: the cluster
 // servers under cluster and the model packages
 // on the host side, neither of which then depends on the
-// other. pkg/hmtypes keeps a compatibility alias for call sites that
-// still spell it there.
+// other.
 //
 // Three facts govern its behaviour: the counter is monotonic, it is
 // per-cluster, and it starts at a random non-zero value rather than at
@@ -89,7 +88,8 @@ func (d *DataVersionTracker) Current() uint32 {
 //
 // Wrap-around past 0xFFFFFFFF is intentional and fine — the IM filter
 // comparison uses == so any increment signals "cluster changed". Zero
-// is skipped (reserved per Matter §10.6.5).
+// is skipped because the tracker uses it for "no version installed
+// yet"; to a reader every value is a version ([ClusterDataVersion]).
 func (d *DataVersionTracker) Bump() uint32 {
 	// Ensure the random initial value is installed before incrementing
 	// so we never bump from the reserved zero state.

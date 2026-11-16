@@ -66,7 +66,7 @@ func (b *Bridge) validateDeviceTypes(topology *endpoint.Topology) error {
 	// (ServerEndpointFacts.ts:140-145 at db021da0 asks the node's
 	// NetworkServer the same).
 	if topology != nil {
-		topology.CommissionsOverBLE = b.cfg.BLE != nil
+		topology.CommissionsOverBLE = b.gattPeripheral() != nil
 	}
 	verdict, err := b.deviceTypeValidator().Validate(topology)
 	if err != nil {

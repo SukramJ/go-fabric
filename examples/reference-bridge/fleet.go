@@ -1101,6 +1101,10 @@ type fleet struct {
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
 	configChange func() error
+	// openWindow opens the node's own commissioning window (the app pipe's
+	// UserIntentCommissioningStart, the user action --custom-flow 1 waits
+	// for); wired by assemble.
+	openWindow func(context.Context) error
 }
 
 func newFleet() *fleet {

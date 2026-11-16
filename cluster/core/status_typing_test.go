@@ -72,8 +72,8 @@ func TestRefusalsAnswerTheirStatus(t *testing.T) {
 		{"Groups", newGroupsFixture(t, 4).ep3, 0x0000},
 		{"ScenesManagement", scenes, 0x0001},
 		{"GeneralDiagnostics", core.NewGeneralDiagnostics(0), 0x0000},
-		{"Schedules", wire.NewSchedulesServer(nil), wire.SchedulesAttrSchedules},
-		{"ScenesManagement stub", wire.ScenesManagement{}, 0x0001},
+		{"Schedules", wire.NewSchedulesServer(nil), wire.SchedulesAttrSchedules}, //nolint:staticcheck // a deprecated wire stub kept for its window (R2-P5-apispec-13, -14)
+		{"ScenesManagement stub", wire.ScenesManagement{}, 0x0001},               //nolint:staticcheck // a deprecated wire stub kept for its window (R2-P5-apispec-13, -14)
 	} {
 		write, invoke := dispatched(t, tc.srv, tc.attrID, 0xFE)
 		if write != im.StatusUnsupportedWrite {

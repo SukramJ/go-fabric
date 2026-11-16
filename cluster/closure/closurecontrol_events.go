@@ -89,6 +89,7 @@ func (s *ControlServer) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
+	s.Hooks.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
 }
 
 // pendingEvent is an event decided under the lock and emitted after it.

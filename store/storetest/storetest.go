@@ -63,6 +63,8 @@ var cases = []testCase{
 	{"fabrics/duplicate-root-and-id", fabricsDuplicate},
 	{"fabrics/pending-add", fabricsPendingAdd},
 	{"fabrics/vid-verification", fabricsVIDVerification},
+	{"fabrics/vendor-verification", fabricsVendorVerificationCase},
+	{"fabrics/rollback-owes-event", fabricsRollbackOwesEventCase},
 	{"fabrics/commit", fabricsCommit},
 	{"fabrics/rollback-pending-add", fabricsRollbackPendingAdd},
 	{"fabrics/update-rollback", fabricsUpdateRollback},
@@ -77,12 +79,17 @@ var cases = []testCase{
 	{"acl", aclCase},
 	{"group-keys", groupKeysCase},
 	{"group-keys/ordering", groupKeysOrdering},
+	{"group-keys/replace-mappings", groupKeysReplaceMappingsCase},
+	{"key-lengths", keyLengthsCase},
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
+	{"resumption/session-parameters", resumptionSessionParametersCase},
 	{"server-subscriptions", serverSubscriptionsCase},
 	{"server-subscriptions/save-order", serverSubscriptionsSaveOrder},
 	{"settings", settingsCase},
 	{"settings/set-settings", setSettingsCase},
+	{"settings/delete", settingsDeleteCase},
+	{"settings/delete-prefix", settingsDeletePrefixCase},
 	{"ota", otaCase},
 	{"thermostat-presets", presetsCase},
 	{"door-locks", doorLocksCase},
@@ -95,6 +102,7 @@ var cases = []testCase{
 	{"copies/credentials", copiesCredentials},
 	{"concurrent", concurrentCase},
 	{"erase", eraseCase},
+	{"erase/owed-event-ids", eraseOwedEventIDsCase},
 }
 
 // eraseCase: Erase leaves the store as a fresh one (store.Eraser, the
@@ -888,13 +896,15 @@ func doorLocksCase(ctx context.Context, t *testing.T, p store.Port) {
 			{
 				UserIndex: 2, UserName: "b", UserStatus: 1, UserType: 0, Credentials: []store.DoorLockCredentialRef{{Type: 1, Index: 1}},
 				CreatorFabricIndex: 1, LastModifiedFabricIndex: 2, ExpiringUserExpiresAt: &expires,
+				CreatedThroughMatter: true, ModifiedThroughMatter: true,
 			},
 			{UserIndex: 1, UserName: "a", UserUniqueID: u32(42), UserStatus: 1},
 		},
 		Credentials: []store.DoorLockCredential{
 			{Type: 2, Index: 1, Data: []byte{9}},
 			{Type: 1, Index: 3, Data: []byte{8}},
-			{Type: 1, Index: 1, Data: []byte{7}, CreatorFabricIndex: 1, LastModifiedFabricIndex: 1},
+			{Type: 1, Index: 1, Data: []byte{7}, CreatorFabricIndex: 1, LastModifiedFabricIndex: 1, ModifiedThroughMatter: true},
+			{Type: 1, Index: 2, Data: []byte{6}, CreatorFabricIndex: 2, LastModifiedFabricIndex: 2, CreatedThroughMatter: true, ModifiedThroughMatter: true},
 		},
 		WeekDaySchedules: []store.DoorLockWeekDaySchedule{
 			{WeekDayIndex: 2, UserIndex: 1, DaysMask: 3, StartHour: 8, EndHour: 17},
@@ -920,7 +930,7 @@ func doorLocksCase(ctx context.Context, t *testing.T, p store.Port) {
 			{UserIndex: 1, UserName: "a", UserUniqueID: u32(42), UserStatus: 1, Credentials: []store.DoorLockCredentialRef{}},
 			auth.Users[0],
 		},
-		Credentials:      []store.DoorLockCredential{auth.Credentials[2], auth.Credentials[1], auth.Credentials[0]},
+		Credentials:      []store.DoorLockCredential{auth.Credentials[2], auth.Credentials[3], auth.Credentials[1], auth.Credentials[0]},
 		WeekDaySchedules: []store.DoorLockWeekDaySchedule{auth.WeekDaySchedules[2], auth.WeekDaySchedules[0], auth.WeekDaySchedules[1]},
 		YearDaySchedules: []store.DoorLockYearDaySchedule{auth.YearDaySchedules[1], auth.YearDaySchedules[0]},
 		HolidaySchedules: []store.DoorLockHolidaySchedule{auth.HolidaySchedules[1], auth.HolidaySchedules[0]},
@@ -973,7 +983,7 @@ func unknownFabricRefused(ctx context.Context, t *testing.T, p store.Port) {
 // groupcast, resumption, default OTA provider, ICD registration.
 func seedFabricRows(ctx context.Context, t *testing.T, p store.Port, f uint8) {
 	t.Helper()
-	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: []byte{3}}))
+	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: f, NOC: []byte{f}, PrivateKey: []byte{2}, IPK: bytes.Repeat([]byte{3}, 16)}))
 	must(t, p.ReplaceACL(ctx, f, []store.ACLEntry{{Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE, Subjects: []uint64{uint64(f)}}}))
 	must(t, p.UpsertGroupKeySet(ctx, keySet(f, 1)))
 	must(t, p.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: f, GroupID: 1, GroupKeySetID: 1}))
@@ -1116,6 +1126,8 @@ func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 		t.Fatal("mutating a read subscription payload changed the store")
 	}
 
+	copiesResumption(ctx, t, p, idx)
+
 	presets := []byte{1}
 	must(t, p.SaveThermostatPresets(ctx, "t", presets, nil))
 	presets[0] = 2
@@ -1135,6 +1147,29 @@ func copiesCase(ctx context.Context, t *testing.T, p store.Port) {
 	must(t, err)
 	if *got2.Users[0].UserUniqueID != 5 || got2.Users[0].Credentials[0].Index != 1 || got2.Credentials[0].Data[0] != 7 {
 		t.Fatal("mutating written door-lock records changed the store")
+	}
+}
+
+// copiesResumption: a resumption record written and read is copied both
+// ways — its id, its secret and its CATs (review II, port unit).
+func copiesResumption(ctx context.Context, t *testing.T, p store.Port, idx uint8) {
+	res := resumptionRec(idx, 7, 1)
+	res.CASEAuthTags = []uint32{0x00010001}
+	must(t, p.UpsertResumption(ctx, res))
+	res.ResumptionID[0] ^= 0xFF
+	res.SharedSecret[0] ^= 0xFF
+	res.CASEAuthTags[0] = 9
+	gotRes, err := p.GetResumptionByPeer(ctx, idx, 7)
+	must(t, err)
+	if want := resumptionRec(idx, 7, 1); !bytes.Equal(gotRes.ResumptionID, want.ResumptionID) || !bytes.Equal(gotRes.SharedSecret, want.SharedSecret) || gotRes.CASEAuthTags[0] != 0x00010001 {
+		t.Fatal("mutating a written ResumptionRecord changed the store")
+	}
+	gotRes.ResumptionID[0] ^= 0xFF
+	gotRes.SharedSecret[0] ^= 0xFF
+	gotRes.CASEAuthTags[0] = 9
+	if again, _ := p.GetResumptionByPeer(ctx, idx, 7); !bytes.Equal(again.ResumptionID, resumptionRec(idx, 7, 1).ResumptionID) ||
+		!bytes.Equal(again.SharedSecret, resumptionRec(idx, 7, 1).SharedSecret) || again.CASEAuthTags[0] != 0x00010001 {
+		t.Fatal("mutating a read ResumptionRecord changed the store")
 	}
 }
 
@@ -1262,4 +1297,56 @@ func constraintsCase(ctx context.Context, t *testing.T, p store.Port) {
 	}
 	// The same index for two users is two week-day schedules.
 	must(t, p.SaveDoorLockAuth(ctx, "lock", store.DoorLockAuth{WeekDaySchedules: []store.DoorLockWeekDaySchedule{{WeekDayIndex: 1, UserIndex: 1}, {WeekDayIndex: 1, UserIndex: 2}}}))
+}
+
+// keyLengthsCase: both backends refuse on write a key a read would refuse —
+// an IPK that is not 16 bytes, an empty private key, an epoch key that is
+// not 16 bytes, a resumption secret that is not 32 bytes — and store an
+// empty EpochKey1 / EpochKey2 as absent (nil, its start 0).
+func keyLengthsCase(ctx context.Context, t *testing.T, p store.Port) {
+	f := addFabric(ctx, t, p, 1)
+	ipk, key := bytes.Repeat([]byte{4}, 16), bytes.Repeat([]byte{3}, 32)
+	for name, rec := range map[string]store.IdentityRecord{
+		"a 15-byte IPK":  {FabricIndex: f, NOC: []byte{1}, PrivateKey: key, IPK: ipk[:15]},
+		"a 17-byte IPK":  {FabricIndex: f, NOC: []byte{1}, PrivateKey: key, IPK: append(bytes.Clone(ipk), 0)},
+		"an empty key":   {FabricIndex: f, NOC: []byte{1}, PrivateKey: []byte{}, IPK: ipk},
+		"no private key": {FabricIndex: f, NOC: []byte{1}, IPK: ipk},
+	} {
+		if err := p.UpsertIdentity(ctx, rec); err == nil {
+			t.Errorf("UpsertIdentity with %s succeeded", name)
+		}
+	}
+	if _, err := p.GetIdentity(ctx, f); !errors.Is(err, store.ErrIdentityNotFound) {
+		t.Errorf("a refused identity was stored: %v", err)
+	}
+	good := keySet(f, 1)
+	for name, ks := range map[string]store.GroupKeySet{
+		"a 15-byte EpochKey0": func() store.GroupKeySet { k := good; k.EpochKey0 = k.EpochKey0[:15]; return k }(),
+		"no EpochKey0":        func() store.GroupKeySet { k := good; k.EpochKey0 = nil; return k }(),
+		"a 2-byte EpochKey1":  func() store.GroupKeySet { k := good; k.EpochKey1, k.EpochStart1 = []byte{1, 2}, 5; return k }(),
+		"a 17-byte EpochKey2": func() store.GroupKeySet {
+			k := good
+			k.EpochKey2, k.EpochStart2 = bytes.Repeat([]byte{2}, 17), 6
+			return k
+		}(),
+	} {
+		if err := p.UpsertGroupKeySet(ctx, ks); err == nil {
+			t.Errorf("UpsertGroupKeySet with %s succeeded", name)
+		}
+	}
+	if _, err := p.GetGroupKeySet(ctx, f, 1); !errors.Is(err, store.ErrGroupKeySetNotFound) {
+		t.Errorf("a refused key set was stored: %v", err)
+	}
+	empty := good
+	empty.EpochKey1, empty.EpochStart1 = []byte{}, 7
+	must(t, p.UpsertGroupKeySet(ctx, empty))
+	got, err := p.GetGroupKeySet(ctx, f, 1)
+	if err != nil || got.EpochKey1 != nil || got.EpochStart1 != 0 || !bytes.Equal(got.EpochKey0, good.EpochKey0) {
+		t.Errorf("an empty EpochKey1 reads back %x (start %d), %v; want absent", got.EpochKey1, got.EpochStart1, err)
+	}
+	if err := p.UpsertResumption(ctx, store.ResumptionRecord{
+		FabricIndex: f, PeerNodeID: 5, ResumptionID: bytes.Repeat([]byte{1}, 16), SharedSecret: bytes.Repeat([]byte{1}, 31),
+	}); err == nil {
+		t.Error("UpsertResumption with a 31-byte secret succeeded")
+	}
 }

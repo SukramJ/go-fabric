@@ -235,6 +235,7 @@ func (c *CommissionerControl) SetEndpoint(endpoint uint16) {
 	c.mu.Lock()
 	c.endpoint = endpoint
 	c.mu.Unlock()
+	c.Server.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close cancels a running approval or commissioning and waits for it.
@@ -345,12 +346,11 @@ func (c *CommissionerControl) approve(request CommissioningApprovalRequest) {
 	} else {
 		c.step, c.request = ccIdle, CommissioningApprovalRequest{}
 	}
-	endpoint := c.endpoint
 	c.mu.Unlock()
 	c.log.Info("matter.commissioner_control.approval_result", slog.Uint64("request_id", request.RequestID), slog.Int("status", int(status)))
-	if err := c.Emit(endpoint, commctrldef.EventCommissioningRequestResult, commctrldef.CommissioningRequestResultEvent{
+	if err := c.EmitEvent(commctrldef.EventCommissioningRequestResult, commctrldef.CommissioningRequestResultEvent{
 		RequestId: request.RequestID, ClientNodeId: request.ClientNodeID, StatusCode: status, FabricIndex: request.FabricIndex,
-	}); err != nil {
+	}); err != nil && !errors.Is(err, spec.ErrNotMounted) { // not in the topology: no event log
 		c.log.Warn("matter.commissioner_control.event_failed", slog.Any("err", err))
 	}
 }

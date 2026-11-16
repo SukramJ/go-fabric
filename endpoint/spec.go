@@ -80,7 +80,7 @@ type Spec struct {
 	Measurement contract.MeasurementSource
 	// NodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller
 	// wrote in an earlier run and the host persisted through
-	// [Config.OnNodeLabelWritten]. Empty serves FriendlyName until a
+	// [Config.Persistence]. Empty serves FriendlyName until a
 	// controller writes one.
 	NodeLabel string
 	// ConfigurationVersion is the bridged device's

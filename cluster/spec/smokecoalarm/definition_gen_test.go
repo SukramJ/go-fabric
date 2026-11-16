@@ -126,17 +126,68 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleSelfTestRequest(func(context.Context, SelfTestRequestRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleSelfTestRequest: a command the server does not accept was registered")
 	}
-	_ = s.EmitSmokeAlarm(0, SmokeAlarmEvent{})                         // not in the empty definition's EventList: refused
-	_ = s.EmitCoAlarm(0, CoAlarmEvent{})                               // not in the empty definition's EventList: refused
-	_ = s.EmitLowBattery(0, LowBatteryEvent{})                         // not in the empty definition's EventList: refused
-	_ = s.EmitHardwareFault(0, HardwareFaultEvent{})                   // not in the empty definition's EventList: refused
-	_ = s.EmitEndOfService(0, EndOfServiceEvent{})                     // not in the empty definition's EventList: refused
-	_ = s.EmitSelfTestComplete(0, SelfTestCompleteEvent{})             // not in the empty definition's EventList: refused
-	_ = s.EmitAlarmMuted(0, AlarmMutedEvent{})                         // not in the empty definition's EventList: refused
-	_ = s.EmitMuteEnded(0, MuteEndedEvent{})                           // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitSmokeAlarm(0, SmokeAlarmEvent{})          // not in the empty definition's EventList: refused
+	_ = s.RecordSmokeAlarm(SmokeAlarmEvent{})           // the same, through EmitEvent
+	if err := bare.RecordSmokeAlarm(SmokeAlarmEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSmokeAlarm on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitCoAlarm(0, CoAlarmEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordCoAlarm(CoAlarmEvent{})  // the same, through EmitEvent
+	if err := bare.RecordCoAlarm(CoAlarmEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordCoAlarm on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLowBattery(0, LowBatteryEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLowBattery(LowBatteryEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLowBattery(LowBatteryEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLowBattery on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitHardwareFault(0, HardwareFaultEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordHardwareFault(HardwareFaultEvent{})  // the same, through EmitEvent
+	if err := bare.RecordHardwareFault(HardwareFaultEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordHardwareFault on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitEndOfService(0, EndOfServiceEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordEndOfService(EndOfServiceEvent{})  // the same, through EmitEvent
+	if err := bare.RecordEndOfService(EndOfServiceEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordEndOfService on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitSelfTestComplete(0, SelfTestCompleteEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSelfTestComplete(SelfTestCompleteEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSelfTestComplete(SelfTestCompleteEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSelfTestComplete on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitAlarmMuted(0, AlarmMutedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordAlarmMuted(AlarmMutedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordAlarmMuted(AlarmMutedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordAlarmMuted on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitMuteEnded(0, MuteEndedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordMuteEnded(MuteEndedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordMuteEnded(MuteEndedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordMuteEnded on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitInterconnectSmokeAlarm(0, InterconnectSmokeAlarmEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitInterconnectCoAlarm(0, InterconnectCoAlarmEvent{})       // not in the empty definition's EventList: refused
-	_ = s.EmitAllClear(0, AllClearEvent{})                             // not in the empty definition's EventList: refused
+	_ = s.RecordInterconnectSmokeAlarm(InterconnectSmokeAlarmEvent{})  // the same, through EmitEvent
+	if err := bare.RecordInterconnectSmokeAlarm(InterconnectSmokeAlarmEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordInterconnectSmokeAlarm on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitInterconnectCoAlarm(0, InterconnectCoAlarmEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordInterconnectCoAlarm(InterconnectCoAlarmEvent{})  // the same, through EmitEvent
+	if err := bare.RecordInterconnectCoAlarm(InterconnectCoAlarmEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordInterconnectCoAlarm on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitAllClear(0, AllClearEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordAllClear(AllClearEvent{})  // the same, through EmitEvent
+	if err := bare.RecordAllClear(AllClearEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordAllClear on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

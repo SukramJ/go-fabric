@@ -98,6 +98,18 @@ type UpdateInfo struct {
 	Source string
 	// ledger is the record of a ledger update, nil for a stored one.
 	ledger *dcl.SoftwareVersion
+	// hostURL marks the record UpdateInfoFromURL builds for a URL the host
+	// named: the one record that is not the ledger's.
+	hostURL bool
+}
+
+// hostSupplied reports whether info is an image the host supplied
+// itself: of [SourceLocal], with no record ([UpdateInfoFromImage], a
+// stored local image) or the record of a URL the host named
+// ([Images.UpdateInfoFromURL]). Every other update — any other Source,
+// an unknown one included — is the ledger's and takes the ledger's rules.
+func hostSupplied(info UpdateInfo) bool {
+	return info.Source == SourceLocal && (info.ledger == nil || info.hostURL)
 }
 
 // Blobs keeps the image files. [MemoryBlobs] is the default.
@@ -107,6 +119,42 @@ type Blobs interface {
 	Get(ctx context.Context, name string) ([]byte, error)
 	Delete(ctx context.Context, name string) error
 	List(ctx context.Context) ([]string, error)
+}
+
+// BlobStreamer is the optional streaming side of a [Blobs]. When the
+// store's Blobs implements it, [Images.DownloadUpdate] writes a ledger
+// image into it as the image arrives and verifies it by reading it back,
+// and every other read of an image ([Images.Find], [Images.Open], the
+// check of a stored image) reads the file in place; without it each image
+// passes through memory whole (Put, Get). An image's small records — its
+// .meta and its provenance (.origin) — go through Put and Get either way.
+//
+// A backend opts in by implementing it on its own type; [MemoryBlobs]
+// does not. Embedding a type that implements it promotes the capability:
+// the embedding type's own Put and Get are then no longer used for image
+// files.
+type BlobStreamer interface {
+	// CreateBlob starts writing the file name. Nothing of it is visible
+	// under name before the writer's Commit, which replaces a file of the
+	// same name; Abort discards what was written.
+	CreateBlob(ctx context.Context, name string) (BlobWriter, error)
+	// OpenBlob opens the file name for reading at any offset; a missing
+	// file wraps fs.ErrNotExist. A blob that implements io.Closer is
+	// closed after the store's own reads, and one [Images.Open] hands to a
+	// BDX transfer is closed by the server when that transfer ends
+	// ([bdx.ServeOptions].Open).
+	OpenBlob(ctx context.Context, name string) (bdx.Blob, error)
+}
+
+// BlobWriter writes one file of a [BlobStreamer]. It is used by one
+// goroutine.
+type BlobWriter interface {
+	io.Writer
+	// Commit makes the written bytes the file's content.
+	Commit() error
+	// Abort discards the written bytes and leaves the file as it was; it
+	// does nothing after Commit.
+	Abort() error
 }
 
 // MemoryBlobs keeps the files in memory. Safe for concurrent use.
@@ -165,6 +213,17 @@ var filenamePattern = regexp.MustCompile(`(?i)^[0-9a-f]+[./][0-9a-f]+[./](?:prod
 // "meta" context of :61-66).
 const metaSuffix = ".meta"
 
+// originSuffix names a stored image's provenance record, written when the
+// image is stored: "host" for an image the host supplied (Store without a
+// ledger record, an image by URL), "ledger <type> <base64>" for a ledger
+// image checked against the record's whole-file checksum, "ledger" for one
+// stored without a checksum. A stored prod or test image whose record is
+// "ledger", or that has none (stored before the store kept the record), is
+// not offered, reused or opened unless
+// [ImagesConfig].AllowUnverifiedLedgerImages is set; a local image needs
+// no record.
+const originSuffix = ".origin"
+
 // Images is the image store over Blobs and the ledgers. Safe for
 // concurrent use.
 type Images struct {
@@ -172,23 +231,51 @@ type Images struct {
 	ledger  *dcl.OTAVersions
 	offline bool
 	log     *slog.Logger
-	// download fetches a ledger image; nil is the ledger's Download.
-	download func(ctx context.Context, v dcl.SoftwareVersion) ([]byte, error)
+	// allowUnverified is ImagesConfig.AllowUnverifiedLedgerImages.
+	allowUnverified bool
+	// download fetches a ledger image into w; nil is the ledger's
+	// Download. A test seam.
+	download func(ctx context.Context, v dcl.SoftwareVersion, w io.Writer) error
+
+	// hiddenMu guards hidden: the names a streamed download has committed
+	// and not yet verified, which Find and Open do not offer meanwhile.
+	hiddenMu sync.Mutex
+	hidden   map[string]int
 }
 
 // ImagesConfig configures [NewImages].
 type ImagesConfig struct {
-	// Blobs keeps the files; nil is a [MemoryBlobs].
+	// Blobs keeps the files; nil is a [MemoryBlobs]. One that also
+	// implements [BlobStreamer] receives a ledger image as it downloads.
 	Blobs Blobs
 	// Ledger asks the production and test-net ledgers; nil asks none, as
 	// the service's offline option (:1283-1296): only stored images are
 	// found, and nothing is downloaded. Its MaxImageSize bounds every
 	// download of the store ([Images.DownloadUpdate],
-	// [Images.UpdateInfoFromURL]) — each is held in memory until it is
-	// verified — at [dcl.DefaultMaxImageSize] when it sets none.
+	// [Images.UpdateInfoFromURL]) at [dcl.DefaultMaxImageSize] when it
+	// sets none. UpdateInfoFromURL holds its image in memory, and so does
+	// DownloadUpdate until the image is verified unless Blobs is a
+	// [BlobStreamer].
 	Ledger *dcl.OTAVersions
 	// Logger receives the store's lines; nil is slog.Default().
 	Logger *slog.Logger
+	// AllowUnverifiedLedgerImages admits a ledger image (of the
+	// production or the test-net ledger) that is not bound to the
+	// ledger's whole-file checksum (OTAChecksum): an update whose record
+	// states none, and a stored prod or test image the store does not
+	// record as checked against one or as supplied by the host (one stored
+	// from a record without a checksum, or by a release before the store
+	// kept provenance records). Without it
+	// [Images.DownloadUpdate] refuses such an update before it downloads
+	// anything or reuses a stored image, with [ErrOTA] and a warning line
+	// (dcl.ota.no_checksum), [Images.CheckForUpdate] does not offer such a
+	// stored image and [Images.Open] does not open it; the file is kept.
+	// With it each update so made available is logged
+	// (dcl.ota.no_checksum_admitted). An image the host supplies itself
+	// ([UpdateInfoFromImage], [Images.UpdateInfoFromURL], a stored local
+	// image, [Images.Store] without a ledger record) needs no checksum
+	// either way.
+	AllowUnverifiedLedgerImages bool
 }
 
 // NewImages returns the image store.
@@ -201,7 +288,143 @@ func NewImages(cfg ImagesConfig) *Images {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Images{blobs: b, ledger: cfg.Ledger, offline: cfg.Ledger == nil, log: log}
+	return &Images{
+		blobs: b, ledger: cfg.Ledger, offline: cfg.Ledger == nil, log: log, allowUnverified: cfg.AllowUnverifiedLedgerImages,
+		hidden: map[string]int{},
+	}
+}
+
+// openBlob opens the stored file name: in place through the backend's
+// [BlobStreamer], else its whole bytes. A missing file wraps
+// fs.ErrNotExist.
+func (i *Images) openBlob(ctx context.Context, name string) (bdx.Blob, error) {
+	if s, ok := i.blobs.(BlobStreamer); ok {
+		return s.OpenBlob(ctx, name)
+	}
+	b, err := i.blobs.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(b), nil
+}
+
+// closeBlob closes a blob the store opened for its own reads.
+func closeBlob(b bdx.Blob) {
+	if c, ok := b.(io.Closer); ok {
+		_ = c.Close()
+	}
+}
+
+// blobReader reads b from its start.
+func blobReader(b bdx.Blob) io.Reader { return io.NewSectionReader(b, 0, b.Size()) }
+
+// hide keeps name out of Find and Open until the returned func runs.
+func (i *Images) hide(name string) func() {
+	i.hiddenMu.Lock()
+	i.hidden[name]++
+	i.hiddenMu.Unlock()
+	return func() {
+		i.hiddenMu.Lock()
+		i.hidden[name]--
+		if i.hidden[name] <= 0 {
+			delete(i.hidden, name)
+		}
+		i.hiddenMu.Unlock()
+	}
+}
+
+// isHidden reports whether a streamed download is verifying name.
+func (i *Images) isHidden(name string) bool {
+	i.hiddenMu.Lock()
+	defer i.hiddenMu.Unlock()
+	return i.hidden[name] > 0
+}
+
+// fetch downloads the image of info, which carries its record, into w:
+// an image the host named by URL ([Images.UpdateInfoFromURL]) through
+// [dcl.OTAVersions.DownloadHostURL], which admits http and any address;
+// every other through [dcl.OTAVersions.Download], whose URL must be https
+// and, without a host client, public — a test-net update with the
+// ledger's TestClient as its client, so that the test-net client's
+// HTTPClient and AllowPrivateDestinations apply, every other with Client.
+func (i *Images) fetch(ctx context.Context, info UpdateInfo, w io.Writer) error {
+	if i.download != nil {
+		return i.download(ctx, *info.ledger, w)
+	}
+	if info.hostURL && hostSupplied(info) {
+		return i.ledger.DownloadHostURL(ctx, *info.ledger, w)
+	}
+	ledger := i.ledger
+	if info.Source == SourceTest {
+		test := *i.ledger
+		test.Client = i.ledger.TestClient
+		ledger = &test
+	}
+	return ledger.Download(ctx, *info.ledger, w)
+}
+
+// originOf is the provenance record of an image stored for info
+// (originSuffix).
+func originOf(info *UpdateInfo) string {
+	switch {
+	case info == nil || info.ledger == nil || hostSupplied(*info):
+		return "host"
+	case info.ledger.OTAChecksum == "":
+		return "ledger"
+	}
+	return "ledger " + strconv.FormatUint(uint64(info.ledger.OTAChecksumType), 10) + " " + info.ledger.OTAChecksum
+}
+
+// recordOrigin records the provenance of the stored image name, stored
+// for info. A failed write is logged and the former record removed, so
+// that the image counts as unbound to a ledger checksum. The record is
+// also removed before an image is written (Store, downloadInto). A
+// record therefore names the bytes it was written for, unless a removal
+// fails as well — a store failure, logged — or the files are changed
+// outside the store.
+func (i *Images) recordOrigin(ctx context.Context, name string, info *UpdateInfo) {
+	if err := i.blobs.Put(ctx, name+originSuffix, []byte(originOf(info))); err != nil {
+		i.log.Warn("ota.images.origin_not_recorded", slog.String("file", name), slog.Any("err", err))
+		i.forgetOrigin(ctx, name)
+	}
+}
+
+// forgetOrigin removes the provenance record of name; a failure other
+// than a missing record is logged.
+func (i *Images) forgetOrigin(ctx context.Context, name string) {
+	if err := i.blobs.Delete(ctx, name+originSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		i.log.Warn("ota.images.origin_not_removed", slog.String("file", name), slog.Any("err", err))
+	}
+}
+
+// vouched reports whether the stored image name needs no admission: a
+// local image, or one whose provenance record names the host or a ledger
+// checksum the image was checked against.
+func (i *Images) vouched(ctx context.Context, name string) bool {
+	parts := strings.Split(name, ".")
+	if len(parts) == 4 && Mode(strings.ToLower(parts[2])) == ModeLocal {
+		return true
+	}
+	rec, err := i.blobs.Get(ctx, name+originSuffix)
+	if err != nil {
+		return false
+	}
+	if string(rec) == "host" {
+		return true
+	}
+	f := strings.Fields(string(rec))
+	if len(f) != 3 || f[0] != "ledger" {
+		return false
+	}
+	_, perr := strconv.ParseUint(f[1], 10, 8)
+	return perr == nil
+}
+
+// servable reports whether the stored image name may be offered and
+// served: when it is vouched for, or the store admits ledger images
+// unbound to a ledger checksum.
+func (i *Images) servable(ctx context.Context, name string) bool {
+	return i.allowUnverified || i.vouched(ctx, name)
 }
 
 // fileName is #fileName (:534-536).
@@ -225,6 +448,7 @@ func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *Updat
 		}
 	}
 	name := fileName(h.VendorID, h.ProductID, mode, h.SoftwareVersion)
+	i.forgetOrigin(ctx, name)
 	if err := i.blobs.Put(ctx, name, image); err != nil {
 		return StoredImage{}, fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
 	}
@@ -233,6 +457,7 @@ func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *Updat
 		spec = info.SpecificationVersion
 	}
 	i.recordMeta(ctx, name, spec)
+	i.recordOrigin(ctx, name, info)
 	i.log.Debug("ota.images.stored", slog.String("file", name))
 	st, _ := i.entry(ctx, name)
 	return st, nil
@@ -325,11 +550,12 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 	if len(parts) != 4 {
 		return StoredImage{}, false
 	}
-	b, err := i.blobs.Get(ctx, name)
+	b, err := i.openBlob(ctx, name)
 	if err != nil {
 		return StoredImage{}, false
 	}
-	h, _, _, err := otaimage.ReadHeader(bytes.NewReader(b))
+	defer closeBlob(b)
+	h, _, _, err := otaimage.ReadHeader(blobReader(b))
 	if err != nil {
 		i.log.Warn("ota.images.unreadable", slog.String("file", name), slog.Any("err", err))
 		return StoredImage{}, false
@@ -339,7 +565,8 @@ func (i *Images) entry(ctx context.Context, name string) (StoredImage, bool) {
 		SoftwareVersionString: h.SoftwareVersionString, MinApplicable: h.MinApplicableSoftwareVersion,
 		// A host-chosen "FFF1.8000.PROD.3" is the prod image: the pattern
 		// admits any case (:55), the Mode constants are lower case.
-		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(strings.ToLower(parts[2])), Size: len(b),
+		MaxApplicable: h.MaxApplicableSoftwareVersion, Mode: Mode(strings.ToLower(parts[2])), Size: int(b.Size()), //nolint:gosec // a stored file's size
+
 	}
 	st.SpecificationVersion = i.readMeta(ctx, name)
 	return st, true
@@ -354,7 +581,7 @@ func (i *Images) Find(ctx context.Context, opts FindOptions) []StoredImage {
 	}
 	var out []StoredImage
 	for _, name := range names {
-		if strings.HasSuffix(name, metaSuffix) || !filenamePattern.MatchString(name) {
+		if strings.HasSuffix(name, metaSuffix) || !filenamePattern.MatchString(name) || i.isHidden(name) {
 			continue
 		}
 		st, ok := i.entry(ctx, name)
@@ -429,7 +656,7 @@ func (i *Images) Delete(ctx context.Context, opts DeleteOptions) (int, error) {
 	}
 	deleted := 0
 	for _, name := range names {
-		if strings.HasSuffix(name, metaSuffix) || !filenamePattern.MatchString(name) {
+		if strings.HasSuffix(name, metaSuffix) || strings.HasSuffix(name, originSuffix) || !filenamePattern.MatchString(name) {
 			continue
 		}
 		if opts.Filename != "" {
@@ -440,6 +667,7 @@ func (i *Images) Delete(ctx context.Context, opts DeleteOptions) (int, error) {
 			continue
 		}
 		_ = i.blobs.Delete(ctx, name+metaSuffix)
+		_ = i.blobs.Delete(ctx, name+originSuffix)
 		if err := i.blobs.Delete(ctx, name); err != nil {
 			return deleted, fmt.Errorf("%w: delete %s: %w", ErrOTA, name, err)
 		}
@@ -478,11 +706,20 @@ func (i *Images) Open(ctx context.Context, filename string) (bdx.Blob, error) {
 	if !filenamePattern.MatchString(filename) {
 		return nil, fmt.Errorf("%w: invalid OTA filename format: %s: %w", ErrOTA, filename, fs.ErrNotExist)
 	}
-	b, err := i.blobs.Get(ctx, filename)
+	if i.isHidden(filename) {
+		return nil, fmt.Errorf("%w: OTA file not found: %s: %w", ErrOTA, filename, fs.ErrNotExist)
+	}
+	if !i.servable(ctx, filename) {
+		i.log.Warn("dcl.ota.no_checksum", slog.String("file", filename),
+			slog.String("message", fmt.Sprintf("OTA image %s: the stored image is not bound to a ledger checksum; not served", filename)))
+		return nil, fmt.Errorf("%w: stored OTA image %s is not bound to a ledger checksum; ImagesConfig.AllowUnverifiedLedgerImages admits it: %w",
+			ErrOTA, filename, fs.ErrNotExist)
+	}
+	b, err := i.openBlob(ctx, filename)
 	if err != nil {
 		return nil, fmt.Errorf("%w: OTA file not found: %s: %w", ErrOTA, filename, err)
 	}
-	return bytes.NewReader(b), nil
+	return b, nil
 }
 
 // CheckOptions configure [Images.CheckForUpdate].
@@ -508,6 +745,10 @@ func (i *Images) CheckForUpdate(ctx context.Context, vid, pid uint16, current ui
 		for k := len(local) - 1; k >= 0; k-- {
 			e := local[k]
 			if opts.IsProduction != nil && *opts.IsProduction && e.Mode == ModeTest {
+				continue
+			}
+			if !i.servable(ctx, e.Filename) {
+				i.log.Debug("ota.images.unverified_not_offered", slog.String("file", e.Filename))
 				continue
 			}
 			u := UpdateInfo{
@@ -591,16 +832,16 @@ const (
 	storedUnreadable
 )
 
-// checkStored validates the stored image b (read with getErr) against info
+// checkStored validates the stored image b (opened with getErr) against info
 // as Store validates a new one — #checkStoredImage over #verifyUpdate
 // (:388-451): the ledger's whole-file checksum and size when info carries
 // them, the header's ids and version.
-func (i *Images) checkStored(name string, b []byte, getErr error, info UpdateInfo) storedCheck {
+func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateInfo) storedCheck {
 	if getErr != nil {
 		i.log.Info("ota.images.stored_unreadable", slog.String("file", name), slog.Any("err", getErr))
 		return storedUnreadable
 	}
-	h, err := otaimage.ValidateFile(bytes.NewReader(b), storeValidation(&info))
+	h, err := otaimage.ValidateFile(blobReader(b), storeValidation(&info))
 	if err == nil {
 		err = verifyHeader(h, info)
 	}
@@ -623,19 +864,60 @@ func (i *Images) checkStored(name string, b []byte, getErr error, info UpdateInf
 // [ErrOTA] unless a stored image validates: after removing one that failed
 // validation, when none is stored, and — keeping the stored image, since
 // nothing could replace it — when it cannot be read or force is set.
+//
+// A ledger update needs the ledger's whole-file checksum unless
+// [ImagesConfig].AllowUnverifiedLedgerImages admits it without: an update
+// whose record states none, and an update of a stored ledger image that
+// carries no record of a checksum it was checked against, are refused
+// with [ErrOTA] before anything else — nothing is downloaded, and the
+// stored image is kept but not reused. An image the host supplied itself
+// needs none.
 func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
+	name := fileName(info.VendorID, info.ProductID, modeOf(info.Source), info.SoftwareVersion)
+	var unverified bool
+	var why string
+	switch {
+	case hostSupplied(info):
+	case info.ledger != nil:
+		unverified, why = info.ledger.OTAChecksum == "", "the ledger record states no checksum (otaChecksum)"
+	default:
+		unverified, why = !i.vouched(ctx, name), "the stored image is not bound to a ledger checksum"
+	}
+	if unverified && !i.allowUnverified {
+		i.log.Warn("dcl.ota.no_checksum", slog.String("file", name), slog.String("source", info.Source),
+			slog.String("message", fmt.Sprintf("OTA image %s (%s): %s; not downloaded or served", name, info.SoftwareVersionString, why)))
+		return "", fmt.Errorf("%w: OTA image %s (%s): %s, so the image is not downloaded or served; ImagesConfig.AllowUnverifiedLedgerImages admits it",
+			ErrOTA, name, info.SoftwareVersionString, why)
+	}
+	got, err := i.downloadUpdate(ctx, info, force)
+	if err == nil && unverified {
+		i.log.Warn("dcl.ota.no_checksum_admitted", slog.String("file", name), slog.String("source", info.Source),
+			slog.String("message", fmt.Sprintf("OTA image %s (%s): %s; admitted by AllowUnverifiedLedgerImages", got, info.SoftwareVersionString, why)))
+	}
+	return got, err
+}
+
+// downloadUpdate is DownloadUpdate past the checksum rule.
+func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
 	mode := modeOf(info.Source)
 	name := fileName(info.VendorID, info.ProductID, mode, info.SoftwareVersion)
-	b, getErr := i.blobs.Get(ctx, name)
+	b, getErr := i.openBlob(ctx, name)
 	exists := !errors.Is(getErr, fs.ErrNotExist)
 	check := storedUnchecked
 	if exists && !force {
 		check = i.checkStored(name, b, getErr, info)
 	}
+	if getErr == nil {
+		closeBlob(b)
+	}
 	if check == storedValid {
 		i.log.Info("ota.images.reused", slog.String("file", name))
 		if info.SpecificationVersion != 0 {
 			i.recordMeta(ctx, name, info.SpecificationVersion)
+		}
+		// Validated against info's ledger checksum, when it states one.
+		if info.ledger != nil && !hostSupplied(info) && info.ledger.OTAChecksum != "" {
+			i.recordOrigin(ctx, name, &info)
 		}
 		return name, nil
 	}
@@ -645,6 +927,7 @@ func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool
 	if exists && !keep {
 		_ = i.blobs.Delete(ctx, name)
 		_ = i.blobs.Delete(ctx, name+metaSuffix)
+		_ = i.blobs.Delete(ctx, name+originSuffix)
 	}
 	if i.offline {
 		switch {
@@ -661,14 +944,14 @@ func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool
 	if info.ledger == nil {
 		return "", fmt.Errorf("%w: no OTA URL provided in update info for %s (%s)", ErrOTA, name, info.SoftwareVersionString)
 	}
-	var buf bytes.Buffer
-	if i.download != nil {
-		b, err := i.download(ctx, *info.ledger)
-		if err != nil {
-			return "", fmt.Errorf("%w: %w", ErrOTA, err)
+	if s, ok := i.blobs.(BlobStreamer); ok {
+		if err := i.downloadInto(ctx, s, name, info); err != nil {
+			return "", err
 		}
-		buf.Write(b)
-	} else if err := i.ledger.Download(ctx, *info.ledger, &buf); err != nil {
+		return name, nil
+	}
+	var buf bytes.Buffer
+	if err := i.fetch(ctx, info, &buf); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrOTA, err)
 	}
 	if _, err := dcl.VerifyImage(bytes.NewReader(buf.Bytes()), *info.ledger, i.log); err != nil {
@@ -678,6 +961,59 @@ func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool
 		return "", err
 	}
 	return name, nil
+}
+
+// downloadInto is DownloadUpdate's download through a [BlobStreamer]
+// (R2-P5-port-14): the ledger image is written into the file name as it
+// arrives, committed, and read back for the checks the buffered path runs
+// on its bytes before it stores them — the ledger's checksum and size
+// (dcl.VerifyImage), then [Images.Store]'s file and header checks — with
+// the same errors. A refused check removes the file and its record; until
+// the checks pass Find and Open do not offer it. The specification
+// version info carries is recorded as Store records it.
+func (i *Images) downloadInto(ctx context.Context, s BlobStreamer, name string, info UpdateInfo) error {
+	defer i.hide(name)()
+	i.forgetOrigin(ctx, name)
+	w, err := s.CreateBlob(ctx, name)
+	if err != nil {
+		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
+	}
+	if err := i.fetch(ctx, info, w); err != nil {
+		_ = w.Abort()
+		return fmt.Errorf("%w: %w", ErrOTA, err)
+	}
+	if err := w.Commit(); err != nil {
+		_ = w.Abort()
+		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
+	}
+	if err := i.verifyStored(ctx, s, name, info); err != nil {
+		_ = i.blobs.Delete(ctx, name)
+		_ = i.blobs.Delete(ctx, name+metaSuffix)
+		_ = i.blobs.Delete(ctx, name+originSuffix)
+		return err
+	}
+	i.recordMeta(ctx, name, info.SpecificationVersion)
+	i.recordOrigin(ctx, name, &info)
+	i.log.Debug("ota.images.stored", slog.String("file", name))
+	return nil
+}
+
+// verifyStored reads the committed file name back and checks it against
+// info's ledger record and header as the buffered path checks its bytes.
+func (i *Images) verifyStored(ctx context.Context, s BlobStreamer, name string, info UpdateInfo) error {
+	b, err := s.OpenBlob(ctx, name)
+	if err != nil {
+		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
+	}
+	defer closeBlob(b)
+	if _, err := dcl.VerifyImage(blobReader(b), *info.ledger, i.log); err != nil {
+		return fmt.Errorf("%w: %w", ErrOTA, err)
+	}
+	h, err := otaimage.ValidateFile(blobReader(b), storeValidation(&info))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrOTA, err)
+	}
+	return verifyHeader(h, info)
 }
 
 // LocalImageOptions are the fields of a local image's [UpdateInfo] its
@@ -732,7 +1068,10 @@ func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error
 // downloads it from that URL into [ModeLocal] — matter.js
 // createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at 862ad75f).
 // Another scheme is refused (a local file is [UpdateInfoFromImage]'s), and
-// so is every URL offline, without a fetch.
+// so is every URL offline, without a fetch. The host names the URL, so
+// both downloads take [dcl.OTAVersions.DownloadHostURL]: http and a
+// server on the local network are admitted, which a ledger record's URL
+// is not.
 func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts LocalImageOptions) (UpdateInfo, error) {
 	scheme, _, _ := strings.Cut(fileURL, ":")
 	if scheme = strings.ToLower(scheme); scheme != "https" && scheme != "http" {
@@ -742,7 +1081,7 @@ func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts Loc
 		return UpdateInfo{}, fmt.Errorf("%w: cannot read OTA image from %s: the service is offline, use UpdateInfoFromImage instead", ErrOTA, fileURL)
 	}
 	var buf bytes.Buffer
-	if err := i.ledger.Download(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &buf); err != nil {
+	if err := i.ledger.DownloadHostURL(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &buf); err != nil {
 		return UpdateInfo{}, fmt.Errorf("%w: failed to read OTA image from %s: %w", ErrOTA, fileURL, err)
 	}
 	u, err := UpdateInfoFromImage(&buf, opts)
@@ -754,5 +1093,6 @@ func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts Loc
 		SoftwareVersionValid: true, OTAURL: fileURL, MinApplicableSoftwareVersion: u.MinApplicable,
 		MaxApplicableSoftwareVersion: u.MaxApplicable, ReleaseNotesURL: u.ReleaseNotesURL, SpecificationVersion: u.SpecificationVersion,
 	}
+	u.hostURL = true
 	return u, nil
 }

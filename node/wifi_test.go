@@ -147,7 +147,7 @@ func TestWiFiDriver(t *testing.T) {
 				cfg.Network.WiFi.Reporter = wifiLink{}
 			}
 			radio := &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1F", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001}
-			cfg.Network.BLE = radio.Radio()
+			cfg.Network.GATT = radio.Radio()
 			n := newNode(t, cfg)
 			if n.Root().WiFiNetworkCommissioning == nil || n.Root().NetworkCommissioning != nil {
 				t.Fatalf("Wi-Fi NetworkCommissioning %v, Ethernet %v", n.Root().WiFiNetworkCommissioning, n.Root().NetworkCommissioning)

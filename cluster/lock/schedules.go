@@ -335,12 +335,6 @@ func (s *DoorLockServer) handleSetHolidaySchedule(ctx context.Context, fields an
 	if err != nil {
 		return nil, err
 	}
-	// The mode field's enum constraint, remapped to INVALID_COMMAND as for
-	// every command in the Supervision list (setHolidaySchedule,
-	// DoorLockServer.ts:1494-1511).
-	if err := s.checkEnum("OperatingMode", lockdef.OperatingModeEnumDef, uint64(req.OperatingMode)); err != nil {
-		return nil, err
-	}
 	return s.mutateSchedule(ctx, func() error { return s.setHolidayScheduleLocked(ctx, req) })
 }
 

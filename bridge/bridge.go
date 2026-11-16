@@ -152,12 +152,13 @@
 //     (endpoint/dispatcher.go:155-169), so the bridge reads as present
 //     and empty rather than broken.
 //   - AttachRootPartsListProvider and AttachAggregatorPartsListProvider
-//     MUST follow their AttachRootClusters / AttachAggregatorClusters
-//     call: each walks the already-attached slice for the Descriptor
+//     are overrides: without them Start installs the live PartsList of
+//     both endpoints itself, from the bridge's own topology. When used,
+//     each MUST follow its AttachRootClusters / AttachAggregatorClusters
+//     call: it walks the already-attached slice for the Descriptor
 //     cluster (0x001D) and installs the provider on it. Called first, or
-//     with no Descriptor mounted, they return false and wire nothing —
-//     check the bool, because the only other symptom is a PartsList
-//     frozen at whatever the Descriptor was constructed with.
+//     with no Descriptor mounted, it returns false and wires nothing —
+//     check the bool.
 //   - AttachCommissioningWindow — silent, and fails open on one check.
 //     The window is wired into the root's GeneralCommissioning by
 //     whichever of this call and AttachRootClusters comes second: a
@@ -205,8 +206,12 @@
 //     controller's operational instance, opens CASE to it as the
 //     initiator, and re-sends the priming report. A skipped piece drops
 //     every former subscription; the controllers then recover through
-//     their liveness timeout, as without a store. This narrow initiator
-//     is the only one in the module (docs/adr/0008).
+//     their liveness timeout, as without a store. The bridge's own
+//     initiator serves this re-establishment (docs/adr/0008) and, until
+//     their removal, the deprecated ConnectPeer and ConnectOtaProvider; a
+//     node establishes every other peer session on its client stack and
+//     reuses this bridge's live ones through [Bridge.LivePeerSession],
+//     which never starts a handshake (docs/adr/0032).
 //   - AttachBDXResponder — fails closed. The responder (a *bdx.Responder)
 //     serves the BDX exchanges a peer opens on a secure session — an OTA
 //     requestor's ReceiveInit for the image a provider offered — on the
@@ -346,7 +351,17 @@ type Config struct {
 	// [Bridge.StartBLE] and [Bridge.StopBLE] — matter.js `network.ble`
 	// (NetworkServer.ts:28-34 at db021da0) with the platform's peripheral
 	// installed. nil is no BLE: the bridge never touches a radio.
-	BLE contract.BLEPeripheral
+	//
+	// Deprecated: set GATT, whose service registration [Bridge.StartBLE]
+	// answers before it advertises; removable in the next minor release.
+	// BLE keeps its meaning while GATT is nil; both set fail [New].
+	BLE contract.BLEPeripheral //nolint:staticcheck // the deprecated port, kept for its window
+
+	// GATT is the host's Bluetooth LE peripheral, on which the bridge
+	// serves BTP and advertises a commissioning window between
+	// [Bridge.StartBLE] and [Bridge.StopBLE]. nil (with BLE nil) is no
+	// BLE: the bridge never touches a radio.
+	GATT contract.GATTPeripheral
 
 	// AdvertiseTimeout caps the per-call timeout for mDNS publish /
 	// withdraw operations. Defaults to 5 seconds when zero. Each
@@ -447,6 +462,15 @@ type Bridge struct {
 	// the bridge so [Bridge.Reassemble] can re-stamp them onto each
 	// freshly assembled root endpoint without the daemon re-attaching.
 	rootClusters []contract.ClusterServer
+	// fabricStateByNode: the node facade drops a removed fabric's
+	// contract.FabricScopedState itself (internal/facadeseam), so the
+	// bridge's fabric removal does not (dropFabricState).
+	fabricStateByNode atomic.Bool
+	// rootPartsByHost and aggregatorPartsByHost record that the host
+	// attached its own PartsList provider (AttachRootPartsListProvider,
+	// AttachAggregatorPartsListProvider); without one, Start installs the
+	// bridge's own (installDefaultPartsListProviders).
+	rootPartsByHost, aggregatorPartsByHost bool
 	// aggregatorClusters carry the cluster servers attached to the
 	// Aggregator endpoint (EP 1) — Descriptor (mandatory) + optional
 	// Identify. Apple-bridge topology fix: EP 1 hosts the
@@ -522,10 +546,10 @@ type Bridge struct {
 	// ([Bridge.rewireMeasurementListeners]); Start wires again when the
 	// manager attached since its initial assembly is another one.
 	listenerManager *subscription.Manager
-	// switchUnsubscribers holds the unsubscribe closures returned by
-	// [generic.ButtonGroup.WireMatterSwitchHandler] (via the
-	// matterSwitchSubscribable assertion) and by a position source's
-	// WireMatterSwitchPositions (matterSwitchPositionReporter) for every
+	// switchUnsubscribers holds the unsubscribe closures returned by a
+	// gesture source's WireMatterSwitchHandler (contract.SwitchGestureSource)
+	// and by a position source's WireMatterSwitchPositions
+	// (contract.SwitchPositionSource) for every
 	// bridged GenericSwitch endpoint. Drained at the start of each reassemble:
 	// the wiring registers update hooks on the underlying press DP(s),
 	// and without teardown the hooks would accumulate across
@@ -606,11 +630,11 @@ type Bridge struct {
 
 	// reportCounterOwner maps the outbound-reliable MessageCounter of an
 	// ongoing report's last message ([reportCounterKey]) to what the
-	// report owes its subscription ([Bridge.noteReportSent]). The peer's
-	// acknowledgement takes it as a delivered update
-	// ([Bridge.releaseReportCounter]); the ACK pump's
-	// [mrp.ErrMaxRetransmissionsReached] as a failed one
-	// ([Bridge.noteReportUndelivered]).
+	// report owes its subscription, while its reporter waits for the
+	// peer's StatusResponse ([Bridge.deliverOngoingReport]). The peer's
+	// acknowledgement drops it ([Bridge.releaseReportCounter]); the ACK
+	// pump's [mrp.ErrMaxRetransmissionsReached] takes it as a failed
+	// update and ends the wait ([Bridge.noteReportUndelivered]).
 	reportCounterOwner sync.Map // map[uint64]*owedReport
 
 	// subSendErrorCount tracks how many consecutive send failures the
@@ -620,20 +644,16 @@ type Bridge struct {
 	// a transient send error (e.g. a momentary socket-write hiccup or
 	// fabric reload race) does not immediately reap an otherwise-healthy
 	// subscription. Reset by a delivered update: a report the peer
-	// acknowledged, or one sent without a tracked message. Subs that
-	// never reach 0 again — peer truly gone — exceed the cap and get
-	// closed via the existing eviction path.
+	// answered with a Success StatusResponse. Subs that never reach 0
+	// again — peer truly gone — exceed the cap and get closed via the
+	// existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
 	// subUpdateMu guards every change of subSendErrorCount
-	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates])
-	// and subUpdateSeq: the reporter, the ACK pump and the inbound
-	// acknowledgement change a subscription's count from their own
-	// goroutines. A leaf lock: nothing is called while it is held.
+	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates]):
+	// the reporter, the ACK pump and a subscription's release change a
+	// subscription's count from their own goroutines. A leaf lock:
+	// nothing is called while it is held.
 	subUpdateMu sync.Mutex
-	// subUpdateSeq numbers each subscription's ongoing reports, for their
-	// outcomes to be counted as matter.js counts updates
-	// ([Bridge.beginUpdate]); guarded by subUpdateMu.
-	subUpdateSeq map[uint32]*updateOrder
 
 	// subAccess remembers, per subscription, what [Bridge.subjectReadsNothing]
 	// last found: the ACL and topology the subject last read a path
@@ -925,6 +945,9 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	if cfg.TCP.MaxInboundConnections < 0 {
 		return nil, fmt.Errorf("bridge: TCP.MaxInboundConnections %d is negative", cfg.TCP.MaxInboundConnections)
 	}
+	if cfg.GATT != nil && cfg.BLE != nil { //nolint:staticcheck // the deprecated port is still honoured
+		return nil, errors.New("bridge: Config takes GATT or the deprecated BLE, not both")
+	}
 	if cfg.AdvertiseTimeout == 0 {
 		cfg.AdvertiseTimeout = 5 * time.Second
 	}
@@ -988,8 +1011,10 @@ func (b *Bridge) seedCounters() error {
 //
 // Start blocks only on the synchronous setup steps; the receive loop
 // runs in a background goroutine. Returns immediately when the
-// listener is bound and the goroutine is running. Cancel ctx (or
-// call [Stop]) to tear everything down.
+// listener is bound and the goroutine is running. ctx bounds those setup
+// steps only: the receive loop and the handlers run under the bridge's
+// own context, which [Bridge.Stop] ends — call Stop to tear everything
+// down.
 //
 // Calling Start a second time on the same instance returns
 // [ErrAlreadyStarted]. A bridge is single-run: from the first
@@ -1028,6 +1053,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// resolveSessionFabric: a session whose fabric cannot be named resolves
 	// to endpoint.FabricIndexUnresolvable rather than to 0, and CheckACL
 	// denies that instead of reading it as commissioning traffic.
+
+	// The live PartsList of the root and the Aggregator, unless the host
+	// attached its own (review II, R2-P5-apinode-13).
+	b.installDefaultPartsListProviders()
 
 	// --- Topology assembly ---
 	if err := b.reassembleLocked(ctx, nil); err != nil {
@@ -1642,50 +1671,22 @@ func (b *Bridge) SetOnEvent(fn func(im.EventRecord)) {
 }
 
 // matterEndpointReceiver is the optional capability a cluster server
-// implements to learn the endpoint id it lives on. Required for any
-// cluster that emits events (the event payload carries the endpoint
-// id as the routing key for subscribers). Today: BasicInformation,
-// GeneralDiagnostics, AccessControl, BridgedDeviceBasicInformation.
-type matterEndpointReceiver interface {
-	SetEndpoint(uint16)
-}
+// implements to learn the endpoint id it lives on
+// ([contract.EndpointReceiver]).
+type matterEndpointReceiver = contract.EndpointReceiver
 
-// matterSwitchSubscribable is the model-side surface of a press
-// source (the per-channel [generic.ButtonGroup], or a lone Button /
-// Action DP) that translates its CCU press updates into Matter §1.13
-// switch events.
-//
-// The parameter names [contract.SwitchEventEmitter] — the shared
-// port contract, which the model's own method signature names too (as
-// an alias). That sharing is the whole point: Go interface
-// satisfaction requires identical parameter types, so re-declaring an
-// emitter interface here, however faithful a copy, could never be
-// satisfied by the model types' method set. The assertion in the
-// reassemble wiring would then silently never match and no press
-// event would reach a commissioner — no compile error, no runtime
-// error, just a bridge that never reports a button. The behavioural
-// guard against that is
-// tests/contract/wiring_pins/matter_switch_press_wiring_test.go.
-//
-// The returned unsubscribe closure is retained in
+// matterSwitchSubscribable is [contract.SwitchGestureSource]: the port is
+// the contract's, so the host's method set and the bridge's assertion
+// name the same parameter type (an interface re-declared here could never
+// be satisfied, and no press would reach a commissioner — no compile
+// error, no runtime error). The returned closure is retained in
 // [Bridge.switchUnsubscribers] and drained on the next reassemble.
-type matterSwitchSubscribable interface {
-	WireMatterSwitchHandler(contract.SwitchEventEmitter) func()
-}
+type matterSwitchSubscribable = contract.SwitchGestureSource
 
-// matterSwitchPositionReporter is the model-side surface of a switch source
-// that knows its positions rather than its gestures: at every reassembly it
-// is handed the Switch server's position input ([contract.SwitchPositionSink],
-// cluster/switch.Server — matter.js SwitchServer.ts's rawPosition and
-// currentPosition) and reports each position there. The parameter names
-// the shared contract type for the reason [matterSwitchSubscribable] gives.
-//
-// The returned closure detaches the sink; it is retained in
-// [Bridge.switchUnsubscribers] and drained on the next reassemble, so a
-// source never reports into the server of a superseded topology.
-type matterSwitchPositionReporter interface {
-	WireMatterSwitchPositions(contract.SwitchPositionSink) func()
-}
+// matterSwitchPositionReporter is [contract.SwitchPositionSource], for the
+// reason [matterSwitchSubscribable] gives; its closure is drained the same
+// way.
+type matterSwitchPositionReporter = contract.SwitchPositionSource
 
 // SetOnFabricRemoved wires the post-RemoveFabric hook, nil-safe. Used by the daemon's
 // WS-event publisher; the operational + subscription manager
@@ -1694,13 +1695,6 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 	b.mu.Lock()
 	b.onFabricRemoved = fn
 	b.mu.Unlock()
-}
-
-// fabricRemovalObserver is the optional capability of a device's cluster
-// server to drop what it holds for a removed fabric's peers
-// (thermo.ThermostatServer: its atomic writes).
-type fabricRemovalObserver interface {
-	MatterFabricRemoved(fabricIndex uint8)
 }
 
 // fabricSessionCloser is the optional capability of a [SessionRegistry]
@@ -1923,16 +1917,15 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	if topo := b.Topology(); topo != nil {
 		for _, ep := range topo.Endpoints {
 			if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
-				ep.ForgetFabricScenes(fabricIndex) // parts included
-				// And the state a device's cluster server keeps for the
-				// fabric's peers: the Thermostat's atomic writes (matter.js
-				// AtomicWriteHandler observes FabricManager.events.deleting,
-				// packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:75,
-				// :378-388 at 862ad75f).
-				for _, srv := range endpoint.ClusterServers(ep) {
-					if o, ok := srv.(fabricRemovalObserver); ok {
-						o.MatterFabricRemoved(fabricIndex)
-					}
+				ep.ForgetFabricScenes(fabricIndex) //nolint:contextcheck // parts included; a removal's consequence, which no request bounds (store/doc.go, store errors)
+				// The state a device's cluster server keeps for the
+				// fabric (the Thermostat's atomic writes, the TLS
+				// tables): contract.FabricScopedState, the one removal
+				// path — the node's fan-out when the node runs the
+				// bridge, here for a host that runs it without the node
+				// (review II, R2-P5-apidev-09).
+				if !b.fabricStateByNode.Load() {
+					b.dropFabricState(context.WithoutCancel(ctx), ep, fabricIndex)
 				}
 			}
 		}
@@ -1942,6 +1935,21 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	b.mu.RUnlock()
 	if hook != nil {
 		hook(fabricIndex)
+	}
+}
+
+// dropFabricState drops fabricIndex from every server of ep that holds
+// state by fabric ([contract.FabricScopedState]); a server whose
+// persistence refused is logged — the next reconcile drops what it kept.
+func (b *Bridge) dropFabricState(ctx context.Context, ep *endpoint.Endpoint, fabricIndex uint8) {
+	for _, srv := range endpoint.ClusterServers(ep) {
+		if s, ok := srv.(contract.FabricScopedState); ok {
+			if err := s.MatterDropFabric(ctx, fabricIndex); err != nil {
+				b.logger.Warn("matter.fabric.drop_state",
+					slog.Int("endpoint", int(ep.ID)), slog.Uint64("cluster", uint64(srv.MatterClusterID())),
+					slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+			}
+		}
 	}
 }
 
@@ -2103,11 +2111,23 @@ type PartsListProviderSetter interface {
 // AttachRootPartsListProvider walks the attached root clusters and
 // installs the live PartsList provider on the Descriptor cluster
 // (cluster ID 0x001D). Returns true when the provider was wired,
-// false when no Descriptor is mounted.
+// false when no Descriptor is mounted. It is an override: without it,
+// [Bridge.Start] installs the bridge's own provider, every endpoint of
+// the live topology but the root.
 func (b *Bridge) AttachRootPartsListProvider(provider func() []uint16) bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	for _, s := range b.rootClusters {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !setPartsListProvider(b.rootClusters, provider) {
+		return false
+	}
+	b.rootPartsByHost = true
+	return true
+}
+
+// setPartsListProvider installs provider on the Descriptor (0x001D) among
+// servers; false when none is mounted.
+func setPartsListProvider(servers []contract.ClusterServer, provider func() []uint16) bool {
+	for _, s := range servers {
 		if s.MatterClusterID() == 0x001D {
 			if setter, ok := s.(PartsListProviderSetter); ok {
 				setter.SetPartsListProvider(provider)
@@ -2116,6 +2136,47 @@ func (b *Bridge) AttachRootPartsListProvider(provider func() []uint16) bool {
 		}
 	}
 	return false
+}
+
+// installDefaultPartsListProviders gives the root's and the Aggregator's
+// Descriptor the live PartsList — both full-family, computed from the
+// bridge's own topology on every read — unless the host attached a
+// provider of its own. The Aggregator's list leaves out the root's other
+// children (an endpoint whose parent is the root, such as an OTA
+// provider's), which are the root's parts, not its. A Descriptor that is
+// not mounted gets nothing.
+func (b *Bridge) installDefaultPartsListProviders() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.rootPartsByHost {
+		setPartsListProvider(b.rootClusters, func() []uint16 {
+			return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() })
+		})
+	}
+	if !b.aggregatorPartsByHost {
+		setPartsListProvider(b.aggregatorClusters, func() []uint16 {
+			return b.liveEndpointIDs(func(ep *endpoint.Endpoint) bool {
+				return !ep.IsRoot() && !ep.IsAggregator() && (!ep.HasParentEndpointID || ep.ParentEndpointID != 0)
+			})
+		})
+	}
+}
+
+// liveEndpointIDs returns the ids of the live topology's endpoints that
+// pass keep, ascending; nil before the first assembly.
+func (b *Bridge) liveEndpointIDs(keep func(*endpoint.Endpoint) bool) []uint16 {
+	topology := b.Topology()
+	if topology == nil {
+		return nil
+	}
+	ids := make([]uint16, 0, len(topology.Endpoints))
+	for _, ep := range topology.Endpoints {
+		if ep != nil && keep(ep) {
+			ids = append(ids, ep.ID)
+		}
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 // AttachAggregatorClusters wires the cluster servers the dispatcher
@@ -2145,19 +2206,16 @@ func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
 // clusters and installs the live PartsList provider on the Aggregator's
 // Descriptor cluster (cluster ID 0x001D on endpoint 1). Returns true
 // when the provider was wired, false when no Descriptor is mounted on
-// the Aggregator.
+// the Aggregator. It is an override: without it, [Bridge.Start] installs
+// the bridge's own provider, every bridged endpoint of the live topology.
 func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	for _, s := range b.aggregatorClusters {
-		if s.MatterClusterID() == 0x001D {
-			if setter, ok := s.(PartsListProviderSetter); ok {
-				setter.SetPartsListProvider(provider)
-				return true
-			}
-		}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !setPartsListProvider(b.aggregatorClusters, provider) {
+		return false
 	}
-	return false
+	b.aggregatorPartsByHost = true
+	return true
 }
 
 // Stop tears down the bridge: reports what every subscription owes,
@@ -2395,12 +2453,16 @@ func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, t
 	}
 }
 
-// reconcileQuiescers brings the quiescing servers of the topologies in
-// touched in line with the topology the bridge serves now — none once
-// Stop ended the run: a server it does not carry is quiesced, and one it
-// carries that takes events is given its endpoint again (SetEndpoint),
-// which re-arms a server a quiesce stopped (cluster/energy EvseServer,
-// cluster/thermo ThermostatServer) and stamps the number it serves at.
+// reconcileQuiescers brings the quiescing and the event-emitting servers
+// of the topologies in touched in line with the topology the bridge
+// serves now — none once Stop ended the run. A server it does not carry
+// is quiesced ([contract.ClusterQuiescer]) and loses its event emitter
+// (SetMatterEventEmitter(nil), [contract.EventReceiver]), so an event it
+// emits afterwards reaches no event log. One it carries that takes events
+// gets the emitter back, and a quiescing one its endpoint again
+// (SetEndpoint), which re-arms a server a quiesce stopped (cluster/energy
+// EvseServer, cluster/thermo ThermostatServer) and stamps the number it
+// serves at.
 //
 // Reassembles are not serialised and each SetEndpoints the servers of its
 // topology before it swaps it in, so a quiesce or a re-arm decided from
@@ -2415,35 +2477,38 @@ func (b *Bridge) reconcileQuiescers(touched ...*endpoint.Topology) {
 		b.mu.RLock()
 		served, gen := b.servedTopology, b.servedGen
 		b.mu.RUnlock()
-		at := map[contract.ClusterQuiescer]uint16{}
-		if served != nil {
-			for _, ep := range served.Endpoints {
-				if ep == nil {
-					continue
-				}
-				for _, srv := range endpoint.ClusterServers(ep) {
-					if q, ok := srv.(contract.ClusterQuiescer); ok && reflect.TypeOf(q).Comparable() {
-						at[q] = ep.ID
-					}
-				}
-			}
+		at := map[contract.ClusterServer]uint16{}
+		for _, srv := range reconciled(served) {
+			at[srv.server] = srv.endpoint
 		}
-		done := map[contract.ClusterQuiescer]bool{}
+		done := map[contract.ClusterServer]bool{}
 		for _, topo := range touched {
-			for _, q := range quiescers(topo) {
-				if done[q] {
+			for _, r := range reconciled(topo) {
+				srv := r.server
+				if done[srv] {
 					continue
 				}
-				done[q] = true
-				id, serves := at[q]
+				done[srv] = true
+				id, serves := at[srv]
+				recv, receives := srv.(contract.EventReceiver)
+				q, quiesces := srv.(contract.ClusterQuiescer)
 				if !serves {
-					q.MatterQuiesce()
+					if quiesces {
+						q.MatterQuiesce()
+					}
+					if receives {
+						recv.SetMatterEventEmitter(nil)
+					}
 					continue
 				}
-				if _, ok := q.(contract.EventReceiver); !ok {
+				if !receives {
 					continue
 				}
-				if r, ok := q.(matterEndpointReceiver); ok {
+				recv.SetMatterEventEmitter(b)
+				if !quiesces {
+					continue
+				}
+				if r, ok := srv.(matterEndpointReceiver); ok {
 					r.SetEndpoint(id)
 				}
 			}
@@ -2457,22 +2522,44 @@ func (b *Bridge) reconcileQuiescers(touched ...*endpoint.Topology) {
 	}
 }
 
-// quiescers lists the servers of topo that implement
-// [contract.ClusterQuiescer] and can be told apart (a comparable dynamic
-// type — every pointer server).
-func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
+// reconciledServer is one server [Bridge.reconcileQuiescers] keeps in
+// line, with the endpoint it is on.
+type reconciledServer struct {
+	server   contract.ClusterServer
+	endpoint uint16
+}
+
+// reconciled lists the servers of topo that implement
+// [contract.ClusterQuiescer] or [contract.EventReceiver] and can be told
+// apart (a comparable dynamic type — every pointer server).
+func reconciled(topo *endpoint.Topology) []reconciledServer {
 	if topo == nil {
 		return nil
 	}
-	var out []contract.ClusterQuiescer
+	var out []reconciledServer
 	for _, ep := range topo.Endpoints {
 		if ep == nil {
 			continue
 		}
 		for _, srv := range endpoint.ClusterServers(ep) {
-			if q, ok := srv.(contract.ClusterQuiescer); ok && reflect.TypeOf(q).Comparable() {
-				out = append(out, q)
+			_, quiesces := srv.(contract.ClusterQuiescer)
+			_, receives := srv.(contract.EventReceiver)
+			if (quiesces || receives) && srv != nil && reflect.TypeOf(srv).Comparable() {
+				out = append(out, reconciledServer{srv, ep.ID})
 			}
+		}
+	}
+	return out
+}
+
+// quiescers lists the servers of topo that implement
+// [contract.ClusterQuiescer] and can be told apart (a comparable dynamic
+// type — every pointer server).
+func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
+	var out []contract.ClusterQuiescer
+	for _, r := range reconciled(topo) {
+		if q, ok := r.server.(contract.ClusterQuiescer); ok {
+			out = append(out, q)
 		}
 	}
 	return out
@@ -2793,12 +2880,21 @@ func (b *Bridge) operationalInstanceFor(fabricIndex uint8) (string, bool) {
 // daemon's setup payload — the bridge itself does not know about
 // passcodes.
 type CommissioningAdvertisement struct {
-	Discriminator      uint16
-	VendorID           uint16
-	ProductID          uint16
-	NodeLabel          string
-	CommissioningMode  uint8
-	DeviceTypeID       uint32
+	Discriminator     uint16
+	VendorID          uint16
+	ProductID         uint16
+	NodeLabel         string
+	CommissioningMode uint8
+	DeviceTypeID      uint32
+	// Hints is the record's pairing hint bitmap (`PH`,
+	// [mdns.CommissionableServiceConfig].Hints); zero sends the default.
+	Hints mdns.PairingHints
+	// PairingHint is the pairing hint's low 16 bits.
+	//
+	// Deprecated: use Hints, which carries every bit of the bitmap;
+	// removable in the next minor release. It keeps its meaning while
+	// Hints is zero; both set fail AnnounceCommissioning with
+	// [mdns.ErrInvalidService].
 	PairingHint        uint16
 	PairingInstruction string
 	InstanceID         [8]byte
@@ -2838,7 +2934,8 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		CommissioningMode:  params.CommissioningMode,
 		DeviceTypeID:       params.DeviceTypeID,
 		DeviceName:         params.NodeLabel,
-		PairingHint:        params.PairingHint,
+		Hints:              params.Hints,
+		PairingHint:        params.PairingHint, //nolint:staticcheck // the deprecated field is forwarded until it is removed
 		PairingInstruction: params.PairingInstruction,
 		RotatingID:         params.RotatingID,
 		Port:               uint16(b.effectiveUDPPort()), //nolint:gosec // the bound / parsed port is ≤ 65535; see #20
@@ -2975,6 +3072,9 @@ func (b *Bridge) diagRing() *diagevent.Ring {
 // [mrpRTTWindow] for why this stays off the cluster surface.
 //
 // Safe on a nil bridge (Matter disabled), which reports an empty summary.
+//
+// Deprecated: nothing reads it, and it has no replacement; removable in
+// the next minor release.
 func (b *Bridge) ControllerRTT() MRPRTTStats {
 	if b == nil {
 		return MRPRTTStats{}

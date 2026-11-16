@@ -96,9 +96,22 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleAnnounceOtaProvider(func(context.Context, AnnounceOtaProviderRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleAnnounceOtaProvider: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})  // no EmitEvent
 	_ = s.EmitStateTransition(0, StateTransitionEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitVersionApplied(0, VersionAppliedEvent{})   // not in the empty definition's EventList: refused
-	_ = s.EmitDownloadError(0, DownloadErrorEvent{})     // not in the empty definition's EventList: refused
+	_ = s.RecordStateTransition(StateTransitionEvent{})  // the same, through EmitEvent
+	if err := bare.RecordStateTransition(StateTransitionEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordStateTransition on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitVersionApplied(0, VersionAppliedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordVersionApplied(VersionAppliedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordVersionApplied(VersionAppliedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordVersionApplied on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitDownloadError(0, DownloadErrorEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordDownloadError(DownloadErrorEvent{})  // the same, through EmitEvent
+	if err := bare.RecordDownloadError(DownloadErrorEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordDownloadError on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

@@ -173,41 +173,83 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleSuppressAlarm registers fn for the SuppressAlarm command; nil removes the handler;
+// HandleSuppressAlarm registers fn for the SuppressAlarm command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSuppressAlarm is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSuppressAlarm(fn func(ctx context.Context, req SuppressAlarmRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSuppressAlarm, fn)
 }
 
-// HandleEnableDisableAlarm registers fn for the EnableDisableAlarm command; nil removes the handler;
+// HandleEnableDisableAlarm registers fn for the EnableDisableAlarm command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableDisableAlarm is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableDisableAlarm(fn func(ctx context.Context, req EnableDisableAlarmRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableDisableAlarm, fn)
 }
 
+// RecordAlarmsStateChanged records the AlarmsStateChanged event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordAlarmsStateChanged(data AlarmsStateChangedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventAlarmsStateChanged, data)
+}
+
 // EmitAlarmsStateChanged emits the AlarmsStateChanged event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordAlarmsStateChanged, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitAlarmsStateChanged(endpoint uint16, data AlarmsStateChangedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventAlarmsStateChanged, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventAlarmsStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordSensorFault records the SensorFault event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordSensorFault(data SensorFaultEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventSensorFault, data)
 }
 
 // EmitSensorFault emits the SensorFault event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordSensorFault, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitSensorFault(endpoint uint16, data SensorFaultEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFault, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Host is the BooleanStateConfiguration kit server's host methods: the ones Set, Get and
@@ -249,12 +291,20 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
+	// Where the device serves the cluster with the generated server
+	// (no kit server for the selection), a command declared here
+	// without its Handle field is refused when the device is built
+	// (device.New), not left out of AcceptedCommandList unannounced.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -284,7 +334,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleSuppressAlarm != nil {
@@ -294,6 +344,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleEnableDisableAlarm != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdEnableDisableAlarm)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

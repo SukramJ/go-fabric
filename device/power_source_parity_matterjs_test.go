@@ -39,7 +39,9 @@ func TestPowerSourceSelectionsParityMatterJS(t *testing.T) {
 	}{
 		{"Wired", psdef.FeatureWired, psdef.Patch{}},
 		{"Battery", psdef.FeatureBattery, psdef.Patch{}},
-		{"Battery, Rechargeable", psdef.FeatureBattery | psdef.FeatureRechargeable, psdef.Patch{}},
+		// BatChargeState and BatReplacementDescription have no default
+		// and are required (decision 17): test input, no reference value.
+		{"Battery, Rechargeable", psdef.FeatureBattery | psdef.FeatureRechargeable, psdef.Patch{BatChargeState: new(psdef.BatChargeStateUnknown)}},
 		// :19-28: the test's selection and state.
 		{"Battery, Replaceable", psdef.FeatureBattery | psdef.FeatureReplaceable, psdef.Patch{
 			Status: new(psdef.PowerSourceStatusActive), Order: new(uint8(1)), Description: new("aa batteries"),
@@ -47,7 +49,9 @@ func TestPowerSourceSelectionsParityMatterJS(t *testing.T) {
 			BatReplaceability:         new(psdef.BatReplaceabilityUserReplaceable),
 			BatReplacementDescription: new("open, replace"), BatQuantity: new(uint8(2)),
 		}},
-		{"Battery, Rechargeable, Replaceable", psdef.FeatureBattery | psdef.FeatureRechargeable | psdef.FeatureReplaceable, psdef.Patch{}},
+		{"Battery, Rechargeable, Replaceable", psdef.FeatureBattery | psdef.FeatureRechargeable | psdef.FeatureReplaceable, psdef.Patch{
+			BatChargeState: new(psdef.BatChargeStateUnknown), BatReplacementDescription: new(""),
+		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()

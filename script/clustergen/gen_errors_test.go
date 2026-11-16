@@ -138,7 +138,8 @@ func TestGenerateShapes(t *testing.T) {
 		"// - Scoped (0x0006): fabric-scoped: spec.NewServer refuses to serve it.",
 		"func (s *Server) HandlePing(fn func(ctx context.Context, req PingRequest) (struct{}, error)) error",
 		"func (s *Server) HandleAsk(fn func(ctx context.Context, req AskRequest) (PairResponseCommand, error)) error",
-		"func (s *Server) EmitEv(endpoint uint16, data EvEvent) error { return spec.EmitOn(s.Underlying(), endpoint, EventEv, data) }",
+		"func (s *Server) EmitEv(endpoint uint16, data EvEvent) error {",
+		"func (s *Server) RecordEv(data EvEvent) error {", "return em.EmitEvent(EventEv, data)",
 		"type Server struct{ spec.Wrapper }", "func Wrap(srv contract.ClusterServer) *Server",
 	} {
 		if !strings.Contains(hull, want) {

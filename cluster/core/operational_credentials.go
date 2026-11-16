@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"reflect"
 	"slices"
 	"sync"
 
@@ -79,14 +80,21 @@ type OperationalCredentials struct {
 	rearmFailSafeForFabric func(fabricIndex uint8)
 	onFabricLeaving        func(ctx context.Context, fabricIndex uint8)
 	onFabricRemoved        func(ctx context.Context, fabricIndex uint8)
-	onAdminEntryInstalled  func(entry store.ACLEntry)
+	// facadeOnFabricRemoved and facadeOnFabricUpdated are the node
+	// facade's slots of the fabric-removed and fabric-updated hooks
+	// (internal/facadeseam), run before the host's.
+	facadeOnFabricRemoved, facadeOnFabricUpdated func(ctx context.Context, fabricIndex uint8)
+	onAdminEntryInstalled                        func(entry store.ACLEntry)
 
-	// pendingCSRSessionID is the session ID that issued the pending
-	// CSRRequest. Set in handleCSRRequest; checked in handleAddNOC to
-	// enforce the matter.js csrSessionId !== session.id guard per
-	// Matter §11.18.7.5.5.
-	// Mirrors matter.js OperationalCredentialsServer.ts:240-245 at db021da0.
-	pendingCSRSessionID uint16
+	// pendingCSRSession is the session that issued the pending
+	// CSRRequest ([invokeSessionBinding]): set in handleCSRRequest,
+	// compared strictly in handleAddNOC — the matter.js
+	// csrSessionId !== session.id guard of addNoc per Matter §11.18.7.5.5
+	// (OperationalCredentialsServer.ts:240-245 at db021da0). UpdateNOC
+	// compares no session: its CSR is consumed by any session of the
+	// fail-safe's fabric (matter.js updateNoc, :317-388, reads no
+	// csrSessionId; review II, Fable R3-1).
+	pendingCSRSession any
 
 	// pendingCSRForUpdate captures `IsForUpdateNOC` from the CSRRequest
 	// that produced [pendingPrivKey]. handleUpdateNOC requires it to be
@@ -199,6 +207,9 @@ type OperationalCredentials struct {
 // owns the cluster), so the hook cannot be passed via [OpcredsConfig]
 // at NewOperationalCredentials time. Idempotent — re-wiring (e.g. on
 // topology rebuild) replaces the closure cleanly. Pass nil to detach.
+// The node facade wires a handler of its own in a separate slot, which
+// runs first; this one is the host's and replacing it leaves the
+// facade's in place.
 func (o *OperationalCredentials) SetOnFabricRemoved(hook func(ctx context.Context, fabricIndex uint8)) {
 	o.mu.Lock()
 	o.onFabricRemoved = hook
@@ -250,6 +261,51 @@ func InvokeSessionIDFromContext(ctx context.Context) uint16 {
 	return v
 }
 
+// invokeSessionKeyCtxKey is the context key of [WithInvokeSession].
+type invokeSessionKeyCtxKey struct{}
+
+// WithInvokeSession returns a derived context carrying an opaque identity of
+// the session the invoke arrived on: a comparable value unique to that
+// session among every session of the node, whichever stack holds it — the
+// bridge stamps its session, a node's client stack its *exchange.Session.
+// It sits beside [WithInvokeSessionID], whose uint16 names a session of the
+// bridge's registry only: a request on a client-stack session carries the
+// identity and no id. The key is a pointer — always comparable, and stable
+// for the session's life when the stack keeps one object per session; nil
+// or any other kind of key stamps nothing, and the request is bound by its
+// id alone (review II, Fable R3-1c).
+//
+// The CSR of a fail-safe is bound to it (OperationalCredentials): matter.js
+// binds the CSR to the requesting session whoever opened it
+// (OperationalCredentialsServer.ts:143-146 → FailsafeContext.ts:176-185 at
+// db021da0, compared at OperationalCredentialsServer.ts:240-245), its ids
+// drawn from one SessionManager for every session (SessionManager.ts:581-606).
+func WithInvokeSession(ctx context.Context, key any) context.Context {
+	if key == nil || reflect.TypeOf(key).Kind() != reflect.Pointer || reflect.ValueOf(key).IsNil() {
+		return ctx
+	}
+	return context.WithValue(ctx, invokeSessionKeyCtxKey{}, key)
+}
+
+// InvokeSessionFromContext returns the identity [WithInvokeSession]
+// stamped, nil when none.
+func InvokeSessionFromContext(ctx context.Context) any {
+	return ctx.Value(invokeSessionKeyCtxKey{})
+}
+
+// invokeSessionBinding is what a CSR binds to and AddNOC compares with
+// (UpdateNOC checks the fabric only): the session's identity when stamped ([WithInvokeSession]), else its
+// bridge id when one is stamped ([WithInvokeSessionID]), else nil.
+func invokeSessionBinding(ctx context.Context) any {
+	if key := InvokeSessionFromContext(ctx); key != nil {
+		return key
+	}
+	if id := InvokeSessionIDFromContext(ctx); id != 0 {
+		return id
+	}
+	return nil
+}
+
 // StoreFacade is the subset of [store.Store] this cluster consumes.
 // Defined as an interface so tests substitute an in-memory fake.
 type StoreFacade interface {
@@ -277,11 +333,14 @@ type StoreFacade interface {
 	// RemoveGroupKeysByFabric erases all group-key-set rows for the
 	// given fabric.
 	RemoveGroupKeysByFabric(ctx context.Context, fabricIndex uint8) error
-	// UpdateFabricVendorID and UpdateFabricVIDVerification are
-	// SetVIDVerificationStatement's writes; the VID verification data is
+	// UpdateFabricVendorVerification is SetVIDVerificationStatement's one
+	// write of the vendor id and the VID verification data; the data is
 	// part of the fabric row ([store.FabricRecord].VIDVerificationStatement,
 	// .VVSC), so it leaves with the row and a pending UpdateNOC's rollback
-	// drops what its window wrote.
+	// drops what its window wrote. UpdateFabricVendorID and
+	// UpdateFabricVIDVerification restore what an UpdateNOC of a release
+	// before v8 replaced (operational_credentials_pending.go).
+	UpdateFabricVendorVerification(ctx context.Context, fabricIndex uint8, u store.FabricVendorUpdate) error
 	UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, vendorID uint16) error
 	UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error
 	// UpdateFabricCredentials, CommitFabric and RollbackFabric move a
@@ -292,6 +351,12 @@ type StoreFacade interface {
 	UpdateFabricCredentials(ctx context.Context, fabricIndex uint8, c store.FabricCredentials) error
 	CommitFabric(ctx context.Context, fabricIndex uint8) error
 	RollbackFabric(ctx context.Context, fabricIndex uint8) (store.FabricPending, error)
+	// OwedFabricEvents and AckOwedFabricEvent acknowledge the hook a
+	// RollbackFabric owes once it ran ([store.OwedFabricEvent]): a rollback
+	// at run time reports its consequences itself and acknowledges them
+	// after; one at construction is the node's to report at its start.
+	OwedFabricEvents(ctx context.Context) ([]store.OwedFabricEvent, error)
+	AckOwedFabricEvent(ctx context.Context, id uint64) error
 	// GetSetting and SetSettings serve a start after an upgrade only: a
 	// release before the row carried its commit state kept it under two
 	// settings keys, which a start rolls back and clears once
@@ -656,7 +721,9 @@ func (o *OperationalCredentials) failSafeRequired(ctx context.Context) bool {
 
 // SetOnFabricUpdated wires the fabric-updated hook after construction.
 // The daemon wires this once both the cluster and the session manager
-// are constructed. Idempotent. Pass nil to detach.
+// are constructed. Idempotent. Pass nil to detach. The node facade
+// wires a handler of its own in a separate slot, which runs first; this
+// one is the host's and replacing it leaves the facade's in place.
 func (o *OperationalCredentials) SetOnFabricUpdated(hook func(ctx context.Context, fabricIndex uint8)) {
 	o.mu.Lock()
 	o.onFabricUpdated = hook
@@ -695,7 +762,7 @@ func (o *OperationalCredentials) clearPendingState() {
 	o.pendingTrustRoot = nil
 	o.pendingTrustRootDER = nil
 	o.pendingCSRNonce = nil
-	o.pendingCSRSessionID = 0
+	o.pendingCSRSession = nil
 	o.pendingCSRForUpdate = false
 	o.pendingFabric = 0
 }
@@ -853,6 +920,7 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, updated []store.FabricRecord) {
 	for i := range updated {
 		o.reportUpdateRolledBack(ctx, &updated[i])
+		o.ackOwedFabricEvents(ctx, store.FabricPendingUpdate, updated[i].FabricIndex)
 	}
 	for i := range added {
 		f := &added[i]
@@ -870,10 +938,35 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 		o.notifyFabricRemoved(f.FabricIndex)
 		o.notifyChanged()
 		o.mu.RLock()
-		hook := o.onFabricRemoved
+		hook := chainFabricHooks(o.facadeOnFabricRemoved, o.onFabricRemoved)
 		o.mu.RUnlock()
 		if hook != nil {
 			hook(ctx, f.FabricIndex)
+		}
+		o.ackOwedFabricEvents(ctx, store.FabricPendingAdd, f.FabricIndex)
+	}
+}
+
+// ackOwedFabricEvents acknowledges the owed events of kind the store holds
+// for fabricIndex ([store.Fabrics.AckOwedFabricEvent]): the consequences
+// of that rollback ran. It runs after them, so a crash before it leaves
+// the event owed and the node's next start runs them again — at least
+// once. A failed read or acknowledgement is logged and leaves the event
+// owed.
+func (o *OperationalCredentials) ackOwedFabricEvents(ctx context.Context, kind store.FabricPending, fabricIndex uint8) {
+	ctx = context.WithoutCancel(ctx)
+	owed, err := o.store.OwedFabricEvents(ctx)
+	if err != nil {
+		o.logger().Warn("matter.opcreds.owed_fabric_event.list_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+		return
+	}
+	for i := range owed {
+		ev := &owed[i]
+		if ev.Kind != kind || ev.Fabric.FabricIndex != fabricIndex {
+			continue
+		}
+		if err := o.store.AckOwedFabricEvent(ctx, ev.ID); err != nil {
+			o.logger().Warn("matter.opcreds.owed_fabric_event.ack_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 		}
 	}
 }
@@ -940,7 +1033,7 @@ func (o *OperationalCredentials) reportUpdateRolledBack(ctx context.Context, bef
 	after, err := o.store.GetFabric(context.WithoutCancel(ctx), before.FabricIndex)
 	o.mu.RLock()
 	withdraw := o.onFabricWithdraw
-	hook := o.onFabricUpdated
+	hook := chainFabricHooks(o.facadeOnFabricUpdated, o.onFabricUpdated)
 	o.mu.RUnlock()
 	if err == nil && after.NodeID != before.NodeID && withdraw != nil {
 		withdraw(ctx, before.CompressedID, before.NodeID)
@@ -1892,11 +1985,11 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// that AddNOC is issued from the same session per Matter §11.18.7.5.5
 	// (matter.js OperationalCredentialsServer.ts:240-245 at db021da0; chip
 	// operational-credentials-server.cpp CSR failsafe binding).
-	csrSessionID := InvokeSessionIDFromContext(ctx)
+	csrSession := invokeSessionBinding(ctx)
 
 	o.mu.Lock()
 	o.pendingCSRNonce = append([]byte(nil), req.CSRNonce...)
-	o.pendingCSRSessionID = csrSessionID
+	o.pendingCSRSession = csrSession
 	// Capture the IsForUpdateNOC flag so the follow-up AddNOC/UpdateNOC
 	// handler can verify that the CSR was produced for the matching command.
 	// Without this both commands happily consume any pending CSR.
@@ -2079,17 +2172,18 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	//
 	// chip: operational-credentials-server.cpp CSR failsafe context check.
 	//
-	// A CSR issued on a session the context did not name (sessionID 0:
-	// a rig without WithInvokeSessionID) binds to none; a CSR issued on a
-	// named session is consumed by that session alone — matter.js compares
-	// the ids strictly (OperationalCredentialsServer.ts:240-245 at
-	// db021da0), and a request that names no session does not match one
-	// that did (review 2026-11 W3-clusec-04).
-	addNOCSessionID := InvokeSessionIDFromContext(ctx)
+	// A CSR is consumed by the session that issued it alone — matter.js
+	// compares the ids strictly (OperationalCredentialsServer.ts:240-245 at
+	// db021da0). The session is its identity when stamped, else its bridge
+	// id ([invokeSessionBinding]); a request that names no session matches
+	// only a CSR that named none (a rig without either stamp), and one that
+	// names a session matches no CSR that named none (review 2026-11
+	// W3-clusec-04; review II, Fable R2-1).
+	addNOCSession := invokeSessionBinding(ctx)
 
 	o.mu.Lock()
 	priv := o.pendingPrivKey
-	pendingCSRSessID := o.pendingCSRSessionID
+	pendingCSRSession := o.pendingCSRSession
 	pendingForUpdate := o.pendingCSRForUpdate
 	root := o.pendingTrustRoot
 	rootDER := o.pendingTrustRootDER
@@ -2101,9 +2195,10 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
 	}
-	// Session-ID mismatch: the AddNOC session must be the CSR's whenever
-	// the CSR named one.
-	if pendingCSRSessID != 0 && addNOCSessionID != pendingCSRSessID {
+	// Session mismatch: the AddNOC session must be the CSR's, strictly —
+	// a CSR on one session is consumed from no other, whichever stack
+	// holds either (review II, Fable R2-1).
+	if addNOCSession != pendingCSRSession {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not found in failsafe context"}, nil
 	}
 	// A CSR issued with IsForUpdateNOC=true must NOT be consumed by AddNOC
@@ -2588,7 +2683,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	o.pendingFabric = idx
 	o.pendingPrivKey = nil
 	o.pendingCSRForUpdate = false
-	hook := o.onFabricUpdated
+	hook := chainFabricHooks(o.facadeOnFabricUpdated, o.onFabricUpdated)
 	o.mu.Unlock()
 	// Bump DataVersion after successful UpdateNOC — fabric list changed.
 	o.dataVersion.Bump()
@@ -2763,7 +2858,7 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 	o.notifyFabricRemoved(fabricIndex)
 
 	o.mu.Lock()
-	hook := o.onFabricRemoved
+	hook := chainFabricHooks(o.facadeOnFabricRemoved, o.onFabricRemoved)
 	withdrawHook := o.onFabricWithdraw
 	o.mu.Unlock()
 
@@ -2952,10 +3047,18 @@ func EncodeECDHFromPrivate(priv *ecdsa.PrivateKey) (*ecdh.PrivateKey, error) {
 // OperationalCredentialsCluster.cpp::HandleAddNOC (fabric table revert,
 // group keys, ACL entries). A rollback that fails is logged: the row stays
 // pending, and the fail-safe's end or the next start rolls it back
-// (review II, R2-P2-comm-05).
+// (review II, R2-P2-comm-05). The fabric was not announced yet, so the
+// removal the rollback records as owed is acknowledged at once; a crash
+// between the two leaves it owed, and the next start reports the removal
+// of a fabric no hook announced.
 func (o *OperationalCredentials) rollbackFailedAddNOC(ctx context.Context, fabricIndex uint8) {
-	if _, err := o.store.RollbackFabric(context.WithoutCancel(ctx), fabricIndex); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
+	was, err := o.store.RollbackFabric(context.WithoutCancel(ctx), fabricIndex)
+	if err != nil && !errors.Is(err, store.ErrFabricNotFound) {
 		o.logger().Error("matter.opcreds.addnoc.rollback_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
+		return
+	}
+	if was == store.FabricPendingAdd {
+		o.ackOwedFabricEvents(ctx, store.FabricPendingAdd, fabricIndex)
 	}
 }
 

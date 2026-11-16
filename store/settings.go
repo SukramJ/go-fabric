@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 )
 
 // Setting keys for persisted writable cluster attributes. Matter
@@ -48,23 +49,29 @@ const (
 const MetadataKeyEventNumber = "event_number_ceiling"
 
 // GetSetting returns the persisted string for key. ok=false when the
-// key has never been written (callers keep their configured default).
+// key has never been written (callers keep their configured default). A
+// sealed value is opened ([NewSealed]).
 func (s *Store) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
-	row := s.db.QueryRowContext(ctx, `SELECT value FROM matter_settings WHERE key = ?`, key)
-	if err := row.Scan(&value); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
-		}
+	value, ok, err = s.readSetting(ctx, s.db, key)
+	if err != nil {
 		return "", false, fmt.Errorf("store: get setting %q: %w", key, err)
 	}
-	return value, true, nil
+	return value, ok, nil
 }
 
-// SetSetting upserts the persisted string for key.
+// upsertSetting is the statement of SetSetting and SetSettings.
+const upsertSetting = `
+INSERT INTO matter_settings (key, value, sealed) VALUES (?, ?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value, sealed = excluded.sealed`
+
+// SetSetting upserts the persisted string for key, sealed when the store
+// has a sealer and the key holds a secret ([NewSealed]).
 func (s *Store) SetSetting(ctx context.Context, key, value string) error {
-	if _, err := s.db.ExecContext(ctx, `
-INSERT INTO matter_settings (key, value) VALUES (?, ?)
-ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value); err != nil {
+	stored, sealed, err := s.sealSetting(key, value)
+	if err != nil {
+		return fmt.Errorf("store: set setting %q: %w", key, err)
+	}
+	if _, err := s.db.ExecContext(ctx, upsertSetting, key, stored, sealed); err != nil {
 		return fmt.Errorf("store: set setting %q: %w", key, err)
 	}
 	return nil
@@ -83,9 +90,11 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, k := range slices.Sorted(maps.Keys(values)) {
-		if _, err := tx.ExecContext(ctx, `
-INSERT INTO matter_settings (key, value) VALUES (?, ?)
-ON CONFLICT(key) DO UPDATE SET value = excluded.value`, k, values[k]); err != nil {
+		stored, sealed, err := s.sealSetting(k, values[k])
+		if err != nil {
+			return fmt.Errorf("store: set settings: %q: %w", k, err)
+		}
+		if _, err := tx.ExecContext(ctx, upsertSetting, k, stored, sealed); err != nil {
 			return fmt.Errorf("store: set settings: %q: %w", k, err)
 		}
 	}
@@ -96,11 +105,66 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value`, k, values[k]); err != ni
 }
 
 // DeleteSetting removes key; a key that is not there is no error.
+//
+// Deprecated: use [Store.DeleteSettings], which every [Settings] backend
+// implements. Removable in the next minor release.
 func (s *Store) DeleteSetting(ctx context.Context, key string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, key); err != nil {
 		return fmt.Errorf("store: delete setting %q: %w", key, err)
 	}
 	return nil
+}
+
+// DeleteSettings implements [Settings]: every key is deleted in one
+// transaction, so a failure on any key keeps all of them.
+func (s *Store) DeleteSettings(ctx context.Context, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: delete settings: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, k := range keys {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, k); err != nil {
+			return fmt.Errorf("store: delete settings: %q: %w", k, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: delete settings: commit: %w", err)
+	}
+	return nil
+}
+
+// DeleteSettingsWithPrefix implements [Settings] in one statement: the
+// keys from prefix up to, not including, prefix with its final "." raised
+// to "/" — exactly the keys that begin with prefix under the BINARY
+// collation the key column compares with.
+func (s *Store) DeleteSettingsWithPrefix(ctx context.Context, prefix string) error {
+	if err := checkSettingsPrefix(prefix); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key >= ? AND key < ?`,
+		prefix, settingsPrefixEnd(prefix)); err != nil {
+		return fmt.Errorf("store: delete settings with prefix %q: %w", prefix, err)
+	}
+	return nil
+}
+
+// checkSettingsPrefix refuses a prefix [Settings.DeleteSettingsWithPrefix]
+// does not accept: one that does not end in ".", the empty one included.
+func checkSettingsPrefix(prefix string) error {
+	if !strings.HasSuffix(prefix, ".") {
+		return fmt.Errorf(`store: delete settings with prefix %q: a prefix must end in "."`, prefix)
+	}
+	return nil
+}
+
+// settingsPrefixEnd is the first key after every key that begins with
+// prefix, which ends in ".": the prefix with that dot raised to "/".
+func settingsPrefixEnd(prefix string) string {
+	return prefix[:len(prefix)-1] + "/"
 }
 
 // GetMetadataCounter returns the persisted integer counter for key

@@ -16,7 +16,7 @@ import (
 // type id and misses an unknown id and one above 0xFFFF.
 func TestLookup(t *testing.T) {
 	t.Parallel()
-	if ty, ok := Lookup(uint32(OnOffPlugInUnitID)); !ok || ty != OnOffPlugInUnitType() || ty.Name != "OnOffPlugInUnit" {
+	if ty, ok := Lookup(uint32(OnOffPlugInUnitID)); !ok || ty.ID != OnOffPlugInUnitID || ty.Name != "OnOffPlugInUnit" {
 		t.Fatalf("Lookup(OnOffPlugInUnit) %v %v", ty, ok)
 	}
 	for _, id := range []uint32{
@@ -29,7 +29,7 @@ func TestLookup(t *testing.T) {
 		}
 	}
 	for _, ty := range Types() {
-		if got, ok := Lookup(uint32(ty.ID)); !ok || got != ty {
+		if got, ok := Lookup(uint32(ty.ID)); !ok || got.ID != ty.ID || got.Name != ty.Name {
 			t.Errorf("Lookup(%#x) misses %s", ty.ID, ty.Name)
 		}
 	}

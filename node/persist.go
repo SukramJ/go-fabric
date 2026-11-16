@@ -38,6 +38,34 @@ const (
 	legacyOperationalHoursSetting = "gendiag.operational_hours"
 )
 
+// keyedSettingRoots are the settings roots the node keeps a bridged
+// endpoint's state under by its stable key, one key per endpoint: the root
+// and the key's String(). [Aggregator.Forget] erases each of them for a
+// forgotten key (nonVolatile.forget); the nonvolatile attribute values,
+// one key per attribute, are erased beside them (nonVolatileCandidates).
+// A root added here is erased with the rest; one kept elsewhere fails
+// TestKeyedSettingRootsAreForgotten.
+var keyedSettingRoots = []string{
+	endpointLabelKeyRoot,
+	endpointConfigVersionKey,
+	scenesKeyRoot,
+	bindingKeyRoot,
+	bridgedUserLabelKeyRoot,
+	endpointSurfaceKey,
+}
+
+// keyedSettingKeys are the keys of every keyed setting root at
+// endpointKeys.
+func keyedSettingKeys(endpointKeys []string) []string {
+	keys := make([]string, 0, len(keyedSettingRoots)*len(endpointKeys))
+	for _, root := range keyedSettingRoots {
+		for _, key := range endpointKeys {
+			keys = append(keys, root+key)
+		}
+	}
+	return keys
+}
+
 // persisted keeps the controller-written state of the node's endpoints in
 // the store's settings table: a bridged endpoint's NodeLabel and
 // ConfigurationVersion under its stable key, its scene table, and the
@@ -54,36 +82,117 @@ type persisted struct {
 	salt func() [16]byte
 }
 
+// EndpointState is the endpoint-level stack state the facade keeps for its
+// own assembler, exported for a host that keeps it itself or assembles its
+// endpoints itself ([Config].Snapshotter, issue #117): a bridged endpoint's
+// scene table (under "scenes.<key>") and the NodeLabel a controller wrote
+// (under "bridged_node_label.<key>"), each keyed by the endpoint's stable
+// key's String(). It is the assembler's [endpoint.Persistence] — a change a
+// controller causes is stored with the change, and a refused store answers
+// FAILURE (the store-error rule of store/doc.go) — and the label's load: a
+// host restores a label by setting its endpoint.Spec's NodeLabel from
+// LoadNodeLabel before assembling, as the facade's [Aggregator] does.
+type EndpointState interface {
+	endpoint.Persistence
+	// LoadNodeLabel returns the label stored for key, "" for none.
+	LoadNodeLabel(ctx context.Context, key device.SourceKey) (string, error)
+}
+
+// NewEndpointState returns the facade's [EndpointState] over st's settings
+// table — the keys the node uses, so a host may build it before [New] (for
+// the assembler its [Config].Snapshotter runs) over a store the node later opens. st
+// must hold the store schema (store.Apply); a nil logger is
+// slog.Default(). A refused save is logged and returned.
+func NewEndpointState(st store.Settings, logger *slog.Logger) EndpointState {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return persisted{st: st, logger: logger}
+}
+
 // EndpointPersistence is the endpoint-level stack state the facade keeps
-// for its own assembler, exported for a host that assembles its endpoints
-// itself ([Config].Snapshotter, issue #117): a bridged endpoint's scene table
-// (endpoint.Config.Scenes, under "scenes.<key>") and the per-endpoint
-// NodeLabel a commissioner wrote (endpoint.Config.OnNodeLabelWritten,
-// under "bridged_node_label.<key>"), each keyed by the endpoint's stable
+// for its own assembler: a bridged endpoint's scene table (under
+// "scenes.<key>") and the per-endpoint NodeLabel a commissioner wrote
+// (under "bridged_node_label.<key>"), each keyed by the endpoint's stable
 // key's String(). A host restores a label by setting its endpoint.Spec's
-// NodeLabel from [EndpointPersistence.NodeLabel] before assembling, as
-// the facade's [Aggregator] does. matter.js keeps both as nonvolatile
-// endpoint state (the citations on the methods of the implementation
-// below and on endpoint.ScenesStore).
+// NodeLabel from [EndpointPersistence.NodeLabel] before assembling.
+//
+// Deprecated: use [EndpointState], whose saves and loads report the
+// store's error. Removable in the next minor release.
 type EndpointPersistence interface {
-	endpoint.ScenesStore
+	endpoint.ScenesStore //nolint:staticcheck // the deprecated port keeps its deprecated shape
 	// OnNodeLabelWritten persists a commissioner-written NodeLabel of the
-	// bridged endpoint under key; it is endpoint.Config.OnNodeLabelWritten.
+	// bridged endpoint under key.
 	OnNodeLabelWritten(key device.SourceKey, label string)
 	// NodeLabel is the label persisted for key, "" for none.
 	NodeLabel(ctx context.Context, key device.SourceKey) string
 }
 
 // NewEndpointPersistence returns the facade's [EndpointPersistence] over
-// st's settings table — the same keys [Node.Persistence] uses, so a host
-// may build it before [New] (for the assembler its Topology runs) over a
-// store the node later opens. st must hold the store schema
-// (store.Apply); a nil logger is slog.Default().
+// st's settings table — the keys the node uses. st must hold the store
+// schema (store.Apply); a nil logger is slog.Default().
+//
+// Deprecated: use [NewEndpointState]. Removable in the next minor release.
 func NewEndpointPersistence(st store.Settings, logger *slog.Logger) EndpointPersistence {
-	if logger == nil {
-		logger = slog.Default()
+	return legacyEndpoints{NewEndpointState(st, logger)}
+}
+
+// legacyEndpoints is an [EndpointState] seen through the deprecated
+// [EndpointPersistence]: its hooks cannot report an error, so a refused
+// save is the state's to log, and a refused load reads as none.
+type legacyEndpoints struct{ s EndpointState }
+
+func (l legacyEndpoints) OnNodeLabelWritten(key device.SourceKey, label string) {
+	_ = l.s.SaveNodeLabel(context.Background(), key, label)
+}
+
+func (l legacyEndpoints) NodeLabel(ctx context.Context, key device.SourceKey) string {
+	label, _ := l.s.LoadNodeLabel(ctx, key)
+	return label
+}
+
+func (l legacyEndpoints) LoadScenes(key device.SourceKey) []byte {
+	table, _ := l.s.LoadScenes(context.Background(), key)
+	return table
+}
+
+func (l legacyEndpoints) SaveScenes(key device.SourceKey, table []byte) {
+	_ = l.s.SaveScenes(context.Background(), key, table)
+}
+
+// endpointState is the endpoint-level persistence the node's assembler
+// and Aggregator use: EndpointState, else the deprecated
+// EndpointPersistence adapted, else own.
+func (c *Config) endpointState(own persisted) EndpointState {
+	switch {
+	case c.EndpointState != nil:
+		return c.EndpointState
+	case c.EndpointPersistence != nil:
+		return hostEndpoints{c.EndpointPersistence}
 	}
-	return persisted{st: st, logger: logger}
+	return own
+}
+
+// hostEndpoints is a host's deprecated [EndpointPersistence] seen as an
+// [EndpointState]: its hooks cannot refuse, so a save never fails.
+type hostEndpoints struct{ p EndpointPersistence }
+
+func (h hostEndpoints) SaveNodeLabel(_ context.Context, key device.SourceKey, label string) error {
+	h.p.OnNodeLabelWritten(key, label)
+	return nil
+}
+
+func (h hostEndpoints) LoadNodeLabel(ctx context.Context, key device.SourceKey) (string, error) {
+	return h.p.NodeLabel(ctx, key), nil
+}
+
+func (h hostEndpoints) LoadScenes(_ context.Context, key device.SourceKey) ([]byte, error) {
+	return h.p.LoadScenes(key), nil
+}
+
+func (h hostEndpoints) SaveScenes(_ context.Context, key device.SourceKey, table []byte) error {
+	h.p.SaveScenes(key, table)
+	return nil
 }
 
 // keyString is the settings-key suffix of a stable key, false for nil.
@@ -144,30 +253,33 @@ func (p persisted) storeConfigVersions(ctx context.Context, topo *endpoint.Topol
 	return nil
 }
 
-// OnNodeLabelWritten implements [EndpointPersistence]: it is the
-// endpoint.Config.OnNodeLabelWritten hook.
-func (p persisted) OnNodeLabelWritten(key device.SourceKey, label string) {
+// SaveNodeLabel implements [EndpointState]: the label under
+// "bridged_node_label.<key>"; a refused write is logged and returned, so a
+// controller's write answers FAILURE.
+func (p persisted) SaveNodeLabel(ctx context.Context, key device.SourceKey, label string) error {
 	k, ok := keyString(key)
 	if !ok {
-		return
+		return nil
 	}
-	if err := p.st.SetSetting(context.Background(), endpointLabelKeyRoot+k, label); err != nil {
+	if err := p.st.SetSetting(context.WithoutCancel(ctx), endpointLabelKeyRoot+k, label); err != nil {
 		p.logger.Warn("label.persist", slog.Any("err", err))
+		return fmt.Errorf("node: persist the NodeLabel of %s: %w", k, err)
 	}
+	return nil
 }
 
-// NodeLabel implements [EndpointPersistence]: the label persisted for a
+// LoadNodeLabel implements [EndpointState]: the label persisted for a
 // bridged endpoint, "" for none.
-func (p persisted) NodeLabel(ctx context.Context, key device.SourceKey) string {
+func (p persisted) LoadNodeLabel(ctx context.Context, key device.SourceKey) (string, error) {
 	k, ok := keyString(key)
 	if !ok {
-		return ""
+		return "", nil
 	}
-	label, found, err := p.st.GetSetting(ctx, endpointLabelKeyRoot+k)
-	if err != nil || !found {
-		return ""
+	label, _, err := p.st.GetSetting(ctx, endpointLabelKeyRoot+k)
+	if err != nil {
+		return "", fmt.Errorf("node: load the NodeLabel of %s: %w", k, err)
 	}
-	return label
+	return label, nil
 }
 
 // restoreRoot applies the persisted root NodeLabel, Location and
@@ -196,28 +308,38 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 	})
 }
 
-// LoadScenes implements endpoint.ScenesStore ([EndpointPersistence]).
-func (p persisted) LoadScenes(key device.SourceKey) []byte {
+// LoadScenes implements [EndpointState] (endpoint.Persistence): the table
+// under "scenes.<key>", nil for none; a refused read is logged and
+// returned, and the endpoint's table stays unloaded until a load succeeds.
+func (p persisted) LoadScenes(ctx context.Context, key device.SourceKey) ([]byte, error) {
 	k, ok := keyString(key)
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	v, found, err := p.st.GetSetting(context.Background(), scenesKeyRoot+k)
-	if err != nil || !found {
-		return nil
+	v, found, err := p.st.GetSetting(ctx, scenesKeyRoot+k)
+	if err != nil {
+		p.logger.Warn("scenes.load", slog.Any("err", err))
+		return nil, fmt.Errorf("node: load the scene table of %s: %w", k, err)
 	}
-	return []byte(v)
+	if !found {
+		return nil, nil
+	}
+	return []byte(v), nil
 }
 
-// SaveScenes implements endpoint.ScenesStore ([EndpointPersistence]).
-func (p persisted) SaveScenes(key device.SourceKey, table []byte) {
+// SaveScenes implements [EndpointState] (endpoint.Persistence): the table
+// under "scenes.<key>"; a refused write is logged and returned, so a scene
+// command answers FAILURE.
+func (p persisted) SaveScenes(ctx context.Context, key device.SourceKey, table []byte) error {
 	k, ok := keyString(key)
 	if !ok {
-		return
+		return nil
 	}
-	if err := p.st.SetSetting(context.Background(), scenesKeyRoot+k, string(table)); err != nil {
+	if err := p.st.SetSetting(context.WithoutCancel(ctx), scenesKeyRoot+k, string(table)); err != nil {
 		p.logger.Warn("scenes.persist", slog.Any("err", err))
+		return fmt.Errorf("node: persist the scene table of %s: %w", k, err)
 	}
+	return nil
 }
 
 // uniqueID returns the BasicInformation UniqueID the store pinned on an

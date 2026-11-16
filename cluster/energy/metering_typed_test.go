@@ -39,7 +39,7 @@ func TestTypedCommodityMeteringServer(t *testing.T) {
 	if err := srv.Handle(0, nil); !errors.Is(err, spec.ErrNotAccepted) {
 		t.Errorf("a command the cluster does not have: %v", err)
 	}
-	if err := spec.EmitOn(srv, 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
+	if err := srv.EmitEvent(0, nil); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("an event the cluster does not define: %v", err)
 	}
 }

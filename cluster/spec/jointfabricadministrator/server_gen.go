@@ -123,53 +123,67 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleIcaccsrRequest registers fn for the IcaccsrRequest command; nil removes the handler;
+// HandleIcaccsrRequest registers fn for the IcaccsrRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleIcaccsrRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleIcaccsrRequest(fn func(ctx context.Context, req IcaccsrRequestRequest) (IcaccsrResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdIcaccsrRequest, fn)
 }
 
-// HandleAddIcac registers fn for the AddIcac command; nil removes the handler;
+// HandleAddIcac registers fn for the AddIcac command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAddIcac is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAddIcac(fn func(ctx context.Context, req AddIcacRequest) (IcacResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdAddIcac, fn)
 }
 
-// HandleOpenJointCommissioningWindow registers fn for the OpenJointCommissioningWindow command; nil removes the handler;
+// HandleOpenJointCommissioningWindow registers fn for the OpenJointCommissioningWindow command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleOpenJointCommissioningWindow is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleOpenJointCommissioningWindow(fn func(ctx context.Context, req OpenJointCommissioningWindowRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdOpenJointCommissioningWindow, fn)
 }
 
-// HandleTransferAnchorRequest registers fn for the TransferAnchorRequest command; nil removes the handler;
+// HandleTransferAnchorRequest registers fn for the TransferAnchorRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleTransferAnchorRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleTransferAnchorRequest(fn func(ctx context.Context, req TransferAnchorRequestRequest) (TransferAnchorResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdTransferAnchorRequest, fn)
 }
 
-// HandleTransferAnchorComplete registers fn for the TransferAnchorComplete command; nil removes the handler;
+// HandleTransferAnchorComplete registers fn for the TransferAnchorComplete command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleTransferAnchorComplete is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleTransferAnchorComplete(fn func(ctx context.Context, req TransferAnchorCompleteRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdTransferAnchorComplete, fn)
 }
 
-// HandleAnnounceJointFabricAdministrator registers fn for the AnnounceJointFabricAdministrator command; nil removes the handler;
+// HandleAnnounceJointFabricAdministrator registers fn for the AnnounceJointFabricAdministrator command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleAnnounceJointFabricAdministrator is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleAnnounceJointFabricAdministrator(fn func(ctx context.Context, req AnnounceJointFabricAdministratorRequest) (struct{}, error)) error {
@@ -242,6 +256,10 @@ type Declare struct {
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
+	// Where the device serves the cluster with the generated server
+	// (no kit server for the selection), a command declared here
+	// without its Handle field is refused when the device is built
+	// (device.New), not left out of AcceptedCommandList unannounced.
 	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.

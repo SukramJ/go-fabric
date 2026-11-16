@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // clusterDataVersion returns the current DataVersion for srv by
@@ -270,6 +271,38 @@ func (d *TopologyDispatcher) Read(ctx context.Context, path im.ConcreteAttribute
 		results = d.readAt(ctx, ep, path, wildcardEndpoint, results)
 	}
 	return results
+}
+
+// AttributePathStatus implements [im.AttributePathChecker]: the status
+// [TopologyDispatcher.Read] answers path, a fully concrete attribute path,
+// with, decided from the topology and the server's attribute set — an
+// endpoint the topology lacks is UnsupportedEndpoint, a cluster the
+// endpoint does not serve UnsupportedCluster — and Success for an
+// attribute the server lists ([contract.ClusterAttributeLister]) or a
+// global list the dispatcher synthesises, whose value is read at its
+// place. Any other attribute is read here, and its status is the read's:
+// the server's attribute set does not decide it.
+func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.ConcreteAttributePath) im.StatusCode {
+	if !path.HasEndpoint || !path.HasCluster || !path.HasAttribute {
+		return im.StatusSuccess
+	}
+	ep := d.topology.FindByID(path.Endpoint)
+	if ep == nil {
+		return im.StatusUnsupportedEndpoint
+	}
+	servers := d.serversFor(ep, path)
+	if len(servers) == 0 {
+		return im.StatusUnsupportedCluster
+	}
+	srv := servers[0]
+	switch path.Attribute {
+	case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
+		return im.StatusSuccess
+	}
+	if lister, ok := srv.(contract.ClusterAttributeLister); ok && slices.Contains(lister.MatterAttributes(), path.Attribute) {
+		return im.StatusSuccess
+	}
+	return readOne(ctx, ep, srv, path).Status
 }
 
 // ExpansionEndpoints implements [im.EndpointExpander]: the ids of the
@@ -557,19 +590,20 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					results = append(results, im.WriteResult{Path: aPath, Status: status})
 					continue
 				}
-				res, changed := d.writeStored(writeCtx, ep, srv, aPath, v)
+				res := d.writeStored(writeCtx, ep, srv, aPath, v)
 				// A successful write that changed the cluster advances the
 				// endpoint-hosted DataVersion once, so DataVersionFilters
 				// miss and subscribers see the change; one that changed
 				// nothing leaves it, as matter.js advances a datasource's
-				// version only for a commit that changed a value
+				// version once per commit, only when a value changed
 				// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457
-				// at db021da0, an equal value no change at :1479). The
-				// verdict is the server's ([contract.ChangeReportingWriter]);
-				// a server without one changed something. A root or
+				// at db021da0, an equal value no change at :1476-1481). The
+				// verdict is the server's ([writeOne], res.Commit); a server
+				// without one changed the written attribute. A root or
 				// Aggregator server with a tracker of its own advances it
 				// inside the same write, on the same verdict.
 				if res.Status == im.StatusSuccess {
+					changed := res.Commit == nil || len(res.Commit.Changed) > 0
 					if _, own := ownDataVersion(ep, srv); changed && !own {
 						ep.BumpClusterDataVersion(cPath.Cluster)
 					}
@@ -889,21 +923,28 @@ func (d *TopologyDispatcher) attributesFor(srv contract.ClusterServer, path im.C
 // MatterRead, except on a request for a fabric-scoped attribute
 // ([fabricScopedReadFailed]).
 //
+// On a request, the value of a fabric-scoped attribute carries its scope
+// ([fabricScopeFor]): the dispatcher scopes every fabric-scoped attribute
+// of the model, whatever the server returns — from MatterReadFiltered or
+// MatterRead alike — and the scope is applied where the value is encoded
+// ([im.MaskFabricScoped]). A read with no request behind it carries none.
+//
 // DataVersion: the cluster's current DataVersion ([clusterDataVersionFor])
 // is stamped on the ReadResult with HasDataVersion. The IM layer uses
 // this in HandleReadRequest for DataVersionFilter evaluation.
 // Mirrors matter.js InteractionServer.ts attributeReportPayload building.
 func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath) im.ReadResult {
 	dv, hasDV := clusterDataVersionFor(ep, srv)
+	scope := fabricScopeFor(ctx, srv, path.Attribute)
 	// Fabric-scoped attributes: prefer MatterReadFiltered when the
 	// cluster server opts in by implementing FabricScopedReader.
 	if fsr, ok := srv.(contract.FabricScopedReader); ok {
 		v, ok := fsr.MatterReadFiltered(ctx, path.Attribute)
 		if ok {
 			if v == nil {
-				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+				return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 			}
-			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 		}
 		if status, failed := fabricScopedReadFailed(ctx, srv, path.Attribute); failed {
 			return im.ReadResult{Path: path, Status: status}
@@ -915,9 +956,9 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	v, ok := srv.MatterRead(path.Attribute)
 	if ok {
 		if v == nil {
-			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+			return im.ReadResult{Path: path, Value: im.AttributeValue{IsNull: true}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 		}
-		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
+		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: v}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV, FabricScope: scope}
 	}
 	// Cluster did not handle the read. Try synthesising the value if
 	// it is a global-attribute ID — this lets every cluster expose
@@ -929,6 +970,43 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 		return im.ReadResult{Path: path, Value: im.AttributeValue{Value: synth}, Status: im.StatusSuccess, DataVersion: dv, HasDataVersion: hasDV}
 	}
 	return im.ReadResult{Path: path, Status: im.StatusUnsupportedAttribute}
+}
+
+// fabricScopeFor is the scope a request's read of srv's attrID carries,
+// nil for a read with no request behind it ([im.LookupFabricFilter]) and
+// for an attribute that is not fabric-scoped. For a cluster of the schema
+// snapshot the generated table is the whole answer
+// ([schema.AttributeFabricScope]) — whatever the server is, a host's own
+// or the module's, and whether or not it is a
+// [contract.FabricScopedReader]. A cluster outside the snapshot is scoped
+// as its server declares ([contract.FabricScopeDeclarer]; spec.Instance
+// declares its definition's), and not at all without a declaration.
+func fabricScopeFor(ctx context.Context, srv contract.ClusterServer, attrID uint32) *im.FabricScope {
+	filtered, fabric, request := im.LookupFabricFilter(ctx)
+	if !request {
+		return nil
+	}
+	clusterID := srv.MatterClusterID()
+	var sensitive bool
+	var fields []uint32
+	if _, standard := schema.ClusterRevision(clusterID); standard {
+		s, ok := schema.AttributeFabricScope(clusterID, attrID)
+		if !ok {
+			return nil
+		}
+		sensitive, fields = s.Sensitive, s.Fields
+	} else {
+		d, ok := srv.(contract.FabricScopeDeclarer)
+		if !ok {
+			return nil
+		}
+		s, ok := d.MatterFabricScope(attrID)
+		if !ok {
+			return nil
+		}
+		sensitive, fields = s.Sensitive, slices.Clone(s.Fields)
+	}
+	return &im.FabricScope{Fabric: fabric, Filtered: filtered, Sensitive: sensitive, Fields: fields}
 }
 
 // fabricScopedReadFailed decides a [contract.FabricScopedReader]'s
@@ -1076,16 +1154,16 @@ func attributeListed(srv contract.ClusterServer, attrID uint32) bool {
 // writeStored is [writeOne] behind the topology's [WritePersister]: a
 // nonvolatile attribute the module holds is stored before the server
 // takes it; a refused store write answers FAILURE and the server never
-// sees the value, a write the server refuses puts the store back. changed
-// is [writeOne]'s.
-func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) (res im.WriteResult, changed bool) {
+// sees the value, a write the server refuses puts the store back. The
+// result is [writeOne]'s.
+func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
 	p := d.topology.Persister
 	if p == nil {
 		return writeOne(ctx, srv, path, value)
 	}
 	done, err := p.PersistWrite(ctx, ep, srv, path.Attribute, value)
 	if err != nil {
-		return im.WriteResult{Path: path, Status: im.StatusFailure}, false
+		return im.WriteResult{Path: path, Status: im.StatusFailure}
 	}
 	return persistedWrite(ctx, srv, path, value, done)
 }
@@ -1093,15 +1171,15 @@ func (d *TopologyDispatcher) writeStored(ctx context.Context, ep *Endpoint, srv 
 // persistedWrite is [writeOne] followed by done, the [WritePersister]'s
 // settlement, with whether srv applied the write — also when srv panics,
 // so the persister is never left waiting. A nil done is writeOne alone.
-func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) (res im.WriteResult, changed bool) {
+func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue, done func(applied bool)) im.WriteResult {
 	if done == nil {
 		return writeOne(ctx, srv, path, value)
 	}
 	applied := false
 	defer func() { done(applied) }()
-	res, changed = writeOne(ctx, srv, path, value)
+	res := writeOne(ctx, srv, path, value)
 	applied = res.Status == im.StatusSuccess
-	return res, changed
+	return res
 }
 
 // writtenHeld is the status the definition of srv's cluster answers a
@@ -1132,28 +1210,47 @@ func writtenHeld(srv contract.ClusterServer, attrID uint32, value im.AttributeVa
 
 // writeOne dispatches a single Write against srv. Errors are mapped
 // to spec-coded status values where the cluster surfaces them
-// distinctly; the catch-all is StatusFailure. changed is whether a
-// successful write changed the cluster: the server's own verdict when it
-// gives one ([contract.ChangeReportingWriter] — decided inside the write,
-// so a change another writer makes around it never stands in for it),
-// true for a server that gives none; false for a refused write.
-func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) (res im.WriteResult, changed bool) {
+// distinctly; the catch-all is StatusFailure. A successful write carries
+// its verdict in Commit, the server's own when it gives one — decided
+// inside the write, so a change another writer makes around it never
+// stands in for it: the attributes a [contract.ChangeNamingWriter] names
+// (sorted, each once), the written attribute or none for a
+// [contract.ChangeReportingWriter]'s true or false, the written attribute
+// for a server that gives none. A refused write carries none.
+func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteAttributePath, value im.AttributeValue) im.WriteResult {
 	v := value.Value
 	if value.IsNull {
 		v = nil
 	}
 	ctx = contract.WithOrigin(ctx, contract.OriginControllerWrite)
-	var err error
-	if cw, ok := srv.(contract.ChangeReportingWriter); ok {
-		changed, err = cw.MatterWriteChanged(ctx, path.Attribute, v)
-	} else {
-		changed, err = true, srv.MatterWrite(ctx, path.Attribute, v)
+	var (
+		changed []uint32
+		err     error
+	)
+	switch w := srv.(type) {
+	case contract.ChangeNamingWriter:
+		changed, err = w.MatterWriteCommit(ctx, path.Attribute, v)
+		if err == nil {
+			changed = slices.Compact(slices.Sorted(slices.Values(changed)))
+		}
+	case contract.ChangeReportingWriter:
+		var moved bool
+		moved, err = w.MatterWriteChanged(ctx, path.Attribute, v)
+		if moved {
+			changed = []uint32{path.Attribute}
+		}
+	default:
+		err = srv.MatterWrite(ctx, path.Attribute, v)
+		changed = []uint32{path.Attribute}
 	}
 	if err != nil {
 		status, cs, hasCS := classifyError(err)
-		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}, false
+		return im.WriteResult{Path: path, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
 	}
-	return im.WriteResult{Path: path, Status: im.StatusSuccess}, changed
+	if changed == nil {
+		changed = []uint32{}
+	}
+	return im.WriteResult{Path: path, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: changed}}
 }
 
 // classifyError maps a cluster server's write or invoke error to the
@@ -1734,6 +1831,13 @@ func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
 // as an append to the current list the same way. A value that is not a
 // one-element list of the attribute's element type is a CONSTRAINT_ERROR.
 //
+// A list-append write of a fabric-scoped list appends to the accessing
+// fabric's entries: on a request the dispatcher hands the server that
+// fabric's entries with the new element, whatever the server's read
+// returns ([writersEntries]). Mirrors matter.js, whose write context is
+// always fabric-filtered (InteractionServer.ts:484-489, ListManager.ts:609-620,
+// AttributeWriteResponse.ts:437-449 at db021da0).
+//
 // An attribute whose value is not a list — a slice other than an octet
 // string — answers INVALID_ACTION. Mirrors matter.js
 // packages/protocol/src/action/server/AttributeWriteResponse.ts:436-443 at
@@ -1744,7 +1848,8 @@ func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
 func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (im.AttributeValue, im.StatusCode) {
 	var current any
 	var ok bool
-	if fr, isFR := srv.(contract.FabricScopedReader); isFR {
+	fr, isFR := srv.(contract.FabricScopedReader)
+	if isFR {
 		_, fabric := im.FabricFilterFromContext(ctx)
 		current, ok = fr.MatterReadFiltered(im.WithFabricFilter(ctx, true, fabric), attrID)
 	} else {
@@ -1763,8 +1868,69 @@ func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uin
 	if list.Kind() != reflect.Slice || list.Type() != item.Type() {
 		return value, im.StatusConstraintError
 	}
+	if scope := fabricScopeFor(ctx, srv, attrID); scope != nil {
+		var status im.StatusCode
+		if list, status = writersEntries(list, scope.Fabric, isFR); status != im.StatusSuccess {
+			return value, status
+		}
+	}
 	merged := reflect.MakeSlice(list.Type(), 0, list.Len()+1)
 	merged = reflect.AppendSlice(merged, list)
 	merged = reflect.Append(merged, item.Index(0))
 	return im.AttributeValue{Value: merged.Interface()}, im.StatusSuccess
+}
+
+// writersEntries is the entries of list, the current value of a
+// fabric-scoped list, that fabric owns: the list a list-append write of
+// that fabric appends to. An entry's owner is the FabricIndex (field 254)
+// of its own encoding — an entry that encodes itself ([spec.Encodable], as
+// every generated struct and a [spec.Instance]'s value do) — judged as a
+// fabric-filtered read judges it ([im.MaskFabricScoped]): an entry another
+// fabric owns is left out, and one without a valid owner answers FAILURE,
+// as the read of the list does. A list whose entries do not encode
+// themselves is the server's fabric-filtered read when the server is a
+// [contract.FabricScopedReader] (filtered, which returns the accessing
+// fabric's entries alone), and answers FAILURE otherwise: the dispatcher
+// cannot tell whose entry it is, and hands the server no entry it does not
+// know to be the writer's. An empty list has no entry to judge.
+func writersEntries(list reflect.Value, fabric uint8, filteredRead bool) (reflect.Value, im.StatusCode) {
+	if list.Len() == 0 {
+		return list, im.StatusSuccess
+	}
+	entries := make([]spec.Encodable, list.Len())
+	for i := range list.Len() {
+		el := list.Index(i)
+		if (el.Kind() == reflect.Pointer || el.Kind() == reflect.Interface) && el.IsNil() {
+			return list, im.StatusFailure
+		}
+		e, ok := el.Interface().(spec.Encodable)
+		if !ok {
+			if filteredRead {
+				return list, im.StatusSuccess
+			}
+			return list, im.StatusFailure
+		}
+		entries[i] = e
+	}
+	scope := im.FabricScope{Fabric: fabric, Filtered: true}
+	out := reflect.MakeSlice(list.Type(), 0, list.Len())
+	for i, e := range entries {
+		enc := tlv.NewEncoder()
+		enc.StartArray(tlv.AnonymousTag())
+		e.EncodeTLV(enc, tlv.AnonymousTag())
+		_ = enc.EndContainer()
+		encoded, err := enc.Bytes()
+		if err != nil {
+			return list, im.StatusFailure
+		}
+		masked, ok := im.MaskFabricScoped(encoded, scope)
+		if !ok {
+			return list, im.StatusFailure
+		}
+		// The array's opener and end alone: the entry is another fabric's.
+		if len(masked) > 2 {
+			out = reflect.Append(out, list.Index(i))
+		}
+	}
+	return out, im.StatusSuccess
 }

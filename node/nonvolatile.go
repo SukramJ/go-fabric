@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -251,7 +250,10 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 		return nil, nil
 	}
 	prev, had, err := st.GetSetting(ctx, key)
-	if err == nil {
+	// A value the store holds already is not written again: the write
+	// changes nothing stored (review II, R2-P5-write-04).
+	wrote := !had || prev != stored
+	if err == nil && wrote {
 		err = st.SetSetting(ctx, key, stored)
 	}
 	if err != nil {
@@ -284,7 +286,11 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 		}
 		// The server refused the value: the store holds what it held.
 		// An absent key is put back as the empty value, which reads as
-		// none.
+		// none; a value that was not written has nothing to put back.
+		if !wrote {
+			k.stored = prev
+			return
+		}
 		if !had {
 			prev = ""
 		}
@@ -544,9 +550,13 @@ func (v *nonVolatile) restored(ctx context.Context, keys map[uint32]nvAttr, stop
 // endpoint ([Aggregator.Forget]), which has left for good, and erases
 // what the store keeps for those keys: the servers' change subscriptions
 // and their UserLabel lists' end, the persister references them no
-// longer, and every nonvolatile value and UserLabel list stored under
-// the keys is erased, so a device Added under such a key afterwards starts
-// as a new one would — from its declaration's Initial and list. A write
+// longer, and every nonvolatile value and every setting kept under one of
+// the keys ([keyedSettingRoots]: the NodeLabel, ConfigurationVersion,
+// scene table, Binding list, UserLabel list and surface) is erased, so a
+// device Added under such a key afterwards starts as a new one would —
+// from its declaration's Initial, label and lists. matter.js erases the
+// persisted data of an endpoint it deletes
+// (packages/node/src/endpoint/Endpoint.ts:984-992 at db021da0). A write
 // that reaches a released server is not stored. A removed endpoint
 // ([Aggregator.Remove]) is not forgotten: its servers keep their state,
 // subscription and stored values for the Add that brings it back. The
@@ -582,13 +592,13 @@ func (v *nonVolatile) forget(ctx context.Context, endpointKeys []string) error {
 	for _, unsubscribe := range unsubscribes {
 		unsubscribe()
 	}
-	return v.erase(ctx, slices.Concat(nonVolatileCandidates(endpointKeys), labelKeys), known)
+	return v.erase(ctx, slices.Concat(nonVolatileCandidates(endpointKeys), keyedSettingKeys(endpointKeys)), known)
 }
 
-// erase writes every key of candidates and of known the store holds a
-// value for as none, in one store write. known are the states of the
-// forgotten keys the persister holds: each is held, and its server let go
-// of, so no write or change stores it meanwhile.
+// erase deletes every key of candidates and of known in one store write
+// (store.Settings DeleteSettings), reading none of them. known are the
+// states of the forgotten keys the persister holds: each is held, and its
+// server let go of, so no write or change stores it meanwhile.
 func (v *nonVolatile) erase(ctx context.Context, candidates []string, known map[string]*nvKey) error {
 	held := slices.Sorted(maps.Keys(known))
 	for _, key := range held {
@@ -601,23 +611,9 @@ func (v *nonVolatile) erase(ctx context.Context, candidates []string, known map[
 			known[key].store.Unlock()
 		}
 	}()
-	st := v.n.persisted.st
-	values := map[string]string{}
-	var errs []error
-	for _, key := range slices.Compact(slices.Sorted(slices.Values(slices.Concat(candidates, held)))) {
-		val, found, err := st.GetSetting(ctx, key)
-		switch {
-		case err != nil:
-			errs = append(errs, err)
-		case found && val != "":
-			values[key] = ""
-		}
-	}
-	if err := errors.Join(errs...); err != nil {
-		return err
-	}
-	if err := st.SetSettings(ctx, values); err != nil {
-		v.n.logger.Warn("nonvolatile.forget", slog.Int("keys", len(values)), slog.Any("err", err))
+	keys := slices.Compact(slices.Sorted(slices.Values(slices.Concat(candidates, held))))
+	if err := v.n.persisted.st.DeleteSettings(ctx, keys...); err != nil {
+		v.n.logger.Warn("nonvolatile.forget", slog.Int("keys", len(keys)), slog.Any("err", err))
 		return err
 	}
 	for _, key := range held {
@@ -628,8 +624,10 @@ func (v *nonVolatile) erase(ctx context.Context, candidates []string, known map[
 
 // nonVolatileCandidates are the settings keys the persister keeps a value
 // under at endpointKeys: every attribute it keeps of every cluster this
-// build defines (schema.ClusterNames with a registered definition). The
-// store lists no keys by prefix, so these are the keys an erasure reads.
+// build defines (schema.ClusterNames with a registered definition): the
+// keys an erasure deletes. A prefix delete would take the keys of a stable
+// key that extends a forgotten one by a dot and a hex segment
+// ([slotOfAny]), so the erasure names its keys.
 func nonVolatileCandidates(endpointKeys []string) []string {
 	var keys []string
 	for _, clusterID := range slices.Sorted(maps.Keys(schema.ClusterNames)) {

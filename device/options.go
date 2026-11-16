@@ -167,6 +167,14 @@ type settings struct {
 	// (compose).
 	measured map[uint32]bool
 	cut      surfaceCut
+	// skipInitialCheck builds the device without New's refusal of an
+	// attribute matter.js requires a value of ([Type.RequiredInitial]
+	// measures them).
+	skipInitialCheck bool
+	// generated are the clusters served by the generated default server
+	// (defaultServer's spec.NewServer, the generated behavior), whose
+	// declared commands [Device.checkDeclaredCommands] holds to a handler.
+	generated map[uint32]*spec.Server
 }
 
 func newSettings() *settings {
@@ -176,6 +184,7 @@ func newSettings() *settings {
 		elements: map[uint32]spec.Options{}, typed: map[uint32]bool{}, implied: map[uint32]spec.Options{},
 		attach: map[uint32][]func(contract.ClusterServer) error{}, ports: map[uint32]any{},
 		transitions: map[uint32]bool{}, declared: map[uint32]bool{},
+		generated: map[uint32]*spec.Server{},
 	}
 }
 

@@ -14,6 +14,8 @@
 package levelcontrol
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -403,18 +405,20 @@ var Definition = &spec.Cluster{
 	Attributes: []spec.Attribute{
 		{
 			ID: AttrCurrentLevel, Name: "CurrentLevel",
-			Type:        spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
-			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, NonVolatile: true, Scene: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "minLevel to maxLevel", Min: &spec.Bound{Ref: "minLevel"}, Max: &spec.Bound{Ref: "maxLevel"}},
+			Type:          spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
+			Conformance:   spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, NonVolatile: true, Scene: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "minLevel to maxLevel", Min: &spec.Bound{Ref: "minLevel"}, Max: &spec.Bound{Ref: "maxLevel"}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrRemainingTime, Name: "RemainingTime",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Quieter: true},
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Quieter: true},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrMinLevel, Name: "MinLevel",
@@ -436,11 +440,12 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrCurrentFrequency, Name: "CurrentFrequency",
-			Type:        spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
-			Conformance: spec.Conformance{Text: "FQ", Op: spec.ConfName, Name: "FQ"},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Scene: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "minFrequency to maxFrequency", Min: &spec.Bound{Ref: "minFrequency"}, Max: &spec.Bound{Ref: "maxFrequency"}},
+			Type:          spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16},
+			Conformance:   spec.Conformance{Text: "FQ", Op: spec.ConfName, Name: "FQ"},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Scene: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "minFrequency to maxFrequency", Min: &spec.Bound{Ref: "minFrequency"}, Max: &spec.Bound{Ref: "maxFrequency"}},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrMinFrequency, Name: "MinFrequency",

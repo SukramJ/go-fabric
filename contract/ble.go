@@ -20,6 +20,11 @@ import (
 // (transport/btp), and when the node is on the radio at all (an
 // uncommissioned node only). An implementation is the radio and the GATT
 // stack, nothing more.
+//
+// Deprecated: implement [GATTPeripheral], which registers the service in a
+// call of its own, so a refused registration is answered before the node
+// advertises; removable in the next minor release. The node adapts a
+// BLEPeripheral to it (registration reported by Serve, as before).
 type BLEPeripheral interface {
 	// Advertise starts advertising adv, or replaces the advertisement that
 	// runs: the payload and the interval take effect at once. It returns
@@ -38,7 +43,51 @@ type BLEPeripheral interface {
 	Serve(ctx context.Context, c3 []byte, accept func(BLEConnection)) error
 }
 
-// BLEAdvertisement is what a [BLEPeripheral] advertises.
+// GATTPeripheral is the host port of a node commissioned over Bluetooth
+// LE: the radio's peripheral role, which the module cannot open itself.
+// What goes on the air stays in the module — the advertisement's bytes and
+// its schedule, the BTP session over the GATT characteristics
+// (transport/btp), and when the node is on the radio at all (an
+// uncommissioned node only); an implementation is the radio and the GATT
+// stack, nothing more. With [WiFiDriver] it is one of the two radios a
+// device-side host supplies.
+//
+// The node registers the Matter GATT service before it advertises, so a
+// service the platform refuses is an error of the call that would have
+// put the node on the air, and no advertisement announces a service that
+// is not there. Advertise and StopAdvertising may be called while the
+// service is served, and from another goroutine than Serve's.
+type GATTPeripheral interface {
+	// Advertise starts advertising adv, or replaces the advertisement that
+	// runs: the payload and the interval take effect at once. It returns
+	// once the radio advertises it. adv.Data is not retained past the
+	// call: an implementation copies what it keeps.
+	Advertise(ctx context.Context, adv BLEAdvertisement) error
+	// StopAdvertising ends the advertisement; without one it does nothing.
+	StopAdvertising(ctx context.Context) error
+	// RegisterService registers the Matter GATT service — service UUID
+	// 0xFFF6 with C1 (write), C2 (indicate) and C3 (read, answered with
+	// c3; nil or empty is an empty value) — and returns once the platform
+	// accepted it, or its refusal. c3 is not retained past the call. ctx
+	// bounds the registration only: the service stays registered until
+	// its [GATTService.Serve] returns. The node registers one service at a
+	// time; a second registration while one is registered may be refused.
+	RegisterService(ctx context.Context, c3 []byte) (GATTService, error)
+}
+
+// GATTService is the Matter GATT service a [GATTPeripheral] registered.
+type GATTService interface {
+	// Serve calls accept once for every central that connects to the
+	// service. accept runs before any of the connection's events is
+	// delivered, so the handlers it registers see every one; calls of
+	// accept do not overlap. Serve blocks: when ctx ends it drops every
+	// connection, unregisters the service and returns nil. An error is a
+	// service the platform withdrew; the service is unregistered then too.
+	// Serve is called once.
+	Serve(ctx context.Context, accept func(BLEConnection)) error
+}
+
+// BLEAdvertisement is what a [GATTPeripheral] advertises.
 type BLEAdvertisement struct {
 	// Data is the complete advertising payload, AD structures included:
 	// the flags and the service data of the Matter service — what
@@ -54,11 +103,12 @@ type BLEAdvertisement struct {
 // BLEConnection is one central's GATT connection to the Matter service,
 // as the peripheral sees it. Its method names follow the central's
 // connection (controller/ble.Connection) where the two roles meet. The
-// handlers are registered during [BLEPeripheral.Serve]'s accept; each is
+// handlers are registered during [GATTService.Serve]'s accept; each is
 // called on a goroutine of the implementation's, one event at a time, in
 // the order the central caused them — a C1 write the central made before
 // it subscribed C2 arrives before the subscription. An event whose
-// handler is not registered is dropped.
+// handler is not registered is dropped. The value a handler receives is
+// the handler's: the implementation does not reuse it.
 type BLEConnection interface {
 	// Remote names the central (its address, as the platform names it).
 	Remote() string
@@ -71,7 +121,9 @@ type BLEConnection interface {
 	OnUnsubscribe(func())
 	// Indicate sends value as an indication on C2 and returns once the
 	// central confirmed it. A connection that is gone, or a ctx that
-	// ends, returns an error.
+	// ends, returns an error. It may be called from a goroutine other
+	// than the handlers', while a handler runs. value is not retained
+	// past the call.
 	Indicate(ctx context.Context, value []byte) error
 	// Disconnect drops the connection. A second call does nothing.
 	Disconnect() error

@@ -164,7 +164,8 @@ func (d *Device) available() bool { return d.reachable.Load() }
 // label, which a later [Device.Update] of the host's name does not
 // replace. The Name of the device's [Options] becomes name, capped at the
 // NodeLabel maximum ([ComposeNodeLabel]). Before the device is added only
-// the name changes.
+// the name changes. Rename reports no error: when the node's store
+// refuses to save the label, the caller is not told.
 func (d *Device) Rename(ctx context.Context, name string) {
 	name = ComposeNodeLabel(name, "")
 	d.mu.Lock()

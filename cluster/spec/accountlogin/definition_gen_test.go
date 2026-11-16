@@ -77,7 +77,12 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleLogout(func(context.Context, LogoutRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleLogout: a command the server does not accept was registered")
 	}
-	_ = s.EmitLoggedOut(0, LoggedOutEvent{}) // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitLoggedOut(0, LoggedOutEvent{})            // not in the empty definition's EventList: refused
+	_ = s.RecordLoggedOut(LoggedOutEvent{})             // the same, through EmitEvent
+	if err := bare.RecordLoggedOut(LoggedOutEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLoggedOut on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

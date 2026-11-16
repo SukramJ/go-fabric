@@ -66,6 +66,10 @@ type GeneralCommissioning struct {
 	// installed (OpcredsConfig.RearmFailSafeForFabric) — so the window's
 	// rollback removes failSafeFabricIndex. Reset by every fresh arm.
 	failSafeFabricAdded bool
+	// failSafeArmedFabric is the fabric of the session whose arm started
+	// the fail-safe context, 0 for a PASE session or none; an expiry
+	// reports it as FailSafeExpiry.ArmedFabric. Set by the fresh arm only.
+	failSafeArmedFabric uint8
 	// failSafeOverPASE records that the armed fail-safe was armed, from
 	// the disarmed state, over a PASE session — the commissioner's own,
 	// not an administrator's over CASE. Kept by a re-arm, cleared when the
@@ -92,6 +96,16 @@ type GeneralCommissioning struct {
 	// waited for ended its own session (review II, R2-P1-rw-05).
 	rollbackPaseCloses     uint64
 	rollbackFabricRemovals map[uint8]uint64
+	// rollbackClosedPase are the PASE session ids the session closer
+	// (SetFailSafeSessionCloser) closed in the finished expiry hooks, in
+	// order; an arm for a named PASE session looks for its own id among
+	// those closed across its settle (ArmOnPaseSession). Emptied when no
+	// arm waits (pendingPaseArms).
+	rollbackClosedPase []uint16
+	pendingPaseArms    int
+	// rollbackUnnamedPaseCloses counts the finished expiry hooks that ran
+	// the deprecated onFailSafeRolledBack, whose closes name no session.
+	rollbackUnnamedPaseCloses uint64
 	// onFailSafeStarting runs before a fresh arm is recorded
 	// ([GeneralCommissioning.SetOnFailSafeStarting]).
 	onFailSafeStarting func(ctx context.Context) (removedFabrics []uint8)
@@ -148,6 +162,9 @@ type GeneralCommissioning struct {
 	// stays open for the full duration (typ. 180 s) and a second,
 	// unintended fabric can be admitted.
 	onCommissioningComplete func(ctx context.Context, fabricIndex uint8)
+	// facadeOnCommissioningComplete is the node facade's slot of the
+	// same hook (internal/facadeseam), run before the host's.
+	facadeOnCommissioningComplete func(ctx context.Context, fabricIndex uint8)
 	// failSafeCommit is CommissioningComplete's durable commit
 	// ([GeneralCommissioning.SetFailSafeCommit]); nil commits the terms
 	// acceptance only.
@@ -160,6 +177,12 @@ type GeneralCommissioning struct {
 	// would run; the bridge wires it (bridge.AttachRootClusters) to clear
 	// the PASE sessions, separately from the host's hook.
 	onFailSafeRolledBack func(ctx context.Context)
+	// onFailSafeExpiry is the host's expiry hook with the fail-safe's
+	// arming and adding fabrics ([GeneralCommissioning.SetOnFailSafeExpiry]).
+	onFailSafeExpiry func(ctx context.Context, e FailSafeExpiry)
+	// failSafeSessionCloser closes the PASE sessions when the fail-safe
+	// expires and names them ([GeneralCommissioning.SetFailSafeSessionCloser]).
+	failSafeSessionCloser func(ctx context.Context) (closed []uint16)
 	// Hook invoked every time ArmFailSafe arms the FailSafe window from
 	// the disarmed state — a re-arm extends the fail-safe in force and
 	// keeps its state, as matter.js failsafeContext.extend does. The bridge
@@ -372,6 +395,10 @@ func (g *GeneralCommissioning) SetOnFailSafeStarting(fn func(ctx context.Context
 // Mirrors matter.js packages/node/src/behaviors/operational-credentials/
 // OperationalCredentialsServer.ts:#handleFailsafeClosed which fires from
 // fabricManager.events.failsafeClosed after the FailSafeContext rolls back.
+//
+// Deprecated: use [GeneralCommissioning.SetOnFailSafeExpiry], whose hook
+// tells the fabric that armed the fail-safe from the one an AddNOC added
+// (this hook's one fabric is either); removable in the next minor release.
 func (g *GeneralCommissioning) SetOnFailSafeExpired(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onFailSafeExpired = fn
@@ -390,27 +417,108 @@ func (g *GeneralCommissioning) SetOnFailSafeExpired(fn func(ctx context.Context,
 // host leaves it alone. ctx is the expiring command's context, or — on the
 // timer — the context of the ArmFailSafe that armed the fail-safe, whose
 // interaction is over. Pass nil to detach.
+//
+// Deprecated: use [GeneralCommissioning.SetFailSafeSessionCloser], whose
+// closer names the sessions it closed, so a PASE session opened after the
+// close still arms ([GeneralCommissioning.ArmOnPaseSession]); removable in
+// the next minor release.
 func (g *GeneralCommissioning) SetOnFailSafeRolledBack(fn func(ctx context.Context)) {
 	g.mu.Lock()
 	g.onFailSafeRolledBack = fn
 	g.mu.Unlock()
 }
 
+// FailSafeExpiry is what [GeneralCommissioning.SetOnFailSafeExpiry]'s hook
+// receives when the fail-safe expires without a CommissioningComplete.
+type FailSafeExpiry struct {
+	// ArmedFabric is the fabric of the session whose arm started the
+	// fail-safe context; 0 when a PASE session armed it.
+	ArmedFabric uint8
+	// AddedFabric is the fabric an AddNOC under the fail-safe installed,
+	// which the rollback removes; 0 when none was added.
+	AddedFabric uint8
+	// OverPASE is whether the fail-safe was armed over a PASE session.
+	OverPASE bool
+}
+
+// SetOnFailSafeExpiry wires the host's fail-safe-expiry hook: it runs when
+// the fail-safe expires without a CommissioningComplete — its timer, an
+// ArmFailSafe with expiry 0, [GeneralCommissioning.ExpireFailSafe] — after
+// the deprecated SetOnFailSafeExpired hook and before the session closer
+// ([GeneralCommissioning.SetFailSafeSessionCloser]), and it receives which
+// fabric armed the fail-safe and which one an AddNOC added, where the
+// older hook's one fabric argument is either. It stays the host's: the
+// bridge wires the session closer, never this hook (decision 9). ctx is as
+// for the session closer. Pass nil to detach.
+func (g *GeneralCommissioning) SetOnFailSafeExpiry(fn func(ctx context.Context, e FailSafeExpiry)) {
+	g.mu.Lock()
+	g.onFailSafeExpiry = fn
+	g.mu.Unlock()
+}
+
+// SetFailSafeSessionCloser wires what closes the PASE sessions when the
+// fail-safe expires without a CommissioningComplete, and names the ids it
+// closed: it runs after the host's hooks, with or without one. The bridge
+// wires it ([bridge.Bridge.AttachRootClusters]). With the ids known, an
+// arm for a PASE session ([GeneralCommissioning.ArmOnPaseSession]) is
+// refused only when its own session is among them — a session opened after
+// the close arms. ctx is the expiring command's context, or — on the timer
+// — the context of the ArmFailSafe that armed the fail-safe. Pass nil to
+// detach.
+func (g *GeneralCommissioning) SetFailSafeSessionCloser(fn func(ctx context.Context) (closed []uint16)) {
+	g.mu.Lock()
+	g.failSafeSessionCloser = fn
+	g.mu.Unlock()
+}
+
+// setArmFabricLocked records the fabric of the arming session as the one
+// the fail-safe is armed for and, for an arm that starts the context
+// (fresh), as the one that armed it. Caller holds g.mu.
+func (g *GeneralCommissioning) setArmFabricLocked(fabric uint8, fresh bool) {
+	g.failSafeFabricIndex = fabric
+	if fresh {
+		g.failSafeArmedFabric = fabric
+	}
+}
+
+// expiryLocked is what an expiry reports to SetOnFailSafeExpiry's hook,
+// read before the expiry resets the fail-safe. Caller holds g.mu.
+func (g *GeneralCommissioning) expiryLocked() FailSafeExpiry {
+	e := FailSafeExpiry{ArmedFabric: g.failSafeArmedFabric, OverPASE: g.failSafeOverPASE}
+	if g.failSafeFabricAdded {
+		e.AddedFabric = g.failSafeFabricIndex
+	}
+	return e
+}
+
+// expiryHook is what runs when the fail-safe expires; it returns the PASE
+// session ids the session closer closed.
+type expiryHook func(ctx context.Context, fabricIndex uint8) (closed []uint16)
+
 // failSafeExpiryHooksLocked returns what runs when the fail-safe expires:
-// the host's hook, then the session owner's. Nil when neither is wired.
-// Caller holds g.mu and calls the result without it.
-func (g *GeneralCommissioning) failSafeExpiryHooksLocked() func(ctx context.Context, fabricIndex uint8) {
-	host, rolledBack := g.onFailSafeExpired, g.onFailSafeRolledBack
-	if host == nil && rolledBack == nil {
+// the host's hooks (SetOnFailSafeExpired, then SetOnFailSafeExpiry with e),
+// then the session owner's (SetOnFailSafeRolledBack, then the session
+// closer, whose ids it returns). Nil when none is wired. Caller holds g.mu
+// and calls the result without it.
+func (g *GeneralCommissioning) failSafeExpiryHooksLocked(e FailSafeExpiry) expiryHook {
+	host, hostWith, rolledBack, closer := g.onFailSafeExpired, g.onFailSafeExpiry, g.onFailSafeRolledBack, g.failSafeSessionCloser
+	if host == nil && hostWith == nil && rolledBack == nil && closer == nil {
 		return nil
 	}
-	return func(ctx context.Context, fabricIndex uint8) {
+	return func(ctx context.Context, fabricIndex uint8) []uint16 {
 		if host != nil {
 			host(ctx, fabricIndex)
+		}
+		if hostWith != nil {
+			hostWith(ctx, e)
 		}
 		if rolledBack != nil {
 			rolledBack(ctx)
 		}
+		if closer != nil {
+			return closer(ctx)
+		}
+		return nil
 	}
 }
 
@@ -433,7 +541,9 @@ func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {
 // the pending fabric, disarms the fail-safe and then posts the
 // commissioning-complete event
 // (src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp:545,
-// :559-560 at 6170af84).
+// :559-560 at 6170af84). The node facade wires a handler of its own in a
+// separate slot, which runs first; this one is the host's and replacing it
+// leaves the facade's in place.
 func (g *GeneralCommissioning) SetOnCommissioningComplete(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onCommissioningComplete = fn
@@ -698,7 +808,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// session). It gates the fail-safe ownership rules below.
 	_, sessFabric := im.FabricFilterFromContext(ctx)
 	if req.ExpiryLengthSeconds != 0 {
-		if err := g.settleArmLocked(ctx, sessFabric); err != nil {
+		if err := g.settleArmLocked(ctx, sessFabric, 0); err != nil {
 			return nil, err
 		}
 	}
@@ -746,8 +856,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// pending fabric). Without firing onFailSafeExpired here a disarm
 		// would leak a half-installed NOC: AddNOC's pending fabric is never
 		// rolled back, so a re-pair attempt collides with the orphaned entry.
-		wasArmed := g.failSafeArmed
-		expiredFabric := g.failSafeFabricIndex
+		wasArmed, expiredFabric, expiry := g.failSafeArmed, g.failSafeFabricIndex, g.expiryLocked()
 		g.failSafeArmed = false
 		g.failSafeOverPASE = false
 		g.stopFailSafeWatchLocked()
@@ -779,7 +888,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// timeout path in watchFailSafeExpiry.
 		var hook func(ctx context.Context, fabricIndex uint8)
 		if wasArmed {
-			hook = g.trackRollbackLocked(g.failSafeExpiryHooksLocked(), expiredFabric)
+			hook = g.trackRollbackLocked(g.failSafeExpiryHooksLocked(expiry), expiredFabric)
 		}
 		g.mu.Unlock()
 		unlocked = true
@@ -841,7 +950,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// that the *same* CASE fabric closes the window the PASE/CASE
 	// session opened. PASE sessions surface as fabric==0, which is OK
 	// here — only Complete is fabric-gated.
-	g.failSafeFabricIndex = sessFabric
+	g.setArmFabricLocked(sessFabric, !extending)
 	// Bump DataVersion on successful arm so Apple's MTRDevice sees the cluster
 	// changed and does not skip it with DataVersionFilter=0.
 	// Mirrors chip src/app/clusters/general-commissioning-server/
@@ -974,6 +1083,7 @@ func (g *GeneralCommissioning) watchFailSafeExpiry(ctx context.Context, fabricIn
 // g.mu.
 func (g *GeneralCommissioning) expireLocked(fabricIndex uint8) func(ctx context.Context) {
 	hadBreadcrumb := g.breadcrumb != 0
+	expiry := g.expiryLocked()
 	g.failSafeArmed = false
 	g.failSafeOverPASE = false
 	g.stopFailSafeWatchLocked()
@@ -992,7 +1102,7 @@ func (g *GeneralCommissioning) expireLocked(fabricIndex uint8) func(ctx context.
 	// As the disarm, ExpireFailSafe and ArmFailSafeFor(0) paths do:
 	// the expiry changed the cluster (review II, R2-P1-core-02).
 	g.dataVersion.Bump()
-	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked(), g.failSafeFabricIndex)
+	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked(expiry), g.failSafeFabricIndex)
 	return func(ctx context.Context) {
 		if termsReverted {
 			g.changes.Notify(gencommTCAttrs...)
@@ -1220,7 +1330,7 @@ func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit
 	// success path and matter.js GeneralCommissioningServer.ts state mutation
 	// on CommissioningComplete.
 	g.dataVersion.Bump()
-	hook := g.onCommissioningComplete
+	hook := chainFabricHooks(g.facadeOnCommissioningComplete, g.onCommissioningComplete)
 	commissioned := g.onCommissioned
 	// The hooks run without the lock — they may take arbitrary locks
 	// (commissioning window mutex, mDNS unpublish, …) — and after the
@@ -1247,7 +1357,7 @@ func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit
 // it without its rollback. Opening a commissioning window no longer calls
 // it (owner decision 47).
 func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8) error {
-	return g.armFailSafeFor(ctx, seconds, fabricIndex, false)
+	return g.armFailSafeFor(ctx, seconds, fabricIndex, false, 0)
 }
 
 // armFailSafeFor is ArmFailSafeFor; forSession says the arm is made for a
@@ -1255,7 +1365,7 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 // rollback of a due window, or one in flight it waits for, may end — then
 // nothing is armed. An arm for a
 // session to come (OpenCommissioningWindow's) arms either way.
-func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8, forSession bool) error {
+func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8, forSession bool, paseSession uint16) error {
 	if seconds == 0 {
 		// A zero-second arm is a DISARM request, a pure state reset: it
 		// does NOT run the arm logic below (now+0 is immediately expired,
@@ -1305,7 +1415,7 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	// item 1b). So a window armed now is not due, and fresh is "disarmed".
 	var err error
 	if forSession {
-		err = g.settleArmLocked(ctx, fabricIndex)
+		err = g.settleArmLocked(ctx, fabricIndex, paseSession)
 	} else if _, err = g.settleExpiryLocked(ctx); err == nil {
 		err = g.startFailSafeLocked(ctx, fabricIndex, false)
 	}
@@ -1356,7 +1466,7 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	if fresh && !forSession {
 		g.breadcrumb = req.Breadcrumb
 	}
-	g.failSafeFabricIndex = fabricIndex
+	g.setArmFabricLocked(fabricIndex, fresh)
 	g.dataVersion.Bump()
 	g.startFailSafeWatchLocked(ctx, fabricIndex, g.failSafeExpiresAt)
 	armedHook := g.onFailSafeArmed
@@ -1438,6 +1548,7 @@ func (g *GeneralCommissioning) FabricRemoved(ctx context.Context, fabricIndex ui
 // rollback; g.mu is held and released.
 func (g *GeneralCommissioning) expireNowLocked(ctx context.Context) {
 	fabric := g.failSafeFabricIndex
+	expiry := g.expiryLocked()
 	g.failSafeArmed = false
 	g.failSafeOverPASE = false
 	g.stopFailSafeWatchLocked()
@@ -1446,7 +1557,7 @@ func (g *GeneralCommissioning) expireNowLocked(ctx context.Context) {
 	g.breadcrumb = 0
 	termsReverted := g.revertTermsLocked()
 	g.dataVersion.Bump()
-	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked(), fabric)
+	hook := g.trackRollbackLocked(g.failSafeExpiryHooksLocked(expiry), fabric)
 	g.mu.Unlock()
 	if termsReverted {
 		g.changes.Notify(gencommTCAttrs...)
@@ -1542,8 +1653,27 @@ func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
 // without a fail-safe", src/app/server/CommissioningWindowManager.cpp:240-241
 // at 6170af84): without the close the session kept its implicit
 // Administer with no fail-safe to end it (review II, R2-P3-pase-03).
+//
+// Deprecated: use [GeneralCommissioning.ArmOnPaseSession], which takes the
+// session's id and is refused only when a rollback closed that session —
+// this arm is refused whenever a rollback it settled closed PASE sessions,
+// its own opened after the close included; removable in the next minor
+// release.
 func (g *GeneralCommissioning) ArmOnPaseEstablished(ctx context.Context) error {
-	return g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true)
+	return g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true, 0)
+}
+
+// ArmOnPaseSession is [GeneralCommissioning.ArmOnPaseEstablished] for the
+// PASE session sessionID: the same arm, refused only when a rollback the
+// arm settled — one it ran over a due window, or one in flight it waited
+// for — closed sessionID, or when ctx ended while it waited. A rollback's
+// sessions are named by the session closer
+// ([GeneralCommissioning.SetFailSafeSessionCloser]); with only the older
+// SetOnFailSafeRolledBack wired, which names none, any PASE
+// close refuses it, as ArmOnPaseEstablished. The caller closes the session
+// on an error.
+func (g *GeneralCommissioning) ArmOnPaseSession(ctx context.Context, sessionID uint16) error {
+	return g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true, sessionID)
 }
 
 // logger is the server's logger ([GeneralCommissioningConfig.Logger]); a

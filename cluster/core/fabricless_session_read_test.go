@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	mstore "github.com/SukramJ/go-fabric/store"
 )
@@ -130,43 +131,31 @@ func TestUnfilteredReadOnFabriclessSessionWithholdsFabricSensitiveFields(t *test
 	ctx := paseRequest(false)
 
 	// AccessControl Acl / Extension / AuxiliaryAcl: every fabric's
-	// entries, each redacted to its FabricIndex.
-	acl := read[core.AccessControlEntryStruct](ctx, t, f.acl, 0x0000)
-	if got := fabricsOf(acl, func(e core.AccessControlEntryStruct) uint8 { return e.FabricIndex }); !slices.Equal(got, []uint8{1, 2}) {
-		t.Errorf("Acl fabrics %v, want [1 2]", got)
-	}
-	for _, e := range acl {
-		if !e.Redacted || e.Privilege != 0 || e.Subjects != nil {
-			t.Errorf("Acl entry of fabric %d goes out whole to a fabric-less session: %+v", e.FabricIndex, e)
+	// entries, each read as its FabricIndex alone — every other field of
+	// their structs is fabric-sensitive. Groupcast Membership: every
+	// fabric's, KeySetId (2, "S") withheld. The servers return the entries
+	// whole; the dispatcher scopes them ([readWire]).
+	for _, c := range []struct {
+		name string
+		srv  contract.ClusterServer
+		attr uint32
+		want []uint32
+	}{
+		{"Acl", f.acl, 0x0000, []uint32{0xFE}},
+		{"Extension", f.acl, 0x0001, []uint32{0xFE}},
+		{"AuxiliaryAcl", f.acl, 0x0007, []uint32{0xFE}},
+		{"Membership", f.gc, 0x0000, []uint32{0, 1, 3, 4, 0xFE}},
+	} {
+		entries := wireEntries(t, readWire(ctx, t, c.srv, c.attr))
+		fabrics := make([]uint8, 0, len(entries))
+		for _, e := range entries {
+			fabrics = append(fabrics, e.fabric)
+			if !slices.Equal(e.tags, c.want) {
+				t.Errorf("%s entry of fabric %d goes to a fabric-less session with fields %v, want %v", c.name, e.fabric, e.tags, c.want)
+			}
 		}
-	}
-	ext := read[core.AccessControlExtensionEntry](ctx, t, f.acl, 0x0001)
-	if got := fabricsOf(ext, func(e core.AccessControlExtensionEntry) uint8 { return e.FabricIndex }); !slices.Equal(got, []uint8{1, 2}) {
-		t.Errorf("Extension fabrics %v, want [1 2]", got)
-	}
-	for _, e := range ext {
-		if !e.Redacted || e.Data != nil {
-			t.Errorf("Extension of fabric %d goes out whole to a fabric-less session: %+v", e.FabricIndex, e)
-		}
-	}
-	aux := read[core.AccessControlAuxiliaryEntryStruct](ctx, t, f.acl, 0x0007)
-	if len(aux) != 2 {
-		t.Errorf("AuxiliaryAcl carries %d entries, want 2", len(aux))
-	}
-	for _, e := range aux {
-		if !e.Redacted {
-			t.Errorf("AuxiliaryAcl entry of fabric %d goes out whole to a fabric-less session", e.Entry.FabricIndex)
-		}
-	}
-
-	// Groupcast Membership: every fabric's, KeySetId ("S") withheld.
-	ms := read[core.GroupcastMembershipStruct](ctx, t, f.gc, 0x0000)
-	if got := fabricsOf(ms, func(m core.GroupcastMembershipStruct) uint8 { return m.FabricIndex }); !slices.Equal(got, []uint8{1, 2}) {
-		t.Errorf("Membership fabrics %v, want [1 2]", got)
-	}
-	for _, m := range ms {
-		if m.KeySetID != nil {
-			t.Errorf("Membership of fabric %d carries KeySetId to a fabric-less session", m.FabricIndex)
+		if !slices.Equal(fabrics, []uint8{1, 2}) {
+			t.Errorf("%s fabrics %v, want [1 2]", c.name, fabrics)
 		}
 	}
 

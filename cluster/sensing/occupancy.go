@@ -280,10 +280,7 @@ func (o *Occupancy) limitsValue() OccupancyHoldTimeLimits {
 func (o *Occupancy) emitOccupancyChanged() {
 	v, _ := o.srv.Value(occdef.AttrOccupancy)
 	bitmap, _ := convertTo[occdef.OccupancyBitmap](v)
-	o.mu.Lock()
-	endpoint := o.endpoint
-	o.mu.Unlock()
-	_ = o.srv.Emit(endpoint, occdef.EventOccupancyChanged, occdef.OccupancyChangedEvent{Occupancy: bitmap})
+	_ = o.srv.EmitEvent(occdef.EventOccupancyChanged, occdef.OccupancyChangedEvent{Occupancy: bitmap})
 }
 
 // occSource answers the deprecated delay attributes with HoldTime
@@ -619,6 +616,7 @@ func (o *Occupancy) SetEndpoint(endpoint uint16) {
 	o.mu.Lock()
 	o.endpoint = endpoint
 	o.mu.Unlock()
+	o.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the hold timer; it is [Occupancy.MatterQuiesce].

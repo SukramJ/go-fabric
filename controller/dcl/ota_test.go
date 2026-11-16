@@ -215,7 +215,7 @@ func TestOTADownload(t *testing.T) {
 			t.Errorf("%q: %v", url, err)
 		}
 	}
-	if err := (&OTAVersions{}).Download(ctx, SoftwareVersion{OTAURL: "http://127.0.0.1:1/x"}, &bytes.Buffer{}); !errors.As(err, &oe) || oe.Unwrap() == nil {
+	if err := (&OTAVersions{}).Download(ctx, SoftwareVersion{OTAURL: "https://127.0.0.1:1/x"}, &bytes.Buffer{}); !errors.As(err, &oe) || oe.Unwrap() == nil {
 		t.Fatalf("unreachable: %v", err)
 	}
 }

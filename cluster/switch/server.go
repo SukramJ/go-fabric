@@ -99,8 +99,8 @@ type Config struct {
 	// Features is the FeatureMap selection; the definition's conformance
 	// is checked.
 	Features Feature
-	// Endpoint is the endpoint the events are addressed to. The bridge
-	// also sets it at assembly ([Server.SetEndpoint]).
+	// Endpoint is the endpoint the events are addressed to; 0 leaves it to
+	// the bridge, which sets it at assembly ([Server.SetEndpoint]).
 	Endpoint uint16
 	// NumberOfPositions is the attribute; 0 is 2 (:474).
 	NumberOfPositions uint8
@@ -320,6 +320,11 @@ func New(cfg Config) (*Server, error) {
 		currentLongPressPosition:   -1,
 	}
 	s.lockFree = sync.NewCond(&s.mu)
+	if cfg.Endpoint != 0 {
+		// An endpoint the host states is the one the events go to, as
+		// the bridge's SetEndpoint would state it.
+		s.Server.SetEndpoint(cfg.Endpoint)
+	}
 	return s, nil
 }
 
@@ -336,6 +341,7 @@ func (s *Server) SetEndpoint(ep uint16) {
 	s.mu.Lock()
 	s.endpoint = ep
 	s.mu.Unlock()
+	s.Server.SetEndpoint(ep) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Endpoint returns the endpoint the events are addressed to.
@@ -818,20 +824,20 @@ func (s *Server) drain() {
 	for len(s.outbox) > 0 {
 		d := s.outbox[0]
 		s.outbox = s.outbox[1:]
-		endpoint, observe := s.endpoint, s.observe
+		observe := s.observe
 		s.mu.Unlock()
-		s.deliver(endpoint, observe, d)
+		s.deliver(observe, d)
 		s.mu.Lock()
 	}
 	s.draining = false
 	s.mu.Unlock()
 }
 
-func (s *Server) deliver(endpoint uint16, observe func(changeKind, uint8, uint8), d delivery) {
+func (s *Server) deliver(observe func(changeKind, uint8, uint8), d delivery) {
 	switch d.kind {
 	case changeEvent:
 		// An event outside EventList is dropped (#queueEvent :225).
-		_ = s.Emit(endpoint, d.event, d.payload)
+		_ = s.EmitEvent(d.event, d.payload)
 		return
 	case changeCurrentPosition:
 		// Validated on input: the store's own check cannot fail.

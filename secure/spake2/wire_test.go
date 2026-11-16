@@ -262,9 +262,10 @@ func TestPBKDFParamRequestWrongInitiatorRandomLength(t *testing.T) {
 	}
 }
 
-// TestPBKDFParamRequestSkipsUnknownStructField — a payload that includes
-// a stray nested Structure at tag 5 (MRPParams slot) must decode
-// successfully with no error surfaced.
+// TestPBKDFParamRequestSkipsUnknownStructField — a payload whose tag-5
+// session parameters carry a member at an unknown context tag must decode
+// successfully with no error surfaced (a known field of the wrong type is
+// refused: TestPBKDFParamRequestRefusesMalformedSessionParameters).
 func TestPBKDFParamRequestSkipsUnknownStructField(t *testing.T) {
 	t.Parallel()
 	rand32 := random32()
@@ -276,7 +277,7 @@ func TestPBKDFParamRequestSkipsUnknownStructField(t *testing.T) {
 	enc.PutBool(tlv.ContextTag(4), false)
 	// tag 5 = optional MRPParams nested Structure
 	enc.StartStruct(tlv.ContextTag(5))
-	enc.PutOctets(tlv.ContextTag(1), []byte{0xDE, 0xAD})
+	enc.PutOctets(tlv.ContextTag(10), []byte{0xDE, 0xAD})
 	_ = enc.EndContainer()
 	_ = enc.EndContainer()
 	payload, _ := enc.Bytes()

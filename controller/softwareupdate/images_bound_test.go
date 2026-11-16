@@ -15,7 +15,8 @@ import (
 // TestImagesHonourTheLedgersMaxImageSize (review II, R2-P0-bound-C01): both
 // of the store's downloads — a ledger update's (DownloadUpdate) and an
 // image's by URL (UpdateInfoFromURL), each held in memory until it is
-// verified — go through dcl.OTAVersions.Download, so the bound the host
+// verified — go through dcl.OTAVersions (Download, DownloadHostURL),
+// whose MaxImageSize bounds both, so the bound the host
 // sets on the ledger it hands in (ImagesConfig.Ledger, MaxImageSize) bounds
 // what the store buffers. A record that announces more is refused without
 // a fetch and nothing is stored; an image by URL announces no size and is
@@ -26,10 +27,10 @@ func TestImagesHonourTheLedgersMaxImageSize(t *testing.T) {
 	f := newFetchMock(t)
 	img := createOtaImage(t, 0xfff1, 0x8000, 3)
 	url := f.add("/ota.bin", img)
-	info := ledgerUpdate(url, 0xfff1, 0x8000, 3, len(img), 0)
+	info := withChecksum(ledgerUpdate(url, 0xfff1, 0x8000, 3, len(img), 0), img)
 
 	blobs := &MemoryBlobs{}
-	bounded := NewImages(ImagesConfig{Blobs: blobs, Ledger: &dcl.OTAVersions{MaxImageSize: int64(len(img)) - 1}, Logger: quietLog()})
+	bounded := NewImages(ImagesConfig{Blobs: blobs, Ledger: hostLedger(int64(len(img)) - 1), Logger: quietLog()})
 	_, err := bounded.DownloadUpdate(ctx, info, false)
 	if !errors.Is(err, ErrOTA) || !errors.Is(err, dcl.ErrOTAImageTooLarge) || !strings.Contains(err.Error(), "MaxImageSize") {
 		t.Fatalf("DownloadUpdate of a %d-byte image under a bound one byte smaller: %v, want ErrOTA wrapping dcl.ErrOTAImageTooLarge", len(img), err)
@@ -46,7 +47,7 @@ func TestImagesHonourTheLedgersMaxImageSize(t *testing.T) {
 	}
 
 	// The same images at exactly the bound, and under the default one.
-	for _, ledger := range []*dcl.OTAVersions{{MaxImageSize: int64(len(img))}, {}} {
+	for _, ledger := range []*dcl.OTAVersions{hostLedger(int64(len(img))), hostLedger(0)} {
 		imgs := NewImages(ImagesConfig{Ledger: ledger, Logger: quietLog()})
 		if _, err := imgs.DownloadUpdate(ctx, info, false); err != nil {
 			t.Fatalf("DownloadUpdate under a bound of %d: %v", ledger.MaxImageSize, err)

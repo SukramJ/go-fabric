@@ -33,6 +33,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
+	rvcrundef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	sadef "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
 	devicelayer "github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -64,7 +66,18 @@ func createNode(t *testing.T, cfg servicearea.Config) error {
 	}
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	rvc, err := devicelayer.NewRoboticVacuumCleaner(devicelayer.Options{StableKey: endpoint.StringKey("rvc:1"), Name: "rvc"},
-		sadef.Declare{HostServer: srv})
+		sadef.Declare{HostServer: srv},
+		// createNode's run mode and operational state
+		// (ServiceAreaServerTest.ts:27-49 at db021da0), which device.New
+		// requires (decision 17).
+		rvcrundef.Declare{Initial: rvcrundef.Patch{SupportedModes: &[]rvcrundef.ModeOptionStruct{
+			{Label: "Idle", Mode: 0, ModeTags: []rvcrundef.ModeTagStruct{{Value: rvcrundef.ModeTagIdle}}},
+			{Label: "Cleaning", Mode: 1, ModeTags: []rvcrundef.ModeTagStruct{{Value: rvcrundef.ModeTagCleaning}}},
+		}, CurrentMode: new(uint8(0))}},
+		rvcopdef.Declare{Initial: rvcopdef.Patch{
+			OperationalStateList: &[]rvcopdef.OperationalStateStruct{{OperationalStateId: rvcopdef.OperationalStateError}},
+			OperationalState:     new(rvcopdef.OperationalStateError),
+		}})
 	if err != nil {
 		t.Fatal(err)
 	}

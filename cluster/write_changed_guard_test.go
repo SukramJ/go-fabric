@@ -34,6 +34,7 @@ func TestEveryMatterWriteSaysWhetherItChanged(t *testing.T) {
 	// a name (levelcontrol, modeselect, onoff, servicearea), each with a
 	// type Server, and must not stand in for each other.
 	declared := map[string]map[string]bool{} // "dir.Type" → method names
+	embeds := map[string][]string{}          // "dir.Type" → embedded "dir.Type"s
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -46,6 +47,38 @@ func TestEveryMatterWriteSaysWhetherItChanged(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		dir := filepath.ToSlash(filepath.Dir(path))
+		ast.Inspect(f, func(n ast.Node) bool {
+			ts, ok := n.(*ast.TypeSpec)
+			if !ok {
+				return true
+			}
+			st, ok := ts.Type.(*ast.StructType)
+			if !ok {
+				return true
+			}
+			for _, fld := range st.Fields.List {
+				if len(fld.Names) > 0 {
+					continue
+				}
+				typ := fld.Type
+				if star, ok := typ.(*ast.StarExpr); ok {
+					typ = star.X
+				}
+				switch e := typ.(type) {
+				case *ast.Ident:
+					embeds[dir+"."+ts.Name.Name] = append(embeds[dir+"."+ts.Name.Name], dir+"."+e.Name)
+				case *ast.SelectorExpr:
+					// A package of this tree is keyed by its directory,
+					// which is its name for every package an embedder
+					// here imports (spec, cluster's own subpackages).
+					if pkg, ok := e.X.(*ast.Ident); ok {
+						embeds[dir+"."+ts.Name.Name] = append(embeds[dir+"."+ts.Name.Name], pkg.Name+"."+e.Sel.Name)
+					}
+				}
+			}
+			return true
+		})
 		for _, decl := range f.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Recv == nil || len(fn.Recv.List) != 1 {
@@ -83,6 +116,43 @@ func TestEveryMatterWriteSaysWhetherItChanged(t *testing.T) {
 		case !exempt && !methods["MatterWriteChanged"]:
 			t.Errorf("%s declares MatterWrite and no MatterWriteChanged (contract.ChangeReportingWriter)", typ)
 		}
+	}
+	// A type that declares its own write and embeds a server naming its
+	// changes (contract.ChangeNamingWriter) declares MatterWriteCommit too:
+	// the dispatcher prefers the promoted one, which would apply the write
+	// without the type's.
+	var names func(typ string, seen map[string]bool) bool
+	names = func(typ string, seen map[string]bool) bool {
+		if seen[typ] {
+			return false
+		}
+		seen[typ] = true
+		if declared[typ]["MatterWriteCommit"] {
+			return true
+		}
+		for _, e := range embeds[typ] {
+			if names(e, seen) {
+				return true
+			}
+		}
+		return false
+	}
+	namers := 0
+	for typ, methods := range declared {
+		if methods["MatterWriteCommit"] {
+			namers++
+		}
+		if !methods["MatterWrite"] && !methods["MatterWriteChanged"] || methods["MatterWriteCommit"] {
+			continue
+		}
+		for _, e := range embeds[typ] {
+			if names(e, map[string]bool{}) {
+				t.Errorf("%s declares its own write and inherits MatterWriteCommit from %s (contract.ChangeNamingWriter): declare it", typ, e)
+			}
+		}
+	}
+	if namers == 0 {
+		t.Fatal("found no type declaring MatterWriteCommit under cluster/, expected spec.Server")
 	}
 	for typ := range writeChangedExempt {
 		if !declared[typ]["MatterWrite"] {

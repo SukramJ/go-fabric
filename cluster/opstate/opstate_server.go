@@ -456,6 +456,7 @@ type Server struct {
 	countdown    *uint32
 	emitter      contract.EventEmitter
 	endpoint     uint16
+	mounted      bool // the endpoint is known ([Server.SetEndpoint])
 }
 
 // Compile-time assertions.
@@ -1021,8 +1022,22 @@ func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 // bridge calls it at reassembly.
 func (s *Server) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
-	s.endpoint = endpoint
+	s.endpoint, s.mounted = endpoint, true
 	s.mu.Unlock()
+}
+
+// EmitEvent emits eventID on the endpoint the server is mounted on — the
+// call the typed Record<Event> makes — with [Server.Emit]'s checks; one
+// while the server is not in the topology (no endpoint or no emitter) is
+// [spec.ErrNotMounted].
+func (s *Server) EmitEvent(eventID uint32, data any) error {
+	s.mu.Lock()
+	endpoint, mounted := s.endpoint, s.mounted && s.emitter != nil
+	s.mu.Unlock()
+	if s.inst.Emits(eventID) && !mounted {
+		return fmt.Errorf("%w: %s event 0x%02X", spec.ErrNotMounted, s.v.def.Name, eventID)
+	}
+	return s.Emit(endpoint, eventID, data)
 }
 
 // statusError carries an exact IM status to the dispatcher.

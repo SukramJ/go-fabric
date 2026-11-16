@@ -7,6 +7,7 @@ import (
 	"context"
 	"reflect"
 	"slices"
+	"sync"
 	"testing"
 )
 
@@ -287,5 +288,84 @@ func TestReadReportsStatusesFirst(t *testing.T) {
 	}
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("report order %+v, want %+v", order, want)
+	}
+}
+
+// checkingStatusOrderDispatcher is statusOrderDispatcher with an
+// AttributePathChecker that answers the absent cluster without a read; it
+// counts the reads of each concrete path.
+type checkingStatusOrderDispatcher struct {
+	statusOrderDispatcher
+	mu    sync.Mutex
+	reads map[ConcreteAttributePath]int
+}
+
+func (d *checkingStatusOrderDispatcher) Read(ctx context.Context, p ConcreteAttributePath) []ReadResult {
+	d.mu.Lock()
+	if d.reads == nil {
+		d.reads = map[ConcreteAttributePath]int{}
+	}
+	d.reads[p]++
+	d.mu.Unlock()
+	return d.statusOrderDispatcher.Read(ctx, p)
+}
+
+func (*checkingStatusOrderDispatcher) AttributePathStatus(_ context.Context, p ConcreteAttributePath) StatusCode {
+	if p.Cluster == 0x0999 {
+		return StatusUnsupportedCluster
+	}
+	return StatusSuccess
+}
+
+// TestReadReportsStatusesFirstReadsEachPathOnce (review II,
+// R2-P5-write-06): with a dispatcher that decides a concrete path's status
+// without a read (AttributePathChecker) the report's order is the one
+// TestReadReportsStatusesFirst holds, and no concrete path is read more
+// than once — a path whose status the checker or the access gate decides
+// is not read at all. matter.js decides a concrete path's status from the
+// model and access (AttributeReadResponse.ts:250, :255-270, :272 at
+// db021da0) and reads its value once, in the producer (:283-308).
+func TestReadReportsStatusesFirstReadsEachPathOnce(t *testing.T) {
+	t.Parallel()
+	at := func(cluster, attr uint32) ConcreteAttributePath {
+		return ConcreteAttributePath{Endpoint: 2, Cluster: cluster, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	}
+	req := ReadRequest{AttributeRequests: []ConcreteAttributePath{
+		at(0x0006, 0xFFFD),
+		at(0x0999, 0x0000),
+		at(0x0300, 0x0000),
+		{Endpoint: 2, Cluster: 0x0006, HasEndpoint: true, HasCluster: true},
+	}}
+	ctx := WithFabricFilter(context.Background(), true, 1)
+	d := &checkingStatusOrderDispatcher{}
+	got := HandleReadRequest(ctx, d, req).Reports
+	want := []struct {
+		path   ConcreteAttributePath
+		status StatusCode
+	}{
+		{at(0x0999, 0x0000), StatusUnsupportedCluster},
+		{at(0x0300, 0x0000), StatusUnsupportedAccess},
+		{at(0x0006, 0xFFFD), StatusSuccess},
+		{at(0x0006, 0x0000), StatusSuccess},
+		{at(0x0006, 0xFFFD), StatusSuccess},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("reports %+v, want %d", got, len(want))
+	}
+	for i, r := range got {
+		st := StatusSuccess
+		if r.IsStatus {
+			st = r.Status.Status
+		}
+		if r.Path != want[i].path || st != want[i].status {
+			t.Errorf("report %d: %+v %v, want %+v %v", i, r.Path, st, want[i].path, want[i].status)
+		}
+		if !r.IsStatus && r.Value.Value == nil {
+			t.Errorf("report %d: a value report without its value", i)
+		}
+	}
+	wantReads := map[ConcreteAttributePath]int{at(0x0006, 0xFFFD): 1, req.AttributeRequests[3]: 1}
+	if !reflect.DeepEqual(d.reads, wantReads) {
+		t.Errorf("reads %v, want %v", d.reads, wantReads)
 	}
 }

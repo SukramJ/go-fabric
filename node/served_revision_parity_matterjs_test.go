@@ -75,7 +75,10 @@ func TestServedClusterRevisionAndFeatureMap(t *testing.T) {
 			all = append(all, served{ty.Name, srv})
 		}
 	}
-	if built < 60 {
+	// 21 types refuse their bare defaults for the values matter.js
+	// requires (decision 17, device.Type.RequiredInitial), beside the ones
+	// that need a feature selection or a port.
+	if built < 50 {
 		t.Fatalf("only %d of %d device types build with their defaults", built, built+refused)
 	}
 	clusters := map[uint32]bool{}
@@ -114,9 +117,11 @@ func TestServedClusterRevisionAndFeatureMap(t *testing.T) {
 			}
 		}
 		for _, attr := range listed {
-			// The dispatcher answers the globals a server leaves out
-			// (synthesizeGlobalRead).
-			if attr >= cluster.AttrGlobalGeneratedCommandList {
+			// The dispatcher answers the three global lists itself
+			// (synthesizeGlobalRead); FeatureMap, ClusterRevision and a
+			// manufacturer-specific attribute it reads from the server.
+			switch attr {
+			case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
 				continue
 			}
 			if !answersRead(s.srv, attr) {
@@ -141,59 +146,13 @@ func TestServedClusterRevisionAndFeatureMap(t *testing.T) {
 // whose every write is refused.
 const operationalCredentialsClusterID = 0x003E
 
-// unansweredWithDefaults are the listed attributes that answer no read at
-// this revision, as "<where> <cluster> <cluster id>:<attribute id>" —
-// measured, not judged: each is a generated server (*spec.Server) the
-// device kit builds with its defaults, serving an attribute that has no
-// model default the generator renders and no value from the host
-// (cluster/spec/server.go MatterRead, "An attribute neither answers is
-// absent"). Whether device.New is to refuse such a type, as it refuses the
-// ones in the device package's refusedDefaults, or the server is to hold a
-// value, is open (review II, the finding W3-clucore-13's guard produced).
-// The set is exact in both directions: a new entry fails, and so does one
-// that is answered again.
-var unansweredWithDefaults = map[string]bool{
-	"AirPurifier FanControl 0x0202:0x0001":                                    true,
-	"AirQualitySensor AirQuality 0x005B:0x0000":                               true,
-	"BasicVideoPlayer MediaPlayback 0x0506:0x0000":                            true,
-	"Camera CameraAvStreamManagement 0x0551:0x0002":                           true,
-	"Camera CameraAvStreamManagement 0x0551:0x0004":                           true,
-	"Camera CameraAvStreamManagement 0x0551:0x0007":                           true,
-	"Camera CameraAvStreamManagement 0x0551:0x0018":                           true,
-	"CastingVideoPlayer MediaPlayback 0x0506:0x0000":                          true,
-	"Chime Chime 0x0556:0x0000":                                               true,
-	"ContentApp ApplicationBasic 0x050D:0x0002":                               true,
-	"ContentApp ApplicationBasic 0x050D:0x0004":                               true,
-	"ContentApp ApplicationBasic 0x050D:0x0005":                               true,
-	"ContentApp ApplicationBasic 0x050D:0x0006":                               true,
-	"Dishwasher OperationalState 0x0060:0x0004":                               true,
-	"Dishwasher OperationalState 0x0060:0x0005":                               true,
-	"EnergyEvse EnergyEvseMode 0x009D:0x0000":                                 true,
-	"ExtractorHood FanControl 0x0202:0x0001":                                  true,
-	"Fan FanControl 0x0202:0x0001":                                            true,
-	"Intercom CameraAvStreamManagement 0x0551:0x0007":                         true,
-	"JointFabricAdministrator JointFabricDatastore 0x0752:0x0000":             true,
-	"JointFabricAdministrator JointFabricDatastore 0x0752:0x0003":             true,
-	"JointFabricAdministrator JointFabricDatastore 0x0752:0x0004":             true,
-	"JointFabricAdministrator JointFabricDatastore 0x0752:0x0005":             true,
-	"JointFabricAdministrator JointFabricDatastore 0x0752:0x0007":             true,
-	"JointFabricAdministrator JointFabricDatastore 0x0752:0x0008":             true,
-	"LaundryDryer OperationalState 0x0060:0x0004":                             true,
-	"LaundryDryer OperationalState 0x0060:0x0005":                             true,
-	"LaundryWasher OperationalState 0x0060:0x0004":                            true,
-	"LaundryWasher OperationalState 0x0060:0x0005":                            true,
-	"ModeSelect ModeSelect 0x0050:0x0000":                                     true,
-	"NetworkInfrastructureManager ThreadBorderRouterManagement 0x0452:0x0000": true,
-	"NetworkInfrastructureManager ThreadBorderRouterManagement 0x0452:0x0001": true,
-	"RoboticVacuumCleaner RvcOperationalState 0x0061:0x0004":                  true,
-	"RoboticVacuumCleaner RvcOperationalState 0x0061:0x0005":                  true,
-	"RoboticVacuumCleaner RvcRunMode 0x0054:0x0000":                           true,
-	"SoilSensor SoilMeasurement 0x0430:0x0000":                                true,
-	"ThreadBorderRouter ThreadBorderRouterManagement 0x0452:0x0000":           true,
-	"ThreadBorderRouter ThreadBorderRouterManagement 0x0452:0x0001":           true,
-	"WaterHeater WaterHeaterManagement 0x0094:0x0005":                         true,
-	"WaterHeater WaterHeaterMode 0x009E:0x0000":                               true,
-}
+// unansweredWithDefaults are the listed attributes that answer no read
+// with a type's bare defaults, as "<where> <cluster> <cluster id>:<attribute id>".
+// None since decision 17: device.New refuses a type whose server would
+// list an attribute matter.js requires a value of (device.Type.RequiredInitial),
+// and the device package's TestEveryListedAttributeHasAValue holds the
+// rest. The set is exact in both directions: a new entry fails.
+var unansweredWithDefaults = map[string]bool{}
 
 // answersRead reports whether srv answers a read of attr on the path the
 // dispatcher takes (endpoint/dispatcher.go readOne): the fabric-aware read

@@ -135,8 +135,23 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleRemoveTrigger(func(context.Context, RemoveTriggerRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleRemoveTrigger: a command the server does not accept was registered")
 	}
-	_ = s.EmitZoneTriggered(0, ZoneTriggeredEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitZoneStopped(0, ZoneStoppedEvent{})     // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitZoneTriggered(0, ZoneTriggeredEvent{})    // not in the empty definition's EventList: refused
+	_ = s.RecordZoneTriggered(ZoneTriggeredEvent{})     // the same, through EmitEvent
+	if err := bare.RecordZoneTriggered(ZoneTriggeredEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordZoneTriggered on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitZoneStopped(0, ZoneStoppedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordZoneStopped(ZoneStoppedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordZoneStopped(ZoneStoppedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordZoneStopped on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

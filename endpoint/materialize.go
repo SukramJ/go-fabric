@@ -224,10 +224,11 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		ProductID:    productID,
 		ProductLabel: productName,
 		SerialNumber: address,
-		// A label a controller wrote outlives this per-dispatch server in
-		// the endpoint's state (Endpoint.NodeLabel), and reaches the host
-		// through Config.OnNodeLabelWritten for persistence.
+		// A label a controller writes is stored first
+		// (Config.Persistence), then outlives this per-dispatch server in
+		// the endpoint's state (Endpoint.NodeLabel).
 		NodeLabel:            ep.NodeLabel(),
+		SaveNodeLabel:        ep.nodeLabelSaver(),
 		OnNodeLabelWrite:     ep.nodeLabelWriter(),
 		ConfigurationVersion: ep.ConfigurationVersion(),
 		UniqueID:             uniqueIDFor(ep.SourceKey),

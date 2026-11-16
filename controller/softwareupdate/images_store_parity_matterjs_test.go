@@ -6,6 +6,8 @@ package softwareupdate
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -28,8 +30,9 @@ import (
 // versions and offline refusals. matter.js's fetchMock is an httptest
 // server here: its request log is the fetch call log, and a ledger record
 // pointing at it is the DeviceSoftwareVersionModelDclSchemaWithSource the
-// cases pass. A service is online with a ledger (a dcl.OTAVersions that
-// asks no ledger, so only downloads reach the network) and offline
+// cases pass. A service is online with a ledger (hostLedger: a
+// dcl.OTAVersions whose ledger lookups fail in the process, so only
+// downloads reach the network) and offline
 // without one (ImagesConfig.Ledger, matter.js's offline option).
 
 // fetchMock serves OTA images and records every request.
@@ -43,7 +46,7 @@ type fetchMock struct {
 func newFetchMock(t *testing.T) *fetchMock {
 	t.Helper()
 	f := &fetchMock{files: map[string][]byte{}}
-	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	f.srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.calls = append(f.calls, r.URL.Path)
 		b, ok := f.files[r.URL.Path]
@@ -104,12 +107,53 @@ func ledgerUpdate(url string, vid, pid uint16, version uint32, size int, spec ui
 
 func quietLog() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
+// onlineImages is an online store. The ported cases' ledger records
+// carry no checksum (ledgerUpdate), which the store admits only under
+// AllowUnverifiedLedgerImages.
 func onlineImages(b Blobs) *Images {
-	return NewImages(ImagesConfig{Blobs: b, Ledger: &dcl.OTAVersions{}, Logger: quietLog()})
+	return NewImages(ImagesConfig{Blobs: b, Ledger: hostLedger(0), Logger: quietLog(), AllowUnverifiedLedgerImages: true})
 }
 
+// noLedgerHost is the ledger host of hostLedger: a request to it fails
+// without leaving the process.
+const noLedgerHost = "ledger.test"
+
+// hostLedger is an online ledger that asks none (each lookup fails and
+// finds nothing) and downloads through a host client, as a host's
+// dcl.Client.HTTPClient: one that trusts the fetchMock's TLS server.
+// Every httptest TLS server presents the same certificate
+// (net/http/httptest/server.go:349 at go1.27.4, testcert.LocalhostCert),
+// so one server's certificate trusts them all.
+func hostLedger(maxImageSize int64) *dcl.OTAVersions {
+	return &dcl.OTAVersions{
+		Client:       &dcl.Client{BaseURL: "https://" + noLedgerHost, HTTPClient: &http.Client{Transport: hostTransport()}},
+		TestClient:   &dcl.Client{BaseURL: "https://" + noLedgerHost, HTTPClient: &http.Client{Transport: hostTransport()}},
+		MaxImageSize: maxImageSize,
+	}
+}
+
+var hostTransport = sync.OnceValue(func() http.RoundTripper {
+	srv := httptest.NewTLSServer(http.NotFoundHandler())
+	defer srv.Close()
+	pool := x509.NewCertPool()
+	pool.AddCert(srv.Certificate())
+	return noLedger{&http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}}
+})
+
+// noLedger fails every request to noLedgerHost and passes the rest on.
+type noLedger struct{ http.RoundTripper }
+
+func (n noLedger) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Host == noLedgerHost {
+		return nil, errors.New("no ledger in this test")
+	}
+	return n.RoundTripper.RoundTrip(req)
+}
+
+// offlineImages is an offline store, admitting the ported cases' records
+// as onlineImages does.
 func offlineImages(b Blobs) *Images {
-	return NewImages(ImagesConfig{Blobs: b, Logger: quietLog()})
+	return NewImages(ImagesConfig{Blobs: b, Logger: quietLog(), AllowUnverifiedLedgerImages: true})
 }
 
 func filenames(st []StoredImage) []string {

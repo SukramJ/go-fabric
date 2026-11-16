@@ -121,6 +121,9 @@ func (b *Bridge) SetSubscriptionPersistence(enabled bool) {
 
 // SubscriptionPersistenceEnabled reports the switch
 // [Bridge.SetSubscriptionPersistence] sets.
+//
+// Deprecated: no host reads it; a test reads it with
+// bridgetest.SubscriptionPersistence. Removable in the next minor release.
 func (b *Bridge) SubscriptionPersistenceEnabled() bool {
 	b.resumption.mu.Lock()
 	defer b.resumption.mu.Unlock()
@@ -166,6 +169,9 @@ func (b *Bridge) beginSubscriptionRun() {
 
 // FormerSubscriptionCount reports how many subscriptions of the previous
 // run are waiting for [Bridge.ReestablishFormerSubscriptions].
+//
+// Deprecated: no host reads it; a test reads it with
+// bridgetest.SubscriptionPersistence. Removable in the next minor release.
 func (b *Bridge) FormerSubscriptionCount() int {
 	b.resumption.mu.Lock()
 	defer b.resumption.mu.Unlock()

@@ -30,6 +30,29 @@ type EndpointExpander interface {
 	ReadAtEndpoint(ctx context.Context, path ConcreteAttributePath, endpoint uint16) []ReadResult
 }
 
+// AttributePathChecker is the optional [Dispatcher] capability an
+// [AttributeExpansion] whose statuses go first
+// ([AttributeExpansion.StatusesFirst]) consults for a fully concrete
+// attribute path, so that it reads no value up front: the status the path
+// is answered with when that status is decided without reading the value
+// — UnsupportedEndpoint, UnsupportedCluster, UnsupportedAttribute, the
+// same status [Dispatcher.Read] would answer the path with — and Success
+// for a path whose value is read at its place. A status only that read
+// reveals is answered at the path's place. The sibling checkers are
+// [CommandPathChecker] and [EventPathChecker]. Without it, each concrete
+// path is read once up front to learn its status and, when it has none,
+// again at its place.
+//
+// Mirrors matter.js packages/protocol/src/action/server/
+// AttributeReadResponse.ts at db021da0: addConcrete decides
+// UnsupportedEndpoint, UnsupportedCluster, UnsupportedAttribute and
+// UnsupportedRead from the model (:255-270) and access in two passes
+// (:250, :272), without a value; the producer reads the value once
+// (:283-308), after every path is registered (:87-94, :96-100).
+type AttributePathChecker interface {
+	AttributePathStatus(ctx context.Context, path ConcreteAttributePath) StatusCode
+}
+
 // AttributeExpansion is the cursor over the attribute paths of one read
 // or subscribe request: it expands path N+1 only once every result of
 // path N was taken, and a path naming no endpoint one endpoint at a time
@@ -125,10 +148,12 @@ func (e *AttributeExpansion) Ascending() *AttributeExpansion {
 // gate, which may also turn a result into a status (an access denial) —
 // reports as a status, the paths in request order; such a result is not
 // handed out again at its path's place. The other results keep their
-// order. Each concrete path is read once up front for it; one without a
-// status is read again at its place, so that its value is as current as
-// the rest of the report. Call it before the first
-// [AttributeExpansion.Next].
+// order. A dispatcher that is an [AttributePathChecker] answers each
+// concrete path's status without a read, and isStatus judges a valueless
+// Success result for a path that exists; otherwise each concrete path is
+// read once up front for it, and one without a status is read again at its
+// place, so that its value is as current as the rest of the report. Call
+// it before the first [AttributeExpansion.Next].
 //
 // Mirrors matter.js packages/protocol/src/action/server/
 // AttributeReadResponse.ts at db021da0: process registers every request
@@ -142,18 +167,39 @@ func (e *AttributeExpansion) StatusesFirst(isStatus func(requested ConcreteAttri
 	return e
 }
 
-// prepare reads every concrete path once and sets aside the results
-// isStatus reports as statuses, in request order; a path with such a
-// result keeps its other results for its place.
+// prepare decides every concrete path's status — by the dispatcher's
+// [AttributePathChecker], else by reading it once — and sets aside the
+// results isStatus reports as statuses, in request order; a path with such
+// a result keeps its other results for its place.
 func (e *AttributeExpansion) prepare() {
 	e.prepared = true
+	checker, hasChecker := e.d.(AttributePathChecker)
 	for i, p := range e.paths {
 		if !isConcreteAttributePath(p) {
 			continue
 		}
+		var results []ReadResult
+		switch {
+		case p.HasNode && e.hasLocalNodeID && p.Node != e.localNodeID, !hasChecker:
+			results = e.concreteResults(p)
+		default:
+			status := checker.AttributePathStatus(e.ctx, p)
+			if status != StatusSuccess {
+				results = []ReadResult{{Path: p, Status: status}}
+				break
+			}
+			// The path exists: only the consumer's gate (an access
+			// denial) can make it a status. Without one its value is
+			// read once, at its place.
+			probe := ReadResult{Path: p, Status: StatusSuccess}
+			if !e.isStatus(p, probe) {
+				continue
+			}
+			results = []ReadResult{probe}
+		}
 		var rest []ReadResult
 		statuses := false
-		for _, r := range e.concreteResults(p) {
+		for _, r := range results {
 			if e.isStatus(p, r) {
 				e.early = append(e.early, expandedResult{requested: p, result: r})
 				statuses = true
@@ -465,7 +511,7 @@ func (r *ReadReports) report(path ConcreteAttributePath, res ReadResult) (rep At
 		rep.IsStatus = true
 		rep.Status = StatusIB{Status: res.Status}
 	} else {
-		rep.Value = res.Value
+		rep.Value, rep.FabricScope = res.Value, res.FabricScope
 	}
 	return rep, true
 }

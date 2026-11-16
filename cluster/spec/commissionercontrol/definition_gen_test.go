@@ -94,7 +94,12 @@ func TestTypedServer(t *testing.T) {
 	}); err == nil {
 		t.Error("HandleCommissionNode: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})                        // no EmitEvent
 	_ = s.EmitCommissioningRequestResult(0, CommissioningRequestResultEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordCommissioningRequestResult(CommissioningRequestResultEvent{})  // the same, through EmitEvent
+	if err := bare.RecordCommissioningRequestResult(CommissioningRequestResultEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordCommissioningRequestResult on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

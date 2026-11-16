@@ -136,10 +136,27 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	_ = s.EmitStartUp(0, StartUpEvent{})                   // not in the empty definition's EventList: refused
-	_ = s.EmitShutDown(0, ShutDownEvent{})                 // not in the empty definition's EventList: refused
-	_ = s.EmitLeave(0, LeaveEvent{})                       // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitStartUp(0, StartUpEvent{})                // not in the empty definition's EventList: refused
+	_ = s.RecordStartUp(StartUpEvent{})                 // the same, through EmitEvent
+	if err := bare.RecordStartUp(StartUpEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordStartUp on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitShutDown(0, ShutDownEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordShutDown(ShutDownEvent{})  // the same, through EmitEvent
+	if err := bare.RecordShutDown(ShutDownEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordShutDown on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLeave(0, LeaveEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLeave(LeaveEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLeave(LeaveEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLeave on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitReachableChanged(0, ReachableChangedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordReachableChanged(ReachableChangedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordReachableChanged(ReachableChangedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordReachableChanged on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

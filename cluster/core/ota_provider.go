@@ -99,7 +99,8 @@ type OTAImageSource interface {
 	QueryImage(ctx context.Context, peer OTAPeer, req provdef.QueryImageRequest) (OTAImage, bool, error)
 	// Open returns the bytes of an image QueryImage offered, named by its
 	// FileDesignator text; an error wrapping fs.ErrNotExist is answered
-	// FileDesignatorUnknown on the BDX exchange.
+	// FileDesignatorUnknown on the BDX exchange. A returned blob that
+	// implements io.Closer is closed when the transfer ends.
 	Open(ctx context.Context, file string) (bdx.Blob, error)
 }
 
@@ -208,6 +209,15 @@ type OTAProviderConfig struct {
 	// takes the peer's options from its SoftwareUpdateManager
 	// (bdxTransferOptionsFor, OtaSoftwareUpdateProviderServer.ts:293-298).
 	TransferBlockSize func(peer OTAPeer) uint16
+	// SessionActivity, when set, reports when the peer last sent on the
+	// secure session of the id, false for a session it does not know. A
+	// QueryImage on another session than a running transfer's cancels the
+	// transfer when the transfer's session was last active before the
+	// query's (OtaSoftwareUpdateProviderServer.ts:197-201 at db021da0
+	// compares the two sessions' activeTimestamp). Without it, or when it
+	// knows either session not, the transfer's last block stands in for
+	// its session's activity and the query's session is active now.
+	SessionActivity func(sessionID uint16) (time.Time, bool)
 	// Clock is the provider's clock. Nil is [clock.System].
 	Clock clock.Clock
 	// Rand stands in for crypto/rand in tests.
@@ -479,12 +489,10 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 		// OP:194-196: no transfer runs, the entry is stale.
 		p.removeInProgress(peer)
 		return provdef.QueryImageResponse{}, false
-	case running.Peer().SessionID != sessionID && running.LastActivity().Before(p.cfg.Clock.Now()):
-		// OP:197-225: another session, last active before this query's —
-		// matter.js compares the two secure sessions' activeTimestamp; the
-		// query's session is active now, so the transfer's last block
-		// stands in for its session's last activity. The old transfer is
-		// cancelled and the query proceeds.
+	case running.Peer().SessionID != sessionID && p.transferSessionOlder(running, sessionID):
+		// OP:197-225: another session, last active before this query's
+		// (transferSessionOlder). The old transfer is cancelled and the
+		// query proceeds.
 		if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
 			p.logger.Warn("ota.provider.reboot_cancel_failed", slog.Any("err", err))
 			return busy, true
@@ -497,6 +505,24 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 	}
 	p.logger.Info("ota.provider.busy", slog.Uint64("node_id", peer.NodeID))
 	return busy, true
+}
+
+// transferSessionOlder reports whether the running transfer's session was
+// last active before the query's session: matter.js compares the two
+// secure sessions' activeTimestamp (OtaSoftwareUpdateProviderServer.ts:197-201
+// at db021da0), read here through [OTAProviderConfig].SessionActivity
+// (review II, F-db021da0-27). Without it, or for a session it does not
+// know, the transfer's last block stands in for its session's activity
+// and the query's session is active now.
+func (p *OTAProvider) transferSessionOlder(running *bdx.ServerSession, querySessionID uint16) bool {
+	if fn := p.cfg.SessionActivity; fn != nil {
+		transfer, okT := fn(running.Peer().SessionID)
+		query, okQ := fn(querySessionID)
+		if okT && okQ {
+			return transfer.Before(query)
+		}
+	}
+	return running.LastActivity().Before(p.cfg.Clock.Now())
 }
 
 // offerBDX is OP:290-381: the requestor is enabled for the "ota" scope as

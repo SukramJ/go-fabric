@@ -600,40 +600,74 @@ func caseDD311() goCertCase {
 // ddFlowSupport is the support file the flow cases' steps are defined in.
 const ddFlowSupport = "tc-dd-flow-support.ts"
 
-// ddFlowReadAt is the matter.js commit the flow cases (TC-DD-3.12, 3.13)
-// are ports of, which is not the snapshot's pin: every tc-dd-flow-support.ts
-// and TC-DD-3.12/3.13.test.ts line cited from here to caseDD313 is that
-// commit's. At the pin (db021da0) the two cases start their TH without a
-// commissioning window and open it by a user action, which the reference
-// daemon cannot do yet:
+// ddUserIntentTHArgs is USER_INTENT_TH_ARGS (tc-dd-flow-support.ts:46),
+// the TH's arguments in both flow cases, TC-DD-3.13 included; the flow the
+// DUT reads is written into the payload anyway.
 //
-//   - the case starts the TH with USER_INTENT_TH_ARGS, "--custom-flow 1"
-//     (tc-dd-flow-support.ts:46 at db021da0; TC-DD-3.12.test.ts:16 and
-//     TC-DD-3.13.test.ts:16, appArgs) — the daemon has no flag that keeps
-//     an uncommissioned node's own window closed at its start
-//     (examples/reference-bridge/main.go parseFlags; node.Start opens it,
-//     node/node.go);
-//   - each leg's .a holds the TH to not having advertised in commissioning
-//     mode (recordNotCommissionable, tc-dd-support.ts:1329-1337, called at
-//     tc-dd-flow-support.ts:129), where the port below notes the opposite
-//     as unverified;
-//   - the IP leg's .d is the user action (recordUserIntentCommissioningStart,
-//     tc-dd-support.ts:1371-1385, at tc-dd-flow-support.ts:167: the
-//     backchannel command userIntentCommissioningStart, packages/testing/
-//     src/device/backchannel.ts:176-178) — the daemon's --app-pipe takes no
-//     such command (examples/reference-bridge/control.go) —, then the
-//     discriminator check, which the pin moved here from a step 0 it no
-//     longer has (:168; the port's step 0 below), then the commissioning.
-//
-// So the pin's case has 12 steps where this port has 13, and the port
-// stays the case as it stood at ddFlowReadAt until the daemon has the flag
-// and the pipe command; it is not a port of the pin's case.
-const ddFlowReadAt = "862ad75f"
+// Under --custom-flow 1 the daemon opens no commissioning window until the
+// app pipe's UserIntentCommissioningStart (examples/reference-bridge,
+// decision 96).
+var ddUserIntentTHArgs = []string{"--custom-flow", "1"}
 
-// flowCase is defineFlowQrTest (tc-dd-flow-support.ts:72-189 at 862ad75f,
-// [ddFlowReadAt]): per leg (BLE, Wi-Fi PAF, IP network, :77-99) a
-// generated payload offering the leg's capability over the flow, two
-// parses, and — on the IP leg only — the commissioning.
+// notCommissionable is recordNotCommissionable (tc-dd-support.ts:1329-1337):
+// the TH's own log is the witness, not DNS-SD — the browse cache outlives
+// the run's earlier daemons, which advertised the same discriminator. The
+// TH logged its decision at start to open no window
+// (commissioning.window_on_demand, node.Start), and no line of its log says
+// it opened its window or published a commissionable record — the two lines
+// userIntent later waits for, which shows the patterns match this log.
+func notCommissionable(th *goTH) error {
+	const decided = "msg=commissioning.window_on_demand"
+	if !waitFor(th.ctx, ddCommissioningLogTimeout, func() bool {
+		return strings.Contains(th.dut.snapshotStderr(), decided)
+	}) {
+		return fmt.Errorf("the TH logged no decision at start to leave its window closed (%s)", decided)
+	}
+	log := th.dut.snapshotStderr()
+	for _, advertised := range []string{ddOwnWindowOpen, ddCommissionablePublished} {
+		if i := strings.Index(log, advertised); i >= 0 {
+			return fmt.Errorf("the TH advertised in commissioning mode: %s", firstLineOf(log[i:]))
+		}
+	}
+	th.note("the TH logged %s at start, and none of its %d log lines says %s or %s", decided, strings.Count(log, "\n"), ddOwnWindowOpen, ddCommissionablePublished)
+	return nil
+}
+
+// The TH's log lines of an opened own window (node/commissioning.go) and of
+// a published commissionable record (bridge/bridge.go).
+const (
+	ddOwnWindowOpen           = "msg=commissioning.own_window.open"
+	ddCommissionablePublished = "msg=matter.mdns.commissioning_published"
+)
+
+// userIntent is recordUserIntentCommissioningStart
+// (tc-dd-support.ts:1371-1385): the user action, the app pipe's
+// UserIntentCommissioningStart, then the TH's log of the window it decided
+// to open and of the commissionable record it published, both after the
+// command.
+func userIntent(th *goTH) error {
+	from := mark(th)
+	wait, err := th.pipeAsync(map[string]any{"Name": "UserIntentCommissioningStart"})
+	if err != nil {
+		return err
+	}
+	if err := wait(); err != nil {
+		return err
+	}
+	for _, line := range []string{ddOwnWindowOpen, ddCommissionablePublished} {
+		if !waitFor(th.ctx, ddCommissioningLogTimeout, func() bool { return strings.Contains(thLogSince(th, from), line) }) {
+			return fmt.Errorf("the TH logged no %s after UserIntentCommissioningStart", line)
+		}
+	}
+	th.note("after UserIntentCommissioningStart the TH logged %s and %s", ddOwnWindowOpen, ddCommissionablePublished)
+	return nil
+}
+
+// flowCase is defineFlowQrTest (tc-dd-flow-support.ts:72-189): the TH
+// started with [ddUserIntentTHArgs]; per leg (BLE, Wi-Fi PAF, IP network,
+// :77-99) a generated payload offering the leg's capability over the flow
+// with the TH not commissionable, two parses, and — on the IP leg only —
+// the user action, the discriminator check and the commissioning.
 func flowCase(tc string, flow int, flowPICS string) goCertCase {
 	d := &dutRun{}
 	legs := []struct {
@@ -645,9 +679,10 @@ func flowCase(tc string, flow int, flowPICS string) goCertCase {
 		{"2", "Wi-Fi PAF", "wifiPublicActionFrame", 3, ddWiFiPAFOnly, "MCORE.DD.DISCOVERY_PAF"},
 		{"3", "IP Network", "onIpNetwork", 2, ddOnNetworkOnly, ""},
 	}
-	steps := []goStep{{n: "0", line: 104, file: ddFlowSupport, title: "the DUT uses the discriminator its onboarding code names", run: d.honored}}
+	var steps []goStep
 	for _, leg := range legs {
 		fields := map[string]int{"discoveryCapabilities": leg.bits, "flowType": flow}
+		// Both .b and .c parse the code, so both carry the scan gate (:102-103).
 		scanGate := "MCORE.DD.SCAN_QR_CODE"
 		if leg.pics != "" {
 			scanGate += " & " + leg.pics
@@ -656,49 +691,43 @@ func flowCase(tc string, flow int, flowPICS string) goCertCase {
 			return d.parse(th, qrWithFields(th, fields), &offering{bit: leg.bit, name: leg.name, flow: flow})
 		}
 		steps = append(steps,
-			goStep{n: leg.n + ".a", line: 123, file: ddFlowSupport, pics: leg.pics, title: leg.transport + " payload over the flow", run: func(th *goTH) error {
+			goStep{n: leg.n + ".a", line: 109, file: ddFlowSupport, pics: leg.pics, title: leg.transport + " payload over the flow, the TH not in commissioning mode", run: func(th *goTH) error {
 				if err := generated(th, qrWithFields(th, fields), map[string]string{
 					"version": "0", "flowType": itoa(flow), "discoveryCapabilities": itoa(leg.bits),
 				}, thQR(th)); err != nil {
 					return err
 				}
-				// The plan's "Commissionee is NOT in commissioning mode"
-				// does not hold: the TH advertises from its start, as
-				// matter.js records (:143-150, NOT_COMMISSIONABLE_UNAVAILABLE).
-				th.note("unverified: the TH advertises as commissionable from its start, so the precondition that it is not in commissioning mode does not hold")
-				return nil
+				return notCommissionable(th)
 			}},
-			goStep{n: leg.n + ".b", line: 154, file: ddFlowSupport, pics: scanGate, title: "scan the QR code", run: scan},
-			goStep{n: leg.n + ".c", line: 167, file: ddFlowSupport, pics: scanGate, title: "the DUT parses the QR code", run: scan},
+			goStep{n: leg.n + ".b", line: 133, file: ddFlowSupport, pics: scanGate, title: "scan the QR code", run: scan},
+			goStep{n: leg.n + ".c", line: 146, file: ddFlowSupport, pics: scanGate, title: "the DUT parses the QR code", run: scan},
 		)
 		if leg.pics == "" {
-			steps = append(steps, goStep{n: leg.n + ".d", line: 182, file: ddFlowSupport, title: "commission over the IP network", run: func(th *goTH) error {
-				if err := d.setup(th); err != nil {
+			steps = append(steps, goStep{n: leg.n + ".d", line: 161, file: ddFlowSupport, title: "the user puts the TH into commissioning mode; commission over the IP network", run: func(th *goTH) error {
+				if err := userIntent(th); err != nil {
 					return err
 				}
-				if err := d.advertising(th); err != nil {
+				if err := d.honored(th); err != nil {
 					return err
 				}
 				return d.commission(th, qrWithFields(th, fields))
 			}})
 		} else {
-			steps = append(steps, goStep{n: leg.n + ".d", line: 182, file: ddFlowSupport, na: noRadio(leg.transport, "tc-dd-flow-support.ts:32-38 at "+ddFlowReadAt), title: "commission over " + leg.transport})
+			steps = append(steps, goStep{n: leg.n + ".d", line: 161, file: ddFlowSupport, na: noRadio(leg.transport, "tc-dd-flow-support.ts:33-39"), title: "commission over " + leg.transport})
 		}
 	}
 	return goCertCase{
-		tc: tc, line: 12, readAt: ddFlowReadAt, role: roleDUT, pics: ddDUTPICS("MCORE.DD.QR_COMMISSIONING", flowPICS),
-		finalize: d.finalize, steps: steps,
+		tc: tc, line: 12, role: roleDUT, pics: ddDUTPICS("MCORE.DD.QR_COMMISSIONING", flowPICS),
+		daemonArgs: ddUserIntentTHArgs, finalize: d.finalize, steps: steps,
 	}
 }
 
-// caseDD312 is TC-DD-3.12, the User-Intent flow (TC-DD-3.12.test.ts:11-18
-// at 862ad75f, [ddFlowReadAt]).
+// caseDD312 is TC-DD-3.12, the User-Intent flow (TC-DD-3.12.test.ts:11-19).
 func caseDD312() goCertCase {
 	return flowCase("TC-DD-3.12", ddUserIntentFlow, "MCORE.DD.USER_INTENT_COMM_FLOW")
 }
 
-// caseDD313 is TC-DD-3.13, the Custom flow (TC-DD-3.13.test.ts:11-18 at
-// 862ad75f, [ddFlowReadAt]).
+// caseDD313 is TC-DD-3.13, the Custom flow (TC-DD-3.13.test.ts:11-19).
 func caseDD313() goCertCase {
 	return flowCase("TC-DD-3.13", ddCustomFlow, "MCORE.DD.CUSTOM_COMM_FLOW")
 }

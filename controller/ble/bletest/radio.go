@@ -23,8 +23,9 @@ var ErrNoService = errors.New("bletest: no Matter GATT service")
 var ErrServing = errors.New("bletest: the Matter GATT service is served already")
 
 // Radio is a node's Bluetooth radio in the in-memory model: a
-// contract.BLEPeripheral a node is built with (node.Network.BLE,
-// bridge.Config.BLE), which the centrals reach as its [Peripheral]. While
+// contract.GATTPeripheral a node is built with (node.Network.GATT,
+// bridge.Config.GATT) — and the deprecated contract.BLEPeripheral — which
+// the centrals reach as its [Peripheral]. While
 // the node serves the Matter GATT service on it ([Radio.Serve]) every
 // connection a central opens reaches the node's BTP server through the
 // contract.BLEConnection the radio hands to Serve's accept — the node's
@@ -42,12 +43,17 @@ type Radio struct {
 	ads     []contract.BLEAdvertisement
 	stops   int
 	serving bool
-	accept  func(contract.BLEConnection)
-	c3      []byte
-	links   []*radioLink
+	// registered: a RegisterService whose Serve has not returned.
+	registered bool
+	accept     func(contract.BLEConnection)
+	c3         []byte
+	links      []*radioLink
 }
 
-var _ contract.BLEPeripheral = (*Radio)(nil)
+var (
+	_ contract.GATTPeripheral = (*Radio)(nil)
+	_ contract.BLEPeripheral  = (*Radio)(nil) //nolint:staticcheck // the deprecated port, while it exists
+)
 
 // Radio returns the peripheral as a node's radio, the same one on every
 // call: from then on a central's connection reaches the node that serves
@@ -98,12 +104,48 @@ func (r *Radio) StopAdvertising(context.Context) error {
 	return nil
 }
 
-// Serve implements contract.BLEPeripheral: the service stays registered
-// until ctx ends, then every connection is dropped. A second concurrent
-// Serve returns [ErrServing].
-func (r *Radio) Serve(ctx context.Context, c3 []byte, accept func(contract.BLEConnection)) error {
+// RegisterService implements contract.GATTPeripheral: the service is
+// registered at once and served by the returned service's Serve; a
+// registration while one is registered returns [ErrServing].
+func (r *Radio) RegisterService(_ context.Context, c3 []byte) (contract.GATTService, error) {
 	r.mu.Lock()
-	if r.serving {
+	defer r.mu.Unlock()
+	if r.registered || r.serving {
+		return nil, ErrServing
+	}
+	r.registered = true
+	return radioService{r: r, c3: bytes.Clone(c3)}, nil
+}
+
+// radioService is a [Radio.RegisterService] registration.
+type radioService struct {
+	r  *Radio
+	c3 []byte
+}
+
+// Serve implements contract.GATTService: the service stays registered
+// until ctx ends, then every connection is dropped.
+func (s radioService) Serve(ctx context.Context, accept func(contract.BLEConnection)) error {
+	defer func() {
+		s.r.mu.Lock()
+		s.r.registered = false
+		s.r.mu.Unlock()
+	}()
+	return s.r.serve(ctx, s.c3, accept, true)
+}
+
+// Serve implements the deprecated contract.BLEPeripheral: the service stays
+// registered until ctx ends, then every connection is dropped. A second
+// concurrent Serve returns [ErrServing].
+func (r *Radio) Serve(ctx context.Context, c3 []byte, accept func(contract.BLEConnection)) error {
+	return r.serve(ctx, c3, accept, false)
+}
+
+// serve serves the Matter GATT service until ctx ends; registered marks a
+// service RegisterService registered.
+func (r *Radio) serve(ctx context.Context, c3 []byte, accept func(contract.BLEConnection), registered bool) error {
+	r.mu.Lock()
+	if r.serving || (r.registered && !registered) {
 		r.mu.Unlock()
 		return ErrServing
 	}

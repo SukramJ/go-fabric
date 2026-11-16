@@ -14,6 +14,8 @@
 package powersource
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -702,18 +704,20 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrBatPercentRemaining, Name: "BatPercentRemaining",
-			Type:        spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
-			Conformance: spec.Conformance{Text: "[BAT]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "BAT"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "max 200", Max: &spec.Bound{Int: 200}},
+			Type:          spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8},
+			Conformance:   spec.Conformance{Text: "[BAT]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "BAT"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "max 200", Max: &spec.Bound{Int: 200}},
+			QuietInterval: 10 * time.Second,
 		},
 		{
 			ID: AttrBatTimeRemaining, Name: "BatTimeRemaining",
-			Type:        spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32},
-			Conformance: spec.Conformance{Text: "[BAT]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "BAT"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Type:          spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32},
+			Conformance:   spec.Conformance{Text: "[BAT]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "BAT"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: 10 * time.Second,
 		},
 		{
 			ID: AttrBatChargeLevel, Name: "BatChargeLevel",
@@ -811,10 +815,11 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrBatTimeToFullCharge, Name: "BatTimeToFullCharge",
-			Type:        spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32},
-			Conformance: spec.Conformance{Text: "[RECHG]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "RECHG"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Type:          spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32},
+			Conformance:   spec.Conformance{Text: "[RECHG]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "RECHG"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: 10 * time.Second,
 		},
 		{
 			ID: AttrBatFunctionalWhileCharging, Name: "BatFunctionalWhileCharging",

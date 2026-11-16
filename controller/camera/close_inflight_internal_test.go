@@ -98,6 +98,39 @@ func TestSecondCloseWaitsForTheFirst(t *testing.T) {
 	})
 }
 
+// TestFirstCloseBoundedByContext (R2-P5-apinode-19, N-life-5): the first
+// Close waits for a raw provider command in flight only until its ctx
+// ends, returns ctx's error and leaves the service closing; a later Close
+// waits for the teardown and returns nil once the command returned.
+// Before, the first Close waited on the command with no bound.
+func TestFirstCloseBoundedByContext(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		f := newPSFixture()
+		later := make(chan error, 1)
+		err := sendDuringClose(t, f, func() {
+			gone, cancel := context.WithCancel(context.Background())
+			cancel()
+			if err := f.svc.Close(gone); !errors.Is(err, context.Canceled) {
+				t.Errorf("the first Close with an ended ctx = %v, want context.Canceled", err)
+			}
+			go func() { later <- f.svc.Close(context.Background()) }()
+			synctest.Wait()
+			select {
+			case err := <-later:
+				t.Errorf("a later Close returned (%v) while the command was in flight", err)
+			default:
+			}
+		})
+		if !errors.Is(err, ErrClosed) {
+			t.Errorf("Send answered during Close = %v, want ErrClosed", err)
+		}
+		if err := <-later; err != nil {
+			t.Fatalf("the later Close: %v", err)
+		}
+	})
+}
+
 // TestProviderReOfferAnsweredDuringCloseAddsNothing (review II, rework of
 // R2-P2-stop-03): a raw ProvideOffer naming a session the camera holds —
 // one the requestor does not track — whose response arrives once Close

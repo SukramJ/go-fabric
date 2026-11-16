@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/reportchunk"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -51,6 +52,16 @@ type ServerConfig struct {
 	ValueWriter  im.AttributeValueWriter
 	// ValueReader decodes a written value; nil is [wire.AttributeValueReader].
 	ValueReader im.AttributeValueReader
+	// Dispatch, when set, returns the dispatcher of each request in place of
+	// Dispatcher: a role whose endpoint tree is re-assembled serves the tree
+	// of the moment (a node's bridge, whose dispatcher each assembly
+	// replaces). A nil answer — no tree yet — answers the request Failure.
+	Dispatch func() im.Dispatcher
+	// RequestContext, when set, adds the role's own facts of the session to
+	// each request's context — what the role's own server stamps for a
+	// session of its own — on top of the server's fabric, subject, node id
+	// and qualities; the timed and Large Message stamps follow it.
+	RequestContext func(ctx context.Context, s *exchange.Session) context.Context
 }
 
 // server is the installed [ServerConfig].
@@ -66,7 +77,7 @@ type server struct {
 // publish no subscription). A nil Dispatcher uninstalls, back to the
 // report-only handler.
 func (r *Subscriptions) Serve(cfg ServerConfig) {
-	if cfg.Dispatcher == nil {
+	if cfg.Dispatcher == nil && cfg.Dispatch == nil {
 		r.server.Store(nil)
 		return
 	}
@@ -156,6 +167,15 @@ func (s *server) serve(ctx context.Context, x *exchange.Exchange, msg *exchange.
 	return im.StatusInvalidAction
 }
 
+// dispatcher is the dispatcher a request is served by
+// ([ServerConfig].Dispatch, else Dispatcher); nil when the role has no tree.
+func (s *server) dispatcher() im.Dispatcher {
+	if s.cfg.Dispatch != nil {
+		return s.cfg.Dispatch()
+	}
+	return s.cfg.Dispatcher
+}
+
 // requestContext is the context a served request runs under: the
 // session's fabric and subject, as the device-side bridge builds it
 // (bridge/receive_dispatch.go) — a client stack's sessions are CASE, so no
@@ -172,86 +192,55 @@ func (s *server) requestContext(ctx context.Context, x *exchange.Exchange, fabri
 	if s.cfg.Qualities != nil {
 		ctx = im.WithElementQualities(ctx, s.cfg.Qualities)
 	}
+	if s.cfg.RequestContext != nil {
+		ctx = s.cfg.RequestContext(ctx, sess)
+	}
 	return ctx
 }
 
 // read is InteractionServer.handleReadRequest (InteractionServer.ts:335-390):
 // the paths validated (a wildcard cluster is InvalidAction, :133), the
-// report assembled and sent as sendDataReport sends it
-// (InteractionMessenger.ts:470-510): in chunks of the session's payload
-// size, every chunk but the last answered by the peer's StatusResponse.
-// The served endpoints log no events, so an event request reports none.
+// report generated and sent as sendDataReport sends it
+// (InteractionMessenger.ts:470-510): chunk by chunk in the session's
+// payload size, every chunk but the last answered by the peer's
+// StatusResponse before the next is generated — the reports pulled from
+// [im.NewReadReports] through the chunker the device side uses
+// ([reportchunk.Chunker]; review II, decision 44, R2-P5-write-08). The
+// served endpoints log no events, so an event request reports none.
 func (s *server) read(ctx context.Context, x *exchange.Exchange, req im.ReadRequest) im.StatusCode {
 	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
 		return status
 	}
+	d := s.dispatcher()
+	if d == nil {
+		return im.StatusFailure
+	}
 	rctx := s.requestContext(ctx, x, req.FabricFiltered)
-	report := im.HandleReadRequest(rctx, s.cfg.Dispatcher, req)
-	report.SuppressResponse = true
-	chunks := s.chunkReport(report, x.Session().MaxPayloadSize())
-	for i, chunk := range chunks {
-		last := i == len(chunks)-1
-		chunk.MoreChunkedMessages = !last
-		chunk.SuppressResponse = last
-		enc := tlv.NewEncoder()
-		chunk.MarshalTLV(enc, s.cfg.ValueWriter)
-		body, err := enc.Bytes()
+	budget := x.Session().MaxPayloadSize()
+	write := reportchunk.Writer(s.cfg.ValueWriter)
+	chunker := reportchunk.New(im.ReportData{SuppressResponse: true}, budget, budget, write, reportchunk.Reads(im.NewReadReports(rctx, d, req)), nil)
+	for {
+		chunk, ok, err := chunker.Next()
+		if err == nil && !ok {
+			return im.StatusSuccess
+		}
+		var body []byte
+		if err == nil {
+			body, err = reportchunk.Encode(chunk, write)
+		}
 		if err != nil {
 			s.log.Debug("matter.controller.interaction.server.report_encode", slog.Any("err", err))
 			return im.StatusFailure
 		}
+		last := !chunk.MoreChunkedMessages
 		if err := x.Send(ctx, im.OpcodeReportData, body, exchange.SendOptions{ExpectAckOnly: last}); err != nil {
 			s.log.Debug("matter.controller.interaction.server.report_send", slog.Any("err", err))
 			return im.StatusSuccess
 		}
-		if !last && !s.awaitChunkStatus(ctx, x) {
+		if last || !s.awaitChunkStatus(ctx, x) {
 			return im.StatusSuccess
 		}
 	}
-	return im.StatusSuccess
-}
-
-// chunkReport splits a report whose encoding exceeds budget into reports
-// that fit, one attribute or event report at a time; a single report
-// above the budget becomes a ResourceExhausted status for its path, as
-// the bridge caps an oversized report (bridge/reply.go chunkReportData).
-func (s *server) chunkReport(rd im.ReportData, budget int) []im.ReportData {
-	size := func(r im.ReportData) int {
-		enc := tlv.NewEncoder()
-		r.MarshalTLV(enc, s.cfg.ValueWriter)
-		b, _ := enc.Bytes()
-		return len(b)
-	}
-	if size(rd) <= budget {
-		return []im.ReportData{rd}
-	}
-	var chunks []im.ReportData
-	cur := im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID}
-	for _, rep := range rd.Reports {
-		one := im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID, Reports: []im.AttributeReport{rep}, MoreChunkedMessages: true}
-		if size(one) > budget {
-			rep = im.AttributeReport{Path: rep.Path, IsStatus: true, Status: im.StatusIB{Status: im.StatusResourceExhausted}}
-		}
-		trial := cur
-		trial.Reports = append(append([]im.AttributeReport(nil), cur.Reports...), rep)
-		trial.MoreChunkedMessages = true
-		if size(trial) > budget && (len(cur.Reports) > 0 || len(cur.EventReports) > 0) {
-			chunks = append(chunks, cur)
-			cur = im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID}
-		}
-		cur.Reports = append(cur.Reports, rep)
-	}
-	for _, ev := range rd.EventReports {
-		trial := cur
-		trial.EventReports = append(append([]im.EventReport(nil), cur.EventReports...), ev)
-		trial.MoreChunkedMessages = true
-		if size(trial) > budget && (len(cur.Reports) > 0 || len(cur.EventReports) > 0) {
-			chunks = append(chunks, cur)
-			cur = im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID}
-		}
-		cur.EventReports = append(cur.EventReports, ev)
-	}
-	return append(chunks, cur)
 }
 
 // awaitChunkStatus reads the StatusResponse a peer owes for a chunk that
@@ -282,9 +271,13 @@ func (s *server) write(ctx context.Context, x *exchange.Exchange, req im.WriteRe
 	if req.TimedRequest != timed {
 		return im.StatusTimedRequestMismatch
 	}
+	d := s.dispatcher()
+	if d == nil {
+		return im.StatusFailure
+	}
 	wctx := s.requestContext(ctx, x, false)
 	wctx = im.WithTimedInteraction(wctx, timed)
-	resp := im.HandleWriteRequest(wctx, s.cfg.Dispatcher, req)
+	resp := im.HandleWriteRequest(wctx, d, req)
 	if !resp.Status.IsSuccess() && !req.SuppressResponse {
 		return resp.Status
 	}
@@ -318,10 +311,18 @@ func (s *server) invoke(ctx context.Context, x *exchange.Exchange, req im.Invoke
 	}
 	ictx := s.requestContext(ctx, x, false)
 	ictx = im.WithTimedInteraction(ictx, timed)
+	// The session carries large messages exactly when it is bound to a TCP
+	// channel; the invoke path refuses a Large Message command otherwise
+	// ([im.WithLargeMessageSession]).
+	ictx = im.WithLargeMessageSession(ictx, x.Session().Transport() == exchange.TransportTCP)
 	after := &im.AfterResponse{}
 	defer after.Run()
 	ictx = im.WithAfterResponse(ictx, after)
-	resp := im.HandleInvokeRequest(ictx, s.cfg.Dispatcher, req)
+	d := s.dispatcher()
+	if d == nil {
+		return im.StatusFailure
+	}
+	resp := im.HandleInvokeRequest(ictx, d, req)
 	for i := range resp.Responses {
 		wire.ResponseCommandOf(&resp.Responses[i])
 	}

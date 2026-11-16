@@ -94,7 +94,18 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})                    // no EmitEvent
 	_ = s.EmitCurrentConditionsChanged(0, CurrentConditionsChangedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordCurrentConditionsChanged(CurrentConditionsChangedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordCurrentConditionsChanged(CurrentConditionsChangedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordCurrentConditionsChanged on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

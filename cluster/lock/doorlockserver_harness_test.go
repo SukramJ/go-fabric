@@ -214,7 +214,10 @@ func createLock(t *testing.T, edit func(*lock.DoorLockConfig)) *lockFixture {
 	return newLockFixture(t, cfg)
 }
 
-// scheduledUser is DoorLockServerTest.ts:166-179.
+// scheduledUser is DoorLockServerTest.ts:166-179. A record of matter.js's
+// state is one a fabric made — its fabric indexes are not nullable
+// (LockAuth.ts:67-71, :97-101 at db021da0) — so the fixture's records are
+// made through Matter.
 func scheduledUser(userType lockdef.UserTypeEnum, expiresAt *int64) store.DoorLockUser {
 	return store.DoorLockUser{
 		UserIndex:               1,
@@ -224,6 +227,8 @@ func scheduledUser(userType lockdef.UserTypeEnum, expiresAt *int64) store.DoorLo
 		Credentials:             []store.DoorLockCredentialRef{{Type: uint8(lockdef.CredentialTypePin), Index: 1}},
 		CreatorFabricIndex:      pairFabric,
 		LastModifiedFabricIndex: pairFabric,
+		CreatedThroughMatter:    true,
+		ModifiedThroughMatter:   true,
 		ExpiringUserExpiresAt:   expiresAt,
 	}
 }
@@ -254,6 +259,7 @@ func scheduledLockState(users ...store.DoorLockUser) lock.DoorLockConfig {
 			Credentials: []store.DoorLockCredential{{
 				Type: uint8(lockdef.CredentialTypePin), Index: 1, Data: pin("1234"),
 				CreatorFabricIndex: pairFabric, LastModifiedFabricIndex: pairFabric,
+				CreatedThroughMatter: true, ModifiedThroughMatter: true,
 			}},
 		},
 	}

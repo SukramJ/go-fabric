@@ -166,10 +166,10 @@ var hostCases = map[uint32]hostCase{
 	h_wc.ClusterID:      {kit: kitOf[*cover.WindowCoveringServer](), covered: []string{"SetCurrentPosition", "SetOperationalStatus", "SetTargetPosition"}},
 	// Thermostat and Valve: AttachMatterTime and RequiresMatterTime are the
 	// node's wiring.
-	h_thermostat.ClusterID: {kit: kitOf[*thermo.ThermostatServer](), covered: []string{
+	h_thermostat.ClusterID: {kit: kitOf[*thermo.ThermostatServer](), host: hostOf[h_thermostat.Host](h_thermostat.Wrap), covered: []string{
 		"ActivePresetHandle", "ActiveScheduleHandle", "AttachMatterTime", "CurrentSuggestion", "Presets", "RequiresMatterTime", "Schedules",
 		"SetAbsoluteSetpointLimit", "SetActivePresetHandle", "SetActiveScheduleHandle", "SetLocalTemperature",
-		"SetOccupied", "SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
+		"SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
 		"Suggestions",
 	}},
@@ -333,7 +333,9 @@ func kitMethods(kit, host reflect.Type) []string {
 	if kit == reflect.TypeFor[*spec.Server]() {
 		return nil // the generated server, whose methods are the typed layer's
 	}
-	skip := map[string]bool{"SetEndpoint": true}
+	// SetEndpoint is the bridge's; EmitEvent the typed layer's
+	// Record<Event> (R2-P5-apispec-07).
+	skip := map[string]bool{"SetEndpoint": true, "EmitEvent": true}
 	for _, it := range typedLayer {
 		if !kit.Implements(it) {
 			continue

@@ -70,15 +70,37 @@ type handshakeHold struct {
 	since     time.Time
 }
 
-// Network names the transport of the connection's peer address.
-func (r *connRoute) Network() string { return r.conn.Remote().Network() }
+// Network names the transport of the connection's peer address
+// ([connNetwork]).
+func (r *connRoute) Network() string { return connNetwork(r.conn) }
 
 // String names the connection for the log.
 func (r *connRoute) String() string {
 	if s, ok := r.conn.(fmt.Stringer); ok {
 		return s.String()
 	}
-	return r.conn.Remote().Network() + "://" + r.conn.Remote().String()
+	if c := r.conn; c != nil && c.Remote() != nil {
+		return c.Remote().Network() + "://" + c.Remote().String()
+	}
+	return "conn://?"
+}
+
+// connNetwork names the transport of c's peer address as
+// [net.Addr.Network] does — "tcp" for a TCP connection — and "" for no
+// connection or one without a peer address. "" is no transport the
+// callers single out: such a route carries no Large Messages
+// ([routeCarriesLargeMessages]) and is not held to the TCP size limit
+// ([Bridge.connMessageLimit]), and nothing on it dereferences a nil
+// address.
+func connNetwork(c transport.Conn) string {
+	if c == nil {
+		return ""
+	}
+	remote := c.Remote()
+	if remote == nil {
+		return ""
+	}
+	return remote.Network()
 }
 
 // routeFor returns the reply route for a message that arrived on c:
@@ -101,6 +123,18 @@ func (b *Bridge) routeFor(c transport.Conn) net.Addr {
 	raw, _ := b.connRoutes.LoadOrStore(c, &connRoute{conn: c})
 	r, _ := raw.(*connRoute)
 	return r
+}
+
+// routeCarriesLargeMessages reports whether a session on route carries
+// Large Messages: a route over a reliable TCP connection does; a UDP
+// address, a BTP (BLE) connection and no route do not. The test is the one
+// [Bridge.connMessageLimit] makes for TCP.
+func routeCarriesLargeMessages(route net.Addr) bool {
+	r, ok := route.(*connRoute)
+	if !ok || r == nil || r.conn == nil || !r.conn.Reliable() {
+		return false
+	}
+	return connNetwork(r.conn) == "tcp"
 }
 
 // isNilRoute reports whether dst names no peer — nil, or a typed nil

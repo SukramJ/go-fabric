@@ -14,40 +14,9 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
-// validateSetCredential is the request validation matter.js runs before
-// setCredential, remapped to INVALID_COMMAND (DoorLockServer.ts:1494-1511):
-// the enum constraints and UserIndex "1 to numberOfTotalUsersSupported".
-func (s *DoorLockServer) validateSetCredential(req lockdef.SetCredentialRequest) error {
-	if err := s.checkEnum("OperationType", lockdef.DataOperationTypeEnumDef, uint64(req.OperationType), dataOperationAddModify...); err != nil {
-		return err
-	}
-	if err := s.checkEnum("CredentialType", lockdef.CredentialTypeEnumDef, uint64(req.Credential.CredentialType)); err != nil {
-		return err
-	}
-	if !req.UserIndex.Null {
-		if maxUsers, _ := s.uint16Attr(lockdef.AttrNumberOfTotalUsersSupported); req.UserIndex.Value > maxUsers {
-			return spec.Errorf(im.StatusInvalidCommand, "lock: UserIndex %d is outside 1 to %d", req.UserIndex.Value, maxUsers)
-		}
-	}
-	if !req.UserStatus.Null {
-		if err := s.checkEnum("UserStatus", lockdef.UserStatusEnumDef, uint64(req.UserStatus.Value), requestUserStatuses...); err != nil {
-			return err
-		}
-	}
-	if !req.UserType.Null {
-		if err := s.checkEnum("UserType", lockdef.UserTypeEnumDef, uint64(req.UserType.Value), setCredentialUserTypes...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *DoorLockServer) handleSetCredential(ctx context.Context, fields any) (any, error) {
 	req, err := requestAs[lockdef.SetCredentialRequest](fields)
 	if err != nil {
-		return nil, err
-	}
-	if err := s.validateSetCredential(req); err != nil {
 		return nil, err
 	}
 	s.op.Lock()
@@ -161,6 +130,8 @@ func (s *DoorLockServer) addCredentialCaseLocked(ctx context.Context, req lockde
 			Credentials:             []store.DoorLockCredentialRef{ref},
 			CreatorFabricIndex:      fabricIndex,
 			LastModifiedFabricIndex: fabricIndex,
+			CreatedThroughMatter:    true,
+			ModifiedThroughMatter:   true,
 		}
 		if !req.UserStatus.Null {
 			user.UserStatus = uint8(req.UserStatus.Value)
@@ -182,7 +153,7 @@ func (s *DoorLockServer) addCredentialCaseLocked(ctx context.Context, req lockde
 			return respond(resourceExhausted, nil)
 		}
 		user.Credentials = append(user.Credentials, ref)
-		user.LastModifiedFabricIndex = fabricIndex
+		user.LastModifiedFabricIndex, user.ModifiedThroughMatter = fabricIndex, true
 		s.dirty = true
 	}
 	s.emitLockUserChangeLocked(ctx, credentialTypeToLockDataType(req.Credential.CredentialType), lockdef.DataOperationTypeAdd, &owner, &credIndex)
@@ -219,8 +190,8 @@ func (s *DoorLockServer) getCredentialStatusLocked(req lockdef.GetCredentialStat
 	}
 	resp.CredentialExists = true
 	resp.UserIndex = nullable(s.ownerOf(credType, index))
-	resp.CreatorFabricIndex = spec.ValueOf(cred.CreatorFabricIndex)
-	resp.LastModifiedFabricIndex = spec.ValueOf(cred.LastModifiedFabricIndex)
+	resp.CreatorFabricIndex = fabricThroughMatter(cred.CreatedThroughMatter, cred.CreatorFabricIndex)
+	resp.LastModifiedFabricIndex = fabricThroughMatter(cred.ModifiedThroughMatter, cred.LastModifiedFabricIndex)
 	return resp
 }
 
@@ -453,6 +424,7 @@ func (s *DoorLockServer) addCredentialLocked(credType uint8, index uint16, data 
 	}
 	s.data.Credentials = append(s.data.Credentials, store.DoorLockCredential{
 		Type: credType, Index: index, Data: enc, CreatorFabricIndex: fabricIndex, LastModifiedFabricIndex: fabricIndex,
+		CreatedThroughMatter: true, ModifiedThroughMatter: true,
 	})
 	s.dirty = true
 	return nil
@@ -465,7 +437,7 @@ func (s *DoorLockServer) updateCredentialDataLocked(credType uint8, index uint16
 		return spec.Errorf(im.StatusFailure, "lock: encrypt the credential: %v", err)
 	}
 	if c := s.findCredential(credType, index); c != nil {
-		c.Data, c.LastModifiedFabricIndex = enc, fabricIndex
+		c.Data, c.LastModifiedFabricIndex, c.ModifiedThroughMatter = enc, fabricIndex, true
 		s.dirty = true
 	}
 	return nil

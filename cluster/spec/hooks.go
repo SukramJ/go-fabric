@@ -16,7 +16,7 @@ import (
 // SetAttributes over its own setters. The server embeds it, calls
 // [Hooks.Init] with its instance when it is built, runs [Hooks.Invoke]
 // first in its MatterInvoke and [Hooks.CheckWrite] after its own checks
-// of a controller's write, and hands the endpoint's emitter on with
+// of a controller's write and its comparison with the held value, and hands the endpoint's emitter on with
 // [Hooks.SetMatterEventEmitter] — promoted, or called from its own when
 // it keeps the emitter itself too.
 type Hooks struct {
@@ -36,7 +36,8 @@ func (h *Hooks) Handle(cmdID uint32, fn CommandHandler) error {
 	return h.handlers.Register(h.inst, cmdID, fn)
 }
 
-// Invoke runs the host's handler of cmdID; handled is false when the host
+// Invoke runs the host's handler of cmdID, its response held to the
+// definition ([HostHandlers.Invoke]); handled is false when the host
 // registered none, and the server's own logic runs.
 func (h *Hooks) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
 	return h.handlers.Invoke(ctx, cmdID, fields)
@@ -48,6 +49,17 @@ func (h *Hooks) Emit(endpoint uint16, eventID uint32, data any) error {
 	return h.events.Emit(h.inst, endpoint, eventID, data)
 }
 
+// EmitEvent emits eventID with data on the endpoint the server is mounted
+// on ([Events.EmitEvent]): the call the typed Record<Event> makes.
+func (h *Hooks) EmitEvent(eventID uint32, data any) error {
+	return h.events.EmitEvent(h.inst, eventID, data)
+}
+
+// SetEndpoint implements [contract.EndpointReceiver]: the endpoint
+// [Hooks.EmitEvent] emits on. A server with a SetEndpoint of its own calls
+// it from there.
+func (h *Hooks) SetEndpoint(endpoint uint16) { h.events.SetEndpoint(endpoint) }
+
 // SetMatterEventEmitter implements [contract.EventReceiver]: the emitter
 // [Hooks.Emit] emits through.
 func (h *Hooks) SetMatterEventEmitter(emitter contract.EventEmitter) { h.events.SetEmitter(emitter) }
@@ -58,7 +70,9 @@ func (h *Hooks) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value
 }
 
 // CheckWrite runs the veto on a controller's write that passed the
-// server's checks ([WriteVeto.Check]).
+// server's checks and changes the value it holds ([WriteVeto.Check]):
+// called after the server's own comparison, never for a write of the held
+// value.
 func (h *Hooks) CheckWrite(ctx context.Context, attrID uint32, value any) error {
 	return h.veto.Check(ctx, attrID, value)
 }

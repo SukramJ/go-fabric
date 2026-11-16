@@ -16,6 +16,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -42,6 +43,8 @@ type rowBacking interface {
 	GetSetting(ctx context.Context, key string) (string, bool, error)
 	SetSetting(ctx context.Context, key, value string) error
 	SetSettings(ctx context.Context, values map[string]string) error
+	DeleteSettings(ctx context.Context, keys ...string) error
+	DeleteSettingsWithPrefix(ctx context.Context, prefix string) error
 	GetMetadataCounter(ctx context.Context, key string) (uint64, bool, error)
 	SetMetadataCounter(ctx context.Context, key string, value uint64) error
 	ListACL(ctx context.Context, fabricIndex uint8) ([]mstore.ACLEntry, error)
@@ -190,6 +193,13 @@ func (s *rowStore) UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, 
 		return err
 	}
 	return s.rowBacking.UpdateFabricVendorID(ctx, fabricIndex, vendorID)
+}
+
+func (s *rowStore) UpdateFabricVendorVerification(ctx context.Context, fabricIndex uint8, u mstore.FabricVendorUpdate) error {
+	if err := s.check("UpdateFabricVendorVerification", true); err != nil {
+		return err
+	}
+	return s.rowBacking.UpdateFabricVendorVerification(ctx, fabricIndex, u)
 }
 
 func (s *rowStore) UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error {
@@ -504,6 +514,50 @@ func TestRow_UpdateNOCKeepsTheVIDDataOnAReadError(t *testing.T) {
 	fabrics, _ := v.([]core.FabricDescriptorStruct)
 	if len(fabrics) != 1 || !bytes.Equal(fabrics[0].VidVerificationStatement, statement) {
 		t.Fatalf("Fabrics after the rolled-back UpdateNOC = %+v; want the VID statement kept", fabrics)
+	}
+}
+
+// TestRow_SetVIDVerificationStatementWritesBothOrNeither is R2-P5-port-05:
+// a SetVIDVerificationStatement that carries a VendorID and a statement
+// changes both in one store write, so a store that fails after its first
+// write changes neither and the command fails; a store that takes the
+// write changes both. Before the fix the vendor id landed alone.
+func TestRow_SetVIDVerificationStatementWritesBothOrNeither(t *testing.T) {
+	t.Parallel()
+	for name, open := range rowBackings {
+		for _, writes := range []int{0, 1} {
+			t.Run(fmt.Sprintf("%s/%d-writes", name, writes), func(t *testing.T) {
+				t.Parallel()
+				ctx := context.Background()
+				st := newRowStore(open(t))
+				r := newRowRig(t, st, nil)
+				idx, _ := r.commission(ctx, t)
+				before, err := st.GetFabric(ctx, idx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				statement := bytes.Repeat([]byte{0x5A}, 85)
+				vendor := before.VendorID + 1
+				st.crashAfterWrites(writes)
+				_, err = r.oc.MatterInvoke(im.WithFabricFilter(ctx, true, idx), 0x0C, core.SetVidVerificationStatementRequest{
+					HasVendorID: true, VendorID: vendor,
+					HasVidVerificationStatement: true, VidVerificationStatement: statement,
+				})
+				st.crashAfterWrites(-1)
+				after, gerr := st.GetFabric(ctx, idx)
+				if gerr != nil {
+					t.Fatal(gerr)
+				}
+				vendorMoved := after.VendorID == vendor
+				dataMoved := bytes.Equal(after.VIDVerificationStatement, statement)
+				switch {
+				case err == nil && (!vendorMoved || !dataMoved):
+					t.Fatalf("answered success with vendor moved %v, data moved %v; want both", vendorMoved, dataMoved)
+				case err != nil && (vendorMoved || dataMoved):
+					t.Fatalf("answered %v with vendor moved %v, data moved %v; want neither", err, vendorMoved, dataMoved)
+				}
+			})
+		}
 	}
 }
 

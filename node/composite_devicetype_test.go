@@ -27,7 +27,7 @@ func TestCompositeDeviceTypesValidate(t *testing.T) {
 		}
 	}
 	camera := func(key string) *device.Camera {
-		c, err := device.NewCamera(opts(key))
+		c, err := device.NewCamera(opts(key), cameraRequired())
 		must(err)
 		return c
 	}
@@ -61,7 +61,7 @@ func TestCompositeDeviceTypesValidate(t *testing.T) {
 
 	// The bare composite, without its components, carries the violations
 	// matter.js pins for it.
-	bare, err := device.FromSpec(device.Spec{Type: device.VideoDoorbellID, Options: opts("bare")})
+	bare, err := device.New(device.VideoDoorbellType(), opts("bare"))
 	must(err)
 	site2, lg2 := loggingSite(t)
 	_ = site2.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{bare}})

@@ -188,3 +188,83 @@ func TestReestablishKeepsTheCreationOrder(t *testing.T) {
 		t.Fatalf("store holds %v after the re-establishment, want the creation order [A=%#x B=%#x]", got, subA, subB)
 	}
 }
+
+// TestReestablishStopsWithTheBridge (review II, Fable read 5b-write F4): a
+// bridge stopped while a former subscription's priming report waits for
+// its first chunk's answer sends no chunk of the peer's remaining
+// records — the wait ends with the bridge's handler context and the
+// peer's loop ends with it.
+func TestReestablishStopsWithTheBridge(t *testing.T) {
+	fab := newResumeFabric(t)
+	st := &savedOrderStore{}
+	ctrl := newFakeController(t, fab)
+	run1 := startResumeDevice(t, st, nil)
+	ctrl.setBridge(run1.addr(t))
+	subA := subscribeOverCASE(t, run1, ctrl)
+	subB := subscribeAgainOverCASE(t, ctrl)
+	waitFor(t, "A and B persisted", func() bool { return slices.Equal(st.saved(), []uint32{subA, subB}) })
+	run1.stop()
+
+	run2 := startResumeDevice(t, st, func(br *Bridge, sessions *operational.Manager) {
+		br.AttachCaseInitiatorProvider(resumeInitiatorProvider(fab, sessions))
+		br.AttachOperationalResolver(staticResolver{addr: ctrl.addr})
+	})
+	var mu sync.Mutex
+	primed := map[uint32]int{}
+	seen := make(chan uint32, 8)
+	ctrl.mu.Lock()
+	ctrl.secureHook = func(_ *message.Header, proto message.ProtocolHeader, payload []byte) bool {
+		if proto.ProtocolID != im.InteractionModelProtocolID || proto.Opcode != im.OpcodeReportData {
+			return false
+		}
+		id, _ := decodeReportSummary(payload)
+		mu.Lock()
+		primed[id]++
+		mu.Unlock()
+		seen <- id
+		// The newest record's first chunk is left unanswered and the
+		// bridge stops meanwhile: what Stop cancels first.
+		run2.br.mu.RLock()
+		cancel := run2.br.serveCancel
+		run2.br.mu.RUnlock()
+		if cancel != nil {
+			cancel()
+		}
+		return true
+	}
+	ctrl.mu.Unlock()
+	ctrl.setBridge(run2.addr(t))
+	sentBefore := run2.br.load.imSent.Load()
+	done := make(chan ReestablishResult, 1)
+	go func() { done <- run2.br.ReestablishFormerSubscriptions(context.Background()) }()
+	wait, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	select {
+	case res := <-done:
+		if len(res.Reestablished) != 0 {
+			t.Errorf("re-established %v after the bridge stopped, want none", res.Reestablished)
+		}
+	case <-wait.Done():
+		t.Fatal("the re-establishment still runs 10 s after the bridge stopped")
+	}
+	// A chunk the bridge sent before it returned reaches the controller
+	// within this window.
+	late, stop := context.WithTimeout(t.Context(), time.Second)
+	defer stop()
+	for drained := false; !drained; {
+		select {
+		case <-seen:
+		case <-late.Done():
+			drained = true
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if primed[subA] != 0 || primed[subB] != 1 {
+		t.Fatalf("priming chunks sent per subscription %v, want B=%#x's first alone, none of A=%#x", primed, subB, subA)
+	}
+	// Not even attempted: one IM message went out, B's first chunk.
+	if n := run2.br.load.imSent.Load() - sentBefore; n != 1 {
+		t.Fatalf("%d IM messages sent during the re-establishment, want B's first chunk alone", n)
+	}
+}

@@ -14,9 +14,21 @@ import (
 
 // SchedulesClusterID is the Schedules cluster ID per Matter Application
 // Cluster Specification §11.20.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 const SchedulesClusterID uint32 = 0x0024
 
 // Schedules cluster attribute IDs per Matter §11.20.5.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 const (
 	SchedulesAttrScheduleProgrammingHandle         uint32 = 0x0000
 	SchedulesAttrNumberOfSchedules                 uint32 = 0x0001
@@ -30,17 +42,35 @@ const (
 
 // SchedulesClusterRevision is the Matter cluster revision for Schedules
 // (0x0024). Cluster revision 1 covers the initial Matter 1.3 publication.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 const SchedulesClusterRevision uint16 = 1
 
 // ErrSchedulesReadOnly is returned when a write or invoke is attempted on
-// the Schedules cluster. The CCU owns schedule mutation; Matter controllers
-// consume schedules read-only through this bridge surface.
+// the Schedules cluster: the host owns schedule mutation, and controllers
+// read the schedules only.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 var ErrSchedulesReadOnly = errors.New("wire: Schedules cluster is read-only in v1.1 bridge")
 
 // ScheduleEntry is the bridge-side representation of one programmed
 // setpoint transition. [SchedulesSource.MatterScheduleEntries] returns one
 // entry per programmed slot; the cluster groups them by DayOfWeek when
 // assembling the Schedules attribute array.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 type ScheduleEntry struct {
 	// DayOfWeek is the day index using the Matter convention: 0=Sunday,
 	// 1=Monday, …, 6=Saturday.
@@ -53,6 +83,12 @@ type ScheduleEntry struct {
 
 // ScheduleStruct is a single entry in the Schedules attribute array,
 // collecting all transitions for one day slot.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 type ScheduleStruct struct {
 	// DayOfWeek is the Matter-convention day index (0=Sun..6=Sat).
 	DayOfWeek uint8
@@ -60,15 +96,20 @@ type ScheduleStruct struct {
 	Transitions []ScheduleEntry
 }
 
-// SchedulesSource is the read interface implemented by models that expose a
-// week-program schedule. The Schedules cluster server calls
+// SchedulesSource is the read interface implemented by a host's model that
+// exposes a week-program schedule. The Schedules cluster server calls
 // MatterScheduleEntries to build the attribute snapshot; it does not poll —
 // reads are always on-demand at attribute-read time.
 //
-// The implementing type (e.g. climate.Climate) is responsible for mapping its
-// internal week-profile representation to the flat []ScheduleEntry slice.
-// The cluster server then groups entries by DayOfWeek to form ScheduleStruct
-// values in the Schedules attribute.
+// The implementing type maps its own week-program representation to the
+// flat []ScheduleEntry slice. The cluster server then groups entries by
+// DayOfWeek to form ScheduleStruct values in the Schedules attribute.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 type SchedulesSource interface {
 	MatterScheduleEntries() []ScheduleEntry
 }
@@ -76,22 +117,33 @@ type SchedulesSource interface {
 // SchedulesServer is a read-only [contract.ClusterServer] projection
 // of a [SchedulesSource] onto the Matter Schedules cluster (0x0024).
 //
-// Write and invoke are rejected with [ErrSchedulesReadOnly]: HM week
-// programs are managed exclusively on the CCU or via go-fabric's own REST
-// API. Matter controllers can read the current schedule but cannot modify it
-// through this cluster.
+// Write and invoke are rejected with [ErrSchedulesReadOnly]: the host
+// manages its week programs; controllers can read the current schedule but
+// cannot modify it through this cluster.
 //
 // Grouping: The cluster groups [ScheduleEntry] values by DayOfWeek into
 // [ScheduleStruct] values for the Schedules attribute. The NumberOfSchedules
 // attribute counts the distinct day groups; NumberOfScheduleTransitions counts
 // total entries; NumberOfScheduleTransitionsPerDay counts the maximum
 // transitions in any single day group.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 type SchedulesServer struct {
 	src SchedulesSource
 }
 
 // NewSchedulesServer constructs a [SchedulesServer] backed by src. src must
 // not be nil.
+//
+// Deprecated: the Schedules cluster (0x0024) is not in the Matter model
+// this module serves (parity/schema.json has no such cluster) and nothing
+// mounts this surface; a thermostat's week programs are the Thermostat
+// server's schedules (cluster/thermo, docs/guides/thermostat.md).
+// Removable in the next minor release.
 func NewSchedulesServer(src SchedulesSource) *SchedulesServer {
 	return &SchedulesServer{src: src}
 }

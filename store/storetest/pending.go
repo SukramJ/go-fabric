@@ -156,7 +156,7 @@ func fabricsUpdateRollback(ctx context.Context, t *testing.T, p store.Port) {
 	rec := fabric(2)
 	plain, err := p.AddFabric(ctx, rec)
 	must(t, err)
-	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: plain, NOC: []byte{1}, PrivateKey: []byte{2}, IPK: []byte{3}}))
+	must(t, p.UpsertIdentity(ctx, store.IdentityRecord{FabricIndex: plain, NOC: []byte{1}, PrivateKey: []byte{2}, IPK: bytes.Repeat([]byte{3}, 16)}))
 	before = stateOf(ctx, t, p, plain)
 	c = store.FabricCredentials{NOC: []byte{4}, ICAC: []byte{5}, PrivateKey: []byte{6}, NodeID: 7}
 	must(t, p.UpdateFabricCredentials(ctx, plain, c))

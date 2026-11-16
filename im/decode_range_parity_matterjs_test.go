@@ -5,9 +5,13 @@ package im
 
 // Path and header integers are type- and range-checked, never masked
 // (review 2026-11 W2-wire-03). An out-of-range value is a ConstraintError
-// as matter.js packages/types/src/tlv/TlvNumber.ts:151-155 throws it; a
-// value of another TLV type is InvalidAction as chip
-// src/app/MessageDef/AttributePathIB.cpp:220-275 answers it.
+// as matter.js packages/types/src/tlv/TlvNumber.ts:145-155 throws it
+// (ValidationOutOfBoundsError, ValidationError.ts:16-29); a value of
+// another TLV type, a signed integer included, is a Failure, as matter.js
+// throws UnexpectedDataError for it (TlvNumber.ts:124-131), which carries
+// no status, and the request's catch answers that with Status.Failure
+// (packages/protocol/src/interaction/InteractionMessenger.ts:425-460 at
+// db021da0).
 
 import (
 	"errors"
@@ -35,7 +39,23 @@ func TestDecodeRangeParity(t *testing.T) {
 		{"(b) ReadRequest endpoint -1 as int8", func() error {
 			_, err := UnmarshalReadRequestTLV(tlv.NewDecoder(readRequest(0x20, 0x02, 0xFF)))
 			return err
-		}, StatusInvalidAction},
+		}, StatusFailure},
+		{"ReadRequest endpoint 1 as int8", func() error {
+			_, err := UnmarshalReadRequestTLV(tlv.NewDecoder(readRequest(0x20, 0x02, 0x01)))
+			return err
+		}, StatusFailure},
+		{"ReadRequest endpoint as a boolean", func() error {
+			_, err := UnmarshalReadRequestTLV(tlv.NewDecoder(readRequest(0x28, 0x02)))
+			return err
+		}, StatusFailure},
+		{"TimedRequest timeout as int16", func() error {
+			_, err := UnmarshalTimedRequestTLV(tlv.NewDecoder([]byte{0x15, 0x21, 0x00, 0xE8, 0x03, 0x18}))
+			return err
+		}, StatusFailure},
+		{"SubscribeRequest MaxIntervalCeiling as a string", func() error {
+			_, err := UnmarshalSubscribeRequestTLV(tlv.NewDecoder([]byte{0x15, 0x28, 0x00, 0x24, 0x01, 0x00, 0x2C, 0x02, 0x01, 0x41, 0x28, 0x07, 0x18}))
+			return err
+		}, StatusFailure},
 		{"(c) TimedRequest 70000 ms as uint32", func() error {
 			_, err := UnmarshalTimedRequestTLV(tlv.NewDecoder([]byte{0x15, 0x26, 0x00, 0x70, 0x11, 0x01, 0x00, 0x18}))
 			return err
@@ -47,7 +67,7 @@ func TestDecodeRangeParity(t *testing.T) {
 		{"CommandPathIB cluster as a string", func() error {
 			_, err := UnmarshalCommandPathTLV(tlv.NewDecoder([]byte{0x37, 0x00, 0x24, 0x00, 0x01, 0x2C, 0x01, 0x01, 0x41, 0x24, 0x02, 0x00, 0x18}))
 			return err
-		}, StatusInvalidAction},
+		}, StatusFailure},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

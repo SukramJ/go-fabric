@@ -908,7 +908,11 @@ A store without a ledger offers stored images only. `ImagesConfig.Ledger`
 test-net ledger or both) turns the ledger lookups and the downloads on:
 `DownloadUpdate` fetches the image a ledger record names and
 `UpdateInfoFromURL` one a URL names, each into memory, verified before it
-is stored. No download passes `dcl.OTAVersions.MaxImageSize` — 0 is
+is stored — unless the store's `Blobs` type itself implements
+`softwareupdate.BlobStreamer` (`MemoryBlobs` does not): `DownloadUpdate` then
+writes the image into the backend as it arrives, verifies it by reading it
+back, removes it when a check fails, and serves BDX transfers from the
+backend in place; the image is offered to no node before its checks pass. No download passes `dcl.OTAVersions.MaxImageSize` — 0 is
 `dcl.DefaultMaxImageSize`, 256 MiB. The size a ledger record announces is
 the vendor's statement and does not raise the bound: a record that
 announces more is refused before the request, an answer longer than its
@@ -927,7 +931,36 @@ images := softwareupdate.NewImages(softwareupdate.ImagesConfig{
 })
 ```
 
-*Source: `controller/dcl/ota.go` (`OTAVersions.Download`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`).*
+Where an image comes from decides how it is fetched and checked. A ledger
+record's image is fetched over `https:` only and, unless the `dcl.Client`
+carries the host's own `HTTPClient`, from a public address only: a
+loopback, private, link-local, unspecified or multicast destination is
+refused when it is dialled, for the URL and each redirect hop
+(`dcl.Client.AllowPrivateDestinations` admits them for a lab; a test-net
+record is downloaded through the ledger's `TestClient`, so that client's
+`HTTPClient` and switch apply). The environment's proxy stays in use: a URL
+or redirect hop whose host is `localhost` or an IP address of those classes
+is refused before it is handed to the proxy (the host as net/http sends it,
+an IPv4 address in any inet_aton-style spelling included), and a host name
+sent through the proxy is the proxy's to resolve and connect to. A ledger image must
+also be bound to the record's whole-file checksum: `DownloadUpdate` refuses
+a record without one — production or test-net ledger — with
+`softwareupdate.ErrOTA` and the warning `dcl.ota.no_checksum` before it
+downloads anything. The store keeps each stored image's provenance (a
+`.origin` record beside it: the host, or the ledger with the checksum the
+image was checked against), and a stored prod or test image that is not
+bound to a checksum — stored from a record without one, or stored before
+the store kept provenance — is not offered by `CheckForUpdate`, reused by
+`DownloadUpdate` or opened for a transfer; the file is kept. Such an image
+without a record is bound, without a new download, the first time a ledger
+update with the checksum reuses it. `ImagesConfig.AllowUnverifiedLedgerImages`
+admits these images and logs each admission
+(`dcl.ota.no_checksum_admitted`). An image the host supplies itself —
+`UpdateInfoFromURL` (`dcl.OTAVersions.DownloadHostURL`),
+`UpdateInfoFromImage`, a local image, or `Images.Store` without a ledger
+record — may come over `http:` from any address and needs no checksum.
+
+*Source: `controller/dcl/ota.go` (`OTAVersions.Download`, `OTAVersions.DownloadHostURL`), `controller/dcl/client.go` (`Client.AllowPrivateDestinations`, `newGuardedClient`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`, `ImagesConfig.AllowUnverifiedLedgerImages`).*
 
 ### TCP
 

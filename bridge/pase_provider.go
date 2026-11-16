@@ -121,7 +121,7 @@ func (p *PerExchangePaseProvider) Forget(key HandshakeKey) {
 		e.expireTimer.Stop()
 	}
 	if e != nil && e.adapter != nil {
-		e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
+		e.adapter.dropped() // [PaseAdapter.dropped]
 	}
 }
 
@@ -139,7 +139,7 @@ func (p *PerExchangePaseProvider) Reset() {
 			e.expireTimer.Stop()
 		}
 		if e.adapter != nil {
-			e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
+			e.adapter.dropped() // [PaseAdapter.dropped]
 		}
 	}
 }
@@ -221,7 +221,7 @@ func (p *PerExchangePaseProvider) reapBefore(cutoff time.Time) {
 			e.expireTimer.Stop()
 		}
 		if e.adapter != nil {
-			e.adapter.releaseStakedID() // [PaseAdapter.SetOnUnfinished]
+			e.adapter.dropped() // [PaseAdapter.dropped]
 		}
 	}
 }

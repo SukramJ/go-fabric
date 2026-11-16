@@ -42,7 +42,7 @@ func TestTypedAccessors(t *testing.T) {
 		t.Errorf("a host's server: %T mounted, %T wrapped", d.Server(levelcontroldef.ClusterID), got)
 	}
 
-	ap, err := NewAirPurifier(testOptions("typed-optional"))
+	ap, err := NewAirPurifier(testOptions("typed-optional"), req("AirPurifier")...)
 	if err != nil {
 		t.Fatal(err)
 	}

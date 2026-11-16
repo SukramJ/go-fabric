@@ -583,7 +583,6 @@ func (c *AmbientContext) mutate(fn func(st *acState, events *[]event) error) err
 	}
 	c.st = next
 	c.rearmLocked()
-	endpoint := c.endpoint
 	var marked []uint32
 	for _, id := range sourced {
 		if c.Serves(id) && !reflect.DeepEqual(attr(&before, id), attr(&next, id)) {
@@ -599,7 +598,7 @@ func (c *AmbientContext) mutate(fn func(st *acState, events *[]event) error) err
 	}
 	for _, e := range events {
 		if c.Emits(e.id) {
-			_ = c.srv.Emit(endpoint, e.id, e.data)
+			_ = c.srv.EmitEvent(e.id, e.data)
 		}
 	}
 	return nil
@@ -949,6 +948,7 @@ func (c *AmbientContext) SetEndpoint(endpoint uint16) {
 	c.mu.Lock()
 	c.endpoint = endpoint
 	c.mu.Unlock()
+	c.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the hold-time timer (chip Shutdown, .cpp:90-98); it is

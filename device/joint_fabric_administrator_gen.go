@@ -18,10 +18,9 @@ const (
 )
 
 // JointFabricAdministratorType returns the JointFabricAdministrator device type, matter.js's packages/node/src/endpoints/joint-fabric-administrator.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#jointfabricadministrator. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func JointFabricAdministratorType() *Type { return &typeJointFabricAdministrator }
+// its cluster requirements are listed in docs/reference/device-types.md#jointfabricadministrator. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func JointFabricAdministratorType() *Type { return typeJointFabricAdministrator.clone() }
 
 // typeJointFabricAdministrator holds [JointFabricAdministratorType]'s cluster requirements.
 var typeJointFabricAdministrator = Type{

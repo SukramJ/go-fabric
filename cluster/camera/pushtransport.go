@@ -947,10 +947,7 @@ func (p *PushTransport) TransportStarted(connectionID uint16, triggerType padef.
 	if err != nil {
 		return err
 	}
-	p.mu.Lock()
-	endpoint := p.endpoint
-	p.mu.Unlock()
-	return p.srv.Emit(endpoint, padef.EventPushTransportBegin, padef.PushTransportBeginEvent{
+	return p.srv.EmitEvent(padef.EventPushTransportBegin, padef.PushTransportBeginEvent{
 		ConnectionId: connectionID, TriggerType: triggerType, ActivationReason: activationReason,
 		ContainerType: &container, CmafSessionNumber: number,
 	})
@@ -964,10 +961,7 @@ func (p *PushTransport) TransportStopped(connectionID uint16) error {
 	if err != nil {
 		return err
 	}
-	p.mu.Lock()
-	endpoint := p.endpoint
-	p.mu.Unlock()
-	return p.srv.Emit(endpoint, padef.EventPushTransportEnd, padef.PushTransportEndEvent{
+	return p.srv.EmitEvent(padef.EventPushTransportEnd, padef.PushTransportEndEvent{
 		ConnectionId: connectionID, ContainerType: &container, CmafSessionNumber: number,
 	})
 }
@@ -1060,4 +1054,5 @@ func (p *PushTransport) SetEndpoint(endpoint uint16) {
 	p.mu.Lock()
 	p.endpoint = endpoint
 	p.mu.Unlock()
+	p.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }

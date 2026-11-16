@@ -60,3 +60,7 @@ func WithoutFailSafeHooks(cfg *Config, hooks failSafeHooks) { cfg.withoutFailSaf
 
 // FailSafeHooksForTest is the set WithoutFailSafeHooks takes.
 type FailSafeHooksForTest = failSafeHooks
+
+// ReopenPending reports whether a reopen after the last fabric's removal
+// waits for the node to become idle (reopenWhenIdle).
+func ReopenPending(n *Node) bool { return n.reopenPending.Load() }

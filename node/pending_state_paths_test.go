@@ -102,7 +102,7 @@ func pendingCSRAfter(t *testing.T, root *node.RootClusters, expire bool) uint8 {
 			t.Fatalf("CommissioningComplete = %#v, want ErrorCode OK", raw)
 		}
 	}
-	if err := root.GeneralCommissioning.ArmOnPaseEstablished(ctx); err != nil {
+	if err := root.GeneralCommissioning.ArmOnPaseEstablished(ctx); err != nil { //nolint:staticcheck // the deprecated unnamed arm, kept for its window
 		t.Fatalf("the PASE arm: %v", err)
 	}
 	// AddNOC checks the trusted root before the CSR (matter.js's order):

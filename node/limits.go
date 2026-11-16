@@ -18,10 +18,26 @@ import (
 // default its comment names, the value the node had before the field
 // existed; [Config.Validate] refuses a value outside the field's bound.
 //
-// Two limits matter.js configures sit on [Config] itself, where they were
-// before this struct: [Config.SupportedFabrics] and
-// [Config.MaxPathsPerInvoke].
+// SupportedFabrics and MaxPathsPerInvoke sat on [Config] itself before
+// they moved here; the Config fields are deprecated and still honoured.
 type Limits struct {
+	// SupportedFabrics is OperationalCredentials' SupportedFabrics, the
+	// number of fabrics the node admits (Matter §11.18.4.4: 1 to 254); 0
+	// is 5, the facade's value before it was configurable. matter.js
+	// defaults it to 254 when unset (OperationalCredentialsServer.ts:
+	// 84-88 initialize), which cluster/core does too; the facade keeps 5.
+	// It replaces [Config].SupportedFabrics; both set and different fail
+	// [Config.Validate].
+	SupportedFabrics uint8
+	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry:
+	// the root BasicInformation advertises it, the PASE and CASE session
+	// parameters carry it and the invoke path refuses a larger batch with
+	// InvalidAction. 0 is im.DefaultMaxPathsPerInvoke (10), matter.js's
+	// DEFAULT_MAX_PATHS_PER_INVOKE. Mirrors matter.js
+	// basicInformation.maxPathsPerInvoke, which InteractionServer.ts:198
+	// enforces. It replaces [Config].MaxPathsPerInvoke; both set and
+	// different fail [Config.Validate].
+	MaxPathsPerInvoke uint16
 	// SubscriptionMaxInterval is the longest MaxInterval the node grants a
 	// subscription: a subscriber asking for more is negotiated down to it,
 	// never below its own MinIntervalFloor. Mirrors matter.js
@@ -81,6 +97,34 @@ const (
 )
 
 // validate returns one error per field outside its bound.
+// foldLimits makes the deprecated Config.SupportedFabrics and
+// Config.MaxPathsPerInvoke and their Limits fields one value: the Limits
+// field when set, else the Config field, written to both (Validate
+// refuses the two set and different).
+func (c *Config) foldLimits() {
+	if c.Limits.SupportedFabrics != 0 {
+		c.SupportedFabrics = c.Limits.SupportedFabrics //nolint:staticcheck // the deprecated field is still honoured
+	}
+	c.Limits.SupportedFabrics = c.SupportedFabrics //nolint:staticcheck // as above
+	if c.Limits.MaxPathsPerInvoke != 0 {
+		c.MaxPathsPerInvoke = c.Limits.MaxPathsPerInvoke //nolint:staticcheck // as above
+	}
+	c.Limits.MaxPathsPerInvoke = c.MaxPathsPerInvoke //nolint:staticcheck // as above
+}
+
+// limitsPairErrors refuses a deprecated Config limit and its Limits field
+// both set and different: one of them would be dropped.
+func (c *Config) limitsPairErrors() []error {
+	var errs []error
+	if a, b := c.SupportedFabrics, c.Limits.SupportedFabrics; a != 0 && b != 0 && a != b { //nolint:staticcheck // the deprecated field is still honoured
+		errs = append(errs, fmt.Errorf("node: Config.SupportedFabrics %d and Limits.SupportedFabrics %d differ; set Limits.SupportedFabrics only", a, b))
+	}
+	if a, b := c.MaxPathsPerInvoke, c.Limits.MaxPathsPerInvoke; a != 0 && b != 0 && a != b { //nolint:staticcheck // as above
+		errs = append(errs, fmt.Errorf("node: Config.MaxPathsPerInvoke %d and Limits.MaxPathsPerInvoke %d differ; set Limits.MaxPathsPerInvoke only", a, b))
+	}
+	return errs
+}
+
 func (l Limits) validate() []error {
 	var errs []error
 	if v := l.SubscriptionMaxInterval; v != 0 {

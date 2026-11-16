@@ -25,9 +25,9 @@ import "context"
 //     group key sets and key map, group table, groupcast groups, ACL,
 //     resumption records, default OTA providers and ICD registrations.
 //     Server subscriptions,
-//     thermostat presets, door-lock records, settings and counters are not
-//     fabric-owned rows and stay (the bridge deletes a fabric's
-//     subscriptions itself).
+//     thermostat presets, door-lock records, owed fabric events, settings
+//     and counters are not fabric-owned rows and stay (the bridge deletes a
+//     fabric's subscriptions itself).
 //   - A row that names a fabric the store does not hold is refused.
 //   - A fabric row carries its commit state ([FabricPending]) and, while an
 //     UpdateNOC is pending, the values it replaced: UpdateFabricCredentials,
@@ -37,6 +37,9 @@ import "context"
 //     and wraps after 254, skipping occupied indexes (matter.js
 //     FabricManager #nextFabricIndex).
 //   - Returned slices are the caller's: mutating one never changes the store.
+//   - After the backend is closed every method returns a non-nil error and
+//     changes nothing; the node and the controller call no method after
+//     their Stop or Close returned.
 //
 // matter.js has the same split one level down: a StorageService
 // (packages/general/src/storage/StorageService.ts:37) resolves a driver —
@@ -54,6 +57,11 @@ import "context"
 // UpdateNOC writes its fabric at once and marks the row, CommissioningComplete
 // commits it, a fail-safe expiry or a start-up rolls it back — so the state
 // can never disagree with the row it describes, and it leaves with the row.
+// A rollback owes the fabric's observers a hook — removed or updated — and
+// the table keeps that debt beside the rows ([OwedFabricEvent]) until the
+// caller acknowledges it, so a crash between the rollback and the hook
+// does not lose it. RemoveFabric does not remove owed events; a backend
+// must not cascade them.
 type Fabrics interface {
 	// AddFabric inserts rec and returns its index: the record's, or one
 	// allocated from the persisted next-fabric-index counter when the
@@ -78,6 +86,17 @@ type Fabrics interface {
 	// the row's [FabricPending] state. Returns [ErrFabricNotFound] for an
 	// index the table does not hold.
 	UpdateFabricVIDVerification(ctx context.Context, fabricIndex uint8, statement, vvsc []byte) error
+	// UpdateFabricVendorVerification writes what one
+	// SetVIDVerificationStatement changes ([FabricVendorUpdate]): the
+	// vendor id, the VID verification data, or both, in one atomic write —
+	// both land or neither does. Each part keeps the semantics of its own
+	// method (UpdateFabricVendorID, UpdateFabricVIDVerification): on a
+	// [FabricPendingUpdate] row it changes the live values only, so a
+	// rollback restores the ones the UpdateNOC found, and it does not
+	// change the row's [FabricPending] state. An update that names neither
+	// part changes nothing. Returns [ErrFabricNotFound] for an index the
+	// table does not hold.
+	UpdateFabricVendorVerification(ctx context.Context, fabricIndex uint8, u FabricVendorUpdate) error
 	// RemoveFabric removes the fabric and every row it owns; see the
 	// cascade above. A pending row is removed like any other.
 	RemoveFabric(ctx context.Context, fabricIndex uint8) error
@@ -111,11 +130,22 @@ type Fabrics interface {
 	// the state it found: [FabricPendingAdd] — the row is deleted with
 	// every row it owns, as RemoveFabric deletes it; [FabricPendingUpdate] —
 	// every prior value moves back (identity and row), the prior values are
-	// erased and the row is committed; [FabricCommitted] — nothing changes.
-	// A crash at any point leaves the pending row or its rollback whole.
-	// Returns [ErrFabricNotFound] (and FabricCommitted) for an index the
-	// table does not hold.
+	// erased, the row is committed and the fabric's resumption records go
+	// (they were made under the identity the rollback drops);
+	// [FabricCommitted] — nothing changes. A rollback that undid a row
+	// also records, in the same write, the hook it owes as an
+	// [OwedFabricEvent] carrying the row as it stood before the rollback.
+	// A crash at any point leaves the pending row or its rollback whole,
+	// its owed event included. Returns [ErrFabricNotFound] (and
+	// FabricCommitted) for an index the table does not hold.
 	RollbackFabric(ctx context.Context, fabricIndex uint8) (FabricPending, error)
+	// OwedFabricEvents returns every event a RollbackFabric recorded and
+	// no AckOwedFabricEvent removed, by ID ascending (the order they were
+	// recorded in).
+	OwedFabricEvents(ctx context.Context) ([]OwedFabricEvent, error)
+	// AckOwedFabricEvent removes the owed event id: its hook ran. An id
+	// the table does not hold (acknowledged already) is no error.
+	AckOwedFabricEvent(ctx context.Context, id uint64) error
 }
 
 // Identity is the node's operational identity on each fabric: NOC, ICAC,
@@ -141,6 +171,9 @@ type GroupKeys interface {
 	// GetGroupKeySet returns [ErrGroupKeySetNotFound] for a missing set.
 	GetGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeySetID uint16) (GroupKeySet, error)
 	// ListGroupKeySets returns the fabric's sets by GroupKeySetID ascending.
+	// A stored set whose epoch key has a refused length is left out — key
+	// set 0 included — and nothing is logged; GetGroupKeySet of its id
+	// returns the error, and an upsert of the id replaces it.
 	ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]GroupKeySet, error)
 	// RemoveGroupKeySet removes the set and the key-map entries naming it.
 	RemoveGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeySetID uint16) error
@@ -149,6 +182,13 @@ type GroupKeys interface {
 	RemoveGroupKeysByFabric(ctx context.Context, fabricIndex uint8) error
 	SetGroupKeyMapping(ctx context.Context, m GroupKeyMapping) error
 	RemoveGroupKeyMapping(ctx context.Context, fabricIndex uint8, groupID uint16) error
+	// ReplaceGroupKeyMappings swaps the fabric's key map for mappings in
+	// one atomic write, as ReplaceACL swaps an ACL: the rows are written
+	// in input order and read back by GroupID ascending; each mapping's
+	// FabricIndex is ignored (the rows are fabricIndex's). A GroupID twice
+	// in mappings is refused, and so is a non-empty map for a fabric the
+	// store does not hold; a refusal changes nothing.
+	ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, mappings []GroupKeyMapping) error
 	// ListGroupKeyMappings returns the fabric's key map by GroupID
 	// ascending.
 	ListGroupKeyMappings(ctx context.Context, fabricIndex uint8) ([]GroupKeyMapping, error)
@@ -210,6 +250,16 @@ type Settings interface {
 	// empty (or nil) map is a no-op that returns nil. The map is the
 	// caller's; the store keeps no reference to it.
 	SetSettings(ctx context.Context, values map[string]string) error
+	// DeleteSettings removes every key of keys in one atomic write, as
+	// SetSettings writes them: all go or none does. A key the store does
+	// not hold is no error; no key is a no-op that returns nil.
+	DeleteSettings(ctx context.Context, keys ...string) error
+	// DeleteSettingsWithPrefix removes every key that begins with prefix in
+	// one atomic write. The prefix is a key root and must end in "." — so
+	// "scenes.ab." never takes "scenes.abc.…" — and any other prefix, the
+	// empty one included, is refused with nothing removed. The counters
+	// are not settings and stay.
+	DeleteSettingsWithPrefix(ctx context.Context, prefix string) error
 	GetMetadataCounter(ctx context.Context, key string) (value uint64, ok bool, err error)
 	SetMetadataCounter(ctx context.Context, key string, value uint64) error
 }

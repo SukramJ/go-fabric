@@ -23,7 +23,7 @@ A host names none of the packages below for these:
 | DNS-SD | a nil `Config.Advertiser`: the module's mDNS responder, shaped by `Network.MDNS` (`Off`, `HostName`) and `Network.InterfaceCheck` (how often it and GeneralDiagnostics compare the host's interfaces; negative disables); `Node.MDNSEnabled`, `MDNSServices`, `DiagnoseMDNS`, `TriggerReannounce` |
 | Attestation | `Config.Attestation.Files`; `Attestation.BlockCommissioningOnError` and `Node.AttestationError` for a host that keeps running on a broken chain |
 | Credentials | `node.NewCommissioningCredentials`, `node.NewWindowCredentials(timeout)`, `Commissioning.WindowCredentials`, `node.ValidateSetupPIN`, `node.MaxDiscriminator`, `node.PBKDFIterationsMin`/`Max`, `node.PBKDFSaltMin`/`Max`; `Node.PairingCodesFor`, `Node.SetupPayload` (the configured passcode, discriminator, vendor and product id with both codes) |
-| The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenOwnWindow` (the configured credentials), `Node.OpenBasicWindow` (the host's), `Node.CloseWindow` (whoever opened it), `Node.SetCommissioningBlocked`. The bridge's window type with its `Set…` wiring is reached only through `Node.Bridge()`: its `SetTransitionHook` replaces the facade's own hook |
+| The commissioning window | `Node.Window()`: open, kind (`WindowOwn`, `WindowBasic`, `WindowEnhanced`), advertised discriminator and mode, opened-at, deadline and timeout on the node's clock — the value `OnWindowTransition` receives; `Node.OpenOwnWindow` (the configured credentials), `Node.OpenBasicWindow` (the host's), `Node.CloseWindow` (whoever opened it), `Node.SetCommissioningBlocked`. The bridge's window type with its `Set…` wiring is reached only through `Node.Bridge()`: its `SetTransitionHook` adds a host hook that runs after the facade's own |
 | Health | `Config.Health{Interval}`, `Node.OnHealthSample` / `OnHealthSampleAsync`, `Node.Health`, `Node.LocalAddr` |
 | Fabrics | `Node.FabricInfos`, `Node.RemoveFabric`, `Config.Observers`, and `Node.Observe` / `Node.ObserveAsync` for hooks registered on a running node |
 | The served surface | `Node.Surface()`: the policies' digest, level, profiles, extensions, the effective surface, every decision, the withheld elements and the announced changes; `Observers.OnSurfaceChanged` for each change as it is announced |
@@ -98,7 +98,12 @@ order with what a skip costs
 **Costs.** The facade attaches every port in the documented order. An
 `Attach…` call replaces what the facade attached for that port, and with
 it the facade's wiring behind it — the fabric fan-out, the window
-semantics, the persistence the facade threads through. A host that drives
+semantics, the persistence the facade threads through. Four hooks are
+the exception: the fabric-removed and fabric-updated hooks of
+`OperationalCredentials`, `GeneralCommissioning`'s commissioning-complete
+hook and the window's `SetTransitionHook` keep the facade's handler in a
+slot of its own, and a host's `Set…` adds a handler that runs after it. A
+host that drives
 `bridge.New` itself instead of `node.New` takes over the whole order, and
 `bridge.New` answers every unattached port with a no-op.
 
@@ -119,7 +124,9 @@ NodeLabel, on every `Reassemble` — as
 the existing layer stays for it beside the device kit
 ([ADR 0018](../adr/0018-device-layer-and-node-facade.md)). It hands the
 facade's group state (`Node.Groups`) and endpoint persistence
-(`Node.Persistence`, or `node.NewEndpointPersistence`) to that assembler.
+(`node.NewEndpointState`, the facade's own over the node's store, or the
+host's own `node.EndpointState` in `Config.EndpointState`) to that
+assembler as `endpoint.Config.Persistence`.
 A sensor built from a classified measurement source does not need the
 seam: `device.Measurement(src)` mounts it on a device of the kit.
 
@@ -129,7 +136,7 @@ the numbers of devices that are gone (`Store.RemoveEndpoint`), device-type
 validation of the bridged endpoints and the bridged NodeLabel and scene
 persistence are the host assembler's to get right.
 
-*Source: `node/config.go` (`Config.Snapshotter`, `Config.EndpointPersistence`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointPersistence`).*
+*Source: `node/config.go` (`Config.Snapshotter`, `Config.EndpointState`), `node/node.go` (`New`: the assembler only without `Topology`), `node/persist.go` (`NewEndpointState`).*
 
 ## `store`
 
@@ -293,6 +300,25 @@ provider (`cluster/core.NewOTAProvider`) on a tree of its own.
 **Costs.** The manager's provider identity (`Config.ProviderNodeID`,
 `ProviderEndpoint`) must be the one the host serves, or the announcements
 point nowhere.
+
+**Identity.** A QueryImage whose vendor and product id are not the ids the
+node's attestation validated when it was commissioned
+(`client.Record.AttestedVendorID`/`AttestedProductID`) is logged as one
+Warn line, `ota.manager.attested_identity_mismatch`, and answered as any
+other query: nothing is refused on it. The ids are kept only when the
+attestation verified the DAC chain against the trust store and no error
+finding stands; a node commissioned before the record kept them, without a
+trust store, or with a failed attestation or an error finding the policy
+accepted, is not judged.
+
+**Storage.** `ImagesConfig.Blobs` keeps the image files. A backend whose
+own type also implements `softwareupdate.BlobStreamer` (`CreateBlob`,
+`OpenBlob`) receives a ledger download as it arrives and is read in place
+for every check and BDX transfer; one that does not, `MemoryBlobs`
+included, passes each image through memory whole. Embedding a type that
+implements `BlobStreamer` promotes it, and the embedding type's own `Put`
+and `Get` are then bypassed for image files. A blob that implements
+`io.Closer` is closed by the BDX server when its transfer ends.
 
 *Source: `controller/ota.go`, `controller/ota_provider.go`, `controller/softwareupdate/manager.go`, `controller/softwareupdate/provider.go`.*
 

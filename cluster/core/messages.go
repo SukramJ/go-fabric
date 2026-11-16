@@ -177,21 +177,9 @@ func activeIDs(active [][]byte) [][]byte {
 // only — matter.js's fabric-filtered list view (ListManager.ts
 // FabricFilteredListProxyHandler), as [Binding.MatterReadFiltered] reads;
 // a read without a request every fabric's whole. An unfiltered read lists
-// every fabric's, and an entry of another fabric than the accessing one —
-// every entry, for a session without a fabric — is served without its
-// fabric-sensitive fields: every field of MessageStruct but FabricIndex
-// is "S" (packages/model/src/standard/elements/messages.element.ts:121-133),
-// so the entry is its FabricIndex alone ([scopeEntry], [redactedEntry]).
-//
-// Mirrors matter.js at db021da0: the list is not filtered for an
-// unfiltered read of an "R F V" attribute
-// (packages/node/src/behavior/state/managed/values/ListManager.ts:610-616
-// createProxy), an entry's owning fabric is its FabricIndex
-// (StructManager.ts:110-113), a fabric-sensitive field of another owning
-// fabric, and every one for a session without a fabric, reads undefined
-// (StructManager.ts:306; packages/protocol/src/action/server/AccessControl.ts:342-356
-// mayRead) and the encoder leaves it out
-// (packages/types/src/tlv/TlvObject.ts:128-134).
+// every fabric's, whole: the dispatcher withholds another fabric's
+// fabric-sensitive fields from the request, as it scopes every
+// fabric-scoped attribute of the model.
 func (m *Messages) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	filtered, fabric, request := im.LookupFabricFilter(ctx)
 	if attrID != messagesdef.AttrMessages || !request {
@@ -199,17 +187,9 @@ func (m *Messages) MatterReadFiltered(ctx context.Context, attrID uint32) (any, 
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if !filtered {
-		out := spec.List[spec.Encodable]{}
-		for _, msg := range m.messages {
-			v, _ := scopeEntry(msg, msg.FabricIndex, false, fabric, true)
-			out = append(out, v)
-		}
-		return out, true
-	}
 	out := spec.List[messagesdef.MessageStruct]{}
 	for _, msg := range m.messages {
-		if msg.FabricIndex == fabric {
+		if !filtered || msg.FabricIndex == fabric {
 			out = append(out, msg)
 		}
 	}

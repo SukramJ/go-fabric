@@ -77,9 +77,9 @@ jobs:
   # the tests of the wire-parsing packages as linux/386 binaries
   # (TEST_32BIT_PKGS in the Makefile). They are static (CGO_ENABLED=0) and
   # run directly on the amd64 runner, whose kernel executes 386 ELF without
-  # an emulator. Its own job, not a step of `build (32-bit)`: that one is a
-  # required check, and this one enters the protection after its first
-  # green run (script/requiredchecks, a pending row).
+  # an emulator. Its own job, not a step of `build (32-bit)`: it entered
+  # the branch protection after its first green run (decision 106,
+  # script/requiredchecks/required.txt).
   test-32bit:
     name: test (linux/386)
     runs-on: ubuntu-latest
@@ -386,10 +386,8 @@ jobs:
   # supply-chain and injection rules (unpinned actions, permissions,
   # template injection, persisted credentials, dangerous triggers). Both
   # pinned, like the lint tools above, and the same versions as the
-  # Makefile's. Not a required check yet: neither tool ran where this job
-  # was written, so its first run's findings are not known; it enters the
-  # branch protection after a green run (script/requiredchecks, a pending
-  # row). script/requiredchecks holds the one rule that needs no tool: no
+  # Makefile's. A required check since its first green run (decision 106,
+  # script/requiredchecks/required.txt). script/requiredchecks holds the one rule that needs no tool: no
   # ${{ }} expression inside a run script.
   workflow-lint:
     name: workflow lint

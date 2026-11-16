@@ -139,7 +139,7 @@ func TestOptionsRefused(t *testing.T) {
 		}
 	}
 	// A nil Declaration is ignored.
-	if _, err := New(OnOffLightType(), opts, nil); err != nil {
+	if _, err := newWith(OnOffLightType(), opts, nil); err != nil {
 		t.Error(err)
 	}
 }
@@ -367,7 +367,7 @@ func TestSpec(t *testing.T) {
 // TestTypeLookups covers the registry and the requirement lookups.
 func TestTypeLookups(t *testing.T) {
 	t.Parallel()
-	if ty, ok := Lookup(uint32(DimmableLightID)); !ok || ty != DimmableLightType() {
+	if ty, ok := Lookup(uint32(DimmableLightID)); !ok || ty.ID != DimmableLightID {
 		t.Error("Lookup(uint32(DimmableLight))")
 	}
 	if _, ok := Lookup(uint32(0xFFFF)); ok {
@@ -503,7 +503,7 @@ func TestClientListCarriesTheMandatoryClientClusters(t *testing.T) {
 // with defaults.
 func TestDefaultSelectionKeepsTheClusterMandatedFeatures(t *testing.T) {
 	t.Parallel()
-	d, err := NewEnergyEvse(testOptions("evse"))
+	d, err := NewEnergyEvse(testOptions("evse"), req("EnergyEvse")...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,8 +518,8 @@ func TestDefaultSelectionKeepsTheClusterMandatedFeatures(t *testing.T) {
 func TestWithElements(t *testing.T) {
 	t.Parallel()
 	el := withElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrVoltage}})
-	d, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology), acPower, el,
-		withElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrActiveCurrent}}))
+	d, err := NewElectricalSensor(testOptions("s"), req("ElectricalSensor", feat(0x009C, ptdef.FeatureNodeTopology), acPower, el,
+		withElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrActiveCurrent}}))...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,12 +527,12 @@ func TestWithElements(t *testing.T) {
 	if s := epm.Underlying().(*spec.Server); !s.Serves(epmdef.AttrVoltage) || !s.Serves(epmdef.AttrActiveCurrent) {
 		t.Error("the elements opted in are not served")
 	}
-	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),
-		withElements(epmdef.ClusterID, spec.Options{Features: 2})); !errors.Is(err, ErrConfiguration) {
+	if _, err := NewElectricalSensor(testOptions("s"), req("ElectricalSensor", feat(0x009C, ptdef.FeatureNodeTopology),
+		withElements(epmdef.ClusterID, spec.Options{Features: 2}))...); !errors.Is(err, ErrConfiguration) {
 		t.Errorf("features through WithElements: %v", err)
 	}
-	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),
-		withServer(&hostServer{id: epmdef.ClusterID}), el); !errors.Is(err, ErrConfiguration) {
+	if _, err := NewElectricalSensor(testOptions("s"), req("ElectricalSensor", feat(0x009C, ptdef.FeatureNodeTopology),
+		withServer(&hostServer{id: epmdef.ClusterID}), el)...); !errors.Is(err, ErrConfiguration) {
 		t.Errorf("WithElements with a host server: %v", err)
 	}
 }

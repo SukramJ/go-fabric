@@ -110,6 +110,7 @@ func newDevice(t *testing.T, features Feature) *device {
 	}
 	d := &device{t: t, s: s, clk: clk, rec: &recorder{}}
 	s.SetMatterEventEmitter(d.rec)
+	s.SetEndpoint(0) // mounted, as the bridge mounts it (EmitEvent needs the endpoint)
 	s.observe = func(kind changeKind, o, n uint8) {
 		if !d.rec.on {
 			return

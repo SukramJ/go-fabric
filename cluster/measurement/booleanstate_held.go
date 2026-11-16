@@ -58,7 +58,7 @@ func NewHeldBooleanState(cfg HeldBooleanStateConfig) (*HeldBooleanState, error) 
 			}
 			v, _ := srv.Value(bsdef.AttrStateValue)
 			on, _ := v.(bool)
-			_ = srv.Emit(uint16(s.endpoint.Load()), bsdef.EventStateChange, bsdef.StateChangeEvent{StateValue: on}) //nolint:gosec // an endpoint number
+			_ = srv.EmitEvent(bsdef.EventStateChange, bsdef.StateChangeEvent{StateValue: on})
 		})
 	}
 	return s, nil
@@ -66,4 +66,7 @@ func NewHeldBooleanState(cfg HeldBooleanStateConfig) (*HeldBooleanState, error) 
 
 // SetEndpoint stamps the endpoint StateChange is addressed to; the bridge
 // calls it at reassembly.
-func (s *HeldBooleanState) SetEndpoint(endpoint uint16) { s.endpoint.Store(uint32(endpoint)) }
+func (s *HeldBooleanState) SetEndpoint(endpoint uint16) {
+	s.endpoint.Store(uint32(endpoint))
+	s.Server.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
+}

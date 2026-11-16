@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 8793,
+  "entry_points": 9053,
   "entry_packages": [
     ".",
     "bdx",
@@ -225,6 +225,7 @@
     "icd/checkin",
     "im",
     "im/subscription",
+    "internal/attestids",
     "internal/chipdm",
     "internal/chiptool",
     "internal/clockvar",
@@ -232,6 +233,7 @@
     "internal/inflight",
     "internal/netwatch",
     "internal/paritytest",
+    "internal/reportchunk",
     "internal/serialqueue",
     "internal/valuejson",
     "logring",
@@ -289,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18548,
-    "reachable": 12492,
-    "whitelisted": 6056,
+    "total_exported": 18794,
+    "reachable": 12622,
+    "whitelisted": 6172,
     "unreachable": 0
   },
   "by_package": [],
@@ -722,7 +724,7 @@
       "identifier": "TestArmStatusResponseWait_OrphanPreviousWaiter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 541
+      "line": 542
     },
     {
       "package": "bridge",
@@ -736,7 +738,7 @@
       "identifier": "TestAttachAckHandler_NilReverts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 451
+      "line": 468
     },
     {
       "package": "bridge",
@@ -757,7 +759,7 @@
       "identifier": "TestAttachCaseHandler_NilReverts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 436
+      "line": 453
     },
     {
       "package": "bridge",
@@ -771,14 +773,14 @@
       "identifier": "TestAttachPaseHandlerProvider_NilClears",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 543
+      "line": 560
     },
     {
       "package": "bridge",
       "identifier": "TestAttachPaseHandler_NilReverts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 422
+      "line": 438
     },
     {
       "package": "bridge",
@@ -1205,7 +1207,7 @@
       "identifier": "TestCASEAdapterReturnsItsSessionIDWhenItsHandshakeDoesNotFinish",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 108
+      "line": 142
     },
     {
       "package": "bridge",
@@ -1576,7 +1578,7 @@
       "identifier": "TestChunkLimitsForRoute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_limits_test.go",
-      "line": 41
+      "line": 45
     },
     {
       "package": "bridge",
@@ -1664,17 +1666,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestChunkStatusResponseTimeoutOverAConnection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/chunk_timeout_test.go",
+      "line": 57
+    },
+    {
+      "package": "bridge",
       "identifier": "TestChunkStatusResponseTimeoutSumsBothDirections",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_timeout_test.go",
-      "line": 22
+      "line": 24
     },
     {
       "package": "bridge",
       "identifier": "TestChunkWaitsOfOneSessionAreBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
-      "line": 96
+      "line": 97
     },
     {
       "package": "bridge",
@@ -1793,7 +1802,7 @@
       "identifier": "TestCommandChangedAttributeReachesASubscriber",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
-      "line": 191
+      "line": 188
     },
     {
       "package": "bridge",
@@ -3060,7 +3069,7 @@
       "identifier": "TestDeliveredReportRestartsTheFailedUpdateCount",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 289
+      "line": 345
     },
     {
       "package": "bridge",
@@ -3151,112 +3160,112 @@
       "identifier": "TestDispatchSC_AckDischargedOnHasAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 365
+      "line": 381
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_AckNotDischargedWithoutHasAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 387
+      "line": 403
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Pake1InvokesHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 176
+      "line": 189
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Pake1MissingHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 126
+      "line": 138
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Pake3NoReplyOnNilPayload",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 196
+      "line": 210
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_PaseHandlerErrorPropagates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 347
+      "line": 362
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_PerExchangeProviderRouting",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 567
+      "line": 584
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Sigma1InvokesHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 213
+      "line": 228
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Sigma1MissingHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 138
+      "line": 151
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Sigma1MulticastReplayDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 240
+      "line": 255
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Sigma2ResumeReachesNoHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 317
+      "line": 332
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_Sigma3ForgetsExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 277
+      "line": 292
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_StandaloneAckDischarges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 402
+      "line": 418
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_StandaloneAckSucceedsWithoutHandlers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 150
+      "line": 163
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_StatusReportDropsSilently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 162
+      "line": 175
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchSC_UnhandledOpcodeDrops",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 473
+      "line": 490
     },
     {
       "package": "bridge",
@@ -3435,6 +3444,34 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestDispatcherScopesAHostServersFabricScopedLists",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_scope_test.go",
+      "line": 215
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDispatcherScopesAListBeforeItIsSplit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_scope_test.go",
+      "line": 271
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDispatcherScopesPrimingAndChangeReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_scope_test.go",
+      "line": 241
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDispatcherScopesTheGeneratedServersSensitiveList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_scope_test.go",
+      "line": 370
+    },
+    {
+      "package": "bridge",
       "identifier": "TestDisplacedAckIsSentAfterItsSuccessorWasPiggybacked",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_displaced_route_test.go",
@@ -3536,7 +3573,7 @@
       "identifier": "TestEncodesAttributeValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_limits_test.go",
-      "line": 73
+      "line": 161
     },
     {
       "package": "bridge",
@@ -3557,7 +3594,7 @@
       "identifier": "TestEventAndAttributeChangeDueTogetherAreOneReportData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_event_attribute_one_report_parity_matterjs_test.go",
-      "line": 71
+      "line": 94
     },
     {
       "package": "bridge",
@@ -3631,10 +3668,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFabricRemovalDropsFabricScopedState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_scoped_state_removal_test.go",
+      "line": 50
+    },
+    {
+      "package": "bridge",
       "identifier": "TestFabricRemoveFromSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_parity_matterjs_test.go",
       "line": 24
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestFabricScopedEntryWithoutAnOwnerFailsThePath",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_scope_test.go",
+      "line": 342
     },
     {
       "package": "bridge",
@@ -3680,17 +3731,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFailedUpdateCountDoesNotOutliveItsSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/failed_update_count_test.go",
+      "line": 56
+    },
+    {
+      "package": "bridge",
       "identifier": "TestFailedUpdateCountIsOneStep",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/failed_update_count_test.go",
       "line": 19
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestFailedUpdatesCountedInSequenceParity",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 362
     },
     {
       "package": "bridge",
@@ -3767,7 +3818,7 @@
       "identifier": "TestGroupJoinFailureIsRetried",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 449
+      "line": 450
     },
     {
       "package": "bridge",
@@ -3802,7 +3853,7 @@
       "identifier": "TestGroupMessageArrivesOverRealMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 482
+      "line": 483
     },
     {
       "package": "bridge",
@@ -3816,14 +3867,14 @@
       "identifier": "TestGroupMessagesAreDroppedWithoutGroupMessaging",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 428
+      "line": 429
     },
     {
       "package": "bridge",
       "identifier": "TestGroupMessagingEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 234
+      "line": 235
     },
     {
       "package": "bridge",
@@ -3838,6 +3889,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_write_node_parity_matterjs_test.go",
       "line": 50
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupWriteReachesASubscriber",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/group_messaging_e2e_test.go",
+      "line": 599
     },
     {
       "package": "bridge",
@@ -3928,7 +3986,7 @@
       "identifier": "TestHandleCase_SigmaRejectSendsStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 746
+      "line": 763
     },
     {
       "package": "bridge",
@@ -3942,14 +4000,14 @@
       "identifier": "TestHandlePase_ErrorPath_InvokesStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 838
+      "line": 855
     },
     {
       "package": "bridge",
       "identifier": "TestHandlePase_MissingHandler_NoStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 858
+      "line": 875
     },
     {
       "package": "bridge",
@@ -4065,6 +4123,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestHostChangeInsideARootWriteAdvancesOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 459
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHostChangeInsideAWriteAdvancesOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 330
+    },
+    {
+      "package": "bridge",
       "identifier": "TestICDSeams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/icd_test.go",
@@ -4138,14 +4210,14 @@
       "identifier": "TestInitiatedHandshakeIsTrackedAtAFullTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_unsecured_bound_test.go",
-      "line": 460
+      "line": 461
     },
     {
       "package": "bridge",
       "identifier": "TestInitiatedHandshakeKeepsItsFailureReportTracked",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_unsecured_bound_test.go",
-      "line": 490
+      "line": 491
     },
     {
       "package": "bridge",
@@ -4212,10 +4284,31 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInvokeStampsTheSessionIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_large_message_fact_test.go",
+      "line": 132
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInvokeStatesWhetherTheSessionCarriesLargeMessages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_large_message_fact_test.go",
+      "line": 54
+    },
+    {
+      "package": "bridge",
       "identifier": "TestKeepAliveStatusParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_keepalive_status_parity_matterjs_test.go",
       "line": 29
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestKeepAliveWaitsForItsStatusResponseParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
+      "line": 465
     },
     {
       "package": "bridge",
@@ -4237,6 +4330,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/session_order_test.go",
       "line": 13
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestLivePeerSessionNewestByPeerActivity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/live_peer_session_test.go",
+      "line": 20
     },
     {
       "package": "bridge",
@@ -4464,6 +4564,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestOneReportInFlightUntilItsStatusResponseParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
+      "line": 400
+    },
+    {
+      "package": "bridge",
       "identifier": "TestOngoingReportChunkPiggybacksTheStatusResponseAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
@@ -4614,7 +4721,7 @@
       "identifier": "TestOutboundReliableRemembersAnAbandonedMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/report_abandoned_before_record_test.go",
-      "line": 68
+      "line": 71
     },
     {
       "package": "bridge",
@@ -4642,7 +4749,7 @@
       "identifier": "TestOutboundReliable_AckStrayWithWaiter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 412
+      "line": 413
     },
     {
       "package": "bridge",
@@ -4670,7 +4777,7 @@
       "identifier": "TestOutboundReliable_TickSendError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 440
+      "line": 441
     },
     {
       "package": "bridge",
@@ -4702,10 +4809,10 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestOverlappingUndeliveredReportsAreOneFailedUpdateParity",
+      "identifier": "TestOverlappingWritesSettleTheHoldOnce",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 337
+      "file": "bridge/write_notifier_version_test.go",
+      "line": 415
     },
     {
       "package": "bridge",
@@ -4719,7 +4826,7 @@
       "identifier": "TestPASEAdapterReturnsItsSessionIDWhenItsProviderDropsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 166
+      "line": 200
     },
     {
       "package": "bridge",
@@ -4727,6 +4834,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
       "line": 64
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPASEContinuationsThatStartNoHandshakeAreDroppedOnTheSingleton",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/handshake_session_id_test.go",
+      "line": 97
     },
     {
       "package": "bridge",
@@ -4762,6 +4876,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
       "line": 93
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPBKDFParamRequestOnAClosedWindowBesideALivePASESession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_window_closed_test.go",
+      "line": 104
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPBKDFParamRequestOnAClosedWindowIsAnsweredInvalidParam",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_window_closed_test.go",
+      "line": 26
     },
     {
       "package": "bridge",
@@ -4807,6 +4935,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPaseAdapter_ClosesTheVerifiersItDrops",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/handlers_test.go",
+      "line": 1039
+    },
+    {
+      "package": "bridge",
       "identifier": "TestPaseAdapter_DecodesInitiatorMRPParams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_mrp_params_test.go",
@@ -4831,7 +4966,7 @@
       "identifier": "TestPaseAdapter_HappyPathPake3_StillEstablishes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_pase_wrongpasscode_test.go",
-      "line": 219
+      "line": 220
     },
     {
       "package": "bridge",
@@ -4985,7 +5120,7 @@
       "identifier": "TestPaseAdapter_TheCallbackOwnsKe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_pase_wrongpasscode_test.go",
-      "line": 256
+      "line": 257
     },
     {
       "package": "bridge",
@@ -4999,7 +5134,14 @@
       "identifier": "TestPaseHandlerProvider_ProviderInvokedPerOpcode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 601
+      "line": 618
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPaseProviderDropClosesTheVerifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/handlers_test.go",
+      "line": 1144
     },
     {
       "package": "bridge",
@@ -5041,7 +5183,7 @@
       "identifier": "TestPerExchangeCaseProvider_OnEvictPrunesSigma1Replied",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 673
+      "line": 690
     },
     {
       "package": "bridge",
@@ -5150,10 +5292,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPrimingReportReadsEachPathOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_change_report_parity_matterjs_test.go",
+      "line": 107
+    },
+    {
+      "package": "bridge",
       "identifier": "TestPrimingReportStatusesFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_change_report_parity_matterjs_test.go",
-      "line": 44
+      "line": 49
     },
     {
       "package": "bridge",
@@ -5461,7 +5610,7 @@
       "identifier": "TestReadChunkLoopAbortsOnErrorStatusResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/status_response_decode_test.go",
-      "line": 118
+      "line": 124
     },
     {
       "package": "bridge",
@@ -5584,6 +5733,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestReestablishPrimingWaitEnds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/chunk_wait_bound_test.go",
+      "line": 248
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReestablishStopsWithTheBridge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_reestablish_order_test.go",
+      "line": 197
+    },
+    {
+      "package": "bridge",
       "identifier": "TestReestablishTriesTheNewestFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_reestablish_order_test.go",
@@ -5595,6 +5758,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_primed_events_test.go",
       "line": 84
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRefusedReportEndsTheSubscriptionParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
+      "line": 438
     },
     {
       "package": "bridge",
@@ -5633,6 +5803,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRemovedServerEmitsIntoNoEventLog",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/withdrawn_emitter_test.go",
+      "line": 21
+    },
+    {
+      "package": "bridge",
       "identifier": "TestReplyRouteSurvivesAnArrivalRacingItsRelease",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_displaced_route_test.go",
@@ -5657,14 +5834,14 @@
       "identifier": "TestReportAbandonedBeforeItsRecordIsAFailedUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/report_abandoned_before_record_test.go",
-      "line": 24
+      "line": 23
     },
     {
       "package": "bridge",
-      "identifier": "TestReportNumberDoesNotOutliveItsSubscription",
+      "identifier": "TestReportChunksStayWithinThePeerLimit",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/failed_update_count_test.go",
-      "line": 59
+      "file": "bridge/chunk_limits_test.go",
+      "line": 126
     },
     {
       "package": "bridge",
@@ -5769,14 +5946,14 @@
       "identifier": "TestReport_PeerUnreachable_ClosesSubscriptionWithoutMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 594
+      "line": 595
     },
     {
       "package": "bridge",
       "identifier": "TestReport_PeerUnreachable_RetriesBeforeEviction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 655
+      "line": 656
     },
     {
       "package": "bridge",
@@ -5784,6 +5961,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/request_boolean_fields_test.go",
       "line": 95
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRequestIntegerFieldOfAnotherTypeAnsweredFailure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/request_integer_fields_test.go",
+      "line": 45
     },
     {
       "package": "bridge",
@@ -5818,28 +6002,28 @@
       "identifier": "TestResolvePaseHandler_NoneFallsBackToNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 488
+      "line": 505
     },
     {
       "package": "bridge",
       "identifier": "TestResolvePaseHandler_ProviderOverridesSingleton",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 513
+      "line": 530
     },
     {
       "package": "bridge",
       "identifier": "TestResolvePaseHandler_ProviderReturningNilFallsBack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 528
+      "line": 545
     },
     {
       "package": "bridge",
       "identifier": "TestResolvePaseHandler_SingletonOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 500
+      "line": 517
     },
     {
       "package": "bridge",
@@ -5983,10 +6167,31 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRootNotifierInsideAWriteAdvancesOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 411
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRouteCarriesLargeMessages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_large_message_fact_test.go",
+      "line": 97
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRouteHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
       "line": 489
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRouteWithoutPeerAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_addrless_test.go",
+      "line": 24
     },
     {
       "package": "bridge",
@@ -6140,7 +6345,7 @@
       "identifier": "TestSessionCloseEndsItsChunkWaits",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
-      "line": 171
+      "line": 172
     },
     {
       "package": "bridge",
@@ -6224,7 +6429,7 @@
       "identifier": "TestSigma1FloodDoesNotGrowTheRetransmitTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_unsecured_bound_test.go",
-      "line": 549
+      "line": 550
     },
     {
       "package": "bridge",
@@ -6252,7 +6457,7 @@
       "identifier": "TestSigma1Replied_PrunedOnSigma3",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
-      "line": 633
+      "line": 650
     },
     {
       "package": "bridge",
@@ -6452,6 +6657,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestStartBLERegistersBeforeItAdvertises",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_register_test.go",
+      "line": 39
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStartBLERegistersWithoutTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ble_register_unlocked_test.go",
+      "line": 61
+    },
+    {
+      "package": "bridge",
       "identifier": "TestStartBLEServiceRefusedStopsAdvertising",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_serve_refused_test.go",
@@ -6539,7 +6758,7 @@
       "identifier": "TestStopEndsPendingChunkWaits",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
-      "line": 139
+      "line": 140
     },
     {
       "package": "bridge",
@@ -6553,7 +6772,7 @@
       "identifier": "TestStopGroupNetworkingLeavesWithoutTheLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
-      "line": 566
+      "line": 567
     },
     {
       "package": "bridge",
@@ -6721,14 +6940,14 @@
       "identifier": "TestSubscriptionAttributeReportsCarryNoStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_change_report_parity_matterjs_test.go",
-      "line": 22
+      "line": 27
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionCloseEndsItsPrimingWait",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
-      "line": 198
+      "line": 199
     },
     {
       "package": "bridge",
@@ -6840,14 +7059,14 @@
       "identifier": "TestSubscription_CloseUnknownCounterNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 572
+      "line": 573
     },
     {
       "package": "bridge",
       "identifier": "TestSubscription_ReleaseCounterOnPeerAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 390
+      "line": 392
     },
     {
       "package": "bridge",
@@ -6932,6 +7151,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
       "line": 191
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTCPSendAboveThePeerLimitIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/chunk_limits_test.go",
+      "line": 97
     },
     {
       "package": "bridge",
@@ -7050,14 +7276,14 @@
       "identifier": "TestUnchangedWriteOverTheWireIsNotReported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
-      "line": 140
+      "line": 137
     },
     {
       "package": "bridge",
       "identifier": "TestUnchangedWrittenAttributeIsNotReported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
-      "line": 76
+      "line": 80
     },
     {
       "package": "bridge",
@@ -7071,7 +7297,7 @@
       "identifier": "TestUndeliveredReportIsOneFailedUpdateParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_send_error_parity_matterjs_test.go",
-      "line": 263
+      "line": 319
     },
     {
       "package": "bridge",
@@ -7099,21 +7325,21 @@
       "identifier": "TestUnsecuredRetransmitEntryKeepsItsSchedule",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_unsecured_bound_test.go",
-      "line": 305
+      "line": 306
     },
     {
       "package": "bridge",
       "identifier": "TestUnsecuredRetransmitEvictionWakesItsWaiter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_unsecured_bound_test.go",
-      "line": 425
+      "line": 426
     },
     {
       "package": "bridge",
       "identifier": "TestUnsecuredRetransmitTableEvictsItsOldestEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_unsecured_bound_test.go",
-      "line": 352
+      "line": 353
     },
     {
       "package": "bridge",
@@ -7127,7 +7353,7 @@
       "identifier": "TestUnsecuredWindowExchangesAreBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/unsecured_window_lifetime_test.go",
-      "line": 195
+      "line": 198
     },
     {
       "package": "bridge",
@@ -7141,7 +7367,7 @@
       "identifier": "TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/unsecured_window_lifetime_test.go",
-      "line": 154
+      "line": 155
     },
     {
       "package": "bridge",
@@ -7162,21 +7388,21 @@
       "identifier": "TestWaitForAck_AckClosesChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 509
+      "line": 510
     },
     {
       "package": "bridge",
       "identifier": "TestWaitForAck_ContextCancelled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 482
+      "line": 483
     },
     {
       "package": "bridge",
       "identifier": "TestWaitForAck_NotPending_ReturnsNilImmediately",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 469
+      "line": 470
     },
     {
       "package": "bridge",
@@ -7218,7 +7444,7 @@
       "identifier": "TestWriteHoldScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_notifier_version_test.go",
-      "line": 368
+      "line": 369
     },
     {
       "package": "bridge",
@@ -7233,6 +7459,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/imwrite_parity_matterjs_test.go",
       "line": 202
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWriteReportsTheAttributesItsCommitNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 281
     },
     {
       "package": "bridge",
@@ -7264,10 +7497,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 532
+    },
+    {
+      "package": "bridge",
       "identifier": "TestWrittenAttributeReachesASubscriber",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
-      "line": 27
+      "line": 31
     },
     {
       "package": "client/discovery",
@@ -7894,6 +8134,13 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestBDXExchangeCarriesATransfer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/bdx_test.go",
+      "line": 19
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestCancelledSendEndsRetransmission",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/retransmission_test.go",
@@ -7911,21 +8158,21 @@
       "identifier": "TestCloseBehaviour",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 441
+      "line": 442
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseSessionSendsCloseSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 693
+      "line": 694
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseTimerExpires",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 521
+      "line": 522
     },
     {
       "package": "client/exchange",
@@ -7939,21 +8186,21 @@
       "identifier": "TestDefaultsAndAccessors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 808
+      "line": 809
     },
     {
       "package": "client/exchange",
       "identifier": "TestDuplicateIsAckedAtOnceAndNotDelivered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 168
+      "line": 169
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 548
+      "line": 549
     },
     {
       "package": "client/exchange",
@@ -8205,7 +8452,7 @@
       "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 403
+      "line": 404
     },
     {
       "package": "client/exchange",
@@ -8282,7 +8529,7 @@
       "identifier": "TestPeerLostHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 636
+      "line": 637
     },
     {
       "package": "client/exchange",
@@ -8338,14 +8585,14 @@
       "identifier": "TestRetransmissionOptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 324
+      "line": 325
     },
     {
       "package": "client/exchange",
       "identifier": "TestRetransmissionSchedule",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 262
+      "line": 263
     },
     {
       "package": "client/exchange",
@@ -8359,35 +8606,35 @@
       "identifier": "TestSecondReliableMessageAcksTheFirstAtOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 206
+      "line": 207
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondSendWhileUnackedIsFlowError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 147
+      "line": 148
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecureSessionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 595
+      "line": 596
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendContextCancelled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 362
+      "line": 363
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendWaitsForAckAndPiggybacksOwedAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 102
+      "line": 103
     },
     {
       "package": "client/exchange",
@@ -8408,7 +8655,7 @@
       "identifier": "TestSessionIDAllocation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 722
+      "line": 723
     },
     {
       "package": "client/exchange",
@@ -8450,7 +8697,7 @@
       "identifier": "TestStatusReportTravelsOnSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 235
+      "line": 236
     },
     {
       "package": "client/exchange",
@@ -8471,7 +8718,7 @@
       "identifier": "TestUnsecuredSessionParameters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 769
+      "line": 770
     },
     {
       "package": "client/exchange",
@@ -9689,7 +9936,7 @@
       "identifier": "AlarmSeverityEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
-      "line": 791
+      "line": 797
     },
     {
       "package": "cluster/alarm",
@@ -10235,7 +10482,7 @@
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 691
+      "line": 693
     },
     {
       "package": "cluster/core",
@@ -10263,14 +10510,14 @@
       "identifier": "PayloadTestResponse",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 854
+      "line": 856
     },
     {
       "package": "cluster/core",
       "identifier": "ReachableChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/bridged_device_basic_information.go",
-      "line": 140
+      "line": 141
     },
     {
       "package": "cluster/core",
@@ -10473,14 +10720,14 @@
       "identifier": "TestEcosystemInformationAppliesChipBuilderRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ecosystem_information_test.go",
-      "line": 134
+      "line": 123
     },
     {
       "package": "cluster/core",
       "identifier": "TestEcosystemInformationDirectoryChanged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ecosystem_information_test.go",
-      "line": 191
+      "line": 180
     },
     {
       "package": "cluster/core",
@@ -10501,7 +10748,28 @@
       "identifier": "TestEventTriggerRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
-      "line": 917
+      "line": 919
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestFacadeSlotsRunBeforeTheHosts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/facade_seam_internal_test.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestFailSafeExpiryDisconnectsAfterAFailedRejoin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_capabilities_test.go",
+      "line": 146
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestFailSafeExpiryDisconnectsWithoutACommittedNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_capabilities_test.go",
+      "line": 117
     },
     {
       "package": "cluster/core",
@@ -10610,6 +10878,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestInterfaceNameCutToTheConstraint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/general_diagnostics_name_internal_test.go",
+      "line": 15
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestNetworkInterfaceRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_internal_test.go",
@@ -10698,6 +10973,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_test.go",
       "line": 287
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_RebootJudgedBySessionActivity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 577
     },
     {
       "package": "cluster/core",
@@ -11268,6 +11550,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestUnreadableStoredNetworksAreNeverOverwritten",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_unseal_test.go",
+      "line": 44
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestWiFiInterfaceEnabledDataVersionAdvancesOnlyOnAChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_test.go",
@@ -11286,6 +11575,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_test.go",
       "line": 219
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiLinkWatcherMovesTheNetworkState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_capabilities_test.go",
+      "line": 73
     },
     {
       "package": "cluster/core",
@@ -11397,14 +11693,14 @@
       "identifier": "ChargingTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 56
+      "line": 57
     },
     {
       "package": "cluster/energy",
       "identifier": "ChargingTargetSchedule",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 54
+      "line": 55
     },
     {
       "package": "cluster/energy",
@@ -11481,21 +11777,21 @@
       "identifier": "EvseFault",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "cluster/energy",
       "identifier": "EvseFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "cluster/energy",
       "identifier": "EvseState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 48
+      "line": 49
     },
     {
       "package": "cluster/energy",
@@ -11635,14 +11931,14 @@
       "identifier": "SupplyState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "cluster/energy",
       "identifier": "TargetDays",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
-      "line": 58
+      "line": 59
     },
     {
       "package": "cluster/energy",
@@ -13350,7 +13646,7 @@
       "identifier": "Assign",
       "reason": "generic: every generated server_gen.go calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 91
+      "line": 100
     },
     {
       "package": "cluster/spec",
@@ -13441,14 +13737,14 @@
       "identifier": "HandleOn",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 234
+      "line": 244
     },
     {
       "package": "cluster/spec",
       "identifier": "HandlerOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 257
+      "line": 271
     },
     {
       "package": "cluster/spec",
@@ -13476,7 +13772,7 @@
       "identifier": "NullDefault",
       "reason": "the Default of a generated attribute whose stated default is null; it is only ever a package-level initializer value, which RTA does not follow",
       "file": "cluster/spec/model.go",
-      "line": 221
+      "line": 222
     },
     {
       "package": "cluster/spec",
@@ -13497,21 +13793,21 @@
       "identifier": "OnChangedAsyncOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 192
+      "line": 201
     },
     {
       "package": "cluster/spec",
       "identifier": "OnChangedOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 156
+      "line": 165
     },
     {
       "package": "cluster/spec",
       "identifier": "OnWriteOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 210
+      "line": 220
     },
     {
       "package": "cluster/spec",
@@ -13567,7 +13863,14 @@
       "identifier": "RequestOf",
       "reason": "generic: the self-held servers call instantiations of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/selfheld.go",
-      "line": 197
+      "line": 263
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "SetWindowHooksForTests",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/export_test.go",
+      "line": 10
     },
     {
       "package": "cluster/spec",
@@ -13588,14 +13891,14 @@
       "identifier": "StateOf",
       "reason": "generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/typed.go",
-      "line": 124
+      "line": 133
     },
     {
       "package": "cluster/spec",
       "identifier": "StateReader",
       "reason": "a constraint only: StateOf, OnChangedOf, OnChangedAsyncOf and OnWriteOf take it, and RTA records their instantiations, not the constraint interface",
       "file": "cluster/spec/typed.go",
-      "line": 82
+      "line": 91
     },
     {
       "package": "cluster/spec",
@@ -13735,7 +14038,7 @@
       "identifier": "UnresolvedDefault",
       "reason": "the Default of a generated attribute whose stated default is a field value; it is only ever a package-level initializer value, which RTA does not follow",
       "file": "cluster/spec/model.go",
-      "line": 214
+      "line": 215
     },
     {
       "package": "cluster/spec",
@@ -15289,91 +15592,91 @@
       "identifier": "ClosureErrorEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 74
+      "line": 76
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "ClosureErrorEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 88
+      "line": 90
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "CurrentPositionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 101
+      "line": 103
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "CurrentPositionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 116
+      "line": 118
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 56
+      "line": 58
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "LatchControlModesBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 128
+      "line": 130
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "LatchControlModesBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 139
+      "line": 141
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "MainStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 147
+      "line": 149
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "MainStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 164
+      "line": 166
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "OverallCurrentStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 206
+      "line": 208
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "OverallTargetStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 264
+      "line": 266
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "TargetPositionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 273
+      "line": 275
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "TargetPositionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 287
+      "line": 289
     },
     {
       "package": "cluster/spec/closurecontrol",
@@ -15401,119 +15704,119 @@
       "identifier": "ThreeLevelAutoEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 216
+      "line": 218
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "ThreeLevelAutoEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 229
+      "line": 231
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "ClosureUnitEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 70
+      "line": 72
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "ClosureUnitEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 81
+      "line": 83
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "DimensionStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 114
+      "line": 116
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 53
+      "line": 55
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "LatchControlModesBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 146
+      "line": 148
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "LatchControlModesBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 157
+      "line": 159
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "ModulationTypeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 165
+      "line": 167
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "ModulationTypeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 179
+      "line": 181
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "OverflowEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 190
+      "line": 192
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "OverflowEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 210
+      "line": 212
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "RangePercent100thsStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 249
+      "line": 251
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "RotationAxisEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 257
+      "line": 259
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "RotationAxisEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 277
+      "line": 279
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "StepDirectionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 294
+      "line": 296
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "StepDirectionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 305
+      "line": 307
     },
     {
       "package": "cluster/spec/closuredimension",
@@ -15541,182 +15844,182 @@
       "identifier": "ThreeLevelAutoEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 123
+      "line": 125
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "ThreeLevelAutoEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 136
+      "line": 138
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "TranslationDirectionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 313
+      "line": 315
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "TranslationDirectionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 334
+      "line": 336
     },
     {
       "package": "cluster/spec/closuredimension",
       "identifier": "UnitRangeStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closuredimension/definition_gen.go",
-      "line": 374
+      "line": 376
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorCapabilitiesBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 124
+      "line": 126
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorCapabilitiesBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 138
+      "line": 140
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorLoopActionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 149
+      "line": 151
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorLoopActionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 161
+      "line": 163
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorLoopDirectionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 170
+      "line": 172
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorLoopDirectionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 181
+      "line": 183
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 189
+      "line": 191
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorModeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 201
+      "line": 203
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "DirectionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 210
+      "line": 212
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "DirectionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 223
+      "line": 225
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "DriftCompensationEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 233
+      "line": 235
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "DriftCompensationEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 247
+      "line": 249
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "EnhancedColorModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 258
+      "line": 260
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "EnhancedColorModeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 271
+      "line": 273
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 110
+      "line": 112
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "MoveModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 281
+      "line": 283
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "MoveModeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 293
+      "line": 295
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "OptionsBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 302
+      "line": 304
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "OptionsBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 312
+      "line": 314
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "StepModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 319
+      "line": 321
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "StepModeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 330
+      "line": 332
     },
     {
       "package": "cluster/spec/colorcontrol",
@@ -15744,14 +16047,14 @@
       "identifier": "UpdateFlagsBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 338
+      "line": 340
     },
     {
       "package": "cluster/spec/colorcontrol",
       "identifier": "UpdateFlagsBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
-      "line": 351
+      "line": 353
     },
     {
       "package": "cluster/spec/commissionercontrol",
@@ -16528,168 +16831,168 @@
       "identifier": "AdjustmentCauseEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 79
+      "line": 81
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "AdjustmentCauseEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 90
+      "line": 92
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "CauseEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 98
+      "line": 100
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "CauseEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 112
+      "line": 114
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ConstraintsStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 154
+      "line": 156
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "CostStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 193
+      "line": 195
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "CostTypeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 203
+      "line": 205
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "CostTypeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 216
+      "line": 218
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ESAStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 226
+      "line": 228
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ESAStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 240
+      "line": 242
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ESATypeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 251
+      "line": 253
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ESATypeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 275
+      "line": 277
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 63
+      "line": 65
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ForecastStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 339
+      "line": 341
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ForecastUpdateReasonEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 448
+      "line": 450
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "ForecastUpdateReasonEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 460
+      "line": 462
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "OptOutStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 469
+      "line": 471
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "OptOutStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 482
+      "line": 484
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "PowerAdjustCapabilityStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 514
+      "line": 516
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "PowerAdjustReasonEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 560
+      "line": 562
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "PowerAdjustReasonEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 572
+      "line": 574
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "PowerAdjustStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 550
+      "line": 552
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "SlotAdjustmentStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 606
+      "line": 608
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
       "identifier": "SlotStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagement/definition_gen.go",
-      "line": 424
+      "line": 426
     },
     {
       "package": "cluster/spec/deviceenergymanagement",
@@ -17410,49 +17713,49 @@
       "identifier": "CumulativeEnergyResetStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen.go",
-      "line": 90
+      "line": 92
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "EnergyMeasurementStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen.go",
-      "line": 137
+      "line": 139
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen.go",
-      "line": 47
+      "line": 49
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "MeasurementAccuracyRangeStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen.go",
-      "line": 281
+      "line": 283
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "MeasurementAccuracyStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen.go",
-      "line": 230
+      "line": 232
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "MeasurementTypeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen.go",
-      "line": 150
+      "line": 152
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "MeasurementTypeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen.go",
-      "line": 176
+      "line": 178
     },
     {
       "package": "cluster/spec/electricalenergymeasurement",
@@ -17529,63 +17832,63 @@
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 59
+      "line": 61
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "HarmonicMeasurementStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 95
+      "line": 97
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "MeasurementAccuracyRangeStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 321
+      "line": 323
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "MeasurementAccuracyStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 270
+      "line": 272
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "MeasurementRangeStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 152
+      "line": 154
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "MeasurementTypeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 169
+      "line": 171
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "MeasurementTypeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 195
+      "line": 197
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "PowerModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 218
+      "line": 220
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
       "identifier": "PowerModeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen.go",
-      "line": 230
+      "line": 232
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
@@ -17613,91 +17916,91 @@
       "identifier": "ChargingTargetScheduleStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 117
+      "line": 119
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "ChargingTargetStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 179
+      "line": 181
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "EnergyTransferStoppedReasonEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 188
+      "line": 190
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "EnergyTransferStoppedReasonEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 200
+      "line": 202
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "FaultStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 209
+      "line": 211
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "FaultStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 235
+      "line": 237
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 80
+      "line": 82
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "StateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 258
+      "line": 260
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "StateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 274
+      "line": 276
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "SupplyStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 287
+      "line": 289
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "SupplyStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 302
+      "line": 304
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TargetDayOfWeekBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 125
+      "line": 127
     },
     {
       "package": "cluster/spec/energyevse",
       "identifier": "TargetDayOfWeekBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevse/definition_gen.go",
-      "line": 141
+      "line": 143
     },
     {
       "package": "cluster/spec/energyevse",
@@ -18677,49 +18980,49 @@
       "identifier": "EffectIdentifierEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/identify/definition_gen.go",
-      "line": 48
+      "line": 50
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "EffectIdentifierEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/identify/definition_gen.go",
-      "line": 63
+      "line": 65
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "EffectVariantEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/identify/definition_gen.go",
-      "line": 75
+      "line": 77
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "EffectVariantEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/identify/definition_gen.go",
-      "line": 85
+      "line": 87
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/identify/definition_gen.go",
-      "line": 43
+      "line": 45
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "IdentifyTypeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/identify/definition_gen.go",
-      "line": 92
+      "line": 94
     },
     {
       "package": "cluster/spec/identify",
       "identifier": "IdentifyTypeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/identify/definition_gen.go",
-      "line": 107
+      "line": 109
     },
     {
       "package": "cluster/spec/identify",
@@ -19251,49 +19554,49 @@
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/levelcontrol/definition_gen.go",
-      "line": 62
+      "line": 64
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "MoveModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/levelcontrol/definition_gen.go",
-      "line": 74
+      "line": 76
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "MoveModeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/levelcontrol/definition_gen.go",
-      "line": 85
+      "line": 87
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "OptionsBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/levelcontrol/definition_gen.go",
-      "line": 93
+      "line": 95
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "OptionsBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/levelcontrol/definition_gen.go",
-      "line": 104
+      "line": 106
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "StepModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/levelcontrol/definition_gen.go",
-      "line": 112
+      "line": 114
     },
     {
       "package": "cluster/spec/levelcontrol",
       "identifier": "StepModeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/levelcontrol/definition_gen.go",
-      "line": 123
+      "line": 125
     },
     {
       "package": "cluster/spec/levelcontrol",
@@ -20224,49 +20527,49 @@
       "identifier": "ErrorStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 61
+      "line": 63
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "ErrorStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 74
+      "line": 76
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "ErrorStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 111
+      "line": 113
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 56
+      "line": 58
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "OperationalStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 120
+      "line": 122
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "OperationalStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 133
+      "line": 135
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "OperationalStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 167
+      "line": 169
     },
     {
       "package": "cluster/spec/operationalstate",
@@ -20364,42 +20667,42 @@
       "identifier": "AnnouncementReasonEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 56
+      "line": 58
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "AnnouncementReasonEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 68
+      "line": 70
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "ChangeReasonEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 77
+      "line": 79
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "ChangeReasonEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 91
+      "line": 93
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 51
+      "line": 53
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "ProviderLocationDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 127
+      "line": 129
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
@@ -20427,63 +20730,63 @@
       "identifier": "UpdateStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 136
+      "line": 138
     },
     {
       "package": "cluster/spec/otasoftwareupdaterequestor",
       "identifier": "UpdateStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/otasoftwareupdaterequestor/definition_gen.go",
-      "line": 154
+      "line": 156
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "ErrorStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 61
+      "line": 63
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "ErrorStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 74
+      "line": 76
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "ErrorStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 111
+      "line": 113
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 56
+      "line": 58
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "OperationalStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 120
+      "line": 122
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "OperationalStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 133
+      "line": 135
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "OperationalStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 167
+      "line": 169
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
@@ -20833,119 +21136,119 @@
       "identifier": "BatApprovedChemistryEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 87
+      "line": 89
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatApprovedChemistryEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 129
+      "line": 131
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatChargeFaultEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 168
+      "line": 170
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatChargeFaultEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 188
+      "line": 190
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatChargeLevelEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 205
+      "line": 207
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatChargeLevelEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 217
+      "line": 219
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatChargeStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 226
+      "line": 228
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatChargeStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 239
+      "line": 241
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatCommonDesignationEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 249
+      "line": 251
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatCommonDesignationEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 339
+      "line": 341
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatFaultEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 426
+      "line": 428
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatFaultEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 438
+      "line": 440
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatReplaceabilityEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 447
+      "line": 449
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "BatReplaceabilityEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 460
+      "line": 462
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 74
+      "line": 76
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "PowerSourceStatusEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 470
+      "line": 472
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "PowerSourceStatusEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 483
+      "line": 485
     },
     {
       "package": "cluster/spec/powersource",
@@ -20973,28 +21276,28 @@
       "identifier": "WiredCurrentTypeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 493
+      "line": 495
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "WiredCurrentTypeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 504
+      "line": 506
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "WiredFaultEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 512
+      "line": 514
     },
     {
       "package": "cluster/spec/powersource",
       "identifier": "WiredFaultEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/powersource/definition_gen.go",
-      "line": 524
+      "line": 526
     },
     {
       "package": "cluster/spec/powersourceconfiguration",
@@ -21610,49 +21913,49 @@
       "identifier": "ErrorStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 62
+      "line": 64
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "ErrorStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 90
+      "line": 92
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "ErrorStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 57
+      "line": 59
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "OperationalStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 151
+      "line": 153
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "OperationalStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 171
+      "line": 173
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "OperationalStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 212
+      "line": 214
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
@@ -21834,91 +22137,91 @@
       "identifier": "AreaInfoStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 83
+      "line": 85
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "AreaStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 180
+      "line": 182
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "LandmarkInfoStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 147
+      "line": 149
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "LocationdescDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 116
+      "line": 118
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "MapStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 211
+      "line": 213
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "OperationalStatusEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 219
+      "line": 221
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "OperationalStatusEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 232
+      "line": 234
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "ProgressStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 270
+      "line": 272
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "SelectAreasStatus",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 280
+      "line": 282
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "SelectAreasStatusDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 293
+      "line": 295
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "SkipAreaStatus",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 303
+      "line": 305
     },
     {
       "package": "cluster/spec/servicearea",
       "identifier": "SkipAreaStatusDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/servicearea/definition_gen.go",
-      "line": 316
+      "line": 318
     },
     {
       "package": "cluster/spec/servicearea",
@@ -23367,21 +23670,21 @@
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
-      "line": 58
+      "line": 60
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "StatusCodeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
-      "line": 69
+      "line": 71
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "StatusCodeEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
-      "line": 79
+      "line": 81
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
@@ -23409,28 +23712,28 @@
       "identifier": "ValveFaultBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
-      "line": 86
+      "line": 88
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "ValveFaultBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
-      "line": 101
+      "line": 103
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "ValveStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
-      "line": 113
+      "line": 115
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "ValveStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
-      "line": 125
+      "line": 127
     },
     {
       "package": "cluster/spec/wakeonlan",
@@ -24207,7 +24510,7 @@
       "identifier": "TestStaleTimerRunDoesNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/server_test.go",
-      "line": 208
+      "line": 209
     },
     {
       "package": "cluster/switch",
@@ -24221,70 +24524,70 @@
       "identifier": "TestSwitchServerCustomValidators",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 406
+      "line": 407
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerDebounce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 432
+      "line": 433
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerLS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 685
+      "line": 686
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerMSASMSLMSM",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 1308
+      "line": 1309
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerMSMSRMSL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 725
+      "line": 726
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerMSMSRMSLMSM",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 901
+      "line": 902
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerMSMSRNotMSL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 818
+      "line": 819
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerMSMSRNotMSLMSM",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 1648
+      "line": 1649
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerMSNotMSRNotMSL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 873
+      "line": 874
     },
     {
       "package": "cluster/switch",
       "identifier": "TestSwitchServerResetState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/switch/switch_parity_matterjs_test.go",
-      "line": 1702
+      "line": 1703
     },
     {
       "package": "cluster/switch",
@@ -24368,7 +24671,7 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 331
+      "line": 332
     },
     {
       "package": "cluster/thermo",
@@ -24732,14 +25035,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 980
+      "line": 1067
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 976
+      "line": 1063
     },
     {
       "package": "controller",
@@ -24824,6 +25127,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/operational_port_parity_matterjs_test.go",
       "line": 40
+    },
+    {
+      "package": "controller",
+      "identifier": "TestSealerSealsAClearControllerDatabase",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/sealer_internal_test.go",
+      "line": 174
+    },
+    {
+      "package": "controller",
+      "identifier": "TestSealerSealsTheControllersStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/sealer_internal_test.go",
+      "line": 99
     },
     {
       "package": "controller",
@@ -25502,7 +25819,7 @@
       "identifier": "TestDeviceIOImageParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/device_fabrictest_internal_test.go",
-      "line": 368
+      "line": 380
     },
     {
       "package": "controller/camera",
@@ -25559,6 +25876,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/policy_stream_parity_matterjsserver_test.go",
       "line": 465
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestFirstCloseBoundedByContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/close_inflight_internal_test.go",
+      "line": 106
     },
     {
       "package": "controller/camera",
@@ -25691,7 +26015,7 @@
       "identifier": "TestProviderDeviceParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/device_fabrictest_internal_test.go",
-      "line": 225
+      "line": 237
     },
     {
       "package": "controller/camera",
@@ -25705,7 +26029,7 @@
       "identifier": "TestProviderReOfferAnsweredDuringCloseAddsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/close_inflight_internal_test.go",
-      "line": 107
+      "line": 140
     },
     {
       "package": "controller/camera",
@@ -26965,7 +27289,7 @@
       "identifier": "TestNodeRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 241
+      "line": 284
     },
     {
       "package": "controller/client",
@@ -27147,42 +27471,49 @@
       "identifier": "TestRecordApplyPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 120
+      "line": 121
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordAttestedProduct",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 201
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordDecodeErrors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 93
+      "line": 94
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 198
+      "line": 241
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordIgnoresRetiredCATs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 287
+      "line": 330
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordOperationalHost",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 151
+      "line": 152
     },
     {
       "package": "controller/client",
       "identifier": "TestRecordRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/record_internal_test.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "controller/client",
@@ -27451,6 +27782,13 @@
       "line": 98
     },
     {
+      "package": "controller/client/sqlstore",
+      "identifier": "SealWithoutScrub",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/export_test.go",
+      "line": 15
+    },
+    {
       "package": "controller/commissioner",
       "identifier": "FuzzDecodeCertSigningRequest",
       "reason": "auto-whitelist:pattern=test-file",
@@ -27491,6 +27829,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
       "line": 396
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAttestedPairWithheld",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/attested_pair_internal_test.go",
+      "line": 17
     },
     {
       "package": "controller/commissioner",
@@ -27672,7 +28017,7 @@
       "identifier": "TestEnsureFailsafeTimerFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 890
+      "line": 895
     },
     {
       "package": "controller/commissioner",
@@ -28222,10 +28567,17 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestCRLDownloadConnectsToPublicDestinationsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 517
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestCRLDownloadRefusesARedirectFromHTTPSToHTTP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 168
+      "line": 179
     },
     {
       "package": "controller/dcl",
@@ -28331,6 +28683,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/commission_test.go",
       "line": 130
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestConnectTargetRefusesAnUnmappedHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/connect_target_ascii_test.go",
+      "line": 15
     },
     {
       "package": "controller/dcl",
@@ -28684,10 +29043,38 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestGitHubNamedURLsConnectToPublicDestinationsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 605
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestGitHubRequestsCarryADeadline",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 217
+      "line": 228
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestGuardBehindAProxy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 546
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestGuardJudgesTheHostAsSent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 670
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestIPv4Legacy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 753
     },
     {
       "package": "controller/dcl",
@@ -28733,6 +29120,20 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestOTADownloadByURLSchemesAndDestinations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 489
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestOTADownloadConnectsToPublicDestinationsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 396
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestOTADownloadLongerThanAnnounced",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/ota_test.go",
@@ -28743,7 +29144,7 @@
       "identifier": "TestOTADownloadRefusesARedirectFromHTTPSToHTTP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 129
+      "line": 140
     },
     {
       "package": "controller/dcl",
@@ -28775,6 +29176,13 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestPublicDestination",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/bounds_net_test.go",
+      "line": 255
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestResponseBounds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_test.go",
@@ -28792,7 +29200,7 @@
       "identifier": "TestRevocationLookupBoundsItsConcurrentDownloads",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 38
+      "line": 49
     },
     {
       "package": "controller/dcl",
@@ -28922,45 +29330,115 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestImagesBufferedDownloadWithoutStreamer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 272
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestImagesDeleteParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 195
+      "line": 239
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesDownloadByOrigin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_destination_test.go",
+      "line": 34
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesDownloadUpdateParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 141
+      "line": 185
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesHonourTheLedgersMaxImageSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_bound_test.go",
-      "line": 23
+      "line": 24
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesOfflineParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 553
+      "line": 597
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesOpenParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 298
+      "line": 342
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesProvenanceNamesItsBytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 295
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesRequireTheLedgersChecksum",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 27
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesServeStoredLedgerImagesBoundToTheirChecksum",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 104
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestImagesSpecificationVersionParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
-      "line": 338
+      "line": 382
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesStreamedDownload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 134
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesStreamedDownloadRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 171
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesStreamedDownloadUnderTheChecksumRule",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 295
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesStreamedImageHiddenUntilVerified",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 231
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesTakeTheLedgerPathUnlessHostSupplied",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 224
     },
     {
       "package": "controller/softwareupdate",
@@ -29013,6 +29491,13 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestManagerOffersOnlyServableStoredImages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_checksum_test.go",
+      "line": 254
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestManagerStalledAfterApplyDelayParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
@@ -29024,6 +29509,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
       "line": 155
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestMemoryBlobsDoesNotStream",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_stream_test.go",
+      "line": 261
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestNoteAttestedIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/attested_identity_test.go",
+      "line": 19
     },
     {
       "package": "controller/softwareupdate",
@@ -29101,6 +29600,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
       "line": 242
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestValidatePeerDetailsWithoutNodeIsUnchanged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/attested_identity_test.go",
+      "line": 71
     },
     {
       "package": "controller/topology",
@@ -29293,6 +29799,13 @@
     },
     {
       "package": "device",
+      "identifier": "InitialFor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/export_test.go",
+      "line": 8
+    },
+    {
+      "package": "device",
       "identifier": "SemanticTag",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "device/options.go",
@@ -29419,10 +29932,17 @@
     },
     {
       "package": "device",
+      "identifier": "TestBareDevicesServeTheDefaultSelection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/default_selection_internal_test.go",
+      "line": 37
+    },
+    {
+      "package": "device",
       "identifier": "TestBaseOptionalConformsAndRefuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 80
+      "line": 81
     },
     {
       "package": "device",
@@ -29450,7 +29970,7 @@
       "identifier": "TestBridgedPowerSourceServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
-      "line": 107
+      "line": 108
     },
     {
       "package": "device",
@@ -29625,7 +30145,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 379
+      "line": 381
     },
     {
       "package": "device",
@@ -29639,7 +30159,14 @@
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 297
+      "line": 306
+    },
+    {
+      "package": "device",
+      "identifier": "TestExcludesZero",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_internal_test.go",
+      "line": 70
     },
     {
       "package": "device",
@@ -29702,7 +30229,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 414
+      "line": 416
     },
     {
       "package": "device",
@@ -29724,6 +30251,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/hostserver_test.go",
       "line": 89
+    },
+    {
+      "package": "device",
+      "identifier": "TestInitialRequirementNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_internal_test.go",
+      "line": 99
     },
     {
       "package": "device",
@@ -29919,7 +30453,21 @@
       "identifier": "TestRefusalsWrapTheirSentinel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 353
+      "line": 367
+    },
+    {
+      "package": "device",
+      "identifier": "TestRefusedAtInitKinds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_internal_test.go",
+      "line": 20
+    },
+    {
+      "package": "device",
+      "identifier": "TestRefusedStructsOfTheSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/initial_snapshot_internal_test.go",
+      "line": 188
     },
     {
       "package": "device",
@@ -29982,7 +30530,7 @@
       "identifier": "TestStandardDeviceTypeCorpusParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/standard_device_type_corpus_parity_matterjs_test.go",
-      "line": 149
+      "line": 153
     },
     {
       "package": "device",
@@ -30333,6 +30881,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 1454
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestAttributePathStatusAnswersAsReadDoes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/write_commit_test.go",
+      "line": 90
     },
     {
       "package": "endpoint",
@@ -30759,49 +31314,49 @@
       "identifier": "TestHandleInvokeRequest_AdministerPrivilegeNotBlockedByGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 370
+      "line": 380
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 322
+      "line": 332
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_AdministerPrivilegeNotBlockedByGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 348
+      "line": 358
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_EnforcesElevatedWritePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 294
+      "line": 304
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_OperateAttributeNotBlockedByPrivilegeGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 397
+      "line": 407
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_RejectsWildcardAttributePath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 427
+      "line": 437
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 478
+      "line": 488
     },
     {
       "package": "endpoint",
@@ -30882,6 +31437,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestListAppendHandsTheServerTheWritersEntries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/append_fabric_scope_test.go",
+      "line": 104
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestMeasurementKindsMeetTheirDeviceTypeRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
@@ -30893,6 +31455,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 180
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestNoWriteChangesOutsideEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/write_changes_guard_test.go",
+      "line": 26
     },
     {
       "package": "endpoint",
@@ -30991,6 +31560,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_expansion_test.go",
       "line": 18
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestReadOneAttachesTheScopeOnARequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/fabric_scope_test.go",
+      "line": 50
     },
     {
       "package": "endpoint",
@@ -31232,6 +31808,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestSpecInstanceDeclaresItsDefinitionsScope",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/fabric_scope_test.go",
+      "line": 101
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestSpecPartsComposeAChildEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/parts_test.go",
@@ -31319,21 +31902,21 @@
       "identifier": "TestTopologyDispatcher_MinInvokePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 224
+      "line": 234
     },
     {
       "package": "endpoint",
       "identifier": "TestTopologyDispatcher_MinReadPrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 530
+      "line": 540
     },
     {
       "package": "endpoint",
       "identifier": "TestTopologyDispatcher_MinWritePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 157
+      "line": 167
     },
     {
       "package": "endpoint",
@@ -31341,6 +31924,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_validation_test.go",
       "line": 477
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestTwoAttributeDataOfOneClusterAdvanceTwice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/write_commit_test.go",
+      "line": 120
     },
     {
       "package": "endpoint",
@@ -31417,14 +32007,14 @@
       "identifier": "TestWriteChangesChangedAttributes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_unchanged_parity_matterjs_test.go",
-      "line": 133
+      "line": 149
     },
     {
       "package": "endpoint",
       "identifier": "TestWriteChangesChangedWins",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_unchanged_parity_matterjs_test.go",
-      "line": 108
+      "line": 124
     },
     {
       "package": "endpoint",
@@ -31446,6 +32036,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_gates_parity_matterjs_test.go",
       "line": 132
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestWriteRecordWalkStaysInTheModule",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/write_changes_guard_test.go",
+      "line": 46
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestWriteResultCarriesTheCommit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/write_commit_test.go",
+      "line": 43
     },
     {
       "package": "endpoint",
@@ -31620,7 +32224,7 @@
       "identifier": "FakeStore",
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "endpoint/endpointtest/endpointtest.go",
-      "line": 66
+      "line": 67
     },
     {
       "package": "examples/host-view",
@@ -31767,77 +32371,77 @@
       "identifier": "TestCameraSimAppPipeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 857
+      "line": 858
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimAudioAndSnapshotStreams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 190
+      "line": 191
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimChime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 830
+      "line": 831
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimDigitalPTZ",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 628
+      "line": 629
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimMechanicalPTZ",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 578
+      "line": 579
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimMotionTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 517
+      "line": 518
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimPushTransportLifecycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 411
+      "line": 412
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimRestoresItsAllocations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 254
+      "line": 255
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimVideoStreams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 127
+      "line": 128
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimWebRTCProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 286
+      "line": 287
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimZoneTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 722
+      "line": 723
     },
     {
       "package": "examples/reference-bridge",
@@ -31880,6 +32484,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
       "line": 65
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCustomFlowFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 30
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCustomFlowOpensAtStart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 129
     },
     {
       "package": "examples/reference-bridge",
@@ -32236,7 +32854,7 @@
       "identifier": "TestOvenPipeDrivesTheCavity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 270
+      "line": 271
     },
     {
       "package": "examples/reference-bridge",
@@ -32306,7 +32924,7 @@
       "identifier": "TestSmokeTestButtonIsIgnoredWhileAlarming",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
-      "line": 248
+      "line": 249
     },
     {
       "package": "examples/reference-bridge",
@@ -32398,6 +33016,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
       "line": 314
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestUserIntentCommissioningStartReportsTheNodesError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 158
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestUserIntentFlowWaitsForThePipe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/custom_flow_test.go",
+      "line": 99
     },
     {
       "package": "examples/reference-bridge",
@@ -33223,28 +33855,28 @@
       "identifier": "TestAttributeExpansionAscendingSortsEachPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_expansion_test.go",
-      "line": 104
+      "line": 105
     },
     {
       "package": "im",
       "identifier": "TestAttributeExpansionHoldsOneEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_expansion_test.go",
-      "line": 72
+      "line": 73
     },
     {
       "package": "im",
       "identifier": "TestAttributeExpansionLeavesTheDispatchersSlice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_expansion_test.go",
-      "line": 141
+      "line": 142
     },
     {
       "package": "im",
       "identifier": "TestAttributeExpansionStatusOnlyForConcretePath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_expansion_test.go",
-      "line": 188
+      "line": 189
     },
     {
       "package": "im",
@@ -33259,6 +33891,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/im_test.go",
       "line": 42
+    },
+    {
+      "package": "im",
+      "identifier": "TestAttributeReportEncoderAppliesItsScope",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/fabric_scope_test.go",
+      "line": 154
     },
     {
       "package": "im",
@@ -33461,7 +34100,7 @@
       "identifier": "TestDecodeRangeParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/decode_range_parity_matterjs_test.go",
-      "line": 19
+      "line": 23
     },
     {
       "package": "im",
@@ -33668,6 +34307,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestEveryFabricSensitiveEventOfTheModelIsGated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/fabric_scope_test.go",
+      "line": 249
+    },
+    {
+      "package": "im",
       "identifier": "TestFabricScopedInvokeNeedsAFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/authority_test.go",
@@ -33693,6 +34339,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/group_parity_matterjs_test.go",
       "line": 180
+    },
+    {
+      "package": "im",
+      "identifier": "TestGroupInvokeLeavesALargeMessageCommandOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_large_message_gate_test.go",
+      "line": 183
     },
     {
       "package": "im",
@@ -33948,6 +34601,20 @@
     },
     {
       "package": "im",
+      "identifier": "TestInvokeLargeMessageGate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_large_message_gate_test.go",
+      "line": 76
+    },
+    {
+      "package": "im",
+      "identifier": "TestInvokeLargeMessageGateOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_large_message_gate_test.go",
+      "line": 148
+    },
+    {
+      "package": "im",
       "identifier": "TestInvokeParity_CommandHandler_FillsUpResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
@@ -34092,6 +34759,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/mandatory_field_parity_matterjs_test.go",
       "line": 72
+    },
+    {
+      "package": "im",
+      "identifier": "TestMaskFabricScopedFiltersAndMasksByTheEntrysOwner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/fabric_scope_test.go",
+      "line": 89
+    },
+    {
+      "package": "im",
+      "identifier": "TestMaskFabricScopedRefusesWhatItCannotScope",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/fabric_scope_test.go",
+      "line": 120
     },
     {
       "package": "im",
@@ -34406,7 +35087,14 @@
       "identifier": "TestReadReportsStatusesFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_expansion_test.go",
-      "line": 256
+      "line": 257
+    },
+    {
+      "package": "im",
+      "identifier": "TestReadReportsStatusesFirstReadsEachPathOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/read_expansion_test.go",
+      "line": 328
     },
     {
       "package": "im",
@@ -35009,6 +35697,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/persistence_test.go",
       "line": 54
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestFallbackIDAndParseHexID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 131
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestFromNamePolicies",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 33
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestFromNamePoliciesPartOnlyOnAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 86
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestOneDefinitionOfTheIDAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/attestids_test.go",
+      "line": 154
     },
     {
       "package": "internal/channelseam",
@@ -36107,28 +36823,28 @@
       "identifier": "ActionRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 108
+      "line": 117
     },
     {
       "package": "node",
       "identifier": "Actions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 97
+      "line": 106
     },
     {
       "package": "node",
       "identifier": "ActionsConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 100
+      "line": 109
     },
     {
       "package": "node",
       "identifier": "ActionsHost",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 104
+      "line": 113
     },
     {
       "package": "node",
@@ -36142,7 +36858,7 @@
       "identifier": "AttestationChain",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 202
+      "line": 225
     },
     {
       "package": "node",
@@ -36156,28 +36872,28 @@
       "identifier": "BDXResponder",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 218
+      "line": 241
     },
     {
       "package": "node",
       "identifier": "BasicInformationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 134
+      "line": 143
     },
     {
       "package": "node",
       "identifier": "CapabilityMinimaStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 190
+      "line": 213
     },
     {
       "package": "node",
       "identifier": "CommissionerControlServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 221
+      "line": 244
     },
     {
       "package": "node",
@@ -36191,42 +36907,42 @@
       "identifier": "CommissioningApprover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 184
+      "line": 207
     },
     {
       "package": "node",
       "identifier": "DCLClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 68
+      "line": 69
     },
     {
       "package": "node",
       "identifier": "DCLOTAVersions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 82
+      "line": 91
     },
     {
       "package": "node",
       "identifier": "DCLSoftwareVersion",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 86
+      "line": 95
     },
     {
       "package": "node",
       "identifier": "DeviceTypeValidationMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 196
+      "line": 219
     },
     {
       "package": "node",
       "identifier": "DiagnosticEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 64
+      "line": 65
     },
     {
       "package": "node",
@@ -36240,21 +36956,21 @@
       "identifier": "DiscoveryNames",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 224
+      "line": 247
     },
     {
       "package": "node",
       "identifier": "EcosystemDirectory",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 115
+      "line": 124
     },
     {
       "package": "node",
       "identifier": "EcosystemInformation",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 120
+      "line": 129
     },
     {
       "package": "node",
@@ -36289,7 +37005,7 @@
       "identifier": "GeneralDiagnosticsFeatures",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 193
+      "line": 216
     },
     {
       "package": "node",
@@ -36331,49 +37047,49 @@
       "identifier": "NTPClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 141
+      "line": 164
     },
     {
       "package": "node",
       "identifier": "OTAApplier",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 165
+      "line": 188
     },
     {
       "package": "node",
       "identifier": "OTAApplyPolicy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 156
+      "line": 179
     },
     {
       "package": "node",
       "identifier": "OTABlob",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "node",
       "identifier": "OTAConsent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 150
+      "line": 173
     },
     {
       "package": "node",
       "identifier": "OTAConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 153
+      "line": 176
     },
     {
       "package": "node",
       "identifier": "OTADownloadProtocol",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 168
+      "line": 191
     },
     {
       "package": "node",
@@ -36387,7 +37103,7 @@
       "identifier": "OTAHTTPClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 171
+      "line": 194
     },
     {
       "package": "node",
@@ -36401,56 +37117,56 @@
       "identifier": "OTAImageHeader",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 49
+      "line": 50
     },
     {
       "package": "node",
       "identifier": "OTAImageOptions",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "node",
       "identifier": "OTAImageSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 147
+      "line": 170
     },
     {
       "package": "node",
       "identifier": "OTAPeer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 159
+      "line": 182
     },
     {
       "package": "node",
       "identifier": "OTAProviderServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 215
+      "line": 238
     },
     {
       "package": "node",
       "identifier": "OTARequestorServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 137
+      "line": 146
     },
     {
       "package": "node",
       "identifier": "OTAUpdateStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 162
+      "line": 185
     },
     {
       "package": "node",
       "identifier": "Occupancy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/inspect.go",
-      "line": 71
+      "line": 77
     },
     {
       "package": "node",
@@ -36461,10 +37177,31 @@
     },
     {
       "package": "node",
+      "identifier": "PeerPathClientBuilt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_peer_test.go",
+      "line": 16
+    },
+    {
+      "package": "node",
+      "identifier": "PeerPathClientSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_peer_test.go",
+      "line": 20
+    },
+    {
+      "package": "node",
+      "identifier": "PeerPathInvoke",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_peer_test.go",
+      "line": 34
+    },
+    {
+      "package": "node",
       "identifier": "PowerSourceConfigurationServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 143
+      "line": 152
     },
     {
       "package": "node",
@@ -36482,73 +37219,80 @@
     },
     {
       "package": "node",
+      "identifier": "ReopenPending",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 66
+    },
+    {
+      "package": "node",
       "identifier": "ReverseCommissioner",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 187
+      "line": 210
     },
     {
       "package": "node",
       "identifier": "SemanticTag",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 56
+      "line": 57
     },
     {
       "package": "node",
       "identifier": "SessionDiagnostics",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/inspect.go",
-      "line": 63
+      "line": 69
     },
     {
       "package": "node",
       "identifier": "SessionInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/inspect.go",
-      "line": 67
+      "line": 73
     },
     {
       "package": "node",
       "identifier": "SessionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 47
+      "line": 48
     },
     {
       "package": "node",
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 212
+      "line": 235
     },
     {
       "package": "node",
       "identifier": "Snapshotter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "node",
       "identifier": "SubscriptionInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 60
+      "line": 61
     },
     {
       "package": "node",
       "identifier": "SubscriptionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "node",
       "identifier": "TCPConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 42
+      "line": 43
     },
     {
       "package": "node",
@@ -36657,6 +37401,20 @@
     },
     {
       "package": "node",
+      "identifier": "TestClientServerStampsTheSessionIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 182
+    },
+    {
+      "package": "node",
+      "identifier": "TestClientSessionCommandGetsItsResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 135
+    },
+    {
+      "package": "node",
       "identifier": "TestConfigFaultsServedByRootGeneralDiagnostics",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/faults_test.go",
@@ -36688,21 +37446,35 @@
       "identifier": "TestFabricRemovalDeletesTheClientPeers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/client_fabric_internal_test.go",
-      "line": 53
+      "line": 57
+    },
+    {
+      "package": "node",
+      "identifier": "TestFabricUpdateEndsAHandshakeInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 73
     },
     {
       "package": "node",
       "identifier": "TestFabricUpdateForgetsTheClientResumptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/client_fabric_internal_test.go",
-      "line": 84
+      "line": 88
+    },
+    {
+      "package": "node",
+      "identifier": "TestKeyedSettingRootsAreForgotten",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/keyed_roots_internal_test.go",
+      "line": 26
     },
     {
       "package": "node",
       "identifier": "TestLateHandlerKeeperDoesNotRaceStop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_keepers_internal_test.go",
-      "line": 133
+      "line": 132
     },
     {
       "package": "node",
@@ -36745,6 +37517,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/pase_failsafe_refused_internal_test.go",
       "line": 24
+    },
+    {
+      "package": "node",
+      "identifier": "TestPeerClientFollowsTheFabricHooks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/peer_client_internal_test.go",
+      "line": 29
     },
     {
       "package": "node",
@@ -36793,7 +37572,7 @@
       "identifier": "TestReopenPendingAtStopArmsNoWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_keepers_internal_test.go",
-      "line": 78
+      "line": 77
     },
     {
       "package": "node",
@@ -36814,7 +37593,7 @@
       "identifier": "TestRingLogs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 148
+      "line": 151
     },
     {
       "package": "node",
@@ -36860,10 +37639,17 @@
     },
     {
       "package": "node",
+      "identifier": "TestStartAndFactoryResetBoundedByContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/lifecycle_bound_internal_test.go",
+      "line": 17
+    },
+    {
+      "package": "node",
       "identifier": "TestStopEndsAReopenWaitingOnTheLifetime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_keepers_internal_test.go",
-      "line": 183
+      "line": 182
     },
     {
       "package": "node",
@@ -36898,7 +37684,7 @@
       "identifier": "TestUniqueIDRotationOnOffOn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 170
+      "line": 173
     },
     {
       "package": "node",
@@ -36919,42 +37705,42 @@
       "identifier": "TimePeerReader",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 144
+      "line": 167
     },
     {
       "package": "node",
       "identifier": "TimeSynchronizationConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 138
+      "line": 161
     },
     {
       "package": "node",
       "identifier": "Topology",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 38
+      "line": 39
     },
     {
       "package": "node",
       "identifier": "WiFiNetworkDiagnosticsServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
-      "line": 140
+      "line": 149
     },
     {
       "package": "node",
       "identifier": "WiFiReporter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 181
+      "line": 204
     },
     {
       "package": "node",
       "identifier": "WindowStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 199
+      "line": 222
     },
     {
       "package": "node",
@@ -38106,6 +38892,13 @@
     },
     {
       "package": "secure/operational",
+      "identifier": "TestNewestSessionForPeer_OrdersByLastPeerActivity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_newest_session_test.go",
+      "line": 19
+    },
+    {
+      "package": "secure/operational",
       "identifier": "TestOccupancy_SeparatesLiveSessionsFromReservedIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_occupancy_test.go",
@@ -38627,7 +39420,7 @@
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "secure/sigma/sigma.go",
-      "line": 435
+      "line": 437
     },
     {
       "package": "secure/sigma",
@@ -39121,6 +39914,13 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestSigma1RefusesMalformedSessionParameters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/decoder_lengths_test.go",
+      "line": 139
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestSigma1RejectsBadEphPoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
@@ -39173,7 +39973,7 @@
       "identifier": "TestSigmaDecodersRefuseWrongFieldLengths",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/decoder_lengths_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "secure/sigma",
@@ -39181,6 +39981,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_tlv_test.go",
       "line": 149
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestSigmaMessagesRefuseMalformedSessionMembers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/decoder_lengths_test.go",
+      "line": 183
     },
     {
       "package": "secure/sigma",
@@ -39796,7 +40603,14 @@
       "identifier": "Eraser",
       "reason": "the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself",
       "file": "store/port.go",
-      "line": 273
+      "line": 323
+    },
+    {
+      "package": "store",
+      "identifier": "SealedWithoutCheck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "store/export_test.go",
+      "line": 11
     },
     {
       "package": "store",

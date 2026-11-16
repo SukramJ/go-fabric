@@ -299,7 +299,7 @@ func (s *Server) OnAttributeChange(cb func(change contract.Change)) (unsubscribe
 }
 
 // Notify tells the listeners that attrIDs changed.
-func (s *Server) Notify(attrIDs ...uint32) { s.srv.Notify(attrIDs...) }
+func (s *Server) Notify(attrIDs ...uint32) { s.srv.AttributeChanges.Notify(attrIDs...) }
 
 // State returns the current state.
 func (s *Server) State() State {

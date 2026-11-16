@@ -8,7 +8,7 @@ package node_test
 // advertisement, dials it over the in-memory BLE model, runs PASE and the
 // commissioning flow over that channel without MRP, and reaches the node
 // over IP (CASE) afterwards. The node's side is its own BLE radio
-// (Network.BLE, an in-memory bletest radio): the node advertises, serves
+// (Network.GATT, an in-memory bletest radio): the node advertises, serves
 // BTP through its bridge and leaves the radio once commissioned (brief
 // 28a).
 
@@ -61,7 +61,7 @@ func (f *ccFabric) announceOperational(t *testing.T, addr *net.UDPAddr, nodeID u
 }
 
 // nodePeripheral is a node's BLE radio as the central reaches it; the
-// node is built with its Radio (Network.BLE).
+// node is built with its Radio (Network.GATT).
 func nodePeripheral() *bletest.Peripheral {
 	return &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1E", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001}
 }
@@ -105,7 +105,7 @@ func TestLiveCommissioningOverBLE(t *testing.T) {
 
 	f := newCCFabric(t, bleFabricID, bleAdmin, "ble")
 	p := nodePeripheral()
-	n := liveNode(t, "node-ble", func(c *node.Config) { c.Network.BLE = p.Radio() })
+	n := liveNode(t, "node-ble", func(c *node.Config) { c.Network.GATT = p.Radio() })
 	central := bletest.NewCentral(p)
 	ch := dialBLE(ctx, t, central)
 

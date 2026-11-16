@@ -181,16 +181,14 @@ func TestSubscriptionAliveNotAfterStop(t *testing.T) {
 	})
 }
 
-// waitGoneLive waits until the subscription went live and the alives it
-// queued before it went live — the priming report's, which runs when its
-// job finds the subscription id already set, and the going-live one,
-// queued right after the status hook (network.go announceSubscriptionStatus)
-// — have run: SubscriptionActive may read true before either is queued.
-// Armed before they ran, a test took one for the report's alive (review
-// II, phase 5: TestSubscriptionAliveNotAfterStop twice under
-// `make race`). It must run in the bubble. The first alive starts the
-// registry's label reconciliation (Registry.hooksFor), so a
-// client.WaitRegistry comes after it, never before.
+// waitGoneLive waits until the subscription went live and its one alive —
+// the going-live one, queued right after the status hook (network.go
+// announceSubscriptionStatus) — has run: SubscriptionActive may read true
+// before it is queued. Armed before it ran, a test took it for the report's
+// alive (review II, phase 5: TestSubscriptionAliveNotAfterStop twice under
+// `make race`). It must run in the bubble. The alive starts the registry's
+// label reconciliation (Registry.hooksFor), so a client.WaitRegistry comes
+// after it, never before.
 func waitGoneLive(t *testing.T, live *atomic.Bool) {
 	t.Helper()
 	waitUntil(t, "the subscription's going-live announcement", live.Load)
@@ -204,7 +202,7 @@ func waitGoneLive(t *testing.T, live *atomic.Bool) {
 // (ClientInteraction.ts:1173-1174, SustainedSubscription.ts:224, :282 at
 // db021da0) and then emits alive (NetworkClient.ts:224-234). The priming
 // report's own alive has no subscription id yet, so the established alive
-// is the batch end of the priming report.
+// is the batch end of the priming report, and the only alive.
 func TestEstablishedAliveFollowsThePrimingReportsHooks(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -293,11 +291,50 @@ func TestEstablishedAliveFollowsThePrimingReportsHooks(t *testing.T) {
 		mu.Lock()
 		got := slices.Clone(order)
 		mu.Unlock()
-		if len(got) < 2 || got[0] != "endpoint 1" {
-			t.Fatalf("hooks %v, want the endpoint before any alive", got)
+		if !slices.Equal(got, []string{"endpoint 1", "alive"}) {
+			t.Fatalf("hooks %v, want the endpoint, then one alive", got)
 		}
 		if err := n.Stop(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	})
+}
+
+// TestOneAlivePerSubscriptionGoingLive: a subscription going live emits
+// exactly one SubscriptionAlive. matter.js gates a report's alive on the
+// subscription id (NetworkClient.ts:179-191 at db021da0) and assigns the id
+// only after the priming report's updated returned (ClientInteraction.ts:1083
+// before :1086, SustainedSubscription.ts:224 before :226 at db021da0), so
+// the priming report emits none and the going-live emission
+// (NetworkClient.ts:226-236) is the one. Deciding the priming report's alive
+// when its job ran, after the SubscribeResponse had set the id, emitted two
+// in 98.8 % of runs (review II, phase 5a); the loop makes one run that lets
+// the priming alive through enough.
+func TestOneAlivePerSubscriptionGoingLive(t *testing.T) {
+	t.Parallel()
+	const runs = 40
+	for i := range runs {
+		synctest.Test(t, func(t *testing.T) {
+			var alives atomic.Int32
+			var live atomic.Bool
+			sr := newScriptedRegistry(t, seedCommissioned(3), func(c *client.RegistryConfig) {
+				c.HooksFor = func(string) client.Hooks {
+					return client.Hooks{
+						SubscriptionStatusChanged: func(active bool) { live.Store(active) },
+						SubscriptionAlive:         func() { alives.Add(1) },
+					}
+				}
+			})
+			n := sr.reg.Get("peer1")
+			sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 0x55)
+			waitGoneLive(t, &live)
+			client.WaitRegistry(sr.reg)
+			if got := alives.Load(); got != 1 {
+				t.Fatalf("run %d: %d SubscriptionAlive hooks as the subscription went live, want 1", i, got)
+			}
+			if err := n.Stop(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }

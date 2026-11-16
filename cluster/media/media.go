@@ -439,15 +439,11 @@ type events struct {
 	ep   uint16
 }
 
-// SetEndpoint stamps the endpoint the server's events are addressed to.
+// SetEndpoint stamps the endpoint the server's events are addressed to. A
+// server that embeds a *spec.Server beside events declares its own
+// SetEndpoint, which calls this and the store's.
 func (e *events) SetEndpoint(endpoint uint16) {
 	e.epMu.Lock()
 	e.ep = endpoint
 	e.epMu.Unlock()
-}
-
-func (e *events) endpoint() uint16 {
-	e.epMu.Lock()
-	defer e.epMu.Unlock()
-	return e.ep
 }

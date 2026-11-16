@@ -101,11 +101,7 @@ func TestDeprecatedIdentifiersAreAnnounced(t *testing.T) {
 	var missing []string
 	walkGoFiles(t, root, func(path string, src []byte) {
 		rel, _ := filepath.Rel(root, path)
-		for _, ident := range deprecatedIdentifiers(string(src)) {
-			if !strings.Contains(string(changelog), ident) {
-				missing = append(missing, rel+": "+ident)
-			}
-		}
+		missing = append(missing, unannounced(string(changelog), filepath.ToSlash(rel), string(src))...)
 	})
 
 	for _, m := range missing {
@@ -113,6 +109,73 @@ func TestDeprecatedIdentifiersAreAnnounced(t *testing.T) {
 			"means something to a consumer who is told the clock is running — README.md's API "+
 			"stability section says the deprecation is announced when it is marked, not when it "+
 			"is removed", m)
+	}
+}
+
+// generatedPattern is a family of generated identifiers one CHANGELOG
+// line announces by its pattern: a deprecation script/clustergen writes
+// into every <cluster>def package is one decision, and naming each of its
+// instances would make the line a list nobody reads. The set a pattern
+// covers is derived from the generator's output itself — every deprecated
+// identifier in a file the path matches whose name the identifier
+// expression matches — so a generated deprecation of another shape still
+// needs its own line.
+type generatedPattern struct {
+	path     *regexp.Regexp // the generated file, module-relative
+	ident    *regexp.Regexp // the identifiers it announces
+	announce string         // the pattern as CHANGELOG.md names it
+}
+
+// generatedPatterns are the generated deprecation families a pattern line
+// announces.
+var generatedPatterns = []generatedPattern{{
+	// R2-P5-apispec-07: the typed emit that takes its endpoint from the
+	// caller, replaced by Record<Event>.
+	path:     regexp.MustCompile(`^cluster/spec/[a-z0-9]+/server_gen\.go$`),
+	ident:    regexp.MustCompile(`^Emit[A-Z]\w*$`),
+	announce: "`<cluster>def.Server.Emit<Event>(endpoint, …)`",
+}}
+
+// unannounced returns the deprecated identifiers of src (module-relative
+// path rel) that changelog does not announce — by name, or for a generated
+// family by its pattern line ([generatedPatterns]) — each as "rel: name".
+func unannounced(changelog, rel, src string) []string {
+	var out []string
+	for _, ident := range deprecatedIdentifiers(src) {
+		if strings.Contains(changelog, ident) {
+			continue
+		}
+		announced := false
+		for _, p := range generatedPatterns {
+			if p.path.MatchString(rel) && p.ident.MatchString(ident) && strings.Contains(changelog, p.announce) {
+				announced = true
+				break
+			}
+		}
+		if !announced {
+			out = append(out, rel+": "+ident)
+		}
+	}
+	return out
+}
+
+// TestGeneratedPatternAnnouncesItsFamilyOnly is the pattern rule's negative
+// fixture: the pattern line announces a generated Emit<Event>, but not the
+// same deprecation outside the generated files, not another generated
+// deprecation, and nothing without the line.
+func TestGeneratedPatternAnnouncesItsFamilyOnly(t *testing.T) {
+	t.Parallel()
+	src := "// Deprecated: use RecordPing.\nfunc (s *Server) EmitPing(endpoint uint16, data PingEvent) error {}\n" +
+		"// Deprecated: gone.\nfunc (s *Server) HandleOld() error {}\n"
+	line := "- " + generatedPatterns[0].announce + " → `Record<Event>`"
+	if got, want := unannounced(line, "cluster/spec/demo/server_gen.go", src), []string{"cluster/spec/demo/server_gen.go: HandleOld"}; !slices.Equal(got, want) {
+		t.Errorf("generated file with the pattern line: %v, want %v", got, want)
+	}
+	if got := unannounced(line, "cluster/demo/server.go", src); len(got) != 2 {
+		t.Errorf("a hand-written file is not covered by the pattern: %v", got)
+	}
+	if got := unannounced("", "cluster/spec/demo/server_gen.go", src); len(got) != 2 {
+		t.Errorf("without the pattern line nothing is announced: %v", got)
 	}
 }
 
@@ -184,7 +247,8 @@ func TestDeprecatedConstGroupIsChecked(t *testing.T) {
 }
 
 // walkGoFiles visits every .go file in the module, skipping the directories
-// that carry no module source.
+// that carry no module source: a hidden one below root ([hiddenBelow]),
+// testdata and node_modules.
 func walkGoFiles(t *testing.T, root string, fn func(path string, src []byte)) {
 	t.Helper()
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -192,8 +256,7 @@ func walkGoFiles(t *testing.T, root string, fn func(path string, src []byte)) {
 			return err
 		}
 		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "testdata", "node_modules":
+			if hiddenBelow(root, path, d.Name()) || d.Name() == "testdata" || d.Name() == "node_modules" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -210,5 +273,48 @@ func walkGoFiles(t *testing.T, root string, fn func(path string, src []byte)) {
 	})
 	if err != nil {
 		t.Fatalf("walk module: %v", err)
+	}
+}
+
+// hiddenBelow reports whether the directory path, named name, is a hidden
+// one below the walk's root: .git, .github, and .claude, whose worktrees
+// are other checkouts of the repository — read as this module's files they
+// answer for a branch that is not the one under test. The repository's
+// nested modules (ble/bluez and its siblings) are its own source and are
+// walked.
+func hiddenBelow(root, path, name string) bool {
+	return filepath.Clean(path) != filepath.Clean(root) && strings.HasPrefix(name, ".")
+}
+
+// TestRepositoryWalksSkipHiddenDirectories: walkGoFiles, and with
+// hiddenBelow the licence header walk, visit the repository's files and
+// its nested modules, and nothing under a hidden directory such as an
+// agent's .claude/worktrees/ checkout.
+func TestRepositoryWalksSkipHiddenDirectories(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for _, path := range []string{
+		"a.go", "pkg/b.go", "ble/bluez/c.go", "pkg/testdata/d.go",
+		".claude/worktrees/other/e.go", ".git/f.go", ".github/g.go",
+	} {
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("package x\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var visited []string
+	walkGoFiles(t, root, func(path string, _ []byte) {
+		rel, _ := filepath.Rel(root, path)
+		visited = append(visited, filepath.ToSlash(rel))
+	})
+	slices.Sort(visited)
+	if want := []string{"a.go", "ble/bluez/c.go", "pkg/b.go"}; !slices.Equal(visited, want) {
+		t.Errorf("walkGoFiles visited %v, want %v", visited, want)
+	}
+	if hiddenBelow(root, root, filepath.Base(root)) {
+		t.Error("the walk's root counts as hidden")
 	}
 }

@@ -6,11 +6,11 @@ package node_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -78,16 +78,18 @@ func (r *requestorStack) End(_ context.Context, _ wrdef.WebRTCSessionStruct, rea
 // End reach the requestor's port over a CASE session the camera's node
 // initiates (connectedhomeip webrtc-provider-manager.cpp:860-1328 at
 // 6170af84: FindOrEstablishSession on the session's ScopedNodeId, the
-// command at originatingEndpointId). The requestor's Operate entry is the
+// command at originatingEndpointId). The signals are Large Message
+// commands, so the session runs over TCP: both nodes take the TCP roles,
+// on a loopback site (docs/adr/0032). The requestor's Operate entry is the
 // one the node installs (webrtc_requestor_acl.go).
 func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
-	site := quietSite(t)
+	site := tcpSite(t)
 	ctx := parityCtx(t)
-	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}})
+	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}}, cameraRequired())
 	if err != nil {
 		t.Fatal(err)
 	}
-	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{cam}}})
+	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{cam}, Configure: withTCP}})
 	stack := &requestorStack{}
 	ctl, err := device.NewCameraController(device.Options{StableKey: endpoint.StringKey("ctl:1"), Name: "ctl"}, wrdef.Declare{RequestorPort: stack})
 	if err != nil {
@@ -99,6 +101,7 @@ func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 		// grants ([node.WebRTCRequestorConfig].GrantFabric).
 		Configure: func(cfg *node.Config) {
 			cfg.WebRTCRequestor = &node.WebRTCRequestorConfig{GrantFabric: func(node.FabricInfo) bool { return true }}
+			withTCP(cfg)
 		},
 	})
 	if _, err := pair.Controller.Commission(ctx, ctlDev, fabrictest.CommissionOptions{}); err != nil {
@@ -174,19 +177,21 @@ func TestCameraProviderSignalsReachTheRequestor(t *testing.T) {
 	}
 }
 
-// TestCameraProviderSignalTooLargeForUDP: the camera's CASE session to the
-// requestor runs over UDP, and an answer that does not fit one message is
-// refused before it is sent (camera.ErrPayloadTooLarge, the value of
-// bridge.ErrPayloadTooLarge; chip sends its signals with kLargePayload over
-// TCP, webrtc-provider-manager.cpp:860-942).
-func TestCameraProviderSignalTooLargeForUDP(t *testing.T) {
-	site := quietSite(t)
+// TestCameraProviderLargeSignalOverTCP: an answer larger than one UDP
+// message (1500 bytes of SDP; 1280 - 48 bytes less the 54-byte message
+// overhead fit one) reaches the requestor: the signal is a Large Message
+// command and goes over TCP (connectedhomeip sends its signals with
+// TransportPayloadCapability::kLargePayload,
+// webrtc-provider-manager.cpp:860-942 at 6170af84). Without TCP the camera
+// refuses it before sending (TestPeerPathWithoutTCPRefusesTheSignal).
+func TestCameraProviderLargeSignalOverTCP(t *testing.T) {
+	site := tcpSite(t)
 	ctx := parityCtx(t)
-	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}})
+	cam, err := device.NewCamera(device.Options{StableKey: endpoint.StringKey("cam:1"), Name: "cam"}, wpdef.Declare{ProviderPort: cameraStack{}}, cameraRequired())
 	if err != nil {
 		t.Fatal(err)
 	}
-	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{cam}}})
+	pair := site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{cam}, Configure: withTCP}})
 	stack := &requestorStack{}
 	ctl, err := device.NewCameraController(device.Options{StableKey: endpoint.StringKey("ctl:1"), Name: "ctl"}, wrdef.Declare{RequestorPort: stack})
 	if err != nil {
@@ -198,12 +203,14 @@ func TestCameraProviderSignalTooLargeForUDP(t *testing.T) {
 		// grants ([node.WebRTCRequestorConfig].GrantFabric).
 		Configure: func(cfg *node.Config) {
 			cfg.WebRTCRequestor = &node.WebRTCRequestorConfig{GrantFabric: func(node.FabricInfo) bool { return true }}
+			withTCP(cfg)
 		},
 	})
 	if _, err := pair.Controller.Commission(ctx, ctlDev, fabrictest.CommissionOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	ctlEp, _ := ctlDev.EndpointOf("ctl:1")
+	camEp, _ := pair.Device.EndpointOf("cam:1")
 	camFabric, ctlFabric := oneFabric(t, pair.Device), oneFabric(t, ctlDev)
 	prov := cam.Server(wpdef.ClusterID).(*camera.Provider)
 	if err := prov.UpsertSession(camera.ProviderSession{
@@ -211,19 +218,33 @@ func TestCameraProviderSignalTooLargeForUDP(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// 1500 bytes of SDP: more than a UDP message carries (1280 - 48 bytes
-	// less the 54-byte message overhead).
+	req := ctl.Server(wrdef.ClusterID).(*camera.Requestor)
+	if err := req.UpsertSession(camera.WebRTCSession{
+		Id: 1, PeerNodeId: camFabric.NodeID, PeerEndpointId: camEp, FabricIndex: ctlFabric.FabricIndex, StreamUsage: wrdef.StreamUsageLiveView,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// 1500 bytes of SDP: more than a UDP message carries.
 	sdp := strings.Repeat("a=candidate:0123456789 ", 66)
-	err = site.Run(ctx, func(ctx context.Context) error { return prov.Answer(ctx, 1, sdp) })
-	if !errors.Is(err, camera.ErrPayloadTooLarge) || !errors.Is(err, bridge.ErrPayloadTooLarge) {
-		t.Fatalf("a %d-byte answer over UDP: %v", len(sdp), err)
+	if err := site.Run(ctx, func(ctx context.Context) error { return prov.Answer(ctx, 1, sdp) }); err != nil {
+		t.Fatalf("a %d-byte answer over TCP: %v", len(sdp), err)
 	}
 	stack.mu.Lock()
 	defer stack.mu.Unlock()
-	if len(stack.answers) != 0 {
+	if len(stack.answers) != 1 || stack.answers[0] != sdp {
 		t.Fatalf("the requestor received %d answers", len(stack.answers))
 	}
 }
+
+// tcpSite is a quiet loopback site: TCP runs over kernel sockets.
+func tcpSite(t *testing.T) *fabrictest.Site {
+	t.Helper()
+	holdSite(t)
+	return fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Logger: slog.New(slog.DiscardHandler)})
+}
+
+// withTCP gives a node both TCP roles.
+func withTCP(cfg *node.Config) { cfg.Network.TCP = node.TCPConfig{Incoming: true, Outgoing: true} }
 
 // oneFabric is the device's one fabric.
 func oneFabric(t *testing.T, d *fabrictest.Device) node.FabricInfo {

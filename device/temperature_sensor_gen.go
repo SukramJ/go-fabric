@@ -19,10 +19,9 @@ const (
 )
 
 // TemperatureSensorType returns the TemperatureSensor device type, matter.js's packages/node/src/devices/temperature-sensor.ts;
-// its cluster requirements are listed in docs/reference/device-types.md#temperaturesensor. It is the registry's
-// value, the one [Lookup] and [FromSpec] return: a caller reads it and
-// does not modify it.
-func TemperatureSensorType() *Type { return &typeTemperatureSensor }
+// its cluster requirements are listed in docs/reference/device-types.md#temperaturesensor. It is a copy of the
+// registry's value, as [Lookup]'s: modifying it changes nothing else.
+func TemperatureSensorType() *Type { return typeTemperatureSensor.clone() }
 
 // typeTemperatureSensor holds [TemperatureSensorType]'s cluster requirements.
 var typeTemperatureSensor = Type{

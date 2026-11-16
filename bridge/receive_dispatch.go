@@ -21,6 +21,7 @@ import (
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -39,6 +40,20 @@ var errChunkRejected = errors.New("bridge: peer rejected ReportData chunk")
 // chunk to a peer that is not listening, holding the dispatch slot for
 // the whole report.
 var errChunkUnanswered = errors.New("bridge: peer did not answer ReportData chunk")
+
+// errChunkWaitDisarmed ends a chunk wait disarmed by another hand: the
+// close of its session. It is an [errChunkWaitAborted] too.
+var errChunkWaitDisarmed = errors.New("bridge: chunk wait disarmed")
+
+// chunkRejectedError is [errChunkRejected] with the status the peer
+// answered.
+type chunkRejectedError struct{ status im.StatusCode }
+
+func (e *chunkRejectedError) Error() string {
+	return errChunkRejected.Error() + ": " + e.status.String()
+}
+
+func (e *chunkRejectedError) Is(target error) bool { return target == errChunkRejected }
 
 // absorbStatusResponse handles an inbound StatusResponse opcode.
 // StatusResponse is the spec-mandated ACK for a ReportData /
@@ -283,7 +298,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// A plain Read's response suppresses the answer to its last chunk
 	// (see [im.HandleReadRequest]).
 	chunker := newReportChunker(im.ReportData{SuppressResponse: true}, limits.budget, limits.hardCap, attributes, events)
-	chunk, have, err := chunker.next()
+	chunk, have, err := chunker.Next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_report", src, err)
 		return err
@@ -303,7 +318,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 			return err
 		}
 		chunks++
-		if chunk, have, err = chunker.next(); err != nil {
+		if chunk, have, err = chunker.Next(); err != nil {
 			debugReplyError(b.logger, "chunk_report", src, err)
 			return err
 		}
@@ -341,31 +356,12 @@ func (b *Bridge) sendReadChunk(ctx context.Context, src net.Addr, requestHdr *me
 	// (`suppressResponse` chunk → `expectAckOnly: true`, no StatusResponse
 	// wait). Reliable delivery of the final chunk is still guaranteed by
 	// sendReplyReliable's MRP retransmit + the post-loop dischargeOwedAck.
-	var waitCh <-chan im.StatusCode
-	if !chunk.SuppressResponse {
-		waitCh = b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	wait := chunkWaitHere
+	if chunk.SuppressResponse {
+		wait = chunkNoWait
 	}
-	// Piggyback the latest peer-sent counter on this chunk's
-	// AckCounter. Without this rewrite every chunk carries
-	// the stale ReadRequest counter, and python-matter-server's
-	// ReliableMessaging drops chunk N+1 after the peer has
-	// StatusResponse-acked chunk N — "Dropping message without
-	// piggyback ack when we are waiting for an ack". Mirrors
-	// the symmetric fix in the Subscribe-Initial loop.
-	chunkHdr := *requestHdr
-	b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
-	if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeReportData, body); err != nil {
-		if waitCh != nil {
-			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-		}
-		debugReplyError(b.logger, "send_report", src, err)
+	if _, err := b.sendChunk(b.replyChunkLeg(ctx, "read", src, requestHdr, proto, im.OpcodeReportData), i, body, chunk, wait); err != nil {
 		return err
-	}
-	if waitCh != nil {
-		leaveSessionOrder(ctx) // the answer arrives on this session
-		if err := b.awaitChunkStatusResponse(ctx, nil, waitCh, "read", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
-			return err
-		}
 	}
 	b.logger.Debug("matter.rx.im.read.chunk",
 		slog.String("src", srcString(src)),
@@ -401,22 +397,30 @@ func readWaitsForChunks(chunks []im.ReportData) bool {
 	return false
 }
 
-// awaitChunkStatusResponse blocks until the peer answers the chunk just
-// sent on (session, exchange) with an IM StatusResponse, then decides
-// whether the chunk loop may go on. Mirrors matter.js
-// InteractionMessenger.ts:839-844 at db021da0, sendDataReportMessage →
-// waitForSuccess: a non-Success status or a missing answer aborts the
-// interaction — the caller returns the error and sends nothing more on
-// the exchange. op names the loop for the log line ("read" /
-// "subscribe").
-//
-// The wait also ends, with [errChunkWaitAborted], when ctx — the
-// handler's context, which the bridge's Stop cancels — is done, when
-// abort closes (nil: never; a priming report passes its subscription's
-// close), and when the wait is disarmed by another hand: the close of
-// its session ([Bridge.SessionClosed]). Review II, R2-P1-req2-01.
-func (b *Bridge) awaitChunkStatusResponse(ctx context.Context, abort <-chan struct{}, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
-	return b.awaitChunkStatusResponseWithin(b.chunkStatusResponseTimeout(sessionID), ctx.Done(), abort, waitCh, op, src, sessionID, exchangeID, initiator, chunkIdx, chunk)
+// replyChunkLeg is the chunk leg of a request's reply on its own exchange
+// (a read's, a priming report's, an InvokeResponse's): each chunk goes out
+// reliably with the latest acknowledgement owed on the exchange
+// piggybacked — without it every chunk carries the request's counter, and
+// a controller that acknowledged chunk N's StatusResponse drops chunk N+1
+// ("Dropping message without piggyback ack when we are waiting for an
+// ack", python-matter-server's ReliableMessaging) — and the wait for its
+// answer ends with ctx, after the handler handed its session's turn on.
+func (b *Bridge) replyChunkLeg(ctx context.Context, op string, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, opcode uint8) chunkLeg {
+	return chunkLeg{
+		op: op, src: src,
+		sessionID: requestHdr.SessionID, exchangeID: proto.ExchangeID, role: !proto.Initiator,
+		send: func(_ int, body []byte) (uint32, error) {
+			chunkHdr := *requestHdr
+			b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
+			if err := b.sendReplyReliable(src, &chunkHdr, proto, opcode, body); err != nil {
+				debugReplyError(b.logger, "send_"+op+"_chunk", src, err)
+				return 0, err
+			}
+			return 0, nil
+		},
+		done:       ctx.Done(),
+		beforeWait: func() { leaveSessionOrder(ctx) }, // the answer arrives on this session
+	}
 }
 
 // errChunkWaitAborted ends a chunk wait whose sender stopped: the
@@ -424,11 +428,20 @@ func (b *Bridge) awaitChunkStatusResponse(ctx context.Context, abort <-chan stru
 // no verdict on the peer.
 var errChunkWaitAborted = errors.New("bridge: chunk wait aborted")
 
-// awaitChunkStatusResponseWithin is [Bridge.awaitChunkStatusResponse]
-// bounded by timeout instead of the chunk StatusResponse bound, and by
-// done and abort (nil: never) — the wait ends with [errChunkWaitAborted]
-// when either closes, or when waitCh closes without a status (the wait
-// was disarmed by its session's close).
+// awaitChunkStatusResponseWithin blocks until the peer answers the chunk
+// just sent on (session, exchange) with an IM StatusResponse, then decides
+// whether the chunk loop may go on ([Bridge.sendChunk]). Mirrors matter.js
+// InteractionMessenger.ts:839-844 at db021da0, sendDataReportMessage →
+// waitForSuccess: a non-Success status ([chunkRejectedError]) or no answer
+// within timeout ([errChunkUnanswered]) aborts the interaction — the
+// caller returns the error and sends nothing more on the exchange. op
+// names the loop for the log line.
+//
+// The wait also ends, with [errChunkWaitAborted], when done — a handler's
+// context, which the bridge's Stop cancels — or abort closes (nil: never),
+// and when the wait is disarmed by another hand: the close of its session
+// ([Bridge.SessionClosed]; [errChunkWaitDisarmed] too). Review II,
+// R2-P1-req2-01.
 func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abort <-chan struct{}, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
@@ -445,7 +458,7 @@ func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abo
 			// Disarmed without an answer: the zero status would read
 			// as Success and release the next chunk to a session that
 			// is gone.
-			return fmt.Errorf("%w: exchange %d chunk %d disarmed", errChunkWaitAborted, exchangeID, chunkIdx)
+			return fmt.Errorf("%w: %w: exchange %d chunk %d", errChunkWaitAborted, errChunkWaitDisarmed, exchangeID, chunkIdx)
 		}
 		if status.IsSuccess() {
 			return nil
@@ -455,7 +468,7 @@ func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abo
 			slog.Int("chunk", chunkIdx),
 			slog.Int("exchange_id", int(exchangeID)),
 			slog.String("status", status.String()))
-		return fmt.Errorf("%w: %s", errChunkRejected, status.String())
+		return &chunkRejectedError{status: status}
 	case <-timer.C():
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		b.logger.Debug("matter.tx."+op+".chunk_ack_timeout",
@@ -579,13 +592,12 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_open", im.StatusBusy)
 	}
 	writeCtx = im.WithWriteTransaction(writeCtx, tx)
-	// The dispatcher records which written attributes changed nothing
-	// (endpoint.WriteChanges); their report is left out. A host notifier's
+	// Each result names the attributes its write changed
+	// ([im.WriteResult.Commit]); only those are reported. A host notifier's
 	// changes of the endpoints written meanwhile are settled against the
-	// same record when the write ends ([Bridge.applyWriteHeld]).
-	changes := &endpointpkg.WriteChanges{}
-	writeCtx = endpointpkg.WithWriteChanges(writeCtx, changes)
-	resp := b.applyWriteHeld(writeCtx, dispatcher, req, changes)
+	// same results when the write ends ([Bridge.applyWriteHeld]).
+	outcome := b.applyWriteHeld(writeCtx, dispatcher, req)
+	resp := outcome.Response
 	// An interaction that ended at a data element (im.WriteResponse.Status)
 	// ends the transaction: the elements before it were written and are
 	// reported, and the controller gets the StatusResponse — matter.js's
@@ -593,11 +605,11 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	// (InteractionMessenger.ts:431-460 at db021da0).
 	if !resp.Status.IsSuccess() {
 		b.endWriteInteraction(txKey)
-		b.reportWrittenAttributes(resp, changes)
+		b.reportWrittenAttributes(outcome.Results)
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_ended", resp.Status)
 	}
 	b.routing.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
-	b.reportWrittenAttributes(resp, changes)
+	b.reportWrittenAttributes(outcome.Results)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
 	// elide it. matter.js InteractionServer.ts and chip
@@ -723,11 +735,22 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// the session that issued the CSRRequest (matter.js
 	// OperationalCredentialsServer.ts session-ID binding guard).
 	invokeCtx = core.WithInvokeSessionID(invokeCtx, requestHdr.SessionID)
+	// And the session's identity, which a session of another stack (a
+	// node's client stack) never shares: the CSR of a fail-safe binds to it
+	// whichever stack holds the session ([core.WithInvokeSession]; review
+	// II, Fable R2-1).
+	if sess := b.lookupSession(requestHdr.SessionID); sess != nil {
+		invokeCtx = core.WithInvokeSession(invokeCtx, sess)
+	}
 	if challenge, ok := b.sessionAttestationChallenge(requestHdr.SessionID); ok {
 		invokeCtx = core.WithInvokeAttestationChallenge(invokeCtx, challenge)
 	}
 	// The gate above passed, so a set Timed flag means a valid window.
 	invokeCtx = im.WithTimedInteraction(invokeCtx, req.TimedRequest)
+	// Whether the session carries Large Messages: it does exactly over a
+	// TCP connection ([routeCarriesLargeMessages]); the invoke path refuses
+	// a Large Message command otherwise ([im.WithLargeMessageSession]).
+	invokeCtx = im.WithLargeMessageSession(invokeCtx, routeCarriesLargeMessages(src))
 	// A server that sizes its response by the exchange (GeneralDiagnostics
 	// PayloadTestRequest) reads the largest payload one message of it
 	// carries ([Bridge.invokeMaxPayloadSize]).
@@ -779,17 +802,9 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// All but the last chunk wait for the controller's StatusResponse
 	// before the next goes out, as for a chunked read (matter.js
 	// InteractionMessenger.ts sendInvokeResponse → waitForSuccess).
+	leg := b.replyChunkLeg(ctx, "invoke", src, requestHdr, proto, im.OpcodeInvokeResponse)
 	for i, chunk := range chunks[:len(chunks)-1] {
-		waitCh := b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-		chunkHdr := *requestHdr
-		b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
-		if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeInvokeResponse, chunk); err != nil {
-			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-			debugReplyError(b.logger, "send_invoke_chunk", src, err)
-			return err
-		}
-		leaveSessionOrder(ctx) // the answer arrives on this session
-		if err := b.awaitChunkStatusResponse(ctx, nil, waitCh, "invoke", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, im.ReportData{MoreChunkedMessages: true}); err != nil {
+		if _, err := b.sendChunk(leg, i, chunk, im.ReportData{MoreChunkedMessages: true}, chunkWaitHere); err != nil {
 			return err
 		}
 	}
@@ -907,8 +922,8 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 	return nil
 }
 
-// reportWrittenAttributes marks every successfully written attribute dirty
-// for the subscriptions that cover it. (The dispatcher has already advanced
+// reportWrittenAttributes marks every attribute a write changed dirty for
+// the subscriptions that cover it. (The dispatcher has already advanced
 // the cluster's DataVersion: endpoint/dispatcher.go WriteAuthorized for a
 // bridged endpoint, the server's own tracker for the root.) A write is a state change
 // like any other: matter.js commits it to the behavior's state, whose
@@ -919,29 +934,22 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 // BasicInformation.NodeLabel was never reported at all. Found by the CHIP
 // Python harness (TC-IDM-2.3 step 4).
 //
-// An attribute changes records as unchanged — every write of it in the
-// interaction left the cluster as it was, by its server's verdict
-// (contract.ChangeReportingWriter) — is not marked: matter.js broadcasts
-// only the properties a commit changed
+// The attributes marked are the ones each successful write's verdict names
+// ([im.WriteResult.Commit]): the written one only when it changed, and any
+// other the write moved with it; a write with no verdict marks its written
+// attribute. matter.js broadcasts only the properties a commit changed
 // (packages/node/src/behavior/state/managed/Datasource.ts:1319 at
-// db021da0, onChange with the change list :1484 fills) and advances no
-// version for an equal value (:1456-1457, :1479), and the dispatcher left
-// the version as it was.
-func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse, changes *endpointpkg.WriteChanges) {
+// db021da0, onChange with the change list; a name noted only when its
+// value differs, :1476-1484) and advances no version for an equal value
+// (:1456-1457), and the dispatcher left the version as it was.
+func (b *Bridge) reportWrittenAttributes(results []im.WriteResult) {
 	mgr := b.subscriptionManagerLocked()
-	for _, r := range resp.Responses {
-		if !r.Status.Status.IsSuccess() || !r.Path.HasEndpoint || !r.Path.HasCluster || !r.Path.HasAttribute {
-			continue
-		}
-		if changes.Unchanged(r.Path) {
-			continue
-		}
-		if mgr != nil {
-			mgr.OnAttributeChanged(im.ConcreteAttributePath{
-				Endpoint: r.Path.Endpoint, Cluster: r.Path.Cluster, Attribute: r.Path.Attribute,
-				HasEndpoint: true, HasCluster: true, HasAttribute: true,
-			})
-		}
+	if mgr == nil {
+		return
+	}
+	rec := recordOf(results)
+	for _, p := range slices.Concat(rec.changed, rec.unjudged) {
+		mgr.OnAttributeChanged(p)
 	}
 }
 
@@ -1318,6 +1326,25 @@ func (b *Bridge) adoptPASESessionOnAddNOC(sessionID uint16, resp im.InvokeRespon
 				slog.Int("session_id", int(sessionID)), slog.Any("err", err))
 		}
 	}
+}
+
+// lookupSession is the live session of the id, nil for none (or the
+// unsecured id 0).
+func (b *Bridge) lookupSession(sessionID uint16) *channel.Session {
+	if sessionID == 0 {
+		return nil
+	}
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if lookup == nil {
+		return nil
+	}
+	sess, ok := lookup.Lookup(sessionID)
+	if !ok {
+		return nil
+	}
+	return sess
 }
 
 // sessionAttestationChallenger is the optional capability of the session

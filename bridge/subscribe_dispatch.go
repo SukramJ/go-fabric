@@ -253,7 +253,7 @@ func (p *primingSource) next() (im.AttributeReport, bool) {
 			rep.IsStatus = true
 			rep.Status = im.StatusIB{Status: rr.Status}
 		} else {
-			rep.Value = rr.Value
+			rep.Value, rep.FabricScope = rr.Value, rr.FabricScope
 		}
 		p.log(rep)
 		p.reports++
@@ -667,7 +667,7 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 	// AND the per-datagram budget. The chunker splits on
 	// per-attribute boundaries; each chunk except the last carries
 	// MoreChunkedMessages=true (Matter §10.6.6).
-	chunk, have, err := chunker.next()
+	chunk, have, err := chunker.Next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_initial_report", src, err)
 		return err
@@ -692,6 +692,9 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 	// trip is sub-millisecond. A chunk that is never answered aborts the
 	// Subscribe instead of releasing the next chunk to a peer that is not
 	// listening.
+	// The handler handed its session's turn on before the priming began.
+	leg := b.replyChunkLeg(ctx, "subscribe", src, requestHdr, proto, im.OpcodeReportData)
+	leg.abort, leg.beforeWait = abort, nil
 	for i := 0; have; i++ {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
@@ -706,24 +709,12 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 			slog.Int("bytes", len(body)),
 			slog.Bool("final", !chunk.MoreChunkedMessages))
 
-		// Arm the per-exchange StatusResponse waiter BEFORE the send
-		// to avoid a missed-wakeup race: Apple can reply faster than
-		// our scheduler returns from sendReplyReliable.
-		waitCh := b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-		// Piggyback the latest peer-sent counter on this chunk's
-		// AckCounter. Without this rewrite every chunk carries the
-		// stale SubscribeRequest counter, and python-matter-server's
-		// ReliableMessaging drops chunk N+1 after the peer has
-		// StatusResponse-acked chunk N — "Dropping message without
-		// piggyback ack when we are waiting for an ack".
-		chunkHdr := *requestHdr
-		b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
-		if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeReportData, body); err != nil {
-			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-			debugReplyError(b.logger, "send_initial_report", src, err)
-			return err
-		}
-		// Block until Apple StatusResponse-acks this chunk on the IM
+		// The wait is armed before the send — Apple can reply faster
+		// than our scheduler returns from the send — and each chunk
+		// piggybacks the latest acknowledgement owed on the exchange
+		// ([Bridge.replyChunkLeg]).
+		//
+		// Every chunk waits until Apple StatusResponse-acks it on the IM
 		// layer, or the timeout expires.
 		//
 		// chip's ReadHandler.cpp:241-271 sends `SendSubscribeResponse`
@@ -740,7 +731,7 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 		// peer is not consuming the priming report, and matter.js's
 		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
 		// MessageExchange.ts:855-863).
-		if err := b.awaitChunkStatusResponse(ctx, abort, waitCh, "subscribe", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
+		if _, err := b.sendChunk(leg, i, body, chunk, chunkWaitHere); err != nil {
 			return err
 		}
 
@@ -749,7 +740,7 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 			slog.Int("chunk", i),
 			slog.Int("bytes", len(body)),
 			slog.Bool("more", chunk.MoreChunkedMessages))
-		if chunk, have, err = chunker.next(); err != nil {
+		if chunk, have, err = chunker.Next(); err != nil {
 			debugReplyError(b.logger, "chunk_initial_report", src, err)
 			return err
 		}

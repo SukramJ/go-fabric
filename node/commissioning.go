@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/internal/facadeseam"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/spake2"
@@ -66,12 +67,16 @@ type commissioningHost struct {
 	// life is the node's lifetime (Node.life), the context of a window
 	// PASE session's auto-armed fail-safe.
 	life context.Context
+	// onDemand is [Commissioning].WindowOnDemand: the node opens its own
+	// window only on the host's call, never by itself
+	// (reopenIfDecommissioned and Start's open).
+	onDemand bool
 
 	// basicMu guards basic.
 	basicMu sync.Mutex
 	basic   *basicWindow // the open OpenBasicWindow window, nil without one
 
-	// ble is whether the node has a BLE radio (Network.BLE); clk paces
+	// ble is whether the node has a BLE radio (Network.GATT); clk paces
 	// the bound of leaving it. fabricCount counts the node's fabrics
 	// (set by wireCommissioningWindow).
 	ble         bool
@@ -112,7 +117,9 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 	window.SetFailSafeExpirer(h.root.GeneralCommissioning)
 	window.SetPaseSessionCloser(paseCloser{h.sessions})
 	window.SetPaseVerifierInstaller(h)
-	window.SetTransitionHook(func() {
+	// In the facade's own slot (internal/facadeseam): a host's
+	// SetTransitionHook adds to it.
+	facadeSlot(facadeseam.SetTransitionHook(window, func() {
 		//nolint:contextcheck // the hook fires on a window transition, outside any request; the announce is bounded by the node's lifetime
 		reopen := h.transition(ctx, window)
 		// The host's observer runs after the facade's handling.
@@ -124,7 +131,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 			// close, then open.
 			h.reopenIfDecommissioned(ctx, st) //nolint:contextcheck // as above
 		}
-	})
+	}), "commissioning window transition")
 }
 
 // transition is the facade's handling of a window transition: the PASE
@@ -431,8 +438,13 @@ func (h *commissioningHost) attachPase(p *bridge.PerExchangePaseProvider) {
 
 // reopenIfDecommissioned opens the node's own window once its last fabric is
 // gone and no window is open (a rolled-back first commissioning leaves the
-// node's own window open, which keeps its timer).
+// node's own window open, which keeps its timer). With
+// [Commissioning].WindowOnDemand it opens nothing: the window is the
+// host's to open.
 func (h *commissioningHost) reopenIfDecommissioned(ctx context.Context, st store.Fabrics) {
+	if h.onDemand {
+		return
+	}
 	win := h.br.CommissioningWindow()
 	if win == nil || win.IsOpen() {
 		return
@@ -482,7 +494,7 @@ func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, i
 	provider.SetClock(h.br.Clock())
 	// On the node's lifetime: a provider no restore stops ends with the
 	// node.
-	provider.StartReaper(h.life, 30*time.Second, time.Minute)
+	provider.StartReaper(h.life, handshakeReapInterval, handshakeAdapterTTL)
 
 	if h.active != nil {
 		h.active.Stop()
@@ -592,10 +604,12 @@ func (c *WindowCredentials) validate() error {
 // restarted window runs with the configured credentials and is advertised
 // under the configured discriminator. Once it closes, the configured
 // credentials are back: a node without a fabric reopens its own window
-// under the configured discriminator, a commissioned node publishes no
+// under the configured discriminator (not with
+// [Commissioning].WindowOnDemand), a commissioned node publishes no
 // commissionable record until the next window — the facade's window
-// semantics, unchanged. From the first [Node.Stop] on it returns
-// [ErrStopped] and opens nothing.
+// semantics, unchanged. Before [Node.Start] completed it returns
+// [ErrNotStarted], and from the first [Node.Stop] on [ErrStopped]; either
+// way it opens nothing.
 //
 // matter.js has no per-window basic credentials: openBasicCommissioningWindow
 // opens the window with the node's own passcode
@@ -608,6 +622,9 @@ func (c *WindowCredentials) validate() error {
 func (n *Node) OpenBasicWindow(ctx context.Context, creds WindowCredentials) error {
 	if n.stopBegan() {
 		return ErrStopped
+	}
+	if !n.started.Load() {
+		return ErrNotStarted
 	}
 	if err := creds.validate(); err != nil {
 		return err
@@ -641,11 +658,16 @@ func stoppedAs(err error) error {
 // Mirrors matter.js DeviceCommissioner.allowBasicCommissioning
 // (packages/protocol/src/protocol/DeviceCommissioner.ts:130-137), which
 // opens the window with the node's configured passcode; ADR 0025 principle
-// 3 (the window's wiring stays behind [Node.Bridge]). From the first
-// [Node.Stop] on it returns [ErrStopped] and opens nothing.
+// 3 (the window's wiring stays behind [Node.Bridge]). Before [Node.Start]
+// completed it returns [ErrNotStarted], and from the first [Node.Stop] on
+// [ErrStopped]; either way it opens nothing — a node with
+// [Commissioning].WindowOnDemand opens its window here, after Start.
 func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
 	if n.stopBegan() {
 		return ErrStopped
+	}
+	if !n.started.Load() {
+		return ErrNotStarted
 	}
 	return stoppedAs(n.br.CommissioningWindow().OpenOwnWindow(ctx, timeout))
 }
@@ -656,8 +678,11 @@ func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
 // a PASE session already established and an armed fail-safe are left to
 // their commissioner. Without an open window it does nothing. A node
 // without a fabric that closes a basic window reopens its own window, as
-// when that window closes on its timeout. It returns ctx.Err() when ctx
-// is done before the call, and [ErrStopped] from the first [Node.Stop] on.
+// when that window closes on its timeout (unless
+// [Commissioning].WindowOnDemand leaves the window to the host). It
+// returns ctx.Err() when ctx is done before the call, [ErrNotStarted]
+// before [Node.Start] completed, and [ErrStopped] from the first
+// [Node.Stop] on.
 //
 // Mirrors matter.js DeviceCommissioner.endCommissioning ("Close the open
 // commissioning window, whoever opened it",
@@ -670,6 +695,9 @@ func (n *Node) CloseWindow(ctx context.Context) error {
 	}
 	if n.stopBegan() {
 		return ErrStopped
+	}
+	if !n.started.Load() {
+		return ErrNotStarted
 	}
 	n.br.CommissioningWindow().EndCommissioning()
 	return nil

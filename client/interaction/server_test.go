@@ -8,6 +8,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -577,4 +578,60 @@ func TestReportValues(t *testing.T) {
 	if len(none.Values(1, 6)) != 0 || len(r.Values(3, 6)) != 0 {
 		t.Fatal("values from no report")
 	}
+}
+
+// lazyDispatcher is fakeDispatcher with the attribute path checker the
+// device's dispatcher has, counting its reads.
+type lazyDispatcher struct {
+	*fakeDispatcher
+	reads atomic.Int32
+}
+
+func (d *lazyDispatcher) Read(ctx context.Context, p im.ConcreteAttributePath) []im.ReadResult {
+	d.reads.Add(1)
+	return d.fakeDispatcher.Read(ctx, p)
+}
+
+func (d *lazyDispatcher) AttributePathStatus(_ context.Context, p im.ConcreteAttributePath) im.StatusCode {
+	if _, ok := d.sizes[p.Attribute]; !ok || p.Cluster != servedCluster {
+		return im.StatusUnsupportedAttribute
+	}
+	return im.StatusSuccess
+}
+
+// TestServeReadGeneratesChunkByChunk (review II, decision 44,
+// R2-P5-write-08): a served read whose report exceeds one message is
+// generated as it is sent — the first chunk goes out before the paths
+// behind it are read, the next only after the peer's StatusResponse — and
+// each path is read once. matter.js fills a message from the read
+// response's generator and awaits the chunk's send before it pulls
+// further (InteractionMessenger.ts:470-510, :555 at db021da0).
+func TestServeReadGeneratesChunkByChunk(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, reg, _, _ := handlerRig(t)
+		d := &lazyDispatcher{fakeDispatcher: &fakeDispatcher{sizes: map[uint32]int{0: 400, 1: 400, 2: 400, 3: 400, 4: 400, 5: 400}}}
+		reg.Serve(interaction.ServerConfig{Dispatcher: d, Qualities: plainQualities{}})
+		s.push(t, 0x7401, im.OpcodeReadRequest, readRequest(t, 0, 1, 2, 3, 4, 5))
+		reports := 0
+		for chunk := 0; ; chunk++ {
+			m := expectOpcode(t, s, im.OpcodeReportData)
+			rd := decodeReport(t, m.payload)
+			reports += len(rd.Reports)
+			if chunk == 0 {
+				// The chunker reads one report past the chunk that filled.
+				if n := int(d.reads.Load()); n > reports+1 || n >= 6 {
+					t.Fatalf("%d paths read when the first chunk of %d reports went out, want the read to wait", n, reports)
+				}
+			}
+			if !rd.MoreChunkedMessages {
+				s.ackPushed(t, m)
+				break
+			}
+			s.continueOn(t, m, im.OpcodeStatusResponse, statusResponse(t, im.StatusSuccess))
+		}
+		if reports != 6 || d.reads.Load() != 6 {
+			t.Fatalf("%d reports from %d reads, want 6 from 6", reports, d.reads.Load())
+		}
+	})
 }

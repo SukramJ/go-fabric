@@ -566,3 +566,43 @@ func TestOTAProvider_ClosedTransferCancelsOnlyUnsettled(t *testing.T) {
 		}
 	}
 }
+
+// TestOTAProvider_RebootJudgedBySessionActivity: with the sessions'
+// activity at hand ([OTAProviderConfig].SessionActivity), a query on
+// another session cancels the running transfer only when the transfer's
+// session was last active before the query's — matter.js compares the two
+// sessions' activeTimestamp (OtaSoftwareUpdateProviderServer.ts:197-201
+// at db021da0; review II, F-db021da0-27). A transfer whose session heard
+// from the peer after the query's session did is not a reboot: Busy.
+func TestOTAProvider_RebootJudgedBySessionActivity(t *testing.T) {
+	t.Parallel()
+	base := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	activity := map[uint16]time.Time{7: base.Add(2 * time.Second), 8: base.Add(time.Second)}
+	f := newOTAFixture(t, func(cfg *OTAProviderConfig) {
+		cfg.SessionActivity = func(id uint16) (time.Time, bool) {
+			at, ok := activity[id]
+			return at, ok
+		}
+	})
+	r := f.query(t, 7, bdxQuery())
+	_, done := f.startDownload(t, 7, *r.ImageUri)
+	f.clock.Advance(time.Minute)
+	// The transfer's session (7) heard from the peer after the query's
+	// session (8): no reboot, although the transfer's last block is older
+	// than now.
+	if busy := f.query(t, 8, bdxQuery()); busy.Status != provdef.StatusBusy {
+		t.Fatalf("query on a session older than the transfer's: %+v, want Busy", busy)
+	}
+	// The query's session is the newer one: the requestor rebooted.
+	activity[8] = base.Add(3 * time.Second)
+	if r2 := f.query(t, 8, bdxQuery()); r2.Status != provdef.StatusUpdateAvailable {
+		t.Fatalf("query on the newer session: %+v", r2)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("the old transfer was not cancelled")
+	}
+}

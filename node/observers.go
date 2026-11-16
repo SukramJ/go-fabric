@@ -52,6 +52,14 @@ type Observers struct {
 	// node is idle — no fail-safe armed and no session left (matter.js
 	// #resetWhenIdle); OnWindowTransition reports that. Mirrors
 	// matter.js FabricManager `events.deleted` (FabricManager.ts:253).
+	// The removal a fail-safe rollback owes is kept in the store until it
+	// ran (store.OwedFabricEvent), so it reaches the host at least once:
+	// after a crash between the rollback and this hook — or in the
+	// moment after the hook — the next Start runs it, and a host may hear
+	// the same removal twice. One residual: a store upgraded from a release
+	// before schema v8 that went down inside a fail-safe window owes the
+	// removal of that window's AddNOC in memory only — it reaches the host
+	// only if the first process on the upgraded store starts.
 	OnFabricRemoved func(FabricInfo)
 	// OnFabricUpdated runs after an UpdateNOC (or the fail-safe rollback
 	// of one) changed a fabric's operational identity and the facade
@@ -62,6 +70,9 @@ type Observers struct {
 	// FabricManager `events.replaced` (FabricManager.ts:236-246, :377),
 	// which a fabric's persist emits too, and CommissioningServer's
 	// fabricsChanged(index, "updated") (CommissioningServer.ts:118-141).
+	// The revert a fail-safe rollback of an UpdateNOC owes is delivered at
+	// least once, as OnFabricRemoved's removal is: a host may hear it
+	// twice after a crash.
 	OnFabricUpdated func(FabricInfo)
 	// OnCommissioningComplete runs after a successful
 	// CommissioningComplete and the facade's own handling of it (pending

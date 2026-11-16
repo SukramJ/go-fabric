@@ -48,13 +48,14 @@ func TestBaseOptionalOnEveryType(t *testing.T) {
 		}
 		t.Run(ty.Name, func(t *testing.T) {
 			t.Parallel()
-			d, err := New(ty, testOptions(ty.Name),
+			d, err := New(ty, testOptions(ty.Name), append([]Declaration{
 				fixedlabeldef.Declare{Initial: fixedlabeldef.Patch{LabelList: &fixed}},
-				userlabeldef.Declare{Initial: userlabeldef.Patch{LabelList: &user}})
+				userlabeldef.Declare{Initial: userlabeldef.Patch{LabelList: &user}},
+			}, initialFor(ty.Name)...)...)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if d.Type() != ty {
+			if d.Type().ID != ty.ID {
 				t.Error("the device's type is not the type it was built from")
 			}
 			if _, listed := ty.Server(fixedlabeldef.ClusterID); listed {

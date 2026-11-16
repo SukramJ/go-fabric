@@ -44,3 +44,10 @@ func (specElementQualities) AttributeFixed(cluster, attribute uint32) bool {
 	a := def.Attribute(attribute)
 	return a != nil && a.Quality.Fixed
 }
+
+// ElementQualities is the [im.ElementQualities] the bridge reads a wildcard
+// path by — Fixed from the generated definitions, Diagnostics from the
+// clusters above — for a server of the bridge's endpoint tree that runs on
+// another stack: a node serves the tree on the sessions its client stack
+// opened too (docs/adr/0032), with the bridge's qualities.
+func (b *Bridge) ElementQualities() im.ElementQualities { return specElementQualities{} }

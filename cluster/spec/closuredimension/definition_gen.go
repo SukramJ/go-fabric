@@ -14,6 +14,8 @@
 package closuredimension
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -471,13 +473,14 @@ var Definition = &spec.Cluster{
 	Attributes: []spec.Attribute{
 		{
 			ID: AttrCurrentState, Name: "CurrentState",
-			Type:        spec.Type{Name: "DimensionStateStruct", Kind: spec.KindStruct, Struct: DimensionStateStructDef},
-			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Constraint:  spec.Constraint{Text: "desc", Desc: true},
-			Default:     spec.NullDefault{},
-			Decode:      decodeAttrCurrentState,
+			Type:          spec.Type{Name: "DimensionStateStruct", Kind: spec.KindStruct, Struct: DimensionStateStructDef},
+			Conformance:   spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			Constraint:    spec.Constraint{Text: "desc", Desc: true},
+			Default:       spec.NullDefault{},
+			QuietInterval: time.Second,
+			Decode:        decodeAttrCurrentState,
 		},
 		{
 			ID: AttrTargetState, Name: "TargetState",

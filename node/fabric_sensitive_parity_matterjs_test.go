@@ -24,34 +24,37 @@ import (
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // TestFabricSensitiveFieldsWithheldFromOtherFabrics walks every cluster
 // server of a node — the root with ICD configured, a bridged endpoint for
 // every device type the device kit builds with its defaults (the walk of
-// TestNoAttributeReadableBelowItsReadPrivilege), and the two servers no
+// TestNoAttributeReadableBelowItsReadPrivilege), the two servers no
 // device type mounts that hold fabric-scoped lists, Messages and
-// EcosystemInformation — on a node commissioned into fabric 1. For every
-// fabric-scoped list attribute whose entry struct has a fabric-sensitive
-// field (spec.Field.FabricSensitive of the generated definition), it
-// gives the attribute an entry of fabric 1 where the server offers a way
-// (populate), reads it the way the dispatcher reads it
-// (endpoint/dispatcher.go readOne) unfiltered as fabric 2 and as a session
-// without a fabric, and holds the wire bytes the bridge writes
-// (bridge.AttributeValueTLV) to what matter.js serves at db021da0
-// (spectest.CheckWithheld): an entry of another fabric carries its other
-// fields and FabricIndex, and none of its fabric-sensitive fields. The
-// attributes it cannot give an entry of fabric 1 are pinned in
-// unpopulatedFabricSensitive, exactly: an unpopulated list is not a
-// checked one.
+// EcosystemInformation, and host servers for the lists no server of the
+// node serves at this composition (scopeStubs) — on a node commissioned
+// into fabric 1. For every fabric-scoped list attribute whose entry struct
+// has a fabric-sensitive field, and every list whose own access is
+// fabric-sensitive (spectest.FabricSensitiveLists of the generated
+// definition), it gives the attribute an entry of fabric 1 where the
+// server offers a way (populate), reads it through the node's dispatcher
+// (endpoint.TopologyDispatcher, which scopes every fabric-scoped attribute
+// of the model on a request) unfiltered as fabric 2 and as a session
+// without a fabric, and holds the wire bytes — the bridge's writer with
+// the read's scope applied (im.MaskFabricScoped) — to what matter.js
+// serves at db021da0 (spectest.CheckWithheld): an entry of another fabric
+// carries its other fields and FabricIndex, and none of its
+// fabric-sensitive fields; a fabric-sensitive list carries the reader's
+// entries alone. The attributes it cannot give an entry of fabric 1 are
+// pinned in unpopulatedFabricSensitive, exactly: an unpopulated list is
+// not a checked one.
 //
-// Of the model's ten such attributes (parity/schema.json) the walk serves
-// nine; AccessControl's Arl is not served (no ARL feature). The six lists
-// whose attribute access is "S" (the WebRTC and PushAV sessions, the TLS
-// certificates and endpoints) are outside the class: their entry structs
-// carry no "S" field, and matter.js filters the whole list for a remote
-// read instead (ListManager.ts:610-616).
+// The model's ten lists with fabric-sensitive entry fields and its six
+// fabric-sensitive lists (parity/schema.json) are all walked: AccessControl's
+// Arl (no ARL feature) and the six through a host server each, which
+// returns two fabrics' entries whole as a host's own server may.
 func TestFabricSensitiveFieldsWithheldFromOtherFabrics(t *testing.T) {
 	t.Parallel()
 	site := quietSite(t)
@@ -101,16 +104,32 @@ func TestFabricSensitiveFieldsWithheldFromOtherFabrics(t *testing.T) {
 		t.Fatalf("only %d device types were bridged (%d refused)", added, refused)
 	}
 	topo := pair.Device.Node().Bridge().Topology()
+	dispatcher := endpoint.NewTopologyDispatcher(topo)
 
 	// First every entry of fabric 1, then every read: one server's entry
 	// can be another's (a Groupcast membership grants an AuxiliaryAcl
 	// entry).
 	type target struct {
+		d   im.Dispatcher
 		ep  uint16
 		srv contract.ClusterServer
 		l   spectest.FabricSensitiveList
 	}
 	var targets []target
+	// The host servers stand on a topology of their own: three of their
+	// clusters are root singletons the node's composition places on its
+	// root alone.
+	stubs := scopeStubTopology()
+	stubDispatcher := endpoint.NewTopologyDispatcher(stubs)
+	for _, ep := range stubs.Endpoints {
+		for _, srv := range endpoint.ClusterServers(ep) {
+			for _, l := range spectest.FabricSensitiveLists(spec.Lookup(srv.MatterClusterID())) {
+				if answersRead(srv, l.Attribute.ID) {
+					targets = append(targets, target{stubDispatcher, ep.ID, srv, l})
+				}
+			}
+		}
+	}
 	for _, ep := range topo.Endpoints {
 		for _, srv := range endpoint.ClusterServers(ep) {
 			def := spec.Lookup(srv.MatterClusterID())
@@ -121,7 +140,7 @@ func TestFabricSensitiveFieldsWithheldFromOtherFabrics(t *testing.T) {
 				if !answersRead(srv, l.Attribute.ID) {
 					continue // not served at this composition
 				}
-				targets = append(targets, target{ep.ID, srv, l})
+				targets = append(targets, target{dispatcher, ep.ID, srv, l})
 				if fill := populate[fmt.Sprintf("0x%04X/0x%04X", def.ID, l.Attribute.ID)]; fill != nil {
 					if err := fill(ep.ID, srv); err != nil {
 						t.Errorf("endpoint %d %s: an entry of fabric 1: %v", ep.ID, l, err)
@@ -134,10 +153,10 @@ func TestFabricSensitiveFieldsWithheldFromOtherFabrics(t *testing.T) {
 	unpopulated := map[string]bool{}
 	for _, tg := range targets {
 		key := tg.l.String()
-		own := wireOf(t, key, readAs(tg.srv, tg.l.Attribute.ID, true, 1))
+		own := readAs(t, tg.d, tg.ep, tg.srv, tg.l.Attribute.ID, true, 1)
 		n := 0
 		for _, reader := range []uint8{2, 0} {
-			remote := wireOf(t, key, readAs(tg.srv, tg.l.Attribute.ID, false, reader))
+			remote := readAs(t, tg.d, tg.ep, tg.srv, tg.l.Attribute.ID, false, reader)
 			n = spectest.CheckWithheld(t, tg.l, own, remote, 1, reader)
 		}
 		if n == 0 {
@@ -159,6 +178,21 @@ func TestFabricSensitiveFieldsWithheldFromOtherFabrics(t *testing.T) {
 	for key := range unpopulatedFabricSensitive {
 		if !unpopulated[key] {
 			t.Errorf("%s is pinned in unpopulatedFabricSensitive and is checked or no longer served: remove the entry", key)
+		}
+	}
+	// Every list the walk selects over the model's linked definitions is
+	// checked (script/fabricscopecheck holds the selection to the
+	// snapshot's ten lists with fabric-sensitive entry fields and six
+	// fabric-sensitive lists).
+	for id := range schema.ClusterNames {
+		def := spec.Lookup(id)
+		if def == nil {
+			continue
+		}
+		for _, l := range spectest.FabricSensitiveLists(def) {
+			if !checked[l.String()] && !unpopulatedFabricSensitive[l.String()] {
+				t.Errorf("%s: not walked — serve it on the node or through scopeStubTopology", l)
+			}
 		}
 	}
 	keys := func(m map[string]bool) []string {
@@ -250,29 +284,99 @@ func joinGroupcast(ep uint16, srv contract.ClusterServer) error {
 	return err
 }
 
-// readAs reads attr the way the dispatcher does (endpoint/dispatcher.go
-// readOne) for a read of a session of fabric (0: a session without a
-// fabric), stamped as the bridge stamps a read
-// (bridge/receive_dispatch.go, im.WithFabricFilter).
-func readAs(srv contract.ClusterServer, attr uint32, filtered bool, fabric uint8) any {
+// readAs is srv's attr at endpoint ep as a read of a session of fabric
+// (0: a session without a fabric) receives it, stamped as the bridge
+// stamps a read (bridge/receive_dispatch.go, im.WithFabricFilter): the
+// dispatcher's result written by the bridge's writer
+// (bridge.AttributeValueTLV) with the result's scope applied
+// (im.MaskFabricScoped), as an attribute report's encoder applies it.
+func readAs(t *testing.T, d im.Dispatcher, ep uint16, srv contract.ClusterServer, attr uint32, filtered bool, fabric uint8) []byte {
+	t.Helper()
 	ctx := im.WithFabricFilter(context.Background(), filtered, fabric)
-	if fsr, ok := srv.(contract.FabricScopedReader); ok {
-		if v, ok := fsr.MatterReadFiltered(ctx, attr); ok {
-			return v
-		}
+	path := im.ConcreteAttributePath{Endpoint: ep, Cluster: srv.MatterClusterID(), Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	results := d.Read(ctx, path)
+	if len(results) != 1 || results[0].Status != im.StatusSuccess {
+		t.Fatalf("endpoint %d 0x%04X/0x%04X: read %+v", ep, path.Cluster, attr, results)
 	}
-	v, _ := srv.MatterRead(attr)
-	return v
+	b, err := bridge.AttributeValueTLV(results[0].Value.Value)
+	if err != nil {
+		t.Fatalf("endpoint %d 0x%04X/0x%04X: encode %T: %v", ep, path.Cluster, attr, results[0].Value.Value, err)
+	}
+	if results[0].FabricScope == nil {
+		t.Fatalf("endpoint %d 0x%04X/0x%04X: a request's read carries no scope", ep, path.Cluster, attr)
+	}
+	masked, ok := im.MaskFabricScoped(b, *results[0].FabricScope)
+	if !ok {
+		t.Fatalf("endpoint %d 0x%04X/0x%04X: the value cannot be scoped: % X", ep, path.Cluster, attr, b)
+	}
+	return masked
 }
 
-// wireOf is v as the bridge writes it.
-func wireOf(t *testing.T, what string, v any) []byte {
-	t.Helper()
-	b, err := bridge.AttributeValueTLV(v)
-	if err != nil {
-		t.Fatalf("%s: encode %T: %v", what, v, err)
+// scopeStub is a host's own server of a cluster's fabric-scoped lists:
+// each returns an entry of fabric 1 and one of fabric 2, whole, and the
+// server is no contract.FabricScopedReader.
+type scopeStub struct {
+	cluster uint32
+	attrs   []uint32
+}
+
+func (s scopeStub) MatterClusterID() uint32 { return s.cluster }
+func (s scopeStub) MatterRead(attr uint32) (any, bool) {
+	switch {
+	case slices.Contains(s.attrs, attr):
+		return []scopeStubEntry{1, 2}, true
+	case attr == 0xFFFC:
+		return uint32(0), true
+	case attr == 0xFFFD:
+		rev, _ := schema.ClusterRevision(s.cluster)
+		return rev, true
 	}
-	return b
+	return nil, false
+}
+func (scopeStub) MatterWrite(context.Context, uint32, any) error         { return nil }
+func (scopeStub) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
+func (scopeStub) MatterReportable() []uint32                             { return nil }
+
+// scopeStubEntry is an entry of its fabric: fields 0 to 2 and FabricIndex.
+type scopeStubEntry uint8
+
+func (e scopeStubEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	enc.StartStruct(tag)
+	for f := range uint8(3) {
+		enc.PutUint(tlv.ContextTag(f), uint64(e)*10+uint64(f))
+	}
+	enc.PutUint(tlv.ContextTag(0xFE), uint64(e))
+	_ = enc.EndContainer()
+}
+
+// scopeStubSource serves one stub on an endpoint.
+type scopeStubSource struct{ srv contract.ClusterServer }
+
+func (scopeStubSource) MatterDeviceType() uint16 { return 0x0016 }
+func (s scopeStubSource) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{s.srv}
+}
+
+// scopeStubTopology serves, one per endpoint, AccessControl's Arl (no
+// server of the node holds the ARL feature) and the six lists whose own
+// access is fabric-sensitive.
+func scopeStubTopology() *endpoint.Topology {
+	stubs := []scopeStub{
+		{0x001F, []uint32{0x0006}},         // AccessControl.Arl
+		{0x0553, []uint32{0x0000}},         // WebRtcTransportProvider.CurrentSessions
+		{0x0554, []uint32{0x0000}},         // WebRtcTransportRequestor.CurrentSessions
+		{0x0555, []uint32{0x0001}},         // PushAvStreamTransport.CurrentConnections
+		{0x0801, []uint32{0x0001, 0x0003}}, // TlsCertificateManagement.ProvisionedRoot/ClientCertificates
+		{0x0802, []uint32{0x0001}},         // TlsClientManagement.ProvisionedEndpoints
+	}
+	topo := &endpoint.Topology{}
+	for i, s := range stubs {
+		topo.Endpoints = append(topo.Endpoints, &endpoint.Endpoint{
+			ID: uint16(i + 1), DeviceType: 0x0016, SourceKey: endpoint.StringKey(fmt.Sprintf("stub:%d", i)),
+			Scope: "s", DeviceAddress: "d", Source: scopeStubSource{s},
+		})
+	}
+	return topo
 }
 
 // fsPresenter accepts every message.

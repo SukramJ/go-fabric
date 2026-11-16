@@ -288,7 +288,10 @@ type DoorLockConfig struct {
 	// Initial holds the users, credentials and schedules a lock starts
 	// with when its AuthStore holds none for it, or without an AuthStore:
 	// matter.js's state given at endpoint creation. Credential data is in
-	// clear here; the server encrypts it.
+	// clear here; the server encrypts it. A seeded record keeps
+	// CreatedThroughMatter and ModifiedThroughMatter false, so GetUser and
+	// GetCredentialStatus answer its fabric indexes null until a Matter
+	// command changes it.
 	Initial store.DoorLockAuth
 	// Auth persists the records; nil keeps them in memory. AuthKey names
 	// this lock's records in it.
@@ -737,6 +740,7 @@ func (s *DoorLockServer) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
+	s.Server.SetEndpoint(endpoint) // the store's EmitEvent, the typed Record<Event>
 }
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: the auto-relock
@@ -975,7 +979,7 @@ func (s *DoorLockServer) moveHardware(ctx context.Context, op LockOperation) err
 func (s *DoorLockServer) setActuated(locked bool) error {
 	if s.src != nil {
 		s.tracker.Bump()
-		s.NotifyFrom(contract.OriginCommand, lockdef.AttrLockState)
+		s.AttributeChanges.NotifyFrom(contract.OriginCommand, lockdef.AttrLockState)
 		return nil
 	}
 	state := lockdef.LockStateUnlocked
@@ -1362,11 +1366,8 @@ func (s *DoorLockServer) emit(events []queuedEvent) {
 	if len(events) == 0 {
 		return
 	}
-	s.mu.Lock()
-	endpoint := s.endpoint
-	s.mu.Unlock()
 	for _, e := range events {
-		_ = s.Emit(endpoint, e.id, e.payload) // an event outside the selection's EventList is dropped
+		_ = s.EmitEvent(e.id, e.payload) // an event outside the selection's EventList is dropped
 	}
 }
 

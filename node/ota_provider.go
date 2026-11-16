@@ -102,6 +102,9 @@ func (n *Node) buildOTAProvider() error {
 			n.otaStatusListeners.emit(n.logger, "ota_provider_status", otaProviderStatus{peer, status, version})
 		},
 		RebootQuery: cfg.RebootQuery, TransferBlockSize: cfg.TransferBlockSize,
+		// A transfer's session against a query's, by the peer's last
+		// activity on each (review II, F-db021da0-27).
+		SessionActivity: n.peerActivity,
 		// The URI names this node on the requestor's fabric (OP:381).
 		NodeID: func(fabricIndex uint8) (uint64, bool) {
 			_, nodeID, ok := n.caseIDs.announceIdentity(fabricIndex)
@@ -188,12 +191,6 @@ func placeOTAProvider(topo *endpoint.Topology) {
 			return
 		}
 	}
-}
-
-// isRootChild reports whether ep hangs off the root directly — the
-// Aggregator's siblings, which are not in its PartsList.
-func isRootChild(ep *endpoint.Endpoint) bool {
-	return ep.HasParentEndpointID && ep.ParentEndpointID == 0
 }
 
 // otaProviderEndpointID returns the provider endpoint's number, false

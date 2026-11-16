@@ -38,16 +38,29 @@ type GroupKeySet struct {
 }
 
 // UpsertGroupKeySet inserts or replaces a key-set row. The fabric
-// must already exist (FK constraint).
+// must already exist (FK constraint). EpochKey0 must be 16 bytes;
+// EpochKey1 and EpochKey2 are 16 bytes or absent, an empty one stored as
+// absent — the lengths a read accepts ([checkGroupKeySet]).
 func (s *Store) UpsertGroupKeySet(ctx context.Context, rec GroupKeySet) error {
+	rec, err := checkGroupKeySet(rec)
+	if err != nil {
+		return fmt.Errorf("store: upsert group key set: %w", err)
+	}
+	var keys [3][]byte
+	for i, k := range [3][]byte{rec.EpochKey0, rec.EpochKey1, rec.EpochKey2} {
+		var err error
+		if keys[i], err = s.sealColumn(k, "matter_group_keys", groupEpochKeyColumns[i], rec.FabricIndex, rec.GroupKeySetID); err != nil {
+			return fmt.Errorf("store: upsert group key set: %w", err)
+		}
+	}
 	if _, err := s.db.ExecContext(
 		ctx, `
 INSERT INTO matter_group_keys
     (fabric_index, group_key_set_id, security_policy,
      epoch_key_0, epoch_start_0,
      epoch_key_1, epoch_start_1,
-     epoch_key_2, epoch_start_2)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     epoch_key_2, epoch_start_2, sealed)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(fabric_index, group_key_set_id) DO UPDATE SET
     security_policy = excluded.security_policy,
     epoch_key_0     = excluded.epoch_key_0,
@@ -55,11 +68,13 @@ ON CONFLICT(fabric_index, group_key_set_id) DO UPDATE SET
     epoch_key_1     = excluded.epoch_key_1,
     epoch_start_1   = excluded.epoch_start_1,
     epoch_key_2     = excluded.epoch_key_2,
-    epoch_start_2   = excluded.epoch_start_2`,
+    epoch_start_2   = excluded.epoch_start_2,
+    sealed          = excluded.sealed`,
 		rec.FabricIndex, rec.GroupKeySetID, uint8(rec.SecurityPolicy),
-		rec.EpochKey0, int64(rec.EpochStart0), //nolint:gosec // start time fits in int64 in practice; see #20
-		nullableBytes(rec.EpochKey1), nullableEpochStart(rec.EpochKey1, rec.EpochStart1),
-		nullableBytes(rec.EpochKey2), nullableEpochStart(rec.EpochKey2, rec.EpochStart2),
+		keys[0], int64(rec.EpochStart0), //nolint:gosec // start time fits in int64 in practice; see #20
+		nullableBytes(keys[1]), nullableEpochStart(rec.EpochKey1, rec.EpochStart1),
+		nullableBytes(keys[2]), nullableEpochStart(rec.EpochKey2, rec.EpochStart2),
+		s.sealer != nil,
 	); err != nil {
 		return fmt.Errorf("store: upsert group key set: %w", err)
 	}
@@ -73,10 +88,10 @@ func (s *Store) GetGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeyS
 SELECT fabric_index, group_key_set_id, security_policy,
        epoch_key_0, epoch_start_0,
        epoch_key_1, epoch_start_1,
-       epoch_key_2, epoch_start_2
+       epoch_key_2, epoch_start_2, sealed
 FROM matter_group_keys
 WHERE fabric_index = ? AND group_key_set_id = ?`, fabricIndex, groupKeySetID)
-	rec, err := scanGroupKeySet(row)
+	rec, err := s.scanGroupKeySet(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return GroupKeySet{}, ErrGroupKeySetNotFound
 	}
@@ -87,13 +102,17 @@ WHERE fabric_index = ? AND group_key_set_id = ?`, fabricIndex, groupKeySetID)
 }
 
 // ListGroupKeySets returns every key-set for fabricIndex ordered by
-// group_key_set_id ascending.
+// group_key_set_id ascending. A row holding an epoch key of a length a
+// write refuses — left by an earlier release or an edit of the file — is
+// left out, so one bad row does not take the fabric's other key sets (the
+// IPK's among them) down; [Store.GetGroupKeySet] of that row returns the
+// error. A sealed value that does not open still fails the list.
 func (s *Store) ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]GroupKeySet, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT fabric_index, group_key_set_id, security_policy,
        epoch_key_0, epoch_start_0,
        epoch_key_1, epoch_start_1,
-       epoch_key_2, epoch_start_2
+       epoch_key_2, epoch_start_2, sealed
 FROM matter_group_keys WHERE fabric_index = ?
 ORDER BY group_key_set_id ASC`, fabricIndex)
 	if err != nil {
@@ -103,7 +122,10 @@ ORDER BY group_key_set_id ASC`, fabricIndex)
 
 	var out []GroupKeySet
 	for rows.Next() {
-		rec, err := scanGroupKeySet(rows)
+		rec, err := s.scanGroupKeySet(rows)
+		if errors.Is(err, errMalformedKey) {
+			continue // GetGroupKeySet reports it; the fabric's other key sets stay usable
+		}
 		if err != nil {
 			return nil, fmt.Errorf("store: list group key sets: scan: %w", err)
 		}
@@ -190,6 +212,32 @@ ON CONFLICT(fabric_index, group_id) DO UPDATE SET
 	return nil
 }
 
+// ReplaceGroupKeyMappings implements [GroupKeys] in one transaction: the
+// fabric's rows are deleted and mappings inserted in input order; a
+// duplicate GroupID fails the primary key, an unknown fabric the foreign
+// key, and either rolls the whole write back.
+func (s *Store) ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, mappings []GroupKeyMapping) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: replace group key mappings: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM matter_group_key_map WHERE fabric_index = ?`, fabricIndex); err != nil {
+		return fmt.Errorf("store: replace group key mappings: delete: %w", err)
+	}
+	for i, m := range mappings {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id) VALUES (?, ?, ?)`,
+			fabricIndex, m.GroupID, m.GroupKeySetID); err != nil {
+			return fmt.Errorf("store: replace group key mappings: insert %d (group %d): %w", i, m.GroupID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: replace group key mappings: commit: %w", err)
+	}
+	return nil
+}
+
 // RemoveGroupKeyMapping deletes a (fabric, group_id) binding.
 func (s *Store) RemoveGroupKeyMapping(ctx context.Context, fabricIndex uint8, groupID uint16) error {
 	if _, err := s.db.ExecContext(ctx, `
@@ -226,7 +274,46 @@ ORDER BY group_id ASC`, fabricIndex)
 	return out, nil
 }
 
-func scanGroupKeySet(r scanRow) (GroupKeySet, error) {
+// epochKeySize is an epoch key's size, the length cluster/core's
+// KeySetWrite accepts (group_key_management.go, epochKeyLen); a key set
+// read with another is refused.
+const epochKeySize = 16
+
+// errMalformedKey is a stored key of a length a write would have refused:
+// a row an earlier release, or an edit of the file, left.
+var errMalformedKey = errors.New("store: malformed key")
+
+// checkGroupKeySet is the write side of the epoch key lengths: EpochKey0
+// epochKeySize bytes, EpochKey1 and EpochKey2 epochKeySize bytes or absent;
+// an empty slot is normalised to absent (nil, its start 0), so a write and
+// its read agree in both backends (store/memstore copies the rule).
+func checkGroupKeySet(rec GroupKeySet) (GroupKeySet, error) {
+	if len(rec.EpochKey0) != epochKeySize {
+		return rec, fmt.Errorf("store: epoch_key_0 length=%d (want %d)", len(rec.EpochKey0), epochKeySize)
+	}
+	for i, k := range []*[]byte{&rec.EpochKey1, &rec.EpochKey2} {
+		if len(*k) == 0 {
+			*k = nil
+			continue
+		}
+		if len(*k) != epochKeySize {
+			return rec, fmt.Errorf("store: epoch_key_%d length=%d (want %d)", i+1, len(*k), epochKeySize)
+		}
+	}
+	if rec.EpochKey1 == nil {
+		rec.EpochStart1 = 0
+	}
+	if rec.EpochKey2 == nil {
+		rec.EpochStart2 = 0
+	}
+	return rec, nil
+}
+
+// groupEpochKeyColumns are the epoch key columns, by slot.
+var groupEpochKeyColumns = [3]string{"epoch_key_0", "epoch_key_1", "epoch_key_2"}
+
+// scanGroupKeySet reads one key set, its epoch keys opened.
+func (s *Store) scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 	var (
 		rec    GroupKeySet
 		policy uint8
@@ -235,12 +322,13 @@ func scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 		start0 int64
 		start1 sql.NullInt64
 		start2 sql.NullInt64
+		sealed bool
 	)
 	if err := r.Scan(
 		&rec.FabricIndex, &rec.GroupKeySetID, &policy,
 		&rec.EpochKey0, &start0,
 		&key1, &start1,
-		&key2, &start2,
+		&key2, &start2, &sealed,
 	); err != nil {
 		return GroupKeySet{}, err
 	}
@@ -257,6 +345,26 @@ func scanGroupKeySet(r scanRow) (GroupKeySet, error) {
 	}
 	if start2.Valid {
 		rec.EpochStart2 = uint64(start2.Int64) //nolint:gosec // round-trip of stored value; see #20
+	}
+	for i, k := range [3]*[]byte{&rec.EpochKey0, &rec.EpochKey1, &rec.EpochKey2} {
+		plain, err := s.openColumn(*k, sealed, "matter_group_keys", groupEpochKeyColumns[i], rec.FabricIndex, rec.GroupKeySetID)
+		if err != nil {
+			return GroupKeySet{}, err
+		}
+		if i > 0 && plain != nil && len(plain) == 0 {
+			// An empty optional slot an earlier release stored is read
+			// as absent, as a write now stores it.
+			plain = nil
+			if i == 1 {
+				rec.EpochStart1 = 0
+			} else {
+				rec.EpochStart2 = 0
+			}
+		}
+		if plain != nil && len(plain) != epochKeySize {
+			return GroupKeySet{}, fmt.Errorf("%w: %s length=%d (want %d)", errMalformedKey, groupEpochKeyColumns[i], len(plain), epochKeySize)
+		}
+		*k = plain
 	}
 	return rec, nil
 }

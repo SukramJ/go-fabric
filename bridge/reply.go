@@ -15,10 +15,13 @@ import (
 	mattermeasure "github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/reportchunk"
 	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
+	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -288,7 +291,7 @@ func (b *Bridge) sendReplyTimed(
 		if needsAck {
 			tracker.trackUnsecured(counter, handshakeKeyOf(requestHdr, requestProto.ExchangeID), datagram, src, b.clk().Now(), peer)
 		}
-		if err := sendVia(listener, src, datagram); err != nil {
+		if err := b.sendRouted(listener, src, 0, datagram); err != nil {
 			if needsAck {
 				tracker.Untrack(requestHdr.SessionID, counter)
 			}
@@ -329,7 +332,7 @@ func (b *Bridge) sendReplyTimed(
 	if needsAck {
 		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())
 	}
-	if err := sendVia(listener, src, datagram); err != nil {
+	if err := b.sendRouted(listener, src, requestHdr.SessionID, datagram); err != nil {
 		if needsAck {
 			tracker.Untrack(requestHdr.SessionID, counter)
 		}
@@ -436,13 +439,11 @@ const reportChunkHardCap = udp.MaxDatagramSize - 200
 
 // chunkLimits are the per-message budget and the hard ceiling for the
 // chunkers, for one route: the UDP constants, or over a reliable
-// connection the connection's frame size bounded by the peer's stated
-// MaxTcpMessageSize — matter.js keeps `maxTcpMessageSize` on the Session
-// (Session.ts:87, :119), bounds a message over TCP by it
-// (MessageChannel.ts:86-92) and refuses a larger one (:106-112; the TCP
-// channel its own limit, TcpChannel.ts:116-120) at db021da0. The 200-byte
-// margin is the headers' and the AES-CCM tag's, as for
-// [reportChunkHardCap].
+// connection the message limit of [Bridge.connMessageLimit] less a
+// 200-byte margin for the headers and the AES-CCM tag, as for
+// [reportChunkHardCap]: matter.js sizes report chunks by the exchange's
+// maxPayloadSize, the channel's less MATTER_MESSAGE_OVERHEAD
+// (MessageExchange.ts:465-468 at db021da0).
 type chunkLimits struct {
 	budget, hardCap int
 }
@@ -458,27 +459,78 @@ type SessionTransportResolver interface {
 }
 
 // chunkLimitsFor picks the chunk limits for a reply to sessionID over dst.
+// Over a connection both stay within its message limit: a limit above the
+// UDP hard cap is the budget and the cap, a smaller one caps the UDP
+// budget and is the hard cap.
 func (b *Bridge) chunkLimitsFor(dst net.Addr, sessionID uint16) chunkLimits {
-	r, ok := dst.(*connRoute)
-	if !ok || r == nil || r.conn == nil || !r.conn.Reliable() {
+	size, ok := b.connMessageLimit(dst, sessionID)
+	if !ok {
 		return udpChunkLimits
 	}
-	size := 0
-	if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
-		size = m.MaxMessageSize()
+	n := size - 200
+	if n > reportChunkHardCap {
+		return chunkLimits{budget: n, hardCap: n}
 	}
-	b.mu.Lock()
+	return chunkLimits{budget: min(reportChunkPayloadBudget, n), hardCap: n}
+}
+
+// maxUDPMessageSize is matter.js MAX_UDP_MESSAGE_SIZE, 1280 - 48
+// (packages/general/src/net/udp/UdpSocket.ts:12 at db021da0): the floor
+// of a peer's TCP message limit.
+const maxUDPMessageSize = 1280 - 48
+
+// connMessageLimit is the largest Matter message — headers and MIC
+// included — one send on route may carry for sessionID; ok is false for a
+// UDP route and for a connection that names no maximum of its own, whose
+// replies keep the UDP limits. Over TCP it is the connection's maximum
+// bounded by the peer's: matter.js MessageChannel.maxPayloadSize takes
+// Math.min(channelMax, session.peerMaxTcpMessageSize) on TCP and the
+// channel's maximum otherwise (packages/protocol/src/protocol/MessageChannel.ts:86-92),
+// and peerMaxTcpMessageSize is max(maxTcpMessageSize ?? 64000,
+// MAX_UDP_MESSAGE_SIZE) (packages/protocol/src/session/Session.ts:237-239,
+// SessionParameters.ts:187) at db021da0. The peer's size is the one its
+// session states ([SessionTransportResolver]); a session that states none
+// takes the 64000 fallback.
+func (b *Bridge) connMessageLimit(route net.Addr, sessionID uint16) (int, bool) {
+	r, ok := route.(*connRoute)
+	if !ok || r == nil || r.conn == nil || !r.conn.Reliable() {
+		return 0, false
+	}
+	m, ok := r.conn.(interface{ MaxMessageSize() int })
+	if !ok || m.MaxMessageSize() <= 0 {
+		return 0, false
+	}
+	channelMax := m.MaxMessageSize()
+	if connNetwork(r.conn) != "tcp" {
+		return channelMax, true
+	}
+	peer := int(sessionparams.DefaultMaxTCPMessageSize)
+	b.mu.RLock()
 	lookup := b.sessions
-	b.mu.Unlock()
+	b.mu.RUnlock()
 	if res, ok := lookup.(SessionTransportResolver); ok {
-		if _, peerMax, known := res.TransportParametersFor(sessionID); known && peerMax > 0 && (size == 0 || int(peerMax) < size) {
-			size = int(peerMax)
+		if _, stated, known := res.TransportParametersFor(sessionID); known && stated > 0 {
+			peer = int(stated)
 		}
 	}
-	if size <= reportChunkHardCap+200 {
-		return udpChunkLimits
+	return min(channelMax, max(peer, maxUDPMessageSize)), true
+}
+
+// sendRouted is [sendVia] for a message of the bridge on the session
+// sessionID names (this node's id for it; 0 for the unsecured session):
+// over TCP a message above the route's limit for that session
+// ([Bridge.connMessageLimit]) is refused before the write, with
+// [tcp.ErrMessageTooLarge] — the sender splits by the limit, it is never
+// cut. matter.js MessageChannel.send throws MessageTooLargeError for an
+// encoded message above maxPayloadSize on a TCP channel, before the write
+// (packages/protocol/src/protocol/MessageChannel.ts:104-112 at db021da0).
+func (b *Bridge) sendRouted(listener *udp.Listener, dst net.Addr, sessionID uint16, datagram []byte) error {
+	if r, ok := dst.(*connRoute); ok && r != nil && connNetwork(r.conn) == "tcp" {
+		if limit, ok := b.connMessageLimit(dst, sessionID); ok && len(datagram) > limit {
+			return fmt.Errorf("%w: %d bytes exceed the limit of %d for session %d", tcp.ErrMessageTooLarge, len(datagram), limit, sessionID)
+		}
 	}
-	return chunkLimits{budget: size - 200, hardCap: size - 200}
+	return sendVia(listener, dst, datagram)
 }
 
 // chunkReportData splits rd into per-datagram chunks whose encoded
@@ -503,372 +555,48 @@ func (b *Bridge) chunkLimitsFor(dst net.Addr, sessionID uint16) chunkLimits {
 // instead — the rest of the report, and the SubscribeResponse that
 // depends on it, still go out.
 func chunkReportData(rd im.ReportData, budget, hardCap int) ([]im.ReportData, error) {
-	// Fast path: single small report → no work.
-	probe, err := EncodeReportData(rd)
-	if err != nil {
-		return nil, err
-	}
-	if len(probe) <= budget {
-		return []im.ReportData{rd}, nil
-	}
-	c := newReportChunker(rd, budget, hardCap, sliceAttributeReports(rd.Reports), func() []im.EventReport { return rd.EventReports })
-	chunks := make([]im.ReportData, 0, 4)
-	for {
-		chunk, ok, err := c.next()
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return chunks, nil
-		}
-		chunks = append(chunks, chunk)
-	}
+	return reportchunk.Split(rd, budget, hardCap, defaultAttributeValueWriter)
 }
 
 // attributeReportSource yields a report's attribute reports one at a
-// time; ok is false once they are exhausted.
-type attributeReportSource func() (im.AttributeReport, bool)
+// time ([reportchunk.Source]).
+type attributeReportSource = reportchunk.Source
 
 // sliceAttributeReports is the source over reports already built.
 func sliceAttributeReports(reports []im.AttributeReport) attributeReportSource {
-	i := 0
-	return func() (im.AttributeReport, bool) {
-		if i >= len(reports) {
-			return im.AttributeReport{}, false
-		}
-		i++
-		return reports[i-1], true
-	}
+	return reportchunk.Slice(reports)
 }
 
-// reportChunker is [chunkReportData]'s greedy fill, fed one report at a
-// time: it pulls attribute reports from a source, then the event reports
-// events returns — called only once the attribute reports are exhausted —
-// and hands out each chunk as soon as it is full, so a responder sends
-// chunk N and waits for the peer's answer before chunk N+1 is generated.
-// What it holds between two calls of next is the chunk being filled, the
-// chunks a split list completed and not yet handed out, and the source's
-// own cursor. Mirrors matter.js
-// packages/protocol/src/interaction/InteractionMessenger.ts:470-797 at
-// db021da0 (sendDataReport fills a message from its payload iterator, pulled
-// at :555 — the read response's generator, AttributeReadResponse.ts:64 — and
-// sendAndResetReport awaits sendDataReportMessage, :510, before it pulls
-// further).
-//
-// Every chunk but the last carries MoreChunkedMessages; only the last
-// carries the template's SuppressResponse (Matter §10.6.6). A report
-// without any entry is one empty chunk, the template itself.
-type reportChunker struct {
-	template        im.ReportData
-	budget, hardCap int
-	attributes      attributeReportSource
-	events          func() []im.EventReport
-	eventReports    []im.EventReport
-	eventsTaken     bool
-	current         im.ReportData
-	pending         []im.ReportData
-	emitted, done   bool
-}
+// reportChunker is the chunker every report of the bridge goes out
+// through ([reportchunk.Chunker]), its values written by
+// [defaultAttributeValueWriter].
+type reportChunker = reportchunk.Chunker
 
-// newReportChunker chunks the reports of template's subscription (its
-// HasSubscription, SubscriptionID and SuppressResponse; its report arrays
-// are ignored) drawn from attributes and then events (nil: none).
+// newReportChunker chunks the reports of template's subscription drawn
+// from attributes and then events ([reportchunk.New]).
 func newReportChunker(template im.ReportData, budget, hardCap int, attributes attributeReportSource, events func() []im.EventReport) *reportChunker {
-	template.Reports, template.EventReports, template.MoreChunkedMessages = nil, nil, false
-	c := &reportChunker{template: template, budget: budget, hardCap: hardCap, attributes: attributes, events: events}
-	c.current = c.fresh()
-	return c
-}
-
-// fresh is an empty intermediate chunk of the template's subscription.
-func (c *reportChunker) fresh() im.ReportData {
-	return im.ReportData{HasSubscription: c.template.HasSubscription, SubscriptionID: c.template.SubscriptionID}
-}
-
-// next returns the next chunk; ok is false once the last went out.
-func (c *reportChunker) next() (chunk im.ReportData, ok bool, err error) {
-	for len(c.pending) == 0 && !c.done {
-		if rep, more := c.nextAttribute(); more {
-			if err := c.addAttributeReport(rep); err != nil {
-				return im.ReportData{}, false, err
-			}
-			continue
-		}
-		if ev, more := c.nextEvent(); more {
-			if err := c.addEventReport(ev); err != nil {
-				return im.ReportData{}, false, err
-			}
-			continue
-		}
-		c.done = true
-		last := c.current
-		if len(last.Reports) > 0 || len(last.EventReports) > 0 || !c.emitted {
-			if !c.emitted {
-				// Nothing at all: the empty report still closes the
-				// interaction as one ReportDataMessage.
-				last.HasSubscription, last.SubscriptionID = c.template.HasSubscription, c.template.SubscriptionID
-			}
-			last.SuppressResponse = c.template.SuppressResponse
-			c.pending = append(c.pending, last)
-		}
-		c.current = im.ReportData{}
-	}
-	if len(c.pending) == 0 {
-		return im.ReportData{}, false, nil
-	}
-	chunk = c.pending[0]
-	c.pending = c.pending[1:]
-	if len(c.pending) == 0 {
-		c.pending = nil
-	}
-	c.emitted = true
-	return chunk, true, nil
-}
-
-func (c *reportChunker) nextAttribute() (im.AttributeReport, bool) {
-	if c.attributes == nil {
-		return im.AttributeReport{}, false
-	}
-	rep, ok := c.attributes()
-	if !ok {
-		c.attributes = nil
-	}
-	return rep, ok
-}
-
-func (c *reportChunker) nextEvent() (im.EventReport, bool) {
-	if !c.eventsTaken {
-		c.eventsTaken = true
-		if c.events != nil {
-			c.eventReports = c.events()
-		}
-	}
-	if len(c.eventReports) == 0 {
-		c.eventReports = nil
-		return im.EventReport{}, false
-	}
-	ev := c.eventReports[0]
-	c.eventReports = c.eventReports[1:]
-	return ev, true
-}
-
-// closeCurrent hands out the chunk being filled — more follows: the entry
-// that did not fit it — and starts the next with seed.
-func (c *reportChunker) closeCurrent(seed im.ReportData) {
-	full := c.current
-	full.MoreChunkedMessages = true
-	c.pending = append(c.pending, full)
-	c.current = seed
-}
-
-func (c *reportChunker) addAttributeReport(rep im.AttributeReport) error {
-	if parts, ok := splitListAttributeReport(c.template, rep, c.budget); ok {
-		if oversized, err := anyPartOversized(c.template, parts, c.hardCap); err != nil {
-			return err
-		} else if oversized {
-			return c.addAttributeReport(attributeStatus(rep, im.StatusResourceExhausted))
-		}
-		for _, part := range parts {
-			if err := c.addAttributeReport(part); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	rep, err := capOversizedAttributeReport(c.template, rep, c.hardCap)
-	if err != nil {
-		return err
-	}
-	current := c.current
-	candidate := current
-	candidate.Reports = append(candidate.Reports, rep)
-	body, err := EncodeReportData(candidate)
-	if err != nil {
-		return err
-	}
-	if len(body) > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
-		seed := c.fresh()
-		seed.Reports = []im.AttributeReport{rep}
-		c.closeCurrent(seed)
-		return nil
-	}
-	c.current = candidate
-	return nil
-}
-
-func (c *reportChunker) addEventReport(ev im.EventReport) error {
-	ev, err := capOversizedEventReport(c.template, ev, c.hardCap)
-	if err != nil {
-		return err
-	}
-	current := c.current
-	candidate := current
-	candidate.EventReports = append(candidate.EventReports, ev)
-	body, err := EncodeReportData(candidate)
-	if err != nil {
-		return err
-	}
-	if len(body) > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
-		seed := c.fresh()
-		seed.EventReports = []im.EventReport{ev}
-		c.closeCurrent(seed)
-		return nil
-	}
-	c.current = candidate
-	return nil
+	return reportchunk.New(template, budget, hardCap, defaultAttributeValueWriter, attributes, events)
 }
 
 // rawListValue is a list attribute value carried as the TLV encodings of
-// its members, as [tlv.SplitArrayMembers] returns them; rawListMember is
-// one member. [splitListAttributeReport] builds both, and
-// [defaultAttributeValueWriter] writes them back verbatim.
+// its members, rawListMember one member ([reportchunk.List],
+// [reportchunk.Member]); [defaultAttributeValueWriter] writes them back
+// verbatim.
 type (
-	rawListValue  [][]byte
-	rawListMember []byte
+	rawListValue  = reportchunk.List
+	rawListMember = reportchunk.Member
 )
 
+// applyFabricScope applies rep's fabric scope to its value before the
+// report is chunked ([reportchunk.ApplyFabricScope]).
+func applyFabricScope(rep im.AttributeReport) im.AttributeReport {
+	return reportchunk.ApplyFabricScope(rep, defaultAttributeValueWriter)
+}
+
 // splitListAttributeReport splits a list attribute whose report alone
-// does not fit budget into a REPLACE-ALL report carrying as many leading
-// members as fit, followed by one ListIndex=null append report per
-// remaining member, all at the attribute's DataVersion. Mirrors matter.js
-// InteractionMessenger.sendDataReport, which chunks such an attribute with
-// chunkAttributePayload (packages/protocol/src/interaction/
-// AttributeDataEncoder.ts) and packs as many members into the initial
-// REPLACE-ALL as the message holds; chip's ReportDataEncoder does the
-// same (src/app/reporting/Engine.cpp, the AttributeValueEncoder list
-// chunking). Without it a list larger than one datagram — the NOCs of
-// three fabrics, a long ACL — rides in a single oversized message that a
-// chip controller cannot authenticate and discards.
-//
-// ok is false when rep is no splittable list: a status, an entry that
-// already addresses a list item, a non-list value, an empty list, or one
-// that fits budget alone.
+// does not fit budget ([reportchunk.SplitList]).
 func splitListAttributeReport(rd im.ReportData, rep im.AttributeReport, budget int) ([]im.AttributeReport, bool) {
-	if rep.IsStatus || rep.Path.ListAppend || rep.Path.HasListIndex || rep.Value.IsNull || rep.Value.Value == nil {
-		return nil, false
-	}
-	switch rep.Value.Value.(type) {
-	case rawListValue, rawListMember, []byte, string:
-		return nil, false
-	}
-	size := func(r im.AttributeReport) int {
-		body, err := EncodeReportData(im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID, Reports: []im.AttributeReport{r}})
-		if err != nil {
-			return budget + 1
-		}
-		return len(body)
-	}
-	if size(rep) <= budget {
-		return nil, false
-	}
-	enc := tlv.NewEncoder()
-	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), rep.Value)
-	encoded, err := enc.Bytes()
-	if err != nil {
-		return nil, false
-	}
-	members, err := tlv.SplitArrayMembers(encoded)
-	if err != nil || len(members) == 0 {
-		return nil, false
-	}
-	head := rep
-	n := 1
-	for n < len(members) {
-		head.Value = im.AttributeValue{Value: rawListValue(members[:n+1])}
-		if size(head) > budget {
-			break
-		}
-		n++
-	}
-	head.Value = im.AttributeValue{Value: rawListValue(members[:n])}
-	out := make([]im.AttributeReport, 0, 1+len(members)-n)
-	out = append(out, head)
-	for _, m := range members[n:] {
-		item := rep
-		item.Path.ListAppend = true
-		item.Value = im.AttributeValue{Value: rawListMember(m)}
-		out = append(out, item)
-	}
-	return out, true
-}
-
-// capOversizedAttributeReport downgrades rep to an
-// AttributeStatusIB(ResourceExhausted) when its own encoded size —
-// alone, with no sibling report in the chunk — already breaches
-// [reportChunkHardCap]. Such an entry can never occupy a chunk by
-// itself without [udp.Listener.Send] rejecting the datagram, so
-// shipping the raw value is never an option. Split out of
-// [chunkReportData] to keep that function's per-entry bookkeeping
-// readable.
-func capOversizedAttributeReport(rd im.ReportData, rep im.AttributeReport, hardCap int) (im.AttributeReport, error) {
-	if rep.IsStatus {
-		return rep, nil
-	}
-	alone := im.ReportData{
-		HasSubscription: rd.HasSubscription,
-		SubscriptionID:  rd.SubscriptionID,
-		Reports:         []im.AttributeReport{rep},
-	}
-	aloneBody, err := EncodeReportData(alone)
-	if err != nil {
-		return im.AttributeReport{}, err
-	}
-	if len(aloneBody) <= hardCap {
-		return rep, nil
-	}
-	return attributeStatus(rep, im.StatusResourceExhausted), nil
-}
-
-// anyPartOversized reports a part of a split list too large for any
-// message. Such an entry fails the whole attribute: one status on the
-// attribute's path, never a status on a list-item path, which a reader's
-// list buffering does not take (connectedhomeip's BufferedReadCallback
-// passes a failed list item through, and its Python controller aborts on
-// it, matter/clusters/attribute.cpp:110-116 at 6170af84 — TC-TLSCERT-2.9).
-func anyPartOversized(rd im.ReportData, parts []im.AttributeReport, hardCap int) (bool, error) {
-	for _, part := range parts {
-		capped, err := capOversizedAttributeReport(rd, part, hardCap)
-		if err != nil {
-			return false, err
-		}
-		if capped.IsStatus {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// attributeStatus is rep's attribute answered with status: the path
-// without a list index, which a status never carries here.
-func attributeStatus(rep im.AttributeReport, status im.StatusCode) im.AttributeReport {
-	path := rep.Path
-	path.ListAppend, path.HasListIndex, path.ListIndex = false, false, 0
-	return im.AttributeReport{Path: path, IsStatus: true, Status: im.StatusIB{Status: status}}
-}
-
-// capOversizedEventReport is [capOversizedAttributeReport]'s twin for
-// EventReport.
-func capOversizedEventReport(rd im.ReportData, ev im.EventReport, hardCap int) (im.EventReport, error) {
-	if ev.IsStatus {
-		return ev, nil
-	}
-	alone := im.ReportData{
-		HasSubscription: rd.HasSubscription,
-		SubscriptionID:  rd.SubscriptionID,
-		EventReports:    []im.EventReport{ev},
-	}
-	aloneBody, err := EncodeReportData(alone)
-	if err != nil {
-		return im.EventReport{}, err
-	}
-	if len(aloneBody) <= hardCap {
-		return ev, nil
-	}
-	return im.EventReport{
-		Path:     ev.Path,
-		IsStatus: true,
-		Status:   im.StatusIB{Status: im.StatusResourceExhausted},
-	}, nil
+	return reportchunk.SplitList(rd, rep, budget, defaultAttributeValueWriter)
 }
 
 // EncodeWriteResponse serialises wr into the TLV bytes that ride as
@@ -1048,14 +776,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// returning `null` (the previous default-writer fall-through)
 		// surfaces as ACCESS_DENIED on every follow-up read and Apple
 		// tears the fabric down via RemoveFabric.
-		// An entry another fabric owns, on a non-fabric-filtered read,
-		// carries FabricIndex alone: fields 1-5 are fabric-sensitive
-		// (access-control.element.ts, access "S"), withheld as matter.js
-		// StructManager mayRead withholds them.
+		// The dispatcher withholds another fabric's fabric-sensitive
+		// fields from a request (im.MaskFabricScoped); an entry with the
+		// deprecated Redacted set is still written as its FabricIndex
+		// alone.
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			if e.Redacted {
+			if e.Redacted { //nolint:staticcheck // SA1019: the deprecated Redacted branch is honoured until its removal
 				enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
 				_ = enc.EndContainer()
 				continue
@@ -1070,13 +798,13 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		_ = enc.EndContainer()
 	case []mattercore.AccessControlAuxiliaryEntryStruct:
 		// AccessControl.AuxiliaryAcl (0x0007): AccessControlEntryStruct
-		// with [5] AuxiliaryType. A redacted entry — another fabric's on
-		// an unfiltered read — carries FabricIndex alone, every other
-		// field being fabric-sensitive (access-control.element.ts).
+		// with [5] AuxiliaryType. An entry with the deprecated Redacted
+		// set is written as its FabricIndex alone; the dispatcher scopes
+		// the fields (im.MaskFabricScoped).
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			if !e.Redacted {
+			if !e.Redacted { //nolint:staticcheck // SA1019: the deprecated Redacted branch is honoured until its removal
 				encodeACLEntryFields(enc, e.Entry)
 				enc.PutUint(tlv.ContextTag(5), uint64(e.AuxiliaryType))
 			}
@@ -1187,12 +915,12 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// without this case every read/subscribe of 0x001F:0x0001 fell
 		// through to `default:` and returned TLV null regardless of
 		// what AccessControl.MatterWrite had stored.
-		// Data is fabric-sensitive: another fabric's entry on an
-		// unfiltered read carries FabricIndex alone.
+		// An entry with the deprecated Redacted set is written without
+		// Data; the dispatcher scopes the fields (im.MaskFabricScoped).
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			if !e.Redacted {
+			if !e.Redacted { //nolint:staticcheck // SA1019: the deprecated Redacted branch is honoured until its removal
 				enc.PutOctets(tlv.ContextTag(1), e.Data)
 			}
 			enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))

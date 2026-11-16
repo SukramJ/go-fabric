@@ -25,7 +25,7 @@ func TestStopWaitsForTheFailSafeRollback(t *testing.T) {
 	entered := make(chan struct{})
 	gate := make(chan struct{})
 	var running atomic.Bool
-	gc.SetOnFailSafeExpired(func(context.Context, uint8) {
+	gc.SetOnFailSafeExpired(func(context.Context, uint8) { //nolint:staticcheck // the deprecated host hook, kept for its window
 		running.Store(true)
 		close(entered)
 		<-gate

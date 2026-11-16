@@ -159,7 +159,7 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 		zmdef.CmdRemoveTrigger:           z.removeTrigger,
 	}
 	srv, err := spec.NewServer(zmdef.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{
-		Handlers: handlers, DataVersion: cfg.DataVersion, BeforeWrite: z.beforeWrite, Sink: zonesSink{z},
+		Handlers: handlers, DataVersion: cfg.DataVersion, WriteRule: z.writeRule, Sink: zonesSink{z},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrZonesConfig, err)
@@ -232,11 +232,11 @@ func (z *Zones) Sensitivity() uint8 {
 	return z.sensitivity
 }
 
-// beforeWrite holds a write of Sensitivity to 1..SensitivityMax
+// writeRule holds a write of Sensitivity to 1..SensitivityMax
 // (CONSTRAINT_ERROR). Mirrors chip WriteAttribute
 // (ZoneManagementCluster.cpp:259-284); the definition's own constraint
 // says the same.
-func (z *Zones) beforeWrite(_ context.Context, attrID uint32, value any) error {
+func (z *Zones) writeRule(_ context.Context, attrID uint32, value any) error {
 	if attrID != zmdef.AttrSensitivity {
 		return nil
 	}
@@ -595,19 +595,13 @@ func (z *Zones) removeTrigger(ctx context.Context, fields any) (any, error) {
 // ZoneTriggered emits the ZoneTriggered event the host reports for a
 // zone. Mirrors chip GenerateZoneTriggeredEvent (:701-716).
 func (z *Zones) ZoneTriggered(zoneID uint16, reason ZoneTriggeredReason) error {
-	z.mu.Lock()
-	endpoint := z.endpoint
-	z.mu.Unlock()
-	return z.srv.Emit(endpoint, zmdef.EventZoneTriggered, zmdef.ZoneTriggeredEvent{Zone: zoneID, Reason: reason})
+	return z.srv.EmitEvent(zmdef.EventZoneTriggered, zmdef.ZoneTriggeredEvent{Zone: zoneID, Reason: reason})
 }
 
 // ZoneStopped emits the ZoneStopped event the host reports for a zone.
 // Mirrors chip GenerateZoneStoppedEvent (:718-733).
 func (z *Zones) ZoneStopped(zoneID uint16, reason ZoneStoppedReason) error {
-	z.mu.Lock()
-	endpoint := z.endpoint
-	z.mu.Unlock()
-	return z.srv.Emit(endpoint, zmdef.EventZoneStopped, zmdef.ZoneStoppedEvent{Zone: zoneID, Reason: reason})
+	return z.srv.EmitEvent(zmdef.EventZoneStopped, zmdef.ZoneStoppedEvent{Zone: zoneID, Reason: reason})
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -649,4 +643,5 @@ func (z *Zones) SetEndpoint(endpoint uint16) {
 	z.mu.Lock()
 	z.endpoint = endpoint
 	z.mu.Unlock()
+	z.SelfHeld.SetEndpoint(endpoint) // the store's EmitEvent, the typed Record<Event>
 }

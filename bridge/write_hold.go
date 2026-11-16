@@ -13,6 +13,83 @@ import (
 	"github.com/SukramJ/go-fabric/im/subscription"
 )
 
+// writeRecord is the verdict of one write message, read from the
+// dispatcher's results ([im.WriteOutcome.Results]): the attributes its
+// writes changed, by [im.WriteResult.Commit], and the paths it wrote
+// without a verdict.
+type writeRecord struct {
+	// changed are the attributes a successful write's Commit named,
+	// without a list index, in the order the results named them.
+	changed []im.ConcreteAttributePath
+	// unjudged are the written paths of successful writes that carried
+	// no Commit: each is taken to have changed for its report, and is not
+	// among the changed ones a held notification is settled against.
+	unjudged []im.ConcreteAttributePath
+}
+
+// recordOf is the record of a write message's results.
+func recordOf(results []im.WriteResult) writeRecord {
+	var r writeRecord
+	for _, res := range results {
+		if res.Status != im.StatusSuccess || !res.Path.HasEndpoint || !res.Path.HasCluster || !res.Path.HasAttribute {
+			continue
+		}
+		if res.Commit == nil {
+			r.unjudged = append(r.unjudged, attributeOf(res.Path.Endpoint, res.Path.Cluster, res.Path.Attribute))
+			continue
+		}
+		for _, id := range res.Commit.Changed {
+			p := attributeOf(res.Path.Endpoint, res.Path.Cluster, id)
+			if !slices.Contains(r.changed, p) {
+				r.changed = append(r.changed, p)
+			}
+		}
+	}
+	return r
+}
+
+// attributeOf is the concrete path of one attribute.
+func attributeOf(endpoint uint16, cluster, attribute uint32) im.ConcreteAttributePath {
+	return im.ConcreteAttributePath{
+		Endpoint: endpoint, Cluster: cluster, Attribute: attribute,
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	}
+}
+
+// changedAt reports whether the record names p's attribute changed.
+func (r writeRecord) changedAt(p im.ConcreteAttributePath) bool {
+	return slices.Contains(r.changed, attributeOf(p.Endpoint, p.Cluster, p.Attribute))
+}
+
+// endpoints are the endpoints the record changed an attribute of, each
+// once.
+func (r writeRecord) endpoints() []uint16 {
+	var out []uint16
+	for _, p := range r.changed {
+		if !slices.Contains(out, p.Endpoint) {
+			out = append(out, p.Endpoint)
+		}
+	}
+	return out
+}
+
+// merged is the record of every write in rs: the attributes any of them
+// changed.
+func merged(rs []writeRecord) writeRecord {
+	if len(rs) == 1 {
+		return rs[0]
+	}
+	var out writeRecord
+	for _, r := range rs {
+		for _, p := range r.changed {
+			if !slices.Contains(out.changed, p) {
+				out.changed = append(out.changed, p)
+			}
+		}
+	}
+	return out
+}
+
 // writeHoldTable makes a controller's write one commit per attribute data
 // beside a host's change notifier (review II, R2-P4-fr-im-01), as
 // [invokeCommitTable] makes a command one. The dispatcher advances a
@@ -24,7 +101,8 @@ import (
 // time. While a write is applied to an endpoint, a notification's changed
 // paths of that endpoint update the notifier's memory and are held here,
 // neither advanced nor marked dirty; [Bridge.settleWrite] settles them when
-// the write ends. matter.js writes each attribute data in a transaction of
+// the last write that holds the endpoint ends, against the records of
+// every write that ended while the hold was open. matter.js writes each attribute data in a transaction of
 // its own (packages/protocol/src/action/server/AttributeWriteResponse.ts:426-435
 // at db021da0, openForWrite then commit), and a commit advances the
 // version once for whatever it changed
@@ -38,6 +116,10 @@ type writeHoldTable struct {
 	running  map[uint16]int
 	wildcard int
 	held     map[uint16]*heldWrite
+	// overlap are, per endpoint, the records of the writes that changed
+	// one of its attributes and ended while another write still held the
+	// endpoint: the hold is settled against them too when it closes.
+	overlap map[uint16][]writeRecord
 }
 
 // heldWrite is what notifications reported for one endpoint while a
@@ -45,6 +127,9 @@ type writeHoldTable struct {
 type heldWrite struct {
 	paths []heldPath
 	quiet []*quietPath
+	// record is, once the hold is handed out, the merged record of every
+	// write that ended while it was open, the last one's included.
+	record writeRecord
 }
 
 // heldPath is one changed path a notification held, with the wiring's
@@ -53,6 +138,13 @@ type heldPath struct {
 	ep   *endpointpkg.Endpoint
 	mgr  *subscription.Manager
 	path im.ConcreteAttributePath
+	// advanceOnly is a change whose report goes out on its own (a
+	// quieter attribute's, by its throttle): the hold settles its
+	// cluster's version and marks nothing.
+	advanceOnly bool
+	// markOnly is a change whose version advanced elsewhere (a server's
+	// report view): the hold marks it and advances nothing.
+	markOnly bool
 }
 
 // writeScope is the endpoints one write message names.
@@ -130,6 +222,44 @@ func (t *writeHoldTable) holdPaths(ep *endpointpkg.Endpoint, mgr *subscription.M
 	return nil
 }
 
+// holdAdvance holds the version advance of a change of attrs of cluster
+// on ep, whose report goes out on its own, while a write to ep is applied
+// and reports true; false when none is.
+func (t *writeHoldTable) holdAdvance(ep *endpointpkg.Endpoint, cluster uint32, attrs []uint32) bool {
+	if len(attrs) == 0 {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.holding(ep.ID) {
+		return false
+	}
+	h := t.entry(ep.ID)
+	for _, a := range attrs {
+		h.paths = append(h.paths, heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true})
+	}
+	return true
+}
+
+// holdMarks holds the marks of attrs of cluster on ep — a report view's,
+// which advances nothing — while a write to ep is applied and reports
+// true; false when none is.
+func (t *writeHoldTable) holdMarks(ep *endpointpkg.Endpoint, mgr *subscription.Manager, cluster uint32, attrs []uint32) bool {
+	if len(attrs) == 0 {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.holding(ep.ID) {
+		return false
+	}
+	h := t.entry(ep.ID)
+	for _, a := range attrs {
+		h.paths = append(h.paths, heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true})
+	}
+	return true
+}
+
 // holdQuiet leaves qp's check to the end of the write applied to
 // endpoint and reports true; false when none is.
 func (t *writeHoldTable) holdQuiet(endpoint uint16, qp *quietPath) bool {
@@ -145,9 +275,14 @@ func (t *writeHoldTable) holdQuiet(endpoint uint16, qp *quietPath) bool {
 	return true
 }
 
-// end closes the hold s opened and returns what was held for the
-// endpoints s names — every endpoint for a wildcard — so far.
-func (t *writeHoldTable) end(s writeScope) map[uint16]*heldWrite {
+// end closes the hold s opened, for the write whose record is rec, and
+// returns what was held for every endpoint no write holds any longer —
+// each entry with the merged record of the writes that ended while it was
+// held. An endpoint another write still holds keeps its entry, and rec,
+// when it changed one of the endpoint's attributes, waits with it for that
+// write's end (review II, R2-P5-write-05): a notification the other write
+// caused is settled against that write's record, not against this one's.
+func (t *writeHoldTable) end(s writeScope, rec writeRecord) map[uint16]*heldWrite {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if s.wildcard {
@@ -159,82 +294,109 @@ func (t *writeHoldTable) end(s writeScope) map[uint16]*heldWrite {
 			delete(t.running, id)
 		}
 	}
-	if s.wildcard {
-		out := t.held
-		t.held = nil
-		return out
+	// The endpoints rec changed an attribute of whose hold stays open
+	// keep it for the write that closes the hold.
+	for _, id := range rec.endpoints() {
+		if !t.holding(id) {
+			continue
+		}
+		if t.overlap == nil {
+			t.overlap = make(map[uint16][]writeRecord, 1)
+		}
+		t.overlap[id] = append(t.overlap[id], rec)
 	}
 	var out map[uint16]*heldWrite
-	for _, id := range s.endpoints {
-		if h, ok := t.held[id]; ok {
-			if out == nil {
-				out = make(map[uint16]*heldWrite, 1)
-			}
-			out[id] = h
-			delete(t.held, id)
+	for id, h := range t.held {
+		if t.holding(id) {
+			continue
+		}
+		if out == nil {
+			out = make(map[uint16]*heldWrite, 1)
+		}
+		h.record = merged(append(t.overlap[id], rec))
+		out[id] = h
+		delete(t.held, id)
+	}
+	for id := range t.overlap {
+		if !t.holding(id) {
+			delete(t.overlap, id)
 		}
 	}
 	return out
 }
 
 // applyWriteHeld applies req through d with the notifications of the
-// endpoints it names held for its duration ([writeHoldTable]), and settles
-// them when it ends — after a panic too, so no hold outlives its write.
-func (b *Bridge) applyWriteHeld(ctx context.Context, d im.Dispatcher, req im.WriteRequest, changes *endpointpkg.WriteChanges) im.WriteResponse {
-	scope := writeScopeOf(req)
+// endpoints it names held for its duration ([Bridge.holdWrite]).
+func (b *Bridge) applyWriteHeld(ctx context.Context, d im.Dispatcher, req im.WriteRequest) (out im.WriteOutcome) {
+	b.holdWrite(writeScopeOf(req), func() []im.WriteResult {
+		out = im.HandleWrite(ctx, d, req)
+		return out.Results
+	})
+	return out
+}
+
+// holdWrite runs a write with the notifications of the endpoints scope
+// names held for its duration ([writeHoldTable]), and settles them when it
+// ends against the record of the results run returns
+// ([im.WriteResult.Commit]) — after a panic too, with an empty record, so
+// no hold outlives its write.
+func (b *Bridge) holdWrite(scope writeScope, run func() []im.WriteResult) {
 	b.writeHolds.begin(scope)
-	defer b.settleWrite(scope, changes)
-	return im.HandleWriteRequest(ctx, d, req)
+	var results []im.WriteResult
+	defer func() { b.settleWrite(scope, recordOf(results)) }()
+	results = run()
 }
 
 // settleWrite ends the hold of a write and settles what it held, judged by
-// the write's record (changes):
+// the write's record (rec) — merged, for an endpoint whose hold outlasted
+// it, with the records of the writes that ended while the hold was open:
 //
-//   - every path the write changed is read again into the current
+//   - every attribute the write changed is read again into the current
 //     wiring's memory, whether or not a notification arrived, so the next
 //     notification compares with the written value;
-//   - a held path the write changed was advanced by the dispatcher and is
+//   - a held path a write changed was advanced by the dispatcher and is
 //     reported by [Bridge.reportWrittenAttributes]: it is neither advanced
 //     nor marked again;
 //   - any other held path — an attribute the host moved with the written
 //     one — is marked dirty, and its cluster's DataVersion advanced once,
-//     unless the write changed that cluster and advanced it already: one
+//     unless a write changed that cluster and advanced it already: one
 //     commit, one advance (Datasource.ts:1446-1457 at db021da0).
 //
-// The rule rests on the record alone: a verdict that answered "unchanged"
-// for a value that moved leaves a notification's change of it to be
-// advanced and reported here.
-func (b *Bridge) settleWrite(scope writeScope, changes *endpointpkg.WriteChanges) {
-	held := b.writeHolds.end(scope)
-	written := changes.ChangedAttributes()
+// The rule rests on the record alone: a verdict that did not name a value
+// that moved leaves a notification's change of it to be advanced and
+// reported here.
+func (b *Bridge) settleWrite(scope writeScope, rec writeRecord) {
+	held := b.writeHolds.end(scope, rec)
 	b.mu.RLock()
 	wiring := b.listenerWiring
 	b.mu.RUnlock()
-	wiring.rememberWritten(written)
+	wiring.rememberWritten(rec.changed)
 	for epID, h := range held {
-		// The clusters of this endpoint the write advanced already.
+		// The clusters of this endpoint the writes advanced already.
 		advanced := make(map[uint32]struct{}, 1)
-		for _, p := range written {
+		for _, p := range h.record.changed {
 			if p.Endpoint == epID {
 				advanced[p.Cluster] = struct{}{}
 			}
 		}
 		marks := make([]heldPath, 0, len(h.paths))
 		for _, hp := range h.paths {
-			if changes.Changed(hp.path) {
+			if h.record.changedAt(hp.path) {
 				continue
 			}
-			if _, done := advanced[hp.path.Cluster]; !done {
-				hp.ep.BumpClusterDataVersion(hp.path.Cluster)
+			if _, done := advanced[hp.path.Cluster]; !done && !hp.markOnly {
+				hp.ep.BumpDataVersionOf(hp.path.Cluster)
 				advanced[hp.path.Cluster] = struct{}{}
 			}
-			marks = append(marks, hp)
+			if !hp.advanceOnly {
+				marks = append(marks, hp)
+			}
 		}
 		for _, hp := range marks {
 			hp.mgr.OnAttributeChanged(hp.path)
 		}
 		for _, qp := range h.quiet {
-			if changes.Changed(qp.path) {
+			if h.record.changedAt(qp.path) {
 				qp.refresh()
 				continue
 			}

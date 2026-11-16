@@ -57,7 +57,7 @@ func TestCameraServesTheKitAvSettings(t *testing.T) {
 	t.Parallel()
 	panMax := int16(90)
 	d, err := device.NewCamera(device.Options{StableKey: device.StringKey("ptz"), Name: "ptz"},
-		avdef.Declare{Features: avdef.FeatureMechanicalPan, Initial: avdef.Patch{PanMax: &panMax}, MechanicalPTZ: ptzPort{}})
+		required("Camera", avdef.Declare{Features: avdef.FeatureMechanicalPan, Initial: avdef.Patch{PanMax: &panMax}, MechanicalPTZ: ptzPort{}})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestChimeServesTheKitChimeWithItsPort(t *testing.T) {
 	if c.SelectedChime() != 1 {
 		t.Fatalf("SelectedChime %d", c.SelectedChime())
 	}
-	plain, err := device.NewChime(device.Options{StableKey: device.StringKey("chime-plain"), Name: "chime"})
+	plain, err := device.NewChime(device.Options{StableKey: device.StringKey("chime-plain"), Name: "chime"}, required("Chime")...)
 	if err != nil {
 		t.Fatal(err)
 	}

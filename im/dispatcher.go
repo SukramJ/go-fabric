@@ -237,6 +237,13 @@ type ReadResult struct {
 	// Without it the result has no version: it is never left out for a
 	// DataVersionFilter, and its AttributeDataIB carries 0.
 	HasDataVersion bool
+	// FabricScope, when set, is the scope of a request's read of a
+	// fabric-scoped list attribute: Value is what the server returned,
+	// every fabric's entries whole, and the scope is applied to it when it
+	// is encoded ([MaskFabricScoped]; [AttributeReport.FabricScope]).
+	// endpoint.TopologyDispatcher sets it for every server on a request; a
+	// read with no request behind it has none and reads the value whole.
+	FabricScope *FabricScope
 }
 
 // WriteResult is one (path, status) pair produced by a Write.
@@ -251,6 +258,27 @@ type WriteResult struct {
 	// status" — wire encoding omits the ClusterStatus tag.
 	ClusterStatus    uint8
 	HasClusterStatus bool
+	// Commit is the verdict of a successful write: the attributes of the
+	// cluster it changed ([WriteCommit]). nil means the dispatcher gave
+	// no verdict, and the written attribute is taken to have changed; a
+	// Commit whose Changed is empty is a write that changed nothing. A
+	// refused write carries none. endpoint.TopologyDispatcher gives one
+	// for every write it applies.
+	Commit *WriteCommit
+}
+
+// WriteCommit is the verdict of one applied write: the ids of the
+// written cluster's attributes the write changed, on the endpoint and
+// cluster of [WriteResult.Path]. The written attribute is among them only
+// when its value moved; another attribute the write moved with it is
+// named when the server names it (contract.ChangeNamingWriter) —
+// spec.Server names a sibling its Sink set inside the write. An empty Changed is a write that changed nothing: no
+// DataVersion advance and no report. It is matter.js's per-commit change
+// list (packages/node/src/behavior/state/managed/Datasource.ts:1476-1484
+// at db021da0, a name noted only when its value differs; :1319, the list
+// handed on), carried in the result instead of an observer.
+type WriteCommit struct {
+	Changed []uint32
 }
 
 // InvokeResult is the outcome of a single command dispatch.

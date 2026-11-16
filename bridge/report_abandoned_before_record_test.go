@@ -4,7 +4,6 @@
 package bridge
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -47,14 +46,18 @@ func TestReportAbandonedBeforeItsRecordIsAFailedUpdate(t *testing.T) {
 	if n := r.outbound.Pending(); n != 0 {
 		t.Fatalf("%d entries pending after the exhaustion", n)
 	}
-	r.dev.br.noteReportSent(context.Background(), r.sub.ID, r.reportSID, counters, owedReport{paths: []im.ConcreteAttributePath{undeliveredReportPath}})
+	owed := &owedReport{subID: r.sub.ID, paths: []im.ConcreteAttributePath{undeliveredReportPath}}
+	r.dev.br.recordOngoingReport(r.reportSID, counters, owed)
+	if !owed.settled.Load() {
+		t.Error("the abandoned report's update is not settled")
+	}
 
 	if _, held := r.dev.br.reportCounterOwner.Load(reportCounterKey(r.reportSID, counters[len(counters)-1])); held {
 		t.Error("the abandoned report's record is still held")
 	}
 	failures, counted := r.dev.br.subSendErrorCount.Load(r.sub.ID)
 	if !counted || failures != 1 {
-		t.Fatalf("failed updates = %v (counted %v), want 1: a report abandoned before its record counts as delivered", failures, counted)
+		t.Fatalf("failed updates = %v (counted %v), want 1: a report abandoned before its record is a failed update", failures, counted)
 	}
 	// What it carried is owed again: the subscription engine sends it.
 	r.pending(t)

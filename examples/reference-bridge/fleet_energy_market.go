@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"math/rand/v2"
 	"sync"
@@ -799,10 +800,10 @@ func (r *fakeReadings) snapshot(t measurementTarget, now uint32) {
 		slog.Warn("meter.fakereadings", slog.String("cluster", "energy"), slog.Any("err", err))
 		return
 	}
-	if ep, ok := t.dev.EndpointNumber(); ok {
-		if err := t.energy.EmitCumulativeEnergyMeasured(ep, eemdef.CumulativeEnergyMeasuredEvent{EnergyImported: &imported}); err != nil {
-			slog.Warn("meter.fakereadings", slog.String("event", "CumulativeEnergyMeasured"), slog.Any("err", err))
-		}
+	// Before the meter is mounted the event has no log to go to
+	// (spec.ErrNotMounted); a reading is not worth a warning then.
+	if err := t.energy.RecordCumulativeEnergyMeasured(eemdef.CumulativeEnergyMeasuredEvent{EnergyImported: &imported}); err != nil && !errors.Is(err, spec.ErrNotMounted) {
+		slog.Warn("meter.fakereadings", slog.String("event", "CumulativeEnergyMeasured"), slog.Any("err", err))
 	}
 }
 

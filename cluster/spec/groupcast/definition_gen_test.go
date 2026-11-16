@@ -112,7 +112,18 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleGroupcastTesting(func(context.Context, GroupcastTestingRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleGroupcastTesting: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})    // no EmitEvent
 	_ = s.EmitGroupcastTesting(0, GroupcastTestingEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordGroupcastTesting(GroupcastTestingEvent{})  // the same, through EmitEvent
+	if err := bare.RecordGroupcastTesting(GroupcastTestingEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordGroupcastTesting on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

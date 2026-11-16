@@ -23,6 +23,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -55,8 +56,10 @@ func minimalConfig(db *sql.DB) node.Config {
 		},
 		Store:  node.Store{DB: db},
 		Logger: slog.New(slog.DiscardHandler),
-		// A unit test publishes nothing on the network.
-		Network: node.Network{Listen: "127.0.0.1:0", PreferIPv4: true, MDNS: node.MDNS{Off: true}},
+		// A unit test publishes nothing on the network: its advertiser is
+		// the no-op one (a test that watches the records sets its own).
+		Network:    node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
+		Advertiser: mdns.NewNoop(),
 	}
 }
 
@@ -846,6 +849,7 @@ func TestNetworkInterfacesFollowTheRootNetworkAndTheAdvertiser(t *testing.T) {
 		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
 		cfg.Network.WiFi = &node.WiFi{Reporter: wifiLink{}}
 		cfg.Network.MDNS = node.MDNS{Interfaces: []string{"gf-absent0"}}
+		cfg.Advertiser = nil // the node's own advertiser, which the MDNS configures
 		n := newNode(t, cfg)
 		for _, e := range read(t, n) {
 			if e.InterfaceType != mattercore.InterfaceTypeWiFi || e.IsOperational {

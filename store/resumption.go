@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 
 // ResumptionRecord is a CASE resumption-id row (Matter §4.13.2.4).
@@ -22,14 +24,67 @@ import (
 // privilege to resumed sessions without re-validating the full NOC.
 // Persisted as JSON in the `case_authenticated_tags` column (migration
 // 010). An empty or nil slice means no CATs were present.
+// SessionParameters are the peer's session parameters of the session the
+// record resumes — what a CASE client keeps to resume it
+// (client/handshake.ResumptionRecord.SessionParameters). One record per
+// peer serves both roles, the responder's and the client's. Every field
+// is optional: zero is absent, and a record a responder wrote carries
+// none.
+//
 // matter.js ref: packages/protocol/src/session/case/
 type ResumptionRecord struct {
-	FabricIndex  uint8
-	PeerNodeID   uint64
-	ResumptionID []byte   // 16 bytes
-	SharedSecret []byte   // 32 bytes (HKDF input for resumed sessions)
-	CASEAuthTags []uint32 // optional; nil == no CATs (Matter §6.6.5.1)
+	FabricIndex       uint8
+	PeerNodeID        uint64
+	ResumptionID      []byte   // 16 bytes
+	SharedSecret      []byte   // 32 bytes (HKDF input for resumed sessions)
+	CASEAuthTags      []uint32 // optional; nil == no CATs (Matter §6.6.5.1)
+	SessionParameters sessionparams.Parameters
 }
+
+// resumptionColumns are the matter_resumption columns a record reads back,
+// in scanResumption's order, the seal mark last.
+const resumptionColumns = `fabric_index, peer_node_id, resumption_id, shared_secret, case_authenticated_tags,
+    session_idle_interval, session_active_interval, session_active_threshold,
+    data_model_revision, interaction_model_revision, specification_version,
+    max_paths_per_invoke, supported_transports, max_tcp_message_size, sealed`
+
+// scanResumption reads one row of resumptionColumns, its shared secret
+// opened.
+func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
+	var (
+		rec      ResumptionRecord
+		nodeBlob []byte
+		catsJSON []byte
+		sealed   bool
+	)
+	p := &rec.SessionParameters
+	if err := r.Scan(&rec.FabricIndex, &nodeBlob, &rec.ResumptionID, &rec.SharedSecret, &catsJSON,
+		&p.SessionIdleInterval, &p.SessionActiveInterval, &p.SessionActiveThreshold,
+		&p.DataModelRevision, &p.InteractionModelRevision, &p.SpecificationVersion,
+		&p.MaxPathsPerInvoke, &p.SupportedTransports, &p.MaxTCPMessageSize, &sealed); err != nil {
+		return ResumptionRecord{}, err
+	}
+	if len(nodeBlob) != 8 {
+		return ResumptionRecord{}, fmt.Errorf("store: peer_node_id length=%d (want 8)", len(nodeBlob))
+	}
+	rec.PeerNodeID = binary.BigEndian.Uint64(nodeBlob)
+	secret, err := s.openColumn(rec.SharedSecret, sealed, "matter_resumption", "shared_secret", rec.FabricIndex, nodeBlob)
+	if err != nil {
+		return ResumptionRecord{}, err
+	}
+	if len(secret) != resumptionSecretSize {
+		return ResumptionRecord{}, fmt.Errorf("store: shared_secret length=%d (want %d)", len(secret), resumptionSecretSize)
+	}
+	rec.SharedSecret = secret
+	if err := json.Unmarshal(catsJSON, &rec.CASEAuthTags); err != nil {
+		rec.CASEAuthTags = nil // tolerate corrupt rows
+	}
+	return rec, nil
+}
+
+// resumptionSecretSize is the shared secret's size, checked on every write
+// and every read.
+const resumptionSecretSize = 32
 
 // ErrResumptionNotFound is returned when a lookup misses.
 var ErrResumptionNotFound = errors.New("store: resumption record not found")
@@ -41,8 +96,8 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 	if len(rec.ResumptionID) != 16 {
 		return fmt.Errorf("store: resumption_id length=%d (want 16)", len(rec.ResumptionID))
 	}
-	if len(rec.SharedSecret) != 32 {
-		return fmt.Errorf("store: shared_secret length=%d (want 32)", len(rec.SharedSecret))
+	if len(rec.SharedSecret) != resumptionSecretSize {
+		return fmt.Errorf("store: shared_secret length=%d (want %d)", len(rec.SharedSecret), resumptionSecretSize)
 	}
 	cats := rec.CASEAuthTags
 	if cats == nil {
@@ -52,17 +107,36 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 	if err != nil {
 		return fmt.Errorf("store: marshal case_authenticated_tags: %w", err)
 	}
+	p := rec.SessionParameters
+	peer := uint64ToBE(rec.PeerNodeID)
+	secret, err := s.sealColumn(rec.SharedSecret, "matter_resumption", "shared_secret", rec.FabricIndex, peer)
+	if err != nil {
+		return fmt.Errorf("store: upsert resumption: %w", err)
+	}
 	if _, err := s.db.ExecContext(
 		ctx, `
 INSERT INTO matter_resumption
-    (fabric_index, peer_node_id, resumption_id, shared_secret, case_authenticated_tags)
-VALUES (?, ?, ?, ?, ?)
+    (`+resumptionColumns+`)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(fabric_index, peer_node_id) DO UPDATE SET
     resumption_id              = excluded.resumption_id,
     shared_secret              = excluded.shared_secret,
     case_authenticated_tags    = excluded.case_authenticated_tags,
+    session_idle_interval      = excluded.session_idle_interval,
+    session_active_interval    = excluded.session_active_interval,
+    session_active_threshold   = excluded.session_active_threshold,
+    data_model_revision        = excluded.data_model_revision,
+    interaction_model_revision = excluded.interaction_model_revision,
+    specification_version      = excluded.specification_version,
+    max_paths_per_invoke       = excluded.max_paths_per_invoke,
+    supported_transports       = excluded.supported_transports,
+    max_tcp_message_size       = excluded.max_tcp_message_size,
+    sealed                     = excluded.sealed,
     last_used_at               = CURRENT_TIMESTAMP`,
-		rec.FabricIndex, uint64ToBE(rec.PeerNodeID), rec.ResumptionID, rec.SharedSecret, catsJSON,
+		rec.FabricIndex, peer, rec.ResumptionID, secret, catsJSON,
+		p.SessionIdleInterval, p.SessionActiveInterval, p.SessionActiveThreshold,
+		p.DataModelRevision, p.InteractionModelRevision, p.SpecificationVersion,
+		p.MaxPathsPerInvoke, p.SupportedTransports, p.MaxTCPMessageSize, s.sealer != nil,
 	); err != nil {
 		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
@@ -76,55 +150,29 @@ func (s *Store) GetResumptionByID(ctx context.Context, resumptionID []byte) (Res
 	if len(resumptionID) != 16 {
 		return ResumptionRecord{}, fmt.Errorf("store: resumption_id length=%d (want 16)", len(resumptionID))
 	}
-	var (
-		rec      ResumptionRecord
-		nodeBlob []byte
-		catsJSON []byte
-	)
-	err := s.db.QueryRowContext(ctx, `
-SELECT fabric_index, peer_node_id, resumption_id, shared_secret, case_authenticated_tags
-FROM matter_resumption WHERE resumption_id = ?`, resumptionID).
-		Scan(&rec.FabricIndex, &nodeBlob, &rec.ResumptionID, &rec.SharedSecret, &catsJSON)
+	rec, err := s.scanResumption(s.db.QueryRowContext(ctx, `
+SELECT `+resumptionColumns+`
+FROM matter_resumption WHERE resumption_id = ?`, resumptionID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return ResumptionRecord{}, ErrResumptionNotFound
 	}
 	if err != nil {
 		return ResumptionRecord{}, fmt.Errorf("store: get resumption: %w", err)
-	}
-	if len(nodeBlob) != 8 {
-		return ResumptionRecord{}, fmt.Errorf("store: peer_node_id length=%d (want 8)", len(nodeBlob))
-	}
-	rec.PeerNodeID = binary.BigEndian.Uint64(nodeBlob)
-	if err := json.Unmarshal(catsJSON, &rec.CASEAuthTags); err != nil {
-		rec.CASEAuthTags = nil // tolerate corrupt rows
 	}
 	return rec, nil
 }
 
 // GetResumptionByPeer looks up by (fabric_index, peer_node_id).
 func (s *Store) GetResumptionByPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (ResumptionRecord, error) {
-	var (
-		rec      ResumptionRecord
-		nodeBlob []byte
-		catsJSON []byte
-	)
-	err := s.db.QueryRowContext(ctx, `
-SELECT fabric_index, peer_node_id, resumption_id, shared_secret, case_authenticated_tags
+	rec, err := s.scanResumption(s.db.QueryRowContext(ctx, `
+SELECT `+resumptionColumns+`
 FROM matter_resumption WHERE fabric_index = ? AND peer_node_id = ?`,
-		fabricIndex, uint64ToBE(peerNodeID)).
-		Scan(&rec.FabricIndex, &nodeBlob, &rec.ResumptionID, &rec.SharedSecret, &catsJSON)
+		fabricIndex, uint64ToBE(peerNodeID)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return ResumptionRecord{}, ErrResumptionNotFound
 	}
 	if err != nil {
 		return ResumptionRecord{}, fmt.Errorf("store: get resumption: %w", err)
-	}
-	if len(nodeBlob) != 8 {
-		return ResumptionRecord{}, fmt.Errorf("store: peer_node_id length=%d (want 8)", len(nodeBlob))
-	}
-	rec.PeerNodeID = binary.BigEndian.Uint64(nodeBlob)
-	if err := json.Unmarshal(catsJSON, &rec.CASEAuthTags); err != nil {
-		rec.CASEAuthTags = nil // tolerate corrupt rows
 	}
 	return rec, nil
 }

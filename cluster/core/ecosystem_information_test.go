@@ -98,29 +98,18 @@ func TestEcosystemInformationFiltersByFabric(t *testing.T) {
 	if len(devs) != 2 {
 		t.Fatalf("unfiltered DeviceDirectory = %#v", devs)
 	}
-	if _, own := devs[0].(ecodef.EcosystemDeviceStruct); !own {
-		t.Errorf("own entry redacted: %#v", devs[0])
-	}
-	if r, redacted := devs[1].(redactedEntry); !redacted || r.fabricIndex != 2 {
-		t.Errorf("foreign entry = %#v, want FabricIndex 2 alone", devs[1])
-	}
-	// The redacted entry carries FabricIndex and nothing else: the full
-	// struct's mandatory fields are missing from it.
-	var full ecodef.EcosystemLocationStruct
-	if err := full.DecodeTLV(spectest.Decode(t, spectest.Encode(t, devs[1]))); err == nil {
-		t.Error("a redacted entry decoded as a full EcosystemLocationStruct")
+	// Every entry whole: the dispatcher scopes the fields
+	// (endpoint.TopologyDispatcher, im.MaskFabricScoped).
+	for _, d := range devs {
+		if _, whole := d.(ecodef.EcosystemDeviceStruct); !whole {
+			t.Errorf("unfiltered entry = %#v, want it whole", d)
+		}
 	}
 
-	// A session without a fabric sees nothing filtered and nothing whole.
+	// A session without a fabric reads nothing filtered.
 	pase := im.WithFabricFilter(context.Background(), true, 0)
 	if devs := ecoRead(t, e, pase, ecodef.AttrDeviceDirectory); len(devs) != 0 {
 		t.Errorf("fabric-0 filtered read = %#v", devs)
-	}
-	pase = im.WithFabricFilter(context.Background(), false, 0)
-	for _, d := range ecoRead(t, e, pase, ecodef.AttrDeviceDirectory) {
-		if _, redacted := d.(redactedEntry); !redacted {
-			t.Errorf("fabric-0 unfiltered read disclosed %#v", d)
-		}
 	}
 
 	local := ecoRead(t, e, context.Background(), ecodef.AttrLocationDirectory)

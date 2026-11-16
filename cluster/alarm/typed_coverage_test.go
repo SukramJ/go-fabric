@@ -154,7 +154,11 @@ func TestSetBeforeWriteVetoesTheSensitivityWrite(t *testing.T) {
 		return veto
 	})
 	before := srv.MatterDataVersion()
-	if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityHigh)); !errors.Is(err, veto) {
+	// The level the device holds (High) reaches no veto (R2-P5-apispec-02).
+	if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityHigh)); err != nil || seenAttr != 0 {
+		t.Fatalf("a write of the held level: %v, veto heard 0x%X", err, seenAttr)
+	}
+	if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityLow)); !errors.Is(err, veto) {
 		t.Fatalf("MatterWrite = %v, want the veto", err)
 	}
 	if seenAttr != alarm.AttrSmokeSensitivityLevel || len(d.written) != 0 || srv.MatterDataVersion() != before {
@@ -162,7 +166,7 @@ func TestSetBeforeWriteVetoesTheSensitivityWrite(t *testing.T) {
 			seenAttr, d.written, srv.MatterDataVersion() != before)
 	}
 	srv.SetBeforeWrite(nil)
-	if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityHigh)); err != nil {
+	if err := srv.MatterWrite(ctx, alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityLow)); err != nil {
 		t.Errorf("MatterWrite after removing the veto = %v", err)
 	}
 }

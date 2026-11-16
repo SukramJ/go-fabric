@@ -383,6 +383,16 @@ func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value a
 			list[i].FabricIndex = fabric
 		}
 	}
+	// The entries held already, written again, change nothing and reach no
+	// veto: the host's veto hears a change only ([spec.WriteVeto.Check]).
+	// The comparison is the one replace makes below.
+	held := b.entries()
+	if request {
+		held = slices.DeleteFunc(held, func(t TargetStruct) bool { return t.FabricIndex != fabric })
+	}
+	if slices.Equal(held, list) {
+		return false, nil
+	}
 	// The veto sees the written entries as they would be stored, the
 	// accessing fabric stamped.
 	if err := b.veto.Check(ctx, bindingAttrBinding, slices.Clone(list)); err != nil {

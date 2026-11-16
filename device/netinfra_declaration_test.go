@@ -39,8 +39,8 @@ func TestNetworkInfrastructureManagerDeclaresTheNetinfraServers(t *testing.T) {
 	if err := store.SaveNetwork(ctx, extPanID, netinfraDataset); err != nil {
 		t.Fatal(err)
 	}
-	d, err := device.NewNetworkInfrastructureManager(device.Options{StableKey: device.StringKey("nim"), Name: "nim"},
-		tdirdef.Declare{ThreadNetworkStore: store, Initial: tdirdef.Patch{PreferredExtendedPanId: &extPanID}})
+	d, err := device.NewNetworkInfrastructureManager(device.Options{StableKey: device.StringKey("nim"), Name: "nim"}, required("NetworkInfrastructureManager",
+		tdirdef.Declare{ThreadNetworkStore: store, Initial: tdirdef.Patch{PreferredExtendedPanId: &extPanID}})...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +65,8 @@ func TestNetworkInfrastructureManagerDeclaresTheNetinfraServers(t *testing.T) {
 
 	// A preferred network the store does not hold refuses the device.
 	other := []byte{1, 2, 3, 4, 5, 6, 7, 8}
-	if _, err := device.NewNetworkInfrastructureManager(device.Options{StableKey: device.StringKey("nim2"), Name: "nim2"},
-		tdirdef.Declare{Initial: tdirdef.Patch{PreferredExtendedPanId: &other}}); err == nil {
+	if _, err := device.NewNetworkInfrastructureManager(device.Options{StableKey: device.StringKey("nim2"), Name: "nim2"}, required("NetworkInfrastructureManager",
+		tdirdef.Declare{Initial: tdirdef.Patch{PreferredExtendedPanId: &other}})...); err == nil {
 		t.Error("a preferred network outside the store was accepted")
 	}
 }

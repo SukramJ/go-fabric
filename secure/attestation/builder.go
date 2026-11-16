@@ -10,12 +10,12 @@ import (
 	"crypto/sha1" //nolint:gosec // G505: blocklisted import; the SKID derivation in computeSKID is the only use and states why SHA-1 is not ours to choose.
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/attestids"
 )
 
 // Matter Attestation Certificate Subject DN attributes
@@ -27,8 +27,8 @@ import (
 // (vendor, product) pair — Apple Home rejects bridges whose VID/PID
 // does not appear in the DAC.
 var (
-	oidMatterVendorID  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 2, 1}
-	oidMatterProductID = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 2, 2}
+	oidMatterVendorID  = attestids.OIDVendorID
+	oidMatterProductID = attestids.OIDProductID
 )
 
 // matterAttCertName composes the Subject DN for a Matter attestation
@@ -54,7 +54,7 @@ func matterAttCertName(cn string, vid, pid uint16, includePID bool) pkix.Name {
 // oidCommonName is RFC 5280 id-at-commonName (2.5.4.3). Spelled out
 // here so [matterAttCertName] can place it in the same ExtraNames
 // slice as the Matter-specific OIDs and control the encoding order.
-var oidCommonName = asn1.ObjectIdentifier{2, 5, 4, 3}
+var oidCommonName = attestids.OIDCommonName
 
 // computeSKID derives the 20-byte SubjectKeyIdentifier from an EC
 // public key per the SHA-1(uncompressed point) convention used by

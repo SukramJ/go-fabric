@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -234,5 +235,61 @@ func TestSubscriptionCloseEndsItsPrimingWait(t *testing.T) {
 		}
 	case <-wait.Done():
 		t.Fatal("the priming still waits 5 s after its subscription was closed")
+	}
+}
+
+// TestReestablishPrimingWaitEnds (review II, R2-P5-write-07): the priming
+// report of a re-established subscription waits for each chunk's answer
+// through the same chunk sender as the other legs, so its wait ends with
+// the bridge's handler context — which Stop cancels; an abort, no verdict
+// on the peer — and with its session's close, which says the peer is
+// gone; neither runs out the chunk bound. The wait lives as long as the
+// bridge, not as long as the call that started the re-establishment.
+func TestReestablishPrimingWaitEnds(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name string
+		end  func(b *Bridge, id uint16)
+		want error
+	}{
+		{"the bridge's handler context ends", func(b *Bridge, _ uint16) {
+			b.mu.RLock()
+			cancel := b.serveCancel
+			b.mu.RUnlock()
+			cancel()
+		}, errChunkWaitAborted},
+		{"the session closes", func(b *Bridge, id uint16) { b.SessionClosed(id) }, errPeerGone},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			b := newStartedBridge(t)
+			b.chunkStatusResponseTimeoutOverride = time.Minute
+			p := chunkWaitPeers(t, b, 65)[0]
+			target := subTarget{src: p.addr, sessionID: p.id, exchangeID: 0x3500}
+			reports := make([]im.AttributeReport, 200)
+			for i := range reports {
+				reports[i] = im.AttributeReport{
+					Path:  im.ConcreteAttributePath{Endpoint: 1, Cluster: 6, Attribute: uint32(i), HasEndpoint: true, HasCluster: true, HasAttribute: true},
+					Value: im.AttributeValue{Value: uint32(i)},
+				}
+			}
+			chunker := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: 9}, reportChunkPayloadBudget, reportChunkHardCap, sliceAttributeReports(reports), nil)
+			done := make(chan error, 1)
+			go func() { done <- b.sendPrimingReport(target, chunker) }()
+			if _, _, ok := readOneIMDatagram(t, p.conn, p.sess, 3*time.Second); !ok {
+				t.Fatal("the priming report's first chunk did not reach the peer")
+			}
+			c.end(b, p.id)
+			wait, stop := context.WithTimeout(t.Context(), 5*time.Second)
+			defer stop()
+			select {
+			case err := <-done:
+				if !errors.Is(err, c.want) {
+					t.Errorf("the priming report ended with %v, want %v", err, c.want)
+				}
+			case <-wait.Done():
+				t.Fatal("the priming report still waits for its chunk's answer 5 s later")
+			}
+		})
 	}
 }

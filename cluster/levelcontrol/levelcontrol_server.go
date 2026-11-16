@@ -732,9 +732,9 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	if err != nil {
 		return false, err
 	}
-	if err := s.veto.Check(ctx, attrID, storedUint8(v)); err != nil {
-		return false, err
-	}
+	// The host's veto ([Server.SetBeforeWrite]) is consulted behind the
+	// server's own rules and its comparison with the held value, for a
+	// write that changes it only ([spec.WriteVeto.Check]).
 	switch attrID {
 	case AttrOptions:
 		n, _ := v.(uint64)                   // a map8 per ValidateWrite
@@ -744,12 +744,21 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	default: // AttrStartUpCurrentLevel, the last writable attribute
 		next := nullableUint8Of(v)
 		s.mu.Lock()
-		changed := !equalLevel(s.startUp, next)
-		s.startUp = next
+		held := equalLevel(s.startUp, next)
 		s.mu.Unlock()
 		// A write of the value in effect changes nothing and leaves the
 		// DataVersion (Datasource.ts:1456-1457, :1476-1480 at db021da0
 		// #noteIfChanged).
+		if held {
+			return false, nil
+		}
+		if err := s.veto.Check(ctx, attrID, storedUint8(v)); err != nil {
+			return false, err
+		}
+		s.mu.Lock()
+		changed := !equalLevel(s.startUp, next)
+		s.startUp = next
+		s.mu.Unlock()
 		if changed {
 			s.tracker().Bump()
 			s.changes.NotifyFrom(contract.OriginControllerWrite, AttrStartUpCurrentLevel)
@@ -813,6 +822,9 @@ func (s *Server) writeOptions(ctx context.Context, options uint8) (changed bool,
 	if s.src.Options() == options {
 		return false, nil
 	}
+	if err := s.veto.Check(ctx, AttrOptions, options); err != nil {
+		return false, err
+	}
 	if err := s.src.SetOptions(ctx, options); err != nil {
 		return false, fmt.Errorf("levelcontrol: Options write: %w", err)
 	}
@@ -831,6 +843,13 @@ func (s *Server) writeOnLevel(ctx context.Context, level *uint8) (changed bool, 
 	// nothing, as for Options above.
 	if held, known := s.src.OnLevel(); known == (level != nil) && (!known || held == *level) {
 		return false, nil
+	}
+	var vetoed any // the stored form: a uint8, nil for null
+	if level != nil {
+		vetoed = *level
+	}
+	if err := s.veto.Check(ctx, AttrOnLevel, vetoed); err != nil {
+		return false, err
 	}
 	if err := s.src.SetOnLevel(ctx, level); err != nil {
 		return false, fmt.Errorf("levelcontrol: OnLevel write: %w", err)
@@ -854,18 +873,11 @@ func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWrite
 // The DataVersion advances only after a command that succeeded and moved
 // CurrentLevel ([Server.finish]).
 //
-// A command the host replaced through [Server.Handle] ends the current
-// scene when its handler succeeds: matter.js invalidates in the command
-// method before it calls the logic a host overrides
-// (packages/node/src/behaviors/level-control/LevelControlServer.ts:276-277,
-// :293-294, :359-360, :373-374, :426-427, :442-443, :487-488, :498 at
-// db021da0), and the handler applies its own gate, as a host's port does
-// ([Server.handOffExecutes]).
+// A command the host replaced through [Server.Handle] is the host's
+// handler alone ([spec.CommandRegistrar]): the server runs no gate, no
+// transition and no scene invalidation for it.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
-		if err == nil {
-			s.invalidateScenes()
-		}
 		return resp, err
 	}
 	switch cmdID {

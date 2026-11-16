@@ -94,6 +94,14 @@ func New(opts Options) (*Camera, error) {
 				SupportedStreamUsages: &usages, StreamUsagePriorities: &usages, AllocatedVideoStreams: &streams,
 				RateDistortionTradeOffPoints: &points, VideoSensorParams: &sensor, MinViewportResolution: &minView, SnapshotCapabilities: &snapshots,
 				MaxConcurrentEncoders: &encoders, MaxEncodedPixelRate: &pixelRate, MaxNetworkBandwidth: &bandwidth,
+				// The microphone and the viewport device.New requires
+				// (decision 17), matter.js's corpus values
+				// (StandardDeviceTypeCorpusTest.ts:132-137, :166 at db021da0).
+				MicrophoneCapabilities: &csdef.AudioCapabilitiesStruct{
+					MaxNumberOfChannels: 1, SupportedCodecs: []csdef.AudioCodecEnum{csdef.AudioCodecOpus},
+					SupportedSampleRates: []uint32{48000}, SupportedBitDepths: []uint8{16},
+				},
+				Viewport: &csdef.ViewportStruct{X1: 0, Y1: 0, X2: 1920, Y2: 1080},
 			},
 			VideoStreamPort: port, AudioStreamPort: port, SnapshotStreamPort: port, SnapshotCapturePort: port,
 		},

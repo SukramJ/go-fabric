@@ -38,7 +38,7 @@ func TestInvokeBatch(t *testing.T) {
 			site := fabrictest.NewSite(t, fabrictest.Options{})
 			pair := site.UncommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
 				Bridged:   eps,
-				Configure: func(cfg *node.Config) { cfg.MaxPathsPerInvoke = maxPaths },
+				Configure: func(cfg *node.Config) { cfg.Limits.MaxPathsPerInvoke = maxPaths },
 			}})
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()

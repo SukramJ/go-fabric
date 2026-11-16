@@ -25,8 +25,31 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
+
+// answerOngoingReport answers the ongoing report of sessionID that waits
+// for the peer's StatusResponse with status, as an inbound StatusResponse
+// does (absorbStatusResponse → signalStatusResponseRX).
+func answerOngoingReport(t *testing.T, b *Bridge, sessionID uint16, status im.StatusCode) {
+	t.Helper()
+	var key mrp.ExchangeKey
+	waitFor(t, "a report waiting for its StatusResponse", func() bool {
+		found := false
+		b.routing.statusResponseWaits.Range(func(k, _ any) bool {
+			ek, ok := k.(mrp.ExchangeKey)
+			if ok && ek.SessionID == sessionID && ek.Initiator {
+				key, found = ek, true
+			}
+			return !found
+		})
+		return found
+	})
+	if !b.signalStatusResponseRX(key.SessionID, key.ExchangeID, true, status) {
+		t.Fatal("the StatusResponse found no waiting report")
+	}
+}
 
 // readReportData reads the bridge's next ReportData from the peer socket
 // within wait and decodes it; ok is false when none arrives.
@@ -118,11 +141,20 @@ func TestEventAndAttributeChangeDueTogetherAreOneReportData(t *testing.T) {
 		t.Fatalf("a report inside MinIntervalFloor: %d attribute and %d event reports; a critical event does not pass the floor", len(got.Reports), len(got.EventReports))
 	}
 
-	m.Tick(context.Background(), t0.Add(time.Second))
+	// The report's reporter holds the tick until the peer's
+	// StatusResponse settles it ([Bridge.deliverOngoingReport]): the
+	// test answers it once it has read the report.
+	ticked := make(chan struct{})
+	go func() {
+		defer close(ticked)
+		m.Tick(context.Background(), t0.Add(time.Second))
+	}()
 	got, ok := readReportData(t, peerConn, peerSess, 5*time.Second)
 	if !ok {
 		t.Fatal("no report when the floor ended")
 	}
+	answerOngoingReport(t, b, sessionID, im.StatusSuccess)
+	<-ticked
 	if !got.HasSubscription || got.SubscriptionID != sub.ID {
 		t.Fatalf("report of subscription %d (present %v), want %d", got.SubscriptionID, got.HasSubscription, sub.ID)
 	}

@@ -42,6 +42,21 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Removed in the next release: `Bridge.ConnectPeer` and `Bridge.ConnectOtaProvider`
+
+A node reaches the peers its device-side servers talk to — the OTA
+requestor's provider, the camera's WebRTC requestor — over its own peer
+path ([ADR 0032](../adr/0032-the-device-sides-peer-path.md)): a live session
+of either of its stacks that carries the command (TCP for a Large Message
+command), else one its client stack establishes. The node wires it; a host
+calls nothing.
+
+| Symbol | Route |
+| --- | --- |
+| `Bridge.ConnectPeer(ctx, fabricIndex, nodeID)` | inside a node: nothing, the node attaches its peer path to every `camera.Provider`; a live session without a handshake: `Bridge.LivePeerSession(fabricIndex, nodeID, bridge.PeerSessionRequirement{LargeMessage: …})` |
+| `Bridge.ConnectOtaProvider(ctx, fabricIndex, nodeID)` | inside a node: nothing, the OTA requestor uses the peer path; a bridge run without a node attaches its own `core.OtaProviderConnector` |
+| a camera signal over UDP | refused before sending with `camera.ErrNoLargeMessageTransport`: give the node the TCP client role (`Network.TCP.Outgoing`) |
+
 ## Removed in the next release: `fabrictest.UseWiFiCommissioning`
 
 Wi-Fi commissioning is part of the facade since milestone 7 (wave 28b):
@@ -277,6 +292,108 @@ stops importing `client/interaction`, `im` and `tlv` this way:
 One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
+
+## Changed after v0.22.2: the facade review (wave A2)
+
+New fields and ports replace older ones; every older one keeps its
+behaviour until it is removed in the next minor release. The behaviour
+changes are the rows marked *changed*.
+
+| Before | Now |
+| --- | --- |
+| an uncommissioned node always opens its own window | `Commissioning.WindowOnDemand`: the node opens none by itself; the host calls `Node.OpenOwnWindow` (a User-Intent product). `Commissioning.Flow` (`node.FlowStandard`, `FlowUserIntent`, `FlowCustom`) states the flow in the QR code and selects the long manual code |
+| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` (16 bits) | `Hints` (`mdns.PairingHints`, every bit of the bitmap); both set is `mdns.ErrInvalidService`, and so is a bit above 22. A commissioner built on connectedhomeip reads a hint with any of bits 16 to 22 set as no hint at all. On the facade: `Commissioning.PairingHints`, `Commissioning.PairingInstruction` |
+| *changed:* `Node.OpenOwnWindow`, `OpenBasicWindow`, `CloseWindow` before `Start` | return `node.ErrNotStarted` and open nothing; call them after `Start` |
+| *changed:* `Config.Advertiser` beside a `Network.MDNS` with `Off`, `HostName` or `Interfaces` | `Config.Validate` refuses the pair: `Network.MDNS` configures the node's own advertiser only — leave it zero beside a host advertiser |
+| *changed:* an advertised device name (`ProductDescription.Name`, else `BasicInformation.NodeLabel`) over 32 bytes | `Config.Validate` refuses it (decision 26); shorten it |
+| `Config.SupportedFabrics`, `Config.MaxPathsPerInvoke` | `Config.Limits.SupportedFabrics`, `Config.Limits.MaxPathsPerInvoke`; both set and different is `ErrInvalidConfig` |
+| `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` | none on the node (no node method returns them); `bridge.CommissioningWindowOpener` returns the `bridge` values |
+| `store.ErrScrubIncomplete`, `store.ErrFabricNotFound`, `dcl.ErrOTAImageTooLarge`, `dcl.DefaultMaxImageSize` compared from a node host | `node.ErrScrubIncomplete`, `node.ErrFabricNotFound`, `node.ErrOTAImageTooLarge`, `node.DCLDefaultMaxImageSize` (the same values) |
+| a host's `SetOnFabricRemoved`, `SetOnFabricUpdated`, `SetOnCommissioningComplete` or the window's `SetTransitionHook` replaced the facade's handler | *changed:* it adds a handler that runs after the facade's |
+| *changed:* a server built with `spec.NewServer` and an optional command in `Options.Commands` without a handler | `NewServer` refuses it (`spec.ErrMissingHandler`): pass the handler in `ServerConfig.Handlers`, or set `Unimplemented` to register it later with `Handle` |
+| *changed:* a `Declare{Commands: […]}` on a cluster the device serves with its generated default server, without the command's `Handle<Command>` field | `device.New` refuses it (`ErrConfiguration`); set the handler — on a kit server, the declared port carries it |
+| `bridge.Bridge.AttachRootPartsListProvider`, `AttachAggregatorPartsListProvider` | not needed: `Bridge.Start` installs the live PartsList of both itself; the two stay as overrides |
+| `bridge.Bridge.AttachPaseHandler`, `AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` with a provider that returns the one handler for every handshake |
+| `bridge.Bridge.SubscriptionPersistenceEnabled`, `FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence(b)` in a test |
+| `bridge.Bridge.ControllerRTT` | none |
+| `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE` | `contract.GATTPeripheral` (`RegisterService` returns a `contract.GATTService`, whose `Serve` takes the centrals), `node.Network.GATT`, `bridge.Config.GATT`: a refused registration is `StartBLE`'s error and nothing is advertised; both set is refused |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeExpired(func(ctx, fabricIndex))` | `SetOnFailSafeExpiry(func(ctx, core.FailSafeExpiry))`: `ArmedFabric`, `AddedFabric`, `OverPASE` |
+| `GeneralCommissioning.SetOnFailSafeRolledBack(func(ctx))` | `SetFailSafeSessionCloser(func(ctx) (closed []uint16))`, which names the PASE sessions it closed |
+| `GeneralCommissioning.ArmOnPaseEstablished(ctx)` | `ArmOnPaseSession(ctx, sessionID)`: refused only when a rollback closed that session |
+| `device.NewRootNode` | none: the root endpoint is the node's (`Node.Root`); `device.RootNodeType` stays for `device.Lookup` |
+| *changed:* the `*device.Type` of `<Name>Type()`, `device.Lookup`, `device.Types`, `Device.Type` was the registry's own value | each is a copy, and `device.New` copies the `Type` it is given: compare types by `ID`, not by pointer |
+| a composite (FloodlightCamera, VideoDoorbell) or a composed device only in code | `device.Spec.Parts`: `FromSpec` builds the parts; a composite missing a mandatory component is refused with the constructor's `ErrComposition` |
+| *breaking:* a device whose kit server lists an attribute without a value — 21 types built bare: AirPurifier, AirQualitySensor, BasicVideoPlayer, Camera, CastingVideoPlayer, Chime, ContentApp, Dishwasher, EnergyEvse, ExtractorHood, Fan, Intercom, JointFabricAdministrator, LaundryDryer, LaundryWasher, ModeSelect, NetworkInfrastructureManager, RoboticVacuumCleaner, SoilSensor, ThreadBorderRouter, WaterHeater; the composites FloodlightCamera and VideoDoorbell through their Camera; and with a feature selection AudioDoorbell, Closure, ClosurePanel, DeviceEnergyManagement, ElectricalMeter, ElectricalSensor, MicrowaveOven, Pump, SecondaryNetworkInterface, PowerSource (Rechargeable, Replaceable) | `device.New` refuses it with `ErrConfiguration` naming the cluster, the attribute and the `<cluster>def.Declare{Initial: <cluster>def.Patch{<Field>: …}}` that states it, as matter.js refuses the server at initialisation (decision 17; the decision named 19 types — the measured set is larger). `(*device.Type).RequiredInitial()` lists them before a build |
+| `ThermostatServer.SetLocalTemperature` for a sensor's reading | `SetMeasuredTemperature`, which applies `LocalTemperatureCalibration`; `SetLocalTemperature` stays the uncalibrated setter |
+| `im.FabricFilterFromContext` / `im.LookupFabricFilter` in a host's server | `contract.AccessingFabric(ctx)` |
+| a host switch source's `WireMatterSwitchHandler` / `WireMatterSwitchPositions` matched by name | `contract.SwitchGestureSource`, `contract.SwitchPositionSource` |
+| a host Wi-Fi driver | may implement `contract.WiFiLinkWatcher` (link changes) and `contract.WiFiDisconnector` (leave the network at the fail-safe's expiry) |
+
+## Changed after v0.22.2: the store port and the endpoint state
+
+The persistence port grows by six methods (review II, decision 107), which
+a host's own backend adds; `store.Store` and `store/memstore` implement
+them and `store/storetest` holds each. A host that only uses those two
+changes nothing in its code; one that carries the schema in its own
+migrations applies step `v9`.
+
+| Before | Now |
+| --- | --- |
+| a host's own `store.Port` implementation | adds `Settings.DeleteSettings(ctx, keys...)` and `Settings.DeleteSettingsWithPrefix(ctx, prefix)` (atomic; a prefix ends in `.`), `GroupKeys.ReplaceGroupKeyMappings(ctx, fabricIndex, mappings)` (atomic, as `ReplaceACL`), `Fabrics.UpdateFabricVendorVerification(ctx, fabricIndex, store.FabricVendorUpdate)` (the vendor id and the VID data in one write), `Fabrics.OwedFabricEvents(ctx)` and `Fabrics.AckOwedFabricEvent(ctx, id)`; its `RollbackFabric` records the owed event (`store.OwedFabricEvent`) and, for a pending update, deletes the fabric's resumption records in the same write; its `RemoveFabric` keeps the owed events (they are not the fabric's rows: do not cascade them); `ResumptionRecord.SessionParameters` round-trips |
+| a host's own `cluster/core.StoreFacade` / `GroupStoreFacade` | adds `UpdateFabricVendorVerification`, `OwedFabricEvents`, `AckOwedFabricEvent` / `ReplaceGroupKeyMappings` |
+| a host that carries the schema in its own migrations | applies `store/migrations/v9.up.sql` (`matter_owed_fabric_events`, the resumption record's session-parameter columns) |
+| `(*store.Store).DeleteSetting(ctx, key)` | `DeleteSettings(ctx, key)` |
+| `OnFabricRemoved` / `OnFabricUpdated` heard once per rollback | heard at least once: a rollback's hook a crash interrupted runs again at the next `Start`, so a host may hear it twice |
+| `endpoint.Config{OnNodeLabelWritten: f, Scenes: s}` | `endpoint.Config{Persistence: p}` with an `endpoint.Persistence` (`SaveNodeLabel`, `LoadScenes`, `SaveScenes`, each with ctx and error): a refused save answers the controller FAILURE |
+| `node.Config.EndpointPersistence`, `node.NewEndpointPersistence(st, logger)` | `node.Config.EndpointState`, `node.NewEndpointState(st, logger)`; a host's own state implements `node.EndpointState` (`endpoint.Persistence` and `LoadNodeLabel`) |
+| `Node.Persistence()` | `Node.EndpointState()`: the host's `EndpointState` or the facade's own, as `endpoint.Config.Persistence` for a host's own assembler |
+| a store upgraded from a release before schema v8 that went down inside a fail-safe window | the removal of that window's AddNOC is owed in memory only: `OnFabricRemoved` reaches the host only if the first process on the upgraded store starts |
+| a host that carries the schema in its own migrations | applies `store/migrations/v10.up.sql` (the seal marks, the DoorLock records' source); a DoorLock record stored before v10 counts as made through Matter |
+| a host's own `store.Port` implementation | round-trips `DoorLockUser` / `DoorLockCredential` `CreatedThroughMatter` and `ModifiedThroughMatter` (storetest door-locks) and refuses the key lengths storetest `key-lengths` names |
+| `store.New(db)` with the keys in clear | optionally `store.Apply`, then `store.NewSealed(ctx, db, sealer)` and `node.Store{DB: db, Credentials: sealed}`; every store of the database then needs the sealer |
+| a host or test that stores an IPK or epoch key of another length, or an empty private key | stores 16-byte keys and a private key: the store refuses another length on write and on read |
+| `dcl.OTAVersions.Download` with an `http:` URL or a URL of the host's own | `dcl.OTAVersions.DownloadHostURL` |
+| a lab whose ledger names hosts on the local network | sets `dcl.Client.AllowPrivateDestinations` on that ledger's client (the TestClient for the test net), or passes its own `HTTPClient` |
+| prod and test OTA images stored before the upgrade | not served until a ledger update that carries the checksum re-binds them (no new download), or until `softwareupdate.ImagesConfig.AllowUnverifiedLedgerImages` is set; storing them again with `Images.Store` makes them host-supplied. A test ledger whose records carry no checksum needs the option too |
+
+## Changed after v0.22.2: the generated server's write hooks and events
+
+| Before | Now |
+| --- | --- |
+| a server's own write rule in `spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule`: it runs on every write, before the comparison with the held value, and no `SetBeforeWrite` / `OnWrite` replaces it |
+| a host veto in `spec.ServerConfig.BeforeWrite` at construction | `srv.SetBeforeWrite(fn)` (the typed `OnWrite`) after construction |
+| a host veto (`OnWrite`, `SetBeforeWrite`) that heard a write of the held value | not called for it: the veto runs behind the comparison, a write of the held value changes nothing |
+| `srv.Notify(ids…)`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` on a `*spec.Server` | `srv.Set(id, v)` for a value the server holds; `srv.MarkChanged(ids…)` for one the host's `Source` answers, `srv.MarkQuietChanged(id)` for a quieter one |
+| `srv.Emit(endpoint, eventID, data)`, `spec.EmitOn(srv, endpoint, …)` | `srv.EmitEvent(eventID, data)`; the bridge tells the server its endpoint (`contract.EndpointReceiver`), `spec.ErrNotMounted` before it does |
+| `<cluster>def.Server.Emit<Event>(endpoint, data)` | `Record<Event>(data)` |
+| a host's `endpointOf` lookup before every emit | none: an event of a server that left the topology reaches no event log (the bridge withdraws its emitter) |
+| `cluster/wire.ScenesManagement{}` | `core.NewScenesManagement(core.ScenesConfig{…})` |
+| `cluster/wire.NewSchedulesServer(src)` and its types | the Thermostat server's schedules ([thermostat](thermostat.md)) |
+| `<cluster>def.Declare{Features: 0}` to select no feature (it kept the device type's default) | `Declare{NoFeatures: true}`; beside a non-zero `Features` it is `device.ErrConfiguration` |
+| a host handler (`Handle`, typed `Handle<Command>`) on LevelControl after which the server ended the current scene | the handler is the whole command: the server ends no scene for it, runs no gate and no transition; a scene recall reaches the server's logic, never the handler |
+
+## Changed after v0.22.2: the write verdict
+
+A write's verdict — which attributes it changed — travels in its result,
+not in the context.
+
+| Before | Now |
+| --- | --- |
+| `endpoint.WithWriteChanges(ctx, changes)` around `im.HandleWriteRequest`, then `changes.Unchanged(path)`, `Changed`, `ChangedAttributes()` | `out := im.HandleWrite(ctx, d, req)`; `out.Response` is the WriteResponse, each of `out.Results` carries `Commit` (`im.WriteCommit`): the ids of the attributes the write changed, empty for none, nil when the dispatcher gave no verdict |
+| a server whose write moves another attribute answering `MatterWriteChanged` true for the cluster (the written attribute is reported too) | implement `contract.ChangeNamingWriter` (`MatterWriteCommit`) and name the attributes that changed; only those are reported. `spec.Server` names its own |
+
+## Changed after v0.22.2: fabric-scoped reads
+
+The dispatcher scopes every fabric-scoped attribute of the model on a
+request, whatever the server returns ([ports](ports.md)).
+
+| Before | Now |
+| --- | --- |
+| a server that withheld another fabric's fabric-sensitive fields itself (a `Redacted` entry, a field left nil, an entry reduced to its `FabricIndex`) | returns every fabric's entries whole from `MatterRead` and an unfiltered `MatterReadFiltered`, the reading fabric's alone from a filtered one; the `Redacted` fields of `cluster/core` are deprecated and still honoured by the bridge's writer |
+| a list-append write of a fabric-scoped list handed the server's whole list with the new element | handed the writing fabric's entries with the new element: the dispatcher keeps an entry that encodes itself (`EncodeTLV`) by its `FabricIndex`; an entry that does not is taken from the server's filtered `MatterReadFiltered`, and without a `contract.FabricScopedReader` the append answers `FAILURE` |
+| a server of a vendor cluster with a fabric-scoped list | declares the scope with `contract.FabricScopeDeclarer`; a server built on a `spec.Instance` declares its definition's |
+| an entry of a fabric-scoped list without a `FabricIndex`, or with one outside 1 to 254 | the request is answered `FAILURE` for the attribute's path: give every entry its owning fabric |
+| fabric-sensitive events gated per cluster | gated per event from the generated table (`schema.EventReadScope`), with the event's own read privilege |
 
 ## Changed after v0.18.0: the exchange receive notifier
 

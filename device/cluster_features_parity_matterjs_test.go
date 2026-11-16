@@ -7,10 +7,12 @@
 // selection leaves out, and that a selection breaking the FeatureMap
 // conformance is refused when the device is built. The with()/for()/
 // alter()/enable() cases (:47-119) are TypeScript's behavior-type algebra,
-// which the Go kit expresses as a declaration's Features; "enable only
-// features matter.js implements unconditionally" (:201-232) walks
-// matter.js's exported behavior classes and has no Go counterpart beyond
-// the cases below.
+// which the Go kit expresses as a declaration's Features. "Enable only
+// features matter.js implements unconditionally" (:201-232) is ported as
+// two tests: node's TestIntentionallyEnabledFeaturesParityMatterJS holds
+// the nine INTENTIONALLY_ENABLED rows (:27-37) against the default
+// servers, and the device package's TestBareDevicesServeTheDefaultSelection
+// holds every generated type built bare to its default selection.
 package device_test
 
 import (

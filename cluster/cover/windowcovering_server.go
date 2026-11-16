@@ -589,6 +589,14 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 	if mode&calibration != 0 {
 		return false, windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
 	}
+	// A write of the Mode in effect changes nothing and reaches no veto;
+	// the host's veto ([spec.WriteVeto.Check]) hears a change only.
+	s.mu.Lock()
+	held := s.wcMode == mode
+	s.mu.Unlock()
+	if held {
+		return false, nil
+	}
 	if err := s.veto.Check(ctx, attrID, uint8(n)); err != nil { //nolint:gosec // ≤ 15 per ValidateWrite
 		return false, err
 	}

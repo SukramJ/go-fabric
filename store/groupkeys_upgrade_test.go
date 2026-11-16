@@ -5,6 +5,7 @@ package store_test
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -126,9 +127,7 @@ CREATE TABLE matter_group_keys (
 	}
 	s := store.New(db)
 	insertLegacyFabric(t, db, 1, 1)
-	if err := s.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: 1, GroupKeySetID: 5, EpochKey0: epochKey(5), EpochStart0: 1}); err != nil {
-		t.Fatal(err)
-	}
+	insertLegacyKeySet(t, db, 1, 5)
 	if err := s.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: 1, GroupID: 0x0101, GroupKeySetID: 5}); err != nil {
 		t.Fatal(err)
 	}
@@ -221,5 +220,17 @@ func TestRemoveGroupKeys_StatementFailure(t *testing.T) {
 	closed := closedStore(t)
 	if err := closed.RemoveGroupKeysByFabric(ctx, 1); err == nil {
 		t.Error("RemoveGroupKeysByFabric on a closed database: want error")
+	}
+}
+
+// insertLegacyKeySet writes a key set (epoch key 0 epochKey(id), start 1)
+// with the columns every schema step has: the release's Store names v10's
+// seal mark, which a database before v10 lacks.
+func insertLegacyKeySet(t *testing.T, db *sql.DB, fabricIndex uint8, id uint16) {
+	t.Helper()
+	if _, err := db.ExecContext(t.Context(), `
+INSERT INTO matter_group_keys (fabric_index, group_key_set_id, security_policy, epoch_key_0, epoch_start_0)
+VALUES (?, ?, 0, ?, 1)`, fabricIndex, id, epochKey(byte(id))); err != nil {
+		t.Fatalf("insert legacy key set %d: %v", id, err)
 	}
 }

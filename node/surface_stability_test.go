@@ -340,7 +340,9 @@ func TestSurfaceWithheldIsAFirstAssembly(t *testing.T) {
 	db := openDB(t, filepath.Join(t.TempDir(), "withheld.db"))
 	closure := func(p *surface.Policies, label string) node.Endpoint {
 		d, err := device.NewClosure(device.Options{StableKey: endpoint.StringKey("closure"), Name: label, Surface: *cmp.Or(p, &surface.Policies{})},
-			closurecontroldef.Declare{Features: closurecontroldef.FeaturePositioning})
+			// MainState is required (decision 17): test input, no
+			// reference value.
+			closurecontroldef.Declare{Features: closurecontroldef.FeaturePositioning, Initial: closurecontroldef.Patch{MainState: new(closurecontroldef.MainStateStopped)}})
 		if d == nil {
 			t.Fatalf("closure: %v", err)
 		}

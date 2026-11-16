@@ -102,25 +102,47 @@ type SceneInfoStruct struct {
 	SceneValid        bool
 	RemainingCapacity uint8
 	FabricIndex       uint8
-	// Redacted marks another fabric's entry on a non-fabric-filtered
-	// read: CurrentScene, CurrentGroup and SceneValid are fabric-sensitive
-	// ("S", scenes-management.element.ts SceneInfoStruct) and are left
-	// out; SceneCount, RemainingCapacity and FabricIndex are served.
+	// Redacted, when set, makes the bridge's writer send the entry
+	// without CurrentScene, CurrentGroup and SceneValid.
+	//
+	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
+	// the model from the schema, whatever the server returns; no server of
+	// this module sets it any more. Return the entry whole. Removable in
+	// the next minor release.
 	Redacted bool
 }
 
 // ScenesState is an endpoint's scene table and scene info: the server is
-// rebuilt per dispatch, the state outlives it. Persist, when set, receives
-// the table after every change (the host stores it); LoadScenesState
-// restores one.
+// rebuilt per dispatch, the state outlives it. A state built over a store
+// ([NewPersistedScenesState]) loads the table from it and stores every
+// change with the change: a change a controller's scene command makes is
+// stored before it is served, and a refused store answers FAILURE with the
+// previous table kept (store/doc.go, the store-error rule); a change that
+// is the consequence of another — a group's or a fabric's removal, the
+// global scene OffWithEffect stores — is kept and stored again with the
+// next change. A table the store could not load stays unloaded: every
+// scene command answers FAILURE and nothing is stored until a load
+// succeeds, so a failed load never lets a save write over the stored
+// table. [NewScenesState] and [LoadScenesState] build a state over a
+// Persist callback that cannot refuse.
 type ScenesState struct {
-	// mu guards info, monitor and table.
+	// mu guards info, monitor, table, loaded, dirty and pending.
 	mu        sync.Mutex
 	table     []SceneEntry
 	info      map[uint8]*SceneInfoStruct
 	monitor   uint8 // fabric whose current scene is valid, 0 for none
 	tableSize uint16
-	persist   func([]byte)
+	// load reads the stored table, nil for a state built loaded; save
+	// stores one, nil for none.
+	load func(context.Context) ([]byte, error)
+	save func(context.Context, []byte) error
+	// loaded reports that the table is the stored one; dirty that a
+	// consequence's store was refused and the next save owes it; pending
+	// are the consequences that reached an unloaded table, applied after
+	// its load.
+	loaded  bool
+	dirty   bool
+	pending []func()
 	// changes carries FabricSceneInfo change reports: matter.js keeps
 	// fabricSceneInfo as behavior state, so every change to a count, the
 	// current scene or its validity reaches subscribers.
@@ -172,7 +194,14 @@ func (st *ScenesState) reportIfChanged(before string) {
 
 // NewScenesState returns an empty state; persist may be nil.
 func NewScenesState(persist func([]byte)) *ScenesState {
-	return &ScenesState{info: map[uint8]*SceneInfoStruct{}, tableSize: scenesDefaultTableSize, persist: persist}
+	st := &ScenesState{info: map[uint8]*SceneInfoStruct{}, tableSize: scenesDefaultTableSize, loaded: true}
+	if persist != nil {
+		st.save = func(_ context.Context, data []byte) error {
+			persist(data)
+			return nil
+		}
+	}
+	return st
 }
 
 // LoadScenesState restores a state from data a Persist callback received.
@@ -185,6 +214,57 @@ func LoadScenesState(data []byte, persist func([]byte)) (*ScenesState, error) {
 		return s, fmt.Errorf("core: ScenesManagement: restore scene table: %w", err)
 	}
 	return s, nil
+}
+
+// NewPersistedScenesState returns a state over a store: load reads the
+// stored table (nil for none) and save stores one, each returning the
+// store's error. The table is loaded before the first scene command,
+// read or change needs it; one the store refuses to load is loaded again
+// before the next, and until a load succeeds the state is unloaded (see
+// [ScenesState]). A stored table that does not decode loads as empty, and
+// the next change replaces it.
+func NewPersistedScenesState(load func(context.Context) ([]byte, error), save func(context.Context, []byte) error) *ScenesState {
+	return &ScenesState{info: map[uint8]*SceneInfoStruct{}, tableSize: scenesDefaultTableSize, load: load, save: save}
+}
+
+// ensureLoaded loads the stored table when the state is not loaded and
+// reports whether it is loaded. The consequences that reached the
+// unloaded table are applied to the loaded one and stored. Caller holds
+// mu.
+func (st *ScenesState) ensureLoaded(ctx context.Context) bool {
+	if st.loaded {
+		return true
+	}
+	if st.load == nil {
+		st.loaded = true
+		return true
+	}
+	data, err := st.load(context.WithoutCancel(ctx))
+	if err != nil {
+		return false
+	}
+	st.table = nil
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &st.table); err != nil {
+			st.table = nil
+		}
+	}
+	st.loaded = true
+	if len(st.pending) > 0 {
+		for _, apply := range st.pending {
+			apply()
+		}
+		st.pending = nil
+		st.store(ctx, false)
+	}
+	return true
+}
+
+// ready loads the table when it is not loaded and reports whether it is.
+func (st *ScenesState) ready(ctx context.Context) bool {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return st.ensureLoaded(ctx)
 }
 
 // fabricCapacity is matter.js #fabricSceneCapacity.
@@ -234,28 +314,85 @@ func (st *ScenesState) remainingCapacity(count int) int {
 	return max(min(st.fabricCapacity()-count, int(st.tableSize)-len(st.table)), 0)
 }
 
-func (st *ScenesState) save() {
-	if st.persist == nil {
-		return
+// store stores the table and reports whether the store took it. A refused
+// store marks the table owed (dirty) when keep is false — a consequence's
+// change, kept and stored again with the next — and leaves the caller to
+// restore the previous table when keep is true. Caller holds mu.
+func (st *ScenesState) store(ctx context.Context, keep bool) bool {
+	if st.save == nil {
+		return true
 	}
-	if data, err := json.Marshal(st.table); err == nil {
-		st.persist(data)
+	data, err := json.Marshal(st.table)
+	if err == nil {
+		err = st.save(context.WithoutCancel(ctx), data)
 	}
+	switch {
+	case err == nil:
+		st.dirty = false
+		return true
+	case !keep:
+		st.dirty = true
+	}
+	return false
 }
 
-// addOrReplace is matter.js #addOrReplaceSceneEntry. Caller holds mu.
-func (st *ScenesState) addOrReplace(e SceneEntry, existing int) im.StatusCode {
-	if existing == -1 {
-		if st.remainingCapacity(st.countFor(e.FabricIndex)) == 0 {
-			return im.StatusResourceExhausted
+// change applies mutate to the loaded table and stores it when mutate
+// reports a change (or a refused store is owed). A command's
+// change (command true) the store refuses is undone: the previous table
+// comes back, with fabric's scene info and the fabric whose current scene
+// is monitored as they were — a removal that invalidated the current
+// scene leaves it valid — and the change answers FAILURE. A consequence's change
+// (command false) is kept when the store refuses it, and reaches an
+// unloaded table as a pending change. Caller holds mu.
+func (st *ScenesState) change(ctx context.Context, command bool, fabric uint8, mutate func() (im.StatusCode, bool)) im.StatusCode {
+	if !st.ensureLoaded(ctx) {
+		if command {
+			return im.StatusFailure
 		}
-		st.table = append(st.table, e)
-	} else {
-		st.table[existing] = e
+		st.pending = append(st.pending, func() { mutate() })
+		return im.StatusSuccess
 	}
-	st.infoFor(e.FabricIndex)
-	st.save()
+	prev := slices.Clone(st.table)
+	prevMonitor := st.monitor
+	prevInfo, hadInfo := SceneInfoStruct{}, false
+	if inf := st.info[fabric]; inf != nil {
+		prevInfo, hadInfo = *inf, true
+	}
+	status, changed := mutate()
+	if status != im.StatusSuccess || !changed && !st.dirty {
+		return status
+	}
+	if !st.store(ctx, command) && command {
+		st.table, st.monitor = prev, prevMonitor
+		// The fabric's entry as it was: restored and its counts
+		// recomputed, or — one the refused command created — gone
+		// (infoFor would create it again, so it is not called then).
+		if hadInfo {
+			*st.info[fabric] = prevInfo
+			st.infoFor(fabric)
+		} else {
+			delete(st.info, fabric)
+		}
+		return im.StatusFailure
+	}
 	return im.StatusSuccess
+}
+
+// addOrReplace is matter.js #addOrReplaceSceneEntry, stored with the
+// change ([ScenesState.change]). Caller holds mu.
+func (st *ScenesState) addOrReplace(ctx context.Context, command bool, e SceneEntry, existing int) im.StatusCode {
+	return st.change(ctx, command, e.FabricIndex, func() (im.StatusCode, bool) {
+		if existing == -1 {
+			if st.remainingCapacity(st.countFor(e.FabricIndex)) == 0 {
+				return im.StatusResourceExhausted, false
+			}
+			st.table = append(st.table, e)
+		} else {
+			st.table[existing] = e
+		}
+		st.infoFor(e.FabricIndex)
+		return im.StatusSuccess, true
+	})
 }
 
 // activate is matter.js #activateSceneInFabricSceneInfo. Caller holds mu.
@@ -273,50 +410,72 @@ func (st *ScenesState) activate(fabric uint8, groupID uint16, sceneID uint8) {
 // RemoveScenesForGroup drops a fabric's scenes of one group — matter.js
 // removeScenesForGroupOnFabric, called by Groups.RemoveGroup — and
 // invalidates the current scene if it was one of them.
+// A refused store keeps the removal and stores it with the next change.
+// No request bounds the store work of this consequence.
 func (st *ScenesState) RemoveScenesForGroup(fabric uint8, groupID uint16) {
+	st.removeScenesForGroup(context.Background(), false, fabric, groupID)
+}
+
+// removeScenesForGroup is RemoveScenesForGroup; a command's removal
+// (RemoveAllScenes) the store refuses answers FAILURE with the scenes
+// kept.
+func (st *ScenesState) removeScenesForGroup(ctx context.Context, command bool, fabric uint8, groupID uint16) im.StatusCode {
 	defer st.reportIfChanged(st.snapshot())
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	before := len(st.table)
-	st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric && e.GroupID == groupID })
-	if st.monitor == fabric {
-		if inf := st.info[fabric]; inf != nil && inf.CurrentGroup == groupID && inf.SceneValid {
-			inf.SceneValid = false
-			st.monitor = 0
+	return st.change(ctx, command, fabric, func() (im.StatusCode, bool) {
+		before := len(st.table)
+		st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric && e.GroupID == groupID })
+		if st.monitor == fabric {
+			if inf := st.info[fabric]; inf != nil && inf.CurrentGroup == groupID && inf.SceneValid {
+				inf.SceneValid = false
+				st.monitor = 0
+			}
 		}
-	}
-	st.infoFor(fabric)
-	if len(st.table) != before {
-		st.save()
-	}
+		st.infoFor(fabric)
+		return im.StatusSuccess, len(st.table) != before
+	})
 }
 
 // RemoveScenesForFabric drops all of a fabric's scenes — matter.js
 // removeScenesForAllGroupsForFabric (Groups.RemoveAllGroups) and the fabric
 // removal cleanup.
+// A refused store keeps the removal and stores it with the next change;
+// on a table not loaded yet it is applied once the load succeeds. No
+// request bounds the store work of this consequence.
 func (st *ScenesState) RemoveScenesForFabric(fabric uint8) {
+	st.removeScenesForFabric(context.Background(), fabric)
+}
+
+// removeScenesForFabric is RemoveScenesForFabric with ctx for the store.
+func (st *ScenesState) removeScenesForFabric(ctx context.Context, fabric uint8) {
 	defer st.reportIfChanged(st.snapshot())
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	before := len(st.table)
-	st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric })
-	if st.monitor == fabric {
-		if inf := st.info[fabric]; inf != nil {
-			inf.SceneValid = false
+	st.change(ctx, false, fabric, func() (im.StatusCode, bool) {
+		before := len(st.table)
+		st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric })
+		if st.monitor == fabric {
+			if inf := st.info[fabric]; inf != nil {
+				inf.SceneValid = false
+			}
+			st.monitor = 0
 		}
-		st.monitor = 0
-	}
-	st.infoFor(fabric)
-	if len(st.table) != before {
-		st.save()
-	}
+		st.infoFor(fabric)
+		return im.StatusSuccess, len(st.table) != before
+	})
 }
 
 // ForgetFabric drops everything the table holds for a removed fabric: its
 // scenes ([ScenesState.RemoveScenesForFabric]) and its scene info entry,
 // so a later fabric with the same index starts without a current scene.
 func (st *ScenesState) ForgetFabric(fabric uint8) {
-	st.RemoveScenesForFabric(fabric)
+	st.forgetFabric(context.Background(), fabric)
+}
+
+// forgetFabric is ForgetFabric with ctx for the store.
+func (st *ScenesState) forgetFabric(ctx context.Context, fabric uint8) {
+	st.removeScenesForFabric(ctx, fabric)
 	st.mu.Lock()
 	delete(st.info, fabric)
 	st.mu.Unlock()
@@ -416,7 +575,7 @@ func (s *ScenesManagement) MakeAllFabricSceneInfoEntriesInvalid() {
 // scene-able values are stored as the fabric's global scene — a new entry
 // named "Global Scene" with transition time 0, or the existing entry with
 // its values replaced. The current scene does not change.
-func (s *ScenesManagement) StoreGlobalScene(_ context.Context, fabricIndex uint8) {
+func (s *ScenesManagement) StoreGlobalScene(ctx context.Context, fabricIndex uint8) {
 	st := s.cfg.State
 	defer st.reportIfChanged(st.snapshot())
 	values := s.captureValues()
@@ -432,8 +591,10 @@ func (s *ScenesManagement) StoreGlobalScene(_ context.Context, fabricIndex uint8
 		entry.Values = values
 	}
 	// matter.js ignores the status of #addOrReplaceSceneEntry here: a
-	// fabric at capacity stores no global scene.
-	_ = st.addOrReplace(entry, i)
+	// fabric at capacity stores no global scene. It is the consequence of
+	// OffWithEffect, which a refused store does not fail: the scene is
+	// kept and stored with the next change.
+	_ = st.addOrReplace(ctx, false, entry, i)
 }
 
 // RecallGlobalScene mirrors matter.js recallGlobalScene
@@ -471,10 +632,11 @@ func (s *ScenesManagement) OnAttributeChange(cb func(change contract.Change)) (u
 func (s *ScenesManagement) MatterClusterID() uint32 { return ScenesManagementClusterID }
 
 // MatterDropFabric implements [contract.FabricScopedState]: the endpoint's
-// table forgets the fabric ([ScenesState.ForgetFabric]); a persisted table
-// is saved through its Persist callback, which reports its own failure.
-func (s *ScenesManagement) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
-	s.cfg.State.ForgetFabric(fabricIndex)
+// table forgets the fabric ([ScenesState.ForgetFabric]); a removal the
+// store refuses is kept and stored with the next change, and one that
+// reaches a table not loaded yet is applied once it loads.
+func (s *ScenesManagement) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	s.cfg.State.forgetFabric(ctx, fabricIndex)
 	return nil
 }
 
@@ -490,18 +652,10 @@ func (s *ScenesManagement) MatterRead(attrID uint32) (any, bool) {
 
 // MatterReadFiltered implements [contract.FabricScopedReader]:
 // FabricSceneInfo is fabric-scoped ("R F V"). A fabric-filtered read lists
-// the accessing fabric's entry; an unfiltered one every fabric's, and an
-// entry of another fabric than the accessing one — every entry, for a
-// session without a fabric — is served Redacted, without CurrentScene,
-// CurrentGroup and SceneValid, the fields that are "S"
-// (packages/model/src/standard/elements/scenes-management.element.ts:179-186).
-// A read without a request sees every entry whole. Mirrors matter.js at
-// db021da0, where FabricSceneInfo is plain behaviour state: a
-// fabric-sensitive field of another owning fabric reads undefined
-// (packages/node/src/behavior/state/managed/values/StructManager.ts:110-113,
-// :306; packages/protocol/src/action/server/AccessControl.ts:342-356
-// mayRead) and the encoder leaves it out
-// (packages/types/src/tlv/TlvObject.ts:128-134).
+// the accessing fabric's entry; an unfiltered one every fabric's, each
+// whole — the dispatcher withholds the fabric-sensitive fields of another
+// fabric's entry from a request, as it scopes every fabric-scoped
+// attribute of the model.
 func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	st := s.cfg.State
 	switch attrID {
@@ -510,7 +664,21 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		defer st.mu.Unlock()
 		return st.tableSize, true
 	case scenesAttrFabricSceneInfo:
-		filtered, fabric, request := im.LookupFabricFilter(ctx)
+		// A table not loaded yet is loaded for the read; one the store
+		// still refuses fails the read and stays unloaded — answered
+		// FAILURE on a request ([contract.FabricScopedReader]'s (nil,
+		// false)), not SceneCount 0 with the whole capacity free, which
+		// the commands' FAILURE would contradict. Mirrors connectedhomeip
+		// src/app/clusters/scenes-server/ScenesManagementCluster.cpp:425-436
+		// at 6170af84 (the FabricSceneInfo encoder returns the scene
+		// table's GetRemainingCapacity error) and
+		// src/app/storage/FabricTableImpl.ipp:578-581, :596-597 (a storage
+		// error is returned; only NOT_FOUND reads as an empty fabric).
+		// matter.js models no unloaded table.
+		if !st.ready(ctx) {
+			return nil, false
+		}
+		filtered, fabric, _ := im.LookupFabricFilter(ctx)
 		// Every fabric of the node has an entry, created on read
 		// (infoFor), also one that never stored a scene. matter.js holds
 		// one for each fabric known when the server initialises and adds
@@ -535,11 +703,7 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 			if filtered && f != fabric {
 				continue
 			}
-			info := *st.infoFor(f)
-			if request && (f != fabric || fabric == 0) {
-				info = SceneInfoStruct{SceneCount: info.SceneCount, RemainingCapacity: info.RemainingCapacity, FabricIndex: info.FabricIndex, Redacted: true}
-			}
-			out = append(out, info)
+			out = append(out, *st.infoFor(f))
 		}
 		return out, true
 	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
@@ -699,6 +863,13 @@ func (s *ScenesManagement) MatterInvoke(ctx context.Context, cmdID uint32, field
 		return nil, err
 	}
 	defer s.cfg.State.reportIfChanged(s.cfg.State.snapshot())
+	// A table the store did not load answers every scene command with
+	// FAILURE until a load succeeds: a command on the empty table would
+	// answer NOT_FOUND for a stored scene, and its change would be stored
+	// over the stored table.
+	if !s.cfg.State.ready(ctx) {
+		return nil, scenesStatusError{im.StatusFailure, "the scene table is not loaded from the store"}
+	}
 	bad := func() (any, error) {
 		return nil, scenesStatusError{im.StatusInvalidCommand, fmt.Sprintf("command 0x%02X: unexpected fields %T", cmdID, fields)}
 	}
@@ -829,7 +1000,7 @@ func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSc
 	st := s.cfg.State
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	resp.Status = st.addOrReplace(SceneEntry{
+	resp.Status = st.addOrReplace(ctx, true, SceneEntry{
 		FabricIndex: fabric, GroupID: req.GroupID, SceneID: req.SceneID, Name: name,
 		TransitionTime: req.TransitionTime, Values: values,
 	}, st.indexOf(fabric, req.GroupID, req.SceneID))
@@ -873,21 +1044,21 @@ func (s *ScenesManagement) removeScene(ctx context.Context, fabric uint8, req Sc
 	st := s.cfg.State
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	i := st.indexOf(fabric, req.GroupID, req.SceneID)
-	if i == -1 {
-		resp.Status = im.StatusNotFound
-		return resp
-	}
-	st.table = slices.Delete(st.table, i, i+1)
-	if st.monitor == fabric {
-		if inf := st.info[fabric]; inf != nil && inf.CurrentGroup == req.GroupID && inf.CurrentScene == req.SceneID && inf.SceneValid {
-			inf.SceneValid = false
-			st.monitor = 0
+	resp.Status = st.change(ctx, true, fabric, func() (im.StatusCode, bool) {
+		i := st.indexOf(fabric, req.GroupID, req.SceneID)
+		if i == -1 {
+			return im.StatusNotFound, false
 		}
-	}
-	st.infoFor(fabric)
-	st.save()
-	resp.Status = im.StatusSuccess
+		st.table = slices.Delete(st.table, i, i+1)
+		if st.monitor == fabric {
+			if inf := st.info[fabric]; inf != nil && inf.CurrentGroup == req.GroupID && inf.CurrentScene == req.SceneID && inf.SceneValid {
+				inf.SceneValid = false
+				st.monitor = 0
+			}
+		}
+		st.infoFor(fabric)
+		return im.StatusSuccess, true
+	})
 	return resp
 }
 
@@ -895,8 +1066,7 @@ func (s *ScenesManagement) removeAllScenes(ctx context.Context, fabric uint8, gr
 	if !s.groupValid(ctx, fabric, groupID) {
 		return RemoveAllScenesResponse{Status: im.StatusInvalidCommand, GroupID: groupID}
 	}
-	s.cfg.State.RemoveScenesForGroup(fabric, groupID)
-	return RemoveAllScenesResponse{Status: im.StatusSuccess, GroupID: groupID}
+	return RemoveAllScenesResponse{Status: s.cfg.State.removeScenesForGroup(ctx, true, fabric, groupID), GroupID: groupID}
 }
 
 func (s *ScenesManagement) storeScene(ctx context.Context, fabric uint8, req SceneRef) SceneStatusResponse {
@@ -921,7 +1091,7 @@ func (s *ScenesManagement) storeScene(ctx context.Context, fabric uint8, req Sce
 		entry = st.table[i]
 		entry.Values = values
 	}
-	resp.Status = st.addOrReplace(entry, i)
+	resp.Status = st.addOrReplace(ctx, true, entry, i)
 	if resp.Status == im.StatusSuccess {
 		st.activate(fabric, req.GroupID, req.SceneID)
 	}
@@ -990,7 +1160,7 @@ func (s *ScenesManagement) copyScene(ctx context.Context, fabric uint8, req Copy
 		}
 		for _, e := range from {
 			e.GroupID = req.GroupTo
-			if status := st.addOrReplace(e, st.indexOf(fabric, req.GroupTo, e.SceneID)); status != im.StatusSuccess {
+			if status := st.addOrReplace(ctx, true, e, st.indexOf(fabric, req.GroupTo, e.SceneID)); status != im.StatusSuccess {
 				resp.Status = status
 				return resp
 			}
@@ -1009,6 +1179,6 @@ func (s *ScenesManagement) copyScene(ctx context.Context, fabric uint8, req Copy
 	}
 	e := st.table[i]
 	e.GroupID, e.SceneID = req.GroupTo, req.SceneTo
-	resp.Status = st.addOrReplace(e, st.indexOf(fabric, req.GroupTo, req.SceneTo))
+	resp.Status = st.addOrReplace(ctx, true, e, st.indexOf(fabric, req.GroupTo, req.SceneTo))
 	return resp
 }

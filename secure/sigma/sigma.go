@@ -322,7 +322,11 @@ func UnmarshalSigma1(b []byte) (Sigma1, error) {
 			copy(s.InitiatorRandom[:], val.octets)
 			hasRandom = true
 		case 2:
-			s.InitiatorSessionID = uint16(val.u & 0xFFFF)
+			id, err := sessionIDOf(val)
+			if err != nil {
+				return s, fmt.Errorf("%w: initiatorSessionId: %w", ErrSessionState, err)
+			}
+			s.InitiatorSessionID = id
 			hasSessionID = true
 		case 3:
 			if len(val.octets) != 32 {
@@ -339,13 +343,11 @@ func UnmarshalSigma1(b []byte) (Sigma1, error) {
 			// initiatorSessionParams container — the initiator's MRP
 			// tuning hints; retained so the responder's retransmission
 			// backoff can honour them (matter.js MRP.ts:129).
-			if val.container {
-				sp, err := parseSessionParameters(dec)
-				if err != nil {
-					return s, fmt.Errorf("%w: sessionParams (tag=5): %w", ErrSessionState, err)
-				}
-				s.InitiatorSessionParams = &sp
+			sp, err := sessionParamsOf(dec, val)
+			if err != nil {
+				return s, fmt.Errorf("%w: sessionParams (tag=5): %w", ErrSessionState, err)
 			}
+			s.InitiatorSessionParams = &sp
 		case 6:
 			// resumptionId — 16 bytes; present only on a resume attempt.
 			if len(val.octets) != 16 {
@@ -435,46 +437,12 @@ func peek(b []byte, n int) []byte {
 type SessionParameters = sessionparams.Parameters
 
 // parseSessionParameters reads a SessionParameters container the
-// decoder has just entered (Sigma1 initiatorSessionParams, tag 5).
-// Field tags mirror the encode side above; unknown tags are skipped
-// so future spec additions do not break the handshake.
+// decoder has just entered (Sigma1 initiatorSessionParams, Sigma2 and
+// Sigma2_Resume responderSessionParams) with the one decoder the PASE
+// messages use: decoded strictly, unknown tags skipped
+// ([sessionparams.DecodeFields]).
 func parseSessionParameters(dec *sigmaDecoder) (SessionParameters, error) {
-	var sp SessionParameters
-	for {
-		tag, val, end, err := dec.next()
-		if err != nil {
-			return sp, err
-		}
-		if end {
-			return sp, nil
-		}
-		if val.container {
-			if err := dec.skipContainer(); err != nil {
-				return sp, err
-			}
-			continue
-		}
-		switch tag {
-		case 1:
-			sp.SessionIdleInterval = uint32(val.u & 0xFFFFFFFF)
-		case 2:
-			sp.SessionActiveInterval = uint32(val.u & 0xFFFFFFFF)
-		case 3:
-			sp.SessionActiveThreshold = uint16(val.u & 0xFFFF)
-		case 4:
-			sp.DataModelRevision = uint16(val.u & 0xFFFF)
-		case 5:
-			sp.InteractionModelRevision = uint16(val.u & 0xFFFF)
-		case 6:
-			sp.SpecificationVersion = uint32(val.u & 0xFFFFFFFF)
-		case 7:
-			sp.MaxPathsPerInvoke = uint16(val.u & 0xFFFF)
-		case 8:
-			sp.SupportedTransports = uint16(val.u & 0xFFFF)
-		case 9:
-			sp.MaxTCPMessageSize = uint32(val.u & 0xFFFFFFFF)
-		}
-	}
+	return sessionparams.DecodeFields(dec.dec)
 }
 
 // encodeSessionParameters writes sp into `enc` as a context-tag-`outerTag`

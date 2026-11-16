@@ -29,7 +29,7 @@ func TestAwaitFlushedReport(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if bound := b.chunkStatusResponseTimeout(0); bound <= flushStatusResponseTimeout {
+		if bound := b.chunkStatusResponseTimeout(nil, 0); bound <= flushStatusResponseTimeout {
 			t.Fatalf("the chunk bound %v does not exceed the flush bound %v; the test cannot tell them apart", bound, flushStatusResponseTimeout)
 		}
 		wait := func(ctx context.Context, exch uint16) <-chan struct{} {

@@ -171,9 +171,9 @@ func adminNodeIDOf(ctx context.Context) *uint64 {
 // entries split to SubjectsPerAccessControlEntry and
 // TargetsPerAccessControlEntry, each with AuxiliaryType Groupcast. A
 // fabric-filtered read sees the accessing fabric's entries; an unfiltered
-// one every fabric's, with another fabric's entries — or all of them for a
-// session without a fabric — redacted to FabricIndex. local marks a read
-// without an IM request behind it, which sees everything. Mirrors matter.js
+// one every fabric's, whole — the dispatcher withholds another fabric's
+// fabric-sensitive fields from the request. local marks a read without an
+// IM request behind it, which sees everything. Mirrors matter.js
 // AccessControlServer #auxiliaryAclFor and the fabric-sensitive handling of
 // a fabric-scoped list.
 func (a *AccessControl) auxiliaryACLRead(ctx context.Context, filtered bool, fabricIndex uint8, local bool) (any, bool) {
@@ -201,7 +201,6 @@ func (a *AccessControl) auxiliaryACLRead(ctx context.Context, filtered bool, fab
 	maxSubjects, maxTargets := int(a.subjectsPerEntry()), int(a.targetsPerEntry())
 	out := []AccessControlAuxiliaryEntryStruct{}
 	for _, e := range entries {
-		redacted := !local && e.FabricIndex != fabricIndex
 		for _, subjects := range chunked(e.Subjects, maxSubjects) {
 			for _, targets := range chunked(e.Targets, maxTargets) {
 				chunk := e
@@ -209,7 +208,6 @@ func (a *AccessControl) auxiliaryACLRead(ctx context.Context, filtered bool, fab
 				out = append(out, AccessControlAuxiliaryEntryStruct{
 					Entry:         aclEntryStruct(chunk),
 					AuxiliaryType: AccessControlAuxiliaryTypeGroupcast,
-					Redacted:      redacted,
 				})
 			}
 		}

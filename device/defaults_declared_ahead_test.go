@@ -55,7 +55,7 @@ func TestDeclaredClosureAndValveAheadFeatures(t *testing.T) {
 			Initial: valvedef.Patch{LevelStep: &step, DefaultOpenLevel: new(uint8(100))},
 		}
 	}
-	if _, err := New(ClosureType(), testOptions("cc-off"), ccDecl()); !errors.Is(err, surface.ErrExtensionNotEnabled) {
+	if _, err := newWith(ClosureType(), testOptions("cc-off"), ccDecl()); !errors.Is(err, surface.ErrExtensionNotEnabled) {
 		t.Errorf("ClosureControl LT|SP|CL without the extension: %v, want ErrExtensionNotEnabled", err)
 	}
 	if _, err := New(WaterValveType(), testOptions("v-off"), vDecl()); !errors.Is(err, surface.ErrExtensionNotEnabled) {
@@ -66,7 +66,7 @@ func TestDeclaredClosureAndValveAheadFeatures(t *testing.T) {
 		o.Surface = surface.Policies{Extensions: surface.NewExtensions(append(closure.Ahead.IDs(), valve.Ahead.IDs()...)...)}
 		return o
 	}
-	cc, err := New(ClosureType(), on("cc"), ccDecl())
+	cc, err := newWith(ClosureType(), on("cc"), ccDecl())
 	if err != nil {
 		t.Fatal(err)
 	}

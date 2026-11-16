@@ -12,7 +12,8 @@ import (
 // The typed server ("the hull", concept v6 A.3 step 1): server_gen.go
 // beside each definition declares State, Patch and Server, a typed view of
 // any contract.ClusterServer of the cluster (brief BT and its addendum) that
-// adds no behavior, with Emit<Event> per event. The runtime half is
+// adds no behavior, with Record<Event> per event (and the deprecated
+// Emit<Event>, which takes the endpoint from its caller). The runtime half is
 // cluster/spec/typed.go and cluster/spec/wrapper.go.
 //
 // Server.Set takes a Patch: the fields set, the others left. Mirrors
@@ -31,10 +32,14 @@ import (
 // Server.OnChangedAsync queues the same call on the device's goroutine.
 //
 // Server.OnWrite installs a veto on a controller's write, called after the
-// definition's checks and before the store, an error refusing the write.
-// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1172-1195
+// definition's checks, the server's own rule and the comparison with the
+// held value, and before the store, an error refusing the write; a write
+// of the held value never reaches it.
+// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:1185-1222
 // (preCommit, which emits `$Changing` with the new and old value before a
-// change commits) and packages/general/src/transaction/Participant.ts:16-23
+// change commits; only for a returned change, :1209-1212, and a deep-equal
+// value is none, :1406-1408, at db021da0) and
+// packages/general/src/transaction/Participant.ts:16-23
 // (a preCommit failure rolls the transaction back). matter.js fires
 // `$Changing` for every change in the transaction; the hull vetoes the
 // controller's writes, spec.Server.MatterWrite — a host's own Set is the
@@ -232,19 +237,23 @@ func (g *generator) server() ([]byte, error) {
 	w.p("\treturn spec.OnChangedAsyncOf(s.Wrapper, fn)")
 	w.p("}")
 	w.p("")
-	w.p("// OnWrite installs fn as the veto of a controller's write")
+	w.p("// OnWrite installs fn as the host's veto of a controller's write")
 	w.p("// (spec.ServerConfig.BeforeWrite): next is the state with the written")
-	w.p("// value in place, attrID the attribute written. An error refuses the")
+	w.p("// value in place, attrID the attribute written. It runs behind the")
+	w.p("// server's own rules and its comparison with the held value, so a")
+	w.p("// write of the held value never reaches it. An error refuses the")
 	w.p("// write — with the IM status it carries, FAILURE otherwise — and nothing")
-	w.p("// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server")
-	w.p("// that takes none. Declare.OnWrite is the veto at construction; this")
-	w.p("// setter changes it at run time.")
+	w.p("// is stored. nil removes the veto, never the server's own rule;")
+	w.p("// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is")
+	w.p("// the veto at construction; this setter changes it at run time.")
 	w.p("func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {")
 	w.p("\treturn spec.OnWriteOf(s.Underlying(), fn)")
 	w.p("}")
 	for _, hc := range cmds {
 		w.p("")
-		w.p("// %s registers fn for the %s command; nil removes the handler;", hc.method, strings.TrimPrefix(hc.cmdID, "Cmd"))
+		w.p("// %s registers fn for the %s command (spec.CommandRegistrar); nil", hc.method, strings.TrimPrefix(hc.cmdID, "Cmd"))
+		w.p("// hands the command back to the server — the generated server restores")
+		w.p("// the handler it was built with, a self-held one its own logic;")
 		w.p("// spec.ErrNoHandlers for a server that takes none. Declare.%s is", hc.method)
 		w.p("// the handler at construction; this setter changes it at run time.")
 		w.p("func (s *Server) %s(fn func(ctx context.Context, req %s) (%s, error)) error {", hc.method, hc.request, hc.response)
@@ -252,11 +261,30 @@ func (g *generator) server() ([]byte, error) {
 		w.p("}")
 	}
 	for _, he := range events {
+		name := strings.TrimPrefix(he.eventID, "Event")
 		w.p("")
-		w.p("// %s emits the %s event on endpoint through the server's Emit;", he.method, strings.TrimPrefix(he.eventID, "Event"))
+		w.p("// %s records the %s event on the endpoint the server is mounted", he.record, name)
+		w.p("// on, through its EmitEvent (spec.Server.EmitEvent):")
+		w.p("// spec.ErrNotMounted before the server knows its endpoint,")
+		w.p("// spec.ErrNoEvents for a server without EmitEvent.")
+		w.p("func (s *Server) %s(data %s) error {", he.record, he.payload)
+		w.p("\tem, ok := s.Underlying().(interface {")
+		w.p("\t\tEmitEvent(eventID uint32, data any) error")
+		w.p("\t})")
+		w.p("\tif !ok {")
+		w.p("\t\treturn spec.ErrNoEvents")
+		w.p("\t}")
+		w.p("\treturn em.EmitEvent(%s, data)", he.eventID)
+		w.p("}")
+		w.p("")
+		w.p("// %s emits the %s event on endpoint through the server's Emit;", he.method, name)
 		w.p("// spec.ErrNoEvents for a server without one.")
+		w.p("//")
+		w.p("// Deprecated: use %s, which emits on the endpoint the server is", he.record)
+		w.p("// mounted on instead of one its caller names. Removable in the next")
+		w.p("// minor release.")
 		w.p("func (s *Server) %s(endpoint uint16, data %s) error {", he.method, he.payload)
-		w.p("\treturn spec.EmitOn(s.Underlying(), endpoint, %s, data)", he.eventID)
+		w.p("\treturn spec.EmitOn(s.Underlying(), endpoint, %s, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour", he.eventID)
 		w.p("}")
 	}
 	g.hostInterface(w)
@@ -403,8 +431,23 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 		w.p("\t\tt.Error(\"%s: a command the server does not accept was registered\")", hc.method)
 		w.p("\t}")
 	}
+	if len(g.hullEvents()) > 0 {
+		w.p("\tbare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent")
+	}
 	for _, he := range g.hullEvents() {
 		w.p("\t_ = s.%s(0, %s{}) // not in the empty definition's EventList: refused", he.method, he.payload)
+		w.p("\t_ = s.%s(%s{})      // the same, through EmitEvent", he.record, he.payload)
+		w.p("\tif err := bare.%s(%s{}); err != spec.ErrNoEvents {", he.record, he.payload)
+		w.p("\t\tt.Errorf(\"%s on a server without EmitEvent: %%v\", err)", he.record)
+		w.p("\t}")
+	}
+	if len(g.c.Features) > 0 {
+		w.p("\tif decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {")
+		w.p("\t\tt.Error(\"Declare: NoFeatures selects no feature\")")
+		w.p("\t}")
+		w.p("\tif decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {")
+		w.p("\t\tt.Error(\"Declare: NoFeatures beside Features is not refused\")")
+		w.p("\t}")
 	}
 	w.p("\t// The declaration: its cluster, its kit form, its veto installed.")
 	w.p("\td := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}")
@@ -442,9 +485,10 @@ func (g *generator) serverTest(w *writer) { //nolint:funlen // one generated tes
 	w.p("}")
 }
 
-// hullEvent is one event's typed emitter.
+// hullEvent is one event's typed emitter: method the deprecated
+// Emit<Event>, record its replacement Record<Event>.
 type hullEvent struct {
-	method, eventID, payload string
+	method, record, eventID, payload string
 }
 
 // hullEvents are the definition's events with their payload types (the
@@ -453,7 +497,8 @@ func (g *generator) hullEvents() []hullEvent {
 	var out []hullEvent
 	for _, p := range g.payloads {
 		if p.event != nil {
-			out = append(out, hullEvent{method: "Emit" + exportName(p.event.Name), eventID: "Event" + exportName(p.event.Name), payload: p.goName})
+			n := exportName(p.event.Name)
+			out = append(out, hullEvent{method: "Emit" + n, record: "Record" + n, eventID: "Event" + n, payload: p.goName})
 		}
 	}
 	return out

@@ -6,6 +6,7 @@ package sigma
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/secure/aesccm"
@@ -125,6 +126,134 @@ func TestSigmaDecodersRefuseWrongFieldLengths(t *testing.T) {
 		for _, tag := range m.needed {
 			if err := m.decode(encodeSigmaFields(t, withField(m.fields, tag, nil))); !errors.Is(err, ErrSessionState) {
 				t.Errorf("%s: without tag %d: err = %v, want ErrSessionState", m.name, tag, err)
+			}
+		}
+	}
+}
+
+// TestSigma1RefusesMalformedSessionParameters: Sigma1's
+// initiatorSessionParams are decoded by the strict decoder the PASE
+// messages use ([sessionparams.DecodeFields]); a wrong-typed or
+// out-of-range field refuses the Sigma1 with ErrSessionState, as any
+// other malformed Sigma1 member, and a well-formed structure is read.
+func TestSigma1RefusesMalformedSessionParameters(t *testing.T) {
+	t.Parallel()
+	sigma1 := func(params func(e *tlv.Encoder)) []byte {
+		e := tlv.NewEncoder()
+		e.StartStruct(tlv.AnonymousTag())
+		e.PutOctets(tlv.ContextTag(1), make([]byte, RandomSize))
+		e.PutUint16(tlv.ContextTag(2), 7)
+		e.PutOctets(tlv.ContextTag(3), make([]byte, 32))
+		e.PutOctets(tlv.ContextTag(4), make([]byte, EphPubKeySize))
+		e.StartStruct(tlv.ContextTag(5))
+		params(e)
+		_ = e.EndContainer()
+		_ = e.EndContainer()
+		b, err := e.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	for name, params := range map[string]func(e *tlv.Encoder){
+		"signed SessionIdleInterval":       func(e *tlv.Encoder) { e.PutInt32(tlv.ContextTag(1), 500) },
+		"SessionActiveThreshold > 16 bits": func(e *tlv.Encoder) { e.PutUint32(tlv.ContextTag(3), 0x10000) },
+		"string MaxPathsPerInvoke":         func(e *tlv.Encoder) { e.PutUTF8(tlv.ContextTag(7), "1") },
+	} {
+		if _, err := UnmarshalSigma1(sigma1(params)); !errors.Is(err, ErrSessionState) {
+			t.Errorf("%s: err = %v, want ErrSessionState", name, err)
+		}
+	}
+	s, err := UnmarshalSigma1(sigma1(func(e *tlv.Encoder) { e.PutUint64(tlv.ContextTag(1), 500) }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.InitiatorSessionParams == nil || s.InitiatorSessionParams.SessionIdleInterval != 500 {
+		t.Fatalf("InitiatorSessionParams = %+v, want SessionIdleInterval 500", s.InitiatorSessionParams)
+	}
+}
+
+// TestSigmaMessagesRefuseMalformedSessionMembers: in Sigma1, Sigma2 and
+// Sigma2_Resume the session-parameters member must be a structure — a
+// non-container element or an array refuses the message, as matter.js
+// refuses an element of another type at a structure field
+// (packages/types/src/tlv/TlvObject.ts:206-207 at db021da0) — and the
+// session-id member must be an unsigned integer that fits 16 bits; a wider
+// encoding of a fitting value is taken.
+func TestSigmaMessagesRefuseMalformedSessionMembers(t *testing.T) {
+	t.Parallel()
+	type member func(e *tlv.Encoder, tag uint8)
+	structParams := func(e *tlv.Encoder, tag uint8) {
+		e.StartStruct(tlv.ContextTag(tag))
+		e.PutUint32(tlv.ContextTag(1), 500)
+		_ = e.EndContainer()
+	}
+	uintParams := func(e *tlv.Encoder, tag uint8) { e.PutUint(tlv.ContextTag(tag), 5) }
+	arrayParams := func(e *tlv.Encoder, tag uint8) {
+		e.StartArray(tlv.ContextTag(tag))
+		_ = e.EndContainer()
+	}
+	id := func(v uint16) member { return func(e *tlv.Encoder, tag uint8) { e.PutUint16(tlv.ContextTag(tag), v) } }
+	wideID := func(e *tlv.Encoder, tag uint8) { e.PutUint64(tlv.ContextTag(tag), 7) }
+	signedID := func(e *tlv.Encoder, tag uint8) { e.PutInt(tlv.ContextTag(tag), 7) }
+	bigID := func(e *tlv.Encoder, tag uint8) { e.PutUint32(tlv.ContextTag(tag), 0x10000) }
+	octets := func(n int) member {
+		return func(e *tlv.Encoder, tag uint8) { e.PutOctets(tlv.ContextTag(tag), make([]byte, n)) }
+	}
+	encode := func(members []member) []byte {
+		e := tlv.NewEncoder()
+		e.StartStruct(tlv.AnonymousTag())
+		for i, m := range members {
+			if m != nil {
+				m(e, uint8(i+1)) //nolint:gosec // a handful of members
+			}
+		}
+		_ = e.EndContainer()
+		b, err := e.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	messages := []struct {
+		name            string
+		idTag, paramTag int // 1-based positions
+		base            []member
+		decode          func([]byte) error
+	}{
+		{"Sigma1", 2, 5, []member{octets(RandomSize), id(7), octets(32), octets(EphPubKeySize), structParams}, func(b []byte) error {
+			_, err := UnmarshalSigma1(b)
+			return err
+		}},
+		{"Sigma2", 2, 5, []member{octets(RandomSize), id(7), octets(EphPubKeySize), octets(40), structParams}, func(b []byte) error {
+			_, err := UnmarshalSigma2(b)
+			return err
+		}},
+		{"Sigma2_Resume", 3, 4, []member{octets(16), octets(16), id(7), structParams}, func(b []byte) error {
+			_, err := UnmarshalSigma2Resume(b)
+			return err
+		}},
+	}
+	for _, m := range messages {
+		with := func(pos int, mem member) []byte {
+			members := slices.Clone(m.base)
+			members[pos-1] = mem
+			return encode(members)
+		}
+		if err := m.decode(encode(m.base)); err != nil {
+			t.Fatalf("%s: well-formed message refused: %v", m.name, err)
+		}
+		if err := m.decode(with(m.idTag, wideID)); err != nil {
+			t.Errorf("%s: an 8-byte session id holding 7 refused: %v", m.name, err)
+		}
+		for what, b := range map[string][]byte{
+			"session parameters as an integer": with(m.paramTag, uintParams),
+			"session parameters as an array":   with(m.paramTag, arrayParams),
+			"signed session id":                with(m.idTag, signedID),
+			"session id above 16 bits":         with(m.idTag, bigID),
+		} {
+			if err := m.decode(b); !errors.Is(err, ErrSessionState) {
+				t.Errorf("%s, %s: err = %v, want ErrSessionState", m.name, what, err)
 			}
 		}
 	}

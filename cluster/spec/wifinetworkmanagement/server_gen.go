@@ -130,18 +130,22 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleNetworkPassphraseRequest registers fn for the NetworkPassphraseRequest command; nil removes the handler;
+// HandleNetworkPassphraseRequest registers fn for the NetworkPassphraseRequest command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleNetworkPassphraseRequest is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleNetworkPassphraseRequest(fn func(ctx context.Context, req NetworkPassphraseRequestRequest) (NetworkPassphraseResponse, error)) error {
@@ -183,6 +187,10 @@ type Declare struct {
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
+	// Where the device serves the cluster with the generated server
+	// (no kit server for the selection), a command declared here
+	// without its Handle field is refused when the device is built
+	// (device.New), not left out of AcceptedCommandList unannounced.
 	Commands []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.

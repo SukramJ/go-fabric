@@ -145,6 +145,9 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: no device type", ErrConfiguration)
 	}
+	// The device keeps a copy: a later change of the Type the host passed
+	// in changes nothing here (R2-P5-apidev-03).
+	t = t.clone()
 	if opts.StableKey == nil {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
 	}
@@ -164,8 +167,14 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 			return nil, fmt.Errorf("%s: %w", t.Name, err)
 		}
 	}
-	clk := &deviceClock{}
-	s.clock = clk
+	s.clock = &deviceClock{}
+	return buildDevice(t, opts, s)
+}
+
+// buildDevice is New's construction once the declarations are collected; t is
+// the device's own copy.
+func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
+	clk, _ := s.clock.(*deviceClock)
 	// The Base device type's optional clusters (FixedLabel, UserLabel)
 	// are the type's too when a declaration names them (base.go); eff is
 	// the type the servers are built from, t stays the device's type.
@@ -222,10 +231,20 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if err := d.attachHooks(s); err != nil {
 		return nil, err
 	}
+	if err := d.checkDeclaredCommands(s); err != nil {
+		return nil, err
+	}
 	d.hosted = make(map[uint32]bool, len(s.servers))
 	for id := range s.servers {
 		d.hosted[id] = true
 	}
+	// An attribute matter.js requires a value of when the server
+	// initialises, which neither the model nor the kit gives one, is the
+	// host's to state (decision 17, R2-P5-apidev-10).
+	if refused := d.refusedInitial(); len(refused) > 0 && !s.skipInitialCheck {
+		return nil, initialError(t, refused)
+	}
+
 	d.ports = maps.Clone(s.ports)
 	if d.identify, err = newIdentifyHandlers(s); err != nil {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
@@ -404,15 +423,20 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	maps.Copy(initial, s.cut.initial(r.ID, s.initial[r.ID]))
 	if factory, held := selfHeldDefaults[r.ID]; held {
+		// The self-held server consumes the values it takes; a server
+		// that then declines the selection leaves the generated one the
+		// whole Initial (review II, R2-P5-apidev-10: the media and camera
+		// kit servers dropped it before).
+		heldInitial := maps.Clone(initial)
 		srv, err := factory(defaultBuild{
 			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key, logger: s.logger,
-			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: initial,
+			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: heldInitial,
 		})
 		if err == nil {
 			err = checkSelection(r.Name, srv, opts)
 		}
 		if err == nil {
-			err = applyInitial(r.Name, srv, initial)
+			err = applyInitial(r.Name, srv, heldInitial)
 		}
 		switch {
 		case err == nil:
@@ -447,7 +471,49 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	fillSelectDefaults(def, srv)
+	s.generated[r.ID] = srv
 	return srv, nil
+}
+
+// checkDeclaredCommands refuses a device whose declaration names an
+// optional command (the Declare's Commands, or the elements a declaration
+// states) for a cluster the generated
+// default server serves, and that command ends without a handler once the
+// declarations' hooks are attached (attachHooks): the generated server is
+// the generated behavior, which leaves a command without a handler out of
+// AcceptedCommandList, so the declaration would have no effect and nothing
+// would say so. It is the rule spec.NewServer applies outside the
+// generated behavior ([spec.ErrMissingHandler]). A kit server carries its
+// declared commands out through its port, and a host's own server
+// (HostServer) is the host's to keep: neither is checked. A command the
+// conformance makes mandatory is the generated behavior's unimplemented
+// one ([spec.Server.UnimplementedMandatoryCommands]), reported by the
+// device-type validator, not here.
+func (d *Device) checkDeclaredCommands(s *settings) error {
+	var missing []error
+	for _, id := range slices.Sorted(maps.Keys(s.generated)) {
+		srv := s.generated[id]
+		if d.Server(id) != contract.ClusterServer(srv) {
+			continue
+		}
+		stubs := srv.UnimplementedMandatoryCommands()
+		// A generated Declare's commands are its implied elements; a
+		// declaration of elements alone states them in elements.
+		declared := append(slices.Clone(s.implied[id].Commands), s.elements[id].Commands...)
+		slices.Sort(declared)
+		for _, cmd := range slices.Compact(declared) {
+			if !srv.Instance.Accepts(cmd) || srv.Handles(cmd) || slices.Contains(stubs, cmd) {
+				continue
+			}
+			name := fmt.Sprintf("0x%02X", cmd)
+			if c := srv.Definition().Command(cmd, spec.Request); c != nil {
+				name = fmt.Sprintf("%s (0x%02X)", c.Name, cmd)
+			}
+			missing = append(missing, fmt.Errorf("%w: %s %s: the declaration selects command %s and nothing handles it; set its Handle field, or leave it out of Commands",
+				ErrConfiguration, d.typ.Name, srv.Definition().Name, name))
+		}
+	}
+	return errors.Join(missing...)
 }
 
 // selection is the feature selection of r's default server: the device
@@ -612,8 +678,9 @@ func featureNames(r *ClusterRequirement, mask uint32) []string {
 	return out
 }
 
-// Type returns the device's type.
-func (d *Device) Type() *Type { return d.typ }
+// Type returns the device's type, a copy: modifying it changes neither
+// the device nor the registry ([Type]).
+func (d *Device) Type() *Type { return d.typ.clone() }
 
 // Server returns the device's server for clusterID, or nil when it mounts
 // none — a cluster served from a [Measurement] source included, whose

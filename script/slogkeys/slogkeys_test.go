@@ -72,6 +72,7 @@ var areaKeys = []string{
 	"active_preset_handle", "additional_mrp_delay", "address",
 	"address_index", "addresses", "adjusted", "admin_vendor_id",
 	"advertised_ms", "after", "age", "akid", "also_named_by", "att_mtu", "attempt",
+	"attested_product_id", "attested_vendor_id",
 	"attribute_reports", "attribute_set", "attribute_statuses", "attributes",
 	"authorities", "auxiliary_acl", "backoff", "boot_reason",
 	"bridged_endpoints", "budget", "by", "bytes", "candidate",

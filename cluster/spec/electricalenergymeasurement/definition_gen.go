@@ -14,6 +14,8 @@
 package electricalenergymeasurement
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -402,35 +404,39 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrCumulativeEnergyImported, Name: "CumulativeEnergyImported",
-			Type:        spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
-			Conformance: spec.Conformance{Text: "IMPE & CUME", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IMPE"}, {Op: spec.ConfName, Name: "CUME"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Decode:      decodeAttrCumulativeEnergyImported,
+			Type:          spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
+			Conformance:   spec.Conformance{Text: "IMPE & CUME", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IMPE"}, {Op: spec.ConfName, Name: "CUME"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: time.Second,
+			Decode:        decodeAttrCumulativeEnergyImported,
 		},
 		{
 			ID: AttrCumulativeEnergyExported, Name: "CumulativeEnergyExported",
-			Type:        spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
-			Conformance: spec.Conformance{Text: "EXPE & CUME", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "EXPE"}, {Op: spec.ConfName, Name: "CUME"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Decode:      decodeAttrCumulativeEnergyExported,
+			Type:          spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
+			Conformance:   spec.Conformance{Text: "EXPE & CUME", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "EXPE"}, {Op: spec.ConfName, Name: "CUME"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: time.Second,
+			Decode:        decodeAttrCumulativeEnergyExported,
 		},
 		{
 			ID: AttrPeriodicEnergyImported, Name: "PeriodicEnergyImported",
-			Type:        spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
-			Conformance: spec.Conformance{Text: "IMPE & PERE", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IMPE"}, {Op: spec.ConfName, Name: "PERE"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Decode:      decodeAttrPeriodicEnergyImported,
+			Type:          spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
+			Conformance:   spec.Conformance{Text: "IMPE & PERE", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "IMPE"}, {Op: spec.ConfName, Name: "PERE"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: time.Second,
+			Decode:        decodeAttrPeriodicEnergyImported,
 		},
 		{
 			ID: AttrPeriodicEnergyExported, Name: "PeriodicEnergyExported",
-			Type:        spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
-			Conformance: spec.Conformance{Text: "EXPE & PERE", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "EXPE"}, {Op: spec.ConfName, Name: "PERE"}}},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
-			Decode:      decodeAttrPeriodicEnergyExported,
+			Type:          spec.Type{Name: "EnergyMeasurementStruct", Kind: spec.KindStruct, Struct: EnergyMeasurementStructDef},
+			Conformance:   spec.Conformance{Text: "EXPE & PERE", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "EXPE"}, {Op: spec.ConfName, Name: "PERE"}}},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: time.Second,
+			Decode:        decodeAttrPeriodicEnergyExported,
 		},
 		{
 			ID: AttrCumulativeEnergyReset, Name: "CumulativeEnergyReset",

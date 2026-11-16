@@ -49,7 +49,7 @@ func TestTypedLaundryWasherControls(t *testing.T) {
 	if err := srv.Handle(0x00, nil); !errors.Is(err, spec.ErrNotAccepted) {
 		t.Errorf("a command the cluster does not have: %v", err)
 	}
-	if err := spec.EmitOn(srv, 1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
+	if err := srv.Emit(1, 0, nil); !errors.Is(err, spec.ErrNotEmitted) {
 		t.Errorf("an event the cluster does not define: %v", err)
 	}
 	refusal := errors.New("not now")

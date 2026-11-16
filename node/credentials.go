@@ -87,10 +87,10 @@ func (c Commissioning) WindowCredentials(timeout time.Duration) WindowCredential
 // of a window the host opens with its own credentials
 // ([Node.OpenBasicWindow]): creds' passcode and discriminator under the
 // node's vendor and product, on-network discovery and, with a BLE radio
-// (Network.BLE), BLE discovery — what [Node.SetupPayload] returns for the
+// (Network.GATT), BLE discovery — what [Node.SetupPayload] returns for the
 // configured secret.
 func (n *Node) PairingCodesFor(creds WindowCredentials) (qr, manual string, err error) {
-	return pairingCodes(n.cfg.ProductDescription, creds.Discriminator, creds.Passcode, n.cfg.Network.BLE != nil)
+	return pairingCodes(n.cfg.ProductDescription, creds.Discriminator, creds.Passcode, n.cfg.Network.hasBLE(), n.cfg.Commissioning.Flow)
 }
 
 // pairingCodes encodes one passcode and discriminator as the QR payload
@@ -99,8 +99,11 @@ func (n *Node) PairingCodesFor(creds WindowCredentials) (qr, manual string, err 
 // discoveryCapabilities, whose `ble` follows `network.ble` and whose
 // `onIpNetwork` defaults to true (NetworkServer.ts:36-51 at db021da0),
 // encoded into every QR code (CommissioningServer.ts:430-443). The manual
-// code carries none.
-func pairingCodes(pd ProductDescription, discriminator uint16, passcode uint32, ble bool) (qr, manual string, err error) {
+// code carries none. The flow ([Commissioning].Flow) goes into the QR
+// code, and a flow other than Standard takes the long manual code with
+// the vendor and product id (CommissioningServer.ts:438, :446-454 at
+// db021da0).
+func pairingCodes(pd ProductDescription, discriminator uint16, passcode uint32, ble bool, flow CommissioningFlow) (qr, manual string, err error) {
 	caps := setup.DiscoveryOnIP
 	if ble {
 		caps |= setup.DiscoveryBLE
@@ -111,11 +114,16 @@ func pairingCodes(pd ProductDescription, discriminator uint16, passcode uint32, 
 		Discriminator: discriminator,
 		Passcode:      passcode,
 		DiscoveryCaps: caps,
+		CustomFlow:    uint8(flow),
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("node: qr payload: %w", err)
 	}
-	manual, err = setup.ManualCode(discriminator, passcode)
+	if flow == FlowStandard {
+		manual, err = setup.ManualCode(discriminator, passcode)
+	} else {
+		manual, err = setup.ManualCodeLong(discriminator, passcode, pd.VendorID, pd.ProductID)
+	}
 	if err != nil {
 		return "", "", fmt.Errorf("node: manual code: %w", err)
 	}

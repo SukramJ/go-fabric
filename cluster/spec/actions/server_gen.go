@@ -133,111 +133,173 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleInstantAction registers fn for the InstantAction command; nil removes the handler;
+// HandleInstantAction registers fn for the InstantAction command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleInstantAction is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleInstantAction(fn func(ctx context.Context, req InstantActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdInstantAction, fn)
 }
 
-// HandleInstantActionWithTransition registers fn for the InstantActionWithTransition command; nil removes the handler;
+// HandleInstantActionWithTransition registers fn for the InstantActionWithTransition command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleInstantActionWithTransition is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleInstantActionWithTransition(fn func(ctx context.Context, req InstantActionWithTransitionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdInstantActionWithTransition, fn)
 }
 
-// HandleStartAction registers fn for the StartAction command; nil removes the handler;
+// HandleStartAction registers fn for the StartAction command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStartAction is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartAction(fn func(ctx context.Context, req StartActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartAction, fn)
 }
 
-// HandleStartActionWithDuration registers fn for the StartActionWithDuration command; nil removes the handler;
+// HandleStartActionWithDuration registers fn for the StartActionWithDuration command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStartActionWithDuration is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStartActionWithDuration(fn func(ctx context.Context, req StartActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStartActionWithDuration, fn)
 }
 
-// HandleStopAction registers fn for the StopAction command; nil removes the handler;
+// HandleStopAction registers fn for the StopAction command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleStopAction is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleStopAction(fn func(ctx context.Context, req StopActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdStopAction, fn)
 }
 
-// HandlePauseAction registers fn for the PauseAction command; nil removes the handler;
+// HandlePauseAction registers fn for the PauseAction command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandlePauseAction is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePauseAction(fn func(ctx context.Context, req PauseActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPauseAction, fn)
 }
 
-// HandlePauseActionWithDuration registers fn for the PauseActionWithDuration command; nil removes the handler;
+// HandlePauseActionWithDuration registers fn for the PauseActionWithDuration command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandlePauseActionWithDuration is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandlePauseActionWithDuration(fn func(ctx context.Context, req PauseActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdPauseActionWithDuration, fn)
 }
 
-// HandleResumeAction registers fn for the ResumeAction command; nil removes the handler;
+// HandleResumeAction registers fn for the ResumeAction command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleResumeAction is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleResumeAction(fn func(ctx context.Context, req ResumeActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdResumeAction, fn)
 }
 
-// HandleEnableAction registers fn for the EnableAction command; nil removes the handler;
+// HandleEnableAction registers fn for the EnableAction command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableAction is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableAction(fn func(ctx context.Context, req EnableActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableAction, fn)
 }
 
-// HandleEnableActionWithDuration registers fn for the EnableActionWithDuration command; nil removes the handler;
+// HandleEnableActionWithDuration registers fn for the EnableActionWithDuration command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleEnableActionWithDuration is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleEnableActionWithDuration(fn func(ctx context.Context, req EnableActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdEnableActionWithDuration, fn)
 }
 
-// HandleDisableAction registers fn for the DisableAction command; nil removes the handler;
+// HandleDisableAction registers fn for the DisableAction command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleDisableAction is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisableAction(fn func(ctx context.Context, req DisableActionRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisableAction, fn)
 }
 
-// HandleDisableActionWithDuration registers fn for the DisableActionWithDuration command; nil removes the handler;
+// HandleDisableActionWithDuration registers fn for the DisableActionWithDuration command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleDisableActionWithDuration is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleDisableActionWithDuration(fn func(ctx context.Context, req DisableActionWithDurationRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdDisableActionWithDuration, fn)
 }
 
+// RecordStateChanged records the StateChanged event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordStateChanged(data StateChangedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventStateChanged, data)
+}
+
 // EmitStateChanged emits the StateChanged event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordStateChanged, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordActionFailed records the ActionFailed event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordActionFailed(data ActionFailedEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventActionFailed, data)
 }
 
 // EmitActionFailed emits the ActionFailed event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordActionFailed, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitActionFailed(endpoint uint16, data ActionFailedEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventActionFailed, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventActionFailed, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Declare is the declaration of the Actions cluster on a device:
@@ -252,9 +314,13 @@ type Declare struct {
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
+	// Where the device serves the cluster with the generated server
+	// (no kit server for the selection), a command declared here
+	// without its Handle field is refused when the device is built
+	// (device.New), not left out of AcceptedCommandList unannounced.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.

@@ -40,20 +40,34 @@ type Config struct {
 	// as in matter.js (GroupsServer keeps it in the root's
 	// GroupKeyManagementServer). nil keeps whatever the source supplies.
 	Groups *groups.Manager
+	// Persistence keeps a bridged endpoint's controller-written
+	// NodeLabel and its scene table across restarts ([Persistence]); the
+	// host hands a restored label back as [Spec.NodeLabel]. With Groups
+	// set, every bridged endpoint whose device type mandates
+	// ScenesManagement (the light device types) serves the stack's
+	// ScenesManagement server, in place of any a source supplies — as
+	// matter.js mounts ScenesManagementServer for those device types. nil
+	// keeps both for the life of the process (or hands them to the
+	// older OnNodeLabelWritten and Scenes hooks).
+	Persistence Persistence
 	// OnNodeLabelWritten fires after a controller wrote a bridged
 	// endpoint's BridgedDeviceBasicInformation NodeLabel, with the
 	// endpoint's stable key and the new label, so the host can persist it
 	// and hand it back as [Spec.NodeLabel] after a restart — matter.js
 	// keeps a written nodeLabel in the endpoint's persisted state. nil
-	// keeps the label for the life of the process only.
+	// keeps the label for the life of the process only. Ignored when
+	// Persistence is set.
+	//
+	// Deprecated: use Persistence, whose SaveNodeLabel stores the label
+	// before it is served and refuses the write when the store refuses.
+	// Removable in the next minor release.
 	OnNodeLabelWritten func(key SourceKey, label string)
 	// Scenes persists the scene tables of the endpoints that serve
-	// ScenesManagement (see [ScenesStore]). With Groups set, every bridged
-	// endpoint whose device type mandates ScenesManagement (the light
-	// device types) serves the stack's ScenesManagement server, in place
-	// of any a source supplies — as matter.js mounts ScenesManagementServer
-	// for those device types. nil keeps the tables for the life of the
-	// process.
+	// ScenesManagement (see [ScenesStore]). nil keeps the tables for the
+	// life of the process. Ignored when Persistence is set.
+	//
+	// Deprecated: use Persistence, whose LoadScenes and SaveScenes report
+	// the store's error. Removable in the next minor release.
 	Scenes ScenesStore
 	// RootDeviceConditions are the device-type conditions the host states
 	// for the root endpoint ([Endpoint.DeviceConditions]) — the node's own
@@ -67,11 +81,81 @@ type Config struct {
 	Clock clock.Clock
 }
 
+// Persistence keeps a bridged endpoint's controller-written state across
+// restarts, under the endpoint's stable key: its
+// BridgedDeviceBasicInformation NodeLabel and its scene table — matter.js
+// keeps both as nonvolatile endpoint state and stores a change in the
+// commit's first phase (Datasource.ts:1224-1262 at db021da0). A change a
+// controller causes is stored with the change, and a refused store answers
+// FAILURE with nothing applied (the store-error rule of store/doc.go;
+// notes/parity/by_design.md BD-Matter-NonVolatileWrite-StoredBeforeApplied).
+type Persistence interface {
+	// SaveNodeLabel stores label, written to the endpoint key names. It
+	// runs before the label is served: an error fails a controller's
+	// write with FAILURE and the endpoint keeps serving the label it had.
+	SaveNodeLabel(ctx context.Context, key SourceKey, label string) error
+	// LoadScenes returns the scene table stored for key, nil for none. An
+	// error leaves the table unloaded: every scene command answers FAILURE
+	// and nothing is saved until a later load succeeds, so a failed load
+	// never lets a save write over the stored table.
+	LoadScenes(ctx context.Context, key SourceKey) ([]byte, error)
+	// SaveScenes stores key's scene table after a change, before the
+	// change is served: an error fails a scene command with FAILURE and
+	// the previous table is kept. A change that is the consequence of
+	// another (a group's or a fabric's removal) is kept and saved again
+	// with the next change.
+	SaveScenes(ctx context.Context, key SourceKey, table []byte) error
+}
+
 // ScenesStore keeps an endpoint's scene table across restarts — matter.js
 // keeps sceneTable as nonvolatile state. key is the endpoint's stable key.
+//
+// Deprecated: use [Persistence], whose LoadScenes and SaveScenes report the
+// store's error. Removable in the next minor release.
 type ScenesStore interface {
 	LoadScenes(key SourceKey) []byte
 	SaveScenes(key SourceKey, table []byte)
+}
+
+// persistence is the Persistence c's endpoints use: Persistence, else the
+// older OnNodeLabelWritten and Scenes hooks adapted, else nil.
+func (c Config) persistence() Persistence {
+	switch {
+	case c.Persistence != nil:
+		return c.Persistence
+	case c.OnNodeLabelWritten != nil || c.Scenes != nil:
+		return hookPersistence{onLabel: c.OnNodeLabelWritten, scenes: c.Scenes}
+	}
+	return nil
+}
+
+// hookPersistence adapts the deprecated hooks to [Persistence]: neither can
+// refuse, so a save never fails; a missing hook keeps its state for the
+// life of the process.
+type hookPersistence struct {
+	onLabel func(SourceKey, string)
+	scenes  ScenesStore
+}
+
+func (h hookPersistence) SaveNodeLabel(_ context.Context, key SourceKey, label string) error {
+	if h.onLabel != nil {
+		h.onLabel(key, label)
+	}
+	return nil
+}
+
+func (h hookPersistence) LoadScenes(_ context.Context, key SourceKey) ([]byte, error) {
+	if h.scenes == nil {
+		return nil, nil
+	}
+	return h.scenes.LoadScenes(key), nil
+}
+
+func (h hookPersistence) SaveScenes(_ context.Context, key SourceKey, table []byte) error {
+	if h.scenes != nil {
+		h.scenes.SaveScenes(key, table)
+	}
+	return nil
 }
 
 // Validate returns nil when the config is internally consistent.
@@ -306,8 +390,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		ClientClusters:      append([]uint32(nil), spec.ClientClusters...),
 		OptIn:               append([]uint32(nil), spec.OptIn...),
 		groups:              a.cfg.Groups,
-		onNodeLabelWritten:  a.cfg.OnNodeLabelWritten,
-		scenesStore:         a.cfg.Scenes,
+		persistence:         a.cfg.persistence(),
 	}, nil
 }
 

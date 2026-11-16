@@ -62,77 +62,11 @@ func requestFabric(ctx context.Context) (uint8, error) {
 	return 0, spec.Errorf(im.StatusUnsupportedAccess, "lock: fabric required")
 }
 
-// invalidField is the INVALID_COMMAND matter.js answers a request field
-// its constraint refuses for the commands DoorLockServer.ts:1494-1511
-// remaps (Supervision onValidationError = throwInvalidCommand).
-func invalidField(field string, v uint64) error {
-	return spec.Errorf(im.StatusInvalidCommand, "lock: %s: the cluster does not define the enum value %d", field, v)
-}
-
-// checkEnum holds an enum field to the values its constraint lists, or —
-// for an empty list — to the values the cluster defines for the feature
-// selection.
-func (s *DoorLockServer) checkEnum(field string, def *spec.Enum, v uint64, allowed ...uint64) error {
-	if !s.EnumSupported(def, v) {
-		return invalidField(field, v)
-	}
-	if len(allowed) > 0 && !slices.Contains(allowed, v) {
-		return spec.Errorf(im.StatusInvalidCommand, "lock: %s %d is outside the command's constraint", field, v)
-	}
-	return nil
-}
-
-// The constraints of SetUser and SetCredential (door-lock-cluster.element.ts):
-// OperationType "add, modify", UserStatus "occupiedEnabled,
-// occupiedDisabled", and UserType without the schedule users and, for
-// SetUser, the programming user.
-var (
-	dataOperationAddModify = []uint64{uint64(lockdef.DataOperationTypeAdd), uint64(lockdef.DataOperationTypeModify)}
-	requestUserStatuses    = []uint64{uint64(lockdef.UserStatusOccupiedEnabled), uint64(lockdef.UserStatusOccupiedDisabled)}
-	setUserUserTypes       = []uint64{
-		uint64(lockdef.UserTypeUnrestrictedUser), uint64(lockdef.UserTypeNonAccessUser), uint64(lockdef.UserTypeForcedUser),
-		uint64(lockdef.UserTypeDisposableUser), uint64(lockdef.UserTypeExpiringUser), uint64(lockdef.UserTypeScheduleRestrictedUser),
-		uint64(lockdef.UserTypeRemoteOnlyUser),
-	}
-	setCredentialUserTypes = []uint64{
-		uint64(lockdef.UserTypeUnrestrictedUser), uint64(lockdef.UserTypeProgrammingUser), uint64(lockdef.UserTypeNonAccessUser),
-		uint64(lockdef.UserTypeForcedUser), uint64(lockdef.UserTypeDisposableUser), uint64(lockdef.UserTypeExpiringUser),
-		uint64(lockdef.UserTypeRemoteOnlyUser),
-	}
-)
-
-// validateSetUser is the request validation matter.js runs before setUser,
-// remapped to INVALID_COMMAND (DoorLockServer.ts:1494-1511).
-func (s *DoorLockServer) validateSetUser(req lockdef.SetUserRequest) error {
-	if err := s.checkEnum("OperationType", lockdef.DataOperationTypeEnumDef, uint64(req.OperationType), dataOperationAddModify...); err != nil {
-		return err
-	}
-	if !req.UserStatus.Null {
-		if err := s.checkEnum("UserStatus", lockdef.UserStatusEnumDef, uint64(req.UserStatus.Value), requestUserStatuses...); err != nil {
-			return err
-		}
-	}
-	if !req.UserType.Null {
-		if err := s.checkEnum("UserType", lockdef.UserTypeEnumDef, uint64(req.UserType.Value), setUserUserTypes...); err != nil {
-			return err
-		}
-	}
-	if !req.CredentialRule.Null {
-		if err := s.checkEnum("CredentialRule", lockdef.CredentialRuleEnumDef, uint64(req.CredentialRule.Value)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // ── User database (USR) ─────────────────────────────────────────────────
 
 func (s *DoorLockServer) handleSetUser(ctx context.Context, fields any) (any, error) {
 	req, err := requestAs[lockdef.SetUserRequest](fields)
 	if err != nil {
-		return nil, err
-	}
-	if err := s.validateSetUser(req); err != nil {
 		return nil, err
 	}
 	s.op.Lock()
@@ -165,6 +99,8 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 			Credentials:             []store.DoorLockCredentialRef{},
 			CreatorFabricIndex:      fabricIndex,
 			LastModifiedFabricIndex: fabricIndex,
+			CreatedThroughMatter:    true,
+			ModifiedThroughMatter:   true,
 		}
 		if !req.UserName.Null {
 			user.UserName = req.UserName.Value
@@ -219,7 +155,7 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 		if !req.CredentialRule.Null {
 			existing.CredentialRule = uint8(req.CredentialRule.Value)
 		}
-		existing.LastModifiedFabricIndex = fabricIndex
+		existing.LastModifiedFabricIndex, existing.ModifiedThroughMatter = fabricIndex, true
 		s.dirty = true
 		s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeModify, &userIndex, &userIndex)
 	default:
@@ -272,9 +208,25 @@ func (s *DoorLockServer) getUserLocked(req lockdef.GetUserRequest) (any, error) 
 		creds = append(creds, lockdef.CredentialStruct{CredentialType: lockdef.CredentialTypeEnum(c.Type), CredentialIndex: c.Index})
 	}
 	resp.Credentials = spec.ValueOf(creds)
-	resp.CreatorFabricIndex = spec.ValueOf(user.CreatorFabricIndex)
-	resp.LastModifiedFabricIndex = spec.ValueOf(user.LastModifiedFabricIndex)
+	resp.CreatorFabricIndex = fabricThroughMatter(user.CreatedThroughMatter, user.CreatorFabricIndex)
+	resp.LastModifiedFabricIndex = fabricThroughMatter(user.ModifiedThroughMatter, user.LastModifiedFabricIndex)
 	return resp, nil
+}
+
+// fabricThroughMatter is a record's creator or last-modifier fabric as
+// GetUser and GetCredentialStatus answer it (R2-P5-port-08): the index
+// when a Matter command made the creation or the change, null for a record
+// the host seeded (DoorLockConfig.Initial), which no fabric made. Each
+// index follows its own source: connectedhomeip sets the creator only when
+// the creation, and the last modifier only when the last modification,
+// came through Matter IM
+// (src/app/clusters/door-lock-server/CodegenIntegration.cpp:570-578,
+// :967-974 at 6170af84).
+func fabricThroughMatter(throughMatter bool, fabricIndex uint8) spec.Nullable[uint8] {
+	if !throughMatter {
+		return spec.NullOf[uint8]()
+	}
+	return spec.ValueOf(fabricIndex)
 }
 
 func (s *DoorLockServer) handleClearUser(ctx context.Context, fields any) (any, error) {

@@ -5,6 +5,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
@@ -279,5 +280,135 @@ func TestScenesParityWithSchema(t *testing.T) {
 	}
 	if got := s.MatterGeneratedCommands(); !slices.Equal(got, []uint32{0, 1, 2, 3, 4, 6, 0x40}) {
 		t.Errorf("GeneratedCommandList %v", got)
+	}
+}
+
+// TestScenesRefusedStoreRestoresSceneInfo (review II, phase 5b): a
+// RemoveScene of the current, valid scene whose store the scene store
+// refuses answers FAILURE and leaves everything as it was — the scene
+// stored, FabricSceneInfo's current scene valid, and the scene still
+// monitored, so a change of a scene-able attribute invalidates it.
+// Before, the table came back but SceneValid stayed false and nothing
+// was monitored.
+func TestScenesRefusedStoreRestoresSceneInfo(t *testing.T) {
+	t.Parallel()
+	light := &sceneOnOff{on: true}
+	refuse := false
+	st := core.NewPersistedScenesState(
+		func(context.Context) ([]byte, error) { return nil, nil },
+		func(context.Context, []byte) error {
+			if refuse {
+				return errors.New("the store refuses")
+			}
+			return nil
+		})
+	s, err := core.NewScenesManagement(core.ScenesConfig{
+		State:      st,
+		Siblings:   func() []contract.ClusterServer { return []contract.ClusterServer{light} },
+		GroupKnown: func(_ context.Context, _ uint8, g uint16) bool { return g == 0x0101 },
+		Fabrics:    func(context.Context) []uint8 { return []uint8{1, 2} },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := invoke(t, s, 0x04, core.SceneRef{GroupID: 0x0101, SceneID: 1}).(core.SceneStatusResponse); r.Status != im.StatusSuccess {
+		t.Fatalf("StoreScene: %v", r.Status)
+	}
+	invoke(t, s, 0x05, core.RecallSceneRequest{GroupID: 0x0101, SceneID: 1})
+	info := func() core.SceneInfoStruct {
+		t.Helper()
+		v, _ := s.MatterReadFiltered(fabric1, 0x0002)
+		si, _ := v.([]core.SceneInfoStruct)
+		if len(si) != 1 {
+			t.Fatalf("FabricSceneInfo = %+v", v)
+		}
+		return si[0]
+	}
+	if si := info(); !si.SceneValid || si.SceneCount != 1 {
+		t.Fatalf("after the recall: %+v", si)
+	}
+	refuse = true
+	if r := invoke(t, s, 0x02, core.SceneRef{GroupID: 0x0101, SceneID: 1}).(core.SceneStatusResponse); r.Status != im.StatusFailure {
+		t.Fatalf("RemoveScene with the store refusing = %v, want FAILURE", r.Status)
+	}
+	if si := info(); !si.SceneValid || si.SceneCount != 1 || si.CurrentScene != 1 || si.CurrentGroup != 0x0101 {
+		t.Errorf("after the refused removal: %+v, want scene 1 of group 0x0101 current, valid and stored", si)
+	}
+	refuse = false
+	st.InvalidateCurrentScene()
+	if si := info(); si.SceneValid {
+		t.Errorf("the current scene is no longer monitored: still valid after a change, %+v", si)
+	}
+}
+
+// TestScenesRefusedFirstStoreLeavesNoSceneInfo (review II, phase 5b): a
+// fabric's first scene command whose store the scene store refuses answers
+// FAILURE and leaves no scene info entry behind for the fabric — the state
+// holds the fabric no more than before the command. Before, the entry the
+// command created stayed (ScenesState.Fabrics listed the fabric).
+func TestScenesRefusedFirstStoreLeavesNoSceneInfo(t *testing.T) {
+	t.Parallel()
+	st := core.NewPersistedScenesState(
+		func(context.Context) ([]byte, error) { return nil, nil },
+		func(context.Context, []byte) error { return errors.New("the store refuses") })
+	s, err := core.NewScenesManagement(core.ScenesConfig{
+		State:      st,
+		Siblings:   func() []contract.ClusterServer { return []contract.ClusterServer{&sceneOnOff{on: true}} },
+		GroupKnown: func(_ context.Context, _ uint8, g uint16) bool { return g == 0x0101 },
+		Fabrics:    func(context.Context) []uint8 { return []uint8{1} },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := invoke(t, s, 0x04, core.SceneRef{GroupID: 0x0101, SceneID: 1}).(core.SceneStatusResponse); r.Status != im.StatusFailure {
+		t.Fatalf("StoreScene with the store refusing = %v, want FAILURE", r.Status)
+	}
+	if got := st.Fabrics(); len(got) != 0 {
+		t.Errorf("Fabrics after the refused first command = %v, want none", got)
+	}
+}
+
+// TestScenesInfoReadFailsWhileTheTableDoesNotLoad (review II, phase 5b):
+// while the scene store refuses to load the table, a FabricSceneInfo read
+// fails ((nil, false), which the dispatcher answers FAILURE on a request)
+// instead of serving SceneCount 0 with the whole capacity free; once the
+// table loads, the read serves it. SceneTableSize needs no table and is
+// served throughout. Before, the failed load was ignored and the read
+// served an empty fabric.
+func TestScenesInfoReadFailsWhileTheTableDoesNotLoad(t *testing.T) {
+	t.Parallel()
+	refuse := true
+	stored := []byte(`[{"f":1,"g":257,"s":1}]`)
+	st := core.NewPersistedScenesState(
+		func(context.Context) ([]byte, error) {
+			if refuse {
+				return nil, errors.New("the store refuses")
+			}
+			return stored, nil
+		},
+		func(context.Context, []byte) error { return nil })
+	s, err := core.NewScenesManagement(core.ScenesConfig{
+		State:      st,
+		Siblings:   func() []contract.ClusterServer { return nil },
+		GroupKnown: func(context.Context, uint8, uint16) bool { return true },
+		Fabrics:    func(context.Context) []uint8 { return []uint8{1} },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, ok := s.MatterReadFiltered(fabric1, 0x0002); ok || v != nil {
+		t.Errorf("FabricSceneInfo with the table unloadable = %+v, %v; want (nil, false)", v, ok)
+	}
+	if _, ok := s.MatterRead(0x0002); ok {
+		t.Error("FabricSceneInfo without a request is served with the table unloadable")
+	}
+	if _, ok := s.MatterReadFiltered(fabric1, 0x0001); !ok {
+		t.Error("SceneTableSize is not served while the table does not load")
+	}
+	refuse = false
+	v, ok := s.MatterReadFiltered(fabric1, 0x0002)
+	si, _ := v.([]core.SceneInfoStruct)
+	if !ok || len(si) != 1 || si[0].SceneCount != 1 {
+		t.Errorf("FabricSceneInfo once the table loads = %+v, %v; want fabric 1 with its stored scene", v, ok)
 	}
 }

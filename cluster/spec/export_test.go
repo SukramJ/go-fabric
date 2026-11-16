@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package spec
+
+// SetWindowHooksForTests installs s's test hooks: stored runs in a Set
+// between its store and its notification, left in a controller write
+// between leaving its commit window and advancing the version. Call it
+// before s is used.
+func SetWindowHooksForTests(s *Server, stored, left func()) {
+	s.storedForTests, s.leftForTests = stored, left
+}

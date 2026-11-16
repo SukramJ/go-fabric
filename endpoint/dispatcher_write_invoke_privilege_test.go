@@ -91,6 +91,16 @@ func (stubOpCredsStore) UpdateFabricCredentials(context.Context, uint8, store.Fa
 
 func (stubOpCredsStore) CommitFabric(context.Context, uint8) error { return nil }
 
+func (stubOpCredsStore) UpdateFabricVendorVerification(context.Context, uint8, store.FabricVendorUpdate) error {
+	return nil
+}
+
+func (stubOpCredsStore) OwedFabricEvents(context.Context) ([]store.OwedFabricEvent, error) {
+	return nil, nil
+}
+
+func (stubOpCredsStore) AckOwedFabricEvent(context.Context, uint64) error { return nil }
+
 func (stubOpCredsStore) RollbackFabric(context.Context, uint8) (store.FabricPending, error) {
 	return store.FabricCommitted, nil
 }

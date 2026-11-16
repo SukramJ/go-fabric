@@ -167,12 +167,43 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleClearTargets(func(context.Context, ClearTargetsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleClearTargets: a command the server does not accept was registered")
 	}
-	_ = s.EmitEvConnected(0, EvConnectedEvent{})                     // not in the empty definition's EventList: refused
-	_ = s.EmitEvNotDetected(0, EvNotDetectedEvent{})                 // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitEvConnected(0, EvConnectedEvent{})        // not in the empty definition's EventList: refused
+	_ = s.RecordEvConnected(EvConnectedEvent{})         // the same, through EmitEvent
+	if err := bare.RecordEvConnected(EvConnectedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordEvConnected on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitEvNotDetected(0, EvNotDetectedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordEvNotDetected(EvNotDetectedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordEvNotDetected(EvNotDetectedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordEvNotDetected on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitEnergyTransferStarted(0, EnergyTransferStartedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordEnergyTransferStarted(EnergyTransferStartedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordEnergyTransferStarted(EnergyTransferStartedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordEnergyTransferStarted on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitEnergyTransferStopped(0, EnergyTransferStoppedEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitFault(0, FaultEvent{})                                 // not in the empty definition's EventList: refused
-	_ = s.EmitRfid(0, RfidEvent{})                                   // not in the empty definition's EventList: refused
+	_ = s.RecordEnergyTransferStopped(EnergyTransferStoppedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordEnergyTransferStopped(EnergyTransferStoppedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordEnergyTransferStopped on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitFault(0, FaultEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordFault(FaultEvent{})  // the same, through EmitEvent
+	if err := bare.RecordFault(FaultEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordFault on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitRfid(0, RfidEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordRfid(RfidEvent{})  // the same, through EmitEvent
+	if err := bare.RecordRfid(RfidEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordRfid on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

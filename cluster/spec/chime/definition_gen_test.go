@@ -99,7 +99,12 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandlePlayChimeSound(func(context.Context, PlayChimeSoundRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandlePlayChimeSound: a command the server does not accept was registered")
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})          // no EmitEvent
 	_ = s.EmitChimeStartedPlaying(0, ChimeStartedPlayingEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordChimeStartedPlaying(ChimeStartedPlayingEvent{})  // the same, through EmitEvent
+	if err := bare.RecordChimeStartedPlaying(ChimeStartedPlayingEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordChimeStartedPlaying on a server without EmitEvent: %v", err)
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

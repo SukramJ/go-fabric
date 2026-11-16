@@ -21,11 +21,11 @@ import (
 )
 
 // TestKeepAliveStatusParity: "requests a status on an MRP session and ends
-// the subscription on INVALID_SUBSCRIPTION", and the SUCCESS answer of
-// "waits for the status and keeps the subscription when the peer answers
-// SUCCESS" — the subscription stays. The waiting half of that case is not
-// ported: an ongoing report of this module counts as delivered with its
-// acknowledgement and does not wait for the status (noteReportSent).
+// the subscription on INVALID_SUBSCRIPTION", and "waits for the status and
+// keeps the subscription when the peer answers SUCCESS" — the keep-alive's
+// reporter returns only once the peer answered it
+// ([Bridge.deliverOngoingReport]; F-db021da0-36), and the subscription
+// stays.
 func TestKeepAliveStatusParity(t *testing.T) {
 	t.Parallel()
 	const sessionID uint16 = 83
@@ -54,8 +54,13 @@ func TestKeepAliveStatusParity(t *testing.T) {
 
 	keepAliveAnswered := func(status im.StatusCode) {
 		t.Helper()
-		// No path is due: the report is the keep-alive.
-		b.reportSubscription(context.Background(), sub, nil)
+		// No path is due: the report is the keep-alive. Its reporter
+		// waits for the answer.
+		reported := make(chan struct{})
+		go func() {
+			defer close(reported)
+			b.reportSubscription(context.Background(), sub, nil)
+		}()
 		proto, body, ok := readOneIMDatagram(t, peerConn, peerSess, time.Second)
 		if !ok {
 			t.Fatal("no keep-alive reached the peer")
@@ -77,9 +82,15 @@ func TestKeepAliveStatusParity(t *testing.T) {
 		datagram := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
 			Opcode: im.OpcodeStatusResponse, ExchangeID: proto.ExchangeID, Initiator: false,
 		}, answer)
+		select {
+		case <-reported:
+			t.Fatal("the keep-alive's reporter returned before the peer answered it")
+		default:
+		}
 		if err := b.dispatch(context.Background(), datagram, peerAddr); err != nil {
 			t.Fatalf("dispatch: %v", err)
 		}
+		<-reported // a reporter that never returns fails the test by its timeout
 	}
 
 	keepAliveAnswered(im.StatusSuccess)

@@ -478,199 +478,335 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleLockDoor registers fn for the LockDoor command; nil removes the handler;
+// HandleLockDoor registers fn for the LockDoor command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleLockDoor is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLockDoor(fn func(ctx context.Context, req LockDoorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLockDoor, fn)
 }
 
-// HandleUnlockDoor registers fn for the UnlockDoor command; nil removes the handler;
+// HandleUnlockDoor registers fn for the UnlockDoor command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUnlockDoor is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnlockDoor(fn func(ctx context.Context, req UnlockDoorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnlockDoor, fn)
 }
 
-// HandleToggle registers fn for the Toggle command; nil removes the handler;
+// HandleToggle registers fn for the Toggle command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleToggle is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleToggle(fn func(ctx context.Context, req ToggleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdToggle, fn)
 }
 
-// HandleUnlockWithTimeout registers fn for the UnlockWithTimeout command; nil removes the handler;
+// HandleUnlockWithTimeout registers fn for the UnlockWithTimeout command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUnlockWithTimeout is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnlockWithTimeout(fn func(ctx context.Context, req UnlockWithTimeoutRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnlockWithTimeout, fn)
 }
 
-// HandleSetWeekDaySchedule registers fn for the SetWeekDaySchedule command; nil removes the handler;
+// HandleSetWeekDaySchedule registers fn for the SetWeekDaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetWeekDaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetWeekDaySchedule(fn func(ctx context.Context, req SetWeekDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetWeekDaySchedule, fn)
 }
 
-// HandleGetWeekDaySchedule registers fn for the GetWeekDaySchedule command; nil removes the handler;
+// HandleGetWeekDaySchedule registers fn for the GetWeekDaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetWeekDaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetWeekDaySchedule(fn func(ctx context.Context, req GetWeekDayScheduleRequest) (GetWeekDayScheduleResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetWeekDaySchedule, fn)
 }
 
-// HandleClearWeekDaySchedule registers fn for the ClearWeekDaySchedule command; nil removes the handler;
+// HandleClearWeekDaySchedule registers fn for the ClearWeekDaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClearWeekDaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearWeekDaySchedule(fn func(ctx context.Context, req ClearWeekDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearWeekDaySchedule, fn)
 }
 
-// HandleSetYearDaySchedule registers fn for the SetYearDaySchedule command; nil removes the handler;
+// HandleSetYearDaySchedule registers fn for the SetYearDaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetYearDaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetYearDaySchedule(fn func(ctx context.Context, req SetYearDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetYearDaySchedule, fn)
 }
 
-// HandleGetYearDaySchedule registers fn for the GetYearDaySchedule command; nil removes the handler;
+// HandleGetYearDaySchedule registers fn for the GetYearDaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetYearDaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetYearDaySchedule(fn func(ctx context.Context, req GetYearDayScheduleRequest) (GetYearDayScheduleResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetYearDaySchedule, fn)
 }
 
-// HandleClearYearDaySchedule registers fn for the ClearYearDaySchedule command; nil removes the handler;
+// HandleClearYearDaySchedule registers fn for the ClearYearDaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClearYearDaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearYearDaySchedule(fn func(ctx context.Context, req ClearYearDayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearYearDaySchedule, fn)
 }
 
-// HandleSetHolidaySchedule registers fn for the SetHolidaySchedule command; nil removes the handler;
+// HandleSetHolidaySchedule registers fn for the SetHolidaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetHolidaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetHolidaySchedule(fn func(ctx context.Context, req SetHolidayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetHolidaySchedule, fn)
 }
 
-// HandleGetHolidaySchedule registers fn for the GetHolidaySchedule command; nil removes the handler;
+// HandleGetHolidaySchedule registers fn for the GetHolidaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetHolidaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetHolidaySchedule(fn func(ctx context.Context, req GetHolidayScheduleRequest) (GetHolidayScheduleResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetHolidaySchedule, fn)
 }
 
-// HandleClearHolidaySchedule registers fn for the ClearHolidaySchedule command; nil removes the handler;
+// HandleClearHolidaySchedule registers fn for the ClearHolidaySchedule command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClearHolidaySchedule is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearHolidaySchedule(fn func(ctx context.Context, req ClearHolidayScheduleRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearHolidaySchedule, fn)
 }
 
-// HandleSetUser registers fn for the SetUser command; nil removes the handler;
+// HandleSetUser registers fn for the SetUser command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetUser is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetUser(fn func(ctx context.Context, req SetUserRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetUser, fn)
 }
 
-// HandleGetUser registers fn for the GetUser command; nil removes the handler;
+// HandleGetUser registers fn for the GetUser command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetUser is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetUser(fn func(ctx context.Context, req GetUserRequest) (GetUserResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetUser, fn)
 }
 
-// HandleClearUser registers fn for the ClearUser command; nil removes the handler;
+// HandleClearUser registers fn for the ClearUser command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClearUser is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearUser(fn func(ctx context.Context, req ClearUserRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearUser, fn)
 }
 
-// HandleSetCredential registers fn for the SetCredential command; nil removes the handler;
+// HandleSetCredential registers fn for the SetCredential command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetCredential is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetCredential(fn func(ctx context.Context, req SetCredentialRequest) (SetCredentialResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetCredential, fn)
 }
 
-// HandleGetCredentialStatus registers fn for the GetCredentialStatus command; nil removes the handler;
+// HandleGetCredentialStatus registers fn for the GetCredentialStatus command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetCredentialStatus is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetCredentialStatus(fn func(ctx context.Context, req GetCredentialStatusRequest) (GetCredentialStatusResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetCredentialStatus, fn)
 }
 
-// HandleClearCredential registers fn for the ClearCredential command; nil removes the handler;
+// HandleClearCredential registers fn for the ClearCredential command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClearCredential is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearCredential(fn func(ctx context.Context, req ClearCredentialRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearCredential, fn)
 }
 
-// HandleUnboltDoor registers fn for the UnboltDoor command; nil removes the handler;
+// HandleUnboltDoor registers fn for the UnboltDoor command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleUnboltDoor is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleUnboltDoor(fn func(ctx context.Context, req UnboltDoorRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdUnboltDoor, fn)
 }
 
-// HandleSetAliroReaderConfig registers fn for the SetAliroReaderConfig command; nil removes the handler;
+// HandleSetAliroReaderConfig registers fn for the SetAliroReaderConfig command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleSetAliroReaderConfig is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleSetAliroReaderConfig(fn func(ctx context.Context, req SetAliroReaderConfigRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdSetAliroReaderConfig, fn)
 }
 
-// HandleClearAliroReaderConfig registers fn for the ClearAliroReaderConfig command; nil removes the handler;
+// HandleClearAliroReaderConfig registers fn for the ClearAliroReaderConfig command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleClearAliroReaderConfig is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleClearAliroReaderConfig(fn func(ctx context.Context, req ClearAliroReaderConfigRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdClearAliroReaderConfig, fn)
 }
 
+// RecordDoorLockAlarm records the DoorLockAlarm event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordDoorLockAlarm(data DoorLockAlarmEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventDoorLockAlarm, data)
+}
+
 // EmitDoorLockAlarm emits the DoorLockAlarm event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordDoorLockAlarm, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitDoorLockAlarm(endpoint uint16, data DoorLockAlarmEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventDoorLockAlarm, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventDoorLockAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordDoorStateChange records the DoorStateChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordDoorStateChange(data DoorStateChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventDoorStateChange, data)
 }
 
 // EmitDoorStateChange emits the DoorStateChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordDoorStateChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitDoorStateChange(endpoint uint16, data DoorStateChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventDoorStateChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventDoorStateChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLockOperation records the LockOperation event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLockOperation(data LockOperationEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLockOperation, data)
 }
 
 // EmitLockOperation emits the LockOperation event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLockOperation, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLockOperation(endpoint uint16, data LockOperationEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperation, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperation, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLockOperationError records the LockOperationError event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLockOperationError(data LockOperationErrorEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLockOperationError, data)
 }
 
 // EmitLockOperationError emits the LockOperationError event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLockOperationError, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLockOperationError(endpoint uint16, data LockOperationErrorEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperationError, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperationError, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
+}
+
+// RecordLockUserChange records the LockUserChange event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLockUserChange(data LockUserChangeEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLockUserChange, data)
 }
 
 // EmitLockUserChange emits the LockUserChange event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLockUserChange, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLockUserChange(endpoint uint16, data LockUserChangeEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLockUserChange, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLockUserChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // Host is the DoorLock kit server's host methods: the ones Set, Get and
@@ -728,12 +864,20 @@ type Declare struct {
 	Initial Patch
 	// Features is the FeatureMap selection; zero is the device type's.
 	Features Feature
+	// NoFeatures selects no feature: FeatureMap 0, also where the
+	// device type's default selection enables one. Set beside a
+	// non-zero Features it is refused when the device is built.
+	NoFeatures bool
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
+	// Where the device serves the cluster with the generated server
+	// (no kit server for the selection), a command declared here
+	// without its Handle field is refused when the device is built
+	// (device.New), not left out of AcceptedCommandList unannounced.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.
@@ -825,7 +969,7 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.OnWrite != nil {
 		decl.Attach = d.attach
 	}
-	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0
+	decl.Features, decl.HasFeatures = uint32(d.Features), d.Features != 0 || d.NoFeatures
 	decl.Elements.Commands = append(decl.Elements.Commands, d.Commands...)
 	decl.Elements.Events = append(decl.Elements.Events, d.Events...)
 	if d.HandleLockDoor != nil {
@@ -915,6 +1059,11 @@ func (d Declare) ClusterDeclaration() spec.ClusterDeclaration {
 	if d.HandleClearAliroReaderConfig != nil {
 		decl.Elements.Commands = append(decl.Elements.Commands, CmdClearAliroReaderConfig)
 		decl.Attach = d.attach
+	}
+	if d.NoFeatures && d.Features != 0 {
+		decl.Attach = func(contract.ClusterServer) error {
+			return errors.New(Name + ": Declare sets both NoFeatures and Features")
+		}
 	}
 	return decl
 }

@@ -146,23 +146,98 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	_ = s.EmitSupplyVoltageLow(0, SupplyVoltageLowEvent{})                   // not in the empty definition's EventList: refused
-	_ = s.EmitSupplyVoltageHigh(0, SupplyVoltageHighEvent{})                 // not in the empty definition's EventList: refused
-	_ = s.EmitPowerMissingPhase(0, PowerMissingPhaseEvent{})                 // not in the empty definition's EventList: refused
-	_ = s.EmitSystemPressureLow(0, SystemPressureLowEvent{})                 // not in the empty definition's EventList: refused
-	_ = s.EmitSystemPressureHigh(0, SystemPressureHighEvent{})               // not in the empty definition's EventList: refused
-	_ = s.EmitDryRunning(0, DryRunningEvent{})                               // not in the empty definition's EventList: refused
-	_ = s.EmitMotorTemperatureHigh(0, MotorTemperatureHighEvent{})           // not in the empty definition's EventList: refused
-	_ = s.EmitPumpMotorFatalFailure(0, PumpMotorFatalFailureEvent{})         // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv})    // no EmitEvent
+	_ = s.EmitSupplyVoltageLow(0, SupplyVoltageLowEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSupplyVoltageLow(SupplyVoltageLowEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSupplyVoltageLow(SupplyVoltageLowEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSupplyVoltageLow on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitSupplyVoltageHigh(0, SupplyVoltageHighEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSupplyVoltageHigh(SupplyVoltageHighEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSupplyVoltageHigh(SupplyVoltageHighEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSupplyVoltageHigh on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitPowerMissingPhase(0, PowerMissingPhaseEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordPowerMissingPhase(PowerMissingPhaseEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPowerMissingPhase(PowerMissingPhaseEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPowerMissingPhase on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitSystemPressureLow(0, SystemPressureLowEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSystemPressureLow(SystemPressureLowEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSystemPressureLow(SystemPressureLowEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSystemPressureLow on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitSystemPressureHigh(0, SystemPressureHighEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSystemPressureHigh(SystemPressureHighEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSystemPressureHigh(SystemPressureHighEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSystemPressureHigh on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitDryRunning(0, DryRunningEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordDryRunning(DryRunningEvent{})  // the same, through EmitEvent
+	if err := bare.RecordDryRunning(DryRunningEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordDryRunning on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitMotorTemperatureHigh(0, MotorTemperatureHighEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordMotorTemperatureHigh(MotorTemperatureHighEvent{})  // the same, through EmitEvent
+	if err := bare.RecordMotorTemperatureHigh(MotorTemperatureHighEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordMotorTemperatureHigh on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitPumpMotorFatalFailure(0, PumpMotorFatalFailureEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordPumpMotorFatalFailure(PumpMotorFatalFailureEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPumpMotorFatalFailure(PumpMotorFatalFailureEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPumpMotorFatalFailure on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitElectronicTemperatureHigh(0, ElectronicTemperatureHighEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitPumpBlocked(0, PumpBlockedEvent{})                             // not in the empty definition's EventList: refused
-	_ = s.EmitSensorFailure(0, SensorFailureEvent{})                         // not in the empty definition's EventList: refused
+	_ = s.RecordElectronicTemperatureHigh(ElectronicTemperatureHighEvent{})  // the same, through EmitEvent
+	if err := bare.RecordElectronicTemperatureHigh(ElectronicTemperatureHighEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordElectronicTemperatureHigh on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitPumpBlocked(0, PumpBlockedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordPumpBlocked(PumpBlockedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordPumpBlocked(PumpBlockedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordPumpBlocked on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitSensorFailure(0, SensorFailureEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordSensorFailure(SensorFailureEvent{})  // the same, through EmitEvent
+	if err := bare.RecordSensorFailure(SensorFailureEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSensorFailure on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitElectronicNonFatalFailure(0, ElectronicNonFatalFailureEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitElectronicFatalFailure(0, ElectronicFatalFailureEvent{})       // not in the empty definition's EventList: refused
-	_ = s.EmitGeneralFault(0, GeneralFaultEvent{})                           // not in the empty definition's EventList: refused
-	_ = s.EmitLeakage(0, LeakageEvent{})                                     // not in the empty definition's EventList: refused
-	_ = s.EmitAirDetection(0, AirDetectionEvent{})                           // not in the empty definition's EventList: refused
-	_ = s.EmitTurbineOperation(0, TurbineOperationEvent{})                   // not in the empty definition's EventList: refused
+	_ = s.RecordElectronicNonFatalFailure(ElectronicNonFatalFailureEvent{})  // the same, through EmitEvent
+	if err := bare.RecordElectronicNonFatalFailure(ElectronicNonFatalFailureEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordElectronicNonFatalFailure on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitElectronicFatalFailure(0, ElectronicFatalFailureEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordElectronicFatalFailure(ElectronicFatalFailureEvent{})  // the same, through EmitEvent
+	if err := bare.RecordElectronicFatalFailure(ElectronicFatalFailureEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordElectronicFatalFailure on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitGeneralFault(0, GeneralFaultEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordGeneralFault(GeneralFaultEvent{})  // the same, through EmitEvent
+	if err := bare.RecordGeneralFault(GeneralFaultEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordGeneralFault on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitLeakage(0, LeakageEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordLeakage(LeakageEvent{})  // the same, through EmitEvent
+	if err := bare.RecordLeakage(LeakageEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordLeakage on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitAirDetection(0, AirDetectionEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordAirDetection(AirDetectionEvent{})  // the same, through EmitEvent
+	if err := bare.RecordAirDetection(AirDetectionEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordAirDetection on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitTurbineOperation(0, TurbineOperationEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordTurbineOperation(TurbineOperationEvent{})  // the same, through EmitEvent
+	if err := bare.RecordTurbineOperation(TurbineOperationEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordTurbineOperation on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

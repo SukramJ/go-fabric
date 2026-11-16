@@ -36,7 +36,7 @@ func (transportOnly) Stop(context.Context, *mpdef.State) (mpdef.PlaybackResponse
 func TestAnOptionalCommandThePortLacksIsUnsupported(t *testing.T) {
 	t.Parallel()
 	playing := mpdef.PlaybackStatePlaying
-	d, err := NewCastingVideoPlayer(testOptions("player"), mpdef.Declare{Playback: transportOnly{}, Initial: mpdef.Patch{CurrentState: &playing}})
+	d, err := NewCastingVideoPlayer(testOptions("player"), req("CastingVideoPlayer", mpdef.Declare{Playback: transportOnly{}, Initial: mpdef.Patch{CurrentState: &playing}})...)
 	if err != nil {
 		t.Fatal(err)
 	}

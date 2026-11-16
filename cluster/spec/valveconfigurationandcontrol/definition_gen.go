@@ -14,6 +14,8 @@
 package valveconfigurationandcontrol
 
 import (
+	"time"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -246,10 +248,11 @@ var Definition = &spec.Cluster{
 		},
 		{
 			ID: AttrRemainingDuration, Name: "RemainingDuration",
-			Type:        spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
-			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
-			Access:      spec.Access{RW: "R", Read: spec.PrivilegeView},
-			Quality:     spec.Quality{Nullable: true, Quieter: true},
+			Type:          spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32},
+			Conformance:   spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			Access:        spec.Access{RW: "R", Read: spec.PrivilegeView},
+			Quality:       spec.Quality{Nullable: true, Quieter: true},
+			QuietInterval: time.Second,
 		},
 		{
 			ID: AttrCurrentState, Name: "CurrentState",

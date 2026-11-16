@@ -103,7 +103,7 @@ func TestPairOverBLE(t *testing.T) {
 	p := &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1E", Discriminator: harnessDiscriminator, VendorID: 0xFFF1, ProductID: 0x8001}
 	h := startHarness(t, func(c *node.Config) {
 		c.Network.WiFi = &node.WiFi{Driver: drv}
-		c.Network.BLE = p.Radio()
+		c.Network.GATT = p.Radio()
 	})
 	tl := newTool(t, h)
 	opts := Options{Central: func(string) (ble.Central, error) { return bletest.NewCentral(p), nil }}

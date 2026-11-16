@@ -47,9 +47,10 @@ type BridgedDeviceBasicInformation struct {
 	dataVersion cluster.DataVersionTracker
 
 	onNodeLabelWrite func(string)
+	saveNodeLabel    func(context.Context, string) error
 	// writeMu serialises controller NodeLabel writes: the comparison, the
-	// store and the OnNodeLabelWrite call are one step, so the hook hears
-	// the labels in the order they are stored. It is never held with mu
+	// save, the store and the OnNodeLabelWrite call are one step, so the
+	// hooks hear the labels in the order they are stored. It is never held with mu
 	// taken first; the hook runs under writeMu, not mu, so it may read the
 	// server.
 	writeMu sync.Mutex
@@ -179,6 +180,13 @@ type BridgedConfig struct {
 	// endpoint keeps it (a server rebuilt per dispatch cannot keep it
 	// itself). The held label reaches no hook.
 	OnNodeLabelWrite func(label string)
+	// SaveNodeLabel, when set, stores a NodeLabel a controller writes
+	// before the server holds it — a label that passed validation and
+	// differs from the one held, as OnNodeLabelWrite hears it. Its error
+	// refuses the write: the write fails (FAILURE) and the server keeps
+	// serving the label it held, and OnNodeLabelWrite does not run. The
+	// store-error rule of store/doc.go.
+	SaveNodeLabel func(ctx context.Context, label string) error
 	// Logger receives the cluster's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 }
@@ -235,6 +243,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		nodeLabel:         cfg.NodeLabel,
 		reachable:         reachable,
 		onNodeLabelWrite:  cfg.OnNodeLabelWrite,
+		saveNodeLabel:     cfg.SaveNodeLabel,
 		configVersion:     max(cfg.ConfigurationVersion, 1),
 	}
 	validateBridgedBasicInfoAttributes(cfg, serialNumber, b.log)
@@ -469,7 +478,7 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(ctx context.Context, attrID 
 // stored; the held label reaches no hook (matter.js observes no equal
 // field, Datasource.ts:1406-1407 and :1479). A hook that writes NodeLabel
 // to this server again deadlocks.
-func (b *BridgedDeviceBasicInformation) MatterWriteChanged(_ context.Context, attrID uint32, value any) (bool, error) {
+func (b *BridgedDeviceBasicInformation) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != bridgedBasicInfoAttrNodeLabel {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
 		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
@@ -495,12 +504,21 @@ func (b *BridgedDeviceBasicInformation) MatterWriteChanged(_ context.Context, at
 	defer b.writeMu.Unlock()
 	b.mu.Lock()
 	changed := b.nodeLabel != s
-	b.nodeLabel = s
-	hook := b.onNodeLabelWrite
+	hook, save := b.onNodeLabelWrite, b.saveNodeLabel
 	b.mu.Unlock()
 	if !changed {
 		return false, nil
 	}
+	// Stored before it is held: a refused store answers FAILURE and the
+	// label held stays served (SaveNodeLabel).
+	if save != nil {
+		if err := save(ctx, s); err != nil {
+			return false, fmt.Errorf("core: BridgedDeviceBasicInformation: store NodeLabel: %w", err)
+		}
+	}
+	b.mu.Lock()
+	b.nodeLabel = s
+	b.mu.Unlock()
 	if hook != nil {
 		hook(s)
 	}

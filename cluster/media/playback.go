@@ -206,5 +206,13 @@ func (s *PlaybackServer) SetAttributes(values map[uint32]any) error { return s.s
 // EmitStateChanged emits StateChanged (event 0x00, info; :83-95), which the
 // server emits when cfg.Events lists it.
 func (s *PlaybackServer) EmitStateChanged(ev mpdef.StateChangedEvent) error {
-	return s.Emit(s.endpoint(), mpdef.EventStateChanged, ev)
+	return s.EmitEvent(mpdef.EventStateChanged, ev)
+}
+
+// SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
+// server's events are addressed to, for its own events and the store's
+// EmitEvent alike.
+func (s *PlaybackServer) SetEndpoint(endpoint uint16) {
+	s.events.SetEndpoint(endpoint)
+	s.Server.SetEndpoint(endpoint)
 }

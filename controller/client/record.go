@@ -55,7 +55,8 @@ const (
 	recTCPSupport                uint32 = 21 // :1083-1084
 	recLongIdleTimeOperatingMode uint32 = 22 // :1089-1090
 	recOperationalHost           uint32 = 23 // this module's (issue 478): peer.Descriptor.OperationalHost; matter.js has no such field
-	recordFields                        = 24
+	recAttestedProduct           uint32 = 24 // review II decision 105: Record.AttestedVendorID/AttestedProductID
+	recordFields                        = 25
 )
 
 // Record is a node's commissioning record: who the node is on our fabric,
@@ -103,6 +104,21 @@ type Record struct {
 	// VendorID and ProductID are the announced ids, nil when unknown or
 	// announced as 0 (:1019-1029, RemoteDescriptor.ts:214-221).
 	VendorID, ProductID *uint16
+	// AttestedVendorID and AttestedProductID are the attested ids: the
+	// BasicInformation VendorID and ProductID the node reported when it
+	// was commissioned, which device attestation validated against the
+	// node's Certification Declaration (the declaration's vendor_id is
+	// that VendorID and its product_id_array holds that ProductID). They
+	// are set together or not at all, and only when the DAC chain was
+	// verified and no error finding stands; nil when unknown — a node
+	// commissioned before the field existed, one whose attestation ran
+	// without a trust store, failed or had an error finding the policy
+	// accepted, one not commissioned (a decommission clears them). They are not the announced VendorID and ProductID
+	// above, and not the DAC's ids, which a white-label product's
+	// declaration may name as dac_origin_vendor_id/product_id instead.
+	// Added by review II decision 105, for the OTA provider's identity
+	// check (controller/softwareupdate).
+	AttestedVendorID, AttestedProductID *uint16
 	// DeviceType is the announced device type, nil when unknown
 	// (:1031-1035).
 	DeviceType *uint32
@@ -173,6 +189,7 @@ func (r Record) clone() Record {
 	c.Addresses = slices.Clone(r.Addresses)
 	c.Discriminator = clonePtr(r.Discriminator)
 	c.VendorID, c.ProductID = clonePtr(r.VendorID), clonePtr(r.ProductID)
+	c.AttestedVendorID, c.AttestedProductID = clonePtr(r.AttestedVendorID), clonePtr(r.AttestedProductID)
 	c.DeviceType = clonePtr(r.DeviceType)
 	c.PairingHint = clonePtr(r.PairingHint)
 	c.ReportedSessionParameters = clonePtr(r.ReportedSessionParameters)
@@ -260,6 +277,12 @@ func (r Record) encode() (map[uint32][]byte, error) {
 	add(r.CommissioningMode != 0, recCommissioningMode, func(e *tlv.Encoder) { e.PutUint(anon, uint64(r.CommissioningMode)) })
 	add(r.VendorID != nil, recVendorID, func(e *tlv.Encoder) { e.PutUint(anon, uint64(*r.VendorID)) })
 	add(r.ProductID != nil, recProductID, func(e *tlv.Encoder) { e.PutUint(anon, uint64(*r.ProductID)) })
+	add(r.AttestedVendorID != nil && r.AttestedProductID != nil, recAttestedProduct, func(e *tlv.Encoder) {
+		e.StartStruct(anon)
+		e.PutUint(tlv.ContextTag(0), uint64(*r.AttestedVendorID))
+		e.PutUint(tlv.ContextTag(1), uint64(*r.AttestedProductID))
+		_ = e.EndContainer()
+	})
 	add(r.DeviceType != nil, recDeviceType, func(e *tlv.Encoder) { e.PutUint(anon, uint64(*r.DeviceType)) })
 	str(recDeviceName, r.DeviceName)
 	add(r.ReportedSessionParameters != nil, recReportedSessionParameters, func(e *tlv.Encoder) { r.ReportedSessionParameters.Encode(e, anon) })
@@ -392,6 +415,14 @@ func (r *Record) decodeField(id uint32, n spec.Node) error {
 		r.ProductID, err = decodePtr(n, spec.DecodeUint[uint16](16))
 	case recDeviceType:
 		r.DeviceType, err = decodePtr(n, spec.DecodeUint[uint32](32))
+	case recAttestedProduct:
+		var vid, pid uint16
+		err = spec.DecodeFields(n, "attestedProduct",
+			spec.Bind(0, "vendorId", true, &vid, spec.DecodeUint[uint16](16)),
+			spec.Bind(1, "productId", true, &pid, spec.DecodeUint[uint16](16)))
+		if err == nil {
+			r.AttestedVendorID, r.AttestedProductID = &vid, &pid
+		}
 	case recTCPUnsupported:
 		r.TCPUnsupported, err = spec.DecodeBool(n)
 	case recPairingHint:

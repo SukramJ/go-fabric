@@ -683,13 +683,14 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	if err != nil {
 		return false, err
 	}
-	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
-		return false, err
-	}
 	n, _ := v.(uint64)      // an enum8 per ValidateWrite
 	level := Sensitivity(n) //nolint:gosec // an enum8 per ValidateWrite
 	if s.state().SmokeSensitivityLevel == level {
 		return false, nil
+	}
+	// The host's veto hears a change only ([spec.Hooks.CheckWrite]).
+	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
+		return false, err
 	}
 	setter, _ := s.src.(SensitivitySetter) // guaranteed by NewServer
 	if err := setter.SetSmokeSensitivityLevel(ctx, level); err != nil {
@@ -772,7 +773,12 @@ func (s *Server) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
+	s.hooks.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
 }
+
+// EmitEvent emits eventID on the endpoint the server is mounted on
+// ([spec.Hooks.EmitEvent]) — the call the typed Record<Event> makes.
+func (s *Server) EmitEvent(eventID uint32, data any) error { return s.hooks.EmitEvent(eventID, data) }
 
 // AlarmSeverityEvent is the payload of the SmokeAlarm, CoAlarm,
 // LowBattery, InterconnectSmokeAlarm and InterconnectCoAlarm events: one

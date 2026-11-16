@@ -167,10 +167,7 @@ func (s *Server) phase() *uint8 {
 	return &c
 }
 
-// Handle implements [spec.CommandRegistrar]: the host's handler of cmdID
-// replaces the server's own handling of it — the state check included —
-// as a matter.js host overrides the behavior's command method; nil hands
-// it back ([spec.HostHandlers]).
+// Handle implements [spec.CommandRegistrar] ([spec.HostHandlers]).
 func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	return s.hooks.Register(s.inst, cmdID, fn)
 }

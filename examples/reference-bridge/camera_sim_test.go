@@ -87,6 +87,7 @@ func simCamera(t *testing.T, opts cameraOptions, edit ...func(*demoCamera)) (*de
 	rec := &simEvents{ch: make(chan simEvent, 64)}
 	for _, srv := range []contract.ClusterServer{c.camera.ZoneManagement().Underlying(), c.camera.PushAvStreamTransport().Underlying()} {
 		srv.(contract.EventReceiver).SetMatterEventEmitter(rec)
+		srv.(contract.EndpointReceiver).SetEndpoint(1) // mounted, as the bridge mounts it
 	}
 	return c, fake, rec
 }

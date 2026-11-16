@@ -114,9 +114,28 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleResetCounts(func(context.Context, ResetCountsRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleResetCounts: a command the server does not accept was registered")
 	}
-	_ = s.EmitDisconnection(0, DisconnectionEvent{})           // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitDisconnection(0, DisconnectionEvent{})    // not in the empty definition's EventList: refused
+	_ = s.RecordDisconnection(DisconnectionEvent{})     // the same, through EmitEvent
+	if err := bare.RecordDisconnection(DisconnectionEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordDisconnection on a server without EmitEvent: %v", err)
+	}
 	_ = s.EmitAssociationFailure(0, AssociationFailureEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitConnectionStatus(0, ConnectionStatusEvent{})     // not in the empty definition's EventList: refused
+	_ = s.RecordAssociationFailure(AssociationFailureEvent{})  // the same, through EmitEvent
+	if err := bare.RecordAssociationFailure(AssociationFailureEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordAssociationFailure on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitConnectionStatus(0, ConnectionStatusEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordConnectionStatus(ConnectionStatusEvent{})  // the same, through EmitEvent
+	if err := bare.RecordConnectionStatus(ConnectionStatusEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordConnectionStatus on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

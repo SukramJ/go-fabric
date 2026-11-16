@@ -35,6 +35,10 @@ func clientNode(t *testing.T) *Node {
 	anyFabric := func(handshake.PeerAddress) (handshake.Fabric, bool) {
 		return handshake.Fabric{Identity: &sigma.Identity{}}, true
 	}
+	// The records in memory: these tests hold the fabric hooks to what they
+	// forget, with peers on fabrics the store does not hold
+	// (handshake.StoreResumption keeps them in the store's rows).
+	n.client.resumption = &handshake.MemoryResumptionStore{}
 	peers, err := peer.NewSet(peer.Context{
 		Exchanges: n.client.exchanges, Names: n.client.names, Fabrics: anyFabric,
 		Resumption: n.client.resumption, Logger: n.logger, Clock: n.cfg.Clock,

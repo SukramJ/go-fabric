@@ -128,8 +128,23 @@ func TestTypedServer(t *testing.T) {
 	if err := s.OnWrite(func(context.Context, State, uint32) error { return nil }); err != nil {
 		t.Error(err)
 	}
+	bare := Wrap(struct{ contract.ClusterServer }{srv})                          // no EmitEvent
 	_ = s.EmitAmbientContextDetectStarted(0, AmbientContextDetectStartedEvent{}) // not in the empty definition's EventList: refused
-	_ = s.EmitAmbientContextDetectEnded(0, AmbientContextDetectEndedEvent{})     // not in the empty definition's EventList: refused
+	_ = s.RecordAmbientContextDetectStarted(AmbientContextDetectStartedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordAmbientContextDetectStarted(AmbientContextDetectStartedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordAmbientContextDetectStarted on a server without EmitEvent: %v", err)
+	}
+	_ = s.EmitAmbientContextDetectEnded(0, AmbientContextDetectEndedEvent{}) // not in the empty definition's EventList: refused
+	_ = s.RecordAmbientContextDetectEnded(AmbientContextDetectEndedEvent{})  // the same, through EmitEvent
+	if err := bare.RecordAmbientContextDetectEnded(AmbientContextDetectEndedEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordAmbientContextDetectEnded on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

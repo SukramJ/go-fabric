@@ -47,7 +47,10 @@ type Config struct {
 	// Network mirrors matter.js `network` (NetworkServer.ts:202-222).
 	Network Network
 	// Commissioning mirrors matter.js `commissioning`
-	// (CommissioningServer.ts:400-410).
+	// (CommissioningServer.ts:409-419 at db021da0). An uncommissioned
+	// node's own window closes after 48 h and nothing reopens it: the node
+	// is then not commissionable until the host calls [Node.OpenOwnWindow]
+	// ([Observers].OnWindowTransition reports the close).
 	Commissioning Commissioning
 	// ProductDescription mirrors matter.js `productDescription`
 	// (ProductDescriptionServer.ts:70-90): the identity the commissionable
@@ -61,8 +64,10 @@ type Config struct {
 	Store Store
 	// Advertiser publishes the node over DNS-SD. nil is the node's own:
 	// the module's mDNS responder (mdns.NewResponder), configured by
-	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Disabled. [Node.Stop]
-	// closes it, the host's as the node's.
+	// [Network].MDNS, or mdns.NewNoop() with [MDNS].Off. [Node.Stop]
+	// closes it, the host's as the node's. [Network].MDNS configures the
+	// node's own advertiser only: with Advertiser set, an MDNS with Off,
+	// HostName or Interfaces set fails [Config.Validate].
 	Advertiser Advertiser
 	// DeviceTypeValidation is the bridge's device-type judgement mode
 	// (bridge.SetDeviceTypeValidation); the zero value is matter.js's
@@ -102,8 +107,8 @@ type Config struct {
 	// OTAProvider serves OTA images: the OTA Software Update Provider on an
 	// endpoint of device type OtaProvider beside the Aggregator, its images
 	// over BDX (ADR 0021). nil, or no ImageSource, mounts none. With
-	// Topology set the node builds the provider ([Node.OTAProvider]) and
-	// the host mounts it.
+	// [Config].Snapshotter set the node builds the provider
+	// ([Node.OTAProvider]) and the host mounts it.
 	OTAProvider *OTAProviderConfig
 	// WebRTCRequestor is the node's part of the WebRtcTransportRequestor
 	// servers its topology mounts (camera.Requestor, the default of
@@ -145,11 +150,18 @@ type Config struct {
 	// endpoints' servers, the PartsList providers and every port stay the
 	// facade's. nil is the facade's [Aggregator] under one scope.
 	Snapshotter Snapshotter
-	// EndpointPersistence, when set, replaces the facade's own scene and
-	// bridged-NodeLabel persistence ([NewEndpointPersistence] over the
-	// node's store) in the facade's assembler and [Aggregator], for a host
-	// that keeps that state itself; [Node.Persistence] returns it. nil is
-	// the facade's own.
+	// EndpointState, when set, replaces the facade's own scene and
+	// bridged-NodeLabel persistence ([NewEndpointState] over the node's
+	// store) in the facade's assembler and [Aggregator], for a host that
+	// keeps that state itself. nil is the facade's own (or, while it is
+	// set, EndpointPersistence adapted).
+	EndpointState EndpointState
+	// EndpointPersistence, when set and EndpointState is not, replaces the
+	// facade's own scene and bridged-NodeLabel persistence; its hooks
+	// cannot refuse a save. [Node.Persistence] returns it.
+	//
+	// Deprecated: use EndpointState, whose saves refuse a controller's
+	// change the store refuses. Removable in the next minor release.
 	EndpointPersistence EndpointPersistence
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
@@ -177,11 +189,11 @@ type Config struct {
 	// [Aggregator.Add] refuses one whose digest is not this one's
 	// ([ErrPolicyMismatch]). The zero value is no policy.
 	Surface surface.Policies
-	// SupportedFabrics is OperationalCredentials' SupportedFabrics, the
-	// number of fabrics the node admits (Matter §11.18.4.4: 1 to 254); 0
-	// is 5, the facade's value before it was configurable. matter.js
-	// defaults it to 254 when unset (OperationalCredentialsServer.ts:
-	// 84-88 initialize), which cluster/core does too; the facade keeps 5.
+	// SupportedFabrics is [Limits].SupportedFabrics.
+	//
+	// Deprecated: set Limits.SupportedFabrics, where the node's other
+	// capacity limits are; removable in the next minor release. It keeps
+	// its meaning while Limits.SupportedFabrics is zero.
 	SupportedFabrics uint8
 	// TimeSynchronization is the root TimeSynchronization cluster
 	// (0x0038), mounted by default ([TimeSynchronization]); its Off
@@ -203,13 +215,11 @@ type Config struct {
 	// clear…Fault do (GeneralDiagnosticsServer.ts:296-411 at db021da0).
 	// nil serves neither the lists nor the events.
 	Faults contract.FaultSource
-	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry:
-	// the root BasicInformation advertises it, the PASE and CASE session
-	// parameters carry it and the invoke path refuses a larger batch with
-	// InvalidAction. 0 is im.DefaultMaxPathsPerInvoke (10), matter.js's
-	// DEFAULT_MAX_PATHS_PER_INVOKE. Mirrors matter.js
-	// basicInformation.maxPathsPerInvoke, which InteractionServer.ts:198
-	// enforces.
+	// MaxPathsPerInvoke is [Limits].MaxPathsPerInvoke.
+	//
+	// Deprecated: set Limits.MaxPathsPerInvoke, where the node's other
+	// capacity limits are; removable in the next minor release. It keeps
+	// its meaning while Limits.MaxPathsPerInvoke is zero.
 	MaxPathsPerInvoke uint16
 	// Sessions are the MRP intervals the node reports in its session
 	// parameters and its operational DNS-SD record ([SessionIntervals]);
@@ -292,7 +302,19 @@ type Network struct {
 	// for a window an administrator opens (:255-275); when its last fabric
 	// is removed, the own window that reopens is on BLE again. nil is no
 	// BLE.
-	BLE contract.BLEPeripheral
+	//
+	// Deprecated: set GATT, whose service registration is answered before
+	// the node advertises; removable in the next minor release. BLE keeps
+	// its meaning while GATT is nil; both set fail [Config.Validate].
+	BLE contract.BLEPeripheral //nolint:staticcheck // the deprecated port, kept for its window
+	// GATT is the node's Bluetooth LE peripheral ([contract.GATTPeripheral]),
+	// with what BLE describes: an uncommissioned node is commissionable
+	// over it, the onboarding payload says so, and the node leaves the
+	// radio once it is commissioned. The node registers the Matter GATT
+	// service before it advertises; a registration the platform refuses
+	// leaves the node off the air, logged as commissioning.ble.start. nil
+	// (with BLE nil) is no BLE.
+	GATT contract.GATTPeripheral
 	// WiFi is the node's Wi-Fi interface: its Driver joins the network a
 	// commissioner hands it (NetworkCommissioning with the Wi-Fi feature),
 	// its Reporter answers WiFiNetworkDiagnostics (0x0036). Either or both;
@@ -424,9 +446,10 @@ func (c *Config) rootDeviceConditions() []string {
 	return out
 }
 
-// Commissioning is matter.js `commissioning` (CommissioningServer.ts:
-// 370-380: passcode, discriminator) plus the SPAKE2+ PBKDF parameters the
-// daemon configures (main.go:91-92 at b4ea1f96^).
+// Commissioning is matter.js `commissioning` (the State of
+// CommissioningServer.ts:409-419 at db021da0: passcode, discriminator)
+// plus the SPAKE2+ PBKDF parameters the daemon configures
+// (main.go:91-92 at b4ea1f96^).
 type Commissioning struct {
 	// Passcode is the setup passcode; it must pass setup.IsValidSetupPIN.
 	Passcode uint32
@@ -472,7 +495,60 @@ type Commissioning struct {
 	// tentative one with the fail-safe and resets it with the last fabric.
 	// The row is served behind [Config].Surface's Extensions (ADR 0030).
 	TermsAndConditions *TermsAndConditions
+	// WindowOnDemand leaves the node's own commissioning window to the
+	// host: the node opens none by itself — not at [Node.Start] while it
+	// has no fabric, not after its last fabric is removed, not when a
+	// [Node.OpenBasicWindow] window closes and not when
+	// [Node.SetCommissioningBlocked] lifts. Until the host calls
+	// [Node.OpenOwnWindow] (or [Node.OpenBasicWindow]) the node accepts
+	// no PASE and publishes no commissionable record, over DNS-SD or BLE;
+	// a commissioned node is unaffected. It is the start of a User-Intent
+	// product (a button opens the window). The zero value opens the
+	// window as before. Mirrors matter.js `commissioning.enabled: false`
+	// (packages/node/src/behavior/system/commissioning/
+	// CommissioningServer.ts:266-273, the field :410 at db021da0).
+	WindowOnDemand bool
+	// Flow is the commissioning flow the onboarding payload states
+	// ([FlowStandard], [FlowUserIntent], [FlowCustom]): the QR code's
+	// flow field and, for a flow other than Standard, the long manual
+	// code with the vendor and product id ([Node.SetupPayload],
+	// [Node.PairingCodesFor]). It states the flow only; whether the node
+	// opens its window by itself is WindowOnDemand. Mirrors matter.js
+	// `commissioning.flowType` (CommissioningServer.ts:415, the QR code
+	// :438, the manual code :446-454 at db021da0).
+	Flow CommissioningFlow
+	// PairingHints is the commissionable record's pairing hint (the `PH`
+	// key): how a user puts the device into commissioning mode, every
+	// bit of [mdns.PairingHints]. Zero sends powerCycle | deviceManual
+	// ([mdns.PairingHintsDefault]). A commissioner built on
+	// connectedhomeip reads a hint with any of bits 16 to 22 set as no
+	// hint at all (see [mdns.PairingHints]).
+	PairingHints mdns.PairingHints
+	// PairingInstruction is the record's `PI` key, the number or text a
+	// hint that needs one refers to. A hint and an instruction that do
+	// not belong together fail [Config.Validate] with
+	// [mdns.ErrInvalidService]: at most one hint that needs an
+	// instruction, that hint with an instruction, an instruction only
+	// with such a hint ([mdns.CommissionableServiceConfig.Validate]).
+	PairingInstruction string
 }
+
+// CommissioningFlow is the commissioning flow an onboarding payload
+// states ([Commissioning].Flow): the QR code's two-bit flow field.
+type CommissioningFlow uint8
+
+const (
+	// FlowStandard is the standard flow: the device is commissionable when
+	// powered.
+	FlowStandard CommissioningFlow = iota
+	// FlowUserIntent is the user-intent flow: the user acts on the device
+	// (a button) before it is commissionable — commonly with
+	// [Commissioning].WindowOnDemand.
+	FlowUserIntent
+	// FlowCustom is the custom flow: the vendor's own steps, looked up by
+	// vendor and product id.
+	FlowCustom
+)
 
 // locationCapability is the LocationCapability the root's
 // GeneralCommissioning serves: Indoor with IndoorOnly, IndoorOutdoor for the
@@ -513,6 +589,8 @@ func (t *TermsAndConditions) core() *mattercore.TermsAndConditionsConfig {
 type ProductDescription struct {
 	// Name is the advertised device name; empty is
 	// BasicInformation.NodeLabel, as the daemon advertises (main.go:285 at b4ea1f96^).
+	// The name advertised — this one, or the NodeLabel standing in — is at
+	// most 32 bytes; a longer one fails [Config.Validate] (decision 26).
 	Name string
 	// DeviceType is the device type the commissionable advertisement
 	// carries (the DT key and the _T<id> subtype). 0 infers it from the
@@ -582,10 +660,44 @@ type Store struct {
 	// Path is a SQLite file the node opens (creating it on first use)
 	// with the pure-Go driver modernc.org/sqlite, foreign keys on and a
 	// 5 s busy timeout; [Node.Stop] closes it. It excludes DB.
-	Path        string
-	DB          *sql.DB
+	Path string
+	// DB is a SQLite database the host opened and keeps: the node applies
+	// both schemas to it and opens its stores on it; [Node.FactoryReset]
+	// scrubs it ([store.Scrub]) after the erase. It excludes Path.
+	DB *sql.DB
+	// Credentials overrides the credential store built from DB or Path.
+	// [Node.FactoryReset] erases it through [store.Eraser]; the erase of a
+	// SQLite store (store.New) scrubs the file it is on.
 	Credentials store.Port
-	Endpoints   endpoint.Store
+	// Endpoints overrides the endpoint-number store built from DB or Path.
+	// [Node.FactoryReset] erases its records row by row and does not scrub
+	// the file they live in: on the host's own database the deleted bytes
+	// may stay in it until the host runs [store.Scrub] on that file.
+	Endpoints endpoint.Store
+	// Sealer seals the secrets of the credential store the node builds on
+	// DB or Path (opt-in): New applies the schema (store.Apply) and opens
+	// the store with store.NewSealed, which seals the clear rows it finds
+	// and scrubs the file; New returns its error. The key must live
+	// outside the database (docs/security.md, "Sealing at rest"). Every
+	// later start needs the same sealer: under another key New fails
+	// with an error that wraps store.ErrUnseal (NewSealed opens one
+	// sealed value first); a store without one reads a sealed secret as
+	// store.ErrNoSealer. It excludes
+	// Credentials (an override is sealed by the host that built it).
+	Sealer store.Sealer
+}
+
+// validate checks which stores the node opens and builds.
+func (s Store) validate() error {
+	switch {
+	case s.Path != "" && s.DB != nil:
+		return errors.New("node: Store takes Path or DB, not both")
+	case s.Path == "" && s.DB == nil && (s.Credentials == nil || s.Endpoints == nil):
+		return errors.New("node: Store needs Path, DB, or both Credentials and Endpoints")
+	case s.Sealer != nil && (s.Credentials != nil || (s.Path == "" && s.DB == nil)):
+		return errors.New("node: Store.Sealer seals the store the node builds on Path or DB; it excludes Credentials")
+	}
+	return nil
 }
 
 // Attestation is the device attestation material.
@@ -673,6 +785,24 @@ const (
 	defaultSupportedFabrics = 5
 )
 
+// maxDeviceNameBytes bounds the commissionable record's `DN` key, the
+// advertised device name (mdns.CommissionableServiceConfig.DeviceName:
+// at most 32 UTF-8 bytes; decision 26).
+const maxDeviceNameBytes = 32
+
+// advertisedName is the device name the commissionable record carries:
+// ProductDescription.Name, else the NodeLabel, which defaults to the
+// ProductName (BasicInformation.defaultNodeLabel).
+func (c *Config) advertisedName() string {
+	switch {
+	case c.ProductDescription.Name != "":
+		return c.ProductDescription.Name
+	case c.BasicInformation.NodeLabel != "":
+		return c.BasicInformation.NodeLabel
+	}
+	return c.BasicInformation.ProductName
+}
+
 // maxUniqueIDBytes is the UniqueID attribute's length ceiling (Matter
 // §11.1.5.13, 32 UTF-8 bytes), the bound mattercore.NewBasicInformation
 // enforces too.
@@ -733,11 +863,8 @@ func (c *Config) Validate() error {
 	if c.ProductDescription.VendorID == 0 || c.ProductDescription.ProductID == 0 {
 		errs = append(errs, errors.New("node: ProductDescription.VendorID and ProductID must be non-zero"))
 	}
-	switch {
-	case c.Store.Path != "" && c.Store.DB != nil:
-		errs = append(errs, errors.New("node: Store takes Path or DB, not both"))
-	case c.Store.Path == "" && c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil):
-		errs = append(errs, errors.New("node: Store needs Path, DB, or both Credentials and Endpoints"))
+	if err := c.Store.validate(); err != nil {
+		errs = append(errs, err)
 	}
 	// A mode that is none of warn, strict and off fails the node's
 	// construction. Mirrors matter.js
@@ -757,11 +884,17 @@ func (c *Config) Validate() error {
 	if cm.IndoorOnly && cm.LocationCapability != mattercore.RegulatoryIndoor {
 		errs = append(errs, fmt.Errorf("node: Commissioning.IndoorOnly excludes LocationCapability %d", cm.LocationCapability))
 	}
+	errs = append(errs, cm.onboardingErrors()...)
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
 		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
 	}
-	if c.SupportedFabrics > maxSupportedFabrics {
-		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+	errs = append(errs, c.limitsPairErrors()...)
+	errs = append(errs, c.advertisementErrors()...)
+	if c.Network.GATT != nil && c.Network.BLE != nil { //nolint:staticcheck // the deprecated port is still honoured
+		errs = append(errs, errors.New("node: Network takes GATT or the deprecated BLE, not both"))
+	}
+	if f := max(c.SupportedFabrics, c.Limits.SupportedFabrics); f > maxSupportedFabrics { //nolint:staticcheck // the deprecated field is still honoured
+		errs = append(errs, fmt.Errorf("node: SupportedFabrics %d exceeds %d", f, maxSupportedFabrics))
 	}
 	errs = append(errs, c.Limits.validate()...)
 	errs = append(errs, c.Sessions.validate()...)
@@ -778,6 +911,35 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 	return nil
+}
+
+// onboardingErrors checks what the onboarding payload and the
+// commissionable record state: a known flow, a pairing hint and
+// instruction that belong together.
+func (c Commissioning) onboardingErrors() []error {
+	var errs []error
+	if err := (mdns.CommissionableServiceConfig{Hints: c.PairingHints, PairingInstruction: c.PairingInstruction}).Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("node: Commissioning.PairingHints and PairingInstruction: %w", err))
+	}
+	if c.Flow > FlowCustom {
+		errs = append(errs, fmt.Errorf("node: Commissioning.Flow %d is not a flow; it must be one of FlowStandard, FlowUserIntent, FlowCustom", c.Flow))
+	}
+	return errs
+}
+
+// advertisementErrors checks the advertiser's configuration: Network.MDNS
+// configures the node's own advertiser only, so beside a host's
+// Advertiser it would be silently ignored; and the advertised device name
+// fits the record's `DN` key.
+func (c *Config) advertisementErrors() []error {
+	var errs []error
+	if m := c.Network.MDNS; c.Advertiser != nil && (m.Off || m.HostName != "" || len(m.Interfaces) > 0) {
+		errs = append(errs, errors.New("node: Network.MDNS (Off, HostName, Interfaces) configures the node's own advertiser and excludes Advertiser"))
+	}
+	if name := c.advertisedName(); len(name) > maxDeviceNameBytes {
+		errs = append(errs, fmt.Errorf("node: the advertised device name %q is %d bytes, at most %d (ProductDescription.Name, else BasicInformation.NodeLabel)", name, len(name), maxDeviceNameBytes))
+	}
+	return errs
 }
 
 // optionalErrors checks the optional sub-systems a Config turns on: each
@@ -822,4 +984,10 @@ func (c *Config) timeSynchronizationErrors() []error {
 		return []error{errors.New("node: TimeSynchronization.Config excludes TimeSynchronization.Off")}
 	}
 	return nil
+}
+
+// hasBLE reports whether the node has a Bluetooth LE peripheral
+// ([Network].GATT or the deprecated [Network].BLE).
+func (n Network) hasBLE() bool {
+	return n.GATT != nil || n.BLE != nil //nolint:staticcheck // the deprecated port is still honoured
 }

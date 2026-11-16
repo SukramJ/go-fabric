@@ -8,9 +8,8 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
+
+	"github.com/SukramJ/go-fabric/internal/attestids"
 )
 
 // ErrProductMismatch is returned by [ValidateProduct] when the DAC's or
@@ -71,96 +70,13 @@ func certificateIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 	return productIDsOf(c.Subject)
 }
 
-// maxFallbackCommonNameBytes is MAX_FALLBACK_COMMON_NAME_BYTES
-// (DistinguishedName.ts:345-346 at db021da0).
-const maxFallbackCommonNameBytes = 64
-
-var (
-	hexIDPattern       = regexp.MustCompile(`^[0-9A-F]{4}$`)
-	fallbackIDPatterns = map[string]*regexp.Regexp{
-		"Mvid:": regexp.MustCompile(`Mvid:([0-9A-F]{4})`),
-		"Mpid:": regexp.MustCompile(`Mpid:([0-9A-F]{4})`),
-	}
-)
-
 // productIDsOf reads a DN's vendor and product id as matter.js's DER parse
-// does with acceptMalformedVidPid (Certificate.ts:302-382,
-// DistinguishedName.ts:252-328 at db021da0):
-//
-//   - a matter-oid-vid or matter-oid-pid attribute that is not exactly 4
-//     uppercase hex digits (parseMatterRdnHex, Certificate.ts:242-249,
-//     :341-351), or that occurs twice (DistinguishedName.ts:261-270), is
-//     read as absent, whatever the other attribute of its type says
-//     (:318-320);
-//   - the commonName fallback is read only when the DN carries neither
-//     attribute, a malformed one counting (Certificate.ts:343, :377-381):
-//     the first commonName, in DN order, whose first 64 bytes carry a
-//     VendorID or ProductID supplies both (DistinguishedName.ts:345-374);
-//     a prefix without 4 uppercase hex digits in a commonName read is an
-//     error, which acceptMalformedVidPid does not cover (:63-72).
-//
-// controller/attestation reads the same rule without
-// acceptMalformedVidPid, where a malformed or repeated id is a profile
-// violation.
+// does with acceptMalformedVidPid: the rule of [attestids.FromName] with
+// acceptMalformed, where a malformed or repeated matter-oid-vid or
+// matter-oid-pid attribute is read as absent and a malformed commonName
+// fallback is still an error. controller/attestation reads the same rule
+// without acceptMalformedVidPid, where a malformed or repeated id is a
+// profile violation.
 func productIDsOf(name pkix.Name) (vid, pid *uint16, err error) {
-	hasAttribute, vidUnusable, pidUnusable := false, false, false
-	var commonNames []string
-	for _, n := range name.Names {
-		var out **uint16
-		var unusable *bool
-		switch {
-		case n.Type.Equal(oidMatterVendorID):
-			out, unusable = &vid, &vidUnusable
-		case n.Type.Equal(oidMatterProductID):
-			out, unusable = &pid, &pidUnusable
-		case n.Type.Equal(oidCommonName):
-			if s, ok := n.Value.(string); ok {
-				commonNames = append(commonNames, s)
-			}
-			continue
-		default:
-			continue
-		}
-		hasAttribute = true
-		s, _ := n.Value.(string)
-		switch {
-		case !hexIDPattern.MatchString(s), *out != nil:
-			*unusable = true
-		default:
-			v, _ := strconv.ParseUint(s, 16, 16)
-			id := uint16(v)
-			*out = &id
-		}
-	}
-	if hasAttribute {
-		if vidUnusable {
-			vid = nil
-		}
-		if pidUnusable {
-			pid = nil
-		}
-		return vid, pid, nil
-	}
-	for _, cn := range commonNames {
-		if len(cn) > maxFallbackCommonNameBytes {
-			cn = cn[:maxFallbackCommonNameBytes]
-		}
-		// VendorID first, as fallbackVidPid reads them (:367-368).
-		for _, f := range []struct {
-			prefix string
-			out    **uint16
-		}{{"Mvid:", &vid}, {"Mpid:", &pid}} {
-			if m := fallbackIDPatterns[f.prefix].FindStringSubmatch(cn); m != nil {
-				v, _ := strconv.ParseUint(m[1], 16, 16)
-				id := uint16(v)
-				*f.out = &id
-			} else if strings.Contains(cn, f.prefix) {
-				return nil, nil, fmt.Errorf("attestation: commonName contains %s not followed by 4 uppercase hex digits", f.prefix)
-			}
-		}
-		if vid != nil || pid != nil {
-			return vid, pid, nil
-		}
-	}
-	return nil, nil, nil
+	return attestids.FromName(name, true)
 }

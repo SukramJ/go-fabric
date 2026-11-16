@@ -98,7 +98,18 @@ func TestTypedServer(t *testing.T) {
 	if err := s.HandleResetWatermarks(func(context.Context, ResetWatermarksRequest) (struct{}, error) { return struct{}{}, nil }); err == nil {
 		t.Error("HandleResetWatermarks: a command the server does not accept was registered")
 	}
-	_ = s.EmitSoftwareFault(0, SoftwareFaultEvent{}) // not in the empty definition's EventList: refused
+	bare := Wrap(struct{ contract.ClusterServer }{srv}) // no EmitEvent
+	_ = s.EmitSoftwareFault(0, SoftwareFaultEvent{})    // not in the empty definition's EventList: refused
+	_ = s.RecordSoftwareFault(SoftwareFaultEvent{})     // the same, through EmitEvent
+	if err := bare.RecordSoftwareFault(SoftwareFaultEvent{}); err != spec.ErrNoEvents {
+		t.Errorf("RecordSoftwareFault on a server without EmitEvent: %v", err)
+	}
+	if decl := (Declare{NoFeatures: true}).ClusterDeclaration(); !decl.HasFeatures || decl.Features != 0 {
+		t.Error("Declare: NoFeatures selects no feature")
+	}
+	if decl := (Declare{NoFeatures: true, Features: 1}).ClusterDeclaration(); decl.Attach == nil || decl.Attach(srv) == nil {
+		t.Error("Declare: NoFeatures beside Features is not refused")
+	}
 	// The declaration: its cluster, its kit form, its veto installed.
 	d := Declare{OnWrite: func(context.Context, State, uint32) error { return nil }}
 	decl := d.ClusterDeclaration()

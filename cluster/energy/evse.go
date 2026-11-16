@@ -5,6 +5,7 @@ package energy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -394,7 +395,7 @@ func (s *EvseServer) forceLocked(attrID uint32, v any) {
 	_ = s.srv.Set(attrID, v)
 	if now, _ := s.srv.Value(attrID); now == old {
 		s.version.Bump()
-		s.srv.Notify(attrID)
+		s.srv.AttributeChanges.Notify(attrID)
 	}
 }
 
@@ -996,7 +997,9 @@ func (s *EvseServer) emitFaultLocked(fault EvseFault) {
 }
 
 func (s *EvseServer) emitLocked(eventID uint32, data any) error {
-	if err := s.srv.Emit(s.endpoint, eventID, data); err != nil {
+	// A server not in the topology (spec.ErrNotMounted) has no event log
+	// to record in: the state change stands, the event is dropped.
+	if err := s.srv.EmitEvent(eventID, data); err != nil && !errors.Is(err, spec.ErrNotMounted) {
 		return fmt.Errorf("energy: %w", err)
 	}
 	return nil
@@ -1387,6 +1390,7 @@ func (s *EvseServer) SetEndpoint(endpoint uint16) {
 		s.quiesced = false
 		s.scheduleEnabledCheckLocked()
 	}
+	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the enabled-until timer.
@@ -1403,8 +1407,13 @@ func (s *EvseServer) Close() {
 // so the server neither disables the supply nor tells its host or emits
 // an event afterwards. The server stays usable: the next EnableCharging or
 // EnableDischarging arms the timer again, and so does the
-// [EvseServer.SetEndpoint] of a reassembly that puts the server back.
-func (s *EvseServer) MatterQuiesce() { s.Close() }
+// [EvseServer.SetEndpoint] of a reassembly that puts the server back. The
+// store's quieter attributes drop a held report as well
+// ([spec.Server.MatterQuiesce]).
+func (s *EvseServer) MatterQuiesce() {
+	s.Close()
+	s.srv.MatterQuiesce()
+}
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *EvseServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
@@ -1417,6 +1426,13 @@ func (s *EvseServer) MatterDataVersion() uint32 { return s.srv.MatterDataVersion
 // OnAttributeChange implements [contract.AttributeChangeNotifier].
 func (s *EvseServer) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
 	return s.srv.OnAttributeChange(cb)
+}
+
+// OnAttributeReport implements [contract.AttributeReportNotifier]: the
+// changes that go on the wire, a quieter attribute's (SessionDuration,
+// SessionEnergyCharged, SessionEnergyDischarged) by its throttle.
+func (s *EvseServer) OnAttributeReport(cb func(change contract.Change)) (unsubscribe func()) {
+	return s.srv.OnAttributeReport(cb)
 }
 
 // MatterRead resolves an attribute.

@@ -108,42 +108,68 @@ func (s *Server) OnChangedAsync(fn func(state State, change contract.Change)) (u
 	return spec.OnChangedAsyncOf(s.Wrapper, fn)
 }
 
-// OnWrite installs fn as the veto of a controller's write
+// OnWrite installs fn as the host's veto of a controller's write
 // (spec.ServerConfig.BeforeWrite): next is the state with the written
-// value in place, attrID the attribute written. An error refuses the
+// value in place, attrID the attribute written. It runs behind the
+// server's own rules and its comparison with the held value, so a
+// write of the held value never reaches it. An error refuses the
 // write — with the IM status it carries, FAILURE otherwise — and nothing
-// is stored. nil removes the veto; spec.ErrNoWriteVeto for a server
-// that takes none. Declare.OnWrite is the veto at construction; this
-// setter changes it at run time.
+// is stored. nil removes the veto, never the server's own rule;
+// spec.ErrNoWriteVeto for a server that takes none. Declare.OnWrite is
+// the veto at construction; this setter changes it at run time.
 func (s *Server) OnWrite(fn func(ctx context.Context, next State, attrID uint32) error) error {
 	return spec.OnWriteOf(s.Underlying(), fn)
 }
 
-// HandleGetSetupPin registers fn for the GetSetupPin command; nil removes the handler;
+// HandleGetSetupPin registers fn for the GetSetupPin command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleGetSetupPin is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleGetSetupPin(fn func(ctx context.Context, req GetSetupPinRequest) (GetSetupPinResponse, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdGetSetupPin, fn)
 }
 
-// HandleLogin registers fn for the Login command; nil removes the handler;
+// HandleLogin registers fn for the Login command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleLogin is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLogin(fn func(ctx context.Context, req LoginRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLogin, fn)
 }
 
-// HandleLogout registers fn for the Logout command; nil removes the handler;
+// HandleLogout registers fn for the Logout command (spec.CommandRegistrar); nil
+// hands the command back to the server — the generated server restores
+// the handler it was built with, a self-held one its own logic;
 // spec.ErrNoHandlers for a server that takes none. Declare.HandleLogout is
 // the handler at construction; this setter changes it at run time.
 func (s *Server) HandleLogout(fn func(ctx context.Context, req LogoutRequest) (struct{}, error)) error {
 	return spec.HandleOn(s.Underlying(), CmdLogout, fn)
 }
 
+// RecordLoggedOut records the LoggedOut event on the endpoint the server is mounted
+// on, through its EmitEvent (spec.Server.EmitEvent):
+// spec.ErrNotMounted before the server knows its endpoint,
+// spec.ErrNoEvents for a server without EmitEvent.
+func (s *Server) RecordLoggedOut(data LoggedOutEvent) error {
+	em, ok := s.Underlying().(interface {
+		EmitEvent(eventID uint32, data any) error
+	})
+	if !ok {
+		return spec.ErrNoEvents
+	}
+	return em.EmitEvent(EventLoggedOut, data)
+}
+
 // EmitLoggedOut emits the LoggedOut event on endpoint through the server's Emit;
 // spec.ErrNoEvents for a server without one.
+//
+// Deprecated: use RecordLoggedOut, which emits on the endpoint the server is
+// mounted on instead of one its caller names. Removable in the next
+// minor release.
 func (s *Server) EmitLoggedOut(endpoint uint16, data LoggedOutEvent) error {
-	return spec.EmitOn(s.Underlying(), endpoint, EventLoggedOut, data)
+	return spec.EmitOn(s.Underlying(), endpoint, EventLoggedOut, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
 
 // AccountLogin carries out the three fabric-scoped, timed commands;
@@ -169,9 +195,13 @@ type Declare struct {
 	// Commands are optional commands the server accepts beyond the
 	// ones the selection mandates: the kit's server carries them out
 	// (through its port), a Handle field below handles one in its place.
+	// Where the device serves the cluster with the generated server
+	// (no kit server for the selection), a command declared here
+	// without its Handle field is refused when the device is built
+	// (device.New), not left out of AcceptedCommandList unannounced.
 	Commands []uint32
 	// Events are optional events the server emits beyond the ones the
-	// selection mandates (Server.Emit<Event>).
+	// selection mandates (Server.Record<Event>).
 	Events []uint32
 	// OnWrite vetoes a controller's write before it is stored
 	// (Server.OnWrite); it runs inline.

@@ -31,9 +31,10 @@ import (
 type ProviderICECandidate = wpdef.ICECandidateStruct
 
 // PeerConnector reaches the requestor of a session over a secure session
-// this node initiates (chip FindOrEstablishSession, webrtc-provider-manager
-// .cpp:860, :887, :914, :941). The node attaches its bridge's
-// (bridge.Bridge.ConnectPeer) to every [Provider] it assembles.
+// (chip FindOrEstablishSession, webrtc-provider-manager.cpp:860, :887,
+// :914, :941). The node attaches its peer path to every [Provider] it
+// assembles: a live TCP session with the requestor, whichever side opened
+// it, else a new one; [ErrNoLargeMessageTransport] when there is neither.
 type PeerConnector interface {
 	ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (PeerSession, error)
 }
@@ -49,18 +50,28 @@ type PeerSession interface {
 // Errors of the provider's signals.
 var (
 	// ErrPayloadTooLarge is a signal whose command does not fit one message
-	// of the session it would go over, refused before it is sent: over UDP
-	// 1178 bytes of payload (matter.js MAX_UDP_MESSAGE_SIZE less the message
-	// overhead, MessageExchange.ts:435-439), over a TCP connection the
-	// connection's largest message. connectedhomeip sends its signals with
-	// TransportPayloadCapability::kLargePayload, over TCP
-	// (webrtc-provider-manager.cpp:860-942 at 6170af84); this node
-	// initiates CASE over UDP only and reuses the newest live session of
-	// the peer, so a large signal reaches the peer when the peer came in
-	// over TCP. bridge.ErrPayloadTooLarge, which the node's [PeerSession]
-	// raises, is this value: a camera host recognises it with this package
-	// alone.
+	// of the session it would go over, refused before it is sent: over a
+	// TCP connection the connection's largest message, bounded by the
+	// MaxTcpMessageSize the peer stated; over UDP 1178 bytes of payload
+	// (matter.js MAX_UDP_MESSAGE_SIZE less the message overhead,
+	// MessageExchange.ts:435-439). Every signal is a Large Message command,
+	// which a node sends over TCP only ([ErrNoLargeMessageTransport]), so
+	// UDP's bound applies only to a [PeerConnector] that does not hold the
+	// signals to the quality — bridge.Bridge.ConnectPeer, deprecated, whose
+	// bridge.ErrPayloadTooLarge is this value: a camera host recognises it
+	// with this package alone.
 	ErrPayloadTooLarge = errors.New("camera: the command does not fit one message of the session to the peer")
+	// ErrNoLargeMessageTransport is a signal that cannot reach the
+	// requestor over a transport that carries large messages: every signal
+	// is a command with the Large Message quality, which goes over TCP only
+	// — no TCP session with the requestor is live and none could be
+	// established (this node dials no TCP, or the requestor accepts none).
+	// Nothing was sent. A requestor answers such a command on any other
+	// session with InvalidTransportType (connectedhomeip CheckCommandFlags,
+	// src/app/InteractionModelEngine.cpp:1875-1884 at 6170af84); its camera
+	// app sends the signals with TransportPayloadCapability::kLargePayload
+	// (webrtc-provider-manager.cpp:860-861, :887-888, :914-915, :941-942).
+	ErrNoLargeMessageTransport = errors.New("camera: the requestor cannot be reached over a transport that carries large messages")
 	// ErrNoPeerConnector is a signal on a Provider no [PeerConnector] was
 	// attached to: the server runs outside a node, or before the node
 	// assembled it.

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package fabricscopecheck guards the removal of a fabric's state: every
-// cluster server the module builds for a cluster with a fabric-scoped
-// attribute implements the removal contract, contract.FabricScopedState,
-// or is listed with the reason it holds no such state (owner decision 37,
-// review II).
+// Package fabricscopecheck guards two rules of fabric-scoped data: the
+// removal of a fabric's state, and its scoping on a read.
+//
+// The removal: every cluster server the module builds for a cluster with a
+// fabric-scoped attribute implements the removal contract,
+// contract.FabricScopedState, or is listed with the reason it holds no
+// such state (owner decision 37, review II).
 //
 // matter.js strips every attribute whose access is fabric-scoped (F) or
 // fabric-sensitive (S) by schema, whatever the server's logic
@@ -39,4 +41,19 @@
 // What the rule does not see: a second server type for a cluster in a
 // package that has one registered, and a server built without its
 // definition (AccessControl, whose entry is kept by hand).
+//
+// # The scoping
+//
+// The dispatcher scopes every fabric-scoped attribute of the model on a
+// request, whatever the server returns: endpoint.TopologyDispatcher
+// attaches the generated scope (schema.AttributeFabricScope) and
+// im.MaskFabricScoped applies it to the encoded value. A server returns
+// every fabric's entries whole. redaction_test.go holds both halves:
+// [TestNoHandWrittenRedactionOutsideTheMask] finds a field withheld by
+// hand outside the mask (a Redacted field beyond the deprecated ones, code
+// that sets one, a reader beyond the bridge writer's deprecated branches,
+// a type that redacts), and [TestEveryFabricSensitivePathHasARowAndAWalkCase]
+// holds every list of the snapshot with fabric-sensitive data to its row
+// in the generated table and to the node walk's selection. Each has its
+// negative case.
 package fabricscopecheck

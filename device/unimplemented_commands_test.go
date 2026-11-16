@@ -22,7 +22,7 @@ import (
 // host registers lists the command again.
 func TestDefaultServerCommandsUnimplementedUntilHandled(t *testing.T) {
 	t.Parallel()
-	d, err := NewModeSelect(testOptions("m"))
+	d, err := NewModeSelect(testOptions("m"), req("ModeSelect")...)
 	if err != nil {
 		t.Fatal(err)
 	}

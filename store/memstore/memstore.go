@@ -35,6 +35,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/store"
@@ -88,6 +89,10 @@ type tables struct {
 	metadata   map[string]uint64
 	presets    map[string]presetRow
 	locks      map[string]store.DoorLockAuth
+	// owed are the fabric events a RollbackFabric recorded, by ID
+	// ascending; owedLastID is the last ID given, never given again.
+	owed       []store.OwedFabricEvent
+	owedLastID uint64
 }
 
 // fabricPrior is what UpdateFabricCredentials keeps of a committed fabric:
@@ -146,11 +151,15 @@ func newTables() tables {
 	}
 }
 
-// Erase empties the store, as [New] returns it ([store.Eraser]).
+// Erase empties the store, as [New] returns it ([store.Eraser]) — except
+// the last owed fabric event ID, which is never given again
+// ([store.OwedFabricEvent.ID]), as SQLite's AUTOINCREMENT sequence
+// outlives the rows.
 func (s *Store) Erase(context.Context) error {
 	fresh := newTables()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	fresh.owedLastID = s.owedLastID
 	s.tables = fresh
 	return nil
 }
@@ -291,6 +300,19 @@ func (s *Store) UpdateFabricVIDVerification(_ context.Context, fabricIndex uint8
 	})
 }
 
+// UpdateFabricVendorVerification implements [store.Fabrics]: both parts
+// under the one mutex; a pending update's prior values stay.
+func (s *Store) UpdateFabricVendorVerification(_ context.Context, fabricIndex uint8, u store.FabricVendorUpdate) error {
+	return s.updateFabric(fabricIndex, func(f *store.FabricRecord) {
+		if u.VendorID != nil {
+			f.VendorID = *u.VendorID
+		}
+		if u.SetVIDData {
+			f.VIDVerificationStatement, f.VVSC = cloneNoneIfEmpty(u.Statement), cloneNoneIfEmpty(u.VVSC)
+		}
+	})
+}
+
 // UpdateFabricCredentials implements [store.Fabrics]: under the one mutex,
 // a committed fabric's current values are kept as its prior and the row
 // marked, then the new identity and node id written; the vendor id and VID
@@ -337,8 +359,10 @@ func (s *Store) CommitFabric(_ context.Context, fabricIndex uint8) error {
 	return nil
 }
 
-// RollbackFabric implements [store.Fabrics]: a pending add goes as
-// RemoveFabric removes it; a pending update gets its prior values back.
+// RollbackFabric implements [store.Fabrics] under the one mutex: the owed
+// event is recorded, then a pending add goes as RemoveFabric removes it; a
+// pending update gets its prior values back and loses its resumption
+// records.
 func (s *Store) RollbackFabric(_ context.Context, fabricIndex uint8) (store.FabricPending, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -347,12 +371,17 @@ func (s *Store) RollbackFabric(_ context.Context, fabricIndex uint8) (store.Fabr
 		return store.FabricCommitted, store.ErrFabricNotFound
 	}
 	found := f.Pending
+	if found != store.FabricCommitted {
+		s.owedLastID++
+		s.owed = append(s.owed, store.OwedFabricEvent{ID: s.owedLastID, Kind: found, Fabric: owedFabric(f)})
+	}
 	switch found {
 	case store.FabricCommitted:
 		// nothing to undo
 	case store.FabricPendingAdd:
 		s.removeFabric(fabricIndex)
 	case store.FabricPendingUpdate:
+		s.removeResumptions(fabricIndex)
 		if p, ok := s.priors[fabricIndex]; ok {
 			f.NodeID, f.VendorID = p.nodeID, p.vendorID
 			f.VIDVerificationStatement, f.VVSC = p.statement, p.vvsc
@@ -366,6 +395,38 @@ func (s *Store) RollbackFabric(_ context.Context, fabricIndex uint8) (store.Fabr
 		delete(s.priors, fabricIndex)
 	}
 	return found, nil
+}
+
+// owedFabric is the part of f an [store.OwedFabricEvent] keeps.
+func owedFabric(f store.FabricRecord) store.FabricRecord {
+	return store.FabricRecord{
+		FabricIndex: f.FabricIndex, FabricID: f.FabricID, NodeID: f.NodeID,
+		RootPublicKey: bytes.Clone(f.RootPublicKey), CompressedID: f.CompressedID,
+		VendorID: f.VendorID, Label: f.Label,
+	}
+}
+
+// OwedFabricEvents implements [store.Fabrics].
+func (s *Store) OwedFabricEvents(context.Context) ([]store.OwedFabricEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.owed) == 0 {
+		return nil, nil
+	}
+	out := make([]store.OwedFabricEvent, len(s.owed))
+	for i := range s.owed {
+		out[i] = s.owed[i]
+		out[i].Fabric.RootPublicKey = bytes.Clone(s.owed[i].Fabric.RootPublicKey)
+	}
+	return out, nil
+}
+
+// AckOwedFabricEvent implements [store.Fabrics].
+func (s *Store) AckOwedFabricEvent(_ context.Context, id uint64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.owed = slices.DeleteFunc(s.owed, func(ev store.OwedFabricEvent) bool { return ev.ID == id })
+	return nil
 }
 
 func (s *Store) updateFabric(fabricIndex uint8, change func(*store.FabricRecord)) error {
@@ -407,6 +468,12 @@ func (s *Store) removeFabric(fabricIndex uint8) {
 	delete(s.acl, fabricIndex)
 	delete(s.otaDefault, fabricIndex)
 	delete(s.icd, fabricIndex)
+	s.removeResumptions(fabricIndex)
+}
+
+// removeResumptions deletes the fabric's resumption records; the caller
+// holds mu.
+func (s *Store) removeResumptions(fabricIndex uint8) {
 	for k := range s.resumption {
 		if k.fabric == fabricIndex {
 			delete(s.resumption, k)
@@ -418,6 +485,13 @@ func (s *Store) removeFabric(fabricIndex uint8) {
 
 // UpsertIdentity implements [store.Identity].
 func (s *Store) UpsertIdentity(_ context.Context, rec store.IdentityRecord) error {
+	// store.Store's checkIdentity: a non-empty private key, a 16-byte IPK.
+	if len(rec.PrivateKey) == 0 {
+		return errors.New("memstore: upsert identity: empty private_key")
+	}
+	if len(rec.IPK) != identityIPKSize {
+		return fmt.Errorf("memstore: upsert identity: ipk length=%d (want %d)", len(rec.IPK), identityIPKSize)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.hasFabric(rec.FabricIndex) {
@@ -490,6 +564,18 @@ func (s *Store) ReplaceACL(_ context.Context, fabricIndex uint8, entries []store
 // UpsertGroupKeySet implements [store.GroupKeys]. An epoch start without
 // its key is not kept, as SQLite stores NULL for both.
 func (s *Store) UpsertGroupKeySet(_ context.Context, rec store.GroupKeySet) error {
+	// store.Store's checkGroupKeySet: EpochKey0 16 bytes, EpochKey1 and
+	// EpochKey2 16 bytes or absent, an empty one stored as absent.
+	if len(rec.EpochKey0) != epochKeySize {
+		return fmt.Errorf("memstore: upsert group key set: epoch_key_0 length=%d (want %d)", len(rec.EpochKey0), epochKeySize)
+	}
+	for i, k := range []*[]byte{&rec.EpochKey1, &rec.EpochKey2} {
+		if len(*k) == 0 {
+			*k = nil
+		} else if len(*k) != epochKeySize {
+			return fmt.Errorf("memstore: upsert group key set: epoch_key_%d length=%d (want %d)", i+1, len(*k), epochKeySize)
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.hasFabric(rec.FabricIndex) {
@@ -555,6 +641,30 @@ func (s *Store) SetGroupKeyMapping(_ context.Context, m store.GroupKeyMapping) e
 		return fmt.Errorf("memstore: set group key mapping: %w %d", errUnknownFabric, m.FabricIndex)
 	}
 	inner(s.keyMap, m.FabricIndex)[m.GroupID] = m
+	return nil
+}
+
+// ReplaceGroupKeyMappings implements [store.GroupKeys] under the one
+// mutex: the new map is built whole, then swapped in.
+func (s *Store) ReplaceGroupKeyMappings(_ context.Context, fabricIndex uint8, mappings []store.GroupKeyMapping) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(mappings) > 0 && !s.hasFabric(fabricIndex) {
+		return fmt.Errorf("memstore: replace group key mappings: %w %d", errUnknownFabric, fabricIndex)
+	}
+	next := make(map[uint16]store.GroupKeyMapping, len(mappings))
+	for i, m := range mappings {
+		if _, dup := next[m.GroupID]; dup {
+			return fmt.Errorf("memstore: replace group key mappings: mapping %d: group %d twice", i, m.GroupID)
+		}
+		m.FabricIndex = fabricIndex
+		next[m.GroupID] = m
+	}
+	if len(next) == 0 {
+		delete(s.keyMap, fabricIndex)
+		return nil
+	}
+	s.keyMap[fabricIndex] = next
 	return nil
 }
 
@@ -698,11 +808,7 @@ func (s *Store) RemoveResumption(_ context.Context, fabricIndex uint8, peerNodeI
 func (s *Store) RemoveResumptionsByFabric(_ context.Context, fabricIndex uint8) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for k := range s.resumption {
-		if k.fabric == fabricIndex {
-			delete(s.resumption, k)
-		}
-	}
+	s.removeResumptions(fabricIndex)
 	return nil
 }
 
@@ -791,6 +897,33 @@ func (s *Store) SetSettings(_ context.Context, values map[string]string) error {
 	defer s.mu.Unlock()
 	for k, v := range values {
 		s.settings[k] = v
+	}
+	return nil
+}
+
+// DeleteSettings implements [store.Settings]: every key under the one
+// mutex.
+func (s *Store) DeleteSettings(_ context.Context, keys ...string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, k := range keys {
+		delete(s.settings, k)
+	}
+	return nil
+}
+
+// DeleteSettingsWithPrefix implements [store.Settings]: every key that
+// begins with prefix, which must end in ".", under the one mutex.
+func (s *Store) DeleteSettingsWithPrefix(_ context.Context, prefix string) error {
+	if !strings.HasSuffix(prefix, ".") {
+		return fmt.Errorf(`memstore: delete settings with prefix %q: a prefix must end in "."`, prefix)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k := range s.settings {
+		if strings.HasPrefix(k, prefix) {
+			delete(s.settings, k)
+		}
 	}
 	return nil
 }
@@ -936,6 +1069,13 @@ func (s *Store) SaveThermostatPresets(_ context.Context, endpointKey string, pre
 	s.presets[endpointKey] = presetRow{presets: bytes.Clone(presets), active: bytes.Clone(activeHandle)}
 	return nil
 }
+
+// identityIPKSize and epochKeySize are the key lengths store.Store
+// checks on write and on read; the two backends refuse the same records.
+const (
+	identityIPKSize = 16
+	epochKeySize    = 16
+)
 
 // --- DoorLocks ---
 

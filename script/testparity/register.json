@@ -6616,7 +6616,11 @@
       "go": [
         "client/interaction:TestInvokeLargeMessageParity",
         "client/interaction:TestInferLargeMessageParity",
-        "client/interaction:TestInvokeBatcherParity"
+        "client/interaction:TestInvokeBatcherParity",
+        "client/interaction:TestServeInvokeLargeMessageGateParity",
+        "im:TestInvokeLargeMessageGate",
+        "im:TestInvokeLargeMessageGateOrder",
+        "bridge:TestInvokeStatesWhetherTheSessionCarriesLargeMessages"
       ],
       "missing": [
         "parses largeMessage from quality DSL string 'L'",
@@ -6628,7 +6632,7 @@
         "detects L quality on a wildcard command request",
         "rethrows non-MalformedRequestError raised during model probing"
       ],
-      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends; an invoke the caller left undecided infers it from the 'L' quality of any of its commands in parity/schema.json (schema.CommandLargeMessage; ClientInteraction.ts:111-127, :716-719 at 862ad75f), an explicit false stands, a path the snapshot does not model infers nothing, and a Large Message command never joins a batch (client/interaction:TestInvokeBatcherParity). Missing: the Quality DSL parse and the CommandModel quality cases test matter.js's model classes (the Go subject is the generated snapshot, held by schema:TestCommandLargeMessageMatchesSnapshot); the ClientCommandMethod pattern is matter.js's typed command API; a legacy command request, a wildcard command and a non-MalformedRequestError during probing have no Go form (every Go invoke names a concrete path and the probe is a map lookup).",
+      "reason": "An invoke's explicit LargeMessage defaults off and reaches its exchange and every part an InvokeBatch split sends; an invoke the caller left undecided infers it from the 'L' quality of any of its commands in parity/schema.json (schema.CommandLargeMessage; ClientInteraction.ts:111-127, :716-719 at 862ad75f), an explicit false stands, a path the snapshot does not model infers nothing, and a Large Message command never joins a batch (client/interaction:TestInvokeBatcherParity). The receiving side, which the file reaches only through its client: both servers state whether the session carries large messages (TCP yes, UDP and BLE no) and the invoke path answers a Large Message command on one that does not InvalidTransportType, leaving it out of a wildcard path's targets (CommandInvokeResponse.ts:281-285, :378-386 at db021da0; review II, R2-P4-imwrite-01). Missing: the Quality DSL parse and the CommandModel quality cases test matter.js's model classes (the Go subject is the generated snapshot, held by schema:TestCommandLargeMessageMatchesSnapshot); the ClientCommandMethod pattern is matter.js's typed command API; a legacy command request, a wildcard command and a non-MalformedRequestError during probing have no Go form (every Go invoke names a concrete path and the probe is a map lookup).",
       "snapshotSha": "08ffe617eb5b02a7b5253cde9e714413da17f104"
     },
     {

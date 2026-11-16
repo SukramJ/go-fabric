@@ -34,12 +34,14 @@ these interfaces does not drag the host's dependencies into the module.
 | --- | --- | --- | --- |
 | `EndpointSource` | a host device | device type and cluster servers of one bridged endpoint | the source is not an endpoint |
 | `ClusterServer` | every server | read, write, invoke; the reportable attributes | required |
-| `FabricScopedReader` | a server with fabric-scoped attributes | read with the FabricFiltered flag and the reading fabric | `MatterRead` answers with the full value |
+| `FabricScopedReader` | a server whose value depends on the reader beyond the fabric scope, or a fabric-scoped list whose entries do not encode themselves and that takes a list-append write | read with the FabricFiltered flag and the reading fabric; a filtered read returns that fabric's entries alone | `MatterRead` answers; either way the dispatcher scopes every fabric-scoped attribute of the model on a request — another fabric's entries filtered, their fabric-sensitive fields withheld — whatever the server returns. A list-append write appends to the writing fabric's entries: the dispatcher keeps those of an entry that encodes itself by its `FabricIndex`, and an append to a list whose entries do not encode themselves answers `FAILURE` without a filtered read |
+| `FabricScopeDeclarer` | a server of a cluster outside the schema snapshot with fabric-scoped lists (`spec.Instance` from its definition) | declares an attribute's fabric scope: fabric-sensitive, and its entry's fabric-sensitive fields | the cluster's lists are not scoped; for a cluster of the snapshot the generated table applies and the declaration is not asked |
 | `ClusterAttributeLister` | a server | the attribute set, for wildcard reads and AttributeList | a wildcard read returns only the global attributes |
 | `ClusterCommandLister` | a server | AcceptedCommandList and GeneratedCommandList | both lists are empty |
 | `ClusterEventLister` | a server | EventList, and which event paths exist on the cluster; an event the server emits is recorded as emitted, so it emits only events it lists | EventList is empty and no event path exists on the cluster: a read of an event on it is answered `UNSUPPORTED_EVENT`, and an event path on it selects nothing for a subscription (`endpoint/dispatcher.go`, `EventPathStatus`) |
 | `ClusterDataVersion` | a server | the cluster's DataVersion on the root and the Aggregator | the endpoint keeps the cluster's DataVersion, on the root and the Aggregator too, and advances it on every change the stack sees; a bridged endpoint's DataVersion is the endpoint's own, kept per cluster, whatever the server implements (`endpoint/dispatcher.go`, `clusterDataVersionFor`) |
 | `ChangeReportingWriter` | a server | `MatterWriteChanged` applies a controller's write as `MatterWrite` does and says whether it changed any attribute of the cluster, the written one or another the write moves with it; the dispatcher calls it instead of `MatterWrite`. A write that changed nothing advances no DataVersion and is reported to no subscriber. Unchanged means the write stored nothing and the host heard nothing of it; a write that stored, or one the server cannot judge, answers changed. Every server of the module implements it, except OperationalCredentials, which refuses every write. A type that embeds a server implementing it and declares its own `MatterWrite` declares `MatterWriteChanged` as well: the promoted method would apply the write without the type's `MatterWrite` | every successful write counts as a change: the cluster's DataVersion advances and the written attribute is reported (`endpoint/dispatcher.go`, `writeOne`; `bridge/receive_dispatch.go`, `reportWrittenAttributes`) |
+| `ChangeNamingWriter` | a server | `MatterWriteCommit` applies a controller's write and names the attributes of the cluster it changed — the written one only when its value moved, and any other the write moves with it; the dispatcher prefers it to `MatterWriteChanged` and `MatterWrite`. A non-empty list advances the cluster's DataVersion once and only the named attributes are reported; an empty list is a write that changed nothing. The list reaches the transport in the write's result (`im.WriteResult.Commit`, `im.HandleWrite`). `spec.Server` implements it. A type that embeds a server implementing it and declares its own `MatterWrite` or `MatterWriteChanged` declares `MatterWriteCommit` as well | `ChangeReportingWriter`'s verdict, recorded under the written attribute (`endpoint/dispatcher.go`, `writeOne`) |
 | `ClusterAttributeReadPrivilege` | a server | a read privilege above the data model's; it can only raise it | the data model's read privilege (`schema.AttributeReadPrivilege`, from parity/schema.json) |
 | `ClusterAttributeWritePrivilege` | a server | a write privilege above the data model's; it can only raise it | the data model's write privilege (`schema.AttributeWritePrivilege`, from parity/schema.json) |
 | `ClusterCommandInvokePrivilege` | a server | an invoke privilege above Operate | Operate |
@@ -77,7 +79,7 @@ in the module.
 
 | Interface | Implemented by | What it does | When absent |
 | --- | --- | --- | --- |
-| `BLEPeripheral` (`BLEAdvertisement`, `BLEConnection`) | the host's BLE stack: `ble/bluez.NewPeripheral` on Linux, `bletest.Peripheral.Radio` in tests | advertises the payload the node gives, serves the Matter GATT service (C1, C2, C3) and hands each central's connection to the node | no BLE: the node is commissionable over IP only and its QR code says so |
+| `GATTPeripheral` (`GATTService`, `BLEAdvertisement`, `BLEConnection`) | the host's BLE stack: `bletest.Peripheral.Radio` in tests; `ble/bluez.NewPeripheral` on Linux implements the deprecated `BLEPeripheral` until its next release | registers the Matter GATT service (C1, C2, C3) before the node advertises — a refusal is `StartBLE`'s error —, advertises the payload the node gives and hands each central's connection to the node | no BLE: the node is commissionable over IP only and its QR code says so |
 | `WiFiDriver` | the host's Wi-Fi stack: `wifi/wpasupplicant.New` on Linux, the reference daemon's `--wifi-sim` in tests | scans and joins the network a commissioner provisions | NetworkCommissioning serves the Ethernet feature |
 | `WiFiInterfaceSwitcher` (optional on a `WiFiDriver`) | a host Wi-Fi stack that can switch its interface on and off | switches the interface a controller's write of `InterfaceEnabled` names; the attribute takes the value once the driver switched | `InterfaceEnabled` stays true: a write of false answers `INVALID_ACTION` |
 
@@ -94,12 +96,12 @@ in the module.
 | `OTA` (`OTAConfig`) | mounts the OTA Software Update Requestor; `Applier` carries out an update; `TransferProtocols` adds the HTTPS download, whose GET goes through `HTTPClient` | no requestor. A nil `Applier` is the facade's own, which validates the image and keeps it under `Dir/applied`. Empty `TransferProtocols` announces BDX alone, and a list without `OTADownloadBDXSynchronous` fails the build; a nil `HTTPClient` is the module's client, which follows a redirect only to an `https://` target; a host's client keeps its own redirect policy |
 | `OTAProvider` | serves OTA images over BDX from an OtaProvider endpoint | no provider (also with a nil `ImageSource`). A nil `Consent` declines an image that needs consent; a nil `ApplyPolicy` proceeds at once |
 | `CommissionerControl` | mounts CommissionerControl on the Aggregator; `Approver` and `Commissioner` are required | no server |
-| `Network.BLE` | the node's Bluetooth LE radio (`contract.BLEPeripheral`): while the node has no fabric its own window is advertised over BLE and PASE is served over BTP; the QR code carries the BLE discovery bit ([Operations](operations.md#ble-commissioning)) | no BLE; the node never touches a radio |
+| `Network.GATT` | the node's Bluetooth LE radio (`contract.GATTPeripheral`; the deprecated `Network.BLE` takes a `contract.BLEPeripheral`): while the node has no fabric its own window is advertised over BLE and PASE is served over BTP; the QR code carries the BLE discovery bit ([Operations](operations.md#ble-commissioning)) | no BLE; the node never touches a radio |
 | `Network.WiFi.Driver` | the node's Wi-Fi radio (`contract.WiFiDriver`): mounts NetworkCommissioning with the Wi-Fi feature in place of the Ethernet one; the committed network is kept in the node's store and rejoined at `Start` and, with a backoff, whenever a join left the node off it, and a successful join re-announces the node's DNS-SD records at once ([Operations](operations.md#wi-fi-provisioning)) | NetworkCommissioning serves the Ethernet feature |
 | `Network.WiFi.Reporter` | mounts WiFiNetworkDiagnostics and states the RootNode condition WiFi | no Wi-Fi diagnostics. EthernetNetworkDiagnostics is always mounted, with every link value null. A `Network.WiFi` with neither `Driver` nor `Reporter` is refused |
 | `Client` | the node's client stack, which the Binding entries reach other nodes through | no client stack. A Binding entry that names a node is dropped |
 | `TimeSynchronization.Config` (`PlatformTime`, `NTPClient`, `PeerReader`) | the host clock as a time source, the NTP query the time client falls back to, the read of the trusted time source's node | the host clock is the source (MixedNTP, milliseconds) while past the Matter epoch; no NTP fallback (TimeFailure); the node's own reader over `Client`, none without it ([Time synchronization](../getting-started/device.md#time-synchronization)) |
-| `EndpointPersistence` | scene tables and bridged NodeLabels, kept by the host | the facade's own, in the settings table |
+| `EndpointState` | scene tables and bridged NodeLabels, kept by the host; a refused save answers the controller FAILURE | the facade's own, in the settings table (`EndpointPersistence` is deprecated) |
 | `Groups` | the group state, for a host with its own assembler | the facade builds one over the credential store |
 | `Snapshotter` | the host's own `bridge.Snapshotter`. The topology it returns comes from an `endpoint.Assembler` over the host's `endpoint.Spec`s; `Endpoint` and `Topology` are read-only to a host | the facade's Aggregator under one scope |
 | `AggregatorServers` | extra servers on the Aggregator (an Actions server, say) | none |
@@ -216,9 +218,10 @@ fails `node.New`.
 
 Beside the ports, the bridge asks the session registry, a cluster server
 and an endpoint's measurement source for optional methods. It finds them
-by type assertion against interfaces that are not exported, so nothing in
-the API names them: a host with its own registry or source implements the
-method with exactly this signature, or the bridge silently does without.
+by type assertion — against the contract's switch-source ports, and for
+the rest against interfaces that are not exported: a host with its own
+registry or source implements the method with exactly this signature, or
+the bridge silently does without.
 `secure/operational.Manager` has every registry method.
 
 | On | Method | Without it |
@@ -238,11 +241,21 @@ method with exactly this signature, or the bridge silently does without.
 | a host's own PASE or CASE handler | `PeerSessionParams() *sessionparams.Parameters` | the handshake's replies retransmit at the default MRP intervals, not at the ones the initiator stated |
 | a PASE or CASE handler | `establishedSession() (sessionID uint16, ok bool)` — unexported, so only the module's `PaseAdapter` and `CaseAdapter` have it | the session the handshake established is bound to the connection or address it came over only with its first message, and the `sessions.open` gauge is not updated when the handshake ends |
 | a cluster server that is a `contract.EventReceiver` | `SetEndpoint(uint16)` | the server is not told the endpoint it is mounted on, which its events carry |
-| a cluster server on a bridged endpoint | `MatterFabricRemoved(fabricIndex uint8)` | the server is not told of a removed fabric and keeps what it holds for that fabric's peers |
-| an endpoint's `Measurement` | `WireMatterSwitchHandler(contract.SwitchEventEmitter) func()` | the source's press gestures do not reach the Switch server |
-| an endpoint's `Measurement` | `WireMatterSwitchPositions(contract.SwitchPositionSink) func()` | the source's positions do not reach the Switch server |
+| an endpoint's `Measurement` | `contract.SwitchGestureSource` (`WireMatterSwitchHandler(contract.SwitchEventEmitter) func()`) | the source's press gestures do not reach the Switch server |
+| an endpoint's `Measurement` | `contract.SwitchPositionSource` (`WireMatterSwitchPositions(contract.SwitchPositionSink) func()`) | the source's positions do not reach the Switch server |
 
-*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`, `paseSessionIDLister`, `peerSessionParamsSource`), `bridge/conn.go` (`reapExemptionSetter`, `establishedSessionReporter`), `bridge/receive_dispatch.go` (`sessionFabricAdopter`), `bridge/ota_provider_link.go` (`peerLossCloser`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `fabricRemovalObserver`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
+A cluster server's state of a removed fabric goes through one port,
+`contract.FabricScopedState`: the node calls it on every server of every
+endpoint; a host that runs the bridge without the node has the bridge's
+fabric removal call it on the servers of the bridged endpoints only — the
+endpoints present at the removal. The root's and the Aggregator's servers
+(AccessControl, ICDManagement, TimeSynchronization,
+OTASoftwareUpdateRequestor, Messages, Binding among them), an endpoint
+absent at the removal, and the drop before a reused fabric index is
+announced again are the node's (`node/fabric_state.go`); without the node
+they are the host's.
+
+*Source: `bridge/securechannel.go` (`gracefulCloseNotifierSetter`, `reannounceTriggerSetter`, `paseCloseNotifierSetter`, `AttachSessionRegistry`, `paseSessionIDLister`, `peerSessionParamsSource`), `bridge/conn.go` (`reapExemptionSetter`, `establishedSessionReporter`), `bridge/receive_dispatch.go` (`sessionFabricAdopter`), `bridge/ota_provider_link.go` (`peerLossCloser`), `bridge/metrics.go` (`sessionCounter`), `bridge/case_initiator.go` (`peerSessionLister`), `bridge/pase_close.go` (`sessionLister`), `bridge/bridge.go` (`fabricSessionCloser`, `fabricSessionExceptCloser`, `matterEndpointReceiver`, `matterSwitchSubscribable`, `matterSwitchPositionReporter`).*
 
 ## `<cluster>def.Host`: the kit server's host methods
 
@@ -340,11 +353,13 @@ it calls nothing, the server stores nothing, no DataVersion advances and
 no subscriber is told (`contract.ChangeReportingWriter`, above). A write
 that reaches a setter counts as a change whether or not the host's state
 shows the value when the setter returns, so a host that applies a write
-later is judged by what was written. A generated server's write veto
-(`spec.ServerConfig.BeforeWrite`, the typed server's `OnWrite`) runs before
-the comparison, for a write of the held value as well.
+later is judged by what was written. A generated server's own write rule
+(`spec.ServerConfig.WriteRule`) runs on every write, before the comparison
+with the held value; the host's veto (`Server.SetBeforeWrite`, the typed
+server's `OnWrite`) runs after the comparison, so a write of the held value
+reaches no veto.
 
-*Source: `contract/matter.go` (`ChangeReportingWriter`), `cluster/spec/server.go` (`MatterWriteChanged`, `holds`), `cluster/fan/fancontrol_server.go`, `cluster/pump/pump_server.go` and `cluster/alarm/smokecoalarm_server.go` (`MatterWriteChanged`), `cluster/levelcontrol/levelcontrol_server.go` (`writeOptions`, `writeOnLevel`), `cluster/core/bridged_device_basic_information.go` (`MatterWriteChanged`).*
+*Source: `contract/matter.go` (`ChangeReportingWriter`), `cluster/spec/server.go` (`MatterWriteCommit`, `holds`), `cluster/fan/fancontrol_server.go`, `cluster/pump/pump_server.go` and `cluster/alarm/smokecoalarm_server.go` (`MatterWriteChanged`), `cluster/levelcontrol/levelcontrol_server.go` (`writeOptions`, `writeOnLevel`), `cluster/core/bridged_device_basic_information.go` (`MatterWriteChanged`).*
 
 Host ports of the root servers, reached through `node.Config` or
 `Node.Root()`:

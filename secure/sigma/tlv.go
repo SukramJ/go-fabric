@@ -135,6 +135,37 @@ func (d *sigmaDecoder) next() (tag uint8, val sigmaValue, end bool, err error) {
 	}, false, nil
 }
 
+// sessionIDOf is a session-id member's value (Sigma1 tag 2, Sigma2 tag 2,
+// Sigma2_Resume tag 3, TlvUInt16): an unsigned integer whose value fits 16
+// bits — a wider encoding of such a value included. Any other element
+// refuses the message, as the session parameters' fields are refused
+// ([sessionparams.DecodeFields]).
+func sessionIDOf(v sigmaValue) (uint16, error) {
+	switch v.elemType {
+	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
+	default:
+		return 0, fmt.Errorf("sigma: session id: TLV type 0x%02X, want an unsigned integer", uint8(v.elemType))
+	}
+	if v.u > 0xFFFF {
+		return 0, fmt.Errorf("sigma: session id: value %d exceeds 16 bits", v.u)
+	}
+	return uint16(v.u & 0xFFFF), nil
+}
+
+// sessionParamsOf reads the session-parameters member whose header v is:
+// it must be a structure — any other element, an array or a list
+// included, refuses the message, as matter.js refuses an element of
+// another type at a structure field (packages/types/src/tlv/TlvObject.ts:206-207
+// at db021da0). The member is the messages' optional session-parameters
+// structure (packages/protocol/src/session/case/CaseMessages.ts:34, :46,
+// :55).
+func sessionParamsOf(dec *sigmaDecoder, v sigmaValue) (SessionParameters, error) {
+	if v.elemType != tlv.TypeStructure {
+		return SessionParameters{}, fmt.Errorf("sigma: session parameters: TLV type 0x%02X, want a structure", uint8(v.elemType))
+	}
+	return parseSessionParameters(dec)
+}
+
 // skipContainer drains elements until the matching End-of-Container.
 // Required after [next] returns a container value the caller does not
 // want to descend into (e.g. the Sigma1 SessionParameters struct).

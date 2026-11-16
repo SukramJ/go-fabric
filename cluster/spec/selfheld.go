@@ -29,16 +29,15 @@ var (
 )
 
 // HostHandlers holds the command handlers a host registers over a
-// self-held server's own command logic. A registered handler replaces the
-// server's handling of its command — the request's checks included — as a
-// matter.js host overrides the behavior's command method
-// (packages/node/src/behaviors/level-control/LevelControlServer.ts:256-261
-// names the override point of its commands); nil hands the command back
-// to the server.
+// self-held server's own command logic, with the meaning
+// [CommandRegistrar] states; nil hands the command back to the server.
 type HostHandlers struct {
-	// mu guards m.
+	// mu guards m and inst.
 	mu sync.Mutex
 	m  map[uint32]CommandHandler
+	// inst is the instance the handlers were registered against, whose
+	// definition holds their responses ([HostHandlers.Invoke]).
+	inst *Instance
 }
 
 // Register sets fn as the host's handler of cmdID; nil removes it. A
@@ -49,6 +48,7 @@ func (h *HostHandlers) Register(inst *Instance, cmdID uint32, fn CommandHandler)
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.inst = inst
 	if fn == nil {
 		delete(h.m, cmdID)
 		return nil
@@ -61,25 +61,70 @@ func (h *HostHandlers) Register(inst *Instance, cmdID uint32, fn CommandHandler)
 }
 
 // Invoke runs the host's handler of cmdID; handled is false when the host
-// registered none, and the server's own logic runs.
+// registered none, and the server's own logic runs. A response the
+// handler returns is held to the definition as [Server.MatterInvoke]
+// holds a handler's: one that breaks its fields' conformance answers
+// FAILURE. A name the response's conformance takes from the cluster's
+// attributes is not resolved here (the handlers hold no read of the
+// server's state).
 func (h *HostHandlers) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
+	return h.invoke(ctx, cmdID, fields, nil)
+}
+
+// invoke is [HostHandlers.Invoke] with the server's attributes resolving
+// the response's conformance names.
+func (h *HostHandlers) invoke(ctx context.Context, cmdID uint32, fields any, peers Peers) (resp any, handled bool, err error) {
 	h.mu.Lock()
-	fn := h.m[cmdID]
+	fn, inst := h.m[cmdID], h.inst
 	h.mu.Unlock()
 	if fn == nil {
 		return nil, false, nil
 	}
 	resp, err = fn(ctx, fields)
-	return resp, true, err
+	if err != nil || inst == nil {
+		return resp, true, err
+	}
+	if err := inst.checkResponse(cmdID, fields, resp, peers); err != nil {
+		return nil, true, err
+	}
+	return resp, true, nil
 }
 
 // Events is a self-held server's event path: the emitter the endpoint
 // hands it ([contract.EventReceiver]) and the emission of its cluster's
 // events with the definition's priority.
 type Events struct {
-	// mu guards emitter.
-	mu      sync.Mutex
-	emitter contract.EventEmitter
+	// mu guards emitter, endpoint and mounted.
+	mu       sync.Mutex
+	emitter  contract.EventEmitter
+	endpoint uint16
+	mounted  bool
+}
+
+// SetEndpoint stores the endpoint the server is mounted on, which
+// [Events.EmitEvent] emits on.
+func (e *Events) SetEndpoint(endpoint uint16) {
+	e.mu.Lock()
+	e.endpoint, e.mounted = endpoint, true
+	e.mu.Unlock()
+}
+
+// EmitEvent emits eventID with data on the endpoint the server is mounted
+// on at the priority inst's definition gives it, as [Server.EmitEvent]: an
+// event outside inst's EventList is [ErrNotEmitted], one while the server
+// is not in the topology — no endpoint or no emitter — [ErrNotMounted].
+func (e *Events) EmitEvent(inst *Instance, eventID uint32, data any) error {
+	if !inst.Emits(eventID) {
+		return fmt.Errorf("%w: %s event 0x%02X", ErrNotEmitted, inst.def.Name, eventID)
+	}
+	e.mu.Lock()
+	emitter, endpoint, mounted := e.emitter, e.endpoint, e.mounted
+	e.mu.Unlock()
+	if !mounted || emitter == nil {
+		return fmt.Errorf("%w: %s event 0x%02X", ErrNotMounted, inst.def.Name, eventID)
+	}
+	emitter.MatterEmitEvent(endpoint, inst.def.ID, eventID, data, inst.EventPriority(eventID))
+	return nil
 }
 
 // SetEmitter stores the endpoint's emitter.
@@ -107,7 +152,9 @@ func (e *Events) Emit(inst *Instance, endpoint uint16, eventID uint32, data any)
 }
 
 // WriteVeto is a self-held server's write veto ([BeforeWriteSetter]):
-// the hook [ServerConfig.BeforeWrite] is on the generated server.
+// the host's hook [ServerConfig.BeforeWrite] is on the generated server.
+// The server's own rules are its own code, in front of its comparison
+// with the held value; the veto is consulted behind it.
 type WriteVeto struct {
 	// mu guards fn.
 	mu sync.Mutex
@@ -122,9 +169,13 @@ func (w *WriteVeto) Set(fn func(ctx context.Context, attrID uint32, value any) e
 }
 
 // Check runs the veto on a controller's write that passed the
-// definition's checks, with the value in its stored form; nil without a
-// veto. The error is returned as given: its IM status when it carries
-// one, FAILURE at the dispatcher otherwise.
+// definition's checks and the server's own rules, with the value in its
+// stored form; nil without a veto. The server calls it after its own
+// comparison with the value it holds, for a write that changes it only: a
+// write of the held value calls no veto, advances no data version and
+// notifies nothing, as [Server.MatterWrite] does. The error is returned as
+// given: its IM status when it carries one, FAILURE at the dispatcher
+// otherwise.
 func (w *WriteVeto) Check(ctx context.Context, attrID uint32, value any) error {
 	w.mu.Lock()
 	fn := w.fn
@@ -165,10 +216,20 @@ func (h *SelfHeld) Handle(cmdID uint32, fn CommandHandler) error {
 
 // Emit implements [EventEmitting] ([Server.Emit]).
 func (h *SelfHeld) Emit(endpoint uint16, eventID uint32, data any) error {
-	return h.srv.Emit(endpoint, eventID, data)
+	return h.srv.Emit(endpoint, eventID, data) //nolint:staticcheck // EventEmitting's implementation for the deprecated EmitOn
 }
 
-// SetBeforeWrite implements [BeforeWriteSetter] ([Server.SetBeforeWrite]).
+// EmitEvent emits eventID with data on the endpoint the store is mounted
+// on ([Server.EmitEvent]).
+func (h *SelfHeld) EmitEvent(eventID uint32, data any) error { return h.srv.EmitEvent(eventID, data) }
+
+// SetEndpoint implements [contract.EndpointReceiver] by handing the
+// endpoint to the store; a server with a SetEndpoint of its own calls it
+// from there.
+func (h *SelfHeld) SetEndpoint(endpoint uint16) { h.srv.SetEndpoint(endpoint) }
+
+// SetBeforeWrite implements [BeforeWriteSetter] ([Server.SetBeforeWrite]):
+// the host's veto; the store's [ServerConfig.WriteRule] stays.
 func (h *SelfHeld) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
 	h.srv.SetBeforeWrite(fn)
 }
@@ -179,15 +240,20 @@ func (h *SelfHeld) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	h.srv.SetMatterEventEmitter(emitter)
 }
 
-// InvokeHeld is a self-held server's MatterInvoke: the host's handler of
-// cmdID when one is registered ([SelfHeld.Handle]), the store's — the
-// server's own logic — otherwise. It is a function rather than a method so
-// that embedding [SelfHeld] promotes no second invoke onto the server.
+// InvokeHeld is a self-held server's MatterInvoke: the request is held to
+// the definition first, as [Server.MatterInvoke] holds it, then the
+// host's handler of cmdID runs when one is registered ([SelfHeld.Handle]),
+// the store's — the server's own logic — otherwise. It is a function
+// rather than a method so that embedding [SelfHeld] promotes no second
+// invoke onto the server.
 func InvokeHeld(ctx context.Context, h *SelfHeld, cmdID uint32, fields any) (any, error) {
-	if resp, handled, err := h.host.Invoke(ctx, cmdID, fields); handled {
+	if err := h.srv.admitRequest(ctx, cmdID, fields, h.srv.peers); err != nil {
+		return nil, err
+	}
+	if resp, handled, err := h.host.invoke(ctx, cmdID, fields, h.srv.peers); handled {
 		return resp, err
 	}
-	return h.srv.MatterInvoke(ctx, cmdID, fields)
+	return h.srv.dispatch(ctx, cmdID, fields)
 }
 
 // RequestOf returns a decoded request payload as the generated request

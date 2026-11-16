@@ -40,7 +40,6 @@ func commissionedKeeperNode(t *testing.T, adv Advertiser) (*Node, *clocktest.Fak
 	t.Helper()
 	ctx := t.Context()
 	cfg := mdnsTestConfig(t)
-	cfg.Network.MDNS.Off = true
 	cfg.Advertiser = adv
 	fake := clocktest.New(time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC))
 	cfg.Clock = fake
