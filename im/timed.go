@@ -152,10 +152,20 @@ func UnmarshalStatusResponseTLV(dec *tlv.Decoder) (StatusResponse, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagStatusResponseStatus:
-			if el.Uint > 0xFF {
-				return sr, fmt.Errorf("%w: status %d exceeds uint8", ErrInvalidStatusResponse, el.Uint)
+			// An unsigned integer, as the StatusIB's status
+			// ([statusIBField]): matter.js decodes the field as a
+			// TlvEnum, a TlvUInt32, which throws on another TLV type
+			// (packages/types/src/tlv/TlvNumber.ts:124-131 at db021da0);
+			// a signed integer or a boolean used to read as Success
+			// (review II, R2-P6-wire-0503).
+			if el.IsContainer {
+				return sr, fmt.Errorf("%w: status is a container", ErrInvalidStatusResponse)
 			}
-			sr.Status = StatusCode(el.Uint)
+			v, err := uint8Field(el)
+			if err != nil {
+				return sr, fmt.Errorf("%w: status: %w", ErrInvalidStatusResponse, err)
+			}
+			sr.Status = StatusCode(v)
 			seenStatus = true
 		default:
 			// InteractionModelRevision and unknown fields: informational.
