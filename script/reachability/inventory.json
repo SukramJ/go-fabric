@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9021,
+  "entry_points": 9024,
   "entry_packages": [
     ".",
     "bdx",
@@ -4126,14 +4126,14 @@
       "identifier": "TestHostChangeInsideARootWriteAdvancesOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
-      "line": 450
+      "line": 459
     },
     {
       "package": "bridge",
       "identifier": "TestHostChangeInsideAWriteAdvancesOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
-      "line": 321
+      "line": 330
     },
     {
       "package": "bridge",
@@ -6170,7 +6170,7 @@
       "identifier": "TestRootNotifierInsideAWriteAdvancesOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
-      "line": 402
+      "line": 411
     },
     {
       "package": "bridge",
@@ -7487,13 +7487,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
       "line": 31
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestWrittenChangesOmittedAttributeIsNotReported",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/write_report_test.go",
-      "line": 505
     },
     {
       "package": "client/discovery",
@@ -30831,7 +30824,7 @@
       "identifier": "TestAttributePathStatusAnswersAsReadDoes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_commit_test.go",
-      "line": 89
+      "line": 90
     },
     {
       "package": "endpoint",
@@ -31864,6 +31857,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestTwoAttributeDataOfOneClusterAdvanceTwice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/write_commit_test.go",
+      "line": 120
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestUnchangedWriteKeepsTheDataVersionParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_unchanged_parity_matterjs_test.go",
@@ -31972,7 +31972,7 @@
       "identifier": "TestWriteResultCarriesTheCommit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_commit_test.go",
-      "line": 42
+      "line": 43
     },
     {
       "package": "endpoint",
