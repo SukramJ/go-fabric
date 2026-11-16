@@ -132,6 +132,9 @@ type OperationalCredentials struct {
 	// report a removal or an update of the rollback and of RemoveFabric run
 	// after it is released.
 	nocMu sync.Mutex
+	// csrBuilder, when set, replaces buildPKCS10CSR: a test's way to fail
+	// the CSR build (export_test.go). Guarded by nocMu.
+	csrBuilder func(*ecdsa.PrivateKey) ([]byte, error)
 	// nocContended, when set, runs when the rollback finds nocMu held by
 	// a NOC command and is about to wait for it: a test's observation
 	// point (export_test.go), so a race test decides on the wait itself
@@ -1970,13 +1973,27 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// packages/protocol/src/common/FailsafeContext.ts:61 (FabricBuilder.create
 	// once per context) and :176-185 (createCertificateSigningRequest over
 	// the builder's pair, packages/protocol/src/fabric/Fabric.ts:549-551).
-	priv, err := o.failSafeKeyPair()
+	priv, drawn, err := o.failSafeKeyPair()
 	if err != nil {
 		o.nocMu.Unlock()
 		return nil, err
 	}
-	csr, err := buildPKCS10CSR(priv)
+	build := buildPKCS10CSR
+	if o.csrBuilder != nil {
+		build = o.csrBuilder
+	}
+	csr, err := build(priv)
 	if err != nil {
+		if drawn {
+			// The pair this request drew has no CSR behind it: it goes,
+			// so a NOC command finds no key pair (MissingCsr) rather than
+			// one without a CSR session (review II, N4-coresec-2).
+			o.mu.Lock()
+			if o.pendingPrivKey == priv {
+				o.pendingPrivKey = nil
+			}
+			o.mu.Unlock()
+		}
 		o.nocMu.Unlock()
 		return nil, fmt.Errorf("core: CSRRequest: build CSR: %w", err)
 	}
@@ -2010,18 +2027,20 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 }
 
 // failSafeKeyPair returns the fail-safe context's pending operational key
-// pair, drawing it on the context's first CSRRequest. nocMu is held.
-func (o *OperationalCredentials) failSafeKeyPair() (*ecdsa.PrivateKey, error) {
+// pair, drawing it on the context's first CSRRequest; drawn reports that
+// this call drew it. nocMu is held.
+func (o *OperationalCredentials) failSafeKeyPair() (priv *ecdsa.PrivateKey, drawn bool, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.pendingPrivKey == nil {
 		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return nil, fmt.Errorf("core: CSRRequest: generate key: %w", err)
+			return nil, false, fmt.Errorf("core: CSRRequest: generate key: %w", err)
 		}
 		o.pendingPrivKey = priv
+		drawn = true
 	}
-	return o.pendingPrivKey, nil
+	return o.pendingPrivKey, drawn, nil
 }
 
 // buildPKCS10CSR creates the DER-encoded PKCS#10 certification request

@@ -5,6 +5,7 @@ package core
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"time"
 )
 
@@ -56,4 +57,12 @@ func (o *OperationalCredentials) NOCLockFree() bool {
 		return true
 	}
 	return false
+}
+
+// FailCSRBuild makes every later CSR build fail with err (review II,
+// N4-coresec-2).
+func (o *OperationalCredentials) FailCSRBuild(err error) {
+	o.nocMu.Lock()
+	o.csrBuilder = func(*ecdsa.PrivateKey) ([]byte, error) { return nil, err }
+	o.nocMu.Unlock()
 }

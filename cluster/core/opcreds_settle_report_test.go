@@ -207,3 +207,21 @@ func TestRemoveFabricStoreFailureIsFailure(t *testing.T) {
 		t.Errorf("RemoveFabric of an unknown index = %#v, %v, want NOCResponse InvalidFabricIndex", resp, err)
 	}
 }
+
+// A CSRRequest whose CSR build fails leaves no key pair behind it: the
+// pair it drew goes with the failure (review II, N4-coresec-2).
+func TestCSRBuildFailureDropsTheDrawnKeyPair(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{SupportedFabrics: 5, FailSafe: armedFailSafe(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oc.FailCSRBuild(errors.New("injected random-source failure"))
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err == nil {
+		t.Fatal("CSRRequest with a failing CSR build succeeded")
+	}
+	if oc.CSRKeyPending() {
+		t.Error("the fail-safe context holds a key pair no CSR was issued for")
+	}
+}
