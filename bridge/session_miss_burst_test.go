@@ -199,3 +199,64 @@ func TestSessionMissBurst_HardCapStopsGrowth(t *testing.T) {
 		t.Errorf("entries = %d, want %d (hard cap)", got, sessionMissBurstMaxEntries)
 	}
 }
+
+// TestSessionMissBurstAtItsExactLimits pins the burst tracker's four
+// bounds at the exact limit (R2-P6-bound-0813): a miss exactly one window
+// after the window's first still counts in it; a burst exactly one
+// cooldown after the last emission is emitted; the sweep runs again
+// exactly one sweep interval after the last; and an entry quiet for exactly
+// the window plus the cooldown is not yet reclaimed.
+func TestSessionMissBurstAtItsExactLimits(t *testing.T) {
+	t.Parallel()
+	t0 := time.Unix(1_700_000_000, 0)
+	t.Run("window", func(t *testing.T) {
+		t.Parallel()
+		var b sessionMissBurst
+		for range sessionMissBurstThreshold - 1 {
+			if b.record(1, t0) {
+				t.Fatal("emitted below the threshold")
+			}
+		}
+		if !b.record(1, t0.Add(sessionMissBurstWindow)) {
+			t.Fatal("the miss exactly one window after the first did not count in the window")
+		}
+	})
+	t.Run("cooldown", func(t *testing.T) {
+		t.Parallel()
+		var b sessionMissBurst
+		for range sessionMissBurstThreshold - 1 {
+			b.record(1, t0)
+		}
+		if !b.record(1, t0) {
+			t.Fatal("the first burst was not emitted")
+		}
+		again := t0.Add(sessionMissBurstCooldown)
+		for range sessionMissBurstThreshold - 1 {
+			if b.record(1, again.Add(-time.Second)) {
+				t.Fatal("emitted inside the cooldown")
+			}
+		}
+		if !b.record(1, again) {
+			t.Fatal("the burst exactly one cooldown after the last emission was suppressed")
+		}
+	})
+	t.Run("sweep interval", func(t *testing.T) {
+		t.Parallel()
+		var b sessionMissBurst
+		b.record(1, t0) // sweeps at t0
+		b.record(2, t0.Add(5*time.Minute))
+		b.record(2, t0.Add(5*time.Minute+sessionMissBurstSweepInterval))
+		if _, kept := b.entries[1]; kept {
+			t.Fatal("the sweep exactly one interval after the last did not run")
+		}
+	})
+	t.Run("horizon", func(t *testing.T) {
+		t.Parallel()
+		var b sessionMissBurst
+		b.record(1, t0)
+		b.record(2, t0.Add(sessionMissBurstWindow+sessionMissBurstCooldown))
+		if _, kept := b.entries[1]; !kept {
+			t.Fatal("an entry quiet for exactly the horizon was reclaimed")
+		}
+	})
+}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -234,5 +235,34 @@ func TestPaseClaimIsReadUnderTheLock(t *testing.T) {
 	<-done
 	if got := b.claimPase(a); got != paseClaimTaken {
 		t.Fatalf("claim after both released = %v, want the slot free (taken)", got)
+	}
+}
+
+// TestPASEClaimHeldUntilItsTimeoutPasses: the single PASE slot is held at
+// exactly pasePairingTimeout after the claim — another handshake is busy,
+// the claiming one still continues — and free only past it
+// (R2-P6-bound-0813).
+func TestPASEClaimHeldUntilItsTimeoutPasses(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0", Clock: clk}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := HandshakeKey{InitiatorNodeID: 1, ExchangeID: 1}
+	second := HandshakeKey{InitiatorNodeID: 2, ExchangeID: 2}
+	if b.claimPase(first) != paseClaimTaken {
+		t.Fatal("the first claim was not taken")
+	}
+	clk.Advance(pasePairingTimeout)
+	if got := b.claimPase(second); got != paseClaimBusy {
+		t.Fatalf("a second handshake at exactly the timeout: claim %v, want busy", got)
+	}
+	if _, begun := b.resolvePaseContinuation(first); !begun {
+		t.Fatal("the claiming handshake no longer continues at exactly the timeout")
+	}
+	clk.Advance(time.Nanosecond)
+	if got := b.claimPase(second); got != paseClaimTaken {
+		t.Fatalf("a second handshake past the timeout: claim %v, want taken", got)
 	}
 }

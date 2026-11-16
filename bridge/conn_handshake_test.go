@@ -272,3 +272,18 @@ func TestSuccessStatusReportKeepsTheHandshakeHold(t *testing.T) {
 		t.Fatalf("%d holds after the peer's success report, want 1", n)
 	}
 }
+
+// TestPASEHoldCountsUntilItsTimeoutPasses: a PASE handshake's TCP hold
+// still counts at exactly pasePairingTimeout and lapses only past it
+// (R2-P6-bound-0813).
+func TestPASEHoldCountsUntilItsTimeoutPasses(t *testing.T) {
+	t.Parallel()
+	since := time.Unix(1_700_000_000, 0)
+	r := &connRoute{handshakes: map[uint16]handshakeHold{1: {pase: true, since: since}}}
+	if n := r.liveHandshakesLocked(since.Add(pasePairingTimeout)); n != 1 {
+		t.Fatalf("%d live holds at exactly the timeout, want 1", n)
+	}
+	if n := r.liveHandshakesLocked(since.Add(pasePairingTimeout + time.Nanosecond)); n != 0 {
+		t.Fatalf("%d live holds past the timeout, want 0", n)
+	}
+}

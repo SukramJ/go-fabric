@@ -113,3 +113,23 @@ func TestSessionCloseEndsOnlyItsChunkedWrites(t *testing.T) {
 		}
 	}
 }
+
+// TestWriteTransactionKeptAtExactlyItsTTL: a chunked write idle for exactly
+// writeTxTTL keeps its transaction; one idle a moment longer loses it
+// (R2-P6-bound-0813).
+func TestWriteTransactionKeptAtExactlyItsTTL(t *testing.T) {
+	t.Parallel()
+	var r exchangeRouting
+	now := time.Unix(1000, 0)
+	a := mrp.ExchangeKey{SessionID: 1, ExchangeID: 7}
+	sweep := mrp.ExchangeKey{SessionID: 2, ExchangeID: 1}
+	r.writeTransaction(a, true, now)
+	r.writeTransaction(sweep, true, now.Add(writeTxTTL))
+	if _, ok := r.writeTxs.Load(a); !ok {
+		t.Fatal("a chunked write idle for exactly writeTxTTL was pruned")
+	}
+	r.writeTransaction(sweep, true, now.Add(writeTxTTL+time.Nanosecond))
+	if _, ok := r.writeTxs.Load(a); ok {
+		t.Fatal("a chunked write idle past writeTxTTL was kept")
+	}
+}
