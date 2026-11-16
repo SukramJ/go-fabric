@@ -92,7 +92,7 @@ func (g *GeneralCommissioning) trackRollbackLocked(hook expiryHook, windowFabric
 // fail-safe armed for it (review II, R2-P2-dr-noc-04). With forSession, an
 // arm from sessFabric's session that the rollback removed, or whose row it
 // could not roll back and left pending (review II, R2-P2-rr-dev-01), is
-// errGencommArmRolledBack. Nothing runs when the fail-safe is armed or no
+// errGencommArmFabricUnsettled. Nothing runs when the fail-safe is armed or no
 // hook is wired. Caller holds g.mu; it is held again on return, and
 // released in between.
 func (g *GeneralCommissioning) startFailSafeLocked(ctx context.Context, sessFabric uint8, forSession bool) error {
@@ -103,7 +103,7 @@ func (g *GeneralCommissioning) startFailSafeLocked(ctx context.Context, sessFabr
 	removals := g.rollbackFabricRemovals[sessFabric]
 	g.runFailSafeStartingLocked(ctx, hook)
 	if forSession && sessFabric != 0 && g.rollbackFabricRemovals[sessFabric] != removals {
-		return errGencommArmRolledBack
+		return errGencommArmFabricUnsettled
 	}
 	return nil
 }
@@ -170,6 +170,16 @@ func (s settledExpiry) endedSession(sessFabric uint8) bool {
 // errGencommArmRolledBack answers an arm whose own session the rollback of
 // the due window it settled ended. The IM layer answers it as FAILURE.
 var errGencommArmRolledBack = errors.New("core: GeneralCommissioning: the fail-safe this arm found had expired, and its rollback ended the arming session")
+
+// errGencommArmFabricUnsettled answers an arm from a fabric's session on a
+// disarmed fail-safe whose new context's start rolled back that fabric's
+// pending row — removing the fabric — or could not roll it back and left
+// it pending (review II, N-findev-1). The IM layer answers it as FAILURE.
+var errGencommArmFabricUnsettled = errors.New("core: GeneralCommissioning: the arming fabric's row was pending; the new fail-safe context removed the fabric or could not settle its row")
+
+// errGencommArmedForAnotherFabric answers ArmFailSafeFor while the
+// fail-safe is armed for another fabric (review II, R2-P6-fsm-1017).
+var errGencommArmedForAnotherFabric = errors.New("core: GeneralCommissioning: the fail-safe is armed for another fabric")
 
 // settleArmLocked is settleExpiryLocked for an arm from sessFabric's
 // session: errGencommArmRolledBack when a rollback it settled ended that
