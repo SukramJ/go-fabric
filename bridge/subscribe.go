@@ -2477,7 +2477,11 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 	if len(attrIDs) == 0 {
 		return
 	}
-	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || b.holdWritten(mgr, ep, clusterID, attrIDs, !advance)) {
+	// A report view's mark waits for a write applied meanwhile, the
+	// write's own change included: the write's report marks it after the
+	// dispatcher's advance (Fable read 5b-write R3).
+	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || b.holdWritten(mgr, ep, clusterID, attrIDs, !advance)) ||
+		change.Origin == contract.OriginControllerWrite && !advance && b.holdWritten(mgr, ep, clusterID, attrIDs, true) {
 		if hook := b.onAttributeChange.Load(); hook != nil {
 			(*hook)(ep.ID, clusterID, change)
 		}

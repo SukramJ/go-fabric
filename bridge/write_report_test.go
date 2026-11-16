@@ -522,3 +522,46 @@ func TestHostChangeInsideARootWriteAdvancesOnce(t *testing.T) {
 		}
 	}
 }
+
+// TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances (Fable read
+// 5b-write R3, the remaining window): on a bridged endpoint the
+// dispatcher advances the cluster's version after the server returned; a
+// report built while the server tells its own write's change — here from
+// the host hook, which runs right after the mark — carries nothing, and
+// the written attribute is reported once, after the advance.
+func TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances(t *testing.T) {
+	t.Parallel()
+	srv, err := spec.NewServer(hepadef.Definition, spec.Options{
+		Features:   uint32(hepadef.FeatureCondition),
+		Attributes: []uint32{hepadef.AttrLastChangedTime},
+	}, spec.ServerConfig{Initial: map[uint32]any{hepadef.AttrCondition: uint8(40)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newAppHarness(t, appDevice{deviceType: 0x002D, servers: []contract.ClusterServer{srv}})
+	epID := h.endpoints[0x002D]
+	w := watchCluster(t, h, epID, hepadef.ClusterID)
+	var inside int
+	h.bridge.SetOnAttributeChange(func(_ uint16, _ uint32, change contract.Change) {
+		if change.Origin != contract.OriginControllerWrite {
+			return
+		}
+		w.now = w.now.Add(time.Minute)
+		w.mgr.Tick(context.Background(), w.now)
+		w.spy.mu.Lock()
+		for _, call := range w.spy.calls {
+			inside += len(call)
+		}
+		w.spy.calls = nil
+		w.spy.mu.Unlock()
+	})
+	if st := h.writeAttribute(epID, hepadef.ClusterID, hepadef.AttrLastChangedTime, uintValue(1000)); st != 0 {
+		t.Fatalf("write: status 0x%02X", st)
+	}
+	if inside != 0 {
+		t.Errorf("%d path(s) reported while the server told its write, before the dispatcher advanced the version", inside)
+	}
+	if advanced, n := w.step(func() {}, hepadef.AttrLastChangedTime); advanced != 1 || n != 1 {
+		t.Errorf("DataVersion advanced %d, LastChangedTime reported %d times; want 1 and 1", advanced, n)
+	}
+}

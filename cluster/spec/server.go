@@ -195,36 +195,13 @@ type Server struct {
 
 	// commit, guarded by mu, collects while a controller's write runs its
 	// host veto and Sink the attributes a Set made meanwhile changed: they
-	// are the write's commit ([writeCommit]). writeMu holds the commit
-	// window: one write's at a time, so the write that opened it closes
-	// it; a write its veto or Sink makes with the ctx it was handed joins
-	// it instead (commitKey).
-	commit  *writeCommit
-	writeMu sync.Mutex
-}
-
-// commitKey carries the open [writeCommit] in the ctx a controller
-// write's veto and Sink are handed.
-type commitKey struct{}
-
-// writeCommit is the change list of one controller write: the attributes
-// a Set changed while the write's veto and Sink ran. Its store advances
-// no version on its own; the write's commit advances it once, as
-// matter.js advances a datasource's version once per transaction for
-// every field it noted (Datasource.ts:1456-1457, :1476-1484 at db021da0)
-// and hands the whole list on (:1319). A Set another goroutine makes
-// while the write runs is folded into the commit too: the server cannot
-// tell it from one its Sink makes.
-//
-// One commit window is open per server at a time: a second controller
-// write of the server waits for the first's veto, Sink and store, as
-// matter.js serialises a datasource's transactions. A veto or Sink that
-// writes the server again passes the ctx it was handed — such a write
-// joins the open commit; one with another ctx would wait for the window
-// it runs in.
-type writeCommit struct {
-	server  *Server
-	changed []uint32
+	// are the write's commit ([writeCommit]).
+	commit *writeCommit
+	// holder is the commit whose write holds the server's commit window
+	// and free closes when it leaves it; both guarded by windowGraph
+	// (write_window.go).
+	holder *writeCommit
+	free   chan struct{}
 }
 
 // Compile-time assertions.
@@ -431,15 +408,58 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 // db021da0: a name is noted only when its value differs). The version
 // advances once for the whole list ([writeCommit]).
 func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any) ([]uint32, error) {
-	v, err := s.ValidateWrite(attrID, value, s.peers)
+	// The write runs inside the server's commit window: one write's at a
+	// time, or the open one of the write whose veto or Sink makes this one
+	// ([Server.enterWindow]).
+	c, joined, err := s.enterWindow(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if joined {
+		changed, _, err := s.writeIn(ctx, attrID, value, nil)
+		return changed, err
+	}
+	changed, wrote, err := func() ([]uint32, bool, error) {
+		defer s.leaveWindow(c)
+		return s.writeIn(context.WithValue(ctx, commitKey{}, c), attrID, value, c)
+	}()
+	// What a Set inside the window changed is told now, after the window
+	// is released and the version advanced, so a listener that writes the
+	// server again does not wait for the window it was told from.
+	if !wrote && len(c.changed) > 0 {
+		// A refused write, or one of the held value: what a Set changed
+		// meanwhile stays changed and advances the version once.
+		s.tracker().Bump()
+		changed = slices.Compact(slices.Sorted(slices.Values(c.changed)))
+		if err != nil {
+			changed = nil
+		}
+	}
+	for _, notify := range c.notifies {
+		notify()
+	}
+	return changed, err
+}
+
+// writeIn is a controller write of attrID inside the commit window ctx
+// carries: the definition's checks, the author's rule and the comparison
+// with the held value — asked here, after the window was entered, so the
+// second of two writes of one value finds it held (matter.js notes no
+// field whose value is equal, Datasource.ts:1476-1481 at db021da0) — then
+// the host's veto and the Sink, and the store. wrote is false when the
+// write stored nothing of its own (refused, or the held value). own is the
+// commit of the window this write entered, nil for a write that joined an
+// open one.
+func (s *Server) writeIn(ctx context.Context, attrID uint32, value any, own *writeCommit) (changed []uint32, wrote bool, err error) {
+	v, err := s.ValidateWrite(attrID, value, s.peers)
+	if err != nil {
+		return nil, false, err
 	}
 	// A struct's fields are held to their conformance as well (matter.js
 	// validates the written state,
 	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
 	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	v = stored(s.def.Attribute(attrID).Type, v)
 	// The author's rule judges every write, the held value included:
@@ -450,7 +470,7 @@ func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any
 		if err := s.rule(ctx, attrID, v); err != nil {
 			// As given: its IM status when it carries one, FAILURE
 			// otherwise (the dispatcher reads no status from the text).
-			return nil, err
+			return nil, false, err
 		}
 	}
 	// The value the server holds reaches no veto and no Sink and stores
@@ -463,44 +483,30 @@ func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any
 	// the value, so a write it lets through at worst stores an equal value
 	// and answers unchanged.
 	if s.holds(attrID, v) {
-		return []uint32{}, nil
+		return []uint32{}, false, nil
 	}
-	// A write the veto or the Sink of an open write of this server makes,
-	// with the ctx it was handed, is part of that write's commit.
-	if outer, nested := ctx.Value(commitKey{}).(*writeCommit); nested && outer.server == s {
-		if err := s.runWriteHooks(ctx, attrID, v); err != nil {
-			return nil, err
-		}
-		return s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil), nil
+	if err := s.runWriteHooks(ctx, attrID, v); err != nil {
+		return nil, false, err
 	}
-	// The veto and the Sink run inside the write's commit: an attribute
-	// a Set changes meanwhile — a sibling the Sink moves — is named by
-	// the write and advances the version with it, once. One commit is
-	// open per server at a time (writeMu), so each write closes exactly
-	// its own.
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	c := &writeCommit{server: s}
+	// The window's own write closes the collection before its store: the
+	// store advances the version once for what it changed and what the
+	// veto and the Sink changed, and its notification joins theirs, told
+	// once the window is released. A joined write's store adds to the
+	// open commit instead ([Server.storeWith]).
+	if own == nil {
+		all, notify := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil)
+		s.emit(notify)
+		return all, true, nil
+	}
 	s.mu.Lock()
-	s.commit = c
+	s.commit = nil
+	earlier := own.changed
 	s.mu.Unlock()
-	err = func() error {
-		defer func() {
-			s.mu.Lock()
-			s.commit = nil
-			s.mu.Unlock()
-		}()
-		return s.runWriteHooks(context.WithValue(ctx, commitKey{}, c), attrID, v)
-	}()
-	if err != nil {
-		// The write is refused; what a Set changed meanwhile stays
-		// changed and advances the version once.
-		if len(c.changed) > 0 {
-			s.tracker().Bump()
-		}
-		return nil, err
+	all, notify := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, earlier)
+	if notify != nil {
+		own.notifies = append(own.notifies, notify)
 	}
-	return s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, c.changed), nil
+	return all, true, nil
 }
 
 // runWriteHooks runs the host's veto and the Sink of a controller's write
@@ -675,7 +681,26 @@ func defaultOf(t Type, d any) (any, bool) {
 // returns the ids of those that changed, sorted, empty when none did
 // ([Server.storeWith] without an earlier list).
 func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
-	return s.storeWith(origin, values, nil)
+	all, notify := s.storeWith(origin, values, nil)
+	s.emit(notify)
+	return all
+}
+
+// emit tells a store's change to the listeners: at once, or — while a
+// controller write's commit is open — once that write left its window,
+// after the version advanced ([writeCommit]).
+func (s *Server) emit(notify func()) {
+	if notify == nil {
+		return
+	}
+	s.mu.Lock()
+	if open := s.commit; open != nil {
+		open.notifies = append(open.notifies, notify)
+		s.mu.Unlock()
+		return
+	}
+	s.mu.Unlock()
+	notify()
 }
 
 // storeWith is store for a commit whose list already holds earlier, the
@@ -691,7 +716,7 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
 // db021da0). A change of a quieter attribute goes to the change listeners
 // at once and to the report listeners when its throttle emits
 // ([Server.quietReport]); every other change is reported at once.
-func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32) []uint32 {
+func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32) (all []uint32, notify func()) {
 	type quietChange struct {
 		qa              *quietAttr
 		wasNull, isNull bool
@@ -723,7 +748,7 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 		open.changed = append(append(open.changed, changed...), earlier...)
 	}
 	s.mu.Unlock()
-	all := slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(changed), earlier...))))
+	all = slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(changed), earlier...))))
 	if all == nil {
 		all = []uint32{}
 	}
@@ -731,24 +756,25 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 		s.tracker().Bump()
 	}
 	if len(changed) == 0 {
-		return all
+		return all, nil
 	}
 	slices.Sort(changed)
 	slices.Sort(plain)
-	if len(plain) == len(changed) {
-		s.AttributeChanges.NotifyFrom(origin, changed...)
-		return all
-	}
-	s.AttributeChanges.ChangedFrom(origin, changed...)
-	if len(plain) > 0 {
-		s.AttributeChanges.ReportFrom(origin, plain...)
-	}
-	for _, id := range changed {
-		if c, ok := quiets[id]; ok {
-			c.qa.q.Changed(c.wasNull, c.isNull)
+	return all, func() {
+		if len(plain) == len(changed) {
+			s.AttributeChanges.NotifyFrom(origin, changed...)
+			return
+		}
+		s.AttributeChanges.ChangedFrom(origin, changed...)
+		if len(plain) > 0 {
+			s.AttributeChanges.ReportFrom(origin, plain...)
+		}
+		for _, id := range changed {
+			if c, ok := quiets[id]; ok {
+				c.qa.q.Changed(c.wasNull, c.isNull)
+			}
 		}
 	}
-	return all
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command
