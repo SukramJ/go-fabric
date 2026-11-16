@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -29,6 +30,14 @@ func TestWrongTypeIsAClass(t *testing.T) {
 		"uint for a string": func() error { _, err := spec.DecodeString(node(u)); return err }(),
 		"uint for a bool":   func() error { _, err := spec.DecodeBool(node(u)); return err }(),
 		"string for octets": func() error { _, err := spec.DecodeBytes(node(str)); return err }(),
+		"a mistyped field of a struct": func() error {
+			st := spec.Node{El: tlv.Element{Type: tlv.TypeStructure, IsContainer: true}, Children: []spec.Node{
+				{El: tlv.Element{Type: tlv.TypeUTF8Str1, String: "x", Tag: tlv.ContextTag(1)}},
+				{El: tlv.Element{Type: tlv.TypeUnsignedInt1, Uint: 1, Tag: tlv.ContextTag(254)}},
+			}}
+			_, err := spec.DecodeStruct[bindingdef.TargetStruct](st)
+			return err
+		}(),
 		"a TLV list for an array": func() error {
 			_, err := spec.DecodeList(spec.DecodeUint[uint8](8))(list)
 			return err

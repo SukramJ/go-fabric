@@ -428,7 +428,7 @@ func DecodeFields(n Node, what string, fields ...FieldSpec) error {
 func wrapField(what, field string, err error) error {
 	var fe *FieldError
 	if errors.As(err, &fe) {
-		return &FieldError{Status: fe.Status, Msg: fmt.Sprintf("%s.%s: %s", what, field, fe.Msg)}
+		return &FieldError{Status: fe.Status, Msg: fmt.Sprintf("%s.%s: %s", what, field, fe.Msg), class: fe.class}
 	}
 	return fmt.Errorf("%s.%s: %w", what, field, err)
 }
