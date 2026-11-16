@@ -53,6 +53,10 @@ type GroupKeyManagement struct {
 	currentFabric         uint8
 	maxGroupsPerFabric    uint16
 	maxGroupKeysPerFabric uint16
+	// staleGroups are the fabrics whose operational group state a reload
+	// could not refresh after a stored change (syncGroups); each later
+	// command or write of the server reloads them again.
+	staleGroups map[uint8]bool
 
 	// logger receives the server's diagnostics (GroupKeyMgmtConfig.Logger).
 	logger *slog.Logger
@@ -242,9 +246,7 @@ func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
 				slog.String("hint", "a GroupKeyMap entry mapped the group to key set 0, the IPK; the group has no key set mapped now"))
 		}
 		if dropped {
-			if err := g.syncGroups(ctx, fabric); err != nil {
-				g.logger.Warn("matter.group_key_management.keyset0_mapping_drop_failed", slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
-			}
+			g.syncGroups(ctx, fabric)
 		}
 	}
 }
@@ -254,14 +256,58 @@ func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
 // GroupKeyManagementServer (keySetWrite → setFromGroupKeySet,
 // keySetRemove → removeGroupKeySet, #updateGroupKeyMap →
 // groupKeyIdMap).
-func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) error {
+//
+// matter.js derives the group state inside the command, after the state
+// assignment and before the transaction commits
+// (GroupKeyManagementServer.ts:368-385, FabricGroups.ts:140-170 at
+// db021da0), so it has no "stored but not derived" outcome; here the store
+// has already taken the write, so the command succeeds and the stale group
+// state is reloaded.
+//
+// A reload that fails is logged and the fabric marked stale; the change
+// answers success for what is stored, and the next command or write of
+// this server reloads the fabric again (reloadStale) (review II,
+// R2-P6-err-1701, R2-P6-err-1014).
+func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) {
 	if g.groups == nil {
-		return nil
+		return
 	}
-	if err := g.groups.Reload(ctx, fabric); err != nil {
-		return fmt.Errorf("core: GroupKeyManagement: refresh group state: %w", err)
+	g.reloadStale(ctx)
+	g.reloadGroups(ctx, fabric)
+}
+
+// reloadGroups reloads fabric's operational group state, marking it stale
+// when the reload fails and clearing the mark when it succeeds.
+func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
+	err := g.groups.Reload(ctx, fabric)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if err != nil {
+		g.logger.Warn("matter.group_key_management.group_state_stale",
+			slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
+		if g.staleGroups == nil {
+			g.staleGroups = map[uint8]bool{}
+		}
+		g.staleGroups[fabric] = true
+		return
 	}
-	return nil
+	delete(g.staleGroups, fabric)
+}
+
+// reloadStale reloads every fabric syncGroups marked stale.
+func (g *GroupKeyManagement) reloadStale(ctx context.Context) {
+	if g.groups == nil {
+		return
+	}
+	g.mu.RLock()
+	stale := make([]uint8, 0, len(g.staleGroups))
+	for f := range g.staleGroups {
+		stale = append(stale, f)
+	}
+	g.mu.RUnlock()
+	for _, f := range stale {
+		g.reloadGroups(ctx, f)
+	}
 }
 
 // Compile-time assertions.
@@ -579,6 +625,7 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 // writeMu. The bindings are kept per group, so the order of the written
 // entries does not count.
 func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	g.reloadStale(ctx)
 	if attrID != groupKeyMgmtAttrGroupKeyMap {
 		return false, spec.Errorf(im.StatusUnsupportedWrite, "core: GroupKeyManagement attribute 0x%04X is read-only", attrID)
 	}
@@ -632,7 +679,8 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	// evaluation detects the cluster changed; one written as it was held
 	// returned above.
 	g.dataVersion.Bump()
-	return true, g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return true, nil
 }
 
 // sameGroupKeyMap reports whether the written list binds the groups the
@@ -754,6 +802,7 @@ type KeySetReadAllIndicesResponse struct {
 
 // MatterInvoke implements [contract.ClusterServer].
 func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	g.reloadStale(ctx)
 	// The fabric is the request's accessing fabric
 	// (FabricFilterFromContext), never a server-wide value: a command
 	// without one is refused (review II, R2-P6-sec-1006).
@@ -975,7 +1024,8 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	// Bump DataVersion after a successful KeySetWrite so DataVersionFilter
 	// evaluation correctly detects the cluster changed.
 	g.dataVersion.Bump()
-	return nil, g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil, nil
 }
 
 // enforceKeySetBudget rejects ADDING a new key-set id once the
@@ -1067,7 +1117,8 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 	// set in the same transaction (core§11.2.7.4.1; matter.js keySetRemove
 	// filters them out of groupKeyMap).
 	g.dataVersion.Bump()
-	return nil, g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil, nil
 }
 
 func (g *GroupKeyManagement) handleKeySetReadAllIndices(ctx context.Context, fabric uint8) (any, error) {
@@ -1129,7 +1180,8 @@ func (g *GroupKeyManagement) createKeySetForGroupcast(ctx context.Context, fabri
 		return fmt.Errorf("core: GroupKeyManagement: create Groupcast key set: %w", err)
 	}
 	g.dataVersion.Bump()
-	return g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil
 }
 
 // checkGroupKeyMapping applies the GroupKeyMap validation a Groupcast
@@ -1175,7 +1227,8 @@ func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	g.dataVersion.Bump()
-	return g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil
 }
 
 // removeGroupKeyMapping drops the fabric's binding of groupID. Mirrors
@@ -1185,5 +1238,6 @@ func (g *GroupKeyManagement) removeGroupKeyMapping(ctx context.Context, fabric u
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	g.dataVersion.Bump()
-	return g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil
 }
