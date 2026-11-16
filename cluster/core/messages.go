@@ -81,7 +81,8 @@ const messagesMax = 8
 // answers a ninth RESOURCE_EXHAUSTED, and a cancel touches only the
 // accessing fabric's messages, as only they are visible to it. A present
 // whose MessageID another fabric's message holds — queued, or being
-// presented — is refused ALREADY_EXISTS and that message stays as it is:
+// presented — is refused ALREADY_EXISTS (the module's status; neither
+// reference answers one here) and that message stays as it is:
 // chip's example looks the id up across fabrics and replaces it
 // (MessagesManager.cpp:73-87, FindCachedMessage(messageId)), so one
 // fabric could take down another's presented message (review II,
