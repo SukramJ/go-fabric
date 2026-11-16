@@ -236,11 +236,8 @@ func TestOwedReloadIsPacedOnTheReceivePath(t *testing.T) {
 	st.mu.Unlock()
 	fake.Advance(time.Minute)
 	flood(1)
-	if _, err := m.Decode(ctx, sealGroup(t, opKeyOf1(t), sid1Of(t), 0x0101, 7, 1, true, []byte("x"))); err != nil {
+	op1, sid1 := opKeyOf(t, 0xA1)
+	if _, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, []byte("x"))); err != nil {
 		t.Fatalf("fabric 1 after the store recovered: %v", err)
 	}
 }
-
-func opKeyOf1(t *testing.T) []byte { op, _ := opKeyOf(t, 0xA1); return op }
-
-func sid1Of(t *testing.T) uint16 { _, sid := opKeyOf(t, 0xA1); return sid }
