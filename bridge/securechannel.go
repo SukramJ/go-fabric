@@ -2348,7 +2348,10 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 	// (ExchangeManager.ts:696-713).
 	defer b.unbindSessionRoute(requestHdr.SessionID)
 	// Every exchange the session carried dies with it, so any timed
-	// deadline it registered can never be consumed.
+	// deadline it registered can never be consumed. [Bridge.SessionClosed]
+	// drops them again when the host's close hook reaches it; this call is
+	// the only drop for a host that does not wire that hook, so it stays
+	// (review II, N-sess-2).
 	b.routing.dropSessionTimedDeadlines(requestHdr.SessionID)
 	b.mu.RLock()
 	reg := b.sessionRegistry
@@ -2444,7 +2447,10 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 	// learned peer address can never be used again — neither of the
 	// early returns below means the session survives. Teardown paths
 	// that do not notify the peer fall back to the expiry sweep and to
-	// overwrite-on-reuse respectively.
+	// overwrite-on-reuse respectively. As on the inbound CloseSession,
+	// this drop stays beside the purge of [Bridge.SessionClosed]: a host
+	// that does not wire the registry's close hook to it has no other
+	// (review II, N-sess-2).
 	b.routing.dropSessionTimedDeadlines(sessionID)
 	// Deferred, not dropped here: this farewell still has to be routed
 	// on that address, and every exit path must release it.
