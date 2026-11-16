@@ -361,7 +361,15 @@ type ThermostatServer struct {
 	// mu guards the values that change after construction: localTemp
 	// through systemMode. It is taken inside op and not held while the Sink
 	// runs.
-	mu       sync.RWMutex
+	mu sync.RWMutex
+	// persist serialises the PresetStore: every path that changes Presets
+	// or ActivePresetHandle holds it across reading the pair, saving it and
+	// storing it, so each save writes the pair that is current when it
+	// runs and the store never falls behind memory (R2-P6-store-1501). It
+	// is taken inside op and outside mu; the inbound setters take it
+	// without op, as they take mu (issue #63). It is a one-slot channel, so
+	// that a waiter is durably blocked for a testing/synctest bubble.
+	persist  chan struct{}
 	features uint32
 	// matterTime is the Matter time TSUGGEST reads
 	// ([ThermostatServer.AttachMatterTime]); nil without one.
@@ -502,6 +510,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		minSetpointDeadBand: defaultMinSetpointDeadBand,
 		occupied:            true,
 		clk:                 clock.Or(cfg.Clock),
+		persist:             make(chan struct{}, 1),
 	}
 	// Mirrors matter.js ThermostatServer.ts:154-160 at 862ad75f: a deadband
 	// above 127 is reset to the default, one below 0 refused.

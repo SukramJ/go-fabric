@@ -512,6 +512,7 @@ func (s *ThermostatServer) revertAtomic(ctx context.Context, attr uint32, preset
 	var err error
 	switch attr {
 	case tdef.AttrPresets:
+		s.lockPersist()
 		s.mu.RLock()
 		active := bytes.Clone(s.activePresetHandle)
 		s.mu.RUnlock()
@@ -519,6 +520,7 @@ func (s *ThermostatServer) revertAtomic(ctx context.Context, attr uint32, preset
 		s.mu.Lock()
 		s.presets = presets
 		s.mu.Unlock()
+		s.unlockPersist()
 		s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrPresets)
 	case tdef.AttrSchedules:
 		if s.schedulePort != nil {

@@ -335,8 +335,15 @@ func normalizePresetCommit(presets, old []Preset, seeding bool, issued map[strin
 	return nil
 }
 
+// lockPersist takes [ThermostatServer.persist]; unlockPersist releases it.
+func (s *ThermostatServer) lockPersist()   { s.persist <- struct{}{} }
+func (s *ThermostatServer) unlockPersist() { <-s.persist }
+
 // savePresets hands presets and the active handle to the PresetStore; a
-// server without one keeps them in memory only.
+// server without one keeps them in memory only. After construction the
+// caller holds persist, read the pair under it and stores what it saved
+// before it releases it (R2-P6-store-1501). A PresetStore must not call
+// back into the server's setters: they wait for persist.
 func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, active []byte) error {
 	if s.presetStore == nil {
 		return nil
@@ -353,6 +360,8 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 // commit). The caller holds s.op; presets are the caller's and are
 // normalised in place.
 func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) error {
+	s.lockPersist()
+	defer s.unlockPersist()
 	s.mu.RLock()
 	old := s.presets
 	active := bytes.Clone(s.activePresetHandle)
@@ -441,6 +450,8 @@ func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []b
 // storeActiveHandle saves and stores the active handle; the caller holds
 // s.op.
 func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte) error {
+	s.lockPersist()
+	defer s.unlockPersist()
 	s.mu.RLock()
 	presets := s.presets
 	same := bytes.Equal(s.activePresetHandle, handle) && (s.activePresetHandle == nil) == (handle == nil)
@@ -462,22 +473,27 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 // (not a command's) setpoint change of the setpoints in effect — matter.js
 // #assert(Un)occupied*SetpointChanging (ThermostatServer.ts:682-706,
 // :744-768 at db021da0): a setpoint someone set by hand is no longer the
-// preset's. It takes s.mu only, so the inbound setters may call it while a
-// write waits on the Sink.
+// preset's. It takes persist and s.mu, never s.op, so the inbound setters
+// may call it while a write waits on the Sink (issue #63); persist keeps
+// its save from overtaking a preset write's (R2-P6-store-1501).
 func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) {
 	if s.features&ThermostatFeaturePRES == 0 {
 		return
 	}
+	s.lockPersist()
 	s.mu.Lock()
 	if s.activePresetHandle == nil || s.occupiedLocked() == unoccupied {
 		s.mu.Unlock()
+		s.unlockPersist()
 		return
 	}
 	previous := s.activePresetHandle
 	s.activePresetHandle = nil
 	presets := s.presets
 	s.mu.Unlock()
-	if err := s.savePresets(ctx, presets, nil); err != nil {
+	err := s.savePresets(ctx, presets, nil)
+	s.unlockPersist()
+	if err != nil {
 		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
 	}
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
