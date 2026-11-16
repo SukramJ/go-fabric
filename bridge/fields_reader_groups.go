@@ -36,7 +36,7 @@ func groupCommandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder) (fi
 	case path.Cluster == mattercore.GroupsClusterID && path.Command == 0x05:
 		fields, err = decodeAddGroupIfIdentifyingRequest(dec)
 	case path.Cluster == 0x003F && path.Command == 0x00:
-		fields, err = decodeKeySetWriteRequest(dec)
+		fields, err = decodeKeySetWriteByDefinition(dec)
 	case path.Cluster == 0x003F && path.Command == 0x01:
 		fields, err = decodeKeySetReadRequest(dec)
 	case path.Cluster == 0x003F && path.Command == 0x03:
