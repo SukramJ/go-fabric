@@ -39,6 +39,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -843,7 +844,12 @@ func (s *DoorLockServer) lockCommand(actuation Actuation) spec.CommandHandler {
 		// (DoorLockServer.ts:198-201, :1049-1080 at db021da0).
 		s.op.Lock()
 		defer s.op.Unlock()
-		if err := s.actuate(ctx, actuation, pinCode); err != nil {
+		err = s.actuate(ctx, actuation, pinCode)
+		// The lock moved but its records were not saved: the physical
+		// outcome stands, so the relock follows the lock as after a
+		// success, and the command answers FAILURE (R2-P6-err-1504).
+		var unsaved notSavedError
+		if err != nil && !errors.As(err, &unsaved) {
 			return nil, err
 		}
 		s.mu.Lock()
@@ -853,9 +859,23 @@ func (s *DoorLockServer) lockCommand(actuation Actuation) spec.CommandHandler {
 			s.scheduleAutoRelockLocked(timeout)
 		}
 		s.mu.Unlock()
-		return nil, nil
+		return nil, err
 	}
 }
+
+// notSavedError is a lock operation the hardware carried out whose records
+// the AuthStore refused to save. The physical outcome stands: the records
+// keep what the operation did — a DisposableUser stays disabled, the lock
+// state is the hardware's — and the auto-relock follows the lock. The
+// command answers FAILURE, as matter.js answers a commit that fails after
+// the hardware moved (fable-6a-w2 G2: DoorLockServer.ts:1033-1041,
+// CommandInvokeResponse.ts:493, :509-520 at db021da0), where matter.js
+// rolls the state back and go-fabric keeps it (R2-P6-err-1504).
+type notSavedError struct{ err error }
+
+func (e notSavedError) Error() string                 { return "lock: save records: " + e.err.Error() }
+func (e notSavedError) Unwrap() error                 { return e.err }
+func (notSavedError) MatterStatusCode() im.StatusCode { return im.StatusFailure }
 
 // lockRequest reads the PINCode and the UnlockWithTimeout timeout of a
 // lock command; a command without fields carries neither.
@@ -944,9 +964,8 @@ func (s *DoorLockServer) actuate(ctx context.Context, actuation Actuation, pinCo
 	if err := s.setActuated(locking); err != nil {
 		return err
 	}
-	return s.commit(ctx, func() error {
+	return s.commitMoved(ctx, func() {
 		s.completeOperationLocked(ctx, opType, req)
-		return nil
 	})
 }
 
@@ -1399,6 +1418,32 @@ func (s *DoorLockServer) commit(ctx context.Context, fn func() error) error {
 			s.mu.Unlock()
 			s.emit(events)
 			return spec.Errorf(im.StatusFailure, "lock: save records: %v", perr)
+		}
+	}
+	s.emit(events)
+	return err
+}
+
+// commitMoved runs fn under mu after the hardware moved and saves the
+// records it changed. A failed save keeps them — the physical outcome
+// stands — logs it and answers [notSavedError] (R2-P6-err-1504); the
+// events fn queued leave either way. The caller holds op.
+func (s *DoorLockServer) commitMoved(ctx context.Context, fn func()) error {
+	s.mu.Lock()
+	fn()
+	dirty := s.dirty
+	s.dirty = false
+	var snapshot store.DoorLockAuth
+	if dirty {
+		snapshot = cloneAuth(s.data)
+	}
+	events := s.takeQueueLocked()
+	s.mu.Unlock()
+	var err error
+	if dirty && s.auth != nil {
+		if perr := s.auth.SaveDoorLockAuth(ctx, s.authKey, snapshot); perr != nil {
+			slog.Default().Warn("matter.doorlock.records_not_saved", slog.String("reason", perr.Error()))
+			err = notSavedError{perr}
 		}
 	}
 	s.emit(events)
