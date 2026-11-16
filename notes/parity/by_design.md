@@ -191,6 +191,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-chip-RotatingDeviceIdentifier | `CommissionableMdnsAdvertisement.ts:84-97` at `db021da0`: the commissionable TXT values carry no RI (absence: the close of the values object, `:91-92`); matter.js reads RI only as a scanner (`packages/protocol/src/common/Scanner.ts:46-47`, `:71`) | `packages/protocol/src/advertisement/mdns/CommissionableMdnsAdvertisement.ts` | `"            PI: pairingInstructions /* Pairing Instruction */,\n        };"` | connectedhomeip at `6170af84`: the derivation (`src/setup_payload/AdditionalDataPayloadGenerator.cpp:81-111`, `:113-127`), off by default (`src/setup_payload/BUILD.gn:19-22`); the counter rule and the random persisted unique id are this module's (owner decision 137) | no |
 | BD-Matter-TcpSendBounded | `NodeJsTcpConnection.ts:105-115` and `TcpChannel.ts:125` at `db021da0`: a send awaits the socket's write with no timeout (presence) | `packages/nodejs/src/net/NodeJsTcpConnection.ts`<br>`packages/protocol/src/transport/tcp/TcpChannel.ts` | `"            this.#socket.write(Bytes.of(data), error => {"`<br>`"        await this.#socket.send(frame);"` | this module's own bound (review II, R2-P6-bound-0202): a frame not handed to the socket within 30 s fails its send and closes the connection | no |
 | BD-Matter-ResumptionRecordsPerFabric | `SessionManager.ts:910-914` at `db021da0`: `#rememberResumptionRecord` keeps one record per peer with no cap (presence, the two `set` at `:912-913`) | `packages/protocol/src/session/SessionManager.ts` | `"        this.#resumptionRecords.set(address, record);"` | neither reference: connectedhomeip caps the node at `CHIP_CONFIG_CASE_SESSION_RESUME_CACHE_SIZE` records in one index and drops its head when full (`src/lib/core/CHIPConfig.h:1336-1343`, `src/protocols/secure_channel/DefaultSessionResumptionStorage.cpp:55-90`, `:95-99` at `6170af84`); 16 per fabric here (owner decision 134) | no |
+| BD-Matter-ReadAccessCapability | `AttributeReadResponse.ts:468` at `db021da0`: a read's only access decision is `session.authorityAt` (presence); the value is a state lookup (`:301`) and the file has no try/catch, so no cluster refuses a read of its own | `packages/protocol/src/action/server/AttributeReadResponse.ts` | `"        const permission = session.authorityAt(level, location);"` | this module's own capability (owner decision 152), answered as both references' access check answers: UNSUPPORTED_ACCESS on a concrete path, the attribute left out of a wildcard (`AttributeReadResponse.ts:272`, `:473-475`, `:406-413`; connectedhomeip `src/app/reporting/Engine.cpp:81-88` at `6170af84`) | no |
 
 ---
 
@@ -6219,6 +6220,8 @@ both TLS servers on endpoint 0 through
 by `tls/*_chip_test.go` (17 + 16 of chip's cases) and the fuzz target
 `FuzzCertificateUpserts` (chip's three `FUZZ_TEST`).
 
+Review II, phase 6a (R2-P6-conc-1109): a removal that will be refused because the certificate is in use hides the certificate for the length of its dependency check, so a concurrent ProvisionEndpoint naming it answers RootCertificateNotFound / ClientCertificateNotFound once — fail closed, and gone with the check. This module's own; the dependency check runs across the two servers.
+
 ### BD-chip-TlsClientManagement-RulesInServer — endpoint provisioning follows connectedhomeip; an endpoint in use answers the model's EndpointInUse
 
 matter.js's `TlsClientManagementServer.ts:14` at `862ad75f` is the empty
@@ -6238,6 +6241,8 @@ Review II, phase 4 (2026-11-14): connectedhomeip's
 `examples/all-clusters-app/all-clusters-common/src/tls-client-management-instance.cpp`
 is outside the exports the review read and was not re-read; what this entry
 says of it is unverified.
+
+Review II, phase 6a (R2-P6-fsm-1108, owner decision 150): ProvisionEndpoint of an existing EndpointID replaces the entry with ReferenceCount 0, as chip's example delegate (`examples/all-clusters-app/all-clusters-common/src/tls-client-management-instance.cpp:320` at `6170af84`, `endpointStruct.referenceCount = 0;` after both the new and the update branch, `:307-313`). Mirrored though it breaks the module's own dependency check: an endpoint a push transport holds can be re-provisioned and then removed, and its root and client certificates after it.
 
 ### BD-chip-OccupancySensing-HoldTimer — the hold timer is connectedhomeip's; matter.js has none
 
@@ -6452,17 +6457,23 @@ whose node list already holds a matching entry writes nothing (review II,
 R2-P1-clu-05, R2-P1-dr-rest-04): a push that waited behind a `RefreshNode`
 of the same node, which had delivered the Pending entry with the whole
 list, would otherwise write the binding a second time. This module's own
-rule. The entry above cites jf-admin-app's delegate as appending the entry
-(`JFADatastoreSync.cpp:1744` at `6170af84`); `examples/jf-admin-app` is not
-among the sources exported at the review's pin, so that line and what the
-delegate does for an entry the node already holds were not re-read (not
-performable: not exported). Pinned by
+rule: jf-admin-app's delegate appends the entry with no test for one already
+present (`examples/jf-admin-app/linux/JFADatastoreSync.cpp:1742-1745`, `:1744`
+at `6170af84`, read in review II, phase 6a). Pinned by
 `cluster/jointfabric:TestBindingPushAfterARefreshThatDeliveredIt`.
 
-Review II, phase 4 (2026-11-14): connectedhomeip's
-`examples/jf-admin-app/linux/JFADatastoreSync.cpp` is outside the exports
-the review read and was not re-read; what this entry says of it is
-unverified.
+Read at `6170af84` (review II, phase 6a, R2-P6-doc-1117 d):
+`examples/jf-admin-app/linux/JFADatastoreSync.cpp:1706-1747` (the
+single-entry `SyncNode`: fetch, merge, write; a failed fetch clears the
+merged list, `:1727`). Lines past `:1750` were not re-read.
+
+Review II, phase 6a (R2-P6-sec-1103, owner decisions 129 and 152): the datastore is the anchor fabric's, ahead of both references — connectedhomeip's cluster asks no accessing fabric (`src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` at `6170af84`: no hit for `AccessingFabric|SubjectDescriptor|FabricIndex`), and matter.js's server is the empty subclass (`JointFabricDatastoreServer.ts:14` at `db021da0`). A command of a request of a fabric other than the recorded anchor fabric answers UNSUPPORTED_ACCESS before it decodes. A read or subscription of such a request is refused by the dispatcher before the server is read — UNSUPPORTED_ACCESS on a concrete path, the attribute left out of a wildcard (`Datastore.MatterReadAllowed`, `BD-Matter-ReadAccessCapability`); behind a dispatcher that does not ask the capability the empty-value read stays the fallback (`MatterReadFiltered`: every attribute but the universal globals withheld, one a later schema adds included). The Datastore admits the universal global attributes (0xFFF8–0xFFFD) to every request, and a successful read of one carries the cluster's DataVersion: a fabric the Datastore refuses still sees that the datastore changed, and when — no content. The anchor is its fabric index and that fabric's identity (root public key, fabric id) in the node's fabric table, which the node hands the datastore (`Datastore.AttachNode`): a request is admitted only when both match, and an UpdateNOC keeps a fabric's root and fabric id, as in matter.js (`packages/protocol/src/fabric/Fabric.ts:579-595`); a reused index with another identity wipes the stale registry when the datastore is attached; a record without the identity (written before this build, or after a host's `SetAnchorFabricIndex` before a table was attached) adopts the table's fabric of that index once — if that index was handed out again while the datastore's endpoint was absent, the new fabric inherits the registry (accepted, review II RECORD-17). While no anchor is recorded every peer is refused: a datastore without an Administrator, or an anchor whose NOC lacks the two CATs, serves peers only after the host's `SetAnchorFabricIndex`; chip serves those. A datastore command during the anchor's fail-safe, before CommissioningComplete, is refused; chip's cases send none (`src/python_testing/TC_JFDS_BindingSync.py:112-114`, `:239-255`; `TC_JFDS_2_2.py:144-146`). Host calls are not fenced. A host that wires the datastore outside the node calls `AttachNode` and forwards every fabric removal and install to it (`MatterDropFabric`); without a fabric table every peer is refused.
+
+Review II, phase 6a (R2-P6-sec-1106, owner decision 129): RefreshNode fetches the node's key sets and takes them into nothing — a held key set's keys and policy are never replaced, an unknown one is not adopted, and the node is enrolled as no recipient (NodeKeySetList is written by the commands alone). connectedhomeip updates the held entry with the node's and appends an unknown one (`src/app/server/JointFabricDatastore.cpp:724-743` at `6170af84`; a null source is cleared, `:119-134`); that a faithful KeySetRead (null keys) would then erase the registry's keys is inferred from this module's own KeySetRead (`cluster/core/group_key_management.go`), not run against chip.
+
+Review II, phase 6a (R2-P6-bound-1113): AddGroup holds GroupList to MaxGroups — tighter than connectedhomeip, whose AddGroup has no capacity test (`src/app/server/JointFabricDatastore.cpp:1360-1385`; its capacity tests are `:183`, `:1159`, `:1227`, `:1684`, `:1930`, `:2122` only, at `6170af84`). RefreshNode refuses a fetched list longer than the per-command cap of that list (memberships and bindings MaxGroups, ACL entries MaxACLs) with ErrNoMemory before anything changes, so no truncated list is pushed; the table's total is not bounded, as chip's merges append without one (`:389`, `:562`, `:959`). After a wipe a push already collected calls no port; the store's last record is a second plaintext copy of the epoch keys in memory until the next save (chip's buffers are self-zeroizing, `JointFabricDatastore.h:532-559`) — recorded, not changed.
+
+Review II, phase 6a (R2-P6-par-1115): UpdateGroup refuses a group whose stored CAT is the Administrator or the Anchor CAT and takes the request's GroupCAT unchecked — mirrored: connectedhomeip `src/app/server/JointFabricDatastore.cpp:1418-1423`, `:1491-1500` at `6170af84` (AddGroup, `:1367`, checks the request's). A group can so be moved onto a reserved CAT, after which it can be neither updated nor removed by command.
 
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 
@@ -6489,9 +6500,14 @@ chip's server does not do this. Pinned by `commissionee_chip_test.go`
 (13 + 3 + 9 of chip's cases; the four C++ liveness cases are one context
 test) and `administrator_rules_test.go` (the statuses `TC_JFADMIN` checks).
 
-Review II, phase 4 (2026-11-14): connectedhomeip's
-`examples/jf-admin-app/linux/JFAManager.cpp` is outside the exports the
-review read and was not re-read; what this entry says of it is unverified.
+Read at `6170af84` (review II, phase 6a, R2-P6-doc-1117 d):
+`examples/jf-admin-app/linux/JFAManager.cpp:95-150`
+(`HandleCommissioningCompleteEvent`: the fabric whose NOC carries both the
+Administrator and the Anchor CAT becomes AdministratorFabricIndex,
+`:105-108`, and the datastore's anchor, `:113-147`). Lines past `:150` were
+not re-read.
+
+Review II, phase 6a (R2-P6-fsm-1104, R2-P6-store-1105): the anchor recording is the module's, and so is its end. The removal of the AdministratorFabricIndex's fabric sets it null and hands the removal to the Datastore (idempotent with the node's FabricScopedState call). The anchor is taken from the datastore: a datastore that records an anchor is never re-pointed — the attribute follows it while the fabric table holds that fabric with the recorded identity (root public key, fabric id); one that records none takes the fabric whose NOC carries both CATs (`examples/jf-admin-app/linux/JFAManager.cpp:105`), recorded in the datastore before the attribute is set — at CommissioningComplete and at `AttachNode` (restart). chip's jf-admin-app sets `jfFabricIndex` once, at `:110`; whether it has a removal handler was not read.
 
 ### BD-chip-JCM-Commissioner — joint commissioning runs as step 10.2 after chip's commissioner
 
@@ -9099,3 +9115,7 @@ matter.js names one administrator for every fabric a synchronisation pass change
 ### BD-chip-FabricLabelBytes — UpdateFabricLabel counts the label's bytes, as connectedhomeip
 
 matter.js counts a label's length in UTF-16 code units: `TlvString` compares `value.length` for a string (`packages/types/src/tlv/TlvString.ts:82-85` at `db021da0`), the state constraint the same (`packages/node/src/behavior/state/validation/constraint.ts:202`), and the fabric `label.length > 32` (`packages/protocol/src/fabric/Fabric.ts:194`); the model says "max 32" (`operational-credentials.element.ts:124`). connectedhomeip counts bytes: `label.size() > 32` on the decoded `CharSpan` answers InvalidCommand (`src/app/clusters/operational-credentials-server/OperationalCredentialsCluster.cpp:711`, `:716`, with a TODO naming ConstraintError at `:713-714`), and the fabric table keeps the label in a 32-byte buffer (`src/credentials/FabricTable.h:48` `kFabricLabelMaxLengthInBytes = 32`, `:237`; `FabricTable.cpp:2142` at `6170af84`). This module counts bytes (`cluster/core/operational_credentials.go`, UpdateFabricLabel), chip's count with matter.js's status (ConstraintError). Every label of at most 32 bytes is also at most 32 code units, so the module refuses only labels matter.js accepts: non-ASCII ones of 33 to 96 bytes. Reason (owner decision 155): the label is stored and served as connectedhomeip's data model holds it, in 32 bytes; that matter.js's count is JavaScript's string length rather than a stated rule is an inference. Review II, N4-coresec-1.
+
+### BD-Matter-ReadAccessCapability — a cluster server may refuse a read or subscription of a requester before it is read
+
+Neither reference refuses a read from inside a cluster: matter.js decides by `session.authorityAt` alone (`packages/protocol/src/action/server/AttributeReadResponse.ts:468` at `db021da0`; the value is a state lookup, `:301`, and the file has no try/catch), connectedhomeip by the ACL (`src/app/reporting/Engine.cpp:65-89` at `6170af84`). A server that implements `contract.ReadAccessDeclarer` is asked by the dispatcher, beside the ACL's read check and before the server is read (`endpoint/dispatcher.go` `readAllowed`): a refused requester gets UNSUPPORTED_ACCESS on a concrete path and the attribute is left out of a wildcard — as both references' access check answers: matter.js `AttributeReadResponse.ts:272` with `:473-475` (concrete path) and `:406-413` (wildcard), chip `Engine.cpp:81-88`. The capability is this module's own; the JointFabricDatastore is its one user (`BD-chip-JointFabricDatastore-RulesInServer`). It covers attribute reads and reports only: a declarer's events go out under the ACL alone, and a subscription whose every path the declarer refuses is accepted and primes with statuses (`bridge` `subjectRefusedEveryPath` judges by the ACL). Review II, R2-P6-sec-1103, owner decision 152. Register row above.
