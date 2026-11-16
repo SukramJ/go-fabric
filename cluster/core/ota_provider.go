@@ -4,6 +4,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -831,30 +832,43 @@ func (p *OTAProvider) cancelUnlessSettled(peer OTAPeer, token []byte, version ui
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]: a removed
-// fabric's in-progress entries leave (their cleanup run, outside p.mu) and
-// its consents with them, so a later fabric that receives the index
-// inherits neither (review II, R2-P6-bound-1206, owner decision 167).
-// matter.js keeps them until the peer's next lookup
-// (OtaSoftwareUpdateProviderServer.ts:556-557, :565-577 at db021da0).
+// fabric's in-progress entries leave (their cleanup run, outside p.mu),
+// its consents with them, and each of its peers loses the BDX scope its
+// query enabled — a transfer of it that still runs is closed — so a later
+// fabric that receives the index inherits none of it (review II,
+// R2-P6-bound-1206, owner decision 167). matter.js removes only stale
+// entries, on the peer's next lookup (OtaSoftwareUpdateProviderServer.ts:566-568
+// at db021da0), and nothing at a fabric's removal.
 func (p *OTAProvider) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
 	p.mu.Lock()
 	var cleanups []func()
+	var peers []OTAPeer
 	for key, d := range p.inProgress {
 		if d.peer.FabricIndex == fabricIndex {
 			if d.cleanup != nil {
 				cleanups = append(cleanups, d.cleanup)
 			}
+			peers = append(peers, d.peer)
 			delete(p.inProgress, key)
 		}
 	}
 	for peer := range p.consents {
 		if peer.FabricIndex == fabricIndex {
+			peers = append(peers, peer)
 			delete(p.consents, peer)
 		}
 	}
 	p.mu.Unlock()
 	for _, fn := range cleanups {
 		fn()
+	}
+	if p.cfg.BDX != nil {
+		slices.SortFunc(peers, func(a, b OTAPeer) int { return cmp.Compare(a.NodeID, b.NodeID) })
+		for _, peer := range slices.Compact(peers) {
+			if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
+				p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
+			}
+		}
 	}
 	return nil
 }

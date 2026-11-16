@@ -7,6 +7,9 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
+
+	"github.com/SukramJ/go-fabric/bdx"
 
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 )
@@ -42,5 +45,30 @@ func TestOTAProviderDropFabricForgetsItsUpdates(t *testing.T) {
 	}
 	if got := f.p.MatterHeldFabrics(); !slices.Equal(got, []uint8{otaTestFabric + 1}) {
 		t.Errorf("held after the drop %v", got)
+	}
+}
+
+// TestOTAProviderDropFabricWithdrawsTheTransferScope (review II,
+// R2-P6-bound-1206 round 4): a removed fabric's peer loses the BDX scope
+// its query enabled, and a transfer of it that still runs is closed.
+func TestOTAProviderDropFabricWithdrawsTheTransferScope(t *testing.T) {
+	t.Parallel()
+	f := newOTAFixture(t, nil)
+	r := f.query(t, 7, bdxQuery())
+	_, done := f.startDownload(t, 7, *r.ImageUri)
+	if err := f.p.MatterDropFabric(context.Background(), otaTestFabric); err != nil {
+		t.Fatal(err)
+	}
+	limit, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	select {
+	case <-done:
+	case <-limit.Done():
+		t.Error("the removed fabric's transfer still runs")
+		_ = f.bdx.DisablePeerForScope(bdx.Peer{FabricIndex: otaTestFabric, NodeID: otaTestPeerNode}, otaScope, true)
+		<-done
+	}
+	if s := f.bdx.SessionFor(bdx.Peer{FabricIndex: otaTestFabric, NodeID: otaTestPeerNode}, otaScope); s != nil {
+		t.Error("a session of the removed fabric's peer is still listed")
 	}
 }

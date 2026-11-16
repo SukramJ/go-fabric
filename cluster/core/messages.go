@@ -319,21 +319,28 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	if reserved {
 		m.presenting--
 	}
-	m.endFlightLocked(flight)
 	if err != nil {
+		m.endFlightLocked(flight)
 		m.unlock()
 		return messagesStatus(err)
 	}
 	if flight.removed {
 		// The fabric was removed while the presenter had the message: it
 		// is not queued under the removed index, and the presenter takes
-		// down what it showed (review II, R2-P6-sec-1201 round 2).
+		// down what it showed. The id stays held until that cancel
+		// returned, so another fabric's present of it is refused meanwhile
+		// and not taken down by it (review II, R2-P6-sec-1201 rounds 2, 4).
 		m.unlock()
-		if err := m.presenter.CancelMessage(ctx, slices.Clone(msg.MessageId)); err != nil {
-			return messagesStatus(err)
+		cancelErr := m.presenter.CancelMessage(ctx, slices.Clone(msg.MessageId))
+		m.mu.Lock()
+		m.endFlightLocked(flight)
+		m.unlock()
+		if cancelErr != nil {
+			return messagesStatus(cancelErr)
 		}
 		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: fmt.Sprintf("core: Messages: fabric %d was removed while its message was presented", fabric)}
 	}
+	m.endFlightLocked(flight)
 	defer m.unlock()
 	// A message with the same id replaces the queued one, looked up again:
 	// it may have gone or come while the presenter ran. Only the accessing

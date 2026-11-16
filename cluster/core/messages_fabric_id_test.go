@@ -212,3 +212,56 @@ func TestMessagesCancelHoldsTheID(t *testing.T) {
 	}
 	wantCoreStatus(t, err, im.StatusAlreadyExists)
 }
+
+// stagedDisplay holds PresentMessage until presentGo closes and
+// CancelMessage until cancelGo closes, signalling each entry.
+type stagedDisplay struct {
+	presentIn, cancelIn chan struct{}
+	presentGo, cancelGo chan struct{}
+}
+
+func (d *stagedDisplay) PresentMessage(context.Context, messagesdef.MessageStruct) error {
+	d.presentIn <- struct{}{}
+	<-d.presentGo
+	return nil
+}
+
+func (d *stagedDisplay) CancelMessage(context.Context, []byte) error {
+	d.cancelIn <- struct{}{}
+	<-d.cancelGo
+	return nil
+}
+
+// TestMessagesRemovedPresentHoldsTheIDUntilItsCancel (review II,
+// R2-P6-sec-1201 round 4): a present whose fabric was removed keeps its id
+// until the presenter's cancel of it returned, so another fabric's present
+// of that id meanwhile is refused and not taken down by that cancel.
+func TestMessagesRemovedPresentHoldsTheIDUntilItsCancel(t *testing.T) {
+	t.Parallel()
+	d := &stagedDisplay{presentIn: make(chan struct{}, 2), cancelIn: make(chan struct{}, 2), presentGo: make(chan struct{}), cancelGo: make(chan struct{})}
+	m, err := core.NewMessages(core.MessagesConfig{Presenter: d})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := messageID(10)
+	done := make(chan error, 1)
+	go func() {
+		done <- decodeAndInvoke(t, m, msgCtx(1, true), messagesdef.CmdPresentMessagesRequest, presentRequest(id, "x"))
+	}()
+	<-d.presentIn
+	m.RemoveFabric(1)
+	close(d.presentGo)
+	<-d.cancelIn
+	second := make(chan error, 1)
+	go func() {
+		second <- decodeAndInvoke(t, m, msgCtx(2, true), messagesdef.CmdPresentMessagesRequest, presentRequest(id, "y"))
+	}()
+	select {
+	case err := <-second:
+		wantCoreStatus(t, err, im.StatusAlreadyExists)
+	case <-d.presentIn:
+		t.Error("fabric 2's present reached the presenter while fabric 1's cancel of the id ran")
+	}
+	close(d.cancelGo)
+	wantCoreStatus(t, <-done, im.StatusUnsupportedAccess)
+}
