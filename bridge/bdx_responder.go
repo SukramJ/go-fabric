@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -39,6 +40,89 @@ type bdxRouting struct {
 	// (waitBDXResponders).
 	active int
 	idle   sync.Cond
+	// activity numbers the messages of every secure exchange in the order
+	// they pass ([initiatedSecureExchange.touch]).
+	activity atomic.Uint64
+}
+
+// maxExchangesPerSession bounds the open exchanges of one secure session
+// that this node opened or answers as a BDX responder — the exchanges the
+// bridge keeps a table of ([Bridge.boundSessionExchanges]); past it the
+// least recently active one ends. matter.js keeps at most 30 non-closed
+// exchanges per secure session (packages/protocol/src/protocol/ExchangeManager.ts:63,
+// :578-595 at db021da0); the retransmit table keeps the same bound per
+// session ([secureExchangeLimit]). Review II, R2-P6-bound-0307.
+const maxExchangesPerSession = 30
+
+// boundSessionExchanges ends the least recently active exchanges of
+// sessionID, never keep — the one just opened — while the session holds
+// more than [maxExchangesPerSession] open exchanges in the two tables
+// (peer-opened BDX exchanges and the ones this node opened). An ended
+// exchange's Receive and Send return [ErrExchangeClosed].
+func (b *Bridge) boundSessionExchanges(sessionID uint16, keep *initiatedSecureExchange) {
+	for {
+		var (
+			open   int
+			oldest *initiatedSecureExchange
+		)
+		visit := func(k, v any) bool {
+			key, ok := k.(secureExchangeKey)
+			ex, isEx := v.(*initiatedSecureExchange)
+			if !ok || !isEx || key.sessionID != sessionID || ex.ended() {
+				return true
+			}
+			open++
+			if ex != keep && (oldest == nil || ex.lastActive.Load() < oldest.lastActive.Load()) {
+				oldest = ex
+			}
+			return true
+		}
+		b.bdx.exchanges.Range(visit)
+		b.resumption.initiated.Range(visit)
+		if open <= maxExchangesPerSession || oldest == nil {
+			return
+		}
+		b.logger.Debug("matter.exchange.evicted",
+			slog.Int("session_id", int(sessionID)),
+			slog.Int("exchange_id", int(oldest.exchangeID)),
+			slog.Bool("responder", oldest.responder),
+			slog.Int("max", maxExchangesPerSession))
+		oldest.fail(errExchangeEvicted)
+	}
+}
+
+// endSessionExchanges ends every exchange of the secure session sessionID
+// in the two tables, the session having closed: a pending Receive and every
+// later Send return [ErrExchangeClosed], and a later session given the same
+// id finds none of them (review II, R2-P6-sec-0302).
+func (b *Bridge) endSessionExchanges(sessionID uint16) {
+	var gone []*initiatedSecureExchange
+	visit := func(k, v any) bool {
+		if key, ok := k.(secureExchangeKey); ok && key.sessionID == sessionID {
+			if ex, ok := v.(*initiatedSecureExchange); ok {
+				gone = append(gone, ex)
+			}
+		}
+		return true
+	}
+	b.bdx.exchanges.Range(visit)
+	b.resumption.initiated.Range(visit)
+	for _, ex := range gone {
+		ex.fail(errExchangeSessionGone)
+	}
+}
+
+// failRespondedExchange ends the BDX exchange the peer opened on
+// (sessionID, exchangeID) because a message it sent was given up: its
+// responder's Receive returns at once instead of at the transfer's idle
+// timeout, as one this node opened does ([Bridge.handleInitiatedPeerLoss]);
+// review II, R2-P6-bound-0307.
+func (b *Bridge) failRespondedExchange(sessionID, exchangeID uint16) {
+	if raw, ok := b.bdx.exchanges.Load(secureExchangeKey{sessionID: sessionID, exchangeID: exchangeID}); ok {
+		if ex, ok := raw.(*initiatedSecureExchange); ok {
+			ex.fail(mrp.ErrMaxRetransmissionsReached)
+		}
+	}
 }
 
 // goResponder runs fn, one exchange's responder, on a goroutine the
@@ -119,8 +203,12 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 	}
 	key := secureExchangeKey{sessionID: hdr.SessionID, exchangeID: proto.ExchangeID}
 	msg := bdx.Message{ProtocolID: proto.ProtocolID, Opcode: proto.Opcode, Payload: append([]byte(nil), payload...)}
+	sess, live := b.sessionNow(hdr.SessionID)
 	if raw, ok := b.bdx.exchanges.Load(key); ok {
-		if ex, ok := raw.(*initiatedSecureExchange); ok {
+		// An exchange of a session that closed, whose id names another
+		// session now, ends here; the message is that session's
+		// (R2-P6-sec-0302).
+		if ex, ok := raw.(*initiatedSecureExchange); ok && ex.boundTo(sess, live) {
 			k := ex.turn.deliver()
 			switch {
 			case ex.enqueue(msg):
@@ -144,14 +232,16 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 		return false
 	}
 	ex := &initiatedSecureExchange{
-		b: b, sessionID: hdr.SessionID, addr: b.currentPeerAddr(hdr.SessionID, nil), exchangeID: proto.ExchangeID,
+		b: b, sessionID: hdr.SessionID, addr: b.currentPeerAddr(hdr.SessionID, nil), exchangeID: proto.ExchangeID, session: sess,
 		createdAt: b.clk().Now(), responder: true, turn: newResponderTurn(b.clk()), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
+	ex.touch()
 	if _, loaded := b.bdx.exchanges.LoadOrStore(key, ex); loaded {
 		// A concurrent first message of the same exchange won the race;
 		// this one is a duplicate the replay window did not see yet.
 		return true
 	}
+	b.boundSessionExchanges(hdr.SessionID, ex)
 	b.goResponder(func() {
 		defer func() { _ = ex.Close() }()
 		responder.HandleExchange(ctx, peer, msg, ex)

@@ -1459,8 +1459,10 @@ func (b *Bridge) captureSubTarget(subID uint32, src net.Addr, requestHdr *messag
 //
 // An id is re-used only after the whole 16-bit space has been consumed.
 // matter.js also skips an id an open exchange it started on the same
-// session still holds (ExchangeManager.ts:189-197, #freeExchangeIdFor);
-// the bridge keeps no table of its own initiated exchanges to consult.
+// session still holds (ExchangeManager.ts:189-197 at db021da0,
+// #freeExchangeIdFor); the bridge does so for the exchanges it keeps a
+// table of — the ones it opens on a secure session for BDX and Invoke
+// ([Bridge.openInitiatedExchange]; review II, R2-P2-ctr-03).
 func (b *Bridge) nextOutboundExchangeID() uint16 {
 	return uint16(b.outboundExchangeID.Add(1)) //nolint:gosec // G115: the truncation to 16 bits is the wrap past 0xFFFF to 0
 }

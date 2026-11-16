@@ -532,6 +532,10 @@ func (b *Bridge) purgeSessionState(sessionID uint16) {
 	// Its exchanges die with it, so no timed deadline it registered can
 	// be consumed.
 	b.routing.dropSessionTimedDeadlines(sessionID)
+	// The exchanges a peer opened for BDX and the ones this node opened
+	// end with it; a later session given its id inherits none (review II,
+	// R2-P6-sec-0302).
+	b.endSessionExchanges(sessionID)
 	b.mu.RLock()
 	outbound, tracker := b.outboundReliable, b.ackTracker
 	b.mu.RUnlock()
