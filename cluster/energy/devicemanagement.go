@@ -236,8 +236,15 @@ type DeviceEnergyManagementServer struct {
 	powerAdjustInProgress bool
 	powerAdjustStartUtc   uint32
 	powerAdjustTimer      clock.Timer
+	powerAdjustUntil      time.Time // the timer's deadline on clock
+	powerAdjustGen        uint64    // the armed timer's; an older one's expiry does nothing
 	pauseInProgress       bool
 	pauseTimer            clock.Timer
+	pauseUntil            time.Time
+	pauseGen              uint64
+	// quiescedTimers are the timers MatterQuiesce stopped, which the
+	// SetEndpoint of a reassembly arms again for the time left.
+	quiescedPowerAdjust, quiescedPause bool
 	// cause is the contract.Origin of the changes a command makes
 	// (OriginCommand), zero outside one: the device's own changes, the
 	// timers' expiries included, are the host's.
@@ -643,8 +650,8 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 	if err := s.setCapabilityCauseLocked(reason); err != nil { // :138-146
 		return err
 	}
-	s.powerAdjustInProgress = true                                                                      // :155
-	s.powerAdjustTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.powerAdjustExpired) // :157
+	s.powerAdjustInProgress = true                                  // :155
+	s.armPowerAdjustLocked(time.Duration(r.Duration) * time.Second) // :157
 	// chip undoes the request when logging the event fails (:166-178,
 	// HandlePowerAdjustRequestFailure :188-200); PowerAdjustStart is in
 	// the EventList whenever the command is (both "PA"), so it cannot.
@@ -652,6 +659,32 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 		_ = s.emitLocked(dem.EventPowerAdjustStart, dem.PowerAdjustStartEvent{})
 	}
 	return nil
+}
+
+// armPowerAdjustLocked arms the power-adjustment timer for d, until
+// powerAdjustUntil; the caller holds mu.
+func (s *DeviceEnergyManagementServer) armPowerAdjustLocked(d time.Duration) {
+	s.powerAdjustUntil = s.clock.Now().Add(d)
+	s.rearmPowerAdjustLocked(d)
+}
+
+func (s *DeviceEnergyManagementServer) rearmPowerAdjustLocked(d time.Duration) {
+	s.powerAdjustGen++
+	gen := s.powerAdjustGen
+	s.powerAdjustTimer = s.clock.AfterFunc(d, func() { s.powerAdjustExpired(gen) })
+}
+
+// armPauseLocked arms the pause timer for d, until pauseUntil; the caller
+// holds mu.
+func (s *DeviceEnergyManagementServer) armPauseLocked(d time.Duration) {
+	s.pauseUntil = s.clock.Now().Add(d)
+	s.rearmPauseLocked(d)
+}
+
+func (s *DeviceEnergyManagementServer) rearmPauseLocked(d time.Duration) {
+	s.pauseGen++
+	gen := s.pauseGen
+	s.pauseTimer = s.clock.AfterFunc(d, func() { s.pauseExpired(gen) })
 }
 
 func (s *DeviceEnergyManagementServer) stopPowerAdjustTimerLocked() {
@@ -670,12 +703,14 @@ func (s *DeviceEnergyManagementServer) stopPauseTimerLocked() {
 
 // powerAdjustExpired is HandlePowerAdjustTimerExpiry (DelegateImpl.cpp:
 // 222-241).
-func (s *DeviceEnergyManagementServer) powerAdjustExpired() {
+func (s *DeviceEnergyManagementServer) powerAdjustExpired(gen uint64) {
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.powerAdjustInProgress {
+	if !s.powerAdjustInProgress || s.powerAdjustTimer == nil || gen != s.powerAdjustGen {
+		// Stopped or re-armed after it fired, before it got the lock
+		// (MatterQuiesce, Close, a cancel, a new request): it does nothing.
 		return
 	}
 	s.powerAdjustTimer = nil
@@ -844,7 +879,7 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 		generateEvent = true
 		s.pauseInProgress = true
 	}
-	s.pauseTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.pauseExpired)             // :443
+	s.armPauseLocked(time.Duration(r.Duration) * time.Second)                                           // :443
 	if herr := s.hook(func() error { return s.manager.Pause(ctx, r.Duration, r.Cause) }); herr != nil { // :451-460
 		s.pauseFailureLocked()
 		return nil, demRefusal("PauseRequest", herr)
@@ -874,13 +909,13 @@ func (s *DeviceEnergyManagementServer) pauseFailureLocked() {
 }
 
 // pauseExpired is HandlePauseRequestTimerExpiry (DelegateImpl.cpp:531-546).
-func (s *DeviceEnergyManagementServer) pauseExpired() {
+func (s *DeviceEnergyManagementServer) pauseExpired(gen uint64) {
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.pauseInProgress {
-		return
+	if !s.pauseInProgress || s.pauseTimer == nil || gen != s.pauseGen {
+		return // stopped or re-armed after it fired, before it got the lock
 	}
 	s.pauseTimer = nil
 	s.pauseInProgress = false
@@ -1088,10 +1123,23 @@ func (s *DeviceEnergyManagementServer) cancelRequest(ctx context.Context, _ any)
 // --- plumbing -----------------------------------------------------------
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
-// calls it at reassembly.
+// calls it at reassembly, for every server of the new topology. A timer
+// [DeviceEnergyManagementServer.MatterQuiesce] stopped is armed again here
+// — a reassembly that puts the same server back — for the time left to its
+// deadline, at once for one that passed meanwhile, as EvseServer re-arms
+// its own (review II, R2-P6-conc-1605).
 func (s *DeviceEnergyManagementServer) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
+	now := s.clock.Now()
+	if s.quiescedPowerAdjust {
+		s.quiescedPowerAdjust = false
+		s.rearmPowerAdjustLocked(max(s.powerAdjustUntil.Sub(now), 0))
+	}
+	if s.quiescedPause {
+		s.quiescedPause = false
+		s.rearmPauseLocked(max(s.pauseUntil.Sub(now), 0))
+	}
 	s.mu.Unlock()
 	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
@@ -1136,9 +1184,28 @@ func (s *DeviceEnergyManagementServer) OnAttributeReport(cb func(change contract
 	return s.srv.OnAttributeReport(cb)
 }
 
-// MatterQuiesce implements [contract.ClusterQuiescer]: a quieter
-// attribute's held report is dropped ([spec.Server.MatterQuiesce]).
-func (s *DeviceEnergyManagementServer) MatterQuiesce() { s.srv.MatterQuiesce() }
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops. The power-adjustment and
+// pause timers stop, so neither changes ESAState, emits PowerAdjustEnd or
+// Resumed, nor calls the host's PowerAdjustCompleted or PauseCompleted
+// afterwards; their deadlines are kept for the
+// [DeviceEnergyManagementServer.SetEndpoint] of a reassembly that puts the
+// server back. A quieter attribute's held report is dropped as well
+// ([spec.Server.MatterQuiesce]). Before, only the uncalled Close stopped
+// the timers (review II, R2-P6-conc-1605).
+func (s *DeviceEnergyManagementServer) MatterQuiesce() {
+	s.mu.Lock()
+	if s.powerAdjustTimer != nil {
+		s.quiescedPowerAdjust = true
+	}
+	if s.pauseTimer != nil {
+		s.quiescedPause = true
+	}
+	s.stopPowerAdjustTimerLocked()
+	s.stopPauseTimerLocked()
+	s.mu.Unlock()
+	s.srv.MatterQuiesce()
+}
 
 // MatterRead resolves an attribute.
 func (s *DeviceEnergyManagementServer) MatterRead(attrID uint32) (any, bool) {
