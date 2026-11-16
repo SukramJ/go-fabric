@@ -379,11 +379,17 @@ type streamKey struct {
 
 // leave marks the stream as leaving, unless a user counted on it since
 // the Deallocate's check (INVALID_IN_STATE, as the check answers): the
-// mark and the count are read under one lock, so no increment slips in
-// between. The returned function clears the mark once the port answered
+// mark and the count are read under pub and mu, so no increment slips in
+// between, nor lands after the read. The returned function clears the mark once the port answered
 // and the table changed or not (review II, appinfra round 2: the
 // reference-count race of R2-P6-conc-1609).
 func (a *AvStream) leave(key streamKey, count func() (uint8, bool)) (func(), error) {
+	// pub first: an increment still publishing has put the old count back
+	// under mu until its change lands, so the count is read only after it
+	// (op → pub → mu, the order of serial and commandChange; review II,
+	// appinfra round 4).
+	a.pub.Lock()
+	defer a.pub.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if n, ok := count(); ok && n > 0 {

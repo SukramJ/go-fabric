@@ -234,3 +234,37 @@ func TestAvStreamRefCountWaitsOutADeallocation(t *testing.T) {
 		}
 	}
 }
+
+// TestAvStreamDeallocateWaitsOutAnIncrementsPublication holds an
+// increment's publication (the store's change notification) and sends a
+// VideoStreamDeallocate meanwhile: the deallocation waits for the
+// increment to land, then reads the count 1 and answers INVALID_IN_STATE;
+// the stream stays, its user counted. Before, the deallocation read the
+// count 0 the change had put back while it published, marked the stream
+// leaving, and deleted it after the increment had answered nil (review
+// II, appinfra round 4, Fable re-check).
+func TestAvStreamDeallocateWaitsOutAnIncrementsPublication(t *testing.T) {
+	t.Parallel()
+	a, _ := newChipAvStream(t)
+	resp, st := invokeStream(a, csdef.CmdVideoStreamAllocate, videoAllocate())
+	wantCode(t, "allocate", st, im.StatusSuccess)
+	id := resp.(csdef.VideoStreamAllocateResponse).VideoStreamId
+	entered, release := blockFirstChange(a)
+	incremented := make(chan error, 1)
+	go func() { incremented <- a.UpdateVideoStreamRefCount(id, true) }()
+	<-entered
+	deallocated := make(chan im.StatusCode, 1)
+	go func() {
+		_, st := invokeStream(a, csdef.CmdVideoStreamDeallocate, csdef.VideoStreamDeallocateRequest{VideoStreamId: id})
+		deallocated <- st
+	}()
+	settle(deallocated)
+	close(release)
+	if err := <-incremented; err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+	wantCode(t, "deallocate of a stream in use", <-deallocated, im.StatusInvalidInState)
+	if v := a.VideoStreams(); len(v) != 1 || v[0].ReferenceCount != 1 {
+		t.Errorf("video streams %+v, want the stream with one user", v)
+	}
+}
