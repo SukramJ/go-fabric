@@ -771,12 +771,13 @@ func (m *Manager) AllocateStake() (Stake, error) {
 	m.mu.Lock()
 	id, err := m.allocateIDLocked()
 	// Every id held by a live session — one fabric's administrator can
-	// open them for as many node ids as it issues NOCs: the least recently
-	// active session is closed and its id reused, as matter.js closes
+	// open them for as many node ids as it issues NOCs: a session is
+	// closed and its id reused, as matter.js closes
 	// findOldestInactiveSession's session and takes its id
 	// (packages/protocol/src/session/SessionManager.ts:590-598, :564-572
-	// at db021da0). Its close runs below, outside the lock (review II,
-	// R2-P3-admin-05).
+	// at db021da0). Which session is [Manager.leastRecentlyActiveLocked]'s
+	// choice: inside the fabric holding the most (R2-P6-bound-0107). Its
+	// close runs below, outside the lock (review II, R2-P3-admin-05).
 	var evicted *Entry
 	if errors.Is(err, ErrSessionExhausted) {
 		if evicted = m.leastRecentlyActiveLocked(); evicted != nil {
@@ -801,15 +802,37 @@ func (m *Manager) AllocateStake() (Stake, error) {
 	return Stake{ID: id, e: e}, nil
 }
 
-// leastRecentlyActiveLocked returns the live session with the least recent
-// traffic, any fabric, PASE or CASE, as matter.js's findOldestInactiveSession
-// filters none (SessionManager.ts:564-572, #leastRecentlyUsedSession
-// :553-562 at db021da0); nil when no live session exists. The order is
-// [lessRecentlyActive]'s. Caller holds m.mu.
+// leastRecentlyActiveLocked returns the session a full id space gives up:
+// the least recently active live session of the fabric that holds the
+// most live sessions (PASE sessions and those not yet on a fabric count
+// as fabric 0); between fabrics of equal size, the least recently active
+// of all of them. nil when no live session exists. The order inside a
+// fabric is [lessRecentlyActive]'s.
+//
+// matter.js's findOldestInactiveSession filters by no fabric
+// (SessionManager.ts:564-572, #leastRecentlyUsedSession :553-562 at
+// db021da0), so one fabric that keeps its sessions busy pushes another
+// fabric's idle ones out. The choice is ahead of matter.js, with chip as
+// the authority (R2-P6-bound-0107): chip's EvictAndAllocate
+// (src/transport/SecureSessionTable.cpp:91 at 6170af84) sorts with
+// DefaultEvictionPolicy, "a spec-compliant sorting policy that ensures
+// both guarantees for sessions per-fabric as mandated by the spec"
+// (:231-232), whose first key evicts from the fabric with the most
+// sessions (:239-243). Caller holds m.mu.
 func (m *Manager) leastRecentlyActiveLocked() *Entry {
-	var oldest *Entry
+	held := make(map[uint8]int)
+	most := 0
 	for _, e := range m.sessions {
 		if e.Session == nil {
+			continue
+		}
+		f := e.FabricIndex()
+		held[f]++
+		most = max(most, held[f])
+	}
+	var oldest *Entry
+	for _, e := range m.sessions {
+		if e.Session == nil || held[e.FabricIndex()] != most {
 			continue
 		}
 		if oldest == nil || lessRecentlyActive(e, oldest) {
