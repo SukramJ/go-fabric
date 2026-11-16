@@ -494,15 +494,15 @@ func (s *EvseServer) IsPluggedIn() bool {
 func (s *EvseServer) Targets() []ChargingTargetSchedule {
 	s.lock()
 	defer s.unlock()
-	return cloneSchedules(s.targets)
+	return nonNilSchedules(cloneAll(s.targets))
 }
 
-func cloneSchedules(in []ChargingTargetSchedule) []ChargingTargetSchedule {
-	out := make([]ChargingTargetSchedule, len(in))
-	for i, sch := range in {
-		out[i] = ChargingTargetSchedule{DayOfWeekForSequence: sch.DayOfWeekForSequence, ChargingTargets: append([]ChargingTarget(nil), sch.ChargingTargets...)}
+// nonNilSchedules is an empty list for none.
+func nonNilSchedules(in []ChargingTargetSchedule) []ChargingTargetSchedule {
+	if in == nil {
+		return []ChargingTargetSchedule{}
 	}
-	return out
+	return in
 }
 
 // --- the attribute setters with their checks (EvseCluster.cpp:47-289) ----
@@ -1323,7 +1323,7 @@ func (s *EvseServer) setTargets(_ context.Context, fields any) (any, error) {
 // chip's; a stored schedule cannot lose all its days — its days inside the
 // new ones are the replaced case).
 func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSchedule, error) {
-	list := cloneSchedules(current)
+	list := nonNilSchedules(cloneAll(current))
 	for _, n := range updates {
 		newMask := uint8(n.DayOfWeekForSequence) & evseDayOfWeekMask // :271-272
 		found := false
@@ -1332,7 +1332,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 			cur := uint8(c.DayOfWeekForSequence) & evseDayOfWeekMask // :285-286
 			a, b := cur&newMask, cur&^newMask                        // :293-294
 			if cur == a {                                            // :298-314
-				next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: TargetDays(a), ChargingTargets: append([]ChargingTarget(nil), n.ChargingTargets...)})
+				next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: TargetDays(a), ChargingTargets: cloneAll(n.ChargingTargets)})
 				found = true
 				continue
 			}
@@ -1342,7 +1342,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 			if len(next) >= evseMaxTargetsDays {
 				return nil, spec.Errorf(im.StatusResourceExhausted, "energy: more than %d target schedules", evseMaxTargetsDays)
 			}
-			next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: n.DayOfWeekForSequence, ChargingTargets: append([]ChargingTarget(nil), n.ChargingTargets...)})
+			next = append(next, n.Clone())
 		}
 		list = next
 	}
@@ -1353,7 +1353,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 func (s *EvseServer) getTargets(_ context.Context, _ any) (any, error) {
 	s.lock()
 	defer s.unlock()
-	return evse.GetTargetsResponse{ChargingTargetSchedules: cloneSchedules(s.targets)}, nil
+	return evse.GetTargetsResponse{ChargingTargetSchedules: nonNilSchedules(cloneAll(s.targets))}, nil
 }
 
 // clearTargets is HandleClearTargets (EvseCluster.cpp:600-604) over

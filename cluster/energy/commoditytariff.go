@@ -167,25 +167,25 @@ func (t *Tariff) values() [len(tariffAttrs)]any {
 		v[3] = uint8(*t.DefaultRandomizationType)
 	}
 	if t.TariffInfo != nil {
-		v[4] = *t.TariffInfo
+		v[4] = t.TariffInfo.Clone()
 	}
 	if t.DayEntries != nil {
-		v[5] = slices.Clone(t.DayEntries)
+		v[5] = cloneAll(t.DayEntries)
 	}
 	if t.DayPatterns != nil {
-		v[6] = slices.Clone(t.DayPatterns)
+		v[6] = cloneAll(t.DayPatterns)
 	}
 	if t.TariffComponents != nil {
-		v[7] = slices.Clone(t.TariffComponents)
+		v[7] = cloneAll(t.TariffComponents)
 	}
 	if t.TariffPeriods != nil {
-		v[8] = slices.Clone(t.TariffPeriods)
+		v[8] = cloneAll(t.TariffPeriods)
 	}
 	if t.IndividualDays != nil {
-		v[9] = slices.Clone(t.IndividualDays)
+		v[9] = cloneAll(t.IndividualDays)
 	}
 	if t.CalendarPeriods != nil {
-		v[10] = slices.Clone(t.CalendarPeriods)
+		v[10] = cloneAll(t.CalendarPeriods)
 	}
 	return v
 }

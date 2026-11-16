@@ -349,19 +349,23 @@ func (s *DeviceEnergyManagementServer) OptOutState() OptOutState {
 	return OptOutState(n)
 }
 
-// PowerAdjustmentCapability returns the capability; nil while null.
+// PowerAdjustmentCapability returns the capability; nil while null. It is
+// a deep copy, which the caller may change.
 func (s *DeviceEnergyManagementServer) PowerAdjustmentCapability() *PowerAdjustCapability {
 	v, _ := s.srv.Value(dem.AttrPowerAdjustmentCapability)
 	if c, ok := v.(PowerAdjustCapability); ok {
+		c = c.Clone()
 		return &c
 	}
 	return nil
 }
 
-// Forecast returns the forecast; nil while null.
+// Forecast returns the forecast; nil while null. It is a deep copy, which
+// the caller — the commands that edit it among them — may change.
 func (s *DeviceEnergyManagementServer) Forecast() *Forecast {
 	v, _ := s.srv.Value(dem.AttrForecast)
 	if f, ok := v.(Forecast); ok {
+		f = f.Clone()
 		return &f
 	}
 	return nil

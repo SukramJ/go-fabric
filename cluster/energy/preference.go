@@ -117,12 +117,12 @@ func NewEnergyPreference(cfg PreferenceConfig) (*PreferenceServer, error) {
 	}
 	initial := map[uint32]any{}
 	if inst.Serves(ep.AttrEnergyBalances) {
-		initial[ep.AttrEnergyBalances] = spec.List[Balance](slices.Clone(cfg.EnergyBalances))
+		initial[ep.AttrEnergyBalances] = spec.List[Balance](cloneAll(cfg.EnergyBalances))
 		initial[ep.AttrEnergyPriorities] = priorityList(slices.Clone(cfg.EnergyPriorities))
 		initial[ep.AttrCurrentEnergyBalance] = cfg.CurrentEnergyBalance
 	}
 	if inst.Serves(ep.AttrLowPowerModeSensitivities) {
-		initial[ep.AttrLowPowerModeSensitivities] = spec.List[Balance](slices.Clone(cfg.LowPowerModeSensitivities))
+		initial[ep.AttrLowPowerModeSensitivities] = spec.List[Balance](cloneAll(cfg.LowPowerModeSensitivities))
 		initial[ep.AttrCurrentLowPowerModeSensitivity] = cfg.CurrentLowPowerModeSensitivity
 	}
 	for _, id := range []uint32{ep.AttrCurrentEnergyBalance, ep.AttrCurrentLowPowerModeSensitivity} {

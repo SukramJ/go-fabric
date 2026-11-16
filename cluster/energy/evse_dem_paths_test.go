@@ -6,7 +6,7 @@ package energy_test
 import (
 	"context"
 	"errors"
-	"slices"
+	"reflect"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -292,7 +292,7 @@ func TestEvseSoCTargets(t *testing.T) {
 	if err := set(target(60, &fifty, nil)); err != nil {
 		t.Fatal(err)
 	}
-	if got := srv.Targets(); len(got) != 1 || !slices.Equal(got[0].ChargingTargets, []energy.ChargingTarget{target(60, &fifty, nil)}) {
+	if got := srv.Targets(); len(got) != 1 || !reflect.DeepEqual(got[0].ChargingTargets, []energy.ChargingTarget{target(60, &fifty, nil)}) {
 		t.Errorf("targets %+v", got)
 	}
 }
