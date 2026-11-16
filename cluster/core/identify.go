@@ -225,7 +225,7 @@ var (
 // countdown reaching zero reports IdentifyTime, the one edge of the
 // countdown matter.js reports — its quiet event emits at once for a
 // remote actor and for a change from or to 0, and keeps the per-second
-// ticks quiet (IdentifyServer.ts:41-47 at 862ad75f). A controller's write
+// ticks quiet (IdentifyServer.ts:41-47 at db021da0). A controller's write
 // and the Identify command are reported by the bridge's write and invoke
 // paths (W3-clucore-05).
 func (i *Identify) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
