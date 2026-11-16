@@ -384,3 +384,73 @@ func TestChunkedReportLaterChunkUnacknowledged(t *testing.T) {
 		t.Fatalf("send = %v, want the StatusResponse wait's timeout", err)
 	}
 }
+
+// lostPeerLookup holds one session, sid, with peer node and fabric.
+type lostPeerLookup struct {
+	sid    uint16
+	sess   *channel.Session
+	fabric uint8
+}
+
+func (l lostPeerLookup) Lookup(id uint16) (*channel.Session, bool) { return l.sess, id == l.sid }
+
+func (l lostPeerLookup) FabricFor(id uint16) (uint8, bool) { return l.fabric, id == l.sid }
+
+// lostPeerRegistry records how a peer loss closes sessions.
+type lostPeerRegistry struct {
+	closed  []uint16
+	perPeer [][2]uint64
+}
+
+func (r *lostPeerRegistry) Close(id uint16) error { r.closed = append(r.closed, id); return nil }
+
+func (r *lostPeerRegistry) CloseAllGraceful(time.Time) int { return 0 }
+
+func (r *lostPeerRegistry) ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, _ time.Duration) int {
+	r.perPeer = append(r.perPeer, [2]uint64{uint64(fabricIndex), peerNodeID})
+	return 1
+}
+
+// TestPeerLossWithoutAFabricClosesOnlyItsSession holds the choice of a
+// peer loss's reach (R2-P6-fsm-0820): a session with a fabric and a peer
+// node id closes every session of that peer; a session without either
+// (PASE, or an unknown peer) closes itself alone — a zero fabric or node
+// id names no peer.
+func TestPeerLossWithoutAFabricClosesOnlyItsSession(t *testing.T) {
+	t.Parallel()
+	const sid = uint16(0x0A10)
+	for _, c := range []struct {
+		name    string
+		fabric  uint8
+		node    uint64
+		perPeer bool
+	}{
+		{"commissioned peer", 1, 0x1234, true},
+		{"no fabric", 0, 0x1234, false},
+		{"no node id", 1, 0, false},
+		{"neither", 0, 0, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			key := make([]byte, 16)
+			sess, err := channel.New(channel.Config{EncryptKey: key, DecryptKey: key, PeerNodeID: c.node, InitialCounter: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			reg := &lostPeerRegistry{}
+			b := &Bridge{}
+			b.sessions = lostPeerLookup{sid: sid, sess: sess, fabric: c.fabric}
+			b.sessionRegistry = reg
+			b.closeLostPeer(sid, 1, 0, "a test exchange")
+			if c.perPeer {
+				if len(reg.perPeer) != 1 || reg.perPeer[0] != [2]uint64{uint64(c.fabric), c.node} || len(reg.closed) != 0 {
+					t.Fatalf("per peer %v, closed %v; want one per-peer close of (%d, %#x) only", reg.perPeer, reg.closed, c.fabric, c.node)
+				}
+				return
+			}
+			if len(reg.perPeer) != 0 || len(reg.closed) != 1 || reg.closed[0] != sid {
+				t.Fatalf("per peer %v, closed %v; want session %#x closed alone", reg.perPeer, reg.closed, sid)
+			}
+		})
+	}
+}
