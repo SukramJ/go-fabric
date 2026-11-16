@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"crypto/rand"
+	"runtime"
 	"testing"
 	"time"
 
@@ -160,4 +161,28 @@ func TestFailureReportOfAnotherInitiatorKeepsTheHold(t *testing.T) {
 	if held {
 		t.Fatal("the hold's own failure report did not release it")
 	}
+}
+
+// TestPaseClaimIsReadUnderTheLock: a claim racing the release of the slot
+// reads the slot's holder under the bridge's lock — run under -race
+// (review II, R2-P6-sec-0304, round 2).
+func TestPaseClaimIsReadUnderTheLock(t *testing.T) {
+	t.Parallel()
+	b := &Bridge{}
+	a, other := HandshakeKey{InitiatorNodeID: 1, ExchangeID: 1}, HandshakeKey{InitiatorNodeID: 2, ExchangeID: 2}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 20000 {
+			b.claimPase(a)
+			runtime.Gosched()
+			b.releasePaseInFlight(a)
+		}
+	}()
+	for range 20000 {
+		b.claimPase(other)
+		runtime.Gosched()
+		b.releasePaseInFlight(other)
+	}
+	<-done
 }
