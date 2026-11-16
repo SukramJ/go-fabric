@@ -42,9 +42,13 @@ const (
 // reading ([clock.MonotonicOf]), so a step of the wall clock moves neither:
 // matter.js feeds its schedule Time.nowUs (IcdPeerWakefulness.ts:148, :154,
 // :160) and compares on it (:100, :116, :226 at 862ad75f). The timers run
-// on the injected clock. Every callback runs outside the wakefulness's lock, on
-// the goroutine of the change (a timer's for an expiry). Safe for
-// concurrent use.
+// on the injected clock. Every callback runs outside the wakefulness's lock,
+// on the goroutine of the change (a timer's for an expiry) — or, while the
+// callbacks of an earlier change still run, on that change's goroutine
+// after them: changes reach the observers one after the other, in the
+// order they happened, so the value an observer saw last is the state's.
+// A change's method may therefore return before its callbacks ran. Safe
+// for concurrent use.
 //
 // Mirrors matter.js packages/protocol/src/icd/IcdPeerWakefulness.ts:35-272;
 // its observables are the On… registrations and the signal channels.
@@ -69,6 +73,17 @@ type PeerWakefulness struct {
 	gen           uint64
 	observers     map[uint64]wakeObserver
 	nextObserver  uint64
+	// pending holds the changes not yet delivered, oldest first; the
+	// goroutine that set delivering drains it.
+	pending    []delivery
+	delivering bool
+}
+
+// delivery is one change's events and the observers registered when it
+// happened.
+type delivery struct {
+	evs []event
+	obs []wakeObserver
 }
 
 type wakeObserver struct {
@@ -473,7 +488,12 @@ func (w *PeerWakefulness) emitAvailableLocked(v bool) event {
 	return event{kind: 1, value: v}
 }
 
-// deliver releases the lock the caller holds and runs the callbacks of evs.
+// deliver releases the lock the caller holds and runs the callbacks of evs
+// — after those of every earlier change. The changes queue under the lock
+// in the order they happened; one goroutine at a time drains the queue
+// outside it, so two concurrent changes cannot reach an observer in the
+// opposite order, and a callback that changes the state again queues its
+// change behind its own instead of waiting for itself.
 func (w *PeerWakefulness) deliver(evs []event) {
 	if len(evs) == 0 {
 		w.mu.Unlock()
@@ -484,9 +504,45 @@ func (w *PeerWakefulness) deliver(evs []event) {
 	for i, id := range ids {
 		obs[i] = w.observers[id]
 	}
+	w.pending = append(w.pending, delivery{evs: evs, obs: obs})
+	if w.delivering {
+		w.mu.Unlock()
+		return
+	}
+	w.delivering = true
+	for len(w.pending) > 0 {
+		d := w.pending[0]
+		w.pending[0] = delivery{}
+		w.pending = w.pending[1:]
+		w.mu.Unlock()
+		w.runDelivery(d)
+		w.mu.Lock()
+	}
+	w.pending = nil
+	w.delivering = false
 	w.mu.Unlock()
-	for _, e := range evs {
-		for _, o := range obs {
+}
+
+// runDelivery runs one change's callbacks outside the lock. A callback
+// that panics ends the drain: the panic goes on up the draining goroutine,
+// and the next change's deliver drains what is left.
+func (w *PeerWakefulness) runDelivery(d delivery) {
+	ok := false
+	defer func() {
+		if !ok {
+			w.mu.Lock()
+			w.delivering = false
+			w.mu.Unlock()
+		}
+	}()
+	runCallbacks(d)
+	ok = true
+}
+
+// runCallbacks runs d's callbacks in order: per event, every observer.
+func runCallbacks(d delivery) {
+	for _, e := range d.evs {
+		for _, o := range d.obs {
 			switch {
 			case e.kind == 0 && o.awake != nil:
 				o.awake(e.value)
