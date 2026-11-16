@@ -191,3 +191,47 @@ func TestThermostatUIRefusesAnUndefinedInitialValue(t *testing.T) {
 		t.Errorf("TemperatureDisplayMode 7: %v, want ErrInvalidValue", err)
 	}
 }
+
+// flakySettings is a SettingStore whose saves fail while fail is set.
+type flakySettings struct {
+	values map[string]string
+	fail   bool
+}
+
+func (f *flakySettings) GetSetting(_ context.Context, key string) (string, bool, error) {
+	v, ok := f.values[key]
+	return v, ok, nil
+}
+
+func (f *flakySettings) SetSetting(_ context.Context, key, value string) error {
+	if f.fail {
+		return errors.New("settings unavailable")
+	}
+	f.values[key] = value
+	return nil
+}
+
+// TestThermostatUISetKeepsKeypadLockoutWhenTheSaveFails
+// (R2-P6-store-1563): the host's KeypadLockout is saved before it is
+// stored, as a controller's write is, so a failed save refuses the call and
+// the served value stays the saved one.
+func TestThermostatUISetKeepsKeypadLockoutWhenTheSaveFails(t *testing.T) {
+	t.Parallel()
+	settings := &flakySettings{values: map[string]string{}}
+	srv := newTSUIC(t, thermo.ThermostatUIConfig{Settings: settings})
+	settings.fail = true
+	if err := srv.Set(tsuic.AttrKeypadLockout, tsuic.KeypadLockoutLockout1); err == nil {
+		t.Fatal("a KeypadLockout whose save failed was accepted")
+	}
+	if v, _ := srv.Value(tsuic.AttrKeypadLockout); v != any(uint8(tsuic.KeypadLockoutNoLockout)) {
+		t.Errorf("KeypadLockout reads %v after the failed save, want NoLockout", v)
+	}
+	settings.fail = false
+	// A call the store refuses for another value puts the saved one back.
+	if err := srv.SetAttributes(map[uint32]any{tsuic.AttrKeypadLockout: tsuic.KeypadLockoutLockout1, tsuic.AttrTemperatureDisplayMode: uint8(9)}); err == nil {
+		t.Fatal("an undefined TemperatureDisplayMode was accepted")
+	}
+	if got := settings.values[thermo.DefaultKeypadLockoutSetting]; got != "0" {
+		t.Errorf("Settings hold KeypadLockout %q after the refused call, want 0", got)
+	}
+}
