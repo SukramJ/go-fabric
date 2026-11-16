@@ -8,6 +8,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/jointfabric"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
 
@@ -25,7 +26,10 @@ type nodeServicesParticipant interface {
 // fabricRemovedParticipant is a cluster server of an endpoint that drops
 // what it holds of a removed fabric: the Joint Fabric servers, which
 // connectedhomeip tells through the FabricTable delegate
-// (JointFabricDatastore.h:323-338, JointFabricAdministrator.h:60-66).
+// (JointFabricDatastore.h:323-338, JointFabricAdministrator.h:60-66). A
+// server that is also a [contract.FabricScopedState] — the Datastore — is
+// told through that path alone, so it hears of a removal once
+// (R2-P6-err-1120).
 type fabricRemovedParticipant interface {
 	OnFabricRemoved(ctx context.Context, fabricIndex uint8)
 }
@@ -48,7 +52,9 @@ func (n *Node) attachNodeServices(t *endpoint.Topology) {
 				p.AttachCommissionerReach(commissionerReach{n: n})
 			}
 			if p, ok := srv.(fabricRemovedParticipant); ok {
-				removed = append(removed, p)
+				if _, scoped := srv.(contract.FabricScopedState); !scoped {
+					removed = append(removed, p)
+				}
 			}
 		}
 	}

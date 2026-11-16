@@ -224,7 +224,7 @@ func (p *fakePort) IcacCsr(context.Context) ([]byte, error) { return p.csr, p.er
 
 // caseCtx is an invoke over CASE on the fabric.
 func caseCtx(ctx context.Context, fabricIndex uint8) context.Context {
-	return im.WithFabricFilter(ctx, true, fabricIndex)
+	return im.WithSubject(im.WithFabricFilter(ctx, true, fabricIndex), 0x77, nil)
 }
 
 // adminFixture is an Administrator on a node with fabric f, its window

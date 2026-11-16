@@ -323,7 +323,10 @@ func TestUpdateGroupWithNullStoredGroupCATVersionSucceeds(t *testing.T) {
 		func(g GroupEntry) bool { return !g.GroupCatVersion.Null && g.GroupCatVersion.Value == 7 })
 }
 
-// TestRefreshNodeFetchesGroupKeySetsAndCommitsNode is :445-476.
+// TestRefreshNodeFetchesGroupKeySetsAndCommitsNode is :445-476, with the
+// key set the node reports not adopted: chip's case expects key set 77 in
+// GroupKeySetList, which owner decision 129 refuses (R2-P6-sec-1106,
+// ahead of chip).
 func TestRefreshNodeFetchesGroupKeySetsAndCommitsNode(t *testing.T) {
 	s := newTrackingSync()
 	s.fetchedGroupKeySetIDs = []uint16{77}
@@ -333,10 +336,8 @@ func TestRefreshNodeFetchesGroupKeySetsAndCommitsNode(t *testing.T) {
 	if s.fetchEndpointListCalls != 1 || s.fetchGroupKeySetListCalls != 1 || s.fetchGroupKeySetCalls != 1 || s.fetchACLListCalls != 1 {
 		t.Fatalf("fetches %d %d %d %d", s.fetchEndpointListCalls, s.fetchGroupKeySetListCalls, s.fetchGroupKeySetCalls, s.fetchACLListCalls)
 	}
-	s.epochKey0[0], s.epochKey1[0] = 0xAA, 0xBB
-	list := d.GroupKeySetList()
-	if len(list) != 1 || list[0].GroupKeySetId != 77 || string(list[0].EpochKey0.Value) != "\x10\x11\x12" || string(list[0].EpochKey1.Value) != "\x20\x21" {
-		t.Fatalf("GroupKeySetList = %+v", list)
+	if list := d.GroupKeySetList(); len(list) != 0 {
+		t.Fatalf("GroupKeySetList = %+v, the node's key set adopted", list)
 	}
 	if n := d.NodeList(); len(n) != 1 || n[0].CommissioningStatusEntry.State != stateCommitted {
 		t.Fatalf("NodeList = %+v", n)

@@ -4,6 +4,7 @@
 package jointfabric
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -191,6 +192,15 @@ const settingPrefix = "jointfabric.datastore:"
 // JointFabricDatastoreServer is the generated behaviour
 // (JointFabricDatastoreServer.ts:14 at 862ad75f).
 //
+// A command of a peer is the anchor fabric's alone: a request of any
+// other fabric, or of any fabric while no anchor is recorded, answers
+// UNSUPPORTED_ACCESS (owner decision 129, ahead of connectedhomeip, whose
+// server asks no accessing fabric): the registry holds the Joint Fabric's
+// epoch keys and its pushes act with the anchor's authority. A call of the
+// host carries no request and is not fenced. A read is not fenced yet:
+// the dispatcher has no way for a server to refuse a read of an attribute
+// that is not fabric-scoped.
+//
 // A command answers when its change is in the tables; the push to the
 // node runs after the answer, as connectedhomeip's delegate completes
 // asynchronously, and commits the entry when it returns. The host methods
@@ -204,10 +214,16 @@ type Datastore struct {
 	store DatastoreStore
 	key   string
 
-	// mu guards t, dirty and the refresh state.
-	mu         sync.Mutex
-	t          tables
-	dirty      map[uint32]struct{}
+	// mu guards t, dirty, saved, gen and the refresh state.
+	mu    sync.Mutex
+	t     tables
+	dirty map[uint32]struct{}
+	// saved is the record the store holds: an update saves only when the
+	// tables differ from it, and a failed save restores them from it.
+	saved []byte
+	// gen counts the wipes of the tables; a refresh or a push started
+	// before one commits nothing after it (R2-P6-conc-1107).
+	gen        uint64
 	refreshing uint64 // 0: no refresh (kUndefinedNodeId)
 	inRefresh  bool
 
@@ -285,6 +301,7 @@ var (
 	_ contract.ClusterCommandLister          = (*Datastore)(nil)
 	_ contract.ClusterCommandInvokePrivilege = (*Datastore)(nil)
 	_ contract.AttributeChangeNotifier       = (*Datastore)(nil)
+	_ contract.FabricScopedState             = (*Datastore)(nil)
 	_ spec.CommandRegistrar                  = (*Datastore)(nil)
 )
 
@@ -301,6 +318,9 @@ func NewDatastore(ctx context.Context, cfg DatastoreConfig) (*Datastore, error) 
 			if err := json.Unmarshal([]byte(v), &d.t); err != nil {
 				return nil, fmt.Errorf("%w: decode %s: %w", ErrStore, d.key, err)
 			}
+		}
+		if d.saved, err = json.Marshal(d.t); err != nil {
+			return nil, fmt.Errorf("%w: encode %s: %w", ErrStore, d.key, err)
 		}
 	}
 	handlers := map[uint32]spec.CommandHandler{}
@@ -338,25 +358,22 @@ func (d *Datastore) takeDirtyLocked() []uint32 {
 	return ids
 }
 
-// update runs fn under the lock, saves the tables when it changed them
-// and reports what it changed. A save that fails restores the tables as
-// they were and is the change's error (ErrStore), as the TLS servers
-// answer a failed save (cluster/tls/certificates.go). connectedhomeip
+// update runs fn under the lock, saves the tables when they differ from
+// the record the store holds and reports the attributes fn marked. A
+// save that fails restores the tables the store holds and is the
+// change's error (ErrStore), as the TLS servers answer a failed save
+// (cluster/tls/certificates.go). The record is encoded once per change
+// and written only when it moved (R2-P6-bound-1113 c); the write runs
+// under the lock, so a store's latency is every reader's. connectedhomeip
 // reports NodeList only (MarkNodeListChanged,
 // joint-fabric-datastore-server.cpp:287-291); here every attribute a
 // change touches advances the data version and is reported.
 func (d *Datastore) update(ctx context.Context, fn func() error) error {
 	d.mu.Lock()
-	var prev []byte
-	if d.store != nil {
-		prev, _ = json.Marshal(d.t)
-	}
 	err := fn()
 	ids := d.takeDirtyLocked()
-	if len(ids) > 0 && d.store != nil {
-		if serr := d.saveLocked(ctx); serr != nil {
-			d.t = tables{}
-			_ = json.Unmarshal(prev, &d.t)
+	if d.store != nil {
+		if serr := d.persistLocked(ctx); serr != nil {
 			ids = nil
 			if err == nil {
 				err = serr
@@ -370,16 +387,27 @@ func (d *Datastore) update(ctx context.Context, fn func() error) error {
 	return err
 }
 
-// saveLocked writes the tables to the store; the caller holds d.mu.
-func (d *Datastore) saveLocked(ctx context.Context) error {
+// persistLocked writes the tables to the store when they differ from the
+// record it holds; a failed write restores the tables from that record.
+// The caller holds d.mu.
+func (d *Datastore) persistLocked(ctx context.Context) error {
 	b, err := json.Marshal(d.t)
-	if err != nil {
-		return fmt.Errorf("%w: encode %s: %w", ErrStore, d.key, err)
+	if err == nil && bytes.Equal(b, d.saved) {
+		return nil
 	}
-	if err := d.store.SetSetting(context.WithoutCancel(ctx), d.key, string(b)); err != nil {
-		return fmt.Errorf("%w: save %s: %w", ErrStore, d.key, err)
+	if err == nil {
+		err = d.store.SetSetting(context.WithoutCancel(ctx), d.key, string(b))
+		if err == nil {
+			d.saved = b
+			return nil
+		}
+		err = fmt.Errorf("%w: save %s: %w", ErrStore, d.key, err)
+	} else {
+		err = fmt.Errorf("%w: encode %s: %w", ErrStore, d.key, err)
 	}
-	return nil
+	d.t = tables{}
+	_ = json.Unmarshal(d.saved, &d.t)
+	return err
 }
 
 // pushFn is a push to a node: the port call and, once it returned, its
@@ -388,14 +416,25 @@ type pushFn func(ctx context.Context) error
 
 // mutate runs fn under the lock, reports what it changed and returns the
 // pushes it collected.
-func (d *Datastore) mutate(ctx context.Context, fn func(pushes *[]pushFn) error) ([]pushFn, error) {
+func (d *Datastore) mutate(ctx context.Context, fn func(pushes *[]pushFn) error) ([]pushFn, context.Context, error) {
 	var pushes []pushFn
-	err := d.update(ctx, func() error { return fn(&pushes) })
+	var gen uint64
+	err := d.update(ctx, func() error {
+		gen = d.gen
+		return fn(&pushes)
+	})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return pushes, nil
+	return pushes, context.WithValue(ctx, genKey{}, gen), nil
 }
+
+// genKey carries, in a push's or a refresh's context, the generation of
+// the tables it started on ([Datastore.commit]).
+type genKey struct{}
+
+// errWiped is a commit whose tables were wiped since its operation began.
+var errWiped = fmt.Errorf("%w: the datastore was wiped", ErrNotFound)
 
 // runPushes runs the pushes in order; the errors are joined under ErrSync.
 func runPushes(ctx context.Context, pushes []pushFn) error {
@@ -413,21 +452,21 @@ func runPushes(ctx context.Context, pushes []pushFn) error {
 
 // do is a host method: the change, then its pushes.
 func (d *Datastore) do(ctx context.Context, fn func(pushes *[]pushFn) error) error {
-	pushes, err := d.mutate(ctx, fn)
+	pushes, pctx, err := d.mutate(ctx, fn)
 	if err != nil {
 		return err
 	}
-	return runPushes(ctx, pushes)
+	return runPushes(pctx, pushes)
 }
 
 // doAsync is a command: the change answers, its pushes run after.
 func (d *Datastore) doAsync(ctx context.Context, fn func(pushes *[]pushFn) error) error {
-	pushes, err := d.mutate(ctx, fn)
+	pushes, pctx, err := d.mutate(ctx, fn)
 	if err != nil {
 		return err
 	}
 	if len(pushes) > 0 {
-		bg := context.WithoutCancel(ctx)
+		bg := context.WithoutCancel(pctx)
 		d.pushes.Add(1)
 		go func() {
 			defer d.pushes.Done()
@@ -437,9 +476,19 @@ func (d *Datastore) doAsync(ctx context.Context, fn func(pushes *[]pushFn) error
 	return nil
 }
 
-// commit applies fn to the tables once a push returned.
-func (d *Datastore) commit(ctx context.Context, fn func()) {
-	_ = d.update(ctx, func() error { fn(); return nil })
+// commit applies fn to the tables once a push or a refresh step
+// returned; its error is the store's (R2-P6-err-1120). An operation whose
+// tables were wiped since it began ([genKey] in ctx) commits nothing and
+// ends with errWiped (R2-P6-conc-1107).
+func (d *Datastore) commit(ctx context.Context, fn func()) error {
+	gen, scoped := ctx.Value(genKey{}).(uint64)
+	return d.update(ctx, func() error {
+		if scoped && gen != d.gen {
+			return errWiped
+		}
+		fn()
+		return nil
+	})
 }
 
 // Wait waits for the pushes and the refresh the commands started.
@@ -715,22 +764,45 @@ func (d *Datastore) SetStatus(ctx context.Context, state State, updateTimestamp 
 	})
 }
 
-// OnFabricRemoved wipes the datastore and the anchor when the removed
-// fabric is the Joint Fabric; any other fabric's removal leaves it. Mirrors
-// JointFabricDatastore.h:323-338 (OnFabricRemoved, ClearAllRecords
-// :532-559).
+// OnFabricRemoved is [Datastore.MatterDropFabric] without its error. The
+// node reaches the datastore through [contract.FabricScopedState] alone.
 func (d *Datastore) OnFabricRemoved(ctx context.Context, fabricIndex uint8) {
-	_ = d.update(ctx, func() error {
+	_ = d.MatterDropFabric(ctx, fabricIndex)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]: the anchor
+// fabric's removal wipes the datastore and the anchor; any other fabric's
+// leaves it. A refresh or a push in flight then commits nothing more. The
+// error is the store's; the next reconcile wipes again. Mirrors
+// JointFabricDatastore.h:323-338 (OnFabricRemoved, ClearAllRecords
+// :532-559); as a [contract.FabricScopedState] the node also wipes at its
+// reconcile the record of an anchor fabric removed while the datastore
+// did not hear of it (R2-P6-store-1114).
+func (d *Datastore) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	return d.update(ctx, func() error {
 		if d.t.AnchorFabricIndex == 0 || fabricIndex != d.t.AnchorFabricIndex {
 			return nil
 		}
 		d.t = tables{}
+		d.gen++
 		d.markLocked(dsdef.AttrAnchorRootCa, dsdef.AttrAnchorNodeId, dsdef.AttrAnchorVendorId, dsdef.AttrFriendlyName,
 			dsdef.AttrGroupKeySetList, dsdef.AttrGroupList, dsdef.AttrNodeList, dsdef.AttrAdminList, dsdef.AttrStatus,
 			dsdef.AttrEndpointGroupIdList, dsdef.AttrEndpointBindingList, dsdef.AttrNodeKeySetList, dsdef.AttrNodeAclList,
 			dsdef.AttrNodeEndpointList)
 		return nil
 	})
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the anchor
+// fabric, when one is recorded — everything the datastore holds is the
+// Joint Fabric's.
+func (d *Datastore) MatterHeldFabrics() []uint8 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.t.AnchorFabricIndex == 0 {
+		return nil
+	}
+	return []uint8{d.t.AnchorFabricIndex}
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
