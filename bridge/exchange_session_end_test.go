@@ -96,7 +96,7 @@ func (r *exchangeSessionRig) reuseSessionID(t *testing.T) {
 	for i := range secret {
 		secret[i] = byte(i + 1)
 	}
-	if _, err := r.dev.sessions.OpenFromPaseWithID(r.sid, 0, 0x9999, 0x0777, secret); err != nil {
+	if _, err := r.dev.sessions.OpenFromPaseWithID(r.sid, 0, 0x9999, 0x0777, secret); err != nil { //nolint:staticcheck // SA1019: the session reuses a chosen id, which no stake install takes (decision 159)
 		t.Fatalf("a new session under id %d: %v", r.sid, err)
 	}
 }
