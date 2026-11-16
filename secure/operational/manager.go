@@ -811,14 +811,17 @@ func (m *Manager) AllocateStake() (Stake, error) {
 //
 // matter.js's findOldestInactiveSession filters by no fabric
 // (SessionManager.ts:564-572, #leastRecentlyUsedSession :553-562 at
-// db021da0), so one fabric that keeps its sessions busy pushes another
-// fabric's idle ones out. The choice is ahead of matter.js, with chip as
-// the authority (R2-P6-bound-0107): chip's EvictAndAllocate
-// (src/transport/SecureSessionTable.cpp:91 at 6170af84) sorts with
-// DefaultEvictionPolicy, "a spec-compliant sorting policy that ensures
-// both guarantees for sessions per-fabric as mandated by the spec"
-// (:231-232), whose first key evicts from the fabric with the most
-// sessions (:239-243). Caller holds m.mu.
+// db021da0), so one fabric that keeps its sessions busy would push
+// another fabric's idle ones out. The per-fabric choice is ahead of
+// matter.js (R2-P6-bound-0107): connectedhomeip evicts from the fabric
+// that holds the most sessions first and uses last activity only as the
+// final tie-break (src/transport/SecureSessionTable.cpp:228-337,
+// DefaultEvictionPolicy, Key1 :239-244, Key6 :333-335 at 6170af84), in a
+// pool sized for three CASE sessions per fabric (src/lib/core/CHIPConfig.h:808-821);
+// matter.js bounds sessions per peer only (packages/protocol/src/session/SessionManager.ts:201-205
+// at db021da0). This choice takes chip's first and last key only; its
+// keys 2-5 (the hinted fabric and peer, the peer holding the most, the
+// session state) are not applied. Caller holds m.mu.
 func (m *Manager) leastRecentlyActiveLocked() *Entry {
 	held := make(map[uint8]int)
 	most := 0
@@ -922,6 +925,13 @@ func (m *Manager) ReleaseStake(s Stake) {
 // registers the new session under a pre-allocated id (see
 // [Manager.AllocateID]). It overwrites any placeholder entry left
 // by AllocateID.
+//
+// The install takes the id, not the [Stake]: it does not check that the
+// id still holds this handshake's reservation. At a full table
+// [Manager.AllocateStake] may have handed the id to another handshake
+// since, and the install then overwrites that handshake's stake, or
+// closes the session it already established under the id (review II,
+// N3-findev-1).
 //
 // peerSessionID is the InitiatorSessionID the commissioner sent in
 // Sigma1 — every outbound encrypted reply must carry this in
@@ -1507,12 +1517,14 @@ const MaxSessionsPerPeer = 5
 // placeholders (Session==nil) are mid-handshake and left alone, and
 // added itself is excluded so a burst of new sessions cannot evict the
 // one that prompted the check. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:647-680
-// #evictExcessSessionsFor and #leastRecentlyUsedSession.
+// packages/protocol/src/session/SessionManager.ts:691-725 at db021da0,
+// #evictExcessSessionsFor (:697) and #leastRecentlyUsedSession (:553-562).
 //
 // Only a session the peer established runs the check: one we initiated
 // evicts nothing, since the peer loss our own traffic reports sweeps
-// those. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:272-277.
+// those. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:312-318
+// at db021da0 (the sessions-added observer runs the check only when
+// !session.isInitiator).
 func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
 	if added.isPase || added.isInitiator {
 		return nil
@@ -1898,11 +1910,12 @@ func (m *Manager) Occupancy() SessionTableOccupancy {
 // to (fabricIndex, peerNodeID), ordered by id. Staked ids are excluded:
 // they carry no peer.
 //
-// Because opening a session evicts that peer's earlier sessions
-// ([Manager.collectStalePeerSessionsLocked]), the ids this reports
-// immediately before an open are the ones the open displaces — which is
-// what the CASE resume record needs, since a resume that reuses the
-// announced session id displaces the very session it is resuming.
+// Opening a session does not close the peer's earlier ones: only a
+// session the peer establishes beyond [MaxSessionsPerPeer] closes its
+// least recently active ones ([Manager.evictExcessPeerSessionsLocked]),
+// so the list can hold several ids, and the bridge picks among them
+// (bridge/case_initiator.go, the fallback when the registry has no
+// [Manager.NewestSessionForPeer]).
 func (m *Manager) SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint16 {
 	m.mu.RLock()
 	var out []uint16
