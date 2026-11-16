@@ -70,14 +70,14 @@ func (s *StoreResumption) SaveResumptionRecord(rec ResumptionRecord) error {
 	})
 }
 
-// DeleteResumptionRecord implements [ResumptionStore].
+// DeleteResumptionRecord implements [ResumptionStore]. Only a missing
+// record is none: a stored record that does not read — one a sealed store
+// cannot open ([store.ErrUnseal]), or any other read error — is removed
+// and reported as one.
 func (s *StoreResumption) DeleteResumptionRecord(peer PeerAddress) (bool, error) {
 	ctx := context.Background()
-	if _, err := s.st.GetResumptionByPeer(ctx, peer.FabricIndex, peer.NodeID); err != nil {
-		if errors.Is(err, store.ErrResumptionNotFound) {
-			return false, nil
-		}
-		return false, err
+	if _, err := s.st.GetResumptionByPeer(ctx, peer.FabricIndex, peer.NodeID); errors.Is(err, store.ErrResumptionNotFound) {
+		return false, nil
 	}
 	if err := s.st.RemoveResumption(ctx, peer.FabricIndex, peer.NodeID); err != nil {
 		return false, err

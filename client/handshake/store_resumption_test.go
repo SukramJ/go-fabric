@@ -84,3 +84,35 @@ func TestStoreResumptionOneRecordForBothRoles(t *testing.T) {
 		t.Error("the row survived the delete")
 	}
 }
+
+// unopenedResumption is a store.Resumption whose record of the peer is
+// stored but does not open (store.ErrUnseal), as a sealed store's row
+// under another key; it counts the removals.
+type unopenedResumption struct {
+	store.Resumption
+	removed int
+}
+
+func (*unopenedResumption) GetResumptionByPeer(context.Context, uint8, uint64) (store.ResumptionRecord, error) {
+	return store.ResumptionRecord{}, store.ErrUnseal
+}
+
+func (u *unopenedResumption) RemoveResumption(context.Context, uint8, uint64) error {
+	u.removed++
+	return nil
+}
+
+// TestStoreResumptionDeletesARecordThatDoesNotOpen: forgetting a peer
+// removes its stored record even when the record does not open; only a
+// missing record is reported as none.
+func TestStoreResumptionDeletesARecordThatDoesNotOpen(t *testing.T) {
+	t.Parallel()
+	st := &unopenedResumption{}
+	ok, err := handshake.NewStoreResumption(st).DeleteResumptionRecord(handshake.PeerAddress{FabricIndex: 1, NodeID: 0xABCD})
+	if err != nil || !ok {
+		t.Errorf("DeleteResumptionRecord = %v, %v; want true, nil", ok, err)
+	}
+	if st.removed != 1 {
+		t.Errorf("RemoveResumption ran %d times, want once", st.removed)
+	}
+}
