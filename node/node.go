@@ -651,7 +651,13 @@ const (
 // generic platform, which keeps a compile-time unique id in RAM
 // (GenericConfigurationManagerImpl.h:128-130), the unique id here is
 // random and persisted, so no two nodes share it and it survives a
-// restart.
+// restart. connectedhomeip starts its advertisement again after each
+// failed PASE attempt inside a window (CommissioningWindowManager.cpp:160-173,
+// :313) and advances the counter then too, where
+// CHIP_ENABLE_ADDITIONAL_DATA_ADVERTISING is set (:504); here the counter
+// advances once per advertised window (own, enhanced, basic) — this
+// module's rule, the counter advanced and persisted before the window's
+// record is published, as connectedhomeip advances before it advertises.
 type rotatingDeviceID struct {
 	st     store.Settings
 	logger *slog.Logger
