@@ -652,6 +652,8 @@ type connReceiver struct {
 	prev chan struct{}
 	done bool
 	wg   sync.WaitGroup
+	// evictOnce evicts the connection's sessions once ([connReceiver.wait]).
+	evictOnce sync.Once
 }
 
 // connReceiverMaxInFlight bounds the messages of one connection that are
@@ -737,11 +739,10 @@ func (r *connReceiver) recoverHandler(msgLen int) {
 		slog.String("stack", string(debug.Stack())))
 }
 
-// close stops delivering, waits for the handler in flight, and then evicts
-// every session bound to the connection, as a dropped TCP connection does:
-// a handler that ran on past the eviction would bind a route of the dead
-// connection that nothing removes (review II, R2-P6-conc-0306). It is not
-// called from a handler of the connection.
+// close stops delivering: a delivery waiting for a slot ends, and a message
+// queued behind the one in dispatch is not handled. The connection's
+// sessions are evicted by [connReceiver.wait], once the handlers that were
+// running have returned (review II, R2-P6-conc-0306).
 func (r *connReceiver) close() {
 	r.mu.Lock()
 	if !r.done {
@@ -749,12 +750,22 @@ func (r *connReceiver) close() {
 		close(r.stopped)
 	}
 	r.mu.Unlock()
-	r.wg.Wait()
-	r.b.evictConn(r.conn)
 }
 
-// wait waits for every delivered message's handler to return.
-func (r *connReceiver) wait() { r.wg.Wait() }
+// wait waits for every delivered message's handler to return and then, once
+// the receiver is closed, evicts every session bound to the connection, as
+// a dropped TCP connection does: a handler that ran on past the eviction
+// would bind a route of the dead connection that nothing removes (review
+// II, R2-P6-conc-0306). Every close is followed by a wait.
+func (r *connReceiver) wait() {
+	r.wg.Wait()
+	r.mu.Lock()
+	closed := r.done
+	r.mu.Unlock()
+	if closed {
+		r.evictOnce.Do(func() { r.b.evictConn(r.conn) })
+	}
+}
 
 // gattPeripheral is the host's peripheral: [Config].GATT, else the older
 // [Config].BLE adapted to it, nil without either.
