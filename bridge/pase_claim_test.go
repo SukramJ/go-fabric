@@ -66,10 +66,9 @@ func (p *pipelinePeer) none(d time.Duration, what string) {
 }
 
 // TestPaseClaimRunsFromItsFirstRequest: the single-active-PASE claim runs
-// pasePairingTimeout from the PBKDFParamRequest that took it; a further
-// PBKDFParamRequest of the same handshake is acknowledged and not answered
-// and renews nothing; and the claim that ran out counts one PASE failure
-// when another commissioner takes the slot (review II, R2-P6-sec-0304).
+// pasePairingTimeout from the PBKDFParamRequest that took it, and the claim
+// that ran out counts one PASE failure when another commissioner takes the
+// slot (review II, R2-P6-sec-0304).
 func TestPaseClaimRunsFromItsFirstRequest(t *testing.T) {
 	r, clk := newPaseClaimRig(t)
 	holder := newPipelinePeer(t, r.b, 0xBAD)
@@ -78,12 +77,7 @@ func TestPaseClaimRunsFromItsFirstRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	holder.recv(mrp.SCOpcodePBKDFParamResponse, "the first PBKDFParamRequest")
-	clk.Advance(pasePairingTimeout - time.Second)
-	if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), nil); err != nil {
-		t.Fatal(err)
-	}
-	holder.none(300*time.Millisecond, "a repeated PBKDFParamRequest of the claim's handshake")
-	clk.Advance(2 * time.Second)
+	clk.Advance(pasePairingTimeout + time.Second)
 	other := HandshakeKey{InitiatorNodeID: 0x600D, ExchangeID: 0x0202}
 	if r.b.paseHandshakeOfAnother(other) {
 		t.Fatal("the claim still holds the slot past pasePairingTimeout from its first request")
@@ -98,6 +92,36 @@ func TestPaseClaimRunsFromItsFirstRequest(t *testing.T) {
 	commissioner.recv(mrp.SCOpcodePBKDFParamResponse, "another commissioner after the claim ran out")
 	if got := r.b.paseFailures.Load(); got != 1 {
 		t.Fatalf("PASE failures after the abandoned claim was taken over: %d, want 1", got)
+	}
+}
+
+// TestRepeatedPBKDFParamRequestEndsThePairing: a further PBKDFParamRequest
+// on the handshake that holds the claim is an error of that pairing, as
+// matter.js's PASE server takes an unexpected message on the accepted
+// exchange: it is not answered, it counts one PASE failure, and the pairing
+// ends — the slot is free for the next commissioner at once, and a Pake1 of
+// the ended handshake begins nothing (review II, R2-P6-sec-0304, round 2).
+func TestRepeatedPBKDFParamRequestEndsThePairing(t *testing.T) {
+	r, _ := newPaseClaimRig(t)
+	holder := newPipelinePeer(t, r.b, 0xBAD)
+	const xid = uint16(0x0101)
+	if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), nil); err != nil {
+		t.Fatal(err)
+	}
+	holder.recv(mrp.SCOpcodePBKDFParamResponse, "the first PBKDFParamRequest")
+	if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), nil); err != nil {
+		t.Fatal(err)
+	}
+	holder.none(300*time.Millisecond, "a repeated PBKDFParamRequest of the claim's handshake")
+	if got := r.b.paseFailures.Load(); got != 1 {
+		t.Fatalf("PASE failures after a repeated PBKDFParamRequest: %d, want 1", got)
+	}
+	other := HandshakeKey{InitiatorNodeID: 0x600D, ExchangeID: 0x0202}
+	if r.b.paseHandshakeOfAnother(other) {
+		t.Fatal("the ended pairing still holds the slot")
+	}
+	if _, begun := r.b.resolvePaseContinuation(HandshakeKey{InitiatorNodeID: 0xBAD, ExchangeID: xid}); begun {
+		t.Fatal("a Pake1 of the ended pairing would still reach its handler")
 	}
 }
 
