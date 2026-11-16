@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/im"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestWiFiNetworkCommissioningBreadcrumbOutsideTheLock pins R2-P1-core-07:
