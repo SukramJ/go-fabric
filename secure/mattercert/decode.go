@@ -8,7 +8,6 @@ import (
 	"crypto/elliptic"
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -326,7 +325,11 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 		}
 		cert.SerialNumber = append([]byte(nil), el.Octets...)
 	case tagSignatureAlgorithm:
-		cert.SignatureAlgorithm = el.Uint
+		v, err := uintField(el, 8, "signature algorithm")
+		if err != nil {
+			return err
+		}
+		cert.SignatureAlgorithm = v
 	case tagIssuer:
 		if !el.IsContainer || el.Type != tlv.TypeList {
 			// A DN is a TLV list; a structure (TC-JFADMIN-1.2 step 16
@@ -346,13 +349,14 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 	case tagNotBefore, tagNotAfter:
 		// notBefore/notAfter are TlvUInt32 (operational.ts:138-139 at
 		// db021da0), and matter.js's Schema.decode validates the bounds.
-		if el.Uint > math.MaxUint32 {
-			return fmt.Errorf("%w: validity time %d exceeds 32 bits", ErrMalformed, el.Uint)
+		v, err := uintField(el, 32, "validity time")
+		if err != nil {
+			return err
 		}
 		if tag == tagNotBefore {
-			cert.NotBefore = el.Uint
+			cert.NotBefore = v
 		} else {
-			cert.NotAfter = el.Uint
+			cert.NotAfter = v
 		}
 	case tagSubject:
 		if !el.IsContainer || el.Type != tlv.TypeList {
@@ -371,19 +375,41 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 		}
 		cert.Subject = dn
 	case tagPublicKeyAlgorithm:
-		cert.PublicKeyAlgorithm = el.Uint
+		v, err := uintField(el, 8, "public-key algorithm")
+		if err != nil {
+			return err
+		}
+		cert.PublicKeyAlgorithm = v
 	case tagEllipticCurveID:
-		cert.EllipticCurveID = el.Uint
+		v, err := uintField(el, 8, "elliptic curve")
+		if err != nil {
+			return err
+		}
+		cert.EllipticCurveID = v
 	case tagEllipticCurvePub:
-		cert.PublicKey = append([]byte(nil), el.Octets...)
+		v, err := octetsField(el, "ec-pub-key")
+		if err != nil {
+			return err
+		}
+		cert.PublicKey = v
 	case tagExtensions:
+		// The extensions are a TLV list, as the encoder writes them
+		// (encode.go); a structure, an array or a scalar is malformed,
+		// not descended into as if it were one (R2-P6-wire-0103).
+		if el.Type != tlv.TypeList {
+			return fmt.Errorf("%w: extensions are not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
+		}
 		ext, err := decodeExtensions(d)
 		if err != nil {
 			return fmt.Errorf("extensions: %w", err)
 		}
 		cert.Extensions = ext
 	case tagSignature:
-		cert.Signature = append([]byte(nil), el.Octets...)
+		v, err := octetsField(el, "signature")
+		if err != nil {
+			return err
+		}
+		cert.Signature = v
 	default:
 		// Unknown future field — skip if container, else accept.
 		if el.IsContainer {
@@ -434,32 +460,19 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 			}
 		}
 		switch tag {
-		case dnTagMatterNodeID:
-			dn.MatterNodeID = el.Uint
-			dn.HasNodeID = true
-			dn.Order = append(dn.Order, tag)
-		case dnTagMatterICACID:
-			dn.MatterICACID = el.Uint
-			dn.HasICACID = true
-			dn.Order = append(dn.Order, tag)
-		case dnTagMatterRCACID:
-			dn.MatterRCACID = el.Uint
-			dn.HasRCACID = true
-			dn.Order = append(dn.Order, tag)
-		case dnTagMatterFabricID:
-			dn.MatterFabricID = el.Uint
-			dn.HasFabricID = true
-			dn.Order = append(dn.Order, tag)
-		case dnTagMatterVVSID:
-			dn.MatterVVSID = el.Uint
-			dn.HasVVSID = true
-			dn.Order = append(dn.Order, tag)
-		case dnTagMatterFirmwareSignID:
-			dn.MatterFirmwareSigningID = el.Uint
-			dn.HasFirmwareSigningID = true
+		case dnTagMatterNodeID, dnTagMatterICACID, dnTagMatterRCACID, dnTagMatterFabricID, dnTagMatterVVSID, dnTagMatterFirmwareSignID:
+			v, err := uintField(el, 64, fmt.Sprintf("dn attribute %d", tag))
+			if err != nil {
+				return dn, err
+			}
+			dn.setMatterID(tag, v)
 			dn.Order = append(dn.Order, tag)
 		case dnTagMatterCASEAuth:
-			dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(el.Uint&0xFFFFFFFF))
+			v, err := uintField(el, 32, "dn case-authenticated tag")
+			if err != nil {
+				return dn, err
+			}
+			dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(v))
 			dn.Order = append(dn.Order, tag)
 		default:
 			if isStandardDNTag(tag) {
@@ -487,10 +500,54 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 	return dn, nil
 }
 
+// setMatterID stores the value of a single-valued Matter DN attribute
+// (node, ICAC, RCAC, fabric, VVS or firmware-signing id) under its tag.
+func (dn *DistinguishedName) setMatterID(tag uint8, v uint64) {
+	switch tag {
+	case dnTagMatterNodeID:
+		dn.MatterNodeID, dn.HasNodeID = v, true
+	case dnTagMatterICACID:
+		dn.MatterICACID, dn.HasICACID = v, true
+	case dnTagMatterRCACID:
+		dn.MatterRCACID, dn.HasRCACID = v, true
+	case dnTagMatterFabricID:
+		dn.MatterFabricID, dn.HasFabricID = v, true
+	case dnTagMatterVVSID:
+		dn.MatterVVSID, dn.HasVVSID = v, true
+	case dnTagMatterFirmwareSignID:
+		dn.MatterFirmwareSigningID, dn.HasFirmwareSigningID = v, true
+	}
+}
+
 // isStandardDNTag reports whether tag is a standard X.520 DN attribute
 // tag (1-16, or 129-143 for the PrintableString forms).
 func isStandardDNTag(tag uint8) bool {
 	return (tag >= dnTagStandardFirst && tag <= dnTagStandardLast) || (tag >= dnTagPrintableFirst && tag <= dnTagPrintableLast)
+}
+
+// uintField is an unsigned-integer member's value: an element of another
+// TLV type, or a value wider than the member's bits, is refused — not
+// masked to the width or read as 0 (R2-P6-wire-0103). The encoding's own
+// width is free; only the value is bounded.
+func uintField(el tlv.Element, bits uint, name string) (uint64, error) {
+	switch el.Type {
+	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
+	default:
+		return 0, fmt.Errorf("%w: %s: TLV type 0x%02X, want an unsigned integer", ErrMalformed, name, uint8(el.Type))
+	}
+	if bits < 64 && el.Uint>>bits != 0 {
+		return 0, fmt.Errorf("%w: %s: value %d exceeds %d bits", ErrMalformed, name, el.Uint, bits)
+	}
+	return el.Uint, nil
+}
+
+// octetsField is an octet-string member's value; an element of another
+// TLV type is refused rather than read as empty (R2-P6-wire-0103).
+func octetsField(el tlv.Element, name string) ([]byte, error) {
+	if el.Type < tlv.TypeOctetStr1 || el.Type > tlv.TypeOctetStr8 {
+		return nil, fmt.Errorf("%w: %s: TLV type 0x%02X, want an octet string", ErrMalformed, name, uint8(el.Type))
+	}
+	return append([]byte(nil), el.Octets...), nil
 }
 
 // skipContainer consumes elements (recursively if nested) until the
@@ -570,9 +627,14 @@ const (
 
 // decodeExtensions reads the children of the top-level Extensions
 // container (the container marker has already been consumed by the
-// outer [Decode] loop).
+// outer [Decode] loop). Each member is read at its own type — basic
+// constraints a structure, extended key usage an array of 8-bit values,
+// key usage a 16-bit value, the key ids and a future extension octet
+// strings — and every extension but a future one occurs at most once
+// (R2-P6-wire-0103).
 func decodeExtensions(d *tlv.Decoder) (CertificateExtensions, error) {
 	var ext CertificateExtensions
+	var seen [extTagFutureExtension]bool
 	for {
 		el, err := d.Next()
 		if err != nil {
@@ -585,23 +647,33 @@ func decodeExtensions(d *tlv.Decoder) (CertificateExtensions, error) {
 			return ext, fmt.Errorf("%w: extension entry with non-context tag", ErrMalformed)
 		}
 		tag := uint8(el.Tag.Number & 0xFF)
+		if tag >= extTagBasicConstraints && tag < extTagFutureExtension {
+			if seen[tag] {
+				return ext, fmt.Errorf("%w: extension %d repeated", ErrMalformed, tag)
+			}
+			seen[tag] = true
+		}
 		if tag >= extTagBasicConstraints && tag <= extTagFutureExtension {
 			ext.Order = append(ext.Order, tag)
 		}
 		switch tag {
 		case extTagBasicConstraints:
-			if !el.IsContainer {
-				return ext, fmt.Errorf("%w: basic-constraints not a container", ErrMalformed)
+			if el.Type != tlv.TypeStructure {
+				return ext, fmt.Errorf("%w: basic-constraints not a structure (type 0x%02X)", ErrMalformed, el.Type)
 			}
 			if err := decodeBasicConstraints(d, &ext); err != nil {
 				return ext, fmt.Errorf("basic-constraints: %w", err)
 			}
 		case extTagKeyUsage:
-			ext.KeyUsage = uint16(el.Uint & 0xFFFF)
+			v, err := uintField(el, 16, "key-usage")
+			if err != nil {
+				return ext, err
+			}
+			ext.KeyUsage = uint16(v)
 			ext.HasKeyUsage = true
 		case extTagExtendedKeyUsage:
-			if !el.IsContainer {
-				return ext, fmt.Errorf("%w: extended-key-usage not a container", ErrMalformed)
+			if el.Type != tlv.TypeArray {
+				return ext, fmt.Errorf("%w: extended-key-usage not an array (type 0x%02X)", ErrMalformed, el.Type)
 			}
 			eku, err := decodeUint8Array(d)
 			if err != nil {
@@ -610,19 +682,31 @@ func decodeExtensions(d *tlv.Decoder) (CertificateExtensions, error) {
 			ext.ExtendedKeyUsage = eku
 			ext.HasExtendedKeyUsage = true
 		case extTagSubjectKeyID:
-			if len(el.Octets) == 0 {
+			v, err := octetsField(el, "subject-key-id")
+			if err != nil {
+				return ext, err
+			}
+			if len(v) == 0 {
 				return ext, fmt.Errorf("%w: subject-key-id empty", ErrMalformed)
 			}
-			ext.SubjectKeyID = append([]byte(nil), el.Octets...)
+			ext.SubjectKeyID = v
 			ext.HasSubjectKeyID = true
 		case extTagAuthorityKeyID:
-			if len(el.Octets) == 0 {
+			v, err := octetsField(el, "authority-key-id")
+			if err != nil {
+				return ext, err
+			}
+			if len(v) == 0 {
 				return ext, fmt.Errorf("%w: authority-key-id empty", ErrMalformed)
 			}
-			ext.AuthorityKeyID = append([]byte(nil), el.Octets...)
+			ext.AuthorityKeyID = v
 			ext.HasAuthorityKeyID = true
 		case extTagFutureExtension:
-			ext.FutureExtensions = append(ext.FutureExtensions, append([]byte(nil), el.Octets...))
+			v, err := octetsField(el, "future-extension")
+			if err != nil {
+				return ext, err
+			}
+			ext.FutureExtensions = append(ext.FutureExtensions, v)
 		default:
 			if el.IsContainer {
 				if err := skipContainer(d); err != nil {
@@ -652,14 +736,18 @@ func decodeBasicConstraints(d *tlv.Decoder, ext *CertificateExtensions) error {
 		tag := uint8(el.Tag.Number & 0xFF)
 		switch tag {
 		case extBCInnerTagIsCa:
+			if el.Type != tlv.TypeBoolTrue && el.Type != tlv.TypeBoolFalse {
+				return fmt.Errorf("%w: basic-constraints: isCA: TLV type 0x%02X, want a boolean", ErrMalformed, uint8(el.Type))
+			}
 			ext.BasicConstraintsIsCA = el.Type == tlv.TypeBoolTrue
 		case extBCInnerTagPathLen:
 			// pathLen is TlvUInt8 (operational.ts:42 at db021da0): a wider
 			// value is refused, not cut to its low byte.
-			if el.Uint > math.MaxUint8 {
-				return fmt.Errorf("%w: basic-constraints: pathLen %d exceeds 255", ErrMalformed, el.Uint)
+			v, err := uintField(el, 8, "basic-constraints: pathLen")
+			if err != nil {
+				return err
 			}
-			ext.BasicConstraintsPathLen = uint8(el.Uint)
+			ext.BasicConstraintsPathLen = uint8(v)
 			ext.BasicConstraintsHasPathLen = true
 		default:
 			if el.IsContainer {
@@ -672,7 +760,8 @@ func decodeBasicConstraints(d *tlv.Decoder, ext *CertificateExtensions) error {
 }
 
 // decodeUint8Array reads a TLV array of UInt elements, returning each
-// as a uint8 (matter spec ExtendedKeyUsage uses 1..6 enum values).
+// as a uint8 (matter spec ExtendedKeyUsage uses 1..6 enum values); an
+// entry of another type or above 8 bits is refused.
 func decodeUint8Array(d *tlv.Decoder) ([]uint8, error) {
 	var out []uint8
 	for {
@@ -683,6 +772,10 @@ func decodeUint8Array(d *tlv.Decoder) ([]uint8, error) {
 		if el.IsEndContainer {
 			return out, nil
 		}
-		out = append(out, uint8(el.Uint&0xFF))
+		v, err := uintField(el, 8, "extended-key-usage entry")
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, uint8(v))
 	}
 }

@@ -524,12 +524,12 @@ func TestDecode_PathLenBeyond8BitsRejected(t *testing.T) {
 	for _, v := range []uint64{256, 0x101, math.MaxUint64} {
 		opts := makeRootCertOpts()
 		opts.bcPathLen = &v
-		if c, err := Decode(buildTestCert(t, opts)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "exceeds 255") {
+		if c, err := Decode(buildTestCert(t, opts)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "exceeds 8 bits") {
 			got := "<no certificate>"
 			if c != nil {
 				got = fmt.Sprintf("pathLen %d (has %v)", c.Extensions.BasicConstraintsPathLen, c.Extensions.BasicConstraintsHasPathLen)
 			}
-			t.Fatalf("Decode(pathLen %d) = %v, %s; want ErrMalformed (exceeds 255)", v, err, got)
+			t.Fatalf("Decode(pathLen %d) = %v, %s; want ErrMalformed (exceeds 8 bits)", v, err, got)
 		}
 	}
 	v := uint64(math.MaxUint8)
