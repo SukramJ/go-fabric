@@ -9,6 +9,7 @@ import (
 	"errors"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
@@ -331,5 +332,56 @@ func TestOwedFabricRemovalReplaysAfterACrashBehindTheHook(t *testing.T) {
 	}
 	if third := startObserved(t, minimalConfig(openDB(t, path))); len(third) != 0 {
 		t.Fatalf("OnFabricRemoved once acknowledged: %+v; want none", third)
+	}
+}
+
+// lookupFailingStore is a store whose GetFabric of one fabric index fails
+// with an error that is not store.ErrFabricNotFound — the store could not
+// answer — and counts the acknowledgements of owed events.
+type lookupFailingStore struct {
+	store.Port
+	index uint8
+	acks  atomic.Int32
+}
+
+func (s *lookupFailingStore) GetFabric(ctx context.Context, fabricIndex uint8) (store.FabricRecord, error) {
+	if fabricIndex == s.index {
+		return store.FabricRecord{}, errors.New("test: the store could not answer")
+	}
+	return s.Port.GetFabric(ctx, fabricIndex)
+}
+
+func (s *lookupFailingStore) AckOwedFabricEvent(ctx context.Context, id uint64) error {
+	s.acks.Add(1)
+	return s.Port.AckOwedFabricEvent(ctx, id)
+}
+
+// TestOwedFabricRemovalWaitsWhenTheStoreCannotAnswer: an owed removal runs
+// only when the store answers that the fabric is gone. A start whose
+// lookup of the fabric fails otherwise runs nothing for it and leaves the
+// event owed; the next start, whose store answers, runs OnFabricRemoved
+// once and acknowledges it.
+func TestOwedFabricRemovalWaitsWhenTheStoreCannotAnswer(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "node.db")
+	seeded := seedPendingAdd(t, path)
+
+	newNode(t, minimalConfig(openDB(t, path))) // rolls the fabric back, owes its removal
+
+	db := openDB(t, path)
+	cfg := minimalConfig(db)
+	failing := &lookupFailingStore{Port: store.New(db), index: seeded.FabricIndex}
+	cfg.Store.Credentials = failing
+	if first := startObserved(t, cfg); len(first) != 0 {
+		t.Fatalf("OnFabricRemoved while the store could not answer: %+v; want none", first)
+	}
+	if n := failing.acks.Load(); n != 0 {
+		t.Fatalf("%d acknowledgements while the store could not answer; want none", n)
+	}
+	if owed, err := store.New(openDB(t, path)).OwedFabricEvents(context.Background()); err != nil || len(owed) != 1 {
+		t.Fatalf("owed events after that start: %+v, %v; want the removal still owed", owed, err)
+	}
+	if next := startObserved(t, minimalConfig(openDB(t, path))); len(next) != 1 || next[0].FabricIndex != seeded.FabricIndex {
+		t.Fatalf("OnFabricRemoved once the store answers: %+v; want once, for fabric %d", next, seeded.FabricIndex)
 	}
 }

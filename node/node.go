@@ -948,7 +948,10 @@ func (n *Node) setAnnounced(fabricIndex uint8, known bool) bool {
 // R2-P2-comm-03. A removed fabric whose index the table holds again — its
 // event outlived a refused acknowledgement and the index was handed out
 // anew — is acknowledged without running anything: the new fabric's add
-// dropped what the node held for the index (observedFabricInstalled).
+// dropped what the node held for the index (observedFabricInstalled). The
+// removal runs only when the store answers that the index holds no fabric
+// ([store.ErrFabricNotFound]); a lookup that fails otherwise runs nothing
+// and leaves the event owed for the next start.
 //
 // For a reverted fabric — an UpdateNOC that no CommissioningComplete
 // committed — the node runs what the rollback at run time runs through
@@ -980,9 +983,16 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 		switch ev.Kind {
 		case store.FabricPendingAdd:
 			removed[idx] = true
-			if _, err := n.st.GetFabric(ctx, idx); err == nil {
+			_, err := n.st.GetFabric(ctx, idx)
+			if err == nil {
 				n.logger.Warn("fabric.owed_removal.superseded", slog.Int("fabric_index", int(idx)))
 				break
+			}
+			if !errors.Is(err, store.ErrFabricNotFound) {
+				// The store could not say whether the index is free: the
+				// removal waits, owed, for the next start.
+				n.logger.Warn("fabric.owed_removal.lookup_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+				continue
 			}
 			n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(idx)))
 			n.fabricRemovedWith(ctx, fabricInfoOf(ev.Fabric))
