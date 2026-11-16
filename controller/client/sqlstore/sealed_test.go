@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	onboardingCluster = 0xFFFF_FFFC // controller/client onboarding.go
-	icdCluster        = 0xFFFF_FFFD // controller/client icd.go
+	onboardingCluster uint32 = 0xFFFF_FFFC // controller/client onboarding.go
+	icdCluster        uint32 = 0xFFFF_FFFD // controller/client icd.go
 )
 
 func sealerOf(t *testing.T, b byte) store.Sealer {
@@ -69,6 +69,9 @@ func TestSealedStoreSealsTheSecretValues(t *testing.T) {
 	if err := s.Save("n", 0, icdCluster, map[uint32][]byte{0: key, 1: pending, 2: {0x07}}, nil); err != nil {
 		t.Fatal(err)
 	}
+	if err := s.Save("n", 0, 0x0006, map[uint32][]byte{0: {0x08}}, nil); err != nil { // an attribute value
+		t.Fatal(err)
+	}
 	rows, err := db.QueryContext(ctx, `SELECT cluster, attribute, value, sealed FROM matter_client_values`)
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +98,9 @@ func TestSealedStoreSealsTheSecretValues(t *testing.T) {
 	}
 	if got := value(t, s, onboardingCluster, 0); !bytes.Equal(got, code) {
 		t.Errorf("the code reads back as %q", got)
+	}
+	if got := value(t, s, 0x0006, 0); !bytes.Equal(got, []byte{0x08}) {
+		t.Errorf("the attribute value reads back as %x", got)
 	}
 
 	again, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7))
@@ -200,5 +206,67 @@ func TestSealedValuesNameTheirSource(t *testing.T) {
 				t.Errorf("controller/client/%s no longer declares %q: update sqlstore's secret values", file, d)
 			}
 		}
+	}
+}
+
+// refusingSealer fails every Seal and Open.
+type refusingSealer struct{}
+
+var errRefused = errors.New("sealer refused")
+
+func (refusingSealer) Seal([]byte, []byte) ([]byte, error) { return nil, errRefused }
+func (refusingSealer) Open([]byte, []byte) ([]byte, error) { return nil, errRefused }
+
+// TestSealedStoreErrors: NewSealed refuses a nil sealer and a database it
+// cannot read; a Seal that fails leaves the clear values as they were on
+// the way in and fails a Save of a secret value with nothing written;
+// Upgrade leaves a database without the tables alone and reports one it
+// cannot read.
+func TestSealedStoreErrors(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	if _, err := sqlstore.NewSealed(ctx, openTestDB(t), nil); err == nil {
+		t.Error("NewSealed with a nil sealer")
+	}
+
+	db := openTestDB(t)
+	if err := sqlstore.New(db).Save("n", 0, icdCluster, map[uint32][]byte{0: {1, 2}, 4: {3}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sqlstore.NewSealed(ctx, db, refusingSealer{}); !errors.Is(err, errRefused) {
+		t.Errorf("NewSealed whose Seal fails: %v, want the sealer's error", err)
+	}
+	if got := value(t, sqlstore.New(db), icdCluster, 0); !bytes.Equal(got, []byte{1, 2}) {
+		t.Errorf("the clear key after a failed sealing: %x, want it unchanged", got)
+	}
+
+	s, err := sqlstore.NewSealed(ctx, openTestDB(t), sealerOf(t, 7))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	failing, err := sqlstore.NewSealed(ctx, openTestDB(t), refusingSealer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := failing.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X"), 1: {4}}, nil); !errors.Is(err, errRefused) {
+		t.Errorf("Save whose Seal fails: %v, want the sealer's error", err)
+	}
+	if eps, err := failing.Load("n"); err != nil || len(eps) != 0 {
+		t.Errorf("after the failed Save: %+v, %v; want nothing written", eps, err)
+	}
+
+	if err := sqlstore.Upgrade(ctx, openEmptyDB(t)); err != nil {
+		t.Errorf("Upgrade of a database without the tables: %v", err)
+	}
+	closed := openTestDB(t)
+	_ = closed.Close()
+	if err := sqlstore.Upgrade(ctx, closed); err == nil {
+		t.Error("Upgrade on a closed database")
+	}
+	if _, err := sqlstore.NewSealed(ctx, closed, sealerOf(t, 7)); err == nil {
+		t.Error("NewSealed on a closed database")
 	}
 }
