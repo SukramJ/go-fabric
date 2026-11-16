@@ -40,8 +40,14 @@ type commitKey struct{}
 // or through another server's write — joins it, as matter.js's
 // transaction re-enters a resource it holds (ResourceSet.ts:87-89); a
 // wait that would close a cycle of windows is refused ([errWriteCycle])
-// instead, as matter.js detects the deadlock and throws (ResourceSet.ts:69,
-// :146). A change listener is told after the window is released, so one
+// instead, as matter.js detects the deadlock (ResourceSet.ts:69, :146);
+// the answer differs — matter.js fails the whole request with one status,
+// this module the path's attribute data, as for every non-status error
+// (notes/parity/by_design.md). The cycle check follows one nested write
+// per commit: a Sink that runs two nested writes at once is not covered.
+// A Sink that writes its own server with a ctx that does not carry the
+// one it was handed waits for its own window and ends only with that
+// ctx. A change listener is told after the window is released, so one
 // that writes the server again does not wait for it.
 type writeCommit struct {
 	server *Server

@@ -419,10 +419,26 @@ func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any
 		changed, _, err := s.writeIn(ctx, attrID, value, nil)
 		return changed, err
 	}
+	settled := false
+	defer func() {
+		if settled {
+			return
+		}
+		// A panicking veto or Sink: what a Set changed meanwhile stays
+		// changed, so it advances the version once and is told before the
+		// panic goes on.
+		if len(c.changed) > 0 {
+			s.tracker().Bump()
+		}
+		for _, notify := range c.notifies {
+			notify()
+		}
+	}()
 	changed, wrote, err := func() ([]uint32, bool, error) {
 		defer s.leaveWindow(c)
 		return s.writeIn(context.WithValue(ctx, commitKey{}, c), attrID, value, c)
 	}()
+	settled = true
 	// What a Set inside the window changed is told now, after the window
 	// is released and the version advanced, so a listener that writes the
 	// server again does not wait for the window it was told from.

@@ -8,6 +8,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/contract"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 )
@@ -129,5 +131,49 @@ func TestWriteCommitNamesTheSiblingItsSinkMoves(t *testing.T) {
 	}
 	if d := srv.MatterDataVersion() - v0; d != 1 {
 		t.Errorf("the version advanced %d times for one write, want once", d)
+	}
+}
+
+type panickingSiblingSink struct{ srv *spec.Server }
+
+func (k *panickingSiblingSink) MatterWriteAttribute(_ context.Context, attrID uint32, _ any) error {
+	if attrID != hepa.AttrLastChangedTime {
+		return nil
+	}
+	if err := k.srv.Set(hepa.AttrCondition, uint8(7)); err != nil {
+		return err
+	}
+	panic("sink fails after it moved a sibling")
+}
+
+// TestWriteCommitSettlesWhenTheSinkPanics (review II, Fable read
+// 5b-write T3): a Sink that sets a sibling and then panics leaves the
+// sibling changed — the version advances once and the change listener
+// is told before the panic goes on.
+func TestWriteCommitSettlesWhenTheSinkPanics(t *testing.T) {
+	t.Parallel()
+	sk := &panickingSiblingSink{}
+	srv := hepaServer(t, spec.ServerConfig{Sink: sk})
+	sk.srv = srv
+	var told []uint32
+	srv.OnAttributeChange(func(ch contract.Change) { told = append(told, ch.Attributes...) })
+	v0 := srv.MatterDataVersion()
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = srv.MatterWriteCommit(context.Background(), hepa.AttrLastChangedTime, uint64(1000))
+	}()
+	if d := srv.MatterDataVersion() - v0; d != 1 {
+		t.Errorf("the version advanced %d times, want once", d)
+	}
+	if !slices.Contains(told, hepa.AttrCondition) {
+		t.Errorf("the listener was told %v, want the sibling", told)
+	}
+	// The window is open again: a Set outside any write advances.
+	v1 := srv.MatterDataVersion()
+	if err := srv.Set(hepa.AttrCondition, uint8(9)); err != nil {
+		t.Fatal(err)
+	}
+	if srv.MatterDataVersion() == v1 {
+		t.Error("a Set after the panic advanced no version: the window stayed open")
 	}
 }
