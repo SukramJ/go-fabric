@@ -283,7 +283,14 @@ func encodeExtensionFieldSetsTLV(enc *tlv.Encoder, sets []mattercore.ExtensionFi
 		for _, p := range s.AttributeValueList {
 			enc.StartStruct(tlv.AnonymousTag())
 			enc.PutUint(tlv.ContextTag(0), uint64(p.AttributeID))
-			enc.PutUint(tlv.ContextTag(p.Tag), p.Unsigned)
+			// The signed variants (tags 2, 4, 6, 8) carry the value's raw
+			// bits in Unsigned, as the decoder keeps them; they go out as
+			// a signed integer (R2-P6-wire-0449).
+			if p.Tag >= 2 && p.Tag%2 == 0 {
+				enc.PutInt(tlv.ContextTag(p.Tag), int64(p.Unsigned)) //nolint:gosec // the raw bits
+			} else {
+				enc.PutUint(tlv.ContextTag(p.Tag), p.Unsigned)
+			}
 			_ = enc.EndContainer()
 		}
 		_ = enc.EndContainer()
