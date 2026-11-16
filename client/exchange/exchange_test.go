@@ -98,7 +98,8 @@ func TestUnsolicitedMessageWithoutAckIsDropped(t *testing.T) {
 
 // TestSendWaitsForAckAndPiggybacksOwedAck: Send returns once the peer
 // acknowledged; the acknowledgement owed for a received message rides on
-// the next send (MessageExchange.ts:679-686) and no standalone ack goes out.
+// the next send (MessageExchange.ts:711-716 at db021da0) and no standalone
+// ack goes out.
 func TestSendWaitsForAckAndPiggybacksOwedAck(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
