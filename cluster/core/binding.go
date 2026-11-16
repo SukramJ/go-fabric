@@ -40,6 +40,8 @@ type Binding struct {
 	mu       sync.RWMutex
 	bindings []TargetStruct
 	save     func([]TargetStruct) error
+	// fabrics is BindingConfig.Fabrics; writeMu guards it with save.
+	fabrics FabricSource
 
 	// obsMu guards observers.
 	obsMu     sync.Mutex
@@ -172,6 +174,12 @@ type BindingConfig struct {
 	// Save stores the list after a change; nil stores nothing. A write
 	// whose Save fails is refused and changes nothing.
 	Save func([]TargetStruct) error
+	// Fabrics is the node's fabric list, the source AccessControl checks
+	// a write's fabric against ([FabricSource]; the node passes its
+	// store). A persisted list (Save set) takes a request's write only for
+	// a fabric it lists, and refuses every request write without it —
+	// fail closed (review II, R2-P6-store-1010, decision 158).
+	Fabrics FabricSource
 }
 
 // Persist restores the list cfg.Load returns and saves every later change
@@ -194,6 +202,7 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 		}
 	}
 	b.save = cfg.Save
+	b.fabrics = cfg.Fabrics
 	b.mu.Lock()
 	before := b.bindings
 	if stored != nil {
@@ -412,6 +421,11 @@ func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value a
 		origin = contract.OriginControllerWrite // a local writer writes as a controller does
 	}
 	return b.replace(origin, func(before []TargetStruct) ([]TargetStruct, error) {
+		if request {
+			if err := b.fabricGoneLocked(ctx, fabric); err != nil {
+				return nil, err
+			}
+		}
 		after := list
 		if request {
 			held := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex != fabric })
@@ -631,6 +645,30 @@ func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, er
 // errBindingWriteRefused is the sentinel of a written value the definition
 // refused.
 var errBindingWriteRefused = errors.New("core: Binding write refused")
+
+// fabricGoneLocked refuses a request's write of fabric to a persisted
+// list when the node's fabric list does not hold the fabric — removed
+// while the write was on its way, its removal's clear already run — or
+// when no fabric source was given or it cannot list (fail closed): the
+// write would otherwise be stored under a removed index (review II,
+// R2-P6-store-1010, decision 158). A list that is not persisted stores
+// nothing and is not checked. writeMu is held.
+func (b *Binding) fabricGoneLocked(ctx context.Context, fabric uint8) error {
+	if b.save == nil {
+		return nil
+	}
+	if b.fabrics == nil {
+		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: "core: Binding: no fabric source to check the write's fabric against"}
+	}
+	listed, err := fabricListed(ctx, b.fabrics, fabric)
+	if err != nil {
+		return bindingStatusError{code: im.StatusFailure, msg: fmt.Sprintf("core: Binding: list fabrics: %v", err)}
+	}
+	if !listed {
+		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: fmt.Sprintf("core: Binding write for fabric %d, which no longer exists", fabric)}
+	}
+	return nil
+}
 
 // bindingStatusError is a Binding refusal with the IM status matter.js
 // answers.

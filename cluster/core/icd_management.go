@@ -1093,6 +1093,21 @@ func (s *ICDManagement) registerClient(ctx context.Context, req icddef.RegisterC
 		fabricIndex: fabric, checkInNodeID: req.CheckInNodeId, monitoredSubject: req.MonitoredSubject,
 		clientType: req.ClientType, key: slices.Clone(req.Key),
 	}
+	// The fabric is checked against the node's fabric list (the store's,
+	// the source AccessControl uses) before anything is stored: a fabric
+	// removed while the command was on its way stores no registration
+	// under its index; a list that cannot be read refuses (fail closed).
+	// Without a store nothing is stored (review II, R2-P6-store-1010,
+	// decision 158).
+	if st := s.cfg.Store; st != nil {
+		listed, err := fabricListed(ctx, st, fabric)
+		if err != nil {
+			return icddef.RegisterClientResponse{}, spec.Errorf(im.StatusFailure, "core: ICD: list fabrics: %v", err)
+		}
+		if !listed {
+			return icddef.RegisterClientResponse{}, spec.Errorf(im.StatusUnsupportedAccess, "core: ICD registration for fabric %d, which no longer exists", fabric)
+		}
+	}
 	s.mu.Lock()
 	next := slices.Clone(s.clients)
 	if idx < 0 {

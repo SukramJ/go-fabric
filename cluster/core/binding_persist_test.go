@@ -45,8 +45,11 @@ func (s *bindingStore) stored() []core.TargetStruct {
 	return slices.Clone(s.list)
 }
 
+// config persists through s; the node's fabric list holds fabrics 1 to 4
+// (a persisted Binding takes a request's write only for a listed fabric,
+// R2-P6-store-1010).
 func (s *bindingStore) config() core.BindingConfig {
-	return core.BindingConfig{Load: s.load, Save: s.save}
+	return core.BindingConfig{Load: s.load, Save: s.save, Fabrics: fabricList{1, 2, 3, 4}}
 }
 
 // TestBindingPersist: a write is saved, a new server restores it before
