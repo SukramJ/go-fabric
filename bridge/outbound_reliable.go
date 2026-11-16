@@ -358,6 +358,13 @@ const unsecuredEntryLifetime = 60 * time.Second
 // intervals it stated (up to a uint32 of milliseconds), for as long as the
 // session lives, in memory of the whole node (review II, R2-P6-bound-0303).
 //
+// One message awaiting its acknowledgement per exchange is matter.js's rule,
+// but matter.js refuses the new message (MessageExchange.ts:701-705 at
+// db021da0) where this table lets it take the older one's place: the
+// supersede is this module's own. A bridge path relies on it — the
+// SubscribeResponse that follows the priming report when the peer's
+// StatusResponse does not acknowledge that report.
+//
 // The number is matter.js's: at most 30 non-closed exchanges per secure
 // session, the least recently active closed beyond it
 // (packages/protocol/src/protocol/ExchangeManager.ts:63, :578-595 at

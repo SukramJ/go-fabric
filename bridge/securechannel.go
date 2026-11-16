@@ -790,12 +790,11 @@ func (b *Bridge) dispatchPase(
 	case mrp.SCOpcodePBKDFParamRequest:
 		claim := b.claimPase(key)
 		if claim == paseClaimRepeated {
-			// The handshake asks again on its live claim: a state
-			// refusal, acknowledged by the MRP layer and not answered;
-			// the claim's time is not renewed.
-			b.logger.Debug("matter.rx.sc.pase_request_repeated",
-				slog.String("src", srcString(src)),
-				slog.Int("exchange_id", int(proto.ExchangeID)))
+			// The handshake asks again on its live claim: an error of
+			// the pairing the claim accepted, which ends it and counts
+			// — not answered, acknowledged by the MRP layer
+			// ([Bridge.endRepeatedPairing]).
+			b.endRepeatedPairing(src, key)
 			return nil
 		}
 		if claim == paseClaimBusy {
@@ -930,9 +929,10 @@ const (
 // claimPase attempts to claim the single-active-PASE slot for the
 // handshake key, for a PBKDFParamRequest. The claim runs
 // [pasePairingTimeout] from the request that took it and is not renewed: a
-// further PBKDFParamRequest of the same handshake is refused as a state
-// error (acknowledged, not answered), so whoever keeps asking cannot hold
-// the slot past its time. A claim that ran out without its handshake ending
+// further PBKDFParamRequest of the same handshake is reported as
+// [paseClaimRepeated], which ends the pairing ([Bridge.endRepeatedPairing]),
+// so whoever keeps asking cannot hold the slot past its time. A claim that
+// ran out without its handshake ending
 // counts one PASE failure when the slot is taken again — by anybody, the
 // same initiator included — so twenty abandoned claims engage the lockout
 // twenty failed passcode attempts engage ([Bridge.recordPaseFailure]).
@@ -970,6 +970,26 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 		b.recordPaseFailure()
 	}
 	return paseClaimTaken
+}
+
+// endRepeatedPairing ends the PASE pairing of key after a further
+// PBKDFParamRequest arrived on it: one PASE failure is counted, the claim is
+// released, the handshake's replies are no longer retransmitted and its
+// hold on a connection ends; the request is acknowledged by the MRP layer
+// and not answered. matter.js's PASE server ignores a NEW exchange while a
+// pairing runs (PaseServer.ts:80-86 at db021da0), but a further
+// PBKDFParamRequest on the accepted exchange reaches its typed read of the
+// next message, is an unexpected message (SecureChannelMessenger.ts:95-98),
+// and the pairing's catch counts it and cancels the pairing (PaseServer.ts
+// :94-95); review II, R2-P6-sec-0304 (decision 65).
+func (b *Bridge) endRepeatedPairing(src net.Addr, key HandshakeKey) {
+	b.logger.Info("matter.rx.sc.pase_request_repeated",
+		slog.String("src", srcString(src)),
+		slog.Int("exchange_id", int(key.ExchangeID)))
+	b.recordPaseFailure()
+	b.releasePaseInFlight(key)
+	b.abandonHandshakeReplies(key)
+	b.releaseHandshake(src, key)
 }
 
 // paseSessionIDLister is the optional capability of a [SessionRegistry] to

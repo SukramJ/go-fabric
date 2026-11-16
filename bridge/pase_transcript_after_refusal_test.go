@@ -22,8 +22,8 @@ import (
 // claim, resolvePaseContinuation); the singleton handler of
 // AttachPaseHandler is handed every Pake1, so there the adapter is the
 // one that refuses it (R2-P5 Fable F3). A further PBKDFParamRequest of the
-// handshake no longer reaches the adapter: the router refuses it on the
-// handshake's live claim (TestPaseClaimRunsFromItsFirstRequest, review II
+// handshake ends the pairing at the router, counted, before it reaches the
+// adapter (TestRepeatedPBKDFParamRequestEndsThePairing, review II
 // R2-P6-sec-0304).
 func TestPaseRefusalEndsTheTranscript(t *testing.T) {
 	t.Parallel()
@@ -39,6 +39,7 @@ func TestPaseRefusalEndsTheTranscript(t *testing.T) {
 	badPake1 := spake2.EncodePake1(make([]byte, 10)) // wrong pA length
 	badPake3 := spake2.EncodePake3(make([]byte, 10)) // wrong cA length
 	request := buildTestPBKDFParamRequest(t, bytes.Repeat([]byte{0x22}, spake2.PBKDFRandomSize))
+	refusedRequest := buildTestPBKDFParamRequestPasscodeID(t, bytes.Repeat([]byte{0x22}, spake2.PBKDFRandomSize), 1)
 
 	type step struct {
 		opcode  uint8
@@ -52,6 +53,7 @@ func TestPaseRefusalEndsTheTranscript(t *testing.T) {
 	}{
 		{"singleton: a refused Pake1", false, []step{{mrp.SCOpcodePake1, badPake1}}, 1},
 		{"singleton: a refused Pake3", false, []step{{mrp.SCOpcodePake1, goodPake1}, {mrp.SCOpcodePake3, badPake3}}, 1},
+		{"singleton: a refused PBKDFParamRequest", false, []step{{mrp.SCOpcodePBKDFParamRequest, refusedRequest}}, 0},
 		{"singleton: a Pake3 without a Pake1", false, []step{{mrp.SCOpcodePake3, badPake3}}, 0},
 		{"provider: a refused Pake1", true, []step{{mrp.SCOpcodePake1, badPake1}}, 1},
 	} {
