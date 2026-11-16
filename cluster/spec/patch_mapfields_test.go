@@ -57,3 +57,42 @@ func TestSetReadsAMapFieldsTypeThroughItsMap(t *testing.T) {
 		t.Errorf("stored Beta %v, want the default 7 patched in", got.Beta)
 	}
 }
+
+// partialPatchProbe carries partialPatchStruct's field A only; its
+// spec.MapFields declaration leaves the optional B out.
+type partialPatchProbe struct{ Alpha uint8 }
+
+var partialPatchStruct = &spec.Struct{Name: "PartialProbeStruct", Fields: []spec.Field{
+	{ID: 0, Name: "A", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{ID: 1, Name: "B", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Default: float64(7)},
+}}
+
+func init() {
+	spec.MapFields[partialPatchProbe](partialPatchStruct, spec.FieldMap{"A": "Alpha"})
+}
+
+// TestSetSkipsAFieldTheMapLeavesOut: a definition field a MapFields
+// declaration maps to no Go field is neither a property the patch demands
+// nor one it fills — the value is stored as the host handed it (review
+// II, R2-P6-api-1314).
+func TestSetSkipsAFieldTheMapLeavesOut(t *testing.T) {
+	t.Parallel()
+	rw := spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate}
+	def := &spec.Cluster{
+		ID: 0xFFF1FC0C, Name: "PartialProbe", Revision: 1,
+		Attributes: []spec.Attribute{{
+			ID: 0, Name: "C", Type: spec.Type{Name: "PartialProbeStruct", Kind: spec.KindStruct, Struct: partialPatchStruct},
+			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Access: rw,
+		}},
+	}
+	srv, err := spec.NewServer(def, spec.Options{}, spec.ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Set(0, partialPatchProbe{Alpha: 3}); err != nil {
+		t.Fatalf("Set of a partially mapped value: %v, want nil", err)
+	}
+	if v, _ := srv.Value(0); v != (partialPatchProbe{Alpha: 3}) {
+		t.Errorf("stored %#v, want partialPatchProbe{Alpha: 3}", v)
+	}
+}

@@ -8,7 +8,9 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	"github.com/SukramJ/go-fabric/contract"
@@ -69,5 +71,55 @@ func TestMarkChangedInsideAWriteJoinsItsCommit(t *testing.T) {
 	}
 	if d := srv.MatterDataVersion() - v1; d != 1 {
 		t.Errorf("MarkChanged outside a write advanced the version %d times, want 1", d)
+	}
+}
+
+// TestMarkQuietChangedInsideAWriteJoinsItsCommit holds MarkQuietChanged to
+// the same open commit as MarkChanged: called from a write's Sink, the
+// quieter attribute's change listeners are told once the write left its
+// window, not inside it (review II, R2-P6-conc-1308).
+func TestMarkQuietChangedInsideAWriteJoinsItsCommit(t *testing.T) {
+	t.Parallel()
+	u8 := spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}
+	m := spec.Conformance{Text: "M", Op: spec.ConfMandatory}
+	def := &spec.Cluster{
+		ID: 0xFFF1FC0D, Name: "QuietProbe", Revision: 1,
+		Attributes: []spec.Attribute{
+			{ID: 0, Name: "Written", Type: u8, Conformance: m, Access: spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate}},
+			{ID: 1, Name: "Computed", Type: u8, Conformance: m, Access: spec.Access{RW: "R", Read: spec.PrivilegeView}, Quality: spec.Quality{Quieter: true}, QuietInterval: time.Second},
+		},
+	}
+	sink := &funcSink{}
+	srv, err := spec.NewServer(def, spec.Options{}, spec.ServerConfig{Sink: sink, Clock: clocktest.New(time.Unix(1_700_000_000, 0))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var (
+		mu   sync.Mutex
+		told []uint32
+	)
+	srv.OnAttributeChange(func(c contract.Change) {
+		mu.Lock()
+		told = append(told, c.Attributes...)
+		mu.Unlock()
+	})
+	sink.fn = func(context.Context, uint32, any) error {
+		if err := srv.MarkQuietChanged(1); err != nil {
+			t.Errorf("MarkQuietChanged inside the Sink: %v", err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if slices.Contains(told, 1) {
+			t.Errorf("inside the Sink %v was already told, want nothing before the write left its window", told)
+		}
+		return nil
+	}
+	if _, err := srv.MatterWriteCommit(context.Background(), 0, uint8(5)); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Contains(told, 1) {
+		t.Errorf("told %v, want the quieter attribute once the write left its window", told)
 	}
 }
