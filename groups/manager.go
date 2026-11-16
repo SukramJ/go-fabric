@@ -515,11 +515,26 @@ func (m *Manager) loadAll(ctx context.Context, paced bool) error {
 		return fmt.Errorf("groups: list fabrics: %w", err)
 	}
 	listed := make(map[uint8]bool, len(recs))
+	var failed []error
 	for i := range recs {
-		listed[recs[i].FabricIndex] = true
-		if _, err := m.fabricStore(ctx, recs[i].FabricIndex); err != nil {
-			return err
+		idx := recs[i].FabricIndex
+		listed[idx] = true
+		if _, err := m.fabricStore(ctx, idx); err != nil {
+			// The fabric the store cannot read stays absent and owed —
+			// tried again on its own, paced, as a fabric ForgetFabric
+			// dropped is — and the others load and serve (review II,
+			// R2-P6-fsm-0315).
+			m.logger.Warn("groups.load_failed",
+				slog.Int("fabric_index", int(idx)),
+				slog.Any("err", err))
+			m.mu.Lock()
+			m.owed[idx] = true
+			m.mu.Unlock()
+			failed = append(failed, err)
 		}
+	}
+	if len(failed) > 0 {
+		m.noteOwedResult(errors.Join(failed...))
 	}
 	m.mu.Lock()
 	m.allLoaded = true

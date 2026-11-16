@@ -32,7 +32,7 @@ type memStore struct {
 	failGet  error
 	// failGetOf makes GetFabric fail for the fabrics it names.
 	failGetOf map[uint8]error
-	getCalls int // GetFabric calls
+	getCalls  int // GetFabric calls
 	// meta is the matter_metadata counter table; failMeta / failMetaSet
 	// make its reads / writes fail.
 	meta        map[string]uint64
