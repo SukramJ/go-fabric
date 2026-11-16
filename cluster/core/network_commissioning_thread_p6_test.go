@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
@@ -103,24 +104,26 @@ func TestThreadConnectOutlivesFailSafe(t *testing.T) {
 // reads the server from the write returns (review II, R2-P6-conc-1011).
 func TestThreadBreadcrumbListenerMayReadTheServer(t *testing.T) {
 	t.Parallel()
-	sim := &simBorderRouter{}
-	n, err := NewThreadNetworkCommissioning(context.Background(), ThreadNetworkCommissioningConfig{
-		BorderRouter: sim, IsFailSafeArmed: func() bool { return true },
+	synctest.Test(t, func(t *testing.T) {
+		sim := &simBorderRouter{}
+		n, err := NewThreadNetworkCommissioning(context.Background(), ThreadNetworkCommissioningConfig{
+			BorderRouter: sim, IsFailSafeArmed: func() bool { return true },
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		n.AttachFailSafe(nil, func(uint64) { n.MatterRead(netcommAttrNetworks) })
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, _ = n.MatterInvoke(context.Background(), netcommdef.CmdAddOrUpdateThreadNetwork, netcommdef.AddOrUpdateThreadNetworkRequest{OperationalDataset: threadDataset, Breadcrumb: bc(3)})
+		}()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatal("AddOrUpdateThreadNetwork did not return: the Breadcrumb listener's read waits for the server's lock")
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	n.AttachFailSafe(nil, func(uint64) { n.MatterRead(netcommAttrNetworks) })
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		_, _ = n.MatterInvoke(context.Background(), netcommdef.CmdAddOrUpdateThreadNetwork, netcommdef.AddOrUpdateThreadNetworkRequest{OperationalDataset: threadDataset, Breadcrumb: bc(3)})
-	}()
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		t.Fatal("AddOrUpdateThreadNetwork did not return: the Breadcrumb listener's read waits for the server's lock")
-	}
 }
 
 // Two ConnectNetworks at once: the second is Busy, as the check and the

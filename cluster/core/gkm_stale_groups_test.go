@@ -6,6 +6,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -112,21 +113,34 @@ func TestGKMKeySetWriteNullKeyWithAStartTimeIsInvalidCommand(t *testing.T) {
 	}
 }
 
-// gatedListStore holds the first ListGroupKeySets until a second one
-// enters or a short wait passes.
+// gatedListStore reads the first ListGroupKeySets and then holds its
+// answer until a second one enters or the other writer has had gateYields
+// turns of the scheduler: a window counted in scheduling turns, not on the
+// wall clock. The answer is read before the hold, so a second writer that
+// is not kept out stores its key set while the first holds a list without
+// it.
 type gatedListStore struct {
 	*fakeStore
 	calls   atomic.Int32
 	entered chan struct{}
 }
 
+// gateYields bounds gatedListStore's hold.
+const gateYields = 10_000
+
 func (s *gatedListStore) ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]mstore.GroupKeySet, error) {
 	switch s.calls.Add(1) {
 	case 1:
-		select {
-		case <-s.entered:
-		case <-time.After(300 * time.Millisecond):
+		sets, err := s.fakeStore.ListGroupKeySets(ctx, fabricIndex)
+		for range gateYields {
+			select {
+			case <-s.entered:
+				return sets, err
+			default:
+				runtime.Gosched()
+			}
 		}
+		return sets, err
 	case 2:
 		close(s.entered)
 	}
