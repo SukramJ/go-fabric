@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18789,
+    "total_exported": 18791,
     "reachable": 12621,
-    "whitelisted": 6168,
+    "whitelisted": 6170,
     "unreachable": 0
   },
   "by_package": [],
@@ -25035,14 +25035,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1022
+      "line": 1055
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1018
+      "line": 1051
     },
     {
       "package": "controller",
@@ -25127,6 +25127,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/operational_port_parity_matterjs_test.go",
       "line": 40
+    },
+    {
+      "package": "controller",
+      "identifier": "TestSealerSealsTheControllersStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/sealer_internal_test.go",
+      "line": 47
     },
     {
       "package": "controller",
@@ -27808,6 +27815,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
       "line": 396
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAttestedPairWithheld",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/attested_pair_internal_test.go",
+      "line": 17
     },
     {
       "package": "controller/commissioner",
