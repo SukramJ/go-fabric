@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
@@ -267,5 +268,81 @@ func TestGKMFailedReloadAfterARemovalFailsClosed(t *testing.T) {
 	_, _ = gkm.MatterInvoke(fabricCtx(2), 0x04, nil)
 	if got := gkm.StaleGroupFabrics(); len(got) != 0 {
 		t.Errorf("stale fabrics after the fabric's removal: %v, want none", got)
+	}
+}
+
+// countingReloadStore fails the group state's key-set read while fail is
+// set and counts the failed reads.
+type countingReloadStore struct {
+	*fakeStore
+	fail   atomic.Bool
+	failed atomic.Int32
+}
+
+func (s *countingReloadStore) ListGroupKeySets(ctx context.Context, fabricIndex uint8) ([]mstore.GroupKeySet, error) {
+	if s.fail.Load() {
+		s.failed.Add(1)
+		return nil, errors.New("injected reload failure")
+	}
+	return s.fakeStore.ListGroupKeySets(ctx, fabricIndex)
+}
+
+// A stale group state is reloaded on the clock, not only by the next
+// GroupKeyManagement command: after 1 s, then with the wait doubled per
+// failed retry; the reload that succeeds unmarks the fabric and the group
+// state serves the stored keys; MatterQuiesce disarms the retry (review
+// II, R2-P6-err-1701 R2-1).
+func TestGKMStaleGroupStateIsRetriedOnTheClock(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	fs := newFakeStore()
+	if _, err := fs.AddFabric(ctx, mstore.FabricRecord{FabricID: 0xA}); err != nil {
+		t.Fatal(err)
+	}
+	mgrStore := &countingReloadStore{fakeStore: fs}
+	mgr, err := groups.NewManager(mgrStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gkm, err := core.NewGroupKeyManagement(fs, core.GroupKeyMgmtConfig{Groups: mgr, Clock: clk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gkm.MatterWrite(fabricCtx(1), 0x0000, []core.GroupKeyMapStruct{{GroupID: 5, GroupKeySetID: 7}}); err != nil {
+		t.Fatal(err)
+	}
+	mgrStore.fail.Store(true)
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(7)); err != nil {
+		t.Fatalf("KeySetWrite the store took: %v", err)
+	}
+	attempts := mgrStore.failed.Load()
+	clk.Advance(time.Second)
+	if got := mgrStore.failed.Load(); got <= attempts {
+		t.Fatal("no retry after 1 s")
+	}
+	attempts = mgrStore.failed.Load()
+	clk.Advance(time.Second)
+	if got := mgrStore.failed.Load(); got != attempts {
+		t.Errorf("a retry 1 s after the first; want the wait doubled to 2 s")
+	}
+	mgrStore.fail.Store(false)
+	clk.Advance(time.Second)
+	if got := gkm.StaleGroupFabrics(); len(got) != 0 {
+		t.Fatalf("stale fabrics after the retry that could read: %v", got)
+	}
+	if ok, err := mgr.HasUsableKey(ctx, 1, 5); !ok || err != nil {
+		t.Errorf("group 5 after the retry: usable key %v, %v; want the stored key set 7", ok, err)
+	}
+	// Quiesced: no retry runs.
+	mgrStore.fail.Store(true)
+	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(8)); err != nil {
+		t.Fatal(err)
+	}
+	gkm.MatterQuiesce()
+	attempts = mgrStore.failed.Load()
+	clk.Advance(time.Hour)
+	if got := mgrStore.failed.Load(); got != attempts {
+		t.Errorf("%d reloads after MatterQuiesce, want none", got-attempts)
 	}
 }

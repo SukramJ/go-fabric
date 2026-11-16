@@ -10,7 +10,9 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
@@ -60,9 +62,19 @@ type GroupKeyManagement struct {
 	maxGroupsPerFabric    uint16
 	maxGroupKeysPerFabric uint16
 	// staleGroups are the fabrics whose operational group state a reload
-	// could not refresh after a stored change (syncGroups); each later
-	// command or write of the server reloads them again.
+	// could not refresh after a stored change (syncGroups); the retry on
+	// the clock and each later command or write of the server reload them
+	// again. retryTimer is the armed retry (nil while none), retryDelay the
+	// wait of the next one.
 	staleGroups map[uint8]bool
+	retryTimer  clock.Timer
+	retryDelay  time.Duration
+	clk         clock.Clock
+	// reloadMu serialises reloadGroups: a failed reload's forget never
+	// lands after a concurrent reload that succeeded and found nothing
+	// stale to re-announce (review II, R2-P6-err-1701 R2-a). It is taken
+	// before mu, never under it.
+	reloadMu sync.Mutex
 
 	// logger receives the server's diagnostics (GroupKeyMgmtConfig.Logger).
 	logger *slog.Logger
@@ -157,7 +169,19 @@ type GroupKeyMgmtConfig struct {
 	Groups *groups.Manager
 	// Logger receives the server's diagnostics; nil uses slog.Default().
 	Logger *slog.Logger
+	// Clock runs the retry of a group state whose reload failed
+	// (staleRetryFirst, doubling up to staleRetryMax); nil is
+	// [clock.System].
+	Clock clock.Clock
 }
+
+// The retry of a fabric's group state after a reload failed: the first
+// after staleRetryFirst, each next one doubled up to staleRetryMax, while
+// any fabric is marked stale (review II, R2-P6-err-1701 R2-1).
+const (
+	staleRetryFirst = time.Second
+	staleRetryMax   = time.Minute
+)
 
 // matter.js defaults — see GroupKeyManagementServer.ts:613-614 at db021da0 (the
 // server overrides the schema minimums: maxGroupKeysPerFabric = 20,
@@ -188,6 +212,7 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 		maxGroupsPerFabric:    cfg.MaxGroupsPerFabric,
 		maxGroupKeysPerFabric: cfg.MaxGroupKeysPerFabric,
 		logger:                logger,
+		clk:                   clock.Or(cfg.Clock),
 	}
 	// Seed DataVersion at a non-zero sentinel on construction so
 	// DataVersionFilter=0 does not produce a false-positive cache hit on
@@ -285,23 +310,34 @@ func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) {
 
 // reloadGroups reloads fabric's operational group state. A reload that
 // fails leaves the fabric marked stale and fails closed: the fabric's
-// group state — its keys among them — leaves the manager at once
-// (groups.Manager.ForgetFabric), so a key set the store no longer holds
-// stops authenticating group messages, whether or not the next reload
-// succeeds; the manager loads the fabric from the store again on its next
-// use (review II, R2-P6-err-1701 R-1). The reload that succeeds after a
-// stale mark re-announces the memberships the forget withdrew
-// (groups.Manager.Load). A fabric the store no longer holds is unmarked:
-// its removal took its group state.
+// group state leaves the manager at once (groups.Manager.ForgetFabric) —
+// its keys, so a key set the store no longer holds stops authenticating
+// group messages whether or not the next reload succeeds, and the
+// reception state of every key of the fabric, the surviving key sets'
+// too, so their senders re-synchronise on the first counter seen, as
+// after a restart. The manager loads the fabric from the store again on
+// its next use, and the retry on the clock (armRetryLocked) reloads it
+// until a reload succeeds (review II, R2-P6-err-1701 R-1, R2-1). The
+// reload that succeeds after a stale mark re-announces the memberships
+// the forget withdrew (groups.Manager.Load). A fabric the store no longer
+// holds is unmarked and forgotten as well. Serialised by reloadMu.
 func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
+	g.reloadMu.Lock()
+	defer g.reloadMu.Unlock()
 	err := g.groups.Reload(ctx, fabric)
 	g.mu.Lock()
 	was := g.staleGroups[fabric]
 	switch {
 	case err == nil, errors.Is(err, groups.ErrNoFabric):
 		delete(g.staleGroups, fabric)
+		if len(g.staleGroups) == 0 {
+			g.stopRetryLocked()
+		}
 		g.mu.Unlock()
-		if err == nil && was {
+		switch {
+		case err != nil:
+			g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
+		case was:
 			if lerr := g.groups.Load(ctx); lerr != nil {
 				g.logger.Warn("matter.group_key_management.group_state_reannounce_failed",
 					slog.Int("fabric_index", int(fabric)), slog.Any("err", lerr))
@@ -313,10 +349,53 @@ func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
 		g.staleGroups = map[uint8]bool{}
 	}
 	g.staleGroups[fabric] = true
+	g.armRetryLocked()
 	g.mu.Unlock()
 	g.logger.Warn("matter.group_key_management.group_state_stale",
 		slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
 	g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
+}
+
+// armRetryLocked arms the retry of the stale fabrics unless one is armed:
+// after staleRetryFirst, then doubled per failed retry up to staleRetryMax.
+// g.mu is held.
+func (g *GroupKeyManagement) armRetryLocked() {
+	if g.retryTimer != nil {
+		return
+	}
+	if g.retryDelay == 0 {
+		g.retryDelay = staleRetryFirst
+	}
+	g.retryTimer = g.clk.AfterFunc(g.retryDelay, g.retryStale)
+}
+
+// stopRetryLocked disarms the retry and resets its backoff. g.mu is held.
+func (g *GroupKeyManagement) stopRetryLocked() {
+	if g.retryTimer != nil {
+		g.retryTimer.Stop()
+		g.retryTimer = nil
+	}
+	g.retryDelay = 0
+}
+
+// retryStale is the retry on the clock: it reloads every stale fabric and,
+// while one stays stale, arms the next retry with the doubled wait.
+func (g *GroupKeyManagement) retryStale() {
+	g.mu.Lock()
+	g.retryTimer = nil
+	// A reload that fails again arms the next retry with the doubled wait.
+	g.retryDelay = min(2*g.retryDelay, staleRetryMax)
+	g.mu.Unlock()
+	g.reloadStale(context.Background())
+}
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: the retry of a
+// stale group state is disarmed. The stale marks stay; the server's next
+// command or write reloads them and arms the retry again when that fails.
+func (g *GroupKeyManagement) MatterQuiesce() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.stopRetryLocked()
 }
 
 // reloadStale reloads every fabric syncGroups marked stale.

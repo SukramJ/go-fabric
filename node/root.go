@@ -268,6 +268,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		MaxGroupKeysPerFabric: cfg.Limits.MaxGroupKeysPerFabric,
 		Groups:                d.groups,
 		Logger:                d.logger,
+		Clock:                 cfg.Clock,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("group key management: %w", err)
