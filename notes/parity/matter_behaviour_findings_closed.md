@@ -339,6 +339,40 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   the embedding layer.)
   Closed 2026-11-16 (review II, phase 5b): joined F-db021da0-21 of [`matter_behaviour_findings.md`](./matter_behaviour_findings.md), which states both sibling couplings at `db021da0`.
 
+- **A closed PASE session does not resume the commissionable broadcast on
+  the responder.** matter.js's `sessions.deleted` observer restarts the
+  commissioning advertisement with "startup" when a PASE session closes
+  while the node is in commissioning mode (`DeviceAdvertiser.ts:152-161`,
+  `:248-260` at `862ad75f`). The operational manager fires its reannounce
+  trigger with fabric index 0 for a PASE victim; on an advertiser with the
+  broadcast events (`mdns.Responder`) the bridge starts no event for it
+  (`bridge/securechannel.go`, `triggerSessionReannounce`), and only the
+  `TriggerReannounce` and per-record fallbacks re-announce the
+  commissionable record. Fix: on index 0, start the responder's
+  "startup" schedule for the active commissionable service (issue #362).
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): fixed by `8feaa508` — the session registry's PASE close hook starts the round (`secure/operational/manager.go`, wired in `bridge/securechannel.go`, `triggerCommissioningReannounce`).
+- **A closed PASE session does not restart the commissioning
+  advertisement.** The device keeps its commissionable record during PASE
+  and publishes nothing when the session closes; matter.js starts a
+  commissioning advertisement round on every PASE session that closes
+  while the window is open (`protocol/DeviceAdvertiser.ts:131-162`). (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): fixed by `8feaa508`, as the row above.
+- **A host-initiated RemoveFabric does not flush the Leave event.**
+  `node/node.go:707` `RemoveFabric` closes the fabric's subscriptions
+  without a last report; matter.js `Fabric.leave` closes each session
+  through `closeSubscriptions(true)` so the Leave event reaches the
+  controller (`fabric/Fabric.ts:447-457`; ClientNodeTest "erases node
+  after leave event"). (Triage 2026-10-29: wave H1, the device IM and write path.)
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): `Node.RemoveFabric` runs the command's own path, whose leaving hook flushes (`node/node.go`, `Bridge.EmitFabricLeavingContext`).
+- **Data versions are drawn anew at every start.**
+  `contract.DataVersionTracker` is the host's, and the module's own
+  trackers start random; matter.js loads a persistent cluster's version
+  from its store and draws one only when the store has none
+  (`behavior/state/managed/Datasource.ts:597`, `:802`), so a controller's
+  cache survives a device restart where this side sends every cluster
+  again. (Triage 2026-10-29: wave H1, the device IM and write path.)
+  Struck 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): the reference statement is false at `db021da0` — a server datasource draws `entropy.randomUint32` at construction and takes a store's version only from an `ExternallyMutableStore`, the client-side cache (`packages/node/src/behavior/state/managed/Datasource.ts:597`, `:796-803`, `:291-294`; no hit for `ExternallyMutableStore` or `.version` under `packages/node/src/storage/server`); it contradicted F-db021da0-17 of the open register.
+
 ## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
 
 - **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
@@ -578,6 +612,27 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 
 - **F-db021da0-21: the thermostat does not follow the temperature or the occupancy of a sibling endpoint.** matter.js couples its Thermostat to two sibling clusters, once, when the node goes online (`reactTo(node.lifecycle.online, #nodeOnline)`, `packages/node/src/behaviors/thermostat/ThermostatServer.ts:168`, `:177-182` at `db021da0`; later structure changes are not followed, the TODO at `:178-179`): the endpoint named by the state field `localIndoorTemperatureMeasurementEndpoint` (`:467`, declared `:1618-1622`) feeds LocalTemperature from its TemperatureMeasurement `measuredValue` (`:480-484`), and the one named by `localOccupancyMeasurementEndpoint` (`:539`, declared `:1631-1635`) feeds Occupancy from its OccupancySensing `occupancy` (`:552-553`, `:577-579`); each is taken over the external state unless a RemoteSensing bit selects the external source (`:455`, `:468`, `:538`, `:540`). Since review II, phase 5b the Go server has the external temperature input with its calibration and the LocalTemperatureNotExposed rule — `ThermostatServer.SetMeasuredTemperature`, the mirror of `externalMeasuredIndoorTemperature` (`:497-501` → `:511-527`) — so the calibration this row first named is applied; occupancy comes from the host (`SetOccupied`). Neither sibling coupling is built: a host that composes a thermostat with such a sensor wires the two itself. Fix: the couplings, from an endpoint the host names. Found in review II, phase 4 (R2-P4-appclim-05); narrowed in phase 5b, when the row of the `862ad75f` section on the OccupancySensing coupling joined it.
   Closed 2026-11-16 (review II, phase 6a, owner decision 147): the couplings stay the host's, recorded as `BD-Matter-Thermostat-HostWiresSiblings` in [`by_design.md`](./by_design.md).
+
+- **F-db021da0-4: what is outstanding when a subscription is activated waits for MinIntervalFloor.**
+  matter.js sends what is outstanding at activation at once: `activate`
+  calls `#triggerSendUpdate()` when an attribute update or an event number
+  is outstanding
+  (`packages/node/src/node/server/ServerSubscription.ts:443-445` at
+  `db021da0`), and `#triggerSendUpdate` starts `#sendUpdate` directly —
+  no floor, no send delay (`:520-529`); an event the initial report already
+  carried is not owed again (`:431-437`). `Subscription.EndPriming`
+  (`im/subscription/subscription.go`) stamps `lastReport` with the end of
+  the priming report and marks the events fired meanwhile urgent, so the
+  changes and events of the priming window go out once MinIntervalFloor has
+  elapsed since the priming report. Not deliberate: no entry of
+  `by_design.md` gives a reason, and the function's comment states the
+  difference without one. Pinned as it is by the subtest "an event fired
+  while the subscription was priming is reported after the floor" of
+  `im/subscription:TestEventReportParityMatterJS`. Fix: when priming ends
+  with a dirty path or an owed event, the first report is due at once, and
+  the floor counts from that report; move the subtest. Found in review II,
+  phase 0 (W2-conc-05).
+  Closed 2026-11-16 (review II, phase 6a, owner decision 144): the floor is kept as connectedhomeip's and recorded as `BD-chip-SubscriptionFloorAfterPriming` in [`by_design.md`](./by_design.md).
 
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 
