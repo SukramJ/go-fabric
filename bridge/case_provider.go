@@ -27,9 +27,10 @@ import (
 // verifier, OnSessionEstablished callback wired). Operators rotate
 // the underlying identity by replacing the factory closure.
 //
-// Memory model: every Resolve stamps the entry's `lastTouched` so
-// stale entries (no Resolve hit within `ttl`) get reaped by the
-// optional [PerExchangeCaseProvider.StartReaper] background goroutine.
+// Memory model: an entry is stamped when it is made and when a Sigma1
+// begins a handshake on it, and entries not stamped within `ttl` get
+// reaped by the optional [PerExchangeCaseProvider.StartReaper] background
+// goroutine.
 // Daemons handling many concurrent commissioners over time should
 // always wire the reaper; without it the adapters map grows
 // unboundedly.
@@ -51,8 +52,14 @@ type PerExchangeCaseProvider struct {
 }
 
 type caseEntry struct {
-	adapter     *CaseAdapter
+	adapter *CaseAdapter
+	// lastTouched is when the adapter was made, then when a Sigma1 last
+	// began a handshake on it: the reaper's and the bound's age.
 	lastTouched time.Time
+	// begun is set once a Sigma1 began a handshake on the adapter
+	// ([PerExchangeCaseProvider.began]); only such an entry counts toward
+	// [maxCaseHandshakes] and can lose its place.
+	begun bool
 }
 
 // SetClock sets the clock the entries are stamped and reaped on; nil is
@@ -73,15 +80,21 @@ func NewPerExchangeCaseProvider(factory func() *CaseAdapter) *PerExchangeCasePro
 // Resolve implements [CaseHandlerProvider]. Returns the existing
 // adapter for key, allocating a fresh one via the factory on first
 // sighting. Returns nil when the factory is nil or returned nil;
-// callers (the SC router) drop the datagram on nil. Every successful
-// Resolve refreshes the entry's `lastTouched`. The provider holds at most
-// [maxCaseHandshakes] adapters: a new one takes the place of the least
-// recently used, which goes as a reaped one goes (review II,
-// R2-P3-dr-dev-03).
+// callers (the SC router) drop the datagram on nil.
+//
+// The provider holds at most [maxCaseHandshakes] adapters whose Sigma1
+// began a handshake: once a new adapter's Sigma1 began one, the least
+// recently begun adapter goes as a reaped one goes (review II,
+// R2-P3-dr-dev-03). A new adapter takes nobody's place while its Sigma1 is
+// judged — one that begins nothing leaves on its own
+// ([CaseAdapter.handshakeFailed]) — so a Sigma1 without a handshake ends no
+// handshake in progress (R2-P6-sec-0301). Until then the adapters exceed
+// the bound by at most the Sigma1s being judged. A Resolve of a held key
+// does not extend the adapter's lifetime: that runs from the Sigma1 that
+// began its handshake (U4-fr-sec-1).
 func (p *PerExchangeCaseProvider) Resolve(key HandshakeKey) CaseHandler {
 	p.mu.Lock()
 	if e, ok := p.entries[key]; ok {
-		e.lastTouched = p.clock.Load().Now()
 		p.mu.Unlock()
 		return e.adapter
 	}
@@ -95,34 +108,72 @@ func (p *PerExchangeCaseProvider) Resolve(key HandshakeKey) CaseHandler {
 		return nil
 	}
 	a.setDetach(func() { p.drop(key, a) })
-	var (
-		evictedKey HandshakeKey
-		evicted    *caseEntry
-	)
-	if len(p.entries) >= maxCaseHandshakes {
-		evictedKey, evicted = p.leastRecentlyUsedLocked()
-		delete(p.entries, evictedKey)
-	}
+	a.setOnBegun(func() { p.began(key, a) })
 	p.entries[key] = &caseEntry{adapter: a, lastTouched: p.clock.Load().Now()}
-	onEvict := p.onEvict
 	p.mu.Unlock()
-	if evicted != nil {
-		dropped([]*caseEntry{evicted})
-		if onEvict != nil {
-			onEvict(evictedKey)
-		}
-	}
 	return a
 }
 
-// leastRecentlyUsedLocked returns the entry touched longest ago and its
-// key. The caller holds p.mu and has at least one entry.
-func (p *PerExchangeCaseProvider) leastRecentlyUsedLocked() (HandshakeKey, *caseEntry) {
+// began follows a Sigma1 that began a handshake on a, key's adapter: the
+// entry counts toward the bound from now, its lifetime restarts, and the
+// least recently begun entries other than key's go while more than
+// [maxCaseHandshakes] are begun.
+func (p *PerExchangeCaseProvider) began(key HandshakeKey, a *CaseAdapter) {
+	p.mu.Lock()
+	e, ok := p.entries[key]
+	if !ok || e.adapter != a {
+		p.mu.Unlock()
+		return
+	}
+	e.begun = true
+	e.lastTouched = p.clock.Load().Now()
+	var (
+		evictedKeys []HandshakeKey
+		gone        []*caseEntry
+	)
+	for p.begunLocked() > maxCaseHandshakes {
+		k, oldest := p.leastRecentlyBegunLocked(key)
+		if oldest == nil {
+			break
+		}
+		delete(p.entries, k)
+		evictedKeys = append(evictedKeys, k)
+		gone = append(gone, oldest)
+	}
+	onEvict := p.onEvict
+	p.mu.Unlock()
+	dropped(gone)
+	if onEvict != nil {
+		for _, k := range evictedKeys {
+			onEvict(k)
+		}
+	}
+}
+
+// begunLocked counts the entries whose Sigma1 began a handshake. The
+// caller holds p.mu.
+func (p *PerExchangeCaseProvider) begunLocked() int {
+	n := 0
+	for _, e := range p.entries {
+		if e.begun {
+			n++
+		}
+	}
+	return n
+}
+
+// leastRecentlyBegunLocked returns the begun entry other than keep's that
+// was touched longest ago, and its key; nil when there is none. The caller
+// holds p.mu.
+func (p *PerExchangeCaseProvider) leastRecentlyBegunLocked(keep HandshakeKey) (HandshakeKey, *caseEntry) {
 	var (
 		oldestKey HandshakeKey
 		oldest    *caseEntry
 	)
 	for k, e := range p.entries {
+		if !e.begun || k == keep {
+			continue
+		}
 		if oldest == nil || e.lastTouched.Before(oldest.lastTouched) {
 			oldestKey, oldest = k, e
 		}
@@ -175,13 +226,23 @@ func (p *PerExchangeCaseProvider) SetOnEvict(fn func(key HandshakeKey)) {
 // Forget removes the adapter for key so the next [Resolve]
 // allocates a fresh one. Operators wire this from a post-Sigma3
 // hook for immediate cleanup; production daemons typically rely on
-// the TTL reaper instead.
+// the TTL reaper instead. The eviction hook runs as for a reaped adapter,
+// so the handshake's state outside the provider — the router's record, its
+// unsecured window, a connection's hold — goes with it (review II,
+// N3-findev-2).
 func (p *PerExchangeCaseProvider) Forget(key HandshakeKey) {
 	p.mu.Lock()
-	e := p.entries[key]
+	e, ok := p.entries[key]
 	delete(p.entries, key)
+	onEvict := p.onEvict
 	p.mu.Unlock()
+	if !ok {
+		return
+	}
 	dropped([]*caseEntry{e})
+	if onEvict != nil {
+		onEvict(key)
+	}
 }
 
 // Reset drops every per-exchange adapter. Operators call this when

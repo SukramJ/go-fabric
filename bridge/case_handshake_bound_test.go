@@ -29,7 +29,7 @@ func TestSigma1RecordsAreBounded(t *testing.T) {
 	b.AttachCaseHandler(&recordingCaseHandler{sigma1RespCode: mrp.SCOpcodeSigma2, sigma1Resp: []byte{0xDD}})
 	const extra = 8
 	for i := range maxCaseHandshakes + extra {
-		if err := b.dispatchSecureChannel(loopbackSrc(), sigma1From(uint64(0x1000+i)), scProto(mrp.SCOpcodeSigma1, 1, false, 0), []byte{0x01}); err != nil {
+		if err := b.dispatchSecureChannel(loopbackSrc(), sigma1From(uint64(0x1000+i)), scProto(mrp.SCOpcodeSigma1, 1, false, 0), distinctSigma1(i)); err != nil {
 			t.Fatalf("Sigma1 %d: %v", i, err)
 		}
 	}
@@ -47,7 +47,7 @@ func TestSigma1RecordsAreBounded(t *testing.T) {
 }
 
 // TestCaseAdaptersAreBounded: a PerExchangeCaseProvider holds at most
-// maxCaseHandshakes adapters; the one that loses its place for a new
+// maxCaseHandshakes adapters whose Sigma1 began a handshake; the one that loses its place for a new
 // handshake is the least recently used, and it goes as a reaped one goes —
 // its eviction is reported and its staked session id released (review II,
 // R2-P3-dr-dev-03).
@@ -66,9 +66,12 @@ func TestCaseAdaptersAreBounded(t *testing.T) {
 	const extra = 8
 	for i := range maxCaseHandshakes + extra {
 		clk.Advance(time.Millisecond)
-		if p.Resolve(HandshakeKey{InitiatorNodeID: uint64(0x1000 + i), ExchangeID: 1}) == nil {
+		a, ok := p.Resolve(HandshakeKey{InitiatorNodeID: uint64(0x1000 + i), ExchangeID: 1}).(*CaseAdapter)
+		if !ok {
 			t.Fatalf("Resolve %d: no adapter", i)
 		}
+		a.sigma1BeganHandshake() // its Sigma1 began a handshake
+
 	}
 	if got := p.Active(); got != maxCaseHandshakes {
 		t.Fatalf("the provider holds %d adapters, want %d", got, maxCaseHandshakes)
@@ -122,7 +125,7 @@ func TestSigma1ThatBeginsNothingTakesNoRecordsPlace(t *testing.T) {
 	begins := &recordingCaseHandler{sigma1RespCode: mrp.SCOpcodeSigma2, sigma1Resp: []byte{0xDD}}
 	b.AttachCaseHandler(begins)
 	for i := range maxCaseHandshakes {
-		if err := b.dispatchSecureChannel(loopbackSrc(), sigma1From(uint64(0x1000+i)), scProto(mrp.SCOpcodeSigma1, 1, false, 0), []byte{0x01}); err != nil {
+		if err := b.dispatchSecureChannel(loopbackSrc(), sigma1From(uint64(0x1000+i)), scProto(mrp.SCOpcodeSigma1, 1, false, 0), distinctSigma1(i)); err != nil {
 			t.Fatalf("Sigma1 %d: %v", i, err)
 		}
 	}
@@ -153,4 +156,10 @@ func TestSigma1ThatBeginsNothingTakesNoRecordsPlace(t *testing.T) {
 	if held() || n > maxCaseHandshakes {
 		t.Fatalf("a Sigma1 that began a handshake at the bound: the oldest record held %v, %d records, want it gone and at most %d", held(), n, maxCaseHandshakes)
 	}
+}
+
+// distinctSigma1 is a Sigma1 payload of its own for the i-th handshake: the
+// router holds a Sigma1's bytes once across keys (R2-P6-sec-0301).
+func distinctSigma1(i int) []byte {
+	return []byte{0x01, byte(i), byte(i >> 8)}
 }

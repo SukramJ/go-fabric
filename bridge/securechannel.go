@@ -1456,12 +1456,27 @@ func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 // and one in progress still takes its initiator's Sigma3 (R2-P4-fr-sec-03).
 // The Sigma1 being judged is marked on the record, so its concurrent copies
 // are dropped as those of a first Sigma1 are.
+//
+// A Sigma1 is held once across keys: bytes a record carries — answered, or
+// being judged — under another key are a replay too. A Sigma1 travels in
+// the clear and nothing in it binds it to the header's source node id or
+// exchange id, so without this a node on the link that captured one could
+// send it again under [maxCaseHandshakes] other keys, begin a handshake
+// with each copy and take the place of every handshake in progress, the one
+// it was captured from included. Copies of one initiator's Sigma1 arrive
+// under its one key (Apple's multicast above) and stay a replay of that key
+// (review II, R2-P6-sec-0301).
 func (b *Bridge) markSigma1Replied(key HandshakeKey, hash [32]byte) (replay, overRecord bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	existing, ok := b.sigma1Replied[key]
 	if ok && (existing.hash == hash || (existing.judged != nil && *existing.judged == hash)) {
 		return true, false
+	}
+	for k, rec := range b.sigma1Replied {
+		if k != key && (rec.hash == hash || (rec.judged != nil && *rec.judged == hash)) {
+			return true, false
+		}
 	}
 	if ok {
 		existing.judged = &hash

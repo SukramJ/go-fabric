@@ -649,6 +649,10 @@ type CaseAdapter struct {
 	// detach, set by the [PerExchangeCaseProvider] that built the adapter,
 	// drops the adapter from the provider once its handshake failed.
 	detach func()
+	// onBegun, set by the [PerExchangeCaseProvider] that built the
+	// adapter, is told that a Sigma1 began a handshake on it
+	// ([CaseAdapter.sigma1BeganHandshake]).
+	onBegun func()
 }
 
 // SetOnUnfinished installs fn, called once with the session id the
@@ -672,6 +676,26 @@ func (a *CaseAdapter) setDetach(fn func()) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.detach = fn
+}
+
+// setOnBegun is the provider's hook told of a Sigma1 that began a
+// handshake on the adapter ([PerExchangeCaseProvider.Resolve]).
+func (a *CaseAdapter) setOnBegun(fn func()) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onBegun = fn
+}
+
+// sigma1BeganHandshake follows a Sigma1 the responder accepted — answered
+// with a Sigma2 or a Sigma2_Resume: the provider that built the adapter
+// gives it its place now (review II, R2-P6-sec-0301).
+func (a *CaseAdapter) sigma1BeganHandshake() {
+	a.mu.RLock()
+	fn := a.onBegun
+	a.mu.RUnlock()
+	if fn != nil {
+		fn()
+	}
 }
 
 // releaseStakedID calls the [CaseAdapter.SetOnUnfinished] hook with the
@@ -926,6 +950,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 				return 0, nil, fmt.Errorf("bridge: CASE resume session pickup: %w", err)
 			}
 		}
+		a.sigma1BeganHandshake()
 		return mrp.SCOpcodeSigma2Resume, out, nil
 	}
 
@@ -948,7 +973,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		a.lastSigma2 = out
 	}
 	a.mu.Unlock()
-
+	a.sigma1BeganHandshake()
 	return mrp.SCOpcodeSigma2, out, nil
 }
 
