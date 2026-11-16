@@ -84,6 +84,16 @@ const idleGrace = 5 * time.Minute
 // (src/transport/raw/TCP.cpp:133-163 at 6170af84).
 const reclaimAgeFloor = NewConnectionIdleTimeout / 5
 
+// sessionlessGrace is how long after its accept a connection that carried
+// messages but no secure session ([Conn.NoteSessionTraffic]) keeps its
+// place at the total bound: the time a pairing or a session handshake may
+// take before its session exists — the bridge's PASE pairing timeout, the
+// longest of them (60 s). Its frames earn it nothing past that: a party
+// that never establishes a session cannot keep places by sending a frame
+// now and then, which before took two source addresses to hold all four
+// (review II, N3-finnet-4). Module's own.
+const sessionlessGrace = time.Minute
+
 // ErrListenerClosed is returned by [Listener.Serve] when it is called
 // on a closed listener.
 var ErrListenerClosed = errors.New("tcp: listener closed")
@@ -430,23 +440,34 @@ func (l *Listener) Close() error {
 }
 
 // idleLongestLocked is the open connection idle longest at now — its last
-// message received or sent, or its accept when it carried none, earliest,
-// the earlier accept first on a tie — among those that carried no traffic
-// within [idleGrace] and, when they carried none, were accepted at least
-// [reclaimAgeFloor] ago; nil when there is none. l.mu is held.
+// secure-session message ([Conn.NoteSessionTraffic]), or its accept when it
+// carried no session, earliest, the earlier accept first on a tie — among
+// those whose sessions carried no message within [idleGrace] and, when it
+// carried no session, were accepted at least [sessionlessGrace] ago (with
+// messages) or [reclaimAgeFloor] ago (silent); nil when there is none.
+// l.mu is held.
 func (l *Listener) idleLongestLocked(now time.Duration) *Conn {
 	var pick *Conn
 	var pickSince time.Duration
 	var pickSeq uint64
 	for c, adm := range l.conns {
-		since, carried := c.idleSince()
-		if !carried {
-			since = adm.at
-			if now-since < reclaimAgeFloor {
+		since, noted := c.sessionSince()
+		if noted {
+			if now-since < idleGrace {
 				continue
 			}
-		} else if now-since < idleGrace {
-			continue
+		} else {
+			// No session yet: the place is held from the accept, briefly
+			// for a silent connection, for a handshake's time for one
+			// that carried messages; its frames do not renew it.
+			since = adm.at
+			floor := reclaimAgeFloor
+			if c.traffic.Load() {
+				floor = sessionlessGrace
+			}
+			if now-since < floor {
+				continue
+			}
 		}
 		if pick == nil || since < pickSince || (since == pickSince && adm.seq < pickSeq) {
 			pick, pickSince, pickSeq = c, since, adm.seq

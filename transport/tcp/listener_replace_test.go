@@ -30,10 +30,11 @@ func TestIdleGraceIsTheSessionIdleTimeout(t *testing.T) {
 }
 
 // TestListenerGivesTheIdleLongestPlaceToANewConnection: four connections
-// from two addresses that each delivered one message hold the listener's
-// places only while they carry traffic. Once each has been idle past the
+// from two addresses that each delivered one message of a session — the
+// host notes it (NoteSessionTraffic) — hold the listener's places only
+// while their sessions carry messages. Once each has been idle past the
 // grace, a new connection takes the place of the one idle longest; a
-// connection that received or sent a message within the grace keeps its
+// connection whose session carried a message within the grace keeps its
 // place; when every held one has, the new one is closed.
 func TestListenerGivesTheIdleLongestPlaceToANewConnection(t *testing.T) {
 	t.Parallel()
@@ -44,7 +45,11 @@ func TestListenerGivesTheIdleLongestPlaceToANewConnection(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 	got := make(chan struct{}, 16)
-	handler := func(_ *Conn, _ []byte, release func()) { release(); got <- struct{}{} }
+	handler := func(c *Conn, _ []byte, release func()) {
+		c.NoteSessionTraffic() // as the bridge notes an authenticated message
+		release()
+		got <- struct{}{}
+	}
 
 	held := make([]*Conn, 0, MaxInboundConnections)
 	clients := make([]net.Conn, 0, MaxInboundConnections)
@@ -71,8 +76,9 @@ func TestListenerGivesTheIdleLongestPlaceToANewConnection(t *testing.T) {
 	}
 
 	fake.Advance(idleGrace)
-	// The oldest receives a message again, the third sends one: both are
-	// spared.
+	// The oldest receives a message of its session again, the third's
+	// session carries one the host notes: both are spared. A send alone
+	// is no session's message.
 	if _, err := clients[0].Write(frameOf([]byte{2})); err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +87,7 @@ func TestListenerGivesTheIdleLongestPlaceToANewConnection(t *testing.T) {
 	if err := held[2].Send([]byte{3}); err != nil {
 		t.Fatal(err)
 	}
+	held[2].NoteSessionTraffic()
 
 	for _, want := range []int{1, 3} {
 		c, _ := acceptFrom(t, l, 3+want, handler)

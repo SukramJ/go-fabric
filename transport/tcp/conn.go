@@ -178,14 +178,16 @@ func (c *Conn) markTraffic() {
 }
 
 // NoteSessionTraffic tells the accepting listener that the connection just
-// carried a message of a secure session — one the host authenticated. From
-// the first note on, the listener measures how long the connection has
-// been idle by these notes alone, not by every frame: a connection that
-// carries a session keeps its place at the total bound
-// ([MaxInboundConnections]) while its sessions carry messages within
-// [idleGrace], and a peer cannot keep it by sending any frame now and then.
-// A connection never noted keeps the measure of every message it received
-// or sent. A no-op on a dialed connection. Review II, N3-finnet-4.
+// carried a message of a secure session — one the host authenticated. The
+// listener measures a connection's place at the total bound
+// ([MaxInboundConnections]) by these notes alone, not by every frame: a
+// connection keeps its place while its sessions carried a message within
+// [idleGrace]; one never noted keeps it only for [sessionlessGrace] after
+// its accept (for [reclaimAgeFloor] when it carried nothing), whatever
+// frames it sends. A host that terminates sessions on the listener's
+// connections calls it for every authenticated message; one that does not
+// leaves its connections measured as sessionless. A no-op on a dialed
+// connection. Review II, N3-finnet-4.
 func (c *Conn) NoteSessionTraffic() {
 	if c.now == nil {
 		return
@@ -194,17 +196,13 @@ func (c *Conn) NoteSessionTraffic() {
 	c.sessionNoted.Store(true)
 }
 
-// idleSince is the reading of the connection's last session message
-// ([Conn.NoteSessionTraffic]) once one was noted, else of its last message
-// received or sent; false when it carried none.
-func (c *Conn) idleSince() (time.Duration, bool) {
-	if c.sessionNoted.Load() {
-		return time.Duration(c.lastSession.Load()), true
-	}
-	if !c.traffic.Load() {
+// sessionSince is the reading of the connection's last session message
+// ([Conn.NoteSessionTraffic]), and false when none was noted.
+func (c *Conn) sessionSince() (time.Duration, bool) {
+	if !c.sessionNoted.Load() {
 		return 0, false
 	}
-	return time.Duration(c.lastTraffic.Load()), true
+	return time.Duration(c.lastSession.Load()), true
 }
 
 // Remote is the peer's address (a [*net.TCPAddr]).
