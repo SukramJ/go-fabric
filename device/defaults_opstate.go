@@ -83,7 +83,7 @@ func opstateServer(build func(opstate.Config) (*opstate.Server, error), port fun
 			return nil, notServed(fmt.Errorf("%s: %w", b.def.Name, errNoPort))
 		}
 		cfg := opstate.Config{
-			Handler: h, DeviceType: b.deviceType, Clock: b.clock, DataVersion: b.cfg.DataVersion,
+			Handler: h, DeviceType: b.deviceType, Clock: b.clock,
 			CountdownTime:       slices.Contains(b.opts.Attributes, opdef.AttrCountdownTime),
 			OperationCompletion: slices.Contains(b.opts.Events, opdef.EventOperationCompletion),
 		}

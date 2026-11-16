@@ -72,6 +72,11 @@ type CertificateManagementConfig struct {
 	// nil allows every removal ([CertificateManagement.SetDependencyChecker]).
 	Checker DependencyChecker
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -183,7 +188,7 @@ func NewCertificateManagement(ctx context.Context, cfg CertificateManagementConf
 		tcmdef.CmdLookupClientCertificate:    c.lookupClient,
 		tcmdef.CmdRemoveClientCertificate:    c.removeClient,
 	}
-	srv, err := spec.NewServer(tcmdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(tcmdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrCertificateConfig, err)
 	}

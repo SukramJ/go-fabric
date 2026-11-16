@@ -50,7 +50,7 @@ type WakeOnLanServer struct {
 // NewWakeOnLan builds a WakeOnLan server.
 func NewWakeOnLan(cfg WakeOnLanConfig) (*WakeOnLanServer, error) {
 	srv, err := spec.NewServer(woldef.Definition, spec.Options{Attributes: cfg.Attributes},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+		spec.ServerConfig{DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: WakeOnLan: %w", err)
 	}

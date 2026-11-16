@@ -250,11 +250,10 @@ func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLoca
 // A declared Sink (onoffdef.Declare) switches the device.
 func newOnOffServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := onoff.Config{
-		Features:    onoff.Feature(b.opts.Features),
-		DataVersion: b.cfg.DataVersion,
-		Initial:     b.cfg.Initial,
-		Bridged:     true,
-		TimeSource:  b.clock,
+		Features:   onoff.Feature(b.opts.Features),
+		Initial:    b.cfg.Initial,
+		Bridged:    true,
+		TimeSource: b.clock,
 	}
 	if d, ok := b.ports.(onoffdef.Declare); ok && d.Sink != nil {
 		cfg.Sink = d.Sink
@@ -290,7 +289,7 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	// Bridged as onoff.Config is (newOnOffServer): every device the kit
 	// builds is added under the Aggregator, where matter.js does not apply
 	// StartUpCurrentLevel (LevelControlServer.ts:224).
-	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion, Clock: b.clock, ManageTransitions: b.transitions, Bridged: true} //nolint:staticcheck // the deprecated tracker passed on for its window (decision 165)
+	cfg := levelcontrol.HeldConfig{Features: b.opts.Features, Clock: b.clock, ManageTransitions: b.transitions, Bridged: true}
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {
 		cfg.OnOff = onOffOf(srv)
 	}
@@ -532,7 +531,7 @@ func newThermostatServer(b defaultBuild) (contract.ClusterServer, error) {
 // matter.js's DoorLockServer, whose default handleLockOperation moves
 // nothing. An empty selection is none, as matter.js's.
 func newDoorLockServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := lock.DoorLockConfig{Features: lock.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion, Clock: b.clock}
+	cfg := lock.DoorLockConfig{Features: lock.Feature(b.opts.Features), Clock: b.clock}
 	if d, ok := b.ports.(doorlockdef.Declare); ok {
 		if d.StateSource != nil {
 			cfg.Source = d.StateSource
@@ -556,7 +555,7 @@ func newDoorLockServer(b defaultBuild) (contract.ClusterServer, error) {
 // NumberOfPositions, MultiPressMax and the position it starts at come from
 // the declaration's Initial.
 func newSwitchServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := switchserver.Config{Features: switchserver.Feature(b.opts.Features), Clock: b.clock, DataVersion: b.cfg.DataVersion}
+	cfg := switchserver.Config{Features: switchserver.Feature(b.opts.Features), Clock: b.clock}
 	configFrom(&cfg, b.def, b.initial)
 	return switchserver.New(cfg)
 }

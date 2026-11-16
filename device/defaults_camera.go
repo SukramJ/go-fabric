@@ -60,7 +60,6 @@ func newRequestorServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d, ok := b.ports.(wrdef.Declare); ok {
 		cfg.Port = d.RequestorPort
 	}
-	cfg.DataVersion = b.cfg.DataVersion
 	return camera.NewRequestor(cfg)
 }
 
@@ -71,7 +70,7 @@ func newChimeServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.ChimePort == nil {
 		return nil, notServed(fmt.Errorf("chime: %w", errNoPort))
 	}
-	cfg := camera.ChimeConfig{Port: d.ChimePort, DataVersion: b.cfg.DataVersion}
+	cfg := camera.ChimeConfig{Port: d.ChimePort}
 	if v, ok := b.initial[chimedef.AttrSelectedChime].(uint8); ok {
 		cfg.SelectedChime = v
 		delete(b.initial, chimedef.AttrSelectedChime)
@@ -92,7 +91,6 @@ func newAvSettingsServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := camera.AvSettingsConfig{
 		Features:   camera.AvFeature(b.opts.Features),
 		Mechanical: d.MechanicalPTZ, Digital: d.DigitalPTZ,
-		DataVersion: b.cfg.DataVersion,
 	}
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := camera.NewAvSettings(cfg)
@@ -112,7 +110,6 @@ func newAvStreamServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := camera.AvStreamConfig{
 		Features: camera.AvStreamFeature(b.opts.Features), Attributes: b.opts.Attributes,
 		Video: d.VideoStreamPort, Audio: d.AudioStreamPort, Snapshot: d.SnapshotStreamPort, Capture: d.SnapshotCapturePort,
-		DataVersion: b.cfg.DataVersion,
 	}
 	configFrom(&cfg, b.def, b.initial)
 	cfg.Initial = maps.Clone(b.initial)
@@ -132,7 +129,7 @@ func newZonesServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.ZonePort == nil {
 		return nil, notServed(fmt.Errorf("zone management: %w", errNoPort))
 	}
-	cfg := camera.ZonesConfig{Features: camera.ZoneFeature(b.opts.Features), Port: d.ZonePort, DataVersion: b.cfg.DataVersion}
+	cfg := camera.ZonesConfig{Features: camera.ZoneFeature(b.opts.Features), Port: d.ZonePort}
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := camera.NewZones(cfg)
 	if errors.Is(err, camera.ErrZonesConfig) {
@@ -149,7 +146,7 @@ func newProviderServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.ProviderPort == nil {
 		return nil, notServed(fmt.Errorf("webrtc transport provider: %w", errNoPort))
 	}
-	cfg := camera.ProviderConfig{Port: d.ProviderPort, DataVersion: b.cfg.DataVersion}
+	cfg := camera.ProviderConfig{Port: d.ProviderPort}
 	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
 		cfg.Streams = av
 	}
@@ -169,7 +166,7 @@ func newPushTransportServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := camera.PushTransportConfig{
 		Features: camera.PushFeature(b.opts.Features), Port: d.PushTransportPort,
 		TLSEndpoints: d.TLSEndpoints, TLSCertificates: d.TLSCertificates,
-		Clock: b.clock, DataVersion: b.cfg.DataVersion,
+		Clock: b.clock,
 	}
 	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
 		cfg.Streams = av

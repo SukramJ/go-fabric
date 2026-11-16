@@ -28,6 +28,11 @@ type UnitLocalizationConfig struct {
 	// here. An error refuses the write.
 	OnWrite func(ctx context.Context, unit unitdef.TempUnitEnum) error
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -68,7 +73,7 @@ func NewUnitLocalization(cfg UnitLocalizationConfig) (*spec.Server, error) {
 		return nil, fmt.Errorf("%w: UnitLocalization: TemperatureUnit %d not in SupportedTemperatureUnits %v", ErrLocalizationConfig, unit, supported)
 	}
 	srv, err := spec.NewServer(unitdef.Definition, spec.Options{Features: uint32(unitdef.FeatureTemperatureUnit)}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Sink:        unitSink{supported: supported, onWrite: cfg.OnWrite},
 		Initial: map[uint32]any{
 			unitdef.AttrTemperatureUnit:           unit,

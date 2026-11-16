@@ -60,6 +60,11 @@ type OccupancyConfig struct {
 	// clock.
 	Clock clock.Clock
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -214,7 +219,7 @@ func NewOccupancy(cfg OccupancyConfig) (*Occupancy, error) {
 	}
 	o := &Occupancy{clock: clock.Or(cfg.Clock), event: cfg.Features&occdef.FeatureOccupancyEvent != 0}
 	srv, err := spec.NewServer(occdef.Definition, opts, spec.ServerConfig{
-		DataVersion: cfg.DataVersion, Source: occSource{o}, Sink: occSink{o},
+		DataVersion: cfg.DataVersion, Source: occSource{o}, Sink: occSink{o}, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("sensing: OccupancySensing: %w", err)

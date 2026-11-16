@@ -226,7 +226,7 @@ func NewCommissionerControl(cfg CommissionerControlConfig) (*CommissionerControl
 		Commands: []uint32{commctrldef.CmdRequestCommissioningApproval, commctrldef.CmdCommissionNode},
 	}, spec.ServerConfig{
 		Handlers:    handlers,
-		DataVersion: &c.dv,
+		DataVersion: &c.dv, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial:     map[uint32]any{commctrldef.AttrSupportedDeviceCategories: cfg.SupportedDeviceCategories},
 	})
 	if err != nil {

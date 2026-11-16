@@ -42,6 +42,11 @@ type WiFiManagementConfig struct {
 	// (WiFiNetworkManagementCluster.cpp:95-99); the system clock when nil.
 	Clock clock.Clock
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -96,7 +101,7 @@ func NewWiFiManagement(cfg WiFiManagementConfig) (*WiFiManagementServer, error) 
 		s.clock = clock.System{}
 	}
 	srv, err := spec.NewServer(wdef.Definition, spec.Options{}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial:     map[uint32]any{wdef.AttrSsid: nil, wdef.AttrPassphraseSurrogate: nil},
 		Handlers:    map[uint32]spec.CommandHandler{wdef.CmdNetworkPassphraseRequest: s.networkPassphraseRequest},
 	})

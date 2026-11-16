@@ -213,6 +213,11 @@ type CommodityTariffConfig struct {
 	// host.
 	SyncInterval time.Duration
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -287,7 +292,7 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		ct.CmdGetDayEntry:        s.getDayEntry,
 	}
 	srv, err := spec.NewServer(ct.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial})
+		spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}

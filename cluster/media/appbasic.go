@@ -69,7 +69,7 @@ type AppBasicServer struct {
 // NewAppBasic builds an ApplicationBasic server.
 func NewAppBasic(cfg AppBasicConfig) (*AppBasicServer, error) {
 	srv, err := spec.NewServer(basicdef.Definition, spec.Options{Attributes: cfg.Attributes},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+		spec.ServerConfig{DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: ApplicationBasic: %w", err)
 	}

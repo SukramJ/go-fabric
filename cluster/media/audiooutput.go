@@ -69,7 +69,7 @@ func NewOutputs(cfg OutputsConfig) (*OutputsServer, error) {
 		handleState(h, &s.stateful, outputdef.CmdRenameOutput, statusOnly(renamer.RenameOutput))
 	}
 	srv, err := newServer(outputdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: AudioOutput: %w", err)
 	}

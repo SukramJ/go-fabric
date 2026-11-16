@@ -88,6 +88,11 @@ type ManagementConfig struct {
 	// activation completed (:286-289); nil writes none.
 	SetBreadcrumb func(uint64)
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Logger receives what chip logs (LogErrorOnFailure, :321) and the
 	// refreshes that fail; slog.Default when nil. A dataset is never
@@ -178,7 +183,7 @@ func NewManagement(ctx context.Context, cfg ManagementConfig) (*ManagementServer
 		handlers[tbrm.CmdSetPendingDatasetRequest] = s.setPendingDataset
 	}
 	srv, err := spec.NewServer(tbrm.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial:     initial,
 		Handlers:    handlers,
 	})

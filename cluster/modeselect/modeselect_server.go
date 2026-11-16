@@ -195,7 +195,7 @@ func NewServer(cfg Config) *Server {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
 	// The selection is the fixed one [instance] was built from.
 	srv := must(spec.NewServer(msdef.Definition, spec.Options{Features: featureMap}, spec.ServerConfig{
-		DataVersion: s.tracker(), Source: modeSource{s},
+		DataVersion: s.tracker(), Source: modeSource{s}, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Handlers: map[uint32]spec.CommandHandler{CmdChangeToMode: s.changeToMode},
 	}))
 	s.held = spec.NewSelfHeld(srv)

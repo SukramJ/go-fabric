@@ -53,6 +53,11 @@ type ProviderConfig struct {
 	// camera app's IsUTCTimeNull (webrtc-provider-manager.cpp:830-836).
 	UTCTimeKnown func() bool
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -122,7 +127,7 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 		wpdef.CmdProvideIceCandidates: serial(&p.op, p.provideIceCandidates),
 		wpdef.CmdEndSession:           serial(&p.op, p.endSession),
 	}
-	srv, err := spec.NewServer(wpdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(wpdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("camera: %w", err)
 	}

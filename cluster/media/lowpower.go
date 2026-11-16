@@ -45,7 +45,7 @@ func NewLowPower(cfg LowPowerConfig) (*LowPowerServer, error) {
 	handle(h, lowpowerdef.CmdSleep, func(ctx context.Context, _ lowpowerdef.SleepRequest) (any, error) {
 		return nil, port.Sleep(ctx)
 	})
-	srv, err := newServer(lowpowerdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	srv, err := newServer(lowpowerdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: LowPower: %w", err)
 	}

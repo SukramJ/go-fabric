@@ -75,7 +75,7 @@ func NewContentLauncher(cfg ContentLauncherConfig) (*ContentLauncherServer, erro
 		return port.LaunchURL(ctx, st, req)
 	})
 	srv, err := newServer(launchdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}

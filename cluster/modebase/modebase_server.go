@@ -631,7 +631,7 @@ func newServer(k kind, cfg Config) (*Server, error) {
 		modes[i] = ModeOption{Label: m.Label, Mode: m.Mode, Tags: slices.Clone(m.Tags)}
 	}
 	s := &Server{k: k, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, current: cfg.CurrentMode}
-	sc := spec.ServerConfig{DataVersion: s.tracker(), Source: modeSource{s}}
+	sc := spec.ServerConfig{DataVersion: s.tracker(), Source: modeSource{s}} //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if accepts {
 		sc.Handlers = map[uint32]spec.CommandHandler{CmdChangeToMode: s.changeToMode}
 	}

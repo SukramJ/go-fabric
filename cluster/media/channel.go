@@ -105,7 +105,7 @@ func NewChannels(cfg ChannelsConfig) (*ChannelsServer, error) {
 		handleState(h, &s.stateful, channeldef.CmdCancelRecordProgram, statusOnly(recorder.CancelRecordProgram))
 	}
 	srv, err := newServer(channeldef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: cfg.Attributes},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: Channel: %w", err)
 	}

@@ -168,6 +168,11 @@ type ThreadDirectoryConfig struct {
 	// none; it must name a stored network.
 	PreferredExtendedPanID []byte
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Logger receives the refusals chip logs (ChipLogError, :274, :295,
 	// :305, :333); slog.Default when nil. A dataset is never logged.
@@ -243,7 +248,7 @@ func NewThreadDirectory(ctx context.Context, cfg ThreadDirectoryConfig) (*Thread
 		return nil, err
 	}
 	srv, err := spec.NewServer(tdir.Definition, spec.Options{}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial: map[uint32]any{
 			tdir.AttrPreferredExtendedPanId: preferred,
 			tdir.AttrThreadNetworkTableSize: s.store.Capacity(),

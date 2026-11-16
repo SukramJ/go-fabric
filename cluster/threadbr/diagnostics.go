@@ -71,6 +71,11 @@ type DiagnosticsConfig struct {
 	// [DiagnosticsFeatures] ([ErrDiagnosticsFeature] otherwise).
 	Features tnd.Feature
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Logger receives the refreshes that fail; slog.Default when nil.
 	Logger *slog.Logger
@@ -137,7 +142,7 @@ func NewDiagnostics(ctx context.Context, cfg DiagnosticsConfig) (*DiagnosticsSer
 		handlers = map[uint32]spec.CommandHandler{tnd.CmdResetCounts: s.resetCounts}
 	}
 	srv, err := spec.NewServer(tnd.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: optional}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial:     initial,
 		Handlers:    handlers,
 	})

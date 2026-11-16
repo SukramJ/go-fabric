@@ -35,6 +35,11 @@ type LocalizationConfigurationConfig struct {
 	// An error refuses the write.
 	OnWrite func(ctx context.Context, activeLocale string) error
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -71,7 +76,7 @@ func NewLocalizationConfiguration(cfg LocalizationConfigurationConfig) (*spec.Se
 		return nil, fmt.Errorf("%w: LocalizationConfiguration: ActiveLocale %q not in SupportedLocales %q", ErrLocalizationConfig, cfg.ActiveLocale, supported)
 	}
 	srv, err := spec.NewServer(lcfgdef.Definition, spec.Options{}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Sink:        localeSink{onWrite: cfg.OnWrite},
 		Initial: map[uint32]any{
 			lcfgdef.AttrActiveLocale:     cfg.ActiveLocale,

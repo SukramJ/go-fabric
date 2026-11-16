@@ -229,6 +229,11 @@ type DoorLockConfig struct {
 	// tracker for [MatterDataVersion] and [MatterInvoke] bumps so the
 	// counter survives server reconstruction across [MatterClusterServers]
 	// calls. When nil, an embedded tracker is used (prior behaviour).
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 
 	// Features is the FeatureMap selection; zero is none, matter.js's
@@ -498,7 +503,7 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 
 	opts := spec.Options{Features: uint32(features), Commands: []uint32{lockdef.CmdUnlockWithTimeout}}
 	initial := s.initialAttributes(cfg, mode, supported, &opts)
-	srvCfg := spec.ServerConfig{DataVersion: s.tracker, Initial: initial, Sink: s, Handlers: s.handlers()}
+	srvCfg := spec.ServerConfig{DataVersion: s.tracker, Initial: initial, Sink: s, Handlers: s.handlers()} //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if s.src != nil {
 		srvCfg.Source = sourceAdapter{s.src}
 	}

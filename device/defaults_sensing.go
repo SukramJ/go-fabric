@@ -38,7 +38,7 @@ func newAmbientContextServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := sensing.AmbientContextConfig{
 		Features:         sensing.AmbientContextFeature(b.opts.Features),
 		ServeObjectCount: slices.Contains(b.opts.Attributes, acsdef.AttrObjectCount),
-		Clock:            b.clock, DataVersion: b.cfg.DataVersion,
+		Clock:            b.clock,
 	}
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := sensing.NewAmbientContext(cfg)
@@ -61,7 +61,7 @@ func newOccupancyServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := sensing.OccupancyConfig{
 		Features:   sensing.OccupancyFeature(b.opts.Features),
 		Attributes: slices.Clone(b.opts.Attributes), Events: slices.Clone(b.opts.Events),
-		Clock: b.clock, DataVersion: b.cfg.DataVersion,
+		Clock: b.clock,
 	}
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := sensing.NewOccupancy(cfg)

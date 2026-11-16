@@ -132,7 +132,7 @@ func NewActions(cfg ActionsConfig) (*Actions, error) {
 	}
 	srv, err := spec.NewServer(actionsdef.Definition, opts, spec.ServerConfig{
 		Handlers:    handlers,
-		DataVersion: &a.dv,
+		DataVersion: &a.dv, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Source:      actionsSource{cfg.Host},
 		Initial:     initial,
 	})

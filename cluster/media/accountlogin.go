@@ -54,7 +54,7 @@ func NewAccountLogin(cfg AccountLoginConfig) (*AccountLoginServer, error) {
 	handle(h, logindef.CmdLogout, func(ctx context.Context, req logindef.LogoutRequest) (any, error) {
 		return nil, port.Logout(ctx, req)
 	})
-	srv, err := newServer(logindef.Definition, spec.Options{Events: cfg.Events}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	srv, err := newServer(logindef.Definition, spec.Options{Events: cfg.Events}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: AccountLogin: %w", err)
 	}

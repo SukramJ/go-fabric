@@ -189,7 +189,7 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 		Features: uint32(cfg.Features),
 		Commands: optionalCommands(cmds),
 		Events:   cfg.Events,
-	}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
 	}

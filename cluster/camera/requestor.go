@@ -41,6 +41,11 @@ type RequestorConfig struct {
 	// checked and answered).
 	Port RequestorPort
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -99,7 +104,7 @@ func NewRequestor(cfg RequestorConfig) (*Requestor, error) {
 		wrdef.CmdIceCandidates: r.iceCandidates,
 		wrdef.CmdEnd:           r.end,
 	}
-	srv, err := spec.NewServer(wrdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(wrdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("camera: %w", err)
 	}

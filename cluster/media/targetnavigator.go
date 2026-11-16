@@ -70,7 +70,7 @@ func NewTargets(cfg TargetsConfig) (*TargetsServer, error) {
 		return port.NavigateTarget(ctx, st, req)
 	})
 	srv, err := newServer(targetdef.Definition, spec.Options{Attributes: cfg.Attributes, Events: cfg.Events},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}

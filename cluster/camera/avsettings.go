@@ -123,6 +123,11 @@ type AvSettingsConfig struct {
 	// Digital changes the streams' viewports; DPTZ requires it.
 	Digital DigitalPTZ
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -234,7 +239,7 @@ func NewAvSettings(cfg AvSettingsConfig) (*AvSettings, error) {
 		avdef.CmdDptzSetViewport:  serial(&a.op, a.dptzSetViewport),
 		avdef.CmdDptzRelativeMove: serial(&a.op, a.dptzRelativeMove),
 	}
-	srv, err := spec.NewServer(avdef.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(avdef.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrAvSettingsConfig, err)
 	}

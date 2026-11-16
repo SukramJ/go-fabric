@@ -68,7 +68,7 @@ func newFanControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	cfg := fan.Config{
 		Source: d.StateSource, Stepper: d.Stepper,
-		Features: fan.Feature(b.opts.Features), DeviceType: b.deviceType, DataVersion: b.cfg.DataVersion,
+		Features: fan.Feature(b.opts.Features), DeviceType: b.deviceType,
 	}
 	if v, ok := consume8(b.initial, fandef.AttrFanModeSequence); ok {
 		cfg.Sequence = fan.Sequence(v)
@@ -93,7 +93,7 @@ func newFanControlServer(b defaultBuild) (contract.ClusterServer, error) {
 // and the colour temperature follows the level (CoupleColorTempToLevel).
 func newLevelControlPortServer(b defaultBuild, d lvldef.Declare) (contract.ClusterServer, error) {
 	cfg := levelcontrol.Config{
-		Source: d.LevelSource, DataVersion: b.cfg.DataVersion, //nolint:staticcheck // the deprecated tracker passed on for its window (decision 165)
+		Source:   d.LevelSource,
 		Features: b.opts.Features, HasFeatures: true,
 	}
 	if d.Transitions {
@@ -167,7 +167,7 @@ func modeServer(newServer func(modebase.Config) (*modebase.Server, error), port 
 		if p == nil {
 			return nil, notServed(fmt.Errorf("%s: %w", b.def.Name, errNoPort))
 		}
-		cfg := modebase.Config{Changer: modeChanger{p}, Features: modebase.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion} //nolint:staticcheck // the deprecated tracker passed on for its window (decision 165)
+		cfg := modebase.Config{Changer: modeChanger{p}, Features: modebase.Feature(b.opts.Features)}
 		if v, ok := b.initial[modeAttrSupportedModes]; ok {
 			delete(b.initial, modeAttrSupportedModes)
 			cfg.SupportedModes = modeOptionsOf(v)

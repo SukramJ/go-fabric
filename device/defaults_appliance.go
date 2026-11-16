@@ -44,7 +44,6 @@ func alarmServer(build func(alarmbase.Config) (*alarmbase.Server, error)) server
 			Features:            b.opts.Features,
 			ModifyEnabledAlarms: slices.Contains(b.opts.Commands, dwadef.CmdModifyEnabledAlarms),
 			Delegate:            alarmDelegateOf(b.ports),
-			DataVersion:         b.cfg.DataVersion,
 		}
 		configFrom(&cfg, b.def, b.initial)
 		for _, id := range []uint32{
@@ -104,7 +103,7 @@ func newBooleanStateConfigurationServer(b defaultBuild) (contract.ClusterServer,
 			optional |= o
 		}
 	}
-	cfg := boolcfg.Config{Features: boolcfg.Feature(b.opts.Features), Optional: optional, DataVersion: b.cfg.DataVersion}
+	cfg := boolcfg.Config{Features: boolcfg.Feature(b.opts.Features), Optional: optional}
 	if d, ok := b.ports.(bscdef.Declare); ok && d.Delegate != nil {
 		cfg.Delegate = d.Delegate
 	}
@@ -142,7 +141,7 @@ func filterServer(build func(filter.Config) (*filter.Server, error)) serverFacto
 		}
 		cfg := filter.Config{
 			Features: filter.Feature(b.opts.Features), Optional: optional, Resetter: resetter, LastChangedTimeWriter: writer,
-			DataVersion: b.cfg.DataVersion, Clock: b.clock,
+			Clock: b.clock,
 		}
 		configFrom(&cfg, b.def, b.initial)
 		// ReplacementProductList is Config.ReplacementProducts.
@@ -188,7 +187,7 @@ func filterPortsOf(ports any) (filter.Resetter, filter.LastChangedTimeWriter) {
 // valid NumberOfRinses): without them that selection keeps the generated
 // server.
 func newLaundryWasherControlsServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := appliance.WasherConfig{Features: b.opts.Features, DataVersion: b.cfg.DataVersion}
+	cfg := appliance.WasherConfig{Features: b.opts.Features}
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := appliance.NewLaundryWasherControls(cfg)
 	if errors.Is(err, appliance.ErrLaundryValue) {
@@ -202,7 +201,7 @@ func newLaundryWasherControlsServer(b defaultBuild) (contract.ClusterServer, err
 // Celsius, no lockout, ScheduleProgrammingVisibility where the selection
 // mandates it.
 func newThermostatUIServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := thermo.ThermostatUIConfig{DataVersion: b.cfg.DataVersion}
+	cfg := thermo.ThermostatUIConfig{}
 	if d, ok := b.ports.(tuidef.Declare); ok && d.SettingStore != nil {
 		cfg.Settings = d.SettingStore
 		if b.key != "" {
@@ -223,7 +222,6 @@ func newCommodityPriceServer(b defaultBuild) (contract.ClusterServer, error) {
 		Features:         energy.CommodityPriceFeature(b.opts.Features),
 		DetailedPrice:    slices.Contains(b.opts.Commands, cpdef.CmdGetDetailedPriceRequest),
 		DetailedForecast: slices.Contains(b.opts.Commands, cpdef.CmdGetDetailedForecastRequest),
-		DataVersion:      b.cfg.DataVersion,
 	})
 }
 
@@ -231,7 +229,7 @@ func newCommodityPriceServer(b defaultBuild) (contract.ClusterServer, error) {
 // ([energy.NewElectricalGridConditions]).
 func newGridConditionsServer(b defaultBuild) (contract.ClusterServer, error) {
 	return energy.NewElectricalGridConditions(energy.GridConditionsConfig{
-		Features: energy.GridConditionsFeature(b.opts.Features), DataVersion: b.cfg.DataVersion,
+		Features: energy.GridConditionsFeature(b.opts.Features),
 	})
 }
 
@@ -246,7 +244,6 @@ func newEnergyEvseServer(b defaultBuild) (contract.ClusterServer, error) {
 		ApproximateEvEfficiency:  slices.Contains(b.opts.Attributes, evsedef.AttrApproximateEvEfficiency),
 		StartDiagnostics:         slices.Contains(b.opts.Commands, evsedef.CmdStartDiagnostics),
 		Clock:                    b.clock,
-		DataVersion:              b.cfg.DataVersion,
 	})
 }
 
@@ -254,5 +251,5 @@ func newEnergyEvseServer(b defaultBuild) (contract.ClusterServer, error) {
 // ([energy.NewCommodityMetering]), every attribute null until the host
 // sets it.
 func newCommodityMeteringServer(b defaultBuild) (contract.ClusterServer, error) {
-	return energy.NewCommodityMetering(energy.CommodityMeteringConfig{DataVersion: b.cfg.DataVersion})
+	return energy.NewCommodityMetering(energy.CommodityMeteringConfig{})
 }

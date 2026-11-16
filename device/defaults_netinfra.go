@@ -22,7 +22,7 @@ import (
 // credentials: the host sets them on it
 // (netinfra.WiFiManagementServer.SetNetworkCredentials).
 func newWiFiManagementServer(b defaultBuild) (contract.ClusterServer, error) {
-	return netinfra.NewWiFiManagement(netinfra.WiFiManagementConfig{Clock: b.clock, DataVersion: b.cfg.DataVersion})
+	return netinfra.NewWiFiManagement(netinfra.WiFiManagementConfig{Clock: b.clock})
 }
 
 // newThreadDirectoryServer is the module's ThreadNetworkDirectory server
@@ -33,7 +33,7 @@ func newWiFiManagementServer(b defaultBuild) (contract.ClusterServer, error) {
 // store saved none (netinfra.ThreadDirectoryConfig); it must
 // name a stored network.
 func newThreadDirectoryServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := netinfra.ThreadDirectoryConfig{DataVersion: b.cfg.DataVersion, Logger: b.logger}
+	cfg := netinfra.ThreadDirectoryConfig{Logger: b.logger}
 	if d, ok := b.ports.(tdirdef.Declare); ok && d.ThreadNetworkStore != nil {
 		cfg.Store = d.ThreadNetworkStore
 	}

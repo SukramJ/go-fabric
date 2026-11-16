@@ -81,6 +81,11 @@ type ServerConfig struct {
 	// root endpoint or the Aggregator only; on every other endpoint the
 	// endpoint keeps the cluster's version, which a change the server
 	// reports advances, and this tracker is read by no one but the host.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, and the server's own version
+	// where it serves one (decision 165, F-db021da0-46); leave it nil.
+	// Removable in the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Source optionally answers reads ahead of the stored values.
 	Source Source

@@ -81,7 +81,7 @@ func NewInputs(cfg InputsConfig) (*InputsServer, error) {
 		handleState(h, &s.stateful, inputdef.CmdRenameInput, statusOnly(renamer.RenameInput))
 	}
 	srv, err := newServer(inputdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: MediaInput: %w", err)
 	}
