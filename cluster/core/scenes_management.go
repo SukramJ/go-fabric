@@ -364,10 +364,15 @@ func (st *ScenesState) change(ctx context.Context, command bool, fabric uint8, m
 	}
 	if !st.store(ctx, command) && command {
 		st.table, st.monitor = prev, prevMonitor
+		// The fabric's entry as it was: restored and its counts
+		// recomputed, or — one the refused command created — gone
+		// (infoFor would create it again, so it is not called then).
 		if hadInfo {
 			*st.info[fabric] = prevInfo
+			st.infoFor(fabric)
+		} else {
+			delete(st.info, fabric)
 		}
-		st.infoFor(fabric)
 		return im.StatusFailure
 	}
 	return im.StatusSuccess

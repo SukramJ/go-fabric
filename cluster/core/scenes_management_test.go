@@ -341,6 +341,33 @@ func TestScenesRefusedStoreRestoresSceneInfo(t *testing.T) {
 	}
 }
 
+// TestScenesRefusedFirstStoreLeavesNoSceneInfo (review II, phase 5b): a
+// fabric's first scene command whose store the scene store refuses answers
+// FAILURE and leaves no scene info entry behind for the fabric — the state
+// holds the fabric no more than before the command. Before, the entry the
+// command created stayed (ScenesState.Fabrics listed the fabric).
+func TestScenesRefusedFirstStoreLeavesNoSceneInfo(t *testing.T) {
+	t.Parallel()
+	st := core.NewPersistedScenesState(
+		func(context.Context) ([]byte, error) { return nil, nil },
+		func(context.Context, []byte) error { return errors.New("the store refuses") })
+	s, err := core.NewScenesManagement(core.ScenesConfig{
+		State:      st,
+		Siblings:   func() []contract.ClusterServer { return []contract.ClusterServer{&sceneOnOff{on: true}} },
+		GroupKnown: func(_ context.Context, _ uint8, g uint16) bool { return g == 0x0101 },
+		Fabrics:    func(context.Context) []uint8 { return []uint8{1} },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := invoke(t, s, 0x04, core.SceneRef{GroupID: 0x0101, SceneID: 1}).(core.SceneStatusResponse); r.Status != im.StatusFailure {
+		t.Fatalf("StoreScene with the store refusing = %v, want FAILURE", r.Status)
+	}
+	if got := st.Fabrics(); len(got) != 0 {
+		t.Errorf("Fabrics after the refused first command = %v, want none", got)
+	}
+}
+
 // TestScenesInfoReadFailsWhileTheTableDoesNotLoad (review II, phase 5b):
 // while the scene store refuses to load the table, a FabricSceneInfo read
 // fails ((nil, false), which the dispatcher answers FAILURE on a request)
