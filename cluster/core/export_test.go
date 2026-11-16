@@ -84,6 +84,7 @@ func (g *GroupKeyManagement) StaleGroupFabrics() []uint8 {
 	}
 	return out
 }
+
 // PendingSceneChanges is the number of consequences waiting for st's table
 // to load (review II, R2-P6-store-1202).
 func PendingSceneChanges(st *ScenesState) int {
