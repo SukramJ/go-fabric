@@ -21,7 +21,9 @@ import (
 // holds at most [Bound] callbacks that have not started: past it the
 // oldest of them is dropped and counted ([Queue.Dropped]) and the first
 // drop since the queue last ran empty is logged at warn
-// (`matter.callbacks.dropped`), so a host callback slower than the events
+// (`matter.callbacks.dropped`); when the queue runs empty again the
+// episode's count and the queue's total are logged at warn
+// (`matter.callbacks.overflow_ended`), so a host callback slower than the events
 // behind it costs those events, not unbounded memory. A callback
 // must not stop its own queue's owner: the stop would wait for the
 // callback that called it.
@@ -37,6 +39,8 @@ type Queue struct {
 	// overflowing is set by a drop and cleared when the queue runs empty:
 	// one warning per episode, not one per dropped callback.
 	overflowing bool
+	// episodeBase is dropped when the current overflow episode began.
+	episodeBase uint64
 	// log is the queue's logger; nil logs through slog.Default().
 	log     *slog.Logger
 	running bool
@@ -96,6 +100,7 @@ func (q *Queue) Enqueue(fn func()) {
 		old.g.Leave(inflight.DeviceCallbacks)
 		if !q.overflowing {
 			q.overflowing = true
+			q.episodeBase = q.dropped - 1
 			q.logger().Warn("matter.callbacks.dropped",
 				slog.Int("max", Bound),
 				slog.Uint64("dropped", q.dropped))
@@ -176,13 +181,26 @@ func (q *Queue) run(done chan struct{}) {
 			q.mu.Unlock()
 			return
 		}
+		var episode, total uint64
+		ended := len(q.items) == 1 && q.overflowing
 		if len(q.items) == 1 {
 			q.overflowing = false
+		}
+		if ended {
+			episode, total = q.dropped-q.episodeBase, q.dropped
 		}
 		it := q.items[0]
 		q.items[0] = item{}
 		q.items = q.items[1:]
+		log := q.logger()
 		q.mu.Unlock()
+		if ended {
+			// What the episode cost, once it is over: the warning at its
+			// start cannot say (review II, R2-P6-bound-0209).
+			log.Warn("matter.callbacks.overflow_ended",
+				slog.Uint64("dropped", episode),
+				slog.Uint64("total", total))
+		}
 		func() {
 			defer it.g.Leave(inflight.DeviceCallbacks)
 			it.fn()

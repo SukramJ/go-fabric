@@ -6,6 +6,7 @@ package serialqueue_test
 import (
 	"bytes"
 	"log/slog"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -103,5 +104,42 @@ func TestQueueIsBounded(t *testing.T) {
 	}
 	if g.Busy() {
 		t.Fatalf("counted %v after the queue drained", g.Snapshot())
+	}
+}
+
+// TestQueueReportsWhatAnOverflowCost: when a queue that dropped callbacks
+// runs empty again, it logs how many the overflow episode dropped and how
+// many the queue dropped in all, so the host learns the whole count, not
+// only that dropping began (review II, R2-P6-bound-0209).
+func TestQueueReportsWhatAnOverflowCost(t *testing.T) {
+	q := serialqueue.New()
+	var logged bytes.Buffer
+	q.SetLogger(slog.New(slog.NewTextHandler(&logged, nil)))
+	q.Start()
+	for _, extra := range []int{7, 3} {
+		release, running := make(chan struct{}), make(chan struct{})
+		q.Enqueue(func() {
+			close(running)
+			<-release
+		})
+		<-running
+		for range serialqueue.Bound + extra {
+			q.Enqueue(func() {})
+		}
+		close(release)
+		for q.Len() > 0 {
+			runtime.Gosched()
+		}
+		q.Enqueue(func() {}) // runs after the episode's last callback
+		for q.Len() > 0 {
+			runtime.Gosched()
+		}
+	}
+	q.Stop()
+	out := logged.String()
+	for _, want := range []string{"dropped=7 total=7", "dropped=3 total=10"} {
+		if !strings.Contains(out, "matter.callbacks.overflow_ended") || !strings.Contains(out, want) {
+			t.Fatalf("the log does not report an episode with %q:\n%s", want, out)
+		}
 	}
 }
