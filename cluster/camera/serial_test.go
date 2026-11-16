@@ -5,12 +5,14 @@ package camera_test
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
@@ -169,5 +171,66 @@ func TestZonesCreateRunsOneAtATime(t *testing.T) {
 	wantCode(t, "second", <-second, im.StatusResourceExhausted)
 	if n := len(z.ZoneList()); n != zoneMaxUserDefined {
 		t.Fatalf("%d zones, want %d", n, zoneMaxUserDefined)
+	}
+}
+
+// gatedVideo is the stream port whose VideoStreamDeallocate waits on gate
+// after it reported, on entered, that it was called, and answers err.
+type gatedVideo struct {
+	*mockStreams
+	entered, gate chan struct{}
+	err           error
+}
+
+func (g gatedVideo) VideoStreamDeallocate(ctx context.Context, id uint16) error {
+	g.entered <- struct{}{}
+	<-g.gate
+	if g.err != nil {
+		return g.err
+	}
+	return g.mockStreams.VideoStreamDeallocate(ctx, id)
+}
+
+// TestAvStreamRefCountWaitsOutADeallocation interleaves a reference-count
+// increment with a VideoStreamDeallocate that waits on the stream port: a
+// stream that is leaving takes no new user — the increment answers
+// ErrStreamNotFound, as for a stream already gone — and the deallocation
+// completes. When the port refuses the deallocation the stream stays and
+// takes users again. Before, the increment answered nil between the count
+// check and the delete, and the stream went with a user counted on it
+// (review II, appinfra round 2, R2-P6-conc-1609's residue).
+func TestAvStreamRefCountWaitsOutADeallocation(t *testing.T) {
+	t.Parallel()
+	for _, refused := range []bool{false, true} {
+		g := gatedVideo{entered: make(chan struct{}, 1), gate: make(chan struct{})}
+		if refused {
+			g.err = errors.New("the encoder is busy")
+		}
+		a, m := newChipAvStream(t, func(cfg *camera.AvStreamConfig) { cfg.Video = &g })
+		g.mockStreams = m
+		resp, st := invokeStream(a, csdef.CmdVideoStreamAllocate, videoAllocate())
+		wantCode(t, "allocate", st, im.StatusSuccess)
+		id := resp.(csdef.VideoStreamAllocateResponse).VideoStreamId
+		done := make(chan im.StatusCode, 1)
+		go func() {
+			_, st := invokeStream(a, csdef.CmdVideoStreamDeallocate, csdef.VideoStreamDeallocateRequest{VideoStreamId: id})
+			done <- st
+		}()
+		<-g.entered
+		if err := a.UpdateVideoStreamRefCount(id, true); !errors.Is(err, camera.ErrStreamNotFound) {
+			t.Errorf("refused %v: increment on a leaving stream: %v, want ErrStreamNotFound", refused, err)
+		}
+		close(g.gate)
+		if refused {
+			wantCode(t, "refused deallocation", <-done, im.StatusFailure)
+			if err := a.UpdateVideoStreamRefCount(id, true); err != nil {
+				t.Errorf("increment after a refused deallocation: %v", err)
+			}
+			continue
+		}
+		wantCode(t, "deallocation", <-done, im.StatusSuccess)
+		if n := len(a.VideoStreams()); n != 0 {
+			t.Errorf("%d video streams after the deallocation", n)
+		}
 	}
 }

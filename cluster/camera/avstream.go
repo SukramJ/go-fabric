@@ -167,9 +167,13 @@ type AvStream struct {
 	// their commit ([serial]); pub serialises each change of the streams
 	// or the priorities with its publication ([AvStream.change]); mu
 	// guards the streams and the priorities.
-	op         sync.Mutex
-	pub        sync.Mutex
-	mu         sync.Mutex
+	op  sync.Mutex
+	pub sync.Mutex
+	mu  sync.Mutex
+	// leaving are the streams a Deallocate passed its checks for and is
+	// waiting on the port about: an increment of their count is refused
+	// as for a stream already gone, so none takes a user while it goes.
+	leaving    map[streamKey]bool
 	videos     []VideoStream
 	audios     []AudioStream
 	snapshots  []SnapshotStream
@@ -365,6 +369,67 @@ func (a *AvStream) served(values map[uint32]any) map[uint32]any {
 		}
 	}
 	return out
+}
+
+// streamKey names a stream: its list attribute and its id.
+type streamKey struct {
+	attrID uint32
+	id     uint16
+}
+
+// leave marks the stream as leaving, unless a user counted on it since
+// the Deallocate's check (INVALID_IN_STATE, as the check answers): the
+// mark and the count are read under one lock, so no increment slips in
+// between. The returned function clears the mark once the port answered
+// and the table changed or not (review II, appinfra round 2: the
+// reference-count race of R2-P6-conc-1609).
+func (a *AvStream) leave(key streamKey, count func() (uint8, bool)) (func(), error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if n, ok := count(); ok && n > 0 {
+		return nil, spec.Errorf(im.StatusInvalidInState, "CameraAvStreamManagement: stream %d still in use", key.id)
+	}
+	if a.leaving == nil {
+		a.leaving = map[streamKey]bool{}
+	}
+	a.leaving[key] = true
+	return func() {
+		a.mu.Lock()
+		delete(a.leaving, key)
+		a.mu.Unlock()
+	}, nil
+}
+
+// videoCount, audioCount and snapshotCount are a stream's reference count;
+// the caller holds a.mu.
+func (a *AvStream) videoCount(id uint16) func() (uint8, bool) {
+	return func() (uint8, bool) {
+		i := slices.IndexFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == id })
+		if i < 0 {
+			return 0, false
+		}
+		return a.videos[i].ReferenceCount, true
+	}
+}
+
+func (a *AvStream) audioCount(id uint16) func() (uint8, bool) {
+	return func() (uint8, bool) {
+		i := slices.IndexFunc(a.audios, func(s AudioStream) bool { return s.AudioStreamId == id })
+		if i < 0 {
+			return 0, false
+		}
+		return a.audios[i].ReferenceCount, true
+	}
+}
+
+func (a *AvStream) snapshotCount(id uint16) func() (uint8, bool) {
+	return func() (uint8, bool) {
+		i := slices.IndexFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == id })
+		if i < 0 {
+			return 0, false
+		}
+		return a.snapshots[i].ReferenceCount, true
+	}
 }
 
 // avStreamState is the state a change edits.
@@ -610,7 +675,7 @@ func (a *AvStream) PrivacyModes() (hard, softRecording, softLivestream bool) {
 
 // UpdateVideoStreamRefCount counts the video stream's use up or down.
 func (a *AvStream) UpdateVideoStreamRefCount(videoStreamID uint16, increment bool) error {
-	return a.updateRefCount(csdef.AttrAllocatedVideoStreams, func() (*uint8, bool) {
+	return a.updateRefCount(streamKey{csdef.AttrAllocatedVideoStreams, videoStreamID}, func() (*uint8, bool) {
 		i := slices.IndexFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == videoStreamID })
 		if i < 0 {
 			return nil, false
@@ -621,7 +686,7 @@ func (a *AvStream) UpdateVideoStreamRefCount(videoStreamID uint16, increment boo
 
 // UpdateAudioStreamRefCount counts the audio stream's use up or down.
 func (a *AvStream) UpdateAudioStreamRefCount(audioStreamID uint16, increment bool) error {
-	return a.updateRefCount(csdef.AttrAllocatedAudioStreams, func() (*uint8, bool) {
+	return a.updateRefCount(streamKey{csdef.AttrAllocatedAudioStreams, audioStreamID}, func() (*uint8, bool) {
 		i := slices.IndexFunc(a.audios, func(s AudioStream) bool { return s.AudioStreamId == audioStreamID })
 		if i < 0 {
 			return nil, false
@@ -633,7 +698,7 @@ func (a *AvStream) UpdateAudioStreamRefCount(audioStreamID uint16, increment boo
 // UpdateSnapshotStreamRefCount counts the snapshot stream's use up or
 // down.
 func (a *AvStream) UpdateSnapshotStreamRefCount(snapshotStreamID uint16, increment bool) error {
-	return a.updateRefCount(csdef.AttrAllocatedSnapshotStreams, func() (*uint8, bool) {
+	return a.updateRefCount(streamKey{csdef.AttrAllocatedSnapshotStreams, snapshotStreamID}, func() (*uint8, bool) {
 		i := slices.IndexFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == snapshotStreamID })
 		if i < 0 {
 			return nil, false
@@ -642,12 +707,12 @@ func (a *AvStream) UpdateSnapshotStreamRefCount(snapshotStreamID uint16, increme
 	}, increment)
 }
 
-func (a *AvStream) updateRefCount(attrID uint32, find func() (*uint8, bool), increment bool) error {
+func (a *AvStream) updateRefCount(key streamKey, find func() (*uint8, bool), increment bool) error {
 	var refused error
 	if err := a.change(contract.OriginHostSet, func() []uint32 {
 		count, ok := find()
 		switch {
-		case !ok:
+		case !ok, increment && a.leaving[key]: // a leaving stream takes no new user
 			refused = ErrStreamNotFound
 			return nil
 		case increment && *count == math.MaxUint8, !increment && *count == 0:
@@ -658,7 +723,7 @@ func (a *AvStream) updateRefCount(attrID uint32, find func() (*uint8, bool), inc
 		default:
 			*count--
 		}
-		return []uint32{attrID}
+		return []uint32{key.attrID}
 	}); err != nil {
 		return err
 	}
@@ -940,6 +1005,11 @@ func (a *AvStream) videoStreamDeallocate(ctx context.Context, fields any) (any, 
 	if err := a.checkVideoStream(req.VideoStreamId, true); err != nil {
 		return nil, err
 	}
+	done, err := a.leave(streamKey{csdef.AttrAllocatedVideoStreams, req.VideoStreamId}, a.videoCount(req.VideoStreamId))
+	if err != nil {
+		return nil, err
+	}
+	defer done()
 	if err := a.video.VideoStreamDeallocate(ctx, req.VideoStreamId); err != nil {
 		return nil, portError("VideoStreamDeallocate", err)
 	}
@@ -1015,6 +1085,11 @@ func (a *AvStream) audioStreamDeallocate(ctx context.Context, fields any) (any, 
 	if err := checkStream("audio", i >= 0, s.ReferenceCount, s.StreamUsage, true, req.AudioStreamId); err != nil {
 		return nil, err
 	}
+	done, err := a.leave(streamKey{csdef.AttrAllocatedAudioStreams, req.AudioStreamId}, a.audioCount(req.AudioStreamId))
+	if err != nil {
+		return nil, err
+	}
+	defer done()
 	if err := a.audio.AudioStreamDeallocate(ctx, req.AudioStreamId); err != nil {
 		return nil, portError("AudioStreamDeallocate", err)
 	}
@@ -1175,6 +1250,11 @@ func (a *AvStream) snapshotStreamDeallocate(ctx context.Context, fields any) (an
 	if err := a.checkSnapshotStream(req.SnapshotStreamId, true); err != nil {
 		return nil, err
 	}
+	done, err := a.leave(streamKey{csdef.AttrAllocatedSnapshotStreams, req.SnapshotStreamId}, a.snapshotCount(req.SnapshotStreamId))
+	if err != nil {
+		return nil, err
+	}
+	defer done()
 	if err := a.snapshot.SnapshotStreamDeallocate(ctx, req.SnapshotStreamId); err != nil {
 		return nil, portError("SnapshotStreamDeallocate", err)
 	}
