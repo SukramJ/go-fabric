@@ -47,6 +47,12 @@ type GroupKeyManagement struct {
 	// :1446-1457 at db021da0). It is taken before mu, never under it, and
 	// the store is called under it.
 	writeMu sync.Mutex
+	// keySetMu makes a key set's budget check and its store one step —
+	// KeySetWrite's and Groupcast's key creation alike — so concurrent
+	// creations never exceed MaxGroupKeysPerFabric (review II,
+	// R2-P6-bound-1015). It is taken before mu, never under it, and the
+	// store is called under it.
+	keySetMu sync.Mutex
 	// mu guards the fields below: the request's fabric, the limits and
 	// the cached key-set state.
 	mu                    sync.RWMutex
@@ -780,6 +786,51 @@ type KeySetWriteRequest struct {
 	GroupKeySet GroupKeySetStruct
 }
 
+// keySetWriteFields is the key set of a KeySetWrite request — the module's
+// [KeySetWriteRequest], or the generated one, whose nullable start times
+// say whether EpochStartTime1 and EpochStartTime2 are set (a 0 that is
+// not null is set).
+func keySetWriteFields(fields any) (gks GroupKeySetStruct, start1Set, start2Set, ok bool) {
+	switch req := fields.(type) {
+	case KeySetWriteRequest:
+		return req.GroupKeySet, false, false, true
+	case gkmdef.KeySetWriteRequest:
+		in := req.GroupKeySet
+		gks = GroupKeySetStruct{
+			GroupKeySetID:          in.GroupKeySetId,
+			GroupKeySecurityPolicy: uint8(in.GroupKeySecurityPolicy),
+			EpochKey0:              nullableBytes(in.EpochKey0),
+			EpochStartTime0:        in.EpochStartTime0.Value,
+			EpochKey1:              nullableBytes(in.EpochKey1),
+			EpochStartTime1:        in.EpochStartTime1.Value,
+			EpochKey2:              nullableBytes(in.EpochKey2),
+			EpochStartTime2:        in.EpochStartTime2.Value,
+		}
+		if in.EpochStartTime0.Null {
+			gks.EpochStartTime0 = 0
+		}
+		if in.EpochStartTime1.Null {
+			gks.EpochStartTime1 = 0
+		}
+		if in.EpochStartTime2.Null {
+			gks.EpochStartTime2 = 0
+		}
+		if in.GroupKeyMulticastPolicy != nil {
+			gks.GroupKeyMulticastPolicy = uint8(*in.GroupKeyMulticastPolicy)
+		}
+		return gks, !in.EpochStartTime1.Null, !in.EpochStartTime2.Null, true
+	}
+	return GroupKeySetStruct{}, false, false, false
+}
+
+// nullableBytes is v's bytes, nil for null.
+func nullableBytes(v spec.Nullable[[]byte]) []byte {
+	if v.Null {
+		return nil
+	}
+	return v.Value
+}
+
 // KeySetReadRequest mirrors Matter §11.2.10.6.2.
 type KeySetReadRequest struct {
 	GroupKeySetID uint16
@@ -921,11 +972,10 @@ const max64BitTime uint64 = 0xFFFFFFFFFFFFFFFF
 const ipkDefaultEpochStartTime uint64 = 0
 
 func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8, fields any) (any, error) {
-	req, ok := fields.(KeySetWriteRequest)
+	gks, start1Set, start2Set, ok := keySetWriteFields(fields)
 	if !ok {
 		return nil, fmt.Errorf("%w: KeySetWriteRequest expected, got %T", errGroupKeyMgmtInvalidArg, fields)
 	}
-	gks := req.GroupKeySet
 
 	// Mirrors matter.js packages/node/src/behaviors/group-key-management/
 	// GroupKeyManagementServer.ts:291-357 at db021da0. Five validation classes,
@@ -950,10 +1000,12 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	if gks.EpochStartTime1 == max64BitTime {
 		gks.EpochStartTime1 = 0
 		gks.EpochKey1 = nil
+		start1Set = false
 	}
 	if gks.EpochStartTime2 == max64BitTime {
 		gks.EpochStartTime2 = 0
 		gks.EpochKey2 = nil
+		start2Set = false
 	}
 
 	// EpochKey length constraint: each non-nil key must be exactly 16 bytes.
@@ -982,7 +1034,12 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	if len(gks.EpochKey1) > 0 && (gks.EpochStartTime1 == 0 || gks.EpochStartTime1 <= gks.EpochStartTime0) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
 	}
-	if len(gks.EpochKey1) == 0 && gks.EpochStartTime1 != 0 {
+	// A null key with a start time that is not null — 0 included — is
+	// refused, as matter.js refuses it (GroupKeyManagementServer.ts:335-337,
+	// :351-353 at db021da0); a request in the module's own struct carries
+	// no null, and there a start time of 0 reads as absent (review II,
+	// R2-P6-par-1013).
+	if len(gks.EpochKey1) == 0 && (start1Set || gks.EpochStartTime1 != 0) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
 	}
 
@@ -992,7 +1049,7 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	if len(gks.EpochKey2) > 0 && (gks.EpochStartTime2 == 0 || gks.EpochStartTime1 == 0 || gks.EpochStartTime2 <= gks.EpochStartTime1) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
 	}
-	if len(gks.EpochKey2) == 0 && gks.EpochStartTime2 != 0 {
+	if len(gks.EpochKey2) == 0 && (start2Set || gks.EpochStartTime2 != 0) {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
 	}
 
@@ -1003,7 +1060,9 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	// never stored — matter.js 452d6f5c dropped the PerGroupID-only check
 	// (GroupKeyManagementServer.ts:keySetWrite → withoutMulticastPolicy).
 
+	g.keySetMu.Lock()
 	if err := g.enforceKeySetBudget(ctx, fabric, gks.GroupKeySetID); err != nil {
+		g.keySetMu.Unlock()
 		return nil, err
 	}
 
@@ -1018,7 +1077,9 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 		EpochKey2:      gks.EpochKey2,
 		EpochStart2:    gks.EpochStartTime2,
 	}
-	if err := g.store.UpsertGroupKeySet(ctx, rec); err != nil {
+	err := g.store.UpsertGroupKeySet(ctx, rec)
+	g.keySetMu.Unlock()
+	if err != nil {
 		return nil, fmt.Errorf("core: KeySetWrite: %w", err)
 	}
 	// Bump DataVersion after a successful KeySetWrite so DataVersionFilter
@@ -1050,8 +1111,11 @@ func (g *GroupKeyManagement) enforceKeySetBudget(ctx context.Context, fabric uin
 			written++
 		}
 	}
-	if written+1 >= int(g.maxGroupKeysPerFabric) {
-		return groupKeyExhaustedErr{maxKeys: g.maxGroupKeysPerFabric}
+	g.mu.RLock()
+	limit := g.maxGroupKeysPerFabric
+	g.mu.RUnlock()
+	if written+1 >= int(limit) {
+		return groupKeyExhaustedErr{maxKeys: limit}
 	}
 	return nil
 }
@@ -1170,13 +1234,17 @@ func (g *GroupKeyManagement) validateKeySetID(ctx context.Context, fabric uint8,
 // MaxGroupKeysPerFabric budget. Mirrors matter.js
 // GroupKeyManagementServer.createKeySetForGroupcast.
 func (g *GroupKeyManagement) createKeySetForGroupcast(ctx context.Context, fabric uint8, id uint16, key []byte) error {
+	g.keySetMu.Lock()
 	if err := g.enforceKeySetBudget(ctx, fabric, id); err != nil {
+		g.keySetMu.Unlock()
 		return err
 	}
-	if err := g.store.UpsertGroupKeySet(ctx, store.GroupKeySet{
+	err := g.store.UpsertGroupKeySet(ctx, store.GroupKeySet{
 		FabricIndex: fabric, GroupKeySetID: id, SecurityPolicy: store.SecurityPolicyTrustFirst,
 		EpochKey0: slices.Clone(key), EpochStart0: groupcastKeyEpochStartTime,
-	}); err != nil {
+	})
+	g.keySetMu.Unlock()
+	if err != nil {
 		return fmt.Errorf("core: GroupKeyManagement: create Groupcast key set: %w", err)
 	}
 	g.dataVersion.Bump()
