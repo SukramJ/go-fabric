@@ -14,7 +14,6 @@ import (
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // OTAConfig turns on the controller's OTA push — matter.js's
@@ -112,7 +111,7 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 
 // startOTA retires a former own node and starts the manager.
 func (c *Controller) startOTA(ctx context.Context, cfg Config) error {
-	if err := c.retireOwnNode(ctx, store.New(cfg.DB), c.log); err != nil {
+	if err := c.retireOwnNode(ctx, c.st, c.log); err != nil {
 		return err
 	}
 	c.ota.Load().Start()

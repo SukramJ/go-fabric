@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // Erase is the controller's factory reset: it closes the controller and
@@ -73,7 +72,7 @@ func (c *Controller) Erase(ctx context.Context) error {
 			errs = append(errs, fmt.Errorf("controller: erase node %s: %w", id, err))
 		}
 	}
-	if err := store.New(c.db).Erase(ctx); err != nil {
+	if err := c.st.Erase(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("controller: erase: %w", err))
 	}
 	return errors.Join(errs...)

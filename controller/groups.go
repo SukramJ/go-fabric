@@ -30,7 +30,7 @@ import (
 func (c *Controller) openGroups(ctx context.Context, cfg Config, log *slog.Logger) error {
 	// The own fabric row the key sets hang on is settled in New, before the
 	// socket opens (ensureFabricRow).
-	st := store.New(cfg.DB)
+	st := c.st
 	m, err := groups.NewManager(st, log)
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (c *Controller) SetGroupKey(ctx context.Context, keySet store.GroupKeySet, 
 	if c.closed || c.groups == nil {
 		return errClosed
 	}
-	st := store.New(c.db)
+	st := c.st
 	keySet.FabricIndex = c.fabricIndex()
 	if err := st.UpsertGroupKeySet(ctx, keySet); err != nil {
 		return err

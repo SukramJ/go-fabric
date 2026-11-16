@@ -153,6 +153,19 @@ type Config struct {
 	// secret — with it and a factory reset anyone can commission the
 	// device — and the database then holds one per node.
 	KeepOnboardingCodes bool
+	// Sealer seals the secrets of the controller's store on DB (opt-in, off
+	// by default), as node.Store.Sealer seals a node's: New opens the
+	// store with store.NewSealed, which seals the clear rows it finds and
+	// scrubs the file, and returns its error. What it seals here: the CASE
+	// resumption records and the group key sets the controller keeps.
+	// The key must live outside the database (docs/security.md, "Sealing
+	// at rest"). Every later New needs the same sealer: under another key
+	// New fails with an error that wraps store.ErrUnseal (NewSealed opens
+	// one sealed value first); a store without one reads a sealed secret as
+	// store.ErrNoSealer. The CA's settings and the node registry are not
+	// sealed by it: ca.Config.RootSigner (Config.CAKey) keeps the root key
+	// out of the database.
+	Sealer store.Sealer
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
 	Names func(*slog.Logger) (*discovery.Names, error)
@@ -290,7 +303,10 @@ type Config struct {
 // fixed at New, keep answering, and Erase is the reset that runs after a
 // Close.
 type Controller struct {
-	db  *sql.DB
+	db *sql.DB
+	// st is the controller's store on db, sealed with Config.Sealer when
+	// one is set: every read and write of the store tables goes through it.
+	st  *store.Store
 	log *slog.Logger
 	// keepCodes is Config.KeepOnboardingCodes.
 	keepCodes bool
@@ -429,7 +445,10 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if err := errors.Join(store.Apply(ctx, cfg.DB), sqlstore.Apply(ctx, cfg.DB)); err != nil {
 		return nil, err
 	}
-	keep := ca.SettingStore{Settings: store.New(cfg.DB)} // "controller.ca" and "controller.ca.fabric"
+	if c.st, err = openStore(ctx, cfg); err != nil {
+		return nil, err
+	}
+	keep := ca.SettingStore{Settings: c.st} // "controller.ca" and "controller.ca.fabric"
 	authority, err := ca.New(ca.Config{Store: keep, Clock: clk, RootSigner: cfg.CAKey})
 	if err != nil {
 		return nil, err
@@ -451,7 +470,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	// registered: a row the former own node left is taken over with its
 	// resumption records gone, so no peer resumes with one of them in the
 	// start-up window (review II, Fable P-4a).
-	if err := c.ensureFabricRow(ctx, store.New(cfg.DB)); err != nil {
+	if err := c.ensureFabricRow(ctx, c.st); err != nil {
 		return nil, err
 	}
 	networks, err := c.openTransports(ctx, cfg, listen, openNames, clk, log)
@@ -464,7 +483,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	// own fabric row, which ensureFabricRow settled above, before the
 	// socket opened and before the peer set and the CASE responder below
 	// read the table.
-	resumption := handshake.NewStoreResumption(store.New(cfg.DB))
+	resumption := handshake.NewStoreResumption(c.st)
 	fabrics := []*commissioner.Fabric{c.fabric}
 	pctx := peer.Context{
 		Exchanges: c.mgr, Names: c.names, Fabrics: c.fabric.Lookup, Resumption: resumption, Logger: log, Clock: clk, Networks: networks,
@@ -562,7 +581,21 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 	}
 	// A database that ran the own node is migrated whether or not the
 	// controller serves OTA (review II, R2-P1-ctl-03).
-	return c.retireOwnNode(ctx, store.New(cfg.DB), c.log)
+	return c.retireOwnNode(ctx, c.st, c.log)
+}
+
+// openStore builds the controller's store on cfg.DB, sealed with
+// cfg.Sealer when one is set (store.NewSealed; the schema is applied),
+// as node's openCredentials does.
+func openStore(ctx context.Context, cfg Config) (*store.Store, error) {
+	if cfg.Sealer == nil {
+		return store.New(cfg.DB), nil
+	}
+	st, err := store.NewSealed(ctx, cfg.DB, cfg.Sealer)
+	if err != nil {
+		return nil, fmt.Errorf("controller: open the sealed store: %w", err)
+	}
+	return st, nil
 }
 
 // openTransports builds the network profiles and opens the network over

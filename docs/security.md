@@ -17,11 +17,12 @@ Two facts govern everything below:
    live in that database **unencrypted**, and so do the CASE resumption
    secrets — a device's and the controller's — and a Wi-Fi node's network
    credentials ([what the store holds in clear](#what-the-store-holds-in-clear)). A
-   device's store seals them when the host hands it a sealer whose key lives
-   outside the database (`store.NewSealed`, [sealing at
-   rest](#sealing-at-rest)); the controller's store does not — the
-   controller has no sealing option, and its database is protected by
-   nothing beyond the file. File location,
+   device's store and the controller's seal them when the host hands it a
+   sealer whose key lives outside the database (`store.NewSealed`,
+   `node.Store.Sealer`, `controller.Config.Sealer`; [sealing at
+   rest](#sealing-at-rest)); without one the database is protected by
+   nothing beyond the file. The controller's CA key is not sealed by it
+   (`Config.CAKey` keeps it out of the database). File location,
    permissions and the sealing key are the host's.
 
 ## Device side
@@ -150,8 +151,16 @@ before it seals anything, `NewSealed` opens one sealed value the database
 already holds (the first sealed identity, else another sealed row or
 setting); a database with no sealed value yet opens. A store without the
 sealer reads a sealed secret as `store.ErrNoSealer`. Provisioning and rotating
-the key are the host's; the module rotates nothing. The controller's store — its CA key, its node
-records — is not sealed.
+the key are the host's; the module rotates nothing.
+
+The controller takes the same sealer as `controller.Config.Sealer` (opt-in,
+off by default): `New` opens its store with `store.NewSealed`, under the
+same rules — another key fails `New` with `store.ErrUnseal`, a store without
+the sealer reads a sealed secret as `store.ErrNoSealer`. It seals the CASE
+resumption records and the group key sets the controller keeps; its CA
+settings and its node records (the registry, kept onboarding codes
+included) are not sealed — `Config.CAKey` (`ca.Config.RootSigner`) keeps the
+root key out of the database.
 
 *Source: `store/seal.go` (`Sealer`, `AESGCMSealer`, `NewSealed`;
 `TestSealedStoreLeavesNoClearSecret`, `TestNewSealedSealsAClearDatabase`,
@@ -167,7 +176,7 @@ records — is not sealed.
 | Device attestation | DAC → PAI → PAA chain, the Certification Declaration and, with a revocation store, the CRLs (Matter Core §6.2.6.1). Findings are resolved by `commissioner.Options.OnAttestationFailure`. | Set `attestation.Reject()` (or a deciding function) in production. **The zero policy proceeds with a warning**, as matter.js's undefined policy does — and the steps that follow attestation include network provisioning, so the Wi-Fi credentials or the Thread dataset of `commissioner.Options` (`WiFiNetwork`, `ThreadNetwork`) then go to a device whose attestation failed (`controller/commissioner/flow.go`, `flow.initializeSteps`, the step order). |
 | Trust anchors | `attestation.Trust`: the CSA's five built-in CD signing keys and the Matter test CD signer (`attestation.KnownCDSigner`), the production PAAs and CD signers of the embedded DCL snapshot (`controller/dcl/snapshot`, refreshed by a reviewed `make update-dcl-snapshot`), plus the CSA test PAAs in `attestation.Development`; the online Distributed Compliance Ledger through `controller/dcl` on top | Use `attestation.Production` for real deployments, with a `dcl.CertificateStore` for the CRL revocation check — the snapshot holds no revocation data. Nothing contacts the ledger unless the host builds a client. With one, the controller also fetches the URLs the ledger's records name: CRL distribution points over `http:` or `https:` — the schema text matter.js carries allows both (`packages/types/src/dcl/device-attestation-revocation.ts:98-101` at db021da0) and matter.js fetches either (`DclCertificateService.ts:1639-1641`); the CRL is authenticated by its signature (`controller/dcl/revocation.go`, `CertificateStore.downloadCRL`) — and OTA images over `https:` only (`controller/dcl/ota.go`, `OTAVersions.Download`). The URLs the GitHub API's answers name, when the store mirrors the development certificates (`controller/dcl/github.go`), are treated the same way; the configured `GitHubConfig.APIURL` is the host's. Without a host `http.Client`, such a download connects to public addresses only: a loopback, private, link-local, unspecified or multicast address (IPv4, IPv6, IPv4-mapped) is refused when it is dialled — only those five classes; other special-use ranges such as 100.64.0.0/10, NAT64 64:ff9b::/96 or 6to4 2002::/16 are not refused; the check runs for the URL itself and every redirect hop, after name resolution (`newGuardedClient` in `controller/dcl/client.go`); `dcl.Client.AllowPrivateDestinations` lifts that for a lab (`softwareupdate.Images` takes the test-net client's switch for a test-net record). A host's `dcl.Client.HTTPClient` is the host's policy and is not guarded. The environment's proxy stays in use: a URL or redirect hop whose host is `localhost` or an IP address of those classes is refused before it is handed to the proxy — the host judged as net/http sends it (mapped to ASCII for a CONNECT), lower-cased, without a trailing dot, an IPv4 address in any inet_aton-style spelling (decimal, octal, hexadecimal, short forms) included; a SOCKS proxy is not handed a host outside ASCII — and a host name sent through the proxy is the proxy's to resolve and connect to. An image the host names by URL itself (`softwareupdate.Images.UpdateInfoFromURL`, `OTAVersions.DownloadHostURL`) may use `http:` and any address. A download that starts at an `https:` URL follows no redirect away from `https:`, whatever the host's `http.Client` (`downloadClient` in `controller/dcl/client.go`). |
 | The fabric's root key | held in the fabric record in the host's store unless `ca.Config.RootSigner` / `ICACSigner` (and `commissioner.FabricConfig.OperationalSigner` for the operational key) hand it to a `crypto.Signer`: then the record holds the certificates and a key reference only; a three-tier PKI (root offline, an ICAC online) keeps the root out too | Protect the database, or keep the keys in an HSM, KMS or TPM behind a signer; `controller/ca/keyfile` is a passphrase-encrypted file signer and documents how to wire PKCS#11 or a KMS |
-| Session resumption state | kept in the controller's database: one record per node it has had a CASE session with, holding that session's shared secret, so a restarted controller resumes instead of running full CASE (`controller/controller.go`, the `handshake.NewStoreResumption(store.New(cfg.DB))` it builds in `New`; table `matter_resumption`). The record is in clear — the controller's store has no sealing option — and whoever reads the database, or a copy of it, can resume a session as the controller's node with that device until the record is replaced. A device persists its records the same way, [in clear](#what-the-store-holds-in-clear) unless its store is sealed | Protect the database as the fabric's keys: file permissions, an encrypted volume, backups treated as key material |
+| Session resumption state | kept in the controller's database: one record per node it has had a CASE session with, holding that session's shared secret, so a restarted controller resumes instead of running full CASE (`controller/controller.go`, the `handshake.NewStoreResumption` over the store it opens in `New`; table `matter_resumption`). Without `Config.Sealer` the record is in clear, and whoever reads the database, or a copy of it, can resume a session as the controller's node with that device until the record is replaced; with it the record is sealed ([sealing at rest](#sealing-at-rest)). A device persists its records the same way, [in clear](#what-the-store-holds-in-clear) unless its store is sealed | Set `Config.Sealer` with a key outside the database, or protect the database as the fabric's keys: file permissions, an encrypted volume, backups treated as key material |
 | Node identities | one fabric per controller database; node ids from the registry | Back up the database with the fabric |
 | Kept onboarding codes | off by default. With `Config.KeepOnboardingCodes`, or after `Node.SetOnboardingCode`, the controller's store holds a node's QR or manual pairing code — the device's setup passcode — in plain text, as it holds the fabric's keys. Whoever reads the store or calls `Controller.Inventory()` can read it. The passcode is worth something whenever the device accepts it again: after a factory reset, or in a basic commissioning window. `client.SecretCode` renders as `redacted` under `fmt`, `slog` and `encoding/json`; `Reveal()` returns the text | Protect the database as the keys. An API that serves the inventory hands out setup passcodes: give it the authorisation an export of the fabric's keys would need, and call `Reveal()` only where the code is shown or printed |
 
