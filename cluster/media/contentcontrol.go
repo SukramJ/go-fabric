@@ -34,15 +34,6 @@ func contentControlValues(st ContentControlState) map[uint32]any {
 	}
 }
 
-func cloneContentControl(st ContentControlState) ContentControlState {
-	st.OnDemandRatings = cloneSlice(st.OnDemandRatings)
-	st.ScheduledContentRatings = cloneSlice(st.ScheduledContentRatings)
-	st.BlockChannelList = cloneSlice(st.BlockChannelList)
-	st.BlockApplicationList = cloneSlice(st.BlockApplicationList)
-	st.BlockContentTimeWindow = cloneSlice(st.BlockContentTimeWindow)
-	return st
-}
-
 // The ContentControl host ports are the generated ones (contentcontroldef):
 // ContentControl carries out Enable and Disable (:87-88), status only, and
 // each feature's commands are a further interface, required with the
@@ -177,7 +168,7 @@ func NewContentControl(cfg ContentControlConfig) (*ContentControlServer, error) 
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, contentControlValues, cloneContentControl, storeState[ContentControlState]); err != nil {
+	if err := s.init(srv, cfg.Initial, contentControlValues, ContentControlState.Clone, storeState[ContentControlState]); err != nil {
 		return nil, fmt.Errorf("media: ContentControl: %w", err)
 	}
 	if err := checkState(srv); err != nil {

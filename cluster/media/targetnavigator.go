@@ -26,11 +26,6 @@ func targetValues(st TargetState) map[uint32]any {
 	}
 }
 
-func cloneTarget(st TargetState) TargetState {
-	st.TargetList = cloneSlice(st.TargetList)
-	return st
-}
-
 // Targets is the TargetNavigator host port (the generated
 // [targetdef.Targets], the declaration's Targets): NavigateTarget
 // (:41-48), answered by NavigateTargetResponse (:50-54); the port makes
@@ -75,7 +70,7 @@ func NewTargets(cfg TargetsConfig) (*TargetsServer, error) {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, targetValues, cloneTarget, storeState[TargetState]); err != nil {
+	if err := s.init(srv, cfg.Initial, targetValues, TargetState.Clone, storeState[TargetState]); err != nil {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
 	if err := checkState(srv); err != nil {

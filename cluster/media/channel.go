@@ -29,13 +29,6 @@ func channelValues(st ChannelState) map[uint32]any {
 	}
 }
 
-func cloneChannel(st ChannelState) ChannelState {
-	st.ChannelList = cloneSlice(st.ChannelList)
-	st.Lineup = clonePtr(st.Lineup)
-	st.CurrentChannel = clonePtr(st.CurrentChannel)
-	return st
-}
-
 // Channels is the Channel host port (the generated [channeldef.Channels],
 // the declaration's Channels). ChangeChannelByNumber and SkipChannel are
 // mandatory (:57-69), status only; ChangeChannel (CL | LI, :43-55) answers
@@ -113,7 +106,7 @@ func NewChannels(cfg ChannelsConfig) (*ChannelsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, channelValues, cloneChannel, storeState[ChannelState]); err != nil {
+	if err := s.init(srv, cfg.Initial, channelValues, ChannelState.Clone, storeState[ChannelState]); err != nil {
 		return nil, fmt.Errorf("media: Channel: %w", err)
 	}
 	return s, nil

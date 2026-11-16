@@ -605,13 +605,13 @@ func (a datastoreAttrs) MatterAttribute(attrID uint32) (any, bool) {
 	case dsdef.AttrFriendlyName:
 		return t.FriendlyName, true
 	case dsdef.AttrGroupKeySetList:
-		return spec.List[GroupKeySet](cloneKeySets(t.GroupKeySets)), true
+		return spec.List[GroupKeySet](cloneEach(t.GroupKeySets)), true
 	case dsdef.AttrGroupList:
 		return spec.List[GroupEntry](slices.Clone(t.Groups)), true
 	case dsdef.AttrNodeList:
 		return spec.List[NodeEntry](slices.Clone(t.Nodes)), true
 	case dsdef.AttrAdminList:
-		return spec.List[AdminEntry](cloneAdmins(t.Admins)), true
+		return spec.List[AdminEntry](cloneEach(t.Admins)), true
 	case dsdef.AttrStatus:
 		return t.Status, true
 	case dsdef.AttrEndpointGroupIdList:
@@ -636,25 +636,13 @@ func encodeACLs(acls []aclEntry) []ACLEntry {
 	return out
 }
 
-func cloneKeySet(k GroupKeySet) GroupKeySet {
-	k.EpochKey0.Value = slices.Clone(k.EpochKey0.Value)
-	k.EpochKey1.Value = slices.Clone(k.EpochKey1.Value)
-	k.EpochKey2.Value = slices.Clone(k.EpochKey2.Value)
-	return k
-}
-
-func cloneKeySets(in []GroupKeySet) []GroupKeySet {
-	out := make([]GroupKeySet, len(in))
+// cloneEach deep-copies a table through each entry's generated Clone
+// (clustergen, decision 142): a key set's epoch keys, an administrator's
+// ICAC and a binding's ids are the copy's own.
+func cloneEach[T interface{ Clone() T }](in []T) []T {
+	out := make([]T, len(in))
 	for i := range in {
-		out[i] = cloneKeySet(in[i])
-	}
-	return out
-}
-
-func cloneAdmins(in []AdminEntry) []AdminEntry {
-	out := slices.Clone(in)
-	for i := range out {
-		out[i].Icac = slices.Clone(out[i].Icac)
+		out[i] = in[i].Clone()
 	}
 	return out
 }
@@ -716,14 +704,14 @@ func (d *Datastore) NodeList() []NodeEntry {
 func (d *Datastore) GroupKeySetList() []GroupKeySet {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return cloneKeySets(d.t.GroupKeySets)
+	return cloneEach(d.t.GroupKeySets)
 }
 
 // AdminList returns the administrators.
 func (d *Datastore) AdminList() []AdminEntry {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return cloneAdmins(d.t.Admins)
+	return cloneEach(d.t.Admins)
 }
 
 // GroupList returns the groups.

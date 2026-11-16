@@ -23,11 +23,6 @@ func inputValues(st InputState) map[uint32]any {
 	}
 }
 
-func cloneInput(st InputState) InputState {
-	st.InputList = cloneSlice(st.InputList)
-	return st
-}
-
 // Inputs is the MediaInput host port (the generated [inputdef.Inputs], the
 // declaration's Inputs): SelectInput, ShowInputStatus and HideInputStatus
 // (:30-35), status only. A port that also implements [InputRenamer] takes
@@ -89,7 +84,7 @@ func NewInputs(cfg InputsConfig) (*InputsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, inputValues, cloneInput, storeState[InputState]); err != nil {
+	if err := s.init(srv, cfg.Initial, inputValues, InputState.Clone, storeState[InputState]); err != nil {
 		return nil, fmt.Errorf("media: MediaInput: %w", err)
 	}
 	if err := checkState(srv); err != nil {

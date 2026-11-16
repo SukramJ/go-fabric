@@ -298,10 +298,11 @@ func nullListOr[T spec.Encodable](p *[]T) any {
 // The state clones are deep (R2-P6-err-1460, decision 142): a port that
 // changes the copy it is handed — through a list, a pointer or a field
 // nested in either — touches no committed value, and neither does a host
-// that changes the copy [stateful.State] returns. Each entry is copied by
-// its generated Clone where the generated type has one (a struct that
-// holds a list or pointer); a value with nothing to share is copied as it
-// is.
+// that changes the copy [stateful.State] returns. A generated state is
+// copied by its generated State.Clone; [AppBasicState], the one state of
+// this package's own, entry by entry by the helpers below — each entry by
+// its generated Clone where the generated type has one, a value with
+// nothing to share as it is.
 
 // cloneOf is v's generated deep Clone, or v itself when its type has none.
 func cloneOf[T any](v T) T {
@@ -331,15 +332,6 @@ func clonePtr[T any](p *T) *T {
 	}
 	v := cloneOf(*p)
 	return &v
-}
-
-// cloneList copies the list p points to ([cloneSlice]); nil stays nil.
-func cloneList[T any](p *[]T) *[]T {
-	if p == nil {
-		return nil
-	}
-	l := cloneSlice(*p)
-	return &l
 }
 
 // nullOr is *p, or nil (null) when p is nil.

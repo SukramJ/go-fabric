@@ -22,11 +22,6 @@ func outputValues(st OutputState) map[uint32]any {
 	}
 }
 
-func cloneOutput(st OutputState) OutputState {
-	st.OutputList = cloneSlice(st.OutputList)
-	return st
-}
-
 // Outputs is the AudioOutput host port (the generated [outputdef.Outputs],
 // the declaration's Outputs): SelectOutput (:30-33), status only; the port
 // makes the output current in st. A port that also implements
@@ -77,7 +72,7 @@ func NewOutputs(cfg OutputsConfig) (*OutputsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, outputValues, cloneOutput, storeState[OutputState]); err != nil {
+	if err := s.init(srv, cfg.Initial, outputValues, OutputState.Clone, storeState[OutputState]); err != nil {
 		return nil, fmt.Errorf("media: AudioOutput: %w", err)
 	}
 	if err := checkState(srv); err != nil {

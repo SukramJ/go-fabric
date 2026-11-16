@@ -29,11 +29,6 @@ func contentLauncherValues(st ContentLauncherState) map[uint32]any {
 	}
 }
 
-func cloneContentLauncher(st ContentLauncherState) ContentLauncherState {
-	st.AcceptHeader = cloneSlice(st.AcceptHeader)
-	return st
-}
-
 // ContentLauncher is the ContentLauncher host port (the generated
 // [launchdef.ContentLauncher], the declaration's ContentLauncher):
 // LaunchContent (ContentSearch, CS, :44-54) and LaunchURL (UrlPlayback,
@@ -80,7 +75,7 @@ func NewContentLauncher(cfg ContentLauncherConfig) (*ContentLauncherServer, erro
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, contentLauncherValues, cloneContentLauncher, storeState[ContentLauncherState]); err != nil {
+	if err := s.init(srv, cfg.Initial, contentLauncherValues, ContentLauncherState.Clone, storeState[ContentLauncherState]); err != nil {
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
 	return s, nil

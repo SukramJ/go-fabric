@@ -238,7 +238,7 @@ func (d *Datastore) updateNodeKeySetListLocked(ks GroupKeySet, p *[]pushFn) {
 			d.markLocked(dsdef.AttrNodeKeySetList)
 			return
 		}
-		*p = append(*p, d.pushKeySet(e.NodeId, cloneKeySet(ks)))
+		*p = append(*p, d.pushKeySet(e.NodeId, ks.Clone()))
 	}
 }
 
@@ -691,29 +691,6 @@ func bindingMatches(a, b BindingTarget) bool {
 	return optEqual(a.Node, b.Node) && optEqual(a.Group, b.Group) && optEqual(a.Endpoint, b.Endpoint) && optEqual(a.Cluster, b.Cluster)
 }
 
-func cloneBinding(b BindingTarget) BindingTarget {
-	clonePtr := func(p *uint64) *uint64 {
-		if p == nil {
-			return nil
-		}
-		v := *p
-		return &v
-	}
-	clone16 := func(p *uint16) *uint16 {
-		if p == nil {
-			return nil
-		}
-		v := *p
-		return &v
-	}
-	var c *uint32
-	if b.Cluster != nil {
-		v := *b.Cluster
-		c = &v
-	}
-	return BindingTarget{Node: clonePtr(b.Node), Group: clone16(b.Group), Endpoint: clone16(b.Endpoint), Cluster: c}
-}
-
 // AddBindingToEndpointForNode adds a binding to a node's endpoint, Pending
 // with a new list id, pushes it and commits it: an endpoint not held is a
 // ConstraintError, a matching binding succeeds unchanged, a full list
@@ -738,7 +715,7 @@ func (d *Datastore) addBindingLocked(nodeID uint64, endpointID uint16, binding B
 	if len(d.t.Bindings) >= MaxGroups { // :1930
 		return ErrNoMemory
 	}
-	entry := EndpointBindingEntry{NodeId: nodeID, EndpointId: endpointID, Binding: cloneBinding(binding), ListId: d.nextListIDLocked(), StatusEntry: StatusEntry{State: statePending}}
+	entry := EndpointBindingEntry{NodeId: nodeID, EndpointId: endpointID, Binding: binding.Clone(), ListId: d.nextListIDLocked(), StatusEntry: StatusEntry{State: statePending}}
 	d.t.Bindings = append(d.t.Bindings, entry)
 	d.markLocked(dsdef.AttrEndpointBindingList)
 	*p = append(*p, func(ctx context.Context) error { // :1943-1952

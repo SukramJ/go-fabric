@@ -37,19 +37,6 @@ func playbackValues(st PlaybackState) map[uint32]any {
 	}
 }
 
-func clonePlayback(st PlaybackState) PlaybackState {
-	st.StartTime = clonePtr(st.StartTime)
-	st.Duration = clonePtr(st.Duration)
-	st.SampledPosition = clonePtr(st.SampledPosition)
-	st.SeekRangeEnd = clonePtr(st.SeekRangeEnd)
-	st.SeekRangeStart = clonePtr(st.SeekRangeStart)
-	st.ActiveAudioTrack = clonePtr(st.ActiveAudioTrack)
-	st.AvailableAudioTracks = cloneList(st.AvailableAudioTracks)
-	st.ActiveTextTrack = clonePtr(st.ActiveTextTrack)
-	st.AvailableTextTracks = cloneList(st.AvailableTextTracks)
-	return st
-}
-
 // Playback is the MediaPlayback host port (the generated
 // [mpdef.Playback], the declaration's Playback): the three mandatory
 // transport commands (media-playback.element.ts:96-98), each answering a
@@ -197,7 +184,7 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, playbackValues, clonePlayback, storeState[PlaybackState]); err != nil {
+	if err := s.init(srv, cfg.Initial, playbackValues, PlaybackState.Clone, storeState[PlaybackState]); err != nil {
 		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
 	}
 	if err := checkState(srv); err != nil {

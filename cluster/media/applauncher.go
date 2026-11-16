@@ -25,12 +25,6 @@ func appLauncherValues(st AppLauncherState) map[uint32]any {
 	}
 }
 
-func cloneAppLauncher(st AppLauncherState) AppLauncherState {
-	st.CatalogList = cloneSlice(st.CatalogList)
-	st.CurrentApp = clonePtr(st.CurrentApp)
-	return st
-}
-
 // AppLauncher is the ApplicationLauncher host port (the generated
 // [launcherdef.AppLauncher], the declaration's AppLauncher): LaunchApp,
 // StopApp and HideApp (:34-50), each answered by LauncherResponse
@@ -83,7 +77,7 @@ func NewAppLauncher(cfg AppLauncherConfig) (*AppLauncherServer, error) {
 		return nil, fmt.Errorf("media: ApplicationLauncher: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, appLauncherValues, cloneAppLauncher, storeState[AppLauncherState]); err != nil {
+	if err := s.init(srv, cfg.Initial, appLauncherValues, AppLauncherState.Clone, storeState[AppLauncherState]); err != nil {
 		return nil, fmt.Errorf("media: ApplicationLauncher: %w", err)
 	}
 	if err := checkState(srv); err != nil {

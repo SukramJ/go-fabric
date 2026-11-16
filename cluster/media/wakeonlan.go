@@ -24,11 +24,6 @@ func wakeOnLanValues(st WakeOnLanState) map[uint32]any {
 	}
 }
 
-func cloneWakeOnLan(st WakeOnLanState) WakeOnLanState {
-	st.LinkLocalAddress = cloneSlice(st.LinkLocalAddress)
-	return st
-}
-
 // WakeOnLanConfig carries the construction parameters of a WakeOnLan
 // server; the cluster has no commands.
 type WakeOnLanConfig struct {
@@ -55,7 +50,7 @@ func NewWakeOnLan(cfg WakeOnLanConfig) (*WakeOnLanServer, error) {
 		return nil, fmt.Errorf("media: WakeOnLan: %w", err)
 	}
 	s := &WakeOnLanServer{Server: srv}
-	if err := s.init(srv, cfg.Initial, wakeOnLanValues, cloneWakeOnLan, storeState[WakeOnLanState]); err != nil {
+	if err := s.init(srv, cfg.Initial, wakeOnLanValues, WakeOnLanState.Clone, storeState[WakeOnLanState]); err != nil {
 		return nil, fmt.Errorf("media: WakeOnLan: %w", err)
 	}
 	return s, nil

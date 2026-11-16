@@ -96,22 +96,22 @@ type (
 )
 
 func (s appLauncherClone) Clone() appLauncherClone {
-	return appLauncherClone(cloneAppLauncher(AppLauncherState(s)))
+	return appLauncherClone(AppLauncherState(s).Clone())
 }
-func (s outputClone) Clone() outputClone     { return outputClone(cloneOutput(OutputState(s))) }
+func (s outputClone) Clone() outputClone     { return outputClone(OutputState(s).Clone()) }
 func (s appBasicClone) Clone() appBasicClone { return appBasicClone(AppBasicState(s).clone()) }
 func (s contentControlClone) Clone() contentControlClone {
-	return contentControlClone(cloneContentControl(ContentControlState(s)))
+	return contentControlClone(ContentControlState(s).Clone())
 }
-func (s channelClone) Clone() channelClone { return channelClone(cloneChannel(ChannelState(s))) }
+func (s channelClone) Clone() channelClone { return channelClone(ChannelState(s).Clone()) }
 func (s contentLauncherClone) Clone() contentLauncherClone {
-	return contentLauncherClone(cloneContentLauncher(ContentLauncherState(s)))
+	return contentLauncherClone(ContentLauncherState(s).Clone())
 }
-func (s inputClone) Clone() inputClone       { return inputClone(cloneInput(InputState(s))) }
-func (s playbackClone) Clone() playbackClone { return playbackClone(clonePlayback(PlaybackState(s))) }
-func (s targetClone) Clone() targetClone     { return targetClone(cloneTarget(TargetState(s))) }
+func (s inputClone) Clone() inputClone       { return inputClone(InputState(s).Clone()) }
+func (s playbackClone) Clone() playbackClone { return playbackClone(PlaybackState(s).Clone()) }
+func (s targetClone) Clone() targetClone     { return targetClone(TargetState(s).Clone()) }
 func (s wakeOnLanClone) Clone() wakeOnLanClone {
-	return wakeOnLanClone(cloneWakeOnLan(WakeOnLanState(s)))
+	return wakeOnLanClone(WakeOnLanState(s).Clone())
 }
 
 func TestMediaStateClonesAreDeep(t *testing.T) {

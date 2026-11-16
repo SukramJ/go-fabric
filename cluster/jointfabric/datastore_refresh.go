@@ -274,7 +274,7 @@ func (d *Datastore) mergeBindingsLocked(nodeID uint64, ep uint16, bindings []End
 			continue
 		}
 		d.t.Bindings = append(d.t.Bindings, EndpointBindingEntry{
-			NodeId: nodeID, EndpointId: b.EndpointId, Binding: cloneBinding(b.Binding), ListId: d.nextListIDLocked(),
+			NodeId: nodeID, EndpointId: b.EndpointId, Binding: b.Binding.Clone(), ListId: d.nextListIDLocked(),
 			StatusEntry: StatusEntry{State: stateCommitted},
 		})
 	}
@@ -398,7 +398,7 @@ func (d *Datastore) syncKeySets(ctx context.Context) error {
 			})
 			for _, e := range d.t.NodeKeySets {
 				if e.GroupKeySetId == ks.GroupKeySetId && (e.StatusEntry.State == statePending || e.StatusEntry.State == stateCommitFailed) {
-					pushes = append(pushes, keyPush{e.NodeId, cloneKeySet(*ks)})
+					pushes = append(pushes, keyPush{e.NodeId, ks.Clone()})
 				}
 			}
 		}
