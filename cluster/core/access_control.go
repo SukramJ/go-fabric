@@ -69,8 +69,8 @@ type AccessControl struct {
 	// to attach metadata to an ACL fabric.
 	extensions map[uint8][]AccessControlExtensionEntry
 	// extLoadErr is the error of each fabric whose stored Extension could
-	// not be read at construction (loadExtensions); that fabric's Extension
-	// write is refused while it stands.
+	// not be read (loadExtension); that fabric's Extension write reads it
+	// again and is refused while it still fails.
 	extLoadErr map[uint8]error
 
 	// Event surface — wired by the bridge during topology assembly via
@@ -342,30 +342,41 @@ func (a *AccessControl) loadExtensions(ctx context.Context) {
 		return
 	}
 	for f := 1; f <= 254; f++ {
-		v, found, err := p.GetSetting(ctx, aclExtensionSettingKey(uint8(f)))
-		if err != nil {
-			// Logged, and the fabric's Extension write refused while it
-			// stands, so the stored value is never overwritten unseen
-			// (review II, R2-P6-err-1016).
+		if err := a.loadExtension(ctx, p, uint8(f)); err != nil {
 			a.logger().Warn("matter.access_control.extension_load_failed", slog.Int("fabric_index", f), slog.Any("err", err))
-			if a.extLoadErr == nil {
-				a.extLoadErr = make(map[uint8]error)
-			}
-			a.extLoadErr[uint8(f)] = err
-			continue
 		}
-		if !found || v == "" {
-			continue
-		}
-		data, err := hex.DecodeString(v)
-		if err != nil {
-			continue
-		}
-		if a.extensions == nil {
-			a.extensions = make(map[uint8][]AccessControlExtensionEntry)
-		}
-		a.extensions[uint8(f)] = []AccessControlExtensionEntry{{Data: data, FabricIndex: uint8(f)}}
 	}
+}
+
+// loadExtension reads fabric's stored Extension into memory. A setting the
+// store cannot read is recorded in extLoadErr and returned: the fabric's
+// Extension write reads it again first, and is refused while it still
+// cannot be read, so the stored value is never overwritten unseen (review
+// II, R2-P6-err-1016). A read that succeeds clears the record.
+func (a *AccessControl) loadExtension(ctx context.Context, p ACLExtensionPersistence, fabric uint8) error {
+	v, found, err := p.GetSetting(ctx, aclExtensionSettingKey(fabric))
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err != nil {
+		if a.extLoadErr == nil {
+			a.extLoadErr = make(map[uint8]error)
+		}
+		a.extLoadErr[fabric] = err
+		return err
+	}
+	delete(a.extLoadErr, fabric)
+	if !found || v == "" {
+		return nil
+	}
+	data, err := hex.DecodeString(v)
+	if err != nil {
+		return nil //nolint:nilerr // a value that does not decode is no Extension, as before
+	}
+	if a.extensions == nil {
+		a.extensions = make(map[uint8][]AccessControlExtensionEntry)
+	}
+	a.extensions[fabric] = []AccessControlExtensionEntry{{Data: data, FabricIndex: fabric}}
+	return nil
 }
 
 // persistExtension writes one fabric's Extension entries ("" clears them).
@@ -1071,15 +1082,22 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 			return false, err
 		}
 		a.mu.RLock()
-		oldExtensions := a.extensions[fabric]
 		loadErr := a.extLoadErr[fabric]
 		a.mu.RUnlock()
 		if loadErr != nil {
-			// The stored Extension of the fabric could not be read at
-			// construction: a write would replace a value nobody saw
-			// (review II, R2-P6-err-1016).
-			return false, spec.Errorf(im.StatusFailure, "core: AccessControl.Extension write: the stored Extension of fabric %d could not be read: %v", fabric, loadErr)
+			// The stored Extension of the fabric could not be read: it is
+			// read again now, and a write that would replace a value nobody
+			// saw is refused (review II, R2-P6-err-1016).
+			if p, ok := a.store.(ACLExtensionPersistence); ok {
+				loadErr = a.loadExtension(ctx, p, fabric)
+			}
+			if loadErr != nil {
+				return false, spec.Errorf(im.StatusFailure, "core: AccessControl.Extension write: the stored Extension of fabric %d could not be read: %v", fabric, loadErr)
+			}
 		}
+		a.mu.RLock()
+		oldExtensions := a.extensions[fabric]
+		a.mu.RUnlock()
 		if extensionsEqual(oldExtensions, stamped) {
 			return false, nil
 		}

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -48,21 +49,25 @@ func TestACLWriteOfARemovedFabricStoresNothing(t *testing.T) {
 	}
 }
 
-// extLoadFailStore fails the read of one fabric's stored Extension.
+// extLoadFailStore fails the read of fabric 1's stored Extension while
+// fail is set.
 type extLoadFailStore struct {
 	*fakeStore
+	fail atomic.Bool
 }
 
 func (s *extLoadFailStore) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
-	if strings.HasSuffix(key, ".extension.1") {
+	if s.fail.Load() && strings.HasSuffix(key, ".extension.1") {
 		return "", false, errors.New("injected settings read failure")
 	}
 	return s.fakeStore.GetSetting(ctx, key)
 }
 
-// A fabric whose stored Extension could not be read at construction
-// refuses its Extension write, so the stored value is never overwritten
-// unseen; another fabric writes as before (review II, R2-P6-err-1016).
+// A fabric whose stored Extension could not be read refuses its Extension
+// write while the value still cannot be read, so the stored value is never
+// overwritten unseen; the write reads it again first, so a store that
+// recovered takes it; another fabric writes as before (review II,
+// R2-P6-err-1016).
 func TestACLExtensionWriteRefusedWhileItsLoadFailed(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -75,7 +80,9 @@ func TestACLExtensionWriteRefusedWhileItsLoadFailed(t *testing.T) {
 	if err := fs.SetSetting(ctx, "access_control.extension.1", "1718"); err != nil {
 		t.Fatal(err)
 	}
-	ac, err := core.NewAccessControl(&extLoadFailStore{fakeStore: fs})
+	st := &extLoadFailStore{fakeStore: fs}
+	st.fail.Store(true)
+	ac, err := core.NewAccessControl(st)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,6 +97,16 @@ func TestACLExtensionWriteRefusedWhileItsLoadFailed(t *testing.T) {
 	}
 	if err := ac.MatterWrite(im.WithFabricFilter(ctx, true, 2), 0x0001, ext(2)); err != nil {
 		t.Errorf("Extension write of fabric 2: %v", err)
+	}
+	// The store recovers: the next write reads the stored value again and
+	// is taken, without a restart.
+	st.fail.Store(false)
+	if err := ac.MatterWrite(im.WithFabricFilter(ctx, true, 1), 0x0001, ext(1)); err != nil {
+		t.Errorf("Extension write of fabric 1 once its value reads again: %v", err)
+	}
+	v, _ := ac.MatterReadFiltered(im.WithFabricFilter(ctx, true, 1), 0x0001)
+	if got, _ := v.([]core.AccessControlExtensionEntry); len(got) != 1 {
+		t.Errorf("fabric 1's Extension after the recovery = %+v, want the stored entry", v)
 	}
 }
 
@@ -112,5 +129,36 @@ func TestACLUnfilteredExtensionReadWithoutAFabricListing(t *testing.T) {
 	got, _ := v.([]core.AccessControlExtensionEntry)
 	if !ok || len(got) != 2 {
 		t.Errorf("unfiltered Extension read from fabric 1 = %+v, want both fabrics' entries", v)
+	}
+}
+
+// A fabric whose row is still pending — after AddNOC, before
+// CommissioningComplete — is held: the commissioner's Acl and Extension
+// writes inside the fail-safe are stored (review II, R2-P6-store-1010).
+func TestACLWriteOfAPendingFabricIsStored(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	idx, err := fs.AddFabric(ctx, mstore.FabricRecord{FabricID: 1, Pending: mstore.FabricPendingAdd})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ac, err := core.NewAccessControl(fs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending := im.WithFabricFilter(ctx, true, idx)
+	acl := []core.AccessControlEntryStruct{{Privilege: 5, AuthMode: 2, Subjects: []uint64{112233}, FabricIndex: idx}}
+	if err := ac.MatterWrite(pending, 0x0000, acl); err != nil {
+		t.Fatalf("Acl write of a pending fabric: %v", err)
+	}
+	if list, _ := fs.ListACL(ctx, idx); len(list) != 1 {
+		t.Errorf("Acl of the pending fabric: %d entries, want 1", len(list))
+	}
+	if err := ac.MatterWrite(pending, 0x0001, []core.AccessControlExtensionEntry{{Data: encodeExtensionTLV(t), FabricIndex: idx}}); err != nil {
+		t.Fatalf("Extension write of a pending fabric: %v", err)
+	}
+	if v, ok, _ := fs.GetSetting(ctx, "access_control.extension.1"); !ok || v == "" {
+		t.Error("Extension of the pending fabric not stored")
 	}
 }
