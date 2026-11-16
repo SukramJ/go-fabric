@@ -38,27 +38,3 @@ func TestNetworkInterfaceRules(t *testing.T) {
 		}
 	}
 }
-
-// ─── basicInfoSerialFromUniqueID ─────────────────────────────────────────────
-
-// TestBasicInfoSerialFromUniqueID_Short verifies that a uid ≤ 16 chars is
-// returned as-is (the `return uid` branch at line 425-427 of basic_information.go).
-func TestBasicInfoSerialFromUniqueID_Short(t *testing.T) {
-	t.Parallel()
-	uid := "0123456789abcdef" // exactly 16 chars
-	got := basicInfoSerialFromUniqueID(uid)
-	if got != uid {
-		t.Errorf("basicInfoSerialFromUniqueID(%q) = %q, want %q", uid, got, uid)
-	}
-}
-
-// TestBasicInfoSerialFromUniqueID_Long verifies that a uid > 16 chars is
-// truncated to the first 16 characters.
-func TestBasicInfoSerialFromUniqueID_Long(t *testing.T) {
-	t.Parallel()
-	uid := "0123456789abcdef0011223344556677" // 32 chars
-	got := basicInfoSerialFromUniqueID(uid)
-	if got != uid[:16] {
-		t.Errorf("basicInfoSerialFromUniqueID(%q) = %q, want %q", uid, got, uid[:16])
-	}
-}

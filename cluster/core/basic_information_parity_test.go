@@ -496,42 +496,36 @@ func TestParityMatterJS_BasicInfoServer_AsyncObserverMechanism_Unsupported(t *te
 	t.Skip("FixMe: go-fabric gap — TypeScript $Changed observer API maps to the event-bus layer, not the cluster layer; covered by integration tests (drift L0x-D_FUTURE_OBSERVER)")
 }
 
-// TestParityMatterJS_BasicInfoServer_SerialNumberFallback pins the
-// SerialNumber fallback behaviour: when Config.SerialNumber is empty,
-// the cluster derives a deterministic, non-empty value from UniqueID.
-// Without this fallback Apple Home logs
-// "could not find cached attribute values for MTRAttributePath
-// BasicInformation.SerialNumber" and the HAP service-build retries
-// until the session is torn down.
-//
-// Source-Origin: derived from matter.js packages/model/src/standard/
-// elements/basic-information.element.ts:75 (SerialNumber, type string,
-// conformance "O", constraint "max 32") + chip
-// src/app/clusters/basic-information/basic-information.cpp attribute
-// non-empty guard. go-fabric mirrors the non-empty contract: when
-// the operator did not configure a serial number, the cluster server
-// falls back to a prefix of the UniqueID hex digest.
-func TestParityMatterJS_BasicInfoServer_SerialNumberFallback(t *testing.T) {
+// TestParityMatterJS_BasicInfoServer_SerialNumberOnlyWhenStated: the root
+// serves SerialNumber only when the host stated it — matter.js's
+// BasicInformationServer defaults no serialNumber
+// (BasicInformationServer.ts:54-75, :89-91 at db021da0), and an unset
+// optional attribute is not listed (ValidatedElements.ts:252, :270-278).
+// No value is derived from UniqueID (owner decision 166).
+func TestParityMatterJS_BasicInfoServer_SerialNumberOnlyWhenStated(t *testing.T) {
 	t.Parallel()
 	cfg := validBasicInfoConfig()
-	cfg.SerialNumber = "" // trigger fallback
+	cfg.SerialNumber = ""
 	b, err := core.NewBasicInformation(cfg)
 	if err != nil {
 		t.Fatalf("NewBasicInformation: %v", err)
 	}
-	v, ok := b.MatterRead(0x000F) // SerialNumber
-	if !ok {
-		t.Fatal("SerialNumber: ok=false — must be present even without config value")
+	if v, ok := b.MatterRead(0x000F); ok {
+		t.Errorf("SerialNumber = %v served although the host stated none", v)
 	}
-	s, ok := v.(string)
-	if !ok {
-		t.Fatalf("SerialNumber type = %T, want string", v)
+	if slices.Contains(b.MatterAttributes(), uint32(0x000F)) {
+		t.Error("SerialNumber listed although the host stated none")
 	}
-	if s == "" {
-		t.Error("SerialNumber fallback = empty string — non-empty required (Apple HAP-mapper cache)")
+	cfg.SerialNumber = "SN-ROOT"
+	b, err = core.NewBasicInformation(cfg)
+	if err != nil {
+		t.Fatalf("NewBasicInformation: %v", err)
 	}
-	if len(s) > 32 {
-		t.Errorf("SerialNumber len=%d, want ≤ 32 (matter.js basic-information.element.ts:51 constraint)", len(s))
+	if v, ok := b.MatterRead(0x000F); !ok || v != "SN-ROOT" {
+		t.Errorf("stated SerialNumber = %v, %v", v, ok)
+	}
+	if !slices.Contains(b.MatterAttributes(), uint32(0x000F)) {
+		t.Error("stated SerialNumber not listed")
 	}
 }
 
