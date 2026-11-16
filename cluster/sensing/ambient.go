@@ -161,11 +161,36 @@ type acState struct {
 	human, object, audio, reached bool
 }
 
+// clone is a deep copy of st: every list, pointer and nested value is the
+// copy's own, each generated value copied by its generated Clone, so a
+// mutation that works on the copy and is not committed leaves st as it
+// was (R2-P6-api-1461, decision 142).
 func (st acState) clone() acState {
-	st.supported = slices.Clone(st.supported)
-	st.detections = slices.Clone(st.detections)
-	st.predicted = slices.Clone(st.predicted)
+	st.supported = cloneEach(st.supported)
+	if st.detections != nil {
+		ds := make([]detection, len(st.detections))
+		for i, d := range st.detections {
+			d.info = d.info.Clone()
+			ds[i] = d
+		}
+		st.detections = ds
+	}
+	st.predicted = cloneEach(st.predicted)
+	st.occ = st.occ.Clone()
 	return st
+}
+
+// cloneEach copies l entry by entry with each entry's generated Clone; nil
+// stays nil.
+func cloneEach[T interface{ Clone() T }](l []T) []T {
+	if l == nil {
+		return nil
+	}
+	out := make([]T, len(l))
+	for i := range l {
+		out[i] = l[i].Clone()
+	}
+	return out
 }
 
 // event is an event a mutation emits once it is committed.
@@ -261,7 +286,7 @@ func NewAmbientContext(cfg AmbientContextConfig) (*AmbientContext, error) {
 		if err := c.checkSupported(cfg.AmbientContextTypeSupported); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrAmbientContextConfig, err)
 		}
-		c.st.supported = slices.Clone(cfg.AmbientContextTypeSupported)
+		c.st.supported = cloneEach(cfg.AmbientContextTypeSupported)
 	}
 	if cfg.ObjectCountConfig != nil && counting {
 		if _, err := srv.CheckSet(def.AttrObjectCountConfig, *cfg.ObjectCountConfig, nil); err != nil {
@@ -270,7 +295,7 @@ func NewAmbientContext(cfg AmbientContextConfig) (*AmbientContext, error) {
 		if err := checkLabel(*cfg.ObjectCountConfig); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrAmbientContextConfig, err)
 		}
-		c.st.occ = *cfg.ObjectCountConfig
+		c.st.occ = cfg.ObjectCountConfig.Clone() // the server's own copy, not the host's pointees
 	}
 	if err := srv.SetAttributes(c.storedValues(c.st)); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrAmbientContextConfig, err)
@@ -342,7 +367,7 @@ func deref[T any](p *T) T {
 func (c *AmbientContext) storedValues(st acState) map[uint32]any {
 	v := map[uint32]any{def.AttrHoldTime: st.holdTime}
 	if c.Serves(def.AttrObjectCountConfig) {
-		v[def.AttrObjectCountConfig] = st.occ
+		v[def.AttrObjectCountConfig] = st.occ.Clone()
 	}
 	return v
 }
@@ -363,12 +388,12 @@ func attr(st *acState, id uint32) any {
 		list := spec.List[Detection]{}
 		if len(st.supported) > 0 { // :547
 			for _, d := range st.detections {
-				list = append(list, d.info)
+				list = append(list, d.info.Clone())
 			}
 		}
 		return list
 	case def.AttrAmbientContextTypeSupported:
-		return spec.List[SemanticTag](slices.Clone(st.supported))
+		return spec.List[SemanticTag](cloneEach(st.supported))
 	case def.AttrObjectCountThresholdReached:
 		return st.reached
 	case def.AttrObjectCount:
@@ -379,7 +404,7 @@ func attr(st *acState, id uint32) any {
 		lo, hi, dflt := st.limits[0], st.limits[1], st.limits[2]
 		return HoldTimeLimits{HoldTimeMin: &lo, HoldTimeMax: &hi, HoldTimeDefault: &dflt}
 	case def.AttrPredictedActivity:
-		return spec.List[PredictedActivity](slices.Clone(st.predicted))
+		return spec.List[PredictedActivity](cloneEach(st.predicted))
 	}
 	return nil
 }
@@ -413,7 +438,7 @@ func (k acSink) MatterWriteAttribute(_ context.Context, attrID uint32, value any
 		if err := c.checkObjectCountConfig(&c.st, cfg); err != nil {
 			return err
 		}
-		c.st.occ = cfg
+		c.st.occ = cfg.Clone()
 	case def.AttrHoldTime: // :150-155
 		h, _ := value.(uint16)
 		if h == c.st.holdTime { // :153: the same value is a success
@@ -723,8 +748,8 @@ func (c *AmbientContext) AddDetection(d Detection) error {
 		now := c.clock.Now()
 		var hold time.Duration
 		if existing < 0 { // :251-267
-			info := d
-			cl := slices.Clone(tags)
+			info := d.Clone()
+			cl := cloneEach(tags)
 			info.AmbientContextSensed = &cl
 			item = detection{info: info, start: now, startEpoch: epochMS(now)}
 			hold = time.Duration(st.holdTime) * time.Second
@@ -849,7 +874,7 @@ func (c *AmbientContext) set(st *acState, id uint32, v any) error {
 		if err := c.checkSupported(list); err != nil {
 			return err
 		}
-		st.supported = slices.Clone(list)
+		st.supported = cloneEach(list)
 	case def.AttrObjectCountConfig:
 		cfg, ok := v.(ObjectCountConfig)
 		if !ok {
@@ -858,7 +883,7 @@ func (c *AmbientContext) set(st *acState, id uint32, v any) error {
 		if err := c.checkObjectCountConfig(st, cfg); err != nil {
 			return host(err)
 		}
-		st.occ = cfg
+		st.occ = cfg.Clone()
 	case def.AttrSimultaneousDetectionLimit:
 		n, ok := v.(uint8)
 		if !ok {
@@ -880,7 +905,7 @@ func (c *AmbientContext) set(st *acState, id uint32, v any) error {
 		if err := c.checkPredicted(list); err != nil {
 			return err
 		}
-		st.predicted = slices.Clone(list)
+		st.predicted = cloneEach(list)
 	}
 	return nil
 }
@@ -903,11 +928,12 @@ func (c *AmbientContext) HoldTime() uint16 {
 	return c.st.holdTime
 }
 
-// ObjectCountConfig returns the object count configuration.
+// ObjectCountConfig returns a copy of the object count configuration: a
+// change to it does not reach the server.
 func (c *AmbientContext) ObjectCountConfig() ObjectCountConfig {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.st.occ
+	return c.st.occ.Clone()
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
