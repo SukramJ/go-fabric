@@ -46,11 +46,19 @@ import (
 //   - Step: an unknown Direction or zero NumberOfSteps is CONSTRAINT_ERROR
 //     (:566-567); a null CurrentState or Position, or a latched closure,
 //     is INVALID_IN_STATE (:589-605); the new target is the current
-//     Position moved by NumberOfSteps × StepValue, clamped to 0 / 100.00 %
-//     or to LimitRange with LM (:607-653);
+//     Position moved by NumberOfSteps × StepValue, a decrease clamped at 0
+//     (LimitRange.Min with LM) and an increase at 100.00 % (LimitRange.Max
+//     with LM) — one bound each, so a Position outside LimitRange can step
+//     to a target still outside it (:607-653, :632-646; R2-P6-fsm-1587) —
+//     and put on no Resolution grid;
 //   - the host's handler runs before TargetState changes, and its error is
 //     FAILURE (:555, :656), as is a target TargetState refuses (:557,
-//     :659);
+//     :659) — after the handler ran: a SetTarget Position the rounding
+//     takes above 100.00 % (a Resolution that does not divide 10000) and
+//     a Step target off the Resolution grid (a StepValue, a current
+//     Position or a ceiling that is not a multiple of Resolution) move the
+//     device and answer FAILURE with TargetState unchanged (R2-P6-fsm-1581,
+//     -1582);
 //   - TargetState: a Position above 100.00 % or off the Resolution grid,
 //     or a field of a feature the server lacks, is refused (:326-378);
 //   - CurrentState (quality Q) is reported when it changes to or from
@@ -114,7 +122,14 @@ const positionQuietInterval = 5 * time.Second
 
 // DimensionHandler carries out the commands on the device. It is called
 // after the server's checks and before TargetState changes; an error
-// answers FAILURE and leaves TargetState as it was.
+// answers FAILURE and leaves TargetState as it was. Its success does not
+// make the command succeed: a target TargetState refuses after it — a
+// SetTarget Position rounded above 100.00 %, a Step target off the
+// Resolution grid — answers FAILURE with TargetState unchanged though the
+// device acted, as connectedhomeip's server does
+// (ClosureDimensionCluster.cpp:496-505, :555, :557, :607-659 at 6170af84;
+// R2-P6-fsm-1581, -1582). A Resolution that divides 10000 and a StepValue
+// on its grid avoid both.
 type DimensionHandler = cd.DimensionHandler
 
 // DimensionConfig carries the construction parameters.
@@ -124,7 +139,10 @@ type DimensionConfig struct {
 	// Handler carries out SetTarget and Step; required.
 	Handler DimensionHandler
 
-	// Resolution and StepValue (PS, fixed) are in 0.01 %, 1 to 10000.
+	// Resolution and StepValue (PS, fixed) are in 0.01 %, 1 to 10000. A
+	// Resolution that does not divide 10000, or a StepValue that is not a
+	// multiple of it, is admitted, and a command can then move the device
+	// and answer FAILURE ([DimensionHandler]).
 	Resolution, StepValue uint16
 	// Unit (UT, fixed) and UnitRange (UT, nullable: nil is null).
 	Unit      cd.ClosureUnitEnum
