@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"sync"
 )
 
@@ -106,12 +107,40 @@ func (s *Store) Erase(ctx context.Context) error {
 // reports busy 1: the -wal may then still hold erased bytes, and Scrub
 // says so. Every error it returns is [ErrScrubIncomplete]; running it
 // again once the reader is gone finishes the scrub.
+//
+// Scrub runs on one connection of the pool with PRAGMA
+// journal_size_limit = 0 for the run (the connection's own limit restored
+// after it): a rollback journal SQLite keeps between transactions — in
+// journal_mode PERSIST, and in any rollback mode under
+// locking_mode EXCLUSIVE — still held the pre-images of the deleted or
+// sealed pages after the VACUUM; with the limit at 0 SQLite truncates it
+// at the VACUUM's commit (measured: TestNewSealedLeavesNoClearSecretPerJournalMode,
+// which switching only PERSIST to DELETE for the run did not satisfy under
+// EXCLUSIVE). The disk blocks a truncated or deleted -journal or -wal
+// occupied are not overwritten by any SQLite call.
 func Scrub(ctx context.Context, db *sql.DB) error {
-	if _, err := db.ExecContext(ctx, `VACUUM`); err != nil {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrScrubIncomplete, err)
+	}
+	defer func() { _ = conn.Close() }()
+	var limit int64
+	if err := conn.QueryRowContext(ctx, `PRAGMA journal_size_limit`).Scan(&limit); err != nil {
+		return fmt.Errorf("%w: journal size limit: %w", ErrScrubIncomplete, err)
+	}
+	if limit != 0 {
+		if _, err := conn.ExecContext(ctx, `PRAGMA journal_size_limit = 0`); err != nil {
+			return fmt.Errorf("%w: journal size limit: %w", ErrScrubIncomplete, err)
+		}
+		defer func() {
+			_, _ = conn.ExecContext(context.WithoutCancel(ctx), `PRAGMA journal_size_limit = `+strconv.FormatInt(limit, 10))
+		}()
+	}
+	if _, err := conn.ExecContext(ctx, `VACUUM`); err != nil {
 		return fmt.Errorf("%w: vacuum: %w", ErrScrubIncomplete, err)
 	}
 	var busy, logFrames, checkpointed int
-	if err := db.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &logFrames, &checkpointed); err != nil {
+	if err := conn.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &logFrames, &checkpointed); err != nil {
 		return fmt.Errorf("%w: wal checkpoint: %w", ErrScrubIncomplete, err)
 	}
 	if busy != 0 {

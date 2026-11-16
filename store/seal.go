@@ -132,10 +132,10 @@ func (a *AESGCMSealer) Open(sealed, aad []byte) ([]byte, error) {
 // without a sealer wrote — in one transaction, so a failure (a value that
 // does not open, a Seal error) leaves the database as it was; then it
 // rewrites the file and empties the -wal ([Scrub]), so the clear values do
-// not stay behind in free pages — measured in WAL mode and in the rollback
-// journal's DELETE (SQLite's default) and TRUNCATE modes; in PERSIST mode
-// the kept -journal still holds clear pages, and copies taken before the
-// upgrade keep the clear values. A scrub that does not finish is
+// not stay behind in free pages — measured in WAL mode, in the rollback
+// journal's DELETE (SQLite's default), TRUNCATE and PERSIST modes and under
+// locking_mode EXCLUSIVE, whose kept -journal Scrub truncates; copies taken
+// before the upgrade keep the clear values. A scrub that does not finish is
 // [ErrScrubIncomplete], and the next NewSealed tries again. A database
 // with no clear row is not written to.
 //

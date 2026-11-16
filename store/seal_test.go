@@ -12,6 +12,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -813,19 +814,27 @@ func sealedOver(t *testing.T, db *sql.DB) *store.Store {
 	return s
 }
 
-// TestNewSealedLeavesNoClearSecretPerJournalMode (Fable F4): the sealing
-// upgrade's residue claim in the journal modes it holds in — WAL
-// (TestNewSealedSealsAClearDatabase too) and the rollback journal's DELETE
-// (SQLite's default) and TRUNCATE forms: after NewSealed over a clear
-// database, no clear secret is in any file of the directory, the handle
-// open and after Close. journal_mode(PERSIST) is left out because the claim
-// does not hold there: measured, the kept -journal still holds clear
-// pre-images of the settings page after the scrub; the documentation limits
-// the claim to these modes.
+// TestNewSealedLeavesNoClearSecretPerJournalMode (Fable F4, sec Q2): the
+// sealing upgrade's residue claim in every journal mode that keeps a file:
+// WAL (TestNewSealedSealsAClearDatabase too), the rollback journal's DELETE
+// (SQLite's default), TRUNCATE and PERSIST forms, and the rollback journal
+// under locking_mode(EXCLUSIVE), which keeps the -journal between
+// transactions as PERSIST does: after NewSealed over a clear database, no
+// clear secret is in any file of the directory, the handle open and after
+// Close. An EXCLUSIVE handle is one connection: the lock it holds keeps
+// every other connection of a pool out.
 func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 	t.Parallel()
-	for _, mode := range []string{"", "journal_mode(DELETE)", "journal_mode(TRUNCATE)", walMode} {
-		name := mode
+	for _, mode := range [][]string{
+		nil,
+		{"journal_mode(DELETE)"},
+		{"journal_mode(TRUNCATE)"},
+		{"journal_mode(PERSIST)"},
+		{walMode},
+		{"locking_mode(EXCLUSIVE)"},
+		{"locking_mode(EXCLUSIVE)", "journal_mode(PERSIST)"},
+	} {
+		name := strings.Join(mode, ",")
 		if name == "" {
 			name = "default"
 		}
@@ -833,15 +842,14 @@ func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
 			dir := t.TempDir()
-			var pragmas []string
-			if mode != "" {
-				pragmas = append(pragmas, mode)
-			}
-			db, err := store.OpenSQLite(filepath.Join(dir, "matter.db"), pragmas...)
+			db, err := store.OpenSQLite(filepath.Join(dir, "matter.db"), mode...)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() { _ = db.Close() }()
+			if slices.Contains(mode, "locking_mode(EXCLUSIVE)") {
+				db.SetMaxOpenConns(1)
+			}
 			if err := store.Apply(ctx, db); err != nil {
 				t.Fatal(err)
 			}
