@@ -885,7 +885,7 @@ func eventPayloadFabricIndex(payload any) (uint8, bool) {
 		if f.Uint() > 0xFF {
 			return 0, false
 		}
-		return uint8(f.Uint()), true
+		return uint8(f.Uint()), true //nolint:gosec // G115: checked ≤ 0xFF above
 	default:
 		return 0, false
 	}

@@ -621,6 +621,15 @@ func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im
 	}
 }
 
+// withSessionAuthMode stamps the PASE auth mode on ctx when sessionID was
+// established over PASE ([Bridge.resolveSessionPASE]).
+func (b *Bridge) withSessionAuthMode(ctx context.Context, sessionID uint16) context.Context {
+	if b.resolveSessionPASE(sessionID) {
+		return im.WithAuthModePASE(ctx)
+	}
+	return ctx
+}
+
 // withReadAuthority stamps on ctx the subject's read check
 // ([im.WithAuthority]) that [readResultAuthorizer] applies to the
 // results, so the dispatcher authorises a location before it reads the
@@ -1970,10 +1979,7 @@ func (b *Bridge) subscribeWith(
 	// session's fabric only (review II, R2-P2-alloc-07).
 	subLocalNodeID := b.localNodeIDFor(requestHdr.SessionID, subFabricIndex)
 	subCtx = im.WithLocalNodeID(subCtx, subLocalNodeID)
-	if b.resolveSessionPASE(requestHdr.SessionID) {
-		subCtx = im.WithAuthModePASE(subCtx)
-	}
-	subCtx = withReadAuthority(subCtx, dispatcher)
+	subCtx = withReadAuthority(b.withSessionAuthMode(subCtx, requestHdr.SessionID), dispatcher)
 
 	// A normal subscribe from this peer has begun: a re-establishment of
 	// its former subscriptions still in flight must leave it alone.

@@ -40,7 +40,7 @@ func TestFlaggedReportReadsTheConfigurationVersionOnce(t *testing.T) {
 		}
 	}
 	sub := &subscription.Subscription{AttributePaths: []im.ConcreteAttributePath{flagged(1), flagged(1), flagged(1)}}
-	var changed []im.ConcreteAttributePath
+	changed := make([]im.ConcreteAttributePath, 0, 10)
 	for attr := range uint32(10) {
 		changed = append(changed, im.ConcreteAttributePath{Endpoint: 1, Cluster: 6, Attribute: attr, HasEndpoint: true, HasCluster: true, HasAttribute: true})
 	}

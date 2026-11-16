@@ -170,6 +170,8 @@ func nullToNonNullableScalar(def *spec.Cluster, a *spec.Attribute) error {
 	case spec.KindBool, spec.KindUint, spec.KindEnum, spec.KindBitmap, spec.KindInt,
 		spec.KindFloat32, spec.KindFloat64, spec.KindString, spec.KindBytes:
 		return fmt.Errorf("%s.%s: null to an attribute that is not nullable: %w", def.Name, a.Name, spec.ErrWrongType)
+	case spec.KindAny, spec.KindStruct, spec.KindList:
+		// A list or a struct: the definition's check on the path.
 	}
 	return nil
 }

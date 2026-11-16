@@ -22,7 +22,7 @@ func persistedIDs(t *testing.T, st *memstore.Store) []uint32 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var ids []uint32
+	ids := make([]uint32, 0, len(rows))
 	for _, row := range rows {
 		rec, err := subscription.UnmarshalPeerSubscription(row)
 		if err != nil {
