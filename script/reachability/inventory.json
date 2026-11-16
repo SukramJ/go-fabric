@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9068,
+  "entry_points": 9075,
   "entry_packages": [
     ".",
     "bdx",
@@ -291,9 +291,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 18797,
+    "total_exported": 18808,
     "reachable": 12622,
-    "whitelisted": 6175,
+    "whitelisted": 6186,
     "unreachable": 0
   },
   "by_package": [],
@@ -12141,35 +12141,35 @@
       "identifier": "ACLEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AccessControlEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 48
+      "line": 49
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AccessControlTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AddGroupRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 60
+      "line": 61
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "AdminEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "cluster/jointfabric",
@@ -12190,7 +12190,7 @@
       "identifier": "BindingTarget",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 54
+      "line": 55
     },
     {
       "package": "cluster/jointfabric",
@@ -12211,49 +12211,49 @@
       "identifier": "DatastoreStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "DatastoreSync",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 28
+      "line": 29
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointBindingEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 42
+      "line": 43
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "EndpointGroupIDEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 40
+      "line": 41
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "GroupEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 38
+      "line": 39
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "GroupKeySet",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "cluster/jointfabric",
@@ -12274,35 +12274,42 @@
       "identifier": "NodeEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "NodeKeySetEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 44
+      "line": 45
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "State",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 58
+      "line": 59
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "StatusEntry",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 56
+      "line": 57
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestAccessingIsCASE",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 338
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddAclDeduplicatesAndRemoveAclSyncsDeletePayload",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 450
+      "line": 451
     },
     {
       "package": "cluster/jointfabric",
@@ -12316,14 +12323,21 @@
       "identifier": "TestAddBindingAssignsListIdAndStoresCommittedEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 415
+      "line": 416
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddBindingBackReferenceMarksWrongEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 560
+      "line": 561
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestAddGroupAndMergesAreBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 295
     },
     {
       "package": "cluster/jointfabric",
@@ -12337,14 +12351,14 @@
       "identifier": "TestAddGroupIDToEndpointForNodeAddsMissingNodeKeySet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 360
+      "line": 361
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestAddGroupIDToEndpointForNodeIsIdempotentForDuplicateAssignments",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 379
+      "line": 380
     },
     {
       "package": "cluster/jointfabric",
@@ -12376,10 +12390,31 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "TestAdministratorFabricIndexAfterRemoval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 165
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestAdministratorFabricIndexAfterRestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 203
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestAdministratorLeavesTheDatastoreAlone",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 244
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "TestAnchorOnCommissioningComplete",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
-      "line": 250
+      "line": 252
     },
     {
       "package": "cluster/jointfabric",
@@ -12394,6 +12429,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
       "line": 98
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestAnnouncementClearsOnlyItsOwn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 381
     },
     {
       "package": "cluster/jointfabric",
@@ -12415,6 +12457,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_rules_test.go",
       "line": 172
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestDatastoreCommandsAreTheAnchorFabrics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestDatastoreIsFabricScopedState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 140
     },
     {
       "package": "cluster/jointfabric",
@@ -12498,7 +12554,7 @@
       "identifier": "TestICACCommandsNeedTheAccessingFabricsFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
-      "line": 277
+      "line": 283
     },
     {
       "package": "cluster/jointfabric",
@@ -12512,7 +12568,14 @@
       "identifier": "TestMarkEntryCommittedIfFound",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 635
+      "line": 636
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestNextListIDAtTheTop",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 320
     },
     {
       "package": "cluster/jointfabric",
@@ -12526,7 +12589,7 @@
       "identifier": "TestOnFabricRemovedWipesDatastoreOnlyForAnchorFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 591
+      "line": 592
     },
     {
       "package": "cluster/jointfabric",
@@ -12579,6 +12642,13 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "TestRefreshAfterTheWipe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 116
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "TestRefreshAndBindingPushDoNotLoseAWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_refresh_push_test.go",
@@ -12590,6 +12660,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_rules_test.go",
       "line": 384
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "TestRefreshEndsOnARefusedSave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 276
     },
     {
       "package": "cluster/jointfabric",
@@ -12607,6 +12684,13 @@
     },
     {
       "package": "cluster/jointfabric",
+      "identifier": "TestRefreshKeepsTheDatastoresKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/review2_p6_test.go",
+      "line": 87
+    },
+    {
+      "package": "cluster/jointfabric",
       "identifier": "TestRefreshMerges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_rules_test.go",
@@ -12617,7 +12701,7 @@
       "identifier": "TestRefreshNodeFetchesGroupKeySetsAndCommitsNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 327
+      "line": 330
     },
     {
       "package": "cluster/jointfabric",
@@ -12631,28 +12715,28 @@
       "identifier": "TestRemoveAclIteratorUseAfterFree",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 539
+      "line": 540
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveBindingIteratorUseAfterFree",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 513
+      "line": 514
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveBindingSyncsDeletePendingPayload",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 429
+      "line": 430
     },
     {
       "package": "cluster/jointfabric",
       "identifier": "TestRemoveGroupIdFromEndpointSyncsDeletePendingEntries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/datastore_chip_test.go",
-      "line": 389
+      "line": 390
     },
     {
       "package": "cluster/jointfabric",
@@ -12736,7 +12820,7 @@
       "identifier": "UpdateGroupRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
-      "line": 62
+      "line": 63
     },
     {
       "package": "cluster/levelcontrol",
@@ -13318,6 +13402,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
       "line": 92
+    },
+    {
+      "package": "cluster/netinfra",
+      "identifier": "TestReplacedPassphraseIsZeroed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/netinfra/wifimgmt_internal_test.go",
+      "line": 13
     },
     {
       "package": "cluster/netinfra",
@@ -24812,6 +24903,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/tls/certificates.go",
       "line": 28
+    },
+    {
+      "package": "cluster/tls",
+      "identifier": "TestAllocatorPastItsBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/tls/ids_internal_test.go",
+      "line": 11
     },
     {
       "package": "cluster/valve",
