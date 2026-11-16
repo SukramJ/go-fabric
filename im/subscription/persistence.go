@@ -119,7 +119,7 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 		KeepSubscriptions:    true,
 		AttributePaths:       append([]im.ConcreteAttributePath(nil), p.AttributeRequests...),
 		EventPaths:           append([]im.ConcreteEventPath(nil), p.EventRequests...),
-		sendIntervalOverride: p.SendInterval,
+		sendIntervalOverride: restoredSendInterval(p.SendInterval, p.MinIntervalFloor),
 		// As in Subscribe: the priming report is the first report, so the
 		// engine must not fire a keep-alive into it.
 		lastReport: m.cfg.Clock.Now(),
@@ -142,6 +142,20 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 		slog.Duration("send_interval", p.SendInterval),
 	)
 	return sub, nil
+}
+
+// restoredSendInterval bounds a persisted send interval as
+// [Subscription.SendInterval] bounds a derived one: at most
+// maxSendInterval, then at least the floor and the granted minimum. This
+// module writes only bounded values; a foreign or corrupted record must
+// not put the keep-alives past the session idle reaper (review II,
+// R2-P6-store-0518). Zero stays zero: the interval is derived.
+func restoredSendInterval(d time.Duration, minIntervalFloor uint16) time.Duration {
+	if d <= 0 {
+		return 0
+	}
+	d = min(d, maxSendInterval)
+	return max(d, time.Duration(minIntervalFloor)*time.Second, minGrantedIntervalSeconds*time.Second)
 }
 
 // peerSubscriptionWireVersion versions the persisted encoding.

@@ -72,7 +72,7 @@ func TestRestore_KeepsIDAndNegotiatedIntervals(t *testing.T) {
 	t.Parallel()
 	m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
 	p := samplePeerSubscription()
-	p.SendInterval = 123 * time.Second
+	p.SendInterval = 97 * time.Second
 	sub, err := m.Restore(p, 0x4242)
 	if err != nil {
 		t.Fatal(err)
@@ -83,13 +83,13 @@ func TestRestore_KeepsIDAndNegotiatedIntervals(t *testing.T) {
 	if sub.MaxIntervalCeiling != 600 {
 		t.Fatalf("max interval re-negotiated to %d, want the stored 600 (no clamp on restore)", sub.MaxIntervalCeiling)
 	}
-	if got := sub.SendInterval(); got != 123*time.Second {
-		t.Fatalf("send interval = %s, want the stored 123s", got)
+	if got := sub.SendInterval(); got != 97*time.Second {
+		t.Fatalf("send interval = %s, want the stored 97s", got)
 	}
 	if got, err := m.Get(p.SubscriptionID); err != nil || got != sub {
 		t.Fatal("restored subscription not addressable by its old id")
 	}
-	if back := sub.PeerSubscription(true); back.SendInterval != 123*time.Second || back.SubscriptionID != p.SubscriptionID {
+	if back := sub.PeerSubscription(true); back.SendInterval != 97*time.Second || back.SubscriptionID != p.SubscriptionID {
 		t.Fatalf("re-captured record = %+v", back)
 	}
 	// The allocator must never hand out the restored id again.
@@ -255,5 +255,34 @@ func TestPeerSubscription_KeepsWildcardPathFlags(t *testing.T) {
 	}
 	if got := sub.AttributePaths[0].WildcardPathFlags; got != want.WildcardPathFlags {
 		t.Fatalf("restored flags = %#x, want %#x", got, want.WildcardPathFlags)
+	}
+}
+
+// TestRestore_BoundsThePersistedSendInterval: a persisted send interval
+// is held to the bounds a derived one keeps — at most maxSendInterval, at
+// least the floor and the granted minimum (review II, R2-P6-store-0518).
+func TestRestore_BoundsThePersistedSendInterval(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		send  time.Duration
+		floor uint16
+		want  time.Duration
+	}{
+		{"above the cap", 10 * time.Hour, 2, maxSendInterval},
+		{"below the granted minimum", time.Millisecond, 0, minGrantedIntervalSeconds * time.Second},
+		{"below the floor", 3 * time.Second, 30, 30 * time.Second},
+		{"inside", 90 * time.Second, 2, 90 * time.Second},
+	} {
+		m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
+		p := samplePeerSubscription()
+		p.SendInterval, p.MinIntervalFloor = tc.send, tc.floor
+		sub, err := m.Restore(p, 0x4242)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if got := sub.SendInterval(); got != tc.want {
+			t.Errorf("%s: send interval = %s, want %s", tc.name, got, tc.want)
+		}
 	}
 }
