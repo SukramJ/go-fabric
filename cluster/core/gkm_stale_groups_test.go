@@ -157,19 +157,25 @@ func TestGKMConcurrentKeySetWritesKeepTheBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
-	var ok atomic.Int32
+	var ok, exhausted atomic.Int32
 	for _, id := range []uint16{7, 8} {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(id)); err == nil {
+			_, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(id))
+			switch spec.StatusOf(err) {
+			case im.StatusSuccess:
 				ok.Add(1)
+			case im.StatusResourceExhausted:
+				exhausted.Add(1)
+			default:
+				t.Errorf("KeySetWrite %d = %v, want SUCCESS or RESOURCE_EXHAUSTED", id, err)
 			}
 		}()
 	}
 	wg.Wait()
-	if n := ok.Load(); n != 1 {
-		t.Errorf("%d new key sets taken at one below the cap, want 1", n)
+	if n, m := ok.Load(), exhausted.Load(); n != 1 || m != 1 {
+		t.Errorf("%d new key sets taken and %d refused RESOURCE_EXHAUSTED at one below the cap, want 1 and 1", n, m)
 	}
 }
 

@@ -218,8 +218,8 @@ func TestCSRBuildFailureDropsTheDrawnKeyPair(t *testing.T) {
 		t.Fatal(err)
 	}
 	oc.FailCSRBuild(errors.New("injected random-source failure"))
-	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err == nil {
-		t.Fatal("CSRRequest with a failing CSR build succeeded")
+	if _, err := oc.MatterInvoke(sessionChallengeCtx(ctx), 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); spec.StatusOf(err) != im.StatusFailure {
+		t.Fatalf("CSRRequest with a failing CSR build = %v, want FAILURE", err)
 	}
 	if oc.CSRKeyPending() {
 		t.Error("the fail-safe context holds a key pair no CSR was issued for")
