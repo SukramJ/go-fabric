@@ -275,7 +275,7 @@ func (s actionsSource) MatterAttribute(attrID uint32) (any, bool) {
 		return spec.List[actionsdef.ActionStruct](append([]actionsdef.ActionStruct{}, boundActionList(s.host.ActionList())...)), true
 	case actionsdef.AttrEndpointLists:
 		l := s.host.EndpointLists()
-		return spec.List[actionsdef.EndpointListStruct](append([]actionsdef.EndpointListStruct{}, l[:min(len(l), actionsMaxListLength)]...)), true
+		return spec.List[actionsdef.EndpointListStruct](append([]actionsdef.EndpointListStruct{}, cloneEach(l[:min(len(l), actionsMaxListLength)])...)), true
 	}
 	return nil, false
 }

@@ -320,11 +320,7 @@ next:
 func cloneTags(tags []SemanticTag) []SemanticTag {
 	out := make([]SemanticTag, len(tags))
 	for i, t := range tags {
-		if t.Label != nil {
-			l := *t.Label
-			t.Label = &l
-		}
-		out[i] = t
+		out[i] = t.Clone() // the generated deep copy (decision 142)
 	}
 	return out
 }

@@ -172,7 +172,7 @@ func (m *Messages) MatterRead(attrID uint32) (any, bool) {
 	defer m.mu.Unlock()
 	switch attrID {
 	case messagesdef.AttrMessages:
-		return spec.List[messagesdef.MessageStruct](slices.Clone(m.messages)), true
+		return spec.List[messagesdef.MessageStruct](cloneEach(m.messages)), true
 	case messagesdef.AttrActiveMessageIds:
 		return activeIDs(m.active), true
 	}
@@ -207,7 +207,7 @@ func (m *Messages) MatterReadFiltered(ctx context.Context, attrID uint32) (any, 
 	out := spec.List[messagesdef.MessageStruct]{}
 	for _, msg := range m.messages {
 		if !filtered || msg.FabricIndex == fabric {
-			out = append(out, msg)
+			out = append(out, msg.Clone())
 		}
 	}
 	return out, true
@@ -274,8 +274,9 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 		// messages-server.cpp:359-363.
 		return bindingStatusError{code: im.StatusInvalidCommand, msg: "core: Messages: Responses without ConfirmationResponse"}
 	}
+	req = req.Clone() // the queue keeps its own copy (decision 142)
 	msg := messagesdef.MessageStruct{
-		MessageId: slices.Clone(req.MessageId), Priority: req.Priority, MessageControl: req.MessageControl,
+		MessageId: req.MessageId, Priority: req.Priority, MessageControl: req.MessageControl,
 		StartTime: req.StartTime, Duration: req.Duration, MessageText: req.MessageText,
 		Responses: req.Responses, FabricIndex: fabric,
 	}
@@ -298,7 +299,7 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	flight := messagesInFlight{id: msg.MessageId, fabric: fabric}
 	m.inFlight = append(m.inFlight, flight)
 	m.mu.Unlock()
-	err := m.presenter.PresentMessage(ctx, msg)
+	err := m.presenter.PresentMessage(ctx, msg.Clone())
 	m.mu.Lock()
 	defer m.unlock()
 	if reserved {
