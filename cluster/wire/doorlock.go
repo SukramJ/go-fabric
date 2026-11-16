@@ -45,9 +45,8 @@ var ErrDoorLockMalformed = errors.New("wire: DoorLock command malformed")
 // DoorLockRequest is the common shape for LockDoor / UnlockDoor /
 // UnboltDoor. The PIN field is optional and only meaningful when the
 // cluster advertises the PIN_CREDENTIAL feature — go-fabric does
-// not, so PinCode is decoded but ignored by the model layer (HM
-// devices have no PIN concept; access control is enforced at the
-// Matter fabric level).
+// not, so PinCode is decoded and left to the host (access control is
+// enforced at the Matter fabric level).
 type DoorLockRequest struct {
 	// PinCode is the optional credential supplied by the controller.
 	// nil when absent; non-nil even when length is zero (an explicit

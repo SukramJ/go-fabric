@@ -36,7 +36,7 @@ import (
 // inherit the same requirement.
 //
 // Bridge semantics: go-fabric does not drive any visual or audible
-// indicator on the underlying CCU device, so Identify is implemented
+// indicator on the underlying host device, so Identify is implemented
 // as a no-op surface that:
 //
 //   - reports IdentifyType = None (0x00) — "the device has no

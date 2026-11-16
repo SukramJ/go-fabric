@@ -70,7 +70,7 @@ const (
 	switchClusterRevision = swdef.Revision
 )
 
-// GenericSwitchSource is the model-side surface a HM button source
+// GenericSwitchSource is the model-side surface a host button source
 // (the per-channel press group, or a lone Button / Action DP) exposes.
 // The cluster server reads `NumberOfPositions` once at construction
 // and supports long-press recognition opt-in via `SupportsLongPress`.

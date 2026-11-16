@@ -215,7 +215,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		serialNumber = cfg.UniqueID
 	}
 	// Reachable is taken from cfg so the bridge can advertise the
-	// underlying CCU device's live availability at construction time
+	// underlying host device's live availability at construction time
 	// (materialize.go reads dev.Available() per dispatch). A dead device
 	// must surface Reachable=false immediately, not after a deferred
 	// SetReachable(false) call that — because cluster servers are
@@ -562,7 +562,7 @@ func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
 // the reachable setter triggers events.reachableChanged.emit. Without
 // the event, Apple Home's HAP-service mapper never learns about
 // availability flips and silently caches the boot-time value, so
-// ongoing CCU drop-outs never surface to the user.
+// ongoing device drop-outs never surface to the user.
 func (b *BridgedDeviceBasicInformation) SetReachable(reachable bool) (changed bool) {
 	b.mu.Lock()
 	changed = b.reachable != reachable
@@ -579,7 +579,7 @@ func (b *BridgedDeviceBasicInformation) SetReachable(reachable bool) (changed bo
 			// Priority INFO per matter.js HEAD
 			// packages/model/src/standard/elements/bridged-device-basic-information.element.ts:55
 			// (`Event({ name: "ReachableChanged", id: 0x3, priority: "info" })`).
-			// Critical here also starved the event log: a CCU interface
+			// Critical here also starved the event log: a host interface
 			// flap flips every bridged device at once, and the buffer's
 			// critical class is where the boot-once StartUp / BootReason
 			// events live.
