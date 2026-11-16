@@ -378,6 +378,22 @@ func TestNewSealedScrubsAScrubItOwes(t *testing.T) {
 			t.Error("the next NewSealed left the clear code in the file: the owed scrub was not run")
 		}
 	})
+
+	t.Run("v2's Down while the scrub is owed", func(t *testing.T) {
+		t.Parallel()
+		db, _ := clearRegistry(t, code)
+		if n, err := sqlstore.SealWithoutScrub(ctx, db, sealerOf(t, 7)); err != nil || n != 1 {
+			t.Fatalf("the sealing: %d, %v; want the code sealed", n, err)
+		}
+		// No sealed row is left, but the clear code the sealing replaced may
+		// still be in the file: the owed scrub's record must survive.
+		if _, err := db.ExecContext(ctx, `DELETE FROM matter_client_values`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(ctx, sqlstore.Migrations()[1].Down); err == nil {
+			t.Error("v2's Down dropped the record of a scrub still owed")
+		}
+	})
 	t.Run("a checkpoint a reader blocks", func(t *testing.T) {
 		t.Parallel()
 		db, path := clearRegistry(t, code)
