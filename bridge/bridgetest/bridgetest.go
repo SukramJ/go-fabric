@@ -99,10 +99,10 @@ var (
 // ReportData datagrams travel to: the values a SubscribeRequest would have
 // carried in its message and protocol headers.
 //
-// Deprecated: taken only by [EstablishSubscriptionTarget], which is
-// deprecated; subscribe through a [Session] of the test [Commissioner]
-// instead ([Session.Subscribe]). Removable in the next minor release
-// (review II, N-ctr-5, owner decision 172).
+// Deprecated: taken only by the deprecated [EstablishSubscriptionTarget];
+// subscribe through a [Session] of the test [Commissioner] instead
+// ([Session.Subscribe]). Removable in the next minor release (review II,
+// N-ctr-5, owner decision 172).
 type SubscriptionTarget struct {
 	// Peer is the address reports are sent to. Required.
 	Peer *net.UDPAddr
