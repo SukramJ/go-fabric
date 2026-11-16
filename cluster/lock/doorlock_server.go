@@ -1430,8 +1430,9 @@ func (*DoorLockServer) logger() *slog.Logger { return slog.Default() }
 
 // commitMoved runs fn under mu after the hardware moved and saves the
 // records it changed. A failed save keeps them — the physical outcome
-// stands — logs it and answers [notSavedError] (R2-P6-err-1504); the
-// events fn queued leave either way. The caller holds op.
+// stands — and dirty, so the next commit saves them; it is logged and
+// answers [notSavedError] (R2-P6-err-1504). The events fn queued leave
+// either way. The caller holds op.
 func (s *DoorLockServer) commitMoved(ctx context.Context, fn func()) error {
 	s.mu.Lock()
 	fn()
@@ -1448,6 +1449,11 @@ func (s *DoorLockServer) commitMoved(ctx context.Context, fn func()) error {
 		if perr := s.auth.SaveDoorLockAuth(ctx, s.authKey, snapshot); perr != nil {
 			s.logger().Warn("matter.doorlock.records_not_saved", slog.String("reason", perr.Error()))
 			err = notSavedError{perr}
+			// The records stay dirty, so the next commit saves them: a
+			// restart before it would bring back what the store refused.
+			s.mu.Lock()
+			s.dirty = true
+			s.mu.Unlock()
 		}
 	}
 	s.emit(events)

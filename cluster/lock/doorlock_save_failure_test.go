@@ -66,3 +66,28 @@ func TestUnlockWhoseRecordsAreNotSavedKeepsThePhysicalOutcome(t *testing.T) {
 		t.Errorf("lockState %v 6 s after the unlock, want Locked: the auto-relock was not armed", got)
 	}
 }
+
+// TestRecordsNotSavedAreSavedByTheNextCommit (R2-P6-err-1504, round 2):
+// records the store refused stay dirty, so the next commit that saves —
+// here a LockDoor that changes no record — writes the disabled
+// DisposableUser, and a restart cannot enable it again.
+func TestRecordsNotSavedAreSavedByTheNextCommit(t *testing.T) {
+	auth := &failingAuth{memoryAuth: newMemoryAuth()}
+	f := setUpScheduledLock(t, func(c *lock.DoorLockConfig) {
+		c.Auth, c.AuthKey = auth, "lock"
+	}, scheduledUser(lockdef.UserTypeDisposableUser, nil))
+	auth.mu.Lock()
+	auth.fail = true
+	auth.mu.Unlock()
+	if err := f.unlockScheduled(); err == nil {
+		t.Fatal("unlock with records not saved answered SUCCESS")
+	}
+	auth.mu.Lock()
+	auth.fail = false
+	auth.mu.Unlock()
+	f.must(lockdef.CmdLockDoor, lockdef.LockDoorRequest{})
+	saved, ok, _ := auth.LoadDoorLockAuth(context.Background(), "lock")
+	if !ok || len(saved.Users) == 0 || lockdef.UserStatusEnum(saved.Users[0].UserStatus) != lockdef.UserStatusOccupiedDisabled {
+		t.Errorf("the store holds %+v after the next commit, want the DisposableUser disabled", saved.Users)
+	}
+}
