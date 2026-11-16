@@ -6,6 +6,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -312,6 +313,12 @@ func TestGKMStaleGroupStateIsRetriedOnTheClock(t *testing.T) {
 	if err := gkm.MatterWrite(fabricCtx(1), 0x0000, []core.GroupKeyMapStruct{{GroupID: 5, GroupKeySetID: 7}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := mgr.AddEndpointForGroup(ctx, 1, 5, 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.Load(ctx); err != nil {
+		t.Fatal(err)
+	}
 	mgrStore.fail.Store(true)
 	if _, err := gkm.MatterInvoke(fabricCtx(1), 0x00, validKeySet(7)); err != nil {
 		t.Fatalf("KeySetWrite the store took: %v", err)
@@ -333,6 +340,13 @@ func TestGKMStaleGroupStateIsRetriedOnTheClock(t *testing.T) {
 	}
 	if ok, err := mgr.HasUsableKey(ctx, 1, 5); !ok || err != nil {
 		t.Errorf("group 5 after the retry: usable key %v, %v; want the stored key set 7", ok, err)
+	}
+	// The memberships the forget withdrew are back once the retry
+	// succeeded (the re-announcement's Load; joined with net's a417899a,
+	// which makes Load after ForgetFabric reload the fabric).
+	ms, err := mgr.Memberships(ctx)
+	if err != nil || !slices.ContainsFunc(ms, func(m groups.Membership) bool { return m.FabricIndex == 1 && m.GroupID == 5 }) {
+		t.Errorf("memberships after the retry = %+v, %v; want fabric 1's group 5", ms, err)
 	}
 	// Quiesced: no retry runs.
 	mgrStore.fail.Store(true)
