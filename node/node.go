@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -447,6 +448,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		ble: cfg.Network.hasBLE(), clk: clock.Or(n.cfg.Clock),
 		onDemand: cm.WindowOnDemand,
 	}
+	if cm.RotatingDeviceID {
+		n.window.rotatingID = (&rotatingDeviceID{st: n.st, logger: n.logger}).next
+	}
 	wireCommissioningWindow(n.windowLife, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: windowLife, not New's ctx
 
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
@@ -609,7 +613,7 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 	if _, err := rand.Read(instanceID[:]); err != nil {
 		return bridge.CommissioningAdvertisement{}, fmt.Errorf("node: commissioning instance id: %w", err)
 	}
-	pd, bi := n.cfg.ProductDescription, n.cfg.BasicInformation
+	pd := n.cfg.ProductDescription
 	name := n.cfg.advertisedName()
 	return bridge.CommissioningAdvertisement{
 		InstanceID:    instanceID,
@@ -617,14 +621,92 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 		VendorID:      pd.VendorID,
 		ProductID:     pd.ProductID,
 		NodeLabel:     name,
-		RotatingID: mdns.GenerateRotatingID(
-			mdns.DeriveUniqueIDFromIdentity(pd.VendorID, pd.ProductID, bi.SerialNumber, bi.NodeLabel), 0,
-		),
+		// RotatingID is set per advertised window
+		// (commissioningHost.rotatingID, [Commissioning].RotatingDeviceID).
 		CommissioningMode:  1, // §4.3.1.4 CM=1: standard commissioning window
 		DeviceTypeID:       uint32(pd.DeviceType),
 		Hints:              n.cfg.Commissioning.PairingHints,
 		PairingInstruction: n.cfg.Commissioning.PairingInstruction,
 	}, nil
+}
+
+// The Rotating Device Identifier's two values in the node's store: the
+// unique id (hex, drawn once) as a setting and the lifetime counter as a
+// metadata counter ([Commissioning].RotatingDeviceID).
+const (
+	settingRotatingIDUniqueID          = "commissioning.rotating_device_id.unique_id"
+	metadataKeyRotatingLifetimeCounter = "rotating_device_id_lifetime_counter"
+)
+
+// rotatingDeviceID is the source of the commissionable record's RI. Follows
+// connectedhomeip: the unique id is 16 bytes or longer
+// (src/include/platform/CHIPDeviceConfig.h:380-384 at 6170af84); the
+// lifetime counter advances once per start of a commissioning
+// advertisement (GenericConfigurationManagerImpl.ipp:462-468, called from
+// CommissioningWindowManager.cpp:502-507 StartAdvertisement), is persisted
+// on every advance (src/lib/support/LifetimePersistedCounter.h:92-99) and
+// enters the identifier as its low 16 bits
+// (GenericConfigurationManagerImpl.ipp:581). Unlike connectedhomeip's
+// generic platform, which keeps a compile-time unique id in RAM
+// (GenericConfigurationManagerImpl.h:128-130), the unique id here is
+// random and persisted, so no two nodes share it and it survives a
+// restart.
+type rotatingDeviceID struct {
+	st     store.Settings
+	logger *slog.Logger
+	// mu serialises next: two windows advertised at once take two
+	// counter values.
+	mu sync.Mutex
+}
+
+// next advances the lifetime counter, persists it and returns the RI for
+// the window being advertised; "" (no RI in the record) when the store
+// fails, logged.
+func (r *rotatingDeviceID) next(ctx context.Context) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	uid, err := r.uniqueID(ctx)
+	if err != nil {
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", err))
+		return ""
+	}
+	counter, _, err := r.st.GetMetadataCounter(ctx, metadataKeyRotatingLifetimeCounter)
+	if err != nil {
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("read the lifetime counter: %w", err)))
+		return ""
+	}
+	counter++
+	if counter > 1<<62 { // the store's counter bound; the RI takes the low 16 bits only
+		counter = 1
+	}
+	if err := r.st.SetMetadataCounter(ctx, metadataKeyRotatingLifetimeCounter, counter); err != nil {
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("persist the lifetime counter: %w", err)))
+		return ""
+	}
+	return mdns.GenerateRotatingID(uid, uint16(counter)) //nolint:gosec // G115: the identifier carries the counter's low 16 bits
+}
+
+// uniqueID is the persisted unique id, drawn and stored at its first use.
+func (r *rotatingDeviceID) uniqueID(ctx context.Context) ([]byte, error) {
+	v, ok, err := r.st.GetSetting(ctx, settingRotatingIDUniqueID)
+	if err != nil {
+		return nil, fmt.Errorf("read the unique id: %w", err)
+	}
+	if ok {
+		uid, err := hex.DecodeString(v)
+		if err != nil || len(uid) < mdns.RotatingIDUniqueIDLength {
+			return nil, fmt.Errorf("the stored unique id is not %d hex-encoded bytes or more", mdns.RotatingIDUniqueIDLength)
+		}
+		return uid, nil
+	}
+	uid := make([]byte, mdns.RotatingIDUniqueIDLength)
+	if _, err := rand.Read(uid); err != nil {
+		return nil, fmt.Errorf("draw the unique id: %w", err)
+	}
+	if err := r.st.SetSetting(ctx, settingRotatingIDUniqueID, hex.EncodeToString(uid)); err != nil {
+		return nil, fmt.Errorf("persist the unique id: %w", err)
+	}
+	return uid, nil
 }
 
 // fabricInstalled is OperationalCredentials' OnFabricInstalled: the CASE

@@ -508,6 +508,20 @@ type Commissioning struct {
 	// (packages/node/src/behavior/system/commissioning/
 	// CommissioningServer.ts:266-273, the field :410 at db021da0).
 	WindowOnDemand bool
+	// RotatingDeviceID advertises the Rotating Device Identifier (TXT key
+	// RI) in the commissionable record: a random 16-byte unique id the
+	// node draws once and keeps in its store, and a lifetime counter the
+	// store keeps too, advanced each time a commissioning window is
+	// advertised, so the identifier changes with every window and across
+	// restarts, and is not computable from the node's public identity.
+	// Off by default, as connectedhomeip's build default
+	// (src/setup_payload/BUILD.gn:19-22 at 6170af84,
+	// chip_enable_rotating_device_id = false); matter.js emits no RI
+	// (packages/protocol/src/advertisement/mdns/
+	// CommissionableMdnsAdvertisement.ts:84-97 at db021da0). A store
+	// failure leaves RI out of that window's record rather than advertise
+	// a value that does not rotate.
+	RotatingDeviceID bool
 	// Flow is the commissioning flow the onboarding payload states
 	// ([FlowStandard], [FlowUserIntent], [FlowCustom]): the QR code's
 	// flow field and, for a flow other than Standard, the long manual
