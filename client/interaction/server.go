@@ -116,11 +116,15 @@ func (r *Subscriptions) serverFor(opcode uint8) *server {
 type serverRef = atomic.Pointer[server]
 
 // handle serves one exchange a peer opened with first — matter.js
-// InteractionServerMessenger.handleRequest (InteractionMessenger.ts:344-459
-// at 862ad75f): the message is decoded and dispatched by type, a
-// StatusResponseError on the way is answered as a StatusResponse with its
-// code (:425-459), a decode failure as InvalidAction, and the exchange is
-// closed afterwards (:462).
+// InteractionServerMessenger.handleRequest: the message is decoded and
+// dispatched by type, and a request that fails is answered with the status
+// its error carries, FAILURE otherwise
+// (packages/protocol/src/interaction/InteractionMessenger.ts:431-435 at
+// db021da0), sent unless the request asked to suppress its response
+// (:458-460, :317-322; the flag read from a request whose other fields do
+// not decode, :333-342, :153-162); the exchange is closed afterwards. The
+// bridge answers an undecodable request the same way
+// (bridge.replyDecodeError); review II, R2-P6-par-0701.
 func (s *server) handle(ctx context.Context, x *exchange.Exchange, first *exchange.Message) {
 	defer x.Close()
 	status := s.serve(ctx, x, first, false)
@@ -139,32 +143,54 @@ func (s *server) serve(ctx context.Context, x *exchange.Exchange, msg *exchange.
 		req, err := im.UnmarshalReadRequestTLV(dec)
 		if err != nil {
 			s.log.Debug("matter.controller.interaction.server.read_decode", slog.Any("err", err))
-			return im.StatusInvalidAction
+			return decodeFailure(err)
 		}
 		return s.read(ctx, x, req)
 	case im.OpcodeWriteRequest:
 		req, err := im.UnmarshalWriteRequestTLV(dec, s.cfg.ValueReader)
 		if err != nil {
 			s.log.Debug("matter.controller.interaction.server.write_decode", slog.Any("err", err))
-			return im.StatusInvalidAction
+			return decodeFailureOf(msg.Payload, err)
 		}
 		return s.write(ctx, x, req, timed)
 	case im.OpcodeInvokeRequest:
 		req, err := im.UnmarshalInvokeRequestTLV(dec, s.cfg.FieldsReader)
 		if err != nil {
 			s.log.Debug("matter.controller.interaction.server.invoke_decode", slog.Any("err", err))
-			return im.StatusInvalidAction
+			return decodeFailureOf(msg.Payload, err)
 		}
 		return s.invoke(ctx, x, req, timed)
 	case im.OpcodeTimedRequest:
 		req, err := im.UnmarshalTimedRequestTLV(dec)
 		if err != nil {
 			s.log.Debug("matter.controller.interaction.server.timed_decode", slog.Any("err", err))
-			return im.StatusInvalidAction
+			return decodeFailure(err)
 		}
 		return s.timedInteraction(ctx, x, req)
 	}
 	return im.StatusInvalidAction
+}
+
+// decodeFailure is the status a request that does not decode is answered
+// with: the one its error carries ([im.StatusCodeError]), FAILURE
+// otherwise ([server.handle]).
+func decodeFailure(err error) im.StatusCode {
+	var sce im.StatusCodeError
+	if errors.As(err, &sce) {
+		return sce.MatterStatusCode()
+	}
+	return im.StatusFailure
+}
+
+// decodeFailureOf is [decodeFailure] for a Write or Invoke request, whose
+// SuppressResponse is read from payload on its own
+// ([im.SuppressResponseOf]): a suppressed request is answered with nothing
+// (Success: [server.handle] sends no status).
+func decodeFailureOf(payload []byte, err error) im.StatusCode {
+	if im.SuppressResponseOf(payload) {
+		return im.StatusSuccess
+	}
+	return decodeFailure(err)
 }
 
 // dispatcher is the dispatcher a request is served by
