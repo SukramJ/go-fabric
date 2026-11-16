@@ -62,3 +62,30 @@ func TestSetAttributesJudgesASetpointAgainstTheCallsLimit(t *testing.T) {
 		t.Error("a setpoint below the call's own limit was accepted")
 	}
 }
+
+// TestPresetsAndSchedulesAreCopiedDeep (decision 142): a list handed in
+// or read out shares no field with the one the server holds; the copies
+// are the generated Clone.
+func TestPresetsAndSchedulesAreCopiedDeep(t *testing.T) {
+	t.Parallel()
+	in := []thermo.Preset{setpointPreset(1, 2000, 2600)}
+	srv := mustNew(t, thermostatConfig(5, in))
+	*in[0].HeatingSetpoint = 1500
+	out := srv.Presets()
+	if got := *out[0].HeatingSetpoint; got != 2000 {
+		t.Fatalf("Presets follow the configured list: %d", got)
+	}
+	*out[0].HeatingSetpoint = 1600
+	out[0].PresetHandle.Value[0] = 9
+	if p := srv.Presets()[0]; *p.HeatingSetpoint != 2000 || p.PresetHandle.Value[0] != 1 {
+		t.Errorf("Presets follow a list they returned: heating %d, handle %v", *p.HeatingSetpoint, p.PresetHandle.Value)
+	}
+
+	sched := mschConfig(withSchedules(builtInSchedule(1)))
+	ms := newMSCH(t, sched)
+	got := ms.Schedules()
+	*got[0].Transitions[0].HeatingSetpoint = 1
+	if h := *ms.Schedules()[0].Transitions[0].HeatingSetpoint; h != 2000 {
+		t.Errorf("Schedules follow a list they returned: %d", h)
+	}
+}

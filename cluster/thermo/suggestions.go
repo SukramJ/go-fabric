@@ -181,9 +181,8 @@ func (s *ThermostatServer) readSuggestionLocked(attrID uint32) (any, bool) {
 // cloneSuggestions deep-copies a suggestion list.
 func cloneSuggestions(in []Suggestion) []Suggestion {
 	out := make([]Suggestion, len(in))
-	for i, sg := range in {
-		sg.PresetHandle = bytes.Clone(sg.PresetHandle)
-		out[i] = sg
+	for i := range in {
+		out[i] = in[i].Clone() // the generated deep copy (decision 142)
 	}
 	return out
 }
@@ -196,8 +195,7 @@ func (s *ThermostatServer) currentSuggestionLocked() (Suggestion, bool) {
 	}
 	for _, sg := range s.suggest.list {
 		if sg.UniqueId == s.suggest.current {
-			sg.PresetHandle = bytes.Clone(sg.PresetHandle)
-			return sg, true
+			return sg.Clone(), true
 		}
 	}
 	return Suggestion{}, false

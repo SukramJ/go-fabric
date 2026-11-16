@@ -63,39 +63,8 @@ func cloneSchedules(in []Schedule) []Schedule {
 		return nil
 	}
 	out := make([]Schedule, len(in))
-	for i, sc := range in {
-		out[i] = sc
-		if !sc.ScheduleHandle.Null {
-			out[i].ScheduleHandle.Value = bytes.Clone(sc.ScheduleHandle.Value)
-		}
-		if sc.Name != nil {
-			n := *sc.Name
-			out[i].Name = &n
-		}
-		if sc.PresetHandle != nil {
-			h := bytes.Clone(*sc.PresetHandle)
-			out[i].PresetHandle = &h
-		}
-		out[i].Transitions = make([]ScheduleTransition, len(sc.Transitions))
-		for j, t := range sc.Transitions {
-			out[i].Transitions[j] = t
-			if t.PresetHandle != nil {
-				h := bytes.Clone(*t.PresetHandle)
-				out[i].Transitions[j].PresetHandle = &h
-			}
-			if t.SystemMode != nil {
-				m := *t.SystemMode
-				out[i].Transitions[j].SystemMode = &m
-			}
-			if t.CoolingSetpoint != nil {
-				c := *t.CoolingSetpoint
-				out[i].Transitions[j].CoolingSetpoint = &c
-			}
-			if t.HeatingSetpoint != nil {
-				h := *t.HeatingSetpoint
-				out[i].Transitions[j].HeatingSetpoint = &h
-			}
-		}
+	for i := range in {
+		out[i] = in[i].Clone() // the generated deep copy (decision 142)
 	}
 	return out
 }

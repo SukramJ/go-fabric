@@ -92,23 +92,8 @@ func clonePresets(in []Preset) []Preset {
 		return nil
 	}
 	out := make([]Preset, len(in))
-	for i, p := range in {
-		out[i] = p
-		if !p.PresetHandle.Null {
-			out[i].PresetHandle.Value = bytes.Clone(p.PresetHandle.Value)
-		}
-		if p.Name != nil {
-			n := *p.Name
-			out[i].Name = &n
-		}
-		if p.CoolingSetpoint != nil {
-			c := *p.CoolingSetpoint
-			out[i].CoolingSetpoint = &c
-		}
-		if p.HeatingSetpoint != nil {
-			h := *p.HeatingSetpoint
-			out[i].HeatingSetpoint = &h
-		}
+	for i := range in {
+		out[i] = in[i].Clone() // the generated deep copy (decision 142)
 	}
 	return out
 }

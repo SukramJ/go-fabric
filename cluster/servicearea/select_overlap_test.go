@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
 )
 
@@ -41,5 +42,29 @@ func TestSelectAreasDoesNotStoreAnAreaRemovedMeanwhile(t *testing.T) {
 	}
 	if v, _ := srv.MatterRead(sa.AttrSelectedAreas); len(v.([]uint32)) != 0 {
 		t.Errorf("SelectedAreas %v names an area that is no longer supported", v)
+	}
+}
+
+// TestProgressIsCopiedDeep (decision 142): a Progress list handed in or
+// read out shares no field with the one the server holds.
+func TestProgressIsCopiedDeep(t *testing.T) {
+	t.Parallel()
+	srv := newServer(t, vacuum(&device{}))
+	in := []servicearea.Progress{{AreaId: 7, Status: servicearea.StatusPending, TotalOperationalTime: &spec.Nullable[uint32]{Value: 10}}}
+	if err := srv.SetProgress(in); err != nil {
+		t.Fatal(err)
+	}
+	in[0].TotalOperationalTime.Value = 99
+	read := func() uint32 {
+		v, _ := srv.MatterRead(sa.AttrProgress)
+		return v.(spec.List[servicearea.Progress])[0].TotalOperationalTime.Value
+	}
+	if got := read(); got != 10 {
+		t.Errorf("Progress follows the caller's list after SetProgress: %d", got)
+	}
+	v, _ := srv.MatterRead(sa.AttrProgress)
+	v.(spec.List[servicearea.Progress])[0].TotalOperationalTime.Value = 77
+	if got := read(); got != 10 {
+		t.Errorf("Progress follows a list a read returned: %d", got)
 	}
 }

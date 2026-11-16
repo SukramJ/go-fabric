@@ -286,8 +286,22 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.selected = slices.Clone(cfg.SelectedAreas)
 	s.current = clonePtr(cfg.InitialCurrentArea)
-	s.progress = slices.Clone(cfg.Progress)
+	s.progress = cloneProgress(cfg.Progress)
 	return s, nil
+}
+
+// cloneProgress deep-copies a Progress list with the generated Clone, so
+// a list handed in or out shares no field with the one the server holds
+// (decision 142).
+func cloneProgress(in []Progress) []Progress {
+	if in == nil {
+		return nil
+	}
+	out := make([]Progress, len(in))
+	for i := range in {
+		out[i] = in[i].Clone()
+	}
+	return out
 }
 
 func clonePtr[T any](p *T) *T {
@@ -544,7 +558,7 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 		return nullable(s.endTime), true
 	}
 	// Progress, the last attribute Serves admits.
-	return spec.List[Progress](slices.Clone(s.progress)), true
+	return spec.List[Progress](cloneProgress(s.progress)), true
 }
 
 // nullable is a nullable uint32 in its read form: nil for null.
@@ -792,7 +806,7 @@ func (s *Server) SetProgress(progress []Progress) error {
 		s.mu.Unlock()
 		return err
 	}
-	s.progress = slices.Clone(progress)
+	s.progress = cloneProgress(progress)
 	s.mu.Unlock()
 	s.changed(sa.AttrProgress)
 	return nil
