@@ -17,7 +17,12 @@ import (
 var registry sync.Map // uint32 → *Cluster
 
 // Register adds definitions to the registry; a later registration of the
-// same cluster id replaces the earlier one.
+// same cluster id replaces the earlier one, silently and for the whole
+// process: a hand-written definition registered under a standard cluster
+// id replaces the generated one, and the request decoding of every server
+// of that cluster — every endpoint, every node in the process — follows it
+// from then on. Register a vendor cluster under its own (vendor-prefixed)
+// id.
 //
 // A hand-written definition (a vendor cluster) is supported beside the
 // generated ones. Its request commands' Decode turns a payload into its
