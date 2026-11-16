@@ -772,6 +772,13 @@ func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatch
 		return false
 	}
 	raw, _ := b.subAccess.LoadOrStore(sub.ID, &subjectAccess{})
+	if sub.IsClosed() {
+		// Closed meanwhile: its routing release may have run before the
+		// entry was stored, and nothing else would drop it (review II,
+		// R2-P6-conc-0512). A close after this check releases it.
+		b.subAccess.Delete(sub.ID)
+		return false
+	}
 	st, ok := raw.(*subjectAccess)
 	if !ok {
 		return false

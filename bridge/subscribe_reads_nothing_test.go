@@ -261,3 +261,49 @@ func TestSubjectReadsNothingIsDecidedAcrossAnUnchangedReassembly(t *testing.T) {
 		}
 	})
 }
+
+// closingACL is an ACL source whose listing closes a subscription first:
+// the close lands between the reporter's look-up of its target and its
+// subject-access entry.
+type closingACL struct {
+	switchableACL
+	close func()
+}
+
+func (c *closingACL) ListACL(ctx context.Context, fabricIndex uint8) ([]store.ACLEntry, error) {
+	if c.close != nil {
+		c.close()
+	}
+	return c.switchableACL.ListACL(ctx, fabricIndex)
+}
+
+// TestSubjectReadsNothingLeavesNoEntryForAClosedSubscription (review II,
+// R2-P6-conc-0512): a subscription closed while its subject's access is
+// judged — after the close released its routing — keeps no subject-access
+// entry, which would otherwise outlive it for the process lifetime.
+func TestSubjectReadsNothingLeavesNoEntryForAClosedSubscription(t *testing.T) {
+	t.Parallel()
+	acl := &closingACL{}
+	acl.set(otherAdminEntry(0xA0AD))
+	b := newStartedBridge(t)
+	b.AttachRootClusters([]contract.ClusterServer{&countingOnOff{}})
+	b.AttachACLLister(acl)
+	if err := b.Reassemble(t.Context()); err != nil {
+		t.Fatalf("Reassemble: %v", err)
+	}
+	m := subscription.NewManager(subscription.Config{}, nil, nil)
+	b.AttachSubscriptionManager(m)
+	sub, err := m.Subscribe(subscription.SubscribeArgs{
+		FabricIndex: 1, PeerNodeID: readsNothingSubject, SessionID: 0x20, MinIntervalFloor: 1, MaxIntervalCeiling: 60,
+		AttributePaths: []im.ConcreteAttributePath{rootOnOffPath()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := subTarget{fabricIndex: 1, subjectNodeID: readsNothingSubject, fabricFiltered: true}
+	acl.close = func() { _ = m.Close(sub.ID) }
+	_ = b.subjectReadsNothing(t.Context(), b.Dispatcher(), target, sub)
+	if _, ok := b.subAccess.Load(sub.ID); ok {
+		t.Fatal("a closed subscription keeps its subject-access entry")
+	}
+}
