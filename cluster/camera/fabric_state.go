@@ -119,6 +119,8 @@ func (r *Requestor) MatterHeldFabrics() []uint8 {
 // (FabricScopedDataHandler.ts:41-73 at db021da0); the port is told, so
 // the camera stops uploading for the removed fabric.
 func (p *PushTransport) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	p.op.Lock()
+	defer p.op.Unlock()
 	p.mu.Lock()
 	var ids []uint16
 	for _, c := range p.conns {
@@ -132,7 +134,9 @@ func (p *PushTransport) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 		if err := p.port.DeallocatePushTransport(ctx, id); err != nil {
 			errs = append(errs, fmt.Errorf("camera: DeallocatePushTransport %d of removed fabric %d: %w", id, fabricIndex, err))
 		}
-		p.remove(id)
+		if err := p.remove(id); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	return errors.Join(errs...)
 }

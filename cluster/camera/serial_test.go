@@ -4,14 +4,17 @@
 package camera_test
 
 import (
+	"context"
 	"runtime"
 	"sync/atomic"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // blockFirstChange holds the first change notification of srv until
@@ -76,5 +79,45 @@ func TestProviderChangesDoNotLoseEachOther(t *testing.T) {
 	attr, _ := p.MatterRead(wpdef.AttrCurrentSessions)
 	if l, ok := attr.(spec.List[camera.ProviderSession]); !ok || len(l) != 1 || l[0].Id != 2 {
 		t.Errorf("CurrentSessions = %#v, want session 2 only", attr)
+	}
+}
+
+// gatedPush is the push port whose AllocatePushTransport waits on gate
+// after it reported, on entered, that it was called.
+type gatedPush struct {
+	*mockPush
+	entered, gate chan struct{}
+}
+
+func (g gatedPush) AllocatePushTransport(ctx context.Context, id uint16, fabric uint8, o padef.TransportOptionsStruct, c camera.TLSCredentials) error {
+	select {
+	case g.entered <- struct{}{}:
+	default:
+	}
+	<-g.gate
+	return g.mockPush.AllocatePushTransport(ctx, id, fabric, o, c)
+}
+
+// TestPushAllocateRunsOneAtATime holds the per-fabric bound across the
+// port call: with MaxPerFabric 1, a second AllocatePushTransport of the
+// fabric that arrives while the first waits on the port is answered
+// RESOURCE_EXHAUSTED after it. Before, both passed the count before
+// either was stored, and the fabric held two transports (review II,
+// R2-P6-conc-1609).
+func TestPushAllocateRunsOneAtATime(t *testing.T) {
+	t.Parallel()
+	g := gatedPush{mockPush: newMockPush(), entered: make(chan struct{}, 1), gate: make(chan struct{})}
+	p, _ := newPush(t, func(c *camera.PushTransportConfig) { c.Port, c.MaxPerFabric = g, 1 })
+	req := padef.AllocatePushTransportRequest{TransportOptions: motionOptions()}
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() { _, err := pushInvoke(p, padef.CmdAllocatePushTransport, req); first <- err }()
+	<-g.entered
+	go func() { _, err := pushInvoke(p, padef.CmdAllocatePushTransport, req); second <- err }()
+	settle(g.entered)
+	close(g.gate)
+	wantCode(t, "first", statusOf(<-first), im.StatusSuccess)
+	wantCode(t, "second", statusOf(<-second), im.StatusResourceExhausted)
+	if n := len(p.Connections()); n != 1 {
+		t.Fatalf("%d connections, want 1", n)
 	}
 }

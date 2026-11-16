@@ -126,11 +126,19 @@ type PushTransport struct {
 	view  streamView
 	clock clock.Clock
 
-	// mu guards the state below.
+	// op serialises the commands, the expiries and the fabric removal
+	// from their checks through the port to their commit ([serial]); pub
+	// serialises each change of the connection table with its
+	// publication; mu guards the state below.
+	op       sync.Mutex
+	pub      sync.Mutex
 	mu       sync.Mutex
 	endpoint uint16
 	conns    []TransportConfiguration
-	timers   map[uint16]clock.Timer
+	timers   map[uint16]*expiry
+	// quiesced is set by MatterQuiesce, which stopped the expiries;
+	// SetEndpoint arms them again for the time left.
+	quiesced bool
 	lastID   uint16
 	tlsEP    padef.TLSEndpoints
 	tlsCerts padef.TLSCertificates
@@ -167,17 +175,17 @@ func NewPushTransport(cfg PushTransportConfig) (*PushTransport, error) {
 		clk = clock.System{}
 	}
 	p := &PushTransport{
-		port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clk, timers: map[uint16]clock.Timer{},
+		port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clk, timers: map[uint16]*expiry{},
 		tlsEP: cfg.TLSEndpoints, tlsCerts: cfg.TLSCertificates,
 	}
-	p.conns = slices.Clone(cfg.Connections)
+	p.conns = cloneAll(cfg.Connections)
 	handlers := map[uint32]spec.CommandHandler{
-		padef.CmdAllocatePushTransport:    p.allocate,
-		padef.CmdDeallocatePushTransport:  p.deallocate,
-		padef.CmdModifyPushTransport:      p.modify,
-		padef.CmdSetTransportStatus:       p.setStatus,
-		padef.CmdManuallyTriggerTransport: p.trigger,
-		padef.CmdFindTransport:            p.find,
+		padef.CmdAllocatePushTransport:    serial(&p.op, p.allocate),
+		padef.CmdDeallocatePushTransport:  serial(&p.op, p.deallocate),
+		padef.CmdModifyPushTransport:      serial(&p.op, p.modify),
+		padef.CmdSetTransportStatus:       serial(&p.op, p.setStatus),
+		padef.CmdManuallyTriggerTransport: serial(&p.op, p.trigger),
+		padef.CmdFindTransport:            serial(&p.op, p.find),
 	}
 	srv, err := spec.NewServer(padef.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
@@ -195,11 +203,12 @@ func NewPushTransport(cfg PushTransportConfig) (*PushTransport, error) {
 	return p, nil
 }
 
-// Connections returns CurrentConnections.
+// Connections returns CurrentConnections: a deep copy, which the caller
+// may change.
 func (p *PushTransport) Connections() []TransportConfiguration {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return slices.Clone(p.conns)
+	return cloneAll(p.conns)
 }
 
 // AttachTLS hands the server the node's TLS servers: each lookup the
@@ -218,21 +227,63 @@ func (p *PushTransport) AttachTLS(endpoints padef.TLSEndpoints, certificates pad
 	}
 }
 
-// Close stops the expiry timers (chip's Shutdown, :105-112).
+// expiry is a connection's armed deallocation: its timer and its
+// deadline on the server's clock, which a remount re-arms from.
+type expiry struct {
+	timer clock.Timer
+	at    time.Time
+	ctx   context.Context //nolint:containedctx // the allocating command's values, without its cancel, for the port call
+}
+
+// Close stops the expiry timers (chip's Shutdown, :105-112) as
+// [PushTransport.MatterQuiesce] does.
 func (p *PushTransport) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for id, t := range p.timers {
-		t.Stop()
-		delete(p.timers, id)
+	for _, e := range p.timers {
+		if e.timer != nil {
+			e.timer.Stop()
+			e.timer = nil
+		}
 	}
+	p.quiesced = true
 }
 
-func (p *PushTransport) publish() {
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops. Every connection's expiry
+// timer stops, so none reaches the port or changes CurrentConnections
+// afterwards; the deadlines are kept, and the [PushTransport.SetEndpoint]
+// of a reassembly that puts the same server back arms each again for the
+// time left — at once for one that passed meanwhile — as EvseServer does
+// (review II, R2-P6-conc-1606).
+func (p *PushTransport) MatterQuiesce() {
+	p.Close()
+	p.srv.MatterQuiesce()
+}
+
+// change applies edit to a copy of the connection table and, when edit
+// reports a change, publishes the result and keeps it — both under pub; a
+// table the schema refuses is neither published nor kept (review II,
+// R2-P6-err-1611).
+func (p *PushTransport) change(origin contract.Origin, edit func([]TransportConfiguration) ([]TransportConfiguration, bool)) error {
+	p.pub.Lock()
+	defer p.pub.Unlock()
+	next, changed := edit(p.Connections())
+	if !changed {
+		return nil
+	}
+	if err := p.srv.SetAttributesFrom(origin, map[uint32]any{padef.AttrCurrentConnections: spec.List[TransportConfiguration](nonNil(next))}); err != nil {
+		return fmt.Errorf("camera: CurrentConnections: %w", err)
+	}
 	p.mu.Lock()
-	v := spec.List[TransportConfiguration](nonNil(p.conns))
+	p.conns = next
 	p.mu.Unlock()
-	_ = p.srv.SetAttributesFrom(contract.OriginCommand, map[uint32]any{padef.AttrCurrentConnections: v})
+	return nil
+}
+
+// commitError answers a command whose change the store refused.
+func commitError(err error) error {
+	return spec.Errorf(im.StatusFailure, "%v", err)
 }
 
 // indexLocked returns the index of the fabric's connection of the id (chip's
@@ -689,13 +740,16 @@ func (p *PushTransport) allocate(ctx context.Context, fields any) (any, error) {
 	}
 	opts := stored
 	conn := TransportConfiguration{ConnectionId: id, TransportStatus: padef.TransportStatusInactive, TransportOptions: &opts, FabricIndex: fabric} // :1198-1200
-	p.mu.Lock()
-	p.conns = append(p.conns, conn)
-	if o.ExpiryTime != nil { // :1213-1217
-		p.scheduleLocked(ctx, id, *o.ExpiryTime)
+	if err := p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+		return append(next, conn.Clone()), true
+	}); err != nil {
+		return nil, commitError(err)
 	}
-	p.mu.Unlock()
-	p.publish()
+	if o.ExpiryTime != nil { // :1213-1217
+		p.mu.Lock()
+		p.scheduleLocked(ctx, id, time.Duration(*o.ExpiryTime)*time.Second)
+		p.mu.Unlock()
+	}
 	return padef.AllocatePushTransportResponse{TransportConfiguration: conn}, nil
 }
 
@@ -723,36 +777,50 @@ func (p *PushTransport) generateID() (uint16, bool) {
 // scheduleLocked arms the expiry of a connection. chip's
 // ScheduleTransportDeallocate (:357-385) takes ExpiryTime as the seconds
 // until the deallocation (:1216); the timer runs on the server's clock.
-func (p *PushTransport) scheduleLocked(ctx context.Context, id uint16, seconds uint32) {
-	if t, ok := p.timers[id]; ok {
-		t.Stop()
+func (p *PushTransport) scheduleLocked(ctx context.Context, id uint16, after time.Duration) {
+	if e, ok := p.timers[id]; ok && e.timer != nil {
+		e.timer.Stop()
 	}
-	p.timers[id] = p.clock.AfterFunc(time.Duration(seconds)*time.Second, func() { p.expire(context.WithoutCancel(ctx), id) })
+	e := &expiry{at: p.clock.Now().Add(after), ctx: context.WithoutCancel(ctx)}
+	e.timer = p.clock.AfterFunc(after, func() { p.expire(id, e) })
+	p.timers[id] = e
 }
 
 // expire is chip's PushAVStreamTransportDeallocateCallback (:262-292):
-// the port deallocates, and on success the connection leaves.
-func (p *PushTransport) expire(ctx context.Context, id uint16) {
-	if err := p.port.DeallocatePushTransport(ctx, id); err != nil {
+// the port deallocates, and on success the connection leaves. An expiry
+// a quiesce, a removal or a later schedule replaced does nothing.
+func (p *PushTransport) expire(id uint16, e *expiry) {
+	p.op.Lock()
+	defer p.op.Unlock()
+	p.mu.Lock()
+	current := p.timers[id] == e && e.timer != nil
+	p.mu.Unlock()
+	if !current {
 		return
 	}
-	p.remove(id)
+	if err := p.port.DeallocatePushTransport(e.ctx, id); err != nil {
+		return
+	}
+	_ = p.remove(id) // a shorter table the store held before cannot be refused
 }
 
-func (p *PushTransport) remove(id uint16) {
+// remove drops a connection and its expiry; the caller holds op.
+func (p *PushTransport) remove(id uint16) error {
 	p.mu.Lock()
-	if t, ok := p.timers[id]; ok { // RemoveTimerAppState, :188-202
-		t.Stop()
+	if e, ok := p.timers[id]; ok { // RemoveTimerAppState, :188-202
+		if e.timer != nil {
+			e.timer.Stop()
+		}
 		delete(p.timers, id)
 	}
-	i := p.indexLocked(id, 0, true)
-	if i >= 0 {
-		p.conns = slices.Delete(p.conns, i, i+1)
-	}
 	p.mu.Unlock()
-	if i >= 0 {
-		p.publish()
-	}
+	return p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+		i := slices.IndexFunc(next, func(c TransportConfiguration) bool { return c.ConnectionId == id })
+		if i < 0 {
+			return next, false
+		}
+		return slices.Delete(next, i, i+1), true
+	})
 }
 
 // deallocate carries out DeallocatePushTransport. Mirrors chip
@@ -774,7 +842,9 @@ func (p *PushTransport) deallocate(ctx context.Context, fields any) (any, error)
 	if err := p.port.DeallocatePushTransport(ctx, req.ConnectionId); err != nil { // :1256-1273
 		return nil, portError("DeallocatePushTransport", err)
 	}
-	p.remove(req.ConnectionId)
+	if err := p.remove(req.ConnectionId); err != nil {
+		return nil, commitError(err)
+	}
 	return nil, nil
 }
 
@@ -807,13 +877,19 @@ func (p *PushTransport) modify(ctx context.Context, fields any) (any, error) {
 	if err := p.port.ModifyPushTransport(ctx, req.ConnectionId, stored); err != nil { // :1334
 		return nil, portError("ModifyPushTransport", err)
 	}
-	p.mu.Lock()
-	if i := p.indexLocked(req.ConnectionId, fabric, false); i >= 0 { // :1337-1352
-		opts := stored
-		p.conns[i].TransportOptions = &opts
+	if err := p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+		i := slices.IndexFunc(next, func(c TransportConfiguration) bool { // :1337-1352
+			return c.ConnectionId == req.ConnectionId && c.FabricIndex == fabric
+		})
+		if i < 0 {
+			return next, false
+		}
+		opts := stored.Clone()
+		next[i].TransportOptions = &opts
+		return next, true
+	}); err != nil {
+		return nil, commitError(err)
 	}
-	p.mu.Unlock()
-	p.publish()
 	return nil, nil
 }
 
@@ -847,14 +923,16 @@ func (p *PushTransport) setStatus(ctx context.Context, fields any) (any, error) 
 	if err := p.port.SetTransportStatus(ctx, slices.Clone(ids), req.TransportStatus); err != nil { // :1406
 		return nil, portError("SetTransportStatus", err)
 	}
-	p.mu.Lock()
-	for i := range p.conns { // :1410-1419
-		if slices.Contains(ids, p.conns[i].ConnectionId) {
-			p.conns[i].TransportStatus = req.TransportStatus
+	if err := p.change(contract.OriginCommand, func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
+		for i := range next { // :1410-1419
+			if slices.Contains(ids, next[i].ConnectionId) {
+				next[i].TransportStatus = req.TransportStatus
+			}
 		}
+		return next, true
+	}); err != nil {
+		return nil, commitError(err)
 	}
-	p.mu.Unlock()
-	p.publish()
 	return nil, nil
 }
 
@@ -924,14 +1002,12 @@ func (p *PushTransport) find(ctx context.Context, fields any) (any, error) {
 		return nil, err
 	}
 	fabric := accessingFabricOf(ctx)
-	p.mu.Lock()
 	var out []TransportConfiguration
-	for _, c := range p.conns {
+	for _, c := range p.Connections() {
 		if c.FabricIndex == fabric && (req.ConnectionId.Null || c.ConnectionId == req.ConnectionId.Value) {
 			out = append(out, c)
 		}
 	}
-	p.mu.Unlock()
 	if len(out) == 0 {
 		return nil, pushf(im.StatusNotFound, "no connection")
 	}
@@ -1049,10 +1125,19 @@ func (p *PushTransport) SetMatterEventEmitter(emitter contract.EventEmitter) {
 }
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
-// calls it at reassembly.
+// calls it at reassembly, for every server of the new topology. A server
+// [PushTransport.MatterQuiesce] stopped comes back here, and each kept
+// expiry is armed again for the time left (review II, R2-P6-conc-1606).
 func (p *PushTransport) SetEndpoint(endpoint uint16) {
 	p.mu.Lock()
 	p.endpoint = endpoint
+	if p.quiesced {
+		p.quiesced = false
+		now := p.clock.Now()
+		for id, e := range p.timers {
+			p.scheduleLocked(e.ctx, id, max(e.at.Sub(now), 0))
+		}
+	}
 	p.mu.Unlock()
 	p.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }

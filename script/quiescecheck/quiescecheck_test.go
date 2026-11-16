@@ -44,7 +44,6 @@ const repoRoot = "../.."
 // timer is, not that it is safe.
 var exceptions = map[string]string{
 	"cluster":            "attribute_changes.go: the Quieter's throttle timer, held by the server that embeds the Quieter (N-clumisc-4)",
-	"cluster/camera":     "pushtransport.go: the PushTransport's per-connection expiry timers (N-clumisc-4)",
 	"cluster/cover":      "windowcovering_server.go: the WindowCovering movement step timer (N-clumisc-4)",
 	"cluster/transition": "transition.go: the Engine's step timer, held by the server that drives the Engine (N-clumisc-4)",
 }
