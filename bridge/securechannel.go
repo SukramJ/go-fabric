@@ -2395,7 +2395,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 //
 // Returns nil when the peer address was never observed; the caller
 // skips the notification (best-effort, matching the try/catch around
-// matter.js ExchangeManager.ts:716-726 #sendCloseSession at 862ad75f).
+// matter.js ExchangeManager.ts:781-791 #sendCloseSession at db021da0).
 func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 	if raw, ok := b.sessionPeerAddrs.Load(sessionID); ok {
 		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
@@ -2434,8 +2434,8 @@ func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 // the session keys are still live. Strictly best-effort: any failure
 // (unknown peer address, encrypt error, socket error) is logged at
 // debug and swallowed — matter.js wraps the same send in a
-// try/catch-and-warn (ExchangeManager.ts:716-726 #sendCloseSession at
-// 862ad75f).
+// try/catch-and-warn (ExchangeManager.ts:781-791 #sendCloseSession at
+// db021da0).
 //
 // Wire shape mirrors matter.js SecureChannelMessenger.ts:156-158
 // sendCloseSession → #sendStatusReport(Success, CloseSession,

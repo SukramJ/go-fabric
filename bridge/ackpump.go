@@ -668,8 +668,8 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 // retransmissionBroadcast is matter.js's "retransmit" broadcast event: each
 // retransmission on a secure session with a fabric triggers one broadcast
 // of that fabric's operational advertisement, unless it is broadcasting
-// already (packages/protocol/src/protocol/DeviceAdvertiser.ts:164-172 at
-// 862ad75f, MdnsAdvertiser.ts:234-242 at 862ad75f). fabrics are the
+// already (packages/protocol/src/protocol/DeviceAdvertiser.ts:164-172,
+// MdnsAdvertiser.ts:234-242 at db021da0). fabrics are the
 // distinct fabrics of one tick's re-sent sessions; each fabric's announced
 // service takes the event once, a fabric without one is skipped. An
 // advertiser without the event (mdns.Noop, a custom Advertiser) is left

@@ -444,7 +444,7 @@ func (e *initiatedSecureExchange) enqueue(msg bdx.Message) bool {
 // SetPeerAdditionalMrpDelay sets the margin every later message of the
 // exchange adds to the peer's MRP base interval before the backoff
 // amplifies it. Mirrors matter.js MessageExchange.peerAdditionalMrpDelay
-// (MessageExchange.ts:352-363 at 862ad75f), the setter for an exchange the
+// (MessageExchange.ts:377-379 at db021da0), the setter for an exchange the
 // peer initiated, which the BDX responder calls on an inbound init
 // (BdxProtocol.ts:139-142). It implements [bdx.MrpDelayExchange].
 func (e *initiatedSecureExchange) SetPeerAdditionalMrpDelay(d time.Duration) {
@@ -731,7 +731,7 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 			// A send on a connection that is gone is the reliable
 			// transport's "retransmissions exhausted": the peer is lost
 			// on that session, as matter.js's send reports peerLost on a
-			// failed send (MessageExchange.ts:605-624 at 862ad75f) — the
+			// failed send (MessageExchange.ts:643-651 at db021da0) — the
 			// next connection to the peer runs a fresh CASE.
 			b.handleInitiatedPeerLoss(e.sessionID, e.exchangeID)
 		}
