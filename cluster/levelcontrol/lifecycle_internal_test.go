@@ -198,7 +198,7 @@ func TestSetAttributesAllOrNothingOverAPort(t *testing.T) {
 	s := NewServer(Config{Source: port})
 	var reports atomic.Int32
 	s.OnAttributeChange(func(contract.Change) { reports.Add(1) })
-	err := s.SetAttributes(map[uint32]any{AttrOptions: uint8(OptionExecuteIfOff), AttrOnLevel: uint8(5)})
+	err := s.SetAttributes(map[uint32]any{AttrOptions: OptionExecuteIfOff, AttrOnLevel: uint8(5)})
 	if err == nil {
 		t.Fatal("the refused set succeeded")
 	}

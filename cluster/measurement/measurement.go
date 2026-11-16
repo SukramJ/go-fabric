@@ -1043,7 +1043,7 @@ func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 		// advertises ([elPwrFeatureAltC]).
 		return uint8(2), true
 	case attrElPwrNumberOfMeasurementTypes:
-		return uint8(len(elPwrAccuracy())), true
+		return uint8(len(elPwrAccuracy())), true //nolint:gosec // four entries
 	case attrElPwrAccuracy:
 		return elPwrAccuracy(), true
 	case attrElPwrActivePower:
