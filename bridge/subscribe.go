@@ -3572,6 +3572,11 @@ func (b *Bridge) unskippedChangedPaths(ctx context.Context, dispatcher im.Dispat
 		return paths
 	}
 	qctx := im.WithElementQualities(ctx, specElementQualities{})
+	// A flagged path with a WildcardFilterConfigurationVersion reads the
+	// node's ConfigurationVersion each time its flags are asked; one
+	// report asks once per (changed path × covering subscribed path), so
+	// the reads are taken once per report (review II, R2-P6-bound-0565).
+	reads := &reportReads{Dispatcher: dispatcher}
 	out := make([]im.ConcreteAttributePath, 0, len(paths))
 	for _, p := range paths {
 		if !p.HasEndpoint || !p.HasCluster || !p.HasAttribute {
@@ -3579,13 +3584,33 @@ func (b *Bridge) unskippedChangedPaths(ctx context.Context, dispatcher im.Dispat
 			continue
 		}
 		for _, sp := range sub.AttributePaths {
-			if subscribedPathCovers(sp, p) && !im.WildcardPathFlagsSkip(qctx, dispatcher, sp, p) {
+			if subscribedPathCovers(sp, p) && !im.WildcardPathFlagsSkip(qctx, reads, sp, p) {
 				out = append(out, p)
 				break
 			}
 		}
 	}
 	return out
+}
+
+// reportReads is a dispatcher whose reads are taken once for the one
+// report it serves: a second read of a path answers the first's results.
+// One goroutine uses it, for one report's path filter.
+type reportReads struct {
+	im.Dispatcher
+	reads map[im.ConcreteAttributePath][]im.ReadResult
+}
+
+func (r *reportReads) Read(ctx context.Context, path im.ConcreteAttributePath) []im.ReadResult {
+	if res, ok := r.reads[path]; ok {
+		return res
+	}
+	res := r.Dispatcher.Read(ctx, path)
+	if r.reads == nil {
+		r.reads = make(map[im.ConcreteAttributePath][]im.ReadResult)
+	}
+	r.reads[path] = res
+	return res
 }
 
 // subscribedPathCovers reports whether the subscribed (possibly wildcard)
