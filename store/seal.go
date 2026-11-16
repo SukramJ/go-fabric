@@ -537,21 +537,21 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 	if err := checkSealMarks(ctx, s.db, "NewSealed"); err != nil {
 		return err
 	}
-	stored, markSealed, marked, err := readCanary(ctx, s.db)
+	_, _, marked, err := readCanary(ctx, s.db)
 	if err != nil {
 		return fmt.Errorf("store: NewSealed: %w", err)
 	}
+	if !marked {
+		// The transaction reads the canary again: a NewSealed under another
+		// key may have marked the database since.
+		if marked, err = s.sealUnmarked(ctx); err != nil {
+			return err
+		}
+	}
 	if marked {
-		if err := s.openCanary(stored, markSealed); err != nil {
-			return fmt.Errorf("store: NewSealed: the sealer does not open the database's seal canary: %w", err)
+		if err := s.openMarked(ctx); err != nil {
+			return err
 		}
-		if t, err := clearSecretTable(ctx, s.db); err != nil {
-			return fmt.Errorf("store: NewSealed: %w", err)
-		} else if t != "" {
-			return fmt.Errorf("store: NewSealed: %w: a %s row is not sealed in a sealed database", ErrUnseal, t)
-		}
-	} else if err := s.sealUnmarked(ctx); err != nil {
-		return err
 	}
 	if owed, err := s.ScrubOwed(ctx); err != nil || !owed {
 		return err
@@ -565,23 +565,49 @@ func (s *Store) sealClearRows(ctx context.Context) error {
 	return nil
 }
 
-// sealUnmarked seals a database without the canary: the key check, then
-// every clear row and the canary in one transaction.
-func (s *Store) sealUnmarked(ctx context.Context) error {
-	// The key check before the sealing: a wrong key must not seal the
-	// clear rows beside values it does not open.
-	if err := s.openOneSealed(ctx); err != nil {
-		return err
+// openMarked is NewSealed's open of a database that carries the canary:
+// the canary opened under the sealer (the key check) and a clear secret
+// row refused; nothing is written.
+func (s *Store) openMarked(ctx context.Context) error {
+	stored, markSealed, _, err := readCanary(ctx, s.db)
+	if err != nil {
+		return fmt.Errorf("store: NewSealed: %w", err)
 	}
+	if err := s.openCanary(stored, markSealed); err != nil {
+		return fmt.Errorf("store: NewSealed: the sealer does not open the database's seal canary: %w", err)
+	}
+	if t, err := clearSecretTable(ctx, s.db); err != nil {
+		return fmt.Errorf("store: NewSealed: %w", err)
+	} else if t != "" {
+		return fmt.Errorf("store: NewSealed: %w: a %s row is not sealed in a sealed database", ErrUnseal, t)
+	}
+	return nil
+}
+
+// sealUnmarked seals a database without the canary in one transaction that
+// holds the write lock first: the canary read again (marked reports one a
+// concurrent NewSealed wrote meanwhile, and nothing is written), the key
+// check, every clear row sealed and the canary written.
+func (s *Store) sealUnmarked(ctx context.Context) (marked bool, err error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("store: NewSealed: begin tx: %w", err)
+		return false, fmt.Errorf("store: NewSealed: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 	// A write first, so the transaction holds the write lock before it
 	// reads (UpdateFabricCredentials' reason).
 	if _, err := tx.ExecContext(ctx, `UPDATE matter_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
-		return fmt.Errorf("store: NewSealed: %w", err)
+		return false, fmt.Errorf("store: NewSealed: %w", err)
+	}
+	if _, _, marked, err := readCanary(ctx, tx); err != nil {
+		return false, fmt.Errorf("store: NewSealed: %w", err)
+	} else if marked {
+		return true, nil
+	}
+	// The key check before the sealing: a wrong key must not seal the
+	// clear rows beside values it does not open.
+	if err := s.openOneSealed(ctx, tx); err != nil {
+		return false, err
 	}
 	sealed := 0
 	for _, t := range secretTables {
@@ -600,22 +626,22 @@ func (s *Store) sealUnmarked(ctx context.Context) error {
 			n, err = s.sealClearSettings(ctx, tx)
 		}
 		if err != nil {
-			return fmt.Errorf("store: NewSealed: %s: %w", t.table, err)
+			return false, fmt.Errorf("store: NewSealed: %s: %w", t.table, err)
 		}
 		sealed += n
 	}
 	if err := s.writeCanary(ctx, tx); err != nil {
-		return fmt.Errorf("store: NewSealed: %w", err)
+		return false, fmt.Errorf("store: NewSealed: %w", err)
 	}
 	if sealed > 0 {
 		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
-			return fmt.Errorf("store: NewSealed: %w", err)
+			return false, fmt.Errorf("store: NewSealed: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("store: NewSealed: commit: %w", err)
+		return false, fmt.Errorf("store: NewSealed: commit: %w", err)
 	}
-	return nil
+	return false, nil
 }
 
 // ScrubOwed reports whether the database owes the scrub of a sealing or a
@@ -642,9 +668,10 @@ func (s *Store) ScrubOwed(ctx context.Context) (bool, error) {
 // the mark of an owed scrub until it finished. A wrong old key or a value
 // that does not open under it is [ErrUnseal], and so is a secret row in
 // clear (the host opens the database with [NewSealed] under old first,
-// which seals it); either leaves the database as it was. A scrub that does
-// not finish is [ErrScrubIncomplete] after the commit: the values are
-// sealed under next, and the next NewSealed retries the scrub.
+// which seals it); either leaves the database as it was. Every error after
+// the commit is [ErrScrubIncomplete]: the values are sealed under next,
+// the scrub stays marked as owed ([Store.ScrubOwed]) and the next NewSealed
+// runs it again.
 //
 // No Store may be open on db while Reseal runs, and no other process may
 // write the file: a Store holds no sealer it could swap. db must carry
@@ -700,7 +727,9 @@ func Reseal(ctx context.Context, db *sql.DB, old, next Sealer) error {
 		return fmt.Errorf("store: Reseal: the values are sealed under the new sealer: %w", err)
 	}
 	if _, err := db.ExecContext(ctx, `DELETE FROM matter_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
-		return fmt.Errorf("store: Reseal: %w", err)
+		// The mark stays, so ScrubOwed still says owed and the next
+		// NewSealed scrubs again: the same state as an unfinished scrub.
+		return fmt.Errorf("store: Reseal: the values are sealed under the new sealer, the owed scrub stays marked: %w: %w", ErrScrubIncomplete, err)
 	}
 	return nil
 }
@@ -807,7 +836,7 @@ func checkSealMarks(ctx context.Context, db *sql.DB, op string) error {
 // store, fails NewSealed with [ErrUnseal] instead of the first read later.
 // A database with no sealed value passes. The key parts are read as the
 // driver returns them, as sealTable seals them.
-func (s *Store) openOneSealed(ctx context.Context) error {
+func (s *Store) openOneSealed(ctx context.Context, q sqlExecQuerier) error {
 	for _, t := range secretTables {
 		if t.form == sealSettingText {
 			continue
@@ -824,7 +853,7 @@ func (s *Store) openOneSealed(ctx context.Context) error {
 		}
 		var val []byte
 		dest = append(dest, &val)
-		err := s.db.QueryRowContext(ctx, `SELECT `+cols+`, `+p.column+` FROM `+p.table+ //nolint:gosec // the package's constants
+		err := q.QueryRowContext(ctx, `SELECT `+cols+`, `+p.column+` FROM `+p.table+ //nolint:gosec // the package's constants
 			` WHERE sealed = 1 AND `+p.column+` IS NOT NULL ORDER BY `+cols+` LIMIT 1`).Scan(dest...)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
@@ -838,7 +867,7 @@ func (s *Store) openOneSealed(ctx context.Context) error {
 		return nil
 	}
 	var key, val string
-	err := s.db.QueryRowContext(ctx, `SELECT key, value FROM matter_settings WHERE sealed = 1 ORDER BY key LIMIT 1`).Scan(&key, &val)
+	err := q.QueryRowContext(ctx, `SELECT key, value FROM matter_settings WHERE sealed = 1 ORDER BY key LIMIT 1`).Scan(&key, &val)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}

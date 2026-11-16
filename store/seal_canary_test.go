@@ -393,3 +393,33 @@ func TestSealCanaryAndResealRefusals(t *testing.T) {
 		t.Error("Reseal on a closed handle: want an error")
 	}
 }
+
+// TestResealOwedMarkStaysTruthful (Fable read R3): when the owed mark cannot
+// be deleted after Reseal's commit and scrub, Reseal says
+// ErrScrubIncomplete — the values are under the new key, ScrubOwed still
+// reports the scrub, and the new key opens the database.
+func TestResealOwedMarkStaysTruthful(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	s, err := store.NewSealed(ctx, db, testSealer(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := writeSecrets(t, s)
+	if _, err := db.ExecContext(ctx, `CREATE TRIGGER keep_owed BEFORE DELETE ON matter_metadata
+WHEN OLD.key = 'store.seal_scrub_owed' BEGIN SELECT RAISE(ABORT, 'kept'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Reseal(ctx, db, testSealer(t, 1), testSealer(t, 2)); !errors.Is(err, store.ErrScrubIncomplete) {
+		t.Fatalf("Reseal whose owed mark stays = %v, want ErrScrubIncomplete", err)
+	}
+	next, err := store.NewSealed(ctx, db, testSealer(t, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owed, err := next.ScrubOwed(ctx); err != nil || !owed {
+		t.Errorf("ScrubOwed after the mark stayed = %v, %v; want true", owed, err)
+	}
+	checkSecretsRead(t, next, w)
+}
