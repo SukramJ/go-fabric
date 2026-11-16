@@ -156,6 +156,14 @@ type ControlServer struct {
 	cluster.AttributeChanges
 	spec.Hooks
 
+	// op serialises the commands — MoveTo, Stop, Calibrate — from their
+	// gate to their record, as WindowCovering's queue does, so two cannot
+	// pass the MainState gate together and drive the mover at once
+	// (R2-P6-conc-1511). The host's setters never take it. A one-slot
+	// channel, so that a waiter is durably blocked for a testing/synctest
+	// bubble.
+	op chan struct{}
+
 	// mu guards currentPosition, currentLatch, currentSpeed, errorList,
 	// mainState, secureState, targetPosition, targetLatch and targetSpeed.
 	mu sync.RWMutex
@@ -238,6 +246,7 @@ func New(cfg Config) (*ControlServer, error) {
 		return nil, fmt.Errorf("closure: %w", err)
 	}
 	s := &ControlServer{
+		op:    make(chan struct{}, 1),
 		inst:  inst,
 		mover: cfg.Mover,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
@@ -376,6 +385,8 @@ func (s *ControlServer) MatterInvoke(
 	if resp, handled, err := s.Invoke(ctx, cmdID, fields); handled {
 		return resp, err
 	}
+	s.op <- struct{}{}
+	defer func() { <-s.op }()
 	switch cmdID {
 	case closuredef.CmdMoveTo:
 		return nil, s.invokeMoveTo(ctx, fields)
