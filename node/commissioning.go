@@ -283,13 +283,20 @@ func (h *commissioningHost) endBasic(b *basicWindow) {
 // advertised CM=1 under discriminator (see [Node.OpenBasicWindow]).
 func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierContext, iterations uint32, salt []byte, discriminator uint16, timeout time.Duration) error {
 	window := h.br.CommissioningWindow()
-	if window.IsOpen() && !window.IsOwnWindow() {
-		// Checked before the install, which would replace the
-		// administrator's acceptor.
-		return bridge.ErrAdministratorWindowOpen
+	// Checked under the install's lock, in the install, which would
+	// replace the administrator's acceptor: an administrator's window
+	// opens before its verifier is installed under the same lock, so
+	// one that opens after this check installs its acceptor after this
+	// one, and the basic window's open then fails without detaching it
+	// (review II, R2-P6-conc-2413).
+	adminOpen := func() error {
+		if window.IsOpen() && !window.IsOwnWindow() {
+			return bridge.ErrAdministratorWindowOpen
+		}
+		return nil
 	}
 	//nolint:contextcheck // the provider outlives this call; the adapters it builds carry no ctx of their own (as InstallVerifier's)
-	restore, err := h.installVerifierContext(vc, iterations, salt)
+	restore, err := h.installVerifierContext(vc, iterations, salt, adminOpen)
 	if err != nil {
 		return err
 	}
@@ -484,7 +491,7 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 	if err != nil {
 		return nil, fmt.Errorf("PAKE passcode verifier: %w", err)
 	}
-	return h.installVerifierContext(vc, iterations, salt)
+	return h.installVerifierContext(vc, iterations, salt, nil)
 }
 
 // installVerifierContext makes a PASE acceptor over vc the bridge's until
@@ -492,12 +499,18 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 // (InstallVerifier) and [Node.OpenBasicWindow]'s credentials take. Once
 // stop ran it installs nothing and returns [ErrStopped]: a window opened
 // while the node stops has no acceptor and starts no reaper (review II,
-// R2-P2-stop-02).
-func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte) (restore func(), err error) {
+// R2-P2-stop-02). refuse, when set, runs under the install's lock first,
+// and its error installs nothing.
+func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte, refuse func() error) (restore func(), err error) {
 	h.installMu.Lock()
 	defer h.installMu.Unlock()
 	if h.stopped {
 		return nil, ErrStopped
+	}
+	if refuse != nil {
+		if err := refuse(); err != nil {
+			return nil, err
+		}
 	}
 	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
 		adapter, err := buildPaseAdapterFromContext(h.life, h.sessions, h.root, vc, salt, int(iterations), h.responderParams)
