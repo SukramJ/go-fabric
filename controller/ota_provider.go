@@ -275,6 +275,17 @@ func (c *Controller) retireOwnNode(ctx context.Context, st *store.Store, log *sl
 	if err := st.DeleteSettings(ctx, ownNodeKey); err != nil {
 		return err
 	}
+	// The record held the own node's passcode, discriminator and salt in
+	// clear — it is no sealed setting — and on a sealed database the
+	// opening scrub ran before this delete: scrub again, so its bytes do
+	// not stay in free pages until a later one (review II,
+	// R2-P6-store-2316). A scrub a reader blocks is logged; the passcode
+	// opens nothing once the node is gone.
+	if c.sealed {
+		if err := store.Scrub(ctx, c.db); err != nil {
+			log.Warn("controller.ota.own_node.scrub", slog.Any("err", err))
+		}
+	}
 	log.Info("controller.ota.own_node.retired", slog.String("node", fmt.Sprintf("%016X", rec.NodeID)))
 	return nil
 }

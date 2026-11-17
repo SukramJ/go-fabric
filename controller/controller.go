@@ -319,6 +319,9 @@ type Config struct {
 // Close.
 type Controller struct {
 	db *sql.DB
+	// sealed is whether Config.Sealer seals db (ota_provider.go
+	// retireOwnNode scrubs after the delete it makes).
+	sealed bool
 	// st is the controller's store on db, sealed with Config.Sealer when
 	// one is set: every read and write of the store tables goes through it.
 	st *store.Store
@@ -476,7 +479,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		openNames = discovery.Open
 	}
 	clk := clock.Or(cfg.Clock)
-	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP, metrics: cfg.Metrics, diagRing: newTrace(cfg.Diagnostics, clk), keepCodes: cfg.KeepOnboardingCodes}
+	c := &Controller{db: cfg.DB, sealed: cfg.Sealer != nil, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP, metrics: cfg.Metrics, diagRing: newTrace(cfg.Diagnostics, clk), keepCodes: cfg.KeepOnboardingCodes}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
