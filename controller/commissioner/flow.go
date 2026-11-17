@@ -1108,6 +1108,9 @@ func (f *flow) random(n int) ([]byte, error) {
 // policy decides (:1305-1319); the DAC key kept, parsed from the DAC when
 // the policy accepted a failed validation (:1321-1331).
 func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
+	// An earlier run's pair never outlives this run: a run that fails or
+	// withholds the pair leaves none (review II, R2-P6-fsm-1811).
+	f.attested = nil
 	chain := make([][]byte, 2)
 	for i, kind := range []uint8{certificateTypeDAC, certificateTypePAI} {
 		res, err := f.invoke(ctx, opCredsCluster, cmdCertificateChainRequest, certificateChainRequest(kind), true)
@@ -1140,7 +1143,7 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	var findings []attestation.Finding
 	var baseErr error
 	result, err := attestation.Validate(
-		attestation.Context{Challenge: f.challenge, Store: f.c.ctx.Attestation},
+		attestation.Context{Challenge: f.challenge, Store: f.c.ctx.Attestation, Clock: f.c.ctx.Clock},
 		attestation.Data{
 			DAC: chain[0], PAI: chain[1], Elements: att.elements, Signature: att.signature, Nonce: nonce,
 			VendorID: f.data.vendorID, ProductID: f.data.productID,

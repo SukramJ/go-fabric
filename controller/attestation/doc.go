@@ -16,6 +16,13 @@
 // warnings and information are [Finding]s of the [Result]. Whether a
 // commissioning proceeds on them is the commissioner's [Policy].
 //
-// Like matter.js, the validator never compares a certificate's validity
-// with the current time: the chain is checked at the DAC's notBefore.
+// Like matter.js, the validator checks the chain at the DAC's notBefore.
+// Beyond matter.js it raises three error findings on the device's own
+// certificates, so the [Policy] decides and the commissioner records no
+// attested pair: a DAC without a ProductID, a PAI ProductID that is not
+// the DAC's, and — when [Context].Clock is set, as the commissioner sets
+// it — a DAC past its notAfter. connectedhomeip refuses all three
+// (src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp
+// :553-558, :638-641 at 6170af84); here they are findings (review II,
+// R2-P6-par-1804, R2-P6-par-1805, owner decision 193).
 package attestation

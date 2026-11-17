@@ -32,6 +32,10 @@ var (
 type chainSpec struct {
 	paiVID, dacVID, dacPID uint16
 	paiNoVID               bool
+	// dacNoPID leaves the ProductID out of the DAC's subject; paiPID, when
+	// non-nil, puts one into the PAI's.
+	dacNoPID bool
+	paiPID   *uint16
 	paiNotBefore           time.Time
 	dacNotBefore           time.Time
 	// paiNotAfter and dacNotAfter end the certificate's validity; the
@@ -61,6 +65,13 @@ func notAfterOr(t time.Time) time.Time {
 		return time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
 	}
 	return t
+}
+
+func derefOr(p *uint16) uint16 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }
 
 func skid(pub *ecdsa.PublicKey) []byte {
@@ -99,7 +110,7 @@ func buildChain(t *testing.T, s chainSpec) (dac, pai []byte, dacKey *ecdsa.Priva
 	}
 	paiTmpl := &x509.Certificate{
 		SerialNumber:          big.NewInt(0x1234),
-		Subject:               name("Test PAI", s.paiVID, !s.paiNoVID, 0, false),
+		Subject:               name("Test PAI", s.paiVID, !s.paiNoVID, derefOr(s.paiPID), s.paiPID != nil),
 		NotBefore:             s.paiNotBefore,
 		NotAfter:              notAfterOr(s.paiNotAfter),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
@@ -126,7 +137,7 @@ func buildChain(t *testing.T, s chainSpec) (dac, pai []byte, dacKey *ecdsa.Priva
 	}
 	dacTmpl := &x509.Certificate{
 		SerialNumber:          big.NewInt(0x5678),
-		Subject:               name("Test DAC", s.dacVID, true, s.dacPID, true),
+		Subject:               name("Test DAC", s.dacVID, true, s.dacPID, !s.dacNoPID),
 		NotBefore:             s.dacNotBefore,
 		NotAfter:              notAfterOr(s.dacNotAfter),
 		KeyUsage:              x509.KeyUsageDigitalSignature,

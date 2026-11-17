@@ -14,6 +14,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // cdFormatVersion is CD_FORMAT_VERSION, Matter Core §6.3.1
@@ -28,6 +30,11 @@ type Context struct {
 	// Store is the trust store; nil skips the PAA, chain, revocation and
 	// CD signature checks (dclCertificateService undefined).
 	Store PAAStore
+	// Clock is the current time a DAC past its notAfter is judged at (an
+	// error finding, [CertificateExpired]); nil judges no certificate at
+	// the current time. Go only: matter.js's Context has no clock (review
+	// II, R2-P6-par-1805, owner decision 193).
+	Clock clock.Clock
 }
 
 // Data is the device's attestation data — matter.js DeviceAttestationData
@@ -102,6 +109,14 @@ func Validate(ctx Context, data Data) (Result, error) {
 		return Result{}, fail(AttestationSignatureInvalid, "Attestation signature verification failed against DAC public key")
 	}
 
+	// The device's own certificates, stricter than matter.js: the DAC
+	// carries a ProductID, a PAI ProductID is the DAC's, and the DAC has
+	// not expired at the Context's clock. Each is an error finding, not a
+	// hard failure, so the policy decides and the attested pair is
+	// withheld (review II, R2-P6-par-1804, R2-P6-par-1805, owner decision
+	// 193; ahead of matter.js).
+	findings = append(findings, deviceCertificateFindings(ctx.Clock, dac, pai)...)
+
 	// === DCL-dependent checks (only with a store), DAV:220 ===
 
 	var paa *attCert
@@ -161,6 +176,32 @@ func Validate(ctx Context, data Data) (Result, error) {
 	// Step 10, firmware information: a TODO upstream (DAV:528-534), as is
 	// the certificate_id check (DAV:421-422).
 	return Result{DACPublicKey: dacPublicKey, Findings: findings}, nil
+}
+
+// deviceCertificateFindings are the error findings on the device's own
+// DAC and PAI that matter.js's validator does not raise: a DAC without a
+// ProductID ([DacFormatInvalid]), a PAI ProductID that is not the DAC's
+// ([CertificateChainInvalid]), and — with a clock — a DAC whose notAfter
+// lies before now ([CertificateExpired]; a notAfter of 0 is none).
+func deviceCertificateFindings(clk clock.Clock, dac, pai *attCert) []Finding {
+	var out []Finding
+	if dac.productID == nil {
+		out = append(out, Finding{Level: LevelError, Check: DacFormatInvalid, Message: "DAC carries no ProductID"})
+	} else if pai.productID != nil && *pai.productID != *dac.productID {
+		out = append(out, Finding{
+			Level: LevelError, Check: CertificateChainInvalid,
+			Message: fmt.Sprintf("PAI productId %s does not match DAC productId %s", idHex(pai.productID), idHex(dac.productID)),
+		})
+	}
+	if clk != nil && dac.notAfter != 0 {
+		if now := clk.Now(); now.Unix()-matterEpochOffset > dac.notAfter {
+			out = append(out, Finding{
+				Level: LevelError, Check: CertificateExpired,
+				Message: fmt.Sprintf("DAC notAfter (%d) is before the current time (%d)", dac.notAfter, now.Unix()-matterEpochOffset),
+			})
+		}
+	}
+	return out
 }
 
 // checkChain is the store branch, DAV:232-364: the PAA, the chain, the
