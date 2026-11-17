@@ -48,7 +48,8 @@ So the operator's rules are the persistence guide's
   upgrades (a volume, the add-on's data directory, the service's state
   directory);
 - protect it like a key: it holds the node's private operational keys
-  unencrypted. A file the node creates through `Store.Path` (or
+  unencrypted unless `Store.Sealer` is set ([sealing at
+  rest](../security.md#sealing-at-rest)). A file the node creates through `Store.Path` (or
   `store.OpenSQLite`) is created with mode `0600`, and
   SQLite gives its `-wal` and `-shm` files the same mode; an existing file
   keeps its mode, and a host that opens its own handle (`Store.DB`) sets the

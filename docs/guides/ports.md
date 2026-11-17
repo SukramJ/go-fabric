@@ -158,7 +158,7 @@ These are read once at `Start`, or feed a component `Start` builds.
 
 | Port | Failure mode | What a skip costs |
 | --- | --- | --- |
-| `AttachACLLister` | fails closed | every fabric-scoped request is denied with UnsupportedAccess. `endpoint.UnenforcedACL` is the explicit way to run without an ACL |
+| `AttachACLLister` | fails closed | every operational (CASE) request is denied with UnsupportedAccess. `endpoint.UnenforcedACL` is the explicit way to run without an ACL |
 | `AttachSessionLookup` | silent | every encrypted datagram is dropped. CASE completes and carries no traffic |
 | `AttachPaseHandlerProvider` (or `AttachPaseHandler`) | fails closed | commissioning cannot begin. Prefer the provider: the singleton serialises commissioners |
 | `AttachCaseHandlerProvider` (or `AttachCaseHandler`) | fails closed | no CASE. A singleton rejects the parallel CASE sessions Apple Home opens |

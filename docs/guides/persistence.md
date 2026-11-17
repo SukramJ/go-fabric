@@ -375,10 +375,9 @@ The schemas are independent and can be applied in either order.
 The module ships no backup tool. What a backup has to respect:
 
 - **The file holds private keys.** The node's operational keys and the
-  controller's CA key are stored unencrypted, unless the node's store
-  seals them (`store.NewSealed`, [sealing at
-  rest](../security.md#sealing-at-rest)); the controller's are never
-  sealed. The store's documentation leaves file-system protection to the
+  controller's CA key are stored unencrypted, unless the store seals
+  them (`store.NewSealed`; for a controller `controller.Config.Sealer`,
+  [sealing at rest](../security.md#sealing-at-rest)). The store's documentation leaves file-system protection to the
   operator. Protect the database and every copy of it like the keys — and,
   under a sealer, keep the sealing key out of the backup.
 - **Copy a consistent state.** Stop the node first, or use SQLite's own

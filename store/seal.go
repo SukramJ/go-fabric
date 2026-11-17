@@ -690,6 +690,11 @@ func (s *Store) ScrubOwed(ctx context.Context) (bool, error) {
 // are not this store's and are not resealed: a controller's database
 // moves with controller.Reseal, which reseals both stores in one
 // transaction, and a registry alone with sqlstore.Reseal.
+//
+// The one transaction is atomic only with a journal: under
+// journal_mode=OFF SQLite cannot roll it back, and a Reseal that fails
+// part-way can leave the file half-moved. journal_mode=OFF is not
+// supported (review II, R2-P6-doc-3007).
 func Reseal(ctx context.Context, db *sql.DB, old, next Sealer) error {
 	if old == nil || next == nil {
 		return errors.New("store: Reseal: nil Sealer")

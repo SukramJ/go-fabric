@@ -70,7 +70,7 @@
 //     first dispatcher carries it; a later call replaces the lister on
 //     the running dispatcher at once (the one port of this group that
 //     does). Without one, TopologyDispatcher.CheckACL denies every
-//     fabric-scoped request with UnsupportedAccess: a bridge that pairs
+//     operational (CASE) request with UnsupportedAccess: a bridge that pairs
 //     normally and then answers nothing. A deployment that
 //     means to run unguarded passes [endpoint.UnenforcedACL] — the
 //     explicit spelling of the same effect.
@@ -3093,12 +3093,16 @@ type CommissioningAdvertisement struct {
 	PairingInstruction string
 	InstanceID         [8]byte
 
-	// RotatingID is the optional Matter §5.4.2.4 "Rotating Device
-	// Identifier" — 36 uppercase-hex characters when present, empty
-	// to suppress the `RI` TXT key. Callers compute it via
-	// [mdns.GenerateRotatingID] from a persisted UniqueID +
-	// LifetimeCounter pair; the bridge merely forwards the precomputed
-	// value into the mDNS service config.
+	// RotatingID is the optional Rotating Device Identifier, as
+	// connectedhomeip generates it (generateRotatingDeviceIdAsBinary,
+	// src/setup_payload/AdditionalDataPayloadGenerator.cpp:81 at
+	// 6170af84; matter.js advertises no RI key,
+	// packages/protocol/src/advertisement/mdns/CommissionableMdnsAdvertisement.ts:85-92
+	// at db021da0) — 36 uppercase-hex characters when present, empty to
+	// suppress the `RI` TXT key. Callers compute it via
+	// [mdns.GenerateRotatingID] from a persisted UniqueID + LifetimeCounter
+	// pair; the bridge merely forwards the precomputed value into the mDNS
+	// service config.
 	RotatingID string
 }
 
