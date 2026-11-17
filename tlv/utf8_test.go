@@ -23,6 +23,15 @@ func TestDecodeUTF8_ReplacesIllFormedLikeTextDecoder(t *testing.T) {
 		{"surrogate", []byte{0xED, 0xA0, 0x80}, "���"},
 		{"overlong", []byte{0xC0, 0xAF}, "��"},
 		{"broken then valid lead", []byte{0xE2, 0xC3, 0xA4}, "�ä"},
+		// Each lead byte range and continuation bound at its edges, beside
+		// an ill-formed byte so the decode takes the replacing path
+		// (R2-P5-tmut-18 rest).
+		{"lead C2, continuation 80", []byte{0xC2, 0x80, 0xFF}, "\u0080�"},
+		{"lead DF, continuation BF", []byte{0xDF, 0xBF, 0xFF}, "\u07FF�"},
+		{"lead E1", []byte{0xE1, 0x80, 0x80, 0xFF}, "\u1000�"},
+		{"lead EF", []byte{0xEF, 0xBC, 0x81, 0xFF}, "\uFF01�"},
+		{"lead F1", []byte{0xF1, 0x80, 0x80, 0x80, 0xFF}, "\U00040000�"},
+		{"lead F3", []byte{0xF3, 0xBF, 0xBF, 0xBF, 0xFF}, "\U000FFFFF�"},
 	}
 	for _, tc := range cases {
 		if got := decodeUTF8(tc.in); got != tc.want {
@@ -67,6 +76,18 @@ func TestBoundedWriters_SmallestFit(t *testing.T) {
 		got, _ := enc.Bytes()
 		if len(got) != 2 || got[1] != 1 {
 			t.Errorf("%s: % X, want a one-byte integer", name, got)
+		}
+	}
+}
+
+// TestUTF16Length counts a supplementary-plane rune, from U+10000 on, as two
+// UTF-16 code units and every other rune as one (R2-P5-tmut-18 rest).
+func TestUTF16Length(t *testing.T) {
+	for s, want := range map[string]uint64{
+		"a": 1, "\uFFFF": 1, "\U00010000": 2, "a\U0010FFFF": 3,
+	} {
+		if got := utf16Length(s); got != want {
+			t.Errorf("utf16Length(%q) = %d, want %d", s, got, want)
 		}
 	}
 }
