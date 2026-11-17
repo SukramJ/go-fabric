@@ -4,6 +4,7 @@
 package fabrictest
 
 import (
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"strconv"
@@ -47,7 +48,7 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 		_ = l.Close()
 		s.tb.Fatalf("fabrictest: controller %d: %v", index, err)
 	}
-	s.onClose(func() { _ = db.Close() })
+	s.onClose(func() { s.logTeardown(fmt.Sprintf("controller %d: close the store", index), db.Close()) })
 	log := opts.Logger
 	if log == nil {
 		log = s.log

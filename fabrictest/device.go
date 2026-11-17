@@ -175,9 +175,9 @@ func (s *Site) addDevice(topo Topology, base *node.Config) *Device {
 	s.onClose(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 		defer cancel()
-		_ = d.Stop(ctx)
+		s.logTeardown(fmt.Sprintf("device %d: stop", d.index), d.Stop(ctx))
 		if db != nil {
-			_ = db.Close()
+			s.logTeardown(fmt.Sprintf("device %d: close the store", d.index), db.Close())
 		}
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
@@ -373,7 +373,7 @@ func (d *Device) siteClient(cfg *node.Config) {
 		if d.names == nil {
 			d.names = discovery.NewNames(newQueryConn(d.site), d.site.log)
 			names := d.names
-			d.site.onClose(func() { _ = names.Close() })
+			d.site.onClose(func() { d.site.logTeardown("close the DNS-SD cache", names.Close()) })
 		}
 		cfg.Client.Names = d.names
 		d.mu.Unlock()
@@ -400,7 +400,7 @@ func (d *Device) sitePeerClient(n *node.Node) {
 	if d.names == nil {
 		d.names = discovery.NewNames(newQueryConn(d.site), d.site.log)
 		names := d.names
-		d.site.onClose(func() { _ = names.Close() })
+		d.site.onClose(func() { d.site.logTeardown("close the DNS-SD cache", names.Close()) })
 	}
 	names := d.names
 	d.mu.Unlock()

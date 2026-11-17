@@ -82,6 +82,24 @@
 // time only while no task and no host operation is pending. A site given
 // clock.System runs on the wall clock, and Run only runs the work.
 //
+// What the site leaves to the test. A test fails on what it asserts and
+// on the site's own refusals: a host that cannot be built, an address in
+// use, a wait that ran out ([ErrWaited], naming the work in flight). Some
+// things reach the test's log only: an error of what the site closes, at
+// the end or at a restart (a node's stop, a store's or a socket's close),
+// and a controller socket's serve that ended before its stack stopped it;
+// counted work that held a fake clock past a second with nothing moving,
+// and a process that stayed busy as long, after which the site moves on —
+// as matter.js's MockTime abandons a host operation pending past
+// MAX_HOST_ASYNC_MS (packages/testing/src/mocks/time.ts:70, :170-177 at
+// db021da0). A stuck host operation does not fail a test by itself.
+// DNS-SD is answered from the records the devices publish, each on an
+// mdns.Noop advertiser, so the production responder (its announcements,
+// goodbyes and question handling) is not on the path; and [Pair.Grant]
+// writes the access control list to the device's store, not through the
+// AccessControl cluster, so it emits no AccessControl event
+// (R2-P6-test-2519).
+//
 // The package is test support: it is imported from _test.go files, its
 // hosts accept the CSA test attestation chain and their credentials are
 // fixed and public.

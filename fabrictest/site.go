@@ -236,6 +236,16 @@ func (s *Site) index() int {
 	return i
 }
 
+// logTeardown reports err of what the site closes — a node's stop, a
+// store's or a socket's close — through the test's log, so a host that
+// fails to stop is seen in the test's output; it does not fail the test
+// (R2-P6-test-2519).
+func (s *Site) logTeardown(what string, err error) {
+	if err != nil {
+		s.tb.Logf("fabrictest: %s: %v", what, err)
+	}
+}
+
 // onClose runs fn when the site closes, the last registered first.
 func (s *Site) onClose(fn func()) {
 	s.mu.Lock()

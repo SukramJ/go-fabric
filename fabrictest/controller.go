@@ -97,6 +97,10 @@ type ControllerOptions struct {
 	OTA *controller.OTAConfig
 }
 
+// errServeEnded is the report of a controller socket's serve that returned
+// no error before the stack stopped it.
+var errServeEnded = errors.New("returned without an error")
+
 // Controller is an in-process Matter controller of a site: the module's
 // own controller stack (controller/, ADR 0020) wired as an application
 // wires it — an exchange manager on the controller's socket, the DNS-SD
@@ -181,7 +185,7 @@ func (c *Controller) start() error {
 		// next start (a Restart, a test's retry) can listen.
 		ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 		defer cancel()
-		st.close(ctx)
+		c.site.logTeardown(fmt.Sprintf("controller %d: close the failed start", c.index), st.close(ctx))
 		return err
 	}
 	c.mu.Lock()
@@ -269,8 +273,14 @@ func (c *Controller) build() (*stack, error) {
 	go func() {
 		defer close(served)
 		// In arrival order per secure session, as controller.New serves
-		// its socket (controller/controller.go, openNetwork).
-		_ = l.ServeOrdered(ctx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { mgr.HandleDatagram(buf, src) })
+		// its socket (controller/controller.go, openNetwork). A serve that
+		// ends before the stack stopped it is reported, not seen only as
+		// the timeouts that follow (R2-P6-test-2519); the close waits for
+		// this goroutine, so the report lands before the test ends.
+		err := l.ServeOrdered(ctx, message.SessionOrderKey, func(buf []byte, src *net.UDPAddr, _ func()) { mgr.HandleDatagram(buf, src) })
+		if ctx.Err() == nil {
+			c.site.logTeardown(fmt.Sprintf("controller %d: the socket's serve ended", c.index), cmp.Or(err, errServeEnded))
+		}
 	}()
 	st.names = discovery.NewNames(newQueryConn(c.site), log)
 	if st.ca, err = ca.New(ca.Config{Store: c.caStore, Clock: clk, IntermediateCA: c.opts.IntermediateCA}); err != nil {
@@ -337,10 +347,8 @@ func (c *Controller) Close() {
 		// timeout. With a fake clock the close runs under Site.Run, as
 		// Restart's does, so that timer fires instead of the close
 		// waiting on a clock nobody moves.
-		_ = c.site.Run(ctx, func(ctx context.Context) error {
-			c.shutdown(ctx)
-			return nil
-		})
+		err := c.site.Run(ctx, func(ctx context.Context) error { return c.shutdown(ctx) })
+		c.site.logTeardown(fmt.Sprintf("controller %d: close", c.index), err)
 	})
 }
 
@@ -357,12 +365,14 @@ func (c *Controller) Close() {
 func (c *Controller) Restart(ctx context.Context) error {
 	// The stack's close waits for timers of its own (a subscription's
 	// last exchange); with a fake clock it runs under Site.Run.
+	var stopErr error
 	if err := c.site.Run(ctx, func(ctx context.Context) error {
-		c.shutdown(ctx)
+		stopErr = c.shutdown(ctx)
 		return nil
 	}); err != nil {
 		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
 	}
+	c.site.logTeardown(fmt.Sprintf("controller %d: restart: stop", c.index), stopErr)
 	//nolint:contextcheck // the new stack's services run under contexts of their own, as at AddController
 	if err := c.start(); err != nil {
 		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
@@ -370,27 +380,30 @@ func (c *Controller) Restart(ctx context.Context) error {
 	return nil
 }
 
-// shutdown stops the controller's stack, leaving its stores. The fields
-// are read under the lock and closed outside it, so the site's resolver
-// is not held up while the stack winds down.
-func (c *Controller) shutdown(ctx context.Context) {
+// shutdown stops the controller's stack, leaving its stores, and returns
+// what its parts' closes reported. The fields are read under the lock and
+// closed outside it, so the site's resolver is not held up while the
+// stack winds down.
+func (c *Controller) shutdown(ctx context.Context) error {
 	c.mu.RLock()
 	st := &stack{
 		listener: c.listener, mgr: c.mgr, stop: c.stop, served: c.served, names: c.names,
 		set: c.set, subs: c.subs, com: c.com, reg: c.reg,
 	}
 	c.mu.RUnlock()
-	st.close(ctx)
+	return st.close(ctx)
 }
 
-// close stops what of the stack was built, the last built first. The
+// close stops what of the stack was built, the last built first, and
+// returns every error a part's close reported (R2-P6-test-2519). The
 // listener's Close returns once its address is free again.
-func (st *stack) close(ctx context.Context) {
+func (st *stack) close(ctx context.Context) error {
+	var errs []error
 	if st.reg != nil {
-		_ = st.reg.Close(ctx)
+		errs = append(errs, st.reg.Close(ctx))
 	}
 	if st.subs != nil {
-		_ = st.subs.Close(ctx)
+		errs = append(errs, st.subs.Close(ctx))
 	}
 	if st.com != nil {
 		st.com.Close()
@@ -399,18 +412,19 @@ func (st *stack) close(ctx context.Context) {
 		st.set.Close(ctx)
 	}
 	if st.mgr != nil {
-		_ = st.mgr.Shutdown(ctx)
+		errs = append(errs, st.mgr.Shutdown(ctx))
 	}
 	if st.stop != nil {
 		st.stop()
 		<-st.served
 	}
 	if st.listener != nil {
-		_ = st.listener.Close()
+		errs = append(errs, st.listener.Close())
 	}
 	if st.names != nil {
-		_ = st.names.Close()
+		errs = append(errs, st.names.Close())
 	}
+	return errors.Join(errs...)
 }
 
 // Index is the controller's host index on the site, from 1.
