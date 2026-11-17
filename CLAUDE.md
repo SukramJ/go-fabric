@@ -298,6 +298,13 @@ projection — is the host's decision and the host's own gold standard.
 consumer, mirrors `aiohomematic` there; the two reference layers do not
 overlap, and CCU wire knowledge never enters this module.
 
+The consumers of this module are four repositories, all checked out beside
+it: `../openccu-loom`, `../go-ha2fabric`, `../go-fabric-ui` and
+`../go-fabric-server`. Any check of who uses an identifier — a deprecation,
+an API break, a removal after the deprecation window, a migration note —
+greps all four, names the commit each was read at, and lists the four in its
+report, so a missing one is visible.
+
 ### Work that starts in a host
 
 Matter rules live here. A rule decided while working in a host — how this
