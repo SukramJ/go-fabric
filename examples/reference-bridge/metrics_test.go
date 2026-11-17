@@ -4,9 +4,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"expvar"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -77,5 +79,25 @@ func TestMetricsEndpointServesNoCommandLine(t *testing.T) {
 		if !strings.HasPrefix(name, metricsPrefix) {
 			t.Errorf("the metrics endpoint serves %q, which is not one of the node's metrics", name)
 		}
+	}
+}
+
+// TestMetricsRefusesANonLoopbackAddress holds R2-P6-sec-2613: the
+// unauthenticated endpoint serves on loopback; an address that is not —
+// the unspecified one here — is refused unless the operator passes
+// --metrics-expvar-any-address.
+func TestMetricsRefusesANonLoopbackAddress(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := slog.New(slog.DiscardHandler)
+	if err := serveMetrics(ctx, "127.0.0.1:0", false, logger); err != nil {
+		t.Fatalf("loopback: %v", err)
+	}
+	if err := serveMetrics(ctx, ":0", false, logger); err == nil || !strings.Contains(err.Error(), "--metrics-expvar-any-address") {
+		t.Fatalf("the unspecified address: %v", err)
+	}
+	if err := serveMetrics(ctx, ":0", true, logger); err != nil {
+		t.Fatalf("the unspecified address with the opt-in: %v", err)
 	}
 }
