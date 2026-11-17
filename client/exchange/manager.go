@@ -729,18 +729,29 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 	x := newExchange(m, s, id, protocol, true, opts)
 	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
-	s.addExchange(x)
+	// In the table first, then on the session: a close between the two
+	// either aborts x (it is on the session, abort removes it from the
+	// table) or refuses it here (R2-P6-conc-1809).
+	if !s.addExchange(x) {
+		m.unregister(x)
+		return nil, ErrSessionClosed
+	}
 	m.cleanupSessionExchanges(s)
 	return x, nil
 }
 
-// removeExchange drops x from the table if the index still maps to it.
-func (m *Manager) removeExchange(x *Exchange) {
+// unregister drops x, which never reached its session, from the table.
+func (m *Manager) unregister(x *Exchange) {
 	m.mu.Lock()
 	if key := (exchangeKey{x.session, x.index}); m.exchanges[key] == x {
 		delete(m.exchanges, key)
 	}
 	m.mu.Unlock()
+}
+
+// removeExchange drops x from the table if the index still maps to it.
+func (m *Manager) removeExchange(x *Exchange) {
+	m.unregister(x)
 	x.session.deleteExchange(x)
 	x.session.closeIfDeferred()
 }
@@ -1061,6 +1072,10 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 			return
 		}
 		x := m.accept(s, msg)
+		if x == nil {
+			// The session closed since the check above.
+			return
+		}
 		s.adoptSource(src)
 		x.onMessageReceived(msg, false)
 		m.handleSecureChannel(x, msg)
@@ -1140,6 +1155,10 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 // starts no handler and closes the exchange.
 func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 	x := m.accept(s, msg)
+	if x == nil && s.IsClosed() {
+		// The session closed since route's check: nothing to answer on.
+		return
+	}
 	if x == nil {
 		// An inbound unsecured session holds its one handshake
 		// ([maxInboundUnsecuredHandshakes]): acknowledged, then dropped.
@@ -1335,18 +1354,24 @@ func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, 
 // MessageExchange.fromInitialMessage and #addExchange
 // (ExchangeManager.ts:478-489, :551-566 at db021da0). A Sigma1 on an inbound
 // unsecured session that holds [maxInboundUnsecuredHandshakes] handshakes
-// already registers none and returns nil.
+// already registers none and returns nil, as does a closed session
+// (R2-P6-conc-1809): the exchange enters the table first and the session
+// second, so a close in between either aborts it or refuses it.
 func (m *Manager) accept(s *Session, msg *Message) *Exchange {
 	x := newExchange(m, s, msg.ExchangeID, msg.ProtocolID, false, Options{})
 	handshake := s.inbound && s.secure == nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Opcode == mrp.SCOpcodeSigma1
-	if handshake && !s.addHandshake(x) {
-		return nil
-	}
 	m.mu.Lock()
 	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
-	if !handshake {
-		s.addExchange(x)
+	added := false
+	if handshake {
+		added = s.addHandshake(x)
+	} else {
+		added = s.addExchange(x)
+	}
+	if !added {
+		m.unregister(x)
+		return nil
 	}
 	m.cleanupSessionExchanges(s)
 	return x

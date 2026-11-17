@@ -489,19 +489,27 @@ func (s *Session) closeIfDeferred() {
 	}
 }
 
-func (s *Session) addExchange(x *Exchange) {
+// addExchange adds x unless the session is closed: a close that took its
+// snapshot of the exchanges to abort before x arrived would never abort
+// it (review II, R2-P6-conc-1809). The check and the add are one step
+// under s.mu, the lock closeWith sets closed under.
+func (s *Session) addExchange(x *Exchange) bool {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return false
+	}
 	s.exchanges[x] = struct{}{}
-	s.mu.Unlock()
+	return true
 }
 
 // addHandshake adds x, the exchange a Sigma1 opened, unless the session
-// holds [maxInboundUnsecuredHandshakes] such exchanges already — in one
-// step, so two Sigma1 received at once cannot both pass.
+// holds [maxInboundUnsecuredHandshakes] such exchanges already or is
+// closed — in one step, so two Sigma1 received at once cannot both pass.
 func (s *Session) addHandshake(x *Exchange) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.handshakes >= maxInboundUnsecuredHandshakes {
+	if s.closed || s.handshakes >= maxInboundUnsecuredHandshakes {
 		return false
 	}
 	x.handshake = true
