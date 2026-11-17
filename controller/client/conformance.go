@@ -226,10 +226,19 @@ func rawIDList(n spec.Node) []uint32 {
 	if !isList(n) {
 		return nil
 	}
+	// A set, not a search of out: the list is the peer's, as long as the
+	// image quota admits, and this runs under the image's read lock that
+	// report application waits for (review II, R2-P6-bound-2358).
 	out := make([]uint32, 0, len(n.Children))
+	seen := make(map[uint32]struct{}, len(n.Children))
 	for _, e := range n.Children {
-		if isUint(e) && e.El.Uint <= 0xFFFF_FFFF && !slices.Contains(out, uint32(e.El.Uint)) {
-			out = append(out, uint32(e.El.Uint))
+		if !isUint(e) || e.El.Uint > 0xFFFF_FFFF {
+			continue
+		}
+		id := uint32(e.El.Uint)
+		if _, dup := seen[id]; !dup {
+			seen[id] = struct{}{}
+			out = append(out, id)
 		}
 	}
 	return out
