@@ -125,12 +125,15 @@ reported. chip reports only NodeList.
 
 The global trust anchors of a vendor come from the DCL.
 `AdministratorConfig.TrustAnchors` and `JointFabricOptions.TrustAnchors`
-take that lookup. Without one, the commissioner fails the Vendor ID
+take that lookup. Without one, both sides fail the Vendor ID
 Verification (`VENDOR_ID_VERIFICATION_FAILED`, cause
-`jcm.ErrNoTrustAnchor`) and does not ask for consent; `jcm.SelfAnchored`
-is the explicit opt-in to chip's placeholder, the other side's own RCAC,
-for tests and examples. The administrator still uses that placeholder
-when it has no lookup.
+`jcm.ErrNoTrustAnchor`): the commissioner does not ask for consent, and
+the administrator answers an `AnnounceJointFabricAdministrator` with
+`FAILURE`. `jcm.SelfAnchored` is the explicit opt-in to chip's
+placeholder, the other side's own RCAC, for tests and examples. The
+device kit's administrator (`device.NewJointFabricAdministrator`) is
+built without a lookup; a host that needs one mounts its own
+`jointfabric.NewAdministrator` as the declaration's `HostServer`.
 
 ## The commissioner side
 
