@@ -41,13 +41,21 @@ type peerKey struct {
 // ScopedStorage (ScopedStorage.ts:16-34) with the blob driver behind it.
 type Storage interface {
 	// Open returns the named file for an outbound transfer; an error
-	// wrapping fs.ErrNotExist is answered FileDesignatorUnknown.
+	// wrapping fs.ErrNotExist is answered FileDesignatorUnknown. name is
+	// the peer's: the second path element of its file designator, of the
+	// characters A-Z a-z 0-9 . - _ only — and it may be empty, "." or "..",
+	// which a storage that maps names to files refuses itself (review II,
+	// R2-P6-bound-1908).
 	Open(ctx context.Context, name string) (Blob, error)
 }
 
 // SinkStorage is the optional [Storage] capability a scope needs to accept
-// files a peer sends (a SendInit).
+// files a peer sends (a SendInit). The sink takes what the peer sends up
+// to the Init's definite length, or [ScopeConfig].MaxLength when the scope
+// sets one; without either it bounds the transfer itself.
 type SinkStorage interface {
+	// Create returns the sink of the named file; name is as [Storage].Open
+	// takes it — the peer's, possibly empty, "." or "..".
 	Create(ctx context.Context, name string) (Sink, error)
 }
 
@@ -68,6 +76,13 @@ type ScopeConfig struct {
 	// applied as the exchange's peerAdditionalMrpDelay (:139-142). nil is
 	// the responder's default ([Responder.SetAdditionalMrpDelay]).
 	AdditionalMrpDelay *time.Duration
+	// MaxLength, when set, caps the bytes a peer sends under the scope (a
+	// SendInit): an Init announcing a longer definite length is refused
+	// with [StatusLengthTooLarge] before the sink is created, and a transfer
+	// without one ends with that status before a byte past the cap reaches
+	// the sink. Zero is no cap beyond the Init's own definite length, which
+	// the transfer must meet either way (review II, R2-P6-bound-1908).
+	MaxLength uint64
 }
 
 // MrpDelayExchange is an [Exchange] whose MRP retransmissions take an
@@ -366,10 +381,18 @@ func (r *Responder) HandleExchange(ctx context.Context, peer Peer, first Message
 			r.refuse(ctx, ex, m, newError(StatusFileDesignatorUnknown, "No storage context found for BDX file designator %q", fd.Text()))
 			return
 		}
+		limit := entry.cfg.MaxLength
+		if limit > 0 && init.MaxLength != nil && *init.MaxLength > limit {
+			r.refuse(ctx, ex, m, newError(StatusLengthTooLarge, "SendInit announces %d bytes, more than the scope's %d", *init.MaxLength, limit))
+			return
+		}
 		sink, err := creator.Create(ctx, file)
 		if err != nil {
 			r.refuse(ctx, ex, m, err)
 			return
+		}
+		if limit > 0 {
+			sink = &cappedSink{Sink: sink, left: limit}
 		}
 		opts.Sink = sink
 	}
@@ -380,6 +403,23 @@ func (r *Responder) HandleExchange(ctx context.Context, peer Peer, first Message
 		r.logger.Warn("bdx.transfer_failed", slog.String("scope", scope), slog.Uint64("node_id", peer.NodeID), slog.Any("err", err))
 	}
 	r.unregister(s)
+}
+
+// cappedSink passes at most left bytes to its sink; a write past them is
+// refused with StatusLengthTooLarge before any of it is written
+// (ScopeConfig.MaxLength).
+type cappedSink struct {
+	Sink
+	left uint64
+}
+
+func (c *cappedSink) Write(p []byte) (int, error) {
+	if uint64(len(p)) > c.left {
+		return 0, newError(StatusLengthTooLarge, "Received a block of %dbytes with %dbytes left of the scope's MaxLength", len(p), c.left)
+	}
+	n, err := c.Sink.Write(p)
+	c.left -= uint64(n) //nolint:gosec // n <= len(p) <= left
+	return n, err
 }
 
 // refuse is onNewExchange's catch (BdxProtocol.ts:159-164): a BDX error is
