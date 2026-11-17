@@ -30,6 +30,6 @@
 // coalescing, service-change coalescing) runs after that. User callbacks
 // never run on the loop.
 //
-// The package imports mdns and the standard library only; it does not
+// The package imports mdns, clock and the standard library only; it does not
 // import bridge/, node/, device/ or endpoint/ (ADR 0020).
 package discovery
