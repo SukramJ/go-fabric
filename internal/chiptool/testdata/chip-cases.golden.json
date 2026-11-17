@@ -354,7 +354,7 @@
     "BRBINFO/2.1": {
       "tests": 1,
       "steps": 30,
-      "stepsSkipped": 38
+      "stepsSkipped": 40
     },
     "CADMIN/1.10": {
       "tests": 1,
