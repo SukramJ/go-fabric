@@ -122,7 +122,18 @@ func (b *Bridge) connectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 	if resolver == nil {
 		return peerLink{}, ErrOperationalResolverMissing
 	}
+	ctx, done := b.beginInitiation(ctx, fabricIndex)
+	defer done()
+	link, err := b.initiateCASE(ctx, provider, resolver, fabricIndex, peerNodeID)
+	if err != nil && errors.Is(context.Cause(ctx), errFabricUpdated) {
+		return peerLink{}, fmt.Errorf("%w: %w", errFabricUpdated, err)
+	}
+	return link, err
+}
 
+// initiateCASE is [Bridge.connectPeer]'s handshake: prepare, resolve, and
+// run CASE to each address until one completes.
+func (b *Bridge) initiateCASE(ctx context.Context, provider CaseInitiatorProvider, resolver OperationalResolver, fabricIndex uint8, peerNodeID uint64) (peerLink, error) {
 	init, err := provider(ctx, fabricIndex, peerNodeID)
 	if err != nil {
 		return peerLink{}, fmt.Errorf("bridge: prepare CASE: %w", err)
@@ -166,6 +177,56 @@ func (b *Bridge) connectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 		lastErr = errors.New("bridge: no operational address for peer")
 	}
 	return peerLink{}, lastErr
+}
+
+// errFabricUpdated ends a CASE initiation whose fabric an UpdateNOC
+// replaced ([Bridge.abortFabricInitiations]).
+var errFabricUpdated = errors.New("bridge: the fabric of the CASE initiation was updated")
+
+// beginInitiation registers a CASE initiation on fabricIndex: the returned
+// context ends with errFabricUpdated when the fabric is updated before the
+// initiation is done; done deregisters it.
+func (b *Bridge) beginInitiation(ctx context.Context, fabricIndex uint8) (initCtx context.Context, done func()) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	in := &caseInitiating{fabricIndex: fabricIndex, cancel: cancel}
+	b.resumption.mu.Lock()
+	if b.resumption.initiating == nil {
+		b.resumption.initiating = make(map[*caseInitiating]struct{})
+	}
+	b.resumption.initiating[in] = struct{}{}
+	b.resumption.mu.Unlock()
+	return ctx, func() {
+		b.resumption.mu.Lock()
+		delete(b.resumption.initiating, in)
+		b.resumption.mu.Unlock()
+		cancel(nil)
+	}
+}
+
+// abortFabricInitiations ends every CASE initiation this node runs on
+// fabricIndex: its handshake stops at its next wait and is abandoned, its
+// caller sees errFabricUpdated. connectedhomeip aborts a pending
+// establishment on the updated fabric in either role — the initiator's
+// CASESession registers for the fabric's events as the responder's does
+// (src/protocols/secure_channel/CASESession.cpp:476, :529, the abort
+// :423-433 at 6170af84); matter.js's initiator has no such abort: the
+// fabric is read once per attempt and the handshake's only abort is the
+// caller's signal (packages/protocol/src/peer/PeerConnection.ts:568,
+// packages/protocol/src/session/case/CaseClient.ts:67 at db021da0). The
+// session admission's identity compare stays the backstop for a handshake
+// that completes before its abort is seen. Returns how many it ended.
+// Review II, R2-P6-sec-2412, owner decision 233.
+func (b *Bridge) abortFabricInitiations(fabricIndex uint8) int {
+	b.resumption.mu.Lock()
+	defer b.resumption.mu.Unlock()
+	ended := 0
+	for in := range b.resumption.initiating {
+		if in.fabricIndex == fabricIndex {
+			in.cancel(errFabricUpdated)
+			ended++
+		}
+	}
+	return ended
 }
 
 func abandon(init *CaseInitiation) {

@@ -84,6 +84,18 @@ type resumptionState struct {
 	// node id and the exchange id) → *initiatedExchange; the OTA link's
 	// secure exchanges share it under a secureExchangeKey.
 	initiated sync.Map
+
+	// initiating are the CASE initiations this node runs ([Bridge.connectPeer]),
+	// each with its fabric, so a fabric update aborts the ones on its
+	// fabric ([Bridge.abortFabricInitiations]). Guarded by mu.
+	initiating map[*caseInitiating]struct{}
+}
+
+// caseInitiating is one CASE initiation of [Bridge.connectPeer]: its fabric
+// and the cancel of its context.
+type caseInitiating struct {
+	fabricIndex uint8
+	cancel      context.CancelCauseFunc
 }
 
 func (r *resumptionState) storeLocked() SubscriptionStore {
