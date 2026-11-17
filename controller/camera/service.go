@@ -609,13 +609,16 @@ func (w serviceWatch) reported(nodeID uint64, endpointID uint16, present map[uin
 // an earlier report listed and this one does not ends as camera_restarted
 // after a StartUp, else camera_dropped. Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2283-2296 at
-// 0bd06f2.
+// 0bd06f2. The same report then applies to the raw route's requestor
+// entries (providerSessions.reconcileUntracked; review II,
+// R2-P6-store-2203).
 func (s *Service) reconcile(nodeID uint64, endpointID uint16, present map[uint16]bool, restarted bool) {
 	cause := endCameraDropped
 	if restarted {
 		cause = endCameraRestarted
 	}
 	s.m.sessions.reconcile(nodeID, endpointID, present, cause)
+	s.ps.reconcileUntracked(target{nodeID, endpointID}, present, func(t target, id uint16) bool { return s.m.sessions.knows(t.nodeID, t.endpointID, id) })
 }
 
 // reportCompleted is a report batch of the node applied: each provider

@@ -253,6 +253,9 @@ type providerSessions struct {
 	// (review II, R2-P1-cam-b-02).
 	owners   map[providerKey]*lifecycle
 	recordMu sync.Mutex
+	// listed, guarded by mu: the requestor entries the registry does not
+	// name that a CurrentSessions report has listed (reconcileUntracked).
+	listed map[providerKey]bool
 	// closed, guarded by mu and set under recordMu too: the Service's
 	// Close began; a new session answered from now on is ended, not
 	// registered (review II, R2-P2-stop-03). Every requestor upsert
@@ -331,6 +334,7 @@ func (p *providerSessions) sessionEnded(k providerKey) {
 	p.mu.Lock()
 	delete(p.offers, k)
 	delete(p.owners, k)
+	delete(p.listed, k)
 	p.mu.Unlock()
 }
 
@@ -747,6 +751,49 @@ func (p *providerSessions) untracked(tracked func(t target, id uint16) bool) []w
 		}
 	}
 	return out
+}
+
+// reconcileUntracked applies one CurrentSessions report of an endpoint
+// (present: the ids it lists for this controller) to the requestor's
+// entries of this fabric on that endpoint the registry does not name — the
+// raw route's — as the registry applies a report to its own sessions
+// (sessionRegistry.reconcile): an entry the report lists is marked listed,
+// and one an earlier report listed and this one does not is dropped, its
+// records with it, as a vanished session's are. A report built before the
+// offer does not list the session, so only a listed entry can go. The
+// camera dropped the session without an End (a restart); kept, the entry
+// would count as held for the sweep and the requestor would accept
+// signals for a dead id. matterjs-server at 0bd06f2 keeps it: it applies
+// a report to registry lives only
+// (packages/ws-controller/src/camera/sessionRegistry.ts:414-432), and a
+// report takes a requestor entry away only through the registry's
+// sessionVanished
+// (packages/ws-controller/src/controller/MatterController.ts:581-584) —
+// a divergence, the module's rule (review II, R2-P6-store-2203, decision
+// 207).
+func (p *providerSessions) reconcileUntracked(t target, present map[uint16]bool, tracked func(t target, id uint16) bool) {
+	for _, s := range p.requestor.sessions() {
+		if s.FabricIndex != p.fabricIndex || s.PeerNodeId != t.nodeID || s.PeerEndpointId != t.endpointID || tracked(t, s.Id) {
+			continue
+		}
+		k := p.key(t, s.Id)
+		p.mu.Lock()
+		listed := p.listed[k]
+		if present[s.Id] && !listed {
+			if p.listed == nil {
+				p.listed = map[providerKey]bool{}
+			}
+			p.listed[k] = true
+		}
+		p.mu.Unlock()
+		if present[s.Id] || !listed {
+			continue
+		}
+		p.log.Info("camera.session.dropped_by_report", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("webrtc_session_id", int(s.Id)))
+		// A session the registry took the id for since is its own
+		// (ownedByOther); a raw entry has no owner.
+		p.removeTrackedOf(t, s.Id, nil)
+	}
 }
 
 // sendEndSession ends a session with UserHangup through the provider
