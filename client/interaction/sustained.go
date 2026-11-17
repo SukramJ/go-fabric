@@ -331,10 +331,14 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	// establishments and paces consecutive short-lived subscriptions only:
 	// one the peer drops before it lasted losses' current interval waits
 	// its next step before the re-subscribe, one that lasted it starts it
-	// over. So a peer that grants and drops at once is not re-subscribed
-	// without a pause, and the failed attempts of an outage do not count
-	// against the subscription that ends it. Ahead of matter.js; the rule
-	// is this module's (review II, R2-P6-fsm-2110).
+	// over. "Short-lived" is measured against the current interval, not
+	// the first step: after several quick drops (the interval at, say,
+	// 16 min) a subscription that lasted 10 min and is then lost still
+	// waits 16 min and doubles the interval again. So a peer that grants
+	// and drops at once is not re-subscribed without a pause, and the
+	// failed attempts of an outage do not count against the subscription
+	// that ends it. Ahead of matter.js; the rule is this module's (review
+	// II, R2-P6-fsm-2110).
 	losses := newRetries(DefaultSustainRetries, c.rand)
 	for {
 		req, closed, deliberate := innerRequest(outer, updated)
