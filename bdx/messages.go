@@ -163,8 +163,10 @@ func decodeRangeControl(b byte) rangeControl {
 // WideRange says — chosen by value, as connectedhomeip chooses it
 // (src/protocols/bdx/BdxMessages.cpp:47-48, :53 at 6170af84), so nothing is
 // truncated (review II, R2-P6-wire-1909; an Ahead-of-matter.js row: matter.js
-// takes the wide form by type, BdxAcceptMessagesSchema.ts:110 at db021da0,
-// and writes a number above 2³²−1 modulo 2³², DataWriter.ts:33-35). A
+// takes the wide form by type — BdxInitMessagesSchema.ts:115 for the Init,
+// BdxAcceptMessagesSchema.ts:110 for the ReceiveAccept, at db021da0 — and
+// writes a number above 2³²−1 through DataView.setUint32,
+// DataWriter.ts:33-35, which wraps it modulo 2³²). A
 // MaxLength of 0 means an indefinite length, as in matter.js, and is not
 // put on the wire.
 type Init struct {

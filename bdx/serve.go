@@ -252,7 +252,10 @@ func negotiateReceiver(ctx context.Context, f *inboundFlow, modes []DriverMode, 
 	// The Init's definite length is the length the transfer must meet: a
 	// block past it is refused before it reaches the sink, and BlockEof
 	// short of it fails — as the initiating Receive holds the Accept's
-	// (R2-P2-alloc-06; review II, R2-P6-bound-1908).
+	// (R2-P2-alloc-06; review II, R2-P6-bound-1908; an Ahead-of-matter.js
+	// row: matter.js's receiver-and-responder collects the accept
+	// parameters with no length, bdx-session-initiator.ts:105-111 at
+	// db021da0).
 	if length != nil {
 		f.setDataLength(*length)
 	}

@@ -57,9 +57,13 @@ const (
 // maxCRLPointsPerIssuer bounds the CRL distribution points one lookup uses
 // of the points the ledger lists for one issuer. The ledger's answer
 // admits about 10⁵ points within its body bound; past this number the
-// rest are not used and the lookup counts as incomplete — not cached,
-// logged once (review II, R2-P6-bound-1905; an Ahead-of-matter.js row).
-// An issuer partitions its revocations over a few CRLs (§6.2.6.1).
+// rest are not used and the lookup counts as incomplete — not cached (so
+// each lookup costs the bound's downloads again), logged once (review II,
+// R2-P6-bound-1905; an Ahead-of-matter.js row: matter.js downloads every
+// point, DclCertificateService.ts:1575-1579, :1587-1596 at db021da0). The
+// value 64 is this module's judgement, not a measured figure: an issuer may
+// partition its revocations over several CRLs (§6.2.6.1), and 64 is meant
+// to sit above any such partition.
 const maxCRLPointsPerIssuer = 64
 
 // revocationEntry is DclCertificateService.RevocationEntry (:2117-2120):

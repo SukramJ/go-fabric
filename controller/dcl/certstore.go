@@ -740,14 +740,18 @@ func (s *CertificateStore) saveIndex(ctx context.Context) {
 	}
 }
 
-// storeCertificate is #storeCertificate (:1328-1350): never downgrade a
-// production certificate to test, keep the first FetchedAt. A
-// non-production source (the test ledger, GitHub, a test AddCertificate)
-// never replaces a production entry: the entry, its DER included, stays
-// as the production source stored it, so the bytes [CertificateStore.PAA]
-// reports as production are the production ledger's (review II,
-// R2-P6-sec-1902; the Ahead-of-matter.js row of the promotion and of this
-// rule). fromLedger says the bytes are the production ledger's answer
+// storeCertificate is #storeCertificate (DclCertificateService.ts:1442 ff.
+// at db021da0): never downgrade a production certificate to test, keep
+// the first FetchedAt. A non-production source (the test ledger, GitHub, a
+// test AddCertificate) never replaces a production entry: the entry, its
+// DER included, stays as the production source stored it, so the bytes
+// [CertificateStore.PAA] reports as production are the production
+// ledger's — for a store written before this rule, once an update has
+// fetched the entry again (storedCertificate.ProductionLedger). matter.js
+// keeps the production flag and stores the new bytes under it
+// (DclCertificateService.ts:1449-1452, :1460 at db021da0); review II,
+// R2-P6-sec-1902, the Ahead-of-matter.js row of the promotion and of this
+// rule. fromLedger says the bytes are the production ledger's answer
 // (storedCertificate.ProductionLedger). It reports whether it stored.
 func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata, fromLedger bool) bool {
 	s.mu.Lock()
@@ -838,8 +842,11 @@ func (s *CertificateStore) fetchCertificates(ctx context.Context, force bool) er
 // ledger and the .der files of one GitHub directory an update fetches,
 // one request each, while it holds the update slot: past them the rest
 // is not fetched, logged once (review II, R2-P6-bound-1911; an
-// Ahead-of-matter.js row). Both sit far above the lists' sizes at the
-// review (about a hundred production roots).
+// Ahead-of-matter.js row: matter.js loops every listed root and file,
+// DclCertificateService.ts:1144-1147, :1304-1307, :1335-1338 at
+// db021da0). The value 1024 is this module's judgement, not a measured
+// figure: it is meant to sit well above both lists; the ledger's current
+// root count was not measured.
 const (
 	maxRootsPerUpdate       = 1024
 	maxGitHubFilesPerUpdate = 1024
@@ -878,7 +885,8 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		existing, ok := s.index[refID]
 		s.mu.Unlock()
 		// A stored test certificate the production ledger lists is upgraded
-		// (:1075-1082) by the production ledger's own record: it is fetched
+		// (DclCertificateService.ts:1186-1192 at db021da0) by the production
+		// ledger's own record: it is fetched
 		// and stored below, its DER replacing the test source's, and the
 		// entry stays a test certificate when that fetch fails. matter.js
 		// sets the flag on the stored entry by key identifier alone and

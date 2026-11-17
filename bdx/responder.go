@@ -81,7 +81,9 @@ type ScopeConfig struct {
 	// with [StatusLengthTooLarge] before the sink is created, and a transfer
 	// without one ends with that status before a byte past the cap reaches
 	// the sink. Zero is no cap beyond the Init's own definite length, which
-	// the transfer must meet either way (review II, R2-P6-bound-1908).
+	// the transfer must meet either way (review II, R2-P6-bound-1908; an
+	// Ahead-of-matter.js row — no counterpart was found in matter.js's
+	// BDX scope configuration; the value is the host's).
 	MaxLength uint64
 }
 
