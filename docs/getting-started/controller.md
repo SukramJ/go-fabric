@@ -868,8 +868,10 @@ software-update manager: `Controller.SoftwareUpdates()` is a
 `softwareupdate.Manager` — `AddUpdateConsent` queues a node's update and
 announces the provider to it, `ForceUpdate` announces at once,
 `RemoveConsent` cancels, `QueryUpdates` and `CheckForUpdates` look for
-updates in the `softwareupdate.Images` store and the DCL ledgers,
-`QueuedUpdates` shows the queue. The provider is the controller itself: the
+updates in the `softwareupdate.Images` store and the DCL ledgers (a product
+whose check fails is passed over; its failure joins the returned error,
+which is nil only when every product's check succeeded, while the updates
+found for the others are still returned), `QueuedUpdates` shows the queue. The provider is the controller itself: the
 OTA provider server sits at `controller.OTAProviderEndpoint` of the
 controller's own endpoint tree, served as RootNodeID over the sessions the
 controller holds (matter.js's provider on the controller's node), and the
