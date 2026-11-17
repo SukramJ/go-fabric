@@ -96,3 +96,27 @@ func TestConformanceFailsOnUnmodelledForms(t *testing.T) {
 		}
 	}
 }
+
+// TestConformanceChoiceAndRevisionForms (R2-P6-test-2512): a bracketed
+// term with a choice suffix is the optional term it brackets; a revision
+// term is held to the "Rev >= vN" form — inside a conjunction or as
+// another comparison it is an unmodelled form, not "allowed".
+func TestConformanceChoiceAndRevisionForms(t *testing.T) {
+	t.Parallel()
+	if req, allowed := Conformance(t, "[ICTL].b+", map[string]bool{"ICTL": true}); req || !allowed {
+		t.Errorf("[ICTL].b+ with ICTL: required %v allowed %v, want optional", req, allowed)
+	}
+	if req, allowed := Conformance(t, "[ICTL].b+", nil); req || allowed {
+		t.Errorf("[ICTL].b+ without ICTL: required %v allowed %v, want not allowed", req, allowed)
+	}
+	if req, allowed := Conformance(t, "Rev >= v2", nil); req || !allowed {
+		t.Errorf("Rev >= v2: required %v allowed %v, want optional", req, allowed)
+	}
+	for _, expr := range []string{"P, [Rev >= v2 & ICTL & !ImageRotation].b+", "Rev < v2", "[Rev > v1]"} {
+		rec := &fatalRecorder{TB: t}
+		Conformance(rec, expr, map[string]bool{"ICTL": true})
+		if !rec.failed {
+			t.Errorf("Conformance(%q) did not fail", expr)
+		}
+	}
+}

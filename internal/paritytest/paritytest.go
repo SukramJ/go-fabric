@@ -13,6 +13,7 @@ package paritytest
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -176,33 +177,54 @@ var clusterIndex = sync.OnceValue(func() map[uint32]json.RawMessage {
 func Conformance(tb testing.TB, expr string, names map[string]bool) (required, allowed bool) {
 	tb.Helper()
 	// Every term is checked before any is evaluated: an unmodelled form
-	// behind a term that holds still fails.
+	// behind a term that holds still fails. A revision term is modelled in
+	// the "Rev >= vN" form only, which holds at the snapshot's revision; in
+	// a conjunction or as another comparison it is unmodelled
+	// (R2-P6-test-2512).
 	for term := range strings.SplitSeq(expr, ",") {
-		if term = strings.Trim(strings.TrimSpace(term), "[]"); !strings.HasPrefix(term, "Rev") && strings.ContainsAny(term, "!&()<>=") {
-			tb.Fatalf("paritytest.Conformance: %q uses a form it does not model (term %q); extend it before relying on the answer", expr, term)
+		inner, _ := conformanceTerm(term)
+		if strings.HasPrefix(inner, "Rev") {
+			if !revAtLeast.MatchString(inner) {
+				tb.Fatalf("paritytest.Conformance: %q uses a revision form it does not model (term %q); extend it before relying on the answer", expr, inner)
+			}
+			continue
+		}
+		if strings.ContainsAny(inner, "!&()<>=") {
+			tb.Fatalf("paritytest.Conformance: %q uses a form it does not model (term %q); extend it before relying on the answer", expr, inner)
 		}
 	}
 	for term := range strings.SplitSeq(expr, ",") {
-		term = strings.TrimSpace(term)
-		optional := strings.HasPrefix(term, "[") && strings.HasSuffix(term, "]")
-		if optional {
-			term = strings.TrimSpace(term[1 : len(term)-1])
-		}
-		if i := strings.Index(term, "."); i >= 0 {
-			term = term[:i]
-		}
+		inner, optional := conformanceTerm(term)
 		switch {
-		case term == "M":
+		case inner == "M":
 			return !optional, true
-		case term == "O":
+		case inner == "O":
 			return false, true
-		case strings.HasPrefix(term, "Rev"):
+		case strings.HasPrefix(inner, "Rev"):
 			return false, true
-		case holds(term, names):
+		case holds(inner, names):
 			return !optional, true
 		}
 	}
 	return false, false
+}
+
+// revAtLeast is the one revision comparison Conformance models.
+var revAtLeast = regexp.MustCompile(`^Rev >= v\d+$`)
+
+// choiceSuffix is a conformance term's choice suffix: ".a", ".b+", ".a2".
+var choiceSuffix = regexp.MustCompile(`\.[a-z]\d*\+?$`)
+
+// conformanceTerm is one comma-separated term without its choice suffix
+// and its optional brackets, and whether it was bracketed. The suffix is
+// cut before the bracket test, so "[ICTL].b+" is the optional ICTL
+// (R2-P6-test-2512).
+func conformanceTerm(term string) (inner string, optional bool) {
+	term = strings.TrimSpace(choiceSuffix.ReplaceAllString(strings.TrimSpace(term), ""))
+	if strings.HasPrefix(term, "[") && strings.HasSuffix(term, "]") {
+		return strings.TrimSpace(term[1 : len(term)-1]), true
+	}
+	return term, false
 }
 
 // holds evaluates a name or a disjunction of names.
