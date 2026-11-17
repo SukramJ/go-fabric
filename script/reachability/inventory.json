@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9748,
+  "entry_points": 9749,
   "entry_packages": [
     ".",
     "bdx",
@@ -295,8 +295,8 @@
   ],
   "summary": {
     "total_exported": 19321,
-    "reachable": 12654,
-    "whitelisted": 6667,
+    "reachable": 12653,
+    "whitelisted": 6668,
     "unreachable": 0
   },
   "by_package": [],
@@ -13951,6 +13951,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/lock/doorlock_server.go",
       "line": 60
+    },
+    {
+      "package": "cluster/lock",
+      "identifier": "StateSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/lock/doorlock_server.go",
+      "line": 129
     },
     {
       "package": "cluster/measurement",
