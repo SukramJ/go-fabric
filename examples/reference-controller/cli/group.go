@@ -336,6 +336,27 @@ func servesGroupcast(ctx context.Context, n *client.Node) (bool, error) {
 // wire form chip stores (src/app/server/AclStorage.cpp:162-171 converts
 // the internal 0xFFFFFFFFFFFF0000|group node id to GroupIdFromNodeId) and
 // the one cluster/core's AccessControl accepts (0x0001..0xFFFF).
+// addGroupOK judges an AddGroup answer: an AddGroupResponse whose Status
+// (context tag 0) is Success, for the group asked — decoded by tag
+// (groupsdef.AddGroupResponse.DecodeTLV), not by the members' position
+// (R2-P6-wire-2609); TestGroupMessaging.yaml:145-150 expects Status 0.
+func addGroupOK(res interaction.Result, groupID uint16) error {
+	if !res.HasFields || res.Command != groupsdef.CmdAddGroupResponse {
+		return fmt.Errorf("no AddGroupResponse (status %s, command 0x%02X)", res.Status, res.Command)
+	}
+	var rsp groupsdef.AddGroupResponse
+	if err := rsp.DecodeTLV(res.Fields); err != nil {
+		return fmt.Errorf("AddGroupResponse: %w", err)
+	}
+	if rsp.Status != groupsdef.Status(im.StatusSuccess) {
+		return fmt.Errorf("status %s", im.StatusCode(rsp.Status))
+	}
+	if rsp.GroupId != groupID {
+		return fmt.Errorf("AddGroupResponse for group %d, want %d", rsp.GroupId, groupID)
+	}
+	return nil
+}
+
 func legacyJoin(ctx context.Context, n *client.Node, g groupRecord) error {
 	gid := uint64(g.GroupID)
 	if err := appendEntry(ctx, n, listPath(0, gkmdef.ClusterID),
@@ -350,9 +371,8 @@ func legacyJoin(ctx context.Context, n *client.Node, g groupRecord) error {
 		if err != nil {
 			return fmt.Errorf("AddGroup on endpoint %d: %w", ep, err)
 		}
-		// AddGroupResponse: Status 0 (TestGroupMessaging.yaml:145-150).
-		if len(res.Fields.Children) == 0 || res.Fields.Children[0].El.Uint != 0 {
-			return fmt.Errorf("AddGroup on endpoint %d: status %s", ep, valueJSON(nil, res.Fields))
+		if err := addGroupOK(res, g.GroupID); err != nil {
+			return fmt.Errorf("AddGroup on endpoint %d: %w", ep, err)
 		}
 		targets = append(targets, acldef.AccessControlTargetStruct{
 			Cluster: spec.NullOf[uint32](), Endpoint: spec.ValueOf(ep), DeviceType: spec.NullOf[uint32](),
