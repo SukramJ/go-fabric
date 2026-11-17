@@ -175,7 +175,10 @@ func (m *MemoryBlobs) Put(_ context.Context, name string, data []byte) error {
 	return nil
 }
 
-// Get implements [Blobs].
+// Get implements [Blobs]. The slice it returns is the stored file, not a
+// copy (an image is not doubled per read): the caller only reads it — a
+// write into it would change the file under every other reader (review
+// II, R2-P6-conc-1916).
 func (m *MemoryBlobs) Get(_ context.Context, name string) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -288,7 +291,8 @@ func (n *nameLocks) lock(name string) func() {
 	return func() {
 		l.held.Unlock()
 		n.mu.Lock()
-		if l.users--; l.users == 0 {
+		l.users--
+		if l.users == 0 {
 			delete(n.locks, name)
 		}
 		n.mu.Unlock()
