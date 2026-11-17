@@ -648,7 +648,7 @@ const heapSampleAge = time.Second
 // from one reading per heapSampleAge.
 type runtimeHeap struct {
 	// readMemStats reads the heap (runtime.ReadMemStats); now is the
-	// sample's clock (time.Now).
+	// sample's clock (clock.System).
 	readMemStats func(*runtime.MemStats)
 	now          func() time.Time
 	// mu guards at and m: the last reading and when it was taken.
@@ -658,7 +658,7 @@ type runtimeHeap struct {
 }
 
 func newRuntimeHeap() *runtimeHeap {
-	return &runtimeHeap{readMemStats: runtime.ReadMemStats, now: time.Now}
+	return &runtimeHeap{readMemStats: runtime.ReadMemStats, now: clock.System{}.Now}
 }
 
 // read returns the last reading while it is younger than heapSampleAge,
