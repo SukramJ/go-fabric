@@ -32,6 +32,11 @@ const (
 	pingInterval = 20 * time.Second
 	// pongTimeout is 4.5 times the interval (connection.py:138-146).
 	pongTimeout = pingInterval * 9 / 2
+	// writeTimeout bounds one write on an established connection: a peer
+	// that stops reading fills the socket buffer, and the write blocking
+	// on it would otherwise hold the framer until the peer's TCP gives up
+	// (R2-P6-err-2010). The same bound as a peer that sends nothing.
+	writeTimeout = pongTimeout
 	// apiVersionMajor and apiVersionMinor are the version the client
 	// declares (connection.py:259-267).
 	apiVersionMajor = 1
@@ -58,6 +63,10 @@ type apiConn struct {
 	handle func(typ uint16, payload []byte)
 	// lastRx is the clock time of the last message, in nanoseconds.
 	lastRx atomic.Int64
+	// writeTimeout bounds each write of send.
+	writeTimeout time.Duration
+	// pinging is a keep-alive ping in the write.
+	pinging atomic.Bool
 
 	done      chan struct{}
 	closeOnce sync.Once
@@ -78,7 +87,7 @@ func dialAPI(ctx context.Context, addr string, psk []byte, o *Options) (*apiConn
 	if err != nil {
 		return nil, err
 	}
-	a := &apiConn{nc: nc, clk: o.Clock, log: o.Logger, done: make(chan struct{})}
+	a := &apiConn{nc: nc, clk: o.Clock, log: o.Logger, done: make(chan struct{}), writeTimeout: writeTimeout}
 	// The handshake and the hello read synchronously; the connection is
 	// closed when they overrun, or when ctx ends.
 	expired := atomic.Bool{}
@@ -206,7 +215,9 @@ func (a *apiConn) run() {
 }
 
 // keepAlive pings every pingInterval and closes the connection when
-// nothing arrived for pongTimeout (connection.py:138-146).
+// nothing arrived for pongTimeout (connection.py:138-146). The ping is
+// written beside the ticker, one at a time, so a write stuck on a peer
+// that reads nothing does not stop the silence check (R2-P6-err-2010).
 func (a *apiConn) keepAlive() {
 	tk := a.clk.NewTicker(pingInterval)
 	defer tk.Stop()
@@ -219,18 +230,29 @@ func (a *apiConn) keepAlive() {
 				a.close(errPongTimeout)
 				return
 			}
-			_ = a.send(wire.Empty(wire.TypePingRequest))
+			if a.pinging.CompareAndSwap(false, true) {
+				go func() {
+					defer a.pinging.Store(false)
+					_ = a.send(wire.Empty(wire.TypePingRequest))
+				}()
+			}
 		}
 	}
 }
 
-// send writes m; a write that fails closes the connection.
+// send writes m; a write that fails, or blocks past writeTimeout, closes
+// the connection.
 func (a *apiConn) send(m wire.Message) error {
 	select {
 	case <-a.done:
 		return ErrProxyUnavailable
 	default:
 	}
+	// The kernel judges a socket deadline against the wall clock, so it is
+	// taken from the wall clock and not from a.clk: a fake clock's instant
+	// would expire it at once. A concurrent send moves it on, which only
+	// lengthens the write in flight by as much.
+	_ = a.nc.SetWriteDeadline(time.Now().Add(a.writeTimeout))
 	if err := a.f.WriteMessage(m); err != nil {
 		a.close(err)
 		return fmt.Errorf("%w: %w", ErrProxyUnavailable, err)
