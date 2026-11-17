@@ -306,9 +306,11 @@ node's attestation validated when it was commissioned
 (`client.Record.AttestedVendorID`/`AttestedProductID`) is logged as one
 Warn line, `ota.manager.attested_identity_mismatch`, and answered as any
 other query: nothing is refused on it. The ids are kept only when the
-attestation verified the DAC chain against the trust store and no error
-finding stands; a node commissioned before the record kept them, without a
-trust store, or with a failed attestation or an error finding the policy
+attestation verified the DAC chain against the trust store up to a
+production root, the Certification Declaration is not signed by the Matter
+test CD signer and no error finding stands; a node commissioned before the
+record kept them, without a trust store, under a test root or a test-signed
+declaration, or with a failed attestation or an error finding the policy
 accepted, is not judged.
 
 **Storage.** `ImagesConfig.Blobs` keeps the image files. A backend whose

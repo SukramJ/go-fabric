@@ -1167,7 +1167,7 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		// (owner decision 119): a finding that a check could not run (no
 		// trust store, DclServiceUnavailable) or a LevelError one the
 		// policy accepts below leaves it unattested, with one log line.
-		if why, withheld := attestedPairWithheld(findings); withheld {
+		if why, withheld := attestedPairWithheld(result); withheld {
 			f.log.Info("matter.controller.commissioning.attested_identity_not_recorded", slog.String("reason", why))
 		} else {
 			f.attested = &[2]uint16{f.data.vendorID, f.data.productID}
@@ -1204,12 +1204,25 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 }
 
 // attestedPairWithheld reports why an attestation that returned no error
-// still records no attested pair: a check that did not run because no
-// trust store (DCL service) was available — the DAC chain, or the
-// Certification Declaration's authorized_paa_list
+// still records no attested pair: a chain that ends in a test root or a
+// declaration the test CD signer signed ([attestation.Result].TestPAA,
+// TestCDSigner; decision 119 extended by decision 192), a check that did
+// not run because no trust store (DCL service) was available — the DAC
+// chain, or the Certification Declaration's authorized_paa_list
 // ([attestation.DclServiceUnavailable]) — or an error finding
 // ([attestation.LevelError]), which a policy may accept.
-func attestedPairWithheld(findings []attestation.Finding) (string, bool) {
+func attestedPairWithheld(result attestation.Result) (string, bool) {
+	findings := result.Findings
+	// A test root or the test CD signer: trusted as such by a store that
+	// accepts test certificates, without a finding, and their keys are
+	// public — the pair is anyone's to claim (R2-P6-sec-1803, decision
+	// 214).
+	switch {
+	case result.TestPAA:
+		return "the attestation chain ends in a test root", true
+	case result.TestCDSigner:
+		return "the Certification Declaration is signed by the Matter test CD signer", true
+	}
 	for _, fd := range findings {
 		if fd.Check == attestation.DclServiceUnavailable {
 			return "the attestation chain was not verified: " + fd.Message, true

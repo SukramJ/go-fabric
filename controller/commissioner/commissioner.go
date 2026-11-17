@@ -214,13 +214,17 @@ type Result struct {
 	// validated them — [attestation.Validate] returned no error, so the
 	// Certification Declaration's vendor_id is that VendorID and its
 	// product_id_array holds that ProductID — and the DAC chain was
-	// verified against the trust store and no error finding stands. Both
-	// nil otherwise, also when the OnAttestationFailure policy let
-	// commissioning go on: an error of Validate, a check that did not run
-	// for want of a trust store (attestation.DclServiceUnavailable), an
-	// accepted attestation.LevelError finding; the commissioning log names
-	// the reason (matter.controller.commissioning.attested_identity_not_recorded).
-	// client.Record keeps them (review II decisions 105 and 119).
+	// verified against the trust store, ends in a production root, the
+	// declaration is not the Matter test CD signer's and no error finding
+	// stands. Both nil otherwise, also when the OnAttestationFailure
+	// policy let commissioning go on: an error of Validate, a check that
+	// did not run for want of a trust store
+	// (attestation.DclServiceUnavailable), an accepted
+	// attestation.LevelError finding, a test root or the test CD signer
+	// (attestation.Result.TestPAA, TestCDSigner); the commissioning log
+	// names the reason
+	// (matter.controller.commissioning.attested_identity_not_recorded).
+	// client.Record keeps them (review II decisions 105, 119, 192, 214).
 	AttestedVendorID, AttestedProductID *uint16
 }
 

@@ -32,7 +32,7 @@ func TestAttestedPairWithheld(t *testing.T) {
 		{"an error finding", []attestation.Finding{{Level: attestation.LevelError, Check: attestation.TrustedAsTestCertificate, Message: "test PAA"}}, true},
 		{"informational and warning findings", []attestation.Finding{{Level: attestation.LevelInfo, Check: attestation.PaaTrustStoreTimeMismatch}, {Level: attestation.LevelWarning, Check: attestation.CertificationTypeProvisional}}, false},
 	} {
-		why, withheld := attestedPairWithheld(c.findings)
+		why, withheld := attestedPairWithheld(attestation.Result{Findings: c.findings})
 		if withheld != c.withheld || (withheld && why == "") {
 			t.Errorf("%s: withheld %v (%q), want %v", c.name, withheld, why, c.withheld)
 		}
@@ -46,7 +46,7 @@ func TestAttestedPairWithheld(t *testing.T) {
 func TestAttestedPairStrictFindingsWithhold(t *testing.T) {
 	t.Parallel()
 	for _, c := range []attestation.Check{attestation.DacFormatInvalid, attestation.CertificateChainInvalid, attestation.CertificateExpired} {
-		if _, withheld := attestedPairWithheld([]attestation.Finding{{Level: attestation.LevelError, Check: c, Message: "x"}}); !withheld {
+		if _, withheld := attestedPairWithheld(attestation.Result{Findings: []attestation.Finding{{Level: attestation.LevelError, Check: c, Message: "x"}}}); !withheld {
 			t.Errorf("%s: the pair is recorded", c)
 		}
 	}
@@ -80,3 +80,27 @@ func TestAttestationStepClearsAnEarlierPair(t *testing.T) {
 type refusingConn struct{}
 
 func (refusingConn) Send(*net.UDPAddr, []byte) error { return errors.New("refused") }
+
+// TestAttestedPairNeedsProductionTrust: the pair is recorded only when the
+// chain ends in a production root and the Certification Declaration is not
+// the test CD signer's — under a store that accepts test certificates both
+// raise no finding, and their keys are public, so such a pair is anyone's
+// to claim (review II, R2-P6-sec-1803, owner decisions 192 and 214).
+func TestAttestedPairNeedsProductionTrust(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name     string
+		res      attestation.Result
+		withheld bool
+	}{
+		{"production root, production signer", attestation.Result{}, false},
+		{"test root", attestation.Result{TestPAA: true}, true},
+		{"test CD signer", attestation.Result{TestCDSigner: true}, true},
+		{"both", attestation.Result{TestPAA: true, TestCDSigner: true}, true},
+	} {
+		why, withheld := attestedPairWithheld(c.res)
+		if withheld != c.withheld || (withheld && why == "") {
+			t.Errorf("%s: withheld %v (%q), want %v", c.name, withheld, why, c.withheld)
+		}
+	}
+}

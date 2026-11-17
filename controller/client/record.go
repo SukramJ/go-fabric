@@ -110,7 +110,8 @@ type Record struct {
 	// node's Certification Declaration (the declaration's vendor_id is
 	// that VendorID and its product_id_array holds that ProductID). They
 	// are set together or not at all, and only when the DAC chain was
-	// verified and no error finding stands; nil when unknown — a node
+	// verified up to a production root, the declaration is not the Matter
+	// test CD signer's and no error finding stands; nil when unknown — a node
 	// commissioned before the field existed, one whose attestation ran
 	// without a trust store, failed or had an error finding the policy
 	// accepted, one not commissioned (a decommission clears them). They are not the announced VendorID and ProductID

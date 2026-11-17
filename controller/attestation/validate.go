@@ -57,6 +57,18 @@ type Result struct {
 	DACPublicKey *ecdsa.PublicKey
 	// Findings are the non-fatal findings, in the order they arose.
 	Findings []Finding
+	// TestPAA is true when the chain ends in a root the trust store holds
+	// as not production ([PAA].Production false) — false without a store,
+	// whose chain was not checked ([DclServiceUnavailable]).
+	TestPAA bool
+	// TestCDSigner is true when the Certification Declaration is signed by
+	// the Matter test CD signer.
+	//
+	// Both are Go only: a store that accepts test certificates raises no
+	// finding for either, and the test keys are public, so the commissioner
+	// records the attested pair only when both are false (review II,
+	// R2-P6-sec-1803, owner decision 214). The findings stay matter.js's.
+	TestCDSigner bool
 }
 
 // Validate validates the device's attestation. Mirrors matter.js
@@ -120,6 +132,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 	// === DCL-dependent checks (only with a store), DAV:220 ===
 
 	var paa *attCert
+	testPAA := false
 	if ctx.Store == nil {
 		// DAV:312-318 at db021da0.
 		findings = append(findings, Finding{
@@ -128,7 +141,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 				"Register DclCertificateService in the environment for full attestation.",
 		})
 	} else {
-		if paa, err = checkChain(ctx.Store, dac, pai, &findings); err != nil {
+		if paa, testPAA, err = checkChain(ctx.Store, dac, pai, &findings); err != nil {
 			return Result{}, err
 		}
 	}
@@ -175,7 +188,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 
 	// Step 10, firmware information: a TODO upstream (DAV:528-534), as is
 	// the certificate_id check (DAV:421-422).
-	return Result{DACPublicKey: dacPublicKey, Findings: findings}, nil
+	return Result{DACPublicKey: dacPublicKey, Findings: findings, TestPAA: testPAA, TestCDSigner: signer.IsTestSigner}, nil
 }
 
 // deviceCertificateFindings are the error findings on the device's own
@@ -206,14 +219,14 @@ func deviceCertificateFindings(clk clock.Clock, dac, pai *attCert) []Finding {
 
 // checkChain is the store branch, DAV:232-364: the PAA, the chain, the
 // validity at the DAC's notBefore, the PAA vendor id, revocation. It
-// returns the PAA.
-func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCert, error) {
+// returns the PAA and whether the store holds it as not production.
+func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCert, bool, error) {
 	// Step 2: the PAA by the PAI's authority key identifier, test roots
 	// considered (DAV:233-241).
 	paiAkid := pai.x509.AuthorityKeyId
 	meta, ok := store.PAA(paiAkid)
 	if !ok {
-		return nil, fail(PaaNotTrusted, "PAA not found in trust store for authority key identifier "+hex.EncodeToString(paiAkid))
+		return nil, false, fail(PaaNotTrusted, "PAA not found in trust store for authority key identifier "+hex.EncodeToString(paiAkid))
 	}
 	// A test root under a production policy (DAV:243-251).
 	if !meta.Production && !store.AcceptsTestCertificates() {
@@ -240,7 +253,7 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	// does not parse is not the peer's fault: a plain error (DAV:270).
 	paa, err := parseAttCert(meta.DER, kindPAA, false)
 	if err != nil {
-		return nil, fmt.Errorf("attestation: trust store PAA: %w", err)
+		return nil, false, fmt.Errorf("attestation: trust store PAA: %w", err)
 	}
 	// The PAA key is read inside matter.js's try (DAV:272-279), so a key
 	// it cannot use fails the chain as the signature does. The key and the
@@ -250,21 +263,21 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 		err = VerifyIssuedBy(pai.x509, paa.x509)
 	}
 	if err != nil {
-		return nil, fail(CertificateChainInvalid, "PAI signature verification failed: "+err.Error())
+		return nil, false, fail(CertificateChainInvalid, "PAI signature verification failed: "+err.Error())
 	}
 	// Reading the PAI key apart from the DAC check (DAV:281-286).
 	paiAlgorithm, err := KeyAlgorithmOf(pai.x509)
 	if err != nil {
-		return nil, &Error{Check: CertificateUnparseable, Message: "Device returned a PAI whose public key cannot be read: " + err.Error(), Err: err}
+		return nil, false, &Error{Check: CertificateUnparseable, Message: "Device returned a PAI whose public key cannot be read: " + err.Error(), Err: err}
 	}
 	// mayIssue (DAV:288-294; kinds/CertificateSignature.ts:40-54): a PAI
 	// key no stronger than its PAA's.
 	if !MayIssue(paaAlgorithm, paiAlgorithm) {
-		return nil, fail(CertificateChainInvalid, fmt.Sprintf("PAI key algorithm %s is stronger than the %s of its PAA", paiAlgorithm, paaAlgorithm))
+		return nil, false, fail(CertificateChainInvalid, fmt.Sprintf("PAI key algorithm %s is stronger than the %s of its PAA", paiAlgorithm, paaAlgorithm))
 	}
 	// The DAC's signature by the PAI (DAV:296-303).
 	if err := VerifyIssuedBy(dac.x509, pai.x509); err != nil {
-		return nil, fail(CertificateChainInvalid, "DAC signature verification failed: "+err.Error())
+		return nil, false, fail(CertificateChainInvalid, "DAC signature verification failed: "+err.Error())
 	}
 
 	// Step 3b: validity at the DAC's notBefore; notAfter 0 is none
@@ -272,19 +285,19 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	nb := dac.notBefore
 	switch {
 	case nb < pai.notBefore:
-		return nil, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is before PAI notBefore (%d)", nb, pai.notBefore))
+		return nil, false, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is before PAI notBefore (%d)", nb, pai.notBefore))
 	case pai.notAfter != 0 && nb > pai.notAfter:
-		return nil, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is after PAI notAfter (%d)", nb, pai.notAfter))
+		return nil, false, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is after PAI notAfter (%d)", nb, pai.notAfter))
 	case nb < paa.notBefore:
-		return nil, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is before PAA notBefore (%d)", nb, paa.notBefore))
+		return nil, false, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is before PAA notBefore (%d)", nb, paa.notBefore))
 	case paa.notAfter != 0 && nb > paa.notAfter:
-		return nil, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is after PAA notAfter (%d)", nb, paa.notAfter))
+		return nil, false, fail(CertificateExpired, fmt.Sprintf("DAC notBefore (%d) is after PAA notAfter (%d)", nb, paa.notAfter))
 	}
 
 	// Step 4 (DCL part): a PAA vendor id, when present, is the PAI's
 	// (DAV:333-340).
 	if paa.vendorID != nil && !sameID(paa.vendorID, pai.vendorID) {
-		return nil, fail(VendorIDMismatch, fmt.Sprintf("PAA vendorId %s does not match PAI vendorId %s", idHex(paa.vendorID), idHex(pai.vendorID)))
+		return nil, false, fail(VendorIDMismatch, fmt.Sprintf("PAA vendorId %s does not match PAI vendorId %s", idHex(paa.vendorID), idHex(pai.vendorID)))
 	}
 
 	// Step 5: revocation of the DAC, then the PAI, keyed by (AKID, serial,
@@ -293,20 +306,20 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	if r, ok := store.(Revocations); ok {
 		revoked, err := r.IsRevoked(dac.x509.AuthorityKeyId, serialBytes(dac.x509.SerialNumber), strings.ToUpper(hex.EncodeToString(dac.x509.RawIssuer)))
 		if err != nil {
-			return nil, fmt.Errorf("attestation: revocation check: %w", err)
+			return nil, false, fmt.Errorf("attestation: revocation check: %w", err)
 		}
 		if revoked {
-			return nil, fail(CertificateRevoked, "Device Attestation Certificate has been revoked")
+			return nil, false, fail(CertificateRevoked, "Device Attestation Certificate has been revoked")
 		}
 		revoked, err = r.IsRevoked(paiAkid, serialBytes(pai.x509.SerialNumber), strings.ToUpper(hex.EncodeToString(pai.x509.RawIssuer)))
 		if err != nil {
-			return nil, fmt.Errorf("attestation: revocation check: %w", err)
+			return nil, false, fmt.Errorf("attestation: revocation check: %w", err)
 		}
 		if revoked {
-			return nil, fail(CertificateRevoked, "Product Attestation Intermediate certificate has been revoked")
+			return nil, false, fail(CertificateRevoked, "Product Attestation Intermediate certificate has been revoked")
 		}
 	}
-	return paa, nil
+	return paa, !meta.Production, nil
 }
 
 // checkDeclaration is Step 9, the CD's fields (DeviceAttestationValidator.ts
