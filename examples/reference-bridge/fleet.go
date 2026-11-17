@@ -490,9 +490,10 @@ func (v *demoValve) Close(context.Context) error {
 // reportFromDevice applies a position the valve reported by itself — the
 // manual lever on the head, or its own local timer — as opposed to one a
 // Matter command asked for. A real host drives this from its southbound
-// event stream; this example has no southbound bus, so the only caller is
-// the fleet's own test, where it stands for a change that starts at the
-// device rather than at a controller.
+// event stream; this example has no southbound bus, so its callers are
+// the app pipe's SetValveState command (control.go) and the fleet's own
+// test, where it stands for a change that starts at the device rather than
+// at a controller.
 func (v *demoValve) reportFromDevice(state valvedef.ValveStateEnum) {
 	v.mu.Lock()
 	v.stopTravelLocked()
@@ -625,7 +626,8 @@ func (s *demoSelector) ChangeToMode(_ context.Context, newMode uint8) error {
 
 // reportFromDevice applies a position someone turned the knob to by hand.
 // Like [demoValve.reportFromDevice] it stands in for the southbound event a
-// real host would forward, and the fleet's test is its caller. An unknown
+// real host would forward; the app pipe's SetSelectorMode command
+// (control.go) and the fleet's test are its callers. An unknown
 // mode is refused rather than stored: the device cannot be in a position its
 // own mode list does not have.
 func (s *demoSelector) reportFromDevice(mode uint8) error {
