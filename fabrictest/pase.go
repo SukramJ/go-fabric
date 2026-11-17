@@ -26,15 +26,24 @@ import (
 // [Pair.Commissioned] is false. With a fake site clock it runs under
 // [Site.Run].
 func (c *Controller) PASE(ctx context.Context, d *Device) (*Pair, error) {
+	// One stack for the whole call, read under the lock a Restart takes
+	// (R2-P6-conc-2509).
+	c.mu.RLock()
+	com, mgr := c.com, c.mgr
+	c.mu.RUnlock()
 	var s *exchange.Session
 	err := c.site.Run(ctx, func(ctx context.Context) error {
 		var err error
-		s, _, err = c.com.EstablishPASE(ctx, commissioner.PASEOptions{Passcode: d.Passcode(), Addresses: []*net.UDPAddr{d.Addr()}})
+		s, _, err = com.EstablishPASE(ctx, commissioner.PASEOptions{Passcode: d.Passcode(), Addresses: []*net.UDPAddr{d.Addr()}})
 		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fabrictest: PASE to device %d: %w", d.index, err)
 	}
-	ix := interaction.Bind(interaction.SessionProvider(c.mgr, s), interaction.Config{Logger: c.opts.Logger, Clock: c.site.clk})
+	// The interaction runs on the controller's host clock, which counts
+	// its work in the controller's in-flight group as the rest of the
+	// stack's (R2-P6-conc-2513): the site does not move a fake clock while
+	// it has work in hand.
+	ix := interaction.Bind(interaction.SessionProvider(mgr, s), interaction.Config{Logger: c.opts.Logger, Clock: c.site.hostClock(c.group)})
 	return &Pair{Controller: c, Device: d, interaction: ix, paseSession: s}, nil
 }

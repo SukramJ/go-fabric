@@ -416,8 +416,14 @@ func (st *stack) close(ctx context.Context) {
 // Index is the controller's host index on the site, from 1.
 func (c *Controller) Index() int { return c.index }
 
-// Addr is the controller's UDP address.
-func (c *Controller) Addr() *net.UDPAddr { return c.listener.LocalAddr() }
+// Addr is the controller's UDP address. The site's resolver reads it from
+// the devices' goroutines, also while [Controller.Restart] replaces the
+// listener (R2-P6-conc-2509).
+func (c *Controller) Addr() *net.UDPAddr {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.listener.LocalAddr()
+}
 
 // CA is the controller's certificate authority.
 func (c *Controller) CA() *ca.CA {
@@ -471,8 +477,13 @@ type CommissionOptions struct {
 // over CASE — and returns the pair, whose peer holds the CASE session.
 // With a fake site clock it runs under [Site.Run].
 func (c *Controller) Commission(ctx context.Context, d *Device, opts CommissionOptions) (*Pair, error) {
+	// One stack for the whole call, read under the lock a Restart takes
+	// (R2-P6-conc-2509).
+	c.mu.RLock()
+	fabric, com, set := c.fabric, c.com, c.set
+	c.mu.RUnlock()
 	o := commissioner.Options{
-		Fabric: c.fabric, Passcode: d.Passcode(), NodeID: opts.NodeID, Addresses: []*net.UDPAddr{d.Addr()},
+		Fabric: fabric, Passcode: d.Passcode(), NodeID: opts.NodeID, Addresses: []*net.UDPAddr{d.Addr()},
 	}
 	if opts.Edit != nil {
 		opts.Edit(&o)
@@ -480,17 +491,17 @@ func (c *Controller) Commission(ctx context.Context, d *Device, opts CommissionO
 	var res commissioner.Result
 	err := c.site.Run(ctx, func(ctx context.Context) error {
 		var err error
-		res, err = c.com.Commission(ctx, o)
+		res, err = com.Commission(ctx, o)
 		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fabrictest: commission device %d: %w", d.index, err)
 	}
-	p := c.set.Get(res.Address)
+	p := set.Get(res.Address)
 	if p == nil {
 		return nil, errors.New("fabrictest: the commissioned device has no peer")
 	}
-	return &Pair{Controller: c, Device: d, Address: res.Address, peer: p, interaction: c.com.Interaction(p)}, nil
+	return &Pair{Controller: c, Device: d, Address: res.Address, peer: p, interaction: com.Interaction(p)}, nil
 }
 
 // Pair is a controller and a device of one site: commissioned
