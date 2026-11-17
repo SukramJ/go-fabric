@@ -64,7 +64,6 @@ import (
 type defaultBuild struct {
 	def     *spec.Cluster
 	opts    spec.Options
-	cfg     spec.ServerConfig
 	clock   clock.Clock
 	sibling func(clusterID uint32) contract.ClusterServer
 	// deviceType is the device's type id; key its StableKey, which names
@@ -247,11 +246,11 @@ func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLoca
 // this layer sits under the Aggregator, so StartUpOnOff is not applied
 // (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
 // Its countdown runs on the device's clock, the node's once it is added.
-// A declared Sink (onoffdef.Declare) switches the device.
+// A declared Sink (onoffdef.Declare) switches the device; the
+// declaration's Initial reaches the server through applyInitial.
 func newOnOffServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := onoff.Config{
 		Features:   onoff.Feature(b.opts.Features),
-		Initial:    b.cfg.Initial,
 		Bridged:    true,
 		TimeSource: b.clock,
 	}
