@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -52,6 +53,14 @@ const (
 	maxConcurrentCRLDownloads = 4
 	revocationLookupTimeout   = 10 * time.Second
 )
+
+// maxCRLPointsPerIssuer bounds the CRL distribution points one lookup uses
+// of the points the ledger lists for one issuer. The ledger's answer
+// admits about 10⁵ points within its body bound; past this number the
+// rest are not used and the lookup counts as incomplete — not cached,
+// logged once (review II, R2-P6-bound-1905; an Ahead-of-matter.js row).
+// An issuer partitions its revocations over a few CRLs (§6.2.6.1).
+const maxCRLPointsPerIssuer = 64
 
 // revocationEntry is DclCertificateService.RevocationEntry (:2117-2120):
 // one authority's revoked serials (uppercase hex) and its Name DER as hex.
@@ -128,16 +137,18 @@ func newRevocationCache(s *CertificateStore) *revocationCache {
 	}
 }
 
+// get is the lookup of akid. Every entry unused for the hour goes at each
+// call, not only one asked again, so an authority never asked again does
+// not keep its lookup for the life of the store (review II,
+// R2-P6-bound-1904).
 func (c *revocationCache) get(ctx context.Context, akid string) (revocationLookup, error) {
 	now := c.s.clock.Now()
 	c.mu.Lock()
+	maps.DeleteFunc(c.values, func(_ string, v *cachedLookup) bool { return now.Sub(v.lastUsed) >= revocationCacheExpiry })
 	if v, ok := c.values[akid]; ok {
-		if now.Sub(v.lastUsed) < revocationCacheExpiry {
-			v.lastUsed = now
-			c.mu.Unlock()
-			return v.lookup, nil
-		}
-		delete(c.values, akid)
+		v.lastUsed = now
+		c.mu.Unlock()
+		return v.lookup, nil
 	}
 	call, ok := c.inflight[akid]
 	if !ok {
@@ -254,6 +265,18 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 	if len(crlPoints) == 0 {
 		return empty, nil
 	}
+	cut := len(crlPoints) > maxCRLPointsPerIssuer
+	if cut {
+		s.log.Warn("dcl.revocation.too_many_points", slog.String("akid", akid), slog.Int("points", len(crlPoints)),
+			slog.Int("used", maxCRLPointsPerIssuer),
+			slog.String("message", fmt.Sprintf("DCL lists %d CRL points for AKID %s; the first %d are used and the lookup is incomplete", len(crlPoints), akid, maxCRLPointsPerIssuer)))
+		crlPoints = crlPoints[:maxCRLPointsPerIssuer]
+	}
+	// The points per vendor, counted once (step 7.2 below).
+	perVID := map[uint16]int{}
+	for i := range crlPoints {
+		perVID[crlPoints[i].VID]++
+	}
 	// Every entry contributes: an issuer may partition its revocations over
 	// several CRLs (§6.2.6.1); step 7.2 applies to entries sharing VendorID
 	// and IssuerSubjectKeyID (§11.23.11.8).
@@ -266,12 +289,11 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 	slots := make(chan struct{}, maxConcurrentCRLDownloads)
 	for i := range crlPoints {
 		p := crlPoints[i]
-		sameVID := 0
-		for j := range crlPoints {
-			if crlPoints[j].VID == p.VID {
-				sameVID++
-			}
+		if err := ctx.Err(); err != nil {
+			results[i] = result{err: err}
+			continue
 		}
+		sameVID := perVID[p.VID]
 		select {
 		case slots <- struct{}{}:
 		case <-ctx.Done():
@@ -309,7 +331,7 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 	if len(lookup.entries) == 0 && transient > 0 {
 		return revocationLookup{}, dclErrorf("All CRL downloads failed for AKID %s", akid)
 	}
-	lookup.complete = transient == 0
+	lookup.complete = transient == 0 && !cut
 	return lookup, nil
 }
 

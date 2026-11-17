@@ -25,6 +25,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -382,11 +383,15 @@ func (c *manualClock) pending() int { return c.Pending() }
 type logRecorder struct {
 	mu   sync.Mutex
 	errs []string
+	msgs []string
 }
 
 func (l *logRecorder) Enabled(context.Context, slog.Level) bool { return true }
 
 func (l *logRecorder) Handle(_ context.Context, r slog.Record) error {
+	l.mu.Lock()
+	l.msgs = append(l.msgs, r.Message)
+	l.mu.Unlock()
 	r.Attrs(func(a slog.Attr) bool {
 		if a.Key == "err" {
 			l.mu.Lock()
@@ -411,6 +416,13 @@ func (l *logRecorder) has(s string) bool {
 		}
 	}
 	return false
+}
+
+// hasMessage reports whether a line with message msg was logged.
+func (l *logRecorder) hasMessage(msg string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Contains(l.msgs, msg)
 }
 
 func (l *logRecorder) all() string {
