@@ -117,11 +117,11 @@ var floors = []packageFloor{
 		pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 92, spread: 3.3,
 		why: "measures 92.6 or 95.9 (review 2026-11 W6): the virtual central's teardown closes sessions and drops connections on fire-and-forget goroutines (bletest.go drop, UnsubscribeC2, the pipe loop's stop arm), and whether they run before the test binary exits is scheduling, which no clock drives. The floor is the whole percent below the lowest measurement",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 88},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ca/keyfile", min: 73},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client/sqlstore", min: 89},
-	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
@@ -266,6 +266,12 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: a function variable node installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
+	{
+		pkg:          "github.com/SukramJ/go-fabric/internal/sealseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: an interface and function variables store and controller/client/sqlstore install from their init, so the package holds no statement a test could execute",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/sessionseam", min: 0, unmeasurable: true, why: "function variables only: secure/operational installs them, node and the module's test fixtures call them (review II, decisions 159, 160)"},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/surfaceseam",

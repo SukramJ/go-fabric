@@ -144,3 +144,59 @@ func TestRegistryCoalescesUpdates(t *testing.T) {
 		t.Fatalf("events %+v, want Added and one Updated with the latest entry", got)
 	}
 }
+
+// TestRegistryCoalescesPerEntry: an update coalesces only with its own
+// entry's queued event; one queued for another border router is passed
+// over and the update queues behind it (review II, R2-P6-bound-2027).
+func TestRegistryCoalescesPerEntry(t *testing.T) {
+	t.Parallel()
+	r, stub, _ := newTestRegistry(t)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var got []Event
+	var mu sync.Mutex
+	r.OnChange(func(e Event) {
+		mu.Lock()
+		got = append(got, e)
+		n := len(got)
+		mu.Unlock()
+		if n == 1 {
+			close(entered)
+			<-release
+		}
+	})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		stub.discover(t, brMeshcop, txt{"xa": brXA, "nn": "Home"}, "otbr.local")
+	}()
+	<-entered
+	const otherXA = "1122334455667788"
+	stub.discover(t, "Other._meshcop._udp.local", txt{"xa": otherXA, "nn": "Other"}, "other.local")
+	stub.discover(t, brMeshcop, txt{"xa": brXA, "nn": "Home-2"}, "otbr.local")
+	close(release)
+	<-done
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 3 ||
+		got[0].Kind != EventAdded || got[0].Entry.ExtAddress != brXA ||
+		got[1].Kind != EventAdded || got[1].Entry.ExtAddress != otherXA ||
+		got[2].Kind != EventUpdated || got[2].Entry.ExtAddress != brXA || got[2].Entry.NetworkName != "Home-2" {
+		t.Fatalf("events %+v, want Added %s, Added %s, Updated %s", got, brXA, otherXA, brXA)
+	}
+}
+
+// TestXaOfTrelInstance: a TREL instance's xa is its first label when that
+// is 16 hex digits, upper-cased; any other label gives none.
+func TestXaOfTrelInstance(t *testing.T) {
+	t.Parallel()
+	for qname, want := range map[string]string{
+		brTrel:                               brXA,
+		"aabbccddeeff00zz._trel._udp.local":  "",
+		"aabbccddeeff001._trel._udp.local":   "",
+		"aabbccddeeff00110._trel._udp.local": "",
+	} {
+		if got := xaOfTrelInstance(qname); got != want {
+			t.Errorf("xaOfTrelInstance(%q) = %q, want %q", qname, got, want)
+		}
+	}
+}
