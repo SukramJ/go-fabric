@@ -5,6 +5,7 @@ package thread
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"reflect"
@@ -140,8 +141,8 @@ func TestRedactCarriesNoSecret(t *testing.T) {
 		t.Fatalf("redacted Raw %x, NetworkKey %x, PSKc %x", r.Raw, r.NetworkKey, r.PSKc)
 	}
 	for _, secret := range [][]byte{key, pskc} {
-		for _, form := range []string{fmt.Sprintf("%+v", *r), fmt.Sprintf("%x", enc), fmt.Sprintf("%v", *r)} {
-			if strings.Contains(form, fmt.Sprintf("%x", secret)) || strings.Contains(form, strings.Trim(fmt.Sprint(secret), "[]")) {
+		for _, form := range []string{fmt.Sprintf("%+v", *r), hex.EncodeToString(enc), fmt.Sprintf("%v", *r)} {
+			if strings.Contains(form, hex.EncodeToString(secret)) || strings.Contains(form, strings.Trim(fmt.Sprintf("%d", secret), "[]")) {
 				t.Fatalf("the redacted dataset prints a secret: %s", form)
 			}
 		}

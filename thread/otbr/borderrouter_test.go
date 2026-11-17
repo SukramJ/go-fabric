@@ -342,7 +342,7 @@ func TestFailedActivationReenablesTheInterface(t *testing.T) {
 				}
 				refused := false
 				hc.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-					if r.Method == "PUT" && r.URL.Path == "/node/state" && !refused {
+					if r.Method == http.MethodPut && r.URL.Path == "/node/state" && !refused {
 						b, _ := r.GetBody()
 						if body, _ := io.ReadAll(b); string(body) == `"enable"` {
 							refused = true
@@ -357,7 +357,7 @@ func TestFailedActivationReenablesTheInterface(t *testing.T) {
 			}
 			reqs := srv.Requests()
 			last := reqs[len(reqs)-1]
-			if last.Method != "PUT" || last.Path != "/node/state" || last.Body != `"enable"` {
+			if last.Method != http.MethodPut || last.Path != "/node/state" || last.Body != `"enable"` {
 				t.Fatalf("last request %+v, want the interface enabled again", last)
 			}
 			if srv.State() == "disabled" {
