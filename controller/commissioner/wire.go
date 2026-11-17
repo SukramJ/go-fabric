@@ -67,8 +67,8 @@ type signedElements struct {
 // 64 is judged downstream — in the AttestationResponse the error finding
 // AttestationSignatureInvalid the policy judges, in the CSRResponse the
 // CSR signature verification failure (an empty one stays unexpected
-// data). Mirrors matter.js, whose client decodes the command fields
-// without validating their bounds
+// data). Mirrors matter.js, whose client decodes the signature without
+// validating its length
 // (packages/protocol/src/action/client/ClientInteraction.ts:552, :561 at
 // db021da0) and judges the length in EcdsaSignature
 // (packages/general/src/crypto/EcdsaSignature.ts:39-40):

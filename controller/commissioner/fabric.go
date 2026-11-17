@@ -135,9 +135,12 @@ func (f *Fabric) CurrentLabel() string {
 }
 
 // SetLabel sets the fabric's label and saves the fabric record when it
-// changed — matter.js Fabric.setLabel (Fabric.ts:193-201 at 862ad75f): a
-// label longer than [MaxLabelLength] bytes is [ErrLabel], an unchanged
-// one is nothing, a changed one is persisted before it takes effect. The
+// changed — after matter.js Fabric.setLabel (Fabric.ts:193-201 at
+// db021da0), which bounds the label at 32 UTF-16 code units and sets it
+// before it persists; here the bound is [MaxLabelLength] bytes and a
+// changed label is persisted before it takes effect (the module's own
+// rule, decision 155): a longer one is [ErrLabel], an unchanged one is
+// nothing. The
 // commissioner gives the new
 // label to the nodes it commissions from then on; a client.Registry
 // reconciles it to the nodes commissioned before (Registry.SetFabricLabel).

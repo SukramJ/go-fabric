@@ -301,7 +301,8 @@ func TestCommissioningConnection(t *testing.T) {
 
 	// Ahead of matter.js (review II, R2-P6-fsm-1806, owner decision 207):
 	// matter.js drops the device on invalid credentials and closes the
-	// late session (CommissioningConnection.ts:167-170 at db021da0); here
+	// late session (CommissioningConnection.ts:167-170, the late session
+	// :140-157 at db021da0); here
 	// the confirmation failure ends that address only, as connectedhomeip
 	// tries the next address after any PASE failure
 	// (SetUpCodePairer.cpp:959-967 at 6170af84), so the device's other
