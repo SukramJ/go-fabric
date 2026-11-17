@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9624,
+  "entry_points": 9631,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19230,
+    "total_exported": 19236,
     "reachable": 12653,
-    "whitelisted": 6577,
+    "whitelisted": 6583,
     "unreachable": 0
   },
   "by_package": [],
@@ -29890,6 +29890,48 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/sqlstore/export_test.go",
       "line": 15
+    },
+    {
+      "package": "controller/client/sqlstore",
+      "identifier": "TestDropEmptySealMark",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/seal_internal_test.go",
+      "line": 79
+    },
+    {
+      "package": "controller/client/sqlstore",
+      "identifier": "TestRefuseClearSecretWriteReadError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/seal_internal_test.go",
+      "line": 161
+    },
+    {
+      "package": "controller/client/sqlstore",
+      "identifier": "TestResealWithAScrubAReaderBlocks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/seal_internal_test.go",
+      "line": 224
+    },
+    {
+      "package": "controller/client/sqlstore",
+      "identifier": "TestSealCanaryHoldsItsOwnValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/seal_internal_test.go",
+      "line": 64
+    },
+    {
+      "package": "controller/client/sqlstore",
+      "identifier": "TestSealUnmarkedSeesAConcurrentMark",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/seal_internal_test.go",
+      "line": 150
+    },
+    {
+      "package": "controller/client/sqlstore",
+      "identifier": "TestSealWritesTheDatabaseRefuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/sqlstore/seal_internal_test.go",
+      "line": 173
     },
     {
       "package": "controller/client/sqlstore",
