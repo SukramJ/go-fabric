@@ -588,16 +588,17 @@ func (s *Scanner) Find(ctx context.Context, id discovery.Identifier, timeout tim
 	return devicesOf(s.devicesLocked(id, false)), nil
 }
 
-// FindContinuously is findCommissionableDevicesContinuously (:577-650):
+// FindContinuously is findCommissionableDevicesContinuously (:576-644):
 // callback receives every device the identifier selects, once per
-// peripheral while the scanner holds its record, until timeout (0: none),
-// ctx ends, [Scanner.Cancel] or [Scanner.Close]; it returns the devices
-// then stored. The peripherals already reported are bounded as the
-// records are: past [maxScannerRecords] of them, those whose record the
-// scanner forgot are dropped, and such a peripheral advertising again is
-// reported again — also when it advertised again before the drop: the
-// record's epoch tells it from the one reported (review II,
-// R2-P6-bound-2029).
+// peripheral (address) for the discovery — as matter.js, which reports
+// each deviceIdentifier once (:617-621), the address (:392) — until
+// timeout (0: none), ctx ends, [Scanner.Cancel] or [Scanner.Close]; it
+// returns the devices then stored. The peripherals already reported are
+// bounded as the records are: past [maxScannerRecords] of them, those
+// whose record the scanner forgot are dropped, and such a peripheral
+// advertising again is reported again — also when it advertised again
+// before the drop: the record's epoch tells it from the one reported
+// (review II, R2-P6-bound-2029).
 func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier, callback func(Device), timeout time.Duration) ([]Device, error) {
 	if !id.SupportedOverBLE() {
 		return nil, nil
