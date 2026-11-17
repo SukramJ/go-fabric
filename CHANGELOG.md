@@ -222,7 +222,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `cluster/core`: `WiFiNetworkCommissioningConfig.OnConnected`, run after each successful join (review II, R2-P6-api-2450).
 - `device`: `ErrNotBridged`, the refusal of `Device.SetReachable`, `Rename` and `Update` on a part (see Changed; review II, R2-P6-api-2503).
 - `schema`: `ClusterRequestCommandLevels` and `ClusterResponseCommandLevels`, the levels a command id exists at as a request and as a response (see Changed and Deprecated; review II, R2-P6-par-2713, decision 227).
-
+- Guards (`script/docscheck`, review II): the published pages and the ADRs cite this repository by symbol, `` `file.go` (`Name`, …) ``, not by line range, and every name such a citation lists occurs in its file (`TestPublishedPagesCiteNoLineNumbers`, `TestCitedNamesOccurInTheirFile`; R2-P6-doc-3001, -3083); no non-test Go file says "v1.1" (`TestNoV11LabelInGo`, R2-P6-doc-3014); the host-ports page lists every cluster `script/clustergen` gives a `Host` (`TestPortsHostTableListsEveryHost`, R2-P6-doc-3050); the store-seam pages name the store's last schema step (`TestStoreSeamPagesNameTheLastSchemaVersion`, R2-P6-doc-3053); the ADR index has one row per ADR with its status, and an ADR another one supersedes names its successor (`TestADRIndexListsEveryADR`, `TestSupersededADRNamesItsSuccessor`; R2-P6-doc-3085, -3086).
 
 ### Changed
 
@@ -555,7 +555,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 - `controller/topology`: an extended address two Thread nodes claim, or an RLOC16 two nodes of one Thread network claim, resolves to neither node; RLOC16s are matched within the observer's network (decisions 222, 237). A burst of changes rebuilds at the latest five debounces after its first change (R2-P6-fsm-2314) (review II, R2-P6-bound-2362).
 - `controller/camera`: after `Close`, `Capabilities`, `ReleaseStream`, `StopByKey` and a `Session`'s `Stop`, `ProvideAnswer` and `ProvideICECandidates` return `ErrClosed` and send nothing; `Release` stays callable (R2-P6-api-2207). Once a session ended, `Session.Signals` hands what it holds for 10 s, then discards the rest and closes (R2-P6-bound-2206). `New` refuses a `Reports` a Service that is not closed holds (`ErrInvalidArgument`); `Reports.Install` on a configuration it already wrapped changes nothing (R2-P6-api-2208) (review II).
 - `controller/camera`: a raw-route session the camera stops listing (after it was listed) leaves the requestor; the give-back chain and the leftover sweep's EndSession are bounded by the 10 s cleanup budget (review II, R2-P6-store-2203, R2-P6-conc-2210).
-
+- `cluster/wire`: `ErrSchedulesReadOnly`'s text is "wire: Schedules cluster is read-only"; it named a v1.1 bridge (review II, R2-P6-doc-3014).
 
 ### Deprecated
 
