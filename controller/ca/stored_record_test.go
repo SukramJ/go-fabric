@@ -28,6 +28,7 @@ import (
 func TestNewNeverReplacesAStoredRecord(t *testing.T) {
 	t.Parallel()
 	otherKey := func(t *testing.T) []byte {
+		t.Helper()
 		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			t.Fatal(err)
@@ -48,8 +49,8 @@ func TestNewNeverReplacesAStoredRecord(t *testing.T) {
 		{"the root certificate lost beside an ICAC", true, func(_ *testing.T, s *ca.Stored) { s.RootCertBytes = nil }},
 		{"the certificate counter 0", false, func(_ *testing.T, s *ca.Stored) { s.NextCertificateID = 0 }},
 		{"the certificate counter at the ICAC's id", true, func(_ *testing.T, s *ca.Stored) { s.NextCertificateID = s.ICAC.CertID }},
-		{"a root key that is not the root certificate's", false, func(t *testing.T, s *ca.Stored) { s.RootKeyPair.PrivateKey = otherKey(t) }},
-		{"an ICAC key that is not the ICAC certificate's", true, func(t *testing.T, s *ca.Stored) { s.ICAC.KeyPair.PrivateKey = otherKey(t) }},
+		{"a root key that is not the root certificate's", false, func(t *testing.T, s *ca.Stored) { t.Helper(); s.RootKeyPair.PrivateKey = otherKey(t) }},
+		{"an ICAC key that is not the ICAC certificate's", true, func(t *testing.T, s *ca.Stored) { t.Helper(); s.ICAC.KeyPair.PrivateKey = otherKey(t) }},
 		{"the ICAC key identifier lost", true, func(_ *testing.T, s *ca.Stored) { s.ICAC.KeyIdentifier = nil }},
 		{"the ICAC certificate lost", true, func(_ *testing.T, s *ca.Stored) { s.ICAC.CertBytes = nil }},
 		{"the ICAC key lost", true, func(_ *testing.T, s *ca.Stored) { s.ICAC.KeyPair.PrivateKey = nil }},
