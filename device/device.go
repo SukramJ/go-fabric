@@ -289,6 +289,26 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	return d, nil
 }
 
+// withMandatedElements adds the attributes, commands and events the
+// device type's requirement mandates to opts.
+func withMandatedElements(r *ClusterRequirement, opts spec.Options) spec.Options {
+	for _, e := range r.Elements {
+		if e.Presence != PresenceMandatory {
+			continue
+		}
+		switch e.Element {
+		case schema.RequirementAttribute:
+			opts.Attributes = append(opts.Attributes, e.ID)
+		case schema.RequirementCommand:
+			opts.Commands = append(opts.Commands, e.ID)
+		case schema.RequirementEvent:
+			opts.Events = append(opts.Events, e.ID)
+		default:
+		}
+	}
+	return opts
+}
+
 // identifyClusterID is Identify (identify.element.ts, 0x0003).
 const identifyClusterID uint32 = 0x0003
 
@@ -427,20 +447,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		opts.Commands = append(opts.Commands, extra.Commands...)
 		opts.Events = append(opts.Events, extra.Events...)
 	}
-	for _, e := range r.Elements {
-		if e.Presence != PresenceMandatory {
-			continue
-		}
-		switch e.Element {
-		case schema.RequirementAttribute:
-			opts.Attributes = append(opts.Attributes, e.ID)
-		case schema.RequirementCommand:
-			opts.Commands = append(opts.Commands, e.ID)
-		case schema.RequirementEvent:
-			opts.Events = append(opts.Events, e.ID)
-		default:
-		}
-	}
+	opts = withMandatedElements(r, opts)
 	// Without the elements the surface policies removed (compose).
 	opts = s.cut.trim(r.ID, opts)
 	inst, err := spec.New(def, opts)

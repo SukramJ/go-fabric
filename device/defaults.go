@@ -356,7 +356,7 @@ func colorConfigFrom(cfg *light.ColorControlServerConfig, initial map[uint32]any
 		ccdef.AttrCurrentX: &cfg.InitialX, ccdef.AttrCurrentY: &cfg.InitialY, ccdef.AttrEnhancedCurrentHue: &cfg.InitialEnhancedHue,
 	} {
 		if v, ok := consumeMax(initial, id, math.MaxUint16); ok {
-			*dst = uint16(v)
+			*dst = uint16(v) //nolint:gosec // consumeMax held it to 0xFFFF
 		}
 	}
 	for id, dst := range map[uint32]*uint8{ccdef.AttrCurrentHue: &cfg.InitialHue, ccdef.AttrCurrentSaturation: &cfg.InitialSaturation} {
@@ -451,13 +451,13 @@ func newWindowCoveringServer(b defaultBuild) (contract.ClusterServer, error) {
 	// (window-covering-cluster.element.ts:71-72, :75-76 at db021da0).
 	configFrom(&cfg, b.def, b.initial)
 	if v, ok := consumeMax(b.initial, wcdef.AttrCurrentPositionLiftPercent100ths, math.MaxUint16); ok {
-		cfg.InitialPositionPercent100ths = uint16(v)
+		cfg.InitialPositionPercent100ths = uint16(v) //nolint:gosec // consumeMax held it to 0xFFFF
 		delete(b.initial, wcdef.AttrTargetPositionLiftPercent100ths)
 	} else {
 		cfg.InitialPositionUnknown = true
 	}
 	if v, ok := consumeMax(b.initial, wcdef.AttrCurrentPositionTiltPercent100ths, math.MaxUint16); ok {
-		cfg.InitialTiltPositionPercent100ths = uint16(v)
+		cfg.InitialTiltPositionPercent100ths = uint16(v) //nolint:gosec // consumeMax held it to 0xFFFF
 		delete(b.initial, wcdef.AttrTargetPositionTiltPercent100ths)
 	} else {
 		cfg.InitialTiltPositionUnknown = true
