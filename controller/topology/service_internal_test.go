@@ -145,6 +145,26 @@ func TestServiceDebounce(t *testing.T) {
 	h.want(1, "an identical graph")
 }
 
+// TestServiceDebounceBoundsABurst (review II, R2-P6-fsm-2314): changes
+// that keep coming faster than the debounce do not hold the rebuild off:
+// it runs at the latest maxDebounceBursts debounces after the burst's
+// first change, and the next change starts a new burst. Before, every
+// change restarted the debounce, and only the periodic rebuild ran.
+func TestServiceDebounceBoundsABurst(t *testing.T) {
+	h := newHarness(t, Config{Debounce: 10 * time.Millisecond}, router(1, 1024))
+	for range 7 { // 0, 8, … 48 ms: every change within the debounce of the one before
+		h.svc.changed()
+		h.fake.Advance(8 * time.Millisecond)
+	}
+	h.want(1, "a burst longer than five debounces")
+	h.set(router(1, 1024), router(2, 2048))
+	for range 7 { // 56, 64, … 104 ms: bounded at 106 ms
+		h.svc.changed()
+		h.fake.Advance(8 * time.Millisecond)
+	}
+	h.want(2, "the next burst's bound")
+}
+
 // TestServiceLifecycle ports "does not re-emit when only node/connection
 // ordering changes" and "re-emits when node lifecycle events change the
 // graph" (NetworkTopologyServiceTest.ts:490-533, matterjs-server at

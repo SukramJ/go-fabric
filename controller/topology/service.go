@@ -36,7 +36,9 @@ const (
 // defaults on the system clock, without change hooks.
 type Config struct {
 	// Debounce is the trailing debounce of a change-driven rebuild: every
-	// change restarts it; 0 is [DefaultDebounce].
+	// change restarts it, but a burst of changes waits at most
+	// maxDebounceBursts debounces from its first change; 0 is
+	// [DefaultDebounce].
 	Debounce time.Duration
 	// Periodic is the interval of the periodic rebuild, which catches what
 	// arrives without a change hook; 0 is [DefaultPeriodic].
@@ -138,6 +140,7 @@ type Service struct {
 	mu        sync.Mutex
 	closed    bool
 	debounce  clock.Timer
+	burst     time.Time // the first change the pending debounce collects
 	periodic  clock.Timer
 	inflight  *flight
 	observers map[int]func(Topology)
@@ -423,19 +426,42 @@ func (s *Service) runWithDeadline(tasks []func()) {
 	}
 }
 
+// maxDebounceBursts bounds a burst: its rebuild runs at the latest this
+// many debounces after its first change. Every applied report of every
+// node is a change here (Changes.Install), where matterjs-server
+// schedules only on a diagnostics attribute it reads; without the bound
+// one node that reports more often than every debounce — a power meter —
+// would hold off every change-driven rebuild until the periodic one
+// (review II, R2-P6-fsm-2314).
+const maxDebounceBursts = 5
+
 // changed schedules a rebuild after the debounce, restarting a pending
 // one — matterjs-server's #scheduleRebuild at 0bd06f22
-// (NetworkTopologyService.ts:260-268).
+// (NetworkTopologyService.ts:260-268) — but no later than
+// maxDebounceBursts debounces after the burst's first change.
 func (s *Service) changed() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return
 	}
+	now := s.clk.Now()
 	if s.debounce != nil {
 		s.debounce.Stop()
+	} else {
+		s.burst = now
 	}
-	s.debounce = s.clk.AfterFunc(s.cfg.Debounce, s.rebuild)
+	wait := min(s.cfg.Debounce, max(s.burst.Add(maxDebounceBursts*s.cfg.Debounce).Sub(now), 0))
+	var t clock.Timer
+	t = s.clk.AfterFunc(wait, func() {
+		s.mu.Lock()
+		if s.debounce == t {
+			s.debounce = nil
+		}
+		s.mu.Unlock()
+		s.rebuild()
+	})
+	s.debounce = t
 }
 
 // rebuild builds and tells the observers when the graph moved.
