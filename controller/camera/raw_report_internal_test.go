@@ -16,7 +16,8 @@ import (
 // earlier report listed it — the rule the registry applies to its own
 // sessions; a report that never listed it (one built before the offer)
 // leaves it, a session the registry names is the registry's, and another
-// endpoint's entry stays. Before, the entry stayed for good, the sweep
+// endpoint's entry stays; a new session under a reused id starts
+// unlisted. Before, the entry stayed for good, the sweep
 // counted it as held and the requestor accepted signals for the dead id.
 func TestReportDropsListedRawSession(t *testing.T) {
 	t.Parallel()
@@ -50,5 +51,23 @@ func TestReportDropsListedRawSession(t *testing.T) {
 	}
 	if !held(4) {
 		t.Error("another endpoint's entry was removed")
+	}
+
+	// The camera hands id 9 to a new session; the old one was listed. A
+	// report built before the new offer lists nothing: the new session
+	// starts unlisted, as a new registry life does, and stays.
+	f.setCamera(psEndpoint, []sessionPeer{{9, psServer}})
+	if _, err := f.establish(t, psEndpoint, psOfferRequest(nil)); err != nil {
+		t.Fatalf("establish: %v", err)
+	}
+	f.batch() // lists 9: the old session's mark
+	// The camera loses 9 without an End and answers a new offer with 9 …
+	if _, err := f.establish(t, psEndpoint, psOfferRequest(nil)); err != nil {
+		t.Fatalf("establish again: %v", err)
+	}
+	f.setCamera(psEndpoint, []sessionPeer{})
+	f.batch() // … a report built before the new offer
+	if !held(9) {
+		t.Error("a report built before a new session under a reused id removed it")
 	}
 }

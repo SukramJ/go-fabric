@@ -647,6 +647,10 @@ func (a *arrivedSession) learn(resp any) {
 	}
 	k := a.p.key(a.t, id)
 	a.p.own(k, life)
+	// A new session under the id starts unlisted: a mark an older session
+	// under it left would let a report built before this offer remove it
+	// (review II, R2-P6-store-2203). A re-offer keeps the mark.
+	a.p.unlist(k)
 	if po, ok := a.fields.(wpdef.ProvideOfferRequest); ok {
 		a.withdraw = a.p.offerSent(k, po.Sdp)
 	}
@@ -751,6 +755,13 @@ func (p *providerSessions) untracked(tracked func(t target, id uint16) bool) []w
 		}
 	}
 	return out
+}
+
+// unlist clears the listed mark of a key.
+func (p *providerSessions) unlist(k providerKey) {
+	p.mu.Lock()
+	delete(p.listed, k)
+	p.mu.Unlock()
 }
 
 // reconcileUntracked applies one CurrentSessions report of an endpoint
