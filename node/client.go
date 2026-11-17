@@ -407,8 +407,13 @@ func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8)
 				continue
 			}
 			// A handshake in flight ran under the old NOC: its connection
-			// process ends first, then its sessions and record go.
-			p.Disconnect(ctx, nil)
+			// process ends first, then its sessions and record go. The wait
+			// is not the command's context's: a teardown whose context has
+			// ended would otherwise walk the sessions before a handshake
+			// finishing in that instant adopts its own, which then outlives
+			// the update; the process's end is bounded by its own waits
+			// (dev6a R8).
+			p.Disconnect(context.WithoutCancel(ctx), nil)
 			for _, s := range cs.exchanges.SessionsFor(addr) {
 				// The UpdateNOC's own session closes once its response is
 				// out, as the bridge's invoking session does (review II,
