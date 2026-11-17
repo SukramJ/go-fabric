@@ -370,10 +370,17 @@ type Controller struct {
 
 	// The OTA push (ota.go): the update manager and the reboot armer;
 	// registry is reg for the node hooks, which run while New builds it.
-	ota      atomic.Pointer[softwareupdate.Manager]
-	registry atomic.Pointer[client.Registry]
-	armer    *peer.RebootResubscribeArmer
-	armerObs atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
+	ota atomic.Pointer[softwareupdate.Manager]
+	// otaDeleted counts the update manager's NodeDeleted calls the node
+	// hooks handed off (ota.go otaHooks); otaDeletedMu guards the Add
+	// against Close's Wait, and otaDeletedClosed refuses an Add once Close
+	// waits.
+	otaDeletedMu     sync.Mutex
+	otaDeletedClosed bool
+	otaDeleted       sync.WaitGroup
+	registry         atomic.Pointer[client.Registry]
+	armer            *peer.RebootResubscribeArmer
+	armerObs         atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
 	// groups is the controller's group sender (groups.go).
 	groups *groups.Manager
 	// otaProvider is the OTA provider on the controller's identity
@@ -775,6 +782,10 @@ func (c *Controller) Close(ctx context.Context) error {
 	}
 	c.closeVendorInfo()
 	if m := c.ota.Swap(nil); m != nil {
+		c.otaDeletedMu.Lock()
+		c.otaDeletedClosed = true
+		c.otaDeletedMu.Unlock()
+		c.otaDeleted.Wait()
 		m.Close()
 	}
 	if c.groups != nil {

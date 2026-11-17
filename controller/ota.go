@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -142,6 +143,22 @@ func (c *Controller) BDX() *bdx.Responder {
 	return st.bdx
 }
 
+// otaNodeDeleted hands the update manager's NodeDeleted for p to a
+// goroutine Close waits for; nothing once Close began to close the
+// manager.
+func (c *Controller) otaNodeDeleted(p softwareupdate.Peer) {
+	m := c.ota.Load()
+	if m == nil {
+		return
+	}
+	c.otaDeletedMu.Lock()
+	defer c.otaDeletedMu.Unlock()
+	if c.otaDeletedClosed {
+		return
+	}
+	c.otaDeleted.Go(func() { m.NodeDeleted(p) })
+}
+
 // armerContext is the reboot armer's view of the stack — matter.js's
 // SessionManager and ClientSubscriptions (RebootResubscribeArmer.ts:58-75
 // at 862ad75f).
@@ -243,16 +260,43 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 			}
 			return nil
 		}
+		// lastPeer is the node's address as the last hook saw it: Deleted
+		// runs once the registry no longer holds the node, so nodeOf is nil
+		// there.
+		var lastPeer atomic.Pointer[softwareupdate.Peer]
+		seen := func(n *client.Node) {
+			if p, ok := n.PeerAddress(); ok {
+				lastPeer.Store(&p)
+			}
+		}
 		h.Changed = func() {
 			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
+				seen(n)
 				m.NodeChanged(n)
 			}
 			if inner.Changed != nil {
 				inner.Changed()
 			}
 		}
+		// The manager forgets a node that left the registry at once — its
+		// consents and its queued update (review II, R2-P6-bound-1914,
+		// decision 219). Deleted can run inside the registry's fabric
+		// operation (Erase, a peer's leave), and NodeDeleted calls the
+		// host's OnUpdateFailed for a queued update: it runs on its own
+		// goroutine, after the hook returned, so a host callback that
+		// starts a fabric operation does not wait for the one running.
+		// Close waits for it before it closes the manager.
+		h.Deleted = func() {
+			if p := lastPeer.Load(); p != nil {
+				c.otaNodeDeleted(*p)
+			}
+			if inner.Deleted != nil {
+				inner.Deleted()
+			}
+		}
 		h.Event = func(endpoint uint16, cluster, event uint32, e client.EventData, value any) {
 			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
+				seen(n)
 				m.NodeEvent(n, endpoint, cluster, event, value)
 			}
 			if inner.Event != nil {
@@ -261,6 +305,7 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 		}
 		h.SubscriptionStatusChanged = func(active bool) {
 			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
+				seen(n)
 				m.NodeSubscription(n, active)
 			}
 			if inner.SubscriptionStatusChanged != nil {
