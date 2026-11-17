@@ -699,10 +699,10 @@ func TestServeRefusesANonCASESession(t *testing.T) {
 		opcode  uint8
 		payload func(t *testing.T) []byte
 	}{
-		"read":   {im.OpcodeReadRequest, func(t *testing.T) []byte { return readRequest(t, 20) }},
-		"write":  {im.OpcodeWriteRequest, func(t *testing.T) []byte { return writeRequest(t, false, false) }},
-		"invoke": {im.OpcodeInvokeRequest, func(t *testing.T) []byte { return invokeRequest(t, false, false, 20) }},
-		"timed":  {im.OpcodeTimedRequest, func(t *testing.T) []byte { return timedRequest(t, 1000) }},
+		"read":   {im.OpcodeReadRequest, func(t *testing.T) []byte { t.Helper(); return readRequest(t, 20) }},
+		"write":  {im.OpcodeWriteRequest, func(t *testing.T) []byte { t.Helper(); return writeRequest(t, false, false) }},
+		"invoke": {im.OpcodeInvokeRequest, func(t *testing.T) []byte { t.Helper(); return invokeRequest(t, false, false, 20) }},
+		"timed":  {im.OpcodeTimedRequest, func(t *testing.T) []byte { t.Helper(); return timedRequest(t, 1000) }},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
