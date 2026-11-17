@@ -280,9 +280,11 @@ func TestDefaultSubscription(t *testing.T) {
 		}
 
 		// The underlying subscription is lost: the replacement is refreshed.
+		// It lasted less than the retry schedule's first interval, so the
+		// replacement waits it (review II, R2-P6-fsm-2110).
 		sn.reg.CloseForPeer(sn.reg.Active()[0].Peer())
 		hl.wait(t, client.Reconnecting)
-		again := sn.next(t)
+		again := sn.nextAdvancing(t)
 		ar := subscribeRequestOf(t, again)
 		if !hasFilter(ar.DataVersionFilters, 1, onoff.ClusterID, 6) || len(ar.EventFilters) != 1 || ar.EventFilters[0].EventMin != 8 {
 			t.Fatalf("re-subscription %+v", ar)
