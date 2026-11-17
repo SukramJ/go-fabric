@@ -160,6 +160,18 @@ func (f *fakePeers) Has(addr handshake.PeerAddress) bool {
 	return f.peers[addr] != nil
 }
 
+// replace puts another peer at addr, or none (nil), as client/peer.Set
+// does once it closed the peer and a holder asks for the node again.
+func (f *fakePeers) replace(addr handshake.PeerAddress, p *peer.Peer) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if p == nil {
+		delete(f.peers, addr)
+		return
+	}
+	f.peers[addr] = p
+}
+
 // fakeLink is the peers' sessions and connection attempts.
 type fakeLink struct {
 	mu        sync.Mutex

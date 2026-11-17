@@ -499,26 +499,39 @@ func (m *Manager) disposeServer(source uint16) {
 
 // trackCreated records p as the manager's when the set held no peer for
 // addr before (creates), and opens a binding period for a recorded peer
-// that has none. A record whose peer is no longer the set's (another
-// peer at addr) is dropped.
+// that has none, after the previous period's release. A record whose peer
+// is no longer the set's (another peer at addr) is dropped, and its open
+// period ended: the set closed that peer, and nothing else would end the
+// period's context before the manager's (R2-P6-bound-2104).
 func (m *Manager) trackCreated(addr handshake.PeerAddress, p *peer.Peer, creates bool) {
 	m.stateMu.Lock()
 	defer m.stateMu.Unlock()
 	rec := m.created[addr]
+	if rec != nil && rec.peer != p {
+		dropCreated(m.created, addr, rec)
+		rec = nil
+	}
 	switch {
-	case creates:
+	case rec == nil && creates:
 		rec = &createdPeer{peer: p}
 		m.created[addr] = rec
-	case rec != nil && rec.peer != p:
-		delete(m.created, addr)
-		return
 	case rec == nil:
 		return
 	}
 	if rec.period == nil {
 		ctx, cancel := context.WithCancel(m.life)
-		rec.period = &bindingPeriod{ctx: ctx, cancel: cancel}
+		rec.period = &bindingPeriod{ctx: ctx, cancel: cancel, after: rec.released, released: make(chan struct{})}
 	}
+}
+
+// dropCreated forgets the record of a peer the set no longer holds and
+// ends its open period; the set closed the peer, so there is no process
+// left to stop. The caller holds stateMu.
+func dropCreated(created map[handshake.PeerAddress]*createdPeer, addr handshake.PeerAddress, rec *createdPeer) {
+	if rec.period != nil {
+		rec.period.cancel()
+	}
+	delete(created, addr)
 }
 
 // releaseUnbound ends the binding period of every peer the manager
@@ -527,7 +540,8 @@ func (m *Manager) trackCreated(addr handshake.PeerAddress, p *peer.Peer, creates
 // connection process is stopped. The peer stays in the set and is never
 // closed, its sessions with it — another holder may use the same peer
 // (owner decision 221) — and its record stays, so a later entry for the
-// node opens a new period and is released again. It runs on the worker
+// node opens a new period and is released again; a record whose address
+// the set no longer holds is dropped here. It runs on the worker
 // after every task, so an entry that went — unregistered, its server
 // detached, parked again — stops the connecting it started. Ahead of
 // matter.js, whose BindingManager keeps the peer it made for an entry
@@ -556,13 +570,17 @@ func (m *Manager) releaseUnbound() {
 		period *bindingPeriod
 	}
 	ended := make(map[handshake.PeerAddress]end)
+	addrs := make([]handshake.PeerAddress, 0, len(m.created))
 	for addr, rec := range m.created {
+		addrs = append(addrs, addr)
 		if rec.period != nil && !inUse[rec.peer] {
 			ended[addr] = end{rec.peer, rec.period}
+			rec.released = rec.period.released
 			rec.period = nil
 		}
 	}
 	m.stateMu.Unlock()
+	m.dropClosed(addrs)
 	for addr, e := range ended {
 		p, period := e.peer, e.period
 		m.log.Debug("binding.peer.released", slog.Uint64("node_id", addr.NodeID), slog.Int("fabric_index", int(addr.FabricIndex)))
@@ -574,7 +592,36 @@ func (m *Manager) releaseUnbound() {
 			// running would start the stopped process again.
 			period.calls.Wait()
 			m.link.release(m.unbound, p)
+			close(period.released)
 		}()
+	}
+}
+
+// dropClosed drops the record of every address in addrs the set no longer
+// holds: the peer was closed (a peer leaves client/peer.Set only so), and
+// the record would otherwise keep it until the node is bound again
+// (R2-P6-bound-2104). The set is asked outside stateMu; the records
+// change only on the worker, where this runs.
+func (m *Manager) dropClosed(addrs []handshake.PeerAddress) {
+	set, ok := m.cfg.Peers.(peerSet)
+	if !ok {
+		return
+	}
+	var gone []handshake.PeerAddress
+	for _, addr := range addrs {
+		if !set.Has(addr) {
+			gone = append(gone, addr)
+		}
+	}
+	if len(gone) == 0 {
+		return
+	}
+	m.stateMu.Lock()
+	defer m.stateMu.Unlock()
+	for _, addr := range gone {
+		if rec := m.created[addr]; rec != nil {
+			dropCreated(m.created, addr, rec)
+		}
 	}
 }
 

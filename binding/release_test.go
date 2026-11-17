@@ -200,3 +200,97 @@ func TestReleaseWaitsForTheEntriesConnectCalls(t *testing.T) {
 		t.Fatalf("events %v, want %v", h.link.events, want)
 	}
 }
+
+// TestNextPeriodConnectsAfterTheRelease: a release that runs late — its
+// period's Connect call slow to return — does not stop the next period's
+// connection process: the next period's Connect call waits for it
+// (review II, R2-P6-bound-2104, stale release after the next period).
+func TestNextPeriodConnectsAfterTheRelease(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, nil)
+	held := make(chan struct{})
+	release := sync.OnceFunc(func() { close(held) })
+	t.Cleanup(release)
+	h.link.block, h.link.held = true, held
+	h.listen()
+	e := Entry{FabricIndex: 1, Node: 2, Endpoint: 1, Cluster: 0x0006}
+	h.m.Register(1, e)
+	h.flush()
+	p, _ := h.peers.For(peerAddr(1, 2))
+	waitFor(t, func() bool { return h.link.connected(p) == 1 })
+	h.m.Unregister(1, e)
+	h.flush()
+	again := Entry{FabricIndex: 1, Node: 2, Endpoint: 4, Cluster: 0x0006}
+	h.m.Register(1, again)
+	h.flush()
+	for range 100 {
+		runtime.Gosched()
+	}
+	if n := h.link.connected(p); n != 1 {
+		t.Fatalf("the next period connected (%d calls) before the last period's release ran", n)
+	}
+	release()
+	waitFor(t, func() bool { return h.link.connected(p) == 2 })
+	if n := h.link.released(p); n != 1 {
+		t.Fatalf("released %d times, want 1 before the next period's Connect call", n)
+	}
+}
+
+// TestRecordOfAClosedPeerIsDropped: the record of a peer the manager
+// created goes once the set no longer holds the node's address (the set
+// closed the peer), and a replaced peer's open period is ended — neither
+// keeps the old peer or its context until the node is bound again
+// (review II, R2-P6-bound-2104, record lifetime and replaced peer).
+func TestRecordOfAClosedPeerIsDropped(t *testing.T) {
+	t.Parallel()
+	created := func(h *harness, addr handshake.PeerAddress) *createdPeer {
+		h.m.stateMu.Lock()
+		defer h.m.stateMu.Unlock()
+		return h.m.created[addr]
+	}
+	t.Run("closed between periods", func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, nil)
+		h.listen()
+		addr := peerAddr(1, 2)
+		e := Entry{FabricIndex: 1, Node: 2, Endpoint: 1, Cluster: 0x0006}
+		h.m.Register(1, e)
+		h.flush()
+		p, _ := h.peers.For(addr)
+		h.m.Unregister(1, e)
+		h.flush()
+		waitFor(t, func() bool { return h.link.released(p) == 1 })
+		if created(h, addr) == nil {
+			t.Fatal("the record went while the set still holds the peer")
+		}
+		h.peers.replace(addr, nil)
+		// Any task runs the release pass.
+		h.m.Register(1, Entry{FabricIndex: 1, Node: 3, Endpoint: 1, Cluster: 0x0006})
+		h.flush()
+		if rec := created(h, addr); rec != nil {
+			t.Fatalf("the record still holds the closed peer %p", rec.peer)
+		}
+	})
+	t.Run("replaced in a period", func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, nil)
+		h.listen()
+		addr := peerAddr(1, 2)
+		e := Entry{FabricIndex: 1, Node: 2, Endpoint: 1, Cluster: 0x0006}
+		h.m.Register(1, e)
+		h.flush()
+		old, _ := h.peers.For(addr)
+		waitFor(t, func() bool { return h.link.connected(old) == 1 })
+		// The set closed the old peer and a holder asked for the node
+		// again before the manager's next task.
+		h.peers.replace(addr, &peer.Peer{})
+		h.m.Register(1, Entry{FabricIndex: 1, Node: 2, Endpoint: 4, Cluster: 0x0006})
+		h.flush()
+		if !h.link.connectsEnded(old) {
+			t.Fatal("the replaced peer's period still runs")
+		}
+		if rec := created(h, addr); rec != nil {
+			t.Fatalf("the record holds %p, the manager did not create the set's peer", rec.peer)
+		}
+	})
+}

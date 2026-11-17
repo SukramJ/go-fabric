@@ -196,27 +196,47 @@ func (r *record) empty() bool {
 // record outlives a release, as the peer stays in the set (decision 221),
 // so a later entry for the node is the manager's again (Fable F1). period
 // is the current binding period — from the first entry naming the node to
-// the release after its last — nil between periods.
+// the release after its last — nil between periods. released is the last
+// ended period's release, which the next period's Connect calls wait for,
+// so a release that runs late cannot stop the next period's process. The
+// record is dropped once the set no longer holds the node's address (the
+// peer was closed) or holds another peer there.
 type createdPeer struct {
-	peer   *peer.Peer
-	period *bindingPeriod
+	peer     *peer.Peer
+	period   *bindingPeriod
+	released <-chan struct{}
 }
 
 // bindingPeriod is one binding period of a created peer: the context its
 // entries' Connect calls run on, and those calls, which the release waits
 // for before it stops the connection process — a Connect call starts the
 // process again when it finds it stopped (Fable F2).
+//
+// after is the previous period's release (nil for the first period and for
+// a peer the manager did not create): a Connect call waits for it, for a
+// Disconnect that ran after this period's call began would stop the
+// process the call started. released is closed once this period's release
+// ran (nil for a period no release ends).
 type bindingPeriod struct {
-	ctx    context.Context //nolint:containedctx // ends the entries' Connect calls at the release
-	cancel context.CancelFunc
-	calls  sync.WaitGroup
+	ctx      context.Context //nolint:containedctx // ends the entries' Connect calls at the release
+	cancel   context.CancelFunc
+	calls    sync.WaitGroup
+	after    <-chan struct{}
+	released chan struct{}
 }
 
 // connect runs one counted Connect call of the period on its context:
-// none once the period ended, and no error for a call the end
-// interrupted.
+// none once the period ended, none before the previous period's release
+// ran, and no error for a call the end interrupted.
 func (b *bindingPeriod) connect(link peerLink, p *peer.Peer) error {
 	defer b.calls.Done()
+	if b.after != nil {
+		select {
+		case <-b.after:
+		case <-b.ctx.Done():
+			return nil
+		}
+	}
 	if b.ctx.Err() != nil {
 		return nil // released before the call began
 	}
