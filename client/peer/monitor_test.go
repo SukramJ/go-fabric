@@ -273,3 +273,38 @@ func TestSessionMoveCarriesOperationalAddress(t *testing.T) {
 		}
 	})
 }
+
+// TestMonitorSuspectCheckDoesNotTakeAnAddressChangeResult: a
+// session-suspect check that finds an address-change run in flight waits
+// for it and then runs its own, which probes the session; it never takes
+// the address-change run's result, which may come without any probe
+// (nothing discovered, or within the cooldown). matter.js hands every
+// caller the run in flight whatever its reason
+// (PeerAddressMonitor.ts:111-112, :122 at db021da0); the rule is this
+// module's (review II, R2-P6-conc-2111).
+func TestMonitorSuspectCheckDoesNotTakeAnAddressChangeResult(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		h, p, n := monitored(t)
+		h.udp.drain()
+		// Hold the discovery loop, so the address-change run waits in it.
+		_, release := h.mdns.hold()
+		defer release()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go func() { _, _ = h.names.Browse(ctx, "_held._tcp.local") }()
+		synctest.Wait()
+		change := verifyAsync(context.Background(), p, ReasonAddressChange)
+		synctest.Wait()
+		suspect := verifyAsync(context.Background(), p, ReasonSessionSuspect)
+		synctest.Wait()
+		release()
+		if r := waitVerify(t, change); !r.ok {
+			t.Fatal("nothing discovered: the address-change run wants true without a probe")
+		}
+		n.answer(t, h.udp.next(t)) // the suspect run's own probe
+		if r := waitVerify(t, suspect); !r.ok || r.err != nil {
+			t.Fatalf("suspect check = %+v, want its own probe answered", r)
+		}
+	})
+}

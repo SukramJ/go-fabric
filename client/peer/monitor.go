@@ -63,8 +63,9 @@ type monitor struct {
 
 // monitorRun is one verification other callers join.
 type monitorRun struct {
-	done chan struct{}
-	ok   bool
+	done   chan struct{}
+	ok     bool
+	reason ReachabilityReason
 }
 
 // addressMonitor is the peer's monitor, created on first use with the
@@ -144,11 +145,30 @@ func (m *monitor) close() {
 
 // verify runs the verification or joins the one in flight; only an
 // address-change run re-arms the timer afterwards (:102-127).
+//
+// A session-suspect check never takes an address-change run's result,
+// which may come without any probe (the address still discovered, or
+// within the cooldown): it waits for that run and then runs or joins a
+// session-suspect one. Runs of one reason coalesce, and an address-change
+// check joins a suspect run, which always probes. Ahead of matter.js,
+// which hands every caller the run in flight whatever its reason
+// (PeerAddressMonitor.ts:111-112, :122 at db021da0); the rule is this
+// module's (review II, R2-P6-conc-2111).
 func (m *monitor) verify(ctx context.Context, reason ReachabilityReason) (bool, error) {
 	m.mu.Lock()
 	r := m.running
+	for r != nil && reason == ReasonSessionSuspect && r.reason != ReasonSessionSuspect {
+		m.mu.Unlock()
+		select {
+		case <-r.done:
+		case <-ctx.Done():
+			return false, ctx.Err()
+		}
+		m.mu.Lock()
+		r = m.running
+	}
 	if r == nil {
-		r = &monitorRun{done: make(chan struct{})}
+		r = &monitorRun{done: make(chan struct{}), reason: reason}
 		m.running = r
 		go func() {
 			ok := m.run(reason)
