@@ -7,6 +7,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -150,44 +152,85 @@ func loadRules(t *testing.T) rules {
 	return r
 }
 
-// moduleGraph loads every package of the module and returns its non-test
-// imports inside the module, module-relative.
+// moduleGraph loads every package of the module and of each nested module
+// (every go.mod below the root: ble/bluez, ble/esphome, wifi/wpasupplicant,
+// examples/ble-wifi-light), and returns their non-test imports inside the
+// repository, repository-relative. A nested module is released on its own
+// (R2-P6-test-2808): the root's ./... does not reach it, so it is loaded from
+// its own directory. Every load is for GOOS=linux, the platform CI runs on and
+// the one ble/bluez and wifi/wpasupplicant implement (elsewhere a stub).
 func moduleGraph(t *testing.T) map[string][]string {
 	t.Helper()
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedImports | packages.NeedFiles,
-		Dir:  root,
-	}
-	pkgs, err := packages.Load(cfg, "./...")
+	nested, err := nestedModules(root)
 	if err != nil {
-		t.Fatalf("packages.Load: %v", err)
+		t.Fatal(err)
 	}
+	if len(nested) == 0 {
+		t.Fatal("no nested module found; the walk is broken")
+	}
+	dirs := append([]string{root}, nested...)
 	graph := map[string][]string{}
-	for _, p := range pkgs {
-		for _, e := range p.Errors {
-			t.Errorf("load %s: %v", p.PkgPath, e)
+	for _, dir := range dirs {
+		cfg := &packages.Config{
+			Mode: packages.NeedName | packages.NeedImports | packages.NeedFiles,
+			Dir:  dir,
+			Env:  append(os.Environ(), "GOOS=linux"),
 		}
-		from, ok := relPath(p.PkgPath)
-		if !ok {
-			continue
+		pkgs, err := packages.Load(cfg, "./...")
+		if err != nil {
+			t.Fatalf("packages.Load in %s: %v", dir, err)
 		}
-		deps := []string{}
-		for ip := range p.Imports {
-			if to, ok := relPath(ip); ok {
-				deps = append(deps, to)
+		for _, p := range pkgs {
+			for _, e := range p.Errors {
+				t.Errorf("load %s: %v", p.PkgPath, e)
 			}
+			from, ok := relPath(p.PkgPath)
+			if !ok {
+				continue
+			}
+			deps := []string{}
+			for ip := range p.Imports {
+				if to, ok := relPath(ip); ok {
+					deps = append(deps, to)
+				}
+			}
+			sort.Strings(deps)
+			graph[from] = deps
 		}
-		sort.Strings(deps)
-		graph[from] = deps
 	}
 	if len(graph) == 0 {
 		t.Fatal("no packages loaded")
 	}
 	return graph
+}
+
+// nestedModules returns the directory of every go.mod below root, skipping
+// dot-directories (.git, .claude's worktrees) and testdata, which holds
+// fixture modules.
+func nestedModules(root string) ([]string, error) {
+	var dirs []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if path != root && (strings.HasPrefix(name, ".") || name == "testdata" || name == "node_modules") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() == "go.mod" && filepath.Dir(path) != root {
+			dirs = append(dirs, filepath.Dir(path))
+		}
+		return nil
+	})
+	sort.Strings(dirs)
+	return dirs, err
 }
 
 // TestLayering holds ADR 0026 principle 1: a package imports only its own
