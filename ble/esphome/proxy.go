@@ -243,7 +243,12 @@ func (p *proxy) wakeUp() {
 }
 
 // run keeps the proxy connected until the central closes: first is the
-// connection NewCentral opened, nil when that failed.
+// connection NewCentral opened, nil when that failed. The reconnect wait
+// doubles after every loss and every failed dial up to maxBackoff; only a
+// connection that held for SilenceTimeout starts it afresh, so a proxy
+// that answers the hello and drops the connection is not redialled — a
+// Noise handshake and a browse each time — every second
+// (R2-P6-fsm-2008).
 func (p *proxy) run(first *apiConn) {
 	defer p.c.wg.Done()
 	backoff := initialBackoff
@@ -267,13 +272,17 @@ func (p *proxy) run(first *apiConn) {
 				continue
 			}
 		}
-		backoff = initialBackoff
+		since := p.c.clk.Now()
 		cause := p.attach(a)
 		p.detach(a, cause)
 		a = nil
+		if p.c.clk.Now().Sub(since) >= p.c.opts.SilenceTimeout {
+			backoff = initialBackoff
+		}
 		if !p.sleep(backoff) {
 			return
 		}
+		backoff = min(2*backoff, maxBackoff)
 	}
 }
 

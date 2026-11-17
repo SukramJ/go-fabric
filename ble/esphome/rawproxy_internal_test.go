@@ -7,7 +7,9 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ble"
 
 	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
@@ -33,12 +35,18 @@ type rawProxy struct {
 
 func newRawProxy(t *testing.T, script func(f wire.Framer, n int, typ uint16, payload []byte) bool) *rawProxy {
 	t.Helper()
+	return newRawProxyWith(t, nil, script)
+}
+
+// newRawProxyWith is newRawProxy with a hello hook.
+func newRawProxyWith(t *testing.T, hello func(n int) bool, script func(f wire.Framer, n int, typ uint16, payload []byte) bool) *rawProxy {
+	t.Helper()
 	var lc net.ListenConfig
 	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := &rawProxy{ln: ln, script: script}
+	r := &rawProxy{ln: ln, script: script, hello: hello}
 	var wg sync.WaitGroup
 	t.Cleanup(func() {
 		_ = ln.Close()
@@ -164,4 +172,54 @@ func TestHandlesSetBeforeIndications(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = k.Disconnect()
+}
+
+// TestReconnectBackoffGrowsWhileConnectionsFail (R2-P6-fsm-2008): a proxy
+// that answers the hello and then drops the connection is redialled on a
+// growing backoff, not every second: only a connection that held for
+// SilenceTimeout starts the ladder afresh.
+func TestReconnectBackoffGrowsWhileConnectionsFail(t *testing.T) {
+	clk := clocktest.New(time.Unix(1_700_000_000, 0))
+	// The first connection holds until the test drops it; every later one
+	// closes after the device information.
+	rp := newRawProxyWith(t, func(n int) bool { return n == 0 }, nil)
+	c, err := NewCentral([]Proxy{{Addr: rp.addr()}}, Options{Clock: clk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	ladder := map[time.Duration]bool{}
+	for d := initialBackoff; d <= maxBackoff; d *= 2 {
+		ladder[d] = true
+	}
+	// armedBackoff is the reconnect wait the run loop armed.
+	armedBackoff := func() time.Duration {
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			for _, d := range clk.Armed() {
+				if ladder[d] {
+					return d
+				}
+			}
+			time.Sleep(time.Millisecond)
+		}
+		t.Fatal("no reconnect wait armed")
+		return 0
+	}
+	rp.drop()
+	for _, want := range []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second} {
+		got := armedBackoff()
+		if got != want {
+			t.Fatalf("reconnect wait %v, want %v", got, want)
+		}
+		before := rp.accepted()
+		clk.Advance(got)
+		deadline := time.Now().Add(5 * time.Second)
+		for rp.accepted() == before {
+			if time.Now().After(deadline) {
+				t.Fatal("no redial after the wait")
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
 }
