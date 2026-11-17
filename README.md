@@ -124,7 +124,7 @@ package, and Go makes all of them unimportable from outside — the one-way
 seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
 `channelseam`, `coreseam`, `deviceseam`, `exchangeseam`, `facadeseam`, `fabrictestseam`,
-`nodeseam`, `sessionseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
+`nodeseam`, `sealseam`, `sessionseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
 internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`, `caseauth`, `deepcopy`);
 and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
@@ -244,6 +244,7 @@ becomes permissible in:
 | `bridge.Bridge.SubscriptionReporter`, `SubscriptionEventReporter`, `SubscriptionFlushReporter` | none needed: `Bridge.AttachSubscriptionManager` installs the bridge's sender; pass nil as `subscription.NewManager`'s reporter | `v0.23.0` |
 | `bridge/bridgetest.EstablishSubscriptionTarget`, `SubscriptionTarget`, `SubscriptionTarget.PeerCounter`, `ErrNoPeerCounter`, `ErrNoSubscriptionID`, `ErrNoPeer`, `ErrPeerCounterNotAnchored`, `ErrNotEstablished` | `bridgetest.Session.Subscribe` of the test `Commissioner` | `v0.23.0` |
 | `bridge.ErrAckWaitTimeout` | none: no function returns it | `v0.23.0` |
+| `client/peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

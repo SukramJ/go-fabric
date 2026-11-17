@@ -452,6 +452,18 @@ changes are the rows marked *changed*.
 | `bridgetest.EstablishSubscriptionTarget(b, subID, target)` in a test | subscribe through a commissioned `bridgetest.Session` (`Session.Subscribe`): the real SubscribeRequest sets the route and anchors the peer's counter window |
 | `bridge.ErrAckWaitTimeout` compared from a host | nothing: no function returns it |
 
+## Changed after v0.22.2: the controller, the client stack and the radio kits
+
+Review II, phase 6b, first wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release; the behaviour
+changes are the rows marked *changed* or *breaking*.
+
+| Before | Now |
+| --- | --- |
+| *breaking:* `JointFabricOptions.Consent: func(info commissioner.TrustInfo) bool { … }` | `func(_ context.Context, info commissioner.TrustInfo) (bool, error) { return …, nil }`: the context is Commission's and ends the wait; an error fails the step |
+| *changed:* `sqlstore.New` on a registry a `sqlstore.NewSealed` has marked | refuses to write a secret value (`store.ErrNoSealer`): open it with `NewSealed` and its sealer; `sqlstore.Reseal` / `controller.Reseal` rotate the key |
+| `peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the
