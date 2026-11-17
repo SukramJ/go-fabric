@@ -811,8 +811,9 @@ func (r *fakeReadings) snapshot(t measurementTarget, now uint32) {
 // --- the electrical readings -------------------------------------------------
 
 // Accuracy bounds: one range over the whole int64 domain the cluster
-// allows (-2^62 to 2^62) with FixedMax 1. Matter requires AccuracyRanges
-// to hold at least one entry (ElectricalPowerMeasurement.Accuracy,
+// allows (-2^62 to 2^62) with FixedMax 1, as cluster/measurement's
+// elPwrAccuracy has it. Matter requires AccuracyRanges to hold at least
+// one entry (ElectricalPowerMeasurement.Accuracy,
 // MeasurementAccuracyStruct, min 1).
 const (
 	accuracyMin int64 = -(1 << 62)
@@ -824,14 +825,31 @@ const (
 // ElectricalPowerMeasurement on AC with ActivePower, Voltage, ActiveCurrent
 // and Frequency null, and ElectricalEnergyMeasurement with imported,
 // cumulative energy null.
+//
+// ElectricalPowerMeasurement's Accuracy holds one entry per measurement
+// type the daemon serves — the three the fake readings set
+// (fakeReadings.updateLocked: Voltage, ActiveCurrent, ActivePower), in
+// MeasurementType order — and NumberOfMeasurementTypes is the list's
+// length, the rule cluster/measurement's elPwrAccuracy follows and
+// docs/guides/embed-in-a-daemon.md states (R2-P6-par-2601,
+// R2-P6-par-1466). Frequency is declared but never set, so it carries no
+// entry.
 func electricalDeclarations() []device.Declaration {
 	fixed := uint64(1)
-	mode, types := epmdef.PowerModeAc, uint8(1)
-	power := []epmdef.MeasurementAccuracyStruct{{
-		MeasurementType: epmdef.MeasurementTypeActivePower, Measured: true,
-		MinMeasuredValue: accuracyMin, MaxMeasuredValue: accuracyMax,
-		AccuracyRanges: []epmdef.MeasurementAccuracyRangeStruct{{RangeMin: accuracyMin, RangeMax: accuracyMax, FixedMax: &fixed}},
-	}}
+	mode := epmdef.PowerModeAc
+	entry := func(t epmdef.MeasurementTypeEnum) epmdef.MeasurementAccuracyStruct {
+		return epmdef.MeasurementAccuracyStruct{
+			MeasurementType: t, Measured: true,
+			MinMeasuredValue: accuracyMin, MaxMeasuredValue: accuracyMax,
+			AccuracyRanges: []epmdef.MeasurementAccuracyRangeStruct{{RangeMin: accuracyMin, RangeMax: accuracyMax, FixedMax: &fixed}},
+		}
+	}
+	power := []epmdef.MeasurementAccuracyStruct{
+		entry(epmdef.MeasurementTypeVoltage),
+		entry(epmdef.MeasurementTypeActiveCurrent),
+		entry(epmdef.MeasurementTypeActivePower),
+	}
+	types := uint8(len(power))
 	energy := eemdef.MeasurementAccuracyStruct{
 		MeasurementType: eemdef.MeasurementTypeElectricalEnergy, Measured: true,
 		MinMeasuredValue: accuracyMin, MaxMeasuredValue: accuracyMax,

@@ -6,6 +6,8 @@ package main
 import (
 	"testing"
 	"time"
+
+	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 )
 
 // reading is one update's EnergyReporting values on one endpoint.
@@ -95,5 +97,43 @@ func TestEnergyReportingFakeReadings(t *testing.T) { //nolint:gocognit,cyclop //
 	fireMarket(t, f, triggerFakeReadingsStop)
 	if f.electricalMeter.testEventTrigger(0x0091_0000_0000_0003) {
 		t.Error("an unknown EnergyReporting trigger was handled")
+	}
+}
+
+// TestElectricalAccuracyCoversServedTypes holds R2-P6-par-2601: after the
+// fake readings ran, every ElectricalPowerMeasurement reading that is not
+// null on either endpoint has an Accuracy entry of its type, and
+// NumberOfMeasurementTypes is the list's length (the rule of
+// cluster/measurement's elPwrAccuracy, R2-P6-par-1466). A reading the
+// fake readings start setting later fails here until it gets its entry.
+func TestElectricalAccuracyCoversServedTypes(t *testing.T) {
+	f := marketFleet(t)
+	r := &f.electricalMeter.readings
+	r.schedule = func(time.Duration, func()) func() { return func() {} }
+	fireMarket(t, f, triggerFakeReadingsLoadStart)
+	defer fireMarket(t, f, triggerFakeReadingsStop)
+	for i, tg := range r.targets {
+		st := tg.power.Get()
+		listed := map[epmdef.MeasurementTypeEnum]bool{}
+		for _, a := range st.Accuracy {
+			listed[a.MeasurementType] = true
+		}
+		if int(st.NumberOfMeasurementTypes) != len(st.Accuracy) {
+			t.Errorf("endpoint %d: NumberOfMeasurementTypes %d, Accuracy has %d entries", i, st.NumberOfMeasurementTypes, len(st.Accuracy))
+		}
+		served := map[epmdef.MeasurementTypeEnum]*int64{
+			epmdef.MeasurementTypeVoltage:       st.Voltage,
+			epmdef.MeasurementTypeActiveCurrent: st.ActiveCurrent,
+			epmdef.MeasurementTypeActivePower:   st.ActivePower,
+			epmdef.MeasurementTypeFrequency:     st.Frequency,
+		}
+		for typ, v := range served {
+			if v != nil && !listed[typ] {
+				t.Errorf("endpoint %d: measurement type %d is set but has no Accuracy entry (%v)", i, typ, st.Accuracy)
+			}
+		}
+		if !listed[epmdef.MeasurementTypeActivePower] {
+			t.Errorf("endpoint %d: no ActivePower entry", i)
+		}
 	}
 }
