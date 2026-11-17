@@ -5,6 +5,7 @@ package camera
 
 import (
 	"context"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -667,7 +668,9 @@ func checkRange[T ~uint8 | ~uint16 | ~uint32](v *T, field string, r fieldRange) 
 	if n := int64(*v); n < r.min || n > r.max {
 		return 0, invalidArguments("%s must be %s", field, rangeText(r))
 	}
-	return int(*v), nil
+	// Saturated on a 32-bit build, as the camera's values are (review II,
+	// R2-P6-bound-2250).
+	return saturatedInt(uint32(*v), math.MaxInt), nil
 }
 
 // hints converts the video bounds. Mirrors matterjs-server

@@ -5,6 +5,7 @@ package camera
 
 import (
 	"errors"
+	"math"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -115,7 +116,7 @@ func toCameraState(st csdef.State, absent []uint32, features csdef.Feature) *cam
 		out.minViewport = &r
 	}
 	for _, p := range st.RateDistortionTradeOffPoints {
-		out.rateDistortionPoints = append(out.rateDistortionPoints, rateDistortionPoint{codec: p.Codec, resolution: resolutionOf(p.Resolution), minBitRate: int(p.MinBitRate)})
+		out.rateDistortionPoints = append(out.rateDistortionPoints, rateDistortionPoint{codec: p.Codec, resolution: resolutionOf(p.Resolution), minBitRate: intOf(p.MinBitRate)})
 	}
 	for _, c := range st.SnapshotCapabilities {
 		out.snapshotCapabilities = append(out.snapshotCapabilities, snapshotCapability{
@@ -129,7 +130,7 @@ func toCameraState(st csdef.State, absent []uint32, features csdef.Feature) *cam
 	for _, a := range st.AllocatedAudioStreams {
 		out.audio = append(out.audio, allocatedAudioStream{
 			audioStreamID: a.AudioStreamId, streamUsage: a.StreamUsage, audioCodec: a.AudioCodec, channelCount: int(a.ChannelCount),
-			sampleRate: int(a.SampleRate), bitRate: int(a.BitRate), bitDepth: int(a.BitDepth), referenceCount: int(a.ReferenceCount),
+			sampleRate: intOf(a.SampleRate), bitRate: intOf(a.BitRate), bitDepth: int(a.BitDepth), referenceCount: int(a.ReferenceCount),
 		})
 	}
 	for _, s := range st.AllocatedSnapshotStreams {
@@ -145,7 +146,7 @@ func toCameraState(st csdef.State, absent []uint32, features csdef.Feature) *cam
 		m := st.MicrophoneCapabilities
 		caps := &audioCapabilities{supportedCodecs: slices.Clone(m.SupportedCodecs), maxNumberOfChannels: int(m.MaxNumberOfChannels)}
 		for _, r := range m.SupportedSampleRates {
-			caps.supportedSampleRates = append(caps.supportedSampleRates, int(r))
+			caps.supportedSampleRates = append(caps.supportedSampleRates, intOf(r))
 		}
 		for _, d := range m.SupportedBitDepths {
 			caps.supportedBitDepths = append(caps.supportedBitDepths, int(d))
@@ -167,10 +168,21 @@ func videoStreamOf(v csdef.VideoStreamStruct) allocatedVideoStream {
 		videoStreamID: v.VideoStreamId, streamUsage: v.StreamUsage, videoCodec: v.VideoCodec,
 		minResolution: resolutionOf(v.MinResolution), maxResolution: resolutionOf(v.MaxResolution),
 		minFrameRate: int(v.MinFrameRate), maxFrameRate: int(v.MaxFrameRate),
-		minBitRate: int(v.MinBitRate), maxBitRate: int(v.MaxBitRate),
+		minBitRate: intOf(v.MinBitRate), maxBitRate: intOf(v.MaxBitRate),
 		keyFrameInterval: int(v.KeyFrameInterval), referenceCount: int(v.ReferenceCount),
 	}
 }
+
+// intOf is a camera's uint32 value as an int, saturated at the build's
+// int ceiling: on a 32-bit build (make build-32bit compiles the module
+// for linux/armv7) an int holds 2^31−1 at most, and a plain conversion
+// of a larger value turns negative — a bit rate floor below zero spun the
+// window search under the endpoint lock (review II, R2-P6-bound-2250).
+func intOf(v uint32) int { return saturatedInt(v, math.MaxInt) }
+
+// saturatedInt is v, or ceiling when v is above it; ceiling is at most
+// math.MaxInt.
+func saturatedInt(v uint32, ceiling uint64) int { return int(min(uint64(v), ceiling)) } //nolint:gosec // ceiling is at most math.MaxInt
 
 func resolutionOf(r csdef.VideoResolutionStruct) resolution {
 	return resolution{width: int(r.Width), height: int(r.Height)}

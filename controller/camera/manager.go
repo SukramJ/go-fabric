@@ -724,7 +724,8 @@ func exhausted(st *cameraState, allocated []OccupyingStream) *ExhaustedError {
 		e.MaxEncoders = &v
 	}
 	if st.maxEncodedPixelRate.set {
-		v := int(st.maxEncodedPixelRate.value)
+		// Saturated on a 32-bit build (review II, R2-P6-bound-2250).
+		v := floorInt(st.maxEncodedPixelRate.value)
 		e.MaxPixelRate = &v
 	}
 	return e

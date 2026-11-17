@@ -4,6 +4,7 @@
 package camera
 
 import (
+	"cmp"
 	"math"
 	"slices"
 	"strconv"
@@ -516,8 +517,8 @@ type videoPixelRateBudget struct {
 // encodedPixelRate is what MaxEncodedPixelRate (§11.2.7.2) charges for a
 // stream allocated with this window. Mirrors matterjs-server
 // packages/ws-controller/src/camera/streamPolicy.ts:398-411 at 0bd06f2.
-func encodedPixelRate(window videoEnvelope) int {
-	return window.maxResolution.pixels() * window.maxFrameRate
+func encodedPixelRate(window videoEnvelope) int64 {
+	return window.maxResolution.pixels() * int64(window.maxFrameRate)
 }
 
 // freeEncodedPixelRate is what is left of MaxEncodedPixelRate after the
@@ -530,13 +531,15 @@ func freeEncodedPixelRate(budget videoPixelRateBudget) (float64, bool) {
 	if !budget.maxEncodedPixelRate.set {
 		return 0, false
 	}
-	committed := 0
+	// int64: the products and their sum pass 2^31 with a few 4K streams
+	// (review II, R2-P6-bound-2251).
+	var committed int64
 	for _, s := range budget.videoStreams {
-		committed += s.maxResolution.pixels() * s.maxFrameRate
+		committed += s.maxResolution.pixels() * int64(s.maxFrameRate)
 	}
 	for _, s := range budget.snapshotStreams {
 		if s.encodedPixels {
-			committed += s.maxResolution.pixels() * s.frameRate
+			committed += s.maxResolution.pixels() * int64(s.frameRate)
 		}
 	}
 	return budget.maxEncodedPixelRate.value - float64(committed), true
@@ -684,7 +687,7 @@ func findDegradedVideoStream(streams []allocatedVideoStream, bounds *videoCaller
 		if d := usageRank(a.streamUsage, preferred.usage, preferred.set) - usageRank(b.streamUsage, preferred.usage, preferred.set); d != 0 {
 			return d
 		}
-		return b.maxResolution.pixels() - a.maxResolution.pixels()
+		return cmp.Compare(b.maxResolution.pixels(), a.maxResolution.pixels())
 	})
 	if len(candidates) == 0 {
 		return nil

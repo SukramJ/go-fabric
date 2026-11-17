@@ -50,8 +50,9 @@ type resolution struct {
 	width, height int
 }
 
-// pixels is the frame's area.
-func (r resolution) pixels() int { return r.width * r.height }
+// pixels is the frame's area, in int64: two uint16 sides overflow a
+// 32-bit int (review II, R2-P6-bound-2251).
+func (r resolution) pixels() int64 { return int64(r.width) * int64(r.height) }
 
 // String is the "1920x1080" spelling an error-102 bound states. Mirrors
 // matterjs-server packages/ws-controller/src/camera/streamPolicy.ts:248-250
