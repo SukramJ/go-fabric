@@ -128,6 +128,13 @@ var areaKeys = []string{
 	// bridge (review II, 6a wave 3): whether the StatusResponse answering a
 	// flushed report could not be decoded (matter.tx.*.flush_answered).
 	"undecodable",
+	// controller/client (review II, 6b wave 2): the redacting LogValue of
+	// ICDRegistration and CommissioningWindow, one key per field.
+	"client_type", "last_offset", "manual_code", "monitored_subject",
+	"passcode", "pending_key", "qr_code",
+	// controller/topology (review II, 6b wave 2): the nodes that claim one
+	// Thread address (matter.controller.topology.claim_collision).
+	"nodes",
 }
 
 // skippedTop are the top-level directories the guard does not judge.

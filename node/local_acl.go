@@ -5,11 +5,16 @@ package node
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/SukramJ/go-fabric/internal/facadeseam"
 	"github.com/SukramJ/go-fabric/store"
 )
+
+// errACLWriteLock is logged when the root's AccessControl server offers no
+// write lock; addLocalOperateEntry then writes nothing.
+var errACLWriteLock = errors.New("node: the AccessControl server's write lock is unavailable")
 
 // addLocalOperateEntry adds an Operate entry for CASE, no subject, one
 // target (epID, cluster) to fabricIndex's ACL unless the ACL holds one —
@@ -27,7 +32,7 @@ func (n *Node) addLocalOperateEntry(ctx context.Context, fabricIndex uint8, epID
 	if !facadeseam.WithACLWriteLock(n.root.AccessControl, run) {
 		// Not reached: the root's AccessControl is always a
 		// *core.AccessControl. Fail closed — no write without the lock.
-		n.logger.Error(event+"_lock", slog.String("err", "the AccessControl server's write lock is unavailable"))
+		n.logger.Error(event+"_lock", slog.Any("err", errACLWriteLock))
 		return false
 	}
 	return added

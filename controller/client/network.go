@@ -752,7 +752,7 @@ func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 	n.mu.Unlock()
 	if full {
 		if first {
-			n.log.Info("matter.controller.client.unknown_not_logged", slog.Int("logged", maxUnknownWarned),
+			n.log.Info("matter.controller.client.unknown_not_logged", slog.Int("max", maxUnknownWarned),
 				slog.String("reason", "the node reported more unknown clusters and events than are logged; further unknown events of the node are not logged"))
 		}
 		return
