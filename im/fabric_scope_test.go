@@ -266,7 +266,7 @@ func TestEveryFabricSensitiveEventOfTheModelIsGated(t *testing.T) {
 	if err := json.Unmarshal(parity.SchemaJSON(), &snap); err != nil {
 		t.Fatal(err)
 	}
-	auth := EventReadAuthorizer{FabricIndex: 2} // no checker: the ACL gate passes
+	auth := EventReadAuthorizer{Checker: fakeEventACL{allowFabric: 2, maxPriv: 5}, FabricIndex: 2} // the ACL gate passes
 	sensitive := 0
 	for _, c := range snap.Clusters {
 		for _, e := range c.Events {

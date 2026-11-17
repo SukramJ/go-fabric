@@ -60,6 +60,19 @@ func TestDispatcherWithoutACLCheckerDenies(t *testing.T) {
 	if d.writes != 0 || d.invokes != 0 || d.reads != 0 {
 		t.Errorf("a denied subject ran %d writes, %d invokes, %d reads", d.writes, d.invokes, d.reads)
 	}
+	// Events: an authorizer without a Checker denies as the dispatcher
+	// does (Fable's read of sub round 1, B-1); PASE keeps its grant.
+	ev := []EventReport{{Path: ConcreteEventPath{Endpoint: 0, Cluster: 0x0028, Event: 0x00, HasEndpoint: true, HasCluster: true, HasEvent: true}, Number: 1}}
+	noChecker := EventReadAuthorizer{FabricIndex: 1, SubjectNodeID: 0x1234}
+	if noChecker.Allows(caseCtx, 0, 0x0028) {
+		t.Error("CASE event read without a Checker: allowed, want denied")
+	}
+	if got := AuthorizeEventReports(caseCtx, noChecker, ev); len(got) != 0 {
+		t.Errorf("CASE events without a Checker: %+v, want none", got)
+	}
+	if !noChecker.Allows(paseCtx, 0, 0x0028) || len(AuthorizeEventReports(paseCtx, noChecker, ev)) != 1 {
+		t.Error("PASE events without a Checker: denied, want the implicit grant")
+	}
 
 	p := &noACLDispatcher{}
 	if wr := HandleWriteRequest(paseCtx, p, write); len(wr.Responses) != 1 || wr.Responses[0].Status.Status != StatusSuccess {

@@ -658,9 +658,6 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		if g.pase {
 			return StatusSuccess
 		}
-		if !g.hasACL {
-			return StatusUnsupportedAccess
-		}
 		return checkSubjectACL(g.ctx, g.aclChecker, g.fabricIndex, g.subjectNodeID, g.subjectCATs, endpoint, clusterID, privilege)
 	})
 

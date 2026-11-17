@@ -399,9 +399,10 @@ func (b *Bridge) subscriptionTargetOf(sub *subscription.Subscription) (subTarget
 // eventReadAuthorizer builds the ACL + fabric-sensitive gate for event reads
 // and subscriptions from the requesting session's identity, using dispatcher's
 // optional [im.ACLChecker]. A PASE session (fabricIndex==0 before AddNOC,
-// pase==true after it adopted the session onto the new fabric) or a
-// dispatcher without an ACLChecker passes the ACL gate inside
-// [im.AuthorizeEventReports]; its fabric-sensitive drop applies to every
+// pase==true after it adopted the session onto the new fabric) passes the
+// ACL gate inside [im.AuthorizeEventReports]; any other session of a
+// dispatcher without an ACLChecker reads no event (owner decision 136);
+// its fabric-sensitive drop applies to every
 // session — a fabric-sensitive record reaches only the fabric that owns it,
 // none for a PASE session before AddNOC. Shared by
 // the plain event read (receive_dispatch), the Subscribe-Initial priming report
@@ -423,8 +424,9 @@ func (b *Bridge) eventReadAuthorizer(dispatcher im.Dispatcher, fabricIndex uint8
 // authorizedEventReports filters events down to those the subscribing subject
 // (captured on target) is permitted to read AND drops fabric-sensitive records
 // owned by another fabric, as [im.AuthorizeEventReports] does. A PASE session
-// or a dispatcher without an [im.ACLChecker] passes the ACL gate; the
-// fabric-sensitive drop applies to every session. Each event is gated at its
+// passes the ACL gate, and a dispatcher without an [im.ACLChecker] grants
+// any other session nothing; the fabric-sensitive drop applies to every
+// session. Each event is gated at its
 // read privilege — View, the Matter default, for most clusters — and a
 // fabric-sensitive record (AccessControl's among them, Matter §8.4.3.2 /
 // §9.10.7.1) is dropped when its FabricIndex differs from the subscribing
@@ -471,9 +473,9 @@ func (b *Bridge) reportEventsWith(ctx context.Context, sub *subscription.Subscri
 	// privilege, default View; AccessControlEntryChanged is Administer).
 	// Without this an ACE-less subject would stream every fired event.
 	// A PASE subscriber passes the ACL gate (the auth mode, not fabric
-	// index 0, which alone is refused), and so does every subscriber of a
-	// dispatcher without an ACLChecker; the fabric-sensitive drop applies
-	// to every subscriber.
+	// index 0, which alone is refused); a dispatcher without an
+	// ACLChecker grants any other subscriber nothing (decision 136). The
+	// fabric-sensitive drop applies to every subscriber.
 	report := im.ReportData{
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
@@ -603,8 +605,8 @@ func (b *Bridge) MatterEmitEvent(endpoint uint16, cluster, event uint32, data an
 // authorized to read, mirroring the per-result ACL gate in
 // [im.HandleReadRequest]. A PASE session — fabricIndex==0 before AddNOC,
 // [im.IsPASEFromContext] after it adopted the session onto the new fabric
-// — or a dispatcher without an [im.ACLChecker] returns every result
-// unchanged.
+// — returns every result; a dispatcher without an [im.ACLChecker] returns
+// none to any other session, as it denies a Read (owner decision 136).
 //
 // This closes the subscribe-path ACL bypass: unlike HandleReadRequest,
 // the subscription read paths (initial + ongoing) call dispatcher.Read
@@ -634,8 +636,9 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 
 // readResultAuthorizer is the gate [Bridge.readAuthorizedResults] applies
 // to each result, for the subject ctx carries: nil when every result
-// passes (PASE, or a dispatcher without an ACL), else a func reporting
-// whether the subject may read the result's attribute.
+// passes (PASE), else a func reporting whether the subject may read the
+// result's attribute — one that refuses every result for a dispatcher
+// without an [im.ACLChecker] (owner decision 136).
 func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im.ReadResult) bool {
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	if im.IsPASEFromContext(ctx) {
@@ -643,7 +646,7 @@ func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im
 	}
 	aclChecker, hasACL := dispatcher.(im.ACLChecker)
 	if !hasACL {
-		return nil
+		return func(im.ReadResult) bool { return false }
 	}
 	if !im.HasAccessingFabric(fabricIndex) {
 		// No accessing fabric and not PASE: no subject the ACL could grant
@@ -684,21 +687,22 @@ func (b *Bridge) withSessionAuthMode(ctx context.Context, sessionID uint16) cont
 // drives no server read in its priming report or its reports, as a
 // Read's subject drives none since R2-P6-bound-0405 (decision 162;
 // review II, wave 3, the gate's hand-over). The per-result filter stays
-// the gate of what is reported. A PASE session and a dispatcher without
-// an [im.ACLChecker] get no stamp — nothing is checked for them; a
-// session without an accessing fabric gets one that refuses every
-// location, as the filter refuses every result.
+// the gate of what is reported. A PASE session gets no stamp — nothing is
+// checked for it; a dispatcher without an [im.ACLChecker] and a session
+// without an accessing fabric get one that refuses every location, as the
+// filter refuses every result.
 func withReadAuthority(ctx context.Context, dispatcher im.Dispatcher) context.Context {
 	if im.IsPASEFromContext(ctx) {
 		return ctx
 	}
+	refuse := func(uint16, uint32, uint8) im.StatusCode { return im.StatusUnsupportedAccess }
 	aclChecker, hasACL := dispatcher.(im.ACLChecker)
 	if !hasACL {
-		return ctx
+		return im.WithAuthority(ctx, refuse)
 	}
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	if !im.HasAccessingFabric(fabricIndex) {
-		return im.WithAuthority(ctx, func(uint16, uint32, uint8) im.StatusCode { return im.StatusUnsupportedAccess })
+		return im.WithAuthority(ctx, refuse)
 	}
 	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
 	base := ctx

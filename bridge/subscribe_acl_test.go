@@ -158,7 +158,7 @@ func TestReadAuthorizedResults_PASEBypassesACL(t *testing.T) {
 }
 
 // fakeReadOnlyDispatcher implements im.Dispatcher but deliberately does
-// NOT implement im.ACLChecker, exercising the passthrough branch of
+// NOT implement im.ACLChecker, exercising the denying branch of
 // readAuthorizedResults for a dispatcher that never wired ACL
 // enforcement. TopologyDispatcher (the production dispatcher) always
 // implements im.ACLChecker, so this case cannot be reached with the real
@@ -181,11 +181,12 @@ func (f *fakeReadOnlyDispatcher) Invoke(_ context.Context, _ im.ConcreteCommandP
 
 var _ im.Dispatcher = (*fakeReadOnlyDispatcher)(nil)
 
-// TestReadAuthorizedResults_NoACLChecker_Passthrough verifies that a
-// dispatcher without an im.ACLChecker returns every result unchanged,
-// even for a CASE fabric and a fabric-sensitive path — matching the
-// documented "dispatcher without ACLChecker" fallback.
-func TestReadAuthorizedResults_NoACLChecker_Passthrough(t *testing.T) {
+// TestReadAuthorizedResults_NoACLChecker_Denies verifies that a
+// dispatcher without an im.ACLChecker grants a CASE subject's subscription
+// nothing — no attribute result, no server read under the stamp, no event —
+// as such a dispatcher denies a Read (review II, R2-P6-sec-0560, owner
+// decision 136; Fable's read of sub round 1, B-1). PASE keeps its grant.
+func TestReadAuthorizedResults_NoACLChecker_Denies(t *testing.T) {
 	t.Parallel()
 	path := accessControlACLPath()
 	fd := &fakeReadOnlyDispatcher{results: []im.ReadResult{{Path: path, Status: im.StatusSuccess}}}
@@ -194,12 +195,21 @@ func TestReadAuthorizedResults_NoACLChecker_Passthrough(t *testing.T) {
 	ctx = im.WithSubject(ctx, 0x0000000000001111, nil)
 
 	b := &Bridge{}
-	got := b.readAuthorizedResults(ctx, fd, path)
-	if len(got) != 1 {
-		t.Fatalf("readAuthorizedResults: want 1 result (no ACLChecker => passthrough), got %d: %+v", len(got), got)
+	if got := b.readAuthorizedResults(ctx, fd, path); len(got) != 0 {
+		t.Errorf("readAuthorizedResults: want no result without an ACLChecker, got %+v", got)
 	}
-	if got[0] != fd.results[0] {
-		t.Errorf("readAuthorizedResults: result = %+v, want unchanged %+v", got[0], fd.results[0])
+	if fn, ok := im.LookupAuthority(withReadAuthority(ctx, fd)); !ok || fn(0, 0x001F, 1).IsSuccess() {
+		t.Errorf("withReadAuthority: stamped %v, want a check that refuses", ok)
+	}
+	if b.eventReadAuthorizer(fd, 1, false, 0x1111, nil).Allows(ctx, 0, 0x001F) {
+		t.Error("eventReadAuthorizer: allowed without an ACLChecker, want denied")
+	}
+	pase := im.WithAuthModePASE(ctx)
+	if got := b.readAuthorizedResults(pase, fd, path); len(got) != 1 {
+		t.Errorf("PASE readAuthorizedResults: want the result, got %+v", got)
+	}
+	if _, ok := im.LookupAuthority(withReadAuthority(pase, fd)); ok {
+		t.Error("PASE withReadAuthority: stamped, want no check")
 	}
 }
 

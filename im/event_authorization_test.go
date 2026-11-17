@@ -156,16 +156,17 @@ func TestAuthorizeEventReports_PASEBypass(t *testing.T) {
 	}
 }
 
-// TestAuthorizeEventReports_NilCheckerFailOpen verifies that a nil ACLChecker
-// returns every event unchanged, matching the attribute path's "dispatcher
-// without ACLChecker" fallback.
-func TestAuthorizeEventReports_NilCheckerFailOpen(t *testing.T) {
+// TestAuthorizeEventReports_NilCheckerDenies verifies that a nil ACLChecker
+// grants a session that is not PASE no event, as a dispatcher without an
+// ACLChecker denies its reads (review II, R2-P6-sec-0560, owner decision
+// 136; Fable's read of sub round 1, B-1).
+func TestAuthorizeEventReports_NilCheckerDenies(t *testing.T) {
 	t.Parallel()
 	auth := EventReadAuthorizer{Checker: nil, FabricIndex: 1}
 	in := []EventReport{acEventReport(1), plainEventReport()}
 	got := AuthorizeEventReports(context.Background(), auth, in)
-	if len(got) != 2 {
-		t.Fatalf("nil checker fail-open: want 2 events, got %d", len(got))
+	if len(got) != 0 {
+		t.Fatalf("nil checker: want no events, got %d", len(got))
 	}
 }
 
