@@ -164,7 +164,9 @@ func (s SettingStore) load(key string, into any) (bool, error) {
 		return false, err
 	}
 	if err := json.Unmarshal([]byte(v), into); err != nil {
-		return false, fmt.Errorf("ca: setting %q: %w", key, err)
+		// A record that does not parse is refused, never replaced (Fable
+		// read F4).
+		return false, fmt.Errorf("%w: setting %q: %w", ErrConfig, key, err)
 	}
 	return true, nil
 }

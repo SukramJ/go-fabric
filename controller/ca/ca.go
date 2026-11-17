@@ -46,8 +46,9 @@ const (
 // [New] does not load and does not replace: one that is incomplete (the
 // root's key identifier or certificate missing, an ICAC with some but not
 // all of its parts), whose certificate counter would repeat a serial, or
-// whose stored root or ICAC key is not its certificate's (review II,
-// R2-P6-store-1851–1853).
+// whose stored root or ICAC key is not its certificate's, and one whose
+// JSON, keys or certificates do not parse (review II, R2-P6-store-1851–1853,
+// Fable read F4).
 var ErrConfig = errors.New("ca: stored credentials do not match the configuration")
 
 // ErrInvalidCATs is a CASE Authenticated Tag list GenerateNOC refuses to
@@ -460,7 +461,7 @@ func (c *CA) load(s Stored) error {
 	if s.RootKeyPair != nil && c.cfg.RootSigner == nil {
 		k, err := privateKey(s.RootKeyPair.PrivateKey)
 		if err != nil {
-			return fmt.Errorf("ca: stored root key: %w", err)
+			return fmt.Errorf("%w: stored root key: %w", ErrConfig, err)
 		}
 		c.rootKey = k
 	}
@@ -469,7 +470,7 @@ func (c *CA) load(s Stored) error {
 	c.nextID = s.NextCertificateID
 	root, err := mattercert.Decode(c.rootCert)
 	if err != nil {
-		return fmt.Errorf("ca: stored root certificate: %w", err)
+		return fmt.Errorf("%w: stored root certificate: %w", ErrConfig, err)
 	}
 	c.rootPub = root.PublicKey
 	if k, ok := c.rootKey.(*ecdsa.PrivateKey); ok && !bytes.Equal(publicKeyBytes(&k.PublicKey), c.rootPub) {
@@ -495,7 +496,7 @@ func (c *CA) load(s Stored) error {
 		if c.cfg.ICACSigner != nil {
 			icac, err := mattercert.Decode(s.ICAC.CertBytes)
 			if err != nil {
-				return fmt.Errorf("ca: stored ICAC certificate: %w", err)
+				return fmt.Errorf("%w: stored ICAC certificate: %w", ErrConfig, err)
 			}
 			if err := signerFor(c.cfg.ICACSigner, icac.PublicKey, "ICAC"); err != nil {
 				return err
@@ -513,11 +514,11 @@ func (c *CA) load(s Stored) error {
 		}
 		k, err := privateKey(s.ICAC.KeyPair.PrivateKey)
 		if err != nil {
-			return fmt.Errorf("ca: stored ICAC key: %w", err)
+			return fmt.Errorf("%w: stored ICAC key: %w", ErrConfig, err)
 		}
 		icac, err := mattercert.Decode(s.ICAC.CertBytes)
 		if err != nil {
-			return fmt.Errorf("ca: stored ICAC certificate: %w", err)
+			return fmt.Errorf("%w: stored ICAC certificate: %w", ErrConfig, err)
 		}
 		if !bytes.Equal(publicKeyBytes(&k.PublicKey), icac.PublicKey) {
 			// R2-P6-store-1853 (b).

@@ -118,3 +118,48 @@ func TestSettingStoreKeepsAPartialICAC(t *testing.T) {
 		}
 	}
 }
+
+// TestUnparseableStoredRecordIsErrConfig: a stored record that does not
+// parse — its JSON, the root key, the root certificate, the ICAC key or
+// certificate — is refused as ErrConfig, like an incomplete one, and the
+// record stays (review II, decision 191, Fable read F4).
+func TestUnparseableStoredRecordIsErrConfig(t *testing.T) {
+	t.Parallel()
+	t.Run("JSON", func(t *testing.T) {
+		t.Parallel()
+		settings := &mapSettings{m: map[string]string{ca.DefaultSettingKey: "{not json"}}
+		if _, err := ca.New(ca.Config{Store: ca.SettingStore{Settings: settings}}); !errors.Is(err, ca.ErrConfig) {
+			t.Fatalf("New = %v, want ErrConfig", err)
+		}
+		if settings.m[ca.DefaultSettingKey] != "{not json" {
+			t.Fatal("the stored record changed")
+		}
+	})
+	for _, c := range []struct {
+		name   string
+		icac   bool
+		damage func(s *ca.Stored)
+	}{
+		{"the root key", false, func(s *ca.Stored) { s.RootKeyPair.PrivateKey = []byte{1, 2, 3} }},
+		{"the root certificate", false, func(s *ca.Stored) { s.RootCertBytes = []byte{0x15, 0x01} }},
+		{"the ICAC key", true, func(s *ca.Stored) { s.ICAC.KeyPair.PrivateKey = []byte{1, 2, 3} }},
+		{"the ICAC certificate", true, func(s *ca.Stored) { s.ICAC.CertBytes = []byte{0x15, 0x01} }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			st := &ca.MemoryStore{}
+			if _, err := ca.New(ca.Config{Store: st, IntermediateCA: c.icac}); err != nil {
+				t.Fatal(err)
+			}
+			rec, _, _ := st.Load()
+			c.damage(&rec)
+			_ = st.Save(rec)
+			if _, err := ca.New(ca.Config{Store: st, IntermediateCA: c.icac}); !errors.Is(err, ca.ErrConfig) {
+				t.Fatalf("New = %v, want ErrConfig", err)
+			}
+			if after, _, _ := st.Load(); !reflect.DeepEqual(after, rec) {
+				t.Fatal("the stored record changed")
+			}
+		})
+	}
+}
