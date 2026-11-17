@@ -1067,8 +1067,8 @@ const maxHostLabel = 40
 // (a negative InterfaceCheck stays the documented "off"); a negative OTA
 // HTTPS limit or announced-update delay, which would read as the default
 // or as no wait; an advertised device type the schema does not define; an
-// mDNS host name that is not one DNS label; and EndpointState beside the
-// deprecated EndpointPersistence, which it would ignore.
+// mDNS host name that is not one DNS label; and EndpointState beside
+// EndpointPersistence, the older field the node would then ignore.
 func (c *Config) boundErrors() []error {
 	var errs []error
 	if c.Health != nil && c.Health.Interval > 0 && c.Health.Interval < minPeriod {
