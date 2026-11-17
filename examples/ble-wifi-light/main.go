@@ -110,7 +110,7 @@ func run(ctx context.Context, o options, out io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("wi-fi interface %s: %w", o.wifiInterface, err)
 		}
-		defer func() { _ = d.Close() }()
+		defer func() { _ = d.Close() }() //nolint:contextcheck // Close takes no context; it sweeps the networks still owed on its own
 		wifi = d
 	}
 
