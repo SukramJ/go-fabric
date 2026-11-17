@@ -305,7 +305,11 @@ func (s *Set) Adopt(session *exchange.Session) *Peer {
 }
 
 // Disconnect ends every peer's connection process and keeps the set from
-// connecting again: a later attempt fails with [ErrNotConnectable].
+// connecting again: every attempt a later [Peer.Connect] makes fails with
+// [ErrNotConnectable], which the process handles as any other error — it
+// waits Timing.DelayAfterUnhandledError and retries — so Connect returns
+// an [*UnreachableError] at its timeout, unless the set's [ErrorHandler]
+// ends the process with a fatal error (review II, R2-P6-err-2106).
 // Mirrors matter.js PeerSet.disconnect (PeerSet.ts:248-262).
 func (s *Set) Disconnect(ctx context.Context) {
 	s.mu.Lock()
