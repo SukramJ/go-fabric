@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)
-Entry points: 9519 across 290 test packages.
+Entry points: 9526 across 290 test packages.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 19126 |
-| Reached by a test | 12644 |
-| Whitelisted | 6482 |
+| Total exported | 19134 |
+| Reached by a test | 12650 |
+| Whitelisted | 6484 |
 | **Unreached** | **0** |
 
 ## Top-20 packages by unreached exported identifiers

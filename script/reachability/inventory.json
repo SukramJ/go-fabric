@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9519,
+  "entry_points": 9526,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19126,
-    "reachable": 12644,
-    "whitelisted": 6482,
+    "total_exported": 19134,
+    "reachable": 12650,
+    "whitelisted": 6484,
     "unreachable": 0
   },
   "by_package": [],
@@ -826,6 +826,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_race_test.go",
       "line": 334
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttachedManagerReportsWithoutAFurtherHook",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_report_sender_test.go",
+      "line": 25
     },
     {
       "package": "bridge",
@@ -6033,7 +6040,7 @@
       "identifier": "TestReport_PeerUnreachable_RetriesBeforeEviction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
-      "line": 656
+      "line": 657
     },
     {
       "package": "bridge",
@@ -7160,63 +7167,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 950
+      "line": 949
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 976
+      "line": 975
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 839
+      "line": 838
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 993
+      "line": 992
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 907
+      "line": 906
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 749
+      "line": 748
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 757
+      "line": 756
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 1019
+      "line": 1018
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 872
+      "line": 871
     },
     {
       "package": "bridge",
@@ -37432,10 +37439,17 @@
     },
     {
       "package": "im/subscription",
+      "identifier": "DiscardReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/export_test.go",
+      "line": 19
+    },
+    {
+      "package": "im/subscription",
       "identifier": "HoldReporting",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/export_test.go",
-      "line": 8
+      "line": 10
     },
     {
       "package": "im/subscription",
