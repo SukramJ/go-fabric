@@ -108,7 +108,7 @@ func TestADRIndexListsEveryADR(t *testing.T) {
 
 // supersedesBlock is an ADR's "- **Supersedes…**" bullet with its
 // continuation lines: "Supersedes" and "Supersedes in part".
-var supersedesBlock = regexp.MustCompile(`(?m)^- \*\*Supersedes[^*]*\*\*:?(.*(?:\n  .*)*)`)
+var supersedesBlock = regexp.MustCompile(`(?m)^- \*\*Supersedes[^*]*\*\*:?(.*(?:\n {2}.*)*)`)
 
 // adrLink is a relative link to another ADR file.
 var adrLink = regexp.MustCompile(`\]\(\./(\d{4})-[^)]+\.md\)`)

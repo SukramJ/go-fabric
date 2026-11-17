@@ -55,7 +55,7 @@ var symbolCitation = regexp.MustCompile("`((?:[\\w.-]+/)*[\\w.-]+\\.(?:go|sql))`
 
 // citedName is a backticked token that names a Go or SQL symbol: Name,
 // Type.Method, pkg.Name, *Type; a call's "()" is dropped first.
-var citedName = regexp.MustCompile(`^[*&]?[A-Za-z_][\w]*(?:\.[A-Za-z_]\w*)*$`)
+var citedName = regexp.MustCompile(`^[*&]?[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$`)
 
 // TestCitedNamesOccurInTheirFile: in "`file.go` (`Name`, …)" on a
 // published page or an ADR, every backticked name in the parenthesis
