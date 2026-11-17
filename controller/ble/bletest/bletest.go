@@ -396,6 +396,15 @@ func (c *connection) startSession() {
 	// first packet cannot pass for a second request.
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// A drop that ran before this lock found nothing to close: nothing is
+	// created after it (review II, R2-P6-conc-2053). drop closes gone
+	// before it reads what to close under c.mu, so either it sees the
+	// session made here or this sees gone closed.
+	select {
+	case <-c.gone:
+		return
+	default:
+	}
 	req := c.request
 	if from := c.p.Faults.WithholdHandshakeFrom; from > 0 && c.handshakeWrites >= from {
 		return
