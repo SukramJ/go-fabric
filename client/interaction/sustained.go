@@ -50,8 +50,8 @@ type retries struct {
 	cfg  RetrySchedule
 	rand func() float64
 	base time.Duration
-	// establishedAt is when the sustained subscription the schedule paces
-	// was last established (R2-P6-fsm-2110).
+	// establishedAt is, for the schedule of short-lived subscriptions,
+	// when the sustained subscription was last established (R2-P6-fsm-2110).
 	establishedAt time.Time
 }
 
@@ -323,14 +323,19 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	// recreatePriority: a mode-flip recreate goes out on the priority
 	// connection (:133-135).
 	recreatePriority := false
-	// The retry schedule spans establishments: a subscription the peer
-	// drops before it lasted the schedule's current interval continues it,
-	// one that lasted it starts it over. Ahead of matter.js, which starts
-	// a new schedule per establishment loop (SustainedSubscription.ts:203
-	// at db021da0), so a peer that grants and drops at once is
-	// re-subscribed without a pause; the rule is this module's (review II,
-	// R2-P6-fsm-2110).
-	schedule := newRetries(DefaultSustainRetries, c.rand)
+	// Two schedules. The attempts of one establishment follow matter.js:
+	// their schedule starts over with each establishment loop
+	// (SustainedSubscription.ts:203 inside the loop of :139 at db021da0;
+	// connectedhomeip resets its count at every SubscribeResponse,
+	// src/app/ReadClient.cpp:1139 at 6170af84). losses spans
+	// establishments and paces consecutive short-lived subscriptions only:
+	// one the peer drops before it lasted losses' current interval waits
+	// its next step before the re-subscribe, one that lasted it starts it
+	// over. So a peer that grants and drops at once is not re-subscribed
+	// without a pause, and the failed attempts of an outage do not count
+	// against the subscription that ends it. Ahead of matter.js; the rule
+	// is this module's (review II, R2-P6-fsm-2110).
+	losses := newRetries(DefaultSustainRetries, c.rand)
 	for {
 		req, closed, deliberate := innerRequest(outer, updated)
 		// The attempt's network: a mode-flip recreate's goes out on the
@@ -347,6 +352,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			return
 		}
 
+		schedule := newRetries(DefaultSustainRetries, c.rand)
 		var held *icd.PeerWakefulness
 		for {
 			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
@@ -362,7 +368,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 				// nil branch's "a wakefulness present now is the feed", and the recreate
 				// takes the hold.
 				held = established(outer, inner, wakefulness())
-				schedule.establishedAt = c.clock.Now()
+				losses.establishedAt = c.clock.Now()
 				break
 			}
 			if ctx.Err() != nil {
@@ -395,7 +401,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		if ctx.Err() != nil {
 			return
 		}
-		if replace, ok := c.afterEstablishment(ctx, outer, schedule, !flipped); !ok {
+		if replace, ok := c.afterEstablishment(ctx, outer, losses, !flipped); !ok {
 			return
 		} else if replace {
 			continue
@@ -408,19 +414,19 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	}
 }
 
-// afterEstablishment applies the cross-establishment retry rule
+// afterEstablishment applies the short-lived-subscription rule
 // (R2-P6-fsm-2110) when the subscription established at
-// schedule.establishedAt ended: the schedule starts over when it lasted
-// the schedule's current interval. After a genuine loss (lost) the
-// subscription is reported not live (:289-293) and, when it did not last,
-// the schedule's next step is waited before the re-subscribe — but for a
-// peer that requires awaiting, which has no timed retry and which the gate
-// parks for its next wake. It reports whether the loop replaces the
-// subscription (a loss), and false for ok when ctx ended.
-func (c *Interaction) afterEstablishment(ctx context.Context, outer *Subscription, schedule *retries, lost bool) (replace, ok bool) {
-	lasted := c.clock.Now().Sub(schedule.establishedAt) >= schedule.current()
+// losses.establishedAt ended: losses starts over when it lasted losses'
+// current interval. After a genuine loss (lost) the subscription is
+// reported not live (:289-293) and, when it did not last, losses' next
+// step is waited before the re-subscribe — but for a peer that requires
+// awaiting, which has no timed retry and which the gate parks for its
+// next wake. It reports whether the loop replaces the subscription (a
+// loss), and false for ok when ctx ended.
+func (c *Interaction) afterEstablishment(ctx context.Context, outer *Subscription, losses *retries, lost bool) (replace, ok bool) {
+	lasted := c.clock.Now().Sub(losses.establishedAt) >= losses.current()
 	if lasted {
-		schedule.reset()
+		losses.reset()
 	}
 	if !lost {
 		return false, true
@@ -430,7 +436,7 @@ func (c *Interaction) afterEstablishment(ctx context.Context, outer *Subscriptio
 	if lasted || requiresAwait(outer.wakefulness()) {
 		return true, true
 	}
-	retry := schedule.next()
+	retry := losses.next()
 	c.log.Info("matter.controller.interaction.sustain_retry",
 		slog.Uint64("node_id", outer.peer.NodeID), slog.Duration("retry", retry), slog.String("reason", "subscription lost early"))
 	return true, c.sleep(ctx, retry)

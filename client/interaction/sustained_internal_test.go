@@ -138,3 +138,36 @@ func TestSustainedRetryScheduleSpansEstablishments(t *testing.T) {
 		r.wantAttempts(5)
 	})
 }
+
+// TestSustainedRetryAfterAnOutageIsNotCarriedOver: the failed attempts of
+// an outage do not count against the subscription that ends it: one lost a
+// minute after it was established following an hour of failed attempts is
+// re-subscribed at once, as both references do — matter.js starts the
+// attempts' schedule per establishment (SustainedSubscription.ts:203 in the
+// loop of :139 at db021da0), connectedhomeip resets its retry count at
+// every SubscribeResponse (src/app/ReadClient.cpp:1139 at 6170af84)
+// (review II, R2-P6-fsm-2110, Fable F3).
+func TestSustainedRetryAfterAnOutageIsNotCarriedOver(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		const failures = 10 // 15 s doubling: the last waits the hour
+		r := newICDRig(t, func(n int) error {
+			if n <= failures {
+				return errTransient
+			}
+			return nil
+		})
+		r.start(nil, nil)
+		for i := 0; r.attemptsNow() <= failures; i++ {
+			if i > 2*failures {
+				t.Fatalf("%d attempts after %d hours", r.attemptsNow(), i)
+			}
+			r.advance(time.Hour)
+		}
+		r.wantAttempts(failures + 1)
+		r.wantActive(true)
+		r.advance(time.Minute)
+		r.lose()
+		r.wantAttempts(failures + 2)
+	})
+}

@@ -87,17 +87,16 @@ func TestSustainedSubscription(t *testing.T) {
 			t.Fatal("registration")
 		}
 
-		// The underlying subscription is lost before it lasted the retry
-		// schedule's current interval (60 s after the two failures): it is
-		// replaced after the schedule's next step, 60 s and the jitter.
-		// matter.js replaces it at once, its schedule starting over per
-		// establishment (review II, R2-P6-fsm-2110).
+		// The underlying subscription is lost before it lasted the
+		// short-lived schedule's first interval: it is replaced after that
+		// step, 15 s and the jitter — the two failed attempts before do not
+		// count. matter.js replaces it at once (review II, R2-P6-fsm-2110).
 		reg.CloseForPeer(sub.Peer())
 		if a := <-active; a {
 			t.Fatal("active after the loss")
 		}
-		s.clock.waitTimer(t, 67500*time.Millisecond)
-		s.clock.Advance(67500 * time.Millisecond)
+		s.clock.waitTimer(t, 16875*time.Millisecond)
+		s.clock.Advance(16875 * time.Millisecond)
 		establish(t, s, 12)
 		if a := <-active; !a || sub.ID() != 12 {
 			t.Fatalf("replacement active %v id %d", a, sub.ID())
@@ -199,14 +198,14 @@ func TestSustainedRefreshRequest(t *testing.T) {
 			t.Fatal("not active")
 		}
 		// A replacement is refreshed from the original request. The lost
-		// subscription lasted less than the schedule's current interval, so
-		// the replacement waits its next step, 30 s (R2-P6-fsm-2110).
+		// subscription lasted less than the short-lived schedule's first
+		// interval, so the replacement waits it, 15 s (R2-P6-fsm-2110).
 		reg.CloseForPeer(sub.Peer())
 		if a := <-active; a {
 			t.Fatal("active after the loss")
 		}
-		s.clock.waitTimer(t, 30*time.Second)
-		s.clock.Advance(30 * time.Second)
+		s.clock.waitTimer(t, 15*time.Second)
+		s.clock.Advance(15 * time.Second)
 		third := s.next(t)
 		if dv, _ := filters(third); len(dv) != 1 || dv[0].DataVersion != 2 {
 			t.Fatalf("replacement %+v", dv)
