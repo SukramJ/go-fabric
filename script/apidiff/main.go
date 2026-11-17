@@ -17,18 +17,29 @@
 // compare. Nothing is committed: the export data lives in the temporary
 // directory.
 //
+// The base is the last release tag of the module: `git describe --tags
+// --abbrev=0 --match 'v[0-9]*'`, never a nested module's tag
+// (ble/esphome/v0.22.2), which can name another commit and another
+// version (R2-P6-sup-2801). The nested modules a tracked go.mod outside
+// the excluded trees declares (ble/bluez, ble/esphome, wifi/wpasupplicant)
+// are released on their own and compared on their own, each with its last
+// "<dir>/v*" tag (R2-P6-sup-2803); one CHANGELOG.md announces the breaks
+// of all of them. Each module is exported with GOOS=linux, the platform
+// CI runs on, so a local run on darwin compares what CI compares.
+//
 // Usage: go run ./script/apidiff [-check] [-base TAG]
 package main
 
 import (
 	"bytes"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -36,7 +47,7 @@ const module = "github.com/SukramJ/go-fabric"
 
 func main() {
 	check := flag.Bool("check", false, "fail when an incompatible change has no CHANGELOG line under [Unreleased]")
-	base := flag.String("base", "", "the release to compare with; empty is `git describe --tags --abbrev=0`")
+	base := flag.String("base", "", "the root module's release to compare with; empty is `git describe --tags --abbrev=0 --match 'v[0-9]*'`")
 	flag.Parse()
 	if err := run(*check, *base); err != nil {
 		fmt.Fprintln(os.Stderr, "apidiff:", err)
@@ -44,25 +55,36 @@ func main() {
 	}
 }
 
+// target is one module the guard compares.
+type target struct {
+	// Dir is the module's directory, relative to the repository root.
+	Dir string
+	// Path is its module path.
+	Path string
+	// Name qualifies a symbol of the module's root package in the
+	// CHANGELOG ("fabric.Version", "esphome.Central").
+	Name string
+}
+
+// rootName is the root package's name (doc.go).
+const rootName = "fabric"
+
 func run(check bool, base string) error {
-	if base == "" {
-		tag, err := output("git", "describe", "--tags", "--abbrev=0")
-		if err != nil {
-			return fmt.Errorf("the last tag: %w", err)
-		}
-		base = tag
+	targets, err := modules()
+	if err != nil {
+		return err
 	}
 	head, err := output("git", "rev-parse", "HEAD")
 	if err != nil {
 		return err
 	}
-	tagCommit, err := output("git", "rev-list", "-n", "1", base)
-	if err != nil {
-		return fmt.Errorf("tag %s: %w", base, err)
-	}
-	if head == tagCommit {
-		fmt.Printf("apidiff: HEAD is %s; nothing to compare\n", base)
-		return nil
+	var changelog string
+	if check {
+		b, err := os.ReadFile("CHANGELOG.md")
+		if err != nil {
+			return err
+		}
+		changelog = string(b)
 	}
 	tmp, err := os.MkdirTemp("", "apidiff-")
 	if err != nil {
@@ -73,47 +95,125 @@ func run(check bool, base string) error {
 	if _, err := output("go", "build", "-o", tool, "golang.org/x/exp/cmd/apidiff"); err != nil {
 		return fmt.Errorf("build the tool: %w", err)
 	}
+	var failed []string
+	for i, t := range targets {
+		b := base
+		if t.Dir != "." || b == "" {
+			if b, err = lastTag(t.Dir); err != nil {
+				return err
+			}
+		}
+		if b == "" { // a nested module never released: nothing to compare
+			fmt.Printf("apidiff: %s has no release tag %sv*; nothing to compare\n", t.Path, tagPrefix(t.Dir))
+			continue
+		}
+		ok, err := compare(t, b, head, filepath.Join(tmp, strconv.Itoa(i)), tool, check, changelog)
+		if err != nil {
+			return fmt.Errorf("%s: %w", t.Path, err)
+		}
+		if !ok {
+			failed = append(failed, t.Path)
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("an incompatible change is not announced (%s)", strings.Join(failed, ", "))
+	}
+	return nil
+}
+
+// modules lists the root module and every nested module a tracked go.mod
+// declares outside the trees that are not public API.
+func modules() ([]target, error) {
+	targets := []target{{Dir: ".", Path: module, Name: rootName}}
+	out, err := output("git", "ls-files", "--", "*/go.mod")
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range strings.Fields(out) {
+		dir := filepath.ToSlash(filepath.Dir(f))
+		if isExcluded(dir) {
+			continue
+		}
+		targets = append(targets, target{Dir: dir, Path: module + "/" + dir, Name: path.Base(dir)})
+	}
+	return targets, nil
+}
+
+// tagPrefix is the prefix of a module's release tags: none for the root,
+// "<dir>/" for a nested module (the Go modules convention).
+func tagPrefix(dir string) string {
+	if dir == "." {
+		return ""
+	}
+	return dir + "/"
+}
+
+// lastTag is the module's last release tag reachable from HEAD, "" for a
+// nested module without one. The root module must have one.
+func lastTag(dir string) (string, error) {
+	tag, err := output("git", "describe", "--tags", "--abbrev=0", "--match", tagPrefix(dir)+"v[0-9]*")
+	if err != nil {
+		if dir != "." && strings.Contains(err.Error(), "No names found") {
+			return "", nil
+		}
+		return "", fmt.Errorf("the last tag of %s: %w", dir, err)
+	}
+	return tag, nil
+}
+
+// compare runs apidiff for one module against its tag and, with check,
+// holds its incompatible changes to the CHANGELOG. It reports false when a
+// change is not announced.
+func compare(t target, base, head, tmp, tool string, check bool, changelog string) (bool, error) {
+	tagCommit, err := output("git", "rev-list", "-n", "1", base)
+	if err != nil {
+		return false, fmt.Errorf("tag %s: %w", base, err)
+	}
+	if head == tagCommit {
+		fmt.Printf("apidiff: %s: HEAD is %s; nothing to compare\n", t.Path, base)
+		return true, nil
+	}
 	old := filepath.Join(tmp, "old")
 	if err := extract(base, old); err != nil {
-		return err
+		return false, err
 	}
 	oldExport, newExport := filepath.Join(tmp, "old.export"), filepath.Join(tmp, "new.export")
-	if err := runIn(old, tool, "-m", "-w", oldExport, module); err != nil {
-		return fmt.Errorf("export %s: %w", base, err)
+	if err := runIn(filepath.Join(old, t.Dir), tool, "-m", "-w", oldExport, t.Path); err != nil {
+		return false, fmt.Errorf("export %s: %w", base, err)
 	}
-	if err := runIn(".", tool, "-m", "-w", newExport, module); err != nil {
-		return fmt.Errorf("export the working tree: %w", err)
+	if err := runIn(t.Dir, tool, "-m", "-w", newExport, t.Path); err != nil {
+		return false, fmt.Errorf("export the working tree: %w", err)
 	}
 	out, err := output(tool, "-m", "-incompatible", oldExport, newExport)
 	if err != nil {
-		return fmt.Errorf("compare: %w", err)
+		return false, fmt.Errorf("compare: %w", err)
 	}
-	changes := parse(out)
+	changes := parse(out, t)
 	if len(changes) == 0 {
-		fmt.Printf("apidiff: no incompatible change against %s\n", base)
-		return nil
+		fmt.Printf("apidiff: %s: no incompatible change against %s\n", t.Path, base)
+		return true, nil
 	}
-	fmt.Printf("apidiff: %d incompatible change(s) against %s:\n", len(changes), base)
+	fmt.Printf("apidiff: %s: %d incompatible change(s) against %s:\n", t.Path, len(changes), base)
 	for _, c := range changes {
 		fmt.Println("  " + c.Line)
 	}
 	if !check {
-		return nil
+		return true, nil
 	}
-	changelog, err := os.ReadFile("CHANGELOG.md")
+	text, err := unreleased(changelog, base)
 	if err != nil {
-		return err
+		return false, err
 	}
-	missing := unannounced(changes, unreleased(string(changelog), base))
+	missing := unannounced(changes, text)
 	if len(missing) == 0 {
-		fmt.Println("apidiff: every incompatible change is named under [Unreleased] or a release newer than " + base)
-		return nil
+		fmt.Printf("apidiff: %s: every incompatible change is named under [Unreleased] or a release newer than %s\n", t.Path, base)
+		return true, nil
 	}
-	fmt.Printf("apidiff: not named under [Unreleased] or a release newer than %s (### Changed, ### Removed or ### Deprecated) in CHANGELOG.md:\n", base)
+	fmt.Printf("apidiff: %s: not named under [Unreleased] or a release newer than %s (### Changed, ### Removed or ### Deprecated) in CHANGELOG.md:\n", t.Path, base)
 	for _, c := range missing {
 		fmt.Printf("  %s (name %q)\n", c.Line, c.Symbol)
 	}
-	return errors.New("an incompatible change is not announced")
+	return false, nil
 }
 
 // extract writes the tree of rev into dir: git archive, unpacked by tar.
@@ -156,6 +256,9 @@ func output(name string, args ...string) (string, error) {
 func runIn(dir, name string, args ...string) error {
 	cmd := exec.CommandContext(context.Background(), name, args...) //nolint:gosec // as output
 	cmd.Dir = dir
+	// The export is the API CI sees: ble/bluez and wifi/wpasupplicant
+	// declare theirs in _linux files and a stub elsewhere.
+	cmd.Env = append(os.Environ(), "GOOS=linux")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
