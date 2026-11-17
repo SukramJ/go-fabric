@@ -97,6 +97,12 @@ func TestLoadOrdersAndChecks(t *testing.T) {
 	if _, err := Splice([]byte("no markers"), doc); err == nil {
 		t.Error("splice without markers")
 	}
+	// A doc that ends at the end marker, without a newline, yields the
+	// block through the marker instead of slicing past the end
+	// (R2-P6-err-2712).
+	if b, ok := Block([]byte(DocBegin + "\nx\n" + DocEnd)); !ok || string(b) != DocBegin+"\nx\n"+DocEnd {
+		t.Errorf("Block of a doc ending at the marker = %q, %v", b, ok)
+	}
 	if _, ok := Block([]byte("no markers")); ok {
 		t.Error("block without markers")
 	}

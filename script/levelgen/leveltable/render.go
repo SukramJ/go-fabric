@@ -245,14 +245,21 @@ func Splice(doc, block []byte) ([]byte, error) {
 	return append(out, doc[end:]...), nil
 }
 
-// Block returns doc's generated block, markers included.
+// Block returns doc's generated block, markers included, with the newline
+// after the end marker when there is one — bounded as Splice bounds it, so
+// a doc that ends at the marker yields the block instead of a panic
+// (R2-P6-err-2712).
 func Block(doc []byte) ([]byte, bool) {
 	i := bytes.Index(doc, []byte(DocBegin))
 	j := bytes.Index(doc, []byte(DocEnd))
 	if i < 0 || j < i {
 		return nil, false
 	}
-	return doc[i : j+len(DocEnd)+1], true
+	end := j + len(DocEnd)
+	if end < len(doc) && doc[end] == '\n' {
+		end++
+	}
+	return doc[i:end], true
 }
 
 func formatSource(src []byte) ([]byte, error) {
