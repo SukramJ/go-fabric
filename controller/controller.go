@@ -164,13 +164,18 @@ type Config struct {
 	// nodes' attribute values — stays readable. A database written without
 	// a sealer is sealed on the way in and its file scrubbed, as a node's
 	// store is (store.NewSealed): each store records the scrub it owes with
-	// its sealing, and a scrub that did not finish (store.ErrScrubIncomplete
-	// from New, or a process that ended first) is run by the next New. The
-	// key must live outside the database
-	// (docs/security.md, "Sealing at rest"). Every later New needs the
-	// same sealer: under another key New fails with an error that wraps
-	// store.ErrUnseal (the stores open one sealed value first); without
-	// one, New fails reading the sealed CA with store.ErrNoSealer.
+	// its sealing; a scrub that did not finish (a reader holding the -wal,
+	// a full disk, or a process that ended first) does not fail New — both
+	// stores open sealed, the scrub stays owed (store.Store.ScrubOwed,
+	// sqlstore.Store.ScrubOwed; New logs it once) and the next New runs it.
+	// To rotate the key, [Reseal] moves both stores in one transaction
+	// while no controller is open on the database. The key must live
+	// outside the database (docs/security.md, "Sealing at rest"). Every
+	// later New needs the same sealer: under another key New fails with an
+	// error that wraps store.ErrUnseal (the stores open one sealed value
+	// first); without one, New fails reading the sealed CA with
+	// store.ErrNoSealer. The node registry carries its own seal canary
+	// (sqlstore.NewSealed).
 	Sealer store.Sealer
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
@@ -466,7 +471,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if err := errors.Join(store.Apply(ctx, cfg.DB), sqlstore.Apply(ctx, cfg.DB)); err != nil {
 		return nil, err
 	}
-	if c.st, c.nodeStore, err = openStores(ctx, cfg); err != nil {
+	if c.st, c.nodeStore, err = openStores(ctx, cfg, log); err != nil {
 		return nil, err
 	}
 	keep := ca.SettingStore{Settings: c.st} // "controller.ca" and "controller.ca.fabric"
@@ -610,8 +615,10 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 // openStores builds the controller's store and node registry on cfg.DB,
 // sealed with cfg.Sealer when one is set — store.NewSealed, then
 // sqlstore.NewSealed, the schemas applied — as node's openCredentials
-// opens a node's credential store (node/node.go).
-func openStores(ctx context.Context, cfg Config) (st *store.Store, nodes *sqlstore.Store, err error) {
+// opens a node's credential store (node/node.go). A sealing whose scrub
+// did not finish opens both (decision 132) and is said once, as node says
+// it (node/node.go, matter.store.seal_scrub_owed).
+func openStores(ctx context.Context, cfg Config, log *slog.Logger) (st *store.Store, nodes *sqlstore.Store, err error) {
 	if cfg.Sealer == nil {
 		return store.New(cfg.DB), sqlstore.New(cfg.DB), nil
 	}
@@ -620,6 +627,16 @@ func openStores(ctx context.Context, cfg Config) (st *store.Store, nodes *sqlsto
 	}
 	if nodes, err = sqlstore.NewSealed(ctx, cfg.DB, cfg.Sealer); err != nil {
 		return nil, nil, fmt.Errorf("controller: open the sealed node registry: %w", err)
+	}
+	// The rows are sealed; the old bytes may remain in the file until a
+	// later open scrubs them (review II, fx-csql F2, decision 132).
+	for _, owed := range []func(context.Context) (bool, error){st.ScrubOwed, nodes.ScrubOwed} {
+		if o, err := owed(ctx); err != nil || o {
+			log.Warn("matter.store.seal_scrub_owed",
+				slog.String("detail", "the sealed values' former bytes may remain in the database file until a later start scrubs it"),
+				slog.Any("err", err))
+			break
+		}
 	}
 	return st, nodes, nil
 }
