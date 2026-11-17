@@ -1363,7 +1363,7 @@ func (m *Manager) accept(s *Session, msg *Message) *Exchange {
 	m.mu.Lock()
 	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
-	added := false
+	var added bool
 	if handshake {
 		added = s.addHandshake(x)
 	} else {

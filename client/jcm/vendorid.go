@@ -135,7 +135,8 @@ func VerifyVendorID(ctx context.Context, signer Signer, info *Info, lookup Trust
 // (step 12a, which chip does not support, :103-104) the to-be-signed
 // message carries it, and [verifyStatement] checks it.
 func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallenge []byte, resp opcreds.SignVidVerificationResponse, lookup TrustAnchorLookup) error {
-	ctx = context.WithValue(ctx, adminRCACKey{}, info.AdminRCAC) // for SelfAnchored
+	// The administrator's RCAC travels to SelfAnchored in the context.
+	ctx = context.WithValue(ctx, adminRCACKey{}, info.AdminRCAC)
 	rcac, err := mattercert.Decode(info.AdminRCAC) // :64-66
 	if err != nil {
 		return fmt.Errorf("jcm: RCAC: %w", err)
