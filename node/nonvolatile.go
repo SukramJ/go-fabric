@@ -127,7 +127,8 @@ type nvKey struct {
 	attrID uint32
 	// label: a bridged LabelList, kept in persistUserLabels' form;
 	// labelSrv: the UserLabel server whose list an owed label key is
-	// written from when the node stops (a rollback the store refused).
+	// written from when the node stops (a change or a rollback the store
+	// refused).
 	label    bool
 	labelSrv contract.ClusterServer
 }
@@ -341,12 +342,29 @@ func (v *nonVolatile) storeHeld(ctx context.Context, k *nvKey, key string) {
 	k.stored, k.known, k.owed = held, true, false
 }
 
-// storeLabel writes an owed label key from the list its UserLabel server
-// holds, as persistUserLabels stores each change of it, while the node
-// keeps that server's list; one it let go of (the endpoint left the
-// topology) takes its debt with it, and the server in its place stores
-// its own list. Only a refused rollback owes a label key; persistUserLabels
-// writes the list again at its next change. The caller holds k.store.
+// labelChanged stores the list a bridged UserLabel server holds after a
+// change of it (persistUserLabels' subscription) under key, under the
+// key's store lock as every other nonvolatile key's change: a host's
+// change and a controller's write of the list are stored one after the
+// other, each as the list the server holds then, so the older list is
+// never stored last; a refused store owes the key, written again at the
+// next change and when the node stops (review II, R2-P6-store-2416). A
+// server the node let go of meanwhile (a forgotten or replaced endpoint)
+// stores nothing.
+func (v *nonVolatile) labelChanged(ctx context.Context, key string, srv contract.ClusterServer) {
+	k := v.keyState(key)
+	k.store.Lock()
+	defer k.store.Unlock()
+	k.labelSrv = srv
+	v.storeLabel(ctx, k, key)
+}
+
+// storeLabel writes a label key from the list its UserLabel server holds
+// (k.labelSrv), while the node keeps that server's list; one it let go of
+// (the endpoint left the topology) takes its debt with it, and the server
+// in its place stores its own list. A refused store owes the key: a
+// change ([nonVolatile.labelChanged]) or a refused rollback. The caller
+// holds k.store.
 func (v *nonVolatile) storeLabel(ctx context.Context, k *nvKey, key string) {
 	srv := k.labelSrv
 	if srv == nil {

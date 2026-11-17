@@ -98,7 +98,7 @@ func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) erro
 				continue
 			}
 			key := bridgedUserLabelKeyRoot + k
-			unsubscribe, err := n.persisted.userLabel(context.WithoutCancel(ctx), key, srv)
+			unsubscribe, err := n.userLabel(context.WithoutCancel(ctx), key, srv)
 			if err != nil {
 				if n.userLabels.persisted == nil {
 					n.userLabels.persisted = map[contract.ClusterServer]labelSub{}
@@ -119,10 +119,12 @@ func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) erro
 }
 
 // userLabel restores srv's LabelList from key and saves each later change
-// of it there; it returns the function that stops the saving. A store that
-// fails the read returns its error and subscribes nothing; a value that
-// does not decode is logged and restores nothing.
-func (p persisted) userLabel(ctx context.Context, key string, srv contract.ClusterServer) (unsubscribe func(), err error) {
+// of it there, through the nonvolatile persister's lock of the key
+// ([nonVolatile.labelChanged]); it returns the function that stops the
+// saving. A store that fails the read returns its error and subscribes
+// nothing; a value that does not decode is logged and restores nothing.
+func (n *Node) userLabel(ctx context.Context, key string, srv contract.ClusterServer) (unsubscribe func(), err error) {
+	p := n.persisted
 	v, ok, err := p.st.GetSetting(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("node: load %s: %w", key, err)
@@ -138,15 +140,8 @@ func (p persisted) userLabel(ctx context.Context, key string, srv contract.Clust
 		}
 	}
 	return spec.ChangesOf(srv, func(c contract.Change) {
-		if !slices.Contains(c.Attributes, userlabeldef.AttrLabelList) {
-			return
-		}
-		b, err := json.Marshal(userlabeldef.Wrap(srv).Get().LabelList)
-		if err == nil {
-			err = p.st.SetSetting(ctx, key, string(b))
-		}
-		if err != nil {
-			p.logger.Warn("label.persist", slog.String("key", key), slog.Any("err", err))
+		if slices.Contains(c.Attributes, userlabeldef.AttrLabelList) {
+			n.nonVolatile.labelChanged(ctx, key, srv)
 		}
 	}), nil
 }
