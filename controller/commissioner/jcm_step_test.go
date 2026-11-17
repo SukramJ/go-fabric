@@ -114,7 +114,10 @@ func TestJointFabricStep(t *testing.T) {
 		dev.challenge = func() []byte { return fl.challenge }
 		var asked TrustInfo
 		consented := false
-		fl.opts.JointFabric = &JointFabricOptions{TrustAnchors: c.anchors, Consent: func(info TrustInfo) bool { asked, consented = info, true; return c.consent }}
+		fl.opts.JointFabric = &JointFabricOptions{TrustAnchors: c.anchors, Consent: func(_ context.Context, info TrustInfo) (bool, error) {
+			asked, consented = info, true
+			return c.consent, nil
+		}}
 		_, err := fl.jointFabricTrustVerification(t.Context())
 		switch c.want {
 		case jcm.VendorIDVerificationFailed:

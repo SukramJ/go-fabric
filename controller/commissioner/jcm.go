@@ -41,9 +41,18 @@ type JointFabricOptions struct {
 	// verified, whether to commission it onto the fabric; false aborts
 	// with UserDeniedConsent, nil with TrustVerificationDelegateNotSet
 	// (AskUserForConsent, DeviceCommissioner.cpp:430-441;
-	// ContinueAfterUserConsent :63-73). It must not block long: the
-	// fail-safe runs.
-	Consent func(info TrustInfo) bool
+	// ContinueAfterUserConsent :63-73), an error with InternalError and
+	// the error as the step's cause.
+	//
+	// It may take as long as a person needs: the flow extends the
+	// fail-safe before the call and keeps re-arming it while Consent runs
+	// (every [BTPIdleAliveInterval], up to the device's cumulative
+	// fail-safe limit). ctx is Commission's: when it ends the stage fails
+	// at once with the context's error, whether or not Consent has
+	// returned; a Consent that ignores ctx runs on until it returns and
+	// its answer is dropped (review II, R2-P6-fsm-1860, owner decision
+	// 215).
+	Consent func(ctx context.Context, info TrustInfo) (bool, error)
 	// TrustAnchors finds the globally trusted root of the administrator's
 	// vendor (the DCL's Operational Trust Anchors). nil fails the Vendor ID
 	// Verification (VENDOR_ID_VERIFICATION_FAILED, cause
@@ -96,7 +105,7 @@ func (f *flow) jointFabricTrustVerification(ctx context.Context) (stepResult, er
 	if err != nil {
 		return 0, err
 	}
-	t := &jcmTrust{opts: f.opts.JointFabric, info: jcm.NewInfo(), challenge: f.challenge, signer: flowSigner{f}}
+	t := &jcmTrust{opts: f.opts.JointFabric, info: jcm.NewInfo(), challenge: f.challenge, signer: flowSigner{f}, keepArmed: f.keepFailsafeArmed}
 	if err := t.parse(report); err != nil {
 		return 0, newError(ErrJointFabric, err.Error(), err)
 	}
@@ -118,7 +127,10 @@ type jcmTrust struct {
 	// cause is the error behind a failed stage, joined to the step's
 	// error.
 	cause error
-	done  bool
+	// keepArmed keeps the fail-safe armed while Consent runs; the returned
+	// func ends that. nil keeps nothing armed (a test of the stages).
+	keepArmed func(ctx context.Context) (stop func(), err error)
+	done      bool
 	// perform replaces a stage in tests.
 	perform func(ctx context.Context, stage jcm.Stage)
 }
@@ -304,7 +316,7 @@ func (t *jcmTrust) performStage(ctx context.Context, s jcm.Stage) {
 		case jcm.StagePerformingVendorIDVerification:
 			return t.performVendorIDVerification(ctx)
 		case jcm.StageAskingUserForConsent:
-			return t.askUserForConsent()
+			return t.askUserForConsent(ctx)
 		case jcm.StageComplete:
 			return jcm.Success
 		default:
@@ -352,14 +364,43 @@ func (t *jcmTrust) performVendorIDVerification(ctx context.Context) jcm.Result {
 
 // askUserForConsent asks the host (AskUserForConsent :430-441,
 // ContinueAfterUserConsent :63-73).
-func (t *jcmTrust) askUserForConsent() jcm.Result {
+func (t *jcmTrust) askUserForConsent(ctx context.Context) jcm.Result {
 	if t.opts == nil || t.opts.Consent == nil {
 		return jcm.TrustVerificationDelegateNotSet
 	}
-	if !t.opts.Consent(t.info) {
-		return jcm.UserDeniedConsent
+	if t.keepArmed != nil {
+		stop, err := t.keepArmed(ctx)
+		if err != nil {
+			t.cause = err
+			return jcm.InternalError
+		}
+		defer stop()
 	}
-	return jcm.Success
+	// Consent runs on a goroutine of its own, so the stage ends with ctx
+	// even when the host's function does not; its late answer is dropped.
+	type answer struct {
+		ok  bool
+		err error
+	}
+	answered := make(chan answer, 1)
+	go func() {
+		ok, err := t.opts.Consent(ctx, t.info)
+		answered <- answer{ok, err}
+	}()
+	select {
+	case a := <-answered:
+		switch {
+		case a.err != nil:
+			t.cause = a.err
+			return jcm.InternalError
+		case !a.ok:
+			return jcm.UserDeniedConsent
+		}
+		return jcm.Success
+	case <-ctx.Done():
+		t.cause = ctx.Err()
+		return jcm.InternalError
+	}
 }
 
 // flowSigner sends SignVIDVerificationRequest over the commissioning
@@ -381,4 +422,26 @@ func (s flowSigner) SignVIDVerification(ctx context.Context, fabricIndex uint8, 
 		return opcredsdef.SignVidVerificationResponse{}, nil, err
 	}
 	return resp, s.f.challenge, nil
+}
+
+// keepFailsafeArmed keeps the fail-safe armed while the host's Consent
+// runs: the fail-safe extended first, as the network scan does
+// (ensureFailsafeTimerFor), then re-armed periodically by the re-arm
+// timer of a BLE commissioning (every BTPIdleAliveInterval, up to the
+// cumulative limit). On BLE that timer runs already and stays; otherwise
+// the returned func stops it. A flow that holds no fail-safe (none armed
+// yet — the flow arms at 7.1, before this step) keeps nothing (review II,
+// R2-P6-fsm-1860).
+func (f *flow) keepFailsafeArmed(ctx context.Context) (func(), error) {
+	if end, _ := f.failsafeTimes(); end.IsZero() {
+		return func() {}, nil
+	}
+	if err := f.ensureFailsafeTimerFor(ctx, f.defaultFailSafe); err != nil {
+		return nil, err
+	}
+	if f.armIntervalRunning() {
+		return func() {}, nil
+	}
+	f.startArmInterval(ctx)
+	return f.stopArmInterval, nil
 }

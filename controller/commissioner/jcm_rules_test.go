@@ -85,7 +85,7 @@ func TestJCMVerifyAdministratorInformation(t *testing.T) {
 		t.Fatalf("invalid endpoint: %s", r)
 	}
 	tr.opts.Consent = nil
-	if r := tr.askUserForConsent(); r != jcm.TrustVerificationDelegateNotSet {
+	if r := tr.askUserForConsent(t.Context()); r != jcm.TrustVerificationDelegateNotSet {
 		t.Fatalf("no consent: %s", r)
 	}
 }

@@ -143,9 +143,9 @@ type delegate struct {
 func (d *delegate) options() *JointFabricOptions {
 	return &JointFabricOptions{
 		Progress: func(s jcm.Stage, r jcm.Result) { d.progress++; d.lastStage, d.lastResult = s, r },
-		Consent: func(info TrustInfo) bool {
+		Consent: func(_ context.Context, info TrustInfo) (bool, error) {
 			d.asked, d.lastVendorID = true, info.AdminVendorID
-			return d.consent
+			return d.consent, nil
 		},
 		TrustAnchors: func(context.Context, uint16, []byte) ([]byte, error) { d.lookedUp = true; return nil, errLookup },
 	}
