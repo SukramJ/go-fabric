@@ -148,7 +148,8 @@ var (
 // OpenCertificateStore loads the stored trust store, runs the first update
 // and starts the periodic one — the service's construction
 // (DclCertificateService.ts:332-352). A failed update is logged, not
-// returned (update :952-972); a store that cannot be read is an error.
+// returned (update :952-972); a store that cannot be read is an error, one
+// whose content does not parse is logged and read as empty.
 func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*CertificateStore, error) {
 	s := &CertificateStore{
 		opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{},
@@ -647,7 +648,11 @@ func (s *CertificateStore) loadIndex(ctx context.Context) error {
 	}
 	var idx storedIndex
 	if err := json.Unmarshal(data, &idx); err != nil {
-		return err
+		// A cache of ledger answers: read as empty, refetched (review II,
+		// R2-P6-store-1910).
+		s.log.Warn("dcl.certificates.store_unreadable", slog.Any("err", err),
+			slog.String("message", "The stored trust store does not parse; it is read as empty and refetched"))
+		return nil
 	}
 	valid, invalid := 0, 0
 	s.mu.Lock()

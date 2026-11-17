@@ -15,7 +15,9 @@ import (
 // Store keeps the trust store between runs — the "certificates" storage
 // of matter.js's DclCertificateService (DclCertificateService.ts:333-335:
 // the index and one DER per key identifier), here one blob the
-// [CertificateStore] writes whole.
+// [CertificateStore] writes whole. What it keeps is a cache of ledger
+// answers: a blob that does not parse is logged and read as nothing
+// stored, and the next update refetches (review II, R2-P6-store-1910).
 type Store interface {
 	// Load returns what Save last stored; nil and no error when nothing is.
 	Load(ctx context.Context) ([]byte, error)
@@ -62,13 +64,20 @@ func (f FileStore) Load(context.Context) ([]byte, error) {
 	return b, err
 }
 
-// Save implements [Store].
+// Save implements [Store]. The temporary file is synced before the rename,
+// so a crash leaves the former file or the new one, not a short one
+// (review II, R2-P6-store-1910; as bdx.FileSink).
 func (f FileStore) Save(_ context.Context, data []byte) error {
 	tmp, err := os.CreateTemp(filepath.Dir(f.Path), filepath.Base(f.Path)+".*")
 	if err != nil {
 		return err
 	}
 	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmp.Name())
 		return err

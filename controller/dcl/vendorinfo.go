@@ -157,7 +157,8 @@ type VendorInfoService struct {
 // the store holds fewer than its ExpectedCount, then the static vendors
 // for every id still unknown, then a refresh (unless offline) and, unless
 // offline or disabled, the periodic refresh. A failed refresh is logged;
-// a store that does not load is the error.
+// a store that does not load is the error, one whose content does not
+// parse is logged and read as empty.
 func NewVendorInfoService(ctx context.Context, opts VendorInfoOptions) (*VendorInfoService, error) {
 	s := &VendorInfoService{opts: opts, client: opts.Client, store: opts.Store, log: opts.Logger, index: map[uint16]VendorInfo{}, stop: make(chan struct{})}
 	s.periodic, s.cancelPeriodic = context.WithCancel(context.Background())
@@ -349,7 +350,10 @@ func (s *VendorInfoService) loadVendors(ctx context.Context) error {
 	}
 	var stored []VendorInfo
 	if err := json.Unmarshal(b, &stored); err != nil {
-		return fmt.Errorf("dcl: vendor store: %w", err)
+		// A cache of ledger answers: read as empty, refetched (review II,
+		// R2-P6-store-1910).
+		s.log.Warn("matter.controller.dcl.vendor_info.store_unreadable", slog.Any("err", err))
+		return nil
 	}
 	for _, v := range stored {
 		s.index[v.VendorID] = v
