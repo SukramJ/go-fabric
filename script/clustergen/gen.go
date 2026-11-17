@@ -1201,7 +1201,8 @@ func baseDec(t typeInfo, v *value) string {
 
 // numericBounds reads the numeric bounds of a constraint ("min 1", "0 to
 // 100", "8"); references and expressions are the runtime's. The bounds
-// are clamped to int64; hi -1 means unbounded above.
+// are clamped to int64; a side without a bound is math.MinInt64 (lo) or
+// math.MaxInt64 (hi).
 func numericBounds(c *constraint, typeName string) (lo, hi int64, ok bool) {
 	lo, hi = math.MinInt64, math.MaxInt64
 	if b, has := typeBounds[typeName]; has {
