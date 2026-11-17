@@ -18,7 +18,8 @@ import (
 // keys on, as the schemas' cascades need them on every pooled connection;
 // a busy timeout of 5 s) plus the write-ahead log, the reference
 // controller's settings. A file it creates is owner-only (0600): it holds
-// the CA's root key unencrypted. The schemas are [New]'s to apply.
+// the CA's root key, unencrypted unless [Config].Sealer seals it. The
+// schemas are [New]'s to apply.
 //
 // The file is opened on first use — [New]'s schemas, which report a path
 // that cannot be opened. The caller closes the database after the
