@@ -21,6 +21,9 @@
 // matter.js builds http:// URLs the same way — so the operational dataset
 // a dataset write carries, network key and PSKc included, crosses it in
 // clear: the border router belongs on the host's own trusted LAN segment.
+// The default client follows no redirect, so the dataset is never sent
+// where an answer points; a host's own [Config.HTTPClient] is used as
+// given.
 //
 // The client's mutating operations — the Thread interface's state, the
 // active and pending datasets — are unexported: the one way to them is

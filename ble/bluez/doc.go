@@ -43,7 +43,9 @@
 // The UUIDs are transport/btp's (ServiceUUID, C1/C2/C3CharacteristicUUID).
 // Every D-Bus failure is an [*Error] naming the D-Bus error
 // (org.bluez.Error.NotReady, org.freedesktop.DBus.Error.AccessDenied …), so
-// a missing right on the system bus reads as one. Linux only; elsewhere
+// a missing right on the system bus reads as one. The peripheral's exported
+// methods answer the owner of org.bluez only (GetNameOwner); another
+// caller gets org.bluez.Error.NotPermitted. Linux only; elsewhere
 // [NewCentral] and [NewPeripheral] return [ErrUnsupported].
 package bluez
 
