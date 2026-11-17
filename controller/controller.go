@@ -1054,12 +1054,13 @@ type PairOptions struct {
 	// the terms and pairs again with the acknowledgement. nil acknowledges
 	// nothing, as a device without terms needs.
 	TermsAndConditions *commissioner.TermsAndConditionsAcknowledgement
-	// Progress, when set, is called on Pair's goroutine as each step of
-	// the pairing starts and ends ([PairingStep]): the search for the
-	// device (skipped with Address), PASE, the commissioning steps under
-	// matter.js's names, then the node's start, "Subscribe" 21.1. A
-	// failed step is the last report. Pair waits for it, so it must not
-	// block.
+	// Progress, when set, is called as each step of the pairing starts
+	// and ends ([PairingStep]): the search for the device (skipped with
+	// Address), PASE, the commissioning steps under matter.js's names,
+	// then the node's start, "Subscribe" 21.1. A failed step is the last
+	// report. It runs on the pairing's goroutines — Pair's, and in a
+	// discovery race each transport's search and each attempt — one call
+	// at a time. Pair waits for it, so it must not block.
 	// It is the commissioner's Options.Progress, which Edit may replace.
 	Progress func(PairingStep)
 	// Edit adjusts the commissioner's options last (a seam).

@@ -39,6 +39,10 @@ const (
 // network always, BLE where a QR code's capabilities name it or the code
 // names none (a manual code).
 func (c *Controller) pairDiscovered(ctx context.Context, st stack, pc PairingCode, identity discovery.Identity, opts PairOptions, searchTimeout time.Duration) (*client.Node, error) {
+	// The race reports from each transport's search and each attempt's
+	// goroutine: the host's hook runs one call at a time (review II,
+	// R2-P6-doc-2313).
+	opts.Progress = serialProgress(opts.Progress)
 	r := &pairRace{progress: opts.Progress}
 	var transports []discovery.Transport
 	if st.names != nil {
@@ -120,6 +124,19 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Regi
 		return nodeID, true
 	}
 	return n, reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)})
+}
+
+// serialProgress is progress called one report at a time; nil stays nil.
+func serialProgress(progress func(PairingStep)) func(PairingStep) {
+	if progress == nil {
+		return nil
+	}
+	var mu sync.Mutex
+	return func(st PairingStep) {
+		mu.Lock()
+		defer mu.Unlock()
+		progress(st)
+	}
 }
 
 // bothContexts is a context that ends with a or b.
