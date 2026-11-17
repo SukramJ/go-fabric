@@ -157,8 +157,10 @@ func uint64Field(el tlv.Element) (uint64, error) {
 // tag ([contextMember]).
 var errNonContextMember = errors.New("im: structure member without a context tag")
 
-// contextMember is the rule every structure decoder of this package applies
-// to a member before its switch: a member with a context tag is the
+// contextMember is the rule every request decoder of this package, the
+// path lists, StatusIB and StatusResponse apply to a member before their
+// switch (the client's report decoders keep skipping a non-context
+// member): a member with a context tag is the
 // decoder's to read — one whose tag it does not know is skipped whole by
 // the switch's default arm ([skipField]) — and a member with any other tag
 // refuses the structure. matter.js TlvObject refuses a non-context tag and

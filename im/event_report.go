@@ -206,11 +206,10 @@ func readEventPathFields(dec *tlv.Decoder) (ConcreteEventPath, error) {
 		if el.IsEndContainer {
 			return p, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			if err := skipField(dec, el); err != nil {
-				return ConcreteEventPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
-			}
-			continue
+		// A non-context member refuses the path, as for every path list
+		// ([readAttributePathField]; TlvEventPath.ts:16 is a TlvTaggedList).
+		if err := contextMember(el); err != nil {
+			return ConcreteEventPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 		// Type- and range-checked, never masked (review 2026-11
 		// W2-wire-03): matter.js

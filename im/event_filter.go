@@ -148,11 +148,10 @@ func readClusterPathFields(dec *tlv.Decoder) (node uint64, hasNode bool, endpoin
 			}
 			return node, hasNode, endpoint, cluster, nil
 		}
-		if inner.Tag.Kind != tlv.TagKindContext {
-			if skipErr := skipField(dec, inner); skipErr != nil {
-				return 0, false, 0, 0, skipErr
-			}
-			continue
+		// A non-context member refuses the path, as for every path list
+		// ([readAttributePathField]; TlvClusterPath.ts:13 is a TlvTaggedList).
+		if ctxErr := contextMember(inner); ctxErr != nil {
+			return 0, false, 0, 0, ctxErr
 		}
 		switch uint8(inner.Tag.Number & 0xFF) {
 		case 0: // NodeID

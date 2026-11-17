@@ -74,7 +74,7 @@ const (
 // schedule, which matter.js leaves at 0 for this wait
 // (packages/protocol/src/protocol/MessageExchange.ts:878-885 passes
 // undefined for includeMaximumSendingTime, :882; MessageChannel.ts:239-240
-// then hands no peerSessionParameters; MRP.ts:104 makes the term 0 — review
+// then hands no peerSessionParameters; MRP.ts:102 makes the term 0 — review
 // II, R2-P6-par-0707): the module's one timer runs from the send, not
 // from the report's acknowledgement (notes/parity/by_design.md,
 // BD-Matter-Subscription-ReportWaitBound; review II, R2-P1-req2-12).

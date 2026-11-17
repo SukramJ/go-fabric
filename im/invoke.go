@@ -432,11 +432,10 @@ func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 			}
 			return p, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			if err := skipField(dec, el); err != nil {
-				return ConcreteCommandPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
-			}
-			continue
+		// A non-context member refuses the path, as for every path list
+		// ([readAttributePathField]; TlvCommandPath.ts:14 is a TlvTaggedList).
+		if err := contextMember(el); err != nil {
+			return ConcreteCommandPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 		// Type- and range-checked, never masked (review 2026-11
 		// W2-wire-03): matter.js

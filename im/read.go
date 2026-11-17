@@ -259,10 +259,15 @@ func readAttributePathFields(dec *tlv.Decoder) (ConcreteAttributePath, error) {
 // packages/types/src/protocol/types/TlvAttributePath.ts:19-26 (bounded
 // TlvEndpointNumber / TlvClusterId / TlvAttributeId, nullable TlvUInt16
 // listIndex) and chip src/app/MessageDef/AttributePathIB.cpp:220-275. A
-// field of a foreign tag is skipped, as TlvObject skips an unknown one.
+// member with a context tag the switch does not know is skipped whole, a
+// member of any other tag refuses the path ([contextMember]): the path is
+// a TlvTaggedList (TlvAttributePath.ts:19), the same ObjectSchema as
+// TlvObject (packages/types/src/tlv/TlvObject.ts:381-382), whose decoder
+// refuses a profile and an anonymous tag (:205-214 at db021da0; review
+// II, R2-P6-wire-0504, Fable's read of sub round 1, H-5).
 func readAttributePathField(dec *tlv.Decoder, el tlv.Element, p *ConcreteAttributePath) error {
-	if el.Tag.Kind != tlv.TagKindContext {
-		return skipField(dec, el)
+	if err := contextMember(el); err != nil {
+		return err
 	}
 	var err error
 	switch uint8(el.Tag.Number & 0xFF) {

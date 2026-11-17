@@ -138,19 +138,19 @@ type Subscription struct {
 // [EventReporter] was not sent, because nothing of it was left for this
 // subscriber: every event, and every attribute change due with them, was
 // filtered — by the access check, or as a fabric-sensitive event of
-// another fabric. The reporter calls it instead of sending an empty
-// ReportData. The engine then sends the keep-alive when the pass was the
-// send interval's, and otherwise does not count the pass as a report: the
-// time of the last report stays, so the next keep-alive is due a send
-// interval after the last report that reached the subscriber.
-//
-// A reporter that never calls it is taken to have sent what it was
-// handed. This is the module's own rule: matter.js sends an empty
-// report in such a pass and counts it
+// another fabric. A reporter that sends nothing for such a pass calls it;
+// the bridge's does not since owner decision 169 — it sends the empty
+// report, as matter.js
 // (packages/node/src/node/server/ServerSubscription.ts:549-551 and
 // :921-936, packages/protocol/src/interaction/InteractionMessenger.ts:794-796
-// at db021da0), with a TODO of its own for the case
-// (ServerSubscription.ts:923-925).
+// at db021da0) and connectedhomeip. When it is called, the engine sends
+// the keep-alive when the pass was the send interval's, and otherwise does
+// not count the pass as a report: the time of the last report stays, so
+// the next keep-alive is due a send interval after the last report that
+// reached the subscriber.
+//
+// A reporter that never calls it is taken to have sent what it was
+// handed.
 //
 // It acts only inside a deprecated [EventReporter]'s call; a
 // [ReportSender] returns [NothingForSubscriber] instead.
@@ -489,8 +489,10 @@ type dueWork struct {
 // subscription's paths — is not a report: the time of the last report
 // stays, so a dirty attribute past its floor and the keep-alive are not
 // held back by a report that was never sent. The same holds for a pass
-// whose data the sender filters down to nothing, which only the sender
-// can see: [NothingForSubscriber] and [Subscription.revokeReport].
+// whose data a sender filters down to nothing and does not send, which
+// only the sender can see: [NothingForSubscriber] and
+// [Subscription.revokeReport]. The bridge's sender sends the empty report
+// instead and the pass counts (owner decision 169).
 func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (work dueWork, due bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

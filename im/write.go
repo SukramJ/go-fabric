@@ -175,7 +175,7 @@ func readAttributeWrites(dec *tlv.Decoder, valueReader AttributeValueReader) ([]
 // matter.js takes the fields by id and keeps the Data as raw TLV, decoded
 // later with the path (packages/types/src/tlv/TlvObject.ts:215-233,
 // packages/types/src/protocol/types/TlvAttributeData.ts:19 TlvAny,
-// packages/protocol/src/action/server/AttributeWriteResponse.ts:428 at db021da0). The
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:429 at db021da0). The
 // Data member is replayed from a copy of the decoder taken before it —
 // a [tlv.Decoder] is its buffer and a read position.
 func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (AttributeWrite, error) {

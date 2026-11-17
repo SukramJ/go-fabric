@@ -80,21 +80,22 @@ func TestDecodeRangeParity(t *testing.T) {
 		})
 	}
 
-	t.Run("the two AttributePathIB decoders skip a foreign tag alike", func(t *testing.T) {
+	t.Run("the two AttributePathIB decoders refuse a foreign tag alike", func(t *testing.T) {
 		t.Parallel()
-		// List { anonymous uint8 7, endpoint 1, cluster 6 }
+		// List { anonymous uint8 7, endpoint 1, cluster 6 }: a tagged
+		// list refuses a non-context member (TlvObject.ts:205-214 at
+		// db021da0; review II, R2-P6-wire-0504, Fable's read of sub
+		// round 1, H-5).
 		raw := []byte{0x17, 0x04, 0x07, 0x24, 0x02, 0x01, 0x24, 0x03, 0x06, 0x18}
-		p, err := UnmarshalAttributePathTLV(tlv.NewDecoder(raw))
-		if err != nil || !p.HasEndpoint || p.Endpoint != 1 || p.Cluster != 6 {
-			t.Fatalf("UnmarshalAttributePathTLV = %+v, %v; want endpoint 1 cluster 6", p, err)
+		if p, err := UnmarshalAttributePathTLV(tlv.NewDecoder(raw)); err == nil {
+			t.Fatalf("UnmarshalAttributePathTLV = %+v; want the path refused", p)
 		}
 		dec := tlv.NewDecoder(raw)
 		if _, err := dec.Next(); err != nil {
 			t.Fatal(err)
 		}
-		q, err := readAttributePathFields(dec)
-		if err != nil || q != p {
-			t.Errorf("readAttributePathFields = %+v, %v; want %+v", q, err, p)
+		if q, err := readAttributePathFields(dec); err == nil {
+			t.Errorf("readAttributePathFields = %+v; want the path refused", q)
 		}
 	})
 }

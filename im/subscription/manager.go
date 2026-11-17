@@ -457,8 +457,10 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// (`src/app/ReadHandler.cpp:761-765` at 6170af84);
 	// `kSubscriptionMaxIntervalPublisherLimit` enters only through
 	// `GetPublisherSelectedIntervalLimit` (:42-52), inside the
-	// `CHIP_CONFIG_ENABLE_ICD_SERVER` block (:767-803, :780) — the non-ICD
-	// path has no cap (review II, R2-P6-par-0705). matter.js (`packages/node/src/node/server/ServerSubscription.ts:314-344` at db021da0)
+	// `CHIP_CONFIG_ENABLE_ICD_SERVER` block (:767-803, :780), and as the
+	// bound of an application's `SetMaxReportingInterval`
+	// (`src/app/ReadHandler.h:325`) — the non-ICD path has no cap on the
+	// request (review II, R2-P6-par-0705). matter.js (`packages/node/src/node/server/ServerSubscription.ts:314-344` at db021da0)
 	// further clamps to min(subscriptionMaxInterval, maxIntervalCeiling) and
 	// also lifts by minIntervalFloor. go-fabric clamps maxCeil down to
 	// cfg.MaxIntervalCeilingSeconds (default 3600 s, the value of chip's
@@ -807,7 +809,7 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 			// The report the flush waited for failed: nothing more is
 			// sent, as matter.js returns from a closed subscription's
 			// failed update without a further report
-			// (packages/node/src/node/server/ServerSubscription.ts:557-562
+			// (packages/node/src/node/server/ServerSubscription.ts:558-562
 			// at db021da0; its #flush, :753-763, from #cancel only, :825,
 			// only notes the next update while one is in flight,
 			// :520-525). Review II, R2-P6-par-0702.
