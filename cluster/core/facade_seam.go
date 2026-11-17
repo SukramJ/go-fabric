@@ -40,6 +40,16 @@ func init() {
 		o.mu.Unlock()
 		return true
 	}
+	facadeseam.WithACLWriteLock = func(server any, fn func()) bool {
+		a, ok := server.(*AccessControl)
+		if !ok || a == nil {
+			return false
+		}
+		a.writeMu.Lock()
+		defer a.writeMu.Unlock()
+		fn()
+		return true
+	}
 }
 
 // chainFabricHooks is the facade's slot, then the host's, as one hook; nil

@@ -10,7 +10,9 @@
 // method. A hook runs the facade's handler first and the host's after it,
 // so a host that sets the public slot through [node.Node.Root] or
 // [node.Node.Bridge] adds to the facade's wiring instead of replacing it
-// (review II, R2-P5-apinode-07).
+// (review II, R2-P5-apinode-07). It also hands the node the
+// AccessControl server's write lock for the entries the node adds to a
+// fabric's ACL itself ([WithACLWriteLock]).
 //
 // Direction of the edge: cluster/core and bridge install the setters from
 // their init; package node calls them. The seam is module-internal, so the
@@ -42,4 +44,12 @@ var (
 	// host without the node, then stands aside, so each server is asked
 	// once.
 	OwnFabricState func(bridge any) bool
+	// WithACLWriteLock runs fn while it holds the write lock of a
+	// *core.AccessControl — the lock a controller's ACL write holds across
+	// its read of the fabric's list, its comparison and its store — and
+	// reports true; it runs nothing and reports false when server is not
+	// one. The node's own read-modify-write of a fabric's ACL (the entries
+	// it adds for a served requestor or OTA provider) runs inside fn
+	// (review II, R2-P6-sec-2401).
+	WithACLWriteLock func(server any, fn func()) bool
 )

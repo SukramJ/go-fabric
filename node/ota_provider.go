@@ -14,7 +14,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // OTAProviderConfig serves OTA software images to the requestors of the
@@ -240,28 +239,10 @@ func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 }
 
 // ensureOTAProviderACLOn adds the provider's Operate/CASE entry to
-// fabricIndex's ACL unless it is there.
+// fabricIndex's ACL unless it is there, under the AccessControl server's
+// write lock (addLocalOperateEntry).
 func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, epID uint16) {
-	acl, err := n.st.ListACL(ctx, fabricIndex)
-	if err != nil {
-		n.logger.Warn("ota.provider.acl_list", slog.Any("err", err))
-		return
-	}
-	cluster := provdef.ClusterID
-	for _, e := range acl {
-		if e.Privilege == store.PrivilegeOperate && e.AuthMode == store.AuthModeCASE && len(e.Subjects) == 0 &&
-			len(e.Targets) == 1 && e.Targets[0].Endpoint != nil && *e.Targets[0].Endpoint == epID &&
-			e.Targets[0].Cluster != nil && *e.Targets[0].Cluster == cluster {
-			return
-		}
-	}
-	ep := epID
-	entry := store.ACLEntry{
-		FabricIndex: fabricIndex, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE,
-		Targets: []store.ACLTarget{{Endpoint: &ep, Cluster: &cluster}},
-	}
-	if err := n.st.ReplaceACL(ctx, fabricIndex, append(acl, entry)); err != nil {
-		n.logger.Warn("ota.provider.acl_add", slog.Any("err", err))
+	if !n.addLocalOperateEntry(ctx, fabricIndex, epID, provdef.ClusterID, "ota.provider.acl") {
 		return
 	}
 	// The ACL changed: the DataVersion moves, and no

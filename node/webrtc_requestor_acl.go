@@ -9,7 +9,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // WebRTCRequestorConfig is the node's part of the WebRtcTransportRequestor
@@ -91,28 +90,11 @@ func (n *Node) ensureRequestorACL(ctx context.Context) {
 }
 
 // ensureRequestorACLOn adds the requestor's Operate/CASE entry to
-// fabricIndex's ACL unless it is there.
+// fabricIndex's ACL unless it is there (the duplicate check :67-79, the
+// entry :81-91), under the AccessControl server's write lock
+// (addLocalOperateEntry).
 func (n *Node) ensureRequestorACLOn(ctx context.Context, fabricIndex uint8, epID uint16) {
-	acl, err := n.st.ListACL(ctx, fabricIndex)
-	if err != nil {
-		n.logger.Warn("webrtc.requestor.acl_list", slog.Any("err", err))
-		return
-	}
-	cluster := camera.RequestorClusterID
-	for _, e := range acl { // :67-79
-		if e.Privilege == store.PrivilegeOperate && e.AuthMode == store.AuthModeCASE && len(e.Subjects) == 0 &&
-			len(e.Targets) == 1 && e.Targets[0].Endpoint != nil && *e.Targets[0].Endpoint == epID &&
-			e.Targets[0].Cluster != nil && *e.Targets[0].Cluster == cluster {
-			return
-		}
-	}
-	ep := epID
-	entry := store.ACLEntry{
-		FabricIndex: fabricIndex, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE,
-		Targets: []store.ACLTarget{{Endpoint: &ep, Cluster: &cluster}},
-	}
-	if err := n.st.ReplaceACL(ctx, fabricIndex, append(acl, entry)); err != nil { // :81-91
-		n.logger.Warn("webrtc.requestor.acl_add", slog.Any("err", err))
+	if !n.addLocalOperateEntry(ctx, fabricIndex, epID, camera.RequestorClusterID, "webrtc.requestor.acl") {
 		return
 	}
 	n.root.AccessControl.NotifyLocalEntryInstalled()
