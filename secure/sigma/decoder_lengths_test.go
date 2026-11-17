@@ -63,9 +63,11 @@ func withField(fields []sigmaField, tag uint8, f *sigmaField) []sigmaField {
 // byte long, and every mandatory field of Sigma2 and of Sigma2_Resume
 // dropped in turn, is a decode error (ErrSessionState); the unmodified
 // message decodes. Sigma1's fields are checked for length only — the
-// table drops none of them, so its missing-field returns are not held
-// here. Without
-// a check the decoders copy a short random into a zero-padded array or
+// table drops none of them; its missing-field returns are held by
+// TestUnmarshalSigma1_MandatoryFieldsMissing (tags 1-3) and
+// TestUnmarshalSigma1_MissingEphPub (tag 4) in sigma_marshal_test.go and
+// TestUnmarshalSigma1_ResumptionTagsAllOrNothing (tags 6 and 7) in
+// sigma_test.go (R2-P6-test-3114). Without a check the decoders copy a short random into a zero-padded array or
 // keep a key of the wrong size, and the failure surfaces — if at all — as
 // a MIC or destination mismatch much later (R2-P5-tmut-16).
 func TestSigmaDecodersRefuseWrongFieldLengths(t *testing.T) {
