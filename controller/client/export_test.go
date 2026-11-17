@@ -239,3 +239,18 @@ func ApplyAsked(n *Node, ep uint16, cluster uint32, v spec.Node) {
 	b.attr(ep, cluster, 0, v, 1)
 	n.apply(askedFor(ep, cluster), &b.r, true)
 }
+
+// OnRegisterChecked sets the test seam Register calls once its checks
+// outside the ICD client's lock passed, before it starts the operation.
+func OnRegisterChecked(c *ICDClient, fn func()) {
+	c.mu.Lock()
+	c.registerChecked = fn
+	c.mu.Unlock()
+}
+
+// ICDRegistering reports a registration operation in flight.
+func ICDRegistering(c *ICDClient) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.op != nil && c.op.kind == icdRegistering
+}
