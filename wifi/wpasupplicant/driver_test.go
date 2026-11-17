@@ -1332,6 +1332,44 @@ func TestNetworksLeftBehindAreRemoved(t *testing.T) {
 		}
 	})
 
+	t.Run("a path handed out again is not owed", func(t *testing.T) {
+		t.Parallel()
+		const reused = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/3")
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.nextNetworks = []dbus.ObjectPath{reused, reused}
+		b.onSelect = failJoin
+		b.fail[ifaceInterface+".RemoveNetwork"] = dbus.Error{Name: "fi.w1.wpa_supplicant1.UnknownError"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status == statusSuccess {
+			t.Fatal("the join succeeded")
+		}
+		// The failed removal was carried out after all, and the next
+		// sweep cannot read Networks: the path stays owed.
+		b.mu.Lock()
+		delete(b.fail, ifaceInterface+".RemoveNetwork")
+		b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
+		delete(b.props, "Networks")
+		b.onSelect = nil
+		b.mu.Unlock()
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q", status, debug)
+		}
+		// wpa_supplicant numbered the joined network with the same path.
+		b.mu.Lock()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{reused})
+		b.mu.Unlock()
+		before := len(b.callsCopy())
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range b.callsCopy()[before:] {
+			if c.method == ifaceInterface+".RemoveNetwork" {
+				t.Fatalf("Close removed %v, the joined network", c.args[0])
+			}
+		}
+	})
+
 	t.Run("the CurrentNetwork unreadable", func(t *testing.T) {
 		t.Parallel()
 		const first = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/1")

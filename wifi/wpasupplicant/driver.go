@@ -834,6 +834,12 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 		d.log.Warn("wpasupplicant: failed to add network", ssidAttr, slog.String("reason", errName(err)))
 		return "", "", "add network: " + errName(err)
 	}
+	// A path wpa_supplicant hands out now is this join's network, not one
+	// owed from before: a removal that failed by its answer may have been
+	// carried out, and the path numbered anew (review II, R2-P6-store-2021).
+	d.mu.Lock()
+	delete(d.owed, network)
+	d.mu.Unlock()
 	d.log.Info("wpasupplicant: added network", ssidAttr, slog.String("path", string(network)))
 	return network, prev, ""
 }
