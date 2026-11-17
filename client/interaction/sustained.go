@@ -62,6 +62,14 @@ func newRetries(cfg RetrySchedule, rand func() float64) *retries {
 	return &retries{cfg: cfg, rand: rand, base: cfg.InitialInterval}
 }
 
+// current is the interval the next step waits, its jitter not counted.
+func (r *retries) current() time.Duration {
+	if r.cfg.MaximumInterval != 0 && r.base > r.cfg.MaximumInterval {
+		return r.cfg.MaximumInterval
+	}
+	return r.base
+}
+
 func (r *retries) next() time.Duration {
 	maxJitterMs := r.cfg.JitterFactor * float64(r.base) / float64(time.Millisecond)
 	jitter := time.Duration(math.Floor(maxJitterMs*r.rand())) * time.Millisecond
@@ -309,6 +317,14 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	// recreatePriority: a mode-flip recreate goes out on the priority
 	// connection (:133-135).
 	recreatePriority := false
+	// The retry schedule spans establishments: a subscription the peer
+	// drops before it lasted the schedule's current interval continues it,
+	// one that lasted it starts it over. Ahead of matter.js, which starts
+	// a new schedule per establishment loop (SustainedSubscription.ts:203
+	// at db021da0), so a peer that grants and drops at once is
+	// re-subscribed without a pause; the rule is this module's (review II,
+	// R2-P6-fsm-2110).
+	schedule := newRetries(DefaultSustainRetries, c.rand)
 	for {
 		req, closed, deliberate := innerRequest(outer, updated)
 		// The attempt's network: a mode-flip recreate's goes out on the
@@ -325,8 +341,8 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			return
 		}
 
-		schedule := newRetries(DefaultSustainRetries, c.rand)
 		var held *icd.PeerWakefulness
+		var establishedAt time.Time
 		for {
 			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
 			if err == nil {
@@ -341,6 +357,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 				// nil branch's "a wakefulness present now is the feed", and the recreate
 				// takes the hold.
 				held = established(outer, inner, wakefulness())
+				establishedAt = c.clock.Now()
 				break
 			}
 			if ctx.Err() != nil {
@@ -373,12 +390,28 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		if ctx.Err() != nil {
 			return
 		}
+		lasted := c.clock.Now().Sub(establishedAt) >= schedule.current()
+		if lasted {
+			schedule = newRetries(DefaultSustainRetries, c.rand)
+		}
 		if !flipped {
 			// A genuine loss: report not live so consumers re-establish. A
 			// deliberate recreate keeps active until it re-established or has
 			// to park (:289-293).
 			outer.setActive(false)
 			c.log.Info("matter.controller.interaction.sustain_replacing", slog.Uint64("node_id", outer.peer.NodeID))
+			if !lasted && !requiresAwait(wakefulness()) {
+				// Dropped before it lasted the schedule's interval: its next
+				// step is waited first (R2-P6-fsm-2110). A peer that requires
+				// awaiting has no timed retry; the gate parks it for its next
+				// wake instead.
+				retry := schedule.next()
+				c.log.Info("matter.controller.interaction.sustain_retry",
+					slog.Uint64("node_id", outer.peer.NodeID), slog.Duration("retry", retry), slog.String("reason", "subscription lost early"))
+				if !c.sleep(ctx, retry) {
+					return
+				}
+			}
 			continue
 		}
 		deliberate.Store(true)

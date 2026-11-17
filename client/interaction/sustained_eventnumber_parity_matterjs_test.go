@@ -99,6 +99,7 @@ func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 		states.wait(t, true)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60)
 		states.wait(t, true)
 		if n, ok := sub.MaxEventNumber(); !ok || n != 9 {
@@ -129,6 +130,7 @@ func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 		states.wait(t, true)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60, 5)
 		states.wait(t, true)
 		if n, ok := sub.MaxEventNumber(); !ok || n != 9 {
@@ -160,6 +162,7 @@ func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 		ssPushEvents(t, r, 0x7302, 1)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60)
 		states.wait(t, true)
 		if n, ok := sub.MaxEventNumber(); !ok || n != 5 {

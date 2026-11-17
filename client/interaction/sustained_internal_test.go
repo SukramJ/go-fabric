@@ -90,3 +90,51 @@ func TestSustainedHoldsWakefulnessFedAfterEstablishment(t *testing.T) {
 		r.wantActive(true)
 	})
 }
+
+// attemptsNow is the rig's attempt count once the loop has settled.
+func (r *icdRig) attemptsNow() int {
+	r.t.Helper()
+	settle()
+	a, _ := r.count()
+	return a
+}
+
+// TestSustainedRetryScheduleSpansEstablishments: a peer that grants the
+// subscription and drops it at once is re-subscribed on the retry
+// schedule, not at once each time: the schedule lives across
+// establishments and starts over only after a subscription that lasted
+// its current interval. matter.js starts a new schedule per establishment
+// loop (SustainedSubscription.ts:203 at db021da0); the rule is this
+// module's (review II, R2-P6-fsm-2110).
+func TestSustainedRetryScheduleSpansEstablishments(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newICDRig(t, nil)
+		r.start(nil, nil)
+		r.wantAttempts(1)
+		r.lose() // lasted nothing: wait the first interval
+		if n := r.attemptsNow(); n != 1 {
+			t.Fatalf("%d attempts at once after a subscription that lasted nothing, want 1", n)
+		}
+		r.advance(15 * time.Second)
+		r.wantAttempts(2)
+		r.lose() // the schedule continues: 30 s
+		r.advance(15 * time.Second)
+		if n := r.attemptsNow(); n != 2 {
+			t.Fatalf("%d attempts 15 s into the second interval, want 2", n)
+		}
+		r.advance(15 * time.Second)
+		r.wantAttempts(3)
+		// A subscription that lasted the current interval (60 s) resets the
+		// schedule and is replaced at once.
+		r.advance(time.Minute)
+		r.lose()
+		r.wantAttempts(4)
+		r.lose()
+		if n := r.attemptsNow(); n != 4 {
+			t.Fatalf("%d attempts at once after a reset schedule's first loss, want 4", n)
+		}
+		r.advance(15 * time.Second)
+		r.wantAttempts(5)
+	})
+}
