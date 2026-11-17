@@ -1949,7 +1949,15 @@ func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID ui
 // exchange ends and, marked peer-lost, sends nothing
 // (NodeSession.ts:349-352). The controller reconnects with CASE under the
 // new NOC.
+//
+// A CASE handshake this node answers on fabricIndex that has not finished
+// is aborted first ([Bridge.abortFabricHandshakes]): it would complete
+// under the replaced NOC. connectedhomeip aborts a pending establishment
+// on the updated fabric (src/protocols/secure_channel/CASESession.h:149-153,
+// CASESession.cpp:423-433 at 6170af84); matter.js's CASE server has no
+// such listener (review II, R2-P6-sec-2412).
 func (b *Bridge) CloseFabricSessionsAfterUpdate(ctx context.Context, fabricIndex uint8) {
+	b.abortFabricHandshakes(fabricIndex)
 	invoking := mattercore.InvokeSessionIDFromContext(ctx)
 	b.CloseFabricSessionsExcept(fabricIndex, invoking)
 	if invoking == 0 {

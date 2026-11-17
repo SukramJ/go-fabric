@@ -1708,6 +1708,55 @@ func (b *Bridge) endHandshakeOfReplacedHandler(key HandshakeKey, hash [32]byte) 
 	}
 }
 
+// abortFabricHandshakes ends every CASE handshake this node answers whose
+// responder resolved fabricIndex and that no Sigma3 completed yet: its
+// record goes, what it still retransmits is dropped, and a provider's
+// adapter leaves its provider and returns its staked id. A later Sigma3 of
+// it is acknowledged and not answered ([Bridge.dropHandshakeNotBegun]).
+// Returns how many it ended. Review II, R2-P6-sec-2412.
+func (b *Bridge) abortFabricHandshakes(fabricIndex uint8) int {
+	type pending struct {
+		key HandshakeKey
+		seq uint64
+	}
+	var candidates []pending
+	b.mu.RLock()
+	for key, rec := range b.sigma1Replied {
+		if rec.completed == nil {
+			candidates = append(candidates, pending{key, rec.seq})
+		}
+	}
+	b.mu.RUnlock()
+	ended := 0
+	for _, c := range candidates {
+		h, provided := b.resolveCaseHandlerOf(c.key)
+		a, ok := h.(*CaseAdapter)
+		if !ok || !a.pendingOnFabric(fabricIndex) {
+			continue
+		}
+		b.mu.Lock()
+		rec, held := b.sigma1Replied[c.key]
+		gone := held && rec.seq == c.seq && rec.completed == nil
+		if gone {
+			delete(b.sigma1Replied, c.key)
+		}
+		b.mu.Unlock()
+		if !gone {
+			continue
+		}
+		b.releaseCASEHandshakeEverywhere(c.key)
+		b.abandonHandshakeReplies(c.key)
+		if provided {
+			a.handshakeFailed()
+		}
+		ended++
+		b.logger.Info("matter.rx.sc.case_aborted_fabric_updated",
+			slog.Int("fabric_index", int(fabricIndex)),
+			slog.Int("exchange_id", int(c.key.ExchangeID)))
+	}
+	return ended
+}
+
 // holdCompletedRecord keeps the record of the completed handshake key from
 // ending ([Bridge.sigma1RecordOver], [Bridge.endSigma1Record]) until the
 // returned release runs: while its success report is sent again, the old

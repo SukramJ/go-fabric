@@ -1004,6 +1004,23 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	return mrp.SCOpcodeSigma2, out, nil
 }
 
+// pendingOnFabric reports whether the adapter's handshake resolved
+// fabricIndex and has not established its session
+// ([Bridge.abortFabricHandshakes]).
+func (a *CaseAdapter) pendingOnFabric(fabricIndex uint8) bool {
+	r := a.snapshotResponder()
+	if r == nil {
+		return false
+	}
+	fi, _, ok := r.SessionIdentity()
+	if !ok || fi != fabricIndex {
+		return false
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return !a.established
+}
+
 // takeResumeInstall returns, once, the session the last Sigma1 installed by
 // resumption: the router ties it to the Sigma2_Resume's retransmission
 // entry ([Bridge.handleCase]).
