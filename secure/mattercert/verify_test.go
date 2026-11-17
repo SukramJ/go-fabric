@@ -1359,42 +1359,6 @@ func TestVerifyAndExtractPubKey_ICAC_BadSignature(t *testing.T) {
 	}
 }
 
-// TestVerifySignature_WrongSigLength verifies that verifySignature (called
-// via VerifyAndExtractPubKey) rejects a cert with a non-64-byte signature.
-// We do this by building a cert TLV with only 32 bytes in the sig field.
-func TestVerifyAndExtractPubKey_WrongSigLength(t *testing.T) {
-	t.Parallel()
-	rootPriv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	nocPriv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	now := nowEpoch()
-
-	rootOpts := verifyTestCertOpts{
-		notBefore:        now - 100,
-		notAfter:         0,
-		issuerRCACID:     0x0001,
-		subjectHasRCACID: true,
-		subjectRCACID:    0x0001,
-		pubKey:           marshalPub(rootPriv),
-	}
-	rootRaw := buildSignedCert(t, rootOpts, rootPriv)
-	rootCert, err := mattercert.Decode(rootRaw)
-	if err != nil {
-		t.Fatalf("Decode root: %v", err)
-	}
-
-	// Build a NOC manually with a 32-byte signature field (too short).
-	// validateMandatory rejects sig != 64 bytes, so we can't use Decode+verify.
-	// Instead we build the cert TLV manually so we can control the sig length,
-	// then pass the raw bytes to VerifyAndExtractPubKey which will Decode it.
-	//
-	// Since validateMandatory rejects 32-byte sig, we need a way to bypass.
-	// The test must use a 64-byte sig for Decode to succeed. But verifySignature
-	// is already tested by the tampered-NOC test above. Skip the impossible path.
-	_ = nocPriv
-	_ = rootCert
-	t.Skip("verifySignature wrong-sig-length path is covered by FakeSignature test; skip duplicate")
-}
-
 // TestDecode_SubjectKeyIDEmpty verifies ErrMalformed when the SubjectKeyID
 // extension has an empty octet string.
 func TestDecode_SubjectKeyIDEmpty(t *testing.T) {

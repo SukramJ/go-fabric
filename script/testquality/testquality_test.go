@@ -108,12 +108,7 @@ var skipInRangeLeft = map[string]int{
 
 // preconditionSkipsLeft are the G2b sites left, as "<file>:<func>" with the
 // number of skips in it.
-var preconditionSkipsLeft = map[string]int{
-	// The skip names the wrong covering test: the length check is held by
-	// der_edges_test.go's "signature short" case (R2-P5-tassert-07, refuted
-	// as a coverage gap; not this unit's).
-	"secure/mattercert/verify_test.go:TestVerifyAndExtractPubKey_WrongSigLength": 1,
-}
+var preconditionSkipsLeft = map[string]int{}
 
 // environmentSkips are the G2 sites whose reason names the environment
 // ([envSkip], [envVar], [livePath]), as "<file>:<func>" with the number
