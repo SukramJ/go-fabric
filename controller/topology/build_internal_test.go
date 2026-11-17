@@ -545,3 +545,32 @@ func TestBuildEscapesControlCharacters(t *testing.T) {
 		t.Fatal("no node carries the border router's escaped host name")
 	}
 }
+
+// TestBuildCollidingClaimsResolveToNeither (review II, R2-P6-bound-2362,
+// owner decision 222): an extended address two nodes claim, and an RLOC16
+// two nodes claim, resolve to neither node. A neighbour entry naming the
+// claimed extended address shows as unknown_<ext>; the claimed RLOC16
+// names no node. Before, the later node's claim won, so a node could
+// redirect another node's edges to itself.
+func TestBuildCollidingClaimsResolveToNeither(t *testing.T) {
+	t.Parallel()
+	const shared = 0x0A0B0C0D0E0F1011
+	observer := mkThread(1, threadOpts{role: role(threaddiagdef.RoutingRoleLeader), rloc16: ptr[uint16](1024), ext: 0x1111111111111111, neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(shared, 0, 3, ptr[int8](-40), true),
+		neighbour(0x2222222222222222, 0x0C00, 3, ptr[int8](-40), true),
+	}})
+	genuine := mkThread(2, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0800), ext: shared})
+	claimant := mkThread(3, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: shared})
+	rlocClaimant := mkThread(4, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x4444444444444444})
+	topo := Build([]Image{observer, genuine, claimant, rlocClaimant}, nil, at)
+	for _, id := range []string{"2", "3", "4"} {
+		if _, ok := connection(topo, "1", id); ok {
+			t.Errorf("an edge 1-%s through a claim two nodes share", id)
+		}
+	}
+	for _, want := range []string{"unknown_" + hex16(shared), "unknown_" + hex16(0x2222222222222222)} {
+		if !slices.ContainsFunc(topo.Nodes, func(n Node) bool { return n.ID == want }) {
+			t.Errorf("no node %s for the neighbour whose claim collided", want)
+		}
+	}
+}

@@ -15,8 +15,12 @@ import (
 // extended address, and by RLOC16 as the fallback — matterjs-server's
 // buildExtAddrMap and buildRloc16Map at 0bd06f22
 // (topology-utils.ts:385-398, :405-418). A node without a known extended
-// address or RLOC16 is absent from that map; on a collision the later
-// node wins, as Map.set does there.
+// address or RLOC16 is absent from that map. An extended address or
+// RLOC16 two nodes claim resolves to neither: both are self-reported
+// diagnostics, and nothing tells which claim is true, so a neighbour
+// entry naming it shows as unknown_<ext> rather than as an edge to the
+// node that claimed it last (review II, R2-P6-bound-2362, owner decision
+// 222). matterjs-server keeps the later node's claim (Map.set).
 type threadMaps struct {
 	byExt  map[uint64]string
 	byRloc map[uint16]string
@@ -24,16 +28,30 @@ type threadMaps struct {
 
 func newThreadMaps(nodes []*Image) threadMaps {
 	m := threadMaps{byExt: map[uint64]string{}, byRloc: map[uint16]string{}}
+	extTaken, rlocTaken := map[uint64]bool{}, map[uint16]bool{}
 	for _, img := range nodes {
 		id := strconv.FormatUint(img.NodeID, 10)
 		if ext := threadExtAddress(img.GeneralDiagnostics.NetworkInterfaces); ext != 0 {
-			m.byExt[ext] = id
+			claim(m.byExt, extTaken, ext, id)
 		}
 		if r := img.ThreadNetworkDiagnostics.Rloc16; r != nil {
-			m.byRloc[*r] = id
+			claim(m.byRloc, rlocTaken, *r, id)
 		}
 	}
 	return m
+}
+
+// claim records id's claim of key in byKey; a key another node claimed
+// too is removed and stays removed (taken).
+func claim[K comparable](byKey map[K]string, taken map[K]bool, key K, id string) {
+	switch prior, ok := byKey[key]; {
+	case taken[key]:
+	case ok && prior != id:
+		delete(byKey, key)
+		taken[key] = true
+	default:
+		byKey[key] = id
+	}
 }
 
 // node is the commissioned node a neighbour entry names, by extended
