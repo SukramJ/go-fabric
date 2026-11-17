@@ -559,8 +559,11 @@ var ErrReportTooLarge = errors.New("interaction: report too large")
 // ResourceExhausted and [ErrReportTooLarge]; the bytes are released when
 // an interaction ends. A peer reaches it only with its own interactions:
 // an attribute of a scalar value is charged at most 140 bytes, so a
-// wildcard read of some 15 000 such attributes stays below it. This
-// module's own rule (review II, R2-P2-alloc-05;
+// wildcard read of some 120 000 such attributes stays below it. 16 MiB
+// since the charge counts memory (owner decision 220; it was 2 MiB of
+// payload, decision 48), half of what a node's image may hold
+// (controller/client.DefaultMaxImageBytesPerNode), which charges the same
+// spec.Node. This module's own rule (review II, R2-P2-alloc-05;
 // owner decision 45). matter.js's messenger does not collect a read's
 // chunks — it hands each report on as it arrives
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1012-1053 at
@@ -570,7 +573,7 @@ var ErrReportTooLarge = errors.New("interaction: report too large")
 // is configurable ([Config].MaxReportBytesPerSession,
 // [SubscriptionsConfig].MaxReportBytesPerSession; owner decision 48),
 // this its default.
-const DefaultMaxReportBytesPerSession = 2 << 20
+const DefaultMaxReportBytesPerSession = 16 << 20
 
 // assemblies is the report bytes each session's interactions hold.
 var assemblies = struct {

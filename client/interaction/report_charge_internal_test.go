@@ -111,7 +111,7 @@ func TestInvokeChargeCountsTheFields(t *testing.T) {
 // TestReportChargeOfScalarAttributes: an attribute report of a scalar
 // value is charged at most scalarAttributeCharge bytes, so a read of
 // DefaultMaxReportBytesPerSession / scalarAttributeCharge such attributes
-// (about 15 000) stays below the default bound, as
+// (about 120 000) stays below the default bound, as
 // DefaultMaxReportBytesPerSession's doc states.
 func TestReportChargeOfScalarAttributes(t *testing.T) {
 	t.Parallel()

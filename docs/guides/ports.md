@@ -140,7 +140,7 @@ Use `Observers` instead.
 | `Advertise`, `Advertiser` | the `_matterd._udp` commissioner record and the advertiser publishing it | no record; `mdns.NewResponder()` when `Advertise` is set |
 | `Diagnostics` (`diag.Diagnostics{Capacity}`) | the size of the diagnostic trace (`Controller.DiagnosticEvents`, `Controller.OnDiagnosticEvent`) | 256 events |
 | `Metrics` (`contract.Metrics`) | the named counters and gauges (`controller.Metric…`) | nothing recorded |
-| `MaxReportBytesPerSession` | the bound on the report chunks a session's interactions with a paired node (the commissioning steps' included) hold while the rest arrive (`interaction.ErrReportTooLarge` past it; [limits](limits.md)); negative is `controller.ErrConfiguration` | `interaction.DefaultMaxReportBytesPerSession` (2 MiB) |
+| `MaxReportBytesPerSession` | the bound on the report chunks a session's interactions with a paired node (the commissioning steps' included) hold while the rest arrive (`interaction.ErrReportTooLarge` past it; [limits](limits.md)); negative is `controller.ErrConfiguration` | `interaction.DefaultMaxReportBytesPerSession` (16 MiB) |
 | `MaxImageBytesPerNode` | the bound on what one paired node's reports leave in the controller's image of it and in `DB` — the image is charged its values' stored bytes and what each endpoint, cluster, attribute and TLV element holds in memory: a report that would raise the image above it is not applied, an image stored above it is cut back to what the node's structure names when it loads ([limits](limits.md)); negative is `controller.ErrConfiguration` | `client.DefaultMaxImageBytesPerNode` (32 MiB) |
 
 `controller/commissioner.Context.Scanners` (`CommissionedScanner`) are the

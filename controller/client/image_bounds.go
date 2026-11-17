@@ -21,7 +21,9 @@ import (
 // own (review II, R2-P3-ctl-dev-02, owner decision 54; R2-P3-dr-ctl-02):
 // matter.js bounds neither what a peer's reports store nor their sum
 // (ClientStructure.ts:568-610, :1147-1193 at db021da0). The value is
-// chosen, sixteen times interaction.DefaultMaxReportBytesPerSession.
+// chosen (decision 59), sixteen times the 2 MiB report bound of then;
+// since decision 220 interaction.DefaultMaxReportBytesPerSession is
+// 16 MiB of charged memory, half of this quota.
 const DefaultMaxImageBytesPerNode = 32 << 20
 
 // What the image charges towards a node's quota beside a value's stored
