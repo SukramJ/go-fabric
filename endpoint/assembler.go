@@ -358,6 +358,9 @@ func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *S
 // it resolves the persisted endpoint id for the spec's stable key and
 // binds the per-identity state that has to survive a reassembly.
 func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec) (*Endpoint, error) {
+	if err := checkBridgedInfo(spec, a.cfg.VendorName); err != nil {
+		return nil, err
+	}
 	id, err := a.assignOrReuseID(ctx, scope, spec.StableKey, spec.DeviceType)
 	if err != nil {
 		return nil, err

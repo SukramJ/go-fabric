@@ -619,12 +619,15 @@ func applyStatedBridgedInfo(cfg *mattercore.BridgedConfig, st bdbidef.Patch) {
 	}
 }
 
+// bridgedVendorName is the VendorName a bridged endpoint serves: the
+// spec's, else the bridge's — as stated, never cut; the assembly refused
+// one beyond the attribute's constraint (checkBridgedInfo; R2-P6-wire-2502,
+// decision 201).
 func bridgedVendorName(ep *Endpoint) string {
-	name := ep.VendorName
-	if name == "" {
-		name = ep.BridgeVendorName
+	if ep.VendorName != "" {
+		return ep.VendorName
 	}
-	return truncateLabel(name)
+	return ep.BridgeVendorName
 }
 
 // identifyClusterID is the Identify cluster (identify.element.ts, 0x0003).
