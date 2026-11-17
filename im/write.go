@@ -164,7 +164,7 @@ func readAttributeWrites(dec *tlv.Decoder, valueReader AttributeValueReader) ([]
 			}
 			return out, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeStructure {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: AttributeDataIB not struct", ErrInvalidWriteRequest)
 		}
 		w, err := readAttributeData(dec, valueReader)

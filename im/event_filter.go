@@ -60,7 +60,7 @@ func readDataVersionFilterArray(dec *tlv.Decoder) ([]DataVersionFilter, error) {
 			}
 			return filters, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeStructure {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeStructure {
 			// Not a DataVersionFilterIB: skipped whole, so its members
 			// are not read as the array's (R2-P6-wire-0504).
 			if err := skipField(dec, el); err != nil {
@@ -205,7 +205,7 @@ func readEventFilterArray(dec *tlv.Decoder) ([]EventMinimumNumber, error) {
 			}
 			return filters, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeStructure {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeStructure {
 			// Skip non-struct elements — forward-compat tolerance. A
 			// scalar has already been fully consumed by dec.Next(); a
 			// container (e.g. a nested Array/List) still has its inner

@@ -119,7 +119,7 @@ func readInvokeResponseIBs(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 		if ib.IsEndContainer {
 			return out, nil
 		}
-		if !ib.IsContainer || ib.Type != tlv.TypeStructure {
+		if taggedArrayElement(ib) || !ib.IsContainer || ib.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: InvokeResponseIB not struct", ErrInvalidInvokeRequest)
 		}
 		ent, err := readInvokeResponseIB(dec, fieldsReader)

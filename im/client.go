@@ -213,7 +213,7 @@ func UnmarshalWriteResponseTLV(dec *tlv.Decoder) (WriteResponse, error) {
 			if ib.IsEndContainer {
 				break
 			}
-			if !ib.IsContainer || ib.Type != tlv.TypeStructure {
+			if taggedArrayElement(ib) || !ib.IsContainer || ib.Type != tlv.TypeStructure {
 				return WriteResponse{}, fmt.Errorf("%w: AttributeStatusIB is not a structure", ErrInvalidWriteResponse)
 			}
 			st, _, err := readAttributeStatusFields(dec)
@@ -439,7 +439,7 @@ func readAttributeReports(dec *tlv.Decoder, valueReader AttributeValueReader) ([
 		if ib.IsEndContainer {
 			return out, nil
 		}
-		if !ib.IsContainer || ib.Type != tlv.TypeStructure {
+		if taggedArrayElement(ib) || !ib.IsContainer || ib.Type != tlv.TypeStructure {
 			return nil, errors.New("im: AttributeReportIB is not a structure")
 		}
 		rep, err := readAttributeReport(dec, valueReader)
@@ -558,7 +558,7 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 		if ib.IsEndContainer {
 			return out, nil
 		}
-		if !ib.IsContainer || ib.Type != tlv.TypeStructure {
+		if taggedArrayElement(ib) || !ib.IsContainer || ib.Type != tlv.TypeStructure {
 			return nil, errors.New("im: EventReportIB is not a structure")
 		}
 		var rep EventReport

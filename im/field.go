@@ -178,6 +178,19 @@ func contextMember(el tlv.Element) error {
 	return fmt.Errorf("%w (tag kind %d)", errNonContextMember, el.Tag.Kind)
 }
 
+// taggedArrayElement reports an element of an array that carries a tag.
+// Array elements are anonymous: matter.js refuses a tagged one as it
+// refuses a value that is not an array, both as UnexpectedDataError
+// (packages/types/src/tlv/TlvArray.ts:73-78 at db021da0), and
+// connectedhomeip's reader as CHIP_ERROR_INVALID_TLV_TAG
+// (src/lib/core/TLVReader.cpp:873-875 at 6170af84). Every array reader of
+// a message treats it as it treats an element of the wrong type — its
+// malformed error, or the skip of a reader that tolerates one (review
+// II, F-db021da0-48).
+func taggedArrayElement(el tlv.Element) bool {
+	return !el.IsEndContainer && el.Tag.Kind != tlv.TagKindAnonymous
+}
+
 // skipField drains el when it opens a container, so an ignored field
 // never desynchronises the decoder.
 func skipField(dec *tlv.Decoder, el tlv.Element) error {

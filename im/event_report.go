@@ -187,7 +187,7 @@ func readEventPathArray(dec *tlv.Decoder) ([]ConcreteEventPath, error) {
 			}
 			return paths, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeList {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeList {
 			return nil, fmt.Errorf("%w: EventPathIB not list, got 0x%02X", ErrInvalidPath, el.Type)
 		}
 		p, err := readEventPathFields(dec)

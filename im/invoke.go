@@ -302,7 +302,7 @@ func readCommandData(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]Comm
 			}
 			return out, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeStructure {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: CommandDataIB not struct", ErrInvalidInvokeRequest)
 		}
 		inv, err := readCommandInvocation(dec, fieldsReader)
