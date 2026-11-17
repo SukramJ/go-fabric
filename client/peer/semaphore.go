@@ -187,12 +187,15 @@ func (sl *Slot) Close() {
 		return
 	}
 	sl.once.Do(func() {
-		if sl.timeout != nil {
-			sl.timeout.Stop()
-		}
 		s := sl.s
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		// The timeout is read under the lock grantLocked sets it under: the
+		// timer may fire before the grant has returned (review II,
+		// R2-P6-conc-2103).
+		if sl.timeout != nil {
+			sl.timeout.Stop()
+		}
 		s.running--
 		s.scheduleLocked()
 	})
