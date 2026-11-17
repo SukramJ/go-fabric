@@ -335,9 +335,7 @@ for `schema/`, `script/clustergen` for the cluster definitions under
 [ADR 0018](./docs/adr/0018-device-layer-and-node-facade.md)).
 
 ```sh
-cd ../matter.js/packages/model && npm run build   # once, per matter.js checkout
-cd -
-make generate-matter-schema                       # extract + generate + gofumpt
+make generate-matter-schema   # build packages/model at the checkout's HEAD, extract + generate + gofumpt
 ```
 
 `make generate-matter-schema` does both halves: it copies the extractor into
