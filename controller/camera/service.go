@@ -290,8 +290,9 @@ func (s *Service) Close(ctx context.Context) error {
 // untrackedSessions are the requestor's sessions of this fabric the
 // registry does not name.
 func (s *Service) untrackedSessions() []sessionKey {
-	var out []sessionKey
-	for _, e := range s.ps.untracked(func(t target, id uint16) bool { return s.m.sessions.knows(t.nodeID, t.endpointID, id) }) {
+	entries := s.ps.untracked(func(t target, id uint16) bool { return s.m.sessions.knows(t.nodeID, t.endpointID, id) })
+	out := make([]sessionKey, 0, len(entries))
+	for _, e := range entries {
 		out = append(out, sessionKey{e.PeerNodeId, e.PeerEndpointId, e.Id})
 	}
 	return out

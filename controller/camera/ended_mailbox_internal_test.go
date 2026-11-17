@@ -32,6 +32,7 @@ func pumpEnded(b *mailbox) bool {
 func TestEndedMailboxDiscardsUnreadSignals(t *testing.T) {
 	t.Parallel()
 	t.Run("unread signals go once the grace passed", func(t *testing.T) {
+		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			b := newMailbox(context.Background(), nil)
 			b.put(Signal{Kind: SignalAnswer, SDP: "x"})
@@ -59,6 +60,7 @@ func TestEndedMailboxDiscardsUnreadSignals(t *testing.T) {
 		})
 	})
 	t.Run("a reader within the grace gets every signal", func(t *testing.T) {
+		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			b := newMailbox(context.Background(), nil)
 			b.put(Signal{Kind: SignalAnswer, SDP: "x"})

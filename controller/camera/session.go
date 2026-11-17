@@ -471,13 +471,17 @@ func (b *mailbox) pump(life context.Context) {
 	}()
 	ended := b.ended
 	var grace <-chan time.Time
-	stop := func() bool { return false }
-	defer func() { stop() }()
+	var timer clock.Timer
+	defer func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}()
 	// endGrace starts the grace once the session ended; ended is then
 	// no longer selected.
 	endGrace := func() {
-		t := b.clk.NewTimer(endedSignalsGrace)
-		grace, stop, ended = t.C(), t.Stop, nil
+		timer = b.clk.NewTimer(endedSignalsGrace)
+		grace, ended = timer.C(), nil
 	}
 	for {
 		b.mu.Lock()

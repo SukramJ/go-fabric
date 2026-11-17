@@ -93,8 +93,8 @@ func TestUint32ValuesSaturateAtTheIntCeiling(t *testing.T) {
 // budget. Before, both were int and wrapped past 2^31−1 there.
 func TestPixelArithmeticIsInt64(t *testing.T) {
 	t.Parallel()
-	var area int64 = resolution{65535, 65535}.pixels()
-	if area != 4_294_836_225 {
+	// Compared with an int64, so an int area does not compile.
+	if area := (resolution{65535, 65535}).pixels(); area != int64(4_294_836_225) {
 		t.Errorf("65535x65535 = %d pixels", area)
 	}
 	uhd := allocatedVideoStream{maxResolution: resolution{3840, 2160}, maxFrameRate: 60}
@@ -105,8 +105,7 @@ func TestPixelArithmeticIsInt64(t *testing.T) {
 	if !ok || free != 3e9-2_488_320_000 {
 		t.Errorf("free pixel rate after five 4K60 streams = %v, %v; want %v", free, ok, 3e9-2_488_320_000)
 	}
-	var rate int64 = encodedPixelRate(videoEnvelope{maxResolution: resolution{7680, 4320}, maxFrameRate: 30})
-	if rate != 995_328_000 {
+	if rate := encodedPixelRate(videoEnvelope{maxResolution: resolution{7680, 4320}, maxFrameRate: 30}); rate != int64(995_328_000) {
 		t.Errorf("encodedPixelRate(8K30) = %d", rate)
 	}
 	if got := scaleToPixels(resolution{65535, 65535}, 1920*1080); got.pixels() > 1920*1080 {
