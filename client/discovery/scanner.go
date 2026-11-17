@@ -68,7 +68,7 @@ type Identifier struct {
 }
 
 // ByInstanceID selects the node with this instance name (the first label
-// of its `_matterc._udp` name).
+// of its `_matterc._udp` name), in any case.
 func ByInstanceID(id string) Identifier { return Identifier{kind: identifyInstance, instanceID: id} }
 
 // ByLongDiscriminator selects nodes announcing this 12-bit discriminator.
@@ -199,7 +199,13 @@ func (id Identifier) matches(d *Device) bool {
 	}
 	switch id.kind {
 	case identifyInstance:
-		return d.InstanceID == id.instanceID
+		// A DNS label, matched without regard to case, as the cache keys
+		// its names (Names.get) — ahead of matter.js, which compares it as
+		// received (CommissionableMdnsScanner.ts:535 at db021da0);
+		// connectedhomeip resolves the instance name and compares DNS
+		// names case-insensitively (src/lib/dnssd/wire/QName.cpp:141 at
+		// 6170af84) (review II, R2-P6-par-2152).
+		return strings.EqualFold(d.InstanceID, id.instanceID)
 	case identifyLongDiscriminator:
 		return d.D == id.long
 	case identifyShortDiscriminator:
