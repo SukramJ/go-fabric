@@ -54,6 +54,8 @@ const maxEntries = 256
 // until one is free (review II, R2-P6-bound-2026). Without it every
 // instance name a LAN announces — also one that never carries a valid xa
 // and so never becomes an entry — is kept until its last record goes.
+//
+// Mirrors matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:24-27 (INSTANCE_OBSERVER_CAP), :225-233 (the eviction loop) and :241-267 (#evictOldestPendingInstance) at db021da0; the tombstones and their bound are the module's own.
 const maxInstances = 512
 
 // The service suffixes the registry watches. Mirrors matter.js
