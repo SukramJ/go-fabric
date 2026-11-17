@@ -44,6 +44,25 @@ const (
 	txtAPIEncryption = "api_encryption"
 )
 
+// maxConcurrentDials bounds the connections one browse opens at once: the
+// number of instances is the LAN's to choose (R2-P6-bound-2009).
+const maxConcurrentDials = 8
+
+// eachBounded runs f for every item, at most maxConcurrentDials at once,
+// and returns when all have.
+func eachBounded[T any](items []T, f func(int, T)) {
+	sem := make(chan struct{}, maxConcurrentDials)
+	var wg sync.WaitGroup
+	for i, it := range items {
+		sem <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-sem }()
+			f(i, it)
+		})
+	}
+	wg.Wait()
+}
+
 // ErrNoBrowser is DiscoverOptions or Discover without a Browser.
 var ErrNoBrowser = errors.New("esphome: discovery needs a DNS-SD browser")
 
@@ -246,38 +265,38 @@ func Discover(ctx context.Context, o Options) ([]Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	found := make([]*Proxy, len(cs))
-	var wg sync.WaitGroup
-	for i, c := range cs {
+	admitted := make([]candidate, 0, len(cs))
+	for _, c := range cs {
 		if err := admit(c, disc.AllowPlaintext); err != nil {
 			skip(o.Logger, c, err)
 			continue
 		}
-		wg.Go(func() {
-			var psk []byte
-			if c.psk != "" {
-				k, err := wire.DecodeKey(c.psk)
-				if err != nil {
-					skip(o.Logger, c, err)
-					return
-				}
-				psk = k
-			}
-			dctx, cancel := clock.WithTimeout(ctx, o.Clock, o.ConnectTimeout)
-			defer cancel()
-			a, addr, err := dialFirst(dctx, c.addrs, psk, &o)
+		admitted = append(admitted, c)
+	}
+	found := make([]*Proxy, len(admitted))
+	eachBounded(admitted, func(i int, c candidate) {
+		var psk []byte
+		if c.psk != "" {
+			k, err := wire.DecodeKey(c.psk)
 			if err != nil {
 				skip(o.Logger, c, err)
 				return
 			}
-			a.close(context.Canceled)
-			if psk == nil {
-				warnPlaintext(o.Logger, c.name, c.addrs)
-			}
-			found[i] = &Proxy{Addr: addr, Key: c.psk, Name: c.name}
-		})
-	}
-	wg.Wait()
+			psk = k
+		}
+		dctx, cancel := clock.WithTimeout(ctx, o.Clock, o.ConnectTimeout)
+		defer cancel()
+		a, addr, err := dialFirst(dctx, c.addrs, psk, &o)
+		if err != nil {
+			skip(o.Logger, c, err)
+			return
+		}
+		a.close(context.Canceled)
+		if psk == nil {
+			warnPlaintext(o.Logger, c.name, c.addrs)
+		}
+		found[i] = &Proxy{Addr: addr, Key: c.psk, Name: c.name}
+	})
 	out := make([]Proxy, 0, len(found))
 	for _, p := range found {
 		if p != nil {
@@ -378,48 +397,44 @@ func (c *Central) staticAt(addrs []string) bool {
 	return false
 }
 
-// join connects to the new candidates at once and adds those that are
-// usable proxies.
+// join connects to the new candidates, maxConcurrentDials at once, and
+// adds those that are usable proxies.
 func (c *Central) join(ctx context.Context, cs []candidate) {
-	var wg sync.WaitGroup
-	for _, cd := range cs {
-		wg.Go(func() {
-			p, err := newProxy(c, Proxy{Addr: cd.addrs[0], Key: cd.psk, Name: cd.name}, cd.addrs[1:]...)
-			if err != nil {
+	eachBounded(cs, func(_ int, cd candidate) {
+		p, err := newProxy(c, Proxy{Addr: cd.addrs[0], Key: cd.psk, Name: cd.name}, cd.addrs[1:]...)
+		if err != nil {
+			c.refuse(cd, err)
+			return
+		}
+		p.key = cd.key
+		dctx, cancel := clock.WithTimeout(ctx, c.clk, c.opts.ConnectTimeout)
+		a, err := p.dial(dctx)
+		cancel()
+		if err != nil {
+			p.stop()
+			if permanent(err) {
 				c.refuse(cd, err)
-				return
+			} else if ctx.Err() == nil {
+				skip(c.log, cd, err)
 			}
-			p.key = cd.key
-			dctx, cancel := clock.WithTimeout(ctx, c.clk, c.opts.ConnectTimeout)
-			a, err := p.dial(dctx)
-			cancel()
-			if err != nil {
-				p.stop()
-				if permanent(err) {
-					c.refuse(cd, err)
-				} else if ctx.Err() == nil {
-					skip(c.log, cd, err)
-				}
-				return
-			}
-			c.setMu.Lock()
-			if ctx.Err() != nil || c.ctx.Err() != nil {
-				c.setMu.Unlock()
-				a.close(context.Canceled)
-				p.stop()
-				return
-			}
-			c.proxies = append(c.proxies, p)
-			delete(c.skipped, cd.key)
+			return
+		}
+		c.setMu.Lock()
+		if ctx.Err() != nil || c.ctx.Err() != nil {
 			c.setMu.Unlock()
-			c.log.Info("ble.esphome.proxy_discovered", slog.String("proxy", p.name), slog.Any("addresses", cd.addrs), slog.Bool("encrypted", p.psk != nil))
-			if p.psk == nil {
-				warnPlaintext(c.log, p.name, cd.addrs)
-			}
-			c.start(p, a)
-		})
-	}
-	wg.Wait()
+			a.close(context.Canceled)
+			p.stop()
+			return
+		}
+		c.proxies = append(c.proxies, p)
+		delete(c.skipped, cd.key)
+		c.setMu.Unlock()
+		c.log.Info("ble.esphome.proxy_discovered", slog.String("proxy", p.name), slog.Any("addresses", cd.addrs), slog.Bool("encrypted", p.psk != nil))
+		if p.psk == nil {
+			warnPlaintext(c.log, p.name, cd.addrs)
+		}
+		c.start(p, a)
+	})
 }
 
 // refuse remembers a device refused for good at its configuration.
@@ -432,9 +447,16 @@ func (c *Central) refuse(cd candidate, err error) {
 
 // leave drops the discovered proxies no longer advertised that carry no
 // connection; one still connected stays until a browse misses it while
-// it is down.
+// it is down. A refused name no longer advertised is forgotten
+// (R2-P6-bound-2009): it is refused again, at its config_hash, should it
+// come back.
 func (c *Central) leave(advertised map[string]bool) {
 	c.setMu.Lock()
+	for name := range c.skipped {
+		if !advertised[name] {
+			delete(c.skipped, name)
+		}
+	}
 	var gone []*proxy
 	keep := c.proxies[:0:0]
 	for _, p := range c.proxies {

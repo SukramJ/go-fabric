@@ -30,6 +30,13 @@ const (
 	// sightingFreshness is how far back a proxy's report of a peripheral
 	// counts when Connect picks the proxy with the strongest signal.
 	sightingFreshness = 30 * time.Second
+	// maxSightings bounds the peripherals the central remembers, as
+	// controller/ble's scanner bounds its records (maxScannerRecords): a
+	// peripheral in a proxy's range advertises from as many addresses as
+	// it likes, and a proxy reports what it wants (R2-P6-bound-2003). At
+	// the bound the reports older than sightingFreshness go, then the
+	// oldest down to three quarters of it.
+	maxSightings = 8192
 )
 
 // Options configure [NewCentral]; the zero value is the system clock, no
@@ -315,6 +322,9 @@ func (c *Central) discovered(p *proxy, addr uint64, addrType uint32, rssi int32,
 	c.mu.Lock()
 	s := c.sightings[addr]
 	if s == nil {
+		if len(c.sightings) >= maxSightings {
+			c.shedSightingsLocked()
+		}
 		s = map[*proxy]sighting{}
 		c.sightings[addr] = s
 	}
@@ -324,6 +334,41 @@ func (c *Central) discovered(p *proxy, addr uint64, addrType uint32, rssi int32,
 	if cb != nil && scanning {
 		cb(ble.Peripheral{Address: macString(addr)}, data)
 	}
+}
+
+// shedSightingsLocked makes room at maxSightings: the peripherals whose
+// latest report is older than sightingFreshness go, then, oldest first,
+// as many as keep the map at three quarters of the bound — so the next
+// shed is a quarter of the bound's inserts away.
+func (c *Central) shedSightingsLocked() {
+	now := c.clk.Now()
+	type seen struct {
+		addr uint64
+		at   time.Time
+	}
+	all := make([]seen, 0, len(c.sightings))
+	for addr, s := range c.sightings {
+		var latest time.Time
+		for _, x := range s {
+			if x.at.After(latest) {
+				latest = x.at
+			}
+		}
+		if now.Sub(latest) > sightingFreshness {
+			delete(c.sightings, addr)
+			continue
+		}
+		all = append(all, seen{addr, latest})
+	}
+	keep := maxSightings * 3 / 4
+	if len(all) <= keep {
+		return
+	}
+	slices.SortFunc(all, func(a, b seen) int { return a.at.Compare(b.at) })
+	for _, x := range all[:len(all)-keep] {
+		delete(c.sightings, x.addr)
+	}
+	c.log.Debug("ble.esphome.sightings_shed", slog.Int("kept", keep), slog.Int("bound", maxSightings))
 }
 
 // forgetProxy drops a proxy's reports when its connection ends: a
