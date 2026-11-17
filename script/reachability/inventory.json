@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9728,
+  "entry_points": 9730,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19319,
+    "total_exported": 19321,
     "reachable": 12654,
-    "whitelisted": 6665,
+    "whitelisted": 6667,
     "unreachable": 0
   },
   "by_package": [],
@@ -398,28 +398,28 @@
       "identifier": "TestPeerCreatedForAnEntryIsReleasedWithItsLastEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "binding/release_test.go",
-      "line": 31
+      "line": 30
     },
     {
       "package": "binding",
       "identifier": "TestPeerCreatedIsReleasedEveryBindingPeriod",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "binding/release_test.go",
-      "line": 155
+      "line": 145
     },
     {
       "package": "binding",
       "identifier": "TestReleaseStopsConnectingOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "binding/release_test.go",
-      "line": 97
+      "line": 96
     },
     {
       "package": "binding",
       "identifier": "TestReleaseWaitsForTheEntriesConnectCalls",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "binding/release_test.go",
-      "line": 183
+      "line": 173
     },
     {
       "package": "binding",
@@ -27642,7 +27642,7 @@
       "identifier": "CommissionedIdentity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/ble/scanner.go",
-      "line": 668
+      "line": 709
     },
     {
       "package": "controller/ble",
@@ -27873,7 +27873,7 @@
       "identifier": "TestScanner_ContinuousDiscoveryForgetsWithItsRecords",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_bounds_test.go",
-      "line": 60
+      "line": 65
     },
     {
       "package": "controller/ble",
@@ -30372,14 +30372,14 @@
       "identifier": "TestConsentAwaitsAReArmInFlight",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 207
+      "line": 192
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentEndsWhenTheFailSafeCannotBeKept",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 157
+      "line": 152
     },
     {
       "package": "controller/commissioner",
@@ -30393,21 +30393,21 @@
       "identifier": "TestConsentErrorFailsTheStage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 120
+      "line": 115
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentKeepsAShortFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 133
+      "line": 128
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentOnBLE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 251
+      "line": 232
     },
     {
       "package": "controller/commissioner",
@@ -30428,7 +30428,7 @@
       "identifier": "TestCreateFabricNeverReplacesAStoredFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 186
+      "line": 185
     },
     {
       "package": "controller/commissioner",
@@ -30519,7 +30519,7 @@
       "identifier": "TestFabricLabelIsBoundInBytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 93
+      "line": 92
     },
     {
       "package": "controller/commissioner",
@@ -30911,7 +30911,7 @@
       "identifier": "TestRotationDoesNotHoldTheObserverLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 211
+      "line": 210
     },
     {
       "package": "controller/commissioner",
@@ -30939,14 +30939,14 @@
       "identifier": "TestStoredFabricIdentityIsChecked",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 24
+      "line": 23
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestStoredOperationalKeyIsNeverDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 259
+      "line": 254
     },
     {
       "package": "controller/commissioner",
@@ -31016,7 +31016,7 @@
       "identifier": "TestZeroFabricLabelIsSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 142
+      "line": 141
     },
     {
       "package": "controller/commissioner",
@@ -44103,6 +44103,13 @@
     },
     {
       "package": "thread/brdiscovery",
+      "identifier": "TestRegistryCoalescesPerEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/brdiscovery/registry_internal_test.go",
+      "line": 151
+    },
+    {
+      "package": "thread/brdiscovery",
       "identifier": "TestRegistryCoalescesUpdates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/brdiscovery/registry_internal_test.go",
@@ -44121,6 +44128,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/brdiscovery/registry_internal_test.go",
       "line": 21
+    },
+    {
+      "package": "thread/brdiscovery",
+      "identifier": "TestXaOfTrelInstance",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/brdiscovery/registry_internal_test.go",
+      "line": 190
     },
     {
       "package": "thread/otbr",
