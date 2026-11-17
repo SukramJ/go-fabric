@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -123,12 +124,20 @@ func TestSubscribeExchangeLeavesNoReplyRoute(t *testing.T) {
 	if !ok || report.Opcode != im.OpcodeReportData {
 		t.Fatalf("first reply = (%v, opcode %#x), want the priming ReportData", ok, report.Opcode)
 	}
+	// The peer's StatusResponse acknowledges the report, as every peer's
+	// message on the exchange does (hs 4b: an unacknowledged report holds
+	// the exchange's next message back).
+	reportCounter, held := pendingCounterOfExchange(b, sessionID, exchangeID)
+	if !held {
+		t.Fatal("the priming report waits for no acknowledgement; the test needs it tracked")
+	}
 	status, err := EncodeStatusResponse(im.StatusResponse{Status: im.StatusSuccess})
 	if err != nil {
 		t.Fatal(err)
 	}
 	answer := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
 		Opcode: im.OpcodeStatusResponse, ExchangeID: exchangeID, Initiator: true, NeedsAck: true,
+		HasAck: true, AckCounter: reportCounter,
 	}, status)
 	if err := b.dispatch(context.Background(), answer, peerAddr); err != nil {
 		t.Fatalf("dispatch of the StatusResponse: %v", err)
@@ -148,5 +157,86 @@ func TestSubscribeExchangeLeavesNoReplyRoute(t *testing.T) {
 	}
 	if n := routesOfExchange(b, sessionID, exchangeID); n != 0 {
 		t.Errorf("reply routes of the finished Subscribe exchange = %d, want 0", n)
+	}
+}
+
+// pendingCounterOfExchange is the counter of the message of sessionID's
+// exchange that waits for its acknowledgement, if one does.
+func pendingCounterOfExchange(b *Bridge, sessionID, exchangeID uint16) (uint32, bool) {
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+	key, ok := tracker.secureByExchange[secureSlot{sessionID, exchangeID}]
+	return key.counter, ok
+}
+
+// TestSubscribeResponseWaitsForThePrimingReportsAck (review II, hs 4b):
+// a peer whose StatusResponse does not acknowledge the priming report gets
+// no SubscribeResponse — a message of the exchange waits for its
+// acknowledgement, and a new one is refused, not sent in its place — and
+// the subscription is not established. Mirrors matter.js
+// packages/protocol/src/protocol/MessageExchange.ts:701-705 at db021da0.
+func TestSubscribeResponseWaitsForThePrimingReportsAck(t *testing.T) {
+	t.Parallel()
+	const (
+		sessionID  uint16 = 92
+		exchangeID uint16 = 0x2192
+	)
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
+	b.AttachAckTracker(mrp.NewAckTracker(time.Hour)) // attached after Start: no pump
+	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	b.AttachSubscriptionManager(mgr)
+	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+	markPASE(b, sessionID)
+	var paths []im.ConcreteAttributePath
+	for _, ep := range b.Topology().Endpoints {
+		if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+			paths = endpointpkg.ReportablePaths(ep)[:1]
+			break
+		}
+	}
+	if len(paths) != 1 {
+		t.Fatal("the topology has no bridged endpoint with a reportable path")
+	}
+	enc := tlv.NewEncoder()
+	im.SubscribeRequest{MaxIntervalCeiling: 60, AttributeRequests: paths}.MarshalTLV(enc)
+	payload, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
+		Opcode: im.OpcodeSubscribeRequest, ExchangeID: exchangeID, Initiator: true, NeedsAck: true,
+	}, payload)
+	done := make(chan error, 1)
+	go func() { done <- b.dispatch(context.Background(), request, peerAddr) }()
+	if report, _, ok := readOneIMDatagram(t, peerConn, peerSess, 5*time.Second); !ok || report.Opcode != im.OpcodeReportData {
+		t.Fatalf("first reply = (%v, opcode %#x), want the priming ReportData", ok, report.Opcode)
+	}
+	status, err := EncodeStatusResponse(im.StatusResponse{Status: im.StatusSuccess})
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
+		Opcode: im.OpcodeStatusResponse, ExchangeID: exchangeID, Initiator: true, NeedsAck: true,
+	}, status)
+	if err := b.dispatch(context.Background(), answer, peerAddr); err != nil {
+		t.Fatalf("dispatch of the StatusResponse: %v", err)
+	}
+	if err := <-done; !errors.Is(err, errExchangeAwaitsAck) {
+		t.Fatalf("dispatch of the SubscribeRequest = %v, want the refusal of the SubscribeResponse", err)
+	}
+	for {
+		next, _, ok := readOneIMDatagram(t, peerConn, peerSess, 200*time.Millisecond)
+		if !ok {
+			break
+		}
+		if next.ProtocolID == im.InteractionModelProtocolID {
+			t.Fatalf("opcode %#x followed the unacknowledged priming report, want nothing", next.Opcode)
+		}
+	}
+	if n := mgr.Active(); n != 0 {
+		t.Errorf("mgr.Active() = %d, want 0: the subscription is not established", n)
 	}
 }

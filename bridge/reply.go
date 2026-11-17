@@ -329,9 +329,13 @@ func (b *Bridge) sendReplyTimed(
 	datagram := make([]byte, 0, len(hdrBytes)+len(enc.Ciphertext))
 	datagram = append(datagram, hdrBytes...)
 	datagram = append(datagram, enc.Ciphertext...)
-	// Tracked before it is sent, for the reason above.
+	// Tracked before it is sent, for the reason above — and not sent at
+	// all while an earlier message of the exchange waits for its
+	// acknowledgement ([outboundReliableTracker.TrackOnExchange]; hs 4b).
 	if needsAck {
-		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())
+		if err := tracker.TrackOnExchange(counter, requestHdr.SessionID, requestProto.ExchangeID, !requestProto.Initiator, datagram, src, b.clk().Now()); err != nil {
+			return fmt.Errorf("%w: %w", ErrReplySend, err)
+		}
 	}
 	if err := b.sendRouted(listener, src, requestHdr.SessionID, datagram); err != nil {
 		if needsAck {

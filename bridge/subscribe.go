@@ -1947,7 +1947,11 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// entry, a no-op ([outboundReliableTracker.Ack]).
 	track := tracker != nil && respProto.NeedsAck && !target.flush
 	if track {
-		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, b.clk().Now())
+		// Not sent while an earlier message of the exchange waits for its
+		// acknowledgement ([outboundReliableTracker.TrackOnExchange]; hs 4b).
+		if err := tracker.TrackOnExchange(counter, target.sessionID, target.exchangeID, !target.peerInitiator, datagram, dest, b.clk().Now()); err != nil {
+			return 0, err
+		}
 	}
 	if err := b.sendRouted(listener, dest, target.sessionID, datagram); err != nil {
 		if track {
