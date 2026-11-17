@@ -477,8 +477,13 @@ func (m *Manager) firstRefusal(key []byte) bool {
 // without the key takes no place.
 //
 // The state is keyed on the operational key, not on fabric and key set:
-// key sets that derive the same key share one window, as in matter.js
-// (MessagingState.ts:80-90, receptionStateFor). It is dropped with the
+// key sets of one fabric that derive the same key share one window, as in
+// matter.js (MessagingState.ts:80-90, receptionStateFor). matter.js keeps
+// that state per fabric (packages/protocol/src/groups/FabricGroups.ts:33,
+// :67 at db021da0) and this manager one map for the node: the operational
+// key is derived with the fabric's compressed id as salt
+// ([OperationalKey]), so two fabrics derive the same key only under the
+// same compressed fabric id (review II, TM R3.6). It is dropped with the
 // last key set deriving the key — [Manager.Reload] after KeySetWrite /
 // KeySetRemove and [Manager.ForgetFabric] run forgetUnreferenced, matter.js
 // packages/protocol/src/groups/FabricGroups.ts:207-225
