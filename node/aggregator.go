@@ -425,7 +425,8 @@ func (b *Batch) Add(ep Endpoint) error {
 		return err
 	}
 	a := b.a
-	if err := a.n.checkSurface(b.ctx, ep); err != nil {
+	entries, err := a.n.checkSurface(ep)
+	if err != nil {
 		return err
 	}
 	if err := a.n.checkMatterTime(ep); err != nil {
@@ -435,6 +436,11 @@ func (b *Batch) Add(ep Endpoint) error {
 	defer a.mu.Unlock()
 	if p, _ := a.findLocked(key); p != nil {
 		return fmt.Errorf("%w: %s", ErrDuplicateKey, key)
+	}
+	// Withheld only once the set takes the key, and never for a key it
+	// serves (review II, R2-P6-store-2414).
+	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
+		return err
 	}
 	detach, err := a.attach(ep)
 	if err != nil {
@@ -465,7 +471,8 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 		return fmt.Errorf("%w: %s replaces %s", ErrKeyMismatch, newKey, key)
 	}
 	a := b.a
-	if err := a.n.checkSurface(b.ctx, ep); err != nil {
+	entries, err := a.n.checkSurface(ep)
+	if err != nil {
 		return err
 	}
 	if err := a.n.checkMatterTime(ep); err != nil {
@@ -479,6 +486,9 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	}
 	if part.eps[i] == ep {
 		return nil
+	}
+	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
+		return err
 	}
 	old := a.detach[newKey]
 	detach, err := a.attach(ep)
@@ -531,6 +541,21 @@ func (b *Batch) dropLocked(part *partition, i int, key string) {
 	}
 	a.detachSetLocked(key, nil)
 	b.changed = true
+}
+
+// servesLocked reports whether the set holds an endpoint, or a part of
+// one, under key; a.mu is held.
+func (a *Aggregator) servesLocked(key string) bool {
+	for _, p := range a.parts {
+		for _, ep := range p.eps {
+			for _, e := range surfaceEntries(ep) {
+				if e.key == key {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // attach binds ep to the node when it is a device; the returned detach is

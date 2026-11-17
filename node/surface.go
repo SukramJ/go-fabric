@@ -293,27 +293,32 @@ func surfaceEntries(ep Endpoint) []surfaceEntry {
 	return out
 }
 
-// checkSurface refuses ep when it, or one of its parts, has the reserved
-// key [AggregatorSurfaceKey] ([ErrReservedKey]) or reports a surface
+// checkSurface refuses ep when it, or one of its parts, has a reserved
+// key ([ErrReservedKey]): [AggregatorSurfaceKey], or the stable key of the
+// node's own OTA provider endpoint, which the default snapshot would hold
+// twice (review II, R2-P6-api-2415); or when it reports a surface
 // composed under policies other than the node's ([ErrPolicyMismatch]). An
 // endpoint without a reporter — a host's own Spec type — passes the
-// second check. An endpoint the specification level withheld is recorded
-// and refused with its *surface.WithheldError ([Node.Surface]).
-func (n *Node) checkSurface(ctx context.Context, ep Endpoint) error {
+// second check. It returns ep's surface entries, which the caller hands
+// [Node.recordWithheld] once its set accepted ep's key.
+func (n *Node) checkSurface(ep Endpoint) ([]surfaceEntry, error) {
 	entries := surfaceEntries(ep)
 	for i := range entries {
 		e := &entries[i]
 		if e.key == AggregatorSurfaceKey {
-			return fmt.Errorf("%w: %q is the Aggregator's key in Node.Surface (node.AggregatorSurfaceKey)", ErrReservedKey, e.key)
+			return nil, fmt.Errorf("%w: %q is the Aggregator's key in Node.Surface (node.AggregatorSurfaceKey)", ErrReservedKey, e.key)
+		}
+		if e.key == otaProviderKey.String() {
+			return nil, fmt.Errorf("%w: %q is the key of the node's OTA provider endpoint", ErrReservedKey, e.key)
 		}
 		if e.reporter == nil {
 			continue
 		}
 		if got := e.reporter.Surface().Policies; got != n.surfaceDigest {
-			return fmt.Errorf("%w: endpoint %q (policies %x…, the node's %x…)", ErrPolicyMismatch, e.key, got[:4], n.surfaceDigest[:4])
+			return nil, fmt.Errorf("%w: endpoint %q (policies %x…, the node's %x…)", ErrPolicyMismatch, e.key, got[:4], n.surfaceDigest[:4])
 		}
 	}
-	return n.recordWithheld(ctx, entries)
+	return entries, nil
 }
 
 // recordWithheld records each entry the specification level withheld
@@ -321,8 +326,13 @@ func (n *Node) checkSurface(ctx context.Context, ep Endpoint) error {
 // with a surface.WithheldError) for [Node.Surface], drops the surface
 // persisted for it, and returns a *surface.WithheldError naming the
 // first; an entry that is not withheld clears an earlier record under its
-// key.
-func (n *Node) recordWithheld(ctx context.Context, entries []surfaceEntry) error {
+// key. An entry whose key held reports as one the set serves — a refused
+// duplicate Add, a refused Replace — is neither recorded nor has its
+// surface dropped: the refused call leaves the served endpoint's record
+// as it was, and its error is still returned (review II, R2-P6-store-2414).
+// The caller holds the Aggregator's lock, so the set does not change in
+// between.
+func (n *Node) recordWithheld(ctx context.Context, entries []surfaceEntry, held func(key string) bool) error {
 	n.withheldMu.Lock()
 	defer n.withheldMu.Unlock()
 	var first error
@@ -332,8 +342,17 @@ func (n *Node) recordWithheld(ctx context.Context, entries []surfaceEntry) error
 			continue
 		}
 		r := e.reporter.Surface()
+		served := held != nil && held(e.key)
 		if len(r.Withheld) == 0 {
-			delete(n.withheld, e.key)
+			if !served {
+				delete(n.withheld, e.key)
+			}
+			continue
+		}
+		if served {
+			if first == nil {
+				first = &surface.WithheldError{Endpoint: e.key, Elements: slices.Clone(r.Withheld), Report: r}
+			}
 			continue
 		}
 		if n.withheld == nil {
