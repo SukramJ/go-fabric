@@ -48,3 +48,39 @@ func TestEraseDropsTheRegistrysSealMark(t *testing.T) {
 		t.Errorf("the registry under the erased key after the new controller marked it = %v, want store.ErrUnseal", err)
 	}
 }
+
+// TestNewOpensWithAnOwedRegistryScrub (R2-P6-store-2303, decision 132):
+// a registry whose owed scrub cannot be closed out — here its mark will not
+// go — no longer fails New: the controller opens sealed, the registry
+// reports the scrub owed, and the kept code reads back.
+func TestNewOpensWithAnOwedRegistryScrub(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openSealerDB(t, filepath.Join(t.TempDir(), "controller.db"))
+	c, err := New(ctx, sealerConfig(db, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.nodeStore.Save("n", 0, onboardingCodeCluster, map[uint32][]byte{0: []byte(keptCode)}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `CREATE TRIGGER keep_owed BEFORE DELETE ON matter_client_metadata
+WHEN OLD.key = 'sqlstore.seal_scrub_owed' BEGIN SELECT RAISE(ABORT, 'kept'); END`); err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := New(ctx, sealerConfig(db, aesSealer(t, 7)))
+	if err != nil {
+		t.Fatalf("New over a registry whose owed scrub stays marked: %v", err)
+	}
+	defer func() { _ = sealed.Close(ctx) }()
+	if owed, err := sealed.nodeStore.ScrubOwed(ctx); err != nil || !owed {
+		t.Errorf("the registry's ScrubOwed = %v, %v; want true", owed, err)
+	}
+	eps, err := sealed.nodeStore.Load("n")
+	if err != nil || len(eps) != 1 || string(eps[0].Clusters[0].Values[0]) != keptCode {
+		t.Errorf("the kept code under the owed scrub: %+v, %v", eps, err)
+	}
+}

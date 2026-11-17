@@ -200,3 +200,20 @@ func checkSchema(ctx context.Context, q querier, op string) error {
 	}
 	return nil
 }
+
+// ScrubOwed reports whether the registry owes the scrub of a sealing or a
+// [Reseal]: the values are sealed, but the clear (or old-key) bytes they
+// replaced may remain in the file's free pages, its -wal or a kept
+// -journal until a [store.Scrub] of the file finishes — a full disk or a
+// reader holding the -wal stops one. [NewSealed] retries the scrub on
+// every open while it is owed and opens the store either way (decision
+// 132, as [store.Store.ScrubOwed]); a host that wants to fail closed
+// checks ScrubOwed after NewSealed and stops, and one that does not logs
+// it.
+func (s *Store) ScrubOwed(ctx context.Context) (bool, error) {
+	var owed int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed).Scan(&owed); err != nil {
+		return false, fmt.Errorf("sqlstore: scrub owed: %w", err)
+	}
+	return owed > 0, nil
+}

@@ -116,9 +116,10 @@ func sealAAD(nodeID string, ep uint16, cluster, attribute uint32) []byte {
 // file is owed when it sealed a value; a failure leaves the registry as it
 // was. While a scrub is owed NewSealed rewrites the file and empties the
 // -wal ([store.Scrub]), so the clear values do not stay behind in free
-// pages, and then deletes the record. A scrub that does not finish — a
-// reader holds the -wal — is [store.ErrScrubIncomplete], and so is the
-// next NewSealed's until one finishes.
+// pages, and then deletes the record. A scrub that does not finish (a full
+// disk, a reader holding the -wal) does not fail NewSealed (decision 132):
+// the values are sealed, the store is returned, the scrub stays owed
+// ([Store.ScrubOwed]) and every later NewSealed tries it again.
 //
 // While the store is open it writes no secret value in clear, and a secret
 // value it reads without the seal mark is refused with [store.ErrUnseal].
@@ -146,19 +147,20 @@ func NewSealed(ctx context.Context, db *sql.DB, s store.Sealer) (*Store, error) 
 			return nil, err
 		}
 	}
-	var owed int
-	switch err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed).Scan(&owed); {
-	case err != nil:
-		return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
-	case owed == 0:
+	if owed, err := st.ScrubOwed(ctx); err != nil {
+		return nil, fmt.Errorf("sqlstore: NewSealed: %w", err)
+	} else if !owed {
 		return st, nil
 	}
 	if err := store.Scrub(ctx, db); err != nil {
-		return nil, fmt.Errorf("sqlstore: open sealed store: the clear values are sealed: %w", err)
+		// Owed, and visible through ScrubOwed: the values are sealed, and a
+		// full disk or a reader must not keep the controller down
+		// (decision 132, as store's sealClearRows).
+		return st, nil //nolint:nilerr // the owed scrub is a state, not a failure
 	}
-	if _, err := db.ExecContext(ctx, `DELETE FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
-		return nil, fmt.Errorf("sqlstore: open sealed store: %w", err)
-	}
+	// A mark that will not go keeps ScrubOwed true and the next NewSealed
+	// scrubs again: the state of an unfinished scrub.
+	_, _ = db.ExecContext(ctx, `DELETE FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed)
 	return st, nil
 }
 
