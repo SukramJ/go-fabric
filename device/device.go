@@ -761,18 +761,27 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // pattern hosts any application device type on descendants
 // (packages/node/src/endpoints/bridged-node.ts:39-73).
 //
-// A part of another device moves: it leaves its former owner's parts —
-// and that owner's node — and is bound with d to d's node, or waits
-// unbound until d is added. Mirrors matter.js's owner setter, which
+// A part of another device moves while it is bound to no running node:
+// it leaves its former owner's parts — and that owner's node, which has
+// not started — and is bound with d to d's node, or waits unbound until d
+// is added. The bookkeeping mirrors matter.js's owner setter, which
 // removes the endpoint from its former owner's container before it adds
-// it to the new one and, should the add throw, leaves it with no owner
-// (packages/node/src/endpoint/Endpoint.ts:706-725 at db021da0). Here
-// nothing after the move can fail, so p is never half-owned
-// (R2-P6-fsm-2501, step 16). A device a node holds as a bridged device is
-// the Aggregator's, which AddPart does not change: it is refused with
-// [ErrAddedElsewhere] (node.Aggregator.Remove it first). A part already
-// d's is left as it is. A callback on p's queue must not move p: the move
-// waits for p's queue to run what it holds.
+// it to the new one (packages/node/src/endpoint/Endpoint.ts:706-725 at
+// db021da0); matter.js completes that move only while the endpoint is not
+// initialised. A part bound to a running node is refused with
+// [ErrComposition] and stays with its former owner, nothing moved: matter.js
+// refuses the move of a live endpoint too — the add starts its
+// construction (Parts.ts:64-70), which an active one refuses
+// (packages/general/src/util/Construction.ts:284-287) — and Go keeps the
+// state clean where matter.js leaves the endpoint without an owner
+// (Endpoint.ts:719-723; R2-P6-fsm-2501, decision 225). Every refusal comes
+// before the move, so a refused AddPart leaves p with its former owner, as
+// matter.js's parts.add checks before it adds (Parts.ts:45-59); nothing
+// after the move can fail, so p is never half-owned. A device a node holds
+// as a bridged device is the Aggregator's, which AddPart does not change:
+// it is refused with [ErrAddedElsewhere] (node.Aggregator.Remove it
+// first). A part already d's is left as it is. A callback on p's queue
+// must not move p: the move waits for p's queue to run what it holds.
 func (d *Device) AddPart(p *Device) error {
 	if p == nil {
 		return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
@@ -798,6 +807,11 @@ func (d *Device) AddPart(p *Device) error {
 	if former == nil && p.hostOf() != nil {
 		composeMu.Unlock()
 		return fmt.Errorf("%w: %s is a bridged device of a node; remove it from the Aggregator before it becomes a part", ErrAddedElsewhere, p.opts.StableKey)
+	}
+	if h := p.hostOf(); h != nil && h.Running() {
+		composeMu.Unlock()
+		return fmt.Errorf("%w: %s is a part on a running node and does not move; move it before the node starts, or remove its owner first",
+			ErrComposition, p.opts.StableKey)
 	}
 	// The move (Endpoint.ts:710-718): out of the former owner, then in.
 	if former != nil {

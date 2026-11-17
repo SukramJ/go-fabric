@@ -33,6 +33,11 @@ var _ deviceseam.Host = nodeHost{}
 // Clock implements [deviceseam.Host].
 func (h nodeHost) Clock() clock.Clock { return h.n.cfg.Clock }
 
+// Running implements [deviceseam.Host]: the node started. A stopped node
+// has unbound its devices (Node.Stop), so a bound device's node is either
+// not started yet or running.
+func (h nodeHost) Running() bool { return h.n.started.Load() }
+
 // EndpointNumber implements [deviceseam.Host].
 func (h nodeHost) EndpointNumber(key endpoint.SourceKey) (uint16, bool) {
 	if ep := h.n.assembled(key); ep != nil {

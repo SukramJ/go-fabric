@@ -20,10 +20,12 @@ func newTestHost(numbers map[string]uint16) *fakeHost {
 	return &fakeHost{clk: clock.System{}, numbers: numbers}
 }
 
-// TestAddPartMovesThePart (R2-P6-fsm-2501, step 16): a part added to
-// another owner moves, as matter.js's owner setter moves an endpoint — out
-// of the former owner's parts, detached from the former owner's node, and
-// attached with the new owner to its node.
+// TestAddPartMovesThePart (R2-P6-fsm-2501, decision 225): a part bound to
+// no running node, added to another owner, moves — out of the former
+// owner's parts (the bookkeeping of matter.js's owner setter,
+// Endpoint.ts:706-725), unbound from the former owner's node, and bound
+// with the new owner to its node. Neither node has started here, the case
+// in which matter.js moves too.
 func TestAddPartMovesThePart(t *testing.T) {
 	t.Parallel()
 	h1 := newTestHost(map[string]uint16{"test:a": 2, "test:p": 3})
@@ -58,7 +60,7 @@ func TestAddPartMovesThePart(t *testing.T) {
 	if n, ok := p.EndpointNumber(); !ok || n != 6 {
 		t.Errorf("the part on the new owner's node: %d, %v", n, ok)
 	}
-	// Moved back onto a running node: attached there at once.
+	// Moved back onto the first owner's node: attached there at once.
 	if err := a.AddPart(p); err != nil {
 		t.Fatal(err)
 	}
@@ -71,6 +73,44 @@ func TestAddPartMovesThePart(t *testing.T) {
 	}
 	if err := a.AddPart(p); err != nil || len(a.Parts()) != 1 {
 		t.Errorf("a second AddPart of a part: %v, parts %d", err, len(a.Parts()))
+	}
+}
+
+// TestAddPartRefusesALivePart (R2-P6-fsm-2501, decision 225): a part bound
+// to a running node does not move — AddPart answers ErrComposition and the
+// part stays its former owner's, bound and numbered as before; matter.js
+// refuses the move of a live endpoint too (Parts.ts:64-70,
+// Construction.ts:284-287). Unbound from it, the part moves again.
+func TestAddPartRefusesALivePart(t *testing.T) {
+	t.Parallel()
+	live := newTestHost(map[string]uint16{"test:a": 2, "test:p": 3})
+	live.running = true
+	a, b, p := mustBridgedNode(t, "a"), mustBridgedNode(t, "b"), mustOnOff(t, "p")
+	if err := a.AddPart(p); err != nil {
+		t.Fatal(err)
+	}
+	detachA, _, err := deviceseam.Attach(a, live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.AddPart(p); !errors.Is(err, ErrComposition) {
+		t.Fatalf("AddPart of a live part: %v, want ErrComposition", err)
+	}
+	if !slices.Contains(a.Parts(), p) || len(b.Parts()) != 0 || p.owner.Load() != a.Device {
+		t.Errorf("the refused move changed the parts: a %v, b %v", a.Parts(), b.Parts())
+	}
+	if n, ok := p.EndpointNumber(); !ok || n != 3 {
+		t.Errorf("the refused part lost its node: %d, %v", n, ok)
+	}
+	p.life.Lock()
+	running := p.running
+	p.life.Unlock()
+	if !running {
+		t.Error("the refused part was stopped")
+	}
+	detachA()
+	if err := b.AddPart(p); err != nil {
+		t.Errorf("AddPart once the node let the part go: %v", err)
 	}
 }
 

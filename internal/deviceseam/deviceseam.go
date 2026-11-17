@@ -24,6 +24,9 @@ import (
 type Host interface {
 	// Clock is the node's clock.
 	Clock() clock.Clock
+	// Running reports whether the node has started: a part bound to a
+	// running node does not move (device.Device.AddPart).
+	Running() bool
 	// EndpointNumber is the endpoint number the node assembled the
 	// endpoint with key under; false before the endpoint is assembled.
 	EndpointNumber(key endpoint.SourceKey) (uint16, bool)
