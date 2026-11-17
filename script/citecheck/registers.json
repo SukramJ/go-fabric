@@ -50,43 +50,43 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 989,
+    "line": 1012,
     "citation": "packages/ws-controller/src/server/WebSocketControllerHandler.ts:144",
     "error": "no matterjs-server commit"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1024,
+    "line": 1047,
     "citation": "packages/protocol/src/interaction/SubscriptionHandler.ts:284",
     "error": "file not found"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1052,
+    "line": 1075,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1053,
+    "line": 1076,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1230,
+    "line": 1253,
     "citation": "aggregator.ts:62",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2755,
+    "line": 2782,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4367,
+    "line": 4394,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"
@@ -107,7 +107,7 @@
   },
   {
     "file": "notes/parity/matter_behaviour_findings.md",
-    "line": 575,
+    "line": 587,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
   }
