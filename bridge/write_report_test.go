@@ -565,3 +565,72 @@ func TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances(t *testing.T) {
 		t.Errorf("DataVersion advanced %d, LastChangedTime reported %d times; want 1 and 1", advanced, n)
 	}
 }
+
+// reportViewHidden shadows the embedded server's OnAttributeReport in
+// [noReportViewServer] with a method of another signature, so the wrapper
+// is a server with a change view and no report view.
+type reportViewHidden struct{}
+
+func (reportViewHidden) OnAttributeReport() {}
+
+// noReportViewServer is a generated server seen without its report view
+// ([contract.AttributeReportNotifier]): its changes, a write's own
+// included, reach the bridge through OnAttributeChange alone.
+type noReportViewServer struct {
+	*spec.Server
+	reportViewHidden
+}
+
+// TestWrittenAttributeOfAServerWithoutReportViewWaitsForTheAdvance
+// (F-db021da0-59): the sibling of
+// TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances for a server
+// wired on its change view alone. The write's own change is not marked
+// while the server tells it — before the dispatcher advanced the version —
+// but after the advance, once.
+func TestWrittenAttributeOfAServerWithoutReportViewWaitsForTheAdvance(t *testing.T) {
+	t.Parallel()
+	inner, err := spec.NewServer(hepadef.Definition, spec.Options{
+		Features:   uint32(hepadef.FeatureCondition),
+		Attributes: []uint32{hepadef.AttrLastChangedTime},
+	}, spec.ServerConfig{Initial: map[uint32]any{hepadef.AttrCondition: uint8(40)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := noReportViewServer{Server: inner}
+	if _, reports := any(srv).(contract.AttributeReportNotifier); reports {
+		t.Fatal("the wrapper still has a report view")
+	}
+	if _, changes := any(srv).(contract.AttributeChangeNotifier); !changes {
+		t.Fatal("the wrapper lost its change view")
+	}
+	h := newAppHarness(t, appDevice{deviceType: 0x002D, servers: []contract.ClusterServer{srv}})
+	epID := h.endpoints[0x002D]
+	w := watchCluster(t, h, epID, hepadef.ClusterID)
+	var told, inside int
+	h.bridge.SetOnAttributeChange(func(_ uint16, _ uint32, change contract.Change) {
+		if change.Origin != contract.OriginControllerWrite {
+			return
+		}
+		told++
+		w.now = w.now.Add(time.Minute)
+		w.mgr.Tick(context.Background(), w.now)
+		w.spy.mu.Lock()
+		for _, call := range w.spy.calls {
+			inside += len(call)
+		}
+		w.spy.calls = nil
+		w.spy.mu.Unlock()
+	})
+	if st := h.writeAttribute(epID, hepadef.ClusterID, hepadef.AttrLastChangedTime, uintValue(1000)); st != 0 {
+		t.Fatalf("write: status 0x%02X", st)
+	}
+	if told == 0 {
+		t.Fatal("the server told no change of its write; the test proves nothing")
+	}
+	if inside != 0 {
+		t.Errorf("%d path(s) reported while the server told its write, before the dispatcher advanced the version", inside)
+	}
+	if advanced, n := w.step(func() {}, hepadef.AttrLastChangedTime); advanced != 1 || n != 1 {
+		t.Errorf("DataVersion advanced %d, LastChangedTime reported %d times; want 1 and 1", advanced, n)
+	}
+}

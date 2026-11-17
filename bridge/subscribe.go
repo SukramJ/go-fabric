@@ -2681,9 +2681,14 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 	}
 	// A report view's mark waits for a write applied meanwhile, the
 	// write's own change included: the write's report marks it after the
-	// dispatcher's advance (Fable read 5b-write R3).
+	// dispatcher's advance (Fable read 5b-write R3). A write's own change
+	// told by a server without a report view waits the same way: matter.js
+	// advances the version before the commit's changes are handed on
+	// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
+	// :1319 at db021da0), so no report carries the written value under the
+	// version from before the write (review II, F-db021da0-59).
 	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || b.holdWritten(mgr, ep, clusterID, attrIDs, !advance)) ||
-		change.Origin == contract.OriginControllerWrite && !advance && b.holdWritten(mgr, ep, clusterID, attrIDs, true) {
+		change.Origin == contract.OriginControllerWrite && b.holdWritten(mgr, ep, clusterID, attrIDs, true) {
 		if hook := b.onAttributeChange.Load(); hook != nil {
 			(*hook)(ep.ID, clusterID, change)
 		}
