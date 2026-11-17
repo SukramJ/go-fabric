@@ -375,7 +375,12 @@ func (g *generator) ingestElement(dt *deviceType, cr *clusterReq, n *requirement
 		// db021da0; Fable, verify-6b-B R2-P6-par-2708): only a numeric
 		// value is taken, and min / max are tried when the value gives
 		// none — MeterReferencePoint's TariffUnit "kWh | kVAh" is such a
-		// non-numeric value at the pin.
+		// non-numeric value at the pin. Other forms are refused here
+		// (requirementBound) where matter.js reads them: a boolean
+		// numericValue takes as 1 / 0 (FieldValue.ts:219-221), and a
+		// string, null or a unit without a scaled type it reads as
+		// nothing and then tries min / max (Fable fable-read-6b-gen);
+		// none occurs at the pin.
 		where := fmt.Sprintf("%s %s.%s: constraint %q", dt.Name, cr.def.Name, n.Name, c.Text)
 		v, ok, err := requirementBound(c.Value)
 		if err != nil {

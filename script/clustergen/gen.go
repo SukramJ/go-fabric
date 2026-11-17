@@ -1748,7 +1748,12 @@ func referenceOf(raw json.RawMessage) string {
 // rendering as no default: a stated default is told apart from none
 // (W3-clugen-07), and on a struct attribute "no default" would let
 // structDefault build a different one from the fields' own
-// (R2-P6-par-2703, wizard-6b §2 gen Q1).
+// (R2-P6-par-2703, wizard-6b §2 gen Q1). "none" is matter.js's "no
+// default" — FieldValue.cast answers undefined for it, so an override
+// can remove a default the specification states (FieldValue.ts:458-462 at
+// db021da0; Fable fable-read-6b-gen) — and its rendering is then no
+// default (""); none occurs at the pin, so it is refused until one does
+// and that rendering is decided with it.
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
