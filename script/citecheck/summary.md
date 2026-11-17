@@ -16,4 +16,4 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 | Drift-checked (the sentence names a name the file contains) | 4595 |
 | Hard-checked only | 5763 |
 | **Hard errors** | 0 |
-| **Drift** | 374 |
+| **Drift** | 343 |

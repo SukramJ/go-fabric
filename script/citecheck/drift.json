@@ -37,30 +37,12 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 265,
-    "citation": "BdxProtocol.ts:204-211",
-    "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
-    "identifier": "SessionFor",
-    "nearest": 84,
-    "occurrences": 0
-  },
-  {
-    "file": "bdx/responder.go",
     "line": 427,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "onNewExchange",
     "nearest": 110,
     "occurrences": 1
-  },
-  {
-    "file": "bdx/send.go",
-    "line": 39,
-    "citation": "bdx-session-initiator.ts:155-165",
-    "resolved": "packages/protocol/src/bdx/bdx-session-initiator.ts",
-    "identifier": "MaxBlockSize",
-    "nearest": 200,
-    "occurrences": 0
   },
   {
     "file": "bdx/send_serve_test.go",
@@ -312,15 +294,6 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 362,
-    "citation": "PaseServer.ts:155-157",
-    "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
-    "identifier": "SessionParameters",
-    "nearest": 194,
-    "occurrences": 0
-  },
-  {
-    "file": "bridge/handlers.go",
     "line": 1248,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
@@ -410,25 +383,6 @@
     "identifier": "vendorId",
     "nearest": 466,
     "occurrences": 6
-  },
-  {
-    "file": "bridge/receive_test.go",
-    "line": 638,
-    "citation": "InteractionServer.ts:431-436",
-    "resolved": "packages/node/src/node/server/InteractionServer.ts",
-    "at": "db021da0",
-    "identifier": "TimedRequest",
-    "nearest": 50,
-    "occurrences": 2
-  },
-  {
-    "file": "bridge/reply_doorlock_event_test.go",
-    "line": 95,
-    "citation": "DoorLockServer.ts:1017-1022",
-    "resolved": "packages/node/src/behaviors/door-lock/DoorLockServer.ts",
-    "identifier": "FabricIndex",
-    "nearest": 935,
-    "occurrences": 4
   },
   {
     "file": "bridge/securechannel.go",
@@ -533,16 +487,6 @@
   },
   {
     "file": "bridge/subscribe_dispatch.go",
-    "line": 519,
-    "citation": "InteractionServer.ts:647-665",
-    "resolved": "packages/node/src/node/server/InteractionServer.ts",
-    "at": "db021da0",
-    "identifier": "SubscribeRequest",
-    "nearest": 605,
-    "occurrences": 3
-  },
-  {
-    "file": "bridge/subscribe_dispatch.go",
     "line": 740,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
@@ -576,15 +520,6 @@
     "identifier": "initiateExchange",
     "nearest": 900,
     "occurrences": 2
-  },
-  {
-    "file": "bridge/suppress_response_parity_matterjs_test.go",
-    "line": 171,
-    "citation": "SuppressResponseTest.ts:62-64",
-    "resolved": "packages/node/test/endpoint/server/SuppressResponseTest.ts",
-    "identifier": "SuppressResponse",
-    "nearest": 197,
-    "occurrences": 9
   },
   {
     "file": "bridge/timed_conformance_test.go",
@@ -919,15 +854,6 @@
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerLoss",
     "nearest": 338,
-    "occurrences": 2
-  },
-  {
-    "file": "client/handshake/case.go",
-    "line": 66,
-    "citation": "PeerConnection.ts:829-860",
-    "resolved": "packages/protocol/src/peer/PeerConnection.ts",
-    "identifier": "CaseClient",
-    "nearest": 566,
     "occurrences": 2
   },
   {
@@ -1349,15 +1275,6 @@
     "occurrences": 3
   },
   {
-    "file": "cluster/core/fabric_sensitive_parity_matterjs_test.go",
-    "line": 126,
-    "citation": "IcdManagementServer.ts:572-577",
-    "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
-    "identifier": "FabricIndex",
-    "nearest": 756,
-    "occurrences": 4
-  },
-  {
     "file": "cluster/core/group_key_management.go",
     "line": 913,
     "citation": "GroupKeyManagementServer.ts:96",
@@ -1433,26 +1350,6 @@
     "occurrences": 16
   },
   {
-    "file": "cluster/core/icd_management.go",
-    "line": 1083,
-    "citation": "IcdManagementServer.ts:572-583",
-    "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
-    "at": "db021da0",
-    "identifier": "ClientType",
-    "nearest": 420,
-    "occurrences": 1
-  },
-  {
-    "file": "cluster/core/icd_management_test.go",
-    "line": 500,
-    "citation": "IcdManagementServer.ts:572-583",
-    "resolved": "packages/node/src/behaviors/icd-management/IcdManagementServer.ts",
-    "at": "db021da0",
-    "identifier": "RegisteredClients",
-    "nearest": 789,
-    "occurrences": 1
-  },
-  {
     "file": "cluster/core/operational_credentials.go",
     "line": 335,
     "citation": "Fabric.ts:548",
@@ -1469,15 +1366,6 @@
     "identifier": "addNoc",
     "nearest": 272,
     "occurrences": 4
-  },
-  {
-    "file": "cluster/core/operational_credentials.go",
-    "line": 1817,
-    "citation": "OperationalCredentialsServer.ts:110",
-    "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
-    "identifier": "AttestationNonce",
-    "nearest": 64,
-    "occurrences": 2
   },
   {
     "file": "cluster/core/operational_credentials_nocvalidation_test.go",
@@ -1517,15 +1405,6 @@
     "occurrences": 1
   },
   {
-    "file": "cluster/core/scenes_attributes.go",
-    "line": 289,
-    "citation": "OnOffServer.ts:97-100",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
-  },
-  {
     "file": "cluster/core/scenes_management.go",
     "line": 626,
     "citation": "ScenesManagementServer.ts:77-80",
@@ -1533,33 +1412,6 @@
     "identifier": "OnOff",
     "nearest": 552,
     "occurrences": 2
-  },
-  {
-    "file": "cluster/core/scenes_management.go",
-    "line": 637,
-    "citation": "OnOffServer.ts:114-117",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
-  },
-  {
-    "file": "cluster/core/scenes_onoff_test.go",
-    "line": 22,
-    "citation": "OnOffServer.ts:159-165",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "ScenesManagement",
-    "nearest": 267,
-    "occurrences": 1
-  },
-  {
-    "file": "cluster/core/scenes_onoff_test.go",
-    "line": 27,
-    "citation": "OnOffServer.ts:119-122",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
   },
   {
     "file": "cluster/cover/windowcovering_parity_matterjs_test.go",
@@ -1626,15 +1478,6 @@
     "occurrences": 34
   },
   {
-    "file": "cluster/levelcontrol/levelcontrol_server_test.go",
-    "line": 248,
-    "citation": "LevelControlServer.ts:114-120",
-    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
-    "identifier": "LevelControl",
-    "nearest": 62,
-    "occurrences": 34
-  },
-  {
     "file": "cluster/levelcontrol/native.go",
     "line": 267,
     "citation": "LevelControlServer.ts:186-195",
@@ -1650,15 +1493,6 @@
     "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
     "identifier": "targetValue",
     "nearest": 543,
-    "occurrences": 1
-  },
-  {
-    "file": "cluster/levelcontrol/native_parity_matterjs_test.go",
-    "line": 770,
-    "citation": "LevelControlServer.ts:624-627",
-    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
-    "identifier": "preCommit",
-    "nearest": 694,
     "occurrences": 1
   },
   {
@@ -1745,33 +1579,6 @@
     "occurrences": 3
   },
   {
-    "file": "cluster/onoff/server.go",
-    "line": 82,
-    "citation": "OnOffServer.ts:97-100",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
-  },
-  {
-    "file": "cluster/onoff/server.go",
-    "line": 636,
-    "citation": "OnOffServer.ts:97-100",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
-  },
-  {
-    "file": "cluster/onoff/server_internal_test.go",
-    "line": 84,
-    "citation": "OnOffServer.ts:62",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
-  },
-  {
     "file": "cluster/spec/conformance.go",
     "line": 103,
     "citation": "packages/model/src/aspects/Conformance.ts:995-997",
@@ -1788,16 +1595,6 @@
     "identifier": "addEnumMemberValidation",
     "nearest": 763,
     "occurrences": 2
-  },
-  {
-    "file": "cluster/spec/written.go",
-    "line": 119,
-    "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:466-472",
-    "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
-    "at": "db021da0",
-    "identifier": "FabricIndex",
-    "nearest": 51,
-    "occurrences": 4
   },
   {
     "file": "cluster/thermo/thermostat_parity_test.go",
@@ -2291,15 +2088,6 @@
     "occurrences": 39
   },
   {
-    "file": "controller/commissioner/wire.go",
-    "line": 42,
-    "citation": "ControllerCommissioningFlow.ts:1466",
-    "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
-    "identifier": "AddNoc",
-    "nearest": 366,
-    "occurrences": 1
-  },
-  {
     "file": "controller/dcl/cert.go",
     "line": 31,
     "citation": "DclCertificateService.ts:2089",
@@ -2454,24 +2242,6 @@
     "identifier": "InteractionServerMessenger",
     "nearest": 306,
     "occurrences": 4
-  },
-  {
-    "file": "endpoint/materialize.go",
-    "line": 572,
-    "citation": "OnOffServer.ts:97-122",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
-  },
-  {
-    "file": "endpoint/types.go",
-    "line": 867,
-    "citation": "OnOffServer.ts:97-100",
-    "resolved": "packages/node/src/behaviors/on-off/OnOffServer.ts",
-    "identifier": "OnOff",
-    "nearest": 45,
-    "occurrences": 6
   },
   {
     "file": "examples/reference-bridge/ota.go",
@@ -2652,26 +2422,6 @@
     "occurrences": 2
   },
   {
-    "file": "im/client.go",
-    "line": 117,
-    "citation": "action/request/Write.ts:56-184",
-    "resolved": "packages/protocol/src/action/request/Write.ts",
-    "at": "0ceb202d",
-    "identifier": "TimedRequest",
-    "nearest": 24,
-    "occurrences": 1
-  },
-  {
-    "file": "im/client.go",
-    "line": 120,
-    "citation": "Write.ts:165-186",
-    "resolved": "packages/protocol/src/action/request/Write.ts",
-    "at": "862ad75f",
-    "identifier": "DataVersion",
-    "nearest": 136,
-    "occurrences": 4
-  },
-  {
     "file": "im/client_mandatory_test.go",
     "line": 18,
     "citation": "TlvObject.ts:131",
@@ -2753,16 +2503,6 @@
     "identifier": "keepSubscriptions",
     "nearest": 616,
     "occurrences": 4
-  },
-  {
-    "file": "im/subscription/subscription.go",
-    "line": 314,
-    "citation": "packages/node/src/node/server/ServerSubscription.ts:73",
-    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
-    "at": "db021da0",
-    "identifier": "MaxInterval",
-    "nearest": 170,
-    "occurrences": 1
   },
   {
     "file": "im/subscription/subscription.go",
@@ -2884,15 +2624,6 @@
     "occurrences": 3
   },
   {
-    "file": "node/groupcast_server_parity_matterjs_test.go",
-    "line": 646,
-    "citation": "GroupcastServerTest.ts:2204-2242",
-    "resolved": "packages/node/test/behaviors/groupcast/GroupcastServerTest.ts",
-    "identifier": "JoinGroup",
-    "nearest": 63,
-    "occurrences": 1
-  },
-  {
     "file": "node/node.go",
     "line": 1742,
     "citation": "GeneralDiagnosticsServer.ts:527",
@@ -2939,16 +2670,6 @@
     "identifier": "SessionManager",
     "nearest": 56,
     "occurrences": 3
-  },
-  {
-    "file": "node/wildcard_path_flags_parity_matterjs_test.go",
-    "line": 32,
-    "citation": "InteractionProtocolTest.ts:1172-1191",
-    "resolved": "packages/node/test/endpoint/server/InteractionProtocolTest.ts",
-    "at": "db021da0",
-    "identifier": "BasicInformation",
-    "nearest": 1311,
-    "occurrences": 5
   },
   {
     "file": "script/devicegen/coverage_test.go",
@@ -3339,15 +3060,6 @@
     "identifier": "retransmissionIntervalOf",
     "nearest": 147,
     "occurrences": 2
-  },
-  {
-    "file": "secure/spake2/session_params_test.go",
-    "line": 18,
-    "citation": "PaseServer.ts:151",
-    "resolved": "packages/protocol/src/session/pase/PaseServer.ts",
-    "identifier": "SessionParameters",
-    "nearest": 194,
-    "occurrences": 0
   },
   {
     "file": "store/fabric.go",

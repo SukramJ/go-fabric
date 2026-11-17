@@ -11,7 +11,9 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -106,7 +108,14 @@ import (
 // below it (an off-pin citation, open for its re-cite). The cap comment of
 // controller/dcl/certstore.go names GitHub for its second range; its
 // first, the root loop, holds. The lines are in the raising commit.
-const citecheckDriftRatchet = 374
+//
+// 343 after review II, phase 6b wave 3: a citation whose sentence spells a
+// name in Go's form (AddNoc, IcacValue, OnOff) is kept when the cited file
+// spells it in matter.js's lower camel case ("addNoc", icacValue, onOff)
+// next to the cited line (lowerCamel). 31 rows go, among them
+// controller/commissioner/wire.go's re-cited AddNoc sentence, whose line
+// 1466 is the icacValue field of the addNoc invoke; none is new.
+const citecheckDriftRatchet = 343
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()
@@ -314,7 +323,10 @@ func TestCheckAndDerive(t *testing.T) {
 		t.Errorf("summary.md:\n%s", md)
 	}
 
-	fixes, owner := derive(tr, results)
+	fixes, owner, err := derive(tr, results)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(fixes) != len(e.Fixes) {
 		t.Errorf("fixes = %+v, want %v", fixes, e.Fixes)
 	}
@@ -366,6 +378,20 @@ func TestOccurrencesLooseAndStrict(t *testing.T) {
 	}
 	if got := occurrences(lines, "#tie", false); !slices.Equal(got, []int{3}) {
 		t.Errorf("#tie = %v", got)
+	}
+	// Go's exported name is matter.js's lower-camel one: lowerCamel finds
+	// "addNoc" and icacValue for AddNoc and IcacValue
+	// (controller/commissioner/wire.go's citation of the addNoc invoke);
+	// occurrences, which decides whether a citation is drift-checked, does not.
+	invoke := []string{`command: "addNoc",`, "icacValue: this.ca.icacCert,", "readdNocx"}
+	if got := lowerCamel(invoke, "AddNoc"); !slices.Equal(got, []int{1}) {
+		t.Errorf("lowerCamel AddNoc = %v, want the invoke", got)
+	}
+	if got := lowerCamel(invoke, "IcacValue"); !slices.Equal(got, []int{2}) {
+		t.Errorf("lowerCamel IcacValue = %v", got)
+	}
+	if got := occurrences(invoke, "AddNoc", true); len(got) != 0 {
+		t.Errorf("loose AddNoc = %v, want none", got)
 	}
 }
 
@@ -592,3 +618,44 @@ func TestCitecheckRegisters(t *testing.T) {
 		t.Errorf("the register's citations are counted in summary.md:\n%s", sum)
 	}
 }
+
+// unreadableTree lists a.ts but cannot read it: a lazy blob fetch failed.
+type unreadableTree struct{}
+
+func (unreadableTree) files() []string { return []string{"packages/x/src/a.ts"} }
+
+func (unreadableTree) content(p string) ([]string, error) {
+	return nil, fmt.Errorf("%w: %s: fetch failed", errEnv, p)
+}
+
+// TestUnreadableBlobIsNoVerdict: a listed file that cannot be read gives no
+// hard error ("file not found") but the run's exit 2 (R2-P6-err-2812).
+func TestUnreadableBlobIsNoVerdict(t *testing.T) {
+	r := check(unreadableTree{}, citation{File: "x.go", Line: 1, Text: "a.ts:3", Path: "a.ts", Lo: 3, Hi: 3})
+	if r.hard != "" || !errors.Is(r.env, errEnv) {
+		t.Errorf("hard %q, env %v; want no hard error and an environment error", r.hard, r.env)
+	}
+}
+
+// TestCatFileOutOfStepStaysDead: after a read that left the batch pipe out
+// of step, every later read fails with that error instead of taking the
+// next object's bytes as its own; "missing" keeps the pipe in step
+// (R2-P6-err-2812).
+func TestCatFileOutOfStepStaysDead(t *testing.T) {
+	c := &catFile{in: nopWriteCloser{}, out: bufio.NewReader(strings.NewReader(
+		"a missing\nb blob 10\nsho"))} // the stream ends inside b: a failed fetch
+	if _, err := c.show("a"); !errors.Is(err, errMissing) || c.dead != nil {
+		t.Fatalf("missing: %v, dead %v", err, c.dead)
+	}
+	if _, err := c.show("b"); err == nil || c.dead == nil {
+		t.Fatalf("short read: %v, dead %v", err, c.dead)
+	}
+	if data, err := c.show("c"); err == nil {
+		t.Errorf("read after the pipe went out of step: %q", data)
+	}
+}
+
+type nopWriteCloser struct{}
+
+func (nopWriteCloser) Write(p []byte) (int, error) { return len(p), nil }
+func (nopWriteCloser) Close() error                { return nil }

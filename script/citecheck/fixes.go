@@ -50,7 +50,7 @@ type ownerCitation struct {
 //     those moves wrong.
 //   - Everything else goes to the owner, with the candidate lines or
 //     files.
-func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation) {
+func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation, err error) {
 	cited := map[string]map[string]bool{} // Go file → the matter.js files it cites resolvably
 	for i := range results {
 		r := &results[i]
@@ -72,7 +72,11 @@ func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation) {
 		case c.Sha != "":
 			owner = append(owner, ownerCitation{File: c.File, Line: c.Line, Citation: c.Text, At: c.Sha, Problem: problem(r), Identifier: r.ident, Candidates: lineCands(r)})
 		case r.hard == errAmbiguous:
-			if pick := pickCandidate(pin, c, r.candidates, cited[c.File]); pick != "" {
+			pick, err := pickCandidate(pin, c, r.candidates, cited[c.File])
+			if err != nil {
+				return nil, nil, err
+			}
+			if pick != "" {
 				suffix := uniqueSuffix(pin.files(), pick)
 				newPath := suffix
 				fixes = append(fixes, fix{File: c.File, Line: c.Line, Old: c.Text, New: newPath + c.Text[len(c.Path):], Reason: "ambiguous: lengthened to " + pick})
@@ -95,7 +99,7 @@ func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation) {
 			owner = append(owner, ownerCitation{File: c.File, Line: c.Line, Citation: c.Text, Problem: problem(r), Identifier: r.ident, Candidates: lineCands(r)})
 		}
 	}
-	return fixes, owner
+	return fixes, owner, nil
 }
 
 func problem(r *result) string {
@@ -116,13 +120,15 @@ func lineCands(r *result) []string {
 	return out
 }
 
-// pickCandidate chooses the file an ambiguous citation means, or "".
-func pickCandidate(t tree, c citation, candidates []string, sameFile map[string]bool) string {
+// pickCandidate chooses the file an ambiguous citation means, or "". A
+// candidate it cannot read is an error (R2-P6-err-2812): skipping it would
+// pick the other one on a failed fetch.
+func pickCandidate(t tree, c citation, candidates []string, sameFile map[string]bool) (string, error) {
 	var near, anywhere []string
 	for _, f := range candidates {
 		lines, err := t.content(f)
 		if err != nil {
-			continue
+			return "", err
 		}
 		stem := strings.TrimSuffix(path.Base(f), ".ts")
 		in, at := false, false
@@ -146,9 +152,9 @@ func pickCandidate(t tree, c citation, candidates []string, sameFile map[string]
 	}
 	switch {
 	case len(near) == 1:
-		return near[0]
+		return near[0], nil
 	case len(near) == 0 && len(anywhere) == 1:
-		return anywhere[0]
+		return anywhere[0], nil
 	case len(near) == 0:
 		pool := anywhere
 		if len(pool) == 0 {
@@ -161,10 +167,10 @@ func pickCandidate(t tree, c citation, candidates []string, sameFile map[string]
 			}
 		}
 		if len(known) == 1 {
-			return known[0]
+			return known[0], nil
 		}
 	}
-	return ""
+	return "", nil
 }
 
 // uniqueSuffix is the shortest trailing run of f's path elements, two at
@@ -190,7 +196,10 @@ func uniqueSuffix(files []string, f string) string {
 }
 
 func writeFixes(file string, pin tree, results []result) error {
-	fixes, owner := derive(pin, results)
+	fixes, owner, err := derive(pin, results)
+	if err != nil {
+		return err
+	}
 	sort.SliceStable(fixes, func(i, j int) bool {
 		if fixes[i].File != fixes[j].File {
 			return fixes[i].File < fixes[j].File

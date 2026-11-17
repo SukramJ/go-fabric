@@ -218,25 +218,18 @@ func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 						return nil, err
 					}
 				}
-				r := result{cite: c, hard: errNoServerCommit}
-				for _, sha := range c.Shas {
-					if own, err := server.at(sha); err == nil {
-						c.Sha = sha
-						r = check(own, c)
-						break
-					}
+				r := checkServer(server, c)
+				if r.env != nil {
+					return nil, r.env
 				}
 				results = append(results, r)
 				continue
 			}
-			t := pinTree
-			for _, sha := range c.Shas {
-				if own, err := repo.at(sha); err == nil {
-					c.Sha, t = sha, own
-					break
-				}
+			r := checkAt(repo, pinTree, c)
+			if r.env != nil {
+				return nil, r.env
 			}
-			results = append(results, check(t, c))
+			results = append(results, r)
 		}
 		return results, nil
 	}
@@ -269,6 +262,31 @@ func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 		return 1, fmt.Errorf("%d hard errors", len(sum.hard))
 	}
 	return 0, nil
+}
+
+// checkServer checks a matterjs-server citation at the first of its own
+// commits the clone has; without one it is errNoServerCommit.
+func checkServer(server *gitRepo, c citation) result {
+	for _, sha := range c.Shas {
+		if own, err := server.at(sha); err == nil {
+			c.Sha = sha
+			return check(own, c)
+		}
+	}
+	return result{cite: c, hard: errNoServerCommit}
+}
+
+// checkAt checks a matter.js citation at the first of its own commits the
+// clone has, else at the pin.
+func checkAt(repo *gitRepo, pinTree tree, c citation) result {
+	t := pinTree
+	for _, sha := range c.Shas {
+		if own, err := repo.at(sha); err == nil {
+			c.Sha, t = sha, own
+			break
+		}
+	}
+	return check(t, c)
 }
 
 type summary struct {
