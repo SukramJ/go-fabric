@@ -3,10 +3,9 @@
 
 // Package nodeseam carries the one-way seams to a node's configuration
 // that are not public API: fabrictest puts a node's client stack onto its
-// in-memory network, and the reference daemon and the module's tests set
-// the TESTING ONLY knobs — the OTA requestor's harness mode, the Wi-Fi
-// NetworkCommissioning driver (review 2026-11 W5-api-11) and the
-// SpecificationVersion a node reports (phase 32).
+// in-memory network and its peer path, and the reference daemon and the
+// module's tests set the TESTING ONLY knobs — the OTA requestor's harness
+// mode and the SpecificationVersion a node reports (phase 32).
 //
 // Direction of the edge: package node installs [UseClientListener] from
 // its init; fabrictest reads it. node.Client names a bind address and a

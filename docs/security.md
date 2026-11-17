@@ -164,6 +164,13 @@ file is scrubbed of the values under the old key (a scrub that does not
 finish is `store.ErrScrubIncomplete` after the commit and is owed to the
 next `NewSealed`). There is no unseal: the way back to a clear database is
 a factory reset, which drops the canary with every other row, or a restore.
+A node whose sealed store does not open — `New` failed with
+`store.ErrUnseal`, the key lost or a value tampered with — has no
+`FactoryReset` to call: the host erases the database itself with
+`store.New(db).Erase(ctx)` on the node's `*sql.DB`, which needs no sealer,
+empties every `matter_*` table (the endpoint records among them) and
+scrubs the file, or it removes the file; the next `New` starts
+uncommissioned.
 `Reseal` moves the device store's rows only, not the controller's node
 registry on the same file: a controller's database rotates with
 `controller.Reseal(ctx, db, old, new)`, which reseals both stores in one

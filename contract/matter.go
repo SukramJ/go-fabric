@@ -473,8 +473,6 @@ type MeasurementMaterializer func(src any, mc MeasurementContext) []ClusterServe
 // host binds to. A second thing a materialiser needs is then a new
 // field, source-compatible with every materialiser already written
 // against this type — where a second parameter would break all of them.
-// Before v0.1.0 that difference is nothing; after it, it is a
-// deprecation cycle.
 type MeasurementContext struct {
 	// EndpointID is the id of the endpoint the returned cluster servers
 	// are mounted on. It is the same value the assembler stamps onto
@@ -1109,27 +1107,24 @@ type EventReceiver interface {
 	SetMatterEventEmitter(emitter EventEmitter)
 }
 
-// EligibilityState classifies a model source as
-// mappable / partially mappable / unmappable for the operator-facing
-// allowlist UI. Stored on the source itself (rich model, dumb bridge)
-// so the UI does not have to maintain a parallel classification table.
+// EligibilityState classifies a model source as mappable, partially
+// mappable or unmappable to Matter. The classification is the host's,
+// stored on the source itself (rich model, dumb bridge); this module
+// reads none of it, and how a host acts on it or presents it is the
+// host's (review II, R2-P6-doc-2455).
 type EligibilityState uint8
 
-// EligibilityState values. Stable string forms in
-// `(EligibilityState).String()` mirror the JSON tokens the
-// REST API uses (`mappable`, `partially_mappable`, `unmappable`).
+// EligibilityState values; `(EligibilityState).String()` returns a
+// stable token for each (`mappable`, `partially_mappable`, `unmappable`).
 const (
-	// EligibilityUnmappable means no Matter cluster covers the
-	// source. UI shows ⛔; the allowlist toggle is permanently disabled.
+	// EligibilityUnmappable means no Matter cluster covers the source.
 	EligibilityUnmappable EligibilityState = iota
 	// EligibilityMappable means the source has a complete Matter
-	// projection. UI toggle is active; the assembler bridges the source
-	// when the operator enables it.
+	// projection.
 	EligibilityMappable
-	// EligibilityPartial means a partial projection exists —
-	// some clusters map, some features stay with the host's own
-	// interfaces (e.g. siren tones, light effect playlists). UI shows ⚠
-	// with the reason; the toggle remains active.
+	// EligibilityPartial means a partial projection exists — some
+	// clusters map, some features stay with the host's own interfaces
+	// (e.g. siren tones, light effect playlists).
 	EligibilityPartial
 )
 

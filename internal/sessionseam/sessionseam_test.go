@@ -56,28 +56,7 @@ func TestOpenAtIsNamedByTestsOnly(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		local := ""
-		for _, imp := range f.Imports {
-			if p, _ := strconv.Unquote(imp.Path.Value); p == seamPath {
-				local = "sessionseam"
-				if imp.Name != nil {
-					local = imp.Name.Name
-				}
-			}
-		}
-		if local == "" {
-			return nil
-		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			sel, ok := n.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "OpenAt" {
-				return true
-			}
-			if x, ok := sel.X.(*ast.Ident); ok && x.Name == local {
-				offenders = append(offenders, fset.Position(sel.Pos()).String())
-			}
-			return true
-		})
+		offenders = append(offenders, openAtNames(fset, f)...)
 		return nil
 	})
 	if err != nil {
@@ -88,5 +67,73 @@ func TestOpenAtIsNamedByTestsOnly(t *testing.T) {
 	}
 	for _, o := range offenders {
 		t.Errorf("%s names sessionseam.OpenAt outside a test: the install under a chosen id is test support; a production install takes a Stake (decision 160)", o)
+	}
+}
+
+// openAtNames returns where f names the seam's OpenAt: a selector on the
+// name f imports the seam under, and — under a dot import, which names
+// OpenAt bare — every identifier OpenAt that names no field (a
+// selector's, a struct type's or a composite literal key's; review II,
+// R2-P6-test-2417).
+func openAtNames(fset *token.FileSet, f *ast.File) []string {
+	local := ""
+	for _, imp := range f.Imports {
+		if p, _ := strconv.Unquote(imp.Path.Value); p == seamPath {
+			local = "sessionseam"
+			if imp.Name != nil {
+				local = imp.Name.Name
+			}
+		}
+	}
+	if local == "" {
+		return nil
+	}
+	var out []string
+	fields := map[*ast.Ident]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.Field:
+			for _, name := range x.Names {
+				fields[name] = true
+			}
+		case *ast.KeyValueExpr:
+			if id, ok := x.Key.(*ast.Ident); ok {
+				fields[id] = true
+			}
+		case *ast.SelectorExpr:
+			fields[x.Sel] = true
+			if id, ok := x.X.(*ast.Ident); ok && x.Sel.Name == "OpenAt" && id.Name == local {
+				out = append(out, fset.Position(x.Pos()).String())
+			}
+		case *ast.Ident:
+			if local == "." && x.Name == "OpenAt" && !fields[x] {
+				out = append(out, fset.Position(x.Pos()).String())
+			}
+		}
+		return true
+	})
+	return out
+}
+
+// TestOpenAtNamesFindsEveryForm (review II, R2-P6-test-2417): the guard
+// finds OpenAt named through the import's name, an alias and a dot
+// import, and not a field of another value named OpenAt.
+func TestOpenAtNamesFindsEveryForm(t *testing.T) {
+	t.Parallel()
+	for src, want := range map[string]int{
+		"package p\nimport \"" + seamPath + "\"\nvar _ = sessionseam.OpenAt\n":                     1,
+		"package p\nimport s \"" + seamPath + "\"\nvar _ = s.OpenAt\n":                             1,
+		"package p\nimport . \"" + seamPath + "\"\nvar _ = OpenAt\n":                               1,
+		"package p\nimport . \"" + seamPath + "\"\nvar x struct{ OpenAt int }\nvar _ = x.OpenAt\n": 0,
+		"package p\nvar x struct{ OpenAt int }\nvar _ = x.OpenAt\n":                                0,
+	} {
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, "p.go", src, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := len(openAtNames(fset, f)); got != want {
+			t.Errorf("%q: %d names of OpenAt, want %d", src, got, want)
+		}
 	}
 }

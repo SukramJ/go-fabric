@@ -96,7 +96,6 @@ const (
 	maxAccessControlCapacity         = 65534
 )
 
-// validate returns one error per field outside its bound.
 // foldLimits makes the deprecated Config.SupportedFabrics and
 // Config.MaxPathsPerInvoke and their Limits fields one value: the Limits
 // field when set, else the Config field, written to both (Validate
@@ -125,6 +124,7 @@ func (c *Config) limitsPairErrors() []error {
 	return errs
 }
 
+// validate returns one error per field outside its bound.
 func (l Limits) validate() []error {
 	var errs []error
 	if v := l.SubscriptionMaxInterval; v != 0 {

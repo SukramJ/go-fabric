@@ -156,8 +156,10 @@ func (n *Node) watchMatterTime() {
 	n.matterTime.mu.Unlock()
 }
 
-// unwatchMatterTime ends the watch: an adoption after [Node.Stop] — a late
-// NTP answer — reaches no participant.
+// unwatchMatterTime ends the watch: an adoption after it returned — a late
+// NTP answer after [Node.Stop] began — reaches no participant. An adoption
+// whose callback already runs is not waited for; it may reach the
+// participants once more while Stop goes on (review II, R2-P6-conc-2420).
 func (n *Node) unwatchMatterTime() {
 	n.matterTime.mu.Lock()
 	unwatch := n.matterTime.unwatch
