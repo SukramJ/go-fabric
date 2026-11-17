@@ -53,7 +53,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/binding", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
-	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/clock", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/clock/clocktest", min: 99, why: "phase 32: 99.3 with the wall-step and monotonic cases; what is left is Resolve's first select"},
@@ -172,8 +172,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
-		min: 84,
-		why: "Review II phase 6a post pass: measured 84.8 once TestEveryFabricListsEveryIndex drives EveryFabric (decision 158). Phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
+		min: 90,
+		why: "Review II phase 6a wave 3: measured 90.8. Phase 6a post pass: measured 84.8 once TestEveryFabricListsEveryIndex drives EveryFabric (decision 158). Phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
@@ -206,7 +206,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/icd", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/icd/checkin", min: 94},
-	{pkg: "github.com/SukramJ/go-fabric/im", min: 82},
+	{pkg: "github.com/SukramJ/go-fabric/im", min: 85},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
 	// package has concurrent paths whose coverage depends on scheduling, so
 	// a floor at the median makes the gate flaky rather than strict. Floors
