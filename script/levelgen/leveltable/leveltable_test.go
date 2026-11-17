@@ -139,6 +139,14 @@ func TestLoadRejects(t *testing.T) {
 	if _, err := LoadPin(filepath.Join(dir, "bad.json")); err == nil {
 		t.Error("LoadPin of bad JSON")
 	}
+	// A pin feature without a bit, or with one the 32-bit FeatureMap
+	// cannot carry, is refused rather than skipped (R2-P6-par-2714).
+	for name, feature := range map[string]string{"nobit": `{"name":"F"}`, "bit32": `{"name":"F","bit":32}`} {
+		write(t, dir, name+".json", `{"matter":{"revision":"1.4.2"},"deviceTypes":[],"clusters":[{"id":6,"name":"C","features":[`+feature+`]}]}`)
+		if _, err := LoadPin(filepath.Join(dir, name+".json")); err == nil || !strings.Contains(err.Error(), "C.F") {
+			t.Errorf("LoadPin of a feature %s: %v, want a refusal naming C.F", name, err)
+		}
+	}
 }
 
 func TestLevelOrder(t *testing.T) {

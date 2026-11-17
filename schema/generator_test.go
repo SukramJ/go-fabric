@@ -46,9 +46,14 @@ func schemaGenerator(t *testing.T) string {
 // synthSnapshot is a snapshot of one cluster (id 0x0006, "A") with the
 // given attributes and commands, and one device type without requirements.
 func synthSnapshot(attributes, commands string) string {
+	return synthSnapshotFeatures(attributes, commands, ``)
+}
+
+// synthSnapshotFeatures is synthSnapshot with the cluster's features.
+func synthSnapshotFeatures(attributes, commands, features string) string {
 	return `{"matter":{"revision":"1.6.1","sourceCommit":"0123456789"},
 "clusters":[{"id":6,"name":"A","revision":1,"featureMap":0,"classification":"application",
-  "attributes":[` + attributes + `],"commands":[` + commands + `],"events":[],"features":[],"datatypes":[],"attributeOrder":[65533]}],
+  "attributes":[` + attributes + `],"commands":[` + commands + `],"events":[],"features":[` + features + `],"datatypes":[],"attributeOrder":[65533]}],
 "deviceTypes":[{"id":256,"name":"D","classification":"simple","revision":1,"requirements":[],
   "effective":{"composition":"","base":"","conditions":[],"requirements":[]}}],
 "baseDeviceTypes":[],"globalDatatypes":[],"definitions":[],"globalAttributeOrder":[65533]}`
@@ -137,5 +142,29 @@ func TestGeneratorReadsTheEffectiveChangesOmitted(t *testing.T) {
 	}
 	if rows := tableRows(readGenerated(t, root, "attribute_access_gen.go"), "changesOmittedAttributes"); !strings.Contains(rows, "0x0002: {}, // Inherited") {
 		t.Errorf("changesOmittedAttributes lacks the inherited attribute:\n%s", rows)
+	}
+}
+
+// TestGeneratorRefusesAFeatureWithoutAUsableBit: a feature without a bit,
+// or with one outside the 32-bit FeatureMap, is refused rather than left
+// out of clusterFeatures (R2-P6-par-2714).
+func TestGeneratorRefusesAFeatureWithoutAUsableBit(t *testing.T) {
+	t.Parallel()
+	for name, feature := range map[string]string{
+		"no bit": `{"name":"F","effective":{"title":"Eff"}}`,
+		"bit 32": `{"name":"F","bit":32,"effective":{"title":"Eff"}}`,
+		"bit -1": `{"name":"F","bit":-1,"effective":{"title":"Eff"}}`,
+	} {
+		_, out, err := runGenerator(t, synthSnapshotFeatures(``, ``, feature))
+		if err == nil || !strings.Contains(out, "A.F") {
+			t.Errorf("%s: generator %v, want a refusal naming A.F\n%s", name, err, out)
+		}
+	}
+	root, out, err := runGenerator(t, synthSnapshotFeatures(``, ``, `{"name":"F","bit":31,"effective":{"title":"Eff"}}`))
+	if err != nil {
+		t.Fatalf("bit 31: %v\n%s", err, out)
+	}
+	if rows := tableRows(readGenerated(t, root, "devicetype_requirements_gen.go"), "clusterFeatures"); !strings.Contains(rows, `{Name: "F", Bit: 31, Title: "Eff"}`) {
+		t.Errorf("clusterFeatures lacks bit 31:\n%s", rows)
 	}
 }

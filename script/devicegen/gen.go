@@ -645,7 +645,7 @@ func (g *generator) writeRequirement(w *bytes.Buffer, cr *clusterReq, server boo
 		var mask uint32
 		names := make([]string, 0, len(cr.features))
 		for _, f := range cr.features {
-			mask |= 1 << f.Bit
+			mask |= 1 << *f.Bit // at most 31 (snapshot.check)
 			names = append(names, f.Name)
 		}
 		fmt.Fprintf(w, "\t\t\tFeatures: 0x%X, FeatureNames: []string{%s},\n", mask, quoteList(names))

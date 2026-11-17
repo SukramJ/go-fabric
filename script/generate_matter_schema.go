@@ -1322,8 +1322,14 @@ func writeRequirementsFile(snap snapshot) error {
 	for _, c := range snap.Clusters {
 		var feats []string
 		for _, f := range c.Features {
-			if f.Bit == nil || *f.Bit < 0 || *f.Bit > 31 {
-				continue
+			// A feature the 32-bit FeatureMap cannot carry is refused, not
+			// left out: a missing row would read as a feature the cluster
+			// does not define (R2-P6-par-2714).
+			if f.Bit == nil {
+				return fmt.Errorf("%s.%s: feature without a bit", c.Name, f.Name)
+			}
+			if *f.Bit < 0 || *f.Bit > 31 {
+				return fmt.Errorf("%s.%s: feature bit %d outside the 32-bit FeatureMap", c.Name, f.Name, *f.Bit)
 			}
 			title := ""
 			if f.Effective != nil {

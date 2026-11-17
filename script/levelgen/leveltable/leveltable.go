@@ -172,7 +172,8 @@ func LoadPin(path string) (Pin, error) {
 			ID       uint32 `json:"id"`
 			Name     string `json:"name"`
 			Features []struct {
-				Bit *uint8 `json:"bit"`
+				Name string `json:"name"`
+				Bit  *uint8 `json:"bit"`
 			} `json:"features"`
 			Attributes []struct {
 				ID uint32 `json:"id"`
@@ -197,9 +198,15 @@ func LoadPin(path string) (Pin, error) {
 		p.ClusterNames[c.ID] = c.Name
 		pc := PinCluster{ID: c.ID}
 		for _, f := range c.Features {
-			if f.Bit != nil {
-				pc.Features = append(pc.Features, *f.Bit)
+			// A feature without a usable bit is refused, not skipped: the
+			// check against the last level would miss it (R2-P6-par-2714).
+			if f.Bit == nil {
+				return Pin{}, fmt.Errorf("%s: %s.%s: feature without a bit", path, c.Name, f.Name)
 			}
+			if *f.Bit > 31 {
+				return Pin{}, fmt.Errorf("%s: %s.%s: feature bit %d outside the 32-bit FeatureMap", path, c.Name, f.Name, *f.Bit)
+			}
+			pc.Features = append(pc.Features, *f.Bit)
 		}
 		for _, a := range c.Attributes {
 			pc.Attributes = append(pc.Attributes, a.ID)

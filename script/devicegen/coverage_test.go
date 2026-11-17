@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -82,5 +83,24 @@ func TestRunWithHelp(t *testing.T) {
 
 	if err := run([]string{"-h"}, io.Discard); err == nil {
 		t.Error("-h returned nil")
+	}
+}
+
+// TestSnapshotRefusesAFeatureWithoutAUsableBit: a feature without a bit
+// would decode as bit 0, and one at bit 32 or above shifts out of the
+// uint32 mask; both are refused when the snapshot is read
+// (R2-P6-par-2714).
+func TestSnapshotRefusesAFeatureWithoutAUsableBit(t *testing.T) {
+	t.Parallel()
+
+	for name, feature := range map[string]string{
+		"no bit": `{"name":"F","effective":{"title":"Feat"}}`,
+		"bit 32": `{"name":"F","bit":32,"effective":{"title":"Feat"}}`,
+	} {
+		raw := `{"deviceTypes":[{"id":4096,"name":"T","classification":"simple","revision":1,"effective":{"composition":"tree","requirements":[]}}],
+			"clusters":[{"id":1,"name":"C","classification":"application","features":[` + feature + `],"attributes":[],"commands":[],"events":[]}]}`
+		if _, err := parseSnapshot([]byte(raw)); err == nil || !strings.Contains(err.Error(), "C.F") {
+			t.Errorf("%s: parseSnapshot = %v, want a refusal naming C.F", name, err)
+		}
 	}
 }

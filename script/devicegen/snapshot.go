@@ -88,7 +88,7 @@ type cluster struct {
 
 type feature struct {
 	Name      string `json:"name"`
-	Bit       uint   `json:"bit"`
+	Bit       *uint  `json:"bit"`
 	Effective struct {
 		Title       string       `json:"title"`
 		Conformance *conformance `json:"conformance"`
@@ -119,7 +119,27 @@ func parseSnapshot(raw []byte) (*snapshot, error) {
 	if len(s.DeviceTypes) == 0 {
 		return nil, errors.New("snapshot has no device types")
 	}
+	if err := s.check(); err != nil {
+		return nil, err
+	}
 	return &s, nil
+}
+
+// check refuses what the generator would otherwise read silently wrong: a
+// feature without a bit (it would decode as bit 0) or with one the uint32
+// FeatureMap cannot carry (R2-P6-par-2714).
+func (s *snapshot) check() error {
+	for _, c := range s.Clusters {
+		for _, f := range c.Features {
+			if f.Bit == nil {
+				return fmt.Errorf("%s.%s: feature without a bit", c.Name, f.Name)
+			}
+			if *f.Bit > 31 {
+				return fmt.Errorf("%s.%s: feature bit %d outside the 32-bit FeatureMap", c.Name, f.Name, *f.Bit)
+			}
+		}
+	}
+	return nil
 }
 
 // deviceType returns the device type named name, or nil.
