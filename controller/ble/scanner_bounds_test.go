@@ -56,14 +56,46 @@ func TestScanner_RecordsAreBoundedDuringADiscovery(t *testing.T) {
 // TestScanner_ContinuousDiscoveryForgetsWithItsRecords: the peripherals a
 // continuous discovery has reported are bounded as the records are — one
 // whose record the scanner forgot is dropped from them, and reported again
-// when it advertises again (review II, R2-P6-bound-2029).
+// when it advertises again (review II, R2-P6-bound-2029). The callback
+// holds the discovery at one report while the forgotten peripheral
+// advertises again, so its new record is stored inside the round, at the
+// two points that once hid it: before the round's drop, which kept the
+// address because a record of it was held again, and before the round
+// read the devices, which passed the new record over as reported.
 func TestScanner_ContinuousDiscoveryForgetsWithItsRecords(t *testing.T) {
 	t.Parallel()
+	for _, c := range []struct {
+		name string
+		// last is the last peripheral advertised before the hold, and the
+		// one whose report holds the round. At maxScannerRecords, the
+		// report that takes the reported set past the bound: peripheral 0
+		// is forgotten before the round and seen again before its drop. At
+		// one less, the round stays within the bound: peripheral 0 is
+		// forgotten and seen again before the next round reads the
+		// devices.
+		last int
+	}{
+		{"seen again before the drop", maxScannerRecords},
+		{"seen again before the round read it", maxScannerRecords - 1},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			continuousForgetting(t, c.last)
+		})
+	}
+}
+
+func continuousForgetting(t *testing.T, last int) {
+	t.Helper()
 	clock := newFakeClock()
 	c := &mockClient{}
 	s := NewScanner(c, ScannerOptions{Clock: clock})
+	addr := func(i int) string {
+		return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", 0xC1, byte(i>>24), byte(i>>16), byte(i>>8), byte(i), 0x01)
+	}
 	var mu sync.Mutex
 	reported := map[string]int{}
+	held, release := make(chan struct{}), make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	id := discovery.ByLongDiscriminator(1737)
@@ -75,12 +107,13 @@ func TestScanner_ContinuousDiscoveryForgetsWithItsRecords(t *testing.T) {
 			mu.Lock()
 			reported[d.Peripheral.Address]++
 			mu.Unlock()
+			if d.Peripheral.Address == addr(last) {
+				close(held)
+				<-release
+			}
 		}, 0)
 	}()
 	settle(t, s, n+1)
-	addr := func(i int) string {
-		return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", 0xC1, byte(i>>24), byte(i>>16), byte(i>>8), byte(i), 0x01)
-	}
 	advertise := func(i, vendor int) {
 		data := make([]byte, 8)
 		binary.LittleEndian.PutUint16(data[1:3], 1737)
@@ -96,17 +129,20 @@ func TestScanner_ContinuousDiscoveryForgetsWithItsRecords(t *testing.T) {
 			if time.Now().After(deadline) {
 				t.Fatalf("waiting for %s", what)
 			}
-			time.Sleep(time.Millisecond)
+			yield(s)
 		}
 	}
 	advertise(0, 1)
 	waitFor("the first report", func() bool { return times(addr(0)) == 1 })
-	last := maxScannerRecords + 10
 	for i := 1; i <= last; i++ {
 		advertise(i, i+1)
 	}
-	waitFor("the last report", func() bool { return times(addr(last)) == 1 })
-	advertise(0, last+2) // its record was forgotten; it advertises again
+	recv(t, held)
+	// Peripheral 0's record is forgotten once maxScannerRecords others
+	// are newer; it advertises again while the round is held.
+	advertise(last+1, last+2)
+	advertise(0, last+3)
+	close(release)
 	waitFor("the forgotten peripheral reported again", func() bool { return times(addr(0)) == 2 })
 	cancel()
 	s.Cancel(id)

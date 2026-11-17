@@ -100,6 +100,11 @@ type record struct {
 	hasSeenAt      bool
 	// place is the record's element in Scanner.seen.
 	place *list.Element
+	// epoch numbers the stay of its address in the records: a refresh
+	// keeps it, an address stored after it was forgotten gets the next.
+	// FindContinuously's bound tells a peripheral forgotten and seen again
+	// by it.
+	epoch uint64
 }
 
 // waiter is one discovery waiting for an advertisement it selects (:77-82).
@@ -131,7 +136,7 @@ type Scanner struct {
 	// :160-172).
 	scans scanQueue
 
-	// mu guards activeDiscoveries, byData, closed, lastScanEndedAt, records, scanning, seen and waiters.
+	// mu guards activeDiscoveries, byData, closed, epochs, lastScanEndedAt, records, scanning, seen and waiters.
 	mu      sync.Mutex
 	records map[string]*record
 	// byData indexes records by their service data, and seen holds their
@@ -143,6 +148,8 @@ type Scanner struct {
 	scanning          bool
 	closed            bool
 	lastScanEndedAt   time.Time
+	// epochs is the last record epoch given out.
+	epochs uint64
 }
 
 // scanQueue runs scan transitions one after another in the order they
@@ -244,6 +251,12 @@ func (s *Scanner) handleDiscovered(p Peripheral, serviceData []byte) {
 // [maxScannerRecords], forgets the records seen longest ago.
 func (s *Scanner) storeLocked(r *record) {
 	addr := r.device.Peripheral.Address
+	if old, ok := s.records[addr]; ok {
+		r.epoch = old.epoch
+	} else {
+		s.epochs++
+		r.epoch = s.epochs
+	}
 	s.forgetLocked(addr)
 	s.records[addr] = r
 	r.place = s.seen.PushBack(addr)
@@ -582,7 +595,9 @@ func (s *Scanner) Find(ctx context.Context, id discovery.Identifier, timeout tim
 // then stored. The peripherals already reported are bounded as the
 // records are: past [maxScannerRecords] of them, those whose record the
 // scanner forgot are dropped, and such a peripheral advertising again is
-// reported again (review II, R2-P6-bound-2029).
+// reported again — also when it advertised again before the drop: the
+// record's epoch tells it from the one reported (review II,
+// R2-P6-bound-2029).
 func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier, callback func(Device), timeout time.Duration) ([]Device, error) {
 	if !id.SupportedOverBLE() {
 		return nil, nil
@@ -595,23 +610,40 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 		return nil, err
 	}
 	defer s.stopDiscovering(ctx)
-	seen := map[string]bool{}
+	seen := map[string]uint64{} // address -> epoch of the record reported
 	for {
 		news, w, expired, stop := s.nextRound(ctx, id, end)
-		for _, d := range news {
-			if !seen[d.Peripheral.Address] {
-				seen[d.Peripheral.Address] = true
-				callback(d)
+		for _, c := range news {
+			if _, ok := seen[c.device.Peripheral.Address]; !ok {
+				seen[c.device.Peripheral.Address] = c.epoch
+				callback(c.device)
 			}
 		}
 		if len(seen) > maxScannerRecords {
+			// A record forgotten since it was reported is dropped, and so
+			// is one forgotten and stored anew: news may hold the new one,
+			// passed over above, which is reported now; a store after
+			// news was read woke w and the next round reports it.
+			renewed := map[string]uint64{}
 			s.mu.Lock()
-			for addr := range seen {
-				if _, held := s.records[addr]; !held {
-					delete(seen, addr)
+			for addr, epoch := range seen {
+				r, held := s.records[addr]
+				if held && r.epoch == epoch {
+					continue
+				}
+				delete(seen, addr)
+				if held {
+					renewed[addr] = r.epoch
 				}
 			}
 			s.mu.Unlock()
+			for _, c := range news {
+				addr := c.device.Peripheral.Address
+				if epoch, ok := renewed[addr]; ok && epoch == c.epoch {
+					seen[addr] = c.epoch
+					callback(c.device)
+				}
+			}
 		}
 		if w == nil {
 			break
@@ -633,6 +665,13 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 	return devicesOf(s.devicesLocked(id, false)), nil
 }
 
+// candidate is a device a round of FindContinuously read, with its
+// record's epoch.
+type candidate struct {
+	device Device
+	epoch  uint64
+}
+
 // nextRound is one turn of findCommissionableDevicesContinuously's loop
 // up to its await (:617-640): the devices stored now and, unless the
 // discovery is over — the scanner closed, ctx done, end reached — the
@@ -645,13 +684,15 @@ func (s *Scanner) FindContinuously(ctx context.Context, id discovery.Identifier,
 // TestBleScannerCloseDuringContinuousCallback). A nil waiter ends the
 // discovery once the callbacks for news ran; closed and ctx end it before
 // them, as the loop's condition does (:617).
-func (s *Scanner) nextRound(ctx context.Context, id discovery.Identifier, end time.Time) (news []Device, w *waiter, expired <-chan struct{}, stop func()) {
+func (s *Scanner) nextRound(ctx context.Context, id discovery.Identifier, end time.Time) (news []candidate, w *waiter, expired <-chan struct{}, stop func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || ctx.Err() != nil {
 		return nil, nil, nil, nil
 	}
-	news = devicesOf(s.devicesLocked(id, false))
+	for _, r := range s.devicesLocked(id, false) {
+		news = append(news, candidate{device: r.device, epoch: r.epoch})
+	}
 	var remaining time.Duration
 	if !end.IsZero() {
 		if remaining = end.Sub(s.clock.Now()); remaining <= 0 {
