@@ -17,6 +17,21 @@ func RemoveFabricBindings(n *Node, fabricIndex uint8) {
 	n.dropFabricState(context.Background(), fabricIndex)
 }
 
+// CommissionerReachSign drives the commissioner reach's
+// SignVIDVerification of the node nodeID of fabric fabricIndex over n's
+// client stack and returns the attestation challenges of every session the
+// node holds to that peer once it returned, beside its own result.
+func CommissionerReachSign(ctx context.Context, n *Node, fabricIndex uint8, nodeID uint64, signFabric uint8, clientChallenge []byte) (challenge []byte, sessions [][]byte, err error) {
+	r := commissionerReach{n: n}
+	_, challenge, err = r.SignVIDVerification(ctx, jointfabric.CommissionerPeer{FabricIndex: fabricIndex, NodeID: nodeID}, signFabric, clientChallenge)
+	if pr, perr := n.connectedPeer(ctx, fabricIndex, nodeID); perr == nil {
+		for _, s := range pr.Sessions() {
+			sessions = append(sessions, s.AttestationChallenge())
+		}
+	}
+	return challenge, sessions, err
+}
+
 // Reassemblies is the number of reassemblies the Aggregator completed.
 func Reassemblies(a *Aggregator) int64 { return a.reassemblies.Load() }
 

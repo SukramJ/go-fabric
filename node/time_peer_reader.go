@@ -51,6 +51,16 @@ func (r timePeerReader) ReadPeerAttributes(ctx context.Context, fabricIndex uint
 // peerInteraction opens the interaction with the node nodeID of fabric
 // fabricIndex over the client stack, connecting first.
 func (n *Node) peerInteraction(ctx context.Context, fabricIndex uint8, nodeID uint64) (*interaction.Interaction, error) {
+	pr, err := n.connectedPeer(ctx, fabricIndex, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	return interaction.ForPeer(pr, interaction.Config{Logger: n.logger, Clock: n.cfg.Clock}), nil
+}
+
+// connectedPeer is the peer of nodeID on fabricIndex in the node's peer
+// set, connected.
+func (n *Node) connectedPeer(ctx context.Context, fabricIndex uint8, nodeID uint64) (*peer.Peer, error) {
 	set := n.Peers()
 	if set == nil {
 		return nil, errNoClientStack
@@ -62,5 +72,5 @@ func (n *Node) peerInteraction(ctx context.Context, fabricIndex uint8, nodeID ui
 	if _, err := pr.Connect(ctx, peer.ConnectOptions{}); err != nil {
 		return nil, fmt.Errorf("node: peer %d:%#x: %w", fabricIndex, nodeID, err)
 	}
-	return interaction.ForPeer(pr, interaction.Config{Logger: n.logger, Clock: n.cfg.Clock}), nil
+	return pr, nil
 }
