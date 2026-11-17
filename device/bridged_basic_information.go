@@ -5,6 +5,7 @@ package device
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -42,10 +43,13 @@ func (s *settings) declareBridgedBasicInformation(d Declaration, decl spec.Clust
 		len(decl.Elements.Attributes)+len(decl.Elements.Commands)+len(decl.Elements.Events) > 0 {
 		return fmt.Errorf("%w: the endpoint assembler mounts BridgedDeviceBasicInformation (0x0039) itself; its declaration takes Initial only", ErrConfiguration)
 	}
-	for id := range decl.Initial {
+	for _, id := range slices.Sorted(maps.Keys(decl.Initial)) {
 		if slices.Contains(bridgedInfoAssembler, id) {
 			name := bdbidef.Definition.Attribute(id).Name
 			return fmt.Errorf("%w: BridgedDeviceBasicInformation %s (0x%04X) is not the declaration's to state", ErrConfiguration, name, id)
+		}
+		if err := checkBridgedInfoValue(id, decl.Initial[id]); err != nil {
+			return err
 		}
 	}
 	p := copyPatch(o.Initial)
@@ -53,9 +57,31 @@ func (s *settings) declareBridgedBasicInformation(d Declaration, decl spec.Clust
 	return nil
 }
 
+// checkBridgedInfoValue holds a stated BridgedDeviceBasicInformation value
+// to the generated definition's type and constraint — the check a
+// controller's write of the attribute meets (spec.CheckWritten) — and
+// refuses one beyond it with ErrConfiguration, naming the attribute: the
+// assembler serves a stated value as stated, so one the device could
+// not serve within its constraint is refused here rather than served
+// over-long or cut (R2-P6-wire-2502, decision 201).
+func checkBridgedInfoValue(id uint32, v any) error {
+	if err := spec.CheckWritten(bdbidef.Definition, 0, id, v, nil); err != nil {
+		name := bdbidef.Definition.Attribute(id).Name
+		return fmt.Errorf("%w: BridgedDeviceBasicInformation %s (0x%04X): %w", ErrConfiguration, name, id, err)
+	}
+	return nil
+}
+
 // checkBridgedInfoOptions refuses a fact stated twice: Options.Name beside
-// a declared NodeLabel, Options.Vendor beside a declared VendorName.
+// a declared NodeLabel, Options.Vendor beside a declared VendorName; and
+// an Options.Vendor beyond VendorName's constraint, which the device
+// serves as its VendorName ([checkBridgedInfoValue]).
 func checkBridgedInfoOptions(opts Options, p *bdbidef.Patch) error {
+	if opts.Vendor != "" {
+		if err := spec.CheckWritten(bdbidef.Definition, 0, bdbidef.AttrVendorName, opts.Vendor, nil); err != nil {
+			return fmt.Errorf("%w: Options.Vendor, served as BridgedDeviceBasicInformation VendorName: %w", ErrConfiguration, err)
+		}
+	}
 	if p == nil {
 		return nil
 	}
