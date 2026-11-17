@@ -20,7 +20,12 @@ type Descriptor struct {
 	// id (:40-43).
 	Address handshake.PeerAddress
 	// DataModelRevision is the data model revision the peer supports, 0
-	// when unknown (:45-48).
+	// when unknown. Nothing sets or reads it.
+	//
+	// Deprecated: PeerDescriptor has no such member at db021da0; the peer's
+	// data model revision is the one its session parameters report — use
+	// ReportedSessionParameters.DataModelRevision. Removable in the next
+	// minor release (review II, R2-P6-par-3351).
 	DataModelRevision uint16
 	// OperationalAddress is where the peer was last reached, nil when
 	// unknown (:50-53). It is kept as a UDP address: matter.js
