@@ -210,6 +210,21 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	if err != nil {
 		return err
 	}
+	// The device carries our fabric now: the record takes its address
+	// before the peer is looked up, so a lookup that fails leaves a node
+	// that can still be reached and decommissioned. Mirrors matter.js
+	// CommissioningClient.commission, which sets peerAddress and
+	// commissionedAt (packages/node/src/behavior/system/commissioning/
+	// CommissioningClient.ts:324-326 at db021da0) before PeerSet.for
+	// (:330) (review II, R2-P6-err-2318).
+	now := r.clock.Now()
+	n.updateRecord(func(rec *Record) {
+		a := res.Address
+		rec.PeerAddress = &a
+		rec.CommissionedAt = now
+		rec.FabricIndexOnPeer = res.FabricIndexOnPeer
+		rec.AttestedVendorID, rec.AttestedProductID = res.AttestedVendorID, res.AttestedProductID
+	})
 	p := r.cfg.Peers.Get(res.Address)
 	if p == nil {
 		//nolint:contextcheck // the peer's service resolves under the DNS-SD cache's context
@@ -217,16 +232,8 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 			return err
 		}
 	}
-	now := r.clock.Now()
 	d := p.Descriptor()
-	n.updateRecord(func(rec *Record) {
-		a := res.Address
-		rec.PeerAddress = &a
-		rec.CommissionedAt = now
-		rec.FabricIndexOnPeer = res.FabricIndexOnPeer
-		rec.AttestedVendorID, rec.AttestedProductID = res.AttestedVendorID, res.AttestedProductID
-		rec.applyPeer(d)
-	})
+	n.updateRecord(func(rec *Record) { rec.applyPeer(d) })
 	r.bindPeer(n, p)
 	n.mu.Lock()
 	n.settings.defaultSubscription = o.DefaultSubscription.clone()
