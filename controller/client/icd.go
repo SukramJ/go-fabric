@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -483,14 +484,16 @@ func (n *Node) icdImage() icdImage {
 	}
 	// IcdClient.ts:768-783: the peer's timings, the schedule's defaults for
 	// what the image lacks.
-	if v, ok := uintOf(ic, icddef.AttrActiveModeThreshold); ok {
-		out.timings.ActiveModeThreshold = time.Duration(v) * time.Millisecond //nolint:gosec // a uint16 attribute
+	// A value beyond the attribute's type is absent (uintWithin, review II,
+	// R2-P6-bound-2352): the schedule's default stands.
+	if v, ok := uintWithin(ic, icddef.AttrActiveModeThreshold, math.MaxUint16); ok {
+		out.timings.ActiveModeThreshold = time.Duration(v) * time.Millisecond //nolint:gosec // uintWithin bounds it to the attribute's uint16
 	}
-	if v, ok := uintOf(ic, icddef.AttrActiveModeDuration); ok {
-		out.timings.ActiveModeDuration = time.Duration(v) * time.Millisecond //nolint:gosec // a uint32 attribute
+	if v, ok := uintWithin(ic, icddef.AttrActiveModeDuration, math.MaxUint32); ok {
+		out.timings.ActiveModeDuration = time.Duration(v) * time.Millisecond //nolint:gosec // uintWithin bounds it to the attribute's uint32
 	}
-	if v, ok := uintOf(ic, icddef.AttrIdleModeDuration); ok {
-		out.timings.IdleModeDuration = time.Duration(v) * time.Second //nolint:gosec // a uint32 attribute
+	if v, ok := uintWithin(ic, icddef.AttrIdleModeDuration, math.MaxUint32); ok {
+		out.timings.IdleModeDuration = time.Duration(v) * time.Second //nolint:gosec // uintWithin bounds it to the attribute's uint32
 	}
 	return out
 }

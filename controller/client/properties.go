@@ -111,8 +111,8 @@ func (s *structure) computeProperties() Properties {
 		if mode, ok := uintOf(icd, icdmanagement.AttrOperatingMode); ok {
 			p.LongIdleTimeOperating = lits && mode == uint64(icdmanagement.OperatingModeLit)
 		}
-		if idle, ok := uintOf(icd, icdmanagement.AttrIdleModeDuration); ok {
-			d := time.Duration(idle) * time.Second //nolint:gosec // a uint32 attribute
+		if idle, ok := uintWithin(icd, icdmanagement.AttrIdleModeDuration, math.MaxUint32); ok {
+			d := time.Duration(idle) * time.Second //nolint:gosec // uintWithin bounds it to the attribute's uint32
 			p.IdleModeDuration = &d
 		}
 	}
@@ -284,6 +284,19 @@ func uintOf(c *Cluster, attr uint32) (uint64, bool) {
 		return 0, false
 	}
 	return v.El.Uint, true
+}
+
+// uintWithin is uintOf for an attribute of an unsigned type no wider than
+// limit: a value beyond its type is absent. The ICD timings are multiplied
+// into a time.Duration, and a peer's value wider than the attribute's type
+// would overflow it — a negative idle window, a subscription ceiling of 0
+// (review II, R2-P6-bound-2352).
+func uintWithin(c *Cluster, attr uint32, limit uint64) (uint64, bool) {
+	v, ok := uintOf(c, attr)
+	if !ok || v > limit {
+		return 0, false
+	}
+	return v, true
 }
 
 // idListInOrder is a list's numeric entries in list order.
