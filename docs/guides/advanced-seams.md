@@ -235,7 +235,7 @@ and sessions into its own hands. Reading them is a facade route,
 seam, for a host that needs what the diagnostics leave out. Closing is
 the node's.
 
-*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/root.go` (`checkProduct`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go:77`.*
+*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/root.go` (`checkProduct`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go` (`LoadChainFiles`).*
 
 ## `groups`
 
@@ -283,7 +283,7 @@ on the facade: `Node.DiagnosticEvents`, `Node.OnDiagnosticEvent` and
 
 **Costs.** None beyond the type: the ring is the node's.
 
-*Source: `node/facade.go`, `node/diagnostics.go`, `node/node.go` (`diagRing`, `ringLogs`), `diagevent/ring.go:58`.*
+*Source: `node/facade.go`, `node/diagnostics.go`, `node/node.go` (`diagRing`, `ringLogs`), `diagevent/ring.go` (`Event`).*
 
 ## `controller/softwareupdate`
 

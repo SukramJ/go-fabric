@@ -52,7 +52,7 @@ the mutating OTBR operations exposed but never triggered by the library.
 OTBR builds, `camel` after 2024) and which diagnostics flavour the border
 router serves. The dataset codec, `packages/protocol/src/thread/`
 (`OperationalDataset.ts`, 327 lines), is already ported: `controller/thread`
-(`doc.go`, at matter.js `862ad75f`), used by `controller/commissioner/network.go:360`.
+(`doc.go`, at matter.js `862ad75f`), used by `controller/commissioner/network.go` (`thread.DecodeDataset`).
 
 matter.js has **no server behaviour** to mirror here:
 `ThreadBorderRouterManagementServer.ts` is a 14-line generated stub, as are

@@ -149,7 +149,7 @@ fabric is deleted (`FabricManager.ts:262-271`). go-fabric types the port by
 area instead of by key-value context, so a backend stores records, not
 opaque values.
 
-*Source: `store/port.go:8-45`, `store/port.go:53-258`, `store/memstore/memstore.go:4-28`, `endpoint/memstore/memstore.go:4-22`, `store/storetest/storetest.go:4-21`, `store/contract_test.go`, `groups/manager.go:36-44`, `fabrictest/site.go:69-75`, `node/config.go:367-381`.*
+*Source: `store/port.go` (`Port`, `Fabrics`, `Identity`, `ACL`, `GroupKeys`), `store/memstore/memstore.go` (package doc), `endpoint/memstore/memstore.go` (package doc), `store/storetest/storetest.go` (package doc), `store/contract_test.go`, `groups/manager.go` (`Store`), `fabrictest/site.go` (`StoreOnDisk`), `node/config.go` (`Store`).*
 
 ## Opening the database
 
@@ -175,7 +175,7 @@ handle you opened.
 `sqlitestore.Apply`) to the database on every boot. Both scripts are
 idempotent.
 
-*Source: `node/store_path.go`, `store/doc.go:8-36`, `node/node.go` (`openStores`).*
+*Source: `node/store_path.go`, `store/doc.go` (package doc), `node/node.go` (`openStores`).*
 
 ## The device database
 
@@ -211,7 +211,7 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:25-412`, `store/migrations.go:43-67`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
+*Source: `store/schema.sql`, `store/migrations.go` (`migrationVersions`), `store/migrations/v1.up.sql`, `store/metadata.go` (`metadataKeyNextFabricIndex`), `store/settings.go` (`MetadataKeyEventNumber`), `endpoint/sqlitestore/schema.sql` (`matter_endpoints`, `matter_endpoint_allocation`).*
 
 ### Settings keys
 
@@ -285,7 +285,7 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/nonvolatile.go`, `device/held.go`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `cluster/core/network_commissioning_wifi.go:116-117`, `cluster/thermo/thermostatuserinterfaceconfiguration.go:100-102`, `cluster/tls/persist.go:25-29`, `cluster/jointfabric/datastore.go:180-182`, `examples/reference-bridge/persist.go:21-44`.*
+*Source: `store/settings.go` (`SettingNodeLabel`, `SettingLocation`, `SettingUniqueID`, `SettingTermsAcceptance`), `node/persist.go` (`rootConfigVersionKey`, `endpointLabelKeyRoot`, `endpointConfigVersionKey`, `scenesKeyRoot`, `bindingKeyRoot`, `rebootCountSetting`, `operationalTimeSetting`, `legacyOperationalHoursSetting`), `node/nonvolatile.go`, `device/held.go`, `node/persist.go` (`EndpointPersistence`, `countBoot`, `loadOperationalTime`, `storeOperationalTime`, `bindingKey`), `node/root.go` (`rootUserLabelsKey`, `aggregatorUserLabelsKey`), `node/user_labels.go` (`bridgedUserLabelKeyRoot`), `node/node.go` (`settingRotatingIDUniqueID`), `store/ota.go` (`otaRequestorStateKey`), `store/doorlock.go` (`SettingDoorLockCredentialKey`, `settingDoorLockSaved`), `store/icd.go`, `cluster/core/access_control.go` (`aclExtensionSettingKey`), `store/schema.go` (`vidSettingKey`), `cluster/core/operational_credentials_pending.go` (`pendingNOCSettingKey`, `pendingNOCUpdateSettingKey`), `node/surface_stability.go` (`rootSurfaceKey`, `endpointSurfaceKey`), `node/reserve.go` (`endpointReservedKeyRoot`, `forgetPendingKey`), `cluster/core/time_synchronization_features.go` (`timeSyncKeyTrustedTimeSource`, `timeSyncKeyDefaultNTP`, `timeSyncKeyTimeZone`, `timeSyncKeyDSTOffset`), `cluster/core/network_commissioning_wifi.go` (`wifiNetworksKey`), `cluster/thermo/thermostatuserinterfaceconfiguration.go` (`DefaultKeypadLockoutSetting`), `cluster/tls/persist.go` (`settingCertificates`, `settingEndpoints`), `cluster/jointfabric/datastore.go` (`settingPrefix`), `examples/reference-bridge/persist.go` (`blindPositionKey`).*
 
 `script/docscheck` (`TestSettingsKeysDocumented`) holds the table to the
 code: a `SetSetting` call that states its key as a constant fails the
@@ -306,7 +306,7 @@ build while the key is not in a table of this page.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:286-292`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql` (`matter_server_subscriptions`), `node/security.go` (`wireSecurity`), `bridge/bridge.go` (`AttachSubscriptionStore`), `node/config.go` (`BasicInformation.UniqueID`).*
 
 ## The controller database
 
@@ -332,7 +332,7 @@ running full CASE. With `controller.Config.Sealer` the CA, the fabric, the
 resumption records, the group key sets, the kept onboarding codes and the
 ICD keys are sealed ([security](../security.md#sealing-at-rest)).
 
-*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-44`, `examples/reference-controller/cli/stack.go:34-44`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
+*Source: `controller/ca/persist.go` (`SettingStore`, `DefaultSettingKey`), `controller/client/sqlstore/sqlstore.go` (`Store`, `New`), `controller/client/sqlstore/schema.sql` (`matter_client_values`, `matter_client_versions`, `matter_client_metadata`), `examples/reference-controller/cli/stack.go` (`dclTrustKey`, `selfKey`, `groupKeyPref`), `examples/reference-controller/README.md` (The database), `node/client.go` (`NewStoreResumption`).*
 
 ## Schema changes
 
@@ -368,7 +368,7 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-150`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go` (`Schema`, `Apply`, `Upgrade`), `store/migrations.go` (`Migration`, `Migrations`, `SchemaFingerprint`), `controller/client/sqlstore/schema.go` (`Schema`, `Apply`, `Upgrade`, `Migrations`, `SchemaFingerprint`), `endpoint/sqlitestore/sqlitestore.go` (`Schema`, `Apply`), `endpoint/sqlitestore/schema.sql`.*
 
 ## Backup
 
@@ -388,5 +388,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-69`, `store/schema.sql:71-86`, `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go` (package doc, Secrets at rest), `store/schema.sql` (`matter_node_identities`), `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
 

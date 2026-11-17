@@ -131,7 +131,10 @@ func TestCitationsResolve(t *testing.T) {
 	for _, f := range files {
 		checked += checkCitations(t, f)
 	}
-	if checked < 100 {
+	// The published pages cite by symbol since R2-P6-doc-3001
+	// (TestPublishedPagesCiteNoLineNumbers); the line citations left are
+	// the Go package documentation's and the concept papers'.
+	if checked < 10 {
 		t.Fatalf("only %d citations checked; the pattern or the walk is broken", checked)
 	}
 }

@@ -127,7 +127,8 @@ bluetoothd. It needs the system-bus rights its central needs (the
 The reference daemon has no BLE flag: `examples/ble-wifi-light` is the
 example node with BLE and Wi-Fi.
 
-*Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `leaveBLE`),
+*Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `commissioningHost.withdrawBLE`),
+[`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`Node.leaveRadioWhenCommissioned`),
 [`bridge/ble.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `WithdrawBLE`, `StopBLE`, `advertiseBLE`),
 [`transport/btp/accept.go`](https://github.com/SukramJ/go-fabric/blob/main/transport/btp/accept.go) (`Accept`),
 [`ble/bluez/peripheral_linux.go`](https://github.com/SukramJ/go-fabric/blob/main/ble/bluez/peripheral_linux.go) (`NewPeripheral`).*

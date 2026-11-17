@@ -33,7 +33,7 @@ every port, what skipping it costs, and whether the failure is visible.
 `Node.Bridge()` gives you the bridge for a port the facade does not cover
 without leaving the facade.
 
-*Source: `node/doc.go:4-43`, `node/config.go:107-116`, `bridge/bridge.go:29-47`, `node/node.go` (`Node.Bridge`).*
+*Source: `node/doc.go` (package doc), `node/config.go` (`Config.Snapshotter`), `bridge/bridge.go` (package doc, Bring-up sequence), `node/node.go` (`Node.Bridge`).*
 
 ## The program
 
@@ -229,7 +229,7 @@ Defaults worth knowing:
 | `TimeSynchronization` | mounted, UTCTime, Granularity and TimeSource of the node's UTC; `Off` leaves it off the root — the node then has no UTC, and `Aggregator.Add` and `Replace` refuse a Valve with TimeSync —, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
-*Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go` (`New`).*
+*Source: `node/config.go` (`Config`, `Commissioning`, `ProductDescription`, `BasicInformation`, `Config.Validate`), `node/node.go` (`New`).*
 
 ### The node's own name
 
@@ -464,7 +464,7 @@ controller sees it: every endpoint — the root and the Aggregator
 included — by number, with its parent and the PartsList, DeviceTypeList
 and ServerList its Descriptor serves.
 
-*Source: `node/aggregator.go:40-132`, `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`, `Endpoints`), `examples/reference-bridge/main.go:329-331`, `examples/reference-bridge/fleet_node.go` (`endpointByKey`).*
+*Source: `node/aggregator.go` (`Aggregator`), `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`, `Endpoints`), `examples/reference-bridge/fleet_node.go` (`attachNodeProviders`, `endpointByKey`).*
 
 ## Commissioning
 
@@ -482,7 +482,7 @@ fail-safe armed over PASE expires, an open window is revoked), and
 controllers that are already paired keep working. A host calls it before `Start` when, for example, it cannot serve
 its configured attestation chain.
 
-*Source: `node/inspect.go` (`Node.SetupPayload`), `node/node.go` (`Node.Start`), `node/commissioning.go:424-452`, `node/node.go` (`Node.SetCommissioningBlocked`).*
+*Source: `node/inspect.go` (`Node.SetupPayload`), `node/node.go` (`Node.Start`), `node/commissioning.go` (`Node.OpenBasicWindow`), `node/node.go` (`Node.SetCommissioningBlocked`).*
 
 ## Time synchronization
 
