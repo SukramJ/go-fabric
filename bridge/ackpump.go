@@ -417,22 +417,23 @@ func (b *Bridge) expediteDuplicateAck(sessionID, exchangeID uint16, initiator bo
 // exit path so a delayed StatusResponse cannot panic on a closed
 // channel.
 //
-// Returns a freshly-allocated channel that receives the carried
-// status and is then closed exactly once by
-// [Bridge.signalStatusResponseRX] when the StatusResponse lands; a
-// receive that yields the zero value on a closed channel means the
-// wait was disarmed without an answer. Keyed on (session, exchange) so
+// Returns a freshly-allocated channel that receives the peer's answer
+// ([statusAnswer]) and is then closed exactly once by
+// [Bridge.signalStatusResponseRX] or
+// [Bridge.signalUndecodableStatusResponseRX] when the StatusResponse
+// lands; a receive that yields the zero value on a closed channel means
+// the wait was disarmed without an answer. Keyed on (session, exchange) so
 // a StatusResponse from another controller sharing the exchange ID
 // cannot release this waiter.
-func (b *Bridge) armStatusResponseWait(sessionID, exchangeID uint16, initiator bool) <-chan im.StatusCode {
-	ch := make(chan im.StatusCode, 1)
+func (b *Bridge) armStatusResponseWait(sessionID, exchangeID uint16, initiator bool) <-chan statusAnswer {
+	ch := make(chan statusAnswer, 1)
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	if prev, loaded := b.routing.statusResponseWaits.Swap(key, ch); loaded {
 		// Pathological: caller armed a second waiter on the same
 		// exchange without disarming the first. Close the orphan
 		// channel so a goroutine blocked on it unblocks (interpreting
 		// the close as "moved on"); the new wait wins.
-		if prevCh, ok := prev.(chan im.StatusCode); ok {
+		if prevCh, ok := prev.(chan statusAnswer); ok {
 			safeClose(prevCh)
 		}
 	}
@@ -448,7 +449,7 @@ func (b *Bridge) armStatusResponseWait(sessionID, exchangeID uint16, initiator b
 func (b *Bridge) disarmStatusResponseWait(sessionID, exchangeID uint16, initiator bool) {
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	if v, loaded := b.routing.statusResponseWaits.LoadAndDelete(key); loaded {
-		if ch, ok := v.(chan im.StatusCode); ok {
+		if ch, ok := v.(chan statusAnswer); ok {
 			safeClose(ch)
 		}
 	}
@@ -462,24 +463,47 @@ func (b *Bridge) disarmStatusResponseWait(sessionID, exchangeID uint16, initiato
 // waited reports whether a waiter took the status: a chunk loop that
 // sends the exchange's next message, which piggybacks the ack.
 func (b *Bridge) signalStatusResponseRX(sessionID, exchangeID uint16, initiator bool, status im.StatusCode) (waited bool) {
+	return b.signalStatusAnswer(sessionID, exchangeID, initiator, statusAnswer{status: status})
+}
+
+// signalUndecodableStatusResponseRX is [Bridge.signalStatusResponseRX] for
+// a StatusResponse whose Status could not be decoded: the waiter learns
+// that the peer answered, but not with a status it can act on (review
+// II, R2-P6-wire-0503, owner decision 176; [errChunkAnswerUndecodable]).
+func (b *Bridge) signalUndecodableStatusResponseRX(sessionID, exchangeID uint16, initiator bool) (waited bool) {
+	return b.signalStatusAnswer(sessionID, exchangeID, initiator, statusAnswer{status: im.StatusFailure, undecodable: true})
+}
+
+// signalStatusAnswer hands answer to the wait armed on the exchange, if
+// any, and reports whether one took it.
+func (b *Bridge) signalStatusAnswer(sessionID, exchangeID uint16, initiator bool, answer statusAnswer) (waited bool) {
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	if v, loaded := b.routing.statusResponseWaits.LoadAndDelete(key); loaded {
-		if ch, ok := v.(chan im.StatusCode); ok {
-			safeSendAndClose(ch, status)
+		if ch, ok := v.(chan statusAnswer); ok {
+			safeSendAndClose(ch, answer)
 			return true
 		}
 	}
 	return false
 }
 
+// statusAnswer is what a StatusResponse wait receives: the status the
+// peer answered with, or, with undecodable, that its StatusResponse
+// carried no Status this node could decode — status is then FAILURE, the
+// value an earlier reader of the field took for it.
+type statusAnswer struct {
+	status      im.StatusCode
+	undecodable bool
+}
+
 // safeSendAndClose hands status to the waiter and closes the channel,
 // recovering from "send on closed channel" / "close of closed channel"
 // panics. Belt-and-suspenders for the rendezvous channel lifecycle
 // when arm/disarm/signal races.
-func safeSendAndClose(ch chan im.StatusCode, status im.StatusCode) {
+func safeSendAndClose(ch chan statusAnswer, answer statusAnswer) {
 	defer func() { _ = recover() }()
 	select {
-	case ch <- status:
+	case ch <- answer:
 	default:
 	}
 	close(ch)
@@ -487,7 +511,7 @@ func safeSendAndClose(ch chan im.StatusCode, status im.StatusCode) {
 
 // safeClose closes a channel and recovers from "close of closed
 // channel" / "close of nil channel" panics.
-func safeClose(ch chan im.StatusCode) {
+func safeClose(ch chan statusAnswer) {
 	defer func() { _ = recover() }()
 	close(ch)
 }

@@ -41,6 +41,19 @@ var errChunkRejected = errors.New("bridge: peer rejected ReportData chunk")
 // the whole report.
 var errChunkUnanswered = errors.New("bridge: peer did not answer ReportData chunk")
 
+// errChunkAnswerUndecodable is returned by a chunk loop when the peer
+// answered a ReportData chunk with a StatusResponse whose Status could not
+// be decoded: no status of the peer's, so no refusal either (review II,
+// R2-P6-wire-0503, owner decision 176). matter.js decodes the Status
+// strictly and the decode error is not a StatusResponseError (fable-6a-w3
+// H2: packages/types/src/tlv/TlvNumber.ts:124-131,
+// packages/general/src/MatterError.ts:188 at db021da0): on the request's
+// own exchange the interaction answers FAILURE and closes the exchange
+// (packages/protocol/src/interaction/InteractionMessenger.ts:431,
+// :458-463); on a subscription update it is a failed send that is retried
+// (packages/node/src/node/server/ServerSubscription.ts:938-944, :558-608).
+var errChunkAnswerUndecodable = errors.New("bridge: peer's answer to a ReportData chunk is undecodable")
+
 // errChunkWaitDisarmed ends a chunk wait disarmed by another hand: the
 // close of its session. It is an [errChunkWaitAborted] too.
 var errChunkWaitDisarmed = errors.New("bridge: chunk wait disarmed")
@@ -72,8 +85,9 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// throwIfErrorStatusMessage) and throws on anything else; an
 	// undecodable one is treated as Failure so the waiting interaction
 	// stops rather than carries on blind.
-	status := im.StatusFailure
+	status, undecodable := im.StatusFailure, false
 	if sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(payload)); err != nil {
+		undecodable = true
 		b.logger.Warn("matter.rx.im.status_decode",
 			slog.String("src", srcString(src)),
 			slog.Int("exchange_id", int(proto.ExchangeID)),
@@ -105,7 +119,15 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// fires past Apple's state-machine and
 	// `ProcessSubscribeResponse` never triggers (Run 19 of the
 	// Apple-pair-diagnose cycle).
-	waited := b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	// An undecodable one reaches the waiter as such: the waiter decides —
+	// a failed send of a subscription update, FAILURE on the request's
+	// own exchange (owner decision 176; [errChunkAnswerUndecodable]).
+	var waited bool
+	if undecodable {
+		waited = b.signalUndecodableStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	} else {
+		waited = b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	}
 	// A StatusResponse that opens an exchange — the peer speaks as the
 	// initiator and no exchange of ours waits for it — is no answer to
 	// anything: it is answered like any other unsupported opcode.
@@ -137,8 +159,9 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// MRP-acked and the reply refreshes the session's activity.
 	// A reporter that waits for this answer got it and ends the
 	// subscription itself (closeRefusedSubscription): only an answer nobody
-	// waits for ends it here, once (review II, DR5b-c1-04).
-	if !waited && !status.IsSuccess() && !proto.Initiator {
+	// waits for ends it here, once (review II, DR5b-c1-04). An undecodable
+	// answer is no refusal and ends nothing (owner decision 176).
+	if !waited && !undecodable && !status.IsSuccess() && !proto.Initiator {
 		b.closeSubscriptionByExchange(requestHdr.SessionID, proto.ExchangeID, status)
 	}
 	b.logger.Debug("matter.rx.im.status_ack",
@@ -318,6 +341,11 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	chunks := 0
 	for i := 0; have; i++ {
 		if err := b.sendReadChunk(ctx, src, requestHdr, proto, i, chunk); err != nil {
+			if errors.Is(err, errChunkAnswerUndecodable) {
+				// The peer's answer carried no status: the read ends with
+				// FAILURE on its exchange (owner decision 176).
+				_ = b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_answer_undecodable", im.StatusFailure)
+			}
 			return err
 		}
 		chunks++
@@ -445,7 +473,7 @@ var errChunkWaitAborted = errors.New("bridge: chunk wait aborted")
 // and when the wait is disarmed by another hand: the close of its session
 // ([Bridge.SessionClosed]; [errChunkWaitDisarmed] too). Review II,
 // R2-P1-req2-01.
-func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abort <-chan struct{}, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
+func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abort <-chan struct{}, waitCh <-chan statusAnswer, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	select {
@@ -455,7 +483,7 @@ func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abo
 	case <-abort:
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		return fmt.Errorf("%w: exchange %d chunk %d", errChunkWaitAborted, exchangeID, chunkIdx)
-	case status, ok := <-waitCh:
+	case answer, ok := <-waitCh:
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		if !ok {
 			// Disarmed without an answer: the zero status would read
@@ -463,6 +491,14 @@ func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abo
 			// is gone.
 			return fmt.Errorf("%w: %w: exchange %d chunk %d", errChunkWaitAborted, errChunkWaitDisarmed, exchangeID, chunkIdx)
 		}
+		if answer.undecodable {
+			b.logger.Debug("matter.tx."+op+".chunk_answer_undecodable",
+				slog.String("src", srcString(src)),
+				slog.Int("chunk", chunkIdx),
+				slog.Int("exchange_id", int(exchangeID)))
+			return fmt.Errorf("%w: exchange %d chunk %d", errChunkAnswerUndecodable, exchangeID, chunkIdx)
+		}
+		status := answer.status
 		if status.IsSuccess() {
 			return nil
 		}

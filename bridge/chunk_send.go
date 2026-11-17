@@ -69,7 +69,7 @@ type chunkSent struct {
 	// untracked).
 	counter uint32
 	// armed is the wait handed to the caller (chunkWaitCaller).
-	armed <-chan im.StatusCode
+	armed <-chan statusAnswer
 }
 
 // sendChunk sends chunk i, encoded as body, on leg's exchange. A wait is
@@ -79,7 +79,7 @@ type chunkSent struct {
 // the session's close end it with an error ([Bridge.awaitChunkStatusResponseWithin]).
 // With chunkWaitCaller it returns the armed wait.
 func (b *Bridge) sendChunk(leg chunkLeg, i int, body []byte, chunk im.ReportData, wait chunkWait) (chunkSent, error) {
-	var waitCh <-chan im.StatusCode
+	var waitCh <-chan statusAnswer
 	if wait != chunkNoWait {
 		waitCh = b.armStatusResponseWait(leg.sessionID, leg.exchangeID, leg.role)
 	}

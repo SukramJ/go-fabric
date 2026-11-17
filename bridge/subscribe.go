@@ -1339,7 +1339,8 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 	owed.exchangeID = exch
 	b.rememberReportExchange(sub.ID, target.sessionID, exch)
 	key := b.recordOngoingReport(target.sessionID, counters, owed)
-	status, answered, aborted := b.awaitReportAnswer(target, exch, wait, op)
+	answer, answered, aborted := b.awaitReportAnswer(target, exch, wait, op)
+	status := answer.status
 	if key != 0 {
 		b.reportCounterOwner.CompareAndDelete(key, owed)
 	}
@@ -1351,6 +1352,11 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 	}
 	switch {
 	case aborted:
+		owed.requeue(sub)
+	case answered && answer.undecodable:
+		// No status of the peer's, so no refusal: a failed update, its
+		// data owed again (owner decision 176; [errChunkAnswerUndecodable]).
+		b.noteSubscriptionSendError(sub.ID, op, fmt.Errorf("%w: exchange %d", errChunkAnswerUndecodable, exch))
 		owed.requeue(sub)
 	case answered && status.IsSuccess():
 		b.noteUpdateDelivered(sub.ID)
@@ -1401,7 +1407,7 @@ var reportAnswerBoundForTests time.Duration
 // without an answer (the session's close, the ACK pump giving the message
 // up) — or aborted by the engine's stop. An answer's standalone ack goes
 // out at once: nothing of ours follows on the exchange to piggyback it on.
-func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-chan im.StatusCode, op string) (status im.StatusCode, answered, aborted bool) {
+func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-chan statusAnswer, op string) (answer statusAnswer, answered, aborted bool) {
 	// One timer from the send, on [Bridge.chunkStatusResponseTimeout]'s
 	// bound: over UDP the sum of two schedule terms — this node's own
 	// retransmissions (with its sender pad) and the peer's, summed on one
@@ -1424,18 +1430,18 @@ func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-c
 			b.logger.Debug("matter.tx.subscribe."+op+".unanswered",
 				slog.Int("exchange_id", int(exchangeID)),
 				slog.String("hint", "wait ended without an answer"))
-			return 0, false, false
+			return statusAnswer{}, false, false
 		}
 		b.expediteDuplicateAck(target.sessionID, exchangeID, true)
 		b.RunAckPumpOnce(b.clk().Now())
 		return st, true, false
 	case <-target.abort:
-		return 0, false, true
+		return statusAnswer{}, false, true
 	case <-timer.C():
 		b.logger.Debug("matter.tx.subscribe."+op+".unanswered",
 			slog.Int("exchange_id", int(exchangeID)),
 			slog.String("timeout", timeout.String()))
-		return 0, false, false
+		return statusAnswer{}, false, false
 	}
 }
 
@@ -1660,7 +1666,7 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // the chunks before it are this loop's own, on the same key, so arming the
 // final wait up front would have the first of them replace and close it.
 // A failed send disarms it.
-func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, armFinal bool) (counters []uint32, finalWait <-chan im.StatusCode, err error) {
+func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, armFinal bool) (counters []uint32, finalWait <-chan statusAnswer, err error) {
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
 	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
@@ -1759,7 +1765,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 // before the waiter exists; the caller receives on wait through
 // [Bridge.awaitFlushedReport], which disarms it. A failed send disarms
 // it here.
-func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData, arm bool) (counters []uint32, exchangeID uint16, wait <-chan im.StatusCode, err error) {
+func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData, arm bool) (counters []uint32, exchangeID uint16, wait <-chan statusAnswer, err error) {
 	freshExchangeID := b.nextOutboundExchangeID()
 	freshTarget := target
 	freshTarget.exchangeID = freshExchangeID
@@ -1805,18 +1811,19 @@ const flushStatusResponseTimeout = 500 * time.Millisecond
 // after [flushStatusResponseTimeout]; the answer's standalone ack goes
 // out at once, as for a StatusResponse no chunk loop waited for
 // (receive_dispatch's absorbStatusResponse).
-func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan im.StatusCode) {
+func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan statusAnswer) {
 	timeout := flushStatusResponseTimeout
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	defer b.disarmStatusResponseWait(sessionID, exchangeID, true)
 	select {
-	case status := <-wait:
+	case answer := <-wait:
 		b.expediteDuplicateAck(sessionID, exchangeID, true)
 		b.RunAckPumpOnce(b.clk().Now())
 		b.logger.Debug("matter.tx."+op+".flush_answered",
 			slog.Int("exchange_id", int(exchangeID)),
-			slog.String("status", status.String()))
+			slog.String("status", answer.status.String()),
+			slog.Bool("undecodable", answer.undecodable))
 	case <-ctx.Done():
 		b.logger.Debug("matter.tx."+op+".flush_abandoned",
 			slog.Int("exchange_id", int(exchangeID)),
@@ -2177,6 +2184,12 @@ func (b *Bridge) subscribeWith(
 	leaveSessionOrder(ctx)
 	if err := b.streamPrimingChunks(ctx, abort, src, requestHdr, proto, subID, chunker); err != nil {
 		b.abandonPrimingSubscription(subID)
+		if errors.Is(err, errChunkAnswerUndecodable) {
+			// The peer's answer carried no status: the interaction ends
+			// with FAILURE on its own exchange (owner decision 176;
+			// [errChunkAnswerUndecodable]).
+			_ = b.rejectSubscribeStatus(src, requestHdr, proto, "priming_answer_undecodable", im.StatusFailure)
+		}
 		return err
 	}
 	b.logger.Debug("matter.tx.subscribe.initial_reports",

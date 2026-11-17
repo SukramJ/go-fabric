@@ -36,8 +36,8 @@ func TestRefusedReportIsClosedByItsWaiterOnly(t *testing.T) {
 	hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: 9}
 	proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeStatusResponse, ExchangeID: exch, Initiator: false}
 	_ = b.absorbStatusResponse(peerAddr, hdr, proto, body)
-	if status := <-wait; status != im.StatusFailure {
-		t.Fatalf("the waiting reporter got %v, want Failure", status)
+	if answer := <-wait; answer.status != im.StatusFailure || answer.undecodable {
+		t.Fatalf("the waiting reporter got %+v, want Failure", answer)
 	}
 	if _, err := m.Get(sub.ID); err != nil {
 		t.Fatal("the receive path ended the subscription its waiting reporter ends")
