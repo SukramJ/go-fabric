@@ -195,8 +195,15 @@ func (s SettingStore) Load() (Stored, bool, error) {
 		RootKeyPair:       j.RootKeyPair,
 		RootKeyRef:        j.RootKeyRef,
 	}
-	if j.ICACCertID != nil && j.ICACKeyPair != nil {
+	anyICAC := j.ICACCertID != nil || j.ICACKeyPair != nil || len(j.ICACKeyIdentifier) > 0 || len(j.ICACCertBytes) > 0 || j.ICACKeyRef != ""
+	switch {
+	case j.ICACCertID != nil && j.ICACKeyPair != nil:
 		st.ICAC = &StoredICAC{CertID: *j.ICACCertID, KeyPair: *j.ICACKeyPair, KeyIdentifier: j.ICACKeyIdentifier, CertBytes: j.ICACCertBytes, KeyRef: j.ICACKeyRef}
+	case anyICAC:
+		// Some ICAC fields without the id or the key pair: not a CA
+		// without an ICAC, whose next save would drop the fields still
+		// there (review II, R2-P6-store-1851).
+		return Stored{}, false, fmt.Errorf("%w: the stored ICAC is incomplete: icacCertId or icacKeyPair is missing", ErrConfig)
 	}
 	return st, true, nil
 }
