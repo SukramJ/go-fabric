@@ -76,10 +76,9 @@ func (a *FabricAuthority) OnFabricAdded(fn func(*Fabric)) (unsubscribe func()) {
 // vendor id (reserved ones refused), the label, the NOC; then
 // fabricAdded. A store that holds a fabric already is an error and keeps
 // its record: the store holds one fabric, and replacing it would drop the
-// key, NOC and IPK every node commissioned before trusts — matter.js's
-// createFabric refuses an index in use (:164-167). Replacing a fabric is
-// erasing the controller's state first (review II, R2-P6-api-1859, owner
-// decision 191).
+// key, NOC and IPK every node commissioned before trusts. Replacing a
+// fabric is erasing the controller's state first (review II,
+// R2-P6-api-1859, owner decision 191).
 func (a *FabricAuthority) CreateFabric(cfg FabricConfig) (*Fabric, error) {
 	store := cfg.Store
 	if store != nil {

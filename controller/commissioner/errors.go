@@ -252,8 +252,8 @@ const maxDeviceText = 128
 // error message the host may print anywhere: cut at [maxDeviceText]
 // bytes, and quoted with Go's escapes when it holds a control character
 // or is not valid UTF-8, so no raw byte of it reaches a terminal or a log
-// line. Plain printable text stays as it is, the message shape matter.js
-// gives it (review II, R2-P6-sec-1861).
+// line. Plain printable text stays as it is, the message shape the parity
+// tests pin (review II, R2-P6-sec-1861).
 func deviceText(s string) string {
 	cut := len(s) > maxDeviceText
 	if cut {

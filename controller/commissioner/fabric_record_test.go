@@ -182,8 +182,7 @@ func (s *blockingFabricStore) SaveFabric(ca.FabricRecord) error {
 // TestCreateFabricNeverReplacesAStoredFabric: CreateFabric on a store that
 // holds a fabric fails and leaves the record — its key, NOC and IPK — as
 // it was; replacing the fabric would orphan every node commissioned under
-// the old IPK (review II, R2-P6-api-1859, owner decision 191; matter.js's
-// createFabric refuses an index in use).
+// the old IPK (review II, R2-P6-api-1859, owner decision 191).
 func TestCreateFabricNeverReplacesAStoredFabric(t *testing.T) {
 	t.Parallel()
 	st := &ca.MemoryStore{}

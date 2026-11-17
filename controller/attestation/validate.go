@@ -32,8 +32,8 @@ type Context struct {
 	Store PAAStore
 	// Clock is the current time a DAC past its notAfter is judged at (an
 	// error finding, [CertificateExpired]); nil judges no certificate at
-	// the current time. Go only: matter.js's Context has no clock (review
-	// II, R2-P6-par-1805, owner decision 193).
+	// the current time. Go only, ahead of matter.js (review II,
+	// R2-P6-par-1805, owner decision 193; see the package doc).
 	Clock clock.Clock
 }
 

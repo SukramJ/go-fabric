@@ -14,8 +14,8 @@ import (
 // commissioning returns without its control characters and cut at 128
 // bytes, at every site that puts it into a message — the
 // GeneralCommissioning and NOC responses and the NetworkCommissioning
-// suffix. Plain printable text keeps matter.js's message shape (review II,
-// R2-P6-sec-1861).
+// suffix. Plain printable text keeps the message shape the parity tests
+// pin (review II, R2-P6-sec-1861).
 func TestDeviceTextIsNeutralised(t *testing.T) {
 	t.Parallel()
 	f, _ := newTestFlow(t, func(imRequest) (uint8, []byte, bool) { return 0, nil, false })
