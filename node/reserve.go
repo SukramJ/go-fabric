@@ -248,3 +248,90 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	b.ops = append(b.ops, op)
 	return nil
 }
+
+// splitErasures splits a batch's reservation ops into the ones applied
+// before its reassembly and the erasures of forgotten keys applied after
+// it ([Partition.Batch]); readded are the forgotten keys an Add of the
+// same batch brought back (an opRelease after the opErase).
+func splitErasures(ops []reservationOp) (pre, erase []reservationOp, readded []string) {
+	forgotten := map[string]bool{}
+	for _, op := range ops {
+		switch op.kind {
+		case opErase:
+			erase = append(erase, op)
+			forgotten[op.key] = true
+		case opRelease:
+			if forgotten[op.key] && !slices.Contains(readded, op.key) {
+				readded = append(readded, op.key)
+			}
+			pre = append(pre, op)
+		default:
+			pre = append(pre, op)
+		}
+	}
+	return pre, erase, readded
+}
+
+// heldEndpoint is an endpoint [Aggregator.holdBack] took out of its
+// partition: where it was and its device's detach.
+type heldEndpoint struct {
+	key    string
+	at     int
+	ep     Endpoint
+	detach func()
+}
+
+// holdBack takes the endpoints with keys out of scope's partition until
+// the returned restore puts them back where they were; restore reports
+// whether it put any back. A key another goroutine added meanwhile keeps
+// that endpoint, and the held one is unbound; on a stopped node nothing is
+// put back (its Stop unbound every device it held, the held ones among
+// them). nil restore for no key held.
+func (a *Aggregator) holdBack(scope string, keys []string) (restore func() bool) {
+	if len(keys) == 0 {
+		return nil
+	}
+	a.mu.Lock()
+	part := a.partLocked(scope)
+	var held []heldEndpoint
+	for _, k := range keys {
+		i := slices.IndexFunc(part.eps, func(ep Endpoint) bool {
+			ek, err := keyOf(ep.Spec())
+			return err == nil && ek == k
+		})
+		if i < 0 {
+			continue
+		}
+		held = append(held, heldEndpoint{key: k, at: i, ep: part.eps[i], detach: a.detach[k]})
+		part.eps = slices.Delete(part.eps, i, i+1)
+	}
+	a.mu.Unlock()
+	if len(held) == 0 {
+		return nil
+	}
+	return func() bool {
+		var unbind []func()
+		put := false
+		a.mu.Lock()
+		part := a.partLocked(scope)
+		for j := len(held) - 1; j >= 0; j-- {
+			h := held[j]
+			if a.closed {
+				continue
+			}
+			if p, _ := a.findLocked(h.key); p != nil {
+				unbind = append(unbind, h.detach)
+				continue
+			}
+			part.eps = slices.Insert(part.eps, min(h.at, len(part.eps)), h.ep)
+			put = true
+		}
+		a.mu.Unlock()
+		for _, d := range unbind {
+			if d != nil {
+				d()
+			}
+		}
+		return put
+	}
+}

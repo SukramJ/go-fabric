@@ -381,20 +381,33 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	b := &Batch{a: p.a, scope: p.scope, ctx: ctx}
 	fnErr := fn(b)
 	// The reservations first, so the reassembly keeps a removed key's
-	// number and collects a forgotten one's.
-	resErr := p.a.applyReservations(ctx, b.ops)
+	// number — but a forgotten key's erasure last: the reassembly takes
+	// its endpoint off the wire and the device is unbound before what is
+	// stored under its keys is erased, so no write a controller or the
+	// host makes in between stores under an erased key again (review II,
+	// R2-P6-conc-2405, N-finp-3). A key forgotten and added again in the
+	// batch is held out of the first reassembly and served by a second
+	// one, after the erasure, so it starts as a new device would.
+	pre, erase, readded := splitErasures(b.ops)
+	resErr := p.a.applyReservations(ctx, pre)
 	p.a.mu.Lock()
 	started := p.a.started
 	p.a.mu.Unlock()
 	var err error
+	var restore func() bool
 	if b.changed && started {
+		restore = p.a.holdBack(b.scope, readded)
 		err = p.a.reassemble(ctx)
 	}
-	err = errors.Join(resErr, err)
 	// Unbound after the reassembly: no controller reaches them any more.
 	for _, d := range b.detach {
 		d()
 	}
+	resErr = errors.Join(resErr, p.a.applyReservations(ctx, erase))
+	if restore != nil && restore() {
+		err = errors.Join(err, p.a.reassemble(ctx))
+	}
+	err = errors.Join(resErr, err)
 	switch {
 	case fnErr == nil:
 		return err
