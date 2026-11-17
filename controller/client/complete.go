@@ -63,7 +63,27 @@ func (r *Registry) CompleteCommissioning(ctx context.Context, nodeID uint64, o C
 	if err != nil {
 		return nil, err
 	}
-	err = r.runFabricOperation(n, opCommission, func() error {
+	if err := r.completeOperation(ctx, n, addr, o); err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
+// completeOperation is CompleteCommissioning's fabric operation on n.
+func (r *Registry) completeOperation(ctx context.Context, n *Node, addr PeerAddress, o CompleteOptions) error {
+	return r.runFabricOperation(n, opCommission, func() error {
+		// A second call for the node that passed the check above before
+		// the first's ForAddress runs here after the first succeeded: it is
+		// refused, and the node the first commissioned stays. CommissionedAt,
+		// not IsCommissioned: ForAddress gives the node its peer address,
+		// which is what IsCommissioned tests, while CommissionedAt is set
+		// only by a commissioning that succeeded. A module rule (review II,
+		// R2-P6-fsm-2310; Fable fact note fable-6b-w2 G1): matter.js checks
+		// before its forAddress only (packages/node/src/node/client/
+		// Peers.ts:263-266 at db021da0).
+		if !n.Record().CommissionedAt.IsZero() {
+			return fmt.Errorf("%w: %s", ErrAlreadyCommissioned, n.ID())
+		}
 		if err := r.complete(ctx, n, addr, o); err != nil {
 			if derr := r.deleteNode(context.WithoutCancel(ctx), n, nil); derr != nil {
 				r.log.Warn("matter.controller.client.registry.complete_cleanup_failed", slog.String("node", n.ID()), slog.Any("err", derr))
@@ -72,10 +92,6 @@ func (r *Registry) CompleteCommissioning(ctx context.Context, nodeID uint64, o C
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return n, nil
 }
 
 func (r *Registry) complete(ctx context.Context, n *Node, addr PeerAddress, o CompleteOptions) error {

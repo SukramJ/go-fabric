@@ -4,6 +4,8 @@
 package client
 
 import (
+	"context"
+
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -253,4 +255,11 @@ func ICDRegistering(c *ICDClient) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.op != nil && c.op.kind == icdRegistering
+}
+
+// CompleteOperation runs CompleteCommissioning's fabric operation on n, as
+// a second call that passed its check before the first's ForAddress does.
+func CompleteOperation(ctx context.Context, r *Registry, n *Node, o CompleteOptions) error {
+	addr, _ := n.PeerAddress()
+	return r.completeOperation(ctx, n, addr, o)
 }

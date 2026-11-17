@@ -88,6 +88,17 @@ func TestSplitCommissioningParity(t *testing.T) {
 		if !errors.Is(err, client.ErrAlreadyCommissioned) || reg.Get(n.ID()) != n {
 			t.Fatalf("second completion: %v", err)
 		}
+		// A second call that passed that check before the first's
+		// ForAddress, and reaches the fabric operation after the first
+		// succeeded, is refused there and leaves the node (review II,
+		// R2-P6-fsm-2310). Before, it sent CommissioningComplete again and,
+		// with the fail-safe gone, deleted the node the first commissioned.
+		err = site.Run(parityCtx(t), func(ctx context.Context) error {
+			return client.CompleteOperation(ctx, reg, n, client.CompleteOptions{})
+		})
+		if !errors.Is(err, client.ErrAlreadyCommissioned) || reg.Get(n.ID()) != n || !n.IsCommissioned() {
+			t.Fatalf("a completion that passed the check before the first: %v; node kept %v", err, reg.Get(n.ID()) == n)
+		}
 	})
 
 	t.Run("leaves no phantom peer when the node cannot be reached", func(t *testing.T) {
