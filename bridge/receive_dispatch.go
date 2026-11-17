@@ -842,10 +842,16 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// R2-P6-fsm-1001, F-db021da0-10; the NetworkCommissioning server's
 	// ConnectNetwork that outlived its fail-safe, as connectedhomeip). A
 	// concrete command always leaves an entry otherwise, so the test is
-	// exact for a request of concrete commands; a wildcard one that
-	// targets nothing, or whose every target answered with nothing, is
-	// answered with an empty InvokeResponse as before — the two are not
-	// told apart here (Fable's read of sub round 1, C-1).
+	// exact for a request of concrete commands. A request with a
+	// wildcard-endpoint command is always answered, a target that
+	// returned [im.NoResponse] left out of the InvokeResponse — empty when
+	// every target did (decision 182): matter.js expands a path without
+	// an endpoint and answers every target it invokes
+	// (packages/protocol/src/action/server/CommandInvokeResponse.ts:78-85,
+	// :495-508 at db021da0), and connectedhomeip never dispatches such a
+	// unicast command (src/app/CommandHandlerImpl.cpp:278-282 at
+	// 6170af84), so leaving a target out is this module's rule
+	// (by_design).
 	if len(resp.Responses) == 0 && len(req.Invokes) > 0 && allConcreteInvokes(req.Invokes) {
 		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.no_response",

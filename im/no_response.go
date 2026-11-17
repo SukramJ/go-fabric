@@ -5,8 +5,11 @@ package im
 
 // NoResponse is the response a command handler returns for a command it
 // answers with nothing: [HandleInvokeRequest] leaves the command out of
-// the InvokeResponse, and an InvokeRequest none of whose commands is
-// answered is answered with no message at all (the bridge sends none).
+// the InvokeResponse, and an InvokeRequest of concrete commands none of
+// which is answered is answered with no message at all (the bridge sends
+// none). A wildcard-endpoint command leaves each target that returned it
+// out, and its request is always answered — with an empty InvokeResponse
+// when every target returned it (decision 182).
 //
 // A NetworkCommissioning server returns it for a ConnectNetwork whose
 // fail-safe expired while the driver ran: connectedhomeip releases the
