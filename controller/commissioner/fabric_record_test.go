@@ -249,3 +249,54 @@ func (s *onceBlockingStore) SaveFabric(r ca.FabricRecord) error {
 	s.once.Do(func() { close(s.entered); <-s.release })
 	return s.FabricStore.SaveFabric(r)
 }
+
+// TestStoredOperationalKeyIsNeverDropped: a stored fabric record whose
+// key pair or NOC is missing, and an OperationalSigner whose key is not
+// the stored NOC's, are refused with ca.ErrConfig and the record stays as
+// it was — before, a new identity or NOC was minted and saved over it,
+// the stored private key gone (review II, R2-P6-store-1851 class, owner
+// decision 191, Fable read F3).
+func TestStoredOperationalKeyIsNeverDropped(t *testing.T) {
+	t.Parallel()
+	setup := func(t *testing.T) (*ca.CA, *ca.MemoryStore, FabricConfig) {
+		t.Helper()
+		st := &ca.MemoryStore{}
+		c, err := ca.New(ca.Config{Store: st})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg := FabricConfig{FabricID: 1, RootNodeID: 1, Store: st}
+		if _, err := NewFabric(c, cfg); err != nil {
+			t.Fatal(err)
+		}
+		return c, st, cfg
+	}
+	for _, d := range []struct {
+		name   string
+		damage func(*ca.FabricRecord)
+		signer bool
+	}{
+		{"a key pair without its NOC", func(r *ca.FabricRecord) { r.NOC = nil }, false},
+		{"a NOC without its key pair", func(r *ca.FabricRecord) { r.KeyPair = nil }, false},
+		{"a signer whose key is not the stored NOC's", func(*ca.FabricRecord) {}, true},
+	} {
+		t.Run(d.name, func(t *testing.T) {
+			t.Parallel()
+			c, st, cfg := setup(t)
+			rec, _, _ := st.LoadFabric()
+			d.damage(&rec)
+			if err := st.SaveFabric(rec); err != nil {
+				t.Fatal(err)
+			}
+			if d.signer {
+				cfg.OperationalSigner = newOpSigner(t)
+			}
+			if _, err := NewFabric(c, cfg); !errors.Is(err, ca.ErrConfig) {
+				t.Fatalf("NewFabric = %v, want ca.ErrConfig", err)
+			}
+			if after, _, _ := st.LoadFabric(); !reflect.DeepEqual(after, rec) {
+				t.Fatal("the stored record changed")
+			}
+		})
+	}
+}

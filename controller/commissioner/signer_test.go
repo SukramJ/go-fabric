@@ -48,8 +48,10 @@ func (s *opSigner) KeyRef() string { return "kms:op" }
 // TestOperationalSignerRecord: with an OperationalSigner the NOC is for
 // the signer's key, the identity has no PrivateKey, the record holds the
 // NOC, the public key and the KeyRef; it loads again with the signer;
-// without it the record is ErrFabricMismatch; another signer gets a new
-// NOC; a stored private key leaves the record when a signer takes over.
+// without it the record is ErrFabricMismatch; another signer is refused
+// (ca.ErrConfig, the record kept: decision 191, Fable read F3); a stored
+// private key leaves the record when a signer over the same key takes
+// over.
 func TestOperationalSignerRecord(t *testing.T) {
 	t.Parallel()
 	mem := &ca.MemoryStore{}
@@ -80,9 +82,11 @@ func TestOperationalSignerRecord(t *testing.T) {
 		t.Fatalf("without the signer: %v", err)
 	}
 	other := newOpSigner(t)
-	moved, err := NewFabric(authority, FabricConfig{Store: mem, OperationalSigner: other})
-	if err != nil || bytes.Equal(moved.Identity.NOC, f.Identity.NOC) || moved.IPK == nil || !bytes.Equal(moved.IPK, f.IPK) {
-		t.Fatalf("another signer: %v", err)
+	if _, err := NewFabric(authority, FabricConfig{Store: mem, OperationalSigner: other}); !errors.Is(err, ca.ErrConfig) {
+		t.Fatalf("another signer: %v, want ca.ErrConfig", err)
+	}
+	if after, _, _ := mem.LoadFabric(); !bytes.Equal(after.NOC, f.Identity.NOC) {
+		t.Fatal("another signer replaced the stored NOC")
 	}
 
 	// The SQLite path, then a signer over the same key.
@@ -96,7 +100,7 @@ func TestOperationalSignerRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	taken := &opSigner{key: plain.Identity.PrivateKey}
-	moved, err = NewFabric(a2, FabricConfig{Store: mem2, OperationalSigner: taken})
+	moved, err := NewFabric(a2, FabricConfig{Store: mem2, OperationalSigner: taken})
 	if err != nil || !bytes.Equal(moved.Identity.NOC, plain.Identity.NOC) {
 		t.Fatalf("take over: %v", err)
 	}

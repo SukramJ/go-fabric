@@ -55,8 +55,10 @@ type FabricConfig struct {
 	// crypto.Signer whose private key the store never sees (a key file,
 	// an HSM, a KMS); CASE signs Sigma3 through it. The NOC is issued for
 	// its public key; the stored record holds the NOC, the public key and
-	// a KeyRef ([ca.KeyRefOf]), no private key, and a stored NOC for
-	// another key is replaced by a new one. matter.js has no such seam
+	// a KeyRef ([ca.KeyRefOf]), no private key. A stored NOC for another
+	// key is refused with [ca.ErrConfig] (with [ErrFabricMismatch]) and the
+	// record kept; a stored private key of the signer's key leaves the
+	// record. matter.js has no such seam
 	// (Fabric.ts:50-76 keeps #keyPair).
 	OperationalSigner crypto.Signer
 }
@@ -285,6 +287,14 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 	}
 	cfg.FabricID, cfg.RootNodeID, cfg.VendorID = rec.FabricID, rec.RootNodeID, rec.RootVendorID
 	cfg.Label, cfg.FabricIndex = rec.Label, rec.FabricIndex
+	// A stored operational key is never dropped (decision 191, Fable read
+	// F3): a record with a key pair but no NOC, or a NOC but no key pair,
+	// is refused instead of a new identity saved over it. A record that
+	// keeps neither gets one minted below.
+	hasKey := rec.KeyPair != nil && (len(rec.KeyPair.PrivateKey) > 0 || len(rec.KeyPair.PublicKey) > 0)
+	if hasNOC := len(rec.NOC) > 0; hasKey != hasNOC {
+		return nil, fmt.Errorf("%w: %w: the stored fabric holds its operational key pair or its NOC without the other", ErrFabricMismatch, ca.ErrConfig)
+	}
 	if cfg.OperationalSigner != nil {
 		return loadSignerFabric(c, cfg, rec)
 	}
@@ -340,9 +350,13 @@ func checkStoredNOC(c *ca.CA, rec ca.FabricRecord, key *ecdsa.PublicKey) error {
 }
 
 // loadSignerFabric is loadFabric with an operational signer: the stored
-// NOC is kept when it is for the signer's key, otherwise a new NOC is
-// minted under the stored ids; a record that still holds a private key
-// or another NOC is saved again.
+// NOC is kept when it is for the signer's key, and a stored NOC for
+// another key — or one that does not decode — is refused with
+// ca.ErrConfig, the record left as it is (decision 191, Fable read F3):
+// the signer is held to the stored certificate as the CA holds its
+// signers (ca.Config.RootSigner). A record without a NOC gets one minted
+// under the stored ids; a record that still holds the private key the
+// signer now keeps is saved again without it.
 func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error) {
 	pub, err := ca.P256PublicKey(cfg.OperationalSigner)
 	if err != nil {
@@ -351,9 +365,14 @@ func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric,
 	store := cfg.Store
 	keep := false
 	if len(rec.NOC) > 0 {
-		if noc, err := mattercert.Decode(rec.NOC); err == nil && bytes.Equal(noc.PublicKey, pub) {
-			keep = true
+		noc, err := mattercert.Decode(rec.NOC)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w: the stored NOC: %w", ErrFabricMismatch, ca.ErrConfig, err)
 		}
+		if !bytes.Equal(noc.PublicKey, pub) {
+			return nil, fmt.Errorf("%w: %w: the operational signer's key is not the stored NOC's", ErrFabricMismatch, ca.ErrConfig)
+		}
+		keep = true
 	}
 	var f *Fabric
 	if keep {
