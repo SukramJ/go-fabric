@@ -6,6 +6,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -169,5 +170,44 @@ func TestBrowse_Refusals(t *testing.T) {
 	_ = n.Close()
 	if r := <-done; !errors.Is(r.err, ErrClosed) {
 		t.Fatalf("closed cache = %+v", r)
+	}
+}
+
+// TestBrowse_TracksOnlyAdvertisedInstances: a browse follows an instance
+// while the type's PTR names it; once the PTR goes — evicted from the
+// cache by a flood of others — the instance and its SRV targets are
+// dropped, so a browse holds no more than the cache does (review II,
+// R2-P6-bound-2151).
+func TestBrowse_TracksOnlyAdvertisedInstances(t *testing.T) {
+	t.Parallel()
+	n, _, _ := testNames(t)
+	b := &browse{n: n, st: eType, instances: newOmap[string, *browsed](), hosts: map[string]bool{}}
+	onLoop(t, n, b.start)
+	defer onLoop(t, n, b.stop)
+	const packets, perPacket = 200, 100
+	for p := range packets {
+		answers := make([]dns.RR, 0, perPacket)
+		extra := make([]dns.RR, 0, perPacket)
+		for i := range perPacket {
+			inst := fmt.Sprintf("i%d-%d.%s", p, i, eType)
+			answers = append(answers, ptrRR(eType, inst, 4500))
+			extra = append(extra, srvRR(inst, fmt.Sprintf("h%d-%d.local", p, i), 6053, 120, false))
+		}
+		deliver(t, n, 0, answers, extra...)
+	}
+	var tracked, hosts, ptrs int
+	onLoop(t, n, func() {
+		tracked, hosts = b.instances.len(), len(b.hosts)
+		for _, r := range b.ptr.records.values() {
+			if r.Type == TypePTR {
+				ptrs++
+			}
+		}
+	})
+	if tracked > ptrs || tracked > maxCachedRecords {
+		t.Fatalf("the browse tracks %d instances, the type's PTR names %d (cache bound %d)", tracked, ptrs, maxCachedRecords)
+	}
+	if hosts > tracked {
+		t.Fatalf("the browse remembers %d SRV targets for %d tracked instances", hosts, tracked)
 	}
 }
