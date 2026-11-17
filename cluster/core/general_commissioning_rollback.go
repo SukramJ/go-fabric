@@ -177,6 +177,12 @@ var errGencommArmRolledBack = errors.New("core: GeneralCommissioning: the fail-s
 // it pending (review II, N-findev-1). The IM layer answers it as FAILURE.
 var errGencommArmFabricUnsettled = errors.New("core: GeneralCommissioning: the arming fabric's row was pending; the new fail-safe context removed the fabric or could not settle its row")
 
+// errGencommClosed answers an arm once the server is closed
+// ([GeneralCommissioning.Close]): the node is stopping, and a fail-safe
+// armed then would outlive the expiry its stop ran. The IM layer answers
+// it as FAILURE.
+var errGencommClosed = errors.New("core: GeneralCommissioning: closed, the node is stopping")
+
 // errGencommArmedForAnotherFabric answers ArmFailSafeFor while the
 // fail-safe is armed for another fabric (review II, R2-P6-fsm-1017).
 var errGencommArmedForAnotherFabric = errors.New("core: GeneralCommissioning: the fail-safe is armed for another fabric")

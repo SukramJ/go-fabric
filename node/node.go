@@ -1548,7 +1548,11 @@ func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	// ServerNetworkRuntime.ts:446, `await env.close(DeviceCommissioner)`),
 	// and packages/protocol/src/common/FailsafeContext.ts:194-203 (a close
 	// with the fail-safe armed rolls back). No reopen follows: stopping
-	// is set (review II, R2-P6-fsm-2411).
+	// is set (review II, R2-P6-fsm-2411). The server is closed first, so no
+	// arm — an administrator's over CASE above all — takes the fail-safe
+	// again between the expiry and the store's close (facade residual 2a);
+	// a Close that ctx ends is Close's error again in stopLocked.
+	_ = n.root.GeneralCommissioning.Close(ctx)
 	n.root.GeneralCommissioning.ExpireFailSafe(context.WithoutCancel(ctx))
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()

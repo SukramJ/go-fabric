@@ -816,6 +816,11 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// session). It gates the fail-safe ownership rules below.
 	_, sessFabric := im.FabricFilterFromContext(ctx)
 	if req.ExpiryLengthSeconds != 0 {
+		// A closed server arms nothing: the node is stopping, and the
+		// fail-safe its stop expired is not armed again behind it.
+		if g.closed {
+			return nil, errGencommClosed
+		}
 		if err := g.settleArmLocked(ctx, sessFabric, 0); err != nil {
 			return nil, err
 		}
@@ -1035,8 +1040,10 @@ func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fab
 // began before the stop no longer writes after it. The node expires an
 // armed fail-safe first ([GeneralCommissioning.ExpireFailSafe]; review II,
 // R2-P6-fsm-2411); Close itself rolls nothing back, and what a host that
-// calls it alone leaves uncommitted is rolled back by the next start. It
-// may be called again after an error.
+// calls it alone leaves uncommitted is rolled back by the next start. From
+// Close on no arm is taken — ArmFailSafe and the internal arms answer
+// FAILURE — so the node closes the server before it expires the fail-safe
+// at its stop. It may be called again after an error.
 func (g *GeneralCommissioning) Close(ctx context.Context) error {
 	g.mu.Lock()
 	g.closed = true
@@ -1411,6 +1418,10 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 		return nil
 	}
 	g.mu.Lock()
+	if g.closed {
+		g.mu.Unlock()
+		return errGencommClosed
+	}
 	// The settle and the fresh start release the lock around the hooks they
 	// run and hold it again on return, on a panic of a hook too; this guard
 	// frees it then, as handleArmFailSafe's does, while every return below
