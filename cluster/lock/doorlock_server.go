@@ -119,32 +119,14 @@ type LockOperationEvent struct {
 
 var errUnknownCommand = errors.New("lock: unknown command")
 
-// StateSource is the read-side interface a model-layer lock DP must
-// satisfy so DoorLockServer can project its Matter attribute surface.
-//
-// IsJammed returns true when ERROR_JAMMED is asserted.
-// IsLocked returns (locked=true, observed=true) when the lock state is known
-// and the lock is in the locked position; observed=false (the state is not
-// known) reads as a null LockState. The server stores no LockState: it asks
-// IsJammed (NotFullyLocked) and IsLocked at every read, so the state after
-// a LockInvoke is the one IsLocked then reports.
-// LockInvoke dispatches LockDoor / UnlockDoor / UnboltDoor commands to the
-// CCU. cmdID is one of the [wire.DoorLockCmd*] constants; UnlockWithTimeout
-// and an auto-relock arrive as UnlockDoor and LockDoor. A returned error
-// fails the command: the server emits LockOperationError (the
-// [LockOperationFailedError] reason, Unspecified otherwise) and answers the
-// error's IM status if it carries one ([im.StatusCodeError]), FAILURE
-// otherwise. It is not called for a request without an accessing fabric
-// or one the authorization refuses. A source that also implements
-// [LockOperationHandler] is called through HandleLockOperation instead. The
-// implementation owns the southbound urgency of the write it performs:
-// the cluster contract carries no priority, so a host whose command
-// queue ranks by urgency names the value it wants inside LockInvoke.
-type StateSource interface {
-	IsJammed() bool
-	IsLocked() (locked, observed bool)
-	LockInvoke(ctx context.Context, cmdID uint32) error
-}
+// StateSource is the host port DoorLockServer reads LockState from and
+// drives the lock through: the generated port (lockdef.StateSource), whose
+// doc states the contract — one declaration, as every other port of a kit
+// server is (R2-P6-api-2751, owner decision 224). A source that also
+// implements [LockOperationHandler] is called through HandleLockOperation
+// instead of LockInvoke, and a [LockOperationFailedError] names the
+// LockOperationError reason.
+type StateSource = lockdef.StateSource
 
 // Actuation is the movement a lock operation asks of the hardware:
 // matter.js DoorLockBaseServer.Actuation (DoorLockServer.ts:1525).

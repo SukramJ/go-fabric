@@ -260,10 +260,9 @@ var ports = map[string]portSet{
 	}}},
 	"DoorLock": {ports: []portDecl{{
 		name: "StateSource",
-		// cluster/lock declares its own StateSource with the same methods
-		// (an alias would be an apidiff break, R2-P6-api-2751 reported
-		// back); this doc carries the contract that interface's doc
-		// states, so Declare.StateSource is documented as fully.
+		// The one declaration of the port: cluster/lock aliases it
+		// (R2-P6-api-2751, owner decision 224), so this doc carries the
+		// whole contract.
 		doc: []string{
 			"StateSource is the lock's actuator: it reports whether the bolt is",
 			"jammed and locked, and LockInvoke runs a lock operation the kit's",
