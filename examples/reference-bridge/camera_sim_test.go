@@ -8,10 +8,12 @@ import (
 	"encoding/json"
 	"log/slog"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
@@ -348,6 +350,71 @@ func TestCameraSimWebRTCProvider(t *testing.T) {
 	}
 	if err := port.EndSession(ctx, 1, 2); err != nil || simSessions(c) != camMaxWebRTCSessions-1 {
 		t.Fatalf("EndSession = %v, %d sessions left", err, simSessions(c))
+	}
+}
+
+// TestCameraSimWebRTCReOffer: TC-WEBRTCP-2.30 against the provider server
+// and the daemon's port — a re-offer that names no deprecated stream id
+// keeps the session's streams and answers its id.
+func TestCameraSimWebRTCReOffer(t *testing.T) {
+	t.Parallel()
+	c, _, _ := simCamera(t, cameraOptions{})
+	avsm := c.camera.CameraAvStreamManagement().Underlying()
+	provider := c.camera.WebRtcTransportProvider().Underlying()
+
+	// TC_WEBRTCP_2_30.py:117-122 at 6170af84: one audio and one video
+	// stream.
+	resp, status := simInvoke(avsm, csdef.CmdVideoStreamAllocate, simVideoRequest())
+	if status != im.StatusSuccess {
+		t.Fatalf("VideoStreamAllocate: %v", status)
+	}
+	video := resp.(csdef.VideoStreamAllocateResponse).VideoStreamId
+	mono := csdef.AudioStreamAllocateRequest{StreamUsage: csdef.StreamUsageLiveView, AudioCodec: csdef.AudioCodecOpus, ChannelCount: 1, SampleRate: 48000, BitRate: 20000, BitDepth: 24}
+	resp, status = simInvoke(avsm, csdef.CmdAudioStreamAllocate, mono)
+	if status != im.StatusSuccess {
+		t.Fatalf("AudioStreamAllocate: %v", status)
+	}
+	audio := resp.(csdef.AudioStreamAllocateResponse).AudioStreamId
+
+	usage := wpdef.StreamUsageLiveView
+	origin := uint16(2)
+	offer := func(id spec.Nullable[uint16]) wpdef.ProvideOfferRequest {
+		return wpdef.ProvideOfferRequest{
+			WebRtcSessionId: id, Sdp: "v=0", StreamUsage: &usage, OriginatingEndpointId: &origin,
+			VideoStreams: &[]uint16{video}, AudioStreams: &[]uint16{audio},
+		}
+	}
+
+	// TC_WEBRTCP_2_30.py:141-155 at 6170af84 (step 4): a new session.
+	resp, status = simInvoke(provider, wpdef.CmdProvideOffer, offer(spec.NullOf[uint16]()))
+	if status != im.StatusSuccess {
+		t.Fatalf("ProvideOffer with a null session id: %v", status)
+	}
+	saved := resp.(wpdef.ProvideOfferResponse).WebRtcSessionId
+
+	// TC_WEBRTCP_2_30.py:183-197 at 6170af84 (step 7): the re-offer of the
+	// saved id, its streams as VideoStreams/AudioStreams, which a re-offer
+	// does not read (chip WebRTCTransportProviderCluster.cpp:931-951 reads
+	// only the deprecated ids), answers ProvideOfferResponse with the same
+	// id.
+	resp, status = simInvoke(provider, wpdef.CmdProvideOffer, offer(spec.Nullable[uint16]{Value: saved}))
+	if status != im.StatusSuccess {
+		t.Fatalf("the re-offer of session %d: %v, want ProvideOfferResponse", saved, status)
+	}
+	if got := resp.(wpdef.ProvideOfferResponse).WebRtcSessionId; got != saved {
+		t.Fatalf("the re-offer answered session %d, want %d", got, saved)
+	}
+	// Mirrors chip WebRTCTransportProviderCluster.cpp:926 (outSession =
+	// *existingSession) and the camera-app's HandleProvideOffer
+	// (webrtc-provider-manager.cpp:407-445), which sets the deprecated ids
+	// and leaves the session's stream lists: the session keeps its streams.
+	sessions := c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider).Sessions()
+	if len(sessions) != 1 || sessions[0].VideoStreams == nil || !slices.Equal(*sessions[0].VideoStreams, []uint16{video}) ||
+		sessions[0].AudioStreams == nil || !slices.Equal(*sessions[0].AudioStreams, []uint16{audio}) {
+		t.Fatalf("CurrentSessions after the re-offer = %+v, want the session with its streams", sessions)
+	}
+	if s := sessions[0]; s.VideoStreamId == nil || !s.VideoStreamId.Null || s.AudioStreamId == nil || !s.AudioStreamId.Null {
+		t.Fatalf("the re-offered session's deprecated ids = %v, %v; want null (no deprecated id in the re-offer)", s.VideoStreamId, s.AudioStreamId)
 	}
 }
 
