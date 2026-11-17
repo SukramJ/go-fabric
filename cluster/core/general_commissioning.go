@@ -6,7 +6,6 @@ package core
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -258,8 +257,11 @@ const (
 // SetTCAcknowledgements and the TC attributes stay out).
 var gencommInst = mustInstance(gencommdef.Definition, spec.Options{})
 
-// errGencommInvalidArg is returned for malformed command payloads.
-var errGencommInvalidArg = errors.New("core: GeneralCommissioning invalid argument")
+// errGencommInvalidArg is returned for a payload of the wrong Go type,
+// which answers INVALID_COMMAND — the one status of that class on the
+// security-path servers, [errOpcredsInvalidArg]'s ([invalidArgErr]; review
+// II, W6-test-17, R2-P6-err-3112).
+var errGencommInvalidArg error = invalidArgErr{msg: "core: GeneralCommissioning invalid argument"}
 
 // GeneralCommissioningConfig drives [NewGeneralCommissioning].
 type GeneralCommissioningConfig struct {

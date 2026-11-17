@@ -1364,13 +1364,16 @@ func TestOpcreds_SetFailSafeNoOp(t *testing.T) {
 }
 
 // TestOpcreds_UpdateFabricLabelInvalidArgType verifies that UpdateFabricLabel
-// (0x09) with a wrong fields type returns an error.
+// (0x09) with a wrong fields type answers INVALID_COMMAND, the status of
+// that class on every security-path server (review II, W6-test-17,
+// R2-P6-err-3112).
 func TestOpcreds_UpdateFabricLabelInvalidArgType(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	_, err := oc.MatterInvoke(context.Background(), 0x09, "wrong-type")
-	if err == nil {
-		t.Fatal("expected error for invalid UpdateFabricLabelRequest type, got nil")
+	var sce im.StatusCodeError
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
+		t.Fatalf("a wrong UpdateFabricLabelRequest type: %v, want INVALID_COMMAND", err)
 	}
 }
 

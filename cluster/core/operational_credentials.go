@@ -451,6 +451,29 @@ func (opcredsInvalidArgErr) MatterStatusCode() im.StatusCode { return im.StatusI
 
 var errOpcredsInvalidArg error = opcredsInvalidArgErr{}
 
+// invalidArgErr is a security-path server's refusal of a request whose
+// payload is of the wrong Go type, a class only a host calling MatterWrite
+// or MatterInvoke directly reaches (the dispatcher hands the generated
+// type): one status for the class on every such server, INVALID_COMMAND,
+// as [errOpcredsInvalidArg] answers it (review II, W6-test-17,
+// R2-P6-err-3112).
+type invalidArgErr struct{ msg string }
+
+func (e invalidArgErr) Error() string { return e.msg }
+
+func (invalidArgErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
+
+// storeFailureErr is a security-path server's refusal because its store
+// failed: FAILURE, carrying the store's error for errors.Is (review II,
+// W6-test-17, R2-P6-err-3112).
+type storeFailureErr struct{ err error }
+
+func (e storeFailureErr) Error() string { return e.err.Error() }
+
+func (e storeFailureErr) Unwrap() error { return e.err }
+
+func (storeFailureErr) MatterStatusCode() im.StatusCode { return im.StatusFailure }
+
 // opcredsConstraintErr is the typed [im.StatusCodeError] returned when a
 // command is invoked in a state the failsafe context forbids — e.g. an
 // AddNOC that consumes a CSR issued for UpdateNOC (or vice versa). Surfaces

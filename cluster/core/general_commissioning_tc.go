@@ -243,7 +243,7 @@ func (g *GeneralCommissioning) persistTermsLocked(ctx context.Context, acc *term
 		v = strconv.FormatUint(uint64(acc.version), 10) + ":" + strconv.FormatUint(uint64(acc.acks), 10)
 	}
 	if err := g.tcSettings.SetSetting(ctx, store.SettingTermsAcceptance, v); err != nil {
-		return fmt.Errorf("core: GeneralCommissioning: persist the terms acceptance: %w", err)
+		return storeFailureErr{err: fmt.Errorf("core: GeneralCommissioning: persist the terms acceptance: %w", err)}
 	}
 	return nil
 }

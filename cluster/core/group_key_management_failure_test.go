@@ -191,8 +191,10 @@ func TestGKMCommandsRejectTheWrongRequestType(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			gkm := newGKM(t)
-			if _, err := gkm.MatterInvoke(fabricCtx(1), cmdID, "not a request"); err == nil {
-				t.Fatalf("%s accepted a payload of the wrong type", name)
+			_, err := gkm.MatterInvoke(fabricCtx(1), cmdID, "not a request")
+			var sce im.StatusCodeError
+			if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
+				t.Fatalf("%s with a payload of the wrong type: %v, want INVALID_COMMAND (W6-test-17, R2-P6-err-3112)", name, err)
 			}
 		})
 	}
@@ -352,8 +354,10 @@ func TestGKMGroupKeyMapWriteRejectsTheWrongValueType(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
 	gkm.SetCurrentFabric(1)
-	if err := gkm.MatterWrite(context.Background(), 0x0000, "not a list"); err == nil {
-		t.Fatal("GroupKeyMap accepted a string")
+	err := gkm.MatterWrite(context.Background(), 0x0000, "not a list")
+	var sce im.StatusCodeError
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
+		t.Fatalf("GroupKeyMap write of a string: %v, want INVALID_COMMAND (W6-test-17, R2-P6-err-3112)", err)
 	}
 }
 

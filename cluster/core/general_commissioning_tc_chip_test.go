@@ -473,11 +473,17 @@ func TestGencommTerms_StoreErrors(t *testing.T) {
 		TermsAndConditions: &core.TermsAndConditionsConfig{RequiredVersion: 1, RequiredAcknowledgements: 1},
 		Settings:           failing,
 	})
-	if _, err := gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, gencommdef.SetTcAcknowledgementsRequest{TcVersion: 1, TcUserResponse: 1}); err == nil {
-		t.Fatal("a failing store did not fail the commit")
+	// One status per class (review II, W6-test-17, R2-P6-err-3112): a
+	// failing store answers FAILURE and carries the store's error, a
+	// payload of the wrong Go type INVALID_COMMAND.
+	_, err := gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, gencommdef.SetTcAcknowledgementsRequest{TcVersion: 1, TcUserResponse: 1})
+	var sce im.StatusCodeError
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure || !errors.Is(err, failing.fail) {
+		t.Fatalf("a failing store: %v, want FAILURE carrying the store's error", err)
 	}
-	if _, err := gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, "wrong"); err == nil {
-		t.Fatal("a wrong payload type was accepted")
+	_, err = gc.MatterInvoke(caseCtx(), gencommdef.CmdSetTcAcknowledgements, "wrong")
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
+		t.Fatalf("a wrong payload type: %v, want INVALID_COMMAND", err)
 	}
 	// The request may arrive as a pointer.
 	ok := newTermsGencomm(t, newSettingsFake(), nil)
@@ -512,11 +518,14 @@ func TestGencommTerms_FailedCommitStaysTentative(t *testing.T) {
 	if code := setTerms(ctx, t, gc, 1, 1); code != gencommdef.CommissioningErrorOk {
 		t.Fatalf("acceptance: %d", code)
 	}
+	disk := errors.New("disk")
 	st.mu.Lock()
-	st.fail = errors.New("disk")
+	st.fail = disk
 	st.mu.Unlock()
-	if _, err := gc.MatterInvoke(ctx, gencommdef.CmdCommissioningComplete, nil); err == nil {
-		t.Fatal("CommissioningComplete succeeded with a failing store")
+	_, err := gc.MatterInvoke(ctx, gencommdef.CmdCommissioningComplete, nil)
+	var sce im.StatusCodeError
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure || !errors.Is(err, disk) {
+		t.Fatalf("CommissioningComplete with a failing store: %v, want FAILURE carrying the store's error", err)
 	}
 	if !gc.FailSafeArmed() {
 		t.Fatal("the failed commit disarmed the fail-safe")

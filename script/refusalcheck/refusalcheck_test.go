@@ -84,12 +84,11 @@ const bareRefusalRatchet = 100
 // or a failing store, refusals matter.js has no counterpart for. 6 after
 // the three epoch-key length refusals (CONSTRAINT_ERROR, the request
 // schema's in matter.js) and the slot-ordering table (INVALID_COMMAND) of
-// GroupKeyManagement name theirs — the six above.
-var securityLeft = map[string]int{
-	"cluster/core/general_commissioning_tc_chip_test.go": 3,
-	"cluster/core/group_key_management_failure_test.go":  2,
-	"cluster/core/operational_credentials_test.go":       1,
-}
+// GroupKeyManagement name theirs — the six above. 0 after the six name
+// the one status of their class in the server: INVALID_COMMAND for a Go
+// value of the wrong type, FAILURE carrying the store's error for a
+// failing store (review II, phase 6b, W6-test-17, R2-P6-err-3112).
+var securityLeft = map[string]int{}
 
 // minCalls is the floor on MatterWrite and MatterInvoke calls seen in the
 // judged test files: fewer means the walk or the match broke.

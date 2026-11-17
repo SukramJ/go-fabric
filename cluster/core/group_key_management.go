@@ -128,7 +128,10 @@ const (
 )
 
 // Errors.
-var errGroupKeyMgmtInvalidArg = errors.New("core: GroupKeyManagement invalid argument")
+// errGroupKeyMgmtInvalidArg is returned for a payload of the wrong Go type
+// and answers INVALID_COMMAND ([invalidArgErr]; review II, W6-test-17,
+// R2-P6-err-3112).
+var errGroupKeyMgmtInvalidArg error = invalidArgErr{msg: "core: GroupKeyManagement invalid argument"}
 
 // groupKeyNotFoundErr is the typed [im.StatusCodeError] returned when a
 // KeySetRead / KeySetRemove targets a group key set that does not exist on
