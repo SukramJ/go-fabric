@@ -130,8 +130,10 @@ out.matter.sourceCommit = sourceCommit();
 // with local changes names a commit it does not describe. The one expected
 // difference is this script's own copy in the tree (and the form esbuild
 // transpiles it to, beside it). What git ignores — the build output the
-// model is imported from — is not seen here: building the checkout at its
-// HEAD stays the caller's step.
+// model is imported from — is not seen here: make generate-matter-schema
+// builds packages/model at the checkout's HEAD before it runs this script
+// (review II S-12); a run by hand builds it first as the usage block at the
+// end says.
 function sourceCommit(): string {
     const git = (args: string) => execSync(`git ${args}`, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     let commit: string;
@@ -891,6 +893,12 @@ console.log(JSON.stringify(out, null, 2));
 //       mv /tmp/schema.json <go-fabric>/parity/schema.json
 //   rm .gofabric-extract.mts
 //
-// Then regenerate the typed Go maps that read it:
+// Then regenerate everything that reads it — the schema tables, the cluster
+// definitions and the device types (go generate ./schema/... runs only the
+// first, and cluster/spec and device/ would stay stale, R2-P6-doc-2718):
 //
-//   cd <go-fabric> && go generate ./schema/...
+//   cd <go-fabric> && go run ./script/generate_matter_schema.go && \
+//       gofumpt -w schema/ && go run ./script/clustergen && go run ./script/devicegen
+//
+// make generate-matter-schema does all of it — the build, the extract, the
+// move and the three generators.

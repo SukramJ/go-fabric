@@ -556,6 +556,10 @@ tidy: ## tidy go.mod / go.sum
 
 .PHONY: generate-matter-schema
 generate-matter-schema: ## regenerate parity/schema.json, schema/ and the generated cluster definitions from a matter.js checkout
+	# packages/model is built at the checkout's HEAD first: the extractor
+	# imports the build output, which git ignores, so a stale build would
+	# yield a snapshot labelled with HEAD (review II S-12).
+	cd $(MATTERJS_DIR)/packages/model && npm run --silent build
 	# The extractor runs inside the matter.js tree so its bare @matter/model
 	# import resolves; the copy is removed again even when node fails.
 	cp script/extract-from-matter-js.ts $(MATTERJS_DIR)/.gofabric-extract.mts
