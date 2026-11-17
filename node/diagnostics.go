@@ -45,6 +45,7 @@ func (n *Node) OnDiagnosticEventAsync(fn func(DiagnosticEvent)) (unsubscribe fun
 	if fn == nil {
 		return func() {}
 	}
-	q := n.callbacks
-	return n.diagRing.Observe(func(e DiagnosticEvent) { q.Enqueue(func() { fn(e) }) })
+	// Through queued, which contains a panic as every queued host
+	// callback's (review II, R2-P6-err-2410).
+	return n.diagRing.Observe(func(e DiagnosticEvent) { n.queued("diagnostic_event", func() { fn(e) }) })
 }
