@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/jcm"
+
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/client/peer"
@@ -42,6 +44,9 @@ func TestAnnounceThroughTheNodesCommissionerReach(t *testing.T) {
 			t.Fatal(err)
 		}
 		admin, _ := jfa.Server(jfadef.ClusterID).(*jointfabric.Administrator)
+		// Self-minted fabrics: the vendor id is anchored at the
+		// commissioner's own root, an explicit opt-in (owner decision 190).
+		admin.SetTrustAnchorsForTest(jcm.SelfAnchored)
 		return jfa, admin
 	}
 	withClient := func(cfg *node.Config) { cfg.Client = &node.ClientConfig{} }

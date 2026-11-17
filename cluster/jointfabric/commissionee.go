@@ -238,12 +238,14 @@ func (c *commissionee) performVendorIDVerification(ctx context.Context) jcm.Resu
 	if err := c.fetchCommissionerInfo(ctx); err != nil {
 		return jcm.VendorIDVerificationFailed // :300-308
 	}
-	lookup := c.a.trustAnchors
-	if lookup == nil { // OnLookupOperationalTrustAnchor :71-81
-		rcac := c.info.AdminRCAC
-		lookup = func(context.Context, uint16, []byte) ([]byte, error) { return rcac, nil }
-	}
-	if err := jcm.VerifyVendorID(ctx, peerSigner{c.reach, c.peer}, &c.info, lookup, nil); err != nil { // :310-319
+	// Without a lookup the verification fails closed (jcm.VerifyVendorID
+	// answers jcm.ErrNoTrustAnchor): connectedhomeip's placeholder hands
+	// back the commissioner's own RCAC (OnLookupOperationalTrustAnchor,
+	// JCMCommissionee.cpp:71-81 at 6170af84, "temporarily return the
+	// already known remote admin trusted root certificate"), which checks
+	// nothing about the vendor. That is jcm.SelfAnchored, a host's explicit
+	// opt-in (review II, R2-P6-sec-1850, owner decision 190).
+	if err := jcm.VerifyVendorID(ctx, peerSigner{c.reach, c.peer}, &c.info, c.a.trustAnchors, nil); err != nil { // :310-319
 		return jcm.VendorIDVerificationFailed
 	}
 	return jcm.Success
