@@ -900,10 +900,13 @@ const (
 // a recording access check ([im.WithAuthority]) that the dispatcher asks
 // before each read ([im.LookupAuthority]), so a denied location is noted
 // and not read, and the first granted one ends the walk (Fable's read of
-// sub round 1, A-1; decision 162). The dispatcher asks only at a location
-// that exists, so a path that resolves to nothing the node serves stays
-// no refusal (R2-P3-dr-dev-04). A dispatcher that never asks the check
-// has read each location already; its results are judged as they come.
+// sub round 1, A-1; decision 162). The dispatcher asks once the endpoint
+// and the cluster exist, so a path to an endpoint or cluster the node does
+// not serve stays no refusal (R2-P3-dr-dev-04); a concrete attribute the
+// cluster does not serve is judged by the cluster's access, as a Read
+// answers it (Fable's read of sub round 2, A-2). A dispatcher that never
+// asks the check has read each location already; its results are judged
+// as they come.
 func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChecker, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) (refused bool, served [sha256.Size]byte) {
 	digest := sha256.New()
 	note := func(kind byte, endpoint uint16, cluster, detail uint32) {
@@ -2455,7 +2458,9 @@ func (l *listenerSet) add(unsub func()) {
 // of two wirings. Before, two wirings at once left the later one with
 // fresh throttles while the earlier one, overtaken, parked its paths
 // where nothing took them up (review II, N4-rwsub-2). A host's notifier
-// does not re-wire from inside its registration.
+// does not re-wire from inside its registration or its unsubscribe
+// closure: the second wiring would wait for the first on the same
+// goroutine (contract.ChangeNotifier; Fable's read of sub round 2, R-1).
 func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
 	if !b.rewireMu.TryLock() {
 		if hook := b.rewireQueuedForTest; hook != nil {

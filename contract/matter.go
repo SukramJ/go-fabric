@@ -958,6 +958,10 @@ type ConcentrationReadingsSource interface {
 // itself may take the bridge's locks; do not call it, or wait for it,
 // while holding a lock the bridge's readers of this source need. The
 // same holds for [AttributeChangeNotifier] and [AttributeReportNotifier].
+//
+// A host's notifier does not re-wire from inside its registration or its
+// unsubscribe closure (the bridge's Reassemble, AttachSubscriptionManager):
+// the second wiring would wait for the first on the same goroutine.
 type ChangeNotifier interface {
 	OnMatterValueChanged(cb func()) (unsubscribe func())
 }

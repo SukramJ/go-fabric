@@ -143,8 +143,10 @@ type Subscription struct {
 // report, as matter.js
 // (packages/node/src/node/server/ServerSubscription.ts:549-551 and
 // :921-936, packages/protocol/src/interaction/InteractionMessenger.ts:794-796
-// at db021da0) and connectedhomeip. When it is called, the engine sends
-// the keep-alive when the pass was the send interval's, and otherwise does
+// at db021da0) and connectedhomeip (src/app/reporting/Engine.cpp:818-853,
+// src/app/ReadHandler.cpp:352-362 at 6170af84). When it is called, the
+// engine sends the keep-alive when the pass was the send interval's, and
+// otherwise does
 // not count the pass as a report: the time of the last report stays, so
 // the next keep-alive is due a send interval after the last report that
 // reached the subscriber.
