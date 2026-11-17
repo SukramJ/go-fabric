@@ -39,6 +39,19 @@ const (
 	afterRatchet = 126
 )
 
+// nestedRatchets holds, per nested module (a directory under the root
+// with its own go.mod, which [TestSleepRatchet]'s walk skips), the same
+// two exact counts: one pair per module, so a change in one module's
+// tests does not move the root's number or another module's
+// (R2-P6-test-3109, W6-test-15 rest). A new nested module fails
+// [TestNestedModuleSleepRatchets] until it has its row.
+var nestedRatchets = map[string]struct{ sleep, after int }{
+	"ble/bluez":               {sleep: 11, after: 17},
+	"ble/esphome":             {sleep: 11, after: 12},
+	"examples/ble-wifi-light": {sleep: 0, after: 0},
+	"wifi/wpasupplicant":      {sleep: 2, after: 2},
+}
+
 // TestSleepRatchet counts the wall-clock waits in every *_test.go of the
 // module, under the walk rules of [TestNoRawTimeOutsideClock] (dot
 // directories, testdata, node_modules and nested modules are not read), and
@@ -49,9 +62,60 @@ func TestSleepRatchet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sleeps, afters := map[string]int{}, map[string]int{}
-	files := 0
-	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	sleeps, afters, files, _ := walkWallClockWaits(t, root)
+	if files < 100 {
+		t.Fatalf("read %d test files; the walk is not seeing the module", files)
+	}
+	checkRatchet(t, "time.Sleep", "sleepRatchet", sleeps, sleepRatchet)
+	checkRatchet(t, "time.After", "afterRatchet", afters, afterRatchet)
+}
+
+// TestNestedModuleSleepRatchets walks every nested module the root walk
+// skips, by the same rule ([wallClockWaits]), and holds each module's
+// two counts at its [nestedRatchets] row.
+func TestNestedModuleSleepRatchets(t *testing.T) {
+	t.Parallel()
+	root, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, nested := walkWallClockWaits(t, root)
+	seen := map[string]bool{}
+	for len(nested) > 0 {
+		mod := nested[0]
+		nested = nested[1:]
+		rel, _ := filepath.Rel(root, mod)
+		rel = filepath.ToSlash(rel)
+		seen[rel] = true
+		sleeps, afters, files, deeper := walkWallClockWaits(t, mod)
+		nested = append(nested, deeper...)
+		want, ok := nestedRatchets[rel]
+		if !ok {
+			t.Errorf("nested module %s has no nestedRatchets row; add one with its counts", rel)
+			continue
+		}
+		if files == 0 {
+			t.Errorf("nested module %s: read no test file; the walk is not seeing it", rel)
+		}
+		t.Run(rel, func(t *testing.T) {
+			checkRatchet(t, "time.Sleep", "nestedRatchets["+rel+"].sleep", sleeps, want.sleep)
+			checkRatchet(t, "time.After", "nestedRatchets["+rel+"].after", afters, want.after)
+		})
+	}
+	for rel := range nestedRatchets {
+		if !seen[rel] {
+			t.Errorf("nestedRatchets row %s names no nested module; remove it", rel)
+		}
+	}
+}
+
+// walkWallClockWaits counts the wall-clock waits per *_test.go below root
+// (paths relative to root) and returns, without reading them, the
+// directories below root that hold their own go.mod.
+func walkWallClockWaits(t *testing.T, root string) (sleeps, afters map[string]int, files int, nested []string) {
+	t.Helper()
+	sleeps, afters = map[string]int{}, map[string]int{}
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -66,6 +130,7 @@ func TestSleepRatchet(t *testing.T) {
 				return filepath.SkipDir
 			}
 			if _, statErr := os.Stat(filepath.Join(path, "go.mod")); statErr == nil {
+				nested = append(nested, path)
 				return filepath.SkipDir
 			}
 			return nil
@@ -84,13 +149,9 @@ func TestSleepRatchet(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walk module: %v", err)
+		t.Fatalf("walk %s: %v", root, err)
 	}
-	if files < 100 {
-		t.Fatalf("read %d test files; the walk is not seeing the module", files)
-	}
-	checkRatchet(t, "time.Sleep", "sleepRatchet", sleeps, sleepRatchet)
-	checkRatchet(t, "time.After", "afterRatchet", afters, afterRatchet)
+	return sleeps, afters, files, nested
 }
 
 func checkRatchet(t *testing.T, call, name string, perFile map[string]int, ratchet int) {
