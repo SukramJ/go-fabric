@@ -860,9 +860,10 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		// (:1075-1082) by the production ledger's own record: it is fetched
 		// and stored below, its DER replacing the test source's, and the
 		// entry stays a test certificate when that fetch fails. matter.js
-		// sets the flag on the stored entry by key identifier alone
-		// (DclCertificateService.ts:1183-1199 at db021da0); this is ahead
-		// of it (review II, R2-P6-sec-1902).
+		// sets the flag on the stored entry by key identifier alone and
+		// returns before the fetch (DclCertificateService.ts:1184-1188,
+		// :1199 at db021da0); this is ahead of it (review II,
+		// R2-P6-sec-1902).
 		upgrade := isProduction && !existing.IsProduction
 		if ok && !upgrade {
 			return true
