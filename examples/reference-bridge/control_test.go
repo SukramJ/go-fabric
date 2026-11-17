@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"strings"
 	"sync"
 	"testing"
+	"testing/iotest"
 	"testing/synctest"
 	"time"
 
@@ -315,5 +317,29 @@ func TestOvenPipeDrivesTheCavity(t *testing.T) {
 	}
 	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "Bake"}); !errors.Is(err, errUnknownPipeCommand) {
 		t.Fatalf("unknown operation: %v, want errUnknownPipeCommand", err)
+	}
+}
+
+// TestAppPipeSkipsAnOverlongLine holds R2-P6-err-2610: a line longer than
+// maxPipeLine is logged as apppipe.error and skipped, and the writer's
+// next command still applies; a read error ends the writer with an
+// apppipe.error.
+func TestAppPipeSkipsAnOverlongLine(t *testing.T) {
+	f := newFleet()
+	long := `{"Name":"SetSensorValue","Device":"humidity","Pad":"` + strings.Repeat("x", 70<<10) + `"}`
+	in := long + "\n" + `{"Name":"SetSensorValue","Device":"humidity","Value":61.5}` + "\n"
+	var logs bytes.Buffer
+	readPipe(f, strings.NewReader(in), slog.New(slog.NewTextHandler(&logs, nil)))
+	out := logs.String()
+	if strings.Count(out, "apppipe.error") != 1 || !strings.Contains(out, "longer than") || strings.Count(out, "apppipe.applied") != 1 {
+		t.Fatalf("log:\n%s", out)
+	}
+	if v := f.humidity.reading(); v != 61.5 {
+		t.Errorf("humidity = %v after the overlong line", v)
+	}
+	logs.Reset()
+	readPipe(f, io.MultiReader(strings.NewReader(`{"Name":"Set`), iotest.ErrReader(errors.New("pipe broke"))), slog.New(slog.NewTextHandler(&logs, nil)))
+	if !strings.Contains(logs.String(), "pipe broke") {
+		t.Errorf("the read error was not logged:\n%s", logs.String())
 	}
 }
