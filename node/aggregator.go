@@ -407,6 +407,12 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 		d()
 	}
 	resErr = errors.Join(resErr, p.a.applyReservations(ctx, erase))
+	// A key forgotten and added again in this batch is the new device's
+	// once served: an erasure that did not finish must not take it at the
+	// next New.
+	for _, k := range readded {
+		resErr = errors.Join(resErr, p.a.cancelForget(ctx, k))
+	}
 	if restore != nil && restore() {
 		err = errors.Join(err, p.a.reassemble(ctx))
 	}

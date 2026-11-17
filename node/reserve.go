@@ -123,6 +123,9 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 			errs = append(errs, p.reserve(ctx, op.tree))
 		case opRelease:
 			errs = append(errs, p.release(ctx, op.key))
+			// A returning key is no longer forgotten: a forget left half
+			// done for it must not erase it at the next New.
+			errs = append(errs, a.cancelForget(ctx, op.key))
 		case opErase:
 			errs = append(errs, a.erase(ctx, op))
 		}
@@ -215,6 +218,47 @@ func (p persisted) pendingForgets(ctx context.Context) ([][]string, error) {
 	return pending, nil
 }
 
+// cancelForget drops key from every forget in progress (and a forget left
+// with no key): a key added again after a forget that did not finish is
+// the new device's, and the next New finishing that forget must not erase
+// it (review II, R2-P6-store-2406, coordinator decision on facade Q3).
+func (a *Aggregator) cancelForget(ctx context.Context, key string) error {
+	a.forgetMu.Lock()
+	defer a.forgetMu.Unlock()
+	pending, err := a.n.persisted.pendingForgets(ctx)
+	if err != nil || len(pending) == 0 {
+		return err
+	}
+	changed := false
+	kept := pending[:0]
+	for _, keys := range pending {
+		if i := slices.Index(keys, key); i >= 0 {
+			keys = slices.Delete(slices.Clone(keys), i, i+1)
+			changed = true
+		}
+		if len(keys) > 0 {
+			kept = append(kept, keys)
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return a.storeForgets(ctx, kept)
+}
+
+// storeForgets writes the forgets in progress; a.forgetMu is held.
+func (a *Aggregator) storeForgets(ctx context.Context, pending [][]string) error {
+	v := ""
+	if len(pending) > 0 {
+		b, err := json.Marshal(pending)
+		if err != nil {
+			return err
+		}
+		v = string(b)
+	}
+	return a.n.persisted.st.SetSetting(ctx, forgetPendingKey, v)
+}
+
 // markForget records keys as a forget in progress (on) or done (off); the
 // record is read and written under a.forgetMu.
 func (a *Aggregator) markForget(ctx context.Context, keys []string, on bool) error {
@@ -229,15 +273,7 @@ func (a *Aggregator) markForget(ctx context.Context, keys []string, on bool) err
 	if on {
 		pending = append(pending, keys)
 	}
-	v := ""
-	if len(pending) > 0 {
-		b, err := json.Marshal(pending)
-		if err != nil {
-			return err
-		}
-		v = string(b)
-	}
-	return p.st.SetSetting(ctx, forgetPendingKey, v)
+	return a.storeForgets(ctx, pending)
 }
 
 // removeRecords deletes the endpoint store's records of scope ("" is

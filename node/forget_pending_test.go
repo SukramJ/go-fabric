@@ -76,3 +76,77 @@ func TestForgetLeftHalfDoneIsFinishedAtTheNextNew(t *testing.T) {
 		t.Errorf("forget record %q (found %v, %v) after it was finished, want none", v, ok, err)
 	}
 }
+
+// TestReAddedKeyOutlivesItsUnfinishedForget (review II, R2-P6-store-2406,
+// coordinator decision on facade Q3): a key forgotten — the erasure left
+// half done by the store — and then added again in the same run is the
+// new device's: the next New does not finish that forget over it, and
+// what the new device stored survives the restart.
+func TestReAddedKeyOutlivesItsUnfinishedForget(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	st := &refusingKeys{Port: memstore.New(), keys: []string{"nonvolatile."}}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, _ := nvRun(t, cfg, nvHeat)
+	st.refuse.Store(true)
+	if err := n.Aggregator().Forget(ctx, endpoint.StringKey(nvHeat.key)); !errors.Is(err, errKeyRefused) {
+		t.Fatalf("Forget with the store refusing the erasure: %v, want %v", err, errKeyRefused)
+	}
+	st.refuse.Store(false)
+	if err := n.Aggregator().Add(ctx, nvHeat.build(t, nvHeat.key)); err != nil {
+		t.Fatal(err)
+	}
+	ep, ok := endpointOf(t, n, nvHeat.key)
+	if !ok {
+		t.Fatal("the re-added key is not served")
+	}
+	if s := dispatchWrite(t, n, attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint), int64(2300)); s != im.StatusSuccess {
+		t.Fatalf("write: %v", s)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	newNode(t, cfg)
+	const valueKey = "nonvolatile.thermo.0201.0012"
+	if v, ok, err := st.GetSetting(ctx, valueKey); err != nil || !ok || v != nvStoredTLV(t, int64(2300)) {
+		t.Errorf("%s after the restart: %q (found %v, %v), want the re-added device's 2300", valueKey, v, ok, err)
+	}
+}
+
+// TestForgetAndAddInOneBatchOutlivesItsUnfinishedErasure: the same for a
+// key forgotten and added again within one batch.
+func TestForgetAndAddInOneBatchOutlivesItsUnfinishedErasure(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	st := &refusingKeys{Port: memstore.New(), keys: []string{"nonvolatile."}}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, _ := nvRun(t, cfg, nvHeat)
+	st.refuse.Store(true)
+	err := n.Aggregator().Partition(node.Scope).Batch(ctx, func(b *node.Batch) error {
+		if err := b.Forget(endpoint.StringKey(nvHeat.key)); err != nil {
+			return err
+		}
+		return b.Add(nvHeat.build(t, nvHeat.key))
+	})
+	if !errors.Is(err, errKeyRefused) {
+		t.Fatalf("Forget and Add with the store refusing the erasure: %v, want %v", err, errKeyRefused)
+	}
+	st.refuse.Store(false)
+	ep, ok := endpointOf(t, n, nvHeat.key)
+	if !ok {
+		t.Fatal("the re-added key is not served")
+	}
+	if s := dispatchWrite(t, n, attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint), int64(2300)); s != im.StatusSuccess {
+		t.Fatalf("write: %v", s)
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	newNode(t, cfg)
+	const valueKey = "nonvolatile.thermo.0201.0012"
+	if v, ok, err := st.GetSetting(ctx, valueKey); err != nil || !ok || v != nvStoredTLV(t, int64(2300)) {
+		t.Errorf("%s after the restart: %q (found %v, %v), want the re-added device's 2300", valueKey, v, ok, err)
+	}
+}
