@@ -2797,6 +2797,14 @@ func (l *listenerSet) settlerFor(ep *endpointpkg.Endpoint, cluster uint32) func(
 	}
 }
 
+// isOpen reports whether a command's commit of (endpoint, cluster) is open.
+func (t *invokeCommitTable) isOpen(endpoint uint16, cluster uint32) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, ok := t.open[invokedCluster{endpoint, cluster}]
+	return ok
+}
+
 // advanceAtEnd records in the open commit of (endpoint, cluster) that it
 // advances the version when it ends, marking nothing dirty for it, and
 // reports true; false when no commit is open.
@@ -2884,7 +2892,22 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 			mgr.OnAttributeChanged(p)
 		}
 		for _, qp := range quiet {
-			if !b.invokeCommits.hold(epID, qp.path.Cluster, []uint32{qp.path.Attribute}) && !b.writeHolds.holdQuiet(epID, qp) {
+			// A command running against the cluster advances its version
+			// once when it ends; the report still waits for the throttle,
+			// so the commit owes the advance alone (advanceAtEnd), not a
+			// mark that would pass the throttle (review II, N4-x3-1).
+			if b.invokeCommits.isOpen(epID, qp.path.Cluster) {
+				inCommit := map[uint32]struct{}{qp.path.Cluster: {}}
+				if qp.check(inCommit) && !b.invokeCommits.advanceAtEnd(epID, qp.path.Cluster) {
+					// The commit ended meanwhile: the change is its own.
+					if _, done := bumped[qp.path.Cluster]; !done {
+						ep.BumpClusterDataVersion(qp.path.Cluster)
+						bumped[qp.path.Cluster] = struct{}{}
+					}
+				}
+				continue
+			}
+			if !b.writeHolds.holdQuiet(epID, qp) {
 				qp.check(bumped)
 			}
 		}
@@ -3104,20 +3127,21 @@ func (qp *quietPath) read() (attributeReading, bool) {
 
 // check reads the value of a bound quietPath and, on a change, advances the cluster's
 // DataVersion — unless bumped holds the cluster, advanced by this
-// notification already, which check adds it to — and tells the throttle,
-// with the nullness of the old and the new value; a value no server
-// answers counts as null.
-func (qp *quietPath) check(bumped map[uint32]struct{}) {
+// notification already (or owed by a command's commit), which check adds
+// it to — and tells the throttle, with the nullness of the old and the new
+// value; a value no server answers counts as null. It reports whether the
+// value changed.
+func (qp *quietPath) check(bumped map[uint32]struct{}) bool {
 	qp.mu.Lock()
 	defer qp.mu.Unlock()
 	if qp.ep == nil {
-		return // parked: the next wiring sees the change
+		return false // parked: the next wiring sees the change
 	}
 	cur, ok := qp.read()
 	wasNull := !qp.had || qp.last.raw == nil
 	isNull := !ok || cur.raw == nil
 	if (wasNull && isNull) || (ok && qp.had && qp.last.equal(cur)) {
-		return
+		return false
 	}
 	qp.last, qp.had = cur, ok
 	if _, done := bumped[qp.path.Cluster]; !done {
@@ -3125,6 +3149,7 @@ func (qp *quietPath) check(bumped map[uint32]struct{}) {
 		bumped[qp.path.Cluster] = struct{}{}
 	}
 	qp.q.Changed(wasNull, isNull)
+	return true
 }
 
 // settle reads the value of a bound quietPath into its memory without
