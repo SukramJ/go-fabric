@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9788,
+  "entry_points": 9860,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19361,
-    "reachable": 12656,
-    "whitelisted": 6705,
+    "total_exported": 19417,
+    "reachable": 12658,
+    "whitelisted": 6759,
     "unreachable": 0
   },
   "by_package": [],
@@ -27341,14 +27341,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1067
+      "line": 1151
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1063
+      "line": 1147
     },
     {
       "package": "controller",
@@ -27370,6 +27370,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/export_test.go",
       "line": 18
+    },
+    {
+      "package": "controller",
+      "identifier": "TestBackgroundCallbacksOutliveClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/close_callbacks_internal_test.go",
+      "line": 22
     },
     {
       "package": "controller",
@@ -27450,6 +27457,13 @@
     },
     {
       "package": "controller",
+      "identifier": "TestOpenStoresSaysAnOwedScrubOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/scrub_owed_internal_test.go",
+      "line": 51
+    },
+    {
+      "package": "controller",
       "identifier": "TestOperationalPortParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/operational_port_parity_matterjs_test.go",
@@ -27461,6 +27475,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/reseal_internal_test.go",
       "line": 97
+    },
+    {
+      "package": "controller",
+      "identifier": "TestRetiredOwnNodeLeavesNoClearBytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ownnode_scrub_internal_test.go",
+      "line": 20
     },
     {
       "package": "controller",
@@ -27503,6 +27524,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/tcp_bound_internal_test.go",
       "line": 11
+    },
+    {
+      "package": "controller",
+      "identifier": "TestTCPListenerHoldsToMaxMessageSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/tcp_message_size_internal_test.go",
+      "line": 80
+    },
+    {
+      "package": "controller",
+      "identifier": "TestTCPMaxMessageSizeRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/tcp_message_size_internal_test.go",
+      "line": 52
+    },
+    {
+      "package": "controller",
+      "identifier": "TestTCPMaxMessageSizeResolves",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/tcp_message_size_internal_test.go",
+      "line": 24
+    },
+    {
+      "package": "controller",
+      "identifier": "TestTraceEscapesControlCharacters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/trace_printable_internal_test.go",
+      "line": 18
     },
     {
       "package": "controller",
@@ -29053,6 +29102,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "AddRecordAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 269
+    },
+    {
+      "package": "controller/client",
       "identifier": "AdoptFabricFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_fabric_filter_test.go",
@@ -29063,14 +29119,14 @@
       "identifier": "ApplyAsked",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 237
+      "line": 240
     },
     {
       "package": "controller/client",
       "identifier": "ApplyBridge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 233
+      "line": 236
     },
     {
       "package": "controller/client",
@@ -29095,10 +29151,17 @@
     },
     {
       "package": "controller/client",
+      "identifier": "BenchmarkRawIDList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/raw_id_list_internal_test.go",
+      "line": 30
+    },
+    {
+      "package": "controller/client",
       "identifier": "CacheFabricFiltered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 84
+      "line": 87
     },
     {
       "package": "controller/client",
@@ -29116,10 +29179,17 @@
     },
     {
       "package": "controller/client",
+      "identifier": "CompleteOperation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 263
+    },
+    {
+      "package": "controller/client",
       "identifier": "ConnectionStateFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 15
+      "line": 18
     },
     {
       "package": "controller/client",
@@ -29147,7 +29217,7 @@
       "identifier": "DeliverEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 103
+      "line": 106
     },
     {
       "package": "controller/client",
@@ -29168,7 +29238,7 @@
       "identifier": "EmitLeave",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 182
+      "line": 185
     },
     {
       "package": "controller/client",
@@ -29210,14 +29280,14 @@
       "identifier": "HoldOperation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 51
+      "line": 54
     },
     {
       "package": "controller/client",
       "identifier": "HoldsDefaultSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 189
+      "line": 192
     },
     {
       "package": "controller/client",
@@ -29228,10 +29298,17 @@
     },
     {
       "package": "controller/client",
+      "identifier": "ICDRegistering",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 255
+    },
+    {
+      "package": "controller/client",
       "identifier": "ICDTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 107
+      "line": 110
     },
     {
       "package": "controller/client",
@@ -29266,35 +29343,42 @@
       "identifier": "KnownVersions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 76
+      "line": 79
     },
     {
       "package": "controller/client",
       "identifier": "MaxEventNumber",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 96
+      "line": 99
     },
     {
       "package": "controller/client",
       "identifier": "NewWithImageQuota",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 226
+      "line": 229
     },
     {
       "package": "controller/client",
       "identifier": "ObserveRequests",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 19
+      "line": 22
+    },
+    {
+      "package": "controller/client",
+      "identifier": "OnRegisterChecked",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 248
     },
     {
       "package": "controller/client",
       "identifier": "PatchRemoveFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 167
+      "line": 170
     },
     {
       "package": "controller/client",
@@ -29315,7 +29399,7 @@
       "identifier": "RebaseICDPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 121
+      "line": 124
     },
     {
       "package": "controller/client",
@@ -29350,14 +29434,14 @@
       "identifier": "SaveRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 26
+      "line": 29
     },
     {
       "package": "controller/client",
       "identifier": "SaveSettingsAutoSubscribe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 65
+      "line": 68
     },
     {
       "package": "controller/client",
@@ -29371,21 +29455,21 @@
       "identifier": "SetICDCounterStart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 111
+      "line": 114
     },
     {
       "package": "controller/client",
       "identifier": "SetICDFedOffset",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 141
+      "line": 144
     },
     {
       "package": "controller/client",
       "identifier": "SetNewlyCommissioned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 155
+      "line": 158
     },
     {
       "package": "controller/client",
@@ -29406,7 +29490,7 @@
       "identifier": "Started",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 196
+      "line": 199
     },
     {
       "package": "controller/client",
@@ -29420,7 +29504,7 @@
       "identifier": "StoredDefaultSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 204
+      "line": 207
     },
     {
       "package": "controller/client",
@@ -29585,6 +29669,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestDefaultSubscriptionKeepsItsOwnIntervals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/subscribe_options_clone_internal_test.go",
+      "line": 15
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestDeferredReportsPersistInApplyOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/apply_order_internal_test.go",
@@ -29641,6 +29732,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestFlushDoesNotWriteAnErasedClusterBack",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/flush_erase_internal_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestFlushesAreSerialised",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
@@ -29659,6 +29757,41 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/reactions_internal_test.go",
       "line": 15
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestICDClientCloseRefusesNewWork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/icd_close_internal_test.go",
+      "line": 33
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestICDClientRefusesWorkOnceDeleted",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/icd_close_internal_test.go",
+      "line": 130
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestICDDecommissionDuringACommitRemovesThePeer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/icd_close_internal_test.go",
+      "line": 76
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestICDTimingsBeyondTheirTypeAreAbsent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/icd_timing_width_internal_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestImageAboveQuotaWithNothingToCutLogsNoCut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/image_bounds_structure_internal_test.go",
+      "line": 79
     },
     {
       "package": "controller/client",
@@ -29683,6 +29816,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestImageQuotaAdmitsADescriptorListWithinIt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/image_bounds_structure_internal_test.go",
+      "line": 64
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestImageQuotaBoundsMemoryAndRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/image_bounds_internal_test.go",
@@ -29690,10 +29830,24 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestImageQuotaChargesTheStructureADescriptorListCreates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/image_bounds_structure_internal_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestImageQuotaRefusesAReportBeyondIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/image_bounds_internal_test.go",
       "line": 138
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestImageRunningTotalMatchesTheStructure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/image_total_internal_test.go",
+      "line": 23
     },
     {
       "package": "controller/client",
@@ -29914,6 +30068,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestRawIDListKeepsThePeersOrderWithoutDuplicates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/raw_id_list_internal_test.go",
+      "line": 15
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestReadAppliesInTheReportOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/apply_order_internal_test.go",
@@ -29981,6 +30142,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
       "line": 263
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRegistryCloseEndsAReactionWaitingOnItsContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/registry_close_internal_test.go",
+      "line": 19
     },
     {
       "package": "controller/client",
@@ -30187,6 +30355,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestUnknownEventsLoggedAreBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/unknown_warned_internal_test.go",
+      "line": 12
+    },
+    {
+      "package": "controller/client",
       "identifier": "Timing",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/client/surface.go",
@@ -30197,7 +30372,7 @@
       "identifier": "UpdateRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 92
+      "line": 95
     },
     {
       "package": "controller/client",
@@ -30211,7 +30386,7 @@
       "identifier": "WaitRegistry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 47
+      "line": 50
     },
     {
       "package": "controller/client",
@@ -32465,84 +32640,105 @@
       "identifier": "TestBuildBorderRouters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 482
+      "line": 483
+    },
+    {
+      "package": "controller/topology",
+      "identifier": "TestBuildCollidingClaimsResolveToNeither",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/topology/build_internal_test.go",
+      "line": 555
+    },
+    {
+      "package": "controller/topology",
+      "identifier": "TestBuildEscapesControlCharacters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/topology/build_internal_test.go",
+      "line": 525
     },
     {
       "package": "controller/topology",
       "identifier": "TestBuildExternals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 244
+      "line": 245
     },
     {
       "package": "controller/topology",
       "identifier": "TestBuildLikeTheServerPort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 312
+      "line": 313
     },
     {
       "package": "controller/topology",
       "identifier": "TestBuildNodeFlags",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 286
+      "line": 287
+    },
+    {
+      "package": "controller/topology",
+      "identifier": "TestBuildRloc16ClaimsAreScopedByNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/topology/build_internal_test.go",
+      "line": 583
     },
     {
       "package": "controller/topology",
       "identifier": "TestBuildSyntheticMesh",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 145
+      "line": 146
     },
     {
       "package": "controller/topology",
       "identifier": "TestBuildThreadPair",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 182
+      "line": 183
     },
     {
       "package": "controller/topology",
       "identifier": "TestBuildWiFiStar",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 207
+      "line": 208
     },
     {
       "package": "controller/topology",
       "identifier": "TestChangesInstall",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 461
+      "line": 481
     },
     {
       "package": "controller/topology",
       "identifier": "TestChangesInstallDeleted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 510
+      "line": 530
     },
     {
       "package": "controller/topology",
       "identifier": "TestNetworkTypeAndThresholds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 353
+      "line": 354
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceBorderRouters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 718
+      "line": 738
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 395
+      "line": 415
     },
     {
       "package": "controller/topology",
@@ -32553,101 +32749,115 @@
     },
     {
       "package": "controller/topology",
+      "identifier": "TestServiceDebounceBoundsABurst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/topology/service_internal_test.go",
+      "line": 153
+    },
+    {
+      "package": "controller/topology",
       "identifier": "TestServiceLifecycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 152
+      "line": 172
+    },
+    {
+      "package": "controller/topology",
+      "identifier": "TestServiceLogsAClaimCollisionOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/topology/collision_log_internal_test.go",
+      "line": 43
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceObservers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 436
+      "line": 456
     },
     {
       "package": "controller/topology",
       "identifier": "TestServicePeriodic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 190
+      "line": 210
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshConcurrency",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 283
+      "line": 303
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshDeadline",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 311
+      "line": 331
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshFanOut",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 203
+      "line": 223
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceRefreshShared",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 336
+      "line": 356
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceChanged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 586
+      "line": 606
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 648
+      "line": 668
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceMerges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 565
+      "line": 585
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceNotRead",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 604
+      "line": 624
     },
     {
       "package": "controller/topology",
       "identifier": "TestServiceSourceRemove",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/service_internal_test.go",
-      "line": 632
+      "line": 652
     },
     {
       "package": "controller/topology",
       "identifier": "TestThreadMatching",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 393
+      "line": 394
     },
     {
       "package": "controller/topology",
       "identifier": "TestWiFiFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
-      "line": 444
+      "line": 445
     },
     {
       "package": "device",
@@ -32682,7 +32892,7 @@
       "identifier": "TestADeclarationMustStateItsOwnCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 385
+      "line": 400
     },
     {
       "package": "device",
@@ -32703,7 +32913,7 @@
       "identifier": "TestAHookForAClusterThatIsNotMounted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 397
+      "line": 412
     },
     {
       "package": "device",
@@ -32721,10 +32931,38 @@
     },
     {
       "package": "device",
-      "identifier": "TestAPartThatCannotBeBoundStopsTheOwner",
+      "identifier": "TestAPartIsNotBoundOnItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 344
+      "line": 356
+    },
+    {
+      "package": "device",
+      "identifier": "TestAddPartMovesThePart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 29
+    },
+    {
+      "package": "device",
+      "identifier": "TestAddPartRefusesADeviceANodeHolds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 147
+    },
+    {
+      "package": "device",
+      "identifier": "TestAddPartRefusesALivePart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 84
+    },
+    {
+      "package": "device",
+      "identifier": "TestAddPartWaitingOnTheFlipSeesIt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 324
     },
     {
       "package": "device",
@@ -32826,6 +33064,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestBridgedInfoBeyondItsConstraintIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/bridged_info_constraint_test.go",
+      "line": 19
+    },
+    {
+      "package": "device",
       "identifier": "TestBridgedPowerSourceServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/base_test.go",
@@ -32871,21 +33116,28 @@
       "identifier": "TestCommodityTariffRunsOnTheDeclaredTimeSource",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 168
+      "line": 172
     },
     {
       "package": "device",
       "identifier": "TestComposesWithoutADefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 409
+      "line": 424
+    },
+    {
+      "package": "device",
+      "identifier": "TestConcurrentAddPartNeverFormsACycle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 178
     },
     {
       "package": "device",
       "identifier": "TestConfigFromLeavesWhatNoAttributeNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 43
+      "line": 44
     },
     {
       "package": "device",
@@ -32893,6 +33145,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_test.go",
       "line": 466
+    },
+    {
+      "package": "device",
+      "identifier": "TestConsumeKeepsWhatItDoesNotTake",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/consume_keeps_internal_test.go",
+      "line": 42
     },
     {
       "package": "device",
@@ -32920,7 +33179,7 @@
       "identifier": "TestDeclaredServersRefuseASelectionOrAPortTheyLack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 58
+      "line": 59
     },
     {
       "package": "device",
@@ -32955,7 +33214,7 @@
       "identifier": "TestDeviceClockAndQueue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 139
+      "line": 148
     },
     {
       "package": "device",
@@ -33033,6 +33292,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/fabric_scoped_test.go",
       "line": 18
+    },
+    {
+      "package": "device",
+      "identifier": "TestFailedAttachLeavesForeignDevicesBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 120
     },
     {
       "package": "device",
@@ -33130,7 +33396,7 @@
       "identifier": "TestKitOptionsAndPorts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 171
+      "line": 180
     },
     {
       "package": "device",
@@ -33144,7 +33410,7 @@
       "identifier": "TestLevelControlPortCouplesTheColorTemperature",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 318
+      "line": 328
     },
     {
       "package": "device",
@@ -33169,10 +33435,17 @@
     },
     {
       "package": "device",
+      "identifier": "TestLifecycleMethodsOnAPartAreRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 237
+    },
+    {
+      "package": "device",
       "identifier": "TestLifecycleThroughTheSeam",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 69
+      "line": 78
     },
     {
       "package": "device",
@@ -33200,7 +33473,7 @@
       "identifier": "TestMicrowaveModeStartsInTheDeclaredMode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 133
+      "line": 134
     },
     {
       "package": "device",
@@ -33228,14 +33501,14 @@
       "identifier": "TestOperationalStateHandlerReadsTheGeneratedErrorState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 209
+      "line": 219
     },
     {
       "package": "device",
       "identifier": "TestOperationalStateStartsFromTheDeclaration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 227
+      "line": 237
     },
     {
       "package": "device",
@@ -33284,7 +33557,7 @@
       "identifier": "TestPortConfigurationAndHookRefusal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 220
+      "line": 229
     },
     {
       "package": "device",
@@ -33312,7 +33585,7 @@
       "identifier": "TestReflectedFieldsOfAGeneratedStruct",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 271
+      "line": 281
     },
     {
       "package": "device",
@@ -33337,10 +33610,31 @@
     },
     {
       "package": "device",
+      "identifier": "TestRenameReturnsTheHostsRefusal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 276
+    },
+    {
+      "package": "device",
+      "identifier": "TestRequiredInitialSetIsPinned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/required_initial_count_test.go",
+      "line": 19
+    },
+    {
+      "package": "device",
       "identifier": "TestRootNodeAccessorsWrapTheMountedServers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/typed_coverage_test.go",
       "line": 33
+    },
+    {
+      "package": "device",
+      "identifier": "TestSecondUndeclaredHostServerIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/declaration_refusal_internal_test.go",
+      "line": 66
     },
     {
       "package": "device",
@@ -33365,10 +33659,17 @@
     },
     {
       "package": "device",
+      "identifier": "TestSensingValueErrorIsAConfigurationError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/sensing_errors_internal_test.go",
+      "line": 19
+    },
+    {
+      "package": "device",
       "identifier": "TestServiceAreaStartsInTheDeclaredArea",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/declared_coverage_test.go",
-      "line": 99
+      "line": 100
     },
     {
       "package": "device",
@@ -33463,6 +33764,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestTariffTimeSourceSubscriptionFollowsTheDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/port_binding_internal_test.go",
+      "line": 24
+    },
+    {
+      "package": "device",
       "identifier": "TestTemperatureAlarmWithoutItsThresholds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_coverage_test.go",
@@ -33502,6 +33810,48 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 399
+    },
+    {
+      "package": "device",
+      "identifier": "TestTypedHostServerOfAnotherClusterIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/declaration_refusal_internal_test.go",
+      "line": 44
+    },
+    {
+      "package": "device",
+      "identifier": "TestTypedHostServerWithAnIllegalIDIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/declaration_refusal_internal_test.go",
+      "line": 55
+    },
+    {
+      "package": "device",
+      "identifier": "TestTypedNilDeclarationIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/declaration_refusal_internal_test.go",
+      "line": 20
+    },
+    {
+      "package": "device",
+      "identifier": "TestUnconvertibleInitialIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/consume_keeps_internal_test.go",
+      "line": 18
+    },
+    {
+      "package": "device",
+      "identifier": "TestUpdateFnMayAskTheDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 195
+    },
+    {
+      "package": "device",
+      "identifier": "TestUpdateKeepsAConcurrentRename",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 216
     },
     {
       "package": "device",
@@ -33743,6 +34093,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestAssemblyRefusesBridgedInfoBeyondItsConstraint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/bridged_info_check_test.go",
+      "line": 22
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestAssignOrReuseIDRefusesANumberOutsideTheRecordRange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/assigned_id_range_test.go",
@@ -33796,6 +34153,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
       "line": 170
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestBridgedInfoCheckIsTheServingEndpoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/bridged_info_check_test.go",
+      "line": 70
     },
     {
       "package": "endpoint",
@@ -36344,6 +36708,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/pacing_internal_test.go",
       "line": 36
+    },
+    {
+      "package": "fabrictest",
+      "identifier": "TestTeardownAndServeErrorsAreReported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/teardown_report_internal_test.go",
+      "line": 48
     },
     {
       "package": "fabrictest",
@@ -39431,6 +39802,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/paritytest/paritytest_test.go",
       "line": 8
+    },
+    {
+      "package": "internal/paritytest",
+      "identifier": "TestConformanceChoiceAndRevisionForms",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/paritytest/paritytest_test.go",
+      "line": 104
     },
     {
       "package": "internal/paritytest",
