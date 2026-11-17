@@ -241,6 +241,46 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		}
 		after += size
 	}
+	// The Descriptor lists the report carries create structure of their
+	// own: synchronizeServerList a cluster, with its cache, for every id a
+	// ServerList names, synchronizePartsList an endpoint for every part a
+	// PartsList names. The image charges them once they exist, so the
+	// projection charges them now — what a reported list would create, not
+	// only what the report carries values for (review II,
+	// R2-P6-bound-2351, owner decision 54). The structure code that creates
+	// them stays as it is.
+	for _, a := range kept {
+		if a.Path.Cluster != descriptor.ClusterID || !isList(a.Value) {
+			continue
+		}
+		ep := a.Path.Endpoint
+		switch a.Path.Attribute {
+		case descriptor.AttrServerList:
+			e := s.endpoints[ep]
+			if e == nil {
+				newEndpoints[ep] = true
+			}
+			for _, c := range a.Value.Children {
+				if !isUint(c) || c.El.Uint > 0xFFFF_FFFF {
+					continue
+				}
+				if at := (place{ep, uint32(c.El.Uint)}); e == nil || e.clusters[at.cluster] == nil {
+					newClusters[at] = true
+				}
+			}
+		case descriptor.AttrPartsList:
+			for _, c := range a.Value.Children {
+				// EndpointNumber.isValid, 0 to 0xFFFE, as synchronizePartsList;
+				// the root and the endpoint itself are no parts there.
+				if !isUint(c) || c.El.Uint > 0xFFFE || c.El.Uint == 0 || uint16(c.El.Uint) == ep {
+					continue
+				}
+				if part := uint16(c.El.Uint); s.endpoints[part] == nil {
+					newEndpoints[part] = true
+				}
+			}
+		}
+	}
 	after += len(newEndpoints)*imageEndpointBytes + len(newClusters)*imageClusterBytes
 	if quota := s.quota(); after > quota && after > before {
 		if !s.quotaLogged {
