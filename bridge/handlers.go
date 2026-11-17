@@ -643,6 +643,11 @@ type CaseAdapter struct {
 	// a Sigma3 and accepts none.
 	sigma3Digest   [32]byte
 	sigma3Accepted bool
+	// resumeInstalled is the session the last Sigma1 installed by
+	// resumption, until the router takes it for the Sigma2_Resume's
+	// retransmission entry ([CaseAdapter.takeResumeInstall]); zero for
+	// none.
+	resumeInstalled uint16
 	// onUnfinished and releasedStaked: see [CaseAdapter.SetOnUnfinished].
 	onUnfinished   func(sessionID uint16)
 	releasedStaked bool
@@ -919,11 +924,15 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	}
 
 	if result.IsResume() {
-		// Sigma2_Resume fast path: session is live after this reply.
-		// Fire onEstablished now (before sending the reply) so the
-		// operational session is registered before the initiator's
-		// StatusReport Success arrives. Mirrors matter.js
-		// CaseServer.ts line 200-202 (session added before waitForSuccess).
+		// Sigma2_Resume fast path: the session is installed, the host
+		// told and the resumption record replaced before the reply is
+		// sent, so a copy of this Sigma1 finds no record. matter.js sends
+		// Sigma2_Resume first, adds the session after the send and saves
+		// the record after the initiator's success report
+		// (packages/protocol/src/session/case/CaseServer.ts:196-201, :211,
+		// :216, :219 at db021da0). A session the initiator never
+		// acknowledges is closed when its Sigma2_Resume is given up
+		// ([Bridge.closeUnacknowledgedResume]; review II, R2-P6-sec-3320).
 		out := sigma.MarshalSigma2Resume(*result.Sigma2Resume)
 
 		// Every resume that yields a session id the adapter has not
@@ -964,6 +973,9 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 				}
 				return 0, nil, fmt.Errorf("bridge: CASE resume session pickup: %w", err)
 			}
+			a.mu.Lock()
+			a.resumeInstalled = sessionID
+			a.mu.Unlock()
 		}
 		a.sigma1BeganHandshake()
 		return mrp.SCOpcodeSigma2Resume, out, nil
@@ -990,6 +1002,17 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	a.mu.Unlock()
 	a.sigma1BeganHandshake()
 	return mrp.SCOpcodeSigma2, out, nil
+}
+
+// takeResumeInstall returns, once, the session the last Sigma1 installed by
+// resumption: the router ties it to the Sigma2_Resume's retransmission
+// entry ([Bridge.handleCase]).
+func (a *CaseAdapter) takeResumeInstall() (uint16, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	id := a.resumeInstalled
+	a.resumeInstalled = 0
+	return id, id != 0
 }
 
 // caseFailureProtocolCode maps a CASE handshake failure to the

@@ -950,7 +950,12 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	// presenting a resumption id this node issued resumes with
 	// Sigma2_Resume instead of a full handshake. matter.js CaseServer looks
 	// the record up in SessionManager and saves a fresh one after every
-	// session (CaseServer.ts:210); TC-SC-3.2 checks the resume.
+	// session: after the initiator's success report on a resume, after
+	// Sigma3 on a full handshake
+	// (packages/protocol/src/session/case/CaseServer.ts:219, :344 at
+	// db021da0). Here the record is replaced when the session is installed,
+	// before Sigma2_Resume is sent (review II, R2-P6-sec-3320); TC-SC-3.2
+	// checks the resume.
 	responder.SetResumptionStore(resumptionLookup{sessions})
 
 	adapter := bridge.NewCaseAdapter(responder)

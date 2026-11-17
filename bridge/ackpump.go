@@ -668,6 +668,9 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			// [unsecuredEntryLifetime]: the CASE responder's record of
 			// its handshake ends here ([Bridge.unsecuredReplyGivenUp]).
 			b.unsecuredReplyGivenUp(HandshakeKey{InitiatorNodeID: r.Initiator, ExchangeID: r.ExchangeID})
+			if r.Installed != 0 {
+				b.closeUnacknowledgedResume(r.Installed)
+			}
 		}
 		if givenUp {
 			b.noteReportUndelivered(r.SessionID, r.Counter)

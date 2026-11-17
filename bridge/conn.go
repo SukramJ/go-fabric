@@ -564,8 +564,10 @@ func (b *Bridge) purgeSessionState(sessionID uint16) {
 	b.mu.RLock()
 	outbound, tracker := b.outboundReliable, b.ackTracker
 	b.mu.RUnlock()
-	// Nothing it sent is retransmitted on the closed session's keys.
+	// Nothing it sent is retransmitted on the closed session's keys, and
+	// no handshake reply still names it as the session it installed.
 	outbound.DropSession(sessionID)
+	outbound.forgetInstalled(sessionID)
 	b.dropSessionReplyRoutes(tracker, sessionID)
 }
 

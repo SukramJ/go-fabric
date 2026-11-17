@@ -1387,7 +1387,7 @@ func (b *Bridge) handlePase(
 	// makes every non-standalone-ack reply reliable (MessageExchange.ts:602);
 	// the Sigma3/Pake3 piggyback ack (or a standalone ack) stops the
 	// retransmit via the universal inbound Ack path (receive.go).
-	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt)); err != nil {
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt), 0); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		return err
 	}
@@ -1481,12 +1481,46 @@ func (b *Bridge) handleCase(
 	// rebroadcast. matter.js makes every non-standalone-ack reply
 	// reliable (MessageExchange.ts:602); the Sigma3 piggyback ack stops
 	// the retransmit via the universal inbound Ack path (receive.go).
-	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt)); err != nil {
+	var installed uint16
+	if a, ok := handler.(*CaseAdapter); ok && respOpcode == mrp.SCOpcodeSigma2Resume {
+		installed, _ = a.takeResumeInstall()
+	}
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt), installed); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
+		if installed != 0 {
+			// matter.js closes the session when the Sigma2_Resume cannot
+			// be sent (CaseServer.ts:202-206 at db021da0).
+			b.closeUnacknowledgedResume(installed)
+		}
 		return err
 	}
 	b.dischargeOwedReplyAck(requestHdr, proto)
 	return nil
+}
+
+// closeUnacknowledgedResume closes the secure session a resumption installed
+// whose Sigma2_Resume the initiator did not acknowledge: its
+// retransmissions were spent, its time on the unsecured session ran out
+// ([tickOutboundReliable]) or it could not be sent ([Bridge.handleCase]).
+// The controller's CASE responder closes such a session too
+// (client/handshake). An entry that lost its place in the retransmit table
+// to a newer one ([unsecuredEntryLimit]) closes nothing — its datagram went
+// out, and the peer's acknowledgement may still come. Review II,
+// R2-P6-sec-3320.
+func (b *Bridge) closeUnacknowledgedResume(sessionID uint16) {
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	b.logger.Info("matter.rx.sc.resume_unacknowledged",
+		slog.Int("session_id", int(sessionID)))
+	if reg == nil {
+		return
+	}
+	if err := reg.Close(sessionID); err != nil {
+		b.logger.Debug("matter.rx.sc.resume_unacknowledged.miss",
+			slog.Int("session_id", int(sessionID)),
+			slog.Any("err", err))
+	}
 }
 
 // sendHandshakeFailureReport ends the handshake on the request's exchange
@@ -1535,7 +1569,7 @@ func (b *Bridge) sendHandshakeFailureReport(
 		b.endHandshakeUnreported(key, "failure_report")
 		return nil
 	}
-	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body, peer); err != nil {
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body, peer, 0); err != nil {
 		return err
 	}
 	// The report carried the acknowledgement of the request.

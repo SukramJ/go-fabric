@@ -146,6 +146,10 @@ type outboundEntry struct {
 	// activity instead of the session resolver, which knows no unsecured
 	// session ([outboundReliableTracker.trackUnsecured]).
 	peer *handshakePeerTiming
+	// installed is the secure session the reply's handshake installed
+	// before the peer acknowledged the reply, zero for none
+	// ([outboundReliableTracker.trackUnsecuredInstalled]).
+	installed uint16
 	// sentWall is the tracker's clock reading when the datagram first
 	// left, used only to report the peer's round-trip in diagnostics. It is
 	// deliberately NOT the injected `now` the retransmit schedule runs on:
@@ -307,7 +311,40 @@ func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exc
 // ([unsecuredEntryLimit]) and the tracker reports it through its evicted
 // hook.
 func (t *outboundReliableTracker) trackUnsecured(counter uint32, key HandshakeKey, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
+	t.trackUnsecuredInstalled(counter, key, datagram, dest, now, peer, 0)
+}
+
+// trackUnsecuredInstalled is [outboundReliableTracker.trackUnsecured] for a
+// reply whose handshake installed the secure session installed before the
+// peer acknowledged the reply (a Sigma2_Resume): [Tick] reports it with the
+// entry's give-up, and the bridge closes it
+// ([Bridge.closeUnacknowledgedResume]). Zero is none.
+func (t *outboundReliableTracker) trackUnsecuredInstalled(counter uint32, key HandshakeKey, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming, installed uint16) {
 	_ = t.track(counter, 0, key.ExchangeID, key.InitiatorNodeID, datagram, dest, now, 0, peer, exchangeRoleUnnamed)
+	if installed == 0 {
+		return
+	}
+	t.mu.Lock()
+	if e := t.pending[outboundKey{0, counter}]; e != nil {
+		e.installed = installed
+	}
+	t.mu.Unlock()
+}
+
+// forgetInstalled drops sessionID from every unsecured entry that names it
+// as installed: the session closed, and its id may be given to another
+// before the entry is given up ([Bridge.purgeSessionState]).
+func (t *outboundReliableTracker) forgetInstalled(sessionID uint16) {
+	if t == nil || sessionID == 0 {
+		return
+	}
+	t.mu.Lock()
+	for _, e := range t.pending {
+		if e.installed == sessionID {
+			e.installed = 0
+		}
+	}
+	t.mu.Unlock()
 }
 
 // unsecuredEntryLimit is how many reliable messages the unsecured session
@@ -752,6 +789,10 @@ type outboundTickResult struct {
 	Initiator uint64
 	Counter   uint32
 	Err       error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
+	// Installed is, for an unsecured entry given up or expired, the secure
+	// session its handshake installed before the peer acknowledged it
+	// ([outboundReliableTracker.trackUnsecuredInstalled]); zero for none.
+	Installed uint16
 }
 
 // Tick walks every entry whose nextSendAt has elapsed: re-sends via
@@ -793,7 +834,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// is dropped, due or not: [unsecuredEntryLifetime].
 		if key.sessionID == 0 && now.Sub(p.trackedAt) >= unsecuredEntryLifetime {
 			t.dropLocked(key)
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: errUnsecuredEntryExpired})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: errUnsecuredEntryExpired, Installed: p.installed})
 			continue
 		}
 		if now.Before(p.nextSendAt) {
@@ -804,7 +845,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 			if key.sessionID != 0 {
 				t.abandoned[key] = now.Add(now.Sub(p.trackedAt))
 			}
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached, Installed: p.installed})
 			continue
 		}
 		p.retries++
