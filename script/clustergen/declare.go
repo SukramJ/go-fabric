@@ -260,15 +260,33 @@ var ports = map[string]portSet{
 	}}},
 	"DoorLock": {ports: []portDecl{{
 		name: "StateSource",
+		// cluster/lock declares its own StateSource with the same methods
+		// (an alias would be an apidiff break, R2-P6-api-2751 reported
+		// back); this doc carries the contract that interface's doc
+		// states, so Declare.StateSource is documented as fully.
 		doc: []string{
 			"StateSource is the lock's actuator: it reports whether the bolt is",
-			"jammed and locked, and LockInvoke runs a LockDoor or UnlockDoor",
-			"(cmdID) the kit's DoorLock server admitted (cluster/lock",
-			"StateSource). The server reads LockState from it at every read and",
-			"stores none: IsJammed true is NotFullyLocked, IsLocked's observed",
-			"false (the lock's state is not known) is a null LockState, else",
-			"locked is Locked or Unlocked; after LockInvoke the next read asks",
-			"IsLocked again. Without one the server keeps its own lock state.",
+			"jammed and locked, and LockInvoke runs a lock operation the kit's",
+			"DoorLock server admitted (cluster/lock StateSource). The server",
+			"reads LockState from it at every read and stores none: IsJammed",
+			"true is NotFullyLocked, IsLocked's observed false (the lock's state",
+			"is not known) is a null LockState, else locked is Locked or",
+			"Unlocked; after LockInvoke the next read asks IsLocked again.",
+			"Without one the server keeps its own lock state.",
+			"",
+			"cmdID is [CmdLockDoor], [CmdUnlockDoor] or [CmdUnboltDoor];",
+			"UnlockWithTimeout and an auto-relock arrive as UnlockDoor and",
+			"LockDoor. LockInvoke is not called for a request without an",
+			"accessing fabric or one the authorization refuses, and a source",
+			"that also implements cluster/lock's LockOperationHandler is called",
+			"through HandleLockOperation instead. A returned error fails the",
+			"command: the server emits LockOperationError (the reason a",
+			"cluster/lock LockOperationFailedError names, Unspecified",
+			"otherwise), and the error answers its status, FAILURE without one.",
+			"The implementation owns the southbound urgency of the write it",
+			"performs: the cluster contract carries no priority, so a host",
+			"whose command queue ranks by urgency names the value it wants",
+			"inside LockInvoke.",
 		},
 		methods: []string{
 			"IsJammed() bool",
