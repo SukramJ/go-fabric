@@ -86,7 +86,11 @@ var (
 	ErrRequiresEncryption = wire.ErrRequiresEncryption
 	// ErrPlaintextDevice is a proxy without an API key, reached with one.
 	ErrPlaintextDevice = wire.ErrPlaintextDevice
-	// ErrNoProxies is NewCentral without a proxy.
+	// ErrNoProxies is NewCentral without a proxy: none given and no
+	// Options.Discover, or — wrapped, "none answered and none was
+	// discovered over DNS-SD" — no proxy answering once the given ones
+	// were dialled without a failure and the first browse ran. A given
+	// proxy that failed makes NewCentral return that failure instead.
 	ErrNoProxies = errors.New("esphome: no Bluetooth proxy configured")
 	// ErrNoActiveConnections is a proxy that forwards advertisements only:
 	// its feature flags lack ACTIVE_CONNECTIONS (aioesphomeapi/model.py:140),
