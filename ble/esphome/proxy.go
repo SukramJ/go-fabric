@@ -147,6 +147,11 @@ func (p *proxy) dial(ctx context.Context) (*apiConn, error) {
 // answers; a permanent refusal ends the attempt, since every address is
 // the same device.
 func dialFirst(ctx context.Context, addrs []string, psk []byte, o *Options) (*apiConn, string, error) {
+	if len(addrs) == 0 {
+		// errors.Join of nothing is nil: without this a caller took a nil
+		// connection for an answer (R2-P6-err-2006).
+		return nil, "", errNoAddress
+	}
 	var errs []error
 	for _, addr := range addrs {
 		a, err := dialChecked(ctx, addr, psk, o)
@@ -189,6 +194,11 @@ func dialChecked(ctx context.Context, addr string, psk []byte, o *Options) (*api
 // changed — the proxy moved, or took a further address — a reconnect
 // backoff is cut short and setAddrs reports true.
 func (p *proxy) setAddrs(addrs []string) bool {
+	if len(addrs) == 0 {
+		// candidates drops an instance without an address; the proxy
+		// keeps the ones it has.
+		return false
+	}
 	p.mu.Lock()
 	was, now := slices.Sorted(slices.Values(p.addrs)), slices.Sorted(slices.Values(addrs))
 	changed := !slices.Equal(was, now)

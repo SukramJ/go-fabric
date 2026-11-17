@@ -146,9 +146,14 @@ type candidate struct {
 	psk   string
 }
 
+// errNoAddress is an instance without a usable address. discovery.Names
+// returns none such (it returns resolved instances only); another Browser
+// may (R2-P6-err-2006).
+var errNoAddress = errors.New("esphome: the instance has no address")
+
 // candidates browses for timeout and sorts the instances into devices to
-// connect to and devices skipped for a reason the TXT record already
-// gives: a device that requires encryption without a key in keys.
+// connect to and devices skipped for a reason the record already gives: no
+// address, or a device that requires encryption without a key in keys.
 func candidates(ctx context.Context, b Browser, keys Keys, timeout time.Duration, clk clock.Clock, log *slog.Logger) ([]candidate, error) {
 	bctx, cancel := clock.WithTimeout(ctx, clk, timeout)
 	instances, err := b.Browse(bctx, ServiceType)
@@ -162,7 +167,13 @@ func candidates(ctx context.Context, b Browser, keys Keys, timeout time.Duration
 		hash, _ := in.Parameters.Get(txtConfigHash)
 		c := candidate{key: strings.ToLower(in.Name), name: in.Name, hash: hash, psk: keys.lookup(in.Name, mac)}
 		for _, a := range in.Addresses {
-			c.addrs = append(c.addrs, a.String())
+			if a.IP.IsValid() {
+				c.addrs = append(c.addrs, a.String())
+			}
+		}
+		if len(c.addrs) == 0 {
+			skip(log, c, errNoAddress)
+			continue
 		}
 		if _, encrypted := in.Parameters.Get(txtAPIEncryption); encrypted && c.psk == "" {
 			skip(log, c, ErrRequiresEncryption)
