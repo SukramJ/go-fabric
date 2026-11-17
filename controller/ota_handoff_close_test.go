@@ -84,17 +84,15 @@ func TestOnUpdateFailedMayCloseTheController(t *testing.T) {
 	closed := make(chan error, 1)
 	var once sync.Once
 	var release func()
-	var mu sync.Mutex
-	mu.Lock()
+	set := make(chan struct{})
 	_, release = deletedWithQueuedUpdate(t, func(r *otaRig, _ softwareupdate.Peer) {
 		once.Do(func() {
-			mu.Lock() // release is set
-			mu.Unlock()
+			<-set // release is assigned
 			release()
 			closed <- r.c.Close(context.Background())
 		})
 	})
-	mu.Unlock()
+	close(set)
 	if err := <-closed; err != nil {
 		t.Fatalf("Close from OnUpdateFailed: %v", err)
 	}

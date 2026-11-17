@@ -382,9 +382,9 @@ type Controller struct {
 	// otaHandoffs are the update manager's NodeDeleted calls the node
 	// hooks handed off (ota_handoff.go).
 	otaHandoffs otaHandoffs
-	registry         atomic.Pointer[client.Registry]
-	armer            *peer.RebootResubscribeArmer
-	armerObs         atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
+	registry    atomic.Pointer[client.Registry]
+	armer       *peer.RebootResubscribeArmer
+	armerObs    atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
 	// groups is the controller's group sender (groups.go).
 	groups *groups.Manager
 	// otaProvider is the OTA provider on the controller's identity
