@@ -14,7 +14,6 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"time"
@@ -148,9 +147,9 @@ func matterTime(t time.Time) int64 {
 
 // MatterIDs reads the vendor and product id of the subject DN by
 // matter.js's rule for a parse without acceptMalformedVidPid (db021da0;
-// the rule is [matterIDsOf]'s).
+// the rule is [matterIDsOfRaw]'s).
 func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
-	return matterIDsOf(c.Subject)
+	return matterIDsOfRaw(c.RawSubject)
 }
 
 // IssuerMatterIDs reads the vendor and product id of the issuer DN the
@@ -159,16 +158,18 @@ func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 // id only in a `Mvid:` commonName still names its issuer's vendor
 // (CertificatesTest.ts:319-324, the Nuki DAC).
 func IssuerMatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
-	return matterIDsOf(c.Issuer)
+	return matterIDsOfRaw(c.RawIssuer)
 }
 
-// matterIDsOf is the vendor and product id of one DN by the rule of
-// [attestids.FromName] without acceptMalformed — the DER parse without
-// acceptMalformedVidPid: a malformed or repeated matter-oid-vid or
-// matter-oid-pid attribute is a [*profileError], CertificateProfileError;
-// a malformed commonName fallback is an ordinary error.
-func matterIDsOf(name pkix.Name) (vid, pid *uint16, err error) {
-	vid, pid, err = attestids.FromName(name, false)
+// matterIDsOfRaw is the vendor and product id of one DN, given as its DER,
+// by the rule of [attestids.FromRawName] without acceptMalformed — the DER
+// parse without acceptMalformedVidPid: a malformed or repeated
+// matter-oid-vid or matter-oid-pid attribute is a [*profileError],
+// CertificateProfileError; a malformed commonName fallback is an ordinary
+// error. The values are read from their content bytes whatever their
+// string tag (review II, R2-P6-par-2904).
+func matterIDsOfRaw(raw []byte) (vid, pid *uint16, err error) {
+	vid, pid, err = attestids.FromRawName(raw, false)
 	if errors.Is(err, attestids.ErrMalformedAttribute) {
 		return nil, nil, &profileError{msg: err.Error()}
 	}

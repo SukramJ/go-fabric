@@ -64,10 +64,12 @@ func ValidateProduct(chain *Chain, vendorID, productID uint16) error {
 // parse does (Certificate.ts:729, :740 at db021da0), and returns the
 // subject's.
 func certificateIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
-	if _, _, err := productIDsOf(c.Issuer); err != nil {
+	if _, _, err := attestids.FromRawName(c.RawIssuer, true); err != nil {
 		return nil, nil, err
 	}
-	return productIDsOf(c.Subject)
+	// The values are read from their content bytes, whatever their string
+	// tag ([attestids.FromRawName]; review II, R2-P6-par-2904).
+	return attestids.FromRawName(c.RawSubject, true)
 }
 
 // productIDsOf reads a DN's vendor and product id as matter.js's DER parse

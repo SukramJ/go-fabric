@@ -69,29 +69,117 @@ func (e *attributeError) Is(target error) bool { return target == ErrMalformedAt
 //     acceptMalformedVidPid does not cover (:63-72).
 //
 // A value that is not a string counts as malformed; a commonName that is
-// not a string is not read.
+// not a string is not read. crypto/x509 has decoded the values by their
+// string tags; [FromRawName] reads them as matter.js does.
 func FromName(name pkix.Name, acceptMalformed bool) (vid, pid *uint16, err error) {
+	attrs := make([]attribute, 0, len(name.Names))
+	for _, n := range name.Names {
+		s, ok := n.Value.(string)
+		attrs = append(attrs, attribute{oid: n.Type, text: s, isString: ok})
+	}
+	return fromAttributes(attrs, acceptMalformed)
+}
+
+// FromRawName is [FromName] over the DER of a distinguished name — an
+// x509.Certificate's RawSubject or RawIssuer — reading every value from its
+// content bytes as text, whatever its string tag, as matter.js's
+// parseSubjectOrIssuer does (`Bytes.toString(Bytes.of(valueNode._bytes))`,
+// packages/protocol/src/certificate/kinds/Certificate.ts:321-326 at
+// db021da0): "FFF1" in an OCTET STRING is 0xFFF1, in a BMPString it is
+// malformed. An attribute of other than two elements, or whose first is not
+// an OBJECT IDENTIFIER, is skipped (:319, :322-323). Review II, R2-P6-par-2904.
+func FromRawName(raw []byte, acceptMalformed bool) (vid, pid *uint16, err error) {
+	attrs, err := rawAttributes(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fromAttributes(attrs, acceptMalformed)
+}
+
+// attribute is one attribute of a distinguished name: its type and its
+// value as text, isString false when the value is not text.
+type attribute struct {
+	oid      asn1.ObjectIdentifier
+	text     string
+	isString bool
+}
+
+// rawAttributes lists the attributes of the DER RDNSequence raw in order,
+// each value's content bytes as its text ([FromRawName]).
+func rawAttributes(raw []byte) ([]attribute, error) {
+	var seq asn1.RawValue
+	if rest, err := asn1.Unmarshal(raw, &seq); err != nil || len(rest) != 0 || seq.Tag != asn1.TagSequence || !seq.IsCompound {
+		return nil, errors.New("attestids: invalid subject/issuer structure")
+	}
+	var out []attribute
+	for rdns := seq.Bytes; len(rdns) > 0; {
+		var set asn1.RawValue
+		var err error
+		if rdns, err = asn1.Unmarshal(rdns, &set); err != nil {
+			return nil, errors.New("attestids: invalid subject/issuer structure")
+		}
+		if !set.IsCompound {
+			continue
+		}
+		for atvs := set.Bytes; len(atvs) > 0; {
+			var atv asn1.RawValue
+			if atvs, err = asn1.Unmarshal(atvs, &atv); err != nil {
+				return nil, errors.New("attestids: invalid subject/issuer structure")
+			}
+			elems, ok := children(atv)
+			if !ok || len(elems) != 2 {
+				continue
+			}
+			var oid asn1.ObjectIdentifier
+			if _, err := asn1.Unmarshal(elems[0].FullBytes, &oid); err != nil {
+				continue
+			}
+			out = append(out, attribute{oid: oid, text: string(elems[1].Bytes), isString: true})
+		}
+	}
+	return out, nil
+}
+
+// children is the elements of the constructed value v.
+func children(v asn1.RawValue) ([]asn1.RawValue, bool) {
+	if !v.IsCompound {
+		return nil, false
+	}
+	var out []asn1.RawValue
+	for b := v.Bytes; len(b) > 0; {
+		var e asn1.RawValue
+		var err error
+		if b, err = asn1.Unmarshal(b, &e); err != nil {
+			return nil, false
+		}
+		out = append(out, e)
+	}
+	return out, true
+}
+
+// fromAttributes is the rule of [FromName] over attrs, in DN order.
+func fromAttributes(attrs []attribute, acceptMalformed bool) (vid, pid *uint16, err error) {
 	hasAttribute, vidUnusable, pidUnusable := false, false, false
 	var commonNames []string
-	for _, n := range name.Names {
+	for _, n := range attrs {
 		var field string
 		var out **uint16
 		var unusable *bool
 		switch {
-		case n.Type.Equal(OIDVendorID):
+		case n.oid.Equal(OIDVendorID):
 			field, out, unusable = "vendorId", &vid, &vidUnusable
-		case n.Type.Equal(OIDProductID):
+		case n.oid.Equal(OIDProductID):
 			field, out, unusable = "productId", &pid, &pidUnusable
-		case n.Type.Equal(OIDCommonName):
-			if s, ok := n.Value.(string); ok {
-				commonNames = append(commonNames, s)
+		case n.oid.Equal(OIDCommonName):
+			if n.isString {
+				commonNames = append(commonNames, n.text)
 			}
 			continue
 		default:
 			continue
 		}
 		hasAttribute = true
-		s, _ := n.Value.(string)
+		s := n.text
 		id, ok := ParseHexID(s)
 		switch {
 		case !ok:
