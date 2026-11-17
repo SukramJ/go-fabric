@@ -30,8 +30,62 @@ import (
 // not cover): the first is answered with Sigma2_Resume, the second with
 // Sigma2.
 func TestR2P6Sec3320Replay(t *testing.T) {
+	rig := newResumeReplayRig(t)
+	rig.send(rig.copyOn(0x7001, 1000, 0, 0))
+	rig.await(0x7001, mrp.SCOpcodeSigma2Resume)
+	rig.send(rig.copyOn(0x7002, 1001, 0x5002, 0))
+	rig.await(0x7002, mrp.SCOpcodeSigma2)
+}
+
+// TestR2P6Sec3320Concurrent: review II, R2-P6-sec-3320 (owner decision
+// 231) — copies of one resuming Sigma1 sent at once, each on its own
+// exchange with its own initiator session id and source node id (fields
+// the resume MIC does not cover), resume exactly once; every other copy
+// takes the full path.
+func TestR2P6Sec3320Concurrent(t *testing.T) {
+	rig := newResumeReplayRig(t)
+	const copies = 16
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := range uint16(copies) {
+		c := rig.copyOn(0x7100+i, 2000+uint32(i), 0x5100+i, uint64(i)+1)
+		wg.Go(func() {
+			<-start
+			rig.send(c)
+		})
+	}
+	close(start)
+	wg.Wait()
+	resumed := 0
+	for i := range uint16(copies) {
+		if rig.answer(0x7100+i) == mrp.SCOpcodeSigma2Resume {
+			resumed++
+		}
+	}
+	if resumed != 1 {
+		t.Fatalf("%d of %d concurrent copies resumed, want exactly 1", resumed, copies)
+	}
+}
+
+// resumeReplayRig holds node b's genuine resuming Sigma1 from node a and
+// the opcodes b answered, per exchange, to copies of it sent from another
+// address.
+type resumeReplayRig struct {
+	t       *testing.T
+	site    *Site
+	b       *Device
+	other   *net.UDPAddr
+	genuine []byte
+	hdr     message.Header
+	n       int
+	mu      *sync.Mutex
+	answers map[uint16][]uint8
+}
+
+func newResumeReplayRig(t *testing.T) *resumeReplayRig {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
+	t.Cleanup(cancel)
 	site := NewSite(t, Options{Clock: clock.System{}, Logger: slog.New(slog.DiscardHandler)})
 	light, err := device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey("b:1"), Name: "b"})
 	if err != nil {
@@ -110,10 +164,21 @@ func TestR2P6Sec3320Replay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	copyOn := func(exchange uint16, counter uint32, sessionID uint16) []byte {
-		c := append([]byte(nil), genuine...)
-		binary.LittleEndian.PutUint32(c[4:8], hdr.MessageCounter+counter)
+	return &resumeReplayRig{t: t, site: site, b: b, other: other, genuine: genuine, hdr: hdr, n: n, mu: &mu, answers: answers}
+}
+
+// copyOn is the genuine Sigma1 on exchange with a later counter, and —
+// when not zero — another initiator session id and another source node id.
+func (r *resumeReplayRig) copyOn(exchange uint16, counter uint32, sessionID uint16, sourceDelta uint64) []byte {
+	t, n := r.t, r.n
+	t.Helper()
+	{
+		c := append([]byte(nil), r.genuine...)
+		binary.LittleEndian.PutUint32(c[4:8], r.hdr.MessageCounter+counter)
 		binary.LittleEndian.PutUint16(c[n+2:n+4], exchange)
+		if sourceDelta != 0 && r.hdr.HasSourceNodeID {
+			binary.LittleEndian.PutUint64(c[8:16], r.hdr.SourceNodeID+sourceDelta)
+		}
 		if sessionID != 0 {
 			patched := false
 			for j := n + 6; j+4 <= len(c); j++ {
@@ -129,27 +194,35 @@ func TestR2P6Sec3320Replay(t *testing.T) {
 		}
 		return c
 	}
-	await := func(exchange uint16, want uint8) {
-		t.Helper()
-		deadline := time.Now().Add(5 * time.Second)
-		for time.Now().Before(deadline) {
-			mu.Lock()
-			got := append([]uint8(nil), answers[exchange]...)
-			mu.Unlock()
-			for _, op := range got {
-				if op == want {
-					return
-				}
-				if op != mrp.StandaloneAckOpcode {
-					t.Fatalf("exchange %#x answered with opcode %#x, want %#x", exchange, op, want)
-				}
+}
+
+// send hands datagram to b from the other address.
+func (r *resumeReplayRig) send(datagram []byte) { r.site.net.send(r.other, r.b.Addr(), datagram) }
+
+// answer is the first opcode other than an acknowledgement b answered on
+// exchange, waiting up to 5 s.
+func (r *resumeReplayRig) answer(exchange uint16) uint8 {
+	r.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		r.mu.Lock()
+		got := append([]uint8(nil), r.answers[exchange]...)
+		r.mu.Unlock()
+		for _, op := range got {
+			if op != mrp.StandaloneAckOpcode {
+				return op
 			}
-			time.Sleep(10 * time.Millisecond)
 		}
-		t.Fatalf("exchange %#x: no opcode %#x", exchange, want)
+		time.Sleep(10 * time.Millisecond)
 	}
-	site.net.send(other, b.Addr(), copyOn(0x7001, 1000, 0))
-	await(0x7001, mrp.SCOpcodeSigma2Resume)
-	site.net.send(other, b.Addr(), copyOn(0x7002, 1001, 0x5002))
-	await(0x7002, mrp.SCOpcodeSigma2)
+	r.t.Fatalf("exchange %#x: no answer", exchange)
+	return 0
+}
+
+// await fails unless b answered exchange with want.
+func (r *resumeReplayRig) await(exchange uint16, want uint8) {
+	r.t.Helper()
+	if op := r.answer(exchange); op != want {
+		r.t.Fatalf("exchange %#x answered with opcode %#x, want %#x", exchange, op, want)
+	}
 }

@@ -159,6 +159,16 @@ type ResumptionStore interface {
 	GetByID(resumptionID []byte) (*ResumptionRecord, error)
 }
 
+// resumptionClaimer is the optional capability of a [ResumptionStore] to
+// hand a resumption id to one resume at a time: ClaimResumptionID claims
+// id for the resume about to be accepted, false when another resume holds
+// it; release gives it back when this one does not take place. A claim
+// that is not released ends with the record the resume replaces — the
+// store's owner drops it (review II, R2-P6-sec-3320, owner decision 231).
+type resumptionClaimer interface {
+	ClaimResumptionID(id []byte) (release func(), ok bool)
+}
+
 // Sigma1ProcessResult is the discriminated union returned by
 // [Responder.ProcessSigma1WithResume]. Callers check IsResume to
 // decide which opcode to send.
@@ -689,6 +699,24 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	copy(keys.R2IKey[:], finalMat[SessionKeySize:2*SessionKeySize])
 	copy(keys.AttestationChallenge[:], finalMat[2*SessionKeySize:3*SessionKeySize])
 
+	// The record goes to one resume: a store that can claims its id now,
+	// and a Sigma1 whose id another resume holds falls through to Full
+	// Sigma, as a miss does (review II, R2-P6-sec-3320).
+	release := func() {}
+	if c, ok := r.resumptionStore.(resumptionClaimer); ok {
+		var claimed bool
+		if release, claimed = c.ClaimResumptionID(sigma1.ResumptionID); !claimed {
+			return Sigma1ProcessResult{}, false, nil
+		}
+		// Looked up again under the claim: a resume that held the id
+		// and gave it back once its record was replaced leaves no record
+		// under it.
+		if again, err := r.resumptionStore.GetByID(sigma1.ResumptionID); err != nil || again == nil {
+			release()
+			return Sigma1ProcessResult{}, false, nil //nolint:nilerr // a record gone under the claim is a miss
+		}
+	}
+
 	// The resumption is accepted: its session takes its id now, the last
 	// step that can refuse it. A resume that lands on a responder which
 	// already completed a handshake is a second session on this
@@ -699,6 +727,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
 	sessionID, err := r.nextSessionIDLocked(r.idPending || r.state == responderStateFinished)
 	if err != nil {
+		release()
 		return Sigma1ProcessResult{}, false, err
 	}
 	r.sessionID, r.idPending = sessionID, false

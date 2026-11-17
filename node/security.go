@@ -83,6 +83,10 @@ func peerVerifier(rcac, rootPublicKey []byte, ts mattercert.TimeSource) (*matter
 // which Apple Home does within seconds of a pair, and which then signs
 // Sigma2 under the wrong fabric's NOC for every reconnect of the first.
 type caseIdentities struct {
+	// claims hands each resumption id to one resume at a time
+	// ([resumeClaims]; owner decision 231).
+	claims resumeClaims
+
 	// mu guards byIdx and latest.
 	mu     sync.RWMutex
 	byIdx  map[uint8]*caseFabric
@@ -957,7 +961,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	// db021da0). Here the record is replaced when the session is installed,
 	// before Sigma2_Resume is sent (review II, R2-P6-sec-3320); TC-SC-3.2
 	// checks the resume.
-	responder.SetResumptionStore(resumptionLookup{sessions})
+	responder.SetResumptionStore(resumptionLookup{sessions: sessions, claims: &ids.claims})
 
 	adapter := bridge.NewCaseAdapter(responder)
 	// The staked id goes back when the handshake fails or its adapter is
@@ -983,6 +987,15 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 				fabricIndex, localNodeID = fi, nid
 			}
 		}
+		// A resume holds its record's id from acceptance
+		// ([resumptionLookup.ClaimResumptionID]) until the record is
+		// replaced, or gives it back when it installs nothing.
+		var presented []byte
+		if resp := adapter.SnapshotResponder(); resp != nil {
+			if info := resp.ResumeInfo(); info.Resumed {
+				presented = info.PresentedResumptionID
+			}
+		}
 		entry, openErr := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
 			// The install takes this handshake's stake, not the bare id:
 			// a stake an allocation at a full table took over installs
@@ -991,6 +1004,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		})
 		if openErr != nil {
 			held.release(effectiveID)
+			ids.claims.release(presented)
 			return openErr
 		}
 		// The initiator's Sigma1 SessionParameters size the session's
@@ -1030,18 +1044,73 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 					FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
 					CASEAuthTags: peerCATs, SessionParameters: params,
 				}); err != nil {
+					// The presented record stays in the store; its id stays
+					// claimed, so it resumes nothing more.
 					logger.Warn("case.resumption.persist_failed", slog.Any("err", err))
+					return nil
 				}
 			}
 		}
+		// The presented record was replaced: its id is gone from the store.
+		ids.claims.release(presented)
 		return nil
 	})
 	return adapter, nil
 }
 
 // resumptionLookup serves the CASE responder's resumption records from the
-// session manager's store.
-type resumptionLookup struct{ sessions *operational.Manager }
+// session manager's store, each id to one resume at a time.
+type resumptionLookup struct {
+	sessions *operational.Manager
+	claims   *resumeClaims
+}
+
+// ClaimResumptionID implements the sigma responder's optional claim: the
+// id is held from the resume's acceptance until its record was replaced
+// or the resume installed nothing, so concurrent copies of one Sigma1 —
+// whatever their exchange or source node id — resume once (review II,
+// R2-P6-sec-3320, owner decision 231).
+func (l resumptionLookup) ClaimResumptionID(id []byte) (release func(), ok bool) {
+	if l.claims == nil {
+		return func() {}, true
+	}
+	if !l.claims.claim(id) {
+		return nil, false
+	}
+	return func() { l.claims.release(id) }, true
+}
+
+// resumeClaims are the resumption ids a resume holds
+// ([resumptionLookup.ClaimResumptionID]). The zero value is ready. An id
+// stays held only while its resume runs, or when the record it presented
+// could not be replaced; so the set is bounded by the store's records.
+type resumeClaims struct {
+	mu   sync.Mutex
+	held map[string]struct{}
+}
+
+func (c *resumeClaims) claim(id []byte) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, taken := c.held[string(id)]; taken {
+		return false
+	}
+	if c.held == nil {
+		c.held = make(map[string]struct{})
+	}
+	c.held[string(id)] = struct{}{}
+	return true
+}
+
+// release gives id back; nil or an id not held is a no-op.
+func (c *resumeClaims) release(id []byte) {
+	if len(id) == 0 {
+		return
+	}
+	c.mu.Lock()
+	delete(c.held, string(id))
+	c.mu.Unlock()
+}
 
 // GetByID implements [sigma.ResumptionStore].
 func (l resumptionLookup) GetByID(resumptionID []byte) (*sigma.ResumptionRecord, error) {
