@@ -210,9 +210,12 @@ matter.js refuses only at construction. A misplaced singleton is refused in
 every mode, the first misplacing endpoint in tree order alone. A mandatory
 command a server leaves unimplemented is `endpoint.ViolationUnimplemented`:
 logged in warn and off, refused in strict. A mode that is none of the three
-fails `node.New`.
+fails `node.New`. A node that commissions over BLE (`node.Network.BLE`,
+`endpoint.Topology.CommissionsOverBLE`) does not hold the CustomNetworkConfig
+condition, so its RootNode requires NetworkCommissioning, as matter.js
+derives the condition (`ServerEndpointFacts.ts:135-144` at `db021da0`).
 
-*Source: the `bridge` package doc (`bridge/bridge.go`), `bridge/bridge.go` (`AttachCommissioningWindow`, `wireCommissioned`), `bridge/securechannel.go` (`AttachSessionRegistry`), `bridge/ackpump.go`.*
+*Source: the `bridge` package doc (`bridge/bridge.go`), `bridge/bridge.go` (`AttachCommissioningWindow`, `wireCommissioned`), `bridge/securechannel.go` (`AttachSessionRegistry`), `bridge/ackpump.go`, `endpoint/devicetype_validation.go` (`assembledNodeConditions`).*
 
 ### Capabilities the bridge looks for on what is attached
 

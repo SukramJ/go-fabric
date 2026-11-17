@@ -1,6 +1,21 @@
 # ADR 0013 — Cluster definitions generated from the matter.js model
 
-- **Status**: Accepted
+- **Status**: Accepted. Note (2026-11-18, review II, R2-P6-doc-3076, -3081,
+  -3314, -3315): the tables of "What stays as it was" and the migration
+  list are as of the ADR's writing. Since then `schema/timed.go` and
+  `schema/writable.go` are tables generated from the snapshot
+  (`schema/timed_gen.go` lists all eleven timed DoorLock requests;
+  `schema/attribute_access_gen.go`); `device.WithServer` was removed in
+  v0.16.0 for `device.HostServer` (`device/options.go`); `wire.Groups` is
+  removed, ScenesManagement's stub is the one left in `cluster/wire`; the
+  DoorLock server serves PIN, RID, FGP, FACE, WDSCH, DPS, COTA, USR, YDSCH,
+  HDSCH and UBOLT (`cluster/lock/doorlock_server.go`, `servedFeatures`);
+  `cluster/onoff.Server` is a self-held OnOff server; LocalizationConfiguration,
+  TimeFormatLocalization and UnitLocalization have servers in
+  `cluster/core`; and `WebRtcTransportRequestorServer.ts`'s session logic
+  is ported in `cluster/camera` (`requestor.go` cites it, with a parity
+  test), and that sentence's matter.js half holds at `db021da0` as it
+  did at `862ad75f`.
 - **Date**: 2026-10-06
 - **Related**:
   [`../matterjs-comparison.md`](../matterjs-comparison.md) §6 ("Cluster

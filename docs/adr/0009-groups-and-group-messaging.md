@@ -1,6 +1,10 @@
 # ADR 0009 — A real Groups server and group message delivery, as matter.js builds them
 
-- **Status**: Accepted
+- **Status**: Accepted. Note (2026-11-18, review II, R2-P6-doc-3076,
+  -3077): `wire.Groups` has since been removed, not only deprecated —
+  `cluster/core`'s Groups server is the one. Group messaging is exercised
+  against chip-tool (`internal/chiptool/suite_test.go`, the `groups` leg)
+  and in the Go-TH leg (G/3.2, [certifiability](../certifiability.md)).
 - **Date**: 2026-10-04
 - **Supersedes**: [ADR 0004 — Groups stays a stub](./0004-groups-cluster-stays-stub.md)
 - **Followed by**: [ADR 0010 — Groupcast and the Auxiliary ACL](./0010-groupcast-and-auxiliary-acl.md),
@@ -75,7 +79,11 @@ describe.
   `AuxiliaryAccessUpdated`, and GroupcastTesting with the group-message
   outcome events. Mounting part of it would advertise a cluster that does not
   work; it stays an open item with its parts named in the findings.
-- **Sending group messages.** There is no controller role (a scope decision,
+- **Sending group messages** — built since
+  [ADR 0020](./0020-commissioner-and-controller-role.md) stage 5 (wave 20,
+  `a3cc6dda`): `groups/counter.go` (`GroupDataCounterKey`),
+  `groups/sender.go` (`Sender`), `binding/manager.go` (`GroupSender`). At
+  the time: there is no controller role (a scope decision,
   `docs/matterjs-comparison.md`), so no node-global group data counter and no
   outbound group session.
 - **ScenesManagement** stays the stub (`BD-Matter-P2-D18`). matter.js couples

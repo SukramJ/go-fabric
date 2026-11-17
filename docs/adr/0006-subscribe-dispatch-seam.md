@@ -6,14 +6,16 @@
 > module's root; the decision itself is unchanged.
 
 
-- **Status**: accepted
+- **Status**: accepted. Note (2026-11-18, review II, R2-P6-doc-3012): the
+  style template it names was OpenCCU-Loom's ADR 0031, which is
+  [ADR 0002](./0002-im-opcode-dispatch-seam.md) here.
 - **Date**: 2026-06-16
 - **Related**:
   `bridge/subscribe.go` (`handleSubscribeRequest`),
   `bridge/subscribe_dispatch.go`,
-  `docs/adr/0031-im-opcode-dispatch-seam.md` (style template),
+  [ADR 0002](./0002-im-opcode-dispatch-seam.md) (style template),
   the analysis item Area 7 in
-  `notes/audits/architecture-reassessment-2026-06-15.md`,
+  [`notes/audits/architecture-reassessment-2026-06-15.md`](https://github.com/SukramJ/openccu-loom/blob/main/notes/audits/architecture-reassessment-2026-06-15.md) (OpenCCU-Loom),
   [matter.js as the Matter gold standard](../../CLAUDE.md)
 
 ## Context

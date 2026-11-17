@@ -1,6 +1,14 @@
 # ADR 0011 — Certifiability is a goal; certification is not pursued
 
-- **Status**: Accepted
+- **Status**: Accepted. Note (2026-11-18, review II, R2-P6-doc-3080): the last
+  Consequences bullet's scope boundaries are superseded in part — the
+  controller and commissioner role by
+  [ADR 0020](./0020-commissioner-and-controller-role.md), Bluetooth by
+  [ADR 0024](./0024-ble-commissioning-in-the-controller.md) (the
+  commissioner) and [ADR 0031](./0031-ble-and-wifi-provisioning-on-the-device-side.md)
+  (the device side), Thread by
+  [ADR 0027](./0027-thread-border-router-over-otbr-rest.md) (a border-router
+  client); the Thread radio boundary stands (ADR 0031).
 - **Date**: 2026-10-05
 - **Supersedes**: the scope statement "no CSA certification" wherever it was
   read as "certification conformance does not matter here"

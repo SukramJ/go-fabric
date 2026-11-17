@@ -18,6 +18,15 @@
   `controller/*` composing its role (principle 2), not a second facade:
   `node/controllernode` and the own node are gone (`layers.json` lost the
   entry), and `bridge` and `controller/...` stay peers.
+  Note (2026-11-18, review II, R2-P6-doc-3012, -3084): principle 3's
+  `contract/devicetype_names_gen.go` was deleted in `2043f377` (#367).
+  Principle 7: the persistence seam is `store.Port` (`store/port.go`) —
+  `store.Store` is its SQLite implementation — and its second
+  implementation is `store/memstore` (phase 21a, `e1b2bff8`); the two
+  residues it names are still file-based (`cluster/core/ota_requestor_query.go`,
+  `controller/dcl/snapshot/fetch.go`). Principle 9: the metrics hook
+  (`contract.Metrics`, `contract/metrics.go`) and the diagnostic event
+  ring (`diagevent/`) exist.
 - **Date**: 2026-10-20
 - **Related**: [ADR 0025 — design principles of the facade](./0025-facade-design-principles.md),
   [ADR 0018 — the device layer and the node facade](./0018-device-layer-and-node-facade.md),

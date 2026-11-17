@@ -1,7 +1,12 @@
 # ADR 0018 — A device layer (`device/`) generated from the device-type model, and a node facade, as matter.js's `devices/`, `endpoints/` and `ServerNode`
 
 - **Status**: Accepted (2026-10-11; wave 6 of
-  [`../concept-matter-1.6.1-and-device-layer.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-matter-1.6.1-and-device-layer.md), phase 4)
+  [`../concept-matter-1.6.1-and-device-layer.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-matter-1.6.1-and-device-layer.md), phase 4).
+  Note (2026-11-18, review II, R2-P6-doc-3076, -3317): `device.WithServer`
+  was removed in v0.16.0; a host's own server is declared with
+  `device.HostServer` (`device/options.go`). LevelControl and the other
+  clusters `device/defaults.go` lists gained a self-held default server
+  (CHANGELOG v0.10.0, brief BX1).
 - **Date**: 2026-10-08, accepted 2026-10-11
 - **Related**:
   [ADR 0016 — device type validation](./0016-device-type-validation.md),

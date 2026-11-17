@@ -1,6 +1,12 @@
 # ADR 0010 — Groupcast and the AccessControl Auxiliary ACL on the root, as matter.js installs them
 
-- **Status**: Accepted
+- **Status**: Accepted. Note (2026-11-18, review II, R2-P6-doc-3079): Sender
+  was added by [ADR 0020](./0020-commissioner-and-controller-role.md)
+  stage 5 (wave 20, brief AN): the root's Groupcast advertises Listener,
+  Sender and PerGroup (`cluster/core/groupcast.go`, `Groupcast`) and keeps
+  sender-only memberships, and the module sends group messages
+  (`groups/sender.go`, `Sender`). The FeatureMap `0x05` and "minus
+  Sender" below describe the root before that.
 - **Date**: 2026-10-04
 - **Builds on**: [ADR 0009 — A real Groups server and group message delivery](./0009-groups-and-group-messaging.md)
   (which deferred Groupcast)

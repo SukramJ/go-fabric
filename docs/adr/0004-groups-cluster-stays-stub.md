@@ -15,7 +15,7 @@
   `notes/parity/by_design.md` (BD-Matter-P2-D19, L00-BD-Groups),
   `cluster/wire/groups.go`,
   the analysis item Area 7 [W3]/[P2] in
-  `notes/audits/architecture-analysis-2026-06-15.md`,
+  [`notes/audits/architecture-analysis-2026-06-15.md`](https://github.com/SukramJ/openccu-loom/blob/main/notes/audits/architecture-analysis-2026-06-15.md) (OpenCCU-Loom),
   [matter.js as the Matter gold standard](../../CLAUDE.md)
 
 ## Context

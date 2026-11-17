@@ -1,6 +1,8 @@
 # ADR 0012 — A real ScenesManagement server on the bridged lights
 
-- **Status**: Accepted
+- **Status**: Accepted. Note (2026-11-18, review II, R2-P6-doc-3076):
+  `endpoint.Config.Scenes` is deprecated for `endpoint.Config.Persistence`
+  (`endpoint/assembler.go`), which persists the scene tables the same way.
 - **Date**: 2026-10-05
 - **Supersedes**: the ScenesManagement bullet of
   [ADR 0009](./0009-groups-and-group-messaging.md) ("ScenesManagement stays
