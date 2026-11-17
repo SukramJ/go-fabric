@@ -42,7 +42,11 @@ const pingMaxRetransmissions = 2
 // failed ping does not count as a lost peer.
 //
 // Its purpose is per-address reachability in a host — go-fabric-ui's ping
-// measures each address of [Record].Addresses with it. An address that
+// measures each address of [Record].Addresses with it. addr is not checked
+// against the record: the session's traffic goes to whatever address the
+// caller names, so a host that takes the address from outside — a UI
+// client's request — passes only addresses of [Record].Addresses (review
+// II, R2-P6-sec-2361). An address that
 // does not answer is [ErrUnreachable], naming addr; a node not yet
 // commissioned is [ErrNotCommissioned], one without a session
 // [ErrNoSession], a closed one [ErrClosed]; the end of ctx is ctx's error.
