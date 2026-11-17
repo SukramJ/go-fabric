@@ -219,3 +219,28 @@ func wholeCopy(body *ast.BlockStmt, sel *ast.SelectorExpr) bool {
 	})
 	return found
 }
+
+// TestQueryUpdatesReturnsTheProductFailures (review II, R2-P6-err-1912,
+// decision 217): QueryUpdates and CheckForUpdates return the joined
+// failures of the products whose check failed beside
+// the updates the other products found; nil only when all succeeded.
+func TestQueryUpdatesReturnsTheProductFailures(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	first, second := errors.New("product fff1-8000 failed"), errors.New("product fff1-8001 failed")
+	found := []PeerUpdate{{Peer: testPeer}}
+	r.m.query = func(context.Context, *client.Node, bool) ([]PeerUpdate, bool, error) {
+		return found, true, errors.Join(first, second)
+	}
+	got, err := r.m.QueryUpdates(context.Background(), nil, true)
+	if !errors.Is(err, first) || !errors.Is(err, second) || len(got) != 1 {
+		t.Fatalf("QueryUpdates = %v, %v; want the update found and both failures", got, err)
+	}
+	if err := r.m.CheckForUpdates(context.Background()); !errors.Is(err, first) || !errors.Is(err, second) {
+		t.Fatalf("CheckForUpdates = %v; want both failures", err)
+	}
+	r.m.query = func(context.Context, *client.Node, bool) ([]PeerUpdate, bool, error) { return found, true, nil }
+	if _, err := r.m.QueryUpdates(context.Background(), nil, true); err != nil {
+		t.Fatalf("QueryUpdates with every product checked: %v", err)
+	}
+}

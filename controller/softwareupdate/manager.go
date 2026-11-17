@@ -300,6 +300,9 @@ type Manager struct {
 	// check is the timers' update check; nil is checkForUpdates. A test
 	// seam.
 	check func(ctx context.Context) error
+	// query stands in for queryUpdates; nil is queryUpdates. A test seam:
+	// a product check that fails needs a commissioned node.
+	query func(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, bool, error)
 	// obs are the observers of [Manager.Observe], with their own lock.
 	obs observers
 	// bdxSession, when set, stands in for the BDX responder's session
@@ -869,16 +872,16 @@ func (m *Manager) storedCandidates(ctx context.Context, vid, pid uint16, version
 
 // CheckForUpdates checks every node for updates, stored images included,
 // and purges the stored images no node needs — checkForUpdates (:471-474).
-// It returns nil: a product whose check failed is logged and passed over,
-// and the failures are the Err of the [UpdateCheckFinished] event, as for
-// [Manager.QueryUpdates].
+// A product whose check failed is logged and passed over, the others are
+// still checked and the purge still runs; the error joins the failures of
+// those products (errors.Join), as [Manager.QueryUpdates] returns them,
+// and is nil only when every product's check succeeded (review II,
+// R2-P6-err-1912).
 func (m *Manager) CheckForUpdates(ctx context.Context) error {
-	_ = m.checkForUpdates(ctx)
-	return nil
+	return m.checkForUpdates(ctx)
 }
 
-// checkForUpdates is CheckForUpdates; it returns the failures of the
-// products whose check failed.
+// checkForUpdates is CheckForUpdates.
 func (m *Manager) checkForUpdates(ctx context.Context) error {
 	_, failed := m.queryUpdatesAndReport(ctx, nil, true)
 	m.cleanupObsoleteUpdates(ctx)
@@ -935,18 +938,24 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 // QueryUpdates checks every node, or only, for updates over the ledgers
 // and — with includeStored — the stored images, and returns the nodes it
 // found one for — queryUpdates (:559-623). A check the manager ran (it
-// was not suppressed) ends with an [UpdateCheckFinished] event. The error
-// result is nil: a product whose check failed is logged and passed over,
-// and the failures are that event's Err (review II, R2-P6-err-1912).
+// was not suppressed) ends with an [UpdateCheckFinished] event. A product
+// whose check failed is logged and passed over and the others are still
+// checked: the nodes returned are those of the products that succeeded,
+// and the error joins the failures (errors.Join; the event's Err is the
+// same error). It is nil only when every product's check succeeded, so a
+// caller that treats any error as fatal discards the updates found
+// besides (review II, R2-P6-err-1912).
 func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, error) {
-	out, _ := m.queryUpdatesAndReport(ctx, only, includeStored)
-	return out, nil
+	return m.queryUpdatesAndReport(ctx, only, includeStored)
 }
 
-// queryUpdatesAndReport is QueryUpdates with the failures of the products
-// whose check failed.
+// queryUpdatesAndReport is QueryUpdates.
 func (m *Manager) queryUpdatesAndReport(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, error) {
-	out, ran, failed := m.queryUpdates(ctx, only, includeStored)
+	query := m.queryUpdates
+	if m.query != nil {
+		query = m.query
+	}
+	out, ran, failed := query(ctx, only, includeStored)
 	if ran {
 		ev := UpdateEvent{Kind: UpdateCheckFinished, Updates: slices.Clone(out), Err: failed}
 		if only != nil {
