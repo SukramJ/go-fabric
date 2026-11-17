@@ -4,6 +4,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -186,5 +187,29 @@ func TestParseSnapshot(t *testing.T) {
 	}
 	if _, err := write(filepath.Join(dir, "definition_gen.go"), &output{Package: "p"}); err == nil {
 		t.Error("write below a file succeeded")
+	}
+}
+
+// TestEmitWritesNothingWhenAClusterFails: a run whose second cluster fails
+// to generate leaves the output directory untouched — the first cluster's
+// package is not written either (R2-P6-err-2709).
+func TestEmitWritesNothingWhenAClusterFails(t *testing.T) {
+	t.Parallel()
+	s, err := parseSnapshot([]byte(`{"matter":{"revision":"1.6.1","sourceCommit":"0123456789"},"clusters":[
+		{"id":1,"name":"A","attributes":[],"commands":[],"events":[]},
+		{"id":2,"name":"B","attributes":[{"id":0,"name":"X","effective":{"type":"t","metatype":"weird"}}],"commands":[],"events":[]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := emit(io.Discard, dir, s, []string{"A", "B"}); err == nil || !strings.Contains(err.Error(), "unsupported metatype") {
+		t.Fatalf("emit = %v, want B's refusal", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("the output directory holds %d entries after a failed run (first %s)", len(entries), entries[0].Name())
 	}
 }

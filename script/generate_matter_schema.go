@@ -476,6 +476,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s (SHA-256 %s)\n", provenanceFile, snapshotSHA256)
+
+	// Every table generated: only now does a file change on disk.
+	if err := commitStaged(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
 }
 
 const fileHeaderTpl = `// SPDX-License-Identifier: Apache-2.0
@@ -613,7 +619,17 @@ func writeProvenanceFile(sha256hex string) error {
 	return writeIfChanged(provenanceFile, buf.Bytes())
 }
 
-// writeIfChanged gofmts content and writes it to path only when the result
+// staged holds the files a run generated, written only once every table
+// generated (commitStaged): a failure at a later table must not leave the
+// earlier ones regenerated beside stale ones (R2-P6-err-2709).
+var staged []stagedFile
+
+type stagedFile struct {
+	path    string
+	content []byte
+}
+
+// writeIfChanged gofmts content and stages it for path when the result
 // differs from what is on disk, keeping file mtimes stable on repeated runs.
 //
 // The formatting pass is part of the generator rather than a separate step
@@ -632,7 +648,61 @@ func writeIfChanged(path string, content []byte) error {
 		fmt.Printf("  (unchanged: %s)\n", path)
 		return nil
 	}
-	return os.WriteFile(path, content, 0o644)
+	staged = append(staged, stagedFile{path: path, content: content})
+	return nil
+}
+
+// commitStaged writes every staged file: each into a temporary file beside
+// it first, then all renamed into place, so an interrupted run leaves a
+// file old or new, never truncated, and a failed write leaves every file
+// as it was.
+func commitStaged() error {
+	tmps := make([]string, 0, len(staged))
+	removeAll := func() {
+		for _, tmp := range tmps {
+			_ = os.Remove(tmp)
+		}
+	}
+	for _, f := range staged {
+		tmp, err := writeTemp(f.path, f.content)
+		if err != nil {
+			removeAll()
+			return fmt.Errorf("write %s: %w", f.path, err)
+		}
+		tmps = append(tmps, tmp)
+	}
+	for i, f := range staged {
+		if err := os.Rename(tmps[i], f.path); err != nil {
+			removeAll()
+			return fmt.Errorf("rename %s: %w", f.path, err)
+		}
+	}
+	return nil
+}
+
+// writeTemp writes content into a new temporary file in path's directory,
+// with the mode of the file at path (0o644 for a new one).
+func writeTemp(path string, content []byte) (string, error) {
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return "", err
+	}
+	_, err = f.Write(content)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), mode)
+	}
+	if err != nil {
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	return f.Name(), nil
 }
 
 // serverClusterIDs returns dt's server-cluster requirements in ascending ID

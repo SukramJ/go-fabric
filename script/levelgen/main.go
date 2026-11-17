@@ -11,7 +11,9 @@
 // levelgen builds examples/reference-bridge (after writing levels_gen.go,
 // which the build needs) and runs it with --dump-surface --spec-level
 // <level> for every level below the pin. It imports neither schema nor
-// surface itself, so it runs while levels_gen.go is missing or stale.
+// surface itself, so it runs while levels_gen.go is missing or stale. When
+// the measurement or the doc fails, levels_gen.go is put back as it was:
+// a failed run leaves both files as they were (R2-P6-err-2709).
 //
 //	go run ./script/levelgen          # from the module root
 //	go run ./script/levelgen -doc=false
@@ -51,7 +53,7 @@ func main() {
 	}
 }
 
-func run(doc bool) error {
+func run(doc bool) (err error) {
 	files, err := leveltable.Load(levelsDir)
 	if err != nil {
 		return err
@@ -67,12 +69,29 @@ func run(doc bool) error {
 	if err != nil {
 		return err
 	}
+	prev, prevErr := os.ReadFile(goPath)
 	if err := writeIfChanged(goPath, src); err != nil {
 		return err
 	}
 	if !doc {
 		return nil
 	}
+	defer func() {
+		if err == nil {
+			return
+		}
+		// The table was written for the daemon build; the doc did not
+		// follow, so the table goes back to what it was.
+		var rerr error
+		if prevErr == nil {
+			rerr = writeIfChanged(goPath, prev)
+		} else {
+			rerr = os.Remove(goPath)
+		}
+		if rerr != nil {
+			err = fmt.Errorf("%w; restoring %s: %w", err, goPath, rerr)
+		}
+	}()
 	internal, err := measureInternal(files)
 	if err != nil {
 		return err
@@ -179,5 +198,34 @@ func writeIfChanged(path string, content []byte) error {
 		fmt.Printf("  (unchanged: %s)\n", path)
 		return nil
 	}
-	return os.WriteFile(path, content, 0o600) //nolint:gosec // G703: the generator's own fixed output paths
+	return writeAtomic(path, content)
+}
+
+// writeAtomic replaces path with content through a temporary file beside
+// it and a rename, so an interrupted write leaves the old file or the new
+// one, never a truncated one (R2-P6-err-2709). The file keeps the mode of
+// the one it replaces, 0o644 for a new one.
+func writeAtomic(path string, content []byte) error {
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(content)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), mode)
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), path)
+	}
+	if err != nil {
+		_ = os.Remove(f.Name())
+	}
+	return err
 }

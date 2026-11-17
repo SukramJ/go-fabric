@@ -61,7 +61,7 @@ func synthSnapshotFeatures(attributes, commands, features string) string {
 
 // runGenerator writes snap into a fresh tree and runs the generator over
 // it; it returns the tree and the generator's combined output.
-func runGenerator(t *testing.T, snap string) (root string, out string, err error) {
+func runGenerator(t *testing.T, snap string) (root, out string, err error) {
 	t.Helper()
 	root = t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "parity"), 0o750); err != nil {
@@ -166,5 +166,46 @@ func TestGeneratorRefusesAFeatureWithoutAUsableBit(t *testing.T) {
 	}
 	if rows := tableRows(readGenerated(t, root, "devicetype_requirements_gen.go"), "clusterFeatures"); !strings.Contains(rows, `{Name: "F", Bit: 31, Title: "Eff"}`) {
 		t.Errorf("clusterFeatures lacks bit 31:\n%s", rows)
+	}
+}
+
+// TestGeneratorWritesNothingWhenItFails: a generation that fails at a later
+// table leaves every file as it was — none of the earlier tables is
+// written (R2-P6-err-2709). The snapshot fails at the attribute order,
+// after the cluster, access, timed and invoke tables.
+func TestGeneratorWritesNothingWhenItFails(t *testing.T) {
+	t.Parallel()
+	snap := strings.Replace(synthSnapshot(``, ``), `"globalAttributeOrder":[65533]`, `"globalAttributeOrder":[]`, 1)
+	root := t.TempDir()
+	for dir, files := range map[string]map[string]string{
+		"parity": {"schema.json": snap},
+		"schema": {"clusters.go": "old clusters\n"},
+	} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		for name, content := range files {
+			if err := os.WriteFile(filepath.Join(root, dir, name), []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	out, err := exec.Command(schemaGenerator(t), "-root", root).CombinedOutput() //nolint:gosec // G204: the generator built above
+	if err == nil || !strings.Contains(string(out), "globalAttributeOrder") {
+		t.Fatalf("generator: %v, want the attribute order's refusal\n%s", err, out)
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "schema"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if len(names) != 1 || names[0] != "clusters.go" {
+		t.Errorf("schema/ holds %v after a failed run, want only the old clusters.go", names)
+	}
+	if got := readGenerated(t, root, "clusters.go"); got != "old clusters\n" {
+		t.Errorf("clusters.go was rewritten by a failed run:\n%.200s", got)
 	}
 }
