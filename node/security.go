@@ -86,6 +86,9 @@ type caseIdentities struct {
 	// claims hands each resumption id to one resume at a time
 	// ([resumeClaims]; owner decision 231).
 	claims resumeClaims
+	// testAfterStake, a test seam, runs in a responder's install right
+	// after its stake was taken; nil outside tests.
+	testAfterStake func()
 
 	// mu guards byIdx and latest.
 	mu     sync.RWMutex
@@ -893,6 +896,19 @@ func (h *handshakeStake) of(id uint16) operational.Stake {
 	return h.stake
 }
 
+// genOf is the load of fabric's identity the handshake answers under, 0
+// when the handshake resolved another fabric or none: generations are one
+// counter over every fabric, so another fabric's would refuse a good
+// session (review II, R2-P6-sec-2412).
+func (h *handshakeStake) genOf(fabric uint8) uint64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.fabric != fabric {
+		return 0
+	}
+	return h.gen
+}
+
 // release releases the stake when it is the one of id, the id the
 // handshake announced.
 func (h *handshakeStake) release(id uint16) {
@@ -996,11 +1012,18 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 				presented = info.PresentedResumptionID
 			}
 		}
-		entry, openErr := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
+		// Admitted under the load the handshake answered under: an update
+		// that lands after the stake was taken refuses the install
+		// (review II, R2-P6-sec-2412).
+		entry, openErr := ids.admitSessionAt(sessions, fabricIndex, held.genOf(fabricIndex), func() (*operational.Entry, error) {
 			// The install takes this handshake's stake, not the bare id:
 			// a stake an allocation at a full table took over installs
 			// nothing (operational.ErrStakeLost, N3-findev-1).
-			return sessions.OpenFromSigmaWithStake(held.of(effectiveID), fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
+			stake := held.of(effectiveID)
+			if ids.testAfterStake != nil {
+				ids.testAfterStake()
+			}
+			return sessions.OpenFromSigmaWithStake(stake, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
 		})
 		if openErr != nil {
 			held.release(effectiveID)

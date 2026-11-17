@@ -123,3 +123,47 @@ func TestCASEHandshakeWithinOneIdentityIsAdmitted(t *testing.T) {
 		t.Fatalf("OnEstablished: %v", err)
 	}
 }
+
+// TestCASEResponderRefusesASessionWhoseUpdateFollowsItsStake (review II,
+// R2-P6-sec-2412): an UpdateNOC that lands after the responder took its
+// stake — the identity loaded again and the fabric's sessions swept before
+// the session is installed — refuses the install: the admission compares
+// the load the handshake answered under, not only that the fabric exists.
+func TestCASEResponderRefusesASessionWhoseUpdateFollowsItsStake(t *testing.T) {
+	t.Parallel()
+	fx := newCaseFabricFixture(t)
+	st := testStore(t)
+	sessions := operational.NewManager(st)
+	adapter, err := buildCaseAdapter(sessions, fx.ids, nil, slog.New(slog.DiscardHandler), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initiator, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
+		Identity: fx.peer, Verifier: fx.verifier, SessionID: 0x1001,
+		PeerNodeID: fx.local.NodeID, RootPublicKey: fx.root,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sigma1, err := initiator.GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, sigma2, err := adapter.ProcessSigma1(sigma1)
+	if err != nil {
+		t.Fatalf("ProcessSigma1: %v", err)
+	}
+	sigma3, err := initiator.ProcessSigma2Bytes(sigma2)
+	if err != nil {
+		t.Fatalf("ProcessSigma2: %v", err)
+	}
+	fx.ids.testAfterStake = func() { fx.updateIdentity(sessions) }
+	if _, _, err := adapter.ProcessSigma3(sigma3); err == nil {
+		t.Fatal("Sigma3 completed although an update landed after its stake")
+	}
+	for _, s := range sessions.Sessions() {
+		if s.FabricIndex == 1 {
+			t.Fatalf("a session made under the replaced identity is open: %+v", s)
+		}
+	}
+}
