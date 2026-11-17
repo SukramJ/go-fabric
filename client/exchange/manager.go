@@ -1241,7 +1241,7 @@ func busyWait(running *Exchange) uint16 {
 // handshake bound does not count; the running handshake continues.
 // connectedhomeip answers a Sigma1 that meets a running handshake so
 // (src/protocols/secure_channel/CASEServer.cpp:85-122,
-// StatusReport.cpp:112-132 at 6170af84); matter.js's CASE server has no
+// StatusReport.cpp:112-130 at 6170af84); matter.js's CASE server has no
 // such bound (packages/protocol/src/session/case/CaseServer.ts:61-64 at
 // db021da0). The wait for the report's acknowledgement is bounded by
 // [inboundUnsecuredAckWaitLimit] (review II, R2-P6-par-2902).
