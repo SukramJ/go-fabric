@@ -168,7 +168,7 @@ func (k *connection) onReply(typ uint16, m *wire.AddressHandle, svc *wire.Blueto
 		o.done <- *r
 	}
 	if overrun {
-		k.log.Info("ble.esphome.gatt_database_too_large", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.Int("bound", maxGATTAttributes))
+		k.log.Info("ble.esphome.gatt_database_too_large", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.Int("max", maxGATTAttributes))
 		k.endLocally()
 	}
 }
@@ -448,7 +448,7 @@ func (k *connection) onNotify(handle uint32, data []byte) {
 	if len(k.queue) >= maxQueuedIndications {
 		k.queue = nil
 		k.mu.Unlock()
-		k.log.Info("ble.esphome.indications_overrun", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.Int("bound", maxQueuedIndications))
+		k.log.Info("ble.esphome.indications_overrun", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.Int("max", maxQueuedIndications))
 		k.endLocally()
 		return
 	}

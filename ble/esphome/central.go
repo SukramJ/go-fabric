@@ -370,7 +370,7 @@ func (c *Central) shedSightingsLocked() {
 	for _, x := range all[:len(all)-keep] {
 		delete(c.sightings, x.addr)
 	}
-	c.log.Debug("ble.esphome.sightings_shed", slog.Int("kept", keep), slog.Int("bound", maxSightings))
+	c.log.Debug("ble.esphome.sightings_shed", slog.Int("count", keep), slog.Int("max", maxSightings))
 }
 
 // forgetProxy drops a proxy's reports when its connection ends: a
