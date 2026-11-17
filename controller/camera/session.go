@@ -8,7 +8,9 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -188,7 +190,11 @@ type Session struct {
 // candidate and ICE server text; a camera that signals past either bound
 // while the host does not read ends the session: Signals closes at once,
 // without the signals it held, and the end is announced as
-// [EndSignalOverflow] after an EndSession to the camera.
+// [EndSignalOverflow] after an EndSession to the camera. Once the session
+// ended otherwise, what the host has not read within ten seconds of the
+// end — the camera's End among it — is discarded and Signals closes
+// (review II, R2-P6-bound-2206): a host that reads its Signals gets every
+// signal, and one that dropped its Session holds nothing past the grace.
 func (s *Session) Signals() <-chan Signal { return s.box.out }
 
 // ProvideAnswer sends the host's SDP answer to a camera's Offer
@@ -312,6 +318,16 @@ const (
 	signalMailboxBytes = 1 << 20
 )
 
+// endedSignalsGrace is how long an ended session's box still hands what
+// it holds to a reader before it discards the rest and its pump ends. The
+// module's own choice (neither reference queues signals per session): a
+// host that reads its Signals takes what the camera sent before the end —
+// the End itself, typically — within milliseconds; ten seconds is the
+// device cleanup budget, the time this module gives any teardown. A host
+// that dropped its Session costs one goroutine and its held signals for
+// that long, not until the service closes (review II, R2-P6-bound-2206).
+const endedSignalsGrace = deviceCleanupBudget
+
 // signalBytes is a signal's size against signalMailboxBytes: its SDP, its
 // candidates as a send counts them, and the ICE servers an Offer carries.
 func signalBytes(sig Signal) int {
@@ -363,10 +379,17 @@ type mailbox struct {
 	// what it holds and ends.
 	abandoned chan struct{}
 	abandon   sync.Once
+	// ended closes when the session ended: the pump offers what it holds
+	// for endedSignalsGrace on clk, then drops the rest and ends.
+	ended chan struct{}
+	end   sync.Once
+	clk   clock.Clock
 }
 
-func newMailbox(life context.Context) *mailbox {
-	b := &mailbox{wake: make(chan struct{}, 1), out: make(chan Signal), done: make(chan struct{}), abandoned: make(chan struct{})}
+// newMailbox is a box whose pump runs until life ends at the latest; clk
+// (nil: the system clock) times the grace of an ended session.
+func newMailbox(life context.Context, clk clock.Clock) *mailbox {
+	b := &mailbox{wake: make(chan struct{}, 1), out: make(chan Signal), done: make(chan struct{}), abandoned: make(chan struct{}), ended: make(chan struct{}), clk: clock.Or(clk)}
 	go b.pump(life)
 	return b
 }
@@ -406,10 +429,13 @@ func (b *mailbox) handed(sig Signal) {
 	b.mu.Unlock()
 }
 
+// close ends the session's box: it takes nothing more, hands what it
+// holds to a reader for endedSignalsGrace, then discards the rest.
 func (b *mailbox) close() {
 	b.mu.Lock()
 	b.closed = true
 	b.mu.Unlock()
+	b.end.Do(func() { close(b.ended) })
 	b.notify()
 }
 
@@ -432,20 +458,41 @@ func (b *mailbox) notify() {
 }
 
 // pump hands the queued signals on in order and closes out once the box
-// is closed and drained, discarded, or the service's life ended.
+// is closed and drained, discarded, ended for endedSignalsGrace, or the
+// service's life ended. What it did not hand on is dropped.
 func (b *mailbox) pump(life context.Context) {
 	defer close(b.done)
 	defer close(b.out)
+	defer func() {
+		b.mu.Lock()
+		b.queue, b.held, b.heldBytes = nil, 0, 0
+		b.mu.Unlock()
+	}()
+	ended := b.ended
+	var grace <-chan time.Time
+	stop := func() bool { return false }
+	defer func() { stop() }()
+	// endGrace starts the grace once the session ended; ended is then
+	// no longer selected.
+	endGrace := func() {
+		t := b.clk.NewTimer(endedSignalsGrace)
+		grace, stop, ended = t.C(), t.Stop, nil
+	}
 	for {
 		b.mu.Lock()
 		queue := b.queue
 		b.queue = nil
 		closed := b.closed
 		b.mu.Unlock()
-		for i := range queue {
+		for i := 0; i < len(queue); {
 			select {
 			case b.out <- queue[i]:
 				b.handed(queue[i])
+				i++
+			case <-ended:
+				endGrace()
+			case <-grace:
+				return
 			case <-life.Done():
 				return
 			case <-b.abandoned:
@@ -460,6 +507,8 @@ func (b *mailbox) pump(life context.Context) {
 		}
 		select {
 		case <-b.wake:
+		case <-ended:
+			endGrace()
 		case <-life.Done():
 			return
 		case <-b.abandoned:
@@ -483,7 +532,7 @@ func (s *Service) StartStream(ctx context.Context, req StartRequest) (*Session, 
 	if err != nil {
 		return nil, err
 	}
-	sess := &Session{Node: req.Node, Endpoint: req.Endpoint, Owner: req.Owner, Key: req.Key, svc: s, t: args.t, box: newMailbox(s.life)} //nolint:contextcheck // the mailbox lives as long as the service, not the call
+	sess := &Session{Node: req.Node, Endpoint: req.Endpoint, Owner: req.Owner, Key: req.Key, svc: s, t: args.t, box: newMailbox(s.life, s.m.clk)} //nolint:contextcheck // the mailbox lives as long as the service, not the call
 	var registered *sessionKey
 	args.establishing = func(id uint16, life *lifecycle) {
 		k := sessionKey{args.t.nodeID, args.t.endpointID, id}
