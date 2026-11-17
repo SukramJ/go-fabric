@@ -9,13 +9,15 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	"github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
-// networkCommissioningClusterID is NetworkCommissioning (0x0031), whose
-// presence on the root decides CustomNetworkConfig for a remote node.
-const networkCommissioningClusterID uint32 = 0x0031
+// networkCommissioningClusterID is NetworkCommissioning, whose presence on
+// the root decides CustomNetworkConfig for a remote node: the generated
+// definition's id (review II, R2-P6-par-2360).
+const networkCommissioningClusterID = networkcommissioning.ClusterID
 
 // ConformanceStatus is the verdict of a [ConformanceReport].
 type ConformanceStatus int

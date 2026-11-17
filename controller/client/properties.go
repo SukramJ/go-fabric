@@ -18,6 +18,8 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	"github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/spec/powersource"
+	"github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -63,22 +65,19 @@ func (p Properties) Medium() peer.Medium {
 	return m
 }
 
-// Cluster and attribute ids the properties read. ThreadNetworkDiagnostics
-// and WiFiNetworkDiagnostics have no generated definition; their ids are
-// matter.js's (model/src/standard/elements/thread-network-diagnostics.element.ts:20,
-// :31-38, :288 and wi-fi-network-diagnostics.element.ts:20, :28 at
-// 0ceb202d), the clusters "ThreadNetworkDiagnostics" (0x0035) and
-// "WiFiNetworkDiagnostics" (0x0036) of parity/schema.json.
+// Cluster and attribute ids the properties read: the generated
+// definitions' (ADR 0013), so a regeneration carries them (review II,
+// R2-P6-par-2360).
 const (
-	threadDiagnostics            uint32 = 0x0035
-	threadAttrChannel            uint32 = 0x0000
-	threadAttrRoutingRole        uint32 = 0x0001
-	threadAttrNetworkName        uint32 = 0x0002
-	threadAttrPanID              uint32 = 0x0003
-	threadAttrExtendedPanID      uint32 = 0x0004
-	threadRoutingSleepyEndDevice        = 2
-	wifiDiagnostics              uint32 = 0x0036
-	wifiAttrBssid                uint32 = 0x0000
+	threadDiagnostics            = threadnetworkdiagnostics.ClusterID
+	threadAttrChannel            = threadnetworkdiagnostics.AttrChannel
+	threadAttrRoutingRole        = threadnetworkdiagnostics.AttrRoutingRole
+	threadAttrNetworkName        = threadnetworkdiagnostics.AttrNetworkName
+	threadAttrPanID              = threadnetworkdiagnostics.AttrPanId
+	threadAttrExtendedPanID      = threadnetworkdiagnostics.AttrExtendedPanId
+	threadRoutingSleepyEndDevice = uint64(threadnetworkdiagnostics.RoutingRoleSleepyEndDevice)
+	wifiDiagnostics              = wifinetworkdiagnostics.ClusterID
+	wifiAttrBssid                = wifinetworkdiagnostics.AttrBssid
 
 	aggregatorDeviceType    uint32 = 0x000E
 	genericSwitchDeviceType uint32 = 0x000F
