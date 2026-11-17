@@ -30,5 +30,9 @@
 // attribute is matter.js's message, verbatim; the write that brought it
 // already succeeded. The manager never closes a CASE session when a
 // binding goes: matter.js's reference counts of bound peers have no
-// consumer (BindingManager.ts:656-677) and are not ported.
+// consumer (BindingManager.ts:656-677) and are not ported. A peer the
+// manager itself created for an entry — the [Peers] set held none for the
+// node — is released when the last entry naming the node goes: its
+// connection process stops, and it leaves the set when it holds no session
+// (ahead of matter.js; review II, R2-P6-bound-2104).
 package binding

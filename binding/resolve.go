@@ -99,6 +99,8 @@ func (m *Manager) resolveAndEmit(it *item) {
 			return
 		}
 		addr := handshake.PeerAddress{FabricIndex: e.FabricIndex, NodeID: e.Node}
+		set, tracks := m.cfg.Peers.(peerSet)
+		creates := tracks && !set.Has(addr)
 		p, err := m.cfg.Peers.For(addr)
 		if err != nil || p == nil {
 			if err == nil {
@@ -106,6 +108,11 @@ func (m *Manager) resolveAndEmit(it *item) {
 			}
 			m.drop(reasonClientPeerFailed, it, slog.Any("err", err))
 			return
+		}
+		if creates {
+			m.stateMu.Lock()
+			m.created[p] = true
+			m.stateMu.Unlock()
 		}
 		res.Kind, res.Peer, res.Endpoint = KindClient, p, e.Endpoint
 		res.Interaction = interaction.ForPeer(p, m.cfg.Interaction)
@@ -335,7 +342,7 @@ func (m *Manager) establishClientKind(it *item, res Resolution) {
 		}
 	}()
 
-	pe := &pendingEntry{}
+	pe := &pendingEntry{peer: p}
 	online := func() { m.post(func() { m.onClientOnline(it, res, pe) }) }
 	rec := m.record(it.source)
 	m.stateMu.Lock()
@@ -477,12 +484,61 @@ func (m *Manager) disposeServer(source uint16) {
 	}
 }
 
+// releaseUnbound releases every peer the manager created whose node no
+// pending or established entry names any more: its connection process is
+// stopped, and the peer closed — out of the set — when it holds no
+// session; a peer with a session is left as it is, its session not closed
+// (see the package doc). It runs on the worker after every task, so an
+// entry that went — unregistered, its server detached, parked again — takes
+// its peer with it. Ahead of matter.js, whose BindingManager keeps the peer
+// it made for an entry (BindingManager.ts:584-585, #clearPending
+// :613-627 at db021da0) with the connection process and the resolution
+// that have no end of their own; the rule is this module's (review II,
+// R2-P6-bound-2104, TM R3.4).
+func (m *Manager) releaseUnbound() {
+	m.stateMu.Lock()
+	if len(m.created) == 0 {
+		m.stateMu.Unlock()
+		return
+	}
+	inUse := make(map[*peer.Peer]bool)
+	for _, rec := range m.records {
+		for _, pe := range rec.pending {
+			inUse[pe.peer] = true
+		}
+		for _, res := range rec.established {
+			if res.Peer != nil {
+				inUse[res.Peer] = true
+			}
+		}
+	}
+	var unbound []*peer.Peer
+	for p := range m.created {
+		if !inUse[p] {
+			delete(m.created, p)
+			unbound = append(unbound, p)
+		}
+	}
+	m.stateMu.Unlock()
+	for _, p := range unbound {
+		m.log.Debug("binding.peer.released", slog.Uint64("node_id", p.Address().NodeID), slog.Int("fabric_index", int(p.Address().FabricIndex)))
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			m.link.release(context.WithoutCancel(m.life), p)
+		}()
+	}
+}
+
 // peerLink is how the manager drives a peer: the peer's own methods,
 // replaced in the package's tests.
 type peerLink interface {
 	connect(ctx context.Context, p *peer.Peer) error
 	hasSession(p *peer.Peer) bool
 	observe(p *peer.Peer, sessionAdded func()) (stop func())
+	// release stops p's connection process and closes p when it holds no
+	// session (releaseUnbound).
+	release(ctx context.Context, p *peer.Peer)
 }
 
 // realLink is [peerLink] over client/peer: PeerSet.for(addr).connect()
@@ -495,6 +551,13 @@ func (realLink) connect(ctx context.Context, p *peer.Peer) error {
 }
 
 func (realLink) hasSession(p *peer.Peer) bool { return p.HasSession() }
+
+func (realLink) release(ctx context.Context, p *peer.Peer) {
+	p.Disconnect(ctx, nil)
+	if !p.HasSession() {
+		p.Close(ctx)
+	}
+}
 
 func (realLink) observe(p *peer.Peer, sessionAdded func()) func() {
 	return p.Observe(peer.Observer{SessionAdded: func(*exchange.Session) { sessionAdded() }})

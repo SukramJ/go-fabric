@@ -81,9 +81,18 @@ type Resolution struct {
 
 // Peers is where the manager takes the peer of a node entry from —
 // matter.js `node.peers.forAddress` (BindingManager.ts:333);
-// client/peer.Set satisfies it.
+// client/peer.Set satisfies it. A Peers that also reports whether it holds
+// a peer (`Has(handshake.PeerAddress) bool`, as client/peer.Set does) lets
+// the manager release the peers it created once no entry names their node
+// any more; with any other Peers it releases none.
 type Peers interface {
 	For(addr handshake.PeerAddress) (*peer.Peer, error)
+}
+
+// peerSet is the optional face of [Peers] that tells a peer the manager
+// creates from one the set already held.
+type peerSet interface {
+	Has(addr handshake.PeerAddress) bool
 }
 
 // GroupTarget sends to one group — the IM face of a group peer, matter.js
@@ -160,8 +169,12 @@ type item struct {
 }
 
 // pendingEntry is a client entry waiting for its peer's session; its
-// address identifies it (BindingManager.ts:30, :623-626).
-type pendingEntry struct{ cancel func() }
+// address identifies it (BindingManager.ts:30, :623-626). peer is the
+// peer it waits for.
+type pendingEntry struct {
+	cancel func()
+	peer   *peer.Peer
+}
 
 // record is the tracking of one source endpoint — matter.js ServerRecord
 // (BindingManager.ts:34-44). Its `groups` map, every registered group
@@ -238,6 +251,10 @@ type Manager struct {
 	// state is the worker's; stateMu lets Established read it.
 	stateMu sync.Mutex
 	records map[uint16]*record
+	// created are the peers the manager made for a client entry — the set
+	// held none for the node before (peerSet.Has) — until the last entry
+	// that names the node goes (releaseUnbound).
+	created map[*peer.Peer]bool
 }
 
 // New returns a manager over cfg. Its worker starts with the first work
@@ -250,7 +267,7 @@ func New(cfg Config) (*Manager, error) {
 	m := &Manager{
 		cfg: cfg, log: cfg.Logger, link: realLink{},
 		wake: make(chan struct{}, 1), attached: map[uint16]attachment{}, rechecks: map[uint8]bool{},
-		registered: map[regKey]*item{}, records: map[uint16]*record{},
+		registered: map[regKey]*item{}, records: map[uint16]*record{}, created: map[*peer.Peer]bool{},
 	}
 	if m.log == nil {
 		m.log = slog.New(slog.DiscardHandler)
@@ -289,6 +306,7 @@ func (m *Manager) run() {
 		m.queue = m.queue[1:]
 		m.mu.Unlock()
 		fn()
+		m.releaseUnbound()
 	}
 }
 

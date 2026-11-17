@@ -152,16 +152,37 @@ func (f *fakePeers) For(addr handshake.PeerAddress) (*peer.Peer, error) {
 	return p, nil
 }
 
+// Has reports whether For has handed out a peer for addr, as
+// client/peer.Set.Has does.
+func (f *fakePeers) Has(addr handshake.PeerAddress) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.peers[addr] != nil
+}
+
 // fakeLink is the peers' sessions and connection attempts.
 type fakeLink struct {
 	mu        sync.Mutex
 	sessions  map[*peer.Peer]bool
 	observers map[*peer.Peer][]*func()
 	connects  map[*peer.Peer]int
+	releases  map[*peer.Peer]int
 }
 
 func newFakeLink() *fakeLink {
-	return &fakeLink{sessions: map[*peer.Peer]bool{}, observers: map[*peer.Peer][]*func(){}, connects: map[*peer.Peer]int{}}
+	return &fakeLink{sessions: map[*peer.Peer]bool{}, observers: map[*peer.Peer][]*func(){}, connects: map[*peer.Peer]int{}, releases: map[*peer.Peer]int{}}
+}
+
+func (l *fakeLink) release(_ context.Context, p *peer.Peer) {
+	l.mu.Lock()
+	l.releases[p]++
+	l.mu.Unlock()
+}
+
+func (l *fakeLink) released(p *peer.Peer) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.releases[p]
 }
 
 func (l *fakeLink) connect(ctx context.Context, p *peer.Peer) error {
