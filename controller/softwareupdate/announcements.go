@@ -174,15 +174,16 @@ func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) err
 	if !ok {
 		return nil
 	}
-	cfg := a.m.cfg
-	record := otareq.ProviderLocation{ProviderNodeId: cfg.ProviderNodeID, Endpoint: cfg.ProviderEndpoint, FabricIndex: cfg.FabricIndex}
+	fabricIndex := a.m.cfg.FabricIndex
+	providerNodeID, providerEndpoint := a.m.provider()
+	record := otareq.ProviderLocation{ProviderNodeId: providerNodeID, Endpoint: providerEndpoint, FabricIndex: fabricIndex}
 	var existing *otareq.ProviderLocation
 	if ep := n.Endpoint(ota.endpoint); ep != nil {
 		if c := ep.Cluster(otareq.ClusterID); c != nil {
 			if v, err := c.Decoded(otareq.AttrDefaultOtaProviders); err == nil {
 				if list, ok := v.(spec.List[otareq.ProviderLocation]); ok {
 					for _, l := range list {
-						if l.FabricIndex == cfg.FabricIndex {
+						if l.FabricIndex == fabricIndex {
 							l := l
 							existing = &l
 							break
@@ -213,9 +214,9 @@ func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) err
 // endpoint (:266-292). A closed connection is logged and retried later;
 // any other failure is only logged, as matter.js's.
 func (a *announcements) announceOtaProvider(ctx context.Context, n *client.Node, endpoint uint16, reason otareq.AnnouncementReasonEnum) error { //nolint:unparam // the caller keeps matter.js's catch (SoftwareUpdateManager.ts:991-1025)
-	cfg := a.m.cfg
+	providerNodeID, providerEndpoint := a.m.provider()
 	req := otareq.AnnounceOtaProviderRequest{
-		ProviderNodeId: cfg.ProviderNodeID, VendorId: cfg.VendorID, AnnouncementReason: reason, Endpoint: cfg.ProviderEndpoint,
+		ProviderNodeId: providerNodeID, VendorId: a.m.cfg.VendorID, AnnouncementReason: reason, Endpoint: providerEndpoint,
 	}
 	_, err := n.Invoke(ctx, client.CommandAt(endpoint, otareq.ClusterID, otareq.CmdAnnounceOtaProvider), req, client.InvokeOptions{})
 	if err == nil {

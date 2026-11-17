@@ -60,7 +60,9 @@ func (m *Manager) ProviderConfig() ProviderConfig {
 }
 
 // SetBDX gives the manager the provider's BDX responder, once the
-// controller has built its provider (controller/ota.go openOTA).
+// controller has built its provider (controller/ota.go openOTA). It may
+// be called at any time; the manager reads it under its lock (review II,
+// R2-P6-conc-1913).
 func (m *Manager) SetBDX(r *bdx.Responder) {
 	m.mu.Lock()
 	m.cfg.BDX = r
