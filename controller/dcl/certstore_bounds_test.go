@@ -49,9 +49,14 @@ func TestCertificateUpdateListsBounded(t *testing.T) {
 		tree("/repos/project-chip/connectedhomeip/git/trees/master", entry("credentials", "tree", "/t/credentials"))
 		tree("/t/credentials", entry("development", "tree", "/t/dev"))
 		tree("/t/dev", entry("paa-root-certs", "tree", "/t/paa"), entry("cd-certs", "tree", "/t/cd"))
-		files := make([]map[string]any, maxGitHubFilesPerUpdate+100)
-		for i := range files {
-			files[i] = entry(fmt.Sprintf("f%d.der", i), "blob", fmt.Sprintf("/b/%d", i))
+		// Mirror files first: the loop skips them, and the cap does not
+		// count them (review II, R2-P6-bound-1911).
+		files := make([]map[string]any, 0, 2*maxGitHubFilesPerUpdate+100)
+		for i := range maxGitHubFilesPerUpdate {
+			files = append(files, entry(fmt.Sprintf("dcld_mirror_%d.der", i), "blob", fmt.Sprintf("/m/%d", i)))
+		}
+		for i := range maxGitHubFilesPerUpdate + 100 {
+			files = append(files, entry(fmt.Sprintf("f%d.der", i), "blob", fmt.Sprintf("/b/%d", i)))
 		}
 		tree("/t/paa", files...)
 		tree("/t/cd")
@@ -60,7 +65,7 @@ func TestCertificateUpdateListsBounded(t *testing.T) {
 			Client: f.client(), TestClient: f.client(), FetchTestCertificates: true, FetchGitHubCertificates: true,
 			GitHub: GitHubConfig{APIURL: gh.srv.URL, Timeout: 5 * time.Second}, Clock: newManualClock(), Logger: slog.New(log),
 		})
-		if n := gh.hitsPrefix("/b/"); n != maxGitHubFilesPerUpdate {
+		if n := gh.hitsPrefix("/b/"); n != maxGitHubFilesPerUpdate || gh.hitsPrefix("/m/") != 0 {
 			t.Fatalf("%d files fetched, want %d", n, maxGitHubFilesPerUpdate)
 		}
 		if !log.hasMessage("dcl.certificates.too_many_github_files") {

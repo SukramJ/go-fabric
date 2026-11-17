@@ -992,10 +992,8 @@ func (s *CertificateStore) fetchGitHubCertificates(ctx context.Context, force bo
 		s.logGitHubFetchFailure(ctx, "Failed to fetch certificates from GitHub", err, KindPAA)
 		return
 	}
-	for _, name := range s.capGitHubFiles(files, s.github.cfg.CertPath) {
-		if !strings.HasSuffix(name, ".der") || strings.HasPrefix(name, "dcld_mirror_") {
-			continue
-		}
+	paa := func(name string) bool { return !strings.HasPrefix(name, "dcld_mirror_") }
+	for _, name := range s.capGitHubFiles(files, s.github.cfg.CertPath, paa) {
 		if s.isClosed() {
 			return
 		}
@@ -1018,10 +1016,7 @@ func (s *CertificateStore) fetchGitHubCdSignerCertificates(ctx context.Context, 
 		s.logGitHubFetchFailure(ctx, "Failed to fetch CD signer certificates from GitHub", err, KindCDSigner)
 		return
 	}
-	for _, name := range s.capGitHubFiles(files, s.github.cfg.CDSignerCertPath) {
-		if !strings.HasSuffix(name, ".der") {
-			continue
-		}
+	for _, name := range s.capGitHubFiles(files, s.github.cfg.CDSignerCertPath, nil) {
 		if s.isClosed() {
 			return
 		}
@@ -1029,13 +1024,14 @@ func (s *CertificateStore) fetchGitHubCdSignerCertificates(ctx context.Context, 
 	}
 }
 
-// capGitHubFiles is files' .der entries up to maxGitHubFilesPerUpdate;
-// the rest is logged once and dropped.
-func (s *CertificateStore) capGitHubFiles(files []string, dir string) []string {
+// capGitHubFiles is files' .der entries that keep accepts (nil: all), up
+// to maxGitHubFilesPerUpdate — the cap counts only files that would be
+// fetched; the rest is logged once and dropped.
+func (s *CertificateStore) capGitHubFiles(files []string, dir string, keep func(string) bool) []string {
 	der := make([]string, 0, min(len(files), maxGitHubFilesPerUpdate))
 	skipped := 0
 	for _, name := range files {
-		if !strings.HasSuffix(name, ".der") {
+		if !strings.HasSuffix(name, ".der") || (keep != nil && !keep(name)) {
 			continue
 		}
 		if len(der) == maxGitHubFilesPerUpdate {
