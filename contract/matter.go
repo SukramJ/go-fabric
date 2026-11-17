@@ -971,7 +971,8 @@ type ChangeNotifier interface {
 // and therefore knows exactly which of its attributes moved. It reports
 // every change at once, whoever made it, as the matter.js Datasource
 // queues a notification for each committed change
-// (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476):
+// (packages/node/src/behavior/state/managed/Datasource.ts:1487-1492 at
+// db021da0; review II, R2-P6-doc-2906):
 // the host's OnChanged is subscribed here. The bridge subscribes to it at
 // reassembly for every bridged endpoint — to [AttributeReportNotifier]
 // instead when the server implements that — and on a fire it advances

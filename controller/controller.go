@@ -139,7 +139,7 @@ type Config struct {
 	HooksFor func(id string) client.Hooks
 	// ManualStart leaves the commissioned nodes stopped when New returns;
 	// false starts each, as matter.js's start connects them unless
-	// autoConnect is false (CommissioningController.ts:864-866). A
+	// autoConnect is false (CommissioningController.ts:878-880 at db021da0). A
 	// program that only pairs, or reads once, sets it.
 	ManualStart bool
 	// KeepOnboardingCodes keeps the QR or manual pairing code of every

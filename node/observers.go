@@ -39,7 +39,7 @@ type Observers struct {
 	// OnFabricAdded runs after an AddNOC installed a fabric and the
 	// facade rebuilt the fabric's CASE identity and announced its
 	// operational record. Mirrors matter.js FabricManager `events.added`
-	// (FabricManager.ts:209).
+	// (FabricManager.ts:216 at db021da0; review II, R2-P6-doc-2906).
 	OnFabricAdded func(FabricInfo)
 	// OnFabricRemoved runs after RemoveFabric (or the fail-safe rollback
 	// of an AddNOC) deleted a fabric and the facade's cleanup ran — for a

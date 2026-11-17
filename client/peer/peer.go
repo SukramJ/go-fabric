@@ -420,7 +420,8 @@ func (p *Peer) addSession(s *exchange.Session) {
 	// node opened from another address — carries the operational address
 	// with it: matter.js Peer.ts:161-163 observes
 	// MessageChannel.networkAddressChanged, which the socket swap of
-	// ExchangeManager.ts:425-431 emits (W4-ctlnet-02).
+	// ExchangeManager.ts:484-486 at db021da0 emits (W4-ctlnet-02;
+	// R2-P6-doc-2906).
 	s.OnAddressChanged(func(*net.UDPAddr) { p.followAddress(s) })
 	// Only a known medium pads the session's exchanges: the unknown
 	// fallback would inflate every exchange of a peer never characterised
@@ -697,7 +698,8 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 // unreachable (we removed our fabric from it, say), without the
 // CloseSession of a graceful close. Without a cause the sessions stay.
 // Mirrors matter.js Peer.disconnect (Peer.ts:504-527), whose
-// initiateForceClose marks each session lost (NodeSession.ts:349-352).
+// initiateForceClose marks each session lost (NodeSession.ts:379-381 at
+// db021da0; R2-P6-doc-2906).
 func (p *Peer) Disconnect(ctx context.Context, cause error) {
 	p.stopConnecting(ctx)
 	if cause != nil {

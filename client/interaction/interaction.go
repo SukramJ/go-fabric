@@ -193,7 +193,8 @@ func (c *Interaction) Session() *exchange.Session { return c.provider.Session() 
 // message with expected processing time ept: our retransmissions, ept and
 // the 5 s buffer, plus — with includeSending — the peer's retransmissions
 // back to us. Mirrors matter.js ClientInteraction.maximumPeerResponseTime
-// (ClientInteraction.ts:1249-1251), the provider's computation.
+// (packages/protocol/src/action/client/ClientInteraction.ts:1333-1334 at
+// db021da0), the provider's computation (review II, R2-P6-doc-2906).
 func (c *Interaction) MaximumPeerResponseTime(ept time.Duration, includeSending bool) time.Duration {
 	return c.provider.MaximumPeerResponseTime(ept, includeSending)
 }

@@ -106,7 +106,8 @@ func (s *SessionIntervals) apply(p *sessionparams.Parameters) {
 // PASE and CASE peer (PBKDFParamResponse tag 5, Sigma2's
 // responderSessionParams): the intervals of [Config.Sessions], the node's
 // MaxPathsPerInvoke and its TCP roles. Mirrors matter.js
-// SessionManager.sessionParameters (SessionManager.ts:351-360).
+// SessionManager.sessionParameters (SessionManager.ts:391-400 at
+// db021da0; review II, R2-P6-doc-2906).
 func (n *Node) SessionParameters() SessionParameters {
 	return *n.sec.responderParams
 }
