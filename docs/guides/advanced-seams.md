@@ -331,7 +331,8 @@ port of matterjs-server's `NetworkTopologyService`: `topology.Build`, a
 pure function over one `topology.Image` per node (the root endpoint's
 NetworkCommissioning, GeneralDiagnostics, ThreadNetworkDiagnostics and
 WiFiNetworkDiagnostics, read by `topology.ImageOf`), and `topology.Service`,
-which keeps it current — a 2 s debounce after a node's change, a 60 s
+which keeps it current — a 2 s debounce after a node's change (a burst
+of changes rebuilds at the latest five debounces after its first), a 60 s
 periodic rebuild, `Refresh` re-reading the diagnostics of every online
 Thread and Wi-Fi node (four at a time, 30 s at most, concurrent callers
 sharing one run) — and calls `OnChanged` observers only when the graph
@@ -369,8 +370,12 @@ svc.OnChanged(func(t topology.Topology) { /* push it */ })
 
 **Costs.** A node's change hook says that a report applied, not which
 cluster: every report schedules a debounced rebuild (matterjs-server
-filters to the four network clusters); the hash keeps an unchanged graph
-from the observers. The route-table edges of matterjs-server are not
+filters to the four network clusters), so a burst is bounded at five
+debounces, or a node that reports every second would hold every rebuild
+off until the periodic one; the hash keeps an unchanged graph from the
+observers. An extended address or RLOC16 two nodes claim resolves to
+neither (matterjs-server keeps the later claim): a neighbour naming it
+shows as `unknown_<EXTADDR>`. The route-table edges of matterjs-server are not
 built.
 
 **Further sources.** Nodes the controller has not commissioned join the
