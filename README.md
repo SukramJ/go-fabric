@@ -239,6 +239,11 @@ becomes permissible in:
 | `cluster/wire` ids that duplicate a generated constant (`ColorCtrl…`, `ColorHueDir…`, `ColorMoveMode…`, `ColorStepMode…`, `FanControl…`, `MatterEvent…`, `OperationalState…`, `RvcOperationalState…`, `Thermostat…`, `WindowCovering…`; CHANGELOG names each) | the `ClusterID` / `Attr…` / `Cmd…` / `Event…` / enum constant of `cluster/spec/<cluster>` | `v0.23.0` |
 | `cluster/wire.ThermostatCmdSetWeeklySchedule`, `ThermostatCmdGetWeeklySchedule`, `ThermostatCmdClearWeeklySchedule`, `WindowCoveringCmdGoToLiftValue`, `WindowCoveringCmdGoToTiltValue`, `GoToLiftValueRequest`, `GoToTiltValueRequest`, `DecodeGoToLiftValue`, `DecodeGoToTiltValue`, `ErrWindowCoveringMalformed` | none: the commands are not in the model the module serves | `v0.23.0` |
 | `cluster/spec.ServerConfig.DataVersion`, every server `Config.DataVersion` (and `levelcontrol.HeldConfig.DataVersion`), `MatterDataVersion` of `levelcontrol.Server`, `modeselect.Server`, `modebase.Server` | none: leave the field nil; the wire carries the endpoint's DataVersion for the cluster, or the server's own where it serves one | `v0.23.0` |
+| `im/subscription.Reporter`, `EventReporter`, `FlushReporter`, `Manager.SetEventReporter`, `Manager.SetFlushReporter` | `ReportSender` set with `Manager.SetReportSender`; a flush is a `Report` with `Flush` set | `v0.23.0` |
+| `im/subscription.Subscription.TakeDuePaths`, `Subscription.NothingSent` | `Report.Paths`; a `ReportSender` with nothing for the subscriber returns `NothingForSubscriber` | `v0.23.0` |
+| `bridge.Bridge.SubscriptionReporter`, `SubscriptionEventReporter`, `SubscriptionFlushReporter` | none needed: `Bridge.AttachSubscriptionManager` installs the bridge's sender; pass nil as `subscription.NewManager`'s reporter | `v0.23.0` |
+| `bridge/bridgetest.EstablishSubscriptionTarget`, `SubscriptionTarget`, `SubscriptionTarget.PeerCounter`, `ErrNoPeerCounter`, `ErrNoSubscriptionID`, `ErrNoPeer`, `ErrPeerCounterNotAnchored`, `ErrNotEstablished` | `bridgetest.Session.Subscribe` of the test `Commissioner` | `v0.23.0` |
+| `bridge.ErrAckWaitTimeout` | none: no function returns it | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
