@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -286,4 +288,30 @@ func TestManagerNodeDeleted(t *testing.T) {
 		t.Fatal("another node's state went with it")
 	}
 	r.m.NodeDeleted(Peer{FabricIndex: 9, NodeID: 9}) // never seen: no effect, no panic
+}
+
+// TestManagerNodeDeletedDisarmsWithoutAQueuedUpdate (review II,
+// R2-P6-bound-1914): a node armed for its reboot is disarmed when it is
+// deleted although no update of it is queued — its return deadline then
+// recovers nothing.
+func TestManagerNodeDeletedDisarmsWithoutAQueuedUpdate(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	var lost atomic.Int32
+	armer := peer.NewRebootResubscribeArmer(peer.RebootArmerContext{
+		Clock: clk, PeerLost: func(exchange.PeerAddress) { lost.Add(1) },
+		ClosePeerSessionsBefore: func(exchange.PeerAddress, time.Time) {}, CloseSubscriptions: func(exchange.PeerAddress) {},
+		Logger: slog.New(slog.DiscardHandler),
+	})
+	m, err := New(Config{Registry: &client.Registry{}, Images: NewImages(ImagesConfig{}), Clock: clk, Armer: armer, Logger: slog.New(slog.DiscardHandler)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(m.Close)
+	armer.Arm(testPeer, 0)
+	m.NodeDeleted(testPeer)
+	clk.Advance(peer.RebootReturnTimeout(0) + time.Minute)
+	if n := lost.Load(); n != 0 {
+		t.Fatalf("the deleted node's return deadline gave it up %d times; want it disarmed", n)
+	}
 }

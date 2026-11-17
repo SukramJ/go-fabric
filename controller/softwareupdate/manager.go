@@ -1430,8 +1430,9 @@ func (m *Manager) RemoveConsent(p Peer, version uint32) {
 // NodeDeleted forgets the node at p at once, when it left the registry
 // (client.Hooks.Deleted): its consents (each reported as
 // [UpdateConsentChanged]), its queued update whatever its state (reported
-// as [UpdateFailed] with [ErrUpdateCancelled], its BDX transfer closed and
-// its reboot arming lifted), and what the manager observed of it. A later
+// as [UpdateFailed] with [ErrUpdateCancelled]), its BDX scope (a transfer
+// that runs is closed), its reboot arming, and what the manager observed
+// of it — the scope and the arming whether or not an update was queued. A later
 // node at the same address starts with nothing of it. A node the manager
 // never saw is no error. The next full check drops the same for a node
 // whose deletion was not reported (review II, R2-P6-bound-1914).
@@ -1457,17 +1458,19 @@ func (m *Manager) NodeDeleted(p Peer) {
 	delete(m.startUpSuppress, p)
 	failed := m.cfg.OnUpdateFailed
 	m.mu.Unlock()
-	for _, t := range removed {
-		m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t})
-	}
-	if cancelled == nil {
-		return
-	}
+	// The scope and the arming go whether or not an update is queued: the
+	// provider enables the scope and a status arms the peer on their own.
 	if r := m.bdxResponder(); r != nil {
 		_ = r.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
 	}
 	if m.cfg.Armer != nil {
 		m.cfg.Armer.Disarm(p)
+	}
+	for _, t := range removed {
+		m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t})
+	}
+	if cancelled == nil {
+		return
 	}
 	m.log.Info("ota.manager.node_deleted", slog.String("node", peerString(p)))
 	if failed != nil {
@@ -1568,15 +1571,19 @@ func (m *Manager) progressLocked(p Peer, e *queueEntry, status Status, applyDela
 	if transferStarted {
 		e.transferStarted = true
 	}
+	// The arming happens under m.mu, with the entry it is for still queued:
+	// a NodeDeleted that removes the entry disarms after it, so a deleted
+	// peer is never left armed (review II, R2-P6-bound-1914). The armer runs
+	// no callback under its own lock.
+	if status == mattercore.OTAUpdateApplying && m.cfg.Armer != nil {
+		m.cfg.Armer.Arm(p, applyDelay)
+	}
 	m.mu.Unlock()
 	if transferStarted {
 		m.emit(UpdateEvent{Kind: UpdateTransferStarted, Peer: p, Target: target})
 	}
 	if status != mattercore.OTAUpdateApplying {
 		return
-	}
-	if m.cfg.Armer != nil {
-		m.cfg.Armer.Arm(p, applyDelay)
 	}
 	if !wasApplying {
 		if applying != nil {
