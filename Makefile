@@ -225,17 +225,26 @@ reachability: ## regenerate script/reachability/inventory.json — which exporte
 	@# here would measure the wrong thing.
 	$(GO) run ./script/reachability
 
+# The regenerating guards read the working tree, untracked files included, and
+# compare with HEAD: an untracked .go file would make their verdict one about a
+# tree no commit holds (R2-P6-test-2824). On CI's clean checkout this passes.
+.PHONY: no-untracked-go
+no-untracked-go: ## fail when the tree holds an untracked .go file (the regenerating guards read it)
+	@u=$$(git ls-files --others --exclude-standard -- '*.go'); \
+	if [ -n "$$u" ]; then echo "untracked .go files — commit, remove or ignore them before a regenerating guard:"; echo "$$u"; exit 1; fi
+
 .PHONY: reachability-check
-reachability-check: reachability ## regenerate, then fail if the committed snapshot moved or is off its ratchet
-	@git diff --quiet -- script/reachability/inventory.json script/reachability/summary.md || { \
+reachability-check: no-untracked-go reachability ## regenerate, then fail if the committed snapshot moved or is off its ratchet
+	@git diff --quiet HEAD -- script/reachability/inventory.json script/reachability/summary.md || { \
 		echo ""; \
 		echo "The committed reachability snapshot is stale: regenerating it changed the file."; \
 		echo "Run 'make reachability', read the diff, and commit it with the change that moved"; \
 		echo "it — adjusting reachabilityUnreachedRatchet in the same commit if the count moved."; \
 		echo ""; \
-		git --no-pager diff --stat -- script/reachability/; \
+		git --no-pager diff --stat HEAD -- script/reachability/; \
 		exit 1; \
 	}
+	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
 
 .PHONY: surface
 surface: ## regenerate script/surfacecheck/surface.json and summary.md — what a controller sees of the reference daemon
@@ -245,17 +254,17 @@ surface: ## regenerate script/surfacecheck/surface.json and summary.md — what 
 	GO=$(GO) $(GO) run ./script/surfacecheck
 
 .PHONY: surface-check
-surface-check: surface ## regenerate, then fail if the committed surface snapshot moved
-	@git diff --quiet -- script/surfacecheck/surface.json script/surfacecheck/summary.md || { \
+surface-check: no-untracked-go surface ## regenerate, then fail if the committed surface snapshot moved
+	@git diff --quiet HEAD -- script/surfacecheck/surface.json script/surfacecheck/summary.md || { \
 		echo ""; \
 		echo "The committed surface snapshot is stale: regenerating it changed the file."; \
 		echo "Run 'make surface', read the diff — it is what a controller sees change — and"; \
 		echo "commit it with the change that moved it."; \
 		echo ""; \
-		git --no-pager diff --stat -- script/surfacecheck/; \
+		git --no-pager diff --stat HEAD -- script/surfacecheck/; \
 		exit 1; \
 	}
-	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
+	$(GO) test -count=1 -run TestCommittedSnapshot ./script/surfacecheck/
 
 .PHONY: testparity
 testparity: ## render notes/parity/matterjs_tests.md from the matter.js test register (no matter.js clone needed)
@@ -295,19 +304,19 @@ cite-report: ## regenerate script/citecheck/drift.json, summary.md and registers
 	$(GO) run ./script/citecheck -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR) -report
 
 .PHONY: cite-check
-cite-check: ## regenerate the citation artefacts, then fail on a hard error or when they moved off the committed ones
+cite-check: no-untracked-go ## regenerate the citation artefacts, then fail on a hard error or when they moved off the committed ones
 	@# Built, not `go run`: go run turns every non-zero exit into 1, and exit 2
 	@# (no clone, no pin) must not read as "hard errors".
 	@bin=$$(mktemp -d)/citecheck; $(GO) build -o $$bin ./script/citecheck || exit 1; \
 	$$bin -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR); rc=$$?; rm -rf $$(dirname $$bin); \
 	if [ $$rc -eq 2 ]; then echo "cite-check: no matter.js clone with the pin at $(MATTERJS_DIR), or no matterjs-server clone at $(MATTERJS_SERVER_DIR)"; exit 2; fi; \
-	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md script/citecheck/registers.json || { \
+	git diff --quiet HEAD -- script/citecheck/drift.json script/citecheck/summary.md script/citecheck/registers.json || { \
 		echo ""; \
 		echo "The committed citation artefacts are stale: regenerating them changed the files."; \
 		echo "Run 'make cite-report', read the diff, and commit it with the change that moved"; \
 		echo "it — adjusting citecheckDriftRatchet in the same commit if the drift count moved."; \
 		echo ""; \
-		git --no-pager diff --stat -- script/citecheck/; \
+		git --no-pager diff --stat HEAD -- script/citecheck/; \
 		exit 1; \
 	}; \
 	if [ $$rc -ne 0 ]; then echo "cite-check: hard errors (summary.md lists them)"; exit $$rc; fi
