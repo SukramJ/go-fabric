@@ -41,7 +41,17 @@ func TestObserve(t *testing.T) {
 		s2 := h.secureSession(t, 0x11, udpAddr("[fd00::2]:5540"))
 		h.set.Adopt(s2)
 		s2.Close()
+		// The session leaves the peer's list under its lock and the
+		// observers hear of it after the lock: wait for both observers'
+		// notification, not for the list. Waiting for the list let stopA
+		// run before "a deleted", or s1's close overtake s2's notification
+		// (TestObserve -race flake, 12 in 600 before).
 		eventually(t, "the session to leave", func() bool { return len(p.Sessions()) == 1 })
+		eventually(t, "the observers to hear of the session leaving", func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return len(seen) >= 4
+		})
 		stopA()
 		s1.Close()
 		want := []string{"a added", "b added", "a deleted", "b deleted", "set disconnected", "b deleted"}
