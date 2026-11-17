@@ -23,8 +23,10 @@ var errACLWriteLock = errors.New("node: the AccessControl server's write lock is
 // run under the AccessControl server's write lock, the lock a
 // controller's ACL write holds across the same three steps
 // (internal/facadeseam.WithACLWriteLock; review II, R2-P6-sec-2401). A
-// fabric the store no longer holds when the lock is
-// taken gets nothing. Reports whether the entry was stored; event names
+// fabric the store no longer holds when the lock is taken gets nothing,
+// and so does a fabric an AddNOC has not committed (FabricPendingAdd):
+// its ACL is AddNOC's until the commit, and the node's pass at the
+// fabric's CommissioningComplete adds the entry. Reports whether the entry was stored; event names
 // the log lines (<event>_list, <event>_add).
 func (n *Node) addLocalOperateEntry(ctx context.Context, fabricIndex uint8, epID uint16, cluster uint32, event string) bool {
 	var added bool
@@ -49,7 +51,7 @@ func (n *Node) addLocalOperateEntryLocked(ctx context.Context, fabricIndex uint8
 	held := false
 	for i := range fabrics {
 		if fabrics[i].FabricIndex == fabricIndex {
-			held = true
+			held = fabrics[i].Pending != store.FabricPendingAdd
 			break
 		}
 	}
