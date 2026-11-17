@@ -1877,11 +1877,6 @@
       "steps": 15,
       "stepsSkipped": 0
     },
-    "PAVST/2.8": {
-      "tests": 1,
-      "steps": 7,
-      "stepsSkipped": 0
-    },
     "PAVST/2.9": {
       "tests": 1,
       "steps": 8,

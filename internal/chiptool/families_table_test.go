@@ -156,6 +156,10 @@ type family struct {
 	// knownProblems lets a case whose CHIP checker reports only recorded
 	// problems pass, and only then (see knownProblems).
 	knownProblems map[string]knownProblems
+	// failsAs lets an excluded case run and requires it to fail exactly as
+	// recorded (see recordedFailure); its exclude row carries the class
+	// and the reason.
+	failsAs map[string]recordedFailure
 	// timeout raises the per-case budget (defaultCaseTimeout) for a case
 	// that waits longer by design.
 	timeout map[string]time.Duration
@@ -264,6 +268,24 @@ type knownProblems struct {
 	class    gapClass
 	reason   string
 	patterns []*regexp.Regexp //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
+}
+
+// recordedFailure is how an excluded Python case that still runs must
+// fail: the case's own expectation departs from behaviour the module keeps
+// on purpose (a by_design.md entry, named by the exclude row's reason).
+// The case runs instead of being skipped, so its steps before the failure
+// stay measured; it counts as the gap its exclude row names, never as
+// passed. The run fails when the case passes — the gap is gone: remove
+// both rows — or fails otherwise: output does not match, or it reached a
+// different number of steps, so it no longer stops where it is recorded
+// to.
+type recordedFailure struct {
+	// output matches the failure in the case's output: the error the
+	// failing step raises, as the run that recorded it printed it.
+	output *regexp.Regexp
+	// steps is the number of "***** Test Step" lines the case printed up
+	// to that failure (caseCounts.Steps), with no step skipped.
+	steps int
 }
 
 // startUpOnBridged classifies the cases that power-cycle the bridge and
@@ -1120,6 +1142,14 @@ var chipFamilies = []family{
 		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
 		exclude: map[string]gap{
 			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db021da0 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
+			"2.8":  {classHarness, "TC-PAVST-2.8 step 4 has TH2, a second controller on a fresh fabric commissioned on-network, send FindTransport — a Large Message (\"L\") command, push-av-stream-transport.element.ts:130 at db021da0 — with MRP_PAYLOAD and expects NOT_FOUND (TC_PAVST_2_8.py:179-189, TC_PAVSTTestBase.py:352-368, matter_testing.py:3105 at 6170af84); the module answers INVALID_TRANSPORT_TYPE (0xD1) on a UDP session, as matter.js does (CommandInvokeResponse.ts:281-285). chip's engine carries the same gate (InteractionModelEngine.cpp:1875-1884), inert for its code-driven clusters because its generator drops kLargeMessage (sdk_generator.py:62; PushAvStreamTransport Metadata.h:79-81): chip's camera-app passes the step only through that gap. Kept by owner decision 183, notes/parity/by_design.md BD-chip-LargeMessageGateEnforced", false},
+		},
+		// Measured in run 44018148063 (certification families,
+		// app-camera): PAVST/2.8 failed with {Tests:1 TestsSkipped:0
+		// Steps:5 StepsSkipped:0}, the verdict lines naming
+		// "InteractionModelError: InvalidTransportType (0xd1)".
+		failsAs: map[string]recordedFailure{
+			"2.8": {output: regexp.MustCompile(`InteractionModelError: InvalidTransportType \(0xd1\)`), steps: 5},
 		},
 	},
 	{name: "PAVSTI", deviceType: dtCamera, variant: variantCamera},

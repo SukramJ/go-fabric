@@ -164,6 +164,15 @@ kernel modules and stay weekly, outside that gate.
 - **A case that passes with a recorded gap** is one whose CHIP spec checker
   reports exactly the recorded problems and nothing else; it fails as soon as
   another problem appears or the recorded one disappears.
+- **A case that fails as recorded** ("runs, and fails as recorded") is a
+  classified gap whose case still runs: its own expectation departs from
+  behaviour the module keeps on purpose, recorded in
+  [`by_design.md`](../notes/parity/by_design.md). The run requires the
+  recorded error after the recorded number of steps; it fails when the case
+  passes or fails anywhere else. TC-PAVST-2.8 is the one case: its step 4
+  sends a Large Message command over UDP and expects NOT_FOUND, where the
+  module answers INVALID_TRANSPORT_TYPE as matter.js does
+  (`BD-chip-LargeMessageGateEnforced`).
 
 A static complement runs in CI on every pull request (and in `go test ./...`
 wherever a connectedhomeip checkout is present): the
@@ -344,7 +353,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a
 | AVSM | 19 | 19 | 0 | 0 | 0 | 0 | 0 | 0 |
 | AVSUM | 9 | 9 | 0 | 0 | 0 | 0 | 0 | 0 |
 | ZONEMGMT | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
-| PAVST | 15 | 14 | 0 | 0 | 0 | 1 | 0 | 0 |
+| PAVST | 15 | 13 | 0 | 0 | 0 | 1 | 1 | 0 |
 | PAVSTI | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | CHIME | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 0 |
 | JFADMIN | 5 | 1 | 0 | 0 | 0 | 0 | 4 | 0 |
@@ -352,7 +361,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a
 | TBRM | 5 | 3 | 0 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **839** | **600** | **0** | **0** | **2** | **135** | **102** | **0** |
+| **all** | **839** | **599** | **0** | **0** | **2** | **135** | **103** | **0** |
 
 ### Cases not run
 
@@ -550,6 +559,7 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a
 | OPCREDS/3.9 | (b) not supported | not applicable: the case's PICS `OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | OVENOPSTATE/2.6 | (b) not supported | not applicable: the case's PICS `OVENOPSTATE.S & OVENOPSTATE.S.A0002` is false for the reference DUT |
 | PAVST/2.15 | (b) not supported | TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db021da0 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND |
+| PAVST/2.8 | (c) harness | TC-PAVST-2.8 step 4 has TH2, a second controller on a fresh fabric commissioned on-network, send FindTransport — a Large Message ("L") command, push-av-stream-transport.element.ts:130 at db021da0 — with MRP_PAYLOAD and expects NOT_FOUND (TC_PAVST_2_8.py:179-189, TC_PAVSTTestBase.py:352-368, matter_testing.py:3105 at 6170af84); the module answers INVALID_TRANSPORT_TYPE (0xD1) on a UDP session, as matter.js does (CommandInvokeResponse.ts:281-285). chip's engine carries the same gate (InteractionModelEngine.cpp:1875-1884), inert for its code-driven clusters because its generator drops kLargeMessage (sdk_generator.py:62; PushAvStreamTransport Metadata.h:79-81): chip's camera-app passes the step only through that gap. Kept by owner decision 183, notes/parity/by_design.md BD-chip-LargeMessageGateEnforced (runs, and fails as recorded) |
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
 | PSCFG/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |

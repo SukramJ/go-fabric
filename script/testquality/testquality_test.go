@@ -178,14 +178,15 @@ var environmentSkips = map[string]int{
 
 	// The CHIP harness: a leg that runs only on request (docker, its image,
 	// the radio), a case the harness classes itself (manual, excluded,
-	// self-skipped, PICS false, IPv6 multicast missing), and the Go-TH and
+	// self-skipped, failing as recorded, PICS false, IPv6 multicast
+	// missing), and the Go-TH and
 	// Go-controller legs' multicast.
 	"internal/chiptool/blecases_test.go:TestChipToolBLECases":                           3,
 	"internal/chiptool/blewifi_test.go:TestChipToolBLEWiFi":                             2,
 	"internal/chiptool/familyrun_test.go:TestChipCertificationFamilies":                 1,
 	"internal/chiptool/familyrun_test.go:requireIPv6":                                   1,
 	"internal/chiptool/familyrun_test.go:runFamily":                                     3,
-	"internal/chiptool/familyrun_test.go:runPythonCase":                                 1,
+	"internal/chiptool/familyrun_test.go:runPythonCase":                                 2,
 	"internal/chiptool/familyrun_test.go:skipNotApplicable":                             1,
 	"internal/chiptool/gocert_test.go:TestGoCertificationCases":                         1,
 	"internal/chiptool/gocert_test.go:runGoCertCase":                                    1,
@@ -228,7 +229,7 @@ var (
 		`multicast|ipv6|ipv4|socket|loopback|udp 5353|mdns|dns-sd|network interface|no interface|os host name|cannot run on this host|` +
 		`docker|chip-?tool|chipToolErr|chipOnce|connectedhomeip|harness|matter\.js checkout|checkout not present|behind the checkout|built matter\.js|` +
 		`on path|not installed|git |node is not|race detector|geteuid|symlink|` +
-		`not applicable|selfSkip|classHarness|classNotSupported|manualClass|goCertEnv|border router`)
+		`not applicable|selfSkip|failsAs|classHarness|classNotSupported|manualClass|goCertEnv|border router`)
 	envVar   = regexp.MustCompile(`\bGetenv\b|\bLookupEnv\b|\b(GOFABRIC|MATTERJS|CHIP[A-Z]*)_[A-Z0-9_]+\b|\benv[A-Z]\w*|[a-z]Env\b`)
 	livePath = regexp.MustCompile(`_live|live_`)
 )
