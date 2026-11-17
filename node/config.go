@@ -1053,12 +1053,14 @@ func (c *Config) optionalErrors() []error {
 // minPeriod is the shortest period Validate takes for the node's own
 // periodic work — the health probe, the interface check: a period below
 // it runs the work back to back for nothing a host can observe. A module
-// rule; neither reference bounds the two.
+// rule.
 const minPeriod = time.Second
 
-// maxHostLabel is the longest DNS label (RFC 1035 §2.3.4, 63 octets): the
-// mDNS host name is one label before ".local".
-const maxHostLabel = 63
+// maxHostLabel is the longest mDNS host-name override, one DNS label
+// before ".local": connectedhomeip's kHostNameMaxLength, 40 bytes
+// (src/lib/dnssd/Constants.h:32-36 at 6170af84), below RFC 1035's 63 for a
+// label (owner decision 229, review II R2-P6-api-2409).
+const maxHostLabel = 40
 
 // boundErrors refuses the Config values no other check bounds (review II,
 // R2-P6-api-2409): a probe or interface-check period below [minPeriod]

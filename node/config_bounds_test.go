@@ -41,7 +41,8 @@ func TestValidateBoundsTheUncheckedFields(t *testing.T) {
 		{"ProductDescription.DeviceType unknown", func(c *node.Config) { c.ProductDescription.DeviceType = 0xFFFE }, true},
 		{"ProductDescription.DeviceType OnOffLight", func(c *node.Config) { c.ProductDescription.DeviceType = 0x0100 }, false},
 		{"Network.MDNS.HostName with .local", func(c *node.Config) { c.Advertiser, c.Network.MDNS.HostName = nil, "bridge.local" }, true},
-		{"Network.MDNS.HostName 64 bytes", func(c *node.Config) { c.Advertiser, c.Network.MDNS.HostName = nil, strings.Repeat("h", 64) }, true},
+		{"Network.MDNS.HostName 41 bytes", func(c *node.Config) { c.Advertiser, c.Network.MDNS.HostName = nil, strings.Repeat("h", 41) }, true},
+		{"Network.MDNS.HostName 40 bytes", func(c *node.Config) { c.Advertiser, c.Network.MDNS.HostName = nil, strings.Repeat("h", 40) }, false},
 		{"Network.MDNS.HostName label", func(c *node.Config) { c.Advertiser, c.Network.MDNS.HostName = nil, "bridge-1" }, false},
 		{"EndpointState and EndpointPersistence", func(c *node.Config) {
 			c.EndpointState = &hostState{node.NewEndpointState(memstore.New(), nil)}

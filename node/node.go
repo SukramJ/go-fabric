@@ -1525,8 +1525,10 @@ func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	// OnFabricRemoved before Stop returns, instead of at the next start
 	// on this store — or never, when none follows. Mirrors matter.js
 	// packages/protocol/src/protocol/DeviceCommissioner.ts:326-340 at
-	// db021da0 (close closes the fail-safe context) and
-	// packages/protocol/src/common/FailsafeContext.ts:194-203 (a close
+	// db021da0 (close closes the fail-safe context), which the node's stop
+	// reaches (packages/node/src/behavior/system/network/
+	// ServerNetworkRuntime.ts:446, `await env.close(DeviceCommissioner)`),
+	// and packages/protocol/src/common/FailsafeContext.ts:194-203 (a close
 	// with the fail-safe armed rolls back). No reopen follows: stopping
 	// is set (review II, R2-P6-fsm-2411).
 	n.root.GeneralCommissioning.ExpireFailSafe(context.WithoutCancel(ctx))
