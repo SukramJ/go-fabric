@@ -80,12 +80,6 @@ type attemptState struct {
 	settled   bool
 }
 
-// deviceAbort cancels every attempt of one device.
-type deviceAbort struct {
-	ctx    context.Context
-	cancel context.CancelCauseFunc
-}
-
 // connection is one run of CommissioningConnection.
 type connection struct {
 	cfg      connectionConfig
@@ -95,11 +89,14 @@ type connection struct {
 	changed  chan struct{}
 
 	// mu guards holding, lastErr, lastNonRetryable, pending and winner.
-	mu               sync.Mutex
-	queue            []queued
-	devices          map[string]*deviceAbort
-	winner           *connectionResult
-	holding          int
+	mu      sync.Mutex
+	queue   []queued
+	winner  *connectionResult
+	holding int
+	// holdSince is when the latest attempt began to hold its responder:
+	// a hold stops the scheduler for at most the delay from then
+	// (R2-P6-fsm-1806).
+	holdSince        time.Time
 	latest           *attemptState
 	timer            exchange.Timer
 	pending          int
@@ -114,24 +111,36 @@ type connection struct {
 //
 //   - one Abort holds the budget (cfg.timeout) and the caller's ctx (:63);
 //   - the candidates are the devices' addresses in order (:86); one
-//     scheduler (:93-117) launches the next while there is no winner, the
-//     abort has not fired and no attempt holds its responder, skipping the
-//     addresses of a dropped device (:98-100) and waiting until the latest
-//     unsettled attempt is delay old (:106-113);
+//     scheduler (:93-117) launches the next while there is no winner and
+//     the abort has not fired, waiting until the latest unsettled attempt
+//     is delay old (:106-113);
 //   - an attempt (:119-201) that receives the PBKDFParamResponse holds the
-//     responder until it settles (:127-133); its session wins unless a
-//     winner exists, the abort fired or its device was dropped — then the
-//     session is force-closed (:137-157) — and the winner aborts every
-//     other attempt (:158-161);
+//     responder (:127-133); its session wins unless a winner exists or the
+//     abort fired — then the session is force-closed (:137-157) — and the
+//     winner aborts every other attempt (:158-161);
 //   - errors of an attempt that was not cancelled (:163-190): a wrong
-//     passcode drops the device and is the non-retryable error, other
-//     unexpected data is the non-retryable error, a transient or network
-//     error the retryable last error, anything else aborts the run;
+//     passcode or other unexpected data is the non-retryable error, a
+//     transient or network error the retryable last error, anything else
+//     aborts the run;
 //   - the result (:205-249): the winner without waiting for the losers;
 //     else, every attempt settled, the non-retryable error, else on an
 //     abort without a retryable error the external cause as is or, for
 //     the budget, a PairRetransmissionLimitReachedError, else that error
 //     around the last retryable one.
+//
+// Two rules are this module's, ahead of matter.js (review II,
+// R2-P6-fsm-1806, owner decision 207). A wrong passcode — the key
+// confirmation failing — ends that address only, not the device: the
+// device's next address is tried, and the mismatch is the result only
+// when no address is left, as connectedhomeip's SetUpCodePairer tries the
+// next address after any PASE failure (src/controller/SetUpCodePairer.cpp
+// :959-967 at 6170af84). matter.js drops every address of the device
+// (CommissioningConnection.ts:167-170 at db021da0), so a responder at any
+// address of the device — one a party on the link added to its host
+// record — decided for all of them. And an attempt that holds its
+// responder stops the scheduler for at most the delay; after it the next
+// address starts while the holding attempt runs on (matter.js holds
+// without a bound, :97; the bound is the module's own rule).
 func connectPASE(ctx context.Context, cfg connectionConfig) (connectionResult, error) {
 	delay := DelayBeforeNextAddress
 	if cfg.delay != nil {
@@ -144,7 +153,6 @@ func connectPASE(ctx context.Context, cfg connectionConfig) (connectionResult, e
 	c := &connection{
 		cfg: cfg, delay: delay, abortCtx: abortCtx, abort: abort,
 		changed: make(chan struct{}, 1),
-		devices: make(map[string]*deviceAbort),
 	}
 	for _, d := range cfg.devices {
 		for _, a := range d.addrs {
@@ -219,43 +227,36 @@ func (c *connection) failure() error {
 	return &PairRetransmissionLimitReachedError{Message: "Failed to connect on any discovered server"}
 }
 
-// deviceAbortOf is getDeviceAbort (:75-82); c.mu is held.
-func (c *connection) deviceAbortOf(id string) *deviceAbort {
-	d, ok := c.devices[id]
-	if !ok {
-		ctx, cancel := context.WithCancelCause(context.Background())
-		d = &deviceAbort{ctx: ctx, cancel: cancel}
-		c.devices[id] = d
-	}
-	return d
-}
-
 // schedule is the scheduler (:93-117); c.mu is held.
 func (c *connection) schedule() {
 	if c.timer != nil {
 		c.timer.Stop()
 		c.timer = nil
 	}
-	for c.winner == nil && c.abortCtx.Err() == nil && c.holding == 0 {
-		for len(c.queue) > 0 && c.deviceAbortOf(c.queue[0].device.identifier).ctx.Err() != nil {
-			c.queue = c.queue[1:]
-		}
+	for c.winner == nil && c.abortCtx.Err() == nil {
 		if len(c.queue) == 0 {
+			return
+		}
+		// A holding attempt stops the scheduler for at most the delay
+		// from its hold, then the latest unsettled attempt for the delay
+		// from its start.
+		var remaining time.Duration
+		if c.holding > 0 {
+			remaining = c.delay - c.cfg.clock.Now().Sub(c.holdSince)
+		}
+		if c.latest != nil && !c.latest.settled {
+			remaining = max(remaining, c.delay-c.cfg.clock.Now().Sub(c.latest.startedAt))
+		}
+		if remaining > 0 {
+			c.timer = c.cfg.clock.AfterFunc(remaining, func() {
+				c.mu.Lock()
+				defer c.mu.Unlock()
+				c.schedule()
+			})
 			return
 		}
 		next := c.queue[0]
 		c.queue = c.queue[1:]
-		if c.latest != nil && !c.latest.settled {
-			if remaining := c.delay - c.cfg.clock.Now().Sub(c.latest.startedAt); remaining > 0 {
-				c.queue = append([]queued{next}, c.queue...)
-				c.timer = c.cfg.clock.AfterFunc(remaining, func() {
-					c.mu.Lock()
-					defer c.mu.Unlock()
-					c.schedule()
-				})
-				return
-			}
-		}
 		c.launch(next)
 	}
 }
@@ -264,28 +265,26 @@ func (c *connection) schedule() {
 func (c *connection) launch(q queued) {
 	st := &attemptState{startedAt: c.cfg.clock.Now()}
 	c.latest = st
-	dev := c.deviceAbortOf(q.device.identifier)
 	actx, acancel := context.WithCancelCause(c.abortCtx)
-	stop := context.AfterFunc(dev.ctx, func() { acancel(context.Cause(dev.ctx)) })
 	holds := false
 	onPBKDF := func() {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		if !holds {
+		if !holds && !st.settled {
 			holds = true
 			c.holding++
+			c.holdSince = c.cfg.clock.Now()
 		}
 	}
 	c.pending++
 	go func() {
 		defer acancel(nil)
 		s, err := c.cfg.establish(actx, q.addr, q.device, onPBKDF)
-		stop()
 		var loser *exchange.Session
 		var loserCause error
 		c.mu.Lock()
 		switch {
-		case err == nil && (c.winner != nil || c.abortCtx.Err() != nil || dev.ctx.Err() != nil):
+		case err == nil && (c.winner != nil || c.abortCtx.Err() != nil):
 			loser, loserCause = s, context.Cause(actx)
 			if loserCause == nil {
 				loserCause = errLostRace
@@ -293,8 +292,8 @@ func (c *connection) launch(q queued) {
 		case err == nil:
 			c.winner = &connectionResult{session: s, device: q.device}
 			c.abort(errWon)
-		case c.abortCtx.Err() == nil && dev.ctx.Err() == nil:
-			c.classify(q, dev, err)
+		case c.abortCtx.Err() == nil:
+			c.classify(q, err)
 		}
 		// The attempt is decided: it holds the responder no longer, and the
 		// next address may start.
@@ -304,11 +303,10 @@ func (c *connection) launch(q queued) {
 		}
 		c.schedule() //nolint:contextcheck // every attempt derives its context from abortCtx
 		if loser != nil {
-			// The losing session is given up beside the next address — its
-			// device was dropped, so that address is another device's —
-			// and before the attempt stops counting as pending, so a run
-			// without a winner, which waits for every attempt, returns only
-			// once its devices are free (review II).
+			// The losing session is given up before the attempt stops
+			// counting as pending, so a run without a winner, which waits
+			// for every attempt, returns only once its devices are free
+			// (review II).
 			c.mu.Unlock()
 			if c.cfg.giveUp != nil {
 				c.cfg.giveUp(loser, loserCause)
@@ -329,13 +327,13 @@ func (c *connection) launch(q queued) {
 // errWon is the cause the winner aborts the other attempts with.
 var errWon = errors.New("commissioner: another PASE attempt won")
 
-// classify records an attempt's error (:163-190); c.mu is held.
-func (c *connection) classify(q queued, dev *deviceAbort, err error) {
+// classify records an attempt's error (:163-190); c.mu is held. A wrong
+// passcode ends the address, not the device (R2-P6-fsm-1806).
+func (c *connection) classify(q queued, err error) {
 	switch {
 	case errors.Is(err, handshake.ErrPasscodeMismatch):
-		c.cfg.log.Info("matter.controller.commissioning.device_dropped", slog.String("candidate", q.device.identifier), slog.Any("err", err))
+		c.cfg.log.Info("matter.controller.commissioning.address_passcode_mismatch", slog.String("peer", q.addr.String()), slog.String("candidate", q.device.identifier), slog.Any("err", err))
 		c.lastNonRetryable = err
-		dev.cancel(err)
 	case errors.Is(err, handshake.ErrUnexpectedData):
 		c.cfg.log.Info("matter.controller.commissioning.address_failed", slog.String("peer", q.addr.String()), slog.String("candidate", q.device.identifier), slog.Any("err", err))
 		c.lastNonRetryable = err

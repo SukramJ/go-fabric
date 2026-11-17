@@ -6,7 +6,10 @@ package commissioner
 // A port of matter.js packages/protocol/test/peer/CommissioningConnectionTest.ts at
 // 862ad75f: the PASE connection over a device's candidate addresses — the
 // per-address stagger, the responder hold, the credential drop, the
-// session closes of late and losing attempts and the abort paths.
+// session closes of late and losing attempts and the abort paths. The
+// credential drop and the unbounded hold are matter.js's; this module is
+// ahead of both (review II, R2-P6-fsm-1806), and the four cases that pin
+// them are inverted and say so.
 //
 // The cases already ported by TestConnection* in connection_test.go are not
 // repeated here. connectPASE is CommissioningConnection; an establish
@@ -296,38 +299,42 @@ var (
 func TestCommissioningConnection(t *testing.T) {
 	t.Parallel()
 
-	t.Run("does not accept a late success on a device already dropped for invalid credentials", func(t *testing.T) {
+	// Ahead of matter.js (review II, R2-P6-fsm-1806, owner decision 207):
+	// matter.js drops the device on invalid credentials and closes the
+	// late session (CommissioningConnection.ts:167-170 at db021da0); here
+	// the confirmation failure ends that address only, as connectedhomeip
+	// tries the next address after any PASE failure
+	// (SetUpCodePairer.cpp:959-967 at 6170af84), so the device's other
+	// address still wins.
+	t.Run("accepts a success on another address after invalid credentials on one (ahead of matter.js)", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
-			late, lateSession := newGate(), make(chan *exchange.Session, 1)
+			late := newGate()
 			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: 2 * time.Second, delay: ccDelay(0)},
 				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
 					if a.ip == "fd00::1" {
 						return nil, errPasscode
 					}
 					h.block(context.Background(), late) // ignores its signal
-					s := h.session()
-					lateSession <- s
-					return s, nil
+					return h.session(), nil
 				})
-			// Let fd00::1 fail and mark the device invalid, then let fd00::2 complete.
-			h.until("the device drop", func() bool {
+			h.until("both attempts", func() bool {
 				h.mu.Lock()
 				defer h.mu.Unlock()
-				return len(h.ctxs) == 2 && h.ctxs[1].Err() != nil
+				return len(h.ctxs) == 2
 			})
 			late.open()
-			if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
-				t.Fatalf("err = %v, want PasscodeMismatch", err)
-			}
-			// The late session is closed with the real credential error, not the generic race fallback.
-			if cause := h.closedWith(<-lateSession); !errors.Is(cause, handshake.ErrPasscodeMismatch) {
-				t.Fatalf("close cause = %v", cause)
+			res, err := h.result()
+			if err != nil || res.device.identifier != "a" || res.session == nil {
+				t.Fatalf("result %+v, %v, want fd00::2's session", res, err)
 			}
 		})
 	})
 
-	t.Run("credential failure skips later entries with the same deviceIdentifier", func(t *testing.T) {
+	// Ahead of matter.js (R2-P6-fsm-1806): a credential failure does not
+	// skip the device's later entries; the mismatch is the result once
+	// every entry failed.
+	t.Run("credential failure does not skip later entries with the same deviceIdentifier (ahead of matter.js)", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1"), ccDevice("b", "fd00::2"), ccDevice("a", "fd00::3")}, timeout: 2 * time.Second, delay: ccDelay(time.Second)},
@@ -340,7 +347,7 @@ func TestCommissioningConnection(t *testing.T) {
 			if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
 				t.Fatalf("err = %v", err)
 			}
-			if got := h.labelled(); !slices.Equal(got, []string{"a:fd00::1", "b:fd00::2"}) {
+			if got := h.labelled(); !slices.Equal(got, []string{"a:fd00::1", "b:fd00::2", "a:fd00::3"}) {
 				t.Fatalf("attempts %v", got)
 			}
 		})
@@ -624,10 +631,16 @@ func TestCommissioningConnectionStagger(t *testing.T) {
 		})
 	})
 
-	t.Run("holds the next address while an attempt has reached its responder", func(t *testing.T) {
+	// Ahead of matter.js (R2-P6-fsm-1806): matter.js holds the next
+	// address while an attempt holds its responder, without a bound
+	// (CommissioningConnection.ts:97 at db021da0); here the hold lasts at
+	// most the delay from its start (the module's rule), and the next
+	// address then starts while the holding attempt runs on.
+	t.Run("holds the next address for at most the delay while an attempt has reached its responder (ahead of matter.js)", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			firstFails := newGate()
+			defer firstFails.open()
 			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
 				func(h *ccHarness, a *ccAttempt) (*exchange.Session, error) {
 					if a.ip == "fd00::1" {
@@ -638,20 +651,20 @@ func TestCommissioningConnectionStagger(t *testing.T) {
 					return h.session(), nil
 				})
 			h.armed(2)
-			h.at(15 * time.Second)
+			h.at(4900 * time.Millisecond)
 			h.expectOrder(h.order, "fd00::1")
-			firstFails.open()
+			h.at(100 * time.Millisecond)
+			h.expectOrder(h.order, "fd00::1", "fd00::2")
 			res, err := h.result()
 			if err != nil || res.device.identifier != "a" {
 				t.Fatalf("result %+v, %v", res, err)
 			}
-			if got := h.order(); !slices.Equal(got, []string{"fd00::1", "fd00::2"}) {
-				t.Fatalf("order %v", got)
-			}
 		})
 	})
 
-	t.Run("skips the queued addresses of a device dropped for invalid credentials", func(t *testing.T) {
+	// Ahead of matter.js (R2-P6-fsm-1806): the queued addresses of a
+	// device that refused the credentials on one are still tried.
+	t.Run("tries the queued addresses of a device after invalid credentials on one (ahead of matter.js)", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			h := ccStart(t, ccOptions{devices: []*candidate{ccDevice("a", "fd00::1", "fd00::2")}, timeout: time.Minute, delay: ccDelay(5 * time.Second)},
@@ -662,7 +675,7 @@ func TestCommissioningConnectionStagger(t *testing.T) {
 			if _, err := h.result(); !errors.Is(err, handshake.ErrPasscodeMismatch) {
 				t.Fatalf("err = %v", err)
 			}
-			if got := h.order(); !slices.Equal(got, []string{"fd00::1"}) {
+			if got := h.order(); !slices.Equal(got, []string{"fd00::1", "fd00::2"}) {
 				t.Fatalf("order %v", got)
 			}
 		})

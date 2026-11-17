@@ -195,8 +195,13 @@ func TestConnectionStaggerAndWinner(t *testing.T) {
 }
 
 // TestConnectionHoldingResponder: an attempt that received the
-// PBKDFParamResponse holds back every other launch until it settles
-// (:97, :127-133); a late success after the winner is closed (:137-157).
+// PBKDFParamResponse holds back the next launch (:97, :127-133) — for at
+// most DelayBeforeNextAddress from its hold; after it the next address
+// starts while the holding attempt runs on, so a responder that answers
+// PBKDFParamResponse and never Pake2 does not hold the device's other
+// addresses for the whole budget (the module's bound, ahead of matter.js,
+// whose hold has none: review II, R2-P6-fsm-1806). A late success after
+// the winner is closed (:137-157).
 func TestConnectionHoldingResponder(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -205,57 +210,81 @@ func TestConnectionHoldingResponder(t *testing.T) {
 		first := h.next(t)
 		first.onPBKDF()
 		first.onPBKDF() // once only
-		h.clock.Advance(3 * DelayBeforeNextAddress)
-		h.none(t)
-		first.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
-		second := h.next(t)
 		h.armed(t)
-		h.clock.Advance(DelayBeforeNextAddress)
-		third := h.next(t)
+		h.clock.Advance(DelayBeforeNextAddress - time.Second)
+		h.none(t)
+		h.clock.Advance(time.Second)
+		second := h.next(t) // the first still holds
 		won := h.session(t)
-		third.result <- attemptResult{s: won}
+		second.result <- attemptResult{s: won}
 		if res, err := h.wait(t); err != nil || res.session != won {
 			t.Fatalf("result %v", err)
 		}
 		late := h.session(t)
-		<-second.ctx.Done()
-		second.result <- attemptResult{s: late}
+		<-first.ctx.Done()
+		first.result <- attemptResult{s: late}
 		eventually(t, "the late session closed", late.IsPeerLost)
 	})
 }
 
-// TestConnectionPasscodeDropsDevice: a wrong passcode drops every address
-// of the device (:167-170, :98-100); the other device still runs; with no
-// winner the passcode error is the result (:223-225).
-func TestConnectionPasscodeDropsDevice(t *testing.T) {
+// TestConnectionPasscodeMismatchEndsTheAddress: a wrong passcode ends that
+// address only — the device's next address is tried, and the mismatch is
+// the result only when no address is left (connectedhomeip's rule, ahead
+// of matter.js, which drops the device: review II, R2-P6-fsm-1806). A
+// responder at one address of the device — a spoofed one — therefore no
+// longer decides for the device.
+func TestConnectionPasscodeMismatchEndsTheAddress(t *testing.T) {
 	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		h := newConnectionHarness(t)
-		h.start(context.Background(), time.Minute, device("a", 1, 2), device("b", 3))
-		first := h.next(t)
-		if first.device != "a" {
-			t.Fatalf("first attempt on %s", first.device)
-		}
-		first.result <- attemptResult{err: handshake.ErrPasscodeMismatch}
-		other := h.next(t)
-		if other.device != "b" {
-			t.Fatalf("after the drop, an attempt on %s (%s)", other.device, other.addr)
-		}
-		other.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
-		_, err := h.wait(t)
-		if !errors.Is(err, handshake.ErrPasscodeMismatch) {
-			t.Fatalf("error %v", err)
-		}
+	t.Run("the device's next address wins", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			h := newConnectionHarness(t)
+			h.start(context.Background(), time.Minute, device("a", 1, 2))
+			first := h.next(t)
+			first.onPBKDF()
+			first.result <- attemptResult{err: handshake.ErrPasscodeMismatch}
+			second := h.next(t)
+			if second.device != "a" || second.addr == first.addr {
+				t.Fatalf("after the mismatch, an attempt on %s (%s)", second.device, second.addr)
+			}
+			s := h.session(t)
+			second.result <- attemptResult{s: s}
+			if res, err := h.wait(t); err != nil || res.session != s {
+				t.Fatalf("result %+v, %v", res, err)
+			}
+		})
+	})
+	t.Run("the mismatch when no address is left", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			h := newConnectionHarness(t)
+			h.start(context.Background(), time.Minute, device("a", 1, 2), device("b", 3))
+			for _, want := range []string{"a", "a", "b"} {
+				c := h.next(t)
+				if c.device != want {
+					t.Fatalf("an attempt on %s (%s), want %s", c.device, c.addr, want)
+				}
+				err := handshake.ErrPasscodeMismatch
+				if want == "b" {
+					err = fmt.Errorf("%w: lost", exchange.ErrTransient)
+				}
+				c.result <- attemptResult{err: err}
+			}
+			if _, err := h.wait(t); !errors.Is(err, handshake.ErrPasscodeMismatch) {
+				t.Fatalf("error %v, want the passcode mismatch", err)
+			}
+		})
 	})
 }
 
-// TestConnectionLosingDisarmRunsBesideTheNextAddress (review II,
-// R2-P3-rr-ctl-05): a session established on a device already dropped is
-// given up (connectionConfig.giveUp, the commissioner's disarm), and while
-// that runs the next address — another device's — is launched: the
-// attempt is decided and holds the responder no longer. A run without a
-// winner still returns only once the give-up has returned.
-func TestConnectionLosingDisarmRunsBesideTheNextAddress(t *testing.T) {
+// TestConnectionLosingGiveUpHoldsTheRun (review II, R2-P3-rr-ctl-05): a
+// session established after the run was decided — here by the budget —
+// is given up (connectionConfig.giveUp, the commissioner's disarm), and a
+// run without a winner returns only once the give-up has returned, so
+// its devices are free when Commission returns. (The test's other half,
+// the next address launched beside the give-up, needed a device dropped
+// for a wrong passcode; no device is dropped since R2-P6-fsm-1806.)
+func TestConnectionLosingGiveUpHoldsTheRun(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		h := newConnectionHarness(t)
@@ -265,46 +294,25 @@ func TestConnectionLosingDisarmRunsBesideTheNextAddress(t *testing.T) {
 			<-release
 			s.HandlePeerLoss(cause)
 		}
-		h.start(context.Background(), time.Minute, device("a", 1, 2), device("b", 3))
+		h.start(context.Background(), DelayBeforeNextAddress/2, device("a", 1))
 		first := h.next(t)
-		h.armed(t)
-		h.clock.Advance(DelayBeforeNextAddress)
-		second := h.next(t)
-		second.onPBKDF()
-		// A wrong passcode on a's first address drops a; the attempt on its
-		// second address, which holds the responder, still establishes.
-		first.result <- attemptResult{err: handshake.ErrPasscodeMismatch}
-		h.none(t)
-		<-second.ctx.Done()
+		first.onPBKDF()
+		synctest.Wait()
+		h.clock.Advance(DelayBeforeNextAddress / 2)
+		<-first.ctx.Done()
 		late := h.session(t)
-		second.result <- attemptResult{s: late}
+		first.result <- attemptResult{s: late}
 		<-givingUp
 		synctest.Wait()
-		released := false
-		var third *attemptCall
 		select {
-		case third = <-h.calls:
+		case <-h.done:
+			t.Fatal("the run returned before the losing session's give-up did")
 		default:
-			t.Error("no next address launched while the losing session was given up")
-			close(release)
-			released = true
-			third = h.next(t)
 		}
-		if third.device != "b" {
-			t.Errorf("the next attempt is on %s (%s), want b", third.device, third.addr)
-		}
-		third.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
-		if !released {
-			synctest.Wait()
-			select {
-			case <-h.done:
-				t.Error("the run returned before the losing session's give-up did")
-			default:
-			}
-			close(release)
-		}
-		if _, err := h.wait(t); !errors.Is(err, handshake.ErrPasscodeMismatch) {
-			t.Fatalf("error %v, want the passcode mismatch", err)
+		close(release)
+		var pr *PairRetransmissionLimitReachedError
+		if _, err := h.wait(t); !errors.As(err, &pr) {
+			t.Fatalf("error %v, want the budget's", err)
 		}
 		if !late.IsPeerLost() {
 			t.Fatal("the losing session was not given up")

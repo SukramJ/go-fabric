@@ -10,8 +10,10 @@
 //
 // [Commissioner.Commission] establishes PASE to the node's addresses (the
 // connection of CommissioningConnection.ts: one address after the other,
-// 10 s apart, never racing an address of a device whose responder is
-// already engaged) or over the channel, then runs the commissioning flow
+// 10 s apart, an engaged responder holding the next address for at most
+// those 10 s, a wrong passcode ending one address and not the device —
+// the last two ahead of matter.js, review II R2-P6-fsm-1806) or over the
+// channel, then runs the commissioning flow
 // over it — the initial reads, ArmFailSafe, the regulatory configuration
 // for a Wi-Fi or Thread node, time synchronisation, the terms and
 // conditions acknowledgements, device attestation (controller/attestation),
