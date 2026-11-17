@@ -274,3 +274,23 @@ func TestTableMergeRefusesADuplicate(t *testing.T) {
 		t.Errorf("merge of distinct keys: %v", dst)
 	}
 }
+
+// TestPortDocsStateTheStatusRule: a kit server answers the status a port's
+// error carries — a contract.StatusError or an im.StatusCodeError, through
+// the dispatcher's classifyError — and FAILURE only for an error without
+// one (docs/guides/ports.md). A generated port doc that says an error
+// "answers FAILURE" without naming that rule tells a host a specific
+// status cannot be answered; the doc states the rule as the camera ports
+// do: "an error answers its status, FAILURE without one"
+// (R2-P6-doc-2750).
+func TestPortDocsStateTheStatusRule(t *testing.T) {
+	t.Parallel()
+	for cluster, ps := range ports {
+		for _, p := range ps.ports {
+			text := strings.Join(strings.Fields(strings.Join(p.doc, " ")), " ")
+			if strings.Contains(text, "answers FAILURE") && !strings.Contains(text, "its status") {
+				t.Errorf("%s %s: the doc says an error answers FAILURE without the status rule:\n%s", cluster, p.name, text)
+			}
+		}
+	}
+}

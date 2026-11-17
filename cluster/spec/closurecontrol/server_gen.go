@@ -336,8 +336,8 @@ func (s *Server) EmitSecureStateChanged(endpoint uint16, data SecureStateChanged
 }
 
 // Mover drives the closure after the kit's checks: MoveTo to a
-// target position, Stop halts motion; an error answers FAILURE and
-// leaves the target state (cluster/closure).
+// target position, Stop halts motion; an error answers its status,
+// FAILURE without one, and leaves the target state (cluster/closure).
 //
 // Its optional interfaces [Latcher], [SpeedMover] and [Calibrator]
 // unlock the features whose commands and fields need more than a
@@ -359,7 +359,8 @@ type Mover interface {
 // closure is not Moving, WaitingForMotion or Calibrating, so the
 // command changes nothing (cluster §5.4.8.1). A bridged device whose
 // reported state lags its drive can halt it anyway; an error answers
-// FAILURE, as a Mover.Stop error does. matter.js has no counterpart:
+// its status, FAILURE without one, as a Mover.Stop error does.
+// matter.js has no counterpart:
 // its ClosureControlServer has no Stop logic. Without one the idle
 // Stop is a SUCCESS no-op (cluster/closure).
 type StopObserver interface {
@@ -373,7 +374,8 @@ type StopObserver interface {
 // latches, false unlatches. In a MoveTo that also moves, the server
 // unlatches before the motion and latches after it is accepted, as
 // connectedhomeip's closure-app orders a panel's actions. An error
-// answers FAILURE and leaves the target state.
+// answers its status, FAILURE without one, and leaves the target
+// state.
 type Latcher interface {
 	LatchControlModes() LatchControlModesBitmap
 	Latch(ctx context.Context, latch bool) error
@@ -381,8 +383,8 @@ type Latcher interface {
 
 // SpeedMover is an optional interface of a [Mover] for Speed (SP):
 // SetSpeed applies the speed of a MoveTo after the server's checks,
-// before the motion it accompanies. An error answers FAILURE and leaves
-// the target state.
+// before the motion it accompanies. An error answers its status,
+// FAILURE without one, and leaves the target state.
 type SpeedMover interface {
 	SetSpeed(ctx context.Context, speed ThreeLevelAutoEnum) error
 }
@@ -391,7 +393,8 @@ type SpeedMover interface {
 // Calibrate starts the calibration after the server's checks; on success
 // the server sets MainState Calibrating unless the drive reported a
 // MainState meanwhile (that report stands), and the drive reports
-// Stopped when it is done. An error answers FAILURE and leaves MainState.
+// Stopped when it is done. An error answers its status, FAILURE
+// without one, and leaves MainState.
 type Calibrator interface {
 	Calibrate(ctx context.Context) error
 }

@@ -238,7 +238,8 @@ func (s *Server) HandleOnWithTimedOff(fn func(ctx context.Context, req OnWithTim
 
 // Sink switches the device: the kit's OnOff server calls it before it
 // stores a change of OnOff a command makes, and an error leaves the
-// state and answers FAILURE (cluster/onoff Sink).
+// state and answers its status, FAILURE without one (cluster/onoff
+// Sink).
 type Sink interface {
 	SetOnOff(ctx context.Context, on bool) error
 }

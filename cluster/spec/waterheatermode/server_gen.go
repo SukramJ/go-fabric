@@ -203,7 +203,8 @@ func (s *Server) HandleChangeToMode(fn func(ctx context.Context, req ChangeToMod
 // ModeChanger moves the device to a supported mode other than the
 // current one: status 0 (Success) makes newMode the CurrentMode, any
 // other ModeChangeStatus is the response's with text for the user; an
-// error answers FAILURE. The kit's ModeBase server runs on it
+// error answers its status, FAILURE without one. The kit's ModeBase
+// server runs on it
 // (cluster/modebase).
 type ModeChanger interface {
 	ChangeToMode(ctx context.Context, newMode uint8) (status uint8, text string, err error)

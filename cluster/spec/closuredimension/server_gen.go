@@ -271,8 +271,8 @@ func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struc
 }
 
 // DimensionHandler carries out SetTarget and Step after the kit's
-// checks and before TargetState changes; an error answers FAILURE
-// (cluster/closure).
+// checks and before TargetState changes; an error answers its status,
+// FAILURE without one (cluster/closure).
 type DimensionHandler interface {
 	// SetTarget takes Position after the LimitRange clamp and the
 	// Resolution rounding, Latch and Speed as sent.

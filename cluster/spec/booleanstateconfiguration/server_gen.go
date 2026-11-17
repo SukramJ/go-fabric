@@ -279,8 +279,8 @@ func (s *Server) Host() Host {
 
 // Delegate is told what a controller changed — CurrentSensitivityLevel
 // (quality N, the host persists it), and what EnableDisableAlarm and
-// SuppressAlarm did; an error answers FAILURE (cluster/boolcfg
-// Delegate).
+// SuppressAlarm did; an error answers its status, FAILURE without one
+// (cluster/boolcfg Delegate).
 type Delegate interface {
 	CurrentSensitivityLevelChanged(ctx context.Context, level uint8) error
 	AlarmsEnabledChanged(ctx context.Context, enabled AlarmModeBitmap) error

@@ -310,7 +310,7 @@ func (s *Server) EmitOperationCompletion(endpoint uint16, data OperationCompleti
 // checked against the state (cluster/opstate): it moves
 // OperationalState through the device's typed Set and returns the
 // ErrorStateStruct the response reports, the zero value for
-// NoError; an error answers FAILURE.
+// NoError; an error answers its status, FAILURE without one.
 type CommandHandler interface {
 	HandleOperationalCommand(ctx context.Context, cmdID uint32) (ErrorStateStruct, error)
 }

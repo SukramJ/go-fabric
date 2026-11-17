@@ -96,8 +96,8 @@ var devicePorts = map[string]portSet{
 		doc: []string{
 			"Delegate is told what a controller changed — CurrentSensitivityLevel",
 			"(quality N, the host persists it), and what EnableDisableAlarm and",
-			"SuppressAlarm did; an error answers FAILURE (cluster/boolcfg",
-			"Delegate).",
+			"SuppressAlarm did; an error answers its status, FAILURE without one",
+			"(cluster/boolcfg Delegate).",
 		},
 		methods: []string{
 			"CurrentSensitivityLevelChanged(ctx context.Context, level uint8) error",
@@ -249,8 +249,8 @@ var devicePorts = map[string]portSet{
 		doc: []string{
 			"Selector decides a SelectAreas request whose areas are all",
 			"supported (areas without duplicates): a non-Success status is",
-			"answered as is and changes nothing, an error answers FAILURE",
-			"(cluster/servicearea).",
+			"answered as is and changes nothing, an error answers its status,",
+			"FAILURE without one (cluster/servicearea).",
 		},
 		methods: []string{"SelectAreas(ctx context.Context, areas []uint32) (SelectAreasStatus, string, error)"},
 	}, {
@@ -266,8 +266,8 @@ var devicePorts = map[string]portSet{
 		name: "Mover",
 		doc: []string{
 			"Mover drives the closure after the kit's checks: MoveTo to a",
-			"target position, Stop halts motion; an error answers FAILURE and",
-			"leaves the target state (cluster/closure).",
+			"target position, Stop halts motion; an error answers its status,",
+			"FAILURE without one, and leaves the target state (cluster/closure).",
 			"",
 			"Its optional interfaces [Latcher], [SpeedMover] and [Calibrator]",
 			"unlock the features whose commands and fields need more than a",
@@ -293,7 +293,8 @@ var devicePorts = map[string]portSet{
 			"closure is not Moving, WaitingForMotion or Calibrating, so the",
 			"command changes nothing (cluster §5.4.8.1). A bridged device whose",
 			"reported state lags its drive can halt it anyway; an error answers",
-			"FAILURE, as a Mover.Stop error does. matter.js has no counterpart:",
+			"its status, FAILURE without one, as a Mover.Stop error does.",
+			"matter.js has no counterpart:",
 			"its ClosureControlServer has no Stop logic. Without one the idle",
 			"Stop is a SUCCESS no-op (cluster/closure).",
 		},
@@ -309,7 +310,8 @@ var devicePorts = map[string]portSet{
 			"latches, false unlatches. In a MoveTo that also moves, the server",
 			"unlatches before the motion and latches after it is accepted, as",
 			"connectedhomeip's closure-app orders a panel's actions. An error",
-			"answers FAILURE and leaves the target state.",
+			"answers its status, FAILURE without one, and leaves the target",
+			"state.",
 		},
 		methods: []string{
 			"LatchControlModes() LatchControlModesBitmap",
@@ -321,8 +323,8 @@ var devicePorts = map[string]portSet{
 		doc: []string{
 			"SpeedMover is an optional interface of a [Mover] for Speed (SP):",
 			"SetSpeed applies the speed of a MoveTo after the server's checks,",
-			"before the motion it accompanies. An error answers FAILURE and leaves",
-			"the target state.",
+			"before the motion it accompanies. An error answers its status,",
+			"FAILURE without one, and leaves the target state.",
 		},
 		methods: []string{"SetSpeed(ctx context.Context, speed ThreeLevelAutoEnum) error"},
 	}, {
@@ -333,7 +335,8 @@ var devicePorts = map[string]portSet{
 			"Calibrate starts the calibration after the server's checks; on success",
 			"the server sets MainState Calibrating unless the drive reported a",
 			"MainState meanwhile (that report stands), and the drive reports",
-			"Stopped when it is done. An error answers FAILURE and leaves MainState.",
+			"Stopped when it is done. An error answers its status, FAILURE",
+			"without one, and leaves MainState.",
 		},
 		methods: []string{"Calibrate(ctx context.Context) error"},
 	}}},
@@ -341,8 +344,8 @@ var devicePorts = map[string]portSet{
 		name: "DimensionHandler",
 		doc: []string{
 			"DimensionHandler carries out SetTarget and Step after the kit's",
-			"checks and before TargetState changes; an error answers FAILURE",
-			"(cluster/closure).",
+			"checks and before TargetState changes; an error answers its status,",
+			"FAILURE without one (cluster/closure).",
 		},
 		methods: []string{
 			"// SetTarget takes Position after the LimitRange clamp and the",
@@ -358,8 +361,8 @@ var devicePorts = map[string]portSet{
 			"TemperatureSetter applies a SetTemperature the kit's server",
 			"checked: target (TN, 0.01 °C) or level (TL, an index into",
 			"SupportedTemperatureLevels). Nil error stores it; an error",
-			"answers FAILURE, or INVALID_IN_STATE when it wraps",
-			"thermo.ErrTemperatureRefused (cluster/thermo).",
+			"wrapping thermo.ErrTemperatureRefused answers INVALID_IN_STATE,",
+			"any other its status, FAILURE without one (cluster/thermo).",
 		},
 		methods: []string{"SetTemperature(ctx context.Context, target *int16, level *uint8) error"},
 	}}},
@@ -404,7 +407,8 @@ var devicePorts = map[string]portSet{
 		doc: []string{
 			"DemManager is the device's energy management behind the kit's",
 			"server: the hooks run after the server's checks; an error",
-			"answers FAILURE and changes nothing (cluster/energy).",
+			"answers its status, FAILURE without one, and changes nothing",
+			"(cluster/energy).",
 		},
 		methods: []string{
 			"// ApproxEnergyDuringSession is PowerAdjustEnd's EnergyUse, in mWh.",
@@ -433,7 +437,7 @@ var operationalCommands = portSet{ports: []portDecl{{
 		"checked against the state (cluster/opstate): it moves",
 		"OperationalState through the device's typed Set and returns the",
 		"ErrorStateStruct the response reports, the zero value for",
-		"NoError; an error answers FAILURE.",
+		"NoError; an error answers its status, FAILURE without one.",
 	},
 	methods: []string{"HandleOperationalCommand(ctx context.Context, cmdID uint32) (ErrorStateStruct, error)"},
 }}}
@@ -445,7 +449,8 @@ var alarmDelegate = portSet{ports: []portDecl{{
 	name: "Delegate",
 	doc: []string{
 		"Delegate is asked before a command changes Mask (ModifyEnabledAlarms)",
-		"or State (Reset); an error refuses the command and answers FAILURE.",
+		"or State (Reset); an error refuses the command and answers its",
+		"status, FAILURE without one.",
 		"Without one every command is accepted (cluster/alarmbase).",
 	},
 	methods: []string{

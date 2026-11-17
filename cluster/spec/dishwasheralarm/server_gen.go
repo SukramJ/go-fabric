@@ -222,7 +222,8 @@ func (s *Server) Host() Host {
 }
 
 // Delegate is asked before a command changes Mask (ModifyEnabledAlarms)
-// or State (Reset); an error refuses the command and answers FAILURE.
+// or State (Reset); an error refuses the command and answers its
+// status, FAILURE without one.
 // Without one every command is accepted (cluster/alarmbase).
 type Delegate interface {
 	ModifyEnabledAlarms(ctx context.Context, mask uint32) error

@@ -198,8 +198,8 @@ func (s *Server) HandleSetTemperature(fn func(ctx context.Context, req SetTemper
 // TemperatureSetter applies a SetTemperature the kit's server
 // checked: target (TN, 0.01 °C) or level (TL, an index into
 // SupportedTemperatureLevels). Nil error stores it; an error
-// answers FAILURE, or INVALID_IN_STATE when it wraps
-// thermo.ErrTemperatureRefused (cluster/thermo).
+// wrapping thermo.ErrTemperatureRefused answers INVALID_IN_STATE,
+// any other its status, FAILURE without one (cluster/thermo).
 type TemperatureSetter interface {
 	SetTemperature(ctx context.Context, target *int16, level *uint8) error
 }
