@@ -265,18 +265,7 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 	if len(crlPoints) == 0 {
 		return empty, nil
 	}
-	cut := len(crlPoints) > maxCRLPointsPerIssuer
-	if cut {
-		s.log.Warn("dcl.revocation.too_many_points", slog.String("akid", akid), slog.Int("points", len(crlPoints)),
-			slog.Int("used", maxCRLPointsPerIssuer),
-			slog.String("message", fmt.Sprintf("DCL lists %d CRL points for AKID %s; the first %d are used and the lookup is incomplete", len(crlPoints), akid, maxCRLPointsPerIssuer)))
-		crlPoints = crlPoints[:maxCRLPointsPerIssuer]
-	}
-	// The points per vendor, counted once (step 7.2 below).
-	perVID := map[uint16]int{}
-	for i := range crlPoints {
-		perVID[crlPoints[i].VID]++
-	}
+	crlPoints, perVID, cut := s.boundPoints(akid, crlPoints)
 	// Every entry contributes: an issuer may partition its revocations over
 	// several CRLs (§6.2.6.1); step 7.2 applies to entries sharing VendorID
 	// and IssuerSubjectKeyID (§11.23.11.8).
@@ -333,6 +322,23 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 	}
 	lookup.complete = transient == 0 && !cut
 	return lookup, nil
+}
+
+// boundPoints is points up to maxCRLPointsPerIssuer — cut when some were
+// dropped, logged once — and the number of them per vendor, counted once
+// for step 7.2.
+func (s *CertificateStore) boundPoints(akid string, points []RevocationPoint) (_ []RevocationPoint, perVID map[uint16]int, cut bool) {
+	if cut = len(points) > maxCRLPointsPerIssuer; cut {
+		s.log.Warn("dcl.revocation.too_many_points", slog.String("akid", akid), slog.Int("points", len(points)),
+			slog.Int("used", maxCRLPointsPerIssuer),
+			slog.String("message", fmt.Sprintf("DCL lists %d CRL points for AKID %s; the first %d are used and the lookup is incomplete", len(points), akid, maxCRLPointsPerIssuer)))
+		points = points[:maxCRLPointsPerIssuer]
+	}
+	perVID = map[uint16]int{}
+	for i := range points {
+		perVID[points[i].VID]++
+	}
+	return points, perVID, cut
 }
 
 // processRevocationPoint is #processRevocationPoint (:1510-1565): the

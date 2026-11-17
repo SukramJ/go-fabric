@@ -863,7 +863,8 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		// sets the flag on the stored entry by key identifier alone
 		// (DclCertificateService.ts:1183-1199 at db021da0); this is ahead
 		// of it (review II, R2-P6-sec-1902).
-		if ok && !(isProduction && !existing.IsProduction) {
+		upgrade := isProduction && !existing.IsProduction
+		if ok && !upgrade {
 			return true
 		}
 	}
