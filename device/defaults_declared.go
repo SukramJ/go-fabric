@@ -346,8 +346,7 @@ func newCommodityTariffServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(err)
 	}
 	if n, ok := d.TimeSource.(contract.ChangeNotifier); ok && b.bind != nil {
-		// While the device is added: a refused or removed device leaves no
-		// subscription on the host's source (R2-P6-store-2515).
+		// Not for a refused or a removed device (R2-P6-store-2515).
 		logger := b.logger
 		b.bind(func() func() {
 			return n.OnMatterValueChanged(func() {

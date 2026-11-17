@@ -442,6 +442,10 @@ Once a device is added, it has a lifecycle of its own:
 device's Reachable attribute and its ReachableChanged event),
 `Device.Rename(ctx, name)` changes the NodeLabel a controller sees, and
 `Device.EndpointNumber` returns the endpoint the node gave it.
+`SetReachable`, `Rename` and `Device.Update` return an error:
+`device.ErrNotBridged` on a part, whose node serves no reachability or
+label of its own, and from `Rename` the store's refusal to persist the
+label, which is then not served.
 `Node.Topology()` is what the node serves: the Aggregator's endpoint and
 every bridged device with its key, endpoint, device type, name and
 reachability. The [host's view](../guides/host-view.md) walks through a

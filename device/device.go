@@ -86,16 +86,26 @@ type Device struct {
 	ports  map[uint32]any
 
 	// bindings are the subscriptions the device's servers hold on host
-	// ports while the device is added (defaultBuild.bind), set once at
-	// New; unbind undoes the ones attach made.
-	bindings []func() func()
+	// ports (defaultBuild.bind), set once at New. life serialises start,
+	// stop and subscribe; running is whether the device runs on a node
+	// (its queue), subscribed whether the bindings are subscribed, and
+	// unbind undoes them.
+	bindings   []func() func()
+	life       sync.Mutex
+	running    bool
+	subscribed bool
+	unbind     []func()
 
-	// mu guards parts, host, unbind and the host statements of opts
-	// (Name, DeviceAddress, ChannelAddress: Rename, Update).
-	mu     sync.Mutex
-	parts  []*Device
-	host   deviceseam.Host
-	unbind []func()
+	// owner is the device d is a part of ([Device.AddPart]), nil for a
+	// device the host adds itself; written under composeMu.
+	owner atomic.Pointer[Device]
+
+	// mu guards parts, host and the host statements of opts (Name,
+	// DeviceAddress, ChannelAddress: Rename, Update); parts change only
+	// under composeMu too.
+	mu    sync.Mutex
+	parts []*Device
+	host  deviceseam.Host
 
 	// identify holds the host's Identify and TriggerEffect handlers
 	// ([Device.Identify]); never mounted.
@@ -275,6 +285,7 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	}
 	d.report.Effective = d.effective()
 	d.report.Decisions = append(d.report.Decisions, opts.Surface.ServerInternal(d.report.Effective.Endpoints[0], s.candidates)...)
+	d.subscribe() // the device is built: nothing after this refuses it
 	return d, nil
 }
 
@@ -742,12 +753,22 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // base types), except under a BridgedNode, whose "Separate Endpoints"
 // pattern hosts any application device type on descendants
 // (packages/node/src/endpoints/bridged-node.ts:39-73).
+//
+// A part of another device moves: it leaves its former owner's parts —
+// and that owner's node — and is bound with d to d's node, or waits
+// unbound until d is added. Mirrors matter.js's owner setter, which
+// removes the endpoint from its former owner's container before it adds
+// it to the new one and, should the add throw, leaves it with no owner
+// (packages/node/src/endpoint/Endpoint.ts:706-725 at db021da0). Here
+// nothing after the move can fail, so p is never half-owned
+// (R2-P6-fsm-2501, step 16). A device a node holds as a bridged device is
+// the Aggregator's, which AddPart does not change: it is refused with
+// [ErrAddedElsewhere] (node.Aggregator.Remove it first). A part already
+// d's is left as it is. A callback on p's queue must not move p: the move
+// waits for p's queue to run what it holds.
 func (d *Device) AddPart(p *Device) error {
 	if p == nil {
 		return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
-	}
-	if p == d || p.contains(d) {
-		return fmt.Errorf("%w: %s: a part may not contain its owner", ErrComposition, d.typ.Name)
 	}
 	if p.bridgedPowerSource {
 		return fmt.Errorf("%w: %s: the part %s declares PowerSource, which BridgedNode allows on a bridged device under BridgedPowerSourceInfo; a part is no bridged node",
@@ -757,17 +778,46 @@ func (d *Device) AddPart(p *Device) error {
 		return fmt.Errorf("%w: %s (%s) states no component device type %s; its parts must be device types its requirements name",
 			ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
 	}
-	d.mu.Lock()
-	if slices.Contains(d.parts, p) {
-		d.mu.Unlock()
+	composeMu.Lock()
+	if p == d || p.contains(d) {
+		composeMu.Unlock()
+		return fmt.Errorf("%w: %s: a part may not contain its owner", ErrComposition, d.typ.Name)
+	}
+	former := p.owner.Load()
+	if former == d {
+		composeMu.Unlock()
 		return nil
 	}
+	if former == nil && p.hostOf() != nil {
+		composeMu.Unlock()
+		return fmt.Errorf("%w: %s is a bridged device of a node; remove it from the Aggregator before it becomes a part", ErrAddedElsewhere, p.opts.StableKey)
+	}
+	// The move (Endpoint.ts:710-718): out of the former owner, then in.
+	if former != nil {
+		former.mu.Lock()
+		former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
+		former.mu.Unlock()
+	}
+	p.owner.Store(d)
+	d.mu.Lock()
 	d.parts = append(d.parts, p)
 	h := d.host
 	d.mu.Unlock()
-	// A part added to a device the node holds joins its lifecycle.
+	tree := p.treeLocked()
+	bound := p.hostOf() != nil
+	for _, x := range tree {
+		x.setHost(h)
+	}
+	composeMu.Unlock()
+	if bound {
+		for _, x := range tree {
+			x.stop()
+		}
+	}
 	if h != nil {
-		return p.attach(h)
+		for _, x := range tree {
+			x.start()
+		}
 	}
 	return nil
 }

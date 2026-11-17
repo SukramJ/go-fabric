@@ -51,10 +51,11 @@ func (h *fakeHost) NotifyReachable(_ context.Context, _ endpoint.SourceKey, reac
 	h.mu.Unlock()
 }
 
-func (h *fakeHost) Rename(_ context.Context, _ endpoint.SourceKey, name string) {
+func (h *fakeHost) Rename(_ context.Context, _ endpoint.SourceKey, name string) error {
 	h.mu.Lock()
 	h.names = append(h.names, name)
 	h.mu.Unlock()
+	return nil
 }
 
 func (h *fakeHost) HostName(_ context.Context, _ endpoint.SourceKey, name string) {

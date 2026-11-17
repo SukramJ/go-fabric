@@ -349,9 +349,11 @@ func TestLevelControlPortCouplesTheColorTemperature(t *testing.T) {
 	}
 }
 
-// TestAPartThatCannotBeBoundStopsTheOwner: an owner whose part is already
-// bound to another node is not bound either.
-func TestAPartThatCannotBeBoundStopsTheOwner(t *testing.T) {
+// TestAPartIsNotBoundOnItsOwn: a part is bound with its owner, never by
+// itself — the setup in which an owner's refused attach once unbound a part
+// another node held (R2-P6-fsm-2501) cannot arise — and the owner then
+// binds with it.
+func TestAPartIsNotBoundOnItsOwn(t *testing.T) {
 	t.Parallel()
 
 	owner, err := NewBridgedNode(testOptions("owner"))
@@ -366,17 +368,20 @@ func TestAPartThatCannotBeBoundStopsTheOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := &fakeHost{clk: &deviceClock{}, numbers: map[string]uint16{}}
-	detach, _, err := deviceseam.Attach(part, first)
+	if _, _, err := deviceseam.Attach(part, first); !errors.Is(err, ErrComposition) {
+		t.Errorf("binding a part on its own: %v, want ErrComposition", err)
+	}
+	if part.hostOf() != nil {
+		t.Error("the refused part is bound")
+	}
+	second := &fakeHost{clk: &deviceClock{}, numbers: map[string]uint16{}}
+	detach, _, err := deviceseam.Attach(owner, second)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("binding the owner: %v", err)
 	}
 	defer detach()
-	second := &fakeHost{clk: &deviceClock{}, numbers: map[string]uint16{}}
-	if _, _, err := deviceseam.Attach(owner, second); !errors.Is(err, ErrAddedElsewhere) {
-		t.Errorf("binding an owner whose part is bound elsewhere: %v, want ErrAddedElsewhere", err)
-	}
-	if owner.host != nil {
-		t.Error("the owner is still bound after its part refused")
+	if part.hostOf() == nil {
+		t.Error("the part is not bound with its owner")
 	}
 }
 

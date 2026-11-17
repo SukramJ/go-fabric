@@ -48,16 +48,23 @@ func (h nodeHost) NotifyReachable(_ context.Context, key endpoint.SourceKey, rea
 	}
 }
 
-// Rename implements [deviceseam.Host]: the assembled endpoint's NodeLabel,
-// or, before the node assembled it, the persisted label the assembly
-// restores (Aggregator.snapshot).
-func (h nodeHost) Rename(ctx context.Context, key endpoint.SourceKey, name string) {
+// Rename implements [deviceseam.Host]: the label is stored first, as a
+// controller's write of it is (endpoint.Persistence.SaveNodeLabel runs
+// before the label is served), and a refused store serves nothing and is
+// returned to the host (R2-P5-apidev-16). Stored, it becomes the assembled
+// endpoint's NodeLabel, reported to the subscriptions; before the node
+// assembled the endpoint, the assembly restores it (Aggregator.snapshot).
+// The assembled endpoint's SetNodeLabel (through
+// bridge.Bridge.NotifyEndpointNodeLabel) stores the same label once more,
+// the bridge's route for a host that calls it directly.
+func (h nodeHost) Rename(ctx context.Context, key endpoint.SourceKey, name string) error {
+	if err := h.n.endpoints.SaveNodeLabel(ctx, key, name); err != nil {
+		return err
+	}
 	if ep := h.n.assembled(key); ep != nil {
 		h.n.br.NotifyEndpointNodeLabel(ep.ID, name) //nolint:contextcheck // the host's rename outlives the call; the endpoint's save is not bound by it
-		return
 	}
-	// The host's rename: a refused save is the persistence's to log.
-	_ = h.n.endpoints.SaveNodeLabel(ctx, key, name)
+	return nil
 }
 
 // HostName implements [deviceseam.Host]: the host's current name of the

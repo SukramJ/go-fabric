@@ -80,11 +80,12 @@ type defaultBuild struct {
 	initial map[uint32]any
 	// logger receives the server's diagnostics ([Options].Logger).
 	logger *slog.Logger
-	// bind registers a subscription the server holds on a host port for
-	// as long as the device is added to a node: subscribe runs when the
-	// device is attached and the unsubscribe it returns when it is
-	// detached, so a refused or removed device leaves none behind
-	// (R2-P6-store-2515). Nil drops the registration.
+	// bind registers a subscription the server holds on a host port:
+	// subscribe runs once New built the device and again when a node
+	// adds it after a detach, and the unsubscribe it returns runs when
+	// the node removes the device or stops, so a refused or removed
+	// device leaves none behind (R2-P6-store-2515). Nil drops the
+	// registration.
 	bind func(subscribe func() (unsubscribe func()))
 }
 

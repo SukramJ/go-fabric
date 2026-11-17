@@ -31,9 +31,11 @@ type Host interface {
 	// became reachable or unreachable (the ReachableChanged event and the
 	// Reachable attribute); a no-op before the endpoint is assembled.
 	NotifyReachable(ctx context.Context, key endpoint.SourceKey, reachable bool)
-	// Rename sets the NodeLabel of the endpoint with key and reports it;
-	// a no-op before the endpoint is assembled.
-	Rename(ctx context.Context, key endpoint.SourceKey, name string)
+	// Rename stores name as the NodeLabel of the endpoint with key, then
+	// serves and reports it; before the endpoint is assembled it stores
+	// the label the assembly restores. An error is the store's refusal:
+	// nothing is served (device.Device.Rename returns it).
+	Rename(ctx context.Context, key endpoint.SourceKey, name string) error
 	// HostName gives the endpoint with key the host's current name, served
 	// as its NodeLabel while no label is written and persisted nowhere; a
 	// no-op before the endpoint is assembled, whose assembly reads the
