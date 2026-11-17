@@ -1165,7 +1165,7 @@ func TestDclCertificateServiceLookupCdSigner(t *testing.T) {
 		future := csaFutureSigner(t)
 		standInCSA(s, future)
 		// A stored CD signer under the key identifier that does not verify.
-		s.storeCertificate(futureSKID, secattestation.TestPAAFFF1Cert, CertificateMetadata{SubjectKeyID: futureSKID, Kind: KindCDSigner})
+		s.storeCertificate(futureSKID, secattestation.TestPAAFFF1Cert, CertificateMetadata{SubjectKeyID: futureSKID, Kind: KindCDSigner}, false)
 		skidAnswer(f, futureSKID, future.der)
 		if _, ok := s.CDSigner(future.skid()); !ok {
 			t.Fatal("not trusted from the DCL")

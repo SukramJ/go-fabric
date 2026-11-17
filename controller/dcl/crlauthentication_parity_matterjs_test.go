@@ -393,7 +393,7 @@ func dclCrlServe(t *testing.T, f *fakeDCL, issuerSKID []byte, points []dclCrlPoi
 				t.Fatal(err)
 			}
 			id := hexUpper(c.x509.SubjectKeyId)
-			s.storeCertificate(id, tr.der, CertificateMetadata{SubjectKeyID: id, IsProduction: true, Kind: KindCDSigner})
+			s.storeCertificate(id, tr.der, CertificateMetadata{SubjectKeyID: id, IsProduction: true, Kind: KindCDSigner}, true)
 			continue
 		}
 		if _, err := s.AddCertificate(context.Background(), tr.der, tr.kind, false); err != nil {

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"testing"
 )
 
@@ -81,12 +82,38 @@ func TestStoreCertificateKeepsAProductionEntry(t *testing.T) {
 	other := mint(t, certSpec{cn: "Test PAA", vid: u16(0xFFF1), ca: true, noAKID: true, skid: genuine.skid()}, nil)
 	s := openStore(t, CertificateOptions{})
 	id := genuine.skidHex()
-	s.storeCertificate(id, genuine.der, CertificateMetadata{SubjectKeyID: id, IsProduction: true, Kind: KindPAA, IsRoot: true})
+	s.storeCertificate(id, genuine.der, CertificateMetadata{SubjectKeyID: id, IsProduction: true, Kind: KindPAA, IsRoot: true}, true)
 	for _, kind := range []Kind{KindPAA, KindCDSigner} {
-		s.storeCertificate(id, other.der, CertificateMetadata{SubjectKeyID: id, IsProduction: false, Kind: kind})
+		s.storeCertificate(id, other.der, CertificateMetadata{SubjectKeyID: id, IsProduction: false, Kind: kind}, false)
 		e, _ := s.lookup(id)
 		if !e.IsProduction || !bytes.Equal(e.DER, genuine.der) || e.Kind != KindPAA {
 			t.Fatalf("a test %s replaced the production entry: production %v, kind %s", kind, e.IsProduction, e.Kind)
 		}
+	}
+}
+
+// TestCertificateStoreHealsAnOldPromotion (review II, R2-P6-sec-1902): a
+// store written before the rule may hold a production entry over a test
+// source's bytes, unmarked as the production ledger's; the next update
+// that sees the root listed fetches the production record and stores its
+// bytes.
+func TestCertificateStoreHealsAnOldPromotion(t *testing.T) {
+	t.Parallel()
+	genuine := mint(t, certSpec{cn: "Test PAA", vid: u16(0xFFF1), ca: true, noAKID: true}, nil)
+	other := mint(t, certSpec{cn: "Test PAA", vid: u16(0xFFF1), ca: true, noAKID: true, skid: genuine.skid()}, nil)
+	old, err := json.Marshal(map[string]any{"certificates": []any{map[string]any{
+		"subjectKeyId": genuine.skidHex(), "isProduction": true, "kind": string(KindPAA), "isRoot": true, "der": other.der,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mem := &MemoryStore{}
+	_ = mem.Save(context.Background(), old)
+	prod := newFakeDCL(t)
+	prod.addRoot(genuine)
+	s := openStore(t, CertificateOptions{Client: prod.client(), Store: mem, Clock: newManualClock(), UpdateInterval: -1})
+	p, ok := s.PAA(genuine.skid())
+	if !ok || !p.Production || !bytes.Equal(p.DER, genuine.der) {
+		t.Fatalf("after the update: found %v, production %v, the production bytes %v", ok, p.Production, bytes.Equal(p.DER, genuine.der))
 	}
 }

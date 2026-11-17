@@ -95,6 +95,13 @@ func (m CertificateMetadata) kind() Kind {
 type storedCertificate struct {
 	CertificateMetadata
 	DER []byte `json:"der"`
+	// ProductionLedger marks a production entry whose bytes the production
+	// ledger answered (a root it lists, a CD signer it serves). A production
+	// entry without it — one a store wrote before review II R2-P6-sec-1902,
+	// whose promotion may have kept a test source's bytes — is fetched again
+	// at the next update that sees it listed; until then (an offline store)
+	// it keeps its stored bytes.
+	ProductionLedger bool `json:"productionLedger,omitempty"`
 }
 
 // storedIndex is the persisted trust store.
@@ -615,7 +622,7 @@ func (s *CertificateStore) putCDSigner(ctx context.Context, id string, der []byt
 	s.storeCertificate(id, der, CertificateMetadata{
 		Subject: c.x509.Subject.CommonName, SubjectKeyID: id, SerialNumber: hex.EncodeToString(serialContent(c.x509.SerialNumber)),
 		VID: vidOrZero(c), IsProduction: true, Kind: KindCDSigner,
-	})
+	}, true)
 	s.saveIndex(ctx)
 	s.log.Info("dcl.certificates.added", slog.String("kind", string(KindCDSigner)), slog.String("skid", id), slog.Bool("production", true))
 }
@@ -637,13 +644,19 @@ func (s *CertificateStore) AddCertificate(ctx context.Context, der []byte, kind 
 		}
 	}
 	id := hexUpper(c.x509.SubjectKeyId)
-	if _, ok := s.lookup(id); ok {
-		return false, nil
-	}
-	s.storeCertificate(id, der, CertificateMetadata{
+	// The look-up and the store under one lock: a certificate another
+	// writer stores in between makes this add report false, not true over
+	// a store that kept the other (review II, R2-P6-sec-1902).
+	s.mu.Lock()
+	_, exists := s.index[id]
+	added := !exists && s.storeCertificateLocked(id, der, CertificateMetadata{
 		Subject: c.x509.Subject.CommonName, SubjectKeyID: id, SerialNumber: hex.EncodeToString(serialContent(c.x509.SerialNumber)),
 		VID: vidOrZero(c), IsRoot: kind == KindPAA, IsProduction: production, Kind: kind,
-	})
+	}, false)
+	s.mu.Unlock()
+	if !added {
+		return false, nil
+	}
 	s.saveIndex(ctx)
 	s.log.Info("dcl.certificates.added", slog.String("kind", string(kind)), slog.String("skid", id), slog.Bool("production", production))
 	return true, nil
@@ -733,13 +746,20 @@ func (s *CertificateStore) saveIndex(ctx context.Context) {
 // never replaces a production entry: the entry, its DER included, stays
 // as the production source stored it, so the bytes [CertificateStore.PAA]
 // reports as production are the production ledger's (review II,
-// R2-P6-sec-1902; an Ahead-of-matter.js row).
-func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata) {
+// R2-P6-sec-1902; the Ahead-of-matter.js row of the promotion and of this
+// rule). fromLedger says the bytes are the production ledger's answer
+// (storedCertificate.ProductionLedger). It reports whether it stored.
+func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata, fromLedger bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.storeCertificateLocked(id, der, m, fromLedger)
+}
+
+// storeCertificateLocked is storeCertificate under s.mu.
+func (s *CertificateStore) storeCertificateLocked(id string, der []byte, m CertificateMetadata, fromLedger bool) bool {
 	existing, ok := s.index[id]
 	if ok && existing.IsProduction && !m.IsProduction {
-		return
+		return false
 	}
 	if m.FetchedAt.IsZero() {
 		if ok && !existing.FetchedAt.IsZero() {
@@ -748,7 +768,8 @@ func (s *CertificateStore) storeCertificate(id string, der []byte, m Certificate
 			m.FetchedAt = s.clock.Now().UTC().Truncate(time.Millisecond)
 		}
 	}
-	s.index[id] = storedCertificate{CertificateMetadata: m, DER: bytes.Clone(der)}
+	s.index[id] = storedCertificate{CertificateMetadata: m, DER: bytes.Clone(der), ProductionLedger: fromLedger && m.IsProduction}
+	return true
 }
 
 // Update fetches the ledger's roots (and, with the options, the test
@@ -864,7 +885,9 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		// returns before the fetch (DclCertificateService.ts:1184-1188,
 		// :1199 at db021da0); this is ahead of it (review II,
 		// R2-P6-sec-1902).
-		upgrade := isProduction && !existing.IsProduction
+		// A production entry the production ledger did not answer the bytes
+		// of (one a store wrote before that rule) is fetched again too.
+		upgrade := isProduction && (!existing.IsProduction || !existing.ProductionLedger)
 		if ok && !upgrade {
 			return true
 		}
@@ -894,7 +917,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		s.storeCertificate(id, der, CertificateMetadata{
 			Subject: cert.Subject, SubjectAsText: cert.SubjectAsText, SubjectKeyID: id, SerialNumber: cert.SerialNumber,
 			VID: cert.VID, IsRoot: cert.IsRoot, IsProduction: isProduction, Kind: KindPAA,
-		})
+		}, isProduction)
 		stored = stored || id == refID
 	}
 	return stored
@@ -1047,5 +1070,5 @@ func (s *CertificateStore) fetchGitHubCertificate(ctx context.Context, dir *gith
 	s.storeCertificate(id, der, CertificateMetadata{
 		Subject: strings.Replace(name, ".der", "", 1), SubjectKeyID: id, SerialNumber: hex.EncodeToString(serialContent(c.x509.SerialNumber)),
 		VID: vidOrZero(c), IsRoot: kind == KindPAA, IsProduction: false, Kind: kind,
-	})
+	}, false)
 }
