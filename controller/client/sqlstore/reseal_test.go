@@ -119,19 +119,13 @@ func TestResealRefusals(t *testing.T) {
 		t.Errorf("Reseal on a v2 registry = %v; want the schema step named", err)
 	}
 
-	// A registry the release before v3 sealed: v3's Down, then Apply.
-	unmarked := openTestDB(t)
-	s, err := sqlstore.NewSealed(ctx, unmarked, sealerOf(t, 1))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := unmarked.ExecContext(ctx, sqlstore.Migrations()[2].Down); err != nil {
-		t.Fatal(err)
-	}
+	// A registry the release before v3 sealed, then Apply.
+	unmarked := v2SealedRegistry(t, 1, []byte("MT:X"))
 	if err := sqlstore.Apply(ctx, unmarked); err != nil {
+		t.Fatal(err)
+	}
+	var sealedBefore []byte
+	if err := unmarked.QueryRowContext(ctx, `SELECT value FROM matter_client_values WHERE node_id = 'n'`).Scan(&sealedBefore); err != nil {
 		t.Fatal(err)
 	}
 	down := &switchSealer{Sealer: sealerOf(t, 2), refuse: true}
@@ -141,8 +135,9 @@ func TestResealRefusals(t *testing.T) {
 	if present, _ := registryCanary(t, unmarked); present {
 		t.Error("a failed Reseal wrote the canary")
 	}
-	if got := value(t, s, onboardingCluster, 0); string(got) != "MT:X" {
-		t.Errorf("the code after a failed Reseal reads %q under the old key", got)
+	var sealedAfter []byte
+	if err := unmarked.QueryRowContext(ctx, `SELECT value FROM matter_client_values WHERE node_id = 'n'`).Scan(&sealedAfter); err != nil || !bytes.Equal(sealedAfter, sealedBefore) {
+		t.Errorf("the sealed code after a failed Reseal changed (%v)", err)
 	}
 	if err := sqlstore.Reseal(ctx, unmarked, sealerOf(t, 1), sealerOf(t, 2)); err != nil {
 		t.Fatal(err)
@@ -152,6 +147,19 @@ func TestResealRefusals(t *testing.T) {
 	}
 	if _, err := sqlstore.NewSealed(ctx, unmarked, sealerOf(t, 1)); !errors.Is(err, store.ErrUnseal) {
 		t.Errorf("NewSealed under the old key after Reseal = %v, want store.ErrUnseal", err)
+	}
+	if moved, err := sqlstore.NewSealed(ctx, unmarked, sealerOf(t, 2)); err != nil {
+		t.Errorf("NewSealed under the new key after Reseal: %v", err)
+	} else if got := value(t, moved, onboardingCluster, 0); string(got) != "MT:X" {
+		t.Errorf("the code after Reseal reads %q", got)
+	}
+
+	v1 := openEmptyDB(t)
+	if _, err := v1.ExecContext(ctx, sqlstore.Migrations()[0].Up); err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlstore.Reseal(ctx, v1, sealerOf(t, 1), sealerOf(t, 2)); err == nil || !strings.Contains(err.Error(), "v3") {
+		t.Errorf("Reseal on a v1 registry = %v; want the schema step named", err)
 	}
 
 	kept := openTestDB(t)

@@ -137,29 +137,58 @@ func TestSealCanaryRefusals(t *testing.T) {
 	}
 }
 
-// TestRegistryUpgradeFromV2 (decision 157): a registry the release before
-// schema v3 sealed — a sealed code, no canary — opens after Apply under
-// its key, which NewSealed checks on the sealed value and then marks the
-// registry with; under another key it fails with store.ErrUnseal before
-// anything is written. A clear code in a v2 registry is sealed on the way
-// in. v3's Down returns a marked registry to v2's schema.
-func TestRegistryUpgradeFromV2(t *testing.T) {
-	t.Parallel()
+// v2SealedRegistry is a v2 registry as the release before schema v3
+// sealed it: the code of node "n" sealed under sealerOf(b) — the value
+// another registry's NewSealed sealed, whose aad names the row, not the
+// file — and no canary.
+func v2SealedRegistry(t *testing.T, b byte, code []byte) *sql.DB {
+	t.Helper()
 	ctx := t.Context()
-	code := []byte("MT:UPGRADECODE000")
-
-	// A v2 registry as the release before v3 sealed it: the rows of a
-	// sealed store, then v3's Down, which takes the canary with it.
-	db := openTestDB(t)
-	s, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 1))
+	src := openTestDB(t)
+	s, err := sqlstore.NewSealed(ctx, src, sealerOf(t, b))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Save("n", 0, onboardingCluster, map[uint32][]byte{0: code}, nil); err != nil {
 		t.Fatal(err)
 	}
+	var sealedCode []byte
+	if err := src.QueryRowContext(ctx, `SELECT value FROM matter_client_values WHERE node_id = 'n'`).Scan(&sealedCode); err != nil {
+		t.Fatal(err)
+	}
+	db := openEmptyDB(t)
+	for _, m := range sqlstore.Migrations()[:2] {
+		if _, err := db.ExecContext(ctx, m.Up); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_client_values(node_id, endpoint, cluster, attribute, value, sealed) VALUES('n', 0, ?, 0, ?, 1)`, onboardingCluster, sealedCode); err != nil {
+		t.Fatal(err)
+	}
+	return db
+}
+
+// TestV3DownRefusesTheSealCanary (fable-read F5): v3's Down refuses a
+// registry the seal canary marks and leaves it as it was, as store's v10
+// Down refuses a database its canary marks; on a registry without the
+// canary it returns to v2's schema.
+func TestV3DownRefusesTheSealCanary(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	marked := openTestDB(t)
+	if _, err := sqlstore.NewSealed(ctx, marked, sealerOf(t, 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := marked.ExecContext(ctx, sqlstore.Migrations()[2].Down); err == nil {
+		t.Error("v3's Down dropped the seal canary of a marked registry")
+	}
+	if present, data := registryCanary(t, marked); !present || len(data) == 0 {
+		t.Error("the refused Down changed the seal canary")
+	}
+
+	db := openTestDB(t)
 	if _, err := db.ExecContext(ctx, sqlstore.Migrations()[2].Down); err != nil {
-		t.Fatalf("v3 down on a marked registry: %v", err)
+		t.Fatalf("v3's Down on a registry without the canary: %v", err)
 	}
 	byList := openEmptyDB(t)
 	for _, m := range sqlstore.Migrations()[:2] {
@@ -170,8 +199,21 @@ func TestRegistryUpgradeFromV2(t *testing.T) {
 	got, _ := sqlstore.SchemaFingerprint(ctx, db)
 	want, _ := sqlstore.SchemaFingerprint(ctx, byList)
 	if got != want {
-		t.Fatal("v3 down did not leave v2's schema")
+		t.Error("v3's Down did not leave v2's schema")
 	}
+}
+
+// TestRegistryUpgradeFromV2 (decision 157): a registry the release before
+// schema v3 sealed — a sealed code, no canary — opens after Apply under
+// its key, which NewSealed checks on the sealed value and then marks the
+// registry with; under another key it fails with store.ErrUnseal before
+// anything is written. A clear code in a v2 registry is sealed on the way
+// in.
+func TestRegistryUpgradeFromV2(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	code := []byte("MT:UPGRADECODE000")
+	db := v2SealedRegistry(t, 1, code)
 
 	if err := sqlstore.Apply(ctx, db); err != nil {
 		t.Fatalf("Apply on a v2 registry: %v", err)
