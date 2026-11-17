@@ -667,7 +667,11 @@ func (s *Site) pending() int {
 // ([Site.Settle]) it advances the clock to its next deadline, so a timer
 // fn waits on — a standalone acknowledgement, a retransmission, a
 // report's interval — fires. It returns fn's error, or ctx's when ctx ends
-// first. With a clock that is not a [clocktest.Fake] it only runs fn.
+// first — or, for a ctx without a deadline, [ErrWaited] once [Options].Wait
+// has passed on the wall clock, as [Site.Eventually] (R2-P6-test-2511).
+// fn's context ends when Run returns, so an fn Run gave up on sees its
+// context end. With a clock that is not a [clocktest.Fake] it only runs
+// fn.
 //
 // This is MockTime.resolve (packages/testing/src/mocks/time.ts:537-622 at
 // 862ad75f), under which the matter.js site commissions (mock-site.ts:156):
@@ -678,6 +682,9 @@ func (s *Site) Run(ctx context.Context, fn func(ctx context.Context) error) erro
 	if s.fake == nil {
 		return fn(ctx)
 	}
+	until := s.waitUntil(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	finished := make(chan struct{})
 	var result error
 	go func() {
@@ -685,7 +692,7 @@ func (s *Site) Run(ctx context.Context, fn func(ctx context.Context) error) erro
 		result = fn(ctx)
 	}()
 	for {
-		if err := s.quiet(ctx, finished, time.Time{}); err != nil {
+		if err := s.quiet(ctx, finished, until); err != nil {
 			return err
 		}
 		select {
