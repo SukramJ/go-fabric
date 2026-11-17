@@ -6,6 +6,9 @@ package commissioner
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
@@ -122,7 +125,7 @@ type GeneralCommissioningError struct {
 func (e *GeneralCommissioningError) message() string {
 	msg := fmt.Sprintf("Commission error for %q: %s (%d)", e.Command, enumName(gencomm.CommissioningErrorEnumDef, uint64(e.Code)), e.Code)
 	if e.DebugText != "" {
-		msg += ", " + e.DebugText
+		msg += ", " + deviceText(e.DebugText)
 	}
 	return msg
 }
@@ -238,4 +241,30 @@ func isCommissioningError(err error) bool {
 func isStatusError(err error) bool {
 	var se *interaction.StatusError
 	return errors.As(err, &se)
+}
+
+// maxDeviceText is the most of a device's string an error message carries,
+// in bytes: the NOC response's DebugText bound (wire.go), which the
+// generated decoders of the other responses do not all apply.
+const maxDeviceText = 128
+
+// deviceText is a string a device sent — a DebugText — made fit for an
+// error message the host may print anywhere: cut at [maxDeviceText]
+// bytes, and quoted with Go's escapes when it holds a control character
+// or is not valid UTF-8, so no raw byte of it reaches a terminal or a log
+// line. Plain printable text stays as it is, the message shape matter.js
+// gives it (review II, R2-P6-sec-1861).
+func deviceText(s string) string {
+	cut := len(s) > maxDeviceText
+	if cut {
+		s = s[:maxDeviceText]
+	}
+	plain := utf8.ValidString(s) && !strings.ContainsFunc(s, func(r rune) bool { return !strconv.IsPrint(r) })
+	if !plain {
+		s = strconv.Quote(s)
+	}
+	if cut {
+		s += "…"
+	}
+	return s
 }

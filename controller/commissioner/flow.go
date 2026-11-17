@@ -544,7 +544,7 @@ func (f *flow) ensureGeneralCommissioningSuccess(what string, code gencomm.Commi
 func (f *flow) ensureOperationalCredentialsSuccess(what string, r nocResponse) error {
 	suffix := ""
 	if r.debugText != nil && *r.debugText != "" {
-		suffix += ", " + *r.debugText
+		suffix += ", " + deviceText(*r.debugText)
 	}
 	if r.fabricIndex != nil {
 		suffix += fmt.Sprintf(", fabricIndex: %d", *r.fabricIndex)

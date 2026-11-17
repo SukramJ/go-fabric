@@ -458,7 +458,7 @@ func debugSuffix(sep string, text *string) string {
 	if text == nil || *text == "" {
 		return ""
 	}
-	return sep + *text
+	return sep + deviceText(*text)
 }
 
 // networkAt reads the root's Networks and returns the entry at index
