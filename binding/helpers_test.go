@@ -168,6 +168,13 @@ type fakeLink struct {
 	connects  map[*peer.Peer]int
 	ctxs      map[*peer.Peer][]context.Context
 	releases  map[*peer.Peer]int
+	// block makes connect wait for its context to end, as a Connect call
+	// against an unreachable peer does, and then for held to close — a
+	// call slow to return; events records the returns of such calls and
+	// the releases, in order.
+	block  bool
+	held   chan struct{}
+	events []string
 }
 
 func newFakeLink() *fakeLink {
@@ -177,6 +184,7 @@ func newFakeLink() *fakeLink {
 func (l *fakeLink) release(_ context.Context, p *peer.Peer) {
 	l.mu.Lock()
 	l.releases[p]++
+	l.events = append(l.events, "release")
 	l.mu.Unlock()
 }
 
@@ -190,12 +198,23 @@ func (l *fakeLink) connect(ctx context.Context, p *peer.Peer) error {
 	l.mu.Lock()
 	l.connects[p]++
 	l.ctxs[p] = append(l.ctxs[p], ctx)
+	block, held := l.block, l.held
 	l.mu.Unlock()
+	if block {
+		<-ctx.Done()
+		if held != nil {
+			<-held
+		}
+		l.mu.Lock()
+		l.events = append(l.events, "connect returned")
+		l.mu.Unlock()
+		return ctx.Err()
+	}
 	return nil
 }
 
 // connectsEnded reports whether every Connect call made for p has its
-// context ended.
+// context ended (true when none was made).
 func (l *fakeLink) connectsEnded(p *peer.Peer) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -204,7 +223,7 @@ func (l *fakeLink) connectsEnded(p *peer.Peer) bool {
 			return false
 		}
 	}
-	return len(l.ctxs[p]) > 0
+	return true
 }
 
 func (l *fakeLink) hasSession(p *peer.Peer) bool {

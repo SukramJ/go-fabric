@@ -32,8 +32,9 @@
 // binding goes: matter.js's reference counts of bound peers have no
 // consumer (BindingManager.ts:656-677) and are not ported. A peer the
 // manager itself created for an entry — the [Peers] set held none for the
-// node — is released when the last entry naming the node goes: its
-// connection process stops; the peer stays in the set, never closed, for
-// another holder may use it (ahead of matter.js; review II,
-// R2-P6-bound-2104, owner decision 221).
+// node — is released each time the last entry naming the node goes: the
+// entries' Connect calls end, then its connection process stops; the peer
+// stays in the set, never closed, for another holder may use it, and a
+// later entry for the node is released the same way (ahead of matter.js;
+// review II, R2-P6-bound-2104, owner decision 221).
 package binding

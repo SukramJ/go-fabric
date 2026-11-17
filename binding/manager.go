@@ -192,11 +192,24 @@ func (r *record) empty() bool {
 	return len(r.pending) == 0 && len(r.established) == 0 && len(r.dormant) == 0
 }
 
-// createdPeer is a peer the manager created, with the context of the
-// Connect calls its entries make.
+// createdPeer is a peer the manager created for a client entry. The
+// record outlives a release, as the peer stays in the set (decision 221),
+// so a later entry for the node is the manager's again (Fable F1). period
+// is the current binding period — from the first entry naming the node to
+// the release after its last — nil between periods.
 type createdPeer struct {
+	peer   *peer.Peer
+	period *bindingPeriod
+}
+
+// bindingPeriod is one binding period of a created peer: the context its
+// entries' Connect calls run on, and those calls, which the release waits
+// for before it stops the connection process — a Connect call starts the
+// process again when it finds it stopped (Fable F2).
+type bindingPeriod struct {
 	ctx    context.Context //nolint:containedctx // ends the entries' Connect calls at the release
 	cancel context.CancelFunc
+	calls  sync.WaitGroup
 }
 
 // regKey identifies a registered group entry: its source endpoint and its
@@ -259,12 +272,9 @@ type Manager struct {
 	stateMu sync.Mutex
 	records map[uint16]*record
 	// created are the peers the manager made for a client entry — the set
-	// held none for the node before (peerSet.Has) — until the last entry
-	// that names the node goes (releaseUnbound), each with the context its
-	// entries' Connect calls run on: a Connect call starts the connection
-	// process again when it finds it stopped, so a release ends the calls
-	// before it stops the process.
-	created map[*peer.Peer]*createdPeer
+	// held none for the node before (peerSet.Has) — by node address, with
+	// their binding periods (releaseUnbound).
+	created map[handshake.PeerAddress]*createdPeer
 }
 
 // New returns a manager over cfg. Its worker starts with the first work
@@ -277,7 +287,7 @@ func New(cfg Config) (*Manager, error) {
 	m := &Manager{
 		cfg: cfg, log: cfg.Logger, link: realLink{},
 		wake: make(chan struct{}, 1), attached: map[uint16]attachment{}, rechecks: map[uint8]bool{},
-		registered: map[regKey]*item{}, records: map[uint16]*record{}, created: map[*peer.Peer]*createdPeer{},
+		registered: map[regKey]*item{}, records: map[uint16]*record{}, created: map[handshake.PeerAddress]*createdPeer{},
 	}
 	if m.log == nil {
 		m.log = slog.New(slog.DiscardHandler)

@@ -7,6 +7,9 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"runtime"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,6 +38,7 @@ func TestPeerCreatedForAnEntryIsReleasedWithItsLastEntry(t *testing.T) {
 	h.m.Register(1, e2)
 	h.flush()
 	p, _ := h.peers.For(peerAddr(1, 2))
+	waitFor(t, func() bool { return h.link.connected(p) == 2 })
 	h.m.Unregister(1, e1)
 	h.flush()
 	if n := h.link.released(p); n != 0 {
@@ -141,5 +145,68 @@ func TestReleaseStopsConnectingOnly(t *testing.T) {
 	}
 	if got := set.Get(addr); got != p {
 		t.Fatalf("the set holds %p for the node after the release, want the same peer %p", got, p)
+	}
+}
+
+// TestPeerCreatedIsReleasedEveryBindingPeriod: the manager's record of a
+// peer it created outlives the release — the peer stays in the set — so a
+// later entry for the node opens a new binding period, released again
+// with its last entry (review II, R2-P6-bound-2104, Fable F1).
+func TestPeerCreatedIsReleasedEveryBindingPeriod(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, nil)
+	h.listen()
+	e := Entry{FabricIndex: 1, Node: 2, Endpoint: 1, Cluster: 0x0006}
+	h.m.Register(1, e)
+	h.flush()
+	p, _ := h.peers.For(peerAddr(1, 2))
+	waitFor(t, func() bool { return h.link.connected(p) == 1 })
+	h.m.Unregister(1, e)
+	h.flush()
+	waitFor(t, func() bool { return h.link.released(p) == 1 })
+	again := Entry{FabricIndex: 1, Node: 2, Endpoint: 4, Cluster: 0x0006}
+	h.m.Register(1, again)
+	h.flush()
+	waitFor(t, func() bool { return h.link.connected(p) == 2 })
+	h.m.Unregister(1, again)
+	h.flush()
+	waitFor(t, func() bool { return h.link.released(p) == 2 })
+	if !h.link.connectsEnded(p) {
+		t.Fatal("the second period's Connect call outlived its release")
+	}
+}
+
+// TestReleaseWaitsForTheEntriesConnectCalls: the release stops the
+// connection process only once the entries' Connect calls have returned,
+// so none of them starts it again after the stop (review II,
+// R2-P6-bound-2104, Fable F2).
+func TestReleaseWaitsForTheEntriesConnectCalls(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, nil)
+	held := make(chan struct{})
+	release := sync.OnceFunc(func() { close(held) })
+	t.Cleanup(release) // before the manager's Close, which waits for the call
+	h.link.block, h.link.held = true, held
+	h.listen()
+	e := Entry{FabricIndex: 1, Node: 2, Endpoint: 1, Cluster: 0x0006}
+	h.m.Register(1, e)
+	h.flush()
+	p, _ := h.peers.For(peerAddr(1, 2))
+	waitFor(t, func() bool { return h.link.connected(p) == 1 })
+	h.m.Unregister(1, e)
+	h.flush()
+	// The Connect call has seen the cancel but not returned yet: no release.
+	for range 100 {
+		runtime.Gosched()
+	}
+	if n := h.link.released(p); n != 0 {
+		t.Fatalf("released %d times before the entry's Connect call returned", n)
+	}
+	release()
+	waitFor(t, func() bool { return h.link.released(p) == 1 })
+	h.link.mu.Lock()
+	defer h.link.mu.Unlock()
+	if want := []string{"connect returned", "release"}; !slices.Equal(h.link.events, want) {
+		t.Fatalf("events %v, want %v", h.link.events, want)
 	}
 }

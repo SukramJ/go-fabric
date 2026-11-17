@@ -99,6 +99,11 @@ func (m *Manager) resolveAndEmit(it *item) {
 			return
 		}
 		addr := handshake.PeerAddress{FabricIndex: e.FabricIndex, NodeID: e.Node}
+		// Has then For are two calls — client/peer.Set offers no atomic
+		// "for, and did you create it": a host that adds the node's peer
+		// between them has it counted as the manager's, whose release then
+		// stops a connection process the host may have started. Narrow,
+		// and the peer and its sessions stay (decision 221).
 		set, tracks := m.cfg.Peers.(peerSet)
 		creates := tracks && !set.Has(addr)
 		p, err := m.cfg.Peers.For(addr)
@@ -109,12 +114,7 @@ func (m *Manager) resolveAndEmit(it *item) {
 			m.drop(reasonClientPeerFailed, it, slog.Any("err", err))
 			return
 		}
-		if creates {
-			ctx, cancel := context.WithCancel(m.life)
-			m.stateMu.Lock()
-			m.created[p] = &createdPeer{ctx: ctx, cancel: cancel}
-			m.stateMu.Unlock()
-		}
+		m.trackCreated(addr, p, creates)
 		res.Kind, res.Peer, res.Endpoint = KindClient, p, e.Endpoint
 		res.Interaction = interaction.ForPeer(p, m.cfg.Interaction)
 		m.establishClientKind(it, res)
@@ -335,15 +335,25 @@ func (m *Manager) recheckGroups(fabricIndex uint8) {
 func (m *Manager) establishClientKind(it *item, res Resolution) {
 	p := res.Peer
 	m.info("binding.peer.connecting", reasonInitiatingCASE, it)
-	ctx := m.life
+	ctx, period := m.life, (*bindingPeriod)(nil)
 	m.stateMu.Lock()
-	if c := m.created[p]; c != nil {
-		ctx = c.ctx
+	addr := handshake.PeerAddress{FabricIndex: it.entry.FabricIndex, NodeID: it.entry.Node}
+	if c := m.created[addr]; c != nil && c.peer == p && c.period != nil {
+		period, ctx = c.period, c.period.ctx
+		// Counted on the worker, before the release can look: the release
+		// waits for this call (releaseUnbound).
+		period.calls.Add(1)
 	}
 	m.stateMu.Unlock()
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
+		if period != nil {
+			defer period.calls.Done()
+		}
+		if ctx.Err() != nil {
+			return // released before the call began
+		}
 		if err := m.link.connect(ctx, p); err != nil && ctx.Err() == nil {
 			m.log.Debug("binding.peer.connect_failed", append([]any{slog.Any("err", err)}, m.entryAttrs(it)...)...)
 		}
@@ -491,17 +501,43 @@ func (m *Manager) disposeServer(source uint16) {
 	}
 }
 
-// releaseUnbound releases every peer the manager created whose node no
-// pending or established entry names any more: its connection process is
-// stopped. The peer stays in the set and is never closed, its sessions
-// with it — another holder may use the same peer (owner decision 221).
-// It runs on the worker after every task, so an entry that went —
-// unregistered, its server detached, parked again — stops the connecting
-// it started. Ahead of matter.js, whose BindingManager keeps the peer
-// it made for an entry (BindingManager.ts:584-585, #clearPending
-// :613-627 at db021da0) with the connection process and the resolution
-// that have no end of their own; the rule is this module's (review II,
-// R2-P6-bound-2104, TM R3.4).
+// trackCreated records p as the manager's when the set held no peer for
+// addr before (creates), and opens a binding period for a recorded peer
+// that has none. A record whose peer is no longer the set's (another
+// peer at addr) is dropped.
+func (m *Manager) trackCreated(addr handshake.PeerAddress, p *peer.Peer, creates bool) {
+	m.stateMu.Lock()
+	defer m.stateMu.Unlock()
+	rec := m.created[addr]
+	switch {
+	case creates:
+		rec = &createdPeer{peer: p}
+		m.created[addr] = rec
+	case rec != nil && rec.peer != p:
+		delete(m.created, addr)
+		return
+	case rec == nil:
+		return
+	}
+	if rec.period == nil {
+		ctx, cancel := context.WithCancel(m.life)
+		rec.period = &bindingPeriod{ctx: ctx, cancel: cancel}
+	}
+}
+
+// releaseUnbound ends the binding period of every peer the manager
+// created whose node no pending or established entry names any more:
+// the entries' Connect calls are ended and waited for, then the peer's
+// connection process is stopped. The peer stays in the set and is never
+// closed, its sessions with it — another holder may use the same peer
+// (owner decision 221) — and its record stays, so a later entry for the
+// node opens a new period and is released again. It runs on the worker
+// after every task, so an entry that went — unregistered, its server
+// detached, parked again — stops the connecting it started. Ahead of
+// matter.js, whose BindingManager keeps the peer it made for an entry
+// (BindingManager.ts:584-585, #clearPending :613-627 at db021da0) with
+// the connection process and the resolution that have no end of their
+// own; the rule is this module's (review II, R2-P6-bound-2104, TM R3.4).
 func (m *Manager) releaseUnbound() {
 	m.stateMu.Lock()
 	if len(m.created) == 0 {
@@ -519,22 +555,28 @@ func (m *Manager) releaseUnbound() {
 			}
 		}
 	}
-	unbound := make(map[*peer.Peer]*createdPeer)
-	for p, c := range m.created {
-		if !inUse[p] {
-			delete(m.created, p)
-			unbound[p] = c
+	type end struct {
+		peer   *peer.Peer
+		period *bindingPeriod
+	}
+	ended := make(map[handshake.PeerAddress]end)
+	for addr, rec := range m.created {
+		if rec.period != nil && !inUse[rec.peer] {
+			ended[addr] = end{rec.peer, rec.period}
+			rec.period = nil
 		}
 	}
 	m.stateMu.Unlock()
-	for p, c := range unbound {
-		m.log.Debug("binding.peer.released", slog.Uint64("node_id", p.Address().NodeID), slog.Int("fabric_index", int(p.Address().FabricIndex)))
-		// The entries' Connect calls end first: one that found the
-		// process stopped would start it again.
-		c.cancel()
+	for addr, e := range ended {
+		p, period := e.peer, e.period
+		m.log.Debug("binding.peer.released", slog.Uint64("node_id", addr.NodeID), slog.Int("fabric_index", int(addr.FabricIndex)))
+		period.cancel()
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
+			// The period's Connect calls return on the cancel; one still
+			// running would start the stopped process again.
+			period.calls.Wait()
 			m.link.release(context.WithoutCancel(m.life), p)
 		}()
 	}
