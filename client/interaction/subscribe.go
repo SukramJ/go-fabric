@@ -132,26 +132,33 @@ type SubscribeRequest struct {
 func Interval(d time.Duration) *time.Duration { return &d }
 
 // Subscribe subscribes on a fresh exchange. Mirrors matter.js
-// ClientInteraction.subscribe (ClientInteraction.ts:978-1123) at 0ceb202d:
+// ClientInteraction.subscribe
+// (packages/protocol/src/action/client/ClientInteraction.ts:1011-1170 at
+// db021da0; review II, R2-P6-doc-2906):
 //
 //   - a request without paths is refused, more paths than the provider's
-//     subscribePathsSupported only logged (:981-989);
-//   - the peer must have a peer address (:991-994);
+//     subscribePathsSupported only logged (:1014-1022);
+//   - the peer must have a peer address (:1024-1027);
 //   - ReplaceSubscriptions closes our subscriptions with the peer first
-//     (:996-1008);
+//     (:1029-1041);
 //   - the intervals default to 1 s and 60 min, the ceiling may not be below
-//     the floor (:1010-1021), and each is at most 65535 s (Subscribe.ts:46-60);
-//   - the attempt (:1023-1078): the request with the intervals in seconds,
-//     encoded to fit one message (InteractionMessenger.ts:1052-1055); the
-//     priming report's chunks read and acknowledged (:1048,
-//     InteractionMessenger.ts:938-972) and handed to Updated; the
-//     SubscribeResponse; the subscription registered by (peer, id), its
-//     liveness timeout its maximum interval plus twice the maximum peer
-//     response time for a 10 s processing time (:1054-1063).
+//     the floor (:1043-1054), and each is at most 65535 s (Subscribe.ts:46-60
+//     at 0ceb202d);
+//   - the attempt (:1056-1120): the request with the intervals in seconds
+//     (:1073-1080), encoded to fit one message (InteractionMessenger.ts:1052-1055
+//     at 0ceb202d); the priming report's chunks read and acknowledged
+//     (:1083, InteractionMessenger.ts:938-972 at 0ceb202d) and handed to
+//     Updated; the SubscribeResponse (:1086); an attempt that fails abandons
+//     the subscription, waiting for the peer's report unless the peer or
+//     the session ended the interaction (:1087-1098); the subscription
+//     registered by (peer, id), with the maximum peer response time for the
+//     subscription processing time (:1101-1111) — its liveness timeout the
+//     maximum interval plus twice that time, as at 0ceb202d (:1054-1063
+//     there).
 //
 // ctx bounds the establishment of a plain subscription. A sustained one
 // (Sustain) is returned at once and establishes itself on its own until
-// closed (:1092-1115).
+// closed (:1137-1162).
 func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscription, error) {
 	paths := len(req.Attributes) + len(req.Events)
 	if paths == 0 {
