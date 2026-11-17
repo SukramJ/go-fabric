@@ -153,6 +153,15 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 	keyAlg := func(key, curve []byte) []byte { return derSeq(t, derSeq(t, key, curve), spki[1]) }
 	exts := func(entries ...[]byte) []byte { return derCtx3(t, derSeq(t, entries...)) }
 	one, wide := big.NewInt(1), new(big.Int).Lsh(big.NewInt(1), 256)
+	if p.fields[0][0] != 0xa0 {
+		t.Fatal("the RCAC carries no version field")
+	}
+	withVersion := func(content []byte) []byte {
+		q := p
+		q.fields = slices.Clone(p.fields)
+		q.fields[0] = derRaw(t, asn1.ClassContextSpecific, 0, true, content)
+		return q.cert(t)
+	}
 
 	cases := []struct {
 		name string
@@ -161,6 +170,12 @@ func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 		is   error
 	}{
 		{"trailing byte", append(slices.Clone(rcac), 0), "not a DER certificate", ErrMalformed},
+		// The version [0] holds an INTEGER with content (matter.js
+		// Certificate.ts:698-706, derUnsignedInteger :399-406 at db021da0;
+		// review II, R2-P6-par-3208).
+		{"version not an INTEGER", withVersion(derRaw(t, asn1.ClassUniversal, asn1.TagOctetString, false, []byte{2})), "invalid certificate version structure", ErrMalformed},
+		{"version empty", withVersion(nil), "invalid certificate version structure", ErrMalformed},
+		{"version an INTEGER without content", withVersion([]byte{0x02, 0x00}), "INTEGER without content", ErrMalformed},
 		{"not a sequence", derRaw(t, asn1.ClassUniversal, asn1.TagOctetString, false, []byte{1}), "not a DER certificate", ErrMalformed},
 		{"two root elements", derSeq(t, p.tbs(t), p.alg), "expected 3 root elements", ErrMalformed},
 		{"five TBS fields", derSeq(t, derSeq(t, p.fields[:5]...), p.alg, p.sig), "invalid TBSCertificate structure", ErrMalformed},

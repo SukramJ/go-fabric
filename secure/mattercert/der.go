@@ -60,7 +60,19 @@ func DecodeDER(der []byte) (*Certificate, error) {
 	}
 	idx := 0
 	if fields[idx].Class == asn1.ClassContextSpecific && fields[idx].Tag == 0 {
-		idx++ // version [0]
+		// The version [0]: its first element an INTEGER with content; the
+		// value itself is not refused. Mirrors matter.js
+		// packages/protocol/src/certificate/kinds/Certificate.ts:698-706
+		// and derUnsignedInteger (:399-406) at db021da0 (review II,
+		// R2-P6-par-3208).
+		version, err := derChildren(fields[idx].Bytes)
+		if err != nil || len(version) == 0 || version[0].Class != asn1.ClassUniversal || version[0].Tag != asn1.TagInteger || version[0].IsCompound {
+			return nil, fmt.Errorf("%w: invalid certificate version structure", ErrMalformed)
+		}
+		if len(version[0].Bytes) == 0 {
+			return nil, fmt.Errorf("%w: certificate version is an INTEGER without content", ErrMalformed)
+		}
+		idx++
 	}
 	c.SerialNumber = append([]byte(nil), fields[idx].Bytes...)
 	idx++
