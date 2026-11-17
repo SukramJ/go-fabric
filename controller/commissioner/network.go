@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -584,12 +586,29 @@ func (f *flow) withChannelDropFallbackConnect(action func() (netcomm.ConnectNetw
 }
 
 // armInterval is the BLE re-arm timer (#armFailsafeInterval, :905-938):
-// every BTPIdleAliveInterval the failsafe is re-armed for the larger of
-// the default failsafe and what is left, while the PASE session lives and
-// the cumulative failsafe has room.
+// every period the failsafe is re-armed for the larger of the default
+// failsafe and what is left, while the PASE session lives and the
+// cumulative failsafe has room. The JCM consent wait runs it on IP too
+// (keepFailsafeArmed).
+//
+// Beyond matter.js (review II, R2-P6-fsm-1860, Fable read F5, F6): the
+// period is BTPIdleAliveInterval, or half the default failsafe when that
+// is shorter, so a short FailSafeExpiryLengthSeconds does not lapse
+// between two re-arms; each re-arm runs on a context [flow.stopArmInterval]
+// cancels, and stopArmInterval awaits a re-arm in flight, so none
+// overlaps the disarm of an abort or a failure (disarmIfMayBeArmed stops
+// the timer first) or outlives the consent wait; and the timer that ends
+// on its own — the cumulative limit, a closed session, a failed re-arm —
+// says why on lapsed, once.
 type armInterval struct {
-	timer   exchange.Timer
-	stopped bool
+	timer    exchange.Timer
+	stopped  bool
+	cancel   context.CancelFunc
+	inflight sync.WaitGroup
+	// active counts the re-arms in flight (what inflight waits for).
+	active atomic.Int32
+	// lapsed receives the cause once when the timer ends on its own.
+	lapsed chan error
 }
 
 func (f *flow) armIntervalRunning() bool {
@@ -598,29 +617,73 @@ func (f *flow) armIntervalRunning() bool {
 	return f.armTimer != nil && !f.armTimer.stopped
 }
 
-func (f *flow) stopArmInterval() {
+// currentArmInterval is the running timer, nil for none.
+func (f *flow) currentArmInterval() *armInterval {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.armTimer != nil {
-		f.armTimer.stopped = true
-		f.armTimer.timer.Stop()
+	if f.armTimer == nil || f.armTimer.stopped {
+		return nil
+	}
+	return f.armTimer
+}
+
+// stopArmInterval stops the timer, cancels a re-arm in flight and waits
+// for it to return.
+func (f *flow) stopArmInterval() {
+	f.mu.Lock()
+	ai := f.armTimer
+	if ai != nil {
+		ai.stopped = true
+		ai.timer.Stop()
+		ai.cancel()
 		f.armTimer = nil
+	}
+	f.mu.Unlock()
+	if ai != nil {
+		ai.inflight.Wait()
 	}
 }
 
-// startArmInterval (re)starts the timer (:906-938).
-func (f *flow) startArmInterval(ctx context.Context) {
+// startArmInterval (re)starts the timer (:906-938) and returns it.
+func (f *flow) startArmInterval(ctx context.Context) *armInterval {
 	f.stopArmInterval()
-	ai := &armInterval{}
+	actx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	ai := &armInterval{cancel: cancel, lapsed: make(chan error, 1)}
 	f.mu.Lock()
 	f.armTimer = ai
-	f.scheduleArm(context.WithoutCancel(ctx), ai)
+	f.scheduleArm(actx, ai)
 	f.mu.Unlock()
+	return ai
+}
+
+// armPeriod is the re-arm period: BTPIdleAliveInterval, or half the
+// default failsafe when that is shorter (F5).
+func (f *flow) armPeriod() time.Duration {
+	if half := f.defaultFailSafe / 2; half > 0 && half < BTPIdleAliveInterval {
+		return half
+	}
+	return BTPIdleAliveInterval
+}
+
+// endArmInterval ends ai on its own, with cause on lapsed — unless it was
+// stopped already.
+func (f *flow) endArmInterval(ai *armInterval, cause error) {
+	f.mu.Lock()
+	if ai.stopped || f.armTimer != ai {
+		f.mu.Unlock()
+		return
+	}
+	ai.stopped = true
+	ai.timer.Stop()
+	ai.cancel()
+	f.armTimer = nil
+	f.mu.Unlock()
+	ai.lapsed <- cause
 }
 
 // scheduleArm arms the next period; f.mu is held.
 func (f *flow) scheduleArm(ctx context.Context, ai *armInterval) {
-	ai.timer = f.c.ctx.Clock.AfterFunc(BTPIdleAliveInterval, func() {
+	ai.timer = f.c.ctx.Clock.AfterFunc(f.armPeriod(), func() {
 		f.mu.Lock()
 		if ai.stopped || f.armTimer != ai {
 			f.mu.Unlock()
@@ -631,24 +694,35 @@ func (f *flow) scheduleArm(ctx context.Context, ai *armInterval) {
 		f.mu.Unlock()
 		if s := ia.Session(); s != nil && s.IsClosed() {
 			f.log.Debug("matter.controller.commissioning.rearm_skipped", slog.String("reason", "session closed"))
-			f.stopArmInterval()
+			f.endArmInterval(ai, exchange.ErrSessionClosed)
 			return
 		}
 		now := f.now()
 		if expiry.IsZero() || !now.Before(expiry) {
-			f.stopArmInterval()
+			msg := "Commissioning time exceeds the maximum timeframe"
+			if i := f.data.basicCommissioningInfo; i != nil && i.MaxCumulativeFailsafeSeconds != 0 {
+				msg += fmt.Sprintf(" of %ds", i.MaxCumulativeFailsafeSeconds)
+			}
+			f.endArmInterval(ai, newError(ErrCommissioningTimeout, msg, nil))
 			return
 		}
 		f.log.Debug("matter.controller.commissioning.rearm_periodic", slog.Duration("left", expiry.Sub(now)))
 		// The next period is armed now; the re-arm runs beside the step.
 		f.mu.Lock()
-		if !ai.stopped && f.armTimer == ai {
-			f.scheduleArm(ctx, ai)
+		if ai.stopped || f.armTimer != ai {
+			f.mu.Unlock()
+			return
 		}
+		f.scheduleArm(ctx, ai)
+		ai.inflight.Add(1)
+		ai.active.Add(1)
 		f.mu.Unlock()
-		if _, err := f.armFailsafe(ctx, max(f.defaultFailSafe, f.failSafeTimeLeft())); err != nil {
+		_, err := f.armFailsafe(ctx, max(f.defaultFailSafe, f.failSafeTimeLeft()))
+		ai.active.Add(-1)
+		ai.inflight.Done()
+		if err != nil && ctx.Err() == nil {
 			f.log.Warn("matter.controller.commissioning.rearm_periodic_failed", slog.Any("err", err))
-			f.stopArmInterval()
+			f.endArmInterval(ai, err)
 		}
 	})
 }

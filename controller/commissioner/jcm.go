@@ -46,8 +46,10 @@ type JointFabricOptions struct {
 	//
 	// It may take as long as a person needs: the flow extends the
 	// fail-safe before the call and keeps re-arming it while Consent runs
-	// (every [BTPIdleAliveInterval], up to the device's cumulative
-	// fail-safe limit). ctx is Commission's: when it ends the stage fails
+	// (every [BTPIdleAliveInterval], or half the device's fail-safe when
+	// that is shorter). At the device's cumulative fail-safe limit or
+	// after a re-arm fails, the stage fails at once with that cause.
+	// ctx is Commission's: when it ends the stage fails
 	// at once with the context's error, whether or not Consent has
 	// returned; a Consent that ignores ctx runs on until it returns and
 	// its answer is dropped (review II, R2-P6-fsm-1860, owner decision
@@ -127,9 +129,11 @@ type jcmTrust struct {
 	// cause is the error behind a failed stage, joined to the step's
 	// error.
 	cause error
-	// keepArmed keeps the fail-safe armed while Consent runs; the returned
-	// func ends that. nil keeps nothing armed (a test of the stages).
-	keepArmed func(ctx context.Context) (stop func(), err error)
+	// keepArmed keeps the fail-safe armed while Consent runs; stop ends
+	// that, and lapsed receives the cause when the fail-safe can be kept
+	// no longer (the cumulative limit, a failed re-arm). nil keeps nothing
+	// armed (a test of the stages).
+	keepArmed func(ctx context.Context) (stop func(), lapsed <-chan error, err error)
 	done      bool
 	// perform replaces a stage in tests.
 	perform func(ctx context.Context, stage jcm.Stage)
@@ -368,13 +372,15 @@ func (t *jcmTrust) askUserForConsent(ctx context.Context) jcm.Result {
 	if t.opts == nil || t.opts.Consent == nil {
 		return jcm.TrustVerificationDelegateNotSet
 	}
+	var lapsed <-chan error
 	if t.keepArmed != nil {
-		stop, err := t.keepArmed(ctx)
+		stop, l, err := t.keepArmed(ctx)
 		if err != nil {
 			t.cause = err
 			return jcm.InternalError
 		}
 		defer stop()
+		lapsed = l
 	}
 	// Consent runs on a goroutine of its own, so the stage ends with ctx
 	// even when the host's function does not; its late answer is dropped.
@@ -399,6 +405,11 @@ func (t *jcmTrust) askUserForConsent(ctx context.Context) jcm.Result {
 		return jcm.Success
 	case <-ctx.Done():
 		t.cause = ctx.Err()
+		return jcm.InternalError
+	case err := <-lapsed:
+		// The fail-safe can be kept no longer: the stage fails now, not a
+		// later step (Fable read F5).
+		t.cause = err
 		return jcm.InternalError
 	}
 }
@@ -426,22 +437,23 @@ func (s flowSigner) SignVIDVerification(ctx context.Context, fabricIndex uint8, 
 
 // keepFailsafeArmed keeps the fail-safe armed while the host's Consent
 // runs: the fail-safe extended first, as the network scan does
-// (ensureFailsafeTimerFor), then re-armed periodically by the re-arm
-// timer of a BLE commissioning (every BTPIdleAliveInterval, up to the
-// cumulative limit). On BLE that timer runs already and stays; otherwise
-// the returned func stops it. A flow that holds no fail-safe (none armed
-// yet — the flow arms at 7.1, before this step) keeps nothing (review II,
-// R2-P6-fsm-1860).
-func (f *flow) keepFailsafeArmed(ctx context.Context) (func(), error) {
+// (ensureFailsafeTimerFor), then re-armed periodically by the re-arm timer
+// of a BLE commissioning (armInterval: every BTPIdleAliveInterval or half
+// the default fail-safe, up to the cumulative limit). On BLE that timer
+// runs already and stays after the wait; on IP stop ends it and awaits a
+// re-arm in flight. lapsed says why the timer ended on its own. A flow
+// that holds no fail-safe (none armed yet — the flow arms at 7.1, before
+// this step) keeps nothing (review II, R2-P6-fsm-1860, Fable read F5, F6).
+func (f *flow) keepFailsafeArmed(ctx context.Context) (stop func(), lapsed <-chan error, err error) {
 	if end, _ := f.failsafeTimes(); end.IsZero() {
-		return func() {}, nil
+		return func() {}, nil, nil
 	}
 	if err := f.ensureFailsafeTimerFor(ctx, f.defaultFailSafe); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if f.armIntervalRunning() {
-		return func() {}, nil
+	if ai := f.currentArmInterval(); ai != nil {
+		return func() {}, ai.lapsed, nil
 	}
-	f.startArmInterval(ctx)
-	return f.stopArmInterval, nil
+	ai := f.startArmInterval(ctx)
+	return f.stopArmInterval, ai.lapsed, nil
 }
