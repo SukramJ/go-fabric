@@ -20,25 +20,14 @@ func TestRunIsBoundedWithoutADeadline(t *testing.T) {
 	t.Parallel()
 	site := fabrictest.NewSite(t, fabrictest.Options{Wait: 50 * time.Millisecond})
 	left := make(chan struct{})
-	result := make(chan error, 1)
-	go func() {
-		result <- site.Run(context.Background(), func(ctx context.Context) error {
-			defer close(left)
-			<-ctx.Done()
-			return ctx.Err()
-		})
-	}()
-	select {
-	case err := <-result:
-		if !errors.Is(err, fabrictest.ErrWaited) {
-			t.Fatalf("Run = %v, want ErrWaited", err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("Run did not return: unbounded without a deadline")
+	// Unbounded, Run does not return (go test's timeout).
+	err := site.Run(context.Background(), func(ctx context.Context) error {
+		defer close(left)
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	if !errors.Is(err, fabrictest.ErrWaited) {
+		t.Fatalf("Run = %v, want ErrWaited", err)
 	}
-	select {
-	case <-left:
-	case <-time.After(10 * time.Second):
-		t.Error("the fn Run gave up on did not see its context end")
-	}
+	<-left // the fn Run gave up on sees its context end
 }

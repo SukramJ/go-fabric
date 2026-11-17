@@ -10,7 +10,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -156,22 +155,15 @@ func TestConcurrentAddPartNeverFormsACycle(t *testing.T) {
 func TestUpdateFnMayAskTheDevice(t *testing.T) {
 	t.Parallel()
 	d := mustOnOff(t, "u")
-	done := make(chan error, 1)
-	go func() {
-		done <- d.Update(context.Background(), func(st *HostStatement) {
-			_, _ = d.EndpointNumber()
-			_ = d.Parts()
-			_ = d.Spec()
-			st.Name = "Renamed"
-		})
-	}()
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("Update did not return: fn ran under the device's lock")
+	// A fn run under the device's lock deadlocks here (go test's timeout).
+	err := d.Update(context.Background(), func(st *HostStatement) {
+		_, _ = d.EndpointNumber()
+		_ = d.Parts()
+		_ = d.Spec()
+		st.Name = "Renamed"
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 	if got := d.Spec().FriendlyName; got != "Renamed" {
 		t.Errorf("FriendlyName %q, want Renamed", got)

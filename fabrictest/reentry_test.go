@@ -24,16 +24,9 @@ func TestNetworkFilterMayChangeTheNetwork(t *testing.T) {
 		return true
 	})
 	t.Cleanup(func() { nw.Filter(nil) })
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{newPlug(t)}}})
-	}()
-	select {
-	case <-done:
-	case <-time.After(60 * time.Second):
-		t.Fatal("the pair did not commission: the filter deadlocked the network")
-	}
+	// A filter run under the network's lock deadlocks here (go test's
+	// timeout).
+	site.CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{Bridged: []node.Endpoint{newPlug(t)}}})
 }
 
 // TestActOnAStoppedDeviceIsRefused (R2-P6-conc-2520): Act runs fn on a

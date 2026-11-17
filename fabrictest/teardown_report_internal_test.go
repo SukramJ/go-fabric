@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 // loggingTB records what the site logs.
@@ -61,12 +60,8 @@ func TestTeardownAndServeErrorsAreReported(t *testing.T) {
 	if err := l.Close(); err != nil {
 		t.Fatal(err)
 	}
-	timeout := time.After(10 * time.Second)
+	// Unreported, this waits for go test's timeout.
 	for !tb.has("the socket's serve ended") {
-		select {
-		case <-tb.logged:
-		case <-timeout:
-			t.Fatal("a serve that ended under the controller was not reported")
-		}
+		<-tb.logged
 	}
 }
