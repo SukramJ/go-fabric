@@ -257,8 +257,12 @@ key as the device's `api: encryption: key:` holds it) names an ESPHome
 Bluetooth proxy with `active: true`, and implies `--ble`.
 `--bluetooth-proxy-discover` finds the proxies over DNS-SD as well, and
 `--bluetooth-proxy-key name=key` (repeatable) gives a discovered device's key
-by its name or MAC; a device without one is used only when it answers
-plaintext. The host needs no adapter. A proxy serves one API subscriber, so the pairing takes it from Home
+by its name or MAC. A discovered device without a key is skipped (logged as
+`ble.esphome.proxy_skipped`): the plaintext API authenticates neither side,
+so any host announcing `_esphomelib._tcp` would carry the pairing.
+`--bluetooth-proxy-allow-plaintext` dials such a device anyway, over the
+plaintext API, with a warning per proxy. A proxy named with
+`--bluetooth-proxy` is used as given. The host needs no adapter. A proxy serves one API subscriber, so the pairing takes it from Home
 Assistant while it runs
 ([guide](../../docs/guides/ble-proxies.md)).
 

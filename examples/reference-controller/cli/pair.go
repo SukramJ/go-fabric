@@ -152,13 +152,14 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	var useBLE bool
 	var bleAdapter string
 	var proxies, proxyKeys stringsFlag
-	var discoverProxies bool
+	var discoverProxies, allowPlaintext bool
 	pos, err := parseArgs(e, "pair", args, func(fs *flag.FlagSet) {
 		fs.BoolVar(&useBLE, "ble", false, "find the device over BLE and commission it over BTP (needs the BLE build, and --wifi-ssid or --thread-dataset)")
 		fs.StringVar(&bleAdapter, "ble-adapter", "hci0", "the Bluetooth adapter for --ble")
 		fs.Var(&proxies, "bluetooth-proxy", "an ESPHome Bluetooth proxy for --ble instead of an adapter: host[:port][,key]; repeatable (needs the ESPHome build)")
 		fs.BoolVar(&discoverProxies, "bluetooth-proxy-discover", false, "find ESPHome Bluetooth proxies over DNS-SD for --ble, beside any --bluetooth-proxy (needs the ESPHome build)")
 		fs.Var(&proxyKeys, "bluetooth-proxy-key", "the API key of a discovered proxy: name=key, the name its device name or MAC; repeatable (with --bluetooth-proxy-discover)")
+		fs.BoolVar(&allowPlaintext, "bluetooth-proxy-allow-plaintext", false, "dial a discovered proxy that has no --bluetooth-proxy-key over the plaintext API, which authenticates neither side; off, such a proxy is skipped (with --bluetooth-proxy-discover)")
 		fs.StringVar(&wifiSSID, "wifi-ssid", "", "the SSID of the Wi-Fi network the device is to join")
 		fs.StringVar(&wifiCredentials, "wifi-credentials", "", "the Wi-Fi network's passphrase (with --wifi-ssid), or @file; default $"+wifiCredentialsEnv)
 		fs.StringVar(&threadDataset, "thread-dataset", "", "the Thread operational dataset the device is to join, as hex, or @file; default $"+threadDatasetEnv)
@@ -199,7 +200,7 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	if err != nil {
 		return err
 	}
-	pf := ProxyFlags{Proxies: proxies, Discover: discoverProxies, Keys: proxyKeys}
+	pf := ProxyFlags{Proxies: proxies, Discover: discoverProxies, Keys: proxyKeys, AllowPlaintext: allowPlaintext}
 	viaProxies, err := pf.check(e)
 	if err != nil {
 		return err
