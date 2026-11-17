@@ -356,8 +356,8 @@ func TestGKMGroupKeyMapWriteRejectsTheWrongValueType(t *testing.T) {
 	gkm.SetCurrentFabric(1)
 	err := gkm.MatterWrite(context.Background(), 0x0000, "not a list")
 	var sce im.StatusCodeError
-	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
-		t.Fatalf("GroupKeyMap write of a string: %v, want INVALID_COMMAND (W6-test-17, R2-P6-err-3112)", err)
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidDataType {
+		t.Fatalf("GroupKeyMap write of a string: %v, want INVALID_DATA_TYPE (owner decision 234; W6-test-17, R2-P6-err-3112)", err)
 	}
 }
 

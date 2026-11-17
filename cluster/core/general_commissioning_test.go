@@ -228,12 +228,11 @@ func TestGencomm_WriteBreadcrumbValid(t *testing.T) {
 func TestGencomm_WriteBreadcrumbWrongType(t *testing.T) {
 	t.Parallel()
 	gc := defaultGencomm(t)
-	// A value of the wrong Go type answers INVALID_COMMAND, the status of
-	// that class on the security-path servers (review II, W6-test-17,
-	// R2-P6-err-3112).
+	// A written value of the wrong Go type answers INVALID_DATA_TYPE for
+	// the path (owner decision 234; review II, W6-test-17, R2-P6-err-3112).
 	err := gc.MatterWrite(context.Background(), 0x0000, "not-a-uint64")
-	if spec.StatusOf(err) != im.StatusInvalidCommand {
-		t.Fatalf("Breadcrumb of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidCommand)
+	if spec.StatusOf(err) != im.StatusInvalidDataType {
+		t.Fatalf("Breadcrumb of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidDataType)
 	}
 }
 

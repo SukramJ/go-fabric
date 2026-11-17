@@ -263,6 +263,10 @@ var gencommInst = mustInstance(gencommdef.Definition, spec.Options{})
 // II, W6-test-17, R2-P6-err-3112).
 var errGencommInvalidArg error = invalidArgErr{msg: "core: GeneralCommissioning invalid argument"}
 
+// errGencommInvalidValue is returned for an attribute write's value of the
+// wrong Go type: INVALID_DATA_TYPE ([invalidValueErr]; owner decision 234).
+var errGencommInvalidValue error = invalidValueErr{msg: "core: GeneralCommissioning invalid value"}
+
 // GeneralCommissioningConfig drives [NewGeneralCommissioning].
 type GeneralCommissioningConfig struct {
 	// LocationCapability is the fixed regulatory capability (Indoor /
@@ -648,7 +652,7 @@ func (g *GeneralCommissioning) MatterWriteChanged(ctx context.Context, attrID ui
 	}
 	v, ok := value.(uint64)
 	if !ok {
-		return false, fmt.Errorf("%w: Breadcrumb expected uint64, got %T", errGencommInvalidArg, value)
+		return false, fmt.Errorf("%w: Breadcrumb expected uint64, got %T", errGencommInvalidValue, value)
 	}
 	g.mu.Lock()
 	changed := g.breadcrumb != v

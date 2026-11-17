@@ -463,6 +463,18 @@ func (e invalidArgErr) Error() string { return e.msg }
 
 func (invalidArgErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
 
+// invalidValueErr is a security-path server's refusal of an attribute
+// write whose value is of the wrong Go type: INVALID_DATA_TYPE for the
+// path, the status matter.js's write validation answers a value of the
+// wrong datatype with (ValidateError, packages/protocol/src/action/errors.ts:55-57
+// at db021da0; owner decision 234, review II, W6-test-17, R2-P6-err-3112).
+// A command's payload of the wrong Go type stays [invalidArgErr].
+type invalidValueErr struct{ msg string }
+
+func (e invalidValueErr) Error() string { return e.msg }
+
+func (invalidValueErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidDataType }
+
 // storeFailureErr is a security-path server's refusal because its store
 // failed: FAILURE, carrying the store's error for errors.Is (review II,
 // W6-test-17, R2-P6-err-3112).

@@ -133,6 +133,11 @@ const (
 // R2-P6-err-3112).
 var errGroupKeyMgmtInvalidArg error = invalidArgErr{msg: "core: GroupKeyManagement invalid argument"}
 
+// errGroupKeyMgmtInvalidValue is returned for an attribute write's value of
+// the wrong Go type: INVALID_DATA_TYPE ([invalidValueErr]; owner decision
+// 234).
+var errGroupKeyMgmtInvalidValue error = invalidValueErr{msg: "core: GroupKeyManagement invalid value"}
+
 // groupKeyNotFoundErr is the typed [im.StatusCodeError] returned when a
 // KeySetRead / KeySetRemove targets a group key set that does not exist on
 // the fabric. Maps to IM NotFound (0x8b), matching matter.js
@@ -791,7 +796,7 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	}
 	list, ok := value.([]GroupKeyMapStruct)
 	if !ok {
-		return false, fmt.Errorf("%w: GroupKeyMap write expected []GroupKeyMapStruct, got %T", errGroupKeyMgmtInvalidArg, value)
+		return false, fmt.Errorf("%w: GroupKeyMap write expected []GroupKeyMapStruct, got %T", errGroupKeyMgmtInvalidValue, value)
 	}
 	fabric, err := g.writeFabric(ctx)
 	if err != nil {
