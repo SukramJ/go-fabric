@@ -128,17 +128,17 @@ func TestPersistedKeys(t *testing.T) {
 		t.Errorf("label key for a host key: %q (%v)", v, ok)
 	}
 	l.OnNodeLabelWritten(nil, "x")
-	if l.NodeLabel(ctx, nil) != "" || l.LoadScenes(nil) != nil || p.configVersion(ctx, nil) != 0 {
+	if v, err := p.configVersion(ctx, nil); l.NodeLabel(ctx, nil) != "" || l.LoadScenes(nil) != nil || v != 0 || err != nil {
 		t.Error("a nil key was persisted")
 	}
-	if l.LoadScenes(endpoint.StringKey("none")) != nil || p.configVersion(ctx, k) != 0 {
+	if v, err := p.configVersion(ctx, k); l.LoadScenes(endpoint.StringKey("none")) != nil || v != 0 || err != nil {
 		t.Error("absent state read back")
 	}
 	if err := p.st.SetSetting(ctx, endpointConfigVersionKey+"dev:1", "x"); err != nil {
 		t.Fatal(err)
 	}
-	if p.configVersion(ctx, k) != 0 {
-		t.Error("a corrupt version was read")
+	if v, err := p.configVersion(ctx, k); v != 0 || err != nil {
+		t.Errorf("a corrupt version read as %d, %v; want 0, nil (logged)", v, err)
 	}
 }
 

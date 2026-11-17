@@ -404,7 +404,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}); err != nil {
 		return nil, err
 	}
-	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
+	if err := n.persisted.restoreRoot(ctx, n.root.BasicInformation); err != nil {
+		return nil, err
+	}
 	n.bootReason = n.root.bootReason
 	n.setNetworkInterfaceRules()
 	// DiagnosticLogs hands logs over BDX on the requesting session
@@ -419,7 +421,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if n.commissionerControl != nil {
 		aggExtra = append(slices.Clone(aggExtra), n.commissionerControl)
 	}
-	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, aggExtra, n.cfg.Clock)
+	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, n.logger, aggExtra, n.cfg.Clock)
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
 	}

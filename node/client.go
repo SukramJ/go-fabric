@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"slices"
 	"sync"
@@ -497,8 +498,15 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		if err := n.attachMatterTime(t); err != nil {
 			return nil, err
 		}
-		n.persistBindings(ctx, t)
-		n.persistUserLabels(ctx, t)
+		// A store that fails a restore read fails the topology: a server
+		// is never served without its stored state, and the topology
+		// before stays served (review II, R2-P6-store-2403, -2404).
+		if err := n.persistBindings(ctx, t); err != nil {
+			return nil, err
+		}
+		if err := n.persistUserLabels(ctx, t); err != nil {
+			return nil, err
+		}
 		n.persistNonVolatile(ctx, t)
 		// What the servers restored for a fabric the table no longer
 		// holds goes before the topology is served (fabric_state.go).
@@ -545,8 +553,12 @@ func (n *Node) startBindings() {
 // the stored entries at start (BindingServer.ts:120-126). A server met
 // again in a reassembly is not restored again: its list is the newer (and
 // the stored one, since every change is saved). One that left the topology
-// is forgotten.
-func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) {
+// is forgotten. A restore that fails fails the topology, so the server is
+// never served without its Save hook (a write answering SUCCESS that is
+// not stored) and never restored over a list it served (review II,
+// R2-P6-store-2404); the servers restored before it are kept with the
+// ones the node met already.
+func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) error {
 	n.bindSync.persistMu.Lock()
 	defer n.bindSync.persistMu.Unlock()
 	current := map[*mattercore.Binding]bool{}
@@ -563,13 +575,18 @@ func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) {
 				key := bindingKey(ep)
 				if err := b.Persist(n.persisted.bindingConfig(context.WithoutCancel(ctx), key)); err != nil {
 					n.logger.Warn("binding.restore", slog.String("key", key), slog.Any("err", err))
-					continue
+					if n.bindSync.persisted == nil {
+						n.bindSync.persisted = map[*mattercore.Binding]bool{}
+					}
+					maps.Copy(n.bindSync.persisted, current)
+					return err
 				}
 			}
 			current[b] = true
 		}
 	}
 	n.bindSync.persisted = current
+	return nil
 }
 
 // bindingServers are the Binding servers of a topology by endpoint.

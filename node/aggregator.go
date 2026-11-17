@@ -659,10 +659,22 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		specs := make([]endpoint.Spec, 0, len(p.eps)+1)
 		for _, ep := range p.eps {
 			spec := ep.Spec()
-			if label, _ := a.n.endpoints.LoadNodeLabel(ctx, spec.StableKey); label != "" {
+			// A store that fails a read fails the assembly: the default
+			// served in the stored value's place would be stored over it at
+			// the next write, a version read as 0 would go down (review II,
+			// R2-P6-store-2403). The topology before stays served.
+			label, err := a.n.endpoints.LoadNodeLabel(ctx, spec.StableKey)
+			if err != nil {
+				return nil, err
+			}
+			if label != "" {
 				spec.NodeLabel = label
 			}
-			spec.ConfigurationVersion = max(spec.ConfigurationVersion, a.n.persisted.configVersion(ctx, spec.StableKey))
+			version, err := a.n.persisted.configVersion(ctx, spec.StableKey)
+			if err != nil {
+				return nil, err
+			}
+			spec.ConfigurationVersion = max(spec.ConfigurationVersion, version)
 			specs = append(specs, spec)
 		}
 		// The OTA provider's endpoint is numbered in the default scope

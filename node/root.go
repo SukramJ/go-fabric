@@ -350,7 +350,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if r.WiFiNetworkDiagnostics, err = buildWiFiDiagnostics(cfg.Network.WiFi); err != nil {
 		return nil, err
 	}
-	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels, cfg.Locales, r.WiFiNetworkDiagnostics)
+	optional, err := buildRootOptional(ctx, d.st, d.logger, cfg.FixedLabels, cfg.Locales, r.WiFiNetworkDiagnostics)
 	if err != nil {
 		return nil, fmt.Errorf("root labels and diagnostics: %w", err)
 	}
@@ -478,10 +478,10 @@ func attestationMaterialOf(cfg *Config, chain *attestation.Chain, cd []byte) (ma
 // TimeFormatLocalization (24-hour, Gregorian), UnitLocalization,
 // SoftwareDiagnostics (the Go heap), the host's WiFiNetworkDiagnostics when
 // it has one, and EthernetNetworkDiagnostics (every value null).
-func buildRootOptional(ctx context.Context, st store.Settings, fixed []fixedlabeldef.LabelStruct, locales []string,
+func buildRootOptional(ctx context.Context, st store.Settings, logger *slog.Logger, fixed []fixedlabeldef.LabelStruct, locales []string,
 	wifi *mattercore.WiFiNetworkDiagnostics,
 ) ([]contract.ClusterServer, error) {
-	fixedLabel, userLabel, err := buildLabels(ctx, st, rootUserLabelsKey, fixed)
+	fixedLabel, userLabel, err := buildLabels(ctx, st, logger, rootUserLabelsKey, fixed)
 	if err != nil {
 		return nil, err
 	}
@@ -526,15 +526,25 @@ func buildRootOptional(ctx context.Context, st store.Settings, fixed []fixedlabe
 
 // buildLabels constructs one endpoint's FixedLabel and UserLabel, the
 // latter restored from and persisted under key (root_optional.go:93-127 at b4ea1f96^).
-func buildLabels(ctx context.Context, st store.Settings, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
+func buildLabels(ctx context.Context, st store.Settings, logger *slog.Logger, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
 	fixedLabel, err = mattercore.NewFixedLabel(fixed)
 	if err != nil {
 		return nil, nil, err
 	}
+	// A store that fails the read fails the build, and New with it: an
+	// empty list served in the stored one's place would be stored over
+	// it by a controller's read-modify-write (review II,
+	// R2-P6-store-2403). A value that does not decode is logged and
+	// served as none.
 	var labels []userlabeldef.LabelStruct
-	if v, ok, gerr := st.GetSetting(ctx, key); gerr == nil && ok {
-		if json.Unmarshal([]byte(v), &labels) != nil {
+	v, ok, err := st.GetSetting(ctx, key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("node: load %s: %w", key, err)
+	}
+	if ok {
+		if uerr := json.Unmarshal([]byte(v), &labels); uerr != nil {
 			labels = nil
+			logger.Warn("label.restore", slog.String("key", key), slog.Any("err", uerr))
 		}
 	}
 	userLabel, err = mattercore.NewUserLabel(mattercore.UserLabelConfig{
@@ -557,7 +567,7 @@ func buildLabels(ctx context.Context, st store.Settings, key string, fixed []fix
 // Descriptor, FixedLabel ("role" "aggregator"), UserLabel and the host's
 // extra servers (wiring.go:332-345 at b4ea1f96^). Identify counts down on clk, the
 // node's clock.
-func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
+func buildAggregatorClusters(ctx context.Context, st store.Settings, logger *slog.Logger, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
 		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeAggregator))}},
 		nil, nil, nil,
@@ -565,7 +575,7 @@ func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []con
 	if err != nil {
 		return nil, fmt.Errorf("aggregator descriptor: %w", err)
 	}
-	fixedLabel, userLabel, err := buildLabels(ctx, st, aggregatorUserLabelsKey, []fixedlabeldef.LabelStruct{
+	fixedLabel, userLabel, err := buildLabels(ctx, st, logger, aggregatorUserLabelsKey, []fixedlabeldef.LabelStruct{
 		{Label: "role", Value: "aggregator"},
 	})
 	if err != nil {

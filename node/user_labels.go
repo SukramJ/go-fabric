@@ -6,7 +6,9 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"sync"
 
@@ -71,8 +73,11 @@ func (u *userLabelSync) release(keys []string) {
 // packages/model/src/standard/elements/user-label.element.ts:21-22 at 862ad75f),
 // as the root's list is (buildLabels). A server met again in a reassembly
 // keeps its subscription; one that left the topology is released. An
-// endpoint without a stable key keeps its list in memory only.
-func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) {
+// endpoint without a stable key keeps its list in memory only. A store
+// that fails a restore read fails the topology (review II,
+// R2-P6-store-2403): the servers restored before it are kept with the
+// ones the node met already, and none is released.
+func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) error {
 	n.userLabels.mu.Lock()
 	defer n.userLabels.mu.Unlock()
 	current := map[contract.ClusterServer]labelSub{}
@@ -93,7 +98,15 @@ func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) {
 				continue
 			}
 			key := bridgedUserLabelKeyRoot + k
-			current[srv] = labelSub{key: key, unsubscribe: n.persisted.userLabel(context.WithoutCancel(ctx), key, srv)}
+			unsubscribe, err := n.persisted.userLabel(context.WithoutCancel(ctx), key, srv)
+			if err != nil {
+				if n.userLabels.persisted == nil {
+					n.userLabels.persisted = map[contract.ClusterServer]labelSub{}
+				}
+				maps.Copy(n.userLabels.persisted, current)
+				return err
+			}
+			current[srv] = labelSub{key: key, unsubscribe: unsubscribe}
 		}
 	}
 	for srv, sub := range n.userLabels.persisted {
@@ -102,18 +115,25 @@ func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) {
 		}
 	}
 	n.userLabels.persisted = current
+	return nil
 }
 
 // userLabel restores srv's LabelList from key and saves each later change
-// of it there; it returns the function that stops the saving.
-func (p persisted) userLabel(ctx context.Context, key string, srv contract.ClusterServer) (unsubscribe func()) {
-	if v, ok, err := p.st.GetSetting(ctx, key); err == nil && ok {
+// of it there; it returns the function that stops the saving. A store that
+// fails the read returns its error and subscribes nothing; a value that
+// does not decode is logged and restores nothing.
+func (p persisted) userLabel(ctx context.Context, key string, srv contract.ClusterServer) (unsubscribe func(), err error) {
+	v, ok, err := p.st.GetSetting(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("node: load %s: %w", key, err)
+	}
+	if ok {
 		var labels []userlabeldef.LabelStruct
-		if json.Unmarshal([]byte(v), &labels) == nil {
-			if setter, isSetter := srv.(spec.AttributeSetter); isSetter {
-				if err := setter.SetAttributes(map[uint32]any{userlabeldef.AttrLabelList: spec.List[userlabeldef.LabelStruct](labels)}); err != nil {
-					p.logger.Warn("label.restore", slog.String("key", key), slog.Any("err", err))
-				}
+		if uerr := json.Unmarshal([]byte(v), &labels); uerr != nil {
+			p.logger.Warn("label.restore", slog.String("key", key), slog.Any("err", uerr))
+		} else if setter, isSetter := srv.(spec.AttributeSetter); isSetter {
+			if err := setter.SetAttributes(map[uint32]any{userlabeldef.AttrLabelList: spec.List[userlabeldef.LabelStruct](labels)}); err != nil {
+				p.logger.Warn("label.restore", slog.String("key", key), slog.Any("err", err))
 			}
 		}
 	}
@@ -128,5 +148,5 @@ func (p persisted) userLabel(ctx context.Context, key string, srv contract.Clust
 		if err != nil {
 			p.logger.Warn("label.persist", slog.String("key", key), slog.Any("err", err))
 		}
-	})
+	}), nil
 }
