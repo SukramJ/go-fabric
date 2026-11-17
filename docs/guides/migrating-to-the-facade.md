@@ -464,6 +464,23 @@ changes are the rows marked *changed* or *breaking*.
 | *changed:* `sqlstore.New` on a registry a `sqlstore.NewSealed` has marked | refuses to write a secret value (`store.ErrNoSealer`): open it with `NewSealed` and its sealer; `sqlstore.Reseal` / `controller.Reseal` rotate the key |
 | `peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report |
 
+## Changed after v0.22.2: the node, the device and the controller
+
+Review II, phase 6b, second wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release; the behaviour
+changes are the rows marked *changed* or *breaking*.
+
+| Before | Now |
+| --- | --- |
+| *breaking:* `dev.SetReachable(ctx, ok)`, `dev.Rename(ctx, name)`, `dev.Update(ctx, fn)` as statements | each returns `error`: `device.ErrNotBridged` on a part (call it on the bridged device that owns the part), and from `Rename` the store's refusal — the label was not served and the device keeps its name; retry or report it |
+| *changed:* `node.New` with a `BasicInformation` string beyond its attribute's constraint, such as a `SerialNumber` longer than 32 (counted in UTF-16 code units: 32 characters of ASCII) | refused with `node.ErrInvalidConfig`, naming the attribute and its constraint: shorten the value before it reaches the `Config` |
+| *changed:* `node.Config.Network.MDNS.HostName` over 40 bytes, or holding a dot, a space or a tab | refused with `node.ErrInvalidConfig`: one DNS label of at most 40 bytes, without `.local` |
+| *changed:* the other values `node.Config.Validate` now bounds — `Health.Interval` or `Network.InterfaceCheck` below 1 s, a negative `OTA.HTTPSMaxImageSize`, `HTTPSIdleTimeout` or `AnnouncedUpdateQueryDelay`, a `ProductDescription.DeviceType` the schema does not define, `EndpointState` beside `EndpointPersistence`, a `TLS` capacity outside 5–254 | refused with `node.ErrInvalidConfig`: set a value in range, or drop `EndpointPersistence` |
+| `cluster/lock.StateSource` named in a type switch or by reflection | it is the generated `cluster/spec/doorlock.StateSource` (an alias); an implementation of its methods compiles unchanged |
+| *changed:* `client.Node.PingAddress(ctx, addr)` with an address that is not one of the node's record addresses | refused with `client.ErrConfig`, nothing sent: pass one of `n.Record().Addresses` |
+| `topology.Config{…}` without a logger | optional `Logger`: the service logs, once each, a Thread address two nodes claim (`matter.controller.topology.claim_collision`); nil logs nothing |
+| `schema.ClusterCommandLevels(c, id)` | `schema.ClusterRequestCommandLevels(c, id)` for an accepted command, `schema.ClusterResponseCommandLevels(c, id)` for a generated one |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the

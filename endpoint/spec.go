@@ -54,8 +54,9 @@ type Spec struct {
 	// as its primary type (e.g. 0x010A OnOffPlugInUnit).
 	DeviceType uint16
 	// VendorName is the bridged device's manufacturer, served as its
-	// BridgedDeviceBasicInformation VendorName (capped at the attribute's
-	// 32 bytes). The vendor is the host's knowledge, never the module's.
+	// BridgedDeviceBasicInformation VendorName as stated; one beyond the
+	// attribute's constraint refuses the assembly (R2-P6-wire-2502). The
+	// vendor is the host's knowledge, never the module's.
 	// Empty serves the node's own VendorName ([Config.VendorName]).
 	VendorName string
 	// BridgedBasicInformation is what the host states of the bridged

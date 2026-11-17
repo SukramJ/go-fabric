@@ -245,6 +245,7 @@ becomes permissible in:
 | `bridge/bridgetest.EstablishSubscriptionTarget`, `SubscriptionTarget`, `SubscriptionTarget.PeerCounter`, `ErrNoPeerCounter`, `ErrNoSubscriptionID`, `ErrNoPeer`, `ErrPeerCounterNotAnchored`, `ErrNotEstablished` | `bridgetest.Session.Subscribe` of the test `Commissioner` | `v0.23.0` |
 | `bridge.ErrAckWaitTimeout` | none: no function returns it | `v0.23.0` |
 | `client/peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report | `v0.23.0` |
+| `schema.ClusterCommandLevels` | `schema.ClusterRequestCommandLevels` for an accepted command, `schema.ClusterResponseCommandLevels` for a generated one | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
