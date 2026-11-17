@@ -198,7 +198,7 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 	s.localNodeID = func() uint64 { return ctrl.Fabric().RootNodeID }
 	s.reported = s.reconcile
 	s.w = newSessionWatch(life, serviceWatch{s}, ctrl.Clock(), log)
-	s.ps = &providerSessions{nodes: clientProviderNodes{s.io}, requestor: requestor{ctrl.CameraRequestor()}, fabricIndex: ctrl.Fabric().FabricIndex, watch: s.w, log: log, cleanup: s.m.cleanupContext, offers: map[providerKey]string{}}
+	s.ps = &providerSessions{nodes: clientProviderNodes{s.io}, requestor: requestor{ctrl.CameraRequestor()}, fabricIndex: ctrl.Fabric().FabricIndex, watch: s.w, log: log, cleanup: s.m.cleanupContext, offers: map[providerKey]*sentOffer{}}
 	s.wire()
 	s.unsub = ctrl.OnCameraSignal(s.onSignal)
 	cfg.Reports.attach(s)

@@ -367,7 +367,7 @@ func TestCameraArrivalOnTheFabric(t *testing.T) {
 	probe := &arrivalProbe{clientProviderNodes: clientProviderNodes{d.svc.io}}
 	ps := &providerSessions{
 		nodes: probe, requestor: requestor{d.c.CameraRequestor()}, fabricIndex: d.c.Fabric().FabricIndex,
-		log: slog.New(slog.DiscardHandler), cleanup: d.svc.m.cleanupContext, offers: map[providerKey]string{},
+		log: slog.New(slog.DiscardHandler), cleanup: d.svc.m.cleanupContext, offers: map[providerKey]*sentOffer{},
 	}
 	probe.ps = ps
 	usage := wpdef.StreamUsageLiveView

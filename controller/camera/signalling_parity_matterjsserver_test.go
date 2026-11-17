@@ -44,7 +44,7 @@ func sigLabels(sends [][]wpdef.ICECandidateStruct) [][]string {
 // sigService is a service that routes signals to the sessions it holds.
 func sigService() *Service {
 	s := &Service{sessions: map[sessionKey]*Session{}, m: newManager(&fakeIO{}, nil, nil)}
-	s.ps = &providerSessions{offers: map[providerKey]string{}}
+	s.ps = &providerSessions{offers: map[providerKey]*sentOffer{}}
 	return s
 }
 

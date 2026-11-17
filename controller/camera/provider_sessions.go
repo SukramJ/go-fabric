@@ -245,7 +245,7 @@ type providerSessions struct {
 	cleanup func(context.Context) (context.Context, context.CancelFunc)
 
 	mu     sync.Mutex
-	offers map[providerKey]string
+	offers map[providerKey]*sentOffer
 	// owners is the identity of the session each key's offer and
 	// requestor entry were recorded for, guarded by mu; recordMu orders
 	// that recording against an end applied by identity, so a late end
@@ -282,18 +282,36 @@ func (p *providerSessions) key(t target, id uint16) providerKey {
 	return providerKey{id: id, fabricIndex: p.fabricIndex, peerNodeID: t.nodeID, peerEP: t.endpointID}
 }
 
+// sentOffer is one recorded send of an offer; its address tells two sends
+// of the same SDP apart.
+type sentOffer struct{ sdp string }
+
 // offerSent records the SDP sent for the session, so the camera's answer
-// can be narrowed to it; the returned function withdraws it.
+// can be narrowed to it; the returned function withdraws this send: while
+// it is still the record, the offer it replaced comes back, or the key
+// goes when it replaced none (review II, R2-P6-wire-2204). Mirrors
+// matterjs-server packages/ws-controller/src/controller/WebRtcCallbackBridge.ts:125-135
+// at 0bd06f2.
 func (p *providerSessions) offerSent(k providerKey, sdp string) func() {
+	sent := &sentOffer{sdp: sdp}
 	p.mu.Lock()
-	p.offers[k] = sdp
+	if p.offers == nil {
+		p.offers = map[providerKey]*sentOffer{}
+	}
+	replaced := p.offers[k]
+	p.offers[k] = sent
 	p.mu.Unlock()
 	return func() {
 		p.mu.Lock()
-		if p.offers[k] == sdp {
-			delete(p.offers, k)
+		defer p.mu.Unlock()
+		if p.offers[k] != sent {
+			return
 		}
-		p.mu.Unlock()
+		if replaced == nil {
+			delete(p.offers, k)
+		} else {
+			p.offers[k] = replaced
+		}
 	}
 }
 
@@ -301,8 +319,11 @@ func (p *providerSessions) offerSent(k providerKey, sdp string) func() {
 func (p *providerSessions) offerOf(k providerKey) (string, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	sdp, ok := p.offers[k]
-	return sdp, ok
+	sent, ok := p.offers[k]
+	if !ok {
+		return "", false
+	}
+	return sent.sdp, true
 }
 
 // sessionEnded drops the recorded offer of a session that ended.
