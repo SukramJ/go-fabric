@@ -377,9 +377,14 @@ func (s *structure) cutBackStored(stored []StoredEndpoint) []StoredEndpoint {
 		}
 		out = append(out, keep)
 	}
-	s.log.Warn("matter.controller.client.image_cut_at_load", slog.Int("bytes", total), slog.Int("trimmed_bytes", total-storedImageBytes(out)),
-		slog.Int("max_bytes", quota), slog.Int("dropped", dropped),
-		slog.String("reason", "the stored image exceeds the node's quota; what the node's structure does not name is dropped from the image and the store"))
+	// A cut that dropped nothing is no cut: the image loads above its
+	// quota as it is, and a report that would grow it is refused (and
+	// logged) as at any other time (review II, N3-finimg-1).
+	if dropped > 0 {
+		s.log.Warn("matter.controller.client.image_cut_at_load", slog.Int("bytes", total), slog.Int("trimmed_bytes", total-storedImageBytes(out)),
+			slog.Int("max_bytes", quota), slog.Int("dropped", dropped),
+			slog.String("reason", "the stored image exceeds the node's quota; what the node's structure does not name is dropped from the image and the store"))
+	}
 	return out
 }
 

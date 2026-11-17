@@ -72,3 +72,20 @@ func TestImageQuotaAdmitsADescriptorListWithinIt(t *testing.T) {
 		t.Fatal("the ServerList's new cluster was not created")
 	}
 }
+
+// TestImageAboveQuotaWithNothingToCutLogsNoCut (review II, N3-finimg-1): a
+// stored image above the quota whose every cluster the structure names
+// loads as it is, and no cut is logged — there is none.
+func TestImageAboveQuotaWithNothingToCutLogsNoCut(t *testing.T) {
+	t.Parallel()
+	st := &MemoryStore{}
+	n, _ := quotaNode(t, st, 0)
+	n.apply(wildcard, &bridge(1).r, true)
+	reloaded, logs := quotaNode(t, st, 1)
+	if reloaded.Endpoint(2) == nil {
+		t.Fatal("the image did not load")
+	}
+	if logs.has("matter.controller.client.image_cut_at_load") {
+		t.Fatal("a cut at load was logged though nothing was cut")
+	}
+}
