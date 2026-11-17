@@ -9,7 +9,10 @@ import "time"
 // address monitor of a peer — matter.js PeerTimingParameters
 // (packages/protocol/src/peer/PeerTimingParameters.ts:21-133 at
 // 0ceb202d). A zero field is unset: [DefaultTiming] or the base of [Merge]
-// supplies it.
+// supplies it. So is a negative one, but for ProvenAddressRetention: no
+// other parameter gives a negative value a meaning, and a negative pause
+// would make the connection process retry at once — after a peer's
+// refusal, a tight loop of handshakes (review II, R2-P6-api-2155).
 type Timing struct {
 	// DefaultConnectionTimeout bounds [Peer.Connect] when the caller sets
 	// no timeout (:22-28).
@@ -110,9 +113,11 @@ func DefaultTiming() Timing {
 // Merge layers the set fields of over onto base, the groups field-wise so
 // one member of a group leaves its sibling alone — matter.js
 // PeerTimingParameters.merge and applyOverrides (PeerTimingParameters.ts:149-182).
+// A negative field of over is unset as a zero one is ([Timing]), except
+// ProvenAddressRetention.
 func Merge(base, over Timing) Timing {
 	set := func(dst *time.Duration, v time.Duration) {
-		if v != 0 {
+		if v > 0 {
 			*dst = v
 		}
 	}
@@ -123,7 +128,7 @@ func Merge(base, over Timing) Timing {
 	set(&base.DelayAfterPeerError, over.DelayAfterPeerError)
 	set(&base.DelayAfterUnhandledError, over.DelayAfterUnhandledError)
 	set(&base.KickThrottleInterval, over.KickThrottleInterval)
-	if over.KickMinRetransmissions != 0 {
+	if over.KickMinRetransmissions > 0 {
 		base.KickMinRetransmissions = over.KickMinRetransmissions
 	}
 	set(&base.KickMinRestartSaving, over.KickMinRestartSaving)
@@ -132,6 +137,8 @@ func Merge(base, over Timing) Timing {
 	set(&base.AddressChangeStabilizationDelay, over.AddressChangeStabilizationDelay)
 	set(&base.AddressChangeProbeCooldown.Min, over.AddressChangeProbeCooldown.Min)
 	set(&base.AddressChangeProbeCooldown.Max, over.AddressChangeProbeCooldown.Max)
-	set(&base.ProvenAddressRetention, over.ProvenAddressRetention)
+	if over.ProvenAddressRetention != 0 {
+		base.ProvenAddressRetention = over.ProvenAddressRetention
+	}
 	return base
 }
