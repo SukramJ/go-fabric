@@ -30,11 +30,7 @@ func TestRegistryCloseEndsAReactionWaitingOnItsContext(t *testing.T) {
 	<-holding
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
-	done := make(chan error, 1)
-	go func() { done <- r.Close(ctx) }()
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second): // a drain that never ends: this bound only names the failure
-		t.Fatal("Registry.Close waits for a reaction that waits for the registry's context")
-	}
+	// Before, Close waited here for the reaction, which waited for the
+	// registry's context: the test hung to its timeout.
+	_ = r.Close(ctx)
 }

@@ -7,7 +7,6 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -26,11 +25,7 @@ func TestOTAForgetsANodeTheRegistryDeleted(t *testing.T) {
 	entered, release := make(chan struct{}), make(chan struct{})
 	var hold sync.Once
 	var reg *client.Registry
-	type probe struct {
-		peer     softwareupdate.Peer
-		returned bool
-	}
-	failed := make(chan probe, 4)
+	failed := make(chan softwareupdate.Peer, 4)
 	r := newOTARig(t, func(o *controller.OTAConfig) {
 		o.ScriptQueryImage = func(softwareupdate.Peer, softwareupdate.QueryImageRequest) (softwareupdate.QueryImageScript, bool) {
 			hold.Do(func() {
@@ -40,17 +35,11 @@ func TestOTAForgetsANodeTheRegistryDeleted(t *testing.T) {
 			return softwareupdate.QueryImageScript{}, false
 		}
 		o.OnUpdateFailed = func(p softwareupdate.Peer) {
-			done := make(chan struct{})
-			go func() {
-				_, _ = reg.ForDevice(context.Background(), client.Device{InstanceID: "probe-2B4E"}, "")
-				close(done)
-			}()
-			select {
-			case <-done:
-				failed <- probe{p, true}
-			case <-time.After(10 * time.Second): // a held lock never releases: this bound only names the failure
-				failed <- probe{p, false}
-			}
+			// ForDevice takes the registry's fabric-operation lock: inside
+			// the operation this call would wait for itself (the synchronous
+			// wiring hung here to the test's timeout).
+			_, _ = reg.ForDevice(context.Background(), client.Device{InstanceID: "probe-2B4E"}, "")
+			failed <- p
 		}
 	})
 	defer func() {
@@ -79,16 +68,9 @@ func TestOTAForgetsANodeTheRegistryDeleted(t *testing.T) {
 		t.Fatal("no queued update before the erase: the test shows nothing")
 	}
 	r.run(t, func(ctx context.Context) error { reg.Erase(ctx); return nil })
-	select {
-	case got := <-failed:
-		if got.peer != peer {
-			t.Fatalf("OnUpdateFailed for %v, want %v", got.peer, peer)
-		}
-		if !got.returned {
-			t.Fatal("OnUpdateFailed ran inside the registry's fabric operation: a registry call from it did not return")
-		}
-	case <-time.After(30 * time.Second):
-		t.Fatal("the deleted node's queued update was not reported failed")
+	r.eventually(t, "the deleted node's queued update reported failed", func() bool { return len(failed) > 0 })
+	if got := <-failed; got != peer {
+		t.Fatalf("OnUpdateFailed for %v, want %v", got, peer)
 	}
 	for _, u := range r.c.SoftwareUpdates().QueuedUpdates() {
 		if u.Peer == peer {

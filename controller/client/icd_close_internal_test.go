@@ -6,8 +6,8 @@ package client
 import (
 	"errors"
 	"log/slog"
+	"runtime"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -96,10 +96,16 @@ func TestICDDecommissionDuringACommitRemovesThePeer(t *testing.T) {
 	<-saving
 	decommissioned := make(chan struct{})
 	go func() { c.onDecommissioned(); close(decommissioned) }()
-	select {
-	case <-decommissioned:
-		// Before the fix it ran ahead of the commit; let the commit end.
-	case <-time.After(100 * time.Millisecond): // the fixed order waits for the commit here
+	// Before the fix the decommission ran ahead of the commit and ended
+	// here; the fixed order waits for the commit, so it is given the
+	// scheduler for a while and the commit is released either way.
+	for i := 0; i < 10_000; i++ {
+		select {
+		case <-decommissioned:
+			i = 10_000
+		default:
+			runtime.Gosched()
+		}
 	}
 	close(st.release)
 	if !<-committed {

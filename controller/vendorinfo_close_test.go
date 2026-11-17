@@ -58,20 +58,11 @@ func TestCloseDoesNotWaitForAVendorInfoBuild(t *testing.T) {
 	}
 	ctx, cancelClose := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancelClose()
-	closed := make(chan error, 1)
-	go func() { closed <- c.Close(ctx) }()
-	select {
-	case <-closed:
-	case <-time.After(10 * time.Second): // a held lock never releases: this bound only names the failure
-		t.Fatal("Close waits for a VendorInfo whose build does not finish")
-	}
+	// Before, Close waited for vendorMu, held across the build: the test
+	// hung here to its timeout.
+	_ = c.Close(ctx)
 	answer()
-	select {
-	case err := <-first:
-		if !errors.Is(err, controller.ErrConfiguration) {
-			t.Fatalf("the first VendorInfo after Close = %v, want ErrConfiguration", err)
-		}
-	case <-time.After(30 * time.Second):
-		t.Fatal("the first VendorInfo did not return after the ledger answered")
+	if err := <-first; !errors.Is(err, controller.ErrConfiguration) {
+		t.Fatalf("the first VendorInfo after Close = %v, want ErrConfiguration", err)
 	}
 }

@@ -26,15 +26,12 @@ func TestSetGroupKeyObserverClosesTheController(t *testing.T) {
 	var once sync.Once
 	c.Groups().OnGroupcastChanged(func(context.Context, uint8) {
 		once.Do(func() {
+			// Before, this Close waited for the gate's write lock behind
+			// SetGroupKey's read lock, held across Reload: the test hung to
+			// its timeout.
 			go func() { closed <- c.Close(context.Background()) }()
-			select {
-			case err := <-closed:
-				if err != nil {
-					t.Errorf("Close from the observer: %v", err)
-				}
-			case <-time.After(10 * time.Second):
-				t.Error("Close from the groupcast observer did not return: SetGroupKey holds the closed gate across Reload")
-				return
+			if err := <-closed; err != nil {
+				t.Errorf("Close from the observer: %v", err)
 			}
 			if nodes := c.Nodes(); nodes != nil {
 				t.Errorf("Nodes after Close = %v, want nil", nodes)
