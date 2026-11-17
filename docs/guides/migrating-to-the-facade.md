@@ -426,14 +426,31 @@ behaviour until it is removed in the next minor release.
 | `id, _ := m.AllocateID(); m.OpenFromSigmaWithID(id, …)` (and `OpenFromSigmaAsInitiatorWithID`) | `s, _ := m.AllocateStake(); m.OpenFromSigmaWithStake(s, …)` (`OpenFromSigmaAsInitiatorWithStake`), `ReleaseStake(s)` on abort; handle `operational.ErrStakeLost` as a failed handshake |
 | `id, _ := m.AllocateID(); m.OpenFromPaseWithID(id, …)` | `s, _ := m.AllocateStake(); m.OpenFromPaseWithStake(s, …)`; `s.ID` where the id is announced |
 | a self-held server on `spec.Hooks` | a `spec.Server` over the server's state — `ServerConfig.Source` answering its reads, a handler per request command — with MatterInvoke routed through `spec.InvokeHeld` over `spec.NewSelfHeld`; events through `spec.Events`, the veto through `spec.WriteVeto` |
-| `closure.ControlServer.Hooks.Handle`, `.Emit`, `.EmitEvent`, `.SetBeforeWrite` | the same methods on `ControlServer`; a handler or veto set on the field is no longer consulted |
-| `modebase.Server.Hooks`, `Init`, `Invoke`, `CheckWrite` | `Server.Handle` (host handler), `Server.MatterInvoke` (the checked command path); the server needs no `Init` |
+| `closure.ControlServer.Hooks.Handle`, `.Emit`, `.EmitEvent`, `.SetBeforeWrite` | the same methods on `ControlServer`. The field keeps its behaviour until it is removed: `Handle` and `SetBeforeWrite` are mirrored into it, and a handler registered on the field answers its command when `Handle` registered none (decision 177) |
+| `modebase.Server.Hooks`, `Init`, `Invoke`, `CheckWrite` | `Server.Handle` (host handler), `Server.MatterInvoke` (the checked command path); the server needs no `Init`. A handler registered on the field answers ChangeToMode through `MatterInvoke` when `Handle` registered none (decision 177) |
 | a `cluster/wire` id that duplicates a generated one (`wire.ColorCtrlCmdMoveToHue`, `wire.WindowCoveringClusterID`, …) | the constant of `cluster/spec/<cluster>` (`colorcontrol.CmdMoveToHue`, `windowcovering.ClusterID`, …) |
 
 One change needs wiring rather than a rename: a host that assembles endpoints
 with `bridge/` and `endpoint/` but without the node sets `endpoint.Config.Fabrics`
 to its fabric store. A Binding without that source refuses every write, where it
 used to store an entry for any fabric index (decision 158). The node sets it.
+
+## Changed after v0.22.2: subscription reports, access and the wire
+
+Review II, phase 6a, third wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release; the behaviour
+changes are the rows marked *changed*.
+
+| Before | Now |
+| --- | --- |
+| `subscription.NewManager(cfg, br.SubscriptionReporter(), log)`, then `m.SetEventReporter(br.SubscriptionEventReporter())` and `m.SetFlushReporter(br.SubscriptionFlushReporter())` | `subscription.NewManager(cfg, nil, log)`, then `br.AttachSubscriptionManager(m)`, which installs the bridge's report sender; a host without the bridge sets its own with `m.SetReportSender(func(ctx context.Context, sub *subscription.Subscription, r subscription.Report) subscription.ReportOutcome { … })` |
+| *changed:* a `subscription.Manager` with no reporter that admitted subscriptions and sent nothing | refuses `Subscribe` and `Restore` with `subscription.ErrNoReportSender` until a sender is set: attach it (or call `SetReportSender`) before the first `Subscribe` or `Restore`; a test that wants silence sets a sender that returns `subscription.NothingForSubscriber` |
+| `Subscription.TakeDuePaths`, `Subscription.NothingSent` in a host's own reporter | `Report.Paths`; return `NothingForSubscriber` when nothing of the report was for the subscriber |
+| *changed:* `Subscription.RequeueAttributes`, `RequeueEvents` asked for the next report | they owe what they are given: it leaves with the next report another cause starts |
+| *changed:* a host's own `im.Dispatcher` without `CheckACL`, or an `im.EventReadAuthorizer` without a `Checker`, that let every request through | denies every request of a session that is not PASE: implement `im.ACLChecker`, or dispatch through `endpoint.TopologyDispatcher` with `SetACLLister(endpoint.UnenforcedACL{})` to run without access control on purpose |
+| *changed:* a `contract.DataVersionTracker` whose 0 meant "no version" | 0 is an ordinary version, and `Bump` wraps to it |
+| `bridgetest.EstablishSubscriptionTarget(b, subID, target)` in a test | subscribe through a commissioned `bridgetest.Session` (`Session.Subscribe`): the real SubscribeRequest sets the route and anchors the peer's counter window |
+| `bridge.ErrAckWaitTimeout` compared from a host | nothing: no function returns it |
 
 ## Changed after v0.18.0: the exchange receive notifier
 
