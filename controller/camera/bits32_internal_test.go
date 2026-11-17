@@ -4,6 +4,7 @@
 package camera
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -11,15 +12,18 @@ import (
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
-// returnsWithin runs fn and reports whether it returned within d; a
-// spinning fn is left behind (the test fails).
+// returnsWithin runs fn and reports whether it returned before a
+// watchdog of d ended; a spinning fn is left behind (the test fails). The
+// watchdog bounds a failure, it paces nothing: fn is a pure computation.
 func returnsWithin(d time.Duration, fn func()) bool {
+	watchdog, cancel := context.WithTimeout(context.Background(), d)
+	defer cancel()
 	done := make(chan struct{})
 	go func() { fn(); close(done) }()
 	select {
 	case <-done:
 		return true
-	case <-time.After(d):
+	case <-watchdog.Done():
 		return false
 	}
 }

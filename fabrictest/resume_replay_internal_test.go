@@ -6,6 +6,7 @@ package fabrictest
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"log/slog"
 	"net"
 	"sync"
@@ -200,23 +201,26 @@ func (r *resumeReplayRig) copyOn(exchange uint16, counter uint32, sessionID uint
 func (r *resumeReplayRig) send(datagram []byte) { r.site.net.send(r.other, r.b.Addr(), datagram) }
 
 // answer is the first opcode other than an acknowledgement b answered on
-// exchange, waiting up to 5 s.
+// exchange, waited for under the site's quiet protocol ([Site.Eventually],
+// bounded by [Options].Wait).
 func (r *resumeReplayRig) answer(exchange uint16) uint8 {
 	r.t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	var answered uint8
+	err := r.site.Eventually(context.Background(), fmt.Sprintf("an answer on exchange %#x", exchange), func() bool {
 		r.mu.Lock()
-		got := append([]uint8(nil), r.answers[exchange]...)
-		r.mu.Unlock()
-		for _, op := range got {
+		defer r.mu.Unlock()
+		for _, op := range r.answers[exchange] {
 			if op != mrp.StandaloneAckOpcode {
-				return op
+				answered = op
+				return true
 			}
 		}
-		time.Sleep(10 * time.Millisecond)
+		return false
+	})
+	if err != nil {
+		r.t.Fatal(err)
 	}
-	r.t.Fatalf("exchange %#x: no answer", exchange)
-	return 0
+	return answered
 }
 
 // await fails unless b answered exchange with want.

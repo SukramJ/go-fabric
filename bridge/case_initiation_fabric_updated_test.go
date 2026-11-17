@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -45,26 +46,30 @@ func TestFabricUpdateAbortsPendingInitiation(t *testing.T) {
 		defer dev.br.resumption.mu.Unlock()
 		return len(dev.br.resumption.initiating)
 	}
-	for deadline := time.Now().Add(5 * time.Second); initiating() == 0; {
-		if time.Now().After(deadline) {
-			t.Fatal("the initiation never began")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	waitFor(t, "the initiation to begin", func() bool { return initiating() > 0 })
+	// The abort cancels synchronously (abortFabricInitiations); the yields
+	// give a wrongly cancelled initiation its chance to return.
 	dev.br.CloseFabricSessionsAfterUpdate(context.Background(), resumeFabricIndex+1)
+	for range 100 {
+		runtime.Gosched()
+	}
 	select {
 	case err := <-result:
 		t.Fatalf("an update of another fabric ended the initiation: %v", err)
-	case <-time.After(100 * time.Millisecond):
+	default:
 	}
 	dev.br.CloseFabricSessionsAfterUpdate(context.Background(), resumeFabricIndex)
-	select {
-	case err := <-result:
-		if !errors.Is(err, errFabricUpdated) {
-			t.Fatalf("the initiation ended with %v, want errFabricUpdated", err)
+	var ended error
+	waitFor(t, "the initiation on the updated fabric to end", func() bool {
+		select {
+		case ended = <-result:
+			return true
+		default:
+			return false
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("the initiation on the updated fabric went on")
+	})
+	if !errors.Is(ended, errFabricUpdated) {
+		t.Fatalf("the initiation ended with %v, want errFabricUpdated", ended)
 	}
 	if n := initiating(); n != 0 {
 		t.Fatalf("%d initiations still registered", n)
