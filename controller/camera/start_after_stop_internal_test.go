@@ -16,7 +16,7 @@ import (
 func TestStartAfterShutdownIsRefused(t *testing.T) {
 	t.Parallel()
 	m, io, _ := managerWith(fixtureState(), sliceBNumbering())
-	m.shutdown(sliceBCtx)
+	m.shutdown(sliceBCtx, nil)
 	if _, err := sliceBStartKeyed(sliceBCtx, m, "conn-1", ""); !errors.Is(err, ErrClosed) {
 		t.Fatalf("start after the shutdown = %v, want ErrClosed", err)
 	}

@@ -547,6 +547,14 @@ func (r *sessionRegistry) named(nodeID uint64, endpointID, sessionID uint16) *li
 	return nil
 }
 
+// knows reports whether the id names a session of the registry: tracked,
+// or still being established.
+func (r *sessionRegistry) knows(nodeID uint64, endpointID, sessionID uint16) bool {
+	r.mu.Lock()
+	defer r.unlock()
+	return r.named(nodeID, endpointID, sessionID) != nil
+}
+
 // names reports whether the id names life: the session it tracks or the
 // registration holding it.
 func (r *sessionRegistry) names(life *lifecycle, nodeID uint64, endpointID, sessionID uint16) bool {

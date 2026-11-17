@@ -253,14 +253,20 @@ type providerSessions struct {
 	// (review II, R2-P1-cam-b-02).
 	owners   map[providerKey]*lifecycle
 	recordMu sync.Mutex
-	// closed, guarded by mu: the Service's Close began; a new session
-	// answered from now on is ended, not registered (review II,
-	// R2-P2-stop-03).
+	// closed, guarded by mu and set under recordMu too: the Service's
+	// Close began; a new session answered from now on is ended, not
+	// registered (review II, R2-P2-stop-03). Every requestor upsert
+	// checks it under recordMu, so once close returned no entry is added
+	// and Close's end of the untracked entries sees every one added
+	// before (review II, R2-P6-conc-2201).
 	closed bool
 }
 
-// close refuses every session answered from now on.
+// close refuses every session answered from now on; it returns once no
+// requestor upsert is in progress.
 func (p *providerSessions) close() {
+	p.recordMu.Lock()
+	defer p.recordMu.Unlock()
 	p.mu.Lock()
 	p.closed = true
 	p.mu.Unlock()
@@ -608,6 +614,12 @@ func (a *arrivedSession) learn(resp any) {
 	}
 	a.p.recordMu.Lock()
 	defer a.p.recordMu.Unlock()
+	if a.p.isClosed() {
+		// Close began after the check above: the session is ended, as
+		// one answered after it (review II, R2-P6-conc-2201).
+		a.refused = true
+		return
+	}
 	k := a.p.key(a.t, id)
 	a.p.own(k, life)
 	if po, ok := a.fields.(wpdef.ProvideOfferRequest); ok {
@@ -679,6 +691,11 @@ func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.P
 		withdraw()
 		return nil, stackError("ProvideOffer did not return a WebRTCSessionID for node 0x%016X", t.nodeID)
 	}
+	// The closed check and the upsert are one step against Close
+	// (recordMu): an entry added before Close began is one Close ends
+	// (review II, R2-P6-conc-2201).
+	p.recordMu.Lock()
+	defer p.recordMu.Unlock()
 	if p.isClosed() {
 		// Answered once the service's Close began, as newSession's arrival
 		// refuses: the requestor gains no entry nothing would remove. A
@@ -696,6 +713,31 @@ func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.P
 		withdraw()
 	}
 	return resp, nil
+}
+
+// untracked are the requestor's entries of this fabric that tracked does
+// not name: the sessions a host opened through the raw route (review II,
+// R2-P6-fsm-2202).
+func (p *providerSessions) untracked(tracked func(t target, id uint16) bool) []wrdef.WebRTCSessionStruct {
+	var out []wrdef.WebRTCSessionStruct
+	for _, s := range p.requestor.sessions() {
+		if s.FabricIndex == p.fabricIndex && !tracked(target{s.PeerNodeId, s.PeerEndpointId}, s.Id) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// sendEndSession ends a session with UserHangup through the provider
+// route and drops its records once the camera ended it or knew none
+// (invokeEndSession).
+func (p *providerSessions) sendEndSession(t target, id uint16) func(context.Context) error {
+	return func(ctx context.Context) error {
+		return invokeEndSession(ctx, func(ctx context.Context) error {
+			_, err := p.nodes.invokeProvider(ctx, t, callEndSession, wpdef.EndSessionRequest{WebRtcSessionId: id, Reason: endReasonUserHangup})
+			return err
+		}, func(bool) { p.removeTracked(t, id) })
+	}
 }
 
 // removeTracked drops a session this controller ended from the requestor

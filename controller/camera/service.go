@@ -223,7 +223,12 @@ func (s *Service) wire() {
 }
 
 // Close ends every session this service holds, stops its sweeps and
-// detaches it from the controller. A raw provider command in flight is
+// detaches it from the controller. The sessions it ends are the ones
+// [Service.StartStream] opened and every other session of the
+// controller's requestor on this fabric — those a host opened through
+// [Provider.Send] — each with an EndSession (UserHangup) within one
+// cleanup budget, announced as [EndReleased] (review II, R2-P6-fsm-2202).
+// A raw provider command in flight is
 // waited for; an offer of one answered once Close began ends its session
 // instead of keeping it (review II, R2-P2-stop-03). The wait for those
 // commands is bounded by ctx: a Close whose ctx ends first returns ctx's
@@ -246,14 +251,20 @@ func (s *Service) Close(ctx context.Context) error {
 	s.closed = true
 	done := make(chan struct{})
 	s.closeDone = done
-	s.ps.close()
 	s.mu.Unlock()
+	// From here on no session is added to the requestor (ps.close) and no
+	// start registers (closeStarts), so the entries the registry does not
+	// name are the raw route's, every one of them (R2-P6-fsm-2202,
+	// R2-P6-conc-2201).
+	s.ps.close()
+	s.m.sessions.closeStarts()
+	raw := s.untrackedSessions()
 	if s.cfg.Reports != nil {
 		s.cfg.Reports.detach(s)
 	}
 	// The EndSessions need the camera connections, so the sessions end
 	// before the service lets go of the controller.
-	s.m.shutdown(ctx)
+	s.m.shutdown(ctx, func(ctx context.Context) { s.m.releaseUntracked(ctx, raw, s.ps.sendEndSession) })
 	go func() {
 		defer close(done)
 		s.ending.Wait()
@@ -270,6 +281,16 @@ func (s *Service) Close(ctx context.Context) error {
 		}
 		return ctx.Err()
 	}
+}
+
+// untrackedSessions are the requestor's sessions of this fabric the
+// registry does not name.
+func (s *Service) untrackedSessions() []sessionKey {
+	var out []sessionKey
+	for _, e := range s.ps.untracked(func(t target, id uint16) bool { return s.m.sessions.knows(t.nodeID, t.endpointID, id) }) {
+		out = append(out, sessionKey{e.PeerNodeId, e.PeerEndpointId, e.Id})
+	}
+	return out
 }
 
 // finishClose is the teardown after the raw provider commands returned:
