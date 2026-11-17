@@ -61,6 +61,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"go/format"
 	"os"
@@ -191,11 +192,16 @@ type snapshotAttribute struct {
 	// effectiveAccess answers, a derived cluster's inherited attribute
 	// included — field by field (the extractor's accessOut), with the timed
 	// quality ("T") as access.timed, as for a command — and its resolved
-	// quality, of which the fixed flag ("F") is read here.
+	// quality, of which the fixed flag ("F") and changesOmitted ("C") are
+	// read here.
 	Effective *struct {
 		Access  snapshotAccess `json:"access"`
 		Quality struct {
 			Fixed bool `json:"fixed"`
+			// ChangesOmitted is the resolved "C" quality: a derived
+			// cluster lists an inherited attribute without its quality
+			// string, so the raw Quality above may lack it.
+			ChangesOmitted bool `json:"changesOmitted"`
 		} `json:"quality"`
 		// Metatype is the attribute's resolved metatype ("array" for a
 		// list) and Entry the datatype of a list's entries, with the scope
@@ -350,10 +356,18 @@ type snapshot struct {
 }
 
 func main() {
-	root, err := moduleRoot()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+	// -root runs the generator over another tree holding parity/schema.json
+	// and schema/ (schema/generator_test.go: a synthetic snapshot); the
+	// default is this module.
+	rootFlag := flag.String("root", "", "the tree to read parity/schema.json from and write schema/ into (default: this module)")
+	flag.Parse()
+	root := *rootFlag
+	if root == "" {
+		var err error
+		if root, err = moduleRoot(); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
 	}
 	if err := os.Chdir(root); err != nil {
 		fmt.Fprintf(os.Stderr, "chdir %s: %v\n", root, err)
@@ -760,14 +774,25 @@ func writeAccessFile(clusters []snapshotCluster) error {
 	buf.WriteString("}\n\n")
 	buf.WriteString("// changesOmittedAttributes lists every attribute whose matter.js quality\n")
 	buf.WriteString("// carries \"C\" (changesOmitted): a change to it is never reported to a\n")
-	buf.WriteString("// subscriber. Generated from the quality strings in parity/schema.json.\n")
+	buf.WriteString("// subscriber. Generated from the effective quality in parity/schema.json.\n")
 	buf.WriteString("var changesOmittedAttributes = map[uint32]map[uint32]struct{}{\n")
 	for _, c := range clusters {
 		var rows []string
 		for _, a := range c.Attributes {
-			if hasQuality(a.Quality, "C") {
-				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, a.Quality))
+			// The effective quality, as every other table here reads the
+			// effective layer: an inherited attribute carries no quality
+			// string of its own (R2-P6-par-2702).
+			if a.Effective == nil {
+				return fmt.Errorf("%s.%s: attribute without an effective block: no quality to generate from", c.Name, a.Name)
 			}
+			if !a.Effective.Quality.ChangesOmitted {
+				continue
+			}
+			row := fmt.Sprintf("\t\t0x%04X: {}, // %s", a.ID, a.Name)
+			if a.Quality != "" {
+				row += fmt.Sprintf(" %q", a.Quality)
+			}
+			rows = append(rows, row+"\n")
 		}
 		if len(rows) == 0 {
 			continue
@@ -881,6 +906,8 @@ const globalAttributeFirst = 0xFFF8
 // Access.Timed.Required), which matter.js answers NeedsTimedInteraction for
 // outside a timed interaction
 // (packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295).
+// A request command is one whose effective direction is (commandDirection),
+// and one without an effective block is an error (errNoEffective).
 func writeTimedFile(clusters []snapshotCluster) error {
 	var buf bytes.Buffer
 	buf.WriteString(fileHeaderTpl)
@@ -893,7 +920,13 @@ func writeTimedFile(clusters []snapshotCluster) error {
 		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
 		var rows []string
 		for _, m := range cmds {
-			if m.Direction != "request" || m.Effective == nil || !m.Effective.Access.Timed {
+			if commandDirection(m) != "request" {
+				continue
+			}
+			if m.Effective == nil {
+				return errNoEffective(c, m)
+			}
+			if !m.Effective.Access.Timed {
 				continue
 			}
 			rows = append(rows, fmt.Sprintf("\t\t0x%02X: {}, // %s\n", m.ID, m.Name))
@@ -1099,7 +1132,8 @@ func writeFabricScopeFile(snap snapshot) error {
 // Quality.largeMessage, packages/model/src/aspects/Quality.ts:71), which
 // matter.js's client reads to send the invoke over TCP
 // (packages/protocol/src/action/client/ClientInteraction.ts:111-127
-// inferLargeMessage, which probes the request command's schema).
+// inferLargeMessage, which probes the request command's schema). Request
+// commands are selected as writeTimedFile selects them.
 func writeLargeMessageFile(clusters []snapshotCluster) error {
 	var buf bytes.Buffer
 	buf.WriteString(fileHeaderTpl)
@@ -1112,7 +1146,13 @@ func writeLargeMessageFile(clusters []snapshotCluster) error {
 		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
 		var rows []string
 		for _, m := range cmds {
-			if m.Direction != "request" || m.Effective == nil || !m.Effective.Quality.LargeMessage {
+			if commandDirection(m) != "request" {
+				continue
+			}
+			if m.Effective == nil {
+				return errNoEffective(c, m)
+			}
+			if !m.Effective.Quality.LargeMessage {
 				continue
 			}
 			rows = append(rows, fmt.Sprintf("\t\t0x%02X: {}, // %s\n", m.ID, m.Name))
@@ -1168,9 +1208,7 @@ func writeInvokeAccessFile(clusters []snapshotCluster) error {
 				continue
 			}
 			if m.Effective == nil {
-				// No effective access: the tables would leave the command
-				// out (fail open), so the generation stops instead.
-				return fmt.Errorf("%s.%s: request command without an effective block: no access to generate from", c.Name, m.Name)
+				return errNoEffective(c, m)
 			}
 			acc := m.Effective.Access
 			switch acc.Fabric {
@@ -1233,12 +1271,6 @@ func writeInvokeAccessFile(clusters []snapshotCluster) error {
 		return err
 	}
 	return writeIfChanged(invokeFile, out)
-}
-
-// hasQuality reports whether a matter.js quality string carries flag as a
-// token of its own ("N C" carries "C").
-func hasQuality(quality, flag string) bool {
-	return slices.Contains(strings.Fields(quality), flag)
 }
 
 // writeRequirementsFile emits the device-type layer of the snapshot: every
@@ -1585,8 +1617,18 @@ func schemaConformance(raw json.RawMessage) (string, error) {
 	return strings.Join(parts, ", "), nil
 }
 
+// errNoEffective refuses a request command without an effective block:
+// the timed, Large Message and invoke tables would leave it out (fail
+// open), so the generation stops instead (R2-P6-sec-2701).
+func errNoEffective(c snapshotCluster, m snapshotCommand) error {
+	return fmt.Errorf("%s.%s: request command without an effective block: no access to generate from", c.Name, m.Name)
+}
+
 // commandDirection is a command's effective direction, its own when the
-// effective layer states none.
+// effective layer states none. Every table that selects request commands
+// reads it: a derived cluster's override of a base command states no
+// direction of its own (RvcOperationalState's Pause), so the raw direction
+// would leave the override out (R2-P6-sec-2701).
 func commandDirection(m snapshotCommand) string {
 	if m.Effective != nil && m.Effective.Direction != "" {
 		return m.Effective.Direction

@@ -4,8 +4,10 @@
 package schema_test
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/parity"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
@@ -84,5 +86,50 @@ func TestAttributeChangesOmitted(t *testing.T) {
 		if got := schema.ClusterHasChangesOmittedAttribute(c.cluster); got != c.want {
 			t.Errorf("ClusterHasChangesOmittedAttribute(0x%04X) = %v, want %v", c.cluster, got, c.want)
 		}
+	}
+}
+
+// TestAttributeChangesOmittedMatchesSnapshot holds the whole generated set
+// to the effective quality of parity/schema.json: AttributeChangesOmitted
+// answers true for exactly the attributes whose effective quality states
+// changesOmitted, an inherited attribute without a quality string of its
+// own included (R2-P6-par-2702).
+func TestAttributeChangesOmittedMatchesSnapshot(t *testing.T) {
+	t.Parallel()
+	var snap struct {
+		Clusters []struct {
+			ID         uint32 `json:"id"`
+			Name       string `json:"name"`
+			Attributes []struct {
+				ID        uint32 `json:"id"`
+				Name      string `json:"name"`
+				Effective *struct {
+					Quality struct {
+						ChangesOmitted bool `json:"changesOmitted"`
+					} `json:"quality"`
+				} `json:"effective"`
+			} `json:"attributes"`
+		} `json:"clusters"`
+	}
+	if err := json.Unmarshal(parity.SchemaJSON(), &snap); err != nil {
+		t.Fatalf("parse snapshot: %v", err)
+	}
+	total := 0
+	for _, c := range snap.Clusters {
+		for _, a := range c.Attributes {
+			if a.Effective == nil {
+				t.Fatalf("%s.%s: attribute without an effective block", c.Name, a.Name)
+			}
+			want := a.Effective.Quality.ChangesOmitted
+			if want {
+				total++
+			}
+			if got := schema.AttributeChangesOmitted(c.ID, a.ID); got != want {
+				t.Errorf("%s.%s: AttributeChangesOmitted = %v, effective changesOmitted = %v", c.Name, a.Name, got, want)
+			}
+		}
+	}
+	if total == 0 {
+		t.Fatal("snapshot carries no changesOmitted attribute: the extractor lost the effective quality")
 	}
 }
