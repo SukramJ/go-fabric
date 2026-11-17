@@ -371,6 +371,10 @@ type Controller struct {
 	dcl        DCLConfig
 	vendorMu   sync.Mutex
 	vendorInfo *dcl.VendorInfoService
+	// vendorBuilding is closed when the build of vendorInfo in flight
+	// ends; nil while none runs. The build runs without vendorMu, so
+	// Close does not wait for the ledger (review II, R2-P6-err-2317).
+	vendorBuilding chan struct{}
 
 	// The OTA push (ota.go): the update manager and the reboot armer;
 	// registry is reg for the node hooks, which run while New builds it.
