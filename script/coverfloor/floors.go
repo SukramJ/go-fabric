@@ -206,7 +206,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/icd", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/icd/checkin", min: 94},
-	{pkg: "github.com/SukramJ/go-fabric/im", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/im", min: 93},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
 	// package has concurrent paths whose coverage depends on scheduling, so
 	// a floor at the median makes the gate flaky rather than strict. Floors
