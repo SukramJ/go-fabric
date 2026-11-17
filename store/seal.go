@@ -730,13 +730,15 @@ func init() {
 // the owed scrub marked. controller.Reseal runs it beside the node
 // registry's in one transaction ([sealseam.StoreResealTx]).
 func resealTx(ctx context.Context, tx *sql.Tx, old, next Sealer) error {
+	// A write first, so the transaction holds the write lock before it
+	// reads, the schema check included (sealUnmarked's rule).
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("store: Reseal: %w", err)
+	}
 	if err := checkSealMarks(ctx, tx, "Reseal"); err != nil {
 		return err
 	}
 	from, to := &Store{sealer: old}, &Store{sealer: next}
-	if _, err := tx.ExecContext(ctx, `UPDATE matter_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
-		return fmt.Errorf("store: Reseal: %w", err)
-	}
 	stored, markSealed, marked, err := readCanary(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("store: Reseal: %w", err)

@@ -277,11 +277,18 @@ func Reseal(ctx context.Context, db *sql.DB, old, next store.Sealer) error {
 // the canary last, and the owed scrub marked. controller.Reseal runs it
 // beside store's in one transaction ([sealseam.RegistryResealTx]).
 func resealTx(ctx context.Context, tx *sql.Tx, old, next store.Sealer) error {
+	// A write first, so the transaction holds the write lock before it
+	// reads, the schema check included (sealUnmarked's rule). A registry
+	// before v2 has no matter_client_metadata to write: the schema check
+	// names the step then.
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_client_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		if serr := checkSchema(ctx, tx, "Reseal"); serr != nil {
+			return serr
+		}
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	}
 	if err := checkSchema(ctx, tx, "Reseal"); err != nil {
 		return err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE matter_client_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
-		return fmt.Errorf("sqlstore: Reseal: %w", err)
 	}
 	data, marked, err := readCanary(ctx, tx)
 	if err != nil {
