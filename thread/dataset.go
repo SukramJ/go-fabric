@@ -158,16 +158,20 @@ func (ds *OperationalDataset) encodeWithReplay() ([]byte, error) {
 	return EncodeTLVs(out)
 }
 
-// Redact is a shallow copy of ds without PSKc and NetworkKey, the input
-// untouched. The copy carries no replay state, so it encodes canonically;
-// Raw stays, the source bytes and so the secrets with it, as in matter.js.
+// Redact is a shallow copy of ds without PSKc, NetworkKey and Raw, the
+// input untouched: a value that is safe to log. The copy carries no
+// replay state, so it encodes canonically.
 //
 // Mirrors matter.js packages/protocol/src/thread/OperationalDataset.ts:100-102
-// (OperationalDataset.redact): the spread copy there is not in the
-// ORIGINAL_TLVS WeakMap.
+// (OperationalDataset.redact) at db021da0 for PSKc and NetworkKey: the
+// spread copy there is not in the ORIGINAL_TLVS WeakMap. It departs from
+// it for Raw: the copy there keeps raw (:41), the source bytes and the
+// network key and PSKc with them, under a doc that calls the result safe
+// to log (:94); here Raw is dropped too (review II, R2-P6-sec-2022,
+// notes/parity/by_design.md BD-Matter-OperationalDataset-RedactDropsRaw).
 func (ds *OperationalDataset) Redact() *OperationalDataset {
 	c := *ds
-	c.PSKc, c.NetworkKey, c.original = nil, nil, nil
+	c.PSKc, c.NetworkKey, c.Raw, c.original = nil, nil, nil, nil
 	return &c
 }
 

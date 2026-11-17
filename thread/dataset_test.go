@@ -6,7 +6,9 @@ package thread
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -112,5 +114,42 @@ func TestDecodeDatasetHexWhitespace(t *testing.T) {
 	}
 	if _, err := DecodeDatasetHex("000"); !errors.Is(err, ErrThreadDataset) {
 		t.Fatalf("odd length: err = %v", err)
+	}
+}
+
+// TestRedactCarriesNoSecret: the redacted copy of a decoded dataset holds
+// neither the network key nor the PSKc in any field — Raw, the source
+// bytes, included — so printing it does not print them (review II,
+// R2-P6-sec-2022; matter.js keeps raw, a recorded divergence).
+func TestRedactCarriesNoSecret(t *testing.T) {
+	key := []byte{0xde, 0xad, 0xbe, 0xef, 0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe, 0x01, 0x23, 0x45, 0x67}
+	pskc := []byte{0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0x07, 0x18, 0x29, 0x3a, 0x4b, 0x5c, 0x6d, 0x7e, 0x8f, 0x90}
+	blob := encodeTLVs(t,
+		TLV{Type: TLVChannel, Value: []byte{0x00, 0x00, 0x0f}},
+		TLV{Type: TLVNetworkKey, Value: key},
+		TLV{Type: TLVPSKc, Value: pskc},
+		TLV{Type: TLVNetworkName, Value: []byte("Lab")},
+	)
+	ds := decodeDataset(t, blob)
+	r := ds.Redact()
+	enc, err := r.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Raw != nil || r.NetworkKey != nil || r.PSKc != nil {
+		t.Fatalf("redacted Raw %x, NetworkKey %x, PSKc %x", r.Raw, r.NetworkKey, r.PSKc)
+	}
+	for _, secret := range [][]byte{key, pskc} {
+		for _, form := range []string{fmt.Sprintf("%+v", *r), fmt.Sprintf("%x", enc), fmt.Sprintf("%v", *r)} {
+			if strings.Contains(form, fmt.Sprintf("%x", secret)) || strings.Contains(form, strings.Trim(fmt.Sprint(secret), "[]")) {
+				t.Fatalf("the redacted dataset prints a secret: %s", form)
+			}
+		}
+	}
+	if !bytes.Equal(ds.Raw, blob) || !bytes.Equal(ds.NetworkKey, key) {
+		t.Fatal("Redact changed its input")
+	}
+	if r.NetworkName == nil || *r.NetworkName != "Lab" {
+		t.Fatalf("the redacted dataset lost its name: %v", r.NetworkName)
 	}
 }
