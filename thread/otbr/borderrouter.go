@@ -165,12 +165,29 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 		}
 	}
 	if err := b.c.setDataset(ctx, false, dataset); err != nil {
-		return err
+		return b.reenable(ctx, current != nil, err)
 	}
 	if err := b.c.setState(ctx, true); err != nil {
-		return err
+		return b.reenable(ctx, current != nil, err)
 	}
 	return b.awaitAttached(ctx)
+}
+
+// reenable is the step back of an activation that disabled the Thread
+// interface and then failed: the interface is enabled again — once, on
+// the client's own bound, also when the activation's context has ended —
+// so the border router is not left off the network it was on, which
+// RevertActiveDataset would not restore while a dataset is configured
+// (review II, R2-P6-err-2025). The error is the activation's, joined with
+// the re-enable's.
+func (b *BorderRouter) reenable(ctx context.Context, disabled bool, err error) error {
+	if !disabled {
+		return err
+	}
+	if rerr := b.c.setState(context.WithoutCancel(ctx), true); rerr != nil {
+		return errors.Join(err, fmt.Errorf("otbr: re-enable the Thread interface: %w", rerr))
+	}
+	return err
 }
 
 // awaitAttached reads /node/state until the border router is attached
