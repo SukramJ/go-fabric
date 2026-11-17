@@ -675,7 +675,10 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		case netcomm.AttrNetworks:
 			nets, err := decodeNetworks(a.Value)
 			if err != nil {
-				return 0, fmt.Errorf("%w: NetworkCommissioning Networks: %w", errUnexpectedResponse, err)
+				// A value whose shape does not decode is skipped and the
+				// read goes on (F-db021da0-15, reportedValue).
+				f.log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", "NetworkCommissioning Networks"), slog.Int("endpoint", int(a.Path.Endpoint)), slog.Any("err", err))
+				continue
 			}
 			d.networkStatus = append(d.networkStatus, networkStatus{endpoint: a.Path.Endpoint, networks: nets})
 		}
@@ -769,19 +772,32 @@ func (f *flow) armFailsafe(ctx context.Context, d time.Duration) (stepResult, er
 		if err != nil {
 			return 0, err
 		}
+		// By shape, a malformed value absent (F-db021da0-15, reportedValue).
+		def := gencomm.BasicCommissioningInfoDef
+		var fields map[uint32]any
+		if ok[0] {
+			fields, ok[0] = reportedStruct(f.log, "BasicCommissioningInfo", def, v[0])
+		}
 		if !ok[0] {
 			return 0, fmt.Errorf("%w: no BasicCommissioningInfo", errUnexpectedResponse)
 		}
 		var info gencomm.BasicCommissioningInfo
-		if err := info.DecodeTLV(v[0]); err != nil {
-			return 0, fmt.Errorf("%w: BasicCommissioningInfo: %w", errUnexpectedResponse, err)
+		var has bool
+		if info.FailSafeExpiryLengthSeconds, has = fieldUint[uint16](def, fields, "FailSafeExpiryLengthSeconds"); !has {
+			return 0, fmt.Errorf("%w: no BasicCommissioningInfo FailSafeExpiryLengthSeconds", errUnexpectedResponse)
 		}
+		// A missing MaxCumulativeFailsafeSeconds leaves the commissioning
+		// expiry undefined (zero), as an unset field.
+		maxCumulative, hasMax := fieldUint[uint16](def, fields, "MaxCumulativeFailsafeSeconds")
+		info.MaxCumulativeFailsafeSeconds = maxCumulative
 		f.data.basicCommissioningInfo = &info
 		f.defaultFailSafe = time.Duration(info.FailSafeExpiryLengthSeconds) * time.Second
 		started := f.now()
-		f.mu.Lock()
-		f.commissioningExpiry = started.Add(time.Duration(info.MaxCumulativeFailsafeSeconds) * time.Second)
-		f.mu.Unlock()
+		if hasMax {
+			f.mu.Lock()
+			f.commissioningExpiry = started.Add(time.Duration(maxCumulative) * time.Second)
+			f.mu.Unlock()
+		}
 	}
 	maxExpiry := f.defaultFailSafe
 	if i := f.data.basicCommissioningInfo; i != nil {
@@ -1003,12 +1019,13 @@ func (f *flow) configureRegulatoryInformation(ctx context.Context) (stepResult, 
 	if err != nil {
 		return 0, err
 	}
+	var capability uint8
+	if ok[0] {
+		// By shape, a malformed value absent (F-db021da0-15, reportedValue).
+		capability, ok[0] = reportedScalar(f.log, "LocationCapability", spec.DecodeUint[uint8](8), v[0])
+	}
 	if !ok[0] {
 		return 0, fmt.Errorf("%w: no LocationCapability", errUnexpectedResponse)
-	}
-	capability, err := spec.DecodeUint[uint8](8)(v[0])
-	if err != nil {
-		return 0, fmt.Errorf("%w: LocationCapability: %w", errUnexpectedResponse, err)
 	}
 	location := gencomm.RegulatoryLocationTypeEnum(capability)
 	if location == gencomm.RegulatoryLocationTypeIndoorOutdoor {

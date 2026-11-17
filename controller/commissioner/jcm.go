@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -107,7 +108,7 @@ func (f *flow) jointFabricTrustVerification(ctx context.Context) (stepResult, er
 	if err != nil {
 		return 0, err
 	}
-	t := &jcmTrust{opts: f.opts.JointFabric, info: jcm.NewInfo(), challenge: f.challenge, signer: flowSigner{f}, keepArmed: f.keepFailsafeArmed}
+	t := &jcmTrust{opts: f.opts.JointFabric, info: jcm.NewInfo(), challenge: f.challenge, signer: flowSigner{f}, keepArmed: f.keepFailsafeArmed, log: f.log}
 	if err := t.parse(report); err != nil {
 		return 0, newError(ErrJointFabric, err.Error(), err)
 	}
@@ -134,7 +135,9 @@ type jcmTrust struct {
 	// no longer (the cumulative limit, a failed re-arm). nil keeps nothing
 	// armed (a test of the stages).
 	keepArmed func(ctx context.Context) (stop func(), lapsed <-chan error, err error)
-	done      bool
+	// log receives a reported value skipped for its shape; nil discards.
+	log  *slog.Logger
+	done bool
 	// perform replaces a stage in tests.
 	perform func(ctx context.Context, stage jcm.Stage)
 }
@@ -143,7 +146,18 @@ type jcmTrust struct {
 // CHIP_ERROR_NOT_FOUND, KEY_NOT_FOUND, CERT_NOT_FOUND and CANCELLED.
 var errJCMParse = errors.New("commissioner: the device's administrator information is incomplete")
 
-// parse is ParseExtraCommissioningInfo's JCM half (:343-362).
+// logger is t.log, or a discarding one.
+func (t *jcmTrust) logger() *slog.Logger {
+	if t.log == nil {
+		return slog.New(slog.DiscardHandler)
+	}
+	return t.log
+}
+
+// parse is ParseExtraCommissioningInfo's JCM half (:343-362). Every
+// reported value is decoded by its shape, one that does not decode absent
+// (F-db021da0-15, reportedValue); a value the trust cannot do without is
+// then the parse's own "no …" refusal.
 func (t *jcmTrust) parse(r *interaction.Report) error {
 	if err := t.parseAdminFabricIndexAndEndpointID(r); err != nil {
 		return err
@@ -163,9 +177,9 @@ func (t *jcmTrust) parseAdminFabricIndexAndEndpointID(r *interaction.Report) err
 		if a.Path.Cluster != jfadef.ClusterID || a.Path.Attribute != jfadef.AttrAdministratorFabricIndex {
 			continue
 		}
-		idx, err := spec.DecodeNullable(spec.DecodeUint[uint8](8))(a.Value)
-		if err != nil {
-			return fmt.Errorf("%w: AdministratorFabricIndex: %w", errJCMParse, err)
+		idx, ok := reportedScalar(t.logger(), "AdministratorFabricIndex", spec.DecodeNullable(spec.DecodeUint[uint8](8)), a.Value)
+		if !ok {
+			continue
 		}
 		if idx.Null || idx.Value == 0 { // :99-109
 			return fmt.Errorf("%w: AdministratorFabricIndex is null", errJCMParse)
@@ -183,22 +197,27 @@ func (t *jcmTrust) parseAdminFabricIndexAndEndpointID(r *interaction.Report) err
 // from NOCs; a VIDVerificationStatement is refused, as is a fabric
 // without an ICAC (ParseOperationalCredentials :138-256).
 func (t *jcmTrust) parseOperationalCredentials(r *interaction.Report) error {
-	if v, ok := r.Value(rootEndpoint, opCredsCluster, opcredsdef.AttrFabrics); ok {
-		fabrics, err := spec.DecodeList(spec.DecodeStruct[opcredsdef.FabricDescriptorStruct])(v)
-		if err != nil {
-			return fmt.Errorf("%w: Fabrics: %w", errJCMParse, err)
-		}
+	log := t.logger()
+	fabricDef := opcredsdef.FabricDescriptorStructDef
+	v, ok := r.Value(rootEndpoint, opCredsCluster, opcredsdef.AttrFabrics)
+	var fabrics []map[uint32]any
+	if ok {
+		fabrics, ok = reportedStructList(log, "Fabrics", fabricDef, v)
+	}
+	if ok {
 		found := false
 		for _, fd := range fabrics {
-			if fd.VidVerificationStatement != nil { // :158-164
+			if vvs, has := field(fabricDef, fd, "VidVerificationStatement"); has && vvs != nil { // :158-164
 				return fmt.Errorf("%w: a VID Verification Statement is not supported, Joint Fabric requires an ICA", errJCMParse)
 			}
-			if fd.FabricIndex == t.info.AdminFabricIndex { // :166-181
-				if len(fd.RootPublicKey) != 65 {
-					return fmt.Errorf("%w: root public key of %d bytes", errJCMParse, len(fd.RootPublicKey))
+			if idx, has := fieldUint[uint8](fabricDef, fd, "FabricIndex"); has && idx == t.info.AdminFabricIndex { // :166-181
+				rootKey, _ := fieldBytes(fabricDef, fd, "RootPublicKey")
+				if len(rootKey) != 65 {
+					return fmt.Errorf("%w: root public key of %d bytes", errJCMParse, len(rootKey))
 				}
-				t.info.RootPublicKey = slices.Clone(fd.RootPublicKey)
-				t.info.AdminVendorID, t.info.AdminFabricID = fd.VendorId, fd.FabricId
+				t.info.RootPublicKey = slices.Clone(rootKey)
+				t.info.AdminVendorID, _ = fieldUint[uint16](fabricDef, fd, "VendorId")
+				t.info.AdminFabricID, _ = fieldUint[uint64](fabricDef, fd, "FabricId")
 				found = true
 				break
 			}
@@ -207,20 +226,25 @@ func (t *jcmTrust) parseOperationalCredentials(r *interaction.Report) error {
 			return fmt.Errorf("%w: no fabric %d", errJCMParse, t.info.AdminFabricIndex)
 		}
 	}
-	if v, ok := r.Value(rootEndpoint, opCredsCluster, opcredsdef.AttrNocs); ok {
-		nocs, err := spec.DecodeList(spec.DecodeStruct[opcredsdef.NOCStruct])(v)
-		if err != nil {
-			return fmt.Errorf("%w: NOCs: %w", errJCMParse, err)
-		}
+	nocDef := opcredsdef.NOCStructDef
+	v, ok = r.Value(rootEndpoint, opCredsCluster, opcredsdef.AttrNocs)
+	var nocs []map[uint32]any
+	if ok {
+		nocs, ok = reportedStructList(log, "NOCs", nocDef, v)
+	}
+	if ok {
 		for _, n := range nocs { // :195-217
-			if n.FabricIndex != t.info.AdminFabricIndex {
+			if idx, has := fieldUint[uint8](nocDef, n, "FabricIndex"); !has || idx != t.info.AdminFabricIndex {
 				continue
 			}
-			t.info.AdminNOC = slices.Clone(n.Noc)
-			if n.Icac.Null {
+			noc, _ := fieldBytes(nocDef, n, "Noc")
+			t.info.AdminNOC = slices.Clone(noc)
+			icac, has := field(nocDef, n, "Icac")
+			if has && icac == nil {
 				return fmt.Errorf("%w: the administrator fabric has no ICAC", errJCMParse)
 			}
-			t.info.AdminICAC = slices.Clone(n.Icac.Value)
+			b, _ := icac.([]byte)
+			t.info.AdminICAC = slices.Clone(b)
 			break
 		}
 	}
@@ -238,12 +262,16 @@ func (t *jcmTrust) parseOperationalCredentials(r *interaction.Report) error {
 // parseTrustedRoot takes the trusted root whose public key is the
 // administrator fabric's (ParseTrustedRoot :258-328).
 func (t *jcmTrust) parseTrustedRoot(r *interaction.Report) error {
-	if v, ok := r.Value(rootEndpoint, opCredsCluster, opcredsdef.AttrTrustedRootCertificates); ok {
-		roots, err := spec.DecodeList(spec.DecodeBytes)(v)
-		if err != nil {
-			return fmt.Errorf("%w: TrustedRootCertificates: %w", errJCMParse, err)
-		}
-		for _, root := range roots {
+	v, ok := r.Value(rootEndpoint, opCredsCluster, opcredsdef.AttrTrustedRootCertificates)
+	var roots []any
+	if ok {
+		var list any
+		list, ok = reportedValue(t.logger(), "TrustedRootCertificates", spec.Type{Kind: spec.KindList, Entry: &spec.Field{Type: spec.Type{Kind: spec.KindBytes}}}, v)
+		roots, _ = list.([]any)
+	}
+	if ok {
+		for _, entry := range roots {
+			root, _ := entry.([]byte)
 			c, err := mattercert.Decode(root) // :279
 			if err != nil {
 				return fmt.Errorf("%w: trusted root: %w", errJCMParse, err)
