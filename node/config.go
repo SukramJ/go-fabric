@@ -24,6 +24,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/surface"
@@ -1017,6 +1018,7 @@ func (c *Config) optionalErrors() []error {
 	if c.Health != nil && c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
+	errs = append(errs, c.boundErrors()...)
 	if n := c.Network.TCP.MaxInboundConnections; n < 0 {
 		errs = append(errs, fmt.Errorf("node: Network.TCP.MaxInboundConnections %d is negative", n))
 	}
@@ -1034,6 +1036,9 @@ func (c *Config) optionalErrors() []error {
 	if c.TLS != nil && c.TLS.CertificatePort == nil {
 		errs = append(errs, errNoCertificatePort)
 	}
+	if c.TLS != nil {
+		errs = append(errs, c.TLS.capacityErrors()...)
+	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("node: OTA.Dir must be set"))
 	}
@@ -1041,6 +1046,56 @@ func (c *Config) optionalErrors() []error {
 		if err := c.ICD.validate(); err != nil {
 			errs = append(errs, err)
 		}
+	}
+	return errs
+}
+
+// minPeriod is the shortest period Validate takes for the node's own
+// periodic work — the health probe, the interface check: a period below
+// it runs the work back to back for nothing a host can observe. A module
+// rule; neither reference bounds the two.
+const minPeriod = time.Second
+
+// maxHostLabel is the longest DNS label (RFC 1035 §2.3.4, 63 octets): the
+// mDNS host name is one label before ".local".
+const maxHostLabel = 63
+
+// boundErrors refuses the Config values no other check bounds (review II,
+// R2-P6-api-2409): a probe or interface-check period below [minPeriod]
+// (a negative InterfaceCheck stays the documented "off"); a negative OTA
+// HTTPS limit or announced-update delay, which would read as the default
+// or as no wait; an advertised device type the schema does not define; an
+// mDNS host name that is not one DNS label; and EndpointState beside the
+// deprecated EndpointPersistence, which it would ignore.
+func (c *Config) boundErrors() []error {
+	var errs []error
+	if c.Health != nil && c.Health.Interval > 0 && c.Health.Interval < minPeriod {
+		errs = append(errs, fmt.Errorf("node: Health.Interval %v is below %v", c.Health.Interval, minPeriod))
+	}
+	if d := c.Network.InterfaceCheck; d > 0 && d < minPeriod {
+		errs = append(errs, fmt.Errorf("node: Network.InterfaceCheck %v is below %v (negative turns the check off)", d, minPeriod))
+	}
+	if o := c.OTA; o != nil {
+		if o.HTTPSMaxImageSize < 0 {
+			errs = append(errs, fmt.Errorf("node: OTA.HTTPSMaxImageSize %d is negative", o.HTTPSMaxImageSize))
+		}
+		if o.HTTPSIdleTimeout < 0 {
+			errs = append(errs, fmt.Errorf("node: OTA.HTTPSIdleTimeout %v is negative", o.HTTPSIdleTimeout))
+		}
+		if d := o.AnnouncedUpdateQueryDelay; d != nil && *d < 0 {
+			errs = append(errs, fmt.Errorf("node: OTA.AnnouncedUpdateQueryDelay %v is negative", *d))
+		}
+	}
+	if dt := c.ProductDescription.DeviceType; dt != 0 {
+		if _, ok := schema.DeviceTypeRevision(schema.DeviceTypeID(dt)); !ok {
+			errs = append(errs, fmt.Errorf("node: ProductDescription.DeviceType 0x%04X is not a device type of the schema", dt))
+		}
+	}
+	if h := c.Network.MDNS.HostName; h != "" && (strings.ContainsAny(h, ". \t") || len(h) > maxHostLabel) {
+		errs = append(errs, fmt.Errorf("node: Network.MDNS.HostName %q is not one DNS label of at most %d bytes (without \".local\")", h, maxHostLabel))
+	}
+	if c.EndpointState != nil && c.EndpointPersistence != nil { //nolint:staticcheck // the deprecated field is still honoured
+		errs = append(errs, errors.New("node: EndpointState excludes the deprecated EndpointPersistence"))
 	}
 	return errs
 }
