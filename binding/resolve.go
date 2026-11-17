@@ -110,8 +110,9 @@ func (m *Manager) resolveAndEmit(it *item) {
 			return
 		}
 		if creates {
+			ctx, cancel := context.WithCancel(m.life)
 			m.stateMu.Lock()
-			m.created[p] = true
+			m.created[p] = &createdPeer{ctx: ctx, cancel: cancel}
 			m.stateMu.Unlock()
 		}
 		res.Kind, res.Peer, res.Endpoint = KindClient, p, e.Endpoint
@@ -334,10 +335,16 @@ func (m *Manager) recheckGroups(fabricIndex uint8) {
 func (m *Manager) establishClientKind(it *item, res Resolution) {
 	p := res.Peer
 	m.info("binding.peer.connecting", reasonInitiatingCASE, it)
+	ctx := m.life
+	m.stateMu.Lock()
+	if c := m.created[p]; c != nil {
+		ctx = c.ctx
+	}
+	m.stateMu.Unlock()
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		if err := m.link.connect(m.life, p); err != nil && m.life.Err() == nil {
+		if err := m.link.connect(ctx, p); err != nil && ctx.Err() == nil {
 			m.log.Debug("binding.peer.connect_failed", append([]any{slog.Any("err", err)}, m.entryAttrs(it)...)...)
 		}
 	}()
@@ -486,11 +493,11 @@ func (m *Manager) disposeServer(source uint16) {
 
 // releaseUnbound releases every peer the manager created whose node no
 // pending or established entry names any more: its connection process is
-// stopped, and the peer closed — out of the set — when it holds no
-// session; a peer with a session is left as it is, its session not closed
-// (see the package doc). It runs on the worker after every task, so an
-// entry that went — unregistered, its server detached, parked again — takes
-// its peer with it. Ahead of matter.js, whose BindingManager keeps the peer
+// stopped. The peer stays in the set and is never closed, its sessions
+// with it — another holder may use the same peer (owner decision 221).
+// It runs on the worker after every task, so an entry that went —
+// unregistered, its server detached, parked again — stops the connecting
+// it started. Ahead of matter.js, whose BindingManager keeps the peer
 // it made for an entry (BindingManager.ts:584-585, #clearPending
 // :613-627 at db021da0) with the connection process and the resolution
 // that have no end of their own; the rule is this module's (review II,
@@ -512,16 +519,19 @@ func (m *Manager) releaseUnbound() {
 			}
 		}
 	}
-	var unbound []*peer.Peer
-	for p := range m.created {
+	unbound := make(map[*peer.Peer]*createdPeer)
+	for p, c := range m.created {
 		if !inUse[p] {
 			delete(m.created, p)
-			unbound = append(unbound, p)
+			unbound[p] = c
 		}
 	}
 	m.stateMu.Unlock()
-	for _, p := range unbound {
+	for p, c := range unbound {
 		m.log.Debug("binding.peer.released", slog.Uint64("node_id", p.Address().NodeID), slog.Int("fabric_index", int(p.Address().FabricIndex)))
+		// The entries' Connect calls end first: one that found the
+		// process stopped would start it again.
+		c.cancel()
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
@@ -536,8 +546,8 @@ type peerLink interface {
 	connect(ctx context.Context, p *peer.Peer) error
 	hasSession(p *peer.Peer) bool
 	observe(p *peer.Peer, sessionAdded func()) (stop func())
-	// release stops p's connection process and closes p when it holds no
-	// session (releaseUnbound).
+	// release stops p's connection process; p stays in the set, its
+	// sessions open (releaseUnbound).
 	release(ctx context.Context, p *peer.Peer)
 }
 
@@ -554,9 +564,6 @@ func (realLink) hasSession(p *peer.Peer) bool { return p.HasSession() }
 
 func (realLink) release(ctx context.Context, p *peer.Peer) {
 	p.Disconnect(ctx, nil)
-	if !p.HasSession() {
-		p.Close(ctx)
-	}
 }
 
 func (realLink) observe(p *peer.Peer, sessionAdded func()) func() {

@@ -192,6 +192,13 @@ func (r *record) empty() bool {
 	return len(r.pending) == 0 && len(r.established) == 0 && len(r.dormant) == 0
 }
 
+// createdPeer is a peer the manager created, with the context of the
+// Connect calls its entries make.
+type createdPeer struct {
+	ctx    context.Context //nolint:containedctx // ends the entries' Connect calls at the release
+	cancel context.CancelFunc
+}
+
 // regKey identifies a registered group entry: its source endpoint and its
 // entry key.
 type regKey struct {
@@ -253,8 +260,11 @@ type Manager struct {
 	records map[uint16]*record
 	// created are the peers the manager made for a client entry — the set
 	// held none for the node before (peerSet.Has) — until the last entry
-	// that names the node goes (releaseUnbound).
-	created map[*peer.Peer]bool
+	// that names the node goes (releaseUnbound), each with the context its
+	// entries' Connect calls run on: a Connect call starts the connection
+	// process again when it finds it stopped, so a release ends the calls
+	// before it stops the process.
+	created map[*peer.Peer]*createdPeer
 }
 
 // New returns a manager over cfg. Its worker starts with the first work
@@ -267,7 +277,7 @@ func New(cfg Config) (*Manager, error) {
 	m := &Manager{
 		cfg: cfg, log: cfg.Logger, link: realLink{},
 		wake: make(chan struct{}, 1), attached: map[uint16]attachment{}, rechecks: map[uint8]bool{},
-		registered: map[regKey]*item{}, records: map[uint16]*record{}, created: map[*peer.Peer]bool{},
+		registered: map[regKey]*item{}, records: map[uint16]*record{}, created: map[*peer.Peer]*createdPeer{},
 	}
 	if m.log == nil {
 		m.log = slog.New(slog.DiscardHandler)

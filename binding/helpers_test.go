@@ -166,11 +166,12 @@ type fakeLink struct {
 	sessions  map[*peer.Peer]bool
 	observers map[*peer.Peer][]*func()
 	connects  map[*peer.Peer]int
+	ctxs      map[*peer.Peer][]context.Context
 	releases  map[*peer.Peer]int
 }
 
 func newFakeLink() *fakeLink {
-	return &fakeLink{sessions: map[*peer.Peer]bool{}, observers: map[*peer.Peer][]*func(){}, connects: map[*peer.Peer]int{}, releases: map[*peer.Peer]int{}}
+	return &fakeLink{sessions: map[*peer.Peer]bool{}, observers: map[*peer.Peer][]*func(){}, connects: map[*peer.Peer]int{}, ctxs: map[*peer.Peer][]context.Context{}, releases: map[*peer.Peer]int{}}
 }
 
 func (l *fakeLink) release(_ context.Context, p *peer.Peer) {
@@ -188,8 +189,22 @@ func (l *fakeLink) released(p *peer.Peer) int {
 func (l *fakeLink) connect(ctx context.Context, p *peer.Peer) error {
 	l.mu.Lock()
 	l.connects[p]++
+	l.ctxs[p] = append(l.ctxs[p], ctx)
 	l.mu.Unlock()
 	return nil
+}
+
+// connectsEnded reports whether every Connect call made for p has its
+// context ended.
+func (l *fakeLink) connectsEnded(p *peer.Peer) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, ctx := range l.ctxs[p] {
+		if ctx.Err() == nil {
+			return false
+		}
+	}
+	return len(l.ctxs[p]) > 0
 }
 
 func (l *fakeLink) hasSession(p *peer.Peer) bool {

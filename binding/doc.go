@@ -33,6 +33,7 @@
 // consumer (BindingManager.ts:656-677) and are not ported. A peer the
 // manager itself created for an entry — the [Peers] set held none for the
 // node — is released when the last entry naming the node goes: its
-// connection process stops, and it leaves the set when it holds no session
-// (ahead of matter.js; review II, R2-P6-bound-2104).
+// connection process stops; the peer stays in the set, never closed, for
+// another holder may use it (ahead of matter.js; review II,
+// R2-P6-bound-2104, owner decision 221).
 package binding
