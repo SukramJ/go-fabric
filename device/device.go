@@ -85,11 +85,17 @@ type Device struct {
 	hosted map[uint32]bool
 	ports  map[uint32]any
 
-	// mu guards parts, host and the host statements of opts (Name,
-	// DeviceAddress, ChannelAddress: Rename, Update).
-	mu    sync.Mutex
-	parts []*Device
-	host  deviceseam.Host
+	// bindings are the subscriptions the device's servers hold on host
+	// ports while the device is added (defaultBuild.bind), set once at
+	// New; unbind undoes the ones attach made.
+	bindings []func() func()
+
+	// mu guards parts, host, unbind and the host statements of opts
+	// (Name, DeviceAddress, ChannelAddress: Rename, Update).
+	mu     sync.Mutex
+	parts  []*Device
+	host   deviceseam.Host
+	unbind []func()
 
 	// identify holds the host's Identify and TriggerEffect handlers
 	// ([Device.Identify]); never mounted.
@@ -256,6 +262,7 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	}
 
 	d.ports = maps.Clone(s.ports)
+	d.bindings = s.bindings
 	if d.identify, err = newIdentifyHandlers(s); err != nil {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
@@ -438,9 +445,11 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		// whole Initial (review II, R2-P5-apidev-10: the media and camera
 		// kit servers dropped it before).
 		heldInitial := maps.Clone(initial)
+		var bindings []func() func()
 		srv, err := factory(defaultBuild{
 			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key, logger: s.logger,
 			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: heldInitial,
+			bind: func(subscribe func() func()) { bindings = append(bindings, subscribe) },
 		})
 		if err == nil {
 			err = checkSelection(r.Name, srv, opts)
@@ -451,6 +460,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		switch {
 		case err == nil:
 			fillSelectDefaults(def, srv)
+			s.bindings = append(s.bindings, bindings...)
 			return srv, nil
 		case !errors.Is(err, ErrSelectionNotServed):
 			return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)

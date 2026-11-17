@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -149,17 +150,20 @@ func TestMicrowaveModeStartsInTheDeclaredMode(t *testing.T) {
 	}
 }
 
-// tariffTime is a TimeSource that is also a ChangeNotifier.
+// tariffTime is a TimeSource that is also a ChangeNotifier; active counts
+// the subscriptions not yet undone.
 type tariffTime struct {
-	now time.Time
-	cb  func()
+	now    time.Time
+	cb     func()
+	active atomic.Int32
 }
 
 func (t *tariffTime) Now() time.Time { return t.now }
 
 func (t *tariffTime) OnMatterValueChanged(cb func()) func() {
 	t.cb = cb
-	return func() {}
+	t.active.Add(1)
+	return func() { t.active.Add(-1) }
 }
 
 // TestCommodityTariffRunsOnTheDeclaredTimeSource: the source's time is the
@@ -169,13 +173,19 @@ func TestCommodityTariffRunsOnTheDeclaredTimeSource(t *testing.T) {
 	t.Parallel()
 
 	src := &tariffTime{now: time.Unix(1_700_000_000, 0)}
+	var bound []func() func()
 	srv, err := selfHeldDefaults[ctdef.ClusterID](defaultBuild{
 		sibling: noSiblings, clock: &deviceClock{}, opts: spec.Options{Features: uint32(ctdef.FeaturePricing)},
 		ports: ctdef.Declare{TimeSource: src},
+		bind:  func(subscribe func() func()) { bound = append(bound, subscribe) },
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(bound) != 1 || src.cb != nil {
+		t.Fatalf("bindings %d, subscribed before the attach %v; want one binding, no subscription yet", len(bound), src.cb != nil)
+	}
+	bound[0]()
 	if srv == nil || src.cb == nil {
 		t.Fatalf("server %v, the source's notifier subscribed %v", srv, src.cb != nil)
 	}

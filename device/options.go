@@ -171,6 +171,9 @@ type settings struct {
 	// (compose).
 	measured map[uint32]bool
 	cut      surfaceCut
+	// bindings are the self-held servers' subscriptions on host ports
+	// (defaultBuild.bind), the device's once New succeeds.
+	bindings []func() func()
 	// skipInitialCheck builds the device without New's refusal of an
 	// attribute matter.js requires a value of ([Type.RequiredInitial]
 	// measures them).

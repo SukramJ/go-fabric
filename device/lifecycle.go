@@ -60,6 +60,13 @@ func (d *Device) attach(h deviceseam.Host) error {
 	d.mu.Unlock()
 	d.clock.setNode(h.Clock())
 	d.queue.Start()
+	unbind := make([]func(), 0, len(d.bindings))
+	for _, subscribe := range d.bindings {
+		unbind = append(unbind, subscribe())
+	}
+	d.mu.Lock()
+	d.unbind = unbind
+	d.mu.Unlock()
 	for _, p := range parts {
 		if err := p.attach(h); err != nil {
 			d.detach()
@@ -74,8 +81,14 @@ func (d *Device) attach(h deviceseam.Host) error {
 func (d *Device) detach() {
 	d.mu.Lock()
 	d.host = nil
-	parts := d.parts
+	parts, unbind := d.parts, d.unbind
+	d.unbind = nil
 	d.mu.Unlock()
+	for _, u := range unbind {
+		if u != nil {
+			u()
+		}
+	}
 	d.queue.Stop()
 	for _, p := range parts {
 		p.detach()
