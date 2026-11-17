@@ -589,10 +589,10 @@ func TestReport_PeerUnreachable_RetriesBeforeEviction(t *testing.T) {
 	}
 }
 
-// TestDeprecatedAckWaitTimeoutKeepsItsText: ErrAckWaitTimeout is
-// deprecated with nothing left to return it (owner decision 174); for the
-// deprecation window it stays the same sentinel with the same text, so a
-// host that still compares against it or logs it sees no change.
+// TestDeprecatedAckWaitTimeoutKeepsItsText: nothing returns
+// ErrAckWaitTimeout any more (owner decision 174); for the deprecation
+// window it stays the same sentinel with the same text, so a host that
+// still compares against it or logs it sees no change.
 func TestDeprecatedAckWaitTimeoutKeepsItsText(t *testing.T) {
 	t.Parallel()
 	//nolint:staticcheck // SA1019: the deprecated sentinel is what this test holds.
