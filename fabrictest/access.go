@@ -33,8 +33,11 @@ func (p *Pair) Grant(ctx context.Context, privilege Privilege) error {
 	if err != nil {
 		return fmt.Errorf("fabrictest: device fabrics: %w", err)
 	}
+	// The pair's fabric is its controller's: the node id alone is not
+	// unique across a device's fabrics (R2-P6-test-2514).
+	cfid := p.Controller.Fabric().Identity.CompressedFabricID
 	for _, f := range fabrics {
-		if f.NodeID != p.Address.NodeID {
+		if f.NodeID != p.Address.NodeID || f.CompressedFabricID != cfid {
 			continue
 		}
 		return p.Device.Node().Store().ReplaceACL(ctx, f.FabricIndex, []store.ACLEntry{{
