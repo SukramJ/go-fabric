@@ -57,9 +57,6 @@ if [ ! -f "$wt/packages/model/dist/esm/index.js" ]; then
 fi
 
 cp "$here/extract-levels-from-matter-js.ts" "$wt/.gofabric-levels.mts"
-# The extractor checks the tag's command directions against the pin
-# (R2-P6-par-2713).
-export GOFABRIC_PIN="$here/../parity/schema.json"
 # A node that cannot strip TypeScript types itself gets the extractor
 # transpiled by the tag's own esbuild first (as generate-matter-schema does).
 if (cd "$wt" && node .gofabric-levels.mts >"$tmp" 2>"$tmp.err"); then

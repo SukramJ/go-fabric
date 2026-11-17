@@ -59,7 +59,13 @@ func LevelIDsOfFile(f leveltable.File) LevelIDs {
 				lc.Attributes[id] = true
 			}
 		}
-		for _, id := range c.Commands {
+		// The level file keys a command id by direction; the cross-check
+		// compares id presence, which CHIP's side (LevelIDsOfModel) counts
+		// over both directions, so both lists enter one set here.
+		for _, id := range c.RequestCommands {
+			lc.Commands[id] = true
+		}
+		for _, id := range c.ResponseCommands {
 			lc.Commands[id] = true
 		}
 		for _, id := range c.Events {

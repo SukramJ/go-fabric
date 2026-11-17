@@ -283,7 +283,9 @@ func parseElement(r *rule) error {
 		return fmt.Errorf("cluster %s has no feature %q in the pin's schema", f[1], f[3])
 	}
 	levels := map[string]func(uint32, uint32) schema.LevelSet{
-		kindAttribute: schema.ClusterAttributeLevels, kindCommand: schema.ClusterCommandLevels, kindEvent: schema.ClusterEventLevels,
+		// A command row names a request, as the surface's command
+		// elements are (surface.ElementLevels).
+		kindAttribute: schema.ClusterAttributeLevels, kindCommand: schema.ClusterRequestCommandLevels, kindEvent: schema.ClusterEventLevels,
 	}[f[2]]
 	if levels == nil {
 		return fmt.Errorf("kind %q is not feature, attribute, command or event", f[2])

@@ -106,13 +106,14 @@ func TestLevelAccessors(t *testing.T) {
 		t.Errorf("Thermostat levels = %v", all.Levels())
 	}
 	if !schema.ClusterAttributeLevels(thermostat, 0x0000).Has("1.4") ||
-		!schema.ClusterCommandLevels(thermostat, 0x00).Has("1.4") ||
+		!schema.ClusterRequestCommandLevels(thermostat, 0x00).Has("1.4") ||
 		!schema.ClusterEventLevels(thermostat, 0x00).Has("1.6.1") ||
 		!schema.DeviceTypeLevels(0x0301).Has("1.4") {
 		t.Error("an element every level knows is missing")
 	}
 	if schema.ClusterLevels(0xFFFF_FFFF) != 0 || schema.ClusterFeatureLevels(0xFFFF_FFFF, 0) != 0 ||
-		schema.ClusterAttributeLevels(0xFFFF_FFFF, 0) != 0 || schema.ClusterCommandLevels(0xFFFF_FFFF, 0) != 0 ||
+		schema.ClusterAttributeLevels(0xFFFF_FFFF, 0) != 0 || schema.ClusterRequestCommandLevels(0xFFFF_FFFF, 0) != 0 ||
+		schema.ClusterResponseCommandLevels(0xFFFF_FFFF, 0) != 0 ||
 		schema.ClusterEventLevels(0xFFFF_FFFF, 0) != 0 {
 		t.Error("an unknown cluster has no levels")
 	}

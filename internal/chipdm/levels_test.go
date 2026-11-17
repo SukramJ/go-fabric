@@ -71,7 +71,7 @@ func TestCompareLevelOnFixtures(t *testing.T) {
 	f.Matter.Revision = "1.4.2"
 	f.DeviceTypes = []leveltable.DeviceType{{ID: 0x0100, Revision: 3}, {ID: 0x0230, Revision: 1}}
 	f.Clusters = []leveltable.Cluster{
-		{ID: 0x0006, Features: []leveltable.Feature{{Bit: 0, Code: "LT"}}, Attributes: []uint32{0, 0x4000, 0xFFFD}, Commands: []uint32{0, 1}},
+		{ID: 0x0006, Features: []leveltable.Feature{{Bit: 0, Code: "LT"}}, Attributes: []uint32{0, 0x4000, 0xFFFD}, RequestCommands: []uint32{0, 1}},
 		{ID: 0x0104},
 	}
 	m := &Model{

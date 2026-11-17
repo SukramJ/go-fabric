@@ -12,20 +12,18 @@
 // cluster's ClusterRevision (BasicInformation.ConfigurationVersion at
 // revision 6, concept v11 §C.9).
 //
-// Command ids are written without their direction: a request and a
-// response with one id are one id of the level. That merge loses nothing
-// only while every direction the pin (parity/schema.json) carries for an
-// id is present at the tag wherever the tag has the id at all — else the
-// level would admit, at that level, a direction it lacked. The extractor
-// checks exactly that against the pin GOFABRIC_PIN names (generate-level.sh
-// passes it) and fails naming the cluster and id (review II R2-P6-par-2713,
-// wizard-6b §2 gen Q2).
+// Command ids are written by direction — requestCommands and
+// responseCommands, and the same split under mandatory — from each
+// command's effectiveDirection at the tag: an id can name a request at one
+// tag and a response at another (Thermostat 2: a request at v0.13.0, a
+// response at the pin), so a merged list would admit the other direction
+// at the level (review II R2-P6-par-2713, owner decision 227). A command
+// without a direction at the tag ends the run, naming it.
 //
 // Run inside a matter.js checkout at the tag (make generate-level TAG=…
 // copies it there, as generate-matter-schema does for the main extractor).
 import { ClusterModel, DeviceTypeModel, Matter, Specification } from "@matter/model";
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 
 const sorted = (ids: Iterable<number>) => [...new Set(ids)].sort((a, b) => a - b);
 function isMandatory(m: any, revision: number): boolean {
@@ -54,54 +52,6 @@ if (!sourceCommit || !tag) {
     process.exit(1);
 }
 
-// The pin's command directions per cluster id and command id, from the
-// effective direction (the raw one when the effective layer states none),
-// as script/generate_matter_schema.go's commandDirection reads them.
-const pinPath = process.env.GOFABRIC_PIN;
-if (!pinPath) {
-    console.error("GOFABRIC_PIN is not set: run the extractor through script/generate-level.sh");
-    process.exit(1);
-}
-const pinDirections = new Map<number, Map<number, Set<string>>>();
-for (const c of JSON.parse(readFileSync(pinPath, "utf8")).clusters as any[]) {
-    const byId = new Map<number, Set<string>>();
-    for (const m of c.commands ?? []) {
-        const dir = m.effective?.direction || m.direction;
-        if (dir !== "request" && dir !== "response") {
-            throw new Error(`pin cluster ${c.id} command ${m.id}: direction ${JSON.stringify(dir)}`);
-        }
-        if (!byId.has(m.id)) byId.set(m.id, new Set());
-        byId.get(m.id)!.add(dir);
-    }
-    pinDirections.set(c.id, byId);
-}
-
-// checkDirections fails when the tag has a command id without a direction
-// the pin carries for it: the merged id would admit that direction at the
-// level although the tag lacks it.
-function checkDirections(clusterId: number, commands: any[]) {
-    const pin = pinDirections.get(clusterId);
-    if (pin === undefined) return;
-    const atTag = new Map<number, Set<string>>();
-    for (const m of commands) {
-        if (typeof m.id !== "number") continue;
-        if (!atTag.has(m.id)) atTag.set(m.id, new Set());
-        atTag.get(m.id)!.add(m.effectiveDirection === "response" ? "response" : m.effectiveDirection === "request" ? "request" : "unknown");
-    }
-    for (const [id, dirs] of atTag) {
-        const want = pin.get(id);
-        if (want === undefined) continue;
-        for (const d of want) {
-            if (!dirs.has(d)) {
-                throw new Error(
-                    `cluster ${clusterId} command ${id}: the pin has it as ${[...want].join(" and ")}, the tag as ${[...dirs].join(" and ")}; ` +
-                        "a level file merges the directions, so it would admit the missing one (R2-P6-par-2713)",
-                );
-            }
-        }
-    }
-}
-
 const deviceTypes: any[] = [];
 for (const dt of Matter.deviceTypes as DeviceTypeModel[]) {
     if (typeof dt.id !== "number") continue;
@@ -126,15 +76,31 @@ for (const c of Matter.clusters as ClusterModel[]) {
     const attributes = c.attributes as any[];
     const commands = c.commands as any[];
     const events = c.events as any[];
-    checkDirections(c.id, commands);
+    const directed = (d: string) =>
+        commands.filter(m => {
+            if (typeof m.id !== "number") return false;
+            const dir = m.effectiveDirection;
+            if (dir !== "request" && dir !== "response") {
+                throw new Error(`cluster ${c.id} command ${m.id} (${m.name}): direction ${JSON.stringify(dir)} at the tag`);
+            }
+            return dir === d;
+        });
+    const requests = directed("request");
+    const responses = directed("response");
     clusters.push({
         id: c.id,
         revision: c.revision,
         features,
         attributes: ids(attributes),
-        commands: ids(commands),
+        requestCommands: ids(requests),
+        responseCommands: ids(responses),
         events: ids(events),
-        mandatory: { attributes: mand(attributes), commands: mand(commands), events: mand(events) },
+        mandatory: {
+            attributes: mand(attributes),
+            requestCommands: mand(requests),
+            responseCommands: mand(responses),
+            events: mand(events),
+        },
     });
 }
 clusters.sort((a, b) => a.id - b.id);

@@ -89,23 +89,24 @@ func Doc(files []File, pin Pin, internal map[string][]Internal) []byte {
 // writeLevelTable writes the table of the levels with their counts.
 func writeLevelTable(b *bytes.Buffer, files []File) {
 	b.WriteString("## The levels\n\n")
-	b.WriteString("| Level | matter.js tag | Commit | Method | Device types | Clusters | Features | Attributes | Commands | Events |\n")
-	b.WriteString("| --- | --- | --- | --- | --: | --: | --: | --: | --: | --: |\n")
+	b.WriteString("| Level | matter.js tag | Commit | Method | Device types | Clusters | Features | Attributes | Requests | Responses | Events |\n")
+	b.WriteString("| --- | --- | --- | --- | --: | --: | --: | --: | --: | --: | --: |\n")
 	for fi := range files {
 		f := &files[fi]
-		var feat, attr, cmd, ev int
+		var feat, attr, req, resp, ev int
 		for ci := range f.Clusters {
 			c := &f.Clusters[ci]
 			feat += len(c.Features)
 			attr += len(c.Attributes)
-			cmd += len(c.Commands)
+			req += len(c.RequestCommands)
+			resp += len(c.ResponseCommands)
 			ev += len(c.Events)
 		}
-		fmt.Fprintf(b, "| `%s` | `%s` | `%s` | %s | %d | %d | %d | %d | %d | %d |\n",
+		fmt.Fprintf(b, "| `%s` | `%s` | `%s` | %s | %d | %d | %d | %d | %d | %d | %d |\n",
 			f.Matter.Revision, f.Matter.Tag, short(f.Matter.SourceCommit), f.Matter.Method,
-			len(f.DeviceTypes), len(f.Clusters), feat, attr, cmd, ev)
+			len(f.DeviceTypes), len(f.Clusters), feat, attr, req, resp, ev)
 	}
-	b.WriteString("\nThe last level is the pin's revision. Commands count each id once, request and response alike.\n\n")
+	b.WriteString("\nThe last level is the pin's revision. Requests and Responses count the command ids of each direction.\n\n")
 }
 
 // writeAbsent writes what level f does not know of the last level (the
@@ -157,7 +158,8 @@ func mandatoryAbsent(pc, c *Cluster) []string {
 		pin, have []uint32
 	}{
 		{"attribute", pc.Mandatory.Attributes, c.Attributes},
-		{"command", pc.Mandatory.Commands, c.Commands},
+		{"request command", pc.Mandatory.RequestCommands, c.RequestCommands},
+		{"response command", pc.Mandatory.ResponseCommands, c.ResponseCommands},
 		{"event", pc.Mandatory.Events, c.Events},
 	} {
 		var ids []string

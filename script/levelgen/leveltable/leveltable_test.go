@@ -20,14 +20,14 @@ func write(t *testing.T, dir, name, body string) {
 
 const levelA = `{"matter":{"revision":"1.4","tag":"v1","sourceCommit":"0123456789abc","method":"model"},
 "deviceTypes":[{"id":256,"revision":3}],
-"clusters":[{"id":6,"revision":5,"features":[{"bit":0,"code":"LT"}],"attributes":[0,65533],"commands":[0],"events":[],
-"mandatory":{"attributes":[0],"commands":[0],"events":[]}}]}`
+"clusters":[{"id":6,"revision":5,"features":[{"bit":0,"code":"LT"}],"attributes":[0,65533],"requestCommands":[0],"responseCommands":[],"events":[],
+"mandatory":{"attributes":[0],"requestCommands":[0],"responseCommands":[],"events":[]}}]}`
 
 const levelB = `{"matter":{"revision":"1.4.2","tag":"v2","sourceCommit":"fedcba","method":"model"},
 "deviceTypes":[{"id":256,"revision":3},{"id":560,"revision":1}],
-"clusters":[{"id":6,"revision":6,"features":[{"bit":0,"code":"LT"},{"bit":2,"code":"OFFONLY"}],"attributes":[0,1,65533],"commands":[0,1],"events":[0],
-"mandatory":{"attributes":[0,1],"commands":[0,1],"events":[0]}},
-{"id":260,"revision":1,"features":[],"attributes":[0],"commands":[],"events":[],"mandatory":{"attributes":[],"commands":[],"events":[]}}]}`
+"clusters":[{"id":6,"revision":6,"features":[{"bit":0,"code":"LT"},{"bit":2,"code":"OFFONLY"}],"attributes":[0,1,65533],"requestCommands":[0,1],"responseCommands":[2],"events":[0],
+"mandatory":{"attributes":[0,1],"requestCommands":[0,1],"responseCommands":[],"events":[0]}},
+{"id":260,"revision":1,"features":[],"attributes":[0],"requestCommands":[],"responseCommands":[],"events":[],"mandatory":{"attributes":[],"requestCommands":[],"responseCommands":[],"events":[]}}]}`
 
 func TestLoadOrdersAndChecks(t *testing.T) {
 	dir := t.TempDir()
@@ -48,13 +48,17 @@ func TestLoadOrdersAndChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"1.4",   // matter.js v1 (012345678), method model`, "0x0230: 0x02", "features:   map[uint8]LevelSet{0: 0x03, 2: 0x02}", "revisions:  [MaxLevels]uint16{5, 6}"} {
+	for _, want := range []string{
+		`"1.4",   // matter.js v1 (012345678), method model`, "0x0230: 0x02", "features:         map[uint8]LevelSet{0: 0x03, 2: 0x02}", "revisions:        [MaxLevels]uint16{5, 6}",
+		// A command id keyed by its direction (owner decision 227).
+		"requestCommands:  map[uint32]LevelSet{0x00: 0x03, 0x01: 0x02}", "responseCommands: map[uint32]LevelSet{0x02: 0x02}",
+	} {
 		if !bytes.Contains(src, []byte(want)) {
 			t.Errorf("generated source lacks %q:\n%s", want, src)
 		}
 	}
 	pin := Pin{
-		Revision: "1.4.2", DeviceTypes: []uint32{0x100, 0x230}, Clusters: []PinCluster{{ID: 6, Features: []uint8{0, 2}, Attributes: []uint32{0, 1}, Commands: []uint32{1}, Events: []uint32{0}}},
+		Revision: "1.4.2", DeviceTypes: []uint32{0x100, 0x230}, Clusters: []PinCluster{{ID: 6, Features: []uint8{0, 2}, Attributes: []uint32{0, 1}, RequestCommands: []uint32{1}, ResponseCommands: []uint32{2}, Events: []uint32{0}}},
 		DeviceTypeNames: map[uint32]string{0x100: "OnOffLight", 0x230: "Closure"}, ClusterNames: map[uint32]string{6: "OnOff", 0x104: "ClosureControl", 0x39: "BDBI"},
 	}
 	if err := CheckPin(files, pin); err != nil {
@@ -62,7 +66,7 @@ func TestLoadOrdersAndChecks(t *testing.T) {
 	}
 	bad := pin
 	bad.DeviceTypes = append(bad.DeviceTypes, 0x999)
-	bad.Clusters = append(bad.Clusters, PinCluster{ID: 0x777}, PinCluster{ID: 6, Features: []uint8{9}, Attributes: []uint32{0x55}, Commands: []uint32{0x56}, Events: []uint32{0x57}})
+	bad.Clusters = append(bad.Clusters, PinCluster{ID: 0x777}, PinCluster{ID: 6, Features: []uint8{9}, Attributes: []uint32{0x55}, RequestCommands: []uint32{0x56}, ResponseCommands: []uint32{0x58}, Events: []uint32{0x57}})
 	err = CheckPin(files, bad)
 	for _, want := range []string{"device type 0x0999", "cluster 0x0777", "feature bit 9 of cluster 0x0006", "attribute 0x0055", "command 0x0056", "event 0x0057"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
@@ -77,7 +81,7 @@ func TestLoadOrdersAndChecks(t *testing.T) {
 		"| `1.4` | `v1` | `012345678` | model | 1 | 1 | 1 | 2 | 1 | 0 |",
 		"Device types it does not know (1): Closure `0x0230`.",
 		"Clusters it does not know (1): ClosureControl `0x0104`.",
-		"| OnOff `0x0006` | attribute `0x0001`; command `0x0001`; event `0x0000` |",
+		"| OnOff `0x0006` | attribute `0x0001`; request command `0x0001`; event `0x0000` |",
 		"| OnOff `0x0006` | attribute `0x00000001` | (root), `a` |",
 		"| OnOff `0x0006` | cluster `0x0006` | `b` |",
 		"BDBI `0x0039`",
@@ -144,6 +148,18 @@ func TestLoadRejects(t *testing.T) {
 	write(t, dir, "bad.json", "{")
 	if _, err := LoadPin(filepath.Join(dir, "bad.json")); err == nil {
 		t.Error("LoadPin of bad JSON")
+	}
+	// A level file in the merged format of before owner decision 227 is
+	// refused, not read as a cluster without commands (R2-P6-par-2713).
+	legacy := t.TempDir()
+	write(t, legacy, "1.4.json", strings.Replace(levelA, `"requestCommands":[0],"responseCommands":[]`, `"commands":[0]`, 1))
+	if _, err := Load(legacy); err == nil || !strings.Contains(err.Error(), "without their direction") {
+		t.Errorf("Load of a merged-format level: %v", err)
+	}
+	// A pin command without a direction in either layer is refused.
+	write(t, dir, "nodir.json", `{"matter":{"revision":"1.4.2"},"deviceTypes":[],"clusters":[{"id":6,"name":"C","features":[],"commands":[{"id":1,"name":"X"}]}]}`)
+	if _, err := LoadPin(filepath.Join(dir, "nodir.json")); err == nil || !strings.Contains(err.Error(), "C.X") {
+		t.Errorf("LoadPin of a command without a direction: %v", err)
 	}
 	// A pin feature without a bit, or with one the 32-bit FeatureMap
 	// cannot carry, is refused rather than skipped (R2-P6-par-2714).

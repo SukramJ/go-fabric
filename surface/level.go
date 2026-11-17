@@ -300,8 +300,11 @@ func (p *levelPolicy) Judge(el Element) (v Verdict, reason string) {
 // assembler mounts on every bridged endpoint, the rule that keeps it at
 // every level ([ReasonSurfaceChangeSignal], concept v11 §D.9). It returns
 // none at the pin's level. A
-// feature is its one-bit mask; a command id is matched against the
-// accepted and the generated list alike.
+// feature is its one-bit mask. A command id's levels are those of the
+// directions the endpoint serves it in: a request's where the id is
+// accepted, a response's where it is generated, both where it is both —
+// the level table keys a command id by its direction (review II
+// R2-P6-par-2713, owner decision 227).
 func (p Policies) ServerInternal(ep Endpoint, decided []Element) []Decision {
 	level := p.EffectiveLevel()
 	if level == PinLevel() {
@@ -339,7 +342,14 @@ func (p Policies) ServerInternal(ep Endpoint, decided []Element) []Decision {
 			add(c.ID, KindAttribute, id, schema.ClusterAttributeLevels(c.ID, id))
 		}
 		for _, id := range sortedIDs(append(slices.Clone(c.Accepted), c.Generated...)) {
-			add(c.ID, KindCommand, id, schema.ClusterCommandLevels(c.ID, id))
+			var levels schema.LevelSet
+			if slices.Contains(c.Accepted, id) {
+				levels |= schema.ClusterRequestCommandLevels(c.ID, id)
+			}
+			if slices.Contains(c.Generated, id) {
+				levels |= schema.ClusterResponseCommandLevels(c.ID, id)
+			}
+			add(c.ID, KindCommand, id, levels)
 		}
 		for _, id := range sortedIDs(c.Events) {
 			add(c.ID, KindEvent, id, schema.ClusterEventLevels(c.ID, id))
@@ -371,7 +381,10 @@ func ElementLevels(el Element) schema.LevelSet {
 	case KindAttribute:
 		return schema.ClusterAttributeLevels(el.Cluster, el.ID)
 	case KindCommand:
-		return schema.ClusterCommandLevels(el.Cluster, el.ID)
+		// A command candidate is a request: the device layer declares its
+		// commands from the accepted ones (spec.Options.Commands, read as
+		// spec.Request — device/surface.go conformanceOf).
+		return schema.ClusterRequestCommandLevels(el.Cluster, el.ID)
 	case KindEvent:
 		return schema.ClusterEventLevels(el.Cluster, el.ID)
 	default:
