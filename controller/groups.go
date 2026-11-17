@@ -102,20 +102,36 @@ func (c *Controller) Groups() *groups.Manager {
 // not 16 bytes, or EpochKey1 / EpochKey2 present and not 16 bytes — is
 // refused by the store and nothing is written.
 func (c *Controller) SetGroupKey(ctx context.Context, keySet store.GroupKeySet, groupID uint16) error {
-	// Close takes closeMu before it lets the group manager go, so the
-	// manager stays for the whole call (review II, R2-P1-ctl-06).
+	mgr, fabricIndex, err := c.writeGroupKey(ctx, keySet, groupID)
+	if err != nil {
+		return err
+	}
+	// Reload runs the groupcast observers synchronously, outside the
+	// closed gate: an observer that closes the controller, or calls a
+	// gated accessor while a Close waits for the gate, would otherwise
+	// wait for the read lock this call holds (review II, R2-P6-conc-2301).
+	// Close never closes the manager — it detaches its transport and lets
+	// it go — so reloading the one taken under the gate is harmless.
+	return mgr.Reload(ctx, fabricIndex)
+}
+
+// writeGroupKey writes the key set and its mapping under the closed gate
+// and returns the group manager they are for. Close takes closeMu before
+// it lets the group manager go, so no write lands on a closed controller
+// (review II, R2-P1-ctl-06).
+func (c *Controller) writeGroupKey(ctx context.Context, keySet store.GroupKeySet, groupID uint16) (*groups.Manager, uint8, error) {
 	c.closeMu.RLock()
 	defer c.closeMu.RUnlock()
 	if c.closed || c.groups == nil {
-		return errClosed
+		return nil, 0, errClosed
 	}
 	st := c.st
 	keySet.FabricIndex = c.fabricIndex()
 	if err := st.UpsertGroupKeySet(ctx, keySet); err != nil {
-		return err
+		return nil, 0, err
 	}
 	if err := st.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: keySet.FabricIndex, GroupID: groupID, GroupKeySetID: keySet.GroupKeySetID}); err != nil {
-		return err
+		return nil, 0, err
 	}
-	return c.groups.Reload(ctx, keySet.FabricIndex)
+	return c.groups, keySet.FabricIndex, nil
 }
