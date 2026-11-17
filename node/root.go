@@ -583,7 +583,13 @@ func buildAggregatorClusters(ctx context.Context, st store.Settings, logger *slo
 	}
 	identify := mattercore.NewIdentify()
 	identify.SetClock(clk)
-	servers := append([]contract.ClusterServer{identify, descriptor, fixedLabel, userLabel}, extra...)
+	// The host's servers, and the CommissionerControl the node mounts,
+	// under the root's rule: a cluster the Aggregator serves already is
+	// refused (review II, R2-P6-api-2408).
+	servers, err := withHostServers([]contract.ClusterServer{identify, descriptor, fixedLabel, userLabel}, extra, "Aggregator", "Config.AggregatorServers")
+	if err != nil {
+		return nil, err
+	}
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, nil
 }
@@ -591,10 +597,18 @@ func buildAggregatorClusters(ctx context.Context, st store.Settings, logger *slo
 // withRootServers appends the host's own root servers ([Config].RootServers);
 // a cluster the root serves already is refused.
 func withRootServers(servers, extra []contract.ClusterServer) ([]contract.ClusterServer, error) {
+	return withHostServers(servers, extra, "root", "Config.RootServers")
+}
+
+// withHostServers appends a host's own servers of one endpoint (where),
+// configured in field; a cluster the endpoint serves already — its own
+// or an earlier one of extra — is refused: one endpoint serves one server
+// per cluster.
+func withHostServers(servers, extra []contract.ClusterServer, where, field string) ([]contract.ClusterServer, error) {
 	for _, srv := range extra {
 		id := srv.MatterClusterID()
 		if slices.ContainsFunc(servers, func(s contract.ClusterServer) bool { return s.MatterClusterID() == id }) {
-			return nil, fmt.Errorf("node: root: Config.RootServers names cluster 0x%04x, which the root serves already", id)
+			return nil, fmt.Errorf("node: %s: %s names cluster 0x%04x, which the %s serves already", where, field, id, where)
 		}
 		servers = append(servers, srv)
 	}
