@@ -935,18 +935,22 @@ func (b *Bridge) NotifyEndpointReachable(endpointID uint16, reachable bool) bool
 
 // NotifyEndpointNodeLabel sets the BridgedDeviceBasicInformation NodeLabel
 // of the bridged endpoint with id endpointID to label — the host's rename,
-// stored and persisted as a controller's write is
+// stored before it is served as a controller's write is
 // (endpoint.Endpoint.SetNodeLabel) — bumps the cluster's DataVersion and
 // marks the attribute dirty, so a subscribed controller reads the new
-// name. It reports false when no bridged endpoint has the id.
-func (b *Bridge) NotifyEndpointNodeLabel(endpointID uint16, label string) bool {
+// name. It reports false when no bridged endpoint has the id; a refused
+// store serves nothing, reports nothing and is returned
+// (R2-P5-apidev-16, decision 226).
+func (b *Bridge) NotifyEndpointNodeLabel(endpointID uint16, label string) (bool, error) {
 	ep := b.bridgedEndpoint(endpointID)
 	if ep == nil {
-		return false
+		return false, nil
 	}
-	ep.SetNodeLabel(label)
+	if err := ep.SetNodeLabel(label); err != nil {
+		return true, err
+	}
 	b.nodeLabelChanged(ep)
-	return true
+	return true, nil
 }
 
 // NotifyEndpointHostName gives the bridged endpoint with id endpointID the

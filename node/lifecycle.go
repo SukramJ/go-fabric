@@ -71,22 +71,38 @@ func (h nodeHost) NotifyReachable(_ context.Context, key endpoint.SourceKey, rea
 }
 
 // Rename implements [deviceseam.Host]: the label is stored first, as a
-// controller's write of it is (endpoint.Persistence.SaveNodeLabel runs
-// before the label is served), and a refused store serves nothing and is
-// returned to the host (R2-P5-apidev-16). Stored, it becomes the assembled
-// endpoint's NodeLabel, reported to the subscriptions; before the node
-// assembled the endpoint, the assembly restores it (Aggregator.snapshot).
-// The assembled endpoint's SetNodeLabel (through
-// bridge.Bridge.NotifyEndpointNodeLabel) stores the same label once more,
-// the bridge's route for a host that calls it directly.
+// controller's write of it is, and a refused store serves nothing and is
+// returned to the host (R2-P5-apidev-16). An assembled endpoint stores
+// and serves it in one locked step (bridge.Bridge.NotifyEndpointNodeLabel
+// → endpoint.Endpoint.SetNodeLabel, the node's EndpointState as its
+// Persistence) and reports it to the subscriptions — one store write per
+// rename (decision 226). Before the node assembled the endpoint the label
+// is only stored, and the assembly restores it (Aggregator.snapshot); an
+// assembly that lands between that store and the second look serves it
+// through the bridge as well.
 func (h nodeHost) Rename(ctx context.Context, key endpoint.SourceKey, name string) error {
+	if ep := h.n.assembled(key); ep != nil {
+		return h.renameAssembled(ctx, key, ep.ID, name)
+	}
 	if err := h.n.endpoints.SaveNodeLabel(ctx, key, name); err != nil {
 		return err
 	}
 	if ep := h.n.assembled(key); ep != nil {
-		h.n.br.NotifyEndpointNodeLabel(ep.ID, name) //nolint:contextcheck // the host's rename outlives the call; the endpoint's save is not bound by it
+		return h.renameAssembled(ctx, key, ep.ID, name)
 	}
 	return nil
+}
+
+// renameAssembled is Rename's route for an assembled endpoint. An endpoint
+// the bridge no longer serves (a reassembly dropped it between the look
+// and the call) has its label stored directly, so the next assembly
+// restores it.
+func (h nodeHost) renameAssembled(ctx context.Context, key endpoint.SourceKey, id uint16, name string) error {
+	found, err := h.n.br.NotifyEndpointNodeLabel(id, name) //nolint:contextcheck // the host's rename outlives the call; the endpoint's save is not bound by it
+	if err != nil || found {
+		return err
+	}
+	return h.n.endpoints.SaveNodeLabel(ctx, key, name)
 }
 
 // HostName implements [deviceseam.Host]: the host's current name of the

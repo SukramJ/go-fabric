@@ -422,6 +422,11 @@ type endpointState struct {
 	// nilServerLogged is set once [Endpoint.dropNilServers] logged a
 	// dropped nil server for this endpoint.
 	nilServerLogged atomic.Bool
+	// labelMu serialises a NodeLabel's store and its set — the host's
+	// [Endpoint.SetNodeLabel] and a controller's write alike — so the
+	// label served is the label stored last (R2-P5-apidev-16, decision
+	// 226). It is never taken with mu held.
+	labelMu sync.Mutex
 }
 
 // configurationVersion returns the version, 1 when never raised.
@@ -690,41 +695,64 @@ func (e *Endpoint) IncreaseConfigurationVersion() uint32 {
 	return v
 }
 
+// stores reports whether the endpoint hands a written NodeLabel to a
+// [Persistence]: it has one and a stable key.
+func (e *Endpoint) stores() bool { return e.persistence != nil && e.SourceKey != nil }
+
+// storeLabel stores label ([Persistence.SaveNodeLabel], when the endpoint
+// [Endpoint.stores]) and then holds it in the endpoint's state, which
+// outlives the per-dispatch server — both under the state's labelMu, so
+// two writes cannot end served one label and stored the other. A refused
+// store holds nothing and is returned.
+func (e *Endpoint) storeLabel(ctx context.Context, label string) error {
+	s := e.endpointState()
+	s.labelMu.Lock()
+	defer s.labelMu.Unlock()
+	if e.stores() {
+		if err := e.persistence.SaveNodeLabel(ctx, e.SourceKey, label); err != nil {
+			return err
+		}
+	}
+	s.setLabel(label)
+	return nil
+}
+
 // nodeLabelSaver returns the hook a BridgedDeviceBasicInformation server
-// calls with a controller's NodeLabel before it holds it: the label goes
-// to [Persistence.SaveNodeLabel], whose error refuses the write; nil
-// without a persistence or a stable key.
+// calls with a controller's NodeLabel before it holds it: the label is
+// stored and held ([Endpoint.storeLabel]); the store's error refuses the
+// write. Nil when the endpoint does not [Endpoint.stores].
 func (e *Endpoint) nodeLabelSaver() func(context.Context, string) error {
-	if e.persistence == nil || e.SourceKey == nil {
+	if !e.stores() {
 		return nil
 	}
-	p, key := e.persistence, e.SourceKey
-	return func(ctx context.Context, label string) error {
-		return p.SaveNodeLabel(ctx, key, label)
-	}
+	return e.storeLabel
 }
 
 // nodeLabelWriter returns the hook a BridgedDeviceBasicInformation server
 // calls with a written NodeLabel once it is stored: the label goes to the
-// endpoint's state, which outlives the per-dispatch server.
+// endpoint's state, which outlives the per-dispatch server. Nil when the
+// endpoint [Endpoint.stores]: the saver already held the label under the
+// lock that stored it, and a second, unlocked set could serve a label
+// another write has since replaced.
 func (e *Endpoint) nodeLabelWriter() func(string) {
+	if e.stores() {
+		return nil
+	}
 	return func(label string) { e.endpointState().setLabel(label) }
 }
 
 // SetNodeLabel sets the endpoint's BridgedDeviceBasicInformation
-// NodeLabel to label (capped at the Matter maximum): stored in the
-// endpoint's state, so every later read serves it, and handed to
-// [Persistence.SaveNodeLabel]. It is the host's rename
-// (device.Device.Rename through the node), which no store refuses: the
-// label is served whatever the save answers, and the persistence reports
-// its own failure. The caller marks the attribute changed for
+// NodeLabel to label (capped at the Matter maximum): handed to
+// [Persistence.SaveNodeLabel] first and then held in the endpoint's
+// state, so every later read serves it — as a controller's write of it
+// is. It is the host's rename (device.Device.Rename through the node). A
+// refused store serves nothing and is returned; the store and the set
+// are one step under the endpoint's lock, so concurrent renames and
+// controller writes end served and stored alike (R2-P5-apidev-16,
+// decision 226). The caller marks the attribute changed for
 // subscriptions (bridge.Bridge.NotifyEndpointNodeLabel).
-func (e *Endpoint) SetNodeLabel(label string) {
-	label = truncateLabel(label)
-	e.endpointState().setLabel(label)
-	if e.persistence != nil && e.SourceKey != nil {
-		_ = e.persistence.SaveNodeLabel(context.Background(), e.SourceKey, label)
-	}
+func (e *Endpoint) SetNodeLabel(label string) error {
+	return e.storeLabel(context.Background(), truncateLabel(label))
 }
 
 // IsRoot reports whether this is the root bridge endpoint (ID 0).

@@ -15,8 +15,11 @@ import (
 )
 
 // refusingLabels is an EndpointState whose NodeLabel saves fail while
-// refuse is set.
-type refusingLabels struct{ refuse atomic.Bool }
+// refuse is set; saves counts the accepted ones.
+type refusingLabels struct {
+	refuse atomic.Bool
+	saves  atomic.Int32
+}
 
 var errLabelStore = errors.New("label store refused")
 
@@ -24,6 +27,7 @@ func (r *refusingLabels) SaveNodeLabel(context.Context, device.SourceKey, string
 	if r.refuse.Load() {
 		return errLabelStore
 	}
+	r.saves.Add(1)
 	return nil
 }
 
@@ -40,7 +44,7 @@ func (*refusingLabels) SaveScenes(context.Context, endpoint.SourceKey, []byte) e
 // TestDeviceRenameReturnsTheStoresRefusal (R2-P5-apidev-16, step 12): the
 // node's refusal to store a device's label reaches Device.Rename — before
 // the node assembled the endpoint and after — and a refused label is not
-// served; a stored one is.
+// served; a stored one is, with one store write (decision 226).
 func TestDeviceRenameReturnsTheStoresRefusal(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -74,5 +78,8 @@ func TestDeviceRenameReturnsTheStoresRefusal(t *testing.T) {
 	}
 	if d := n.Topology().Devices; len(d) != 1 || d[0].Name != "Desk" {
 		t.Errorf("after the stored rename the node serves %+v, want Desk", d)
+	}
+	if got := labels.saves.Load(); got != 1 {
+		t.Errorf("the rename stored the label %d times, want once", got)
 	}
 }
