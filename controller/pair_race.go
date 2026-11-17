@@ -106,9 +106,8 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Regi
 		}
 		defer func() { _ = ch.Close() }()
 		channel = ch
-		// The peripheral completed the BTP handshake: it has answered
-		// (N3-rwrace-2).
-		discovery.AttemptAnswered(actx)
+		// The peripheral answered once it accepted the connection:
+		// ble.Dial marks the attempt (N3-rwrace-2).
 	}
 	n, err := reg.ForDevice(actx, dev, "")
 	if err != nil {

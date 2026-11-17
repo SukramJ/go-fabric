@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -203,6 +204,10 @@ func Dial(ctx context.Context, central Central, p Peripheral, opts DialOptions) 
 	if err != nil {
 		return nil, fmt.Errorf("ble: connect %s: %w", p.Address, err)
 	}
+	// A peripheral that accepted the connection has answered: a race
+	// attempt dialling it keeps its place through the BTP handshake
+	// (discovery.AttemptAnswered does nothing outside a race; N3-rwrace-2).
+	discovery.AttemptAnswered(ctx)
 	segment, err := segmentSizeFor(ctx, conn, opts.Clock, opts.Logger, p.Address)
 	if err != nil {
 		_ = conn.Disconnect()
