@@ -98,7 +98,16 @@ import (
 // groups/decode.go was rewritten with net's groups fixes, and the two of
 // schema/fabric_scoped.go went with the hand-written tables the generated
 // fabric-scope tables replaced.
-const citecheckDriftRatchet = 372
+//
+// 374 after review II, phase 6b wave 1, two rows new and none gone. The
+// rewritten addNOCRequest sentence of controller/commissioner/wire.go
+// names AddNoc, which ControllerCommissioningFlow.ts:1448 does not carry
+// at the pin: :1448 is the addTrustedRootCertificate invoke, the addNoc
+// invoke with its icacValue is :1459-1470 (an off-pin citation, open for
+// its re-cite). controller/dcl/certstore.go's cap comment names GitHub
+// for its :1304-1307 range; the first range, :1144-1147, is the root loop
+// it cites and holds.
+const citecheckDriftRatchet = 374
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()

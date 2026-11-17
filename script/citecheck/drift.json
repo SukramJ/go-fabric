@@ -10,7 +10,7 @@
   },
   {
     "file": "bdx/messages.go",
-    "line": 287,
+    "line": 299,
     "citation": "BdxAcceptMessagesSchema.ts:66-80",
     "resolved": "packages/protocol/src/bdx/schema/BdxAcceptMessagesSchema.ts",
     "identifier": "SendAccept",
@@ -28,7 +28,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 142,
+    "line": 159,
     "citation": "MessageExchange.ts:1219-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",
@@ -37,7 +37,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 248,
+    "line": 265,
     "citation": "BdxProtocol.ts:204-211",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "SessionFor",
@@ -46,7 +46,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 385,
+    "line": 427,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "onNewExchange",
@@ -100,7 +100,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 438,
+    "line": 476,
     "citation": "BindingManager.ts:147-157",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "sourceEndpoint",
@@ -109,7 +109,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 517,
+    "line": 555,
     "citation": "BindingManager.ts:513-520",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "#scheduleGroupRecheck",
@@ -127,7 +127,7 @@
   },
   {
     "file": "binding/resolve.go",
-    "line": 324,
+    "line": 332,
     "citation": "BindingManager.ts:585-627",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "#establishClientKind",
@@ -136,7 +136,7 @@
   },
   {
     "file": "binding/resolve.go",
-    "line": 364,
+    "line": 388,
     "citation": "BindingManager.ts:629-643",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "#clearPending",
@@ -145,7 +145,7 @@
   },
   {
     "file": "ble/bluez/central_linux.go",
-    "line": 465,
+    "line": 467,
     "citation": "NobleBleChannel.ts:299-440",
     "resolved": "packages/nodejs-ble/src/NobleBleChannel.ts",
     "identifier": "openChannel",
@@ -724,7 +724,7 @@
   },
   {
     "file": "client/exchange/exchange_test.go",
-    "line": 235,
+    "line": 236,
     "citation": "MessageExchange.ts:662-665",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "StatusReport",
@@ -733,7 +733,7 @@
   },
   {
     "file": "client/exchange/exchange_test.go",
-    "line": 392,
+    "line": 393,
     "citation": "MessageExchange.ts:834-860",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "PeerMessageMissingError",
@@ -832,7 +832,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1259,
+    "line": 1287,
     "citation": "ExchangeManager.ts:556-579",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "MessageExchangeContext",
@@ -841,7 +841,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1262,
+    "line": 1290,
     "citation": "SessionManager.ts:636-638",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "asOf",
@@ -850,7 +850,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1302,
+    "line": 1330,
     "citation": "SessionManager.ts:636-638",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "handlePeerLoss",
@@ -877,7 +877,7 @@
   },
   {
     "file": "client/exchange/parity_matterjs_test.go",
-    "line": 212,
+    "line": 216,
     "citation": "ExchangeManager.ts:393-405",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "requiresSecureSession",
@@ -1013,7 +1013,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 195,
+    "line": 196,
     "citation": "ClientInteraction.ts:1249-1251",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "maximumPeerResponseTime",
@@ -1022,7 +1022,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 316,
+    "line": 317,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1031,7 +1031,7 @@
   },
   {
     "file": "client/interaction/invoke.go",
-    "line": 120,
+    "line": 132,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1094,7 +1094,7 @@
   },
   {
     "file": "client/interaction/report.go",
-    "line": 85,
+    "line": 86,
     "citation": "ClientSubscriptionHandler.ts:89",
     "resolved": "packages/protocol/src/action/client/subscription/ClientSubscriptionHandler.ts",
     "identifier": "reportStarted",
@@ -1974,7 +1974,7 @@
   },
   {
     "file": "controller/attestation/validate.go",
-    "line": 413,
+    "line": 467,
     "citation": "Certificate.ts:650",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "serialNumber",
@@ -1983,7 +1983,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 631,
+    "line": 684,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",
@@ -2182,7 +2182,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 154,
+    "line": 155,
     "citation": "CommissioningClient.ts:836-845",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "AdvertisedIntervals",
@@ -2191,7 +2191,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 493,
+    "line": 494,
     "citation": "behavior/system/commissioning/RemoteDescriptor.ts:214-234",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "toLongForm",
@@ -2200,7 +2200,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 517,
+    "line": 518,
     "citation": "RemoteDescriptor.ts:91-143",
     "resolved": "packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts",
     "identifier": "fromLongForm",
@@ -2209,7 +2209,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 726,
+    "line": 727,
     "citation": "CommissioningClient.ts:586",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "peerAddress",
@@ -2291,12 +2291,21 @@
   },
   {
     "file": "controller/commissioner/errors.go",
-    "line": 229,
+    "line": 232,
     "citation": "DeviceAttestationValidator.ts:67",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "DeviceAttestationError",
     "nearest": 108,
     "occurrences": 39
+  },
+  {
+    "file": "controller/commissioner/wire.go",
+    "line": 42,
+    "citation": "ControllerCommissioningFlow.ts:1448",
+    "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
+    "identifier": "AddNoc",
+    "nearest": 366,
+    "occurrences": 1
   },
   {
     "file": "controller/dcl/cert.go",
@@ -2318,12 +2327,22 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 283,
+    "line": 321,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "considerTestCertificates",
     "nearest": 323,
     "occurrences": 2
+  },
+  {
+    "file": "controller/dcl/certstore.go",
+    "line": 847,
+    "citation": "DclCertificateService.ts:1144-1147",
+    "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
+    "at": "db021da0",
+    "identifier": "GitHub",
+    "nearest": 1110,
+    "occurrences": 27
   },
   {
     "file": "controller/dcl/certstore_test.go",
@@ -2363,7 +2382,7 @@
   },
   {
     "file": "controller/dcl/revocation.go",
-    "line": 680,
+    "line": 712,
     "citation": "DclCertificateService.ts:2092-2104",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "identifier": "RevocationSetEntry",
