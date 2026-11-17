@@ -489,10 +489,18 @@ func (p *Proxy) deviceRequest(m *wire.BluetoothDeviceRequest) {
 			p.toSubscriber(&wire.BluetoothDeviceConnectionResponse{Address: m.Address, Error: 0x3e})
 			return
 		}
+		// A connect for an address that holds a slot replaces it: the kit
+		// keeps one link per address and ends the earlier one, whose end
+		// then reports nothing (below). This case is the kit's own rule;
+		// the firmware's answer to it is not modelled (R2-P6-test-2055).
 		sl := &slot{addr: m.Address, conn: conn}
 		p.mu.Lock()
+		old := p.slots[m.Address]
 		p.slots[m.Address] = sl
 		p.mu.Unlock()
+		if old != nil {
+			_ = old.conn.Disconnect()
+		}
 		mtu := p.opts.MTU
 		if mtu == 0 {
 			mtu = uint32(conn.ATTMTU()) //nolint:gosec // an ATT_MTU
@@ -508,10 +516,15 @@ func (p *Proxy) deviceRequest(m *wire.BluetoothDeviceRequest) {
 				_ = conn.Disconnect()
 			}
 			p.mu.Lock()
-			if p.slots[m.Address] == sl {
+			current := p.slots[m.Address] == sl
+			if current {
 				delete(p.slots, m.Address)
 			}
 			p.mu.Unlock()
+			if !current {
+				// Replaced: the address belongs to the newer link.
+				return
+			}
 			p.toSubscriber(&wire.BluetoothDeviceConnectionResponse{Address: m.Address, Error: 0x13})
 			p.toSubscriber(p.free())
 		}()
