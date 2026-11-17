@@ -317,7 +317,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	// requestor once the node has built them.
 	applier := &otaApplier{
 		vendorID: testVendorID, productID: testProductID,
-		dir: otaDownloads, harness: f.otaHarness, logger: logger,
+		dir: otaDownloads, harness: f.otaHarness, logger: logger, life: ctx,
 	}
 	// Actions on the Aggregator (Aggregator: optional), over the demo
 	// scenes (fleet_node.go).

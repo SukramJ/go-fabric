@@ -294,3 +294,84 @@ func TestApplyOTAHarnessFailsWhenTheSeamRefuses(t *testing.T) {
 		t.Errorf("the daemon's configuration: %v", err)
 	}
 }
+
+// TestOtaApplierRemovesTheImageWhenItCannotKeepIt holds R2-P6-err-2611:
+// an image whose applied directory cannot be made leaves the download
+// location too, as a refused one does.
+func TestOtaApplierRemovesTheImageWhenItCannotKeepIt(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	notADir := filepath.Join(dir, "ota")
+	if err := os.WriteFile(notADir, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := &otaApplier{vendorID: testVendorID, productID: testProductID, dir: notADir, logger: slog.New(slog.DiscardHandler)}
+	file := filepath.Join(dir, "download")
+	if err := os.WriteFile(file, testOtaImage(t, testVendorID, testProductID, 2), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.ApplyUpdate(context.Background(), 2, file); err == nil {
+		t.Fatal("applied without an applied directory")
+	}
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Fatalf("the image stayed in the download location: %v", err)
+	}
+}
+
+// startUpEvents counts BasicInformation StartUp events.
+type startUpEvents struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (e *startUpEvents) MatterEmitEvent(_ uint16, cluster, event uint32, _ any, _ contract.EventPriority) {
+	if cluster == 0x0028 && event == 0x00 {
+		e.mu.Lock()
+		e.n++
+		e.mu.Unlock()
+	}
+}
+
+func (e *startUpEvents) count() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.n
+}
+
+// TestOtaHarnessRestartEndsWithTheDaemon holds R2-P6-conc-2612: the
+// in-place restart after an applied image emits nothing once the daemon's
+// lifetime has ended; within it, it emits StartUp.
+func TestOtaHarnessRestartEndsWithTheDaemon(t *testing.T) {
+	t.Parallel()
+	bi, err := mattercore.NewBasicInformation(mattercore.Config{VendorID: testVendorID, ProductID: testProductID, NodeLabel: "ota", SoftwareVersion: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := &startUpEvents{}
+	bi.SetMatterEventEmitter(events)
+	dir := t.TempDir()
+	var r *mattercore.OTASoftwareUpdateRequestor
+	r, err = mattercore.NewOTASoftwareUpdateRequestor(mattercore.OTARequestorConfig{
+		NodeInformation: bi.OtaNodeInformation, Connector: &harnessProvider{t: t}, Applier: &otaApplier{},
+		DownloadDir: dir, Logger: slog.New(slog.DiscardHandler),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(r.Stop)
+	ended, cancel := context.WithCancel(context.Background())
+	cancel()
+	a := &otaApplier{
+		basicInfo: bi, harness: true, logger: slog.New(slog.DiscardHandler), life: ended,
+		requestor: func() *mattercore.OTASoftwareUpdateRequestor { return r },
+	}
+	a.restartedWhenIdle(a.lifetime())
+	if n := events.count(); n != 0 {
+		t.Fatalf("%d StartUp events after the daemon's end", n)
+	}
+	a.life = nil
+	a.restartedWhenIdle(a.lifetime())
+	if n := events.count(); n != 1 {
+		t.Fatalf("%d StartUp events within the daemon's lifetime, want 1", n)
+	}
+}

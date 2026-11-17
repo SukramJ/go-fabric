@@ -47,6 +47,10 @@ type otaApplier struct {
 	logger              *slog.Logger
 	// clock paces restartedWhenIdle's wait for Idle; nil is clock.System.
 	clock clock.Clock
+	// life is the daemon's lifetime (compose's ctx, which ends before the
+	// node stops): restartedWhenIdle gives up with it rather than emit on
+	// a stopped node (R2-P6-conc-2612). Nil is a lifetime without end.
+	life context.Context
 }
 
 var _ node.OTAApplier = (*otaApplier)(nil)
@@ -73,6 +77,8 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	}
 	appliedDir := filepath.Join(a.dir, "applied")
 	if err := os.MkdirAll(appliedDir, 0o750); err != nil {
+		// Out of the download location on this path too (R2-P6-err-2611).
+		_ = os.Remove(file)
 		return err
 	}
 	kept := filepath.Join(appliedDir, fmt.Sprintf("ota-%04x-%04x-v%d.ota", a.vendorID, a.productID, newSoftwareVersion))
@@ -101,8 +107,16 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	a.logger.Info("ota.applied_in_place", slog.Uint64("version", uint64(newSoftwareVersion)))
 	// The requestor returns to Idle once this returns; the start-up path
 	// runs after that, as a restart would.
-	go a.restartedWhenIdle(context.WithoutCancel(ctx))
+	go a.restartedWhenIdle(a.lifetime())
 	return nil
+}
+
+// lifetime is life, or a context without end.
+func (a *otaApplier) lifetime() context.Context {
+	if a.life != nil {
+		return a.life
+	}
+	return context.Background()
 }
 
 // otaHarnessApplyHold is how long the in-place apply of --ota-harness stays
@@ -157,7 +171,8 @@ func (a *otaApplier) verify(version uint32, file string) (node.OTAImageHeader, e
 // start (node.Node.Start), which the matter.js cert requestor's restart
 // into its applied image emits too and TC-SU-2.5 waits for
 // (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at 862ad75f) —
-// then the requestor's own.
+// then the requestor's own. It gives up, emitting nothing, once ctx — the
+// daemon's lifetime — ends.
 func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 	r := a.requestor()
 	if r == nil {
@@ -170,6 +185,12 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 			break
 		}
 		clock.Sleep(clk, 10*time.Millisecond, ctx.Done())
+		if ctx.Err() != nil {
+			return
+		}
+	}
+	if ctx.Err() != nil {
+		return
 	}
 	if a.basicInfo != nil {
 		a.basicInfo.EmitStartUp()
