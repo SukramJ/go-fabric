@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9757,
+  "entry_points": 9760,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19342,
+    "total_exported": 19344,
     "reachable": 12655,
-    "whitelisted": 6687,
+    "whitelisted": 6689,
     "unreachable": 0
   },
   "by_package": [],
@@ -32556,14 +32556,21 @@
       "identifier": "TestAddPartMovesThePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 27
+      "line": 29
     },
     {
       "package": "device",
       "identifier": "TestAddPartRefusesADeviceANodeHolds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 107
+      "line": 147
+    },
+    {
+      "package": "device",
+      "identifier": "TestAddPartRefusesALivePart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 84
     },
     {
       "package": "device",
@@ -32731,7 +32738,7 @@
       "identifier": "TestConcurrentAddPartNeverFormsACycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 138
+      "line": 178
     },
     {
       "package": "device",
@@ -32815,7 +32822,7 @@
       "identifier": "TestDeviceClockAndQueue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 140
+      "line": 148
     },
     {
       "package": "device",
@@ -32899,7 +32906,7 @@
       "identifier": "TestFailedAttachLeavesForeignDevicesBound",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 80
+      "line": 120
     },
     {
       "package": "device",
@@ -32997,7 +33004,7 @@
       "identifier": "TestKitOptionsAndPorts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 172
+      "line": 180
     },
     {
       "package": "device",
@@ -33039,14 +33046,14 @@
       "identifier": "TestLifecycleMethodsOnAPartAreRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 197
+      "line": 237
     },
     {
       "package": "device",
       "identifier": "TestLifecycleThroughTheSeam",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 70
+      "line": 78
     },
     {
       "package": "device",
@@ -33158,7 +33165,7 @@
       "identifier": "TestPortConfigurationAndHookRefusal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/lifecycle_internal_test.go",
-      "line": 221
+      "line": 229
     },
     {
       "package": "device",
@@ -33214,7 +33221,7 @@
       "identifier": "TestRenameReturnsTheHostsRefusal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 236
+      "line": 276
     },
     {
       "package": "device",
@@ -33445,14 +33452,14 @@
       "identifier": "TestUpdateFnMayAskTheDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 155
+      "line": 195
     },
     {
       "package": "device",
       "identifier": "TestUpdateKeepsAConcurrentRename",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/composition_internal_test.go",
-      "line": 176
+      "line": 216
     },
     {
       "package": "device",
@@ -33691,6 +33698,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
       "line": 149
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestAssemblyRefusesBridgedInfoBeyondItsConstraint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/bridged_info_check_test.go",
+      "line": 22
     },
     {
       "package": "endpoint",
