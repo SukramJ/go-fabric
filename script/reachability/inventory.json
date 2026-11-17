@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9631,
+  "entry_points": 9728,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19236,
-    "reachable": 12653,
-    "whitelisted": 6583,
+    "total_exported": 19319,
+    "reachable": 12654,
+    "whitelisted": 6665,
     "unreachable": 0
   },
   "by_package": [],
@@ -392,6 +392,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "binding/manager_test.go",
       "line": 141
+    },
+    {
+      "package": "binding",
+      "identifier": "TestPeerCreatedForAnEntryIsReleasedWithItsLastEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/release_test.go",
+      "line": 31
+    },
+    {
+      "package": "binding",
+      "identifier": "TestPeerCreatedIsReleasedEveryBindingPeriod",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/release_test.go",
+      "line": 155
+    },
+    {
+      "package": "binding",
+      "identifier": "TestReleaseStopsConnectingOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/release_test.go",
+      "line": 97
+    },
+    {
+      "package": "binding",
+      "identifier": "TestReleaseWaitsForTheEntriesConnectCalls",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/release_test.go",
+      "line": 183
     },
     {
       "package": "binding",
@@ -8168,28 +8196,35 @@
       "identifier": "TestBrowse_AsksForWhatAnInstanceLacks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 71
+      "line": 72
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_CachedInstancesAndWithdrawals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 98
+      "line": 99
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_FindsAForeignServiceType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "client/discovery",
       "identifier": "TestBrowse_Refusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/browse_test.go",
-      "line": 160
+      "line": 161
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestBrowse_TracksOnlyAdvertisedInstances",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/browse_test.go",
+      "line": 181
     },
     {
       "package": "client/discovery",
@@ -8242,6 +8277,13 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestImportsAreWhatTheDocSays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/imports_test.go",
+      "line": 18
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestIngress_BorderRouterInstancesEnterTheCache",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/watch_test.go",
@@ -8249,10 +8291,24 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestInstanceIDMatchesWithoutCase",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/instance_case_test.go",
+      "line": 14
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestKnownAnswersParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/known_answers_parity_matterjs_test.go",
       "line": 20
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestNames_CachedAddressesPerHostAreBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_bounds_test.go",
+      "line": 176
     },
     {
       "package": "client/discovery",
@@ -8389,6 +8445,20 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestOmap_N3Disc2",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/omap_test.go",
+      "line": 46
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestOmap_Order",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/omap_test.go",
+      "line": 14
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestOperational_ResolveFindsTheSRVTargetsAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/operational_test.go",
@@ -8434,7 +8504,7 @@
       "identifier": "TestParityDiscovery_CommissionableDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/parity_matterjs_test.go",
-      "line": 554
+      "line": 553
     },
     {
       "package": "client/discovery",
@@ -8455,7 +8525,7 @@
       "identifier": "TestParityDiscovery_OperationalQName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/parity_matterjs_test.go",
-      "line": 636
+      "line": 635
     },
     {
       "package": "client/discovery",
@@ -8476,7 +8546,7 @@
       "identifier": "TestParityDiscovery_ResolutionQueries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/parity_matterjs_test.go",
-      "line": 651
+      "line": 650
     },
     {
       "package": "client/discovery",
@@ -8490,7 +8560,7 @@
       "identifier": "TestParityDiscovery_ScannerFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/parity_matterjs_test.go",
-      "line": 616
+      "line": 615
     },
     {
       "package": "client/discovery",
@@ -8777,21 +8847,21 @@
       "identifier": "TestCloseBehaviour",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 442
+      "line": 443
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseSessionSendsCloseSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 694
+      "line": 695
     },
     {
       "package": "client/exchange",
       "identifier": "TestCloseTimerExpires",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 522
+      "line": 523
     },
     {
       "package": "client/exchange",
@@ -8805,28 +8875,28 @@
       "identifier": "TestDefaultsAndAccessors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 809
+      "line": 810
     },
     {
       "package": "client/exchange",
       "identifier": "TestDuplicateIsAckedAtOnceAndNotDelivered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 169
+      "line": 170
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 549
+      "line": 550
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeIDsAreConsecutiveAndIndexedApart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "client/exchange",
@@ -8865,10 +8935,17 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestExchangeQueueIsBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_test.go",
+      "line": 860
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestExchangesAreKeyedBySession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_table_test.go",
-      "line": 20
+      "line": 22
     },
     {
       "package": "client/exchange",
@@ -8889,35 +8966,35 @@
       "identifier": "TestInboundUnsecuredAckWaitsAreBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/unsecured_bounds_test.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "client/exchange",
       "identifier": "TestInboundUnsecuredSessionHoldsOneHandshake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/unsecured_bounds_test.go",
-      "line": 140
+      "line": 141
     },
     {
       "package": "client/exchange",
       "identifier": "TestInboundUnsecuredSessionLifetime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/unsecured_bounds_test.go",
-      "line": 68
+      "line": 69
     },
     {
       "package": "client/exchange",
       "identifier": "TestInboundUnsecuredSessionsAreBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/unsecured_bounds_test.go",
-      "line": 95
+      "line": 96
     },
     {
       "package": "client/exchange",
       "identifier": "TestInitiateSkipsAnIDInUseOnTheSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_table_test.go",
-      "line": 54
+      "line": 56
     },
     {
       "package": "client/exchange",
@@ -9071,7 +9148,14 @@
       "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 404
+      "line": 405
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestNoExchangeRegistersOnAClosedSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/exchange_table_test.go",
+      "line": 98
     },
     {
       "package": "client/exchange",
@@ -9113,7 +9197,7 @@
       "identifier": "TestParityPeerOpenedExchangeDispatch",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/parity_matterjs_test.go",
-      "line": 192
+      "line": 195
     },
     {
       "package": "client/exchange",
@@ -9148,7 +9232,7 @@
       "identifier": "TestPeerLostHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 637
+      "line": 638
     },
     {
       "package": "client/exchange",
@@ -9156,6 +9240,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
       "line": 274
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestPeerOpenedHandshakeOnInitiatedSessionIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/unsecured_bounds_test.go",
+      "line": 195
     },
     {
       "package": "client/exchange",
@@ -9204,14 +9295,14 @@
       "identifier": "TestRetransmissionOptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 325
+      "line": 326
     },
     {
       "package": "client/exchange",
       "identifier": "TestRetransmissionSchedule",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 263
+      "line": 264
     },
     {
       "package": "client/exchange",
@@ -9225,35 +9316,35 @@
       "identifier": "TestSecondReliableMessageAcksTheFirstAtOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 207
+      "line": 208
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecondSendWhileUnackedIsFlowError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 148
+      "line": 149
     },
     {
       "package": "client/exchange",
       "identifier": "TestSecureSessionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 596
+      "line": 597
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendContextCancelled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 363
+      "line": 364
     },
     {
       "package": "client/exchange",
       "identifier": "TestSendWaitsForAckAndPiggybacksOwedAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 103
+      "line": 104
     },
     {
       "package": "client/exchange",
@@ -9274,7 +9365,7 @@
       "identifier": "TestSessionIDAllocation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 723
+      "line": 724
     },
     {
       "package": "client/exchange",
@@ -9316,7 +9407,7 @@
       "identifier": "TestStatusReportTravelsOnSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 236
+      "line": 237
     },
     {
       "package": "client/exchange",
@@ -9330,21 +9421,21 @@
       "identifier": "TestUnauthenticatedTimingIsClamped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/unsecured_bounds_test.go",
-      "line": 20
+      "line": 21
     },
     {
       "package": "client/exchange",
       "identifier": "TestUnsecuredSessionParameters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 770
+      "line": 771
     },
     {
       "package": "client/exchange",
       "identifier": "TestUnsolicitedMessageWithoutAckIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
-      "line": 74
+      "line": 75
     },
     {
       "package": "client/exchange",
@@ -9407,7 +9498,7 @@
       "identifier": "FlushingBatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 26
+      "line": 28
     },
     {
       "package": "client/interaction",
@@ -9421,35 +9512,49 @@
       "identifier": "HoldConnect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 43
+      "line": 45
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "InvokeChunkCharge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 129
     },
     {
       "package": "client/interaction",
       "identifier": "MaxAssemblyBytesPerSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 114
+      "line": 116
     },
     {
       "package": "client/interaction",
       "identifier": "QueuedInvokes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 15
+      "line": 17
     },
     {
       "package": "client/interaction",
       "identifier": "RecordNetworks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 76
+      "line": 78
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "ReportChunkCharge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 120
     },
     {
       "package": "client/interaction",
       "identifier": "SetTimedWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "client/interaction",
@@ -9593,6 +9698,13 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "TestInvokeChargeCountsTheFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_charge_internal_test.go",
+      "line": 159
+    },
+    {
+      "package": "client/interaction",
       "identifier": "TestInvokeLargeMessageParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/large_message_parity_matterjs_test.go",
@@ -9604,6 +9716,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/large_message_parity_matterjs_test.go",
       "line": 65
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestReportChargeBoundsTheHeap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_charge_internal_test.go",
+      "line": 96
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestReportChargeOfScalarAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/report_charge_internal_test.go",
+      "line": 193
     },
     {
       "package": "client/interaction",
@@ -9625,6 +9751,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/sustained_internal_test.go",
       "line": 75
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestSustainedRetryAfterAnOutageIsNotCarriedOver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/sustained_internal_test.go",
+      "line": 150
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestSustainedRetryScheduleSpansEstablishments",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/sustained_internal_test.go",
+      "line": 109
     },
     {
       "package": "client/interaction",
@@ -9667,6 +9807,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/set_test.go",
       "line": 74
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestAddingASessionDoesNotHoldThePeerAcrossTheDiscoveryLoop",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/peer_lock_test.go",
+      "line": 16
     },
     {
       "package": "client/peer",
@@ -10048,6 +10195,13 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestMergeIgnoresNegativeDurations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/timing_negative_test.go",
+      "line": 17
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestMonitorAllProbesFail",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
@@ -10080,6 +10234,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/monitor_test.go",
       "line": 96
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorSuspectCheckDoesNotTakeAnAddressChangeResult",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/monitor_test.go",
+      "line": 285
     },
     {
       "package": "client/peer",
@@ -10444,6 +10605,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/network_profile_parity_matterjs_test.go",
       "line": 177
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestSemaphoreSlotTimeoutRacesNoGrant",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/semaphore_race_test.go",
+      "line": 16
     },
     {
       "package": "client/peer",
@@ -27474,7 +27642,7 @@
       "identifier": "CommissionedIdentity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/ble/scanner.go",
-      "line": 655
+      "line": 668
     },
     {
       "package": "controller/ble",
@@ -27702,10 +27870,24 @@
     },
     {
       "package": "controller/ble",
+      "identifier": "TestScanner_ContinuousDiscoveryForgetsWithItsRecords",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_bounds_test.go",
+      "line": 60
+    },
+    {
+      "package": "controller/ble",
       "identifier": "TestScanner_RecordsAreBoundedDuringADiscovery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ble/scanner_bounds_test.go",
-      "line": 17
+      "line": 21
+    },
+    {
+      "package": "controller/ble/bletest",
+      "identifier": "TestADroppedConnectionStartsNoSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/bletest/bletest_internal_test.go",
+      "line": 18
     },
     {
       "package": "controller/ca/keyfile",
@@ -27720,6 +27902,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ca/keyfile/keyfile_test.go",
       "line": 21
+    },
+    {
+      "package": "controller/ca/keyfile",
+      "identifier": "TestCreateSyncsTheFileAndItsDirectory",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ca/keyfile/keyfile_test.go",
+      "line": 141
     },
     {
       "package": "controller/ca/keyfile",
@@ -29980,14 +30169,42 @@
       "identifier": "TestAddressesToCandidates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 396
+      "line": 404
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAttestationSignatureOfAnyLength",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/signature_length_test.go",
+      "line": 64
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAttestationStepClearsAnEarlierPair",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/attested_pair_internal_test.go",
+      "line": 60
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAttestedPairNeedsProductionTrust",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/attested_pair_internal_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAttestedPairStrictFindingsWithhold",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/attested_pair_internal_test.go",
+      "line": 46
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestAttestedPairWithheld",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/attested_pair_internal_test.go",
-      "line": 17
+      "line": 22
     },
     {
       "package": "controller/commissioner",
@@ -29998,10 +30215,17 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestCSRSignatureOfAnyLength",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/signature_length_test.go",
+      "line": 40
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestCertificatesCsrNonceEchoed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/csr_nonce_chip_test.go",
-      "line": 69
+      "line": 70
     },
     {
       "package": "controller/commissioner",
@@ -30064,7 +30288,7 @@
       "identifier": "TestCommissionWithOperationalSigner",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/signer_test.go",
-      "line": 110
+      "line": 114
     },
     {
       "package": "controller/commissioner",
@@ -30078,63 +30302,63 @@
       "identifier": "TestCommissioningConnection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_parity_matterjs_test.go",
-      "line": 296
+      "line": 299
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestCommissioningConnectionScripted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_parity_matterjs_test.go",
-      "line": 732
+      "line": 746
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestCommissioningConnectionStagger",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_parity_matterjs_test.go",
-      "line": 502
+      "line": 510
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConfigureRegulatoryInformation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
-      "line": 61
+      "line": 62
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 318
+      "line": 326
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionErrorClasses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 360
+      "line": 368
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionHoldingResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 200
+      "line": 205
     },
     {
       "package": "controller/commissioner",
-      "identifier": "TestConnectionLosingDisarmRunsBesideTheNextAddress",
+      "identifier": "TestConnectionLosingGiveUpHoldsTheRun",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 258
+      "line": 287
     },
     {
       "package": "controller/commissioner",
-      "identifier": "TestConnectionPasscodeDropsDevice",
+      "identifier": "TestConnectionPasscodeMismatchEndsTheAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 230
+      "line": 236
     },
     {
       "package": "controller/commissioner",
@@ -30145,10 +30369,66 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestConsentAwaitsAReArmInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/jcm_consent_test.go",
+      "line": 207
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConsentEndsWhenTheFailSafeCannotBeKept",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/jcm_consent_test.go",
+      "line": 157
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConsentEndsWithTheContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/jcm_consent_test.go",
+      "line": 92
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConsentErrorFailsTheStage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/jcm_consent_test.go",
+      "line": 120
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConsentKeepsAShortFailSafe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/jcm_consent_test.go",
+      "line": 133
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConsentOnBLE",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/jcm_consent_test.go",
+      "line": 251
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConsentOutlivesTheFailSafe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/jcm_consent_test.go",
+      "line": 58
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestContextWiring",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/wiring_test.go",
       "line": 53
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCreateFabricNeverReplacesAStoredFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_record_test.go",
+      "line": 186
     },
     {
       "package": "controller/commissioner",
@@ -30163,6 +30443,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
       "line": 565
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestDeviceTextIsNeutralised",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/devicetext_internal_test.go",
+      "line": 19
     },
     {
       "package": "controller/commissioner",
@@ -30226,6 +30513,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabricauthority_rotation_parity_matterjs_test.go",
       "line": 30
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricLabelIsBoundInBytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_record_test.go",
+      "line": 93
     },
     {
       "package": "controller/commissioner",
@@ -30323,7 +30617,7 @@
       "identifier": "TestInitialDataFullFabricTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
-      "line": 157
+      "line": 158
     },
     {
       "package": "controller/commissioner",
@@ -30404,10 +30698,17 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestNodeIDIsClaimedForTheCommissioning",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_claim_internal_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestOperationalSignerRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/signer_test.go",
-      "line": 53
+      "line": 55
     },
     {
       "package": "controller/commissioner",
@@ -30607,6 +30908,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestRotationDoesNotHoldTheObserverLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_record_test.go",
+      "line": 211
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestRoutableAddr",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/reconnect_probe_test.go",
@@ -30625,6 +30933,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/progress_test.go",
       "line": 70
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestStoredFabricIdentityIsChecked",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_record_test.go",
+      "line": 24
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestStoredOperationalKeyIsNeverDropped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_record_test.go",
+      "line": 259
     },
     {
       "package": "controller/commissioner",
@@ -30680,7 +31002,7 @@
       "identifier": "TestUpdateFabricLabel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
-      "line": 113
+      "line": 114
     },
     {
       "package": "controller/commissioner",
@@ -30688,6 +31010,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
       "line": 421
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestZeroFabricLabelIsSafe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_record_test.go",
+      "line": 142
     },
     {
       "package": "controller/commissioner",
@@ -30719,6 +31048,13 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestBackgroundContextsAreNamed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/background_guard_test.go",
+      "line": 22
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestCRLDownloadConnectsToPublicDestinationsOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
@@ -30743,7 +31079,7 @@
       "identifier": "TestCertificateStoreCloseCancelsPeriodicUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 398
+      "line": 400
     },
     {
       "package": "controller/dcl",
@@ -30757,7 +31093,21 @@
       "identifier": "TestCertificateStoreGitHub",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 295
+      "line": 297
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreHealsAnOldPromotion",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_promotion_test.go",
+      "line": 100
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStorePromotionTakesTheProductionBytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_promotion_test.go",
+      "line": 20
     },
     {
       "package": "controller/dcl",
@@ -30786,6 +31136,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
       "line": 112
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateUpdateListsBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_bounds_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateWaitersHonourTheirContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_bounds_test.go",
+      "line": 94
     },
     {
       "package": "controller/dcl",
@@ -30849,6 +31213,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/fuzz_revocation_test.go",
       "line": 125
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestDERLongLengthNeverWraps",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/crl_length_test.go",
+      "line": 16
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestDamagedStoreIsReadAsEmpty",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/store_damaged_test.go",
+      "line": 19
     },
     {
       "package": "controller/dcl",
@@ -31195,6 +31573,13 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestFileStoreRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/store_damaged_test.go",
+      "line": 58
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestGitHubNamedURLsConnectToPublicDestinationsOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
@@ -31216,6 +31601,13 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestGuardDropsTheHostsDots",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/guard_proxy_dial_test.go",
+      "line": 56
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestGuardJudgesTheHostAsSent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
@@ -31223,10 +31615,31 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestHeld5bDclF6",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/guard_proxy_dial_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestHeld5bDclF6Retry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/guard_proxy_dial_test.go",
+      "line": 106
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestHeld5bDclR8",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/guard_proxy_dial_test.go",
+      "line": 72
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestIPv4Legacy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 753
+      "line": 752
     },
     {
       "package": "controller/dcl",
@@ -31342,6 +31755,13 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestRevocationCacheExpiresUnaskedAuthorities",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_bounds_test.go",
+      "line": 16
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestRevocationExpiredCRL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/revocation_test.go",
@@ -31391,6 +31811,13 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestRevocationPointsPerIssuerBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_bounds_test.go",
+      "line": 45
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestRevocationRejectedPoints",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/revocation_test.go",
@@ -31405,10 +31832,24 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "TestStoreCertificateKeepsAProductionEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_promotion_test.go",
+      "line": 79
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestStores",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/certstore_test.go",
-      "line": 360
+      "line": 362
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestVendorInfoCloseCancelsThePeriodicRefresh",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/vendorinfo_close_test.go",
+      "line": 19
     },
     {
       "package": "controller/dcl",
@@ -31457,28 +31898,35 @@
       "identifier": "ConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 159
+      "line": 160
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "Peer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "QueryImageRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 503
+      "line": 549
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "Status",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 35
+      "line": 36
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestHeaderWriter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_header_url_test.go",
+      "line": 49
     },
     {
       "package": "controller/softwareupdate",
@@ -31513,7 +31961,7 @@
       "identifier": "TestImagesHonourTheLedgersMaxImageSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_bound_test.go",
-      "line": 24
+      "line": 25
     },
     {
       "package": "controller/softwareupdate",
@@ -31521,6 +31969,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_store_parity_matterjs_test.go",
       "line": 597
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesOneWriterPerName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_writers_test.go",
+      "line": 28
     },
     {
       "package": "controller/softwareupdate",
@@ -31594,6 +32049,20 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestImagesWriteNeedsTheRecordRemoved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_writers_test.go",
+      "line": 156
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesWriterWaitHonoursTheContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_writers_test.go",
+      "line": 197
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestManagerAppliedUpdateAfterResubscriptionParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
@@ -31636,6 +32105,13 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestManagerCloseCancelsAndWaitsForTheTimersCheck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_lifecycle_test.go",
+      "line": 73
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestManagerFailedApplyKeepsArmedParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_bdx_parity_matterjs_test.go",
@@ -31643,10 +32119,45 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestManagerForgetsNodesThatLeft",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_lifecycle_test.go",
+      "line": 125
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerInitialCheckReportsItsFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_lifecycle_test.go",
+      "line": 106
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerNodeDeleted",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_lifecycle_test.go",
+      "line": 255
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerNodeDeletedDisarmsWithoutAQueuedUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_lifecycle_test.go",
+      "line": 297
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestManagerOffersOnlyServableStoredImages",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_checksum_test.go",
       "line": 254
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerSettersReadUnderTheLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_lifecycle_test.go",
+      "line": 167
     },
     {
       "package": "controller/softwareupdate",
@@ -31727,6 +32238,13 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestQueryUpdatesReturnsTheProductFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_lifecycle_test.go",
+      "line": 230
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestScriptedApplyUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/script_parity_matterjs_test.go",
@@ -31752,6 +32270,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
       "line": 242
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestUpdateInfoFromURLReadsTheHeaderOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_header_url_test.go",
+      "line": 23
     },
     {
       "package": "controller/softwareupdate",
@@ -43490,28 +44015,28 @@
       "identifier": "TestDatasetFieldsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/dataset_test.go",
-      "line": 46
+      "line": 49
     },
     {
       "package": "thread",
       "identifier": "TestDatasetReplayEdges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/dataset_test.go",
-      "line": 17
+      "line": 20
     },
     {
       "package": "thread",
       "identifier": "TestDecodeDatasetHexWhitespace",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/dataset_test.go",
-      "line": 108
+      "line": 111
     },
     {
       "package": "thread",
       "identifier": "TestDecodeUTF8MatchesTextDecoder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/dataset_test.go",
-      "line": 90
+      "line": 93
     },
     {
       "package": "thread",
@@ -43556,6 +44081,13 @@
       "line": 219
     },
     {
+      "package": "thread",
+      "identifier": "TestRedactCarriesNoSecret",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/dataset_test.go",
+      "line": 125
+    },
+    {
       "package": "thread/brdiscovery",
       "identifier": "TestBorderRouterRegistryParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
@@ -43567,63 +44099,84 @@
       "identifier": "TestRegistryCloseStopsDelivery",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/brdiscovery/registry_internal_test.go",
-      "line": 39
+      "line": 42
+    },
+    {
+      "package": "thread/brdiscovery",
+      "identifier": "TestRegistryCoalescesUpdates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/brdiscovery/registry_internal_test.go",
+      "line": 108
+    },
+    {
+      "package": "thread/brdiscovery",
+      "identifier": "TestRegistryInstanceCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/brdiscovery/registry_internal_test.go",
+      "line": 72
     },
     {
       "package": "thread/brdiscovery",
       "identifier": "TestRegistryNilReceiver",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/brdiscovery/registry_internal_test.go",
-      "line": 18
+      "line": 21
     },
     {
       "package": "thread/otbr",
       "identifier": "LeaderData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "thread/otbr/client.go",
-      "line": 87
+      "line": 96
     },
     {
       "package": "thread/otbr",
       "identifier": "TestBorderRouterActivationAndRevert",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 86
+      "line": 89
     },
     {
       "package": "thread/otbr",
       "identifier": "TestBorderRouterFailures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 178
+      "line": 181
     },
     {
       "package": "thread/otbr",
       "identifier": "TestBorderRouterReads",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 49
+      "line": 52
     },
     {
       "package": "thread/otbr",
       "identifier": "TestBorderRouterReplaceAndClear",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 139
+      "line": 142
     },
     {
       "package": "thread/otbr",
       "identifier": "TestBorderRouterRevertWithoutDeleteRoute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 117
+      "line": 120
     },
     {
       "package": "thread/otbr",
       "identifier": "TestBorderRouterVersionFromItsRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 238
+      "line": 241
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestDefaultClientRefusesRedirects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 374
     },
     {
       "package": "thread/otbr",
@@ -43631,6 +44184,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/probe_parity_matterjs_test.go",
       "line": 155
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestFailedActivationReenablesTheInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 324
     },
     {
       "package": "thread/otbr",
@@ -43645,6 +44205,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/probe_parity_matterjs_test.go",
       "line": 120
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestNumOfRouterIsAByteCount",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 301
     },
     {
       "package": "thread/otbr",
@@ -43809,10 +44376,17 @@
     },
     {
       "package": "thread/otbr",
+      "identifier": "TestResponseBodyBoundIsOneMiB",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 279
+    },
+    {
+      "package": "thread/otbr",
       "identifier": "TestResponseBodyBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_test.go",
-      "line": 253
+      "line": 256
     },
     {
       "package": "thread/otbr",
