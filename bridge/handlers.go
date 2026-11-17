@@ -925,15 +925,16 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	}
 
 	if result.IsResume() {
-		// Sigma2_Resume fast path: the session is installed, the host
-		// told and the resumption record replaced before the reply is
-		// sent, so a copy of this Sigma1 finds no record. matter.js sends
-		// Sigma2_Resume first, adds the session after the send and saves
-		// the record after the initiator's success report
+		// Sigma2_Resume fast path: the session is installed, the host told
+		// and the resumption record replaced before the reply is sent; the
+		// record is consumed at its acceptance, where the responder claims
+		// its id. matter.js sends Sigma2_Resume first, adds the session once
+		// the send is acknowledged and saves the record after the
+		// initiator's success report
 		// (packages/protocol/src/session/case/CaseServer.ts:196-201, :211,
-		// :216, :219 at db021da0). A session the initiator never
-		// acknowledges is closed when its Sigma2_Resume is given up
-		// ([Bridge.closeUnacknowledgedResume]; review II, R2-P6-sec-3320).
+		// :216, :219 at db021da0). A session whose Sigma2_Resume is not
+		// acknowledged is closed ([Bridge.closeUnacknowledgedResume];
+		// review II, R2-P6-sec-3320).
 		out := sigma.MarshalSigma2Resume(*result.Sigma2Resume)
 
 		// Every resume that yields a session id the adapter has not

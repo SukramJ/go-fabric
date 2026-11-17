@@ -1524,12 +1524,19 @@ func (b *Bridge) handleCase(
 // closeUnacknowledgedResume closes the secure session a resumption installed
 // whose Sigma2_Resume the initiator did not acknowledge: its
 // retransmissions were spent, its time on the unsecured session ran out
-// ([tickOutboundReliable]) or it could not be sent ([Bridge.handleCase]).
-// The controller's CASE responder closes such a session too
-// (client/handshake). An entry that lost its place in the retransmit table
-// to a newer one ([unsecuredEntryLimit]) closes nothing — its datagram went
-// out, and the peer's acknowledgement may still come. Review II,
-// R2-P6-sec-3320.
+// ([tickOutboundReliable]), it could not be sent ([Bridge.handleCase]) or
+// its handshake was ended ([Bridge.abandonHandshakeReplies]). That is
+// matter.js's outcome: its send returns only once the message is
+// acknowledged (packages/protocol/src/protocol/MessageExchange.ts:822-830
+// at db021da0), a send that fails — its acknowledgement missing included —
+// closes the session (packages/protocol/src/session/case/CaseServer.ts:202-206),
+// and the session is added only after it (:211). The controller's CASE
+// responder closes such a session too (client/handshake). It is a liveness
+// rule, not a defence: an acknowledgement authenticates nothing. An entry
+// that lost its place in the retransmit table to a newer one
+// ([unsecuredEntryLimit]) closes nothing — its datagram went out, and the
+// peer's acknowledgement may still come; the session is left to the idle
+// reaper. Review II, R2-P6-sec-3320.
 func (b *Bridge) closeUnacknowledgedResume(sessionID uint16) {
 	b.mu.RLock()
 	reg := b.sessionRegistry

@@ -86,8 +86,10 @@ func FromName(name pkix.Name, acceptMalformed bool) (vid, pid *uint16, err error
 // parseSubjectOrIssuer does (`Bytes.toString(Bytes.of(valueNode._bytes))`,
 // packages/protocol/src/certificate/kinds/Certificate.ts:321-326 at
 // db021da0): "FFF1" in an OCTET STRING is 0xFFF1, in a BMPString it is
-// malformed. An attribute of other than two elements, or whose first is not
-// an OBJECT IDENTIFIER, is skipped (:319, :322-323). Review II, R2-P6-par-2904.
+// malformed. An attribute of other than two elements is skipped (:319); one
+// whose first element is not an OBJECT IDENTIFIER is skipped too, a rule of
+// this module (matter.js looks its bytes up by hex without a tag test,
+// :322-323). Review II, R2-P6-par-2904.
 func FromRawName(raw []byte, acceptMalformed bool) (vid, pid *uint16, err error) {
 	attrs, err := rawAttributes(raw)
 	if err != nil {

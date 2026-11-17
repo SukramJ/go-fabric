@@ -1166,8 +1166,11 @@ func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 		// An inbound unsecured session holds its one handshake
 		// ([maxInboundUnsecuredHandshakes]). One whose handler is done
 		// with its exchange no longer runs: its place goes to this
-		// Sigma1 — what connectedhomeip does when its watchdog finds the
-		// running handshake stuck (CASEServer.cpp:92-93 at 6170af84).
+		// Sigma1, as connectedhomeip counts only a handshake in progress
+		// as busy (src/protocols/secure_channel/CASEServer.cpp:85 at
+		// 6170af84, a finished one is back in kInitialized). chip's
+		// watchdog (:92-93) has no counterpart here: the module runs no
+		// background work helper a handshake could be stuck on.
 		if running = s.heldHandshake(); running != nil && running.ended() && s.releaseHandshakeOf(running) {
 			x = m.accept(s, msg)
 		}
@@ -1243,8 +1246,10 @@ func busyWait(running *Exchange) uint16 {
 // (src/protocols/secure_channel/CASEServer.cpp:85-122,
 // StatusReport.cpp:112-130 at 6170af84); matter.js's CASE server has no
 // such bound (packages/protocol/src/session/case/CaseServer.ts:61-64 at
-// db021da0). The wait for the report's acknowledgement is bounded by
-// [inboundUnsecuredAckWaitLimit] (review II, R2-P6-par-2902).
+// db021da0). The report waits for its acknowledgement in one of the
+// [inboundUnsecuredAckWaitLimit] places, so sixteen refused Sigma1 end the
+// wait of an earlier message on an inbound unsecured session — which then
+// loses only its retransmissions (review II, R2-P6-par-2902).
 func (m *Manager) answerBusy(s *Session, msg *Message, running *Exchange) {
 	x := m.acceptAs(s, msg, false)
 	if x == nil {
