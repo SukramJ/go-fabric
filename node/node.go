@@ -970,7 +970,12 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	}
 	n.closeClientFabricSessions(ctx, fabricIndex)
 	if loadErr != nil {
+		// The new identity could not be read; what the update replaced is
+		// gone all the same: the fabric's pending handshakes are aborted
+		// and its sessions end, as on a reload that succeeds. Nothing is
+		// announced under an identity the node does not hold.
 		n.logger.Warn("case.identity.reload_failed", slog.Any("err", loadErr))
+		n.br.CloseFabricSessionsAfterUpdate(ctx, fabricIndex)
 		return
 	}
 	if newCompressed, newNode, ok := n.caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {

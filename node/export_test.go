@@ -79,3 +79,7 @@ type FailSafeHooksForTest = failSafeHooks
 // ReopenPending reports whether a reopen after the last fabric's removal
 // waits for the node to become idle (reopenWhenIdle).
 func ReopenPending(n *Node) bool { return n.reopenPending.Load() }
+
+// FabricUpdated runs the node's UpdateNOC hook for fabricIndex
+// (OperationalCredentials' OnFabricUpdated → fabricUpdated).
+func FabricUpdated(ctx context.Context, n *Node, fabricIndex uint8) { n.fabricUpdated(ctx, fabricIndex) }

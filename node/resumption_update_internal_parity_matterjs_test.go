@@ -10,6 +10,9 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/store/memstore"
 )
@@ -19,8 +22,9 @@ import (
 // resumes a session established under the replaced NOC. Mirrors matter.js
 // packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
 // SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537).
-// The node here holds only the store and an empty CASE identity table, so
-// the hook stops after the drop (the identity reload fails).
+// The node here holds only the store, an empty CASE identity table and an
+// unstarted bridge, so the hook ends the fabric's (no) sessions after the
+// drop and announces nothing (the identity reload fails).
 func TestUpdateNOCDropsResumptionRecordsParity(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -34,7 +38,11 @@ func TestUpdateNOCDropsResumptionRecordsParity(t *testing.T) {
 		t.Fatalf("UpsertResumption: %v", err)
 	}
 	logger := slog.New(slog.DiscardHandler)
-	n := &Node{st: st, logger: logger, caseIDs: newCaseIdentities(logger, nil)}
+	br, err := bridge.New(func(context.Context) (*endpoint.Topology, error) { return &endpoint.Topology{}, nil }, mdns.NewNoop(), bridge.Config{}, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := &Node{st: st, logger: logger, caseIDs: newCaseIdentities(logger, nil), br: br}
 
 	n.fabricUpdated(ctx, idx)
 
