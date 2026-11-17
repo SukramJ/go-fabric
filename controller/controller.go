@@ -272,12 +272,15 @@ type Config struct {
 	// ([Controller.DiagnosticEvents]); the zero value keeps
 	// diag.DefaultDiagnosticsCapacity events.
 	Diagnostics diag.Diagnostics
-	// MaxReportBytesPerSession bounds the report chunks (message payload
-	// bytes) the interactions of one session hold while the rest of their
-	// chunks arrive — reads, subscription reports and invoke responses of
-	// the paired nodes together: the chunk that would pass it is answered
-	// ResourceExhausted and the call returns interaction.ErrReportTooLarge.
-	// 0 is interaction.DefaultMaxReportBytesPerSession (2 MiB); a negative
+	// MaxReportBytesPerSession bounds the report chunks the interactions of
+	// one session hold while the rest of their chunks arrive, each charged
+	// its message payload, its entries and its decoded elements (the
+	// memory they hold, interaction.DefaultMaxReportBytesPerSession) —
+	// reads, subscription reports and invoke responses of the paired nodes
+	// together: the chunk that would pass it is answered ResourceExhausted
+	// and the call returns interaction.ErrReportTooLarge. 0 is
+	// interaction.DefaultMaxReportBytesPerSession (16 MiB, about 70 000
+	// scalar attributes of a wildcard read); a negative
 	// bound is [ErrConfiguration]. It holds for every interaction with a
 	// paired node, the reads a pairing makes once the node is commissioned
 	// included; the commissioning steps themselves, over PASE and the CASE
