@@ -128,6 +128,14 @@ var (
 // address). A directed broadcast cannot be told from a host address
 // without the subnet and is not looked for.
 //
+// Loopback is admitted from every source, a discovered record or a hint
+// any host on the link may send included: what such an address steers is
+// a Sigma1 to the port the record names on this host, a handshake that
+// fails at any service that is not a Matter node, and a controller and a
+// device on one
+// host — the examples, fabrictest — reach each other only over it (review
+// II, R2-P6-bound-2107: deliberate, accepted).
+//
 // matter.js has no such filter to mirror: it takes no hinted address, and
 // a discovered A or AAAA record's value becomes an address as it stands
 // (packages/general/src/net/dns-sd/IpService.ts:392-407 at db021da0, ipOf:
