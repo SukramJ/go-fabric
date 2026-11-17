@@ -27,6 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	timesync "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/controller/attestation"
@@ -549,7 +550,7 @@ func (f *flow) ensureOperationalCredentialsSuccess(what string, r nocResponse) e
 	if r.fabricIndex != nil {
 		suffix += fmt.Sprintf(", fabricIndex: %d", *r.fabricIndex)
 	}
-	f.log.Debug("matter.controller.commissioning.operational_credentials_result", slog.String("context", what), slog.String("status", nocStatusNames[r.status]))
+	f.log.Debug("matter.controller.commissioning.operational_credentials_result", slog.String("context", what), slog.String("status", nocStatusName(r.status)))
 	if r.status == nocStatusOk {
 		return nil
 	}
@@ -561,7 +562,7 @@ func (f *flow) ensureOperationalCredentialsSuccess(what string, r nocResponse) e
 	case what == "updateFabricLabel" && r.status == nocStatusLabelConflict:
 		return newError(ErrFabricLabelConflict, fmt.Sprintf("Cannot set fabric label to %q because another fabric on this device already uses this name. Please adjust fabric labels to be unique.", f.fabric.CurrentLabel()), nil)
 	}
-	return newError(ErrCommissioning, fmt.Sprintf("Commission error for %q: %s (%d)%s", what, nocStatusNames[r.status], r.status, suffix), nil)
+	return newError(ErrCommissioning, fmt.Sprintf("Commission error for %q: %s (%d)%s", what, nocStatusName(r.status), r.status, suffix), nil)
 }
 
 // enumName is the matter.js enum lookup Enum[value].
@@ -588,8 +589,8 @@ func enumName(e *spec.Enum, v uint64) string {
 // PASE session armed (checkTerms, disarmAfterFailure).
 func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 	v, ok, err := f.readValues(ctx,
-		rootAttr(opCredsCluster, opCredsAttrSupportedFabrics),
-		rootAttr(opCredsCluster, opCredsAttrCommissionedFabrics),
+		rootAttr(opCredsCluster, opcredsdef.AttrSupportedFabrics),
+		rootAttr(opCredsCluster, opcredsdef.AttrCommissionedFabrics),
 		rootAttr(descriptor.ClusterID, descriptor.AttrPartsList),
 		rootAttr(descriptor.ClusterID, descriptor.AttrServerList),
 		rootAttr(basicinfo.ClusterID, basicinfo.AttrVendorId),
@@ -1112,8 +1113,8 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	// withholds the pair leaves none (review II, R2-P6-fsm-1811).
 	f.attested = nil
 	chain := make([][]byte, 2)
-	for i, kind := range []uint8{certificateTypeDAC, certificateTypePAI} {
-		res, err := f.invoke(ctx, opCredsCluster, cmdCertificateChainRequest, certificateChainRequest(kind), true)
+	for i, kind := range []opcredsdef.CertificateChainTypeEnum{opcredsdef.CertificateChainTypeDacCertificate, opcredsdef.CertificateChainTypePaiCertificate} {
+		res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdCertificateChainRequest, opcredsdef.CertificateChainRequestRequest{CertificateType: kind}, true)
 		if err != nil {
 			return 0, err
 		}
@@ -1128,7 +1129,7 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := f.invoke(ctx, opCredsCluster, cmdAttestationRequest, octetsRequest(nonce), true)
+	res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdAttestationRequest, opcredsdef.AttestationRequestRequest{AttestationNonce: nonce}, true)
 	if err != nil {
 		return 0, err
 	}
@@ -1247,7 +1248,7 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := f.invoke(ctx, opCredsCluster, cmdCSRRequest, octetsRequest(nonce), true)
+	res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdCsrRequest, opcredsdef.CsrRequestRequest{CsrNonce: nonce}, true)
 	if err != nil {
 		return 0, err
 	}
@@ -1281,17 +1282,15 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	if err != nil {
 		return 0, err
 	}
-	if _, err := f.invoke(ctx, opCredsCluster, cmdAddTrustedRootCertificate, octetsRequest(f.fabric.CA.RootCert()), true); err != nil {
+	if _, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdAddTrustedRootCertificate, opcredsdef.AddTrustedRootCertificateRequest{RootCaCertificate: f.fabric.CA.RootCert()}, true); err != nil {
 		return 0, err
 	}
 	noc, err := f.fabric.CA.GenerateNOC(operationalKey, f.fabric.FabricID, f.address.NodeID, f.opts.CATs)
 	if err != nil {
 		return 0, err
 	}
-	res, err = f.invoke(ctx, opCredsCluster, cmdAddNOC, addNOCRequest{
-		noc: noc, icac: f.fabric.CA.ICACCert(), ipk: f.fabric.IPK,
-		caseAdminSubject: f.fabric.RootNodeID, adminVendorID: f.fabric.RootVendorID,
-	}, true)
+	res, err = f.invoke(ctx, opCredsCluster, opcredsdef.CmdAddNoc,
+		addNOCRequest(noc, f.fabric.CA.ICACCert(), f.fabric.IPK, f.fabric.RootNodeID, f.fabric.RootVendorID), true)
 	if err != nil {
 		return 0, err
 	}
@@ -1415,7 +1414,7 @@ func (f *flow) updateFabricLabel(ctx context.Context) (stepResult, error) {
 		f.log.Error("matter.controller.commissioning.no_fabric_index")
 		return stepFailure, nil
 	}
-	res, err := f.invoke(ctx, opCredsCluster, cmdUpdateFabricLabel, updateFabricLabelRequest(f.fabric.CurrentLabel()), false)
+	res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdUpdateFabricLabel, opcredsdef.UpdateFabricLabelRequest{Label: f.fabric.CurrentLabel()}, false)
 	if err == nil {
 		var nr nocResponse
 		err = response(res, "NocResponse", func(n spec.Node) (err error) {

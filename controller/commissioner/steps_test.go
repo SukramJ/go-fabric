@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -138,7 +139,7 @@ func fabricsDevice(req imRequest) (opcode uint8, payload []byte, ok bool) {
 	return im.OpcodeReportData, encodeTLV(func(e *tlv.Encoder) {
 		e.StartStruct(tlv.AnonymousTag())
 		e.StartArray(tlv.ContextTag(1))
-		for _, a := range []uint32{opCredsAttrSupportedFabrics, opCredsAttrCommissionedFabrics} {
+		for _, a := range []uint32{opcredsdef.AttrSupportedFabrics, opcredsdef.AttrCommissionedFabrics} {
 			e.StartStruct(tlv.AnonymousTag())
 			e.StartStruct(tlv.ContextTag(1))
 			e.PutUint(tlv.ContextTag(0), 1)
