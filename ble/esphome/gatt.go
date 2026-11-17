@@ -90,7 +90,9 @@ type connection struct {
 	log     *slog.Logger
 	clk     clock.Clock
 
-	// Set once by connect, read-only after.
+	// Set once by connect, read-only after; c2 is read under mu by the
+	// API reader as well, which is live before connect returns
+	// (R2-P6-conc-2007).
 	mtu                int
 	c1, c2, cccd, c3   uint32
 	c2Props            uint32
@@ -249,6 +251,7 @@ func (k *connection) discover(ctx context.Context) error {
 		}
 		return shortWords(u.Short)
 	}
+	var c1, c2, c2Props, cccd, c3 uint32
 	for _, s := range r.services {
 		if words(s.UUID) != serviceWords {
 			continue
@@ -256,22 +259,27 @@ func (k *connection) discover(ctx context.Context) error {
 		for _, c := range s.Characteristics {
 			switch words(c.UUID) {
 			case c1Words:
-				k.c1 = c.Handle
+				c1 = c.Handle
 			case c2Words:
-				k.c2, k.c2Props = c.Handle, c.Properties
+				c2, c2Props = c.Handle, c.Properties
 				for _, d := range c.Descriptors {
 					if words(d.UUID) == cccdWords {
-						k.cccd = d.Handle
+						cccd = d.Handle
 					}
 				}
 			case c3Words:
-				k.c3 = c.Handle
+				c3 = c.Handle
 			}
 		}
 	}
-	if k.c1 == 0 || k.c2 == 0 || k.cccd == 0 {
+	if c1 == 0 || c2 == 0 || cccd == 0 {
 		return ErrNoMatterService
 	}
+	// The reader may be in onNotify now: the handles are published under
+	// the lock it reads c2 under.
+	k.mu.Lock()
+	k.c1, k.c2, k.c2Props, k.cccd, k.c3 = c1, c2, c2Props, cccd, c3
+	k.mu.Unlock()
 	return nil
 }
 
@@ -432,11 +440,8 @@ func (k *connection) markGone() {
 
 // onNotify is a BluetoothGATTNotifyDataResponse for the connection.
 func (k *connection) onNotify(handle uint32, data []byte) {
-	if handle != k.c2 {
-		return
-	}
 	k.mu.Lock()
-	if k.on == nil {
+	if handle != k.c2 || k.on == nil {
 		k.mu.Unlock()
 		return
 	}
