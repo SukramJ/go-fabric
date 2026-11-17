@@ -229,6 +229,19 @@ func (d *Device) startLocked(ctx context.Context) error {
 	// operational is the bridge's socket on the in-memory network, which
 	// the node's group messages leave through once it started.
 	var operational *udp.Listener
+	// A step that fails from here stops the node it built — its client
+	// socket among what node.New opened — and closes the bridge's socket,
+	// so the next Start finds the site's addresses free (R2-P6-err-2510).
+	started := false
+	defer func() {
+		if started {
+			return
+		}
+		_ = n.Stop(context.WithoutCancel(ctx))
+		if operational != nil {
+			_ = operational.Close()
+		}
+	}()
 	if nw := d.site.net; nw != nil {
 		addr := hostAddr(d.index)
 		if !bridgeseam.UseListener(n.Bridge(), func() (*udp.Listener, error) {
@@ -272,9 +285,9 @@ func (d *Device) startLocked(ctx context.Context) error {
 	}
 	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
 	if err != nil {
-		_ = n.Stop(ctx)
 		return fmt.Errorf("address: %w", err)
 	}
+	started = true
 	d.mu.Lock()
 	d.n, d.adv, d.addr, d.cfg, d.running = n, cfg.Advertiser, addr, cfg, true
 	d.mu.Unlock()
