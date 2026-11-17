@@ -475,15 +475,13 @@ var resourceMonitoring = portSet{ports: []portDecl{{
 }}}
 
 func init() {
-	devicePorts["DishwasherAlarm"] = alarmDelegate
-	devicePorts["RefrigeratorAlarm"] = alarmDelegate
-	devicePorts["TemperatureAlarm"] = alarmDelegate
-	devicePorts["HepaFilterMonitoring"] = resourceMonitoring
-	devicePorts["ActivatedCarbonFilterMonitoring"] = resourceMonitoring
-	devicePorts["OperationalState"] = operationalCommands
-	devicePorts["RvcOperationalState"] = operationalCommands
-	devicePorts["OvenCavityOperationalState"] = operationalCommands
-	for name, ps := range devicePorts {
-		ports[name] = ps
-	}
+	addPorts(devicePorts, "DishwasherAlarm", alarmDelegate)
+	addPorts(devicePorts, "RefrigeratorAlarm", alarmDelegate)
+	addPorts(devicePorts, "TemperatureAlarm", alarmDelegate)
+	addPorts(devicePorts, "HepaFilterMonitoring", resourceMonitoring)
+	addPorts(devicePorts, "ActivatedCarbonFilterMonitoring", resourceMonitoring)
+	addPorts(devicePorts, "OperationalState", operationalCommands)
+	addPorts(devicePorts, "RvcOperationalState", operationalCommands)
+	addPorts(devicePorts, "OvenCavityOperationalState", operationalCommands)
+	mergePorts(ports, devicePorts, "ports_device.go")
 }

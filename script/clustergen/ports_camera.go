@@ -358,7 +358,5 @@ var cameraPorts = map[string]portSet{
 }
 
 func init() {
-	for name, ps := range cameraPorts {
-		ports[name] = ps
-	}
+	mergePorts(ports, cameraPorts, "ports_camera.go")
 }

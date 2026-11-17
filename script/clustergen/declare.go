@@ -3,7 +3,10 @@
 
 package main
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // The declaration (concept v6 A.3 step 2, brief BU): server_gen.go ends
 // with Declare, the one form in which a host states a cluster of a device —
@@ -555,4 +558,34 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	}
 	w.p("\treturn errors.Join(errs...)")
 	w.p("}")
+}
+
+// mergePorts adds the port sets of table (declared in file) into dst; a
+// cluster dst already holds is a panic at start — two tables naming one
+// cluster would otherwise leave the later file's entry silently
+// (R2-P6-err-2716).
+func mergePorts(dst, table map[string]portSet, file string) {
+	for name, ps := range table {
+		if _, dup := dst[name]; dup {
+			panic(fmt.Sprintf("clustergen: %s declares the ports of %s, which another table already declares", file, name))
+		}
+		dst[name] = ps
+	}
+}
+
+// addPorts adds one cluster's port set to dst, refusing a cluster dst
+// already holds as mergePorts does.
+func addPorts(dst map[string]portSet, name string, ps portSet) {
+	mergePorts(dst, map[string]portSet{name: ps}, "an init")
+}
+
+// mergeHosts adds the host declarations of table (declared in file) into
+// dst, refusing a cluster dst already holds as mergePorts does.
+func mergeHosts(dst, table map[string]hostDecl, file string) {
+	for name, h := range table {
+		if _, dup := dst[name]; dup {
+			panic(fmt.Sprintf("clustergen: %s declares the host of %s, which another table already declares", file, name))
+		}
+		dst[name] = h
+	}
 }

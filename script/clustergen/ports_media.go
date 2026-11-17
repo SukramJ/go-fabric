@@ -298,7 +298,5 @@ var mediaPorts = map[string]portSet{
 }
 
 func init() {
-	for name, ps := range mediaPorts {
-		ports[name] = ps
-	}
+	mergePorts(ports, mediaPorts, "ports_media.go")
 }

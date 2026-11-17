@@ -114,7 +114,5 @@ var jointFabricPorts = map[string]portSet{
 }
 
 func init() {
-	for name, ps := range jointFabricPorts {
-		ports[name] = ps
-	}
+	mergePorts(ports, jointFabricPorts, "ports_jointfabric.go")
 }

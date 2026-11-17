@@ -76,7 +76,5 @@ var jointFabricHosts = map[string]hostDecl{
 }
 
 func init() {
-	for name, h := range jointFabricHosts {
-		hosts[name] = h
-	}
+	mergeHosts(hosts, jointFabricHosts, "hosts_jointfabric.go")
 }

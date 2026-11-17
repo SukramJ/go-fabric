@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -240,5 +241,36 @@ func TestSnapshotRefusesAFeatureWithoutABit(t *testing.T) {
 	_, err := parseSnapshot([]byte(`{"clusters":[{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"features":[{"name":"F","effective":{"title":"T"}}]}]}`))
 	if err == nil || !strings.Contains(err.Error(), "A.F") {
 		t.Errorf("parseSnapshot = %v, want a refusal naming A.F", err)
+	}
+}
+
+// TestTableMergeRefusesADuplicate: a cluster named in two port or host
+// tables is a panic at start, not the later file's entry winning
+// silently (R2-P6-err-2716). The init functions merge through these
+// helpers, so the committed tables are held by every test run.
+func TestTableMergeRefusesADuplicate(t *testing.T) {
+	t.Parallel()
+	refused := func(name string, f func()) {
+		t.Helper()
+		defer func() {
+			if r := recover(); r == nil || !strings.Contains(fmt.Sprint(r), "Twice") {
+				t.Errorf("%s: recovered %v, want a panic naming Twice", name, r)
+			}
+		}()
+		f()
+	}
+	refused("ports", func() {
+		mergePorts(map[string]portSet{"Twice": {}}, map[string]portSet{"Twice": {}}, "test")
+	})
+	refused("hosts", func() {
+		mergeHosts(map[string]hostDecl{"Twice": {}}, map[string]hostDecl{"Twice": {}}, "test")
+	})
+	refused("a port set added twice", func() {
+		addPorts(map[string]portSet{"Twice": {}}, "Twice", portSet{})
+	})
+	dst := map[string]portSet{"A": {}}
+	mergePorts(dst, map[string]portSet{"B": {}}, "test")
+	if _, ok := dst["B"]; !ok || len(dst) != 2 {
+		t.Errorf("merge of distinct keys: %v", dst)
 	}
 }
