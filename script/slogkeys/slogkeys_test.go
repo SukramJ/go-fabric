@@ -125,6 +125,11 @@ var areaKeys = []string{
 	"connect_error", "connected", "network_name", "networking_status", "partition_id",
 	"valid_mapping", "value", "value_type", "vendor_id", "version",
 	"violation", "what", "with_paths",
+	// bridge (review II, 6a wave 3): the number of commands of an
+	// InvokeRequest none of which is answered (matter.rx.im.invoke.no_response),
+	// and whether the StatusResponse answering a flushed report could not be
+	// decoded (matter.tx.*.flush_answered).
+	"commands", "undecodable",
 }
 
 // skippedTop are the top-level directories the guard does not judge.
