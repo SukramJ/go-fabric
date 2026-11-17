@@ -5,6 +5,7 @@ package client
 
 import (
 	"context"
+	"net/netip"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -262,4 +263,11 @@ func ICDRegistering(c *ICDClient) bool {
 func CompleteOperation(ctx context.Context, r *Registry, n *Node, o CompleteOptions) error {
 	addr, _ := n.PeerAddress()
 	return r.completeOperation(ctx, n, addr, o)
+}
+
+// AddRecordAddress adds a to n's record addresses, as a discovery would.
+func AddRecordAddress(n *Node, a netip.AddrPort) {
+	n.updateRecord(func(r *Record) {
+		r.Addresses = append(r.Addresses, NetworkAddress{IP: a.Addr(), Port: a.Port()})
+	})
 }

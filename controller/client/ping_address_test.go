@@ -46,9 +46,17 @@ func TestPingAddress(t *testing.T) {
 	cp := newClientPair(t, clientPairOptions{rootOnly: true})
 	n := cp.node
 	device := cp.pair.Device.Addr().AddrPort()
-	// The device's host, a port nobody listens on.
+	// The device's host, a port nobody listens on — in the record, as a
+	// stale address would be.
 	silent := netip.AddrPortFrom(device.Addr(), device.Port()+1)
+	client.AddRecordAddress(n, silent)
 	before := slices.Clone(n.Record().Addresses)
+	// An address not in the record is refused before anything is sent
+	// (review II, R2-P6-sec-2361, owner decision 236).
+	stranger := netip.AddrPortFrom(device.Addr(), device.Port()+2)
+	if _, err := cp.ping(t, n, stranger); !errors.Is(err, client.ErrConfig) {
+		t.Fatalf("ping of an address outside the record: %v, want ErrConfig", err)
+	}
 
 	if _, err := cp.ping(t, n, device); err != nil {
 		t.Fatalf("ping of the device's address: %v", err)

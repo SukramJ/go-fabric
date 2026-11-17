@@ -42,13 +42,14 @@ const pingMaxRetransmissions = 2
 // failed ping does not count as a lost peer.
 //
 // Its purpose is per-address reachability in a host — go-fabric-ui's ping
-// measures each address of [Record].Addresses with it. addr is not checked
-// against the record: the session's traffic goes to whatever address the
-// caller names, so a host that takes the address from outside — a UI
-// client's request — passes only addresses of [Record].Addresses (review
-// II, R2-P6-sec-2361). An address that
-// does not answer is [ErrUnreachable], naming addr; a node not yet
-// commissioned is [ErrNotCommissioned], one without a session
+// measures each address of [Record].Addresses with it. addr must be one of
+// them: any other is refused with [ErrConfig] and nothing is sent, so a
+// host that takes the address from outside — a UI client's request —
+// cannot make the controller send session traffic to any host:port (review
+// II, R2-P6-sec-2361, owner decision 236; the references' callers probe
+// only a peer's discovered addresses — a module rule, not a mirrored one).
+// An address that does not answer is [ErrUnreachable], naming addr; a node
+// not yet commissioned is [ErrNotCommissioned], one without a session
 // [ErrNoSession], a closed one [ErrClosed]; the end of ctx is ctx's error.
 // A ping waits for no ICD to wake: it is matter.js's protocol-level probe,
 // not a ClientNodeInteraction call, and a sleeping LIT ICD fails it.
@@ -62,6 +63,9 @@ func (n *Node) PingAddress(ctx context.Context, addr netip.AddrPort) (time.Durat
 	}
 	if ia.Session() == nil {
 		return 0, ErrNoSession
+	}
+	if !n.hasAddress(addr) {
+		return 0, fmt.Errorf("%w: %s is not an address of node %s", ErrConfig, addr, n.ID())
 	}
 	opts := interaction.ProbeOptions{
 		AddressOverride: net.UDPAddrFromAddrPort(addr), SuppressPeerLoss: true, MaxRetransmissions: pingMaxRetransmissions,
@@ -83,4 +87,15 @@ func (n *Node) PingAddress(ctx context.Context, addr netip.AddrPort) (time.Durat
 		return 0, fmt.Errorf("%w: %s", ErrUnreachable, addr)
 	}
 	return clock.MonotonicOf(n.clock) - start, nil
+}
+
+// hasAddress reports whether addr is one of the record's addresses.
+func (n *Node) hasAddress(addr netip.AddrPort) bool {
+	want := netip.AddrPortFrom(addr.Addr().Unmap(), addr.Port())
+	for _, a := range n.Record().Addresses {
+		if netip.AddrPortFrom(a.IP.Unmap(), a.Port) == want {
+			return true
+		}
+	}
+	return false
 }
