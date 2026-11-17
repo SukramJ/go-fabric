@@ -1,6 +1,7 @@
 {
-  "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9882,
+  "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
+  "entry_points": 9887,
+  "initializers": 368,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,13 +295,255 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19421,
-    "reachable": 12659,
-    "whitelisted": 6762,
-    "unreachable": 0
+    "total_exported": 27639,
+    "reachable": 20824,
+    "whitelisted": 6791,
+    "unreachable": 24
   },
-  "by_package": [],
-  "unreachable": null,
+  "by_package": [
+    {
+      "package": "cluster/jointfabric",
+      "unreachable_funcs": 4,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "bridge",
+      "unreachable_funcs": 3,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "icd",
+      "unreachable_funcs": 3,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "node",
+      "unreachable_funcs": 3,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "bdx",
+      "unreachable_funcs": 2,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "cluster/core",
+      "unreachable_funcs": 2,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "controller/client",
+      "unreachable_funcs": 2,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "client/exchange",
+      "unreachable_funcs": 1,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "cluster/measurement",
+      "unreachable_funcs": 1,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "secure/operational",
+      "unreachable_funcs": 1,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "secure/sigma",
+      "unreachable_funcs": 1,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "transport/tcp",
+      "unreachable_funcs": 1,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    }
+  ],
+  "unreachable": [
+    {
+      "package": "bdx",
+      "identifier": "ServerSession.InitType",
+      "file": "bdx/responder.go",
+      "line": 568,
+      "kind": "method"
+    },
+    {
+      "package": "bdx",
+      "identifier": "ServerSession.Scope",
+      "file": "bdx/responder.go",
+      "line": 562,
+      "kind": "method"
+    },
+    {
+      "package": "bridge",
+      "identifier": "Bridge.ControllerRTT",
+      "file": "bridge/bridge.go",
+      "line": 3269,
+      "kind": "method"
+    },
+    {
+      "package": "bridge",
+      "identifier": "Bridge.SubscriptionFlushReporter",
+      "file": "bridge/subscribe.go",
+      "line": 381,
+      "kind": "method"
+    },
+    {
+      "package": "bridge",
+      "identifier": "OperationalSessionLookup.WithRetransmitIntervalResolver",
+      "file": "bridge/handlers.go",
+      "line": 1373,
+      "kind": "method"
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "Manager.LocalFixedMrpBackoff",
+      "file": "client/exchange/manager.go",
+      "line": 240,
+      "kind": "method"
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "OperationalCredentials.RolledBackUpdates",
+      "file": "cluster/core/operational_credentials.go",
+      "line": 736,
+      "kind": "method"
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "ScenesState.ForgetFabric",
+      "file": "cluster/core/scenes_management.go",
+      "line": 538,
+      "kind": "method"
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "Datastore.ForceAddNodeKeySetEntry",
+      "file": "cluster/jointfabric/datastore_ops.go",
+      "line": 1014,
+      "kind": "method"
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "Datastore.FriendlyName",
+      "file": "cluster/jointfabric/datastore.go",
+      "line": 674,
+      "kind": "method"
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "Datastore.SetAnchorVendorID",
+      "file": "cluster/jointfabric/datastore.go",
+      "line": 775,
+      "kind": "method"
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "Datastore.Status",
+      "file": "cluster/jointfabric/datastore.go",
+      "line": 681,
+      "kind": "method"
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "HeldBooleanState.Set",
+      "file": "cluster/measurement/booleanstate_held.go",
+      "line": 68,
+      "kind": "method"
+    },
+    {
+      "package": "controller/client",
+      "identifier": "ICDClient.OnAvailableChanged",
+      "file": "controller/client/icd.go",
+      "line": 405,
+      "kind": "method"
+    },
+    {
+      "package": "controller/client",
+      "identifier": "ICDClient.OnRegistered",
+      "file": "controller/client/icd.go",
+      "line": 391,
+      "kind": "method"
+    },
+    {
+      "package": "icd",
+      "identifier": "ModeState.IsActive",
+      "file": "icd/mode.go",
+      "line": 94,
+      "kind": "method"
+    },
+    {
+      "package": "icd",
+      "identifier": "PeerTable.NotePeerActive",
+      "file": "icd/peer_table.go",
+      "line": 255,
+      "kind": "method"
+    },
+    {
+      "package": "icd",
+      "identifier": "Registrations.Clear",
+      "file": "icd/registrations.go",
+      "line": 82,
+      "kind": "method"
+    },
+    {
+      "package": "node",
+      "identifier": "ICD.OnModeChangeAsync",
+      "file": "node/icd.go",
+      "line": 319,
+      "kind": "method"
+    },
+    {
+      "package": "node",
+      "identifier": "Node.OTAProviderEndpoint",
+      "file": "node/ota_provider.go",
+      "line": 165,
+      "kind": "method"
+    },
+    {
+      "package": "node",
+      "identifier": "Node.OnOTAProviderStatusAsync",
+      "file": "node/ota_provider.go",
+      "line": 148,
+      "kind": "method"
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "Entry.PeerMRPIntervals",
+      "file": "secure/operational/manager.go",
+      "line": 459,
+      "kind": "method"
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "Initiator.PeerNodeID",
+      "file": "secure/sigma/initiator.go",
+      "line": 175,
+      "kind": "method"
+    },
+    {
+      "package": "transport/tcp",
+      "identifier": "Dialer.OnPanicRecovered",
+      "file": "transport/tcp/dialer.go",
+      "line": 36,
+      "kind": "method"
+    }
+  ],
   "whitelisted": [
     {
       "package": "bdx",
@@ -10747,6 +10990,97 @@
       "line": 29
     },
     {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Advance",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 216
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.AfterFunc",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 109
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Armed",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 175
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Monotonic",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 79
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.NewTicker",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 125
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.NewTimer",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 117
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Next",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 163
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Now",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 71
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Pending",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 155
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Resolve",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 278
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Set",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 90
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.StepWall",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 100
+    },
+    {
+      "package": "clock/clocktest",
+      "identifier": "Fake.Yield",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 265
+    },
+    {
       "package": "cluster",
       "identifier": "DataVersionTracker",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -11350,6 +11684,27 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "AccessControl.BeginAuxiliaryBatch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 73
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "AccessControl.EndAuxiliaryBatch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "AccessControl.RegisterAuxiliaryProvider",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 25
+    },
+    {
+      "package": "cluster/core",
       "identifier": "DeviceLoadStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
@@ -11371,10 +11726,59 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "GeneralDiagnostics.UpTimeFrom",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "GroupKeyManagement.CheckGroupKeyMapping",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "GroupKeyManagement.StaleGroupFabrics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 78
+    },
+    {
+      "package": "cluster/core",
       "identifier": "LeaveEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/basic_information.go",
       "line": 610
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "OperationalCredentials.CSRKeyPending",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "OperationalCredentials.FailCSRBuild",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 65
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "OperationalCredentials.NOCLockFree",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "OperationalCredentials.OnRollbackWaitsForNOC",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/export_test.go",
+      "line": 31
     },
     {
       "package": "cluster/core",
@@ -13153,6 +13557,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
       "line": 39
+    },
+    {
+      "package": "cluster/jointfabric",
+      "identifier": "Administrator.SetTrustAnchorsForTest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/jointfabric/export_test.go",
+      "line": 12
     },
     {
       "package": "cluster/jointfabric",
@@ -35553,6 +35964,41 @@
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "endpoint/endpointtest/endpointtest.go",
       "line": 75
+    },
+    {
+      "package": "endpoint/endpointtest",
+      "identifier": "FakeStore.EraseEndpoints",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "endpoint/endpointtest/endpointtest.go",
+      "line": 108
+    },
+    {
+      "package": "endpoint/endpointtest",
+      "identifier": "FakeStore.GetEndpoint",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "endpoint/endpointtest/endpointtest.go",
+      "line": 86
+    },
+    {
+      "package": "endpoint/endpointtest",
+      "identifier": "FakeStore.ListEndpoints",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "endpoint/endpointtest/endpointtest.go",
+      "line": 97
+    },
+    {
+      "package": "endpoint/endpointtest",
+      "identifier": "FakeStore.RemoveEndpoint",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "endpoint/endpointtest/endpointtest.go",
+      "line": 102
+    },
+    {
+      "package": "endpoint/endpointtest",
+      "identifier": "FakeStore.UpsertEndpointAssigning",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "endpoint/endpointtest/endpointtest.go",
+      "line": 91
     },
     {
       "package": "examples/host-view",

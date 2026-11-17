@@ -45,9 +45,11 @@ import (
 // fixture key (secure/attestation.TestPAANoVIDPrivateKey).
 //
 // The number was NOT tuned to look good and nothing was annotated to bring it
-// down: the module carries zero fabric:reachable annotations, so every one of
-// the 11 is a measurement rather than an unrefuted assertion. Writing a test
-// that reaches any of them lowers this constant by one.
+// down: the module carried zero fabric:reachable annotations then, so every one
+// of the 11 was a measurement rather than an unrefuted assertion. Writing a
+// test that reaches any of them lowers this constant by one. (Annotations came
+// later, with the generated cluster definitions and the hand-wired seams; their
+// count is held exactly by reachabilityWhitelistRatchet below.)
 // Lowered 11 -> 10 when secure/setup gained a fuzz target: IsValidSetupPIN
 // had no test caller at all, which is a thing worth knowing about a function
 // that classifies a setup passcode.
@@ -63,7 +65,91 @@ import (
 // and secure/sigma.ErrResumptionMICInvalid — whose docs promised behaviour
 // the module does not have. They were deleted, not tested: a test naming a
 // dead sentinel would have "reached" it and protected nothing.
-const reachabilityUnreachedRatchet = 0
+// Raised 0 -> 24 (R2-P6-test-2805, R2-P6-test-2806, owner decision: counted and
+// ratcheted, their fixes in phase 7) when the population gained the exported
+// methods of exported types (8 218 of them) and the root set the package
+// initializers of the test packages. All 24 are methods no test's call path
+// calls: bdx.ServerSession.InitType and .Scope, bridge.Bridge.ControllerRTT and
+// .SubscriptionFlushReporter, bridge.OperationalSessionLookup.WithRetransmitIntervalResolver,
+// client/exchange.Manager.LocalFixedMrpBackoff,
+// cluster/core.OperationalCredentials.RolledBackUpdates,
+// cluster/core.ScenesState.ForgetFabric, cluster/jointfabric.Datastore's
+// ForceAddNodeKeySetEntry, FriendlyName, SetAnchorVendorID and Status,
+// cluster/measurement.HeldBooleanState.Set, controller/client.ICDClient's
+// OnAvailableChanged and OnRegistered, icd.ModeState.IsActive,
+// icd.PeerTable.NotePeerActive, icd.Registrations.Clear,
+// node.ICD.OnModeChangeAsync, node.Node.OTAProviderEndpoint and
+// .OnOTAProviderStatusAsync, secure/operational.Entry.PeerMRPIntervals,
+// secure/sigma.Initiator.PeerNodeID, transport/tcp.Dialer.OnPanicRecovered.
+const reachabilityUnreachedRatchet = 24
+
+// reachabilityWhitelistRatchet holds, per class, the exemptions that take an
+// exported identifier out of the measure by a decision rather than by what its
+// declaration is (R2-P6-test-2804): an annotation with any reason, or a name
+// that begins with mock/fake/stub/dummy. Each one hides an identifier from the
+// unreached count, so it is exact in both directions, as the unreached
+// ratchet: a commit that adds an annotation raises its class here and says
+// why; one that drops an annotation lowers it. Declarations in _test.go files
+// and type aliases are not counted: neither is exported API a test could reach.
+//
+// Set at the tree that introduced it: 1 101 generated annotations (every one
+// "generated: referenced from Definition and the generated test", written by
+// script/clustergen), 55 written by hand, 20 identifiers of the mock/fake
+// pattern (clock/clocktest.Fake and its methods, endpoint/endpointtest.FakeStore
+// and its methods, among others).
+var reachabilityWhitelistRatchet = map[string]int{
+	whitelistClassGenerated:         1101,
+	whitelistClassHand:              55,
+	string(autoWhitelistMockPrefix): 20,
+}
+
+const (
+	whitelistClassGenerated = "annotation: generated"
+	whitelistClassHand      = "annotation: by hand"
+)
+
+// whitelistClass is the ratchet class of one whitelist reason, "" for a class
+// the ratchet does not hold.
+func whitelistClass(reason string) string {
+	switch {
+	case reason == string(autoWhitelistMockPrefix):
+		return reason
+	case strings.HasPrefix(reason, "auto-whitelist:"):
+		return ""
+	case strings.HasPrefix(reason, "generated:"):
+		return whitelistClassGenerated
+	default:
+		return whitelistClassHand
+	}
+}
+
+// TestReachabilityWhitelistOnItsRatchet holds the exemptions per class
+// exactly (R2-P6-test-2804): an annotation with any reason took an identifier
+// out of the unreached count unseen, since only that count was ratcheted.
+func TestReachabilityWhitelistOnItsRatchet(t *testing.T) {
+	t.Parallel()
+	inv := loadReachabilityInventory(t)
+
+	got := make(map[string][]string)
+	for _, e := range inv.Whitelisted {
+		if c := whitelistClass(e.Reason); c != "" {
+			got[c] = append(got[c], e.Package+"."+e.Identifier)
+		}
+	}
+	for class, want := range reachabilityWhitelistRatchet {
+		n := len(got[class])
+		if n != want {
+			t.Errorf("whitelist class %q: %d entries, ratchet %d — a change here hides or exposes "+
+				"identifiers; set reachabilityWhitelistRatchet to %d in the commit that moved it and say why",
+				class, n, want, n)
+		}
+	}
+	for class := range got {
+		if _, ok := reachabilityWhitelistRatchet[class]; !ok {
+			t.Errorf("whitelist class %q has no ratchet", class)
+		}
+	}
+}
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {
@@ -177,7 +263,7 @@ func TestReachabilityInventoryRowsAreWellFormed(t *testing.T) {
 	t.Parallel()
 	inv := loadReachabilityInventory(t)
 
-	validKinds := map[string]bool{"func": true, "type": true, "var": true, "unknown": true}
+	validKinds := map[string]bool{"func": true, "method": true, "type": true, "var": true, "unknown": true}
 	for i, e := range inv.Unreachable {
 		switch {
 		case e.Package == "":
@@ -228,7 +314,7 @@ func TestReachabilityInventoryByPackageMatchesRows(t *testing.T) {
 	for _, item := range inv.Unreachable {
 		c := want[item.Package]
 		switch item.Kind {
-		case "func":
+		case "func", "method":
 			c.funcs++
 		case "type":
 			c.types++
