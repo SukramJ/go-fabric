@@ -712,10 +712,10 @@ func (n *ThreadNetworkCommissioning) OnCommissioningComplete(context.Context) {
 // pending command handle (:1001-1002), and a driver result that arrives
 // afterwards returns before it writes LastNetworkID, LastNetworkingStatus,
 // LastConnectErrorValue or the Breadcrumb and before it adds a
-// ConnectNetworkResponse (:845-857). The answer differs: chip sends
-// nothing for the command (src/app/CommandHandlerImpl.cpp:481-488, :1000;
-// src/app/CommandResponseSender.cpp:82-102 at 6170af84), this server
-// answers the driver's result (F-db021da0-10).
+// ConnectNetworkResponse (:845-857), and the command is answered with
+// nothing ([im.NoResponse]), as chip sends nothing for it
+// (src/app/CommandHandlerImpl.cpp:481-488, :1000;
+// src/app/CommandResponseSender.cpp:82-102 at 6170af84).
 func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	n.mu.Lock()
 	n.expiries++

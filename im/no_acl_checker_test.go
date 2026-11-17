@@ -100,3 +100,26 @@ func TestNoResponseLeavesTheCommandOut(t *testing.T) {
 		t.Fatalf("responses = %+v, want none", ir.Responses)
 	}
 }
+
+// wildcardNoResponseDispatcher answers a wildcard-endpoint command on two
+// endpoints, the first with [NoResponse].
+type wildcardNoResponseDispatcher struct{ noACLDispatcher }
+
+func (*wildcardNoResponseDispatcher) InvokeAuthorized(_ context.Context, p ConcreteCommandPath, _ any, _ CommandAuthorizer) []InvokeResult {
+	a, b := p, p
+	a.Endpoint, a.HasEndpoint = 0, true
+	b.Endpoint, b.HasEndpoint = 1, true
+	return []InvokeResult{{Path: a, Status: StatusSuccess, Response: NoResponse{}}, {Path: b, Status: StatusSuccess}}
+}
+
+// TestWildcardNoResponseLeavesTheCommandOut (Fable's read of sub round 1,
+// C-1): a wildcard-endpoint command whose handler answers [NoResponse] at
+// an endpoint has no entry there — not a CommandDataIB of the sentinel.
+func TestWildcardNoResponseLeavesTheCommandOut(t *testing.T) {
+	t.Parallel()
+	cmd := ConcreteCommandPath{Cluster: 0x0031, Command: 0x06, HasCluster: true, HasCommand: true}
+	ir := HandleInvokeRequest(unchecked(), &wildcardNoResponseDispatcher{}, InvokeRequest{Invokes: []CommandInvocation{{Path: cmd}}})
+	if len(ir.Responses) != 1 || ir.Responses[0].Path.Endpoint != 1 {
+		t.Fatalf("responses = %+v, want endpoint 1's alone", ir.Responses)
+	}
+}

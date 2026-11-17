@@ -807,7 +807,9 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// ConnectNetwork that outlived its fail-safe, as connectedhomeip). A
 	// concrete command always leaves an entry otherwise, so the test is
 	// exact for a request of concrete commands; a wildcard one that
-	// targets nothing is answered as before.
+	// targets nothing, or whose every target answered with nothing, is
+	// answered with an empty InvokeResponse as before — the two are not
+	// told apart here (Fable's read of sub round 1, C-1).
 	if len(resp.Responses) == 0 && len(req.Invokes) > 0 && allConcreteInvokes(req.Invokes) {
 		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.no_response",

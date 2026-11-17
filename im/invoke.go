@@ -683,6 +683,12 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 				continue
 			}
 			for _, res := range wild.InvokeAuthorized(ctx, inv.Path, inv.Fields, g.wildcardTarget) {
+				if res.Status == StatusSuccess && isNoResponse(res.Response) {
+					// Answered with nothing at this endpoint ([NoResponse]),
+					// as a concrete command below (Fable's read of sub
+					// round 1, C-1).
+					continue
+				}
 				ir.Responses = append(ir.Responses, resultEntry(inv, res))
 			}
 			continue
