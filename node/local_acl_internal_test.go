@@ -5,6 +5,7 @@ package node
 
 import (
 	"context"
+	"runtime"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -16,8 +17,8 @@ import (
 )
 
 // pausingACLPort is the node's store with one ListACL that, once armed,
-// reports its entry and then waits for release (or a short bound) before
-// it returns.
+// reports its entry and then waits for release, or for the controller's
+// write to wait on the AccessControl lock, before it returns.
 type pausingACLPort struct {
 	store.Port
 	armed   atomic.Bool
@@ -29,9 +30,17 @@ func (p *pausingACLPort) ListACL(ctx context.Context, fabricIndex uint8) ([]stor
 	acl, err := p.Port.ListACL(ctx, fabricIndex)
 	if p.armed.CompareAndSwap(true, false) {
 		close(p.entered)
-		select {
-		case <-p.release:
-		case <-time.After(300 * time.Millisecond):
+		// Until the controller's write went through, or waits for the
+		// AccessControl lock this read runs under.
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); runtime.Gosched() {
+			select {
+			case <-p.release:
+				return acl, err
+			default:
+			}
+			if blockedIn("MatterWriteChanged") {
+				break
+			}
 		}
 	}
 	return acl, err

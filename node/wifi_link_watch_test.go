@@ -41,9 +41,11 @@ func TestNodeWiFiDriverLinkWatchStarts(t *testing.T) {
 	if err := n.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	wait, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
 	select {
 	case <-drv.watching:
-	case <-time.After(5 * time.Second):
+	case <-wait.Done():
 		t.Fatal("the node's Wi-Fi server never watched the host driver's link")
 	}
 }
