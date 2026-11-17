@@ -20,6 +20,10 @@ import (
 
 func init() {
 	sealseam.RegistryDropEmptySealMark = dropEmptySealMark
+	sealseam.RegistryResealTx = func(ctx context.Context, tx *sql.Tx, old, next sealseam.Sealer) error {
+		return resealTx(ctx, tx, old, next)
+	}
+	sealseam.RegistryDropScrubOwed = dropScrubOwed
 }
 
 // dropEmptySealMark deletes the seal canary when the registry holds no
@@ -216,4 +220,133 @@ func (s *Store) ScrubOwed(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("sqlstore: scrub owed: %w", err)
 	}
 	return owed > 0, nil
+}
+
+// Reseal moves a sealed registry from the sealer old to the sealer next —
+// the rotation of the host's key — in one transaction: the seal canary
+// opened under old (the key check), every sealed value opened under old
+// and sealed under next, the canary last; then the [store.Scrub] that
+// removes the values sealed under old from the file, with the mark of an
+// owed scrub until it finished — [store.Reseal]'s shape on the registry's
+// tables (decision 195). A wrong old key or a value that does not open
+// under it is [store.ErrUnseal], and so is a secret value in clear (the
+// host opens the registry with [NewSealed] under old first, which seals
+// it); either leaves the registry as it was. A registry the release before
+// schema v3 sealed carries no canary: every sealed value opening under old
+// is the key check, and Reseal marks it. Every error after the commit is
+// [store.ErrScrubIncomplete]: the values are sealed under next, the scrub
+// stays marked as owed ([Store.ScrubOwed]) and the next NewSealed runs it
+// again.
+//
+// It is for a host that keeps the registry alone. A controller's database
+// holds store's tables beside it under the same sealer: controller.Reseal
+// moves both in one transaction, so no state exists in which one opens
+// under the new key and the other only under the old.
+//
+// No Store may be open on db while Reseal runs, and no other process may
+// write the file. db must carry schema v3. There is no unseal.
+func Reseal(ctx context.Context, db *sql.DB, old, next store.Sealer) error {
+	if old == nil || next == nil {
+		return errors.New("sqlstore: Reseal: nil Sealer")
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("sqlstore: Reseal: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := resealTx(ctx, tx, old, next); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sqlstore: Reseal: commit: %w", err)
+	}
+	if err := store.Scrub(ctx, db); err != nil {
+		return fmt.Errorf("sqlstore: Reseal: the values are sealed under the new sealer: %w", err)
+	}
+	if err := dropScrubOwed(ctx, db); err != nil {
+		// The mark stays, so ScrubOwed still says owed and the next
+		// NewSealed scrubs again: the same state as an unfinished scrub.
+		return fmt.Errorf("sqlstore: Reseal: the values are sealed under the new sealer, the owed scrub stays marked: %w: %w", store.ErrScrubIncomplete, err)
+	}
+	return nil
+}
+
+// resealTx is [Reseal]'s transaction on tx, without the commit and the
+// scrub: the schema check, the write lock, the canary opened under old, a
+// clear secret value refused, every sealed value moved from old to next,
+// the canary last, and the owed scrub marked. controller.Reseal runs it
+// beside store's in one transaction ([sealseam.RegistryResealTx]).
+func resealTx(ctx context.Context, tx *sql.Tx, old, next store.Sealer) error {
+	if err := checkSchema(ctx, tx, "Reseal"); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_client_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	}
+	data, marked, err := readCanary(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	}
+	if marked {
+		if err := openCanary(old, data); err != nil {
+			return fmt.Errorf("sqlstore: Reseal: the old sealer does not open the registry's seal canary: %w", err)
+		}
+	}
+	if v, err := clearSecretValue(ctx, tx); err != nil {
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	} else if v != "" {
+		return fmt.Errorf("sqlstore: Reseal: %w: the value of %s is not sealed (sqlstore.NewSealed seals it)", store.ErrUnseal, v)
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT node_id, endpoint, cluster, attribute, value FROM matter_client_values WHERE sealed = 1`)
+	if err != nil {
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	}
+	type row struct {
+		nodeID        string
+		ep            uint16
+		cluster, attr uint32
+		value         []byte
+	}
+	var held []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.nodeID, &r.ep, &r.cluster, &r.attr, &r.value); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("sqlstore: Reseal: %w", err)
+		}
+		held = append(held, r)
+	}
+	if err := closeRows(rows); err != nil {
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	}
+	for _, r := range held {
+		aad := sealAAD(r.nodeID, r.ep, r.cluster, r.attr)
+		plain, err := old.Open(r.value, aad)
+		if err != nil {
+			return fmt.Errorf("sqlstore: Reseal: node %q: %w: %w", r.nodeID, store.ErrUnseal, err)
+		}
+		v, err := next.Seal(plain, aad)
+		if err != nil {
+			return fmt.Errorf("sqlstore: Reseal: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE matter_client_values SET value = ? WHERE node_id = ? AND endpoint = ? AND cluster = ? AND attribute = ?`, v, r.nodeID, r.ep, r.cluster, r.attr); err != nil {
+			return fmt.Errorf("sqlstore: Reseal: %w", err)
+		}
+	}
+	if err := writeCanary(ctx, tx, next); err != nil {
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_client_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("sqlstore: Reseal: %w", err)
+	}
+	return nil
+}
+
+// dropScrubOwed deletes the mark of an owed scrub once a [store.Scrub]
+// finished.
+func dropScrubOwed(ctx context.Context, db *sql.DB) error {
+	if _, err := db.ExecContext(ctx, `DELETE FROM matter_client_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
+		return fmt.Errorf("sqlstore: drop the owed scrub's mark: %w", err)
+	}
+	return nil
 }

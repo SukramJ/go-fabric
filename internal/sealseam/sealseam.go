@@ -42,3 +42,31 @@ type Sealer interface {
 //
 // fabric:reachable:reason="assigned by controller/client/sqlstore at init and called by controller/erase.go; a function variable installed through a seam has no call edge the analyzer can follow"
 var RegistryDropEmptySealMark func(ctx context.Context, db *sql.DB) error
+
+// StoreResealTx is store.Reseal's transaction on tx without the commit and
+// the scrub: the schema check, the key check on store's seal canary under
+// old, a clear secret row refused, every sealed value moved from old to
+// next, the canary last and the owed scrub marked. An error leaves tx for
+// the caller to roll back.
+//
+// fabric:reachable:reason="assigned by store at init and called by controller/reseal.go; a function variable installed through a seam has no call edge the analyzer can follow"
+var StoreResealTx func(ctx context.Context, tx *sql.Tx, old, next Sealer) error
+
+// StoreDropScrubOwed deletes store's mark of an owed scrub once a
+// store.Scrub of the file finished.
+//
+// fabric:reachable:reason="assigned by store at init and called by controller/reseal.go; a function variable installed through a seam has no call edge the analyzer can follow"
+var StoreDropScrubOwed func(ctx context.Context, db *sql.DB) error
+
+// RegistryResealTx is sqlstore.Reseal's transaction on tx without the
+// commit and the scrub, as [StoreResealTx] is store's: on the node
+// registry's tables and its own seal canary.
+//
+// fabric:reachable:reason="assigned by controller/client/sqlstore at init and called by controller/reseal.go; a function variable installed through a seam has no call edge the analyzer can follow"
+var RegistryResealTx func(ctx context.Context, tx *sql.Tx, old, next Sealer) error
+
+// RegistryDropScrubOwed deletes the node registry's mark of an owed scrub
+// once a store.Scrub of the file finished.
+//
+// fabric:reachable:reason="assigned by controller/client/sqlstore at init and called by controller/reseal.go; a function variable installed through a seam has no call edge the analyzer can follow"
+var RegistryDropScrubOwed func(ctx context.Context, db *sql.DB) error
