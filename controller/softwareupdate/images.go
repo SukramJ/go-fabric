@@ -241,6 +241,57 @@ type Images struct {
 	// and not yet verified, which Find and Open do not offer meanwhile.
 	hiddenMu sync.Mutex
 	hidden   map[string]int
+
+	// names serialises the writers of one file name: DownloadUpdate and
+	// Store hold a name's lock from their first look at the stored file to
+	// their last write, so a second writer of that name neither reads a
+	// file the first is replacing nor removes the one the first verified
+	// (review II, R2-P6-conc-1901).
+	names nameLocks
+}
+
+// nameLocks is a lock per file name; an unused name holds no entry.
+type nameLocks struct {
+	mu    sync.Mutex
+	locks map[string]*nameLock
+	// waited, when set, is called when a caller finds its name locked and
+	// is about to wait. A test seam.
+	waited func(name string)
+}
+
+type nameLock struct {
+	held  sync.Mutex
+	users int
+}
+
+// lock takes name's lock and returns its release.
+func (n *nameLocks) lock(name string) func() {
+	n.mu.Lock()
+	if n.locks == nil {
+		n.locks = map[string]*nameLock{}
+	}
+	l := n.locks[name]
+	if l == nil {
+		l = &nameLock{}
+		n.locks[name] = l
+	}
+	l.users++
+	waited := n.waited
+	n.mu.Unlock()
+	if !l.held.TryLock() {
+		if waited != nil {
+			waited(name)
+		}
+		l.held.Lock()
+	}
+	return func() {
+		l.held.Unlock()
+		n.mu.Lock()
+		if l.users--; l.users == 0 {
+			delete(n.locks, name)
+		}
+		n.mu.Unlock()
+	}
 }
 
 // ImagesConfig configures [NewImages].
@@ -378,23 +429,27 @@ func originOf(info *UpdateInfo) string {
 // recordOrigin records the provenance of the stored image name, stored
 // for info. A failed write is logged and the former record removed, so
 // that the image counts as unbound to a ledger checksum. The record is
-// also removed before an image is written (Store, downloadInto). A
-// record therefore names the bytes it was written for, unless a removal
-// fails as well — a store failure, logged — or the files are changed
-// outside the store.
+// also removed before an image is written (Store, downloadInto), and a
+// removal that fails there fails the write. A record therefore names the
+// bytes it was written for, unless the removal after a failed record
+// write fails as well — a store failure, logged — or the files are
+// changed outside the store.
 func (i *Images) recordOrigin(ctx context.Context, name string, info *UpdateInfo) {
 	if err := i.blobs.Put(ctx, name+originSuffix, []byte(originOf(info))); err != nil {
 		i.log.Warn("ota.images.origin_not_recorded", slog.String("file", name), slog.Any("err", err))
-		i.forgetOrigin(ctx, name)
+		_ = i.forgetOrigin(ctx, name) // logged; the record is gone or the store is failing
 	}
 }
 
-// forgetOrigin removes the provenance record of name; a failure other
-// than a missing record is logged.
-func (i *Images) forgetOrigin(ctx context.Context, name string) {
+// forgetOrigin removes the provenance record of name. A failure other
+// than a missing record is logged and returned: a writer that goes on
+// would leave the former record on the new bytes (review II, 5b-dcl R9).
+func (i *Images) forgetOrigin(ctx context.Context, name string) error {
 	if err := i.blobs.Delete(ctx, name+originSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		i.log.Warn("ota.images.origin_not_removed", slog.String("file", name), slog.Any("err", err))
+		return fmt.Errorf("%w: remove the provenance record of %s: %w", ErrOTA, name, err)
 	}
+	return nil
 }
 
 // vouched reports whether the stored image name needs no admission: a
@@ -436,19 +491,41 @@ func fileName(vid, pid uint16, mode Mode, version uint32) string {
 // written under its vendor, product, mode and version, read back and
 // checked against its header (and against info's vendor, product and
 // version when given), the specification version recorded; a failed check
-// removes it.
+// removes it. Store and [Images.DownloadUpdate] of one file name run one
+// at a time. A provenance record that cannot be removed before the image
+// is written fails the call with [ErrOTA] and nothing is written (review
+// II, 5b-dcl R9).
 func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *UpdateInfo) (StoredImage, error) {
+	h, err := checkImage(image, info)
+	if err != nil {
+		return StoredImage{}, err
+	}
+	name := fileName(h.VendorID, h.ProductID, mode, h.SoftwareVersion)
+	defer i.names.lock(name)()
+	return i.store(ctx, name, image, info)
+}
+
+// checkImage is Store's check of a whole image before it is kept: the
+// file (storeValidation) and, when info is given, its header against
+// info's vendor, product and version.
+func checkImage(image []byte, info *UpdateInfo) (otaimage.Header, error) {
 	h, err := otaimage.ValidateFile(bytes.NewReader(image), storeValidation(info))
 	if err != nil {
-		return StoredImage{}, fmt.Errorf("%w: %w", ErrOTA, err)
+		return otaimage.Header{}, fmt.Errorf("%w: %w", ErrOTA, err)
 	}
 	if info != nil {
 		if err := verifyHeader(h, *info); err != nil {
-			return StoredImage{}, err
+			return otaimage.Header{}, err
 		}
 	}
-	name := fileName(h.VendorID, h.ProductID, mode, h.SoftwareVersion)
-	i.forgetOrigin(ctx, name)
+	return h, nil
+}
+
+// store is Store under name's lock, once the image is checked.
+func (i *Images) store(ctx context.Context, name string, image []byte, info *UpdateInfo) (StoredImage, error) {
+	if err := i.forgetOrigin(ctx, name); err != nil {
+		return StoredImage{}, err
+	}
 	if err := i.blobs.Put(ctx, name, image); err != nil {
 		return StoredImage{}, fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
 	}
@@ -872,8 +949,13 @@ func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateI
 // with [ErrOTA] before anything else — nothing is downloaded, and the
 // stored image is kept but not reused. An image the host supplied itself
 // needs none.
+//
+// Calls for one file name, and [Images.Store] of it, run one at a time: a
+// second call waits for the first and then finds the image the first
+// stored (review II, R2-P6-conc-1901).
 func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
 	name := fileName(info.VendorID, info.ProductID, modeOf(info.Source), info.SoftwareVersion)
+	defer i.names.lock(name)()
 	var unverified bool
 	var why string
 	switch {
@@ -957,7 +1039,12 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 	if _, err := dcl.VerifyImage(bytes.NewReader(buf.Bytes()), *info.ledger, i.log); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrOTA, err)
 	}
-	if _, err := i.Store(ctx, buf.Bytes(), mode, &info); err != nil {
+	// Store's checks, under the lock DownloadUpdate holds for name: the
+	// header matches info, so Store would pick the same name.
+	if _, err := checkImage(buf.Bytes(), &info); err != nil {
+		return "", err
+	}
+	if _, err := i.store(ctx, name, buf.Bytes(), &info); err != nil {
 		return "", err
 	}
 	return name, nil
@@ -973,7 +1060,9 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 // version info carries is recorded as Store records it.
 func (i *Images) downloadInto(ctx context.Context, s BlobStreamer, name string, info UpdateInfo) error {
 	defer i.hide(name)()
-	i.forgetOrigin(ctx, name)
+	if err := i.forgetOrigin(ctx, name); err != nil {
+		return err
+	}
 	w, err := s.CreateBlob(ctx, name)
 	if err != nil {
 		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
