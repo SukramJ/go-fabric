@@ -518,6 +518,32 @@ func (s *Session) addHandshake(x *Exchange) bool {
 	return true
 }
 
+// heldHandshake is the exchange a Sigma1 opened that the session holds,
+// nil for none ([Session.addHandshake]).
+func (s *Session) heldHandshake() *Exchange {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for x := range s.exchanges {
+		if x.handshake {
+			return x
+		}
+	}
+	return nil
+}
+
+// releaseHandshakeOf gives up the handshake place x holds, x staying with
+// the session as an ordinary exchange; false when x holds none.
+func (s *Session) releaseHandshakeOf(x *Exchange) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, held := s.exchanges[x]; !held || !x.handshake {
+		return false
+	}
+	x.handshake = false
+	s.handshakes--
+	return true
+}
+
 func (s *Session) deleteExchange(x *Exchange) {
 	s.mu.Lock()
 	if _, held := s.exchanges[x]; held && x.handshake {

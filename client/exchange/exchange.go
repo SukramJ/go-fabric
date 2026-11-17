@@ -235,13 +235,19 @@ type Exchange struct {
 	firstTransmitAt time.Time
 	sendOpts        SendOptions
 	used            bool
-	closing         bool
-	closed          bool
-	closeCause      error
-	closeTimer      Timer
-	receivedCount   int
-	lastActive      time.Time
-	createdAt       time.Time
+	// sentOpcode is the opcode of the last message sent, not an
+	// acknowledgement; waitTimeout the timeout of the last wait for the
+	// peer's next message ([Exchange.Next]). A Sigma1 refused for the
+	// handshake this exchange runs reads both ([Manager.answerBusy]).
+	sentOpcode    uint8
+	waitTimeout   time.Duration
+	closing       bool
+	closed        bool
+	closeCause    error
+	closeTimer    Timer
+	receivedCount int
+	lastActive    time.Time
+	createdAt     time.Time
 	// queuedCounted are the queued messages counted as delivered work
 	// (Manager.inflight), held the ones the reader took and has not yet
 	// come back from: its next Next, Send, Close or Abort ends their
@@ -405,6 +411,14 @@ func (x *Exchange) considerClosed() bool {
 	return x.closed || (x.initiator && x.closing)
 }
 
+// ended reports whether the exchange is closing or closed: its handler is
+// done with it.
+func (x *Exchange) ended() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	return x.closing || x.closed
+}
+
 // ConsiderClosed reports whether the exchange counts as closed: closed,
 // or — for an exchange we initiated — closing. It is matter.js
 // MessageExchange.considerClosed (MessageExchange.ts:376-378), which a
@@ -527,6 +541,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 		return nil, fmt.Errorf("%w: the previous message %d is not acknowledged yet", ErrFlow, x.sentToAck.counter)
 	}
 	x.used = true
+	x.sentOpcode = opcode
 	x.notifySentLocked()
 	proto := message.ProtocolHeader{
 		Initiator:  x.initiator,
@@ -1038,6 +1053,7 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 	}
 	x.mu.Lock()
 	x.releaseHeldLocked()
+	x.waitTimeout = timeout
 	x.mu.Unlock()
 	for {
 		x.mu.Lock()
