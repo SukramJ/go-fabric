@@ -40,10 +40,11 @@ func newAmbientContextServer(b defaultBuild) (contract.ClusterServer, error) {
 		ServeObjectCount: slices.Contains(b.opts.Attributes, acsdef.AttrObjectCount),
 		Clock:            b.clock,
 	}
+	selection := cfg
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := sensing.NewAmbientContext(cfg)
 	if err != nil {
-		return nil, notServed(err)
+		return nil, sensingError(err, func() error { _, err := sensing.NewAmbientContext(selection); return err })
 	}
 	return srv, nil
 }
@@ -63,10 +64,24 @@ func newOccupancyServer(b defaultBuild) (contract.ClusterServer, error) {
 		Attributes: slices.Clone(b.opts.Attributes), Events: slices.Clone(b.opts.Events),
 		Clock: b.clock,
 	}
+	selection := cfg
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := sensing.NewOccupancy(cfg)
 	if err != nil {
-		return nil, notServed(err)
+		return nil, sensingError(err, func() error { _, err := sensing.NewOccupancy(selection); return err })
 	}
 	return srv, nil
+}
+
+// sensingError classifies a sensing constructor's refusal err: the
+// selection alone refused (selectionOnly builds the server with the
+// selection and none of the Initial values) is the self-held server
+// declining the selection ([ErrSelectionNotServed]); otherwise a value of
+// the host's Initial is refused, which New reports as [ErrConfiguration]
+// (R2-P6-err-2516).
+func sensingError(err error, selectionOnly func() error) error {
+	if selectionOnly() != nil {
+		return notServed(err)
+	}
+	return err
 }
