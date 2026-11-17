@@ -844,7 +844,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// concrete command always leaves an entry otherwise, so the test is
 	// exact for a request of concrete commands. A request with a
 	// wildcard-endpoint command is always answered, a target that
-	// returned [im.NoResponse] left out of the InvokeResponse — empty when
+	// returned [im.NoResponse] left out of the response message — empty when
 	// every target did (decision 182): matter.js expands a path without
 	// an endpoint and answers every target it invokes
 	// (packages/protocol/src/action/server/CommandInvokeResponse.ts:78-85,

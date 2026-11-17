@@ -119,7 +119,7 @@ type serverRef = atomic.Pointer[server]
 // InteractionServerMessenger.handleRequest: the message is decoded and
 // dispatched by type, and a request that fails is answered with the status
 // its error carries, FAILURE otherwise
-// (packages/protocol/src/interaction/InteractionMessenger.ts:431-435 at
+// (packages/protocol/src/interaction/InteractionMessenger.ts:344, :431-435 at
 // db021da0), sent unless the request asked to suppress its response
 // (:458-460, :317-322; the flag read from a request whose other fields do
 // not decode, :333-342, :153-162); the exchange is closed afterwards. The

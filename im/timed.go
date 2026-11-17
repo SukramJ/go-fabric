@@ -164,7 +164,7 @@ func UnmarshalStatusResponseTLV(dec *tlv.Decoder) (StatusResponse, error) {
 			// An unsigned integer, as the StatusIB's status
 			// ([statusIBField]): matter.js decodes the field as a
 			// TlvEnum, a TlvUInt32, which throws on another TLV type
-			// (packages/types/src/tlv/TlvNumber.ts:124-131 at db021da0);
+			// (packages/types/src/tlv/TlvNumber.ts:289, :124-131 at db021da0);
 			// a signed integer or a boolean used to read as Success
 			// (review II, R2-P6-wire-0503).
 			if el.IsContainer {

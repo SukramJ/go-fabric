@@ -172,7 +172,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 872,
+    "line": 900,
     "citation": "ExchangeManager.ts:480-486",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "at": "db021da0",
@@ -182,7 +182,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1772,
+    "line": 1885,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -191,7 +191,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1774,
+    "line": 1887,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -200,7 +200,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1811,
+    "line": 1924,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -209,7 +209,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1834,
+    "line": 1947,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -264,7 +264,7 @@
   },
   {
     "file": "bridge/exchange_routing.go",
-    "line": 343,
+    "line": 344,
     "citation": "InteractionServer.ts:460-469",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -274,7 +274,7 @@
   },
   {
     "file": "bridge/fabric_session_close_test.go",
-    "line": 44,
+    "line": 45,
     "citation": "ExchangeManager.ts:781-791",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "at": "db021da0",
@@ -284,7 +284,7 @@
   },
   {
     "file": "bridge/fabric_session_close_test.go",
-    "line": 170,
+    "line": 171,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -347,17 +347,8 @@
     "occurrences": 2
   },
   {
-    "file": "bridge/outbound_reliable.go",
-    "line": 28,
-    "citation": "InteractionMessenger.ts:721",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "DataReport",
-    "nearest": 807,
-    "occurrences": 12
-  },
-  {
     "file": "bridge/outbound_reliable_test.go",
-    "line": 205,
+    "line": 182,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -384,7 +375,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 605,
+    "line": 644,
     "citation": "InteractionMessenger.ts:431-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -394,7 +385,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 634,
+    "line": 673,
     "citation": "MessageExchange.ts:602",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "requiresAck",
@@ -403,7 +394,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 676,
+    "line": 726,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
@@ -441,7 +432,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2243,
+    "line": 2329,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -450,7 +441,7 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2387,
+    "line": 2473,
     "citation": "ExchangeManager.ts:696-713",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#deleteSession",
@@ -506,7 +497,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1483,
+    "line": 1659,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -515,7 +506,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2105,
+    "line": 2278,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -524,7 +515,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2181,
+    "line": 2354,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -542,7 +533,7 @@
   },
   {
     "file": "bridge/subscribe_dispatch.go",
-    "line": 511,
+    "line": 519,
     "citation": "InteractionServer.ts:647-665",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -552,7 +543,7 @@
   },
   {
     "file": "bridge/subscribe_dispatch.go",
-    "line": 732,
+    "line": 740,
     "citation": "InteractionMessenger.ts:721",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "waitForSuccess",
@@ -1157,7 +1148,7 @@
   },
   {
     "file": "client/interaction/server.go",
-    "line": 185,
+    "line": 211,
     "citation": "AttributeReadResponse.ts:160-162",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "at": "db021da0",
@@ -1167,7 +1158,7 @@
   },
   {
     "file": "client/interaction/server_test.go",
-    "line": 334,
+    "line": 387,
     "citation": "InteractionMessenger.ts:458-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -2681,7 +2672,7 @@
   },
   {
     "file": "im/event_authorization_test.go",
-    "line": 222,
+    "line": 227,
     "citation": "EventReadResponse.ts:79",
     "resolved": "packages/protocol/src/action/server/EventReadResponse.ts",
     "identifier": "AccessControl",
@@ -2690,7 +2681,7 @@
   },
   {
     "file": "im/read.go",
-    "line": 520,
+    "line": 539,
     "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "identifier": "addConcrete",
@@ -2754,7 +2745,7 @@
   },
   {
     "file": "im/subscription/subscription.go",
-    "line": 290,
+    "line": 314,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:73",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "at": "db021da0",
@@ -2764,7 +2755,7 @@
   },
   {
     "file": "im/subscription/subscription.go",
-    "line": 332,
+    "line": 384,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:412",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdatesActivated",
@@ -2783,7 +2774,7 @@
   },
   {
     "file": "im/write.go",
-    "line": 541,
+    "line": 573,
     "citation": "AttributeWriteResponse.ts:355-358",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "isHeldByOtherWrite",

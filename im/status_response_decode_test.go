@@ -70,7 +70,7 @@ func TestUnmarshalStatusResponseTLV_Malformed(t *testing.T) {
 // TestUnmarshalStatusResponseTLV_WrongType (review II, R2-P6-wire-0503):
 // a Status that is not an unsigned integer is refused, as matter.js's
 // TlvEnum (a TlvUInt32) throws on another TLV type
-// (packages/types/src/tlv/TlvNumber.ts:124-131 at db021da0) — it used to
+// (packages/types/src/tlv/TlvNumber.ts:289, :124-131 at db021da0) — it used to
 // decode as Success.
 func TestUnmarshalStatusResponseTLV_WrongType(t *testing.T) {
 	t.Parallel()
