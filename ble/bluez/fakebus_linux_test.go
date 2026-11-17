@@ -72,6 +72,13 @@ func (b *fakeBus) NameOwner(_ context.Context, name string) (string, error) {
 	return b.owner, nil
 }
 
+// ownerSender is the sender of bluetoothd's calls: the owner of org.bluez.
+func (b *fakeBus) ownerSender() dbus.Sender {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return dbus.Sender(b.owner)
+}
+
 // hold makes the next calls of method wait until the returned release
 // runs; then bluetoothd carries them out.
 func (b *fakeBus) hold(method string) (release func()) {
@@ -303,11 +310,11 @@ func (b *fakeBus) bluetoothd(path dbus.ObjectPath, method string, args []any) ([
 	switch method {
 	case ifaceGattManager + ".RegisterApplication":
 		root, _ := args[0].(dbus.ObjectPath)
-		get, ok := b.method(root, ifaceObjectMgr, "GetManagedObjects").(func() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error))
+		get, ok := b.method(root, ifaceObjectMgr, "GetManagedObjects").(func(dbus.Sender) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error))
 		if !ok {
 			return nil, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"no ObjectManager at " + string(root)}}
 		}
-		objs, derr := get()
+		objs, derr := get(b.ownerSender())
 		if derr != nil {
 			return nil, derr
 		}
@@ -320,11 +327,11 @@ func (b *fakeBus) bluetoothd(path dbus.ObjectPath, method string, args []any) ([
 		b.mu.Unlock()
 	case ifaceAdvertising + ".RegisterAdvertisement":
 		adv, _ := args[0].(dbus.ObjectPath)
-		getAll, ok := b.method(adv, ifaceProperties, "GetAll").(func(string) (map[string]dbus.Variant, *dbus.Error))
+		getAll, ok := b.method(adv, ifaceProperties, "GetAll").(func(dbus.Sender, string) (map[string]dbus.Variant, *dbus.Error))
 		if !ok {
 			return nil, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"no Properties at " + string(adv)}}
 		}
-		props, derr := getAll(ifaceAdvertise)
+		props, derr := getAll(b.ownerSender(), ifaceAdvertise)
 		if derr != nil {
 			return nil, derr
 		}

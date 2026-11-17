@@ -325,6 +325,7 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 		}
 		return nil
 	}
+	//nolint:contextcheck // the exported handlers run on the bus's goroutines, outside the caller's context; fromBluez bounds its own call
 	if err := p.exportAdvertisement(); err != nil {
 		return err
 	}
@@ -431,9 +432,12 @@ func (p *peripheral) release(sender dbus.Sender) *dbus.Error {
 // fromBluez admits a call on an exported method only from the owner of
 // org.bluez: the methods create connections, sockets and goroutines
 // (AcquireWrite, AcquireNotify), complete indications (Confirm), drop the
-// advertisement (Release) and hand out C3, and whoever else the system
-// bus lets call this connection's objects is not bluetoothd (review II,
-// R2-P6-sec-2014). The owner is read with GetNameOwner and kept; a caller
+// advertisement (Release) and hand out C3 and the objects' properties
+// (ReadValue, Properties.Get and GetAll, GetManagedObjects), and whoever
+// else the system bus lets call this connection's objects is not
+// bluetoothd (review II, R2-P6-sec-2014). bluetoothd reads the objects
+// through the getters when it registers the application and the
+// advertisement, from the connection that owns org.bluez. The owner is read with GetNameOwner and kept; a caller
 // that is not the kept one has the owner read again, so a bluetoothd that
 // restarted under a new unique name is followed. Any other caller, and
 // every caller while the owner cannot be read, is refused with
@@ -518,6 +522,7 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 			return err
 		}
 	}
+	//nolint:contextcheck // the exported handlers run on the bus's goroutines, outside Serve's context; fromBluez bounds its own call
 	if err := p.exportApplication(); err != nil {
 		p.unexportApplication()
 		return err
@@ -627,14 +632,20 @@ func (p *peripheral) propertiesOf(path dbus.ObjectPath) map[string]any {
 		return props, ok
 	}
 	return map[string]any{
-		"Get": func(iface, name string) (dbus.Variant, *dbus.Error) {
+		"Get": func(sender dbus.Sender, iface, name string) (dbus.Variant, *dbus.Error) {
+			if derr := p.fromBluez(sender); derr != nil {
+				return dbus.Variant{}, derr
+			}
 			props, ok := lookup(iface)
 			if v, has := props[name]; ok && has {
 				return v, nil
 			}
 			return dbus.Variant{}, dbus.NewError(dbusErrInvalid, []any{"no property " + iface + "." + name})
 		},
-		"GetAll": func(iface string) (map[string]dbus.Variant, *dbus.Error) {
+		"GetAll": func(sender dbus.Sender, iface string) (map[string]dbus.Variant, *dbus.Error) {
+			if derr := p.fromBluez(sender); derr != nil {
+				return nil, derr
+			}
 			props, ok := lookup(iface)
 			if !ok {
 				return map[string]dbus.Variant{}, nil
@@ -652,7 +663,10 @@ func (p *peripheral) exportApplication() error {
 	}
 	exports := make([]export, 0, 8)
 	exports = append(exports, []export{
-		{p.root, ifaceObjectMgr, map[string]any{"GetManagedObjects": func() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error) {
+		{p.root, ifaceObjectMgr, map[string]any{"GetManagedObjects": func(sender dbus.Sender) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error) {
+			if derr := p.fromBluez(sender); derr != nil {
+				return nil, derr
+			}
 			return p.objects(), nil
 		}}},
 		{p.charPath(1), ifaceGattChar, map[string]any{"AcquireWrite": p.acquireWrite}},

@@ -566,11 +566,11 @@ func TestPeripheralRefusesCentralWhileDropping(t *testing.T) {
 // reads it, through the characteristic's Properties.Get.
 func acquiredFlag(t *testing.T, b *fakeBus, p *peripheral, n int, name string) bool {
 	t.Helper()
-	get, ok := b.method(p.charPath(n), methodProps, "Get").(func(string, string) (dbus.Variant, *dbus.Error))
+	get, ok := b.method(p.charPath(n), methodProps, "Get").(func(dbus.Sender, string, string) (dbus.Variant, *dbus.Error))
 	if !ok {
 		t.Fatal("Properties.Get not exported")
 	}
-	v, derr := get(ifaceGattChar, name)
+	v, derr := get(bluezSender, ifaceGattChar, name)
 	if derr != nil {
 		t.Fatalf("%s: %v", name, derr)
 	}
@@ -880,12 +880,13 @@ func TestPeripheralCentralGoneBeforeItsAcquire(t *testing.T) {
 			return false
 		}
 	})
-	p.mu.Lock()
-	left := len(p.conns)
-	p.mu.Unlock()
-	if left != 0 {
-		t.Fatalf("%d connections left after the central was gone", left)
-	}
+	// markGone closes Disconnected before it forgets the connection, so
+	// the forgetting is waited for, not read once.
+	waitUntil(t, "the gone central's connection to be forgotten", func() bool {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return len(p.conns) == 0
+	})
 }
 
 // TestPeripheralFailedUnregisterKeepsTheRegistration: an
@@ -1055,6 +1056,27 @@ func TestPeripheralServesBluetoothdOnly(t *testing.T) {
 	}
 	_, derr := read(intruder, map[string]dbus.Variant{})
 	notPermitted("ReadValue", derr)
+	get, ok := b.method(p.charPath(3), methodProps, "Get").(func(dbus.Sender, string, string) (dbus.Variant, *dbus.Error))
+	if !ok {
+		t.Fatal("Properties.Get not exported with a sender")
+	}
+	_, derr = get(intruder, ifaceGattChar, "Value")
+	notPermitted("Properties.Get", derr)
+	getAll, ok := b.method(p.charPath(3), methodProps, "GetAll").(func(dbus.Sender, string) (map[string]dbus.Variant, *dbus.Error))
+	if !ok {
+		t.Fatal("Properties.GetAll not exported with a sender")
+	}
+	_, derr = getAll(intruder, ifaceGattChar)
+	notPermitted("Properties.GetAll", derr)
+	managed, ok := b.method(p.root, ifaceObjectMgr, "GetManagedObjects").(func(dbus.Sender) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error))
+	if !ok {
+		t.Fatal("GetManagedObjects not exported with a sender")
+	}
+	_, derr = managed(intruder)
+	notPermitted("GetManagedObjects", derr)
+	if v, derr := get(bluezSender, ifaceGattChar, "Value"); derr != nil || !bytes.Equal(v.Value().([]byte), []byte{0x15}) {
+		t.Fatalf("C3's Value for bluetoothd: %v, %v", v, derr)
+	}
 	release, ok := b.method(p.advPath(), ifaceAdvertise, "Release").(func(dbus.Sender) *dbus.Error)
 	if !ok {
 		t.Fatal("Release not exported with a sender")
