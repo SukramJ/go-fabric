@@ -928,8 +928,12 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	loadErr := n.caseIDs.load(ctx, n.st, fabricIndex)
 	// The identity moved first: a handshake from here on runs under the
-	// new NOC, and the sweep below takes every record, session and
-	// handshake in flight made under the old one (review II, Fable P-3).
+	// new NOC, a handshake in flight that began under the old one admits
+	// no session (caseIdentities.admitSessionAt, handshakeStake.of; review
+	// II, R2-P6-sec-2412), and the sweep below takes every record and
+	// session made under the old one (review II, Fable P-3); the bridge's
+	// CloseFabricSessionsAfterUpdate is where a pending handshake of the
+	// fabric is aborted.
 	if err := n.st.RemoveResumptionsByFabric(ctx, fabricIndex); err != nil {
 		n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 	}

@@ -57,6 +57,11 @@ type caseFabric struct {
 	// CASESession.cpp:962-990 tries every IPK epoch key) and addNOCIPK.
 	// identity.IPK is the current one among them (ipkCandidates).
 	ipks [][16]byte
+	// gen is the load that installed the identity, one more for every
+	// load ([caseIdentities.load]: AddNOC, UpdateNOC, a start); a key set
+	// rotation keeps it. A handshake admits its session only under the
+	// generation it began with (review II, R2-P6-sec-2412).
+	gen uint64
 }
 
 // peerVerifier is the verifier rooted at a fabric's trust anchor: built
@@ -88,6 +93,8 @@ type caseIdentities struct {
 	// groups holds key set 0, the IPK key set, per fabric; nil keeps the
 	// AddNOC key alone.
 	groups *groups.Manager
+	// loads counts the loads: the last one's [caseFabric.gen].
+	loads uint64
 }
 
 func newCaseIdentities(logger *slog.Logger, g *groups.Manager) *caseIdentities {
@@ -103,6 +110,13 @@ func newCaseIdentities(logger *slog.Logger, g *groups.Manager) *caseIdentities {
 // chip CASESession.cpp:973-990 caches it (matter.js keys the salts on the
 // AddNOC IPK alone, CaseServer.ts:240-284 — `BD-Matter-CASE-SaltOnMatchedIPK`).
 func (c *caseIdentities) ResolveSigma1Destination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (*sigma.Identity, sigma.PeerVerifier, bool) {
+	id, ver, _, ok := c.resolveSigma1Destination(destinationID, initiatorRandom)
+	return id, ver, ok
+}
+
+// resolveSigma1Destination is ResolveSigma1Destination, with the load the
+// identity comes from ([caseFabric.gen]).
+func (c *caseIdentities) resolveSigma1Destination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (*sigma.Identity, sigma.PeerVerifier, uint64, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	for _, f := range c.byIdx {
@@ -114,14 +128,14 @@ func (c *caseIdentities) ResolveSigma1Destination(destinationID [32]byte, initia
 				continue
 			}
 			if ipk == f.identity.IPK {
-				return f.identity, f.verifier, true
+				return f.identity, f.verifier, f.gen, true
 			}
 			matched := *f.identity
 			matched.IPK = ipk
-			return &matched, f.verifier, true
+			return &matched, f.verifier, f.gen, true
 		}
 	}
-	return nil, nil, false
+	return nil, nil, 0, false
 }
 
 // ipkCandidates returns the fabric's destination identifier keys and the
@@ -198,13 +212,51 @@ func (c *caseIdentities) refreshIPK(ctx context.Context, fabricIndex uint8) {
 // 1 after fabric 2 was installed got a session on fabric 2, and every
 // access check failed (TC-ACL-2.10 after the reboot).
 func (c *caseIdentities) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) { //nolint:unparam // sigma.FabricIndexResolver's signature
+	id, ver, _, ok := c.resolveFabricIndex(fabricIndex)
+	return id, ver, ok
+}
+
+// resolveFabricIndex is ResolveFabricIndex, with the load the identity
+// comes from ([caseFabric.gen]).
+func (c *caseIdentities) resolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, uint64, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	f, ok := c.byIdx[fabricIndex]
 	if !ok || f.identity == nil {
-		return nil, nil, false
+		return nil, nil, 0, false
 	}
-	return f.identity, f.verifier, true
+	return f.identity, f.verifier, f.gen, true
+}
+
+// handshakeResolver is one responder handshake's identity resolver: the
+// node's ([caseIdentities]), recording on the handshake's stake which
+// load of which fabric's identity the handshake answers under, so an
+// UpdateNOC that replaces it before the handshake installs its session
+// refuses the install ([handshakeStake.of]; review II, R2-P6-sec-2412).
+type handshakeResolver struct {
+	ids  *caseIdentities
+	held *handshakeStake
+}
+
+var (
+	_ sigma.IdentityResolver    = handshakeResolver{}
+	_ sigma.FabricIndexResolver = handshakeResolver{}
+)
+
+func (r handshakeResolver) ResolveSigma1Destination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (*sigma.Identity, sigma.PeerVerifier, bool) {
+	id, ver, gen, ok := r.ids.resolveSigma1Destination(destinationID, initiatorRandom)
+	if ok {
+		r.held.resolved(id.FabricIndex, gen)
+	}
+	return id, ver, ok
+}
+
+func (r handshakeResolver) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) {
+	id, ver, gen, ok := r.ids.resolveFabricIndex(fabricIndex)
+	if ok {
+		r.held.resolved(fabricIndex, gen)
+	}
+	return id, ver, ok
 }
 
 // forget drops a removed fabric's identity, so a Sigma1 addressed to it is
@@ -234,6 +286,10 @@ func (c *caseIdentities) forget(fabricIndex uint8) (compressedID [8]byte, nodeID
 // fabric was removed while it ran.
 var errCASEFabricRemoved = errors.New("node: the CASE session's fabric was removed during its handshake")
 
+// errCASEFabricUpdated refuses a CASE session whose fabric's identity an
+// UpdateNOC replaced during its handshake ([caseIdentities.admitSessionAt]).
+var errCASEFabricUpdated = errors.New("node: the CASE session's fabric was updated during its handshake")
+
 // admitSession opens the session of a completed CASE handshake on
 // fabricIndex with open — unless the fabric was removed while the
 // handshake ran. The responder keeps the identity it resolved at Sigma1,
@@ -258,20 +314,55 @@ var errCASEFabricRemoved = errors.New("node: the CASE session's fabric was remov
 // the session is closed here — the session open returned, only while it
 // still holds its id.
 func (c *caseIdentities) admitSession(sessions *operational.Manager, fabricIndex uint8, open func() (*operational.Entry, error)) (*operational.Entry, error) {
-	if _, ok := c.forFabric(fabricIndex); !ok {
-		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
+	return c.admitSessionAt(sessions, fabricIndex, 0, open)
+}
+
+// admitSessionAt is [caseIdentities.admitSession] for a handshake that
+// began under the identity of load gen (0: any): an UpdateNOC that
+// replaced the identity in between — a load since — refuses the session
+// as a removal does, at both checks, so no session or resumption record
+// made under the old NOC outlives the update's sweep. connectedhomeip
+// aborts a handshake pending on a fabric its update touches
+// (src/protocols/secure_channel/CASESession.h:149-153 OnFabricUpdated →
+// InvalidateIfPendingEstablishmentOnFabric, CASESession.cpp:423-434 at
+// 6170af84; review II, R2-P6-sec-2412).
+func (c *caseIdentities) admitSessionAt(sessions *operational.Manager, fabricIndex uint8, gen uint64, open func() (*operational.Entry, error)) (*operational.Entry, error) {
+	if err := c.admissible(fabricIndex, gen); err != nil {
+		return nil, err
 	}
 	entry, err := open()
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := c.forFabric(fabricIndex); !ok {
+	if err := c.admissible(fabricIndex, gen); err != nil {
 		// The entry itself, not its id: by now the id may name another
 		// session or another handshake's stake (decision 159).
 		sessionseam.CloseEntry(sessions, entry)
-		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
+		return nil, err
 	}
 	return entry, nil
+}
+
+// admissible reports why a handshake that began under load gen (0: any)
+// of fabricIndex's identity may not admit its session: the fabric's
+// identity is gone, or another load replaced it.
+func (c *caseIdentities) admissible(fabricIndex uint8, gen uint64) error {
+	f, ok := c.forFabric(fabricIndex)
+	switch {
+	case !ok:
+		return fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
+	case gen != 0 && f.gen != gen:
+		return fmt.Errorf("%w: fabric %d", errCASEFabricUpdated, fabricIndex)
+	}
+	return nil
+}
+
+// generation is the load of fabricIndex's current identity, 0 for none.
+func (c *caseIdentities) generation(fabricIndex uint8) uint64 {
+	if f, ok := c.forFabric(fabricIndex); ok {
+		return f.gen
+	}
+	return 0
 }
 
 // current returns the most recently installed identity, or nil before the
@@ -359,6 +450,8 @@ func (c *caseIdentities) load(ctx context.Context, st fabricIdentities, fabricIn
 		ipks:          ipks,
 	}
 	c.mu.Lock()
+	c.loads++
+	entry.gen = c.loads
 	c.byIdx[fabricIndex] = entry
 	c.latest = entry
 	c.mu.Unlock()
@@ -577,6 +670,10 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 		if !ok {
 			return nil, fmt.Errorf("node: no CASE identity loaded for fabric %d", fabricIndex)
 		}
+		// The handshake runs under this identity; an UpdateNOC that
+		// replaces it before the handshake ends refuses the session
+		// (admitSessionAt).
+		gen := fabric.gen
 		stake, err := sessions.AllocateStake()
 		if err != nil {
 			return nil, fmt.Errorf("allocate CASE session id: %w", err)
@@ -609,7 +706,7 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 			Initiator:          initiator,
 			CompressedFabricID: fabric.identity.CompressedFabricID,
 			OnEstablished: func(ctx context.Context, res sigma.InitiatorResult) error {
-				entry, err := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
+				entry, err := ids.admitSessionAt(sessions, fabricIndex, gen, func() (*operational.Entry, error) {
 					// The install takes the stake, not the bare id: a stake an
 					// allocation at a full table took over installs nothing
 					// (operational.ErrStakeLost, N3-findev-1).
@@ -747,8 +844,22 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 // (review II, R2-P3-dr-dev-07).
 type handshakeStake struct {
 	sessions *operational.Manager
-	mu       sync.Mutex
-	stake    operational.Stake
+	// ids, when set, judges the identity the handshake answers under:
+	// fabric and gen, which the handshake's resolver records
+	// (handshakeResolver).
+	ids    *caseIdentities
+	mu     sync.Mutex
+	stake  operational.Stake
+	fabric uint8
+	gen    uint64
+}
+
+// resolved records that the handshake answers under load gen of fabric's
+// identity.
+func (h *handshakeStake) resolved(fabric uint8, gen uint64) {
+	h.mu.Lock()
+	h.fabric, h.gen = fabric, gen
+	h.mu.Unlock()
 }
 
 // renew stakes an id for a handshake whose Sigma1 the responder accepted —
@@ -769,12 +880,17 @@ func (h *handshakeStake) renew(uint16) (uint16, bool) {
 }
 
 // of returns the stake when it is the one of id, the id the handshake
-// announced; otherwise the zero Stake, which every install refuses
+// announced, and the identity the handshake answers under is still its
+// fabric's — no UpdateNOC replaced it since (review II, R2-P6-sec-2412);
+// otherwise the zero Stake, which every install refuses
 // ([operational.ErrStakeLost]).
 func (h *handshakeStake) of(id uint16) operational.Stake {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.stake.ID != id {
+		return operational.Stake{}
+	}
+	if h.ids != nil && h.gen != 0 && h.ids.admissible(h.fabric, h.gen) != nil {
 		return operational.Stake{}
 	}
 	return h.stake
@@ -805,12 +921,13 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	// close the least recently active session at a full table (review II,
 	// R2-P3-dr-dev-08). The responder is built without an id and takes it
 	// from the renewer ([sigma.Responder.SetSessionIDRenewer]).
-	held := &handshakeStake{sessions: sessions}
+	held := &handshakeStake{sessions: sessions, ids: ids}
 
 	identity := (*sigma.Identity)(nil)
 	var verifier sigma.PeerVerifier
 	if current != nil {
 		identity, verifier = current.identity, current.verifier
+		held.resolved(current.identity.FabricIndex, current.gen)
 	} else {
 		// Sigma1 before any AddNOC: give the responder an ephemeral key so
 		// the handshake fails as a signature mismatch rather than a nil
@@ -824,7 +941,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	}
 
 	responder := sigma.NewResponder(identity, verifier, 0)
-	responder.SetIdentityResolver(ids)
+	responder.SetIdentityResolver(handshakeResolver{ids: ids, held: held})
 	// Our session parameters ride in Sigma2 (CaseServer.ts:272
 	// responderSessionParams: sessions.sessionParameters); nil leaves
 	// NewCaseAdapter's defaults.

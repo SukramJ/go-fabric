@@ -94,8 +94,8 @@ func newCaseFabricFixture(t *testing.T) caseFabricFixture {
 	local := rawKeyIdentity(t, v, 0xB0B, 0xFAB, 1, ipk)
 	peer := rawKeyIdentity(t, v, 0xC0FFEE, 0xFAB, 1, ipk)
 	ids := newCaseIdentities(slog.New(slog.DiscardHandler), nil)
-	f := &caseFabric{identity: local, verifier: v, rootPublicKey: root, ipks: [][16]byte{ipk}}
-	ids.byIdx[1], ids.latest = f, f
+	f := &caseFabric{identity: local, verifier: v, rootPublicKey: root, ipks: [][16]byte{ipk}, gen: 1}
+	ids.byIdx[1], ids.latest, ids.loads = f, f, 1
 	return caseFabricFixture{ids: ids, verifier: v, root: root, peer: peer, local: local}
 }
 
