@@ -11,6 +11,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -357,5 +358,55 @@ func TestClassMarkerWrongAtThePin(t *testing.T) {
 	if len(f) != 3 || !strings.Contains(f[0], "no class None in a.ts") || !strings.Contains(f[1], "gone.ts does not exist") ||
 		!strings.Contains(f[2], "neither a Go-quoted string") {
 		t.Errorf("findings %q", f)
+	}
+}
+
+// TestReadFailureIsExitTwo: a read that fails for a reason other than a
+// path absent at the revision — a lazy blob fetch that failed — makes the
+// run exit 2, not a finding (R2-P6-err-2812).
+func TestReadFailureIsExitTwo(t *testing.T) {
+	rows, err := parseRegister(registerHeading + "\n\n| Entry | marker file | marker text |\n| --- | --- | --- |\n" +
+		"| A | `a.ts` | `\"x\"` |\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	show := func(_, _ string) (string, error) { return "", errors.New("fatal: unable to fetch blob") }
+	var out, errOut strings.Builder
+	if code := report(&out, &errOut, rows, nil, show, revision{name: "the pin", sha: "p"}, revision{name: "ref", sha: "r"}); code != 2 {
+		t.Errorf("exit %d, want 2; out %q", code, out.String())
+	}
+	if !strings.Contains(errOut.String(), "unable to fetch blob") || out.Len() != 0 {
+		t.Errorf("out %q, errOut %q", out.String(), errOut.String())
+	}
+}
+
+// TestGitShowTellsAbsentFromUnreadable: a path the tree does not list is
+// errNoFile; a listed one is read.
+func TestGitShowTellsAbsentFromUnreadable(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.ts"), []byte("x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	repo := gitRepo{dir: dir}
+	for _, args := range [][]string{{"init", "-q"}, {"add", "a.ts"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "a"}} {
+		if _, err := repo.git(args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sha, err := repo.commit("HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := repo.show(sha, "a.ts"); err != nil || got != "x\n" {
+		t.Errorf("show a.ts = %q, %v", got, err)
+	}
+	if _, err := repo.show(sha, "b.ts"); !errors.Is(err, errNoFile) {
+		t.Errorf("show b.ts: %v, want errNoFile", err)
+	}
+	if _, err := (gitRepo{dir: t.TempDir()}).show(sha, "a.ts"); err == nil || errors.Is(err, errNoFile) {
+		t.Errorf("show outside a repository: %v, want an error that is not errNoFile", err)
 	}
 }

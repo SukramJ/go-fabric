@@ -155,7 +155,28 @@ func run(out, errOut io.Writer, root, matterDir, pin, ref string) int {
 		_, _ = fmt.Fprintf(errOut, "aheadcheck: the ref %s in %s: %v\n", ref, matterDir, err)
 		return 2
 	}
-	findings := check(rows, allow, repo.show, revision{name: "the pin", sha: pinSha}, revision{name: ref, sha: refSha})
+	return report(out, errOut, rows, allow, repo.show, revision{name: "the pin", sha: pinSha}, revision{name: ref, sha: refSha})
+}
+
+// report checks the rows through show and returns the exit status. A read
+// that fails for any reason but a path absent at the revision — a lazy blob
+// fetch of CI's blobless clone that failed, a broken repository — is exit
+// 2, "could not run", not a finding (R2-P6-err-2812): a failed fetch read as
+// "caught up?" or "the row is wrong".
+func report(out, errOut io.Writer, rows []row, allow map[string]bool, show showFunc, pin, ref revision) int {
+	var readErr error
+	recording := func(sha, path string) (string, error) {
+		content, err := show(sha, path)
+		if err != nil && !errors.Is(err, errNoFile) && readErr == nil {
+			readErr = err
+		}
+		return content, err
+	}
+	findings := check(rows, allow, recording, pin, ref)
+	if readErr != nil {
+		_, _ = fmt.Fprintln(errOut, "aheadcheck: could not read the clone:", readErr)
+		return 2
+	}
 	for _, f := range findings {
 		_, _ = fmt.Fprintln(out, f)
 	}
@@ -169,7 +190,7 @@ func run(out, errOut io.Writer, root, matterDir, pin, ref string) int {
 		}
 	}
 	_, _ = fmt.Fprintf(out, "aheadcheck: %d rows, %d with a marker, %d in todo-marker.txt; every marker holds at the pin %s and at %s (%s)\n",
-		len(rows), marked, len(rows)-marked, short(pinSha), ref, short(refSha))
+		len(rows), marked, len(rows)-marked, short(pin.sha), ref.name, short(ref.sha))
 	return 0
 }
 
@@ -222,9 +243,16 @@ func (r gitRepo) commit(rev string) (string, error) {
 }
 
 // show returns a file's content at a commit; errNoFile when the path does
-// not exist there.
+// not exist there. Existence is the tree's listing (ls-tree), which reads no
+// blob: `cat-file -e` fails as well for a blob a blobless clone could not
+// fetch, which is no statement about the path. Any other failure is
+// returned as it is.
 func (r gitRepo) show(sha, path string) (string, error) {
-	if _, err := r.git("cat-file", "-e", sha+":"+path); err != nil {
+	listed, err := r.git("ls-tree", "--name-only", sha, "--", path)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(string(listed)) != path {
 		return "", fmt.Errorf("%w: %s", errNoFile, path)
 	}
 	out, err := r.git("show", sha+":"+path)
