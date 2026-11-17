@@ -366,11 +366,15 @@ func (w *sessionWatch) sweepFailed(nodeID uint64, ep uint16) {
 	delete(w.nodesSwept, nodeID)
 }
 
-// endLeftover ends one leftover; NOT_FOUND is a session already gone.
-// Mirrors matterjs-server packages/ws-controller/src/controller/WebRtcProviderSessionWatch.ts:242-251
+// endLeftover ends one leftover; NOT_FOUND is a session already gone. The
+// EndSession runs within the device cleanup budget, so one the camera
+// never answers ends at the deadline (review II, R2-P6-conc-2210). Mirrors
+// matterjs-server packages/ws-controller/src/controller/WebRtcProviderSessionWatch.ts:242-251
 // at 0bd06f2.
 func (w *sessionWatch) endLeftover(nodeID uint64, ep, id uint16) error {
-	if err := w.io.endSession(w.ctx, nodeID, ep, id); err != nil {
+	ctx, cancel := clock.WithTimeout(w.ctx, w.clk, deviceCleanupBudget)
+	defer cancel()
+	if err := w.io.endSession(ctx, nodeID, ep, id); err != nil {
 		if deviceForgotSession(err) {
 			return nil
 		}
