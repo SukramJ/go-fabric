@@ -123,13 +123,13 @@ type Subscription struct {
 	// subscription was priming ([Subscription.PrimedEvents]).
 	primingEventsMax uint64
 	// duePaths are the dirty attribute paths the engine drained together
-	// with the events it is handing to the [EventReporter], until the
-	// reporter takes them ([Subscription.TakeDuePaths]).
+	// with the events it is handing to a deprecated [EventReporter], until
+	// the reporter takes them ([Subscription.TakeDuePaths]).
 	duePaths []im.ConcreteAttributePath
-	// sentNothing is the [EventReporter]'s word that the report the
-	// engine handed it was not sent because nothing of it was left for
-	// the subscriber ([Subscription.NothingSent]), until the engine reads
-	// it.
+	// sentNothing is a deprecated [EventReporter]'s word that the report
+	// the engine handed it was not sent because nothing of it was left for
+	// the subscriber ([Subscription.NothingSent]), until the adapter
+	// ([legacyHooks.sender]) reads it.
 	sentNothing bool
 	closed      bool
 }
@@ -151,6 +151,12 @@ type Subscription struct {
 // :921-936, packages/protocol/src/interaction/InteractionMessenger.ts:794-796
 // at db021da0), with a TODO of its own for the case
 // (ServerSubscription.ts:923-925).
+//
+// It acts only inside a deprecated [EventReporter]'s call; a
+// [ReportSender] returns [NothingForSubscriber] instead.
+//
+// Deprecated: Use [ReportSender] and return [NothingForSubscriber].
+// Removable in the next minor release.
 func (s *Subscription) NothingSent() {
 	s.mu.Lock()
 	s.sentNothing = true
@@ -188,7 +194,11 @@ func (s *Subscription) revokeReport(work dueWork) {
 // #outstandingEventsMinNumber together and calls #sendUpdateMessage once.
 // An [EventReporter] that does not call it sends its events alone; the
 // engine then marks the paths dirty again, and they follow in an attribute
-// report of their own once MinIntervalFloor has elapsed.
+// report of their own once MinIntervalFloor has elapsed. A [ReportSender]
+// gets the paths in its [Report]; for it this returns nil.
+//
+// Deprecated: Use [ReportSender]: [Report.Paths] carries the paths due with
+// the events. Removable in the next minor release.
 func (s *Subscription) TakeDuePaths() []im.ConcreteAttributePath {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -479,9 +489,8 @@ type dueWork struct {
 // subscription's paths — is not a report: the time of the last report
 // stays, so a dirty attribute past its floor and the keep-alive are not
 // held back by a report that was never sent. The same holds for a pass
-// whose events the reporter filters down to nothing, which only the
-// reporter can see: [Subscription.NothingSent] and
-// [Subscription.revokeReport].
+// whose data the sender filters down to nothing, which only the sender
+// can see: [NothingForSubscriber] and [Subscription.revokeReport].
 func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (work dueWork, due bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -576,8 +585,8 @@ func (s *Subscription) requestPathIndex(p im.ConcreteAttributePath) int {
 	return len(s.AttributePaths)
 }
 
-// offerDuePaths holds paths for the [EventReporter] the engine is about
-// to call ([Subscription.TakeDuePaths]).
+// offerDuePaths holds paths for the deprecated [EventReporter] the
+// adapter is about to call ([Subscription.TakeDuePaths]).
 func (s *Subscription) offerDuePaths(paths []im.ConcreteAttributePath) {
 	s.mu.Lock()
 	s.duePaths = paths

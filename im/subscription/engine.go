@@ -20,7 +20,7 @@ import (
 //   - a report of what is owed, or an empty keep-alive, when the send
 //     interval has elapsed.
 //
-// Closed subscriptions are skipped. The reporter callback is invoked
+// Closed subscriptions are skipped. The [ReportSender] is invoked
 // outside the manager's lock so it can safely block on the wire.
 //
 // Shared engine ticker vs. matter.js per-subscription timer (by-design):
@@ -38,7 +38,7 @@ import (
 // solved by a single shared poller. Documented in
 // `notes/parity/by_design.md` §"Systematic Parity Run #02".
 //
-// The context a reporter receives ends when the engine does — with ctx or
+// The context a sender receives ends when the engine does — with ctx or
 // with [Manager.Stop] — so a report that waits on its peer can end its
 // wait instead of holding Stop for the length of it (review II,
 // W2-conc-06).
@@ -77,11 +77,17 @@ func (m *Manager) run(ctx context.Context) {
 // other subscription's reports for that long (the CHIP harness lost its
 // FabricSceneInfo reports to TC-S-2.6 that way).
 func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
-	m.mu.RLock()
-	eventReporter := m.eventReporter
-	m.mu.RUnlock()
-
 	started := &sync.WaitGroup{}
+	send := m.senderFor(false)
+	if send == nil {
+		// Nothing is drained without a way to send it: what the
+		// subscriptions owe stays with them for the sender set next
+		// (review II, R2-P6-api-0508).
+		if m.Active() > 0 {
+			m.logNoSenderOnce("ongoing")
+		}
+		return started
+	}
 	for _, sub := range m.snapshot() {
 		if sub.IsClosed() || sub.isPriming() {
 			continue
@@ -89,7 +95,7 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 		if !sub.reporting.CompareAndSwap(false, true) {
 			continue
 		}
-		work := m.dueReport(ctx, sub, now, eventReporter)
+		work := m.dueReport(ctx, sub, now, send)
 		if work == nil {
 			sub.endReport()
 			continue
@@ -109,70 +115,42 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 }
 
 // dueReport drains what sub has due at now and returns the report to send
-// for it, or nil when nothing is due.
+// for it through send, or nil when nothing is due.
 //
 // One pass, one report: the attribute changes and the events that are due
 // together leave in one ReportData, as matter.js ServerSubscription.ts
 // :539-555 at db021da0 (#sendUpdate takes both and calls
 // #sendUpdateMessage once). When to send is [Subscription.drainDue]'s.
+// The keep-alive, when the send interval has elapsed, rides in the same
+// [Report]. The send interval is the matter.js-style cadence of
+// [Subscription.sendIntervalLocked], not MaxIntervalCeiling: Apple Home's
+// MTRDevice and chip-tool's ReadClient both drop a subscription on a
+// timer that fires well before the ceiling.
 //
-// Which hook gets the report follows from what it carries:
-//
-//   - Events, with or without attribute paths, go to the [EventReporter];
-//     the paths due with them wait on the subscription for it to take
-//     ([Subscription.TakeDuePaths]). A reporter that does not take them
-//     sends the events alone, and the paths are marked dirty again: they
-//     follow in an attribute report of their own once MinIntervalFloor has
-//     elapsed, never as a second report in the same tick.
-//   - Attribute paths alone, and the keep-alive when the send interval
-//     has elapsed with nothing owed, go to the [Reporter]. The send
-//     interval is the matter.js-style cadence of
-//     [Subscription.sendIntervalLocked], not MaxIntervalCeiling: Apple
-//     Home's MTRDevice and chip-tool's ReadClient both drop a subscription
-//     on a timer that fires well before the ceiling.
-//   - An [EventReporter] that found nothing left to send for this
-//     subscriber says so ([Subscription.NothingSent]). The keep-alive
-//     that was due in the same pass then goes to the [Reporter] — the
-//     send interval's report is owed whether or not the events it would
-//     have carried were for this subscriber's eyes — and a pass without
-//     one is no report: it does not move the time of the last report.
-//     Before, such a pass counted, and the keep-alive it had swallowed
-//     came a whole send interval later (review II, R2-P0-rv-A03).
-//
-// Without an [EventReporter] the events drained are not sent, and a pass
-// that drained nothing else is no report either.
-func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Time, eventReporter EventReporter) func() {
+// A sender that found nothing left to send for this subscriber says so
+// ([NothingForSubscriber]). The keep-alive that was due in the same pass
+// then goes out alone — the send interval's report is owed whether or not
+// the data it would have carried was for this subscriber's eyes — and a
+// pass without one is no report: it does not move the time of the last
+// report (review II, R2-P0-rv-A03). The bridge's sender sends such a pass
+// empty and counts it (owner decision 169).
+func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Time, send ReportSender) func() {
 	work, due := sub.drainDue(now, m.eventSourceOf(), false)
 	if !due {
 		return nil
 	}
-	reporter := m.reporter
-	if len(work.events) > 0 && eventReporter != nil {
-		return func() {
-			sub.offerDuePaths(work.paths)
-			eventReporter(ctx, sub, work.events)
-			if left := sub.TakeDuePaths(); len(left) > 0 {
-				// Not a failed update: the paths the event reporter left
-				// are still due.
-				for _, p := range left {
-					sub.markDirty(p)
-				}
-			}
-			if !sub.takeSentNothing() {
-				return
-			}
-			if work.keepAlive && reporter != nil {
-				reporter(ctx, sub, nil)
-				return
-			}
-			sub.revokeReport(work)
+	return func() {
+		report := Report{Paths: work.paths, Events: work.events, KeepAlive: work.keepAlive}
+		if send(ctx, sub, report) != NothingForSubscriber {
+			return
 		}
-	}
-	if reporter == nil || (len(work.paths) == 0 && !work.keepAlive) {
+		if work.keepAlive && (len(work.paths) > 0 || len(work.events) > 0) {
+			if send(ctx, sub, Report{KeepAlive: true}) != NothingForSubscriber {
+				return
+			}
+		}
 		sub.revokeReport(work)
-		return nil
 	}
-	return func() { reporter(ctx, sub, work.paths) }
 }
 
 // Tick is the test surface for [Manager.tick]: it waits for the reports

@@ -21,7 +21,7 @@ import (
 func TestClaimReportWakesWhenTheReportEnds(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		m := NewManager(Config{Clock: clocktest.New(time.Unix(1_700_000_000, 0))}, nil, nil)
+		m := newTestManager(Config{Clock: clocktest.New(time.Unix(1_700_000_000, 0))})
 		subscribe := func() *Subscription {
 			sub, err := m.Subscribe(SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60, AttributePaths: []im.ConcreteAttributePath{{}}})
 			if err != nil {

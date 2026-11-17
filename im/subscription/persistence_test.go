@@ -70,7 +70,7 @@ func TestUnmarshalPeerSubscription_RejectsUnknownVersionAndBadIntervals(t *testi
 // negotiated ones (matter.js useAsMaxInterval / useAsSendInterval).
 func TestRestore_KeepsIDAndNegotiatedIntervals(t *testing.T) {
 	t.Parallel()
-	m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
+	m := newTestManager(Config{MaxIntervalCeilingSeconds: 60})
 	p := samplePeerSubscription()
 	p.SendInterval = 97 * time.Second
 	sub, err := m.Restore(p, 0x4242)
@@ -107,7 +107,7 @@ func TestRestore_KeepsIDAndNegotiatedIntervals(t *testing.T) {
 
 func TestRestore_Refusals(t *testing.T) {
 	t.Parallel()
-	m := NewManager(Config{MaxSubscriptionsPerFabric: 1}, nil, nil)
+	m := newTestManager(Config{MaxSubscriptionsPerFabric: 1})
 	p := samplePeerSubscription()
 	if _, err := m.Restore(p, 1); err != nil {
 		t.Fatal(err)
@@ -186,7 +186,7 @@ func TestTerminatedHook_SeparatesTerminationFromClose(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			m := NewManager(Config{}, nil, nil)
+			m := newTestManager(Config{})
 			var rec terminationRecorder
 			closed := 0
 			m.SetOnSubscriptionTerminated(rec.record)
@@ -248,7 +248,7 @@ func TestPeerSubscription_KeepsWildcardPathFlags(t *testing.T) {
 	if got := out.AttributeRequests[1]; got != in.AttributeRequests[1] {
 		t.Fatalf("unflagged path = %+v, want %+v", got, in.AttributeRequests[1])
 	}
-	m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
+	m := newTestManager(Config{MaxIntervalCeilingSeconds: 60})
 	sub, err := m.Restore(out, 0x4242)
 	if err != nil {
 		t.Fatal(err)
@@ -274,7 +274,7 @@ func TestRestore_BoundsThePersistedSendInterval(t *testing.T) {
 		{"below the floor", 3 * time.Second, 30, 30 * time.Second},
 		{"inside", 90 * time.Second, 2, 90 * time.Second},
 	} {
-		m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
+		m := newTestManager(Config{MaxIntervalCeilingSeconds: 60})
 		p := samplePeerSubscription()
 		p.SendInterval, p.MinIntervalFloor = tc.send, tc.floor
 		sub, err := m.Restore(p, 0x4242)

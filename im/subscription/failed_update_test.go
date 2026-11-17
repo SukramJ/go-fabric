@@ -20,7 +20,7 @@ import (
 func TestFailedUpdateIsOwedNotDue(t *testing.T) {
 	t.Parallel()
 	t0 := time.Unix(1_700_000_000, 0)
-	m := NewManager(Config{Clock: clocktest.New(t0)}, nil, nil)
+	m := newTestManager(Config{Clock: clocktest.New(t0)})
 	sub, err := m.Subscribe(SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MinIntervalFloor: 1, MaxIntervalCeiling: 60, AttributePaths: []im.ConcreteAttributePath{{}}})
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +46,7 @@ func TestFlushAfterAFailedReportInFlightSendsNothing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		for _, failed := range []bool{true, false} {
 			var flushed int
-			m := NewManager(Config{Clock: clocktest.New(time.Unix(1_700_000_000, 0))}, nil, nil)
+			m := newTestManager(Config{Clock: clocktest.New(time.Unix(1_700_000_000, 0))})
 			m.SetFlushReporter(func(context.Context, *Subscription, []im.EventReport, []im.ConcreteAttributePath) { flushed++ })
 			sub, err := m.Subscribe(SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60, AttributePaths: []im.ConcreteAttributePath{{}}})
 			if err != nil {

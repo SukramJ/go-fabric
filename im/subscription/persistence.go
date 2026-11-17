@@ -87,7 +87,8 @@ func (s *Subscription) PeerSubscription(isFabricFiltered bool) PeerSubscription 
 // review II, R2-P1-dr-req-06.
 //
 // Restore enforces the per-fabric quota and refuses an id that already
-// names a live subscription ([ErrIDInUse]). A restored subscription fires
+// names a live subscription ([ErrIDInUse]), and refuses while the manager
+// has no report sender ([ErrNoReportSender]). A restored subscription fires
 // the session-subscriptions-changed hook
 // ([Manager.SetOnSessionSubscriptionsChanged]) as Subscribe does.
 func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, error) {
@@ -99,6 +100,9 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 	}
 	if err := m.validateCadence(p.MinIntervalFloor, p.MaxInterval); err != nil {
 		return nil, err
+	}
+	if m.senderFor(false) == nil {
+		return nil, ErrNoReportSender
 	}
 	m.mu.Lock()
 	if _, taken := m.byID[p.SubscriptionID]; taken {

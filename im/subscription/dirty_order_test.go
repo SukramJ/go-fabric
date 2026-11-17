@@ -30,7 +30,7 @@ func TestTakeDirtyOrderFollowsThePrimingReport(t *testing.T) {
 		// Second request path, the full wildcard: the rest, ascending.
 		at(1, 0x0006, 0x0000), at(2, 0x0006, 0x0000), at(2, 0x0008, 0x0000), at(3, 0x0006, 0x0000),
 	}
-	m := NewManager(Config{}, nil, nil)
+	m := newTestManager(Config{})
 	sub, err := m.Subscribe(SubscribeArgs{
 		FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
 		AttributePaths: []im.ConcreteAttributePath{{Endpoint: 3, Cluster: 0x0300, HasEndpoint: true, HasCluster: true}, {}},

@@ -27,7 +27,7 @@ func TestGrantedMaxIntervalIsAtLeastTwoSeconds(t *testing.T) {
 		{0, 3, 3},
 		{3, 3, 3},
 	} {
-		m := NewManager(Config{}, nil, nil)
+		m := newTestManager(Config{})
 		sub, err := m.Subscribe(SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MinIntervalFloor: tc.floor, MaxIntervalCeiling: tc.ceiling})
 		if err != nil {
 			t.Fatalf("floor %d ceiling %d: %v", tc.floor, tc.ceiling, err)

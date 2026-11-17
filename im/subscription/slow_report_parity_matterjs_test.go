@@ -309,7 +309,7 @@ func TestSlowReportParityMatterJS(t *testing.T) {
 func TestSessionShutdownParityMatterJS(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		m := NewManager(Config{}, nil, nil)
+		m := newTestManager(Config{})
 		terminated := map[uint32]bool{}
 		var mu sync.Mutex
 		m.SetOnSubscriptionTerminated(func(id uint32, _ uint8) { mu.Lock(); terminated[id] = true; mu.Unlock() })

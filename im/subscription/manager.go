@@ -44,6 +44,14 @@ var (
 	// ErrIDInUse is returned by [Manager.Restore] when the former
 	// subscription's id already names a live subscription.
 	ErrIDInUse = errors.New("subscription: id already in use")
+	// ErrNoReportSender is returned by [Manager.Subscribe] and
+	// [Manager.Restore] while the manager has no way to send a report: no
+	// [ReportSender] ([Manager.SetReportSender]) and no deprecated hook. A
+	// subscription admitted then would never be reported to; the refusal
+	// makes the missing wiring visible — the bridge answers the
+	// SubscribeRequest with FAILURE — instead of a successful subscribe to a
+	// device that never changes (review II, R2-P6-api-0508).
+	ErrNoReportSender = errors.New("subscription: no report sender")
 )
 
 // Reporter receives ReportData payloads the engine produces. The
@@ -51,6 +59,12 @@ var (
 // transmit the report on the right secure-channel session. ctx ends
 // when the engine stops ([Manager.Stop]); a reporter that waits on its
 // peer ends the wait with it.
+//
+// Deprecated: Use [ReportSender] ([Manager.SetReportSender]), the one hook
+// for every report, and pass nil as [NewManager]'s reporter. While a
+// Reporter, [EventReporter] or [FlushReporter] is set the manager reports
+// through them as before and no ReportSender is used. Removable in the next
+// minor release.
 type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAttributePath)
 
 // EventReporter is the hook for a report that carries events. The engine
@@ -69,6 +83,11 @@ type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAt
 // pass otherwise. Optional — a nil hook means events fan into the
 // queue but never leave the bridge (useful for unit tests of the cadence
 // math alone).
+//
+// Deprecated: Use [ReportSender] ([Manager.SetReportSender]): its [Report]
+// carries the events and the attribute changes due with them, and its
+// [NothingForSubscriber] replaces [Subscription.NothingSent]. Removable in
+// the next minor release.
 type EventReporter func(ctx context.Context, sub *Subscription, events []im.EventReport)
 
 // FlushReporter receives everything a subscription owes when its fabric
@@ -80,6 +99,9 @@ type EventReporter func(ctx context.Context, sub *Subscription, events []im.Even
 // DataReport). [Reporter] and [EventReporter] stay the ongoing paths; an
 // ongoing report with events carries its attribute changes too
 // ([Subscription.TakeDuePaths]).
+//
+// Deprecated: Use [ReportSender] ([Manager.SetReportSender]): a flush is a
+// [Report] with Flush set. Removable in the next minor release.
 type FlushReporter func(ctx context.Context, sub *Subscription, events []im.EventReport, paths []im.ConcreteAttributePath)
 
 // EventSource is where the engine reads a subscription's events when its
@@ -146,7 +168,13 @@ type Manager struct {
 	reporter      Reporter
 	eventReporter EventReporter
 	flushReporter FlushReporter
-	eventSource   EventSource
+	// sender is the [ReportSender]; the deprecated hooks above win while
+	// one is set ([Manager.senderFor]).
+	sender      ReportSender
+	eventSource EventSource
+	// noSenderLogged: the missing sender was logged since the last
+	// [Manager.SetReportSender] (guarded by mu).
+	noSenderLogged bool
 	// inflight counts a tick being walked and every report it started
 	// until the report returned (internal/inflight SubscriptionPending):
 	// the group the clock carries, nil outside a fabrictest site.
@@ -156,8 +184,8 @@ type Manager struct {
 	// seconds; zero for a node that is no such ICD.
 	icdIdleMax atomic.Uint32
 
-	// mu guards byID, eventReporter, flushReporter, eventSource, nextID, onClosed,
-	// onTerminated and perFabric.
+	// mu guards byID, eventReporter, flushReporter, sender, eventSource,
+	// nextID, onClosed, onTerminated and perFabric.
 	mu        sync.RWMutex
 	byID      map[uint32]*Subscription
 	perFabric map[uint8]int
@@ -193,6 +221,9 @@ func (m *Manager) SetICDIdleModeDuration(seconds uint16) { m.icdIdleMax.Store(ui
 // SetEventReporter wires the optional event-drain hook. Pass nil to
 // detach. Safe to call before Start; calling after Start swaps in the
 // new hook for subsequent ticks.
+//
+// Deprecated: Use [Manager.SetReportSender]. Removable in the next minor
+// release.
 func (m *Manager) SetEventReporter(r EventReporter) {
 	m.mu.Lock()
 	m.eventReporter = r
@@ -202,6 +233,9 @@ func (m *Manager) SetEventReporter(r EventReporter) {
 // SetFlushReporter wires the hook [Manager.FlushFabric] reports through.
 // Pass nil to detach; without one a flush sends nothing and leaves what
 // the subscriptions owe in place. Safe to call before Start.
+//
+// Deprecated: Use [Manager.SetReportSender]. Removable in the next minor
+// release.
 func (m *Manager) SetFlushReporter(r FlushReporter) {
 	m.mu.Lock()
 	m.flushReporter = r
@@ -304,9 +338,13 @@ func (m *Manager) finishClose(victims []*Subscription, terminated bool) {
 	}
 }
 
-// NewManager constructs a manager. logger and reporter may be nil;
-// nil reporter means subscriptions are tracked but no reports flow
-// out (useful for tests of the cadence math alone).
+// NewManager constructs a manager. logger may be nil. reporter, a
+// [Reporter], is deprecated and should be nil: every report goes through
+// the [ReportSender] set with [Manager.SetReportSender] (the bridge's
+// attach sets it), and a manager without one refuses subscriptions
+// ([ErrNoReportSender]). A non-nil reporter wires the manager through
+// the deprecated hooks, as before: attribute reports and keep-alives go
+// to it, events only once [Manager.SetEventReporter] is set too.
 func NewManager(cfg Config, reporter Reporter, logger *slog.Logger) *Manager {
 	if cfg.MaxSubscriptionsPerFabric == 0 {
 		cfg.MaxSubscriptionsPerFabric = DefaultMaxSubscriptionsPerFabric
@@ -382,9 +420,14 @@ func (m *Manager) Stop() {
 
 // Subscribe accepts a SubscribeRequest and returns the live record.
 // The caller wires the [Subscription.ID] into the SubscribeResponse.
+// It refuses with [ErrNoReportSender] while the manager cannot send a
+// report ([Manager.SetReportSender]).
 func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	if err := m.validateCadence(req.MinIntervalFloor, req.MaxIntervalCeiling); err != nil {
 		return nil, err
+	}
+	if m.senderFor(false) == nil {
+		return nil, ErrNoReportSender
 	}
 
 	// When the caller flags that this request is a replacement (same session
@@ -714,7 +757,8 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // subscription closed or ctx ended, and then reports what arrived after
 // that report drained the queues. The flush so lasts as long as that
 // wait, within ctx. A priming subscription owes nothing yet. Without a
-// [FlushReporter] nothing is drained or sent.
+// [ReportSender] nothing is drained or sent (nor, on a manager wired
+// through the deprecated hooks, without a [FlushReporter]).
 //
 // Unlike matter.js, whose subscription is marked closed before its flush
 // (ServerSubscription.ts:776-788 #close, :800-809 #markClosed),
@@ -741,10 +785,11 @@ func (m *Manager) FlushSession(ctx context.Context, sessionID uint16) {
 // flush reports what every open, primed subscription selected by match
 // owes, one report each, and waits for the reports.
 func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
-	m.mu.RLock()
-	flushReporter := m.flushReporter
-	m.mu.RUnlock()
-	if flushReporter == nil {
+	send := m.senderFor(true)
+	if send == nil {
+		if m.senderFor(false) == nil {
+			m.logNoSenderOnce("flush")
+		}
 		return
 	}
 	now := m.cfg.Clock.Now()
@@ -781,7 +826,7 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 			defer wg.Done()
 			defer m.inflight.Leave(inflight.SubscriptionPending)
 			defer sub.endReport()
-			flushReporter(ctx, sub, events, dirty)
+			send(ctx, sub, Report{Events: events, Paths: dirty, Flush: true})
 		}()
 	}
 	wg.Wait()

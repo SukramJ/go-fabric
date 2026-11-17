@@ -16,7 +16,7 @@ func TestSnapshot(t *testing.T) {
 	t.Parallel()
 	path := im.ConcreteAttributePath{HasEndpoint: true, HasCluster: true, HasAttribute: true, Endpoint: 1, Cluster: 0x0006, Attribute: 0x0000}
 	event := im.ConcreteEventPath{HasEndpoint: true, HasCluster: true, HasEvent: true, Endpoint: 0, Cluster: 0x0028, Event: 0x00}
-	m := NewManager(Config{}, nil, nil)
+	m := newTestManager(Config{})
 	subs := make([]*Subscription, 0, 3)
 	for i := range 3 {
 		sub, err := m.Subscribe(SubscribeArgs{

@@ -18,7 +18,7 @@ import (
 // a controller that subscribes twice at once keeps the first.
 func TestKeepSubscriptionsFalseLeavesAPrimingSubscription(t *testing.T) {
 	t.Parallel()
-	m := NewManager(Config{}, nil, nil)
+	m := newTestManager(Config{})
 	established, err := m.Subscribe(SubscribeArgs{FabricIndex: 1, PeerNodeID: 0xABCD, SessionID: 7, MaxIntervalCeiling: 60})
 	if err != nil {
 		t.Fatal(err)

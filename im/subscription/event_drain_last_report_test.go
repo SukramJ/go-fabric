@@ -43,7 +43,7 @@ func TestEventDrainThatSendsNothingIsNoReport(t *testing.T) {
 	for name, src := range sources {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			m := NewManager(Config{}, nil, nil)
+			m := newTestManager(Config{})
 			sub, err := m.Subscribe(SubscribeArgs{
 				FabricIndex: 1, PeerNodeID: 1, SessionID: 1,
 				MinIntervalFloor: 10, MaxIntervalCeiling: 60,
@@ -76,7 +76,7 @@ func TestEventDrainThatSendsNothingIsNoReport(t *testing.T) {
 
 	t.Run("a drain that sends is a report", func(t *testing.T) {
 		t.Parallel()
-		m := NewManager(Config{}, nil, nil)
+		m := newTestManager(Config{})
 		log := im.NewEventLog()
 		m.SetEventSource(log)
 		sub, err := m.Subscribe(SubscribeArgs{
