@@ -31,6 +31,9 @@ type cache struct {
 	// ([structure.imageBytes]).
 	sizes map[uint32]int
 	bytes int
+	// total is the image's running total this cache counts in, nil while
+	// it counts in none (structure.attachCache).
+	total *int
 	// version is the cluster's DataVersion; hasVersion false is
 	// Datasource.UNKNOWN_VERSION (DatasourceCache.ts:47-48).
 	version    uint32
@@ -153,6 +156,9 @@ func (c *cache) erase() {
 
 // setSize records value k's charge; 0 forgets it.
 func (c *cache) setSize(k uint32, size int) {
+	if c.total != nil {
+		*c.total += size - c.sizes[k]
+	}
 	c.bytes += size - c.sizes[k]
 	if size == 0 {
 		delete(c.sizes, k)

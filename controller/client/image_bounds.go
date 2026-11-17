@@ -4,6 +4,7 @@
 package client
 
 import (
+	"fmt"
 	"log/slog"
 	"unsafe"
 
@@ -76,7 +77,16 @@ func (s *structure) quota() int {
 // endpoint and cluster of it and each attribute's charge ([valueCharge]);
 // the node's own settings, record, ICD and onboarding entries are no
 // cluster of the image and do not count.
-func (s *structure) imageBytes() int {
+func (s *structure) imageBytes() int { return s.bytes }
+
+// checkImageTotal makes admit check the running total against the
+// structure's sum (recountImageBytes) and panic on a difference: the
+// package's tests set it, so each of them holds the total's invariant
+// (review II, N3-finimg-3). Off in production.
+var checkImageTotal = false
+
+// recountImageBytes is imageBytes summed from the structure.
+func (s *structure) recountImageBytes() int {
 	total := 0
 	for _, ep := range s.endpoints {
 		total += imageEndpointBytes
@@ -226,6 +236,11 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		sizes[key{at, a.Path.Attribute}] = valueCharge(a.Value)
 	}
 	before := s.imageBytes()
+	if checkImageTotal {
+		if sum := s.recountImageBytes(); sum != before {
+			panic(fmt.Sprintf("client: the image's running total %d differs from its structure's %d", before, sum))
+		}
+	}
 	after := before
 	newEndpoints, newClusters := map[uint16]bool{}, map[place]bool{}
 	for k, size := range sizes {

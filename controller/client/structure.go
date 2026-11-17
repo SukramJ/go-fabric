@@ -57,6 +57,12 @@ type structure struct {
 
 	endpoints map[uint16]*Endpoint
 	root      *Endpoint
+	// bytes is the image's charge ([structure.imageBytes]) kept as a
+	// running total: each endpoint of endpoints, each of their clusters and
+	// each attached cache's values (cache.total points here). admit reads
+	// it on every report, which summed every cluster before (review II,
+	// N3-finimg-3).
+	bytes int
 
 	// pendingOrder and pending are #pendingChanges, a Map in insertion order.
 	pendingOrder []*Endpoint
@@ -105,6 +111,7 @@ func newStructure(mu *sync.RWMutex, log *slog.Logger, p *persister) *structure {
 	s.root = newEndpoint(mu, 0)
 	s.root.deviceType, s.root.classification, s.root.name, s.root.installed = rootNodeDeviceType, "node", "RootNode", true
 	s.endpoints[0] = s.root
+	s.bytes = imageEndpointBytes
 	return s
 }
 
@@ -161,7 +168,9 @@ func (s *structure) loadCache(stored []StoredEndpoint) error {
 				values[id] = n
 			}
 			c := s.clusterFor(ep, sc.ID)
+			s.detachCache(c)
 			c.cache = newCache(s.p, se.Number, sc.ID, values, sc.Version)
+			s.attachCache(ep, c)
 			s.checkUnlistedSeedValues(c)
 			s.synchronizeCluster(ep, c, nil)
 		}
@@ -745,6 +754,7 @@ func (s *structure) endpointFor(number uint16) *Endpoint {
 	}
 	ep := newEndpoint(s.mu, number)
 	s.endpoints[number] = ep
+	s.bytes += imageEndpointBytes
 	return ep
 }
 
@@ -755,7 +765,30 @@ func (s *structure) clusterFor(ep *Endpoint, id uint32) *Cluster {
 	}
 	c := newCluster(s.mu, id, newCache(s.p, ep.number, id, nil, nil))
 	ep.clusters[id] = c
+	if s.endpoints[ep.number] == ep {
+		s.bytes += imageClusterBytes
+		s.attachCache(ep, c)
+	}
 	return c
+}
+
+// attachCache counts c's cache in the image's running total while ep is
+// the structure's endpoint of its number; its values' changes follow.
+func (s *structure) attachCache(ep *Endpoint, c *Cluster) {
+	if s.endpoints[ep.number] != ep || c.cache.total != nil {
+		return
+	}
+	c.cache.total = &s.bytes
+	s.bytes += c.cache.bytes
+}
+
+// detachCache takes c's cache out of the image's running total.
+func (s *structure) detachCache(c *Cluster) {
+	if c.cache.total != &s.bytes {
+		return
+	}
+	s.bytes -= c.cache.bytes
+	c.cache.total = nil
 }
 
 // ownerOf is #ownerOf (:1111-1125): the pending owner, else the owner; the
@@ -788,6 +821,10 @@ func (s *structure) eraseOnce(ep *Endpoint, seen map[*Endpoint]bool) {
 	}
 	if s.endpoints[ep.number] == ep {
 		delete(s.endpoints, ep.number)
+		s.bytes -= imageEndpointBytes + len(ep.clusters)*imageClusterBytes
+		for _, c := range ep.clusters {
+			s.detachCache(c)
+		}
 	}
 	s.deleteClaims(ep)
 	delete(s.partsListOf, ep)
@@ -821,6 +858,10 @@ func (s *structure) rebuild(ep *Endpoint) {
 		c := ep.clusters[id]
 		if c.pendingDelete {
 			delete(ep.clusters, id)
+			if s.endpoints[ep.number] == ep {
+				s.bytes -= imageClusterBytes
+				s.detachCache(c)
+			}
 			if c.current == nil {
 				continue
 			}
