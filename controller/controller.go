@@ -379,13 +379,9 @@ type Controller struct {
 	// The OTA push (ota.go): the update manager and the reboot armer;
 	// registry is reg for the node hooks, which run while New builds it.
 	ota atomic.Pointer[softwareupdate.Manager]
-	// otaDeleted counts the update manager's NodeDeleted calls the node
-	// hooks handed off (ota.go otaHooks); otaDeletedMu guards the Add
-	// against Close's Wait, and otaDeletedClosed refuses an Add once Close
-	// waits.
-	otaDeletedMu     sync.Mutex
-	otaDeletedClosed bool
-	otaDeleted       sync.WaitGroup
+	// otaHandoffs are the update manager's NodeDeleted calls the node
+	// hooks handed off (ota_handoff.go).
+	otaHandoffs otaHandoffs
 	registry         atomic.Pointer[client.Registry]
 	armer            *peer.RebootResubscribeArmer
 	armerObs         atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
@@ -657,16 +653,14 @@ func (c *Controller) clearLive() {
 }
 
 // closeOTA stops the update manager once the NodeDeleted calls the node
-// hooks handed off have returned, and refuses further ones.
-func (c *Controller) closeOTA() {
+// hooks handed off reached the host's callback or returned, within ctx,
+// and refuses further ones (otaHandoffs).
+func (c *Controller) closeOTA(ctx context.Context) {
 	m := c.ota.Swap(nil)
 	if m == nil {
 		return
 	}
-	c.otaDeletedMu.Lock()
-	c.otaDeletedClosed = true
-	c.otaDeletedMu.Unlock()
-	c.otaDeleted.Wait()
+	c.otaHandoffs.close(ctx)
 	m.Close()
 }
 
@@ -830,7 +824,7 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.stopDiscover = nil
 	}
 	c.closeVendorInfo()
-	c.closeOTA()
+	c.closeOTA(ctx)
 	if c.groups != nil {
 		c.groups.SetTransport(nil)
 		c.groups = nil

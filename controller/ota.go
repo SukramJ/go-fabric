@@ -96,7 +96,7 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 		AnnounceAsDefaultProvider: o.AnnounceAsDefaultProvider, AnnouncementInterval: o.AnnouncementInterval,
 		MaxBDXBlockSize: o.MaxBDXBlockSize, BDXAdditionalMrpDelay: o.BDXAdditionalMrpDelay, ApplyDelay: o.ApplyDelay,
 		RequestConsent: o.RequestConsent, OnUpdateAvailable: o.OnUpdateAvailable, OnUpdateApplying: o.OnUpdateApplying,
-		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: o.OnUpdateFailed, OnStatus: c.traceOTAStatus(o.OnStatus),
+		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: c.otaFailed(o.OnUpdateFailed), OnStatus: c.traceOTAStatus(o.OnStatus),
 		ScriptQueryImage: o.ScriptQueryImage, ScriptApplyUpdate: o.ScriptApplyUpdate, OnProviderExchange: o.OnProviderExchange,
 		Clock: c.clock, Logger: c.log,
 	})
@@ -144,19 +144,21 @@ func (c *Controller) BDX() *bdx.Responder {
 }
 
 // otaNodeDeleted hands the update manager's NodeDeleted for p to a
-// goroutine Close waits for; nothing once Close began to close the
-// manager.
+// goroutine Close waits for until it reaches the host's callback
+// (otaHandoffs); nothing once Close began to close the manager.
 func (c *Controller) otaNodeDeleted(p softwareupdate.Peer) {
 	m := c.ota.Load()
 	if m == nil {
 		return
 	}
-	c.otaDeletedMu.Lock()
-	defer c.otaDeletedMu.Unlock()
-	if c.otaDeletedClosed {
+	o := c.otaHandoffs.start(p)
+	if o == nil {
 		return
 	}
-	c.otaDeleted.Go(func() { m.NodeDeleted(p) })
+	go func() {
+		defer c.otaHandoffs.done(p, o)
+		m.NodeDeleted(p)
+	}()
 }
 
 // armerContext is the reboot armer's view of the stack — matter.js's
@@ -285,7 +287,8 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 		// host's OnUpdateFailed for a queued update: it runs on its own
 		// goroutine, after the hook returned, so a host callback that
 		// starts a fabric operation does not wait for the one running.
-		// Close waits for it before it closes the manager.
+		// Close waits for it, within its ctx, until it reaches the host's
+		// callback (otaHandoffs).
 		h.Deleted = func() {
 			if p := lastPeer.Load(); p != nil {
 				c.otaNodeDeleted(*p)
