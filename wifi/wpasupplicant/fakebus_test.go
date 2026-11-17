@@ -67,6 +67,22 @@ type fakeBus struct {
 	// selected is signalled on every SelectNetwork.
 	selected chan struct{}
 	closed   bool
+	// watched is every path Watch subscribed to, in order; watchedAt the
+	// number of calls made before each.
+	watched   []dbus.ObjectPath
+	watchedAt []int
+	// nextNetworks, while not empty, are the paths AddNetwork answers, in
+	// order; fakeNetwork after them.
+	nextNetworks []dbus.ObjectPath
+}
+
+// Watch implements bus: the subscription is recorded, with the calls.
+func (b *fakeBus) Watch(_ context.Context, iface dbus.ObjectPath) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.watched = append(b.watched, iface)
+	b.watchedAt = append(b.watchedAt, len(b.calls))
+	return nil
 }
 
 func newFakeBus() *fakeBus {
@@ -198,10 +214,22 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 			}()
 		}
 	case ifaceInterface + ".AddNetwork":
-		return []any{fakeNetwork}, nil
+		n := fakeNetwork
+		if len(b.nextNetworks) > 0 {
+			n, b.nextNetworks = b.nextNetworks[0], b.nextNetworks[1:]
+		}
+		if v, ok := b.props["Networks"]; ok {
+			listed, _ := v.Value().([]dbus.ObjectPath)
+			b.props["Networks"] = dbus.MakeVariant(append(slices.Clone(listed), n))
+		}
+		return []any{n}, nil
 	case ifaceInterface + ".RemoveNetwork":
 		if cur, _ := b.props["CurrentNetwork"].Value().(dbus.ObjectPath); cur == args[0] {
 			b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
+		}
+		if v, ok := b.props["Networks"]; ok {
+			listed, _ := v.Value().([]dbus.ObjectPath)
+			b.props["Networks"] = dbus.MakeVariant(slices.DeleteFunc(slices.Clone(listed), func(p dbus.ObjectPath) bool { return p == args[0] }))
 		}
 	case ifaceInterface + ".Disconnect":
 		if b.onDisconnect != nil {

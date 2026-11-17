@@ -18,27 +18,27 @@ type systemBus struct {
 	signals chan *dbus.Signal
 }
 
-// dialSystemBus connects to the system bus and subscribes to
-// wpa_supplicant's ScanDone and PropertiesChanged signals under its root
-// object.
+// dialSystemBus connects to the system bus. It subscribes to nothing yet:
+// the driver's Watch names the one interface object it follows.
 func dialSystemBus() (*systemBus, error) {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
 		return nil, fmt.Errorf("wpasupplicant: connect to the system bus: %w", err)
 	}
-	matches := [][]dbus.MatchOption{
-		{dbus.WithMatchSender(service), dbus.WithMatchInterface(ifaceInterface), dbus.WithMatchMember("ScanDone"), dbus.WithMatchPathNamespace(rootPath)},
-		{dbus.WithMatchSender(service), dbus.WithMatchInterface(ifaceProperties), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchPathNamespace(rootPath)},
-	}
-	for _, m := range matches {
-		if err := conn.AddMatchSignal(m...); err != nil {
-			_ = conn.Close()
-			return nil, fmt.Errorf("wpasupplicant: org.freedesktop.DBus.AddMatch: %w", err)
-		}
-	}
 	b := &systemBus{conn: conn, signals: make(chan *dbus.Signal, 256)}
 	conn.Signal(b.signals)
 	return b, nil
+}
+
+// Watch adds watchRules' match rules — what godbus's AddMatchSignal sends,
+// the rule written out.
+func (b *systemBus) Watch(ctx context.Context, iface dbus.ObjectPath) error {
+	for _, rule := range watchRules(iface) {
+		if err := b.conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.AddMatch", 0, rule).Store(); err != nil {
+			return fmt.Errorf("wpasupplicant: org.freedesktop.DBus.AddMatch: %w", err)
+		}
+	}
+	return nil
 }
 
 func (b *systemBus) Call(ctx context.Context, path dbus.ObjectPath, method string, args ...any) ([]any, error) {
