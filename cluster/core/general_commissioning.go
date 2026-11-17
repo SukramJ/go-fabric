@@ -277,7 +277,7 @@ type GeneralCommissioningConfig struct {
 	// go-fabric answers "true" — the bridge runs over Ethernet.
 	SupportsConcurrentConnection bool
 	// FailSafeMaxSeconds bounds how long an ArmFailSafe window stays
-	// active. Matter spec floor is 60 s; v1.1 defaults to 900 s
+	// active. Matter spec floor is 60 s; the module defaults to 900 s
 	// (15 min) to keep parity with the pairing-window default in
 	// the UI concept.
 	FailSafeMaxSeconds uint16

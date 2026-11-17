@@ -48,7 +48,7 @@ const (
 	tagPBKDFRespResponderRandom    uint8 = 2
 	tagPBKDFRespResponderSessionID uint8 = 3
 	tagPBKDFRespPBKDFParameters    uint8 = 4 // nested Structure, only when requested
-	tagPBKDFRespResponderMRPParams uint8 = 5 // optional, omitted in v1.1
+	tagPBKDFRespResponderMRPParams uint8 = 5 // optional: present when the responder states session parameters (sessionParamsForWire)
 )
 
 // PBKDFParameters nested-struct field tags.

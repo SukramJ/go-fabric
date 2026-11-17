@@ -21,7 +21,7 @@ const (
 	SecureChannelProtocolID uint16 = 0x0000
 
 	// SCOpcodeMsgCounterSyncReq / Rsp — counter-sync (group-only;
-	// not used for v1.1 unicast).
+	// not used for unicast).
 	SCOpcodeMsgCounterSyncReq uint8 = 0x00
 	SCOpcodeMsgCounterSyncRsp uint8 = 0x01
 

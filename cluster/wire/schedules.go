@@ -59,7 +59,7 @@ const SchedulesClusterRevision uint16 = 1
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
 // Removable in the next minor release.
-var ErrSchedulesReadOnly = errors.New("wire: Schedules cluster is read-only in v1.1 bridge")
+var ErrSchedulesReadOnly = errors.New("wire: Schedules cluster is read-only")
 
 // ScheduleEntry is the bridge-side representation of one programmed
 // setpoint transition. [SchedulesSource.MatterScheduleEntries] returns one
@@ -191,7 +191,7 @@ func (s *SchedulesServer) MatterRead(attrID uint32) (any, bool) {
 		}
 		return groups, true
 	case SchedulesAttrFeatureMap:
-		// No optional Matter Schedules features are enabled in v1.1.
+		// No optional Matter Schedules features are enabled.
 		return uint32(0), true
 	case SchedulesAttrClusterRevision:
 		return SchedulesClusterRevision, true
@@ -201,7 +201,7 @@ func (s *SchedulesServer) MatterRead(attrID uint32) (any, bool) {
 }
 
 // MatterWrite implements [contract.ClusterServer]. All writes are
-// rejected: the Schedules cluster is read-only in the v1.1 bridge.
+// rejected: the Schedules cluster is read-only here.
 func (s *SchedulesServer) MatterWrite(_ context.Context, attrID uint32, _ any) error {
 	return spec.Errorf(im.StatusUnsupportedWrite, "%w: attribute 0x%04X", ErrSchedulesReadOnly, attrID)
 }
@@ -213,7 +213,7 @@ func (s *SchedulesServer) MatterWriteChanged(ctx context.Context, attrID uint32,
 }
 
 // MatterInvoke implements [contract.ClusterServer]. All invocations
-// are rejected: the Schedules cluster exposes no commands in the v1.1 bridge.
+// are rejected: the Schedules cluster exposes no commands here.
 func (s *SchedulesServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: command 0x%02X", ErrSchedulesReadOnly, cmdID)
 }
