@@ -45,6 +45,13 @@ func (d *fabricScopedRecorder) WriteAuthorized(ctx context.Context, p ConcreteAt
 	return d.Write(ctx, p, v)
 }
 
+// CheckACL grants: the test is about the fabric scope, the gate after
+// the access check (R2-P6-sec-0560 made a dispatcher without a checker
+// deny).
+func (*fabricScopedRecorder) CheckACL(context.Context, uint8, uint64, []uint32, uint16, uint32, uint8) StatusCode {
+	return StatusSuccess
+}
+
 func (d *fabricScopedRecorder) Invoke(context.Context, ConcreteCommandPath, any) InvokeResult {
 	return InvokeResult{}
 }

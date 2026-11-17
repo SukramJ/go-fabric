@@ -43,7 +43,7 @@ const (
 )
 
 // errScenesStub surfaces from Write / Invoke on the stub.
-var errScenesStub = errors.New("wire: ScenesManagement is a read-only stub (HM has no scene management)")
+var errScenesStub = errors.New("wire: ScenesManagement is a read-only stub (it serves no scenes)")
 
 // Compile-time assertions.
 var (
@@ -58,7 +58,7 @@ func (ScenesManagement) MatterClusterID() uint32 { return scenesManagementCluste
 func (ScenesManagement) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case scenesManagementAttrSceneTableSize:
-		// 0 = empty scene table (HM has no scene management).
+		// 0 = empty scene table (the stub serves no scenes).
 		return uint16(0), true
 	case scenesManagementAttrFabricSceneInfo:
 		// Empty list — no scenes stored per fabric.
@@ -88,7 +88,7 @@ func (s ScenesManagement) MatterWriteChanged(ctx context.Context, attrID uint32,
 // `src/app/clusters/scenes-server/ScenesServer.cpp` both require a valid
 // status-code response for unsupported commands.
 func (ScenesManagement) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
-	return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: no commands supported (HM has no scene management), cmdID 0x%02X", errScenesStub, cmdID)
+	return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: no commands supported, cmdID 0x%02X", errScenesStub, cmdID)
 }
 
 // MatterReportable returns nil — no subscribe-able attributes.

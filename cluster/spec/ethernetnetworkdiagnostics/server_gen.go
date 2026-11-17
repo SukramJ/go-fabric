@@ -29,6 +29,35 @@ type State struct {
 	TimeSinceReset uint64       // attribute 0x0008: uint64, O, R V, C
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.PhyRate = func(p *PHYRateEnum) *PHYRateEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PhyRate)
+	c.FullDuplex = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.FullDuplex)
+	c.CarrierDetect = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CarrierDetect)
+	return c
+}
+
 // Patch is a change to the EthernetNetworkDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

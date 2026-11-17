@@ -5,11 +5,13 @@ package endpoint
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 )
@@ -143,6 +145,12 @@ type Endpoint struct {
 	// VendorName is the bridged device's own manufacturer
 	// ([Spec.VendorName]); empty falls back to BridgeVendorName.
 	VendorName string
+	// BridgedBasicInformation is [Spec.BridgedBasicInformation]: what the
+	// host states of the bridged device's BridgedDeviceBasicInformation.
+	BridgedBasicInformation bdbidef.Patch
+	// fabrics is the assembler's [Config.Fabrics], handed to the
+	// endpoint's Binding servers (mountBinding).
+	fabrics mattercore.FabricSource
 
 	// ParentEndpointID is the Matter endpoint ID of the parent
 	// endpoint in the bridge hierarchy. For bridged endpoints (ID ≥ 2)
@@ -274,6 +282,9 @@ type Endpoint struct {
 	// persistence is [Config.Persistence] (or the deprecated hooks it
 	// adapts); nil keeps the label and the scene table in memory.
 	persistence Persistence
+	// log is the Assembler's logger for an endpoint it built; nil logs on
+	// the process default ([Endpoint.logger]).
+	log *slog.Logger
 }
 
 // PublishClusterServers publishes servers as this endpoint's attached
@@ -284,9 +295,36 @@ type Endpoint struct {
 //
 // Only the root (ID 0) and the Aggregator (ID 1) carry an attached set;
 // see [Endpoint.attachedClusters].
+//
+// A nil entry is dropped and logged once for the endpoint (see
+// [dropNilServers]).
 func (e *Endpoint) PublishClusterServers(servers []contract.ClusterServer) {
-	published := append([]contract.ClusterServer(nil), servers...)
+	published := e.dropNilServers(servers)
 	e.attachedClusters.Store(&published)
+}
+
+// dropNilServers returns a fresh copy of servers without its nil entries.
+// A nil entry in a source's MatterClusterServers or in a published set is
+// a host defect; the dispatcher's entry points ask every server for its
+// cluster ID, so one nil entry would stop the process on the first
+// request that walks the endpoint — some of them on a goroutine nothing
+// recovers (R2-P6-err-0403). Dropping it here, the one place every
+// server set passes, keeps the scattered entry points free of a nil
+// guard. The first drop on an endpoint is logged at Warn; later ones are
+// not, so a source that lists nil on every dispatch does not flood the
+// log.
+func (e *Endpoint) dropNilServers(servers []contract.ClusterServer) []contract.ClusterServer {
+	out := make([]contract.ClusterServer, 0, len(servers))
+	for _, s := range servers {
+		if s != nil {
+			out = append(out, s)
+		}
+	}
+	if len(out) != len(servers) && e.endpointState().nilServerLogged.CompareAndSwap(false, true) {
+		e.logger().Warn("endpoint: nil cluster server dropped from the endpoint's server list",
+			"endpoint", e.ID, "dropped", len(servers)-len(out))
+	}
+	return out
 }
 
 // AttachedClusterServers returns the cluster set last published via
@@ -300,6 +338,15 @@ func (e *Endpoint) AttachedClusterServers() []contract.ClusterServer {
 		return nil
 	}
 	return append([]contract.ClusterServer(nil), *published...)
+}
+
+// logger is the endpoint's logger: the Assembler's for an endpoint it
+// built, the process default for one composed by hand.
+func (e *Endpoint) logger() *slog.Logger {
+	if e.log != nil {
+		return e.log
+	}
+	return slog.Default()
 }
 
 // endpointState returns (lazily creating) the state bound to this
@@ -372,6 +419,9 @@ type endpointState struct {
 	// binding is the Binding server [mountBinding] mounts, created on first
 	// use.
 	binding *mattercore.Binding
+	// nilServerLogged is set once [Endpoint.dropNilServers] logged a
+	// dropped nil server for this endpoint.
+	nilServerLogged atomic.Bool
 }
 
 // configurationVersion returns the version, 1 when never raised.

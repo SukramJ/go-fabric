@@ -19,8 +19,9 @@
 //
 //   - SupportedModes: no label and no mode value twice
 //     (ModeUtils.assertSupportedModes), plus the derivation's required
-//     tags — RvcRunMode at least one Idle and one Cleaning mode, Idle,
-//     Cleaning and Mapping never together in one mode; RvcCleanMode at
+//     tags — RvcRunMode at least one Idle and one Cleaning mode, and no
+//     mode with two or more of Idle, Cleaning and Mapping (the refusal's
+//     text, [ErrExclusiveTags], is matter.js's own); RvcCleanMode at
 //     least one Vacuum or Mop mode; LaundryWasherMode and DishwasherMode
 //     at least one Normal mode; OvenMode at least one Bake mode;
 //     RefrigeratorAndTemperatureControlledCabinetMode at least one Auto
@@ -263,6 +264,11 @@ type Config struct {
 	// Features: FeatureDirectModeChange on RvcRunMode / RvcCleanMode.
 	Features Feature
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: no controller reads this tracker — the wire carries the
+	// endpoint's DataVersion for the cluster, which the bridge keeps
+	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
+	// minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -432,20 +438,133 @@ func checkDeviceEnergyManagement(modes []ModeOption) error {
 }
 
 // Server implements [contract.ClusterServer] for one ModeBase derivation.
+//
+// Its state — SupportedModes and CurrentMode — is its own; the generated
+// store beside it ([spec.SelfHeld]) reads that state through a source and
+// carries the typed server's command path: a ChangeToMode is admitted
+// against the definition with the state's values as peers, a host's
+// handler or the server's own logic runs, and the response is checked
+// ([spec.InvokeHeld], decision 154).
 type Server struct {
 	cluster.AttributeChanges
-	spec.Hooks
+	spec.SelfHeld
+	// Hooks is the command path the server had before decision 154, kept
+	// for the deprecation window: the server binds it to its instance and
+	// mirrors into it every host handler ([Server.Handle]), write veto
+	// ([Server.SetBeforeWrite]), endpoint and emitter, so its promoted
+	// methods behave as before. MatterInvoke runs through [spec.InvokeHeld];
+	// a handler registered on the field itself (srv.Hooks.Handle) answers
+	// ChangeToMode when Handle registered none (decision 177).
+	//
+	// Deprecated: the command path is [spec.SelfHeld] with
+	// [spec.InvokeHeld] (decision 154): register a host handler with
+	// [Server.Handle] and invoke with [Server.MatterInvoke]. Removable in
+	// the next minor release.
+	spec.Hooks //nolint:staticcheck // the deprecated field kept for its window
 
 	k        kind
 	inst     *spec.Instance
+	srv      *spec.Server
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
 	changer  ModeChanger
 	modes    []ModeOption
 
+	// cmd serialises ChangeToMode: the read of CurrentMode, its checks,
+	// the host's change and the store are one step (R2-P6-conc-1414).
+	cmd sync.Mutex
 	// mu guards current.
 	mu      sync.Mutex
 	current uint8
+}
+
+// Handle implements [spec.CommandRegistrar]: the host's handler of cmdID
+// replaces the server's own ChangeToMode on the command path
+// ([spec.SelfHeld.Handle]), and a handler registered on the deprecated
+// [Server.Hooks] field; it is mirrored into that field so that
+// [Server.Invoke] runs it as before, and nil hands the command back on
+// both.
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	if err := s.SelfHeld.Handle(cmdID, fn); err != nil {
+		return err
+	}
+	return s.Hooks.Handle(cmdID, fn) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// Emit implements [spec.EventEmitting] ([spec.SelfHeld.Emit]); ModeBase
+// defines no event.
+func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.SelfHeld.Emit(endpoint, eventID, data)
+}
+
+// EmitEvent emits on the endpoint the server is mounted on
+// ([spec.SelfHeld.EmitEvent]).
+func (s *Server) EmitEvent(eventID uint32, data any) error {
+	return s.SelfHeld.EmitEvent(eventID, data)
+}
+
+// SetEndpoint implements [contract.EndpointReceiver] for the store and the
+// Hooks field ([Server.Hooks]).
+func (s *Server) SetEndpoint(endpoint uint16) {
+	s.SelfHeld.SetEndpoint(endpoint)
+	s.Hooks.SetEndpoint(endpoint) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// SetMatterEventEmitter implements [contract.EventReceiver] for the store
+// and the deprecated [Server.Hooks].
+func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
+	s.SelfHeld.SetMatterEventEmitter(emitter)
+	s.Hooks.SetMatterEventEmitter(emitter) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter]; the served
+// attributes are read-only, so no controller write reaches the veto. It
+// is mirrored into the deprecated [Server.Hooks] for [Server.CheckWrite].
+func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.SelfHeld.SetBeforeWrite(fn)
+	s.Hooks.SetBeforeWrite(fn) //nolint:staticcheck // mirrored into the deprecated field
+}
+
+// Init binds the deprecated [Server.Hooks] to inst, as before; the server
+// binds it at construction.
+//
+// Deprecated: the server's command path needs no binding (decision 154).
+// Removable in the next minor release.
+func (s *Server) Init(inst *spec.Instance) {
+	s.Hooks.Init(inst) //nolint:staticcheck // the deprecated field
+}
+
+// Invoke admits the request against the instance [Server.Init] bound and
+// runs the host's handler of cmdID, as before ([spec.Hooks.Invoke]);
+// handled is false without one.
+//
+// Deprecated: use [Server.MatterInvoke], which admits the request and
+// checks the response with the server's values as peers (decision 154).
+// Removable in the next minor release.
+func (s *Server) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
+	return s.Hooks.Invoke(ctx, cmdID, fields) //nolint:staticcheck // the deprecated field
+}
+
+// CheckWrite runs the host's write veto ([Server.SetBeforeWrite]) on a
+// value, as before ([spec.Hooks.CheckWrite]).
+//
+// Deprecated: the served attributes are read-only, so no controller write
+// reaches a veto; the server has no write path that calls it. Removable in
+// the next minor release.
+func (s *Server) CheckWrite(ctx context.Context, attrID uint32, value any) error {
+	return s.Hooks.CheckWrite(ctx, attrID, value) //nolint:staticcheck // the deprecated field
+}
+
+// modeSource answers the store's reads from the server's own state.
+type modeSource struct{ s *Server }
+
+// MatterAttribute implements [spec.Source].
+func (m modeSource) MatterAttribute(attrID uint32) (any, bool) {
+	switch attrID {
+	case AttrSupportedModes, AttrCurrentMode:
+		return m.s.MatterRead(attrID)
+	}
+	return nil, false
 }
 
 // Compile-time assertions.
@@ -498,7 +617,8 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
 	}
-	if cfg.Changer == nil && inst.Accepts(CmdChangeToMode) {
+	accepts := inst.Accepts(CmdChangeToMode)
+	if cfg.Changer == nil && accepts {
 		return nil, ErrNoChanger
 	}
 	tagMin, tagMax := modeTagBounds(k.def)
@@ -512,8 +632,17 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	for i, m := range cfg.SupportedModes {
 		modes[i] = ModeOption{Label: m.Label, Mode: m.Mode, Tags: slices.Clone(m.Tags)}
 	}
-	s := &Server{k: k, inst: inst, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, current: cfg.CurrentMode}
-	s.Init(inst)
+	s := &Server{k: k, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, current: cfg.CurrentMode}
+	sc := spec.ServerConfig{DataVersion: s.tracker(), Source: modeSource{s}} //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
+	if accepts {
+		sc.Handlers = map[uint32]spec.CommandHandler{CmdChangeToMode: s.changeToMode}
+	}
+	srv, err := spec.NewServer(k.def, spec.Options{Features: uint32(cfg.Features)}, sc)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
+	}
+	s.srv, s.inst, s.SelfHeld = srv, srv.Instance, spec.NewSelfHeld(srv)
+	s.Hooks.Init(srv.Instance) //nolint:staticcheck // the deprecated field, bound as before
 	// The mode servers' initialize: ModeUtils.assertMode(supportedModes,
 	// currentMode).
 	if !s.supports(cfg.CurrentMode) {
@@ -625,7 +754,12 @@ func (s *Server) Revision() uint16 { return s.inst.Revision() }
 // MatterClusterID returns the derivation's cluster id.
 func (s *Server) MatterClusterID() uint32 { return s.inst.MatterClusterID() }
 
-// MatterDataVersion implements [contract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion]: the
+// server's own tracker, the host's when it supplied one.
+//
+// Deprecated: no controller reads this version — the wire carries the
+// endpoint's DataVersion for the cluster, which the bridge keeps
+// (decision 165, F-db021da0-46). Removable in the next minor release.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister].
@@ -683,18 +817,29 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 }
 
 // MatterInvoke answers ChangeToMode with a ChangeToModeResponse where the
-// definition accepts it (MicrowaveOvenMode's does not).
+// definition accepts it (MicrowaveOvenMode's does not): the request held
+// to the definition, then a host's handler ([spec.SelfHeld.Handle]) or
+// the server's own logic, the response checked ([spec.InvokeHeld]).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	if cmdID != CmdChangeToMode || !s.inst.Accepts(cmdID) {
-		return nil, im.UnsupportedCommandf("modebase: command 0x%02X is not supported", cmdID)
-	}
-	if resp, handled, err := s.Invoke(ctx, cmdID, fields); handled {
+	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
+}
+
+// changeToMode is the server's own ChangeToMode, which [spec.InvokeHeld]
+// runs when the host registered no handler with [Server.Handle]. A
+// handler registered on the deprecated [Server.Hooks] field answers
+// first, ahead of the request's decoding and outside cmd as before
+// decision 154 (decision 177); the request InvokeHeld admitted is not
+// held a second time there.
+func (s *Server) changeToMode(ctx context.Context, fields any) (any, error) {
+	if resp, handled, err := s.Hooks.Invoke(ctx, CmdChangeToMode, fields); handled { //nolint:staticcheck // the deprecated field's handler, honoured for its window
 		return resp, err
 	}
 	newMode, ok := changeToModeRequest(fields)
 	if !ok {
 		return nil, statusError{im.StatusInvalidCommand, fmt.Sprintf("modebase: ChangeToMode fields %T", fields)}
 	}
+	s.cmd.Lock()
+	defer s.cmd.Unlock()
 	s.mu.Lock()
 	current := s.current
 	s.mu.Unlock()

@@ -176,6 +176,14 @@ func (s *Store) AddFabric(ctx context.Context, rec FabricRecord) (uint8, error) 
 		return 0, fmt.Errorf("store: add fabric: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	// A write first, so the transaction holds the write lock before the
+	// counter read: read first, a writer committing in between made SQLite
+	// refuse the lock upgrade with SQLITE_BUSY without waiting out the busy
+	// timeout (UpdateFabricCredentials' reason; storetest's
+	// fabrics/add-beside-writer).
+	if _, err := tx.ExecContext(ctx, `UPDATE matter_metadata SET value = value WHERE key = 'next_fabric_index'`); err != nil {
+		return 0, fmt.Errorf("store: add fabric: %w", err)
+	}
 
 	idx := rec.FabricIndex
 	if idx == 0 {
@@ -438,6 +446,8 @@ WHERE fabric_index = ? AND pending = ?`, FabricPendingUpdate, fabricIndex, Fabri
 		if err := s.updateSealedCredentials(ctx, tx, fabricIndex, marked > 0, c); err != nil {
 			return err
 		}
+	} else if err := s.refuseClearSecretWrite(ctx, tx); err != nil {
+		return fmt.Errorf("store: update fabric credentials: %w", err)
 	} else if err := s.updateClearCredentials(ctx, tx, fabricIndex, marked > 0, c); err != nil {
 		return err
 	}
@@ -578,8 +588,8 @@ WHERE fabric_index = ?`, fabricIndex); err != nil {
 
 // RollbackFabric implements [Fabrics] in one transaction, the write first:
 // the owed event is copied from the pending row (which a committed or
-// missing row skips), then a pending add's row is deleted (the foreign
-// keys' ON DELETE CASCADE takes its rows, as in RemoveFabric); a pending
+// missing row skips), then a pending add's row is deleted with every row
+// the fabric owns, as in RemoveFabric; a pending
 // update's identity is restored while the row still says so, then the row,
 // and the fabric's resumption records are deleted. A prior node id or
 // vendor id that is not there (a row no UpdateFabricCredentials marked)
@@ -619,6 +629,9 @@ FROM matter_fabrics WHERE fabric_index = ? AND pending IN (?, ?)`, fabricIndex, 
 	if n, err := res.RowsAffected(); err != nil {
 		return FabricCommitted, fmt.Errorf("store: rollback fabric: delete: %w", err)
 	} else if n > 0 {
+		if err := deleteFabricOwnedRows(ctx, tx, fabricIndex); err != nil {
+			return FabricCommitted, fmt.Errorf("store: rollback fabric: %w", err)
+		}
 		if err := tx.Commit(); err != nil {
 			return FabricCommitted, fmt.Errorf("store: rollback fabric: commit: %w", err)
 		}
@@ -740,11 +753,46 @@ func (s *Store) AckOwedFabricEvent(ctx context.Context, id uint64) error {
 	return nil
 }
 
-// RemoveFabric deletes the fabric and (via FK CASCADE) its
-// node_identity, group_keys, group_key_map and acl_entries. Returns
-// [ErrFabricNotFound] when no row exists.
+// fabricOwnedTables are the tables whose rows a fabric owns — each one's
+// foreign key names matter_fabrics (TestFabricOwnedTablesAreTheForeignKeys)
+// and [Fabrics] lists them. RemoveFabric and RollbackFabric delete from
+// each in their own transaction, so the removal of a fabric's key material
+// does not rest on the handle's PRAGMA foreign_keys(1); the schema's ON
+// DELETE CASCADE is the second line.
+var fabricOwnedTables = []string{
+	"matter_node_identities",
+	"matter_group_keys",
+	"matter_group_key_map",
+	"matter_group_table",
+	"matter_groupcast_groups",
+	"matter_acl_entries",
+	"matter_resumption",
+	"matter_ota_default_providers",
+	"matter_icd_registrations",
+}
+
+// deleteFabricOwnedRows deletes the fabric's rows of every
+// [fabricOwnedTables] table on tx.
+func deleteFabricOwnedRows(ctx context.Context, tx *sql.Tx, fabricIndex uint8) error {
+	for _, table := range fabricOwnedTables {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE fabric_index = ?`, fabricIndex); err != nil { //nolint:gosec // the package's constants
+			return fmt.Errorf("%s: %w", table, err)
+		}
+	}
+	return nil
+}
+
+// RemoveFabric deletes the fabric and everything it owns — the rows of
+// every table [Fabrics] lists (fabricOwnedTables) — in one transaction,
+// whether or not the handle has foreign keys on. Returns
+// [ErrFabricNotFound], and changes nothing, when no row exists.
 func (s *Store) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: remove fabric: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.ExecContext(ctx, `DELETE FROM matter_fabrics WHERE fabric_index = ?`, fabricIndex)
 	if err != nil {
 		return fmt.Errorf("store: remove fabric: %w", err)
 	}
@@ -754,6 +802,12 @@ func (s *Store) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 	}
 	if n == 0 {
 		return ErrFabricNotFound
+	}
+	if err := deleteFabricOwnedRows(ctx, tx, fabricIndex); err != nil {
+		return fmt.Errorf("store: remove fabric: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: remove fabric: commit: %w", err)
 	}
 	return nil
 }

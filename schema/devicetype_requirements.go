@@ -3,7 +3,10 @@
 
 package schema
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // RequirementElement is what a device-type requirement requires: matter.js's
 // RequirementElement.ElementType values verbatim
@@ -177,34 +180,84 @@ type DeviceTypeDefinition struct {
 }
 
 // DeviceTypeDefinitionOf returns the snapshot's definition of a device
-// type, or (nil, false) when the snapshot has none. The definition is
-// shared: callers must not modify it.
+// type, or (nil, false) when the snapshot has none. The definition is the
+// caller's own deep copy: a change to it does not reach the module's table
+// (review II, R2-P6-api-1316).
 //
 // Mirrors matter.js ModelLookups.deviceTypeOf (packages/model/src/logic/
 // device-types/ModelLookups.ts).
 func DeviceTypeDefinitionOf(id DeviceTypeID) (*DeviceTypeDefinition, bool) {
 	dt, ok := deviceTypeDefinitions[id]
-	return dt, ok
+	if !ok {
+		return nil, false
+	}
+	return dt.clone(), true
+}
+
+// clone is a deep copy of d.
+func (d *DeviceTypeDefinition) clone() *DeviceTypeDefinition {
+	if d == nil {
+		return nil
+	}
+	c := *d
+	c.Conditions = slices.Clone(d.Conditions)
+	c.Requirements = cloneRequirements(d.Requirements)
+	return &c
+}
+
+// cloneRequirements is a deep copy of rs.
+func cloneRequirements(rs []DeviceTypeRequirement) []DeviceTypeRequirement {
+	if rs == nil {
+		return nil
+	}
+	out := make([]DeviceTypeRequirement, len(rs))
+	for n := range rs {
+		out[n] = rs[n]
+		out[n].Conformance = rs[n].Conformance.clone()
+		out[n].Requirements = cloneRequirements(rs[n].Requirements)
+	}
+	return out
+}
+
+// clone is a deep copy of c.
+func (c Conformance) clone() Conformance {
+	if c.Choice != nil {
+		choice := *c.Choice
+		c.Choice = &choice
+	}
+	if c.Args != nil {
+		args := make([]Conformance, len(c.Args))
+		for n := range c.Args {
+			args[n] = c.Args[n].clone()
+		}
+		c.Args = args
+	}
+	return c
 }
 
 // BaseDeviceTypes returns the device types classified "base" — the Base
 // device type, whose requirements apply to every endpoint that lists a
-// device type and whose conditions every device type may name. Shared:
-// callers must not modify them.
+// device type and whose conditions every device type may name. The slice
+// and the definitions are the caller's own deep copies.
 //
 // Mirrors matter.js ModelLookups.baseDeviceTypes.
 func BaseDeviceTypes() []*DeviceTypeDefinition {
-	return baseDeviceTypeDefinitions
+	out := make([]*DeviceTypeDefinition, len(baseDeviceTypeDefinitions))
+	for n, d := range baseDeviceTypeDefinitions {
+		out[n] = d.clone()
+	}
+	return out
 }
 
 // DeviceTypeConditions returns the conditions a device type declares
-// itself, in declaration order, or nil for an unknown device type.
+// itself, in declaration order, or nil for an unknown device type; the
+// slice is the caller's own.
 func DeviceTypeConditions(id DeviceTypeID) []string {
 	dt, ok := deviceTypeDefinitions[id]
 	if !ok {
 		return nil
 	}
-	return dt.Conditions
+	return slices.Clone(dt.Conditions)
 }
 
 // DeviceTypeConditionScope returns every condition the requirements of a
@@ -327,9 +380,10 @@ type ClusterFeature struct {
 }
 
 // ClusterFeatures returns a cluster's features in bit order, or nil for a
-// cluster without features or unknown to the snapshot.
+// cluster without features or unknown to the snapshot; the slice is the
+// caller's own.
 func ClusterFeatures(clusterID uint32) []ClusterFeature {
-	return clusterFeatures[clusterID]
+	return slices.Clone(clusterFeatures[clusterID])
 }
 
 // ClusterFeatureNames decodes a FeatureMap value into the codes of the

@@ -7,13 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 )
 
 // Errors.
 var (
-	// ErrServiceNotFound is returned by Update / Withdraw when the
-	// instance name was never published.
+	// ErrServiceNotFound is returned by Withdraw when the instance name
+	// was never published.
 	ErrServiceNotFound = errors.New("mdns: service not found")
 )
 
@@ -41,9 +42,12 @@ type Advertiser interface {
 // memory. Used by tests and by the daemon during the boot phase
 // before the network stack is up.
 type Noop struct {
-	// mu guards items.
+	// mu guards items and order.
 	mu    sync.RWMutex
 	items map[string]Service
+	// order is the publish order of items' keys; a re-published key keeps
+	// its place. Active lists in this order, as [Responder.Active] does.
+	order []string
 }
 
 // NewNoop returns an empty no-op advertiser.
@@ -56,8 +60,12 @@ func (n *Noop) Publish(_ context.Context, svc Service) error {
 	if err := svc.Validate(); err != nil {
 		return err
 	}
+	key := noopKey(svc.InstanceName, svc.ServiceType)
 	n.mu.Lock()
-	n.items[noopKey(svc.InstanceName, svc.ServiceType)] = svc
+	if _, replacing := n.items[key]; !replacing {
+		n.order = append(n.order, key)
+	}
+	n.items[key] = svc
 	n.mu.Unlock()
 	return nil
 }
@@ -71,15 +79,17 @@ func (n *Noop) Withdraw(_ context.Context, instanceName, serviceType string) err
 		return fmt.Errorf("%w: %s/%s", ErrServiceNotFound, instanceName, serviceType)
 	}
 	delete(n.items, key)
+	n.order = slices.DeleteFunc(n.order, func(k string) bool { return k == key })
 	return nil
 }
 
-// Active implements [Advertiser].
+// Active implements [Advertiser]. It lists in publish order, a
+// re-published service in its first place, as [Responder.Active] does.
 func (n *Noop) Active() []Service {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	out := make([]Service, 0, len(n.items))
-	for k := range n.items {
+	out := make([]Service, 0, len(n.order))
+	for _, k := range n.order {
 		out = append(out, n.items[k])
 	}
 	return out

@@ -114,7 +114,9 @@ type InitiatorConfig struct {
 	RootPublicKey []byte
 	// Resumption, when non-nil, makes Sigma1 offer session resumption with
 	// the record's id and shared secret. matter.js looks the record up by
-	// peer address (SessionManager.findResumptionRecordByAddress).
+	// peer address (SessionManager.findResumptionRecordByAddress). A
+	// record whose secret is not 32 bytes or whose id is not 16 is not
+	// offered: the handshake is a full one.
 	Resumption *ResumptionRecord
 	// SessionParams are this node's session parameters, sent as Sigma1
 	// tag 5 (matter.js sends `this.#sessions.sessionParameters`).
@@ -151,7 +153,7 @@ func NewPeerInitiator(cfg InitiatorConfig) (*Initiator, error) {
 		peerNodeID:    cfg.PeerNodeID,
 		rootPublicKey: append([]byte(nil), cfg.RootPublicKey...),
 	}
-	if cfg.Resumption != nil && len(cfg.Resumption.SharedSecret) > 0 && len(cfg.Resumption.ResumptionID) == ResumptionIDSize {
+	if cfg.Resumption.wellFormed() {
 		rec := *cfg.Resumption
 		rec.SharedSecret = append([]byte(nil), rec.SharedSecret...)
 		rec.ResumptionID = append([]byte(nil), rec.ResumptionID...)

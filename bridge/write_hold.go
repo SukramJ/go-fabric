@@ -120,13 +120,36 @@ type writeHoldTable struct {
 	// one of its attributes and ended while another write still held the
 	// endpoint: the hold is settled against them too when it closes.
 	overlap map[uint16][]writeRecord
+	// phase numbers the attribute data of the writes being applied
+	// ([writeHoldTable.beginAttributeData]); it only grows.
+	phase uint64
+	// open is the attribute data being applied, which a held change is
+	// stamped with; 0 outside one — before the first, between two, after
+	// the last, or for a dispatcher that does not number them (a group
+	// write) — so such a change is settled against the whole record
+	// (Fable's read of sub round 2, F56-1).
+	open uint64
+	// changedIn are the clusters each attribute data changed, which the
+	// dispatcher advanced with it; kept while a write holds the cluster's
+	// endpoint ([writeHoldTable.end]).
+	changedIn map[phasedCluster]struct{}
+}
+
+// phasedCluster names a cluster of an endpoint in one attribute data.
+type phasedCluster struct {
+	phase    uint64
+	endpoint uint16
+	cluster  uint32
 }
 
 // heldWrite is what notifications reported for one endpoint while a
 // write to it was applied.
 type heldWrite struct {
 	paths []heldPath
-	quiet []*quietPath
+	quiet []heldQuiet
+	// changedIn are the clusters of this endpoint each attribute data of
+	// the writes changed, once the hold is handed out.
+	changedIn map[phasedCluster]struct{}
 	// record is, once the hold is handed out, the merged record of every
 	// write that ended while it was open, the last one's included.
 	record writeRecord
@@ -145,6 +168,31 @@ type heldPath struct {
 	// markOnly is a change whose version advanced elsewhere (a server's
 	// report view): the hold marks it and advances nothing.
 	markOnly bool
+	// phase is the attribute data open when the change arrived (0: none
+	// was).
+	phase uint64
+}
+
+// heldQuiet is a quieter path whose check a write holds, with the
+// attribute data being applied when its change arrived.
+type heldQuiet struct {
+	qp    *quietPath
+	phase uint64
+}
+
+// add holds p once: a host that notifies the same path again while a
+// write is applied — a server that waits on its backend under a wildcard
+// write holds every endpoint — grows the table by distinct paths, not by
+// its notification rate (R2-P6-bound-0409); a path is held once per
+// attribute data it arrived in, so a hold is bounded by its distinct paths
+// times the attribute data applied while it is open (writes that overlap
+// on the endpoint keep it open). Settlement is one advance per cluster and
+// attribute data and one mark per path either way. The caller holds the
+// table's mutex.
+func (h *heldWrite) add(p heldPath) {
+	if !slices.Contains(h.paths, p) {
+		h.paths = append(h.paths, p)
+	}
 }
 
 // writeScope is the endpoints one write message names.
@@ -217,7 +265,7 @@ func (t *writeHoldTable) holdPaths(ep *endpointpkg.Endpoint, mgr *subscription.M
 	}
 	h := t.entry(ep.ID)
 	for _, p := range paths {
-		h.paths = append(h.paths, heldPath{ep: ep, mgr: mgr, path: p})
+		h.add(heldPath{ep: ep, mgr: mgr, path: p, phase: t.open})
 	}
 	return nil
 }
@@ -236,7 +284,7 @@ func (t *writeHoldTable) holdAdvance(ep *endpointpkg.Endpoint, cluster uint32, a
 	}
 	h := t.entry(ep.ID)
 	for _, a := range attrs {
-		h.paths = append(h.paths, heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true})
+		h.add(heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true, phase: t.open})
 	}
 	return true
 }
@@ -255,7 +303,7 @@ func (t *writeHoldTable) holdMarks(ep *endpointpkg.Endpoint, mgr *subscription.M
 	}
 	h := t.entry(ep.ID)
 	for _, a := range attrs {
-		h.paths = append(h.paths, heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true})
+		h.add(heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true, phase: t.open})
 	}
 	return true
 }
@@ -269,8 +317,8 @@ func (t *writeHoldTable) holdQuiet(endpoint uint16, qp *quietPath) bool {
 		return false
 	}
 	h := t.entry(endpoint)
-	if !slices.Contains(h.quiet, qp) {
-		h.quiet = append(h.quiet, qp)
+	if hq := (heldQuiet{qp: qp, phase: t.open}); !slices.Contains(h.quiet, hq) {
+		h.quiet = append(h.quiet, hq)
 	}
 	return true
 }
@@ -314,6 +362,14 @@ func (t *writeHoldTable) end(s writeScope, rec writeRecord) map[uint16]*heldWrit
 			out = make(map[uint16]*heldWrite, 1)
 		}
 		h.record = merged(append(t.overlap[id], rec))
+		for pc := range t.changedIn {
+			if pc.endpoint == id {
+				if h.changedIn == nil {
+					h.changedIn = make(map[phasedCluster]struct{}, 1)
+				}
+				h.changedIn[pc] = struct{}{}
+			}
+		}
 		out[id] = h
 		delete(t.held, id)
 	}
@@ -322,12 +378,82 @@ func (t *writeHoldTable) end(s writeScope, rec writeRecord) map[uint16]*heldWrit
 			delete(t.overlap, id)
 		}
 	}
+	// The attribute data of an endpoint no write holds any more are
+	// settled: the holds handed out above carry their copies (Fable's
+	// read of sub round 2, F56-2).
+	for pc := range t.changedIn {
+		if !t.holding(pc.endpoint) {
+			delete(t.changedIn, pc)
+		}
+	}
 	return out
+}
+
+// beginAttributeData starts the next attribute data of the writes being
+// applied and returns its number.
+func (t *writeHoldTable) beginAttributeData() uint64 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.phase++
+	t.open = t.phase
+	return t.phase
+}
+
+// noteAttributeData records the clusters attribute data phase changed by
+// its results — those the dispatcher advanced with it: a successful
+// result whose verdict named a change, or that carried none — and closes
+// it.
+func (t *writeHoldTable) noteAttributeData(phase uint64, results []im.WriteResult) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, res := range results {
+		if res.Status != im.StatusSuccess || !res.Path.HasEndpoint || !res.Path.HasCluster {
+			continue
+		}
+		if res.Commit != nil && len(res.Commit.Changed) == 0 {
+			continue
+		}
+		if t.changedIn == nil {
+			t.changedIn = make(map[phasedCluster]struct{}, 1)
+		}
+		t.changedIn[phasedCluster{phase, res.Path.Endpoint, res.Path.Cluster}] = struct{}{}
+	}
+	if t.open == phase {
+		t.open = 0
+	}
+}
+
+// phasedWriter is the bridge's dispatcher as a write message is applied
+// through it: each attribute data — one Write or WriteAuthorized call —
+// is numbered in the hold table before it runs and its changed clusters
+// noted after, so a change a host notifies meanwhile is settled against
+// the attribute data it arrived in ([Bridge.settleWrite]). Every other
+// method is the dispatcher's.
+type phasedWriter struct {
+	*endpointpkg.TopologyDispatcher
+	holds *writeHoldTable
+}
+
+func (w phasedWriter) Write(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue) []im.WriteResult {
+	phase := w.holds.beginAttributeData()
+	results := w.TopologyDispatcher.Write(ctx, path, value)
+	w.holds.noteAttributeData(phase, results)
+	return results
+}
+
+func (w phasedWriter) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult {
+	phase := w.holds.beginAttributeData()
+	results := w.TopologyDispatcher.WriteAuthorized(ctx, path, value, authorize)
+	w.holds.noteAttributeData(phase, results)
+	return results
 }
 
 // applyWriteHeld applies req through d with the notifications of the
 // endpoints it names held for its duration ([Bridge.holdWrite]).
 func (b *Bridge) applyWriteHeld(ctx context.Context, d im.Dispatcher, req im.WriteRequest) (out im.WriteOutcome) {
+	if td, ok := d.(*endpointpkg.TopologyDispatcher); ok {
+		d = phasedWriter{TopologyDispatcher: td, holds: &b.writeHolds}
+	}
 	b.holdWrite(writeScopeOf(req), func() []im.WriteResult {
 		out = im.HandleWrite(ctx, d, req)
 		return out.Results
@@ -358,9 +484,18 @@ func (b *Bridge) holdWrite(scope writeScope, run func() []im.WriteResult) {
 //     reported by [Bridge.reportWrittenAttributes]: it is neither advanced
 //     nor marked again;
 //   - any other held path — an attribute the host moved with the written
-//     one — is marked dirty, and its cluster's DataVersion advanced once,
-//     unless a write changed that cluster and advanced it already: one
-//     commit, one advance (Datasource.ts:1446-1457 at db021da0).
+//     one — is marked dirty, and its cluster's DataVersion advanced once
+//     for the attribute data it arrived in, unless that attribute data
+//     changed the cluster and the dispatcher advanced it already: matter.js
+//     commits each attribute data on its own
+//     (packages/protocol/src/action/server/AttributeWriteResponse.ts:426-435,
+//     :444-450 at db021da0), and a commit advances the version once if it
+//     changed anything and not otherwise
+//     (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457,
+//     :1476-1481). A change held while no attribute data was open (a
+//     dispatcher that does not number them, a group write, or between two)
+//     is settled against the whole record, once per cluster (review II,
+//     F-db021da0-56, owner decision 146; F56-1).
 //
 // The rule rests on the record alone: a verdict that did not name a value
 // that moved leaves a notification's change of it to be advanced and
@@ -372,36 +507,73 @@ func (b *Bridge) settleWrite(scope writeScope, rec writeRecord) {
 	b.mu.RUnlock()
 	wiring.rememberWritten(rec.changed)
 	for epID, h := range held {
-		// The clusters of this endpoint the writes advanced already.
-		advanced := make(map[uint32]struct{}, 1)
+		// The clusters of this endpoint advanced already, per attribute
+		// data; phase 0 holds those of the whole record.
+		advanced := make(map[uint64]map[uint32]struct{}, 1)
+		advancedIn := func(phase uint64) map[uint32]struct{} {
+			m, ok := advanced[phase]
+			if !ok {
+				m = make(map[uint32]struct{}, 1)
+				advanced[phase] = m
+			}
+			return m
+		}
 		for _, p := range h.record.changed {
 			if p.Endpoint == epID {
-				advanced[p.Cluster] = struct{}{}
+				advancedIn(0)[p.Cluster] = struct{}{}
 			}
+		}
+		for pc := range h.changedIn {
+			advancedIn(pc.phase)[pc.cluster] = struct{}{}
 		}
 		marks := make([]heldPath, 0, len(h.paths))
 		for _, hp := range h.paths {
 			if h.record.changedAt(hp.path) {
 				continue
 			}
-			if _, done := advanced[hp.path.Cluster]; !done && !hp.markOnly {
+			in := advancedIn(hp.phase)
+			if _, done := in[hp.path.Cluster]; !done && !hp.markOnly {
 				hp.ep.BumpDataVersionOf(hp.path.Cluster)
-				advanced[hp.path.Cluster] = struct{}{}
+				in[hp.path.Cluster] = struct{}{}
 			}
-			if !hp.advanceOnly {
+			if !hp.advanceOnly && !slices.ContainsFunc(marks, func(m heldPath) bool { return m.path == hp.path && m.mgr == hp.mgr }) {
 				marks = append(marks, hp)
 			}
 		}
 		for _, hp := range marks {
 			hp.mgr.OnAttributeChanged(hp.path)
 		}
-		for _, qp := range h.quiet {
-			if h.record.changedAt(qp.path) {
-				qp.refresh()
+		settleQuiet(h, advancedIn)
+	}
+}
+
+// settleQuiet checks each quieter path h holds once: a path notified in
+// several attribute data is checked against one of them that did not
+// advance its cluster when there is one, else against the first — a second
+// check could not see the change the first one stored (Fable's read of sub
+// round 2, F56-3). A path the write changed is read again instead.
+func settleQuiet(h *heldWrite, advancedIn func(uint64) map[uint32]struct{}) {
+	done := make(map[*quietPath]struct{}, len(h.quiet))
+	for _, hq := range h.quiet {
+		if _, ok := done[hq.qp]; ok {
+			continue
+		}
+		done[hq.qp] = struct{}{}
+		if h.record.changedAt(hq.qp.path) {
+			hq.qp.refresh()
+			continue
+		}
+		phase := hq.phase
+		for _, other := range h.quiet {
+			if other.qp != hq.qp {
 				continue
 			}
-			qp.check(advanced)
+			if _, advanced := advancedIn(other.phase)[hq.qp.path.Cluster]; !advanced {
+				phase = other.phase
+				break
+			}
 		}
+		hq.qp.check(advancedIn(phase))
 	}
 }
 

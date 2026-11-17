@@ -273,17 +273,21 @@ func (g *GeneralCommissioning) LastFabricRemoved(ctx context.Context) error {
 		g.mu.Unlock()
 		return nil
 	}
-	g.tcCommitted, g.tcTemporal, g.tcTouched = nil, nil, false
-	var err error
+	// The stored acceptance goes first: when its delete fails, the
+	// acceptance in force stays the stored one — the caller sees the error
+	// and the next start restores what memory still holds — instead of a
+	// node that serves no acceptance until a restart brings it back (review
+	// II, R2-P6-err-1023).
 	if g.tcSettings != nil {
-		err = g.tcSettings.DeleteSettings(ctx, store.SettingTermsAcceptance)
+		if err := g.tcSettings.DeleteSettings(ctx, store.SettingTermsAcceptance); err != nil {
+			g.mu.Unlock()
+			return fmt.Errorf("core: GeneralCommissioning: reset the terms acceptance: %w", err)
+		}
 	}
+	g.tcCommitted, g.tcTemporal, g.tcTouched = nil, nil, false
 	g.dataVersion.Bump()
 	g.mu.Unlock()
 	g.changes.Notify(gencommdef.AttrTcAcceptedVersion, gencommdef.AttrTcAcknowledgements, gencommdef.AttrTcAcknowledgementsRequired)
-	if err != nil {
-		return fmt.Errorf("core: GeneralCommissioning: reset the terms acceptance: %w", err)
-	}
 	return nil
 }
 

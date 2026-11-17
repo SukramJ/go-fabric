@@ -51,6 +51,31 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrCurrentConnections, spec.List[TransportConfigurationStruct]([]TransportConfigurationStruct{TransportConfigurationStruct{ConnectionId: uint16(1), TransportStatus: TransportStatusEnum(0), TransportOptions: spectest.Ptr(TransportOptionsStruct{StreamUsage: StreamUsageEnum(0), VideoStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), AudioStreamId: spectest.Ptr(spec.ValueOf(uint16(1))), TlsEndpointId: uint16(1), Url: "xxxxxxxxxxxxx", TriggerOptions: TransportTriggerOptionsStruct{TriggerType: TransportTriggerTypeEnum(0), MotionZones: spectest.Ptr(spec.ValueOf([]TransportZoneOptionsStruct{TransportZoneOptionsStruct{Zone: spec.ValueOf(uint16(1)), Sensitivity: spectest.Ptr(uint8(1))}})), MotionSensitivity: spectest.Ptr(spec.ValueOf(uint8(1))), MotionTimeControl: spectest.Ptr(TransportMotionTriggerTimeControlStruct{InitialDuration: uint16(1), AugmentationDuration: uint16(1), MaxDuration: uint32(1), BlindDuration: uint16(1)}), MaxPreRollLen: spectest.Ptr(uint16(1))}, IngestMethod: IngestMethodsEnum(0), ContainerOptions: ContainerOptionsStruct{ContainerType: ContainerFormatEnum(0), CmafContainerOptions: spectest.Ptr(CMAFContainerOptionsStruct{CmafInterface: CMAFInterfaceEnum(0), SegmentDuration: uint16(500), ChunkDuration: uint16(1), SessionGroup: spectest.Ptr(uint8(1)), TrackName: spectest.Ptr("x"), MetadataEnabled: spectest.Ptr(true)})}, ExpiryTime: spectest.Ptr(uint32(1)), VideoStreams: spectest.Ptr([]VideoStreamStruct{VideoStreamStruct{VideoStreamName: "x", VideoStreamId: uint16(1)}}), AudioStreams: spectest.Ptr([]AudioStreamStruct{AudioStreamStruct{AudioStreamName: "x", AudioStreamId: uint16(1)}})}), FabricIndex: uint8(1)}}))
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[CMAFContainerOptionsStruct],
+		spectest.CheckClone[ContainerOptionsStruct],
+		spectest.CheckClone[TransportConfigurationStruct],
+		spectest.CheckClone[TransportOptionsStruct],
+		spectest.CheckClone[TransportTriggerOptionsStruct],
+		spectest.CheckClone[TransportZoneOptionsStruct],
+		spectest.CheckClone[AllocatePushTransportRequest],
+		spectest.CheckClone[AllocatePushTransportResponse],
+		spectest.CheckClone[ModifyPushTransportRequest],
+		spectest.CheckClone[ManuallyTriggerTransportRequest],
+		spectest.CheckClone[FindTransportResponse],
+		spectest.CheckClone[PushTransportBeginEvent],
+		spectest.CheckClone[PushTransportEndEvent],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

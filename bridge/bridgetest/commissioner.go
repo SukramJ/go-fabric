@@ -521,12 +521,16 @@ func (r identityFabrics) FabricByIndex(fabricIndex uint8) (handshake.Fabric, boo
 	return r.c.fabric.Lookup(handshake.PeerAddress{FabricIndex: fabricIndex})
 }
 
-// onSession takes a session the device opened to the commissioner.
+// onSession takes a session the device opened to the commissioner. One
+// beyond the unconsumed ones Accept holds is dropped, and logged: a test
+// that waits for it would otherwise wait out Accept's timeout with no hint
+// (review II, R2-P6-test-0613).
 func (c *Commissioner) onSession(s *exchange.Session, _ uint8) {
 	w := c.wrap(s)
 	select {
 	case c.accepted <- w:
 	default:
+		c.tb.Logf("bridgetest: a session the device opened dropped: %d accepted sessions are not consumed (call Accept)", cap(c.accepted))
 	}
 }
 
@@ -568,6 +572,10 @@ func (c *Commissioner) route(s *exchange.Session, report *Report) {
 	select {
 	case c.wrap(s).reports <- report:
 	default:
+		// A full queue drops the report, and says so: a test waiting for
+		// it would otherwise wait out NextReport's timeout with no hint
+		// (review II, R2-P6-test-0613).
+		c.tb.Logf("bridgetest: a report of subscription %d dropped: its session holds %d unconsumed reports (call NextReport)", report.SubscriptionID, cap(c.wrap(s).reports))
 	}
 }
 

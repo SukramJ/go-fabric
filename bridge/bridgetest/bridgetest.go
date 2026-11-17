@@ -45,16 +45,31 @@ var (
 
 	// ErrNoPeer is returned when a [SubscriptionTarget] carries no peer
 	// address, which leaves the reports nowhere to go.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrNoPeer = errors.New("bridgetest: subscription target has no peer address")
 
 	// ErrNoSubscriptionID is returned for subscription ID 0, which the
 	// bridge uses as "no subscription" and therefore never routes.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrNoSubscriptionID = errors.New("bridgetest: subscription id 0")
 
 	// ErrNoPeerCounter is returned when a [SubscriptionTarget] names a
 	// secure session but leaves PeerCounter at 0. See
 	// [SubscriptionTarget.PeerCounter] for why the value cannot be derived
 	// and why a secure target without it is only half-established.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, decision 140).
 	ErrNoPeerCounter = errors.New("bridgetest: subscription target on a secure session has no peer counter")
 
 	// ErrPeerCounterNotAnchored is returned when the peer's receive window
@@ -63,16 +78,31 @@ var (
 	// no peer node id to key the window on, or the window had already
 	// recorded that counter — none of which is the untouched
 	// post-handshake state this models.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrPeerCounterNotAnchored = errors.New("bridgetest: peer receive window not anchored")
 
 	// ErrNotEstablished is returned when the bridge accepted the call but
 	// no route is in place afterwards.
+	//
+	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]). Removable in the next minor release
+	// (review II, N-ctr-5, owner decision 172).
 	ErrNotEstablished = errors.New("bridgetest: subscription target not established")
 )
 
 // SubscriptionTarget describes the peer that a subscription's ongoing
 // ReportData datagrams travel to: the values a SubscribeRequest would have
 // carried in its message and protocol headers.
+//
+// Deprecated: taken only by the deprecated [EstablishSubscriptionTarget];
+// subscribe through a [Session] of the test [Commissioner] instead
+// ([Session.Subscribe]). Removable in the next minor release (review II,
+// N-ctr-5, owner decision 172).
 type SubscriptionTarget struct {
 	// Peer is the address reports are sent to. Required.
 	Peer *net.UDPAddr
@@ -116,6 +146,12 @@ type SubscriptionTarget struct {
 	// leaving the window unanchored. Setting it there anchors that
 	// per-source window anyway, and then needs HasPeerNodeID with a
 	// non-zero PeerNodeID to key on.
+	//
+	// Deprecated: read only by [EstablishSubscriptionTarget], which is
+	// deprecated; subscribe through a [Session] of the test [Commissioner]
+	// instead ([Session.Subscribe]), whose real SubscribeRequest anchors
+	// the window itself. Removable in the next minor release (review II,
+	// N-ctr-5, decision 140).
 	PeerCounter uint32
 
 	// FabricFiltered mirrors the SubscribeRequest's FabricFiltered flag.
@@ -136,9 +172,10 @@ type SubscriptionTarget struct {
 //
 // The subscription itself is not created here. A subscription has two
 // halves — the manager's bookkeeping and this route — and the manager half
-// is already public: create the subscription with
-// subscription.Manager.Subscribe, wire the manager with
-// bridge.Bridge.AttachSubscriptionManager, and pass the ID it allocated.
+// is already public: wire the manager with
+// bridge.Bridge.AttachSubscriptionManager, create the subscription with
+// subscription.Manager.Subscribe, and pass the ID it allocated (a manager
+// without its report sender refuses Subscribe).
 //
 // The identity the ongoing reports authorize against is resolved from
 // target.SessionID through the bridge's own session lookups, exactly as an
@@ -156,6 +193,12 @@ type SubscriptionTarget struct {
 // arrive in order or lose one to the duplicate path. So the anchor happens
 // here too, from [SubscriptionTarget.PeerCounter] — the one value of the
 // modelled handshake that the caller has to supply.
+//
+// Deprecated: no test outside this package calls it. Subscribe through a
+// [Session] of the test [Commissioner] instead ([Session.Subscribe]): a
+// real SubscribeRequest establishes both halves of the subscription and
+// anchors the peer's window with its own counter. Removable in the next
+// minor release (review II, N-ctr-5, decision 140).
 func EstablishSubscriptionTarget(b *bridge.Bridge, subID uint32, target SubscriptionTarget) error {
 	switch {
 	case b == nil:

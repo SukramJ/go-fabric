@@ -18,6 +18,7 @@ import (
 	wdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/caseauth"
 )
 
 // WiFiNetworkManagement (0x0451) after connectedhomeip
@@ -41,6 +42,11 @@ type WiFiManagementConfig struct {
 	// (WiFiNetworkManagementCluster.cpp:95-99); the system clock when nil.
 	Clock clock.Clock
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -60,6 +66,13 @@ type WiFiManagementServer struct {
 	srv   *spec.Server
 	clock clock.Clock
 
+	// change serialises SetNetworkCredentials and ClearNetworkCredentials:
+	// each takes the new credentials under mu and publishes them after
+	// mu is released (the values are checked first, so the publish refuses
+	// none), since the generated server runs a change callback
+	// inline and a callback may read the credentials back (R2-P6-conc-1118).
+	// A callback must not change the credentials.
+	change sync.Mutex
 	// mu guards ssid, passphrase and surrogate.
 	mu         sync.Mutex
 	ssid       []byte
@@ -88,7 +101,7 @@ func NewWiFiManagement(cfg WiFiManagementConfig) (*WiFiManagementServer, error) 
 		s.clock = clock.System{}
 	}
 	srv, err := spec.NewServer(wdef.Definition, spec.Options{}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial:     map[uint32]any{wdef.AttrSsid: nil, wdef.AttrPassphraseSurrogate: nil},
 		Handlers:    map[uint32]spec.CommandHandler{wdef.CmdNetworkPassphraseRequest: s.networkPassphraseRequest},
 	})
@@ -135,11 +148,13 @@ func (s *WiFiManagementServer) SetNetworkCredentials(ssid, passphrase []byte) er
 		// The length only: the passphrase itself never reaches an error.
 		return fmt.Errorf("%w: passphrase of %d bytes is no WPA personal credential", ErrInvalidCredentials, len(passphrase))
 	}
+	s.change.Lock()
+	defer s.change.Unlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	ssidChanged := !bytes.Equal(s.ssid, ssid)
 	passphraseChanged := !bytes.Equal(s.passphrase, passphrase)
 	if !ssidChanged && !passphraseChanged {
+		s.mu.Unlock()
 		return nil
 	}
 	changes := map[uint32]any{}
@@ -154,11 +169,16 @@ func (s *WiFiManagementServer) SetNetworkCredentials(ssid, passphrase []byte) er
 		}
 		changes[wdef.AttrPassphraseSurrogate] = surrogate
 	}
-	if err := s.srv.SetAttributes(changes); err != nil {
-		return err
-	}
+	prevPassphrase := s.passphrase
 	s.ssid, s.passphrase, s.surrogate = slices.Clone(ssid), slices.Clone(passphrase), surrogate
-	return nil
+	s.mu.Unlock()
+	// The replaced passphrase is zeroed, as a cleared one is.
+	if passphraseChanged {
+		clear(prevPassphrase)
+	}
+	// The values are inside the definition's constraints (checked above),
+	// which is all SetAttributes checks: it refuses none of them.
+	return s.srv.SetAttributes(changes)
 }
 
 // ClearNetworkCredentials drops the credentials (:62-72): Ssid and
@@ -166,17 +186,19 @@ func (s *WiFiManagementServer) SetNetworkCredentials(ssid, passphrase []byte) er
 // reports nothing. The surrogate's count survives, so the next passphrase
 // still advances it.
 func (s *WiFiManagementServer) ClearNetworkCredentials() error {
+	s.change.Lock()
+	defer s.change.Unlock()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.ssid == nil {
+		s.mu.Unlock()
 		return nil
-	}
-	if err := s.srv.SetAttributes(map[uint32]any{wdef.AttrSsid: nil, wdef.AttrPassphraseSurrogate: nil}); err != nil {
-		return err
 	}
 	clear(s.passphrase)
 	s.ssid, s.passphrase = nil, nil
-	return nil
+	s.mu.Unlock()
+	// Null is inside the definition of both attributes, which is all
+	// SetAttributes checks.
+	return s.srv.SetAttributes(map[uint32]any{wdef.AttrSsid: nil, wdef.AttrPassphraseSurrogate: nil})
 }
 
 // HasNetworkCredentials reports whether credentials are set
@@ -218,23 +240,9 @@ func (s *WiFiManagementServer) networkPassphraseRequest(ctx context.Context, _ a
 }
 
 // isCASE reports whether a request arrived over a CASE session: chip's
-// `subjectDescriptor.authMode == Access::AuthMode::kCase` (:130). The
-// bridge stamps the session's fabric and subject on every request and
-// marks a PASE session and a group message (bridge/receive_dispatch.go:
-// 511-515, bridge/group_messaging.go:339-350; im.IsPASEFromContext,
-// im.GroupSubjectFromContext); a CASE request is one with a fabric and a
-// node subject that is neither, as cluster/core's OTA provider tells it.
-func isCASE(ctx context.Context) bool {
-	if im.IsPASEFromContext(ctx) {
-		return false
-	}
-	if _, group := im.GroupSubjectFromContext(ctx); group {
-		return false
-	}
-	_, fabric := im.FabricFilterFromContext(ctx)
-	node, _ := im.SubjectFromContext(ctx)
-	return fabric != 0 && node != 0
-}
+// `subjectDescriptor.authMode == Access::AuthMode::kCase` (:130), the
+// module's one rule ([caseauth.IsCASE]).
+func isCASE(ctx context.Context) bool { return caseauth.IsCASE(ctx) }
 
 // SetAttributes implements [spec.AttributeSetter]: Ssid and
 // PassphraseSurrogate are the credentials' ([spec.ErrNotHeld] for a value

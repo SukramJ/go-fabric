@@ -30,7 +30,30 @@ func handler[T any](name string, run func(ctx context.Context, req T) error) spe
 	}
 }
 
+// anchorOnly answers a request of a fabric other than the recorded anchor
+// fabric, or of any fabric while none is recorded, UNSUPPORTED_ACCESS
+// before the command runs (owner decision 129, R2-P6-sec-1103; ahead of
+// connectedhomeip, whose joint-fabric-datastore-server.cpp asks no
+// accessing fabric). A call with no request behind it — the host's — is
+// not fenced.
+func (d *Datastore) anchorOnly(h spec.CommandHandler) spec.CommandHandler {
+	return func(ctx context.Context, fields any) (any, error) {
+		if _, fabric, request := im.LookupFabricFilter(ctx); request && !d.admits(ctx, fabric) {
+			return nil, spec.Errorf(im.StatusUnsupportedAccess, "JointFabricDatastore: fabric %d is not the anchor fabric", fabric)
+		}
+		return h(ctx, fields)
+	}
+}
+
 func (d *Datastore) commands() map[uint32]spec.CommandHandler {
+	cmds := d.commandTable()
+	for id, h := range cmds {
+		cmds[id] = d.anchorOnly(h)
+	}
+	return cmds
+}
+
+func (d *Datastore) commandTable() map[uint32]spec.CommandHandler {
 	return map[uint32]spec.CommandHandler{
 		dsdef.CmdAddKeySet: handler("AddKeySet", func(ctx context.Context, r dsdef.AddKeySetRequest) error { // :293-314
 			return d.AddGroupKeySetEntry(ctx, r.GroupKeySet)
@@ -69,10 +92,11 @@ func (d *Datastore) commands() map[uint32]spec.CommandHandler {
 			return d.AddPendingNode(ctx, r.NodeId, r.FriendlyName)
 		}),
 		dsdef.CmdRefreshNode: handler("RefreshNode", func(ctx context.Context, r dsdef.RefreshNodeRequest) error { // :539-562
-			if err := d.beginRefresh(ctx, r.NodeId); err != nil {
+			rctx, err := d.beginRefresh(ctx, r.NodeId)
+			if err != nil {
 				return err
 			}
-			bg := context.WithoutCancel(ctx)
+			bg := context.WithoutCancel(rctx)
 			d.pushes.Add(1)
 			go func() {
 				defer d.pushes.Done()

@@ -153,6 +153,28 @@ func (v *IcaccsrResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v IcaccsrResponse) Clone() IcaccsrResponse {
+	c := v
+	c.Icaccsr = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Icaccsr)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (IcaccsrResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdIcaccsrResponse
@@ -175,6 +197,22 @@ func (v *AddIcacRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "AddIcac",
 		spec.Bind(0, "IcacValue", true, &v.IcacValue, spec.DecodeBytesIn(0, 400)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddIcacRequest) Clone() AddIcacRequest {
+	c := v
+	c.IcacValue = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.IcacValue)
+	return c
 }
 
 // IcacResponse is the IcacResponse command payload.
@@ -230,6 +268,30 @@ func (v *OpenJointCommissioningWindowRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "Iterations", true, &v.Iterations, spec.DecodeUintIn[uint32](32, 1000, 100000)),
 		spec.Bind(4, "Salt", true, &v.Salt, spec.DecodeBytesIn(16, 32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OpenJointCommissioningWindowRequest) Clone() OpenJointCommissioningWindowRequest {
+	c := v
+	c.PakePasscodeVerifier = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PakePasscodeVerifier)
+	c.Salt = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Salt)
+	return c
 }
 
 // TransferAnchorRequestRequest is the TransferAnchorRequest command payload.

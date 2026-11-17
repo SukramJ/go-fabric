@@ -275,6 +275,21 @@ func (v *TimeZoneStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TimeZoneStruct) Clone() TimeZoneStruct {
+	c := v
+	c.Name = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Name)
+	return c
+}
+
 // TimeZoneStructDef describes TimeZoneStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -343,6 +358,21 @@ func (v *SetUtcTimeRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetUtcTimeRequest) Clone() SetUtcTimeRequest {
+	c := v
+	c.TimeSource = func(p *TimeSourceEnum) *TimeSourceEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TimeSource)
+	return c
+}
+
 // SetTrustedTimeSourceRequest is the SetTrustedTimeSource command payload.
 type SetTrustedTimeSourceRequest struct {
 	TrustedTimeSource spec.Nullable[FabricScopedTrustedTimeSourceStruct] // 0: FabricScopedTrustedTimeSourceStruct, M, X
@@ -379,6 +409,24 @@ func (v *SetTimeZoneRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "SetTimeZone",
 		spec.Bind(0, "TimeZone", true, &v.TimeZone, spec.DecodeListIn(spec.DecodeStruct[TimeZoneStruct], 1, 2)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetTimeZoneRequest) Clone() SetTimeZoneRequest {
+	c := v
+	c.TimeZone = func(s []TimeZoneStruct) []TimeZoneStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TimeZoneStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.TimeZone)
+	return c
 }
 
 // SetTimeZoneResponse is the SetTimeZoneResponse command payload.
@@ -422,6 +470,22 @@ func (v *SetDstOffsetRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "SetDstOffset",
 		spec.Bind(0, "DstOffset", true, &v.DstOffset, spec.DecodeList(spec.DecodeStruct[DSTOffsetStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetDstOffsetRequest) Clone() SetDstOffsetRequest {
+	c := v
+	c.DstOffset = func(s []DSTOffsetStruct) []DSTOffsetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DSTOffsetStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.DstOffset)
+	return c
 }
 
 // SetDefaultNtpRequest is the SetDefaultNtp command payload.
@@ -496,6 +560,21 @@ func (v *TimeZoneStatusEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Offset", true, &v.Offset, spec.DecodeIntIn[int32](32, -43200, 50400)),
 		spec.Bind(1, "Name", false, &v.Name, spec.DecodeOptional(spec.DecodeStringIn(0, 64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TimeZoneStatusEvent) Clone() TimeZoneStatusEvent {
+	c := v
+	c.Name = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Name)
+	return c
 }
 
 // TimeFailureEvent is the TimeFailure event payload.

@@ -36,7 +36,6 @@ type AccountLoginConfig struct {
 // attributes beyond the globals.
 type AccountLoginServer struct {
 	*spec.Server
-	events
 }
 
 // NewAccountLogin builds an AccountLogin server over cfg.Port.
@@ -55,7 +54,7 @@ func NewAccountLogin(cfg AccountLoginConfig) (*AccountLoginServer, error) {
 	handle(h, logindef.CmdLogout, func(ctx context.Context, req logindef.LogoutRequest) (any, error) {
 		return nil, port.Logout(ctx, req)
 	})
-	srv, err := newServer(logindef.Definition, spec.Options{Events: cfg.Events}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	srv, err := newServer(logindef.Definition, spec.Options{Events: cfg.Events}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: AccountLogin: %w", err)
 	}
@@ -69,9 +68,5 @@ func (s *AccountLoginServer) EmitLoggedOut(ev logindef.LoggedOutEvent) error {
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
-// server's events are addressed to, for its own events and the store's
-// EmitEvent alike.
-func (s *AccountLoginServer) SetEndpoint(endpoint uint16) {
-	s.events.SetEndpoint(endpoint)
-	s.Server.SetEndpoint(endpoint)
-}
+// server's events are addressed to, the store's ([spec.Server.EmitEvent]).
+func (s *AccountLoginServer) SetEndpoint(endpoint uint16) { s.Server.SetEndpoint(endpoint) }

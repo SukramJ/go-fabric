@@ -63,7 +63,19 @@ type ThreadNetworkCommissioning struct {
 	// found: attached to the staged network, and its interface up.
 	connected bool
 	enabled   bool
-	busy      bool
+	// busy is held by a running ScanNetworks or ConnectNetwork, claimed
+	// in the same hold as MatterInvoke's check (busyGen names the claim)
+	// and released by the command itself when it returns, also after a
+	// fail-safe expiry: one border-router call of a command at a time
+	// (review II, R2-P6-conc-1026).
+	busy    bool
+	busyGen uint64
+	// expiries counts the fail-safe expiries (OnFailSafeExpired): a
+	// ConnectNetwork whose attach outlives the window that admitted it
+	// sees it moved and drops its result; connectCancel cancels that
+	// attach at the expiry (review II, R2-P6-fsm-1001).
+	expiries      uint64
+	connectCancel context.CancelFunc
 
 	lastStatus     *uint8
 	lastNetworkID  []byte
@@ -339,6 +351,12 @@ func (n *ThreadNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		n.mu.Unlock()
 		return nil, netcommStatus(im.StatusBusy, "core: NetworkCommissioning is busy")
 	}
+	if cmdID == netcommdef.CmdScanNetworks || cmdID == netcommdef.CmdConnectNetwork {
+		// Checked and claimed in one hold: two commands never both pass.
+		n.busy = true
+		n.busyGen++
+		defer n.releaseBusy(n.busyGen)
+	}
 	n.mu.Unlock()
 	switch cmdID {
 	case netcommdef.CmdScanNetworks:
@@ -392,10 +410,25 @@ func (n *ThreadNetworkCommissioning) armedFor(ctx context.Context) bool {
 	return armed != nil && armed()
 }
 
-// breadcrumbLocked is UpdateBreadcrumb (:589-593).
-func (n *ThreadNetworkCommissioning) breadcrumbLocked(bc *uint64) {
-	if bc != nil && n.setBreadcrumb != nil {
-		n.setBreadcrumb(*bc)
+// releaseBusy ends the command's claim gen.
+func (n *ThreadNetworkCommissioning) releaseBusy(gen uint64) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.busyGen == gen {
+		n.busy = false
+	}
+}
+
+// breadcrumb is UpdateBreadcrumb (:589-593). It runs without n.mu: the
+// write reaches GeneralCommissioning's listeners and the host's hook, which
+// may read this server (review II, R2-P6-conc-1011; the Wi-Fi server's
+// R2-P1-core-07).
+func (n *ThreadNetworkCommissioning) breadcrumb(bc *uint64) {
+	n.mu.Lock()
+	set := n.setBreadcrumb
+	n.mu.Unlock()
+	if bc != nil && set != nil {
+		set(*bc)
 	}
 }
 
@@ -431,9 +464,6 @@ func (n *ThreadNetworkCommissioning) matchLocked(id []byte) netcommdef.NetworkCo
 // networking status; success commits the breadcrumb (:924-927). A Wi-Fi
 // SSID in the request is accepted, as chip accepts it (:351-359).
 func (n *ThreadNetworkCommissioning) scanNetworks(ctx context.Context, req netcommdef.ScanNetworksRequest) (any, error) {
-	n.mu.Lock()
-	n.busy = true
-	n.mu.Unlock()
 	results := []netcommdef.ThreadInterfaceScanResultStruct{}
 	status := netcommdef.NetworkCommissioningStatusSuccess
 	active, err := n.br.Dataset(ctx, false)
@@ -447,12 +477,11 @@ func (n *ThreadNetworkCommissioning) scanNetworks(ctx context.Context, req netco
 		results = append(results, r)
 	}
 	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.busy = false
 	n.setStatusLocked(status)
 	n.dataVersion.Bump()
+	n.mu.Unlock()
 	if statusOK(status) {
-		n.breadcrumbLocked(req.Breadcrumb)
+		n.breadcrumb(req.Breadcrumb)
 	}
 	return netcommdef.ScanNetworksResponse{NetworkingStatus: status, ThreadScanResults: &results}, nil
 }
@@ -488,20 +517,21 @@ func (n *ThreadNetworkCommissioning) addOrUpdate(ctx context.Context, req netcom
 	if !n.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: AddOrUpdateThreadNetwork needs an armed failsafe")
 	}
-	n.mu.Lock()
-	defer n.mu.Unlock()
 	xp, ok := extPANIDOf(req.OperationalDataset)
 	if !ok {
 		return configResponse(netcommdef.NetworkCommissioningStatusOutOfRange, 0), nil
 	}
+	n.mu.Lock()
 	if staged, commissioned := extPANIDOf(n.staging); commissioned && !bytes.Equal(staged, xp) {
+		n.mu.Unlock()
 		return configResponse(netcommdef.NetworkCommissioningStatusBoundsExceeded, 0), nil
 	}
 	n.backupLocked()
 	n.staging = slices.Clone(req.OperationalDataset)
 	n.connected = false
 	n.dataVersion.Bump()
-	n.breadcrumbLocked(req.Breadcrumb)
+	n.mu.Unlock()
+	n.breadcrumb(req.Breadcrumb)
 	return configResponse(netcommdef.NetworkCommissioningStatusSuccess, 0), nil
 }
 
@@ -514,15 +544,16 @@ func (n *ThreadNetworkCommissioning) remove(ctx context.Context, req netcommdef.
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: RemoveNetwork needs an armed failsafe")
 	}
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	if st := n.matchLocked(req.NetworkId); !statusOK(st) {
+		n.mu.Unlock()
 		return configResponse(st, 0), nil
 	}
 	n.backupLocked()
 	n.staging, n.connected = nil, false
 	n.lastNetworkID, n.lastConnectErr, n.lastStatus = nil, nil, nil
 	n.dataVersion.Bump()
-	n.breadcrumbLocked(req.Breadcrumb)
+	n.mu.Unlock()
+	n.breadcrumb(req.Breadcrumb)
 	return configResponse(netcommdef.NetworkCommissioningStatusSuccess, 0), nil
 }
 
@@ -531,14 +562,15 @@ func (n *ThreadNetworkCommissioning) remove(ctx context.Context, req netcommdef.
 // NetworkIDNotFound, an index other than 0 OutOfRange.
 func (n *ThreadNetworkCommissioning) reorder(req netcommdef.ReorderNetworkRequest) (any, error) {
 	n.mu.Lock()
-	defer n.mu.Unlock()
-	if st := n.matchLocked(req.NetworkId); !statusOK(st) {
+	st := n.matchLocked(req.NetworkId)
+	n.mu.Unlock()
+	if !statusOK(st) {
 		return configResponse(st, 0), nil
 	}
 	if req.NetworkIndex != 0 {
 		return configResponse(netcommdef.NetworkCommissioningStatusOutOfRange, 0), nil
 	}
-	n.breadcrumbLocked(req.Breadcrumb)
+	n.breadcrumb(req.Breadcrumb)
 	return configResponse(netcommdef.NetworkCommissioningStatusSuccess, 0), nil
 }
 
@@ -559,41 +591,89 @@ func (n *ThreadNetworkCommissioning) connect(ctx context.Context, req netcommdef
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
 	n.mu.Lock()
+	window := n.expiries
 	status := n.matchLocked(req.NetworkId)
 	staged := slices.Clone(n.staging)
+	attach, cancel := context.WithCancel(ctx)
+	defer cancel()
 	if statusOK(status) {
 		n.backupLocked()
-		n.busy = true
+		n.connectCancel = cancel
 	}
 	n.mu.Unlock()
 	var errValue int32
 	var enabled, connected bool
 	if statusOK(status) {
-		if err := n.br.SetActiveDataset(ctx, staged); err != nil {
+		if err := n.br.SetActiveDataset(attach, staged); err != nil {
 			status, errValue = netcommdef.NetworkCommissioningStatusUnknownError, -1
 		} else {
 			enabled, connected = n.probe(context.WithoutCancel(ctx), staged)
 		}
 	}
 	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.busy = false
+	n.connectCancel = nil
 	resp := netcommdef.ConnectNetworkResponse{NetworkingStatus: status, ErrorValue: spec.Nullable[int32]{Null: true}}
+	if !statusOK(status) {
+		resp.ErrorValue = spec.Nullable[int32]{Value: errValue}
+	}
+	if n.expiries != window {
+		// The fail-safe that admitted the command expired while the border
+		// router attached, and OnFailSafeExpired reverted the staged
+		// network: the result writes no attribute and no Breadcrumb, the
+		// reverted dataset is attached again, since this attach may have
+		// landed after the expiry's revert, and the command is answered
+		// with nothing ([im.NoResponse]; review II, R2-P6-fsm-1001,
+		// F-db021da0-10). Follows connectedhomeip
+		// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
+		// at 6170af84, whose one class serves Wi-Fi and Thread: the
+		// fail-safe expiry reverts the driver and releases the pending
+		// command handle (:1001-1002), and a driver result that arrives
+		// afterwards returns before it adds a ConnectNetworkResponse
+		// (:845-857).
+		n.mu.Unlock()
+		n.reattachReverted(context.WithoutCancel(ctx), window)
+		return im.NoResponse{}, nil
+	}
+	defer func() {
+		if statusOK(status) {
+			n.breadcrumb(req.Breadcrumb)
+		}
+	}()
+	defer n.mu.Unlock()
 	if statusOK(status) {
 		n.lastConnectErr = nil
 		n.enabled, n.connected = enabled, connected
 	} else {
-		resp.ErrorValue = spec.Nullable[int32]{Value: errValue}
 		v := errValue
 		n.lastConnectErr = &v
 	}
 	n.lastNetworkID = bytes.Clone(req.NetworkId)
 	n.setStatusLocked(status)
 	n.dataVersion.Bump()
-	if statusOK(status) {
-		n.breadcrumbLocked(req.Breadcrumb)
-	}
 	return resp, nil
+}
+
+// reattachReverted attaches the staged network the fail-safe's expiry
+// restored once more, after a ConnectNetwork the expiry abandoned returned:
+// its attach may have reached the border router after the expiry's revert.
+// It does nothing when a later fail-safe has changed the staged network
+// since (a backup exists again) or another expiry followed.
+func (n *ThreadNetworkCommissioning) reattachReverted(ctx context.Context, window uint64) {
+	n.mu.Lock()
+	if n.backup != nil || n.expiries != window+1 {
+		n.mu.Unlock()
+		return
+	}
+	staging := slices.Clone(n.staging)
+	n.mu.Unlock()
+	_ = n.br.SetActiveDataset(ctx, staging) // as the expiry's own revert: attempted once
+	enabled, connected := n.probe(ctx, staging)
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.backup == nil && n.expiries == window+1 {
+		n.enabled, n.connected = enabled, connected
+		n.dataVersion.Bump()
+	}
 }
 
 // OnCommissioningComplete drops the fail-safe's backup
@@ -611,11 +691,42 @@ func (n *ThreadNetworkCommissioning) OnCommissioningComplete(context.Context) {
 // border router attaches it — the empty dataset of a border router that
 // had none clears its active dataset, as chip attaches an empty one. The
 // backup goes either way.
+//
+// The revert is attempted once. When the border router refuses it or
+// cannot be reached, nothing retries or reports it (the server has no
+// logger): the
+// border router stays on the dataset of the commissioning the fail-safe
+// rolled back, the server holds the backup as its staged network, and
+// Networks reports it not connected (review II, R2-P6-err-1002; chip
+// ignores RevertConfiguration's result, NetworkCommissioningCluster.cpp:1001,
+// and its driver drops the backup whether or not it was restored,
+// GenericNetworkCommissioningThreadDriver.cpp:150-153 at 6170af84).
+//
+// A ConnectNetwork the window admitted that still runs is abandoned: its
+// attach is cancelled, its result writes no attribute and no Breadcrumb,
+// and once it returned the reverted network is attached again
+// (reattachReverted) (review II, R2-P6-fsm-1001). For the state this
+// follows connectedhomeip
+// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
+// at 6170af84: the fail-safe expiry reverts the driver and releases the
+// pending command handle (:1001-1002), and a driver result that arrives
+// afterwards returns before it writes LastNetworkID, LastNetworkingStatus,
+// LastConnectErrorValue or the Breadcrumb and before it adds a
+// ConnectNetworkResponse (:845-857), and the command is answered with
+// nothing ([im.NoResponse]), as chip sends nothing for it
+// (src/app/CommandHandlerImpl.cpp:481-488, :1000;
+// src/app/CommandResponseSender.cpp:82-102 at 6170af84).
 func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	n.mu.Lock()
+	n.expiries++
+	if n.connectCancel != nil {
+		// The ConnectNetwork this window admitted is abandoned: its attach
+		// is cancelled, and it keeps the command's turn (busy) until it
+		// returned and re-attached the reverted network.
+		n.connectCancel()
+	}
 	backup := n.backup
 	n.backup = nil
-	n.busy = false
 	if backup != nil {
 		n.staging = backup
 		if len(backup) == 0 {
@@ -625,7 +736,7 @@ func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	staging := slices.Clone(n.staging)
 	n.mu.Unlock()
 	if backup != nil {
-		_ = n.br.SetActiveDataset(ctx, backup)
+		_ = n.br.SetActiveDataset(ctx, backup) // attempted once, see the doc
 	}
 	enabled, connected := n.probe(ctx, staging)
 	n.mu.Lock()

@@ -53,7 +53,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/binding", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
-	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/clock", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/clock/clocktest", min: 99, why: "phase 32: 99.3 with the wall-step and monotonic cases; what is left is Resolve's first select"},
@@ -90,7 +90,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/camera", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/tls", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/sensing", min: 93},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/jointfabric", min: 83},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/jointfabric", min: 86},
 	{
 		pkg: "github.com/SukramJ/go-fabric/cluster/transition",
 		min: 93,
@@ -172,8 +172,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
-		min: 81,
-		why: "Review II phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
+		min: 90,
+		why: "Review II phase 6a wave 3: measured 90.8. Phase 6a post pass: measured 84.8 once TestEveryFabricListsEveryIndex drives EveryFabric (decision 158). Phase 5b wave A2: measured 81.9 once AssertClusterServerContract's own tests drive it; wave W8 (#457): 77.5 once TestFakeStoreErase drives the fake store (54.1 before, review 2026-11 W6-test-13). Test scaffolding: most of it is exercised through the packages that import it, and go credits that coverage to them; the floor holds what its own tests (the device type conformance helper, the fake store) reach",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/memstore", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
@@ -206,7 +206,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/icd", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/icd/checkin", min: 94},
-	{pkg: "github.com/SukramJ/go-fabric/im", min: 82},
+	{pkg: "github.com/SukramJ/go-fabric/im", min: 93},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
 	// package has concurrent paths whose coverage depends on scheduling, so
 	// a floor at the median makes the gate flaky rather than strict. Floors
@@ -214,6 +214,7 @@ var floors = []packageFloor{
 	// gate that fails on a good day teaches people to re-run it.
 	{pkg: "github.com/SukramJ/go-fabric/im/subscription", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/internal/attestids", min: 99},
+	{pkg: "github.com/SukramJ/go-fabric/internal/deepcopy", min: 99},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/bridgeseam",
 		min:          0,
@@ -265,6 +266,7 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: a function variable node installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
+	{pkg: "github.com/SukramJ/go-fabric/internal/sessionseam", min: 0, unmeasurable: true, why: "function variables only: secure/operational installs them, node and the module's test fixtures call them (review II, decisions 159, 160)"},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/surfaceseam",
 		min:          0,
@@ -278,6 +280,7 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: an interface and a function variable transport/udp installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/valuejson", min: 87},
+	{pkg: "github.com/SukramJ/go-fabric/internal/caseauth", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/logring", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 92},
 	{

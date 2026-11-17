@@ -80,7 +80,8 @@ func (s *ControlServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter
 	s.mu.Unlock()
-	s.Hooks.SetMatterEventEmitter(emitter)
+	s.events.SetEmitter(emitter)
+	s.Hooks.SetMatterEventEmitter(emitter) //nolint:staticcheck // the deprecated field stays bound for its window
 }
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
@@ -89,7 +90,8 @@ func (s *ControlServer) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
-	s.Hooks.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
+	s.events.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
+	s.Hooks.SetEndpoint(endpoint)  //nolint:staticcheck // the deprecated field stays bound for its window
 }
 
 // pendingEvent is an event decided under the lock and emitted after it.
@@ -129,7 +131,7 @@ func (s *ControlServer) ReportError(errs wire.ClosureErrorList) {
 	copy(list, errs)
 	s.mu.Lock()
 	s.errorList = list
-	s.mainState = wire.ClosureMainStateError
+	s.reportMainStateLocked(wire.ClosureMainStateError)
 	s.mu.Unlock()
 	s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState, wire.ClosureControlAttrCurrentErrorList)
 	s.emit([]pendingEvent{{closuredef.EventOperationalError, OperationalErrorEvent{ErrorState: list}, s.inst.EventPriority(closuredef.EventOperationalError)}})
@@ -146,9 +148,9 @@ func (s *ControlServer) SetEngaged(engaged bool) {
 	was := s.mainState != wire.ClosureMainStateDisengaged
 	switch {
 	case !engaged:
-		s.mainState = wire.ClosureMainStateDisengaged
+		s.reportMainStateLocked(wire.ClosureMainStateDisengaged)
 	case s.mainState == wire.ClosureMainStateDisengaged:
-		s.mainState = wire.ClosureMainStateStopped
+		s.reportMainStateLocked(wire.ClosureMainStateStopped)
 	}
 	s.mu.Unlock()
 	s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState)

@@ -44,6 +44,26 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrAuxiliaryAcl, spec.List[AccessControlEntryStruct]([]AccessControlEntryStruct{AccessControlEntryStruct{Privilege: AccessControlEntryPrivilegeEnum(1), AuthMode: AccessControlEntryAuthModeEnum(1), Subjects: spec.ValueOf([]uint64{uint64(1)}), Targets: spec.ValueOf([]AccessControlTargetStruct{AccessControlTargetStruct{Cluster: spec.ValueOf(uint32(1)), Endpoint: spec.ValueOf(uint16(1)), DeviceType: spec.ValueOf(uint32(1))}}), AuxiliaryType: spectest.Ptr(AccessControlAuxiliaryTypeEnum(0)), FabricIndex: uint8(1)}}))
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[AccessControlEntryStruct],
+		spectest.CheckClone[AccessControlExtensionStruct],
+		spectest.CheckClone[AccessRestrictionEntryStruct],
+		spectest.CheckClone[CommissioningAccessRestrictionEntryStruct],
+		spectest.CheckClone[ReviewFabricRestrictionsRequest],
+		spectest.CheckClone[AccessControlEntryChangedEvent],
+		spectest.CheckClone[AccessControlExtensionChangedEvent],
+		spectest.CheckClone[FabricRestrictionReviewUpdateEvent],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedState holds Patch, State and StateFrom against each other.
 func TestTypedState(t *testing.T) {
 	t.Parallel()

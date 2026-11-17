@@ -871,7 +871,10 @@ func (s *ICDManagement) FabricRemoved(ctx context.Context, fabricIndex uint8) {
 	}
 	if st := s.cfg.Store; st != nil {
 		if err := st.ReplaceICDRegistrations(ctx, fabricIndex, nil); err != nil {
-			s.logger.Debug("icd.management.fabric_removed_persist", slog.Uint64("fabric_index", uint64(fabricIndex)), slog.Any("err", err))
+			// The fabric's rows normally went with its removal (the
+			// store's cascade); a clear that fails here is said (review
+			// II, R2-P6-sup-1025).
+			s.logger.Warn("icd.management.fabric_removed_persist", slog.Uint64("fabric_index", uint64(fabricIndex)), slog.Any("err", err))
 		}
 	}
 	if removed {
@@ -1089,6 +1092,26 @@ func (s *ICDManagement) registerClient(ctx context.Context, req icddef.RegisterC
 	entry := icdClient{
 		fabricIndex: fabric, checkInNodeID: req.CheckInNodeId, monitoredSubject: req.MonitoredSubject,
 		clientType: req.ClientType, key: slices.Clone(req.Key),
+	}
+	// The fabric is checked against the node's fabric list (the store's,
+	// the source AccessControl uses) before anything is stored: a fabric
+	// removed while the command was on its way stores no registration
+	// under its index; a list that cannot be read refuses (fail closed).
+	// Without a store there is no list to check against, and the
+	// registration is refused as well (fail closed; review II,
+	// R2-P6-store-1010, decision 158).
+	st := s.cfg.Store
+	if st == nil {
+		return icddef.RegisterClientResponse{}, spec.Errorf(im.StatusUnsupportedAccess, "core: ICD: no fabric list to check fabric %d against (no Store)", fabric)
+	}
+	{
+		listed, err := fabricListed(ctx, st, fabric)
+		if err != nil {
+			return icddef.RegisterClientResponse{}, spec.Errorf(im.StatusFailure, "core: ICD: list fabrics: %v", err)
+		}
+		if !listed {
+			return icddef.RegisterClientResponse{}, spec.Errorf(im.StatusUnsupportedAccess, "core: ICD registration for fabric %d, which no longer exists", fabric)
+		}
 	}
 	s.mu.Lock()
 	next := slices.Clone(s.clients)

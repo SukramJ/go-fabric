@@ -45,7 +45,7 @@ const minChecked = 300
 // securityRatchet is the number of violations the security paths still
 // carry (BY-2, listed for the owner). A new one fails; a fixed one fails
 // too until the constant is lowered in the same commit.
-const securityRatchet = 5
+const securityRatchet = 2
 
 // securityPath reports whether rel is one of the owner-reviewed paths.
 func securityPath(rel string) bool {

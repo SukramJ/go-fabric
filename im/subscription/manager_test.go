@@ -68,8 +68,15 @@ func defaultArgs() subscription.SubscribeArgs {
 	}
 }
 
+// newManager builds a manager that reports through reporter (a hook
+// that is deprecated now) or — reporter nil — discards its reports
+// ([subscription.DiscardReports]).
 func newManager(cfg subscription.Config, reporter subscription.Reporter) *subscription.Manager {
-	return subscription.NewManager(cfg, reporter, nil)
+	m := subscription.NewManager(cfg, reporter, nil)
+	if reporter == nil {
+		m.SetReportSender(subscription.DiscardReports)
+	}
+	return m
 }
 
 // ---- NewManager defaults ----
@@ -104,7 +111,7 @@ func TestNewManager_ZeroConfig_AppliesDefaults(t *testing.T) {
 func TestNewManager_NilLogger_NilReporter(t *testing.T) {
 	t.Parallel()
 	// Both nil: must not panic on construction or basic operations.
-	m := subscription.NewManager(subscription.Config{}, nil, nil)
+	m := newManager(subscription.Config{}, nil)
 	sub, err := m.Subscribe(defaultArgs())
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
@@ -1503,7 +1510,7 @@ func TestCloseSession_ClosesMatchingSessionSubscription(t *testing.T) {
 // reports whether a (fabric, peer) pair holds any active subscription.
 func TestSubjectHasActiveSubscription(t *testing.T) {
 	t.Parallel()
-	m := subscription.NewManager(subscription.Config{MaxSubscriptionsPerFabric: 4}, nil, nil)
+	m := newManager(subscription.Config{MaxSubscriptionsPerFabric: 4}, nil)
 
 	if m.SubjectHasActiveSubscription(1, 0xABCD) {
 		t.Fatal("no subscriptions yet — must return false")
@@ -1655,7 +1662,7 @@ func TestCloseFabricExcept_ZeroExcept_ClosesAll(t *testing.T) {
 // helper that reports whether a fabric holds any active subscription.
 func TestFabricHasAtLeastOneActiveSubscription(t *testing.T) {
 	t.Parallel()
-	m := subscription.NewManager(subscription.Config{MaxSubscriptionsPerFabric: 4}, nil, nil)
+	m := newManager(subscription.Config{MaxSubscriptionsPerFabric: 4}, nil)
 
 	if m.FabricHasAtLeastOneActiveSubscription(1) {
 		t.Fatal("no subscriptions yet — must return false")

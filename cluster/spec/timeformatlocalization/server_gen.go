@@ -23,6 +23,22 @@ type State struct {
 	SupportedCalendarTypes []CalendarTypeEnum // attribute 0x0002: list[CalendarTypeEnum], CALFMT, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedCalendarTypes = func(s []CalendarTypeEnum) []CalendarTypeEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]CalendarTypeEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedCalendarTypes)
+	return c
+}
+
 // Patch is a change to the TimeFormatLocalization state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

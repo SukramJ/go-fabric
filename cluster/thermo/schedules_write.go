@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
@@ -59,6 +61,16 @@ type scheduleRules struct {
 // IsPresetHandlePresentInPresetsOrPending (ThermostatClusterPresets.cpp:480-491
 // at 645b267a); without PRES no handle is present
 // (ThermostatClusterBase.h:99-103).
+//
+// The staged presets may be another peer's: the atomic writes follow
+// matter.js, several peers each holding their own attribute, while chip
+// has one atomic state per endpoint (ThermostatClusterAtomic.cpp:360-363,
+// :172-191 at 645b267a), so there the case cannot arise. A peer's
+// Schedules write is therefore judged against the Presets another peer
+// staged and has not committed; a removal that peer later commits is
+// refused while a stored or staged schedule names the handle
+// (presetsInUseBySchedules). No reference defines the cross-peer answer
+// (R2-P6-par-1565).
 func (s *ThermostatServer) scheduleRules() scheduleRules {
 	presets := s.presets
 	if st := s.atomic.forAttribute(s.clk.Now(), tdef.AttrPresets); st != nil {
@@ -362,7 +374,7 @@ func (r scheduleRules) validateTransitionsPerDay(sc Schedule) error {
 // normalised list.
 func (r scheduleRules) pendingSchedules(stored, list []Schedule) ([]Schedule, error) {
 	pending := make([]Schedule, 0, len(list))
-	for _, sc := range cloneSchedules(list) {
+	for _, sc := range deepcopy.Each(list) {
 		n, err := r.appendPending(stored, pending, sc)
 		if err != nil {
 			return nil, err
@@ -450,12 +462,12 @@ func schedulesTLVEqual(a, b []Schedule) bool {
 // 645b267a), whose error fails the commit — and the list is stored and
 // reported. The caller holds s.op.
 func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedule) error {
-	list := cloneSchedules(staged)
+	list := deepcopy.Each(staged)
 	if err := issueScheduleHandles(list); err != nil {
 		return err
 	}
 	if s.schedulePort != nil {
-		if err := s.schedulePort.CommitSchedules(ctx, cloneSchedules(list)); err != nil {
+		if err := s.schedulePort.CommitSchedules(ctx, deepcopy.Each(list)); err != nil {
 			return err
 		}
 	}

@@ -49,7 +49,7 @@ type CaseInitiation struct {
 	// CompressedFabricID names the peer's operational DNS-SD instance.
 	CompressedFabricID [8]byte
 	// OnEstablished registers the session under Initiator.SessionID()
-	// (secure/operational.Manager.OpenFromSigmaAsInitiatorWithID) and may
+	// (secure/operational.Manager.OpenFromSigmaAsInitiatorWithStake) and may
 	// persist the new resumption record. ctx is the handshake's. Returning
 	// an error abandons the session.
 	OnEstablished func(ctx context.Context, result sigma.InitiatorResult) error
@@ -308,22 +308,17 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	ex := &initiatedExchange{ch: make(chan initiatedMessage, 4)}
 	b.resumption.initiated.Store(key, ex)
 	defer b.resumption.initiated.Delete(key)
-	// A handshake that ends takes what it sent and the peer has not
-	// acknowledged with it — a Sigma1 or Sigma3 nobody answers any more.
-	// The StatusReport that ends it is the exception, as on the responder
-	// side ([Bridge.sendHandshakeFailureReport]): it is sent after the
-	// handshake dropped the rest and stays tracked until it is
-	// acknowledged, its retries are spent or [unsecuredEntryLifetime] is
-	// over. The unsecured session's entries of this handshake only:
-	// exchange ids are per initiator, and a secure session's peer or
-	// another initiator may have picked the same one.
-	reported := false
+	// A handshake that completes takes what it sent and the peer has not
+	// acknowledged with it, before its own last message goes out. One that
+	// fails drops nothing: a Sigma1 or Sigma3 still unacknowledged goes on
+	// being retransmitted until it is acknowledged, its retries are spent or
+	// [unsecuredEntryLifetime] is over, as on the responder side
+	// ([Bridge.sendHandshakeFailureReport]; owner decision 173), and so
+	// does the StatusReport that reports the failure. The unsecured
+	// session's entries of this handshake only: exchange ids are per
+	// initiator, and a secure session's peer or another initiator may have
+	// picked the same one.
 	abandon := func() { b.abandonHandshakeReplies(key) }
-	defer func() {
-		if !reported {
-			abandon()
-		}
-	}()
 
 	sigma1, err := init.Initiator.GenerateSigma1()
 	if err != nil {
@@ -341,9 +336,7 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 	case mrp.SCOpcodeSigma2:
 		sigma3, perr := init.Initiator.ProcessSigma2Bytes(reply.payload)
 		if perr != nil {
-			abandon()
-			reported = true
-			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter)
+			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter, b.handshakeReplyUnacknowledged(key))
 			return 0, perr
 		}
 		if err := b.sendInitiatedUnsecured(addr, exchangeID, ephemeral, mrp.SCOpcodeSigma3, sigma3, &reply.counter); err != nil {
@@ -356,6 +349,7 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		if err := statusReportSuccess(status.payload); err != nil {
 			return 0, err
 		}
+		abandon()
 		// The responder sent its StatusReport reliably and the exchange
 		// ends here, so it is acknowledged now — matter.js
 		// MessageExchange sends the standalone ack of the last received
@@ -364,12 +358,11 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		// budget ran out (seen against matter.js's controller).
 		b.sendInitiatedAck(addr, exchangeID, ephemeral, status.counter)
 	case mrp.SCOpcodeSigma2Resume:
-		abandon()
-		reported = true
 		if perr := init.Initiator.ProcessSigma2Resume(reply.payload); perr != nil {
-			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter)
+			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter, b.handshakeReplyUnacknowledged(key))
 			return 0, perr
 		}
+		abandon()
 		ok := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)
 		// matter.js CaseClient: "Error sending Sigma2Resume-Success,
 		// assume session still valid" — a send failure is not fatal.
@@ -388,7 +381,9 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		}
 	}
 	sessionID := init.Initiator.SessionID()
-	b.sessionPeerAddrs.Store(sessionID, addr)
+	// Bound as every session is bound, its owner recorded, so it never
+	// moves between transports (review II, R2-P6-conc-0314).
+	b.bindSessionRoute(sessionID, addr)
 	b.recordSessionsOpen()
 	b.logger.Info("matter.case.initiator.established",
 		slog.String("peer", addr.String()),
@@ -437,9 +432,19 @@ func statusReportSuccessOr(payload []byte, failure error) error {
 
 // sendCASEError reports a failed handshake to the peer, best effort —
 // matter.js CaseClient.pair sends StatusReport(InvalidParam) unless the
-// failure was a transport one. The caller has dropped the handshake's
-// unacknowledged messages before, so the report stays tracked.
-func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, ackCounter uint32) {
+// failure was a transport one. The report is tracked like the rest. Nothing is
+// sent when sigma1Unacked: the Sigma1 still waited for its acknowledgement
+// when the failing reply arrived, and the handshake ends unreported
+// (review II, F-db021da0-7; [Bridge.endHandshakeUnreported] on the
+// responder side).
+func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, ackCounter uint32, sigma1Unacked bool) {
+	if sigma1Unacked {
+		b.logger.Debug("matter.sc.handshake.failure_report_skipped",
+			slog.String("stage", "case_initiator"),
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.String("reason", "reply_unacknowledged"))
+		return
+	}
 	report := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
 	if err := b.sendInitiatedUnsecured(addr, exchangeID, ephemeral, mrp.SCOpcodeStatusReport, report, &ackCounter); err != nil {
 		b.logger.Debug("matter.case.initiator.error_send", slog.Any("err", err))

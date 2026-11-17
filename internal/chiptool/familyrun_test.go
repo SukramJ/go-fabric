@@ -449,10 +449,15 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 				t.Skipf("skipped, %s: %s (%s)", manualClass(c.ID), manualReason(c.ID), c.Path)
 			}
 			// A run-pending row (status not ported yet) runs: its run is
-			// what it waits for (pendingRunPassed).
+			// what it waits for (pendingRunPassed). A recorded failure
+			// (failsAs) runs and must fail as recorded (runPythonCase).
 			g, excluded := fam.gapFor(c.Name)
-			if excluded && !g.selfSkip && g.class != classNotPortedYet {
+			_, failsAs := fam.failsAs[c.Name]
+			if excluded && !g.selfSkip && g.class != classNotPortedYet && !failsAs {
 				t.Skipf("excluded, %s: %s", g.class, g.reason)
+			}
+			if failsAs && (c.Kind != "py" || fam.perEndpoint[c.Name]) {
+				t.Fatalf("%s has a recorded failure, which the runner holds for a Python case run once only", c.ID)
 			}
 			if fam.multicast[c.Name] {
 				requireIPv6(t, c.ID, "sends Matter group messages (IPv6 multicast)")
@@ -692,6 +697,19 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 			t.Fatalf("%s should skip itself (%s: %s) but ran %+v; full output: %s", id, g.class, g.reason, counts, logFile)
 		}
 		t.Skipf("skipped itself as declared, %s: %s", g.class, g.reason)
+	}
+	if rf, failsAs := fam.failsAs[c.Name]; failsAs {
+		g, _ := fam.gapFor(c.Name)
+		if pass {
+			t.Fatalf("%s passed, but it is recorded to fail (%s: %s): remove its exclude and failsAs rows, "+
+				"and the by_design.md entry's note on the case, now that it passes", id, g.class, g.reason)
+		}
+		if !rf.output.MatchString(out) || counts.Steps != rf.steps || counts.StepsSkipped != 0 {
+			t.Logf("daemon log: %s (whole log: %s)", tail(current().snapshotStderr(), 40), saveCaseLog(id+"-daemon", current().snapshotStderr()))
+			t.Fatalf("%s failed, but not as recorded: want %d steps and output matching %q, got %+v (%v)\nfull output: %s\n--- verdict lines ---\n%s",
+				id, rf.steps, rf.output, counts, err, logFile, verdictLines(out))
+		}
+		t.Skipf("failed as recorded after %d steps, %s: %s", counts.Steps, g.class, g.reason)
 	}
 	if !pass {
 		if known, ok := fam.knownProblems[c.Name]; ok && onlyKnownProblems(t, out, known) {

@@ -162,6 +162,37 @@ func (v *AccessControlEntryStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AccessControlEntryStruct) Clone() AccessControlEntryStruct {
+	c := v
+	c.Subjects = spec.Nullable[[]uint64]{Value: func(s []uint64) []uint64 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint64, len(s))
+		copy(out, s)
+		return out
+	}(v.Subjects.Value), Null: v.Subjects.Null}
+	c.Targets = spec.Nullable[[]AccessControlTargetStruct]{Value: func(s []AccessControlTargetStruct) []AccessControlTargetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AccessControlTargetStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Targets.Value), Null: v.Targets.Null}
+	c.AuxiliaryType = func(p *AccessControlAuxiliaryTypeEnum) *AccessControlAuxiliaryTypeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AuxiliaryType)
+	return c
+}
+
 // AccessControlEntryStructDef describes AccessControlEntryStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -230,6 +261,22 @@ func (v *AccessControlExtensionStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AccessControlExtensionStruct) Clone() AccessControlExtensionStruct {
+	c := v
+	c.Data = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Data)
+	return c
+}
+
 // AccessControlExtensionStructDef describes AccessControlExtensionStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -264,6 +311,22 @@ func (v *AccessRestrictionEntryStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "Restrictions", true, &v.Restrictions, spec.DecodeListIn(spec.DecodeStruct[AccessRestrictionStruct], 1, 2147483647)),
 		spec.Bind(254, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AccessRestrictionEntryStruct) Clone() AccessRestrictionEntryStruct {
+	c := v
+	c.Restrictions = func(s []AccessRestrictionStruct) []AccessRestrictionStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AccessRestrictionStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Restrictions)
+	return c
 }
 
 // AccessRestrictionEntryStructDef describes AccessRestrictionEntryStruct.
@@ -375,6 +438,22 @@ func (v *CommissioningAccessRestrictionEntryStruct) DecodeTLV(n spec.Node) error
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CommissioningAccessRestrictionEntryStruct) Clone() CommissioningAccessRestrictionEntryStruct {
+	c := v
+	c.Restrictions = func(s []AccessRestrictionStruct) []AccessRestrictionStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AccessRestrictionStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Restrictions)
+	return c
+}
+
 // CommissioningAccessRestrictionEntryStructDef describes CommissioningAccessRestrictionEntryStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -401,6 +480,24 @@ func (v *ReviewFabricRestrictionsRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "ReviewFabricRestrictions",
 		spec.Bind(0, "Arl", true, &v.Arl, spec.DecodeList(spec.DecodeStruct[CommissioningAccessRestrictionEntryStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ReviewFabricRestrictionsRequest) Clone() ReviewFabricRestrictionsRequest {
+	c := v
+	c.Arl = func(s []CommissioningAccessRestrictionEntryStruct) []CommissioningAccessRestrictionEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]CommissioningAccessRestrictionEntryStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.Arl)
+	return c
 }
 
 // ReviewFabricRestrictionsResponse is the ReviewFabricRestrictionsResponse command payload.
@@ -458,6 +555,15 @@ func (v *AccessControlEntryChangedEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AccessControlEntryChangedEvent) Clone() AccessControlEntryChangedEvent {
+	c := v
+	c.LatestValue = spec.Nullable[AccessControlEntryStruct]{Value: v.LatestValue.Value.Clone(), Null: v.LatestValue.Null}
+	return c
+}
+
 // AccessControlExtensionChangedEvent is the AccessControlExtensionChanged event payload.
 type AccessControlExtensionChangedEvent struct {
 	AdminNodeId     spec.Nullable[uint64]                       // 1: node-id, M, desc, X
@@ -489,6 +595,15 @@ func (v *AccessControlExtensionChangedEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AccessControlExtensionChangedEvent) Clone() AccessControlExtensionChangedEvent {
+	c := v
+	c.LatestValue = spec.Nullable[AccessControlExtensionStruct]{Value: v.LatestValue.Value.Clone(), Null: v.LatestValue.Null}
+	return c
+}
+
 // FabricRestrictionReviewUpdateEvent is the FabricRestrictionReviewUpdate event payload.
 type FabricRestrictionReviewUpdateEvent struct {
 	Token             uint64  // 0: uint64, M
@@ -515,6 +630,28 @@ func (v *FabricRestrictionReviewUpdateEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "ArlRequestFlowUrl", false, &v.ArlRequestFlowUrl, spec.DecodeOptional(spec.DecodeStringIn(0, 256))),
 		spec.Bind(254, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v FabricRestrictionReviewUpdateEvent) Clone() FabricRestrictionReviewUpdateEvent {
+	c := v
+	c.Instruction = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Instruction)
+	c.ArlRequestFlowUrl = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ArlRequestFlowUrl)
+	return c
 }
 
 // AuxiliaryAccessUpdatedEvent is the AuxiliaryAccessUpdated event payload.

@@ -201,6 +201,11 @@ type DeviceEnergyConfig struct {
 	// PowerAdjust and Pause timers run on. Nil is [clock.System].
 	Clock clock.Clock
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -236,8 +241,15 @@ type DeviceEnergyManagementServer struct {
 	powerAdjustInProgress bool
 	powerAdjustStartUtc   uint32
 	powerAdjustTimer      clock.Timer
+	powerAdjustUntil      time.Time // the timer's deadline on clock
+	powerAdjustGen        uint64    // the armed timer's; an older one's expiry does nothing
 	pauseInProgress       bool
 	pauseTimer            clock.Timer
+	pauseUntil            time.Time
+	pauseGen              uint64
+	// quiescedTimers are the timers MatterQuiesce stopped, which the
+	// SetEndpoint of a reassembly arms again for the time left.
+	quiescedPowerAdjust, quiescedPause bool
 	// cause is the contract.Origin of the changes a command makes
 	// (OriginCommand), zero outside one: the device's own changes, the
 	// timers' expiries included, are the host's.
@@ -280,7 +292,7 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 	for id, fn := range handlers {
 		handlers[id] = s.command(fn)
 	}
-	srv, err := spec.NewServer(dem.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(dem.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
@@ -342,19 +354,23 @@ func (s *DeviceEnergyManagementServer) OptOutState() OptOutState {
 	return OptOutState(n)
 }
 
-// PowerAdjustmentCapability returns the capability; nil while null.
+// PowerAdjustmentCapability returns the capability; nil while null. It is
+// a deep copy, which the caller may change.
 func (s *DeviceEnergyManagementServer) PowerAdjustmentCapability() *PowerAdjustCapability {
 	v, _ := s.srv.Value(dem.AttrPowerAdjustmentCapability)
 	if c, ok := v.(PowerAdjustCapability); ok {
+		c = c.Clone()
 		return &c
 	}
 	return nil
 }
 
-// Forecast returns the forecast; nil while null.
+// Forecast returns the forecast; nil while null. It is a deep copy, which
+// the caller — the commands that edit it among them — may change.
 func (s *DeviceEnergyManagementServer) Forecast() *Forecast {
 	v, _ := s.srv.Value(dem.AttrForecast)
 	if f, ok := v.(Forecast); ok {
+		f = f.Clone()
 		return &f
 	}
 	return nil
@@ -385,7 +401,7 @@ func (s *DeviceEnergyManagementServer) SetPowerAdjustmentCapability(c *PowerAdju
 	if c == nil {
 		return s.set(dem.AttrPowerAdjustmentCapability, nil)
 	}
-	return s.set(dem.AttrPowerAdjustmentCapability, *c)
+	return s.set(dem.AttrPowerAdjustmentCapability, c.Clone()) // the store keeps no list of the caller's
 }
 
 // SetForecast records the forecast; nil is null (DelegateImpl.cpp:
@@ -462,7 +478,7 @@ func (s *DeviceEnergyManagementServer) setForecastLocked(f *Forecast) error {
 	if f == nil {
 		return s.setLocked(dem.AttrForecast, nil)
 	}
-	return s.setLocked(dem.AttrForecast, *f)
+	return s.setLocked(dem.AttrForecast, f.Clone()) // the store keeps no list of the caller's
 }
 
 // setCapabilityCauseLocked is SetPowerAdjustmentCapabilityPowerAdjustReason
@@ -643,8 +659,8 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 	if err := s.setCapabilityCauseLocked(reason); err != nil { // :138-146
 		return err
 	}
-	s.powerAdjustInProgress = true                                                                      // :155
-	s.powerAdjustTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.powerAdjustExpired) // :157
+	s.powerAdjustInProgress = true                                  // :155
+	s.armPowerAdjustLocked(time.Duration(r.Duration) * time.Second) // :157
 	// chip undoes the request when logging the event fails (:166-178,
 	// HandlePowerAdjustRequestFailure :188-200); PowerAdjustStart is in
 	// the EventList whenever the command is (both "PA"), so it cannot.
@@ -652,6 +668,32 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 		_ = s.emitLocked(dem.EventPowerAdjustStart, dem.PowerAdjustStartEvent{})
 	}
 	return nil
+}
+
+// armPowerAdjustLocked arms the power-adjustment timer for d, until
+// powerAdjustUntil; the caller holds mu.
+func (s *DeviceEnergyManagementServer) armPowerAdjustLocked(d time.Duration) {
+	s.powerAdjustUntil = s.clock.Now().Add(d)
+	s.rearmPowerAdjustLocked(d)
+}
+
+func (s *DeviceEnergyManagementServer) rearmPowerAdjustLocked(d time.Duration) {
+	s.powerAdjustGen++
+	gen := s.powerAdjustGen
+	s.powerAdjustTimer = s.clock.AfterFunc(d, func() { s.powerAdjustExpired(gen) })
+}
+
+// armPauseLocked arms the pause timer for d, until pauseUntil; the caller
+// holds mu.
+func (s *DeviceEnergyManagementServer) armPauseLocked(d time.Duration) {
+	s.pauseUntil = s.clock.Now().Add(d)
+	s.rearmPauseLocked(d)
+}
+
+func (s *DeviceEnergyManagementServer) rearmPauseLocked(d time.Duration) {
+	s.pauseGen++
+	gen := s.pauseGen
+	s.pauseTimer = s.clock.AfterFunc(d, func() { s.pauseExpired(gen) })
 }
 
 func (s *DeviceEnergyManagementServer) stopPowerAdjustTimerLocked() {
@@ -670,12 +712,14 @@ func (s *DeviceEnergyManagementServer) stopPauseTimerLocked() {
 
 // powerAdjustExpired is HandlePowerAdjustTimerExpiry (DelegateImpl.cpp:
 // 222-241).
-func (s *DeviceEnergyManagementServer) powerAdjustExpired() {
+func (s *DeviceEnergyManagementServer) powerAdjustExpired(gen uint64) {
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.powerAdjustInProgress {
+	if !s.powerAdjustInProgress || s.powerAdjustTimer == nil || gen != s.powerAdjustGen {
+		// Stopped or re-armed after it fired, before it got the lock
+		// (MatterQuiesce, Close, a cancel, a new request): it does nothing.
 		return
 	}
 	s.powerAdjustTimer = nil
@@ -750,6 +794,9 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 	if f == nil { // :426-431
 		return nil, demFailure("Forecast is null")
 	}
+	// Kept as the guard it is in chip: the command needs STA, under which
+	// both fields are "STA" and the store refuses a forecast without them
+	// (review II, R2-P6-par-1304), so no stored forecast reaches it.
 	if f.EarliestStartTime == nil || f.LatestEndTime == nil { // :436-440
 		return nil, demFailure("EarliestStartTime / LatestEndTime absent")
 	}
@@ -761,6 +808,9 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 		}
 		earliest = now
 	}
+	// uint32 throughout, as chip's (:462, :470): a host forecast whose
+	// EndTime is before its StartTime and a start near 2^32 wrap (review
+	// II, R2-P6-wire-1617, kept as chip's).
 	duration := f.EndTime - f.StartTime  // :462
 	if r.RequestedStartTime < earliest { // :463-468
 		return nil, demConstraint("RequestedStartTime %d before EarliestStartTime %d", r.RequestedStartTime, earliest)
@@ -828,6 +878,9 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 	}
 	slot := f.Slots[active]
 	switch {
+	// Kept as the guard it is in chip: the command needs PAU, under which
+	// the store refuses a slot without these fields (review II,
+	// R2-P6-par-1304), so no stored forecast reaches it.
 	case slot.SlotIsPausable == nil, slot.MinPauseDuration == nil, slot.MaxPauseDuration == nil: // :562-578
 		return nil, demFailure("slot %d lacks SlotIsPausable, MinPauseDuration or MaxPauseDuration", active)
 	case !*slot.SlotIsPausable: // :580-584
@@ -844,7 +897,7 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 		generateEvent = true
 		s.pauseInProgress = true
 	}
-	s.pauseTimer = s.clock.AfterFunc(time.Duration(r.Duration)*time.Second, s.pauseExpired)             // :443
+	s.armPauseLocked(time.Duration(r.Duration) * time.Second)                                           // :443
 	if herr := s.hook(func() error { return s.manager.Pause(ctx, r.Duration, r.Cause) }); herr != nil { // :451-460
 		s.pauseFailureLocked()
 		return nil, demRefusal("PauseRequest", herr)
@@ -866,7 +919,12 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 
 // pauseFailureLocked is HandlePauseRequestFailure (DelegateImpl.cpp:
 // 499-509). chip cancels the power-adjustment timer there (:501), not the
-// pause timer it started (:443); this transcribes it as written.
+// pause timer it started (:443); this transcribes it as written. A pause
+// refused during a power adjustment therefore leaves powerAdjustInProgress
+// set with no timer: the adjustment never ends by itself (no
+// PowerAdjustEnd, the capability's cause stays), CancelPowerAdjustRequest
+// answers INVALID_IN_STATE for the ESAState Online set here, and only a
+// new PowerAdjustRequest recovers (review II, R2-P6-fsm-1623).
 func (s *DeviceEnergyManagementServer) pauseFailureLocked() {
 	s.stopPowerAdjustTimerLocked()
 	_ = s.setLocked(dem.AttrEsaState, EsaStateOnline)
@@ -874,13 +932,13 @@ func (s *DeviceEnergyManagementServer) pauseFailureLocked() {
 }
 
 // pauseExpired is HandlePauseRequestTimerExpiry (DelegateImpl.cpp:531-546).
-func (s *DeviceEnergyManagementServer) pauseExpired() {
+func (s *DeviceEnergyManagementServer) pauseExpired(gen uint64) {
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.pauseInProgress {
-		return
+	if !s.pauseInProgress || s.pauseTimer == nil || gen != s.pauseGen {
+		return // stopped or re-armed after it fired, before it got the lock
 	}
 	s.pauseTimer = nil
 	s.pauseInProgress = false
@@ -1043,6 +1101,8 @@ func (s *DeviceEnergyManagementServer) requestConstraintBasedForecast(ctx contex
 			}
 		}
 	}
+	// The overlap check adds in uint32, as chip's (:778-779): a start near
+	// 2^32 wraps (R2-P6-wire-1617, kept as chip's).
 	for i := 1; i < len(r.Constraints); i++ { // :767-793
 		prev, c := r.Constraints[i-1], r.Constraints[i]
 		if c.StartTime < prev.StartTime || prev.StartTime+prev.Duration >= c.StartTime {
@@ -1088,12 +1148,27 @@ func (s *DeviceEnergyManagementServer) cancelRequest(ctx context.Context, _ any)
 // --- plumbing -----------------------------------------------------------
 
 // SetEndpoint stamps the endpoint the events are addressed to; the bridge
-// calls it at reassembly.
+// calls it at reassembly, for every server of the new topology. A timer
+// [DeviceEnergyManagementServer.MatterQuiesce] stopped is armed again here
+// — a reassembly that puts the same server back — for the time left to its
+// deadline, at once for one that passed meanwhile, as EvseServer re-arms
+// its own (review II, R2-P6-conc-1605).
 func (s *DeviceEnergyManagementServer) SetEndpoint(endpoint uint16) {
+	// The store is stamped first: a timer re-armed below that fires at
+	// once emits on the new endpoint (review II, appinfra round 3).
+	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 	s.mu.Lock()
 	s.endpoint = endpoint
+	now := s.clock.Now()
+	if s.quiescedPowerAdjust {
+		s.quiescedPowerAdjust = false
+		s.rearmPowerAdjustLocked(max(s.powerAdjustUntil.Sub(now), 0))
+	}
+	if s.quiescedPause {
+		s.quiescedPause = false
+		s.rearmPauseLocked(max(s.pauseUntil.Sub(now), 0))
+	}
 	s.mu.Unlock()
-	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the adjustment and pause timers (chip's destructor,
@@ -1136,9 +1211,28 @@ func (s *DeviceEnergyManagementServer) OnAttributeReport(cb func(change contract
 	return s.srv.OnAttributeReport(cb)
 }
 
-// MatterQuiesce implements [contract.ClusterQuiescer]: a quieter
-// attribute's held report is dropped ([spec.Server.MatterQuiesce]).
-func (s *DeviceEnergyManagementServer) MatterQuiesce() { s.srv.MatterQuiesce() }
+// MatterQuiesce implements [contract.ClusterQuiescer]: the bridge calls it
+// when the server leaves the topology or stops. The power-adjustment and
+// pause timers stop, so neither changes ESAState, emits PowerAdjustEnd or
+// Resumed, nor calls the host's PowerAdjustCompleted or PauseCompleted
+// afterwards; their deadlines are kept for the
+// [DeviceEnergyManagementServer.SetEndpoint] of a reassembly that puts the
+// server back. A quieter attribute's held report is dropped as well
+// ([spec.Server.MatterQuiesce]). Before, only the uncalled Close stopped
+// the timers (review II, R2-P6-conc-1605).
+func (s *DeviceEnergyManagementServer) MatterQuiesce() {
+	s.mu.Lock()
+	if s.powerAdjustTimer != nil {
+		s.quiescedPowerAdjust = true
+	}
+	if s.pauseTimer != nil {
+		s.quiescedPause = true
+	}
+	s.stopPowerAdjustTimerLocked()
+	s.stopPauseTimerLocked()
+	s.mu.Unlock()
+	s.srv.MatterQuiesce()
+}
 
 // MatterRead resolves an attribute.
 func (s *DeviceEnergyManagementServer) MatterRead(attrID uint32) (any, bool) {
@@ -1173,8 +1267,10 @@ func (s *DeviceEnergyManagementServer) command(fn spec.CommandHandler) spec.Comm
 }
 
 // SetAttributes implements [spec.AttributeSetter]: the device's own
-// change, all or nothing — every value is checked against the definition
-// before any is applied — through the setters: EsaState
+// change. Every value is checked against the definition before any is
+// applied; the setters then run in attribute-id order, and a value the
+// store still refuses stops there with the earlier ones applied (review
+// II, R2-P6-err-1612). The setters are EsaState
 // ([DeviceEnergyManagementServer.SetEsaState]), AbsMinPower and
 // AbsMaxPower, PowerAdjustmentCapability and Forecast (nil for null), and
 // OptOutState ([DeviceEnergyManagementServer.SetOptOutState], which

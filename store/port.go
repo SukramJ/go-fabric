@@ -23,8 +23,9 @@ import "context"
 //     before it or after it.
 //   - Removing a fabric removes everything that fabric owns: its identity,
 //     group key sets and key map, group table, groupcast groups, ACL,
-//     resumption records, default OTA providers and ICD registrations.
-//     Server subscriptions,
+//     resumption records, default OTA providers and ICD registrations —
+//     the SQLite [Store] deletes each itself, so a handle without foreign
+//     keys removes them too. Server subscriptions,
 //     thermostat presets, door-lock records, owed fabric events, settings
 //     and counters are not fabric-owned rows and stay (the bridge deletes a
 //     fabric's subscriptions itself).
@@ -37,8 +38,11 @@ import "context"
 //     and wraps after 254, skipping occupied indexes (matter.js
 //     FabricManager #nextFabricIndex).
 //   - Returned slices are the caller's: mutating one never changes the store.
-//   - After the backend is closed every method returns a non-nil error and
-//     changes nothing; the node and the controller call no method after
+//   - A backend that closes — the SQLite [Store], whose handle the host
+//     closes — returns a non-nil error from every method after that and
+//     changes nothing (store_closed_db_test.go holds the SQLite store to it;
+//     the port has no Close and storetest no closed case, and memstore
+//     does not close). The node and the controller call no method after
 //     their Stop or Close returned.
 //
 // matter.js has the same split one level down: a StorageService
@@ -184,13 +188,15 @@ type GroupKeys interface {
 	RemoveGroupKeyMapping(ctx context.Context, fabricIndex uint8, groupID uint16) error
 	// ReplaceGroupKeyMappings swaps the fabric's key map for mappings in
 	// one atomic write, as ReplaceACL swaps an ACL: the rows are written
-	// in input order and read back by GroupID ascending; each mapping's
+	// in input order and read back in it; each mapping's
 	// FabricIndex is ignored (the rows are fabricIndex's). A GroupID twice
 	// in mappings is refused, and so is a non-empty map for a fabric the
 	// store does not hold; a refusal changes nothing.
 	ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, mappings []GroupKeyMapping) error
-	// ListGroupKeyMappings returns the fabric's key map by GroupID
-	// ascending.
+	// ListGroupKeyMappings returns the fabric's key map in the order it
+	// was written: ReplaceGroupKeyMappings' input order, a GroupID
+	// SetGroupKeyMapping adds after the rest, a GroupID it rewrites in its
+	// place.
 	ListGroupKeyMappings(ctx context.Context, fabricIndex uint8) ([]GroupKeyMapping, error)
 }
 
@@ -213,7 +219,10 @@ type Groups interface {
 // peer), found by resumption id or by peer.
 type Resumption interface {
 	// UpsertResumption refuses a ResumptionID that is not 16 bytes and a
-	// SharedSecret that is not 32.
+	// SharedSecret that is not 32. A fabric keeps at most
+	// 16 records: the write of one more peer's
+	// evicts the fabric's record written least recently (a rewrite counts
+	// as a write), and never another fabric's.
 	UpsertResumption(ctx context.Context, rec ResumptionRecord) error
 	// GetResumptionByID and GetResumptionByPeer return
 	// [ErrResumptionNotFound] on a miss.

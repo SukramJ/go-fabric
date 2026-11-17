@@ -73,6 +73,22 @@ func (v *ThreadNetworkStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ThreadNetworkStruct) Clone() ThreadNetworkStruct {
+	c := v
+	c.ExtendedPanId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ExtendedPanId)
+	return c
+}
+
 // ThreadNetworkStructDef describes ThreadNetworkStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -102,6 +118,22 @@ func (v *AddNetworkRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddNetworkRequest) Clone() AddNetworkRequest {
+	c := v
+	c.OperationalDataset = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.OperationalDataset)
+	return c
+}
+
 // RemoveNetworkRequest is the RemoveNetwork command payload.
 type RemoveNetworkRequest struct {
 	ExtendedPanId []byte // 0: octstr, M, 8
@@ -119,6 +151,22 @@ func (v *RemoveNetworkRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "RemoveNetwork",
 		spec.Bind(0, "ExtendedPanId", true, &v.ExtendedPanId, spec.DecodeBytesIn(8, 8)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RemoveNetworkRequest) Clone() RemoveNetworkRequest {
+	c := v
+	c.ExtendedPanId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ExtendedPanId)
+	return c
 }
 
 // GetOperationalDatasetRequest is the GetOperationalDataset command payload.
@@ -140,6 +188,22 @@ func (v *GetOperationalDatasetRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetOperationalDatasetRequest) Clone() GetOperationalDatasetRequest {
+	c := v
+	c.ExtendedPanId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ExtendedPanId)
+	return c
+}
+
 // OperationalDatasetResponse is the OperationalDatasetResponse command payload.
 type OperationalDatasetResponse struct {
 	OperationalDataset []byte // 0: octstr, M, max 254
@@ -157,6 +221,22 @@ func (v *OperationalDatasetResponse) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "OperationalDatasetResponse",
 		spec.Bind(0, "OperationalDataset", true, &v.OperationalDataset, spec.DecodeBytesIn(0, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OperationalDatasetResponse) Clone() OperationalDatasetResponse {
+	c := v
+	c.OperationalDataset = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.OperationalDataset)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

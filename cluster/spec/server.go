@@ -81,6 +81,11 @@ type ServerConfig struct {
 	// root endpoint or the Aggregator only; on every other endpoint the
 	// endpoint keeps the cluster's version, which a change the server
 	// reports advances, and this tracker is read by no one but the host.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, and the server's own version
+	// where it serves one (decision 165, F-db021da0-46); leave it nil.
+	// Removable in the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Source optionally answers reads ahead of the stored values.
 	Source Source
@@ -318,13 +323,13 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	// (invokeInitializer: finalizeState → datasource.validate). So is a
 	// bound that names a sibling ("holdTimeLimits.holdTimeMin to …",
 	// DotQualifiedConstraintTest.ts at 862ad75f): an initial value is held
-	// to it again with every sibling in place; in id order the sibling was
-	// still unset and the bound admitted anything.
+	// to it with every sibling in place ([Server.checkInState]).
 	for _, id := range inst.attrs {
 		if _, initial := cfg.Initial[id]; initial {
-			if _, err := s.CheckValue(id, s.values[id], s.peers); err != nil {
-				return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
+			if err := s.checkInState(id, s.values[id], s.peers); err != nil {
+				return nil, err
 			}
+			continue
 		}
 		if err := s.checkIn(id, s.values[id], s.peers); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
@@ -608,6 +613,13 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 // self-held server that keeps its state in a Server stores what a
 // command made of it with [contract.OriginCommand], so its listeners tell
 // it from the host's own Set.
+//
+// Every value is judged against the state the whole patch makes: a bound
+// or an "in" constraint that names a sibling reads the sibling's value in
+// values when the patch sets it, the stored one otherwise. A coherent new
+// range set in one call is therefore accepted, and an incoherent one
+// refused, whatever the order of the ids — as [NewServer] judges its
+// initial values (review II, R2-P6-fsm-1303).
 func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any) error {
 	checked := make(map[uint32]any, len(values))
 	for _, id := range slices.Sorted(maps.Keys(values)) {
@@ -617,10 +629,8 @@ func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any
 		}
 		checked[id] = v
 	}
-	// The siblings an "in" constraint reads are the state with this
-	// change applied, as matter.js validates an assigned property against
-	// the struct it is assigned in. Mirrors matter.js
-	// packages/node/src/behavior/state/managed/values/StructManager.ts:273-287.
+	// The siblings a bound, an "in" constraint or a field's conformance
+	// reads are the state with this change applied.
 	pending := func(attrID uint32) (any, bool) {
 		if v, ok := checked[attrID]; ok {
 			return v, true
@@ -628,17 +638,20 @@ func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any
 		return s.peers(attrID)
 	}
 	for _, id := range slices.Sorted(maps.Keys(checked)) {
-		if err := s.checkIn(id, checked[id], pending); err != nil {
-			return fmt.Errorf("%w: %w", ErrInvalidValue, err)
+		if err := s.checkInState(id, checked[id], pending); err != nil {
+			return err
 		}
 	}
 	s.store(origin, checked)
 	return nil
 }
 
-// check holds a device-side value to the served attribute's type and
-// constraint — the checks of [Instance.CheckValue], list length and list
-// entries and struct fields included — and returns it in its stored form.
+// check holds a device-side value to the served attribute's type and to
+// the parts of its constraint that name no sibling — the checks of
+// [Instance.CheckValue], list length and list entries and struct fields
+// included — and returns it in its stored form. A bound that names a
+// sibling admits here; [Server.checkInState] judges it once the state the
+// value enters is known.
 //
 // The value is first patched with the defaults the feature selection
 // makes storage hold ([Instance.PatchDefaults]), as matter.js patches a
@@ -651,7 +664,30 @@ func (s *Server) check(attrID uint32, value any) (any, error) {
 		}
 		value = patched
 	}
-	return s.CheckSet(attrID, value, s.peers)
+	return s.CheckSet(attrID, value, unresolvedPeers)
+}
+
+// unresolvedPeers resolves no sibling: a bound computed from a sibling's
+// name admits every value ([Peers]).
+func unresolvedPeers(uint32) (any, bool) { return nil, false }
+
+// checkInState holds a device-side value in its stored form to every check
+// that reads the state it enters, with peers resolving that state: its
+// type and constraint with the sibling bounds resolved
+// ([Instance.CheckValue]) and an "in" constraint. A refusal wraps
+// [ErrInvalidValue].
+func (s *Server) checkInState(attrID uint32, v any, peers Peers) error {
+	a := s.def.Attribute(attrID)
+	if a == nil {
+		return fmt.Errorf("%w: %s attribute 0x%04X is not defined", ErrInvalidValue, s.def.Name, attrID)
+	}
+	if _, err := s.checkValueIn(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(v), peers, nameScope{peers: peers, bits: attrID != featureMapAttributeID, conformance: true, enums: true}); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidValue, err)
+	}
+	if err := s.checkIn(attrID, v, peers); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidValue, err)
+	}
+	return nil
 }
 
 // CheckSet checks a value the device sets for attrID — not a controller's

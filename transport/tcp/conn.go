@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/transport"
 )
 
@@ -33,6 +35,13 @@ type Handler func(c *Conn, msg []byte, release func())
 // (TcpChannel.ts:81-82).
 const maxInFlightPerConn = 64
 
+// defaultSendTimeout bounds the write of one [Conn.Send]: a peer that
+// reads nothing for this long, so that the frame cannot be handed to the
+// socket, loses the connection. Module's own: a blocked write holds a
+// goroutine — and every Send queued behind it on the connection — where
+// an asynchronous runtime parks a promise.
+const defaultSendTimeout = 30 * time.Second
+
 // readChunkSize is the size of one socket read. A Go detail with no
 // matter.js counterpart; the assembler accepts chunks of any size.
 const readChunkSize = 16 * 1024
@@ -49,6 +58,8 @@ type Conn struct {
 
 	// writeMu serialises frame writes on nc.
 	writeMu sync.Mutex
+	// sendTimeout bounds one Send's write (defaultSendTimeout).
+	sendTimeout time.Duration
 
 	closeOnce sync.Once
 	closed    chan struct{}
@@ -75,6 +86,11 @@ type Conn struct {
 	now         func() time.Duration
 	traffic     atomic.Bool
 	lastTraffic atomic.Int64
+	// sessionNoted is set by the first [Conn.NoteSessionTraffic];
+	// lastSession is the reading of the latest one. Once it is set, the
+	// listener measures the connection's idleness by lastSession alone.
+	sessionNoted atomic.Bool
+	lastSession  atomic.Int64
 
 	recoveredPanics *panicCounter
 }
@@ -100,6 +116,7 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 		closed:          make(chan struct{}),
 		served:          make(chan struct{}),
 		recoveredPanics: panics,
+		sendTimeout:     defaultSendTimeout,
 	}
 }
 
@@ -107,6 +124,14 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 // Returns [ErrMessageTooLarge] above [Conn.MaxMessageSize] and
 // [ErrConnClosed] after the connection closed. Mirrors matter.js
 // TcpChannel.ts:119-133 send.
+//
+// The write is bounded by an absolute deadline: a frame not handed to the
+// socket within 30 s of the Send (a peer that stopped reading, its receive
+// window full) fails the Send
+// with an error that wraps [os.ErrDeadlineExceeded] and closes the
+// connection, whose stream may then hold part of a frame. The wait for
+// writeMu — a Send queued behind a stuck one — is bounded by the same
+// close.
 func (c *Conn) Send(msg []byte) error {
 	if c.isClosed() {
 		return ErrConnClosed
@@ -117,7 +142,22 @@ func (c *Conn) Send(msg []byte) error {
 	}
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if c.isClosed() {
+		return ErrConnClosed
+	}
+	if c.sendTimeout > 0 {
+		// A socket deadline is a wall-clock instant: the system clock, not
+		// an injected one (a fake clock cannot move the kernel's timer).
+		_ = c.nc.SetWriteDeadline(clock.System{}.Now().Add(c.sendTimeout))
+	}
 	if _, err := c.nc.Write(frame); err != nil {
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			c.logger.Warn("matter.tcp.send_timeout",
+				slog.String("peer", c.remote.String()),
+				slog.Duration("timeout", c.sendTimeout))
+			c.close(err)
+			return fmt.Errorf("tcp: write %s: not handed to the socket within %v, connection closed: %w", c.remote, c.sendTimeout, err)
+		}
 		if c.isClosed() {
 			return ErrConnClosed
 		}
@@ -137,13 +177,32 @@ func (c *Conn) markTraffic() {
 	c.traffic.Store(true)
 }
 
-// idleSince is the reading of the connection's last message received or
-// sent, and false when it carried none.
-func (c *Conn) idleSince() (time.Duration, bool) {
-	if !c.traffic.Load() {
+// NoteSessionTraffic tells the accepting listener that the connection just
+// carried a message of a secure session — one the host authenticated. The
+// listener measures a connection's place at the total bound
+// ([MaxInboundConnections]) by these notes alone, not by every frame: a
+// connection keeps its place while its sessions carried a message within
+// [idleGrace]; one never noted keeps it only for [sessionlessGrace] after
+// its accept (for [reclaimAgeFloor] when it carried nothing), whatever
+// frames it sends. A host that terminates sessions on the listener's
+// connections calls it for every authenticated message; one that does not
+// leaves its connections measured as sessionless. A no-op on a dialed
+// connection. Review II, N3-finnet-4.
+func (c *Conn) NoteSessionTraffic() {
+	if c.now == nil {
+		return
+	}
+	c.lastSession.Store(int64(c.now()))
+	c.sessionNoted.Store(true)
+}
+
+// sessionSince is the reading of the connection's last session message
+// ([Conn.NoteSessionTraffic]), and false when none was noted.
+func (c *Conn) sessionSince() (time.Duration, bool) {
+	if !c.sessionNoted.Load() {
 		return 0, false
 	}
-	return time.Duration(c.lastTraffic.Load()), true
+	return time.Duration(c.lastSession.Load()), true
 }
 
 // Remote is the peer's address (a [*net.TCPAddr]).

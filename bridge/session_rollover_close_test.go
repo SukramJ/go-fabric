@@ -91,7 +91,7 @@ func TestRolloverCloseFlushesTheSessionsSubscriptions(t *testing.T) {
 		flushed []uint32
 		before  []uint16 // the registry's closes when the flush ran
 	)
-	mgr.SetFlushReporter(func(_ context.Context, sub *subscription.Subscription, _ []im.EventReport, paths []im.ConcreteAttributePath) {
+	mgr.SetFlushReporter(func(_ context.Context, sub *subscription.Subscription, _ []im.EventReport, paths []im.ConcreteAttributePath) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 		mu.Lock()
 		defer mu.Unlock()
 		if len(paths) > 0 {

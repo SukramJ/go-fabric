@@ -330,20 +330,21 @@ func TestEventReportParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// :582-584 puts the number back. The retry here goes out a floor after
-	// the failed report, as a failed attribute report's does; matter.js
-	// schedules nothing there.
-	t.Run("events owed again after a failed report are retried when the floor ends", func(t *testing.T) {
+	// :582-584 puts the number back and schedules nothing (:569-584 never
+	// calls #prepareDataUpdate): the events are owed to the next report
+	// another cause starts — here the send interval's (review II,
+	// F-db021da0-3). They went out a floor after the failed report.
+	t.Run("events owed again after a failed report leave with the next report", func(t *testing.T) {
 		t.Parallel()
 		b := newEventReportBench(t, eventArgs(false, press), true)
 		n := b.emit(1, switchCluster, initialPress, im.EventPriorityInfo)
 		b.tick(48 * time.Second)
 		b.wantOne("the send interval's report, which fails")
 		b.sub.RequeueEvents(n)
-		b.tick(57 * time.Second)
-		b.wantNone("inside the floor after the failed report")
 		b.tick(58 * time.Second)
-		if got := b.wantOne("a floor after the failed report"); !equalNumbers(got.events, n) {
+		b.wantNone("a floor after the failed report: owed, not due")
+		b.tick(96 * time.Second)
+		if got := b.wantOne("the next send interval's report"); !equalNumbers(got.events, n) {
 			t.Fatalf("report = %+v, want event %d again", got, n)
 		}
 	})

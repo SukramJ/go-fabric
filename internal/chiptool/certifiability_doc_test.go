@@ -164,6 +164,26 @@ func (f family) gapFor(name string) (gap, bool) {
 	return gap{}, false
 }
 
+// TestRecordedFailuresAreExcluded holds every recordedFailure to the
+// exclude row that classifies it: the row gives the page its class and
+// reason, the recorded failure only lets the case run.
+func TestRecordedFailuresAreExcluded(t *testing.T) {
+	for _, fam := range chipFamilies {
+		for n, rf := range fam.failsAs {
+			g, ok := fam.gapFor(n)
+			switch {
+			case !ok:
+				t.Errorf("%s/%s has a recorded failure but no exclude row with its class and reason", fam.name, n)
+			case g.selfSkip || g.class == classNotPortedYet:
+				t.Errorf("%s/%s has a recorded failure, but its exclude row is %s (selfSkip %v): a recorded failure is a classified gap", fam.name, n, g.class, g.selfSkip)
+			}
+			if rf.output == nil || rf.steps <= 0 {
+				t.Errorf("%s/%s: a recorded failure names its output and the steps it reaches", fam.name, n)
+			}
+		}
+	}
+}
+
 // passedIn reports whether a case (or, for a per-endpoint case, every one
 // of its endpoint runs) has golden counts.
 func passedIn(g docGolden, id string) bool {
@@ -244,6 +264,9 @@ func renderCertifiability(g docGolden, ts matterJSCertCases) string {
 				reason := gp.reason
 				if gp.selfSkip {
 					reason += " (runs, and skips itself)"
+				}
+				if _, ok := fam.failsAs[n]; ok {
+					reason += " (runs, and fails as recorded)"
 				}
 				r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | %s |", id, gp.class, mdCell(reason)))
 				continue

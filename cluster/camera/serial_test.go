@@ -1,0 +1,270 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package camera_test
+
+import (
+	"context"
+	"errors"
+	"runtime"
+	"sync/atomic"
+	"testing"
+
+	"github.com/SukramJ/go-fabric/cluster/camera"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
+	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
+	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
+	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
+)
+
+// blockFirstChange holds the first change notification of srv until
+// release is closed and reports, on entered, that it is held: a change
+// still on its way to the store while a second one runs.
+func blockFirstChange(srv contract.AttributeChangeNotifier) (entered, release chan struct{}) {
+	var first atomic.Bool
+	first.Store(true)
+	entered, release = make(chan struct{}), make(chan struct{})
+	srv.OnAttributeChange(func(contract.Change) {
+		if first.CompareAndSwap(true, false) {
+			close(entered)
+			<-release
+		}
+	})
+	return entered, release
+}
+
+// settle yields until done holds a value or a bounded number of yields
+// passed: a second change that is not serialised behind the held first one
+// completes meanwhile, one that is waits — without a wall-clock wait.
+func settle[T any](done chan T) {
+	for range 10000 {
+		if len(done) > 0 {
+			return
+		}
+		runtime.Gosched()
+	}
+}
+
+// TestProviderChangesDoNotLoseEachOther interleaves two changes of the
+// session table: a removal held between its publication and its commit,
+// and a new session stored meanwhile. Each change applies to the table
+// the one before it left, so the table and CurrentSessions both end with
+// session 2 only. Before, each change cloned the table, released the lock
+// and stored its copy: the removal's copy overwrote the new session in the
+// table while the attribute kept both (review II, R2-P6-conc-1601).
+func TestProviderChangesDoNotLoseEachOther(t *testing.T) {
+	t.Parallel()
+	p, _ := newProvider(t, nil)
+	video := []uint16{1}
+	if err := p.UpsertSession(camera.ProviderSession{Id: 1, FabricIndex: 1, PeerNodeId: 1, VideoStreams: &video}); err != nil {
+		t.Fatal(err)
+	}
+	entered, release := blockFirstChange(p)
+	removed := make(chan struct{})
+	go func() { p.RemoveSession(1); close(removed) }() // fabric 1's EndSession
+	<-entered
+	stored := make(chan error, 1)
+	go func() { // fabric 2's SolicitOffer, while the removal is on its way
+		stored <- p.UpsertSession(camera.ProviderSession{Id: 2, FabricIndex: 2, PeerNodeId: 2, VideoStreams: &video})
+	}()
+	settle(stored)
+	close(release)
+	<-removed
+	if err := <-stored; err != nil {
+		t.Fatal(err)
+	}
+	if s := p.Sessions(); len(s) != 1 || s[0].Id != 2 {
+		t.Errorf("Sessions() = %+v, want session 2 only", s)
+	}
+	attr, _ := p.MatterRead(wpdef.AttrCurrentSessions)
+	if l, ok := attr.(spec.List[camera.ProviderSession]); !ok || len(l) != 1 || l[0].Id != 2 {
+		t.Errorf("CurrentSessions = %#v, want session 2 only", attr)
+	}
+}
+
+// gatedPush is the push port whose AllocatePushTransport waits on gate
+// after it reported, on entered, that it was called.
+type gatedPush struct {
+	*mockPush
+	entered, gate chan struct{}
+}
+
+func (g gatedPush) AllocatePushTransport(ctx context.Context, id uint16, fabric uint8, o padef.TransportOptionsStruct, c camera.TLSCredentials) error {
+	select {
+	case g.entered <- struct{}{}:
+	default:
+	}
+	<-g.gate
+	return g.mockPush.AllocatePushTransport(ctx, id, fabric, o, c)
+}
+
+// TestPushAllocateRunsOneAtATime holds the per-fabric bound across the
+// port call: with MaxPerFabric 1, a second AllocatePushTransport of the
+// fabric that arrives while the first waits on the port is answered
+// RESOURCE_EXHAUSTED after it. Before, both passed the count before
+// either was stored, and the fabric held two transports (review II,
+// R2-P6-conc-1609).
+func TestPushAllocateRunsOneAtATime(t *testing.T) {
+	t.Parallel()
+	g := gatedPush{mockPush: newMockPush(), entered: make(chan struct{}, 1), gate: make(chan struct{})}
+	p, _ := newPush(t, func(c *camera.PushTransportConfig) { c.Port, c.MaxPerFabric = g, 1 })
+	req := padef.AllocatePushTransportRequest{TransportOptions: motionOptions()}
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() { _, err := pushInvoke(p, padef.CmdAllocatePushTransport, req); first <- err }()
+	<-g.entered
+	go func() { _, err := pushInvoke(p, padef.CmdAllocatePushTransport, req); second <- err }()
+	settle(g.entered)
+	close(g.gate)
+	wantCode(t, "first", statusOf(<-first), im.StatusSuccess)
+	wantCode(t, "second", statusOf(<-second), im.StatusResourceExhausted)
+	if n := len(p.Connections()); n != 1 {
+		t.Fatalf("%d connections, want 1", n)
+	}
+}
+
+// gatedZones is the zone port whose CreateTwoDCartesianZone waits on gate
+// after it reported, on entered, that it was called.
+type gatedZones struct {
+	*mockZones
+	entered, gate chan struct{}
+}
+
+func (g gatedZones) CreateTwoDCartesianZone(ctx context.Context, zone camera.TwoDZone) (uint16, error) {
+	select {
+	case g.entered <- struct{}{}:
+	default:
+	}
+	<-g.gate
+	return g.mockZones.CreateTwoDCartesianZone(ctx, zone)
+}
+
+// TestZonesCreateRunsOneAtATime holds MaxUserDefinedZones across the port
+// call: with one user-defined zone left, a second CreateTwoDCartesianZone
+// that arrives while the first waits on the port is answered
+// RESOURCE_EXHAUSTED after it. Before, both passed the budget before
+// either was counted (review II, R2-P6-conc-1609).
+func TestZonesCreateRunsOneAtATime(t *testing.T) {
+	t.Parallel()
+	g := gatedZones{mockZones: &mockZones{nextID: 100}, entered: make(chan struct{}, 1), gate: make(chan struct{})}
+	held := make([]camera.Zone, 0, zoneMaxUserDefined-1)
+	for i := range uint16(zoneMaxUserDefined - 1) {
+		zone := camera.TwoDZone{Name: "held", Use: zmdef.ZoneUseMotion, Vertices: triangle(100 * (i + 1))}
+		held = append(held, camera.Zone{ZoneId: i + 1, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser, TwoDCartesianZone: &zone})
+	}
+	z, _ := newChipZones(t, twoDUser, func(c *camera.ZonesConfig) { c.Port, c.Zones = g, held })
+	first, second := make(chan im.StatusCode, 1), make(chan im.StatusCode, 1)
+	go func() {
+		_, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("a", triangle(1)))
+		first <- st
+	}()
+	<-g.entered
+	go func() {
+		_, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("b", triangle(2)))
+		second <- st
+	}()
+	settle(g.entered)
+	close(g.gate)
+	wantCode(t, "first", <-first, im.StatusSuccess)
+	wantCode(t, "second", <-second, im.StatusResourceExhausted)
+	if n := len(z.ZoneList()); n != zoneMaxUserDefined {
+		t.Fatalf("%d zones, want %d", n, zoneMaxUserDefined)
+	}
+}
+
+// gatedVideo is the stream port whose VideoStreamDeallocate waits on gate
+// after it reported, on entered, that it was called, and answers err.
+type gatedVideo struct {
+	*mockStreams
+	entered, gate chan struct{}
+	err           error
+}
+
+func (g gatedVideo) VideoStreamDeallocate(ctx context.Context, id uint16) error {
+	g.entered <- struct{}{}
+	<-g.gate
+	if g.err != nil {
+		return g.err
+	}
+	return g.mockStreams.VideoStreamDeallocate(ctx, id)
+}
+
+// TestAvStreamRefCountWaitsOutADeallocation interleaves a reference-count
+// increment with a VideoStreamDeallocate that waits on the stream port: a
+// stream that is leaving takes no new user — the increment answers
+// ErrStreamNotFound, as for a stream already gone — and the deallocation
+// completes. When the port refuses the deallocation the stream stays and
+// takes users again. Before, the increment answered nil between the count
+// check and the delete, and the stream went with a user counted on it
+// (review II, appinfra round 2, R2-P6-conc-1609's residue).
+func TestAvStreamRefCountWaitsOutADeallocation(t *testing.T) {
+	t.Parallel()
+	for _, refused := range []bool{false, true} {
+		g := gatedVideo{entered: make(chan struct{}, 1), gate: make(chan struct{})}
+		if refused {
+			g.err = errors.New("the encoder is busy")
+		}
+		a, m := newChipAvStream(t, func(cfg *camera.AvStreamConfig) { cfg.Video = &g })
+		g.mockStreams = m
+		resp, st := invokeStream(a, csdef.CmdVideoStreamAllocate, videoAllocate())
+		wantCode(t, "allocate", st, im.StatusSuccess)
+		id := resp.(csdef.VideoStreamAllocateResponse).VideoStreamId
+		done := make(chan im.StatusCode, 1)
+		go func() {
+			_, st := invokeStream(a, csdef.CmdVideoStreamDeallocate, csdef.VideoStreamDeallocateRequest{VideoStreamId: id})
+			done <- st
+		}()
+		<-g.entered
+		if err := a.UpdateVideoStreamRefCount(id, true); !errors.Is(err, camera.ErrStreamNotFound) {
+			t.Errorf("refused %v: increment on a leaving stream: %v, want ErrStreamNotFound", refused, err)
+		}
+		close(g.gate)
+		if refused {
+			wantCode(t, "refused deallocation", <-done, im.StatusFailure)
+			if err := a.UpdateVideoStreamRefCount(id, true); err != nil {
+				t.Errorf("increment after a refused deallocation: %v", err)
+			}
+			continue
+		}
+		wantCode(t, "deallocation", <-done, im.StatusSuccess)
+		if n := len(a.VideoStreams()); n != 0 {
+			t.Errorf("%d video streams after the deallocation", n)
+		}
+	}
+}
+
+// TestAvStreamDeallocateWaitsOutAnIncrementsPublication holds an
+// increment's publication (the store's change notification) and sends a
+// VideoStreamDeallocate meanwhile: the deallocation waits for the
+// increment to land, then reads the count 1 and answers INVALID_IN_STATE;
+// the stream stays, its user counted. Before, the deallocation read the
+// count 0 the change had put back while it published, marked the stream
+// leaving, and deleted it after the increment had answered nil (review
+// II, appinfra round 4, Fable re-check).
+func TestAvStreamDeallocateWaitsOutAnIncrementsPublication(t *testing.T) {
+	t.Parallel()
+	a, _ := newChipAvStream(t)
+	resp, st := invokeStream(a, csdef.CmdVideoStreamAllocate, videoAllocate())
+	wantCode(t, "allocate", st, im.StatusSuccess)
+	id := resp.(csdef.VideoStreamAllocateResponse).VideoStreamId
+	entered, release := blockFirstChange(a)
+	incremented := make(chan error, 1)
+	go func() { incremented <- a.UpdateVideoStreamRefCount(id, true) }()
+	<-entered
+	deallocated := make(chan im.StatusCode, 1)
+	go func() {
+		_, st := invokeStream(a, csdef.CmdVideoStreamDeallocate, csdef.VideoStreamDeallocateRequest{VideoStreamId: id})
+		deallocated <- st
+	}()
+	settle(deallocated)
+	close(release)
+	if err := <-incremented; err != nil {
+		t.Fatalf("increment: %v", err)
+	}
+	wantCode(t, "deallocate of a stream in use", <-deallocated, im.StatusInvalidInState)
+	if v := a.VideoStreams(); len(v) != 1 || v[0].ReferenceCount != 1 {
+		t.Errorf("video streams %+v, want the stream with one user", v)
+	}
+}

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -40,6 +41,9 @@ type Binding struct {
 	mu       sync.RWMutex
 	bindings []TargetStruct
 	save     func([]TargetStruct) error
+	// fabrics is BindingConfig.Fabrics or SetFabricSource's source, set
+	// without writeMu (fabricSourceBox).
+	fabrics atomic.Pointer[fabricSourceBox]
 
 	// obsMu guards observers.
 	obsMu     sync.Mutex
@@ -140,6 +144,15 @@ const (
 // packages/model/src/standard/elements/binding.element.ts:23 at db021da0).
 const bindingMaxEntries = 4 * 16
 
+// bindingMaxEntriesPerFabric bounds one fabric's share of the list, beside
+// the total: a fabric's Manage subject that filled the whole table would
+// leave every other fabric's write ResourceExhausted. Neither reference
+// bounds a fabric's share — connectedhomeip checks the table's total
+// alone (BindingCluster.cpp:79-80), matter.js has no bound — so this is
+// ahead of both (owner decision 134; review II, R2-P6-bound-1008). A
+// quarter of the table: four fabrics at their full share fill it.
+const bindingMaxEntriesPerFabric = bindingMaxEntries / 4
+
 // bindingInst is the definition (cluster/spec/binding, ADR 0013, from
 // matter.js binding.element.ts): the attribute list and the status of a
 // write to anything but Binding come from it, and a write of the
@@ -163,6 +176,13 @@ type BindingConfig struct {
 	// Save stores the list after a change; nil stores nothing. A write
 	// whose Save fails is refused and changes nothing.
 	Save func([]TargetStruct) error
+	// Fabrics is the node's fabric list, the source AccessControl checks
+	// a write's fabric against ([FabricSource]; the node passes its
+	// store). The server takes a request's write only for a fabric it
+	// lists, and refuses every request write without a source — fail
+	// closed, persisted or not (review II, R2-P6-store-1010, decision
+	// 158). nil keeps a source [Binding.SetFabricSource] gave.
+	Fabrics FabricSource
 }
 
 // Persist restores the list cfg.Load returns and saves every later change
@@ -185,6 +205,9 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 		}
 	}
 	b.save = cfg.Save
+	if cfg.Fabrics != nil {
+		b.fabrics.Store(&fabricSourceBox{cfg.Fabrics})
+	}
 	b.mu.Lock()
 	before := b.bindings
 	if stored != nil {
@@ -194,6 +217,30 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 	b.mu.Unlock()
 	b.writeMu.Unlock()
 	b.notify(contract.OriginHostSet, before, after)
+	return nil
+}
+
+// SetFabricSource gives the server the node's fabric list a request's
+// write is checked against ([BindingConfig.Fabrics] without Persist's
+// restore and store): the endpoint assembler hands its
+// [endpoint.Config.Fabrics] to every Binding it serves. A server without
+// a source refuses every request write — fail closed (review II,
+// R2-P6-store-1010, decision 158).
+func (b *Binding) SetFabricSource(src FabricSource) {
+	b.fabrics.Store(&fabricSourceBox{src})
+}
+
+// fabricSourceBox holds a [FabricSource] for an atomic.Pointer: the
+// assembler sets it on every ClusterServers call, and it must not wait
+// behind a write's store call (review II, R2-P6-store-1010 round 4).
+type fabricSourceBox struct{ src FabricSource }
+
+// fabricSource is the source the server checks writes against, nil for
+// none.
+func (b *Binding) fabricSource() FabricSource {
+	if box := b.fabrics.Load(); box != nil {
+		return box.src
+	}
 	return nil
 }
 
@@ -403,6 +450,11 @@ func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value a
 		origin = contract.OriginControllerWrite // a local writer writes as a controller does
 	}
 	return b.replace(origin, func(before []TargetStruct) ([]TargetStruct, error) {
+		if request {
+			if err := b.fabricGoneLocked(ctx, fabric); err != nil {
+				return nil, err
+			}
+		}
 		after := list
 		if request {
 			held := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex != fabric })
@@ -422,6 +474,22 @@ func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value a
 			return nil, bindingStatusError{
 				code: im.StatusResourceExhausted,
 				msg:  fmt.Sprintf("core: Binding: %d entries exceed the table's %d", len(after), bindingMaxEntries),
+			}
+		}
+		// A request's write is held to its fabric's share as well, when it
+		// grows that share (bindingMaxEntriesPerFabric).
+		if request && len(list) > bindingMaxEntriesPerFabric {
+			held := 0
+			for _, t := range before {
+				if t.FabricIndex == fabric {
+					held++
+				}
+			}
+			if len(list) > held {
+				return nil, bindingStatusError{
+					code: im.StatusResourceExhausted,
+					msg:  fmt.Sprintf("core: Binding: %d entries exceed a fabric's %d", len(list), bindingMaxEntriesPerFabric),
+				}
 			}
 		}
 		return after, nil
@@ -606,6 +674,29 @@ func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, er
 // errBindingWriteRefused is the sentinel of a written value the definition
 // refused.
 var errBindingWriteRefused = errors.New("core: Binding write refused")
+
+// fabricGoneLocked refuses a request's write of fabric when the node's
+// fabric list does not hold the fabric — removed while the write was on
+// its way, its removal's clear already run — or when the list cannot be
+// read (fail closed): the write would otherwise be kept under a removed
+// index (review II, R2-P6-store-1010, decision 158). A server without a
+// source — neither [BindingConfig.Fabrics] nor [Binding.SetFabricSource]
+// gave one — refuses every request write, persisted or not. writeMu is
+// held.
+func (b *Binding) fabricGoneLocked(ctx context.Context, fabric uint8) error {
+	src := b.fabricSource()
+	if src == nil {
+		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: "core: Binding: no fabric source to check the write's fabric against"}
+	}
+	listed, err := fabricListed(ctx, src, fabric)
+	if err != nil {
+		return bindingStatusError{code: im.StatusFailure, msg: fmt.Sprintf("core: Binding: list fabrics: %v", err)}
+	}
+	if !listed {
+		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: fmt.Sprintf("core: Binding write for fabric %d, which no longer exists", fabric)}
+	}
+	return nil
+}
 
 // bindingStatusError is a Binding refusal with the IM status matter.js
 // answers.

@@ -77,7 +77,7 @@ func TestIssue79_MoveToColorOnAnHSDevice(t *testing.T) {
 			if tc.observed != nil {
 				srv.Set(*tc.observed)
 			}
-			if _, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColor, map[uint8]any{0: uint64(45914), 1: uint64(19615), 3: uint64(1), 4: uint64(1)}); err != nil {
+			if _, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColor, map[uint8]any{0: uint64(45914), 1: uint64(19615), 2: uint64(0), 3: uint64(1), 4: uint64(1)}); err != nil {
 				t.Fatalf("MoveToColor: %v", err)
 			}
 			got := srv.Color()

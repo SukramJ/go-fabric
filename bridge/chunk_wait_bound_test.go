@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // White-box tests for the end of a chunk wait — the handler that has sent
@@ -291,5 +292,95 @@ func TestReestablishPrimingWaitEnds(t *testing.T) {
 				t.Fatal("the priming report still waits for its chunk's answer 5 s later")
 			}
 		})
+	}
+}
+
+// TestChunkWaitsBoundTheBatchInvoke: a batch invoke takes one of the
+// session's chunk wait claims before any command runs, so a session that
+// holds all [maxChunkWaitsPerSession] gets its batch answered Busy and the
+// claims stay as they were (R2-P6-bound-0803); a single-command invoke
+// never waits for a chunk's answer, takes no claim and is served at the
+// bound (R2-P6-bound-0809).
+func TestChunkWaitsBoundTheBatchInvoke(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	for range maxChunkWaitsPerSession {
+		if !b.routing.chunkWaits.claim(paseTestSessionID) {
+			t.Fatal("a claim below the bound was refused")
+		}
+	}
+	claims := func() int {
+		b.routing.chunkWaits.mu.Lock()
+		defer b.routing.chunkWaits.mu.Unlock()
+		return b.routing.chunkWaits.n[paseTestSessionID]
+	}
+	on := im.ConcreteCommandPath{Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	off := im.ConcreteCommandPath{Endpoint: unreliabilityTestEndpoint, Cluster: 0x0006, Command: 0x00, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	invoke := func(exchange uint16, payload []byte) uint8 {
+		t.Helper()
+		proto := message.ProtocolHeader{
+			ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeInvokeRequest,
+			ExchangeID: exchange, Initiator: true,
+		}.Marshal()
+		got, ok := dispatchInvokeCapture(t, b, secureTestDatagram(t, b, proto, payload), 2*time.Second)
+		if !ok {
+			t.Fatalf("the invoke on exchange %#x was not answered", exchange)
+		}
+		_, hdrLen, err := message.UnmarshalHeader(got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rproto, _, err := message.UnmarshalProtocolHeader(got[hdrLen:])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rproto.Opcode == im.OpcodeStatusResponse {
+			if s := decodeWriteChunkedStatusResponse(t, got); s != im.StatusBusy {
+				t.Fatalf("the invoke on exchange %#x answered %v", exchange, s)
+			}
+		}
+		return rproto.Opcode
+	}
+
+	if op := invoke(0x3500, encodeInvokeRequestWithRefs(t, on, off)); op != im.OpcodeStatusResponse {
+		t.Errorf("a batch invoke at the bound answered with opcode %#x, want StatusResponse Busy", op)
+	}
+	if n := claims(); n != maxChunkWaitsPerSession {
+		t.Errorf("claims after the refused batch = %d, want %d", n, maxChunkWaitsPerSession)
+	}
+	if op := invoke(0x3501, encodeInvokeRequestSuppress(t, false, on)); op != im.OpcodeInvokeResponse {
+		t.Errorf("a single-command invoke at the bound answered with opcode %#x, want InvokeResponse", op)
+	}
+	if n := claims(); n != maxChunkWaitsPerSession {
+		t.Errorf("claims after the single invoke = %d, want %d", n, maxChunkWaitsPerSession)
+	}
+	b.routing.chunkWaits.release(paseTestSessionID)
+	if op := invoke(0x3502, encodeInvokeRequestWithRefs(t, on, off)); op != im.OpcodeInvokeResponse {
+		t.Errorf("a batch invoke below the bound answered with opcode %#x, want InvokeResponse", op)
+	}
+	if n := claims(); n != maxChunkWaitsPerSession-1 {
+		t.Errorf("claims after the served batch = %d, want %d (its claim given back)", n, maxChunkWaitsPerSession-1)
+	}
+}
+
+// TestEndSessionChunkWaitsEndsOnlyItsOwn: the end of one session's chunk
+// waits leaves another session's wait armed (R2-P5-tmut-20, bridge's own
+// test of a mutant only fabrictest caught).
+func TestEndSessionChunkWaitsEndsOnlyItsOwn(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	mine := b.armStatusResponseWait(1, 0x10, false)
+	theirs := b.armStatusResponseWait(2, 0x10, false)
+	b.endSessionChunkWaits(1)
+	if _, open := <-mine; open {
+		t.Fatal("session 1's wait was not ended")
+	}
+	if _, armed := b.routing.statusResponseWaits.Load(mrp.ExchangeKey{SessionID: 2, ExchangeID: 0x10}); !armed {
+		t.Fatal("session 2's wait was ended with session 1's")
+	}
+	select {
+	case <-theirs:
+		t.Fatal("session 2's wait channel was closed")
+	default:
 	}
 }

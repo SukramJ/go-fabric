@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"slices"
 
@@ -248,7 +249,9 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 		if !m.mappingAllows(c, msg.Header.DestGroupID) {
 			continue // GroupSession.ts:431-433
 		}
-		m.completeMessage(msg, c)
+		if err := m.completeMessage(msg, c); err != nil {
+			return nil, err
+		}
 		return msg, nil
 	}
 	// With no candidate that opened it, the group id is the plain
@@ -372,8 +375,10 @@ func protectedHeaderEnd(buf []byte) int {
 }
 
 // completeMessage fills in the subject of a message whose candidate
-// passed [Manager.mappingAllows] and runs the reception window.
-func (m *Manager) completeMessage(msg *Message, c candidate) {
+// passed [Manager.mappingAllows] and runs the reception window; an error
+// when the key's reception state holds no window for the sender and has
+// no room for one ([Manager.receptionWindow]).
+func (m *Manager) completeMessage(msg *Message, c candidate) error {
 	msg.FabricIndex = c.fabric.index
 	msg.GroupID = msg.Header.DestGroupID
 	msg.SourceNodeID = msg.Header.SourceNodeID
@@ -387,35 +392,74 @@ func (m *Manager) completeMessage(msg *Message, c candidate) {
 	}
 	m.mu.RUnlock()
 
-	msg.Duplicate = !m.receptionWindow(c.epoch.key, msg.SourceNodeID).Accept(msg.Header.MessageCounter)
+	w, ok := m.receptionWindow(c.epoch.key, msg.SourceNodeID)
+	if !ok {
+		if m.firstRefusal(c.epoch.key) {
+			m.logger.Warn("groups.reception.full",
+				slog.Int("fabric_index", int(msg.FabricIndex)),
+				slog.Int("group_id", int(msg.GroupID)),
+				slog.Uint64("source_node_id", msg.SourceNodeID),
+				slog.Int("max", maxGroupSendersPerKey))
+		}
+		return fmt.Errorf("%w: source node %#016x, group %#04x", errReceptionFull, msg.SourceNodeID, msg.GroupID)
+	}
+	msg.Duplicate = !w.Accept(msg.Header.MessageCounter)
+	return nil
+}
+
+// maxGroupSendersPerKey bounds the source node ids an operational key
+// holds reception state for. Because a sender beyond it is refused for as
+// long as the key is held ([Manager.receptionWindow]), it is a hard cap on
+// the group senders one key set serves — senders that left (removed or
+// re-commissioned nodes) keep their places until the key goes — so the
+// number is chosen from memory, not from a reference: a window is a
+// counter, a 32-bit bitmap and a map entry, so 256 senders cost tens of
+// kilobytes per key at most. connectedhomeip's CHIP_CONFIG_MAX_GROUP_DATA_PEERS
+// (15, src/lib/core/CHIPConfig.h:832-834 at 6170af84) is the size of an
+// LRU cache that evicts, not a cap, and is not the source of this one.
+const maxGroupSendersPerKey = 256
+
+// errReceptionFull refuses the message of a sender the key's reception
+// state does not hold, at [maxGroupSendersPerKey].
+var errReceptionFull = errors.New("groups: the operational key's reception state holds its bound of senders")
+
+// firstRefusal reports whether key has refused no sender at its bound
+// before, and marks it: the refusal is logged once per key, until the
+// key's reception state is dropped (forgetUnreferenced).
+func (m *Manager) firstRefusal(key []byte) bool {
+	k := hex.EncodeToString(key)
+	m.receptionMu.Lock()
+	defer m.receptionMu.Unlock()
+	if m.receptionFull[k] {
+		return false
+	}
+	m.receptionFull[k] = true
+	return true
 }
 
 // receptionWindow returns the reception state for (key, source node),
-// creating it on first use.
+// creating it on first use; ok is false when the key holds no window for
+// source and already holds [maxGroupSendersPerKey].
 //
-// There is one window per source node id under a key and no bound on how
-// many, as in matter.js: receptionStateFor adds an entry for every source
-// node id it is asked for
-// (packages/protocol/src/groups/MessagingState.ts:19, :80-90 at db021da0).
-// Nothing but forgetReceptionState removes one (MessagingState.ts:97-99 at
-// db021da0). That is what keeps a recorded datagram a duplicate for as
-// long as its key is held, however many other senders were seen since: a
-// table that evicts must trust the first counter of a sender it no longer
-// holds, and a party without the key can then replay what it recorded —
-// connectedhomeip's group peer table of CHIP_CONFIG_MAX_GROUP_DATA_PEERS
-// senders does (src/lib/core/CHIPConfig.h:833,
-// src/transport/GroupPeerMessageCounter.cpp:79-95,
-// src/transport/SessionManager.cpp:1287-1294 at 6170af84), and this
-// package did while it was bounded the same way (review II, R2-P0-rv-B01;
-// pinned by TestRecordedGroupMessageStaysADuplicate).
-//
-// What the missing bound costs is memory under a holder of the group key.
+// matter.js keeps one reception state per operational key and source node
+// without a bound (packages/protocol/src/groups/MessagingState.ts:19,
+// :80-90 at db021da0); connectedhomeip bounds the senders per fabric — 15
+// data, 2 control by default (src/lib/core/CHIPConfig.h:832-844) — and
+// replaces the least recently used sender when the table is full
+// (src/transport/GroupPeerMessageCounter.cpp:59-98). A table that evicts
+// must trust the first counter of a sender it no longer holds, and a
+// party without the key can then replay what it recorded; this package
+// did while it was bounded that way (review II, R2-P0-rv-B01; pinned by
+// TestRecordedGroupMessageStaysADuplicate). So the bound here evicts
+// nobody: a sender beyond it that the table does not hold yet is refused
+// (decision 133, ahead of matter.js). Every held sender keeps its replay
+// protection whole, and what a holder of the key can deny by stating
+// source node ids is its own key's group traffic — a key belongs to one
+// fabric's key set, so the fault stays inside the fabric that caused it.
 // Only a message that authenticated under a mapped key reaches here
 // ([Manager.Decode]; pinned by
-// TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState), but the
-// source node id of a group message is what its sender states, so a
-// holder of the key adds one entry per id it claims, until the key goes.
-// A party without the key adds none.
+// TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState), so a party
+// without the key takes no place.
 //
 // The state is keyed on the operational key, not on fabric and key set:
 // key sets that derive the same key share one window, as in matter.js
@@ -425,7 +469,7 @@ func (m *Manager) completeMessage(msg *Message, c candidate) {
 // packages/protocol/src/groups/FabricGroups.ts:207-225
 // (#forgetUnreferencedReceptionState). Pinned by
 // TestReceptionStateTeardownParity (review 2026-11 W2-sec-05).
-func (m *Manager) receptionWindow(key []byte, source uint64) *mrp.Window {
+func (m *Manager) receptionWindow(key []byte, source uint64) (*mrp.Window, bool) {
 	k := hex.EncodeToString(key)
 	m.receptionMu.Lock()
 	defer m.receptionMu.Unlock()
@@ -436,8 +480,11 @@ func (m *Manager) receptionWindow(key []byte, source uint64) *mrp.Window {
 	}
 	w, ok := perKey[source]
 	if !ok {
+		if len(perKey) >= maxGroupSendersPerKey {
+			return nil, false
+		}
 		w = mrp.NewWindowEncryptedRollover()
 		perKey[source] = w
 	}
-	return w
+	return w, true
 }

@@ -30,14 +30,13 @@ import (
 // authoritative source for what each subject may read / write / invoke
 // on every cluster of every endpoint.
 //
-// go-fabric exposes the ACL list READ-ONLY in v1.1 — every entry is
-// inserted by the bridge itself (the AddNOC handler installs the
-// default Administer entry per §11.18.6.8.1 immediately after the
-// fabric is persisted). Apple Home reads ACL right after CASE; an
-// empty / missing cluster surfaces as ACCESS_DENIED on every
-// follow-up read and Apple's pairing UI tears the new fabric down via
-// RemoveFabric. Implementing ACL READ is the minimum surface that
-// keeps Apple happy through the post-CASE handshake.
+// AddNOC installs a fabric's first entry, the default Administer entry of
+// §11.18.6.8.1, as soon as the fabric is persisted; an administrator
+// writes the Acl and Extension lists of its own fabric afterwards
+// ([AccessControl.MatterWrite]), and both are persisted. Apple Home reads
+// Acl right after CASE; an empty / missing cluster surfaces as
+// ACCESS_DENIED on every follow-up read and Apple's pairing UI tears the
+// new fabric down via RemoveFabric.
 type AccessControl struct {
 	store ACLStoreFacade
 	// log is the logger [AccessControl.SetLogger] stored; nil is slog.Default().
@@ -64,11 +63,15 @@ type AccessControl struct {
 
 	// extensions holds the per-fabric AccessControlExtensionStruct list
 	// (attribute 0x0001, conformance EXTS). The list is keyed by fabric
-	// index and stored in-memory; the entries are vendor-opaque octstrings
-	// (max 128 bytes each) that controllers use to attach metadata to an
-	// ACL fabric. Mirroring matter.js AccessControlServer.ts in-memory
-	// extension state.
+	// index, loaded from the store at construction and written through to
+	// it (loadExtensions, the Extension write); the entries are
+	// vendor-opaque octstrings (max 128 bytes each) that controllers use
+	// to attach metadata to an ACL fabric.
 	extensions map[uint8][]AccessControlExtensionEntry
+	// extLoadErr is the error of each fabric whose stored Extension could
+	// not be read (loadExtension); that fabric's Extension write reads it
+	// again and is refused while it still fails.
+	extLoadErr map[uint8]error
 
 	// Event surface — wired by the bridge during topology assembly via
 	// [SetMatterEventEmitter] + [SetEndpoint] so [MatterWrite] can fire
@@ -90,6 +93,15 @@ type AccessControl struct {
 	// sources in a row, so it is evaluated once, as matter.js derives once
 	// per command transaction.
 	auxBatch int
+	// auxDeferred is the context of each source change a batch deferred,
+	// per fabric: the event of that fabric names the node behind its own
+	// change, never the node of the command that closes the batch (review
+	// II, R2-P6-conc-1007).
+	auxDeferred map[uint8]context.Context
+	// auxSyncMu makes one synchronisation's read of the source and its
+	// apply one step, so two never apply in the other order than they read.
+	// It is taken before mu, never under it.
+	auxSyncMu sync.Mutex
 
 	// limits is what [AccessControl.SetLimits] set; a zero field is the constant.
 	limits AccessControlLimits
@@ -237,9 +249,9 @@ const (
 // packages/model/src/standard/elements/access-control.element.ts:62-74.
 // Priority: Info (MatterEventPriorityInfo).
 //
-// AdminNodeID and AdminPasscodeID are both nullable (quality X); both
-// are nil in v1.1 because the IM layer does not yet track which
-// commissioner sent the write. LatestValue is nullable (quality X) and
+// AdminNodeID and AdminPasscodeID are both nullable (quality X): the
+// writer's CASE subject or, over PASE, passcode id 0 — the other one null
+// (aclAdminFromContext). LatestValue is nullable (quality X) and
 // set to nil for bulk-replace operations where per-entry diffing is
 // ambiguous.
 type AccessControlEntryChangedEvent struct {
@@ -257,8 +269,8 @@ type AccessControlEntryChangedEvent struct {
 // AccessControlExtensionStruct). Priority: Info
 // (MatterEventPriorityInfo).
 //
-// AdminNodeID and AdminPasscodeID are both nullable (quality X); both
-// are nil in v1.1 for the same reason as [AccessControlEntryChangedEvent].
+// AdminNodeID and AdminPasscodeID are both nullable (quality X) and set
+// as in [AccessControlEntryChangedEvent].
 type AccessControlExtensionChangedEvent struct {
 	AdminNodeID     *uint64                      // nullable; nil = "not tracked"
 	AdminPasscodeID *uint16                      // nullable; nil = "not tracked"
@@ -330,19 +342,41 @@ func (a *AccessControl) loadExtensions(ctx context.Context) {
 		return
 	}
 	for f := 1; f <= 254; f++ {
-		v, found, err := p.GetSetting(ctx, aclExtensionSettingKey(uint8(f)))
-		if err != nil || !found || v == "" {
-			continue
+		if err := a.loadExtension(ctx, p, uint8(f)); err != nil {
+			a.logger().Warn("matter.access_control.extension_load_failed", slog.Int("fabric_index", f), slog.Any("err", err))
 		}
-		data, err := hex.DecodeString(v)
-		if err != nil {
-			continue
-		}
-		if a.extensions == nil {
-			a.extensions = make(map[uint8][]AccessControlExtensionEntry)
-		}
-		a.extensions[uint8(f)] = []AccessControlExtensionEntry{{Data: data, FabricIndex: uint8(f)}}
 	}
+}
+
+// loadExtension reads fabric's stored Extension into memory. A setting the
+// store cannot read is recorded in extLoadErr and returned: the fabric's
+// Extension write reads it again first, and is refused while it still
+// cannot be read, so the stored value is never overwritten unseen (review
+// II, R2-P6-err-1016). A read that succeeds clears the record.
+func (a *AccessControl) loadExtension(ctx context.Context, p ACLExtensionPersistence, fabric uint8) error {
+	v, found, err := p.GetSetting(ctx, aclExtensionSettingKey(fabric))
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err != nil {
+		if a.extLoadErr == nil {
+			a.extLoadErr = make(map[uint8]error)
+		}
+		a.extLoadErr[fabric] = err
+		return err
+	}
+	delete(a.extLoadErr, fabric)
+	if !found || v == "" {
+		return nil
+	}
+	data, err := hex.DecodeString(v)
+	if err != nil {
+		return nil //nolint:nilerr // a value that does not decode is no Extension, as before
+	}
+	if a.extensions == nil {
+		a.extensions = make(map[uint8][]AccessControlExtensionEntry)
+	}
+	a.extensions[fabric] = []AccessControlExtensionEntry{{Data: data, FabricIndex: fabric}}
+	return nil
 }
 
 // persistExtension writes one fabric's Extension entries ("" clears them).
@@ -412,6 +446,11 @@ func (*AccessControl) MinWritePrivilege(attrID uint32) uint8 {
 // — lands on (see writeFabric). It scopes no read: a read with no request
 // behind it sees every fabric's entries whole, and a request's read is
 // scoped by the request's own fabric. Nothing in this module calls it.
+//
+// Deprecated: a fabric-scoped write takes its fabric from the request
+// ([im.WithFabricFilter]); a local write without one lands on the fabric
+// its entries carry. There is no replacement. Removable in the next minor
+// release.
 func (a *AccessControl) SetCurrentFabric(idx uint8) {
 	a.mu.Lock()
 	a.currentFabric = idx
@@ -456,6 +495,7 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 	if had {
 		delete(a.extensions, fabricIndex)
 	}
+	delete(a.extLoadErr, fabricIndex)
 	a.mu.Unlock()
 	if !had {
 		return nil
@@ -628,10 +668,20 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) ([]uint8, error) {
 	lister, ok := a.store.(fabricLister)
 	if !ok {
-		if accessing == 0 {
-			return nil, nil
+		// The fabrics this server holds an Extension of are known without
+		// the store; the Acl of another fabric is not (review II,
+		// N4-w3core-1).
+		var out []uint8
+		a.mu.RLock()
+		for fabric := range a.extensions {
+			out = append(out, fabric)
 		}
-		return []uint8{accessing}, nil
+		a.mu.RUnlock()
+		if accessing != 0 {
+			out = append(out, accessing)
+		}
+		slices.Sort(out)
+		return slices.Compact(out), nil
 	}
 	recs, err := lister.ListFabrics(ctx)
 	if err != nil {
@@ -654,6 +704,29 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 	}
 	slices.Sort(out)
 	return slices.Compact(out), nil
+}
+
+// fabricGone refuses a write of attr for a fabric the store no longer
+// holds — one removed while the write was on its way, whose removal's
+// clear has already run: without the check the write would store under a
+// removed index (review II, R2-P6-store-1010, N4-notesE-1). A pending row
+// counts as held. A store that cannot list fabrics, or whose listing
+// fails, refuses nothing. writeMu is held, as by MatterDropFabric.
+func (a *AccessControl) fabricGone(ctx context.Context, fabric uint8, attr string) error {
+	lister, ok := a.store.(fabricLister)
+	if !ok {
+		return nil
+	}
+	recs, err := lister.ListFabrics(ctx)
+	if err != nil {
+		return nil //nolint:nilerr // no listing, no refusal: the write's own store call decides
+	}
+	for i := range recs {
+		if recs[i].FabricIndex == fabric {
+			return nil
+		}
+	}
+	return aclStatusError{im.StatusUnsupportedAccess, fmt.Sprintf("%s write for fabric %d, which no longer exists", attr, fabric)}
 }
 
 // writeFabric resolves the accessing fabric of a write to the
@@ -875,6 +948,9 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// nothing, so it cannot undo a change another write made.
 		a.writeMu.Lock()
 		defer a.writeMu.Unlock()
+		if err := a.fabricGone(ctx, fabric, "Acl"); err != nil {
+			return false, err
+		}
 		// Snapshot old ACL before the replace so we can classify the
 		// change type for the spec-mandated AccessControlEntryChanged event
 		// (§9.10.7.1). We read before write; a store error here is
@@ -967,8 +1043,8 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 			return false, err
 		}
 		// Every entry this write stores is re-stamped to the writer's own
-		// fabric below (v1.1 has no cross-fabric write path to begin
-		// with), so more than one entry in a single write always means
+		// fabric below (a write reaches no other fabric's list), so more
+		// than one entry in a single write always means
 		// more than one entry for that fabric. Mirrors matter.js
 		// AccessControlServer.ts:344-362 at db021da0
 		// (#validateAccessControlExtensionChanges): a fabric may hold at
@@ -1002,6 +1078,23 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// and fire no event (Datasource.ts:1476-1492 at db021da0).
 		a.writeMu.Lock()
 		defer a.writeMu.Unlock()
+		if err := a.fabricGone(ctx, fabric, "Extension"); err != nil {
+			return false, err
+		}
+		a.mu.RLock()
+		loadErr := a.extLoadErr[fabric]
+		a.mu.RUnlock()
+		if loadErr != nil {
+			// The stored Extension of the fabric could not be read: it is
+			// read again now, and a write that would replace a value nobody
+			// saw is refused (review II, R2-P6-err-1016).
+			if p, ok := a.store.(ACLExtensionPersistence); ok {
+				loadErr = a.loadExtension(ctx, p, fabric)
+			}
+			if loadErr != nil {
+				return false, spec.Errorf(im.StatusFailure, "core: AccessControl.Extension write: the stored Extension of fabric %d could not be read: %v", fabric, loadErr)
+			}
+		}
 		a.mu.RLock()
 		oldExtensions := a.extensions[fabric]
 		a.mu.RUnlock()
@@ -1072,7 +1165,7 @@ func (a *AccessControl) MatterInvoke(_ context.Context, cmdID uint32, _ any) (an
 // MatterReportable returns the attributes that emit reports on
 // change. The ACL list and Extension list are reportable per
 // §9.10.4 so subscribers see entries appearing immediately after
-// AddNOC; v1.1 ships the static set.
+// AddNOC.
 func (a *AccessControl) MatterReportable() []uint32 {
 	return []uint32{accessControlAttrACL, accessControlAttrExtension}
 }
@@ -1100,10 +1193,8 @@ func (a *AccessControl) MatterAttributes() []uint32 {
 // correctly for this cluster. Includes AccessControlExtensionChanged
 // (0x0001) per matter.js
 // packages/model/src/standard/elements/access-control.element.ts:77-88
-// and chip's AccessControl cluster server (spec §9.10.7). The event is
-// listed here so EventList synthesis is complete if EventList suppression
-// is lifted; no emission path is wired because Extensions are not
-// implemented in v1.1.
+// and chip's AccessControl cluster server (spec §9.10.7). The Extension
+// write emits it ([AccessControl.MatterWrite]).
 func (a *AccessControl) MatterEvents() []uint32 {
 	events := []uint32{accessControlEventEntryChanged, accessControlEventExtensionChanged}
 	if a.auxiliaryEnabled() {

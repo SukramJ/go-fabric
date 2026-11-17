@@ -63,6 +63,32 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripEvent(t, Definition, EventLockUserChange, LockUserChangeEvent{LockDataType: LockDataTypeEnum(0), DataOperationType: DataOperationTypeEnum(0), OperationSource: OperationSourceEnum(0), UserIndex: spec.ValueOf(uint16(1)), FabricIndex: spec.ValueOf(uint8(1)), SourceNode: spec.ValueOf(uint64(1)), DataIndex: spec.ValueOf(uint16(1))})
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[LockDoorRequest],
+		spectest.CheckClone[UnlockDoorRequest],
+		spectest.CheckClone[UnlockWithTimeoutRequest],
+		spectest.CheckClone[GetWeekDayScheduleResponse],
+		spectest.CheckClone[GetYearDayScheduleResponse],
+		spectest.CheckClone[GetHolidayScheduleResponse],
+		spectest.CheckClone[GetUserResponse],
+		spectest.CheckClone[SetCredentialRequest],
+		spectest.CheckClone[SetCredentialResponse],
+		spectest.CheckClone[GetCredentialStatusResponse],
+		spectest.CheckClone[UnboltDoorRequest],
+		spectest.CheckClone[SetAliroReaderConfigRequest],
+		spectest.CheckClone[LockOperationEvent],
+		spectest.CheckClone[LockOperationErrorEvent],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

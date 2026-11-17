@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -20,10 +21,15 @@ import (
 
 // TestControllerTCPListenerHoldsTheConfiguredInboundBound: a controller
 // whose TCP listener is bounded at one connection gives a second
-// connection the place of the first, which has delivered no message.
+// connection the place of the first, which has delivered no message and
+// is past the age that spares a fresh connection (a fraction of
+// tcp.NewConnectionIdleTimeout, review II R2-P6-bound-0203); a connection
+// that arrives while the first is younger is refused.
 func TestControllerTCPListenerHoldsTheConfiguredInboundBound(t *testing.T) {
 	t.Parallel()
+	fake := clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC))
 	cfg := config(openDB(t))
+	cfg.Clock = fake
 	cfg.TCP = controller.TCPConfig{Incoming: true, MaxInboundConnections: 1}
 	c, err := controller.New(t.Context(), cfg)
 	if err != nil {
@@ -42,7 +48,15 @@ func TestControllerTCPListenerHoldsTheConfiguredInboundBound(t *testing.T) {
 		t.Cleanup(func() { _ = conn.Close() })
 		return conn
 	}
-	first, second := dial(), dial()
+	first, early := dial(), dial()
+	// The early one is refused: the first, held, is younger than the floor.
+	select {
+	case <-early.Closed():
+	case <-ctx.Done():
+		t.Fatal("a connection took the place of one younger than the floor")
+	}
+	fake.Advance(tcp.NewConnectionIdleTimeout / 2)
+	second := dial()
 	select {
 	case <-first.Closed():
 	case <-ctx.Done():

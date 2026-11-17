@@ -68,6 +68,11 @@ type WasherConfig struct {
 	// Listener, optional, is told about a controller's changes.
 	Listener WasherListener
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -103,6 +108,11 @@ type DryerConfig struct {
 	// Listener, optional, is told about a controller's changes.
 	Listener DryerListener
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -134,7 +144,7 @@ var (
 func NewLaundryWasherControls(cfg WasherConfig) (*WasherServer, error) {
 	s := &WasherServer{speeds: slices.Clone(cfg.SpinSpeeds), rinses: slices.Clone(cfg.SupportedRinses), listener: cfg.Listener}
 	srv, err := spec.NewServer(lwc.Definition, spec.Options{Features: cfg.Features},
-		spec.ServerConfig{DataVersion: cfg.DataVersion, Sink: washerRules{s}})
+		spec.ServerConfig{DataVersion: cfg.DataVersion, Sink: washerRules{s}}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("laundrywashercontrols: %w", err)
 	}
@@ -290,7 +300,7 @@ func (s *WasherServer) SetNumberOfRinses(r NumberOfRinses) error {
 func NewLaundryDryerControls(cfg DryerConfig) (*DryerServer, error) {
 	s := &DryerServer{levels: slices.Clone(cfg.SupportedDrynessLevels), listener: cfg.Listener}
 	srv, err := spec.NewServer(ldc.Definition, spec.Options{},
-		spec.ServerConfig{DataVersion: cfg.DataVersion, Sink: dryerRules{s}})
+		spec.ServerConfig{DataVersion: cfg.DataVersion, Sink: dryerRules{s}}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("laundrydryercontrols: %w", err)
 	}

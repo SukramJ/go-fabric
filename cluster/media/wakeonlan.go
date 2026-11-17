@@ -5,7 +5,6 @@ package media
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
@@ -23,11 +22,6 @@ func wakeOnLanValues(st WakeOnLanState) map[uint32]any {
 		woldef.AttrMacAddress:       st.MacAddress,
 		woldef.AttrLinkLocalAddress: st.LinkLocalAddress,
 	}
-}
-
-func cloneWakeOnLan(st WakeOnLanState) WakeOnLanState {
-	st.LinkLocalAddress = slices.Clone(st.LinkLocalAddress)
-	return st
 }
 
 // WakeOnLanConfig carries the construction parameters of a WakeOnLan
@@ -51,12 +45,12 @@ type WakeOnLanServer struct {
 // NewWakeOnLan builds a WakeOnLan server.
 func NewWakeOnLan(cfg WakeOnLanConfig) (*WakeOnLanServer, error) {
 	srv, err := spec.NewServer(woldef.Definition, spec.Options{Attributes: cfg.Attributes},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+		spec.ServerConfig{DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: WakeOnLan: %w", err)
 	}
 	s := &WakeOnLanServer{Server: srv}
-	if err := s.init(srv, cfg.Initial, wakeOnLanValues, cloneWakeOnLan, storeState[WakeOnLanState]); err != nil {
+	if err := s.init(srv, cfg.Initial, wakeOnLanValues, WakeOnLanState.Clone, storeState[WakeOnLanState]); err != nil {
 		return nil, fmt.Errorf("media: WakeOnLan: %w", err)
 	}
 	return s, nil

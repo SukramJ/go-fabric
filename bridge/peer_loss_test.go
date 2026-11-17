@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/sigma"
@@ -96,10 +97,10 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 		responderSID = uint16(0x0A02)
 		laterSID     = uint16(0x0A03)
 	)
-	if _, err := dev.sessions.OpenFromSigmaAsInitiatorWithID(initiatorSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B01, nil, peerLossKeys(t)); err != nil {
+	if _, err := sessionseam.OpenAt(dev.sessions, initiatorSID, true, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B01, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := dev.sessions.OpenFromSigmaWithID(responderSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B02, nil, peerLossKeys(t)); err != nil {
+	if _, err := sessionseam.OpenAt(dev.sessions, responderSID, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B02, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
 	dev.br.sessionPeerAddrs.Store(initiatorSID, peerAddr)
@@ -116,7 +117,7 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 	defer func() { _ = ex.Close() }()
 	// Established after the exchange was opened: not what went unanswered.
 	stamp.step(time.Millisecond)
-	if _, err := dev.sessions.OpenFromSigmaWithID(laterSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B03, nil, peerLossKeys(t)); err != nil {
+	if _, err := sessionseam.OpenAt(dev.sessions, laterSID, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0B03, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -170,7 +171,7 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 func TestInitiatedPeerLoss_UnknownExchangeIsNoOp(t *testing.T) {
 	t.Parallel()
 	dev := startResumeDevice(t, newMemSubscriptionStore(), nil)
-	if _, err := dev.sessions.OpenFromSigmaWithID(0x0C01, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0D01, nil, peerLossKeys(t)); err != nil {
+	if _, err := sessionseam.OpenAt(dev.sessions, 0x0C01, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0D01, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
 	dev.br.handleInitiatedPeerLoss(0x0C01, 0x7777)
@@ -237,7 +238,7 @@ func newChunkedReportPeer(t *testing.T, base uint16) *chunkedReportPeer {
 		sid  uint16
 		peer uint64
 	}{{p.reportSID, resumeCtrlNode}, {p.siblingSID, resumeCtrlNode}, {p.otherSID, 0xD1D1D1D1}} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(s.sid, resumeFabricIndex, resumeDeviceNode, s.peer, s.sid+0x100, nil, peerLossKeys(t)); err != nil {
+		if _, err := sessionseam.OpenAt(dev.sessions, s.sid, false, resumeFabricIndex, resumeDeviceNode, s.peer, s.sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		dev.br.sessionPeerAddrs.Store(s.sid, peerAddr)
@@ -382,5 +383,75 @@ func TestChunkedReportLaterChunkUnacknowledged(t *testing.T) {
 	}
 	if err := <-done; !errors.Is(err, errChunkUnanswered) {
 		t.Fatalf("send = %v, want the StatusResponse wait's timeout", err)
+	}
+}
+
+// lostPeerLookup holds one session, sid, with peer node and fabric.
+type lostPeerLookup struct {
+	sid    uint16
+	sess   *channel.Session
+	fabric uint8
+}
+
+func (l lostPeerLookup) Lookup(id uint16) (*channel.Session, bool) { return l.sess, id == l.sid }
+
+func (l lostPeerLookup) FabricFor(id uint16) (uint8, bool) { return l.fabric, id == l.sid }
+
+// lostPeerRegistry records how a peer loss closes sessions.
+type lostPeerRegistry struct {
+	closed  []uint16
+	perPeer [][2]uint64
+}
+
+func (r *lostPeerRegistry) Close(id uint16) error { r.closed = append(r.closed, id); return nil }
+
+func (r *lostPeerRegistry) CloseAllGraceful(time.Time) int { return 0 }
+
+func (r *lostPeerRegistry) ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, _ time.Duration) int {
+	r.perPeer = append(r.perPeer, [2]uint64{uint64(fabricIndex), peerNodeID})
+	return 1
+}
+
+// TestPeerLossWithoutAFabricClosesOnlyItsSession holds the choice of a
+// peer loss's reach (R2-P6-fsm-0820): a session with a fabric and a peer
+// node id closes every session of that peer; a session without either
+// (PASE, or an unknown peer) closes itself alone — a zero fabric or node
+// id names no peer.
+func TestPeerLossWithoutAFabricClosesOnlyItsSession(t *testing.T) {
+	t.Parallel()
+	const sid = uint16(0x0A10)
+	for _, c := range []struct {
+		name    string
+		fabric  uint8
+		node    uint64
+		perPeer bool
+	}{
+		{"commissioned peer", 1, 0x1234, true},
+		{"no fabric", 0, 0x1234, false},
+		{"no node id", 1, 0, false},
+		{"neither", 0, 0, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			key := make([]byte, 16)
+			sess, err := channel.New(channel.Config{EncryptKey: key, DecryptKey: key, PeerNodeID: c.node, InitialCounter: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			reg := &lostPeerRegistry{}
+			b := &Bridge{}
+			b.sessions = lostPeerLookup{sid: sid, sess: sess, fabric: c.fabric}
+			b.sessionRegistry = reg
+			b.closeLostPeer(sid, 1, 0, "a test exchange")
+			if c.perPeer {
+				if len(reg.perPeer) != 1 || reg.perPeer[0] != [2]uint64{uint64(c.fabric), c.node} || len(reg.closed) != 0 {
+					t.Fatalf("per peer %v, closed %v; want one per-peer close of (%d, %#x) only", reg.perPeer, reg.closed, c.fabric, c.node)
+				}
+				return
+			}
+			if len(reg.perPeer) != 0 || len(reg.closed) != 1 || reg.closed[0] != sid {
+				t.Fatalf("per peer %v, closed %v; want session %#x closed alone", reg.perPeer, reg.closed, sid)
+			}
+		})
 	}
 }

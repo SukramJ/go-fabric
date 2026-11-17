@@ -40,6 +40,23 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrPriceForecast, spec.List[CommodityPriceStruct]([]CommodityPriceStruct{CommodityPriceStruct{PeriodStart: uint32(1), PeriodEnd: spec.ValueOf(uint32(1)), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1)), Description: spectest.Ptr("x"), Components: spectest.Ptr([]CommodityPriceComponentStruct{CommodityPriceComponentStruct{Price: int64(1), Source: TariffPriceTypeEnum(0), Description: spectest.Ptr("x"), TariffComponentId: spectest.Ptr(uint32(1))}})}}))
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[CommodityPriceComponentStruct],
+		spectest.CheckClone[CommodityPriceStruct],
+		spectest.CheckClone[GetDetailedPriceResponse],
+		spectest.CheckClone[GetDetailedForecastResponse],
+		spectest.CheckClone[PriceChangeEvent],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

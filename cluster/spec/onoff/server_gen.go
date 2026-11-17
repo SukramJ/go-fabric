@@ -25,6 +25,21 @@ type State struct {
 	StartUpOnOff       *StartUpOnOffEnum // attribute 0x4003: StartUpOnOffEnum, LT, RW VM, X N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.StartUpOnOff = func(p *StartUpOnOffEnum) *StartUpOnOffEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StartUpOnOff)
+	return c
+}
+
 // Patch is a change to the OnOff state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

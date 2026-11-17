@@ -435,7 +435,9 @@ type FailSafeExpiry struct {
 	// fail-safe context; 0 when a PASE session armed it.
 	ArmedFabric uint8
 	// AddedFabric is the fabric an AddNOC under the fail-safe installed,
-	// which the rollback removes; 0 when none was added.
+	// which the rollback removes; 0 when none was added, and 0 for an
+	// AddNOC the expiry overtook before it re-stamped the fail-safe — its
+	// row is pending and the rollback removes it all the same.
 	AddedFabric uint8
 	// OverPASE is whether the fail-safe was armed over a PASE session.
 	OverPASE bool
@@ -865,9 +867,9 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// The request's Breadcrumb is not taken: an armed fail-safe expires,
 		// and its expiry resets the Breadcrumb to 0; a fail-safe not armed
 		// is left without side effect. Mirrors matter.js
-		// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:100-104
+		// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:95-98
 		// (`if (expiryLengthSeconds === 0) return SuccessResponse` when not
-		// armed) and :92-97 → packages/protocol/src/common/FailsafeTimer.ts:61-65
+		// armed) and :89-94 → packages/protocol/src/common/FailsafeTimer.ts:61-65
 		// (an armed fail-safe expires) → FailsafeContext.ts:314
 		// restoreBreadcrumb → ServerNodeFailsafeContext.ts:84-91 (breadcrumb
 		// 0); chip GeneralCommissioningCluster.cpp:429-435 ("Don't set the
@@ -878,10 +880,16 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 		// A tentative terms acceptance of the window goes with it
 		// (general_commissioning_tc.go revertTermsLocked).
 		termsReverted := wasArmed && g.revertTermsLocked()
-		// Bump DataVersion on disarm so Apple's MTRDevice sees a version
-		// change and invalidates its cached DataVersion=0.
-		// Mirrors chip MarkAttributeDirty(Breadcrumb).
-		g.dataVersion.Bump()
+		// Only a disarm of an armed fail-safe changes an attribute (the
+		// Breadcrumb); a fail-safe that was not armed is left without side
+		// effect, its DataVersion included: neither matter.js
+		// (GeneralCommissioningServer.ts:95-98 at db021da0) nor
+		// connectedhomeip (GeneralCommissioningCluster.cpp:429-436,
+		// FailSafeContext.cpp:145-150 at 6170af84) changes anything there
+		// (review II, R2-P6-par-1020).
+		if wasArmed {
+			g.dataVersion.Bump()
+		}
 		// Release the cluster lock before firing the hook so
 		// OpCreds.OnFailSafeExpiry (which acquires its own lock to perform
 		// the AddNOC rollback) runs without our mutex held — matching the
@@ -1354,8 +1362,9 @@ func (g *GeneralCommissioning) completeCommissioning(ctx context.Context, commit
 
 // ArmFailSafeFor arms the fail-safe for seconds on behalf of fabricIndex
 // (0: a PASE session), outside any ArmFailSafe command; seconds 0 disarms
-// it without its rollback. Opening a commissioning window no longer calls
-// it (owner decision 47).
+// it without its rollback. A fail-safe armed for another fabric is
+// refused with an error and left as it is; the Breadcrumb is kept. Opening
+// a commissioning window no longer calls it (owner decision 47).
 func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint32, fabricIndex uint8) error {
 	return g.armFailSafeFor(ctx, seconds, fabricIndex, false, 0)
 }
@@ -1392,13 +1401,6 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 		}
 		return nil
 	}
-	req := ArmFailSafeRequest{
-		ExpiryLengthSeconds: uint16(seconds & 0xFFFF), // window timeout ≤ 900 s, fits uint16
-		Breadcrumb:          0,                        // ArmFailSafeFor's fresh arm starts at 0; the rest keep it (below)
-	}
-	// Temporarily inject the fabric index so handleArmFailSafe records it.
-	// handleArmFailSafe re-derives it from ctx via FabricFilterFromContext;
-	// override the context's fabric filter if needed, or set directly.
 	g.mu.Lock()
 	// The settle and the fresh start release the lock around the hooks they
 	// run and hold it again on return, on a panic of a hook too; this guard
@@ -1428,6 +1430,13 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	// R2-P2-comm-08).
 	if forSession && g.failSafeArmed && g.failSafeFabricIndex != fabricIndex {
 		return nil
+	}
+	// ArmFailSafeFor refuses it: an arm for another fabric would re-stamp
+	// the window, so its expiry would report the other window's added
+	// fabric under this one and this fabric's CommissioningComplete would
+	// commit the other window's row (review II, R2-P6-fsm-1017).
+	if !forSession && g.failSafeArmed && g.failSafeFabricIndex != fabricIndex {
+		return fmt.Errorf("%w: armed for fabric %d, not %d", errGencommArmedForAnotherFabric, g.failSafeFabricIndex, fabricIndex)
 	}
 	fresh := !g.failSafeArmed
 	g.failSafeFabricAdded = g.failSafeFabricAdded && !fresh
@@ -1462,10 +1471,8 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	// (GeneralCommissioningServer.ts:65 `breadcrumb: this.state.breadcrumb`,
 	// written back at :117-119, at db021da0): a value written while the
 	// fail-safe was disarmed stays (review II, R2-P2-rr-dev-07). A re-arm
-	// keeps it too; ArmFailSafeFor's fresh arm starts at 0.
-	if fresh && !forSession {
-		g.breadcrumb = req.Breadcrumb
-	}
+	// keeps it too, and so does ArmFailSafeFor's fresh arm, which carries no
+	// Breadcrumb of its own (review II, N-findev-4).
 	g.setArmFabricLocked(fabricIndex, fresh)
 	g.dataVersion.Bump()
 	g.startFailSafeWatchLocked(ctx, fabricIndex, g.failSafeExpiresAt)
@@ -1567,15 +1574,20 @@ func (g *GeneralCommissioning) expireNowLocked(ctx context.Context) {
 	}
 }
 
-// SetCurrentFabric records the fabric the active commissioning
-// session belongs to. The bridge calls this from the IM dispatcher
-// before invoking ArmFailSafe so the expiry hook knows which fabric
-// to roll back.
+// SetCurrentFabric re-stamps the armed fail-safe with the fabric AddNOC
+// just installed ([OpcredsConfig.RearmFailSafeForFabric]), so the expiry
+// reports it as [FailSafeExpiry.AddedFabric]. It does nothing while no
+// fail-safe is armed: a fail-safe that expired before the re-stamp has
+// already reported its expiry, and its rollback removes the AddNOC's
+// pending row all the same (review II, R2-P6-fsm-1024).
 func (g *GeneralCommissioning) SetCurrentFabric(idx uint8) {
 	g.mu.Lock()
+	defer g.mu.Unlock()
+	if !g.failSafeArmed {
+		return
+	}
 	g.failSafeFabricIndex = idx
-	g.failSafeFabricAdded = g.failSafeArmed && idx != 0
-	g.mu.Unlock()
+	g.failSafeFabricAdded = idx != 0
 }
 
 // FailSafeArmed reports whether a fail-safe window is currently

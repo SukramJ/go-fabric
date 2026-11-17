@@ -219,6 +219,13 @@ func buildSignedCert(t *testing.T, opts verifyTestCertOpts, priv *ecdsa.PrivateK
 	probeRaw = append(probeRaw, make([]byte, 64)...)
 	probeRaw = append(probeRaw, 0x18)
 	probeCert, err := mattercert.Decode(probeRaw)
+	if errors.Is(err, mattercert.ErrMalformed) {
+		// A certificate the decoder refuses (a key identifier that is
+		// not 160 bits, say) has no TBS to sign; it is returned with the
+		// placeholder signature, and the verifier refuses it at its
+		// decode as it would the signed one.
+		return probeRaw
+	}
 	if err != nil {
 		t.Fatalf("decode probe TBS: %v", err)
 	}
@@ -1200,6 +1207,7 @@ func TestDecode_UnknownContainerFieldSkipped(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("ext end: %v", err)
 	}
@@ -1516,6 +1524,7 @@ func TestBuildDN_FallbackOrder(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("ext end: %v", err)
 	}
@@ -1669,6 +1678,7 @@ func TestDecode_BasicConstraintsUnknownContainer(t *testing.T) {
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	// Extensions with basic-constraints struct containing an unknown container tag (99)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc, extTagBC)
 	enc.StartStruct(tlv.ContextTag(1))   // basic-constraints struct
 	enc.PutBool(tlv.ContextTag(1), true) // is-ca = true (known field)
 	enc.StartStruct(tlv.ContextTag(99))  // unknown nested container
@@ -1728,6 +1738,7 @@ func TestDecode_ExtensionsUnknownContainer(t *testing.T) {
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	// Extensions with an unknown container (tag 99)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	enc.StartStruct(tlv.ContextTag(99)) // unknown extension container
 	enc.PutUint(tlv.ContextTag(1), 42)
 	if err := enc.EndContainer(); err != nil {
@@ -1874,6 +1885,7 @@ func TestTBSToDER_FallbackOrder_HasICACID(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("ext end: %v", err)
 	}
@@ -1933,6 +1945,7 @@ func TestTBSToDER_FallbackOrder_HasFabricIDAndCAT(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("ext end: %v", err)
 	}
@@ -2058,6 +2071,7 @@ func TestDecodeDN_UnknownContainerInIssuer(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("ext end: %v", err)
 	}
@@ -2180,6 +2194,7 @@ func TestEncodeKeyUsageBits_ZeroFlags(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc, extTagKU)
 	// KeyUsage = 0 → exercises the flags==0 early-return in encodeKeyUsageBits.
 	enc.PutUint(tlv.ContextTag(2), uint64(0))
 	if err := enc.EndContainer(); err != nil {
@@ -2707,6 +2722,7 @@ func TestTBSToDER_CASEAuthTag(t *testing.T) {
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	// Extensions (empty)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("EndContainer extensions: %v", err)
 	}
@@ -2766,6 +2782,7 @@ func TestTBSToDER_FallbackOrder_HasVVSIDAndFirmwareSigningID(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	enc.StartList(tlv.ContextTag(10))
+	putMandatoryExtensions(enc)
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("ext end: %v", err)
 	}
@@ -2799,4 +2816,36 @@ func TestTBSToDER_FallbackOrder_HasVVSIDAndFirmwareSigningID(t *testing.T) {
 	if !bytes.Equal(ordered, fallback) {
 		t.Fatalf("fallback TBS differs from the arrival-order TBS:\n%x\n%x", ordered, fallback)
 	}
+}
+
+// Extension tags putMandatoryExtensions can leave out.
+const (
+	extTagBC = 1
+	extTagKU = 2
+)
+
+// putMandatoryExtensions writes the four extensions every certificate
+// must carry — basic constraints (not a CA), key usage
+// (digitalSignature), a 20-byte subject and authority key identifier —
+// into the open extensions list, except the tags in skip, which the
+// caller writes itself.
+func putMandatoryExtensions(enc *tlv.Encoder, skip ...uint8) {
+	skips := func(tag uint8) bool {
+		for _, s := range skip {
+			if s == tag {
+				return true
+			}
+		}
+		return false
+	}
+	if !skips(extTagBC) {
+		enc.StartStruct(tlv.ContextTag(1))
+		enc.PutBool(tlv.ContextTag(1), false)
+		_ = enc.EndContainer()
+	}
+	if !skips(extTagKU) {
+		enc.PutUint(tlv.ContextTag(2), 0x0001)
+	}
+	enc.PutOctets(tlv.ContextTag(4), make([]byte, 20))
+	enc.PutOctets(tlv.ContextTag(5), make([]byte, 20))
 }

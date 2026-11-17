@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
@@ -25,11 +24,6 @@ func targetValues(st TargetState) map[uint32]any {
 		targetdef.AttrTargetList:    listOr(st.TargetList),
 		targetdef.AttrCurrentTarget: st.CurrentTarget,
 	}
-}
-
-func cloneTarget(st TargetState) TargetState {
-	st.TargetList = slices.Clone(st.TargetList)
-	return st
 }
 
 // Targets is the TargetNavigator host port (the generated
@@ -57,7 +51,6 @@ type TargetsConfig struct {
 type TargetsServer struct {
 	*spec.Server
 	stateful[TargetState]
-	events
 }
 
 // NewTargets builds a TargetNavigator server over cfg.Port.
@@ -72,12 +65,12 @@ func NewTargets(cfg TargetsConfig) (*TargetsServer, error) {
 		return port.NavigateTarget(ctx, st, req)
 	})
 	srv, err := newServer(targetdef.Definition, spec.Options{Attributes: cfg.Attributes, Events: cfg.Events},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, targetValues, cloneTarget, storeState[TargetState]); err != nil {
+	if err := s.init(srv, cfg.Initial, targetValues, TargetState.Clone, storeState[TargetState]); err != nil {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
 	if err := checkState(srv); err != nil {
@@ -96,9 +89,5 @@ func (s *TargetsServer) EmitTargetUpdated(ev targetdef.TargetUpdatedEvent) error
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
-// server's events are addressed to, for its own events and the store's
-// EmitEvent alike.
-func (s *TargetsServer) SetEndpoint(endpoint uint16) {
-	s.events.SetEndpoint(endpoint)
-	s.Server.SetEndpoint(endpoint)
-}
+// server's events are addressed to, the store's ([spec.Server.EmitEvent]).
+func (s *TargetsServer) SetEndpoint(endpoint uint16) { s.Server.SetEndpoint(endpoint) }

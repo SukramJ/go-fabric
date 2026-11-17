@@ -18,7 +18,7 @@ import (
 // which RemoveFabric discards (review II, R2-P2-fabric-06).
 func TestBindingDropFabricReportsTheSaveError(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	stored := []core.TargetStruct{{Node: 2, FabricIndex: 1}, {Node: 3, FabricIndex: 2}}
 	refused := errors.New("disk full")
 	if err := b.Persist(core.BindingConfig{

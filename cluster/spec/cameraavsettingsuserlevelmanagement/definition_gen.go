@@ -157,6 +157,15 @@ func (v *MPTZPresetStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MPTZPresetStruct) Clone() MPTZPresetStruct {
+	c := v
+	c.Settings = v.Settings.Clone()
+	return c
+}
+
 // MPTZPresetStructDef describes MPTZPresetStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -189,6 +198,35 @@ func (v *MPTZStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Tilt", false, &v.Tilt, spec.DecodeOptional(spec.DecodeInt[int16](16))),
 		spec.Bind(2, "Zoom", false, &v.Zoom, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 1, 255))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MPTZStruct) Clone() MPTZStruct {
+	c := v
+	c.Pan = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Pan)
+	c.Tilt = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Tilt)
+	c.Zoom = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Zoom)
+	return c
 }
 
 // MPTZStructDef describes MPTZStruct.
@@ -244,6 +282,35 @@ func (v *MptzSetPositionRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MptzSetPositionRequest) Clone() MptzSetPositionRequest {
+	c := v
+	c.Pan = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Pan)
+	c.Tilt = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Tilt)
+	c.Zoom = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Zoom)
+	return c
+}
+
 // MptzRelativeMoveRequest is the MptzRelativeMove command payload.
 type MptzRelativeMoveRequest struct {
 	PanDelta  *int16 // 0: int16, [MPAN].c+, -1 * (panMax - panMin) to panMax - panMin
@@ -267,6 +334,35 @@ func (v *MptzRelativeMoveRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "TiltDelta", false, &v.TiltDelta, spec.DecodeOptional(spec.DecodeInt[int16](16))),
 		spec.Bind(2, "ZoomDelta", false, &v.ZoomDelta, spec.DecodeOptional(spec.DecodeInt[int8](8))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MptzRelativeMoveRequest) Clone() MptzRelativeMoveRequest {
+	c := v
+	c.PanDelta = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PanDelta)
+	c.TiltDelta = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TiltDelta)
+	c.ZoomDelta = func(p *int8) *int8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ZoomDelta)
+	return c
 }
 
 // MptzMoveToPresetRequest is the MptzMoveToPreset command payload.
@@ -308,6 +404,21 @@ func (v *MptzSavePresetRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "PresetId", false, &v.PresetId, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 1, 255))),
 		spec.Bind(1, "Name", true, &v.Name, spec.DecodeStringIn(0, 32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MptzSavePresetRequest) Clone() MptzSavePresetRequest {
+	c := v
+	c.PresetId = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PresetId)
+	return c
 }
 
 // MptzRemovePresetRequest is the MptzRemovePreset command payload.
@@ -377,6 +488,35 @@ func (v *DptzRelativeMoveRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "DeltaY", false, &v.DeltaY, spec.DecodeOptional(spec.DecodeInt[int16](16))),
 		spec.Bind(3, "ZoomDelta", false, &v.ZoomDelta, spec.DecodeOptional(spec.DecodeIntIn[int8](8, -100, 100))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DptzRelativeMoveRequest) Clone() DptzRelativeMoveRequest {
+	c := v
+	c.DeltaX = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DeltaX)
+	c.DeltaY = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DeltaY)
+	c.ZoomDelta = func(p *int8) *int8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ZoomDelta)
+	return c
 }
 
 func decodeMptzSetPositionRequest(n spec.Node) (any, error) {

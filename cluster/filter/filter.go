@@ -133,6 +133,11 @@ type Config struct {
 	// LastChangedTimeWriter, optional, is told about a controller's write.
 	LastChangedTimeWriter LastChangedTimeWriter
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Clock stamps LastChangedTime on ResetCondition; nil is
 	// [clock.System].
@@ -207,7 +212,7 @@ func newServer(def *spec.Cluster, cfg Config) (*Server, error) {
 		}
 		opts.Commands = []uint32{hepa.CmdResetCondition}
 	}
-	sc := spec.ServerConfig{DataVersion: cfg.DataVersion}
+	sc := spec.ServerConfig{DataVersion: cfg.DataVersion} //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if cfg.LastChangedTimeWriter != nil {
 		sc.Sink = lastChangedSink{cfg.LastChangedTimeWriter}
 	}

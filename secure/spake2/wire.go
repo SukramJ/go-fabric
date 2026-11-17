@@ -81,6 +81,15 @@ func EncodePake1(pA []byte) []byte {
 	return out
 }
 
+// Bytes after a message's end. Every decoder of this file reads one
+// top-level structure and returns at its end-of-container; what follows
+// is not looked at (5a-3 S-5, pinned by
+// TestPASEDecodersTakeBytesAfterTheMessageEnd).
+// Mirrors matter.js packages/types/src/tlv/TlvSchema.ts:48-50
+// (decodeInternal) and TlvObject.ts:205-211 at db021da0: one top-level
+// element is decoded and the reader is dropped; bytes after the
+// structure's end-of-container are not inspected.
+
 // DecodePake1 extracts the pA octet string from a Pake1 TLV payload.
 // Returns [ErrWireMalformed] when the payload is not the expected
 // shape.

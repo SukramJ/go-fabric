@@ -296,8 +296,15 @@ func (s *ColorControlServer) MatterSelfReportedAttributes() []uint32 {
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: a transition stops
 // where it is, without a report (matter.js ColorControlServer
-// [Symbol.asyncDispose]).
-func (s *ColorControlServer) MatterQuiesce() { s.engine.StopAll() }
+// [Symbol.asyncDispose]), and a report a quieter holds back is dropped
+// with its timer, so no timer of the server outlives it, as LevelControl's
+// MatterQuiesce drops its own (R2-P6-fsm-1403). The quieters stay usable.
+func (s *ColorControlServer) MatterQuiesce() {
+	s.engine.StopAll()
+	for _, q := range s.quiet {
+		q.Stop()
+	}
+}
 
 // executes is matter.js #optionsAllowExecution.
 func (s *ColorControlServer) executes(mask, override uint8) bool {

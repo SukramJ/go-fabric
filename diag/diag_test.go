@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/diag"
+	"github.com/SukramJ/go-fabric/diagevent"
 )
 
 // TestDiagnosticsEffective: a capacity below one keeps the default, any
@@ -36,5 +37,19 @@ func TestZeroValues(t *testing.T) {
 	var p diag.PeerInfo
 	if p.Registered || p.State != "" || p.SessionIDs != nil {
 		t.Fatalf("zero peer %+v", p)
+	}
+}
+
+// TestRingDefaultCapacityIsTheDiagnosticsDefault holds R2-P6-api-0225: the
+// ring's own default for a capacity below one is the same number as
+// [diag.DefaultDiagnosticsCapacity] — one default for one ring.
+func TestRingDefaultCapacityIsTheDiagnosticsDefault(t *testing.T) {
+	t.Parallel()
+	r := diagevent.NewRing(0)
+	for range diag.DefaultDiagnosticsCapacity + 50 {
+		r.Record(diagevent.Event{Message: "x"})
+	}
+	if got := len(r.Snapshot()); got != diag.DefaultDiagnosticsCapacity {
+		t.Fatalf("diagevent.NewRing(0) keeps %d events, want diag.DefaultDiagnosticsCapacity %d", got, diag.DefaultDiagnosticsCapacity)
 	}
 }

@@ -14,7 +14,8 @@ import (
 	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
 )
 
-// The typed server's optional interfaces over [spec.Hooks]; SetAttributes
+// The typed server's optional interfaces: Handle ([spec.SelfHeld]), Emit
+// ([spec.Events]) and SetBeforeWrite ([spec.WriteVeto]); SetAttributes
 // holds matter.js's assertions.
 var (
 	_ spec.AttributeSetter   = (*Server)(nil)
@@ -140,16 +141,16 @@ func uint32Ptr(v any) *uint32 {
 	return nil
 }
 
-// Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
-func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.hooks.Handle(cmdID, fn) }
+// Handle implements [spec.CommandRegistrar] ([spec.SelfHeld.Handle]).
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.held.Handle(cmdID, fn) }
 
 // Emit implements [spec.EventEmitting]: ServiceArea defines no event, so
 // every one is [spec.ErrNotEmitted].
 func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
-	return s.hooks.Emit(endpoint, eventID, data)
+	return s.events.Emit(s.Instance, endpoint, eventID, data)
 }
 
-// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.Hooks]).
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.WriteVeto]).
 func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
-	s.hooks.SetBeforeWrite(fn)
+	s.veto.Set(fn)
 }

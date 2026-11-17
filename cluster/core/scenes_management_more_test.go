@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	colordef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -136,7 +136,7 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if len(level.applied) != 1 || level.applied[0][lvldef.AttrCurrentLevel] != 77 || level.ms[0] != 1500 {
 		t.Fatalf("applied %+v over %v ms, want CurrentLevel 77 over 1500 ms", level.applied, level.ms)
 	}
-	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToColorTemperature {
+	if len(color.cmds) != 1 || color.cmds[0] != colordef.CmdMoveToColorTemperature {
 		t.Fatalf("color commands %v, want MoveToColorTemperature", color.cmds)
 	}
 
@@ -148,7 +148,7 @@ func TestScenesCaptureAndRecallLevelAndColor(t *testing.T) {
 	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 2}); err != nil {
 		t.Fatal(err)
 	}
-	if len(color.cmds) != 1 || color.cmds[0] != wire.ColorCtrlCmdMoveToHueAndSaturation {
+	if len(color.cmds) != 1 || color.cmds[0] != colordef.CmdMoveToHueAndSaturation {
 		t.Fatalf("color commands %v, want MoveToHueAndSaturation", color.cmds)
 	}
 	if len(level.applied) != 1 {

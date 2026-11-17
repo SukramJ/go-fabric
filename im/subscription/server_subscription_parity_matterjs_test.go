@@ -21,7 +21,7 @@ func TestServerSubscriptionParity(t *testing.T) {
 
 	t.Run("selects endpoints by its event paths when it has no attribute paths", func(t *testing.T) {
 		t.Parallel()
-		m := NewManager(Config{}, nil, nil)
+		m := newTestManager(Config{})
 		sub, err := m.Subscribe(SubscribeArgs{
 			FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
 			EventPaths: []im.ConcreteEventPath{{Endpoint: 0, Cluster: 0x0028, HasEndpoint: true, HasCluster: true}},
@@ -39,7 +39,7 @@ func TestServerSubscriptionParity(t *testing.T) {
 
 	t.Run("terminates on close() but not on closeForShutdown()", func(t *testing.T) {
 		t.Parallel()
-		m := NewManager(Config{}, nil, nil)
+		m := newTestManager(Config{})
 		terminated := map[uint32]bool{}
 		m.SetOnSubscriptionTerminated(func(id uint32, _ uint8) { terminated[id] = true })
 		args := SubscribeArgs{FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60, KeepSubscriptions: true}

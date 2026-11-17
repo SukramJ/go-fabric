@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	messagesdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
@@ -39,6 +41,11 @@ type MessagesConfig struct {
 	// Features is the FeatureMap (CONF, RESP, RPLY, PROT).
 	Features messagesdef.Feature
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -67,10 +74,11 @@ const messagesMax = 8
 //     ConfirmationResponse is INVALID_COMMAND (src/app/clusters/
 //     messages-server/messages-server.cpp:359-363); the host's refusal is
 //     FAILURE (:392-400).
-//   - A message whose MessageID is queued already replaces it: a presented
-//     one completes first (examples/tv-app/tv-common/clusters/messages/
-//     MessagesManager.cpp HandlePresentMessagesRequest), and the new one is
-//     queued and MessageQueued emitted.
+//   - A message whose MessageID the accessing fabric has queued already
+//     replaces it: a presented one completes first (examples/tv-app/
+//     tv-common/clusters/messages/MessagesManager.cpp
+//     HandlePresentMessagesRequest), and the new one is queued and
+//     MessageQueued emitted.
 //   - CancelMessagesRequest completes a presented message and drops a
 //     queued one; an unknown id is skipped (HandleCancelMessagesRequest).
 //   - ActiveMessageIds lists the presented messages
@@ -78,7 +86,14 @@ const messagesMax = 8
 //
 // Beyond both: a queue holding its eight messages (the list's "max 8")
 // answers a ninth RESOURCE_EXHAUSTED, and a cancel touches only the
-// accessing fabric's messages, as only they are visible to it.
+// accessing fabric's messages, as only they are visible to it. A present
+// whose MessageID another fabric's message holds — queued, or being
+// presented — is refused ALREADY_EXISTS (the module's status; neither
+// reference answers one here) and that message stays as it is:
+// chip's example looks the id up across fabrics and replaces it
+// (MessagesManager.cpp:73-87, FindCachedMessage(messageId)), so one
+// fabric could take down another's presented message (review II,
+// R2-P6-sec-1201, decision 129).
 type Messages struct {
 	*spec.Instance
 	cluster.AttributeChanges
@@ -98,9 +113,34 @@ type Messages struct {
 	// against the queue's eight so two presents cannot both take its last
 	// slot while the presenter has them.
 	presenting int
+	// inFlight holds the id and fabric of every present whose
+	// PresentMessage runs and every cancel whose CancelMessage runs, so
+	// another fabric's present of the same id is refused while the
+	// presenter has it.
+	inFlight []*messagesInFlight
 	// pending holds what a change under mu reports once mu is released.
 	pendingAttrs  []uint32
 	pendingEvents []messagesEvent
+}
+
+// messagesInFlight is one present or cancel at the presenter; removed
+// marks a present whose fabric was removed meanwhile.
+type messagesInFlight struct {
+	id      []byte
+	fabric  uint8
+	removed bool
+}
+
+// beginFlightLocked records an id at the presenter; endFlightLocked takes
+// it back. Caller holds mu.
+func (m *Messages) beginFlightLocked(id []byte, fabric uint8) *messagesInFlight {
+	f := &messagesInFlight{id: id, fabric: fabric}
+	m.inFlight = append(m.inFlight, f)
+	return f
+}
+
+func (m *Messages) endFlightLocked(f *messagesInFlight) {
+	m.inFlight = slices.DeleteFunc(m.inFlight, func(e *messagesInFlight) bool { return e == f })
 }
 
 // messagesEvent is an event a change emits once the lock is released.
@@ -155,7 +195,7 @@ func (m *Messages) MatterRead(attrID uint32) (any, bool) {
 	defer m.mu.Unlock()
 	switch attrID {
 	case messagesdef.AttrMessages:
-		return spec.List[messagesdef.MessageStruct](slices.Clone(m.messages)), true
+		return spec.List[messagesdef.MessageStruct](deepcopy.Each(m.messages)), true
 	case messagesdef.AttrActiveMessageIds:
 		return activeIDs(m.active), true
 	}
@@ -190,7 +230,7 @@ func (m *Messages) MatterReadFiltered(ctx context.Context, attrID uint32) (any, 
 	out := spec.List[messagesdef.MessageStruct]{}
 	for _, msg := range m.messages {
 		if !filtered || msg.FabricIndex == fabric {
-			out = append(out, msg)
+			out = append(out, msg.Clone())
 		}
 	}
 	return out, true
@@ -257,8 +297,9 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 		// messages-server.cpp:359-363.
 		return bindingStatusError{code: im.StatusInvalidCommand, msg: "core: Messages: Responses without ConfirmationResponse"}
 	}
+	req = req.Clone() // the queue keeps its own copy (decision 142)
 	msg := messagesdef.MessageStruct{
-		MessageId: slices.Clone(req.MessageId), Priority: req.Priority, MessageControl: req.MessageControl,
+		MessageId: req.MessageId, Priority: req.Priority, MessageControl: req.MessageControl,
 		StartTime: req.StartTime, Duration: req.Duration, MessageText: req.MessageText,
 		Responses: req.Responses, FabricIndex: fabric,
 	}
@@ -266,6 +307,10 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	// under mu, the presenter called without it, the result applied under
 	// it again (ADR 0026 P6).
 	m.mu.Lock()
+	if m.heldByAnotherLocked(msg.MessageId, fabric) {
+		m.unlock()
+		return bindingStatusError{code: im.StatusAlreadyExists, msg: "core: Messages: another fabric's message holds the MessageID"}
+	}
 	reserved := m.indexLocked(msg.MessageId) < 0
 	if reserved && len(m.messages)+m.presenting >= messagesMax {
 		m.unlock()
@@ -274,18 +319,40 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	if reserved {
 		m.presenting++
 	}
+	flight := m.beginFlightLocked(msg.MessageId, fabric)
 	m.mu.Unlock()
-	err := m.presenter.PresentMessage(ctx, msg)
+	err := m.presenter.PresentMessage(ctx, msg.Clone())
 	m.mu.Lock()
-	defer m.unlock()
 	if reserved {
 		m.presenting--
 	}
 	if err != nil {
+		m.endFlightLocked(flight)
+		m.unlock()
 		return messagesStatus(err)
 	}
+	if flight.removed {
+		// The fabric was removed while the presenter had the message: it
+		// is not queued under the removed index, and the presenter takes
+		// down what it showed. The id stays held until that cancel
+		// returned, so another fabric's present of it is refused meanwhile
+		// and not taken down by it (review II, R2-P6-sec-1201 rounds 2, 4).
+		m.unlock()
+		cancelErr := m.presenter.CancelMessage(ctx, slices.Clone(msg.MessageId))
+		m.mu.Lock()
+		m.endFlightLocked(flight)
+		m.unlock()
+		if cancelErr != nil {
+			return messagesStatus(cancelErr)
+		}
+		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: fmt.Sprintf("core: Messages: fabric %d was removed while its message was presented", fabric)}
+	}
+	m.endFlightLocked(flight)
+	defer m.unlock()
 	// A message with the same id replaces the queued one, looked up again:
-	// it may have gone or come while the presenter ran.
+	// it may have gone or come while the presenter ran. Only the accessing
+	// fabric's can be there: another fabric's present of the id was
+	// refused while this one was in flight.
 	if i := m.indexLocked(msg.MessageId); i >= 0 {
 		m.removeLocked(i)
 	}
@@ -311,11 +378,24 @@ func (m *Messages) cancel(ctx context.Context, fabric uint8, ids [][]byte) error
 		m.mu.Lock()
 		i := m.indexLocked(id)
 		visible := i >= 0 && m.messages[i].FabricIndex == fabric
+		var flight *messagesInFlight
+		if visible {
+			// The id stays the accessing fabric's while the presenter
+			// cancels it: another fabric's present of it is refused even
+			// if the host completes the message meanwhile, so the cancel
+			// never takes that fabric's display down (review II,
+			// R2-P6-sec-1201 round 2).
+			flight = m.beginFlightLocked(id, fabric)
+		}
 		m.mu.Unlock()
 		if !visible {
 			continue
 		}
-		if err := m.presenter.CancelMessage(ctx, slices.Clone(id)); err != nil {
+		err := m.presenter.CancelMessage(ctx, slices.Clone(id))
+		m.mu.Lock()
+		m.endFlightLocked(flight)
+		m.mu.Unlock()
+		if err != nil {
 			return messagesStatus(err)
 		}
 		m.mu.Lock()
@@ -336,6 +416,17 @@ func messagesStatus(err error) error {
 		return err
 	}
 	return bindingStatusError{code: im.StatusFailure, msg: "core: Messages: " + err.Error()}
+}
+
+// heldByAnotherLocked reports whether a message of a fabric other than
+// fabric holds id: queued, or at the presenter (R2-P6-sec-1201).
+func (m *Messages) heldByAnotherLocked(id []byte, fabric uint8) bool {
+	if i := m.indexLocked(id); i >= 0 && m.messages[i].FabricIndex != fabric {
+		return true
+	}
+	return slices.ContainsFunc(m.inFlight, func(e *messagesInFlight) bool {
+		return e.fabric != fabric && bytes.Equal(e.id, id)
+	})
 }
 
 // indexLocked is the queue position of id, -1 when it is not queued.
@@ -479,6 +570,11 @@ func (m *Messages) Complete(id []byte, outcome MessageOutcome) bool {
 func (m *Messages) RemoveFabric(fabricIndex uint8) {
 	m.mu.Lock()
 	defer m.unlock()
+	for _, f := range m.inFlight {
+		if f.fabric == fabricIndex {
+			f.removed = true
+		}
+	}
 	before := len(m.messages)
 	var gone [][]byte
 	m.messages = slices.DeleteFunc(m.messages, func(msg messagesdef.MessageStruct) bool {

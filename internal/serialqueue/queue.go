@@ -7,6 +7,7 @@
 package serialqueue
 
 import (
+	"log/slog"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/internal/inflight"
@@ -16,7 +17,14 @@ import (
 // after the other, in the order they were enqueued. Its owner (ADR 0026
 // principle 5) starts it and stops it — waiting until every queued
 // callback ran. Enqueue never blocks the goroutine that enqueues; a
-// callback handed to a queue that is not running is dropped. A callback
+// callback handed to a queue that is not running is dropped. The queue
+// holds at most [Bound] callbacks that have not started: past it the
+// oldest of them is dropped and counted ([Queue.Dropped]) and the first
+// drop since the queue last ran empty is logged at warn
+// (`matter.callbacks.dropped`); when the queue runs empty again the
+// episode's count and the queue's total are logged at warn
+// (`matter.callbacks.overflow_ended`), so a host callback slower than the events
+// behind it costs those events, not unbounded memory. A callback
 // must not stop its own queue's owner: the stop would wait for the
 // callback that called it.
 type Queue struct {
@@ -27,6 +35,14 @@ type Queue struct {
 	mu      sync.Mutex
 	cond    *sync.Cond
 	items   []item
+	dropped uint64 // callbacks dropped at the bound, over the queue's life
+	// overflowing is set by a drop and cleared when the queue runs empty:
+	// one warning per episode, not one per dropped callback.
+	overflowing bool
+	// episodeBase is dropped when the current overflow episode began.
+	episodeBase uint64
+	// log is the queue's logger; nil logs through slog.Default().
+	log     *slog.Logger
 	running bool
 	stopped chan struct{} // closed when the goroutine of this run exits
 	// group, when set, is the in-flight group a callback counts in from
@@ -50,6 +66,10 @@ func (q *Queue) CountIn(group func() *inflight.Group) {
 	q.group = group
 }
 
+// Bound is the number of queued callbacks that have not started a queue
+// holds; the one running is not counted.
+const Bound = 1024
+
 // New returns a queue that is not running.
 func New() *Queue {
 	q := &Queue{}
@@ -72,8 +92,51 @@ func (q *Queue) Enqueue(fn func()) {
 		it.g = q.group()
 		it.g.Enter(inflight.DeviceCallbacks)
 	}
+	if len(q.items) >= Bound {
+		old := q.items[0]
+		q.items[0] = item{}
+		q.items = q.items[1:]
+		q.dropped++
+		old.g.Leave(inflight.DeviceCallbacks)
+		if !q.overflowing {
+			q.overflowing = true
+			q.episodeBase = q.dropped - 1
+			q.logger().Warn("matter.callbacks.dropped",
+				slog.Int("max", Bound),
+				slog.Uint64("dropped", q.dropped))
+		}
+	}
 	q.items = append(q.items, it)
 	q.cond.Signal()
+}
+
+// SetLogger sets the logger of the queue's warnings; nil logs through
+// slog.Default().
+func (q *Queue) SetLogger(l *slog.Logger) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.log = l
+}
+
+func (q *Queue) logger() *slog.Logger {
+	if q.log != nil {
+		return q.log
+	}
+	return slog.Default()
+}
+
+// Len is the number of queued callbacks that have not started.
+func (q *Queue) Len() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.items)
+}
+
+// Dropped is the number of callbacks dropped at [Bound] since New.
+func (q *Queue) Dropped() uint64 {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.dropped
 }
 
 // Start runs the queue's goroutine; a no-op while it runs.
@@ -118,10 +181,26 @@ func (q *Queue) run(done chan struct{}) {
 			q.mu.Unlock()
 			return
 		}
+		var episode, total uint64
+		ended := len(q.items) == 1 && q.overflowing
+		if len(q.items) == 1 {
+			q.overflowing = false
+		}
+		if ended {
+			episode, total = q.dropped-q.episodeBase, q.dropped
+		}
 		it := q.items[0]
 		q.items[0] = item{}
 		q.items = q.items[1:]
+		log := q.logger()
 		q.mu.Unlock()
+		if ended {
+			// What the episode cost, once it is over: the warning at its
+			// start cannot say (review II, R2-P6-bound-0209).
+			log.Warn("matter.callbacks.overflow_ended",
+				slog.Uint64("dropped", episode),
+				slog.Uint64("total", total))
+		}
 		func() {
 			defer it.g.Leave(inflight.DeviceCallbacks)
 			it.fn()

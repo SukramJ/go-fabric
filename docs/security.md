@@ -114,24 +114,32 @@ database. It gives no integrity or rollback protection: the non-secret
 columns and the seal marks are not authenticated, and an older sealed value
 of the same row, written back into the file, opens.
 
-On the way in `NewSealed` seals every clear row in one transaction and then
-scrubs the file as the factory reset does, so the clear values of an
-existing database do not stay behind — measured in WAL mode and in the
-rollback journal's `DELETE` (SQLite's default) and `TRUNCATE` modes; in
-`PERSIST` mode the kept `-journal` still holds clear pages. Copies taken
-before the upgrade — backups, snapshots, the blocks of the truncated
-`-wal` — keep the clear values, as for the factory reset above. A second call
-writes nothing.
+The first `NewSealed` marks the database with a seal canary: a reserved
+row of `matter_settings` holding a known value sealed under the sealer. On
+the way in it seals every clear row and writes the canary in one
+transaction, then scrubs the file as the factory reset does, so the clear
+values of an existing database do not stay behind — measured in WAL mode,
+in the rollback journal's `DELETE` (SQLite's default), `TRUNCATE` and
+`PERSIST` modes and under `locking_mode=EXCLUSIVE` (the scrub truncates a
+kept `-journal`). Copies taken before the upgrade — backups, snapshots, the
+blocks of a truncated `-wal` or `-journal` — keep the clear values, as for
+the factory reset above. When the scrub cannot finish — a full disk, a
+reader holding the `-wal` — `NewSealed` still returns the sealed store: the
+scrub stays owed (`Store.ScrubOwed`), the node logs one warning, and every
+later `NewSealed` runs it again. A host that wants to fail closed checks
+`ScrubOwed` and stops.
 
 After that, while the store is open, it is strict: it writes no secret in
-clear, and a secret row it reads without the seal mark — a mark edited in the file, a clear row
-planted or written by a store without the sealer — is refused with
-`store.ErrUnseal`, never read as the secret; so is a value under another key
-or moved to another row. A later `NewSealed` adopts every clear row it finds
-and seals it — it cannot tell an edited or planted row from one a store
-without the sealer wrote. A store without the sealer reads a sealed value as
-`store.ErrNoSealer` and refuses a write that would leave a sealed identity
-half clear. Every store of the database needs the sealer; a concurrent
+clear, and a secret row it reads without the seal mark — a mark edited in
+the file, a clear row planted — is refused with `store.ErrUnseal`, never
+read as the secret; so is a value under another key or moved to another
+row. A database that carries the canary is held to the same rule at every
+open: `NewSealed` opens the canary first and refuses a clear secret row
+instead of sealing it, and a store without the sealer (`store.New`)
+refuses to write a secret into it (`store.ErrNoSealer`) and reads a sealed
+one as `store.ErrNoSealer`. The canary is not tamper protection: whoever
+can write the file can delete its row, and the database then counts as
+never sealed. Every store of the database needs the sealer; a concurrent
 writer without it on the same database is not supported. A secret of the
 wrong length is refused on write and on read, in both stores, with or without
 a sealer (the resumption secret 32 bytes, the IPK 16, the epoch keys 16, a
@@ -145,12 +153,19 @@ the schema, opens its credential store with `store.NewSealed` and `New`
 returns its error. A host that builds the store itself applies the schema
 (`store.Apply`), calls `store.NewSealed` and hands the store over as
 `node.Store{DB: db, Credentials: sealed}` (then without `Sealer`). A wrong
-key fails `store.NewSealed`, and with it `New`, with `store.ErrUnseal`:
-before it seals anything, `NewSealed` opens one sealed value the database
-already holds (the first sealed identity, else another sealed row or
-setting); a database with no sealed value yet opens. A store without the
-sealer reads a sealed secret as `store.ErrNoSealer`. Provisioning and rotating
-the key are the host's; the module rotates nothing.
+key fails `store.NewSealed`, and with it `New`, with `store.ErrUnseal`
+before anything is written: `NewSealed` opens the canary first — on a
+database the first `NewSealed` has not marked yet, one sealed value the
+database already holds. Provisioning the key is the host's; to rotate it,
+the host calls `store.Reseal(ctx, db, old, new)` while no store is open on
+the file: one transaction opens every sealed value and the canary under
+the old sealer and seals them under the new one, the canary last, then the
+file is scrubbed of the values under the old key (a scrub that does not
+finish is `store.ErrScrubIncomplete` after the commit and is owed to the
+next `NewSealed`). There is no unseal: the way back to a clear database is
+a factory reset, which drops the canary with every other row, or a restore.
+`Reseal` moves the device store's rows only, not the controller's node
+registry on the same file.
 
 The controller takes the same sealer as `controller.Config.Sealer` (opt-in,
 off by default): `New` opens its store with `store.NewSealed` and its node

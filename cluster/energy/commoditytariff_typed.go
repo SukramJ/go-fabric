@@ -106,23 +106,49 @@ func (s *CommodityTariffServer) startSyncLocked() {
 }
 
 // syncTick is one time sync: [CommodityTariffServer.SyncTime], then the
-// next one, unless the server was quiesced meanwhile.
+// next one — unless the server was quiesced meanwhile, which a tick
+// already waiting on the lock sees before it stores anything (review II,
+// R2-P6-conc-1621).
 func (s *CommodityTariffServer) syncTick() {
-	_ = s.SyncTime() // chip logs what it returns; there is no caller to answer
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.syncTimer == nil {
+		return
+	}
+	_ = s.syncTimeLocked() // chip logs what it returns; there is no caller to answer
 	if s.syncTimer != nil {
 		s.syncTimer.Reset(s.syncEvery)
 	}
 }
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: the time sync
-// stops until the next tariff update starts it again.
+// stops. The next tariff update starts it again, and so does the
+// [CommodityTariffServer.SetEndpoint] of a reassembly that puts the server
+// back.
 func (s *CommodityTariffServer) MatterQuiesce() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.syncTimer != nil {
 		s.syncTimer.Stop()
 		s.syncTimer = nil
+		s.quiesced = true
+	}
+}
+
+// SetEndpoint implements [contract.EndpointReceiver]; the bridge calls it
+// at reassembly, for every server of the new topology. A server
+// [CommodityTariffServer.MatterQuiesce] stopped comes back here: it runs
+// one [CommodityTariffServer.SyncTime] at once — a delayed tariff whose
+// StartDate passed while it was out activates, the current day and day
+// entry are derived for now — and arms the sync again, as EvseServer
+// re-arms its deadline (review II, R2-P6-fsm-1607).
+func (s *CommodityTariffServer) SetEndpoint(endpoint uint16) {
+	s.SelfHeld.SetEndpoint(endpoint) // stamped first, before the sync acts (appinfra round 3)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.quiesced {
+		s.quiesced = false
+		_ = s.syncTimeLocked() // as a tick: there is no caller to answer
+		s.startSyncLocked()
 	}
 }

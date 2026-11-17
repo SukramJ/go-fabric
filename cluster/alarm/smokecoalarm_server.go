@@ -334,6 +334,11 @@ type Config struct {
 	ExpressedStatePriority []ExpressedState
 	// DataVersion is an optional host-owned tracker, as on every server
 	// here; nil uses an embedded one.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -347,7 +352,20 @@ type Server struct {
 	optional Optional
 	priority []ExpressedState
 	inst     *spec.Instance
-	hooks    spec.Hooks
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([Server.Handle]) ahead of the server's own logic
+	// (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
+
+	// refresh serialises Refresh: held across reading the source, swapping
+	// the baseline and handing the events over, so two overlapping calls
+	// cannot swap in the older state last (R2-P6-conc-1503). A one-slot
+	// channel, so that a waiter is durably blocked for a testing/synctest
+	// bubble.
+	refresh chan struct{}
 
 	// mu guards emitter, endpoint, last and lastExpr.
 	mu       sync.Mutex
@@ -403,12 +421,8 @@ func NewServer(cfg Config) (*Server, error) {
 			return nil, ErrSensitivityNotWritable
 		}
 	}
-	inst, err := spec.New(sdef.Definition, instanceOptions(cfg))
-	if err != nil {
-		return nil, fmt.Errorf("alarm: %w", err)
-	}
 	s := &Server{
-		inst:     inst,
+		refresh:  make(chan struct{}, 1),
 		src:      cfg.Source,
 		ext:      cfg.DataVersion,
 		features: cfg.Features,
@@ -416,6 +430,11 @@ func NewServer(cfg Config) (*Server, error) {
 		priority: DefaultExpressedStatePriority,
 		lastExpr: ExpressedNormal,
 	}
+	srv, err := newHeld(sdef.Definition, instanceOptions(cfg), s.MatterRead, s.invoke)
+	if err != nil {
+		return nil, fmt.Errorf("alarm: %w", err)
+	}
+	s.inst, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	if cfg.ExpressedStatePriority != nil {
 		for _, e := range cfg.ExpressedStatePriority {
 			if !s.canExpress(e) || e == ExpressedNormal || e == ExpressedInoperative {
@@ -424,7 +443,6 @@ func NewServer(cfg Config) (*Server, error) {
 		}
 		s.priority = slices.Clone(cfg.ExpressedStatePriority)
 	}
-	s.hooks.Init(inst)
 	return s, nil
 }
 
@@ -438,20 +456,20 @@ func (*Server) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
-// Handle implements spec.CommandRegistrar ([spec.Hooks]).
-func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.hooks.Handle(cmdID, fn) }
+// Handle implements spec.CommandRegistrar ([spec.SelfHeld.Handle]).
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.held.Handle(cmdID, fn) }
 
 // Emit implements spec.EventEmitting: an event of the EventList the host
-// raises itself ([spec.Hooks]); the state's events are the server's
-// ([Server.Refresh]).
+// raises itself ([spec.Events.Emit]); the state's events are the
+// server's ([Server.Refresh]).
 func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
-	return s.hooks.Emit(endpoint, eventID, data)
+	return s.events.Emit(s.inst, endpoint, eventID, data)
 }
 
 // SetBeforeWrite implements spec.BeforeWriteSetter: the veto of a
 // controller's SmokeSensitivityLevel write, before the source takes it.
 func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
-	s.hooks.SetBeforeWrite(fn)
+	s.veto.Set(fn)
 }
 
 // The typed server's optional interfaces.
@@ -688,8 +706,8 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 	if s.state().SmokeSensitivityLevel == level {
 		return false, nil
 	}
-	// The host's veto hears a change only ([spec.Hooks.CheckWrite]).
-	if err := s.hooks.CheckWrite(ctx, attrID, v); err != nil {
+	// The host's veto hears a change only ([spec.WriteVeto.Check]).
+	if err := s.veto.Check(ctx, attrID, spec.Stored(sdef.Definition.Attribute(attrID).Type, v)); err != nil {
 		return false, err
 	}
 	setter, _ := s.src.(SensitivitySetter) // guaranteed by NewServer
@@ -720,13 +738,16 @@ var selfTestBusy = []ExpressedState{
 // refreshes, so the TestInProgress / Testing the host now reports is
 // diffed from here on.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	tester, ok := s.src.(SelfTester)
-	if cmdID != CmdSelfTestRequest || !ok {
+	if _, ok := s.src.(SelfTester); cmdID != CmdSelfTestRequest || !ok {
 		return nil, im.UnsupportedCommandf("alarm: unknown command 0x%02X", cmdID)
 	}
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own SelfTestRequest, which [spec.InvokeHeld] runs
+// when the host registered no handler.
+func (s *Server) invoke(ctx context.Context, _ uint32, _ any) (any, error) {
+	tester, _ := s.src.(SelfTester) // MatterInvoke admitted only a SelfTester's
 	if slices.Contains(selfTestBusy, s.expressedOf(s.state())) {
 		return nil, statusError{im.StatusBusy, "alarm: SelfTestRequest while alarming or testing"}
 	}
@@ -764,7 +785,7 @@ func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()
 	s.emitter = emitter
 	s.mu.Unlock()
-	s.hooks.SetMatterEventEmitter(emitter)
+	s.events.SetEmitter(emitter)
 }
 
 // SetEndpoint stamps the endpoint the events are addressed to; the
@@ -773,12 +794,14 @@ func (s *Server) SetEndpoint(endpoint uint16) {
 	s.mu.Lock()
 	s.endpoint = endpoint
 	s.mu.Unlock()
-	s.hooks.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
+	s.events.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
 }
 
 // EmitEvent emits eventID on the endpoint the server is mounted on
-// ([spec.Hooks.EmitEvent]) — the call the typed Record<Event> makes.
-func (s *Server) EmitEvent(eventID uint32, data any) error { return s.hooks.EmitEvent(eventID, data) }
+// ([spec.Events.EmitEvent]) — the call the typed Record<Event> makes.
+func (s *Server) EmitEvent(eventID uint32, data any) error {
+	return s.events.EmitEvent(s.inst, eventID, data)
+}
 
 // AlarmSeverityEvent is the payload of the SmokeAlarm, CoAlarm,
 // LowBattery, InterconnectSmokeAlarm and InterconnectCoAlarm events: one
@@ -806,7 +829,10 @@ type pendingEvent struct {
 // Refresh reads the host's state and emits the events its change since
 // the previous Refresh calls for. The baseline before the first Refresh
 // is the matter.js initial state, so an alarm that is already sounding
-// when the bridge starts is reported once.
+// when the bridge starts is reported once. Overlapping calls run one
+// after the other, each from its own read of the source, so the baseline
+// never falls back to an older state (R2-P6-conc-1503); the source's
+// SmokeCOState must not call Refresh itself.
 //
 // Each rule is the specification's, as matter.js carries it in
 // smoke-co-alarm-cluster.resource.ts: SmokeAlarm / CoAlarm / LowBattery /
@@ -821,6 +847,8 @@ type pendingEvent struct {
 // Without an emitter the baseline still advances: a change nobody could
 // be told about is not replayed later as if it had just happened.
 func (s *Server) Refresh() {
+	s.refresh <- struct{}{}
+	defer func() { <-s.refresh }()
 	st := s.state()
 	expr := s.expressedOf(st)
 

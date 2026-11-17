@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
@@ -53,6 +55,11 @@ type ProviderConfig struct {
 	// camera app's IsUTCTimeNull (webrtc-provider-manager.cpp:830-836).
 	UTCTimeKnown func() bool
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -76,7 +83,16 @@ type Provider struct {
 	cfg  ProviderConfig
 	view streamView
 
-	// mu guards the state below.
+	// op serialises the commands and the fabric removal: each holds it
+	// from its checks through the port to its commit, as chip's handlers
+	// run one at a time on its single-threaded stack. The host's methods
+	// never take it, so a port may call them (review II, R2-P6-conc-1609).
+	op sync.Mutex
+	// pub serialises each change of the session table with its
+	// publication, so no change is lost to a concurrent one and the table
+	// and CurrentSessions agree (R2-P6-conc-1601); mu guards the state
+	// below.
+	pub      sync.Mutex
 	mu       sync.Mutex
 	sessions []ProviderSession
 	nextID   uint16
@@ -107,13 +123,13 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 	}
 	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}}
 	handlers := map[uint32]spec.CommandHandler{
-		wpdef.CmdSolicitOffer:         p.solicitOffer,
-		wpdef.CmdProvideOffer:         p.provideOffer,
-		wpdef.CmdProvideAnswer:        p.provideAnswer,
-		wpdef.CmdProvideIceCandidates: p.provideIceCandidates,
-		wpdef.CmdEndSession:           p.endSession,
+		wpdef.CmdSolicitOffer:         serial(&p.op, p.solicitOffer),
+		wpdef.CmdProvideOffer:         serial(&p.op, p.provideOffer),
+		wpdef.CmdProvideAnswer:        serial(&p.op, p.provideAnswer),
+		wpdef.CmdProvideIceCandidates: serial(&p.op, p.provideIceCandidates),
+		wpdef.CmdEndSession:           serial(&p.op, p.endSession),
 	}
-	srv, err := spec.NewServer(wpdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(wpdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("camera: %w", err)
 	}
@@ -124,45 +140,58 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 	return p, nil
 }
 
-// Sessions returns CurrentSessions, in the order the sessions were added.
+// Sessions returns CurrentSessions, in the order the sessions were added:
+// a deep copy, which the caller may change.
 func (p *Provider) Sessions() []ProviderSession {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return slices.Clone(p.sessions)
+	return deepcopy.Each(p.sessions)
 }
 
 // UpsertSession implements [wpdef.Host]. Mirrors chip UpsertSession
 // (:308-330): the session of the id is replaced in place, else appended.
+// A table the schema refuses is not stored; the error says why.
 func (p *Provider) UpsertSession(session ProviderSession) error {
-	p.mu.Lock()
-	next := slices.Clone(p.sessions)
-	if i := slices.IndexFunc(next, func(s ProviderSession) bool { return s.Id == session.Id }); i >= 0 {
-		next[i] = session
-	} else {
-		next = append(next, session)
-	}
-	p.mu.Unlock()
-	return p.store(contract.OriginHostSet, next)
+	return p.upsertSession(contract.OriginHostSet, session)
+}
+
+func (p *Provider) upsertSession(origin contract.Origin, session ProviderSession) error {
+	session = session.Clone()
+	return p.change(origin, func(next []ProviderSession) ([]ProviderSession, bool) {
+		if i := slices.IndexFunc(next, func(s ProviderSession) bool { return s.Id == session.Id }); i >= 0 {
+			next[i] = session
+		} else {
+			next = append(next, session)
+		}
+		return next, true
+	})
 }
 
 // RemoveSession implements [wpdef.Host]. Mirrors chip RemoveSession
 // (:332-348): only a removal reports a change.
 func (p *Provider) RemoveSession(sessionID uint16) {
-	p.removeSession(contract.OriginHostSet, sessionID)
+	_ = p.removeSession(contract.OriginHostSet, sessionID) // a shorter table the schema refused before cannot fail now
 }
 
-func (p *Provider) removeSession(origin contract.Origin, sessionID uint16) {
-	p.mu.Lock()
-	next := slices.DeleteFunc(slices.Clone(p.sessions), func(s ProviderSession) bool { return s.Id == sessionID })
-	changed := len(next) != len(p.sessions)
-	p.mu.Unlock()
-	if changed {
-		_ = p.store(origin, next)
+func (p *Provider) removeSession(origin contract.Origin, sessionID uint16) error {
+	return p.change(origin, func(next []ProviderSession) ([]ProviderSession, bool) {
+		kept := slices.DeleteFunc(next, func(s ProviderSession) bool { return s.Id == sessionID })
+		return kept, len(kept) != len(next)
+	})
+}
+
+// change applies edit to a copy of the session table and, when edit
+// reports a change, publishes the result and keeps it — both under pub, so
+// a concurrent change applies to this one's result; a table the schema
+// refuses is neither published nor kept (R2-P6-err-1611). As
+// [Requestor]'s change.
+func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) ([]ProviderSession, bool)) error {
+	p.pub.Lock()
+	defer p.pub.Unlock()
+	next, changed := edit(p.Sessions())
+	if !changed {
+		return nil
 	}
-}
-
-// store publishes a session table the schema admits and keeps it.
-func (p *Provider) store(origin contract.Origin, next []ProviderSession) error {
 	if next == nil {
 		next = []ProviderSession{}
 	}
@@ -333,6 +362,12 @@ type offerRequest struct {
 // checkConstraints is the data model validation both offers open with
 // (SolicitOffer :597-643, ProvideOffer :858-901): the usage, one stream
 // field at least, the ICE servers and the transport policy.
+// Mirrors chip WebRTCTransportProviderCluster.cpp:866-872 and :982-988: a ProvideOffer naming none
+// of VideoStreamID, AudioStreamID, VideoStreams, AudioStreams is INVALID_COMMAND. matter.js has no provider
+// server (WebRtcTransportProviderServer.ts:14).
+// A session that names no stream — as the port may return one — fails
+// CurrentSessions' "O.a+" and is not stored (FAILURE; review II,
+// R2-P6-par-1304).
 func checkConstraints(r offerRequest) error {
 	switch {
 	case r.usage > usageLiveView: // :601-605, :859-863
@@ -427,7 +462,7 @@ func (p *Provider) solicitOffer(ctx context.Context, fields any) (any, error) {
 	if err != nil {
 		return nil, portError("SolicitOffer", err)
 	}
-	if err := p.UpsertSession(session); err != nil { // :811
+	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :811
 		return nil, spec.Errorf(im.StatusFailure, "%v", err)
 	}
 	resp := wpdef.SolicitOfferResponse{WebRtcSessionId: session.Id, DeferredOffer: deferred}
@@ -523,7 +558,7 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 	if err != nil {
 		return nil, portError("ProvideOffer", err)
 	}
-	if err := p.UpsertSession(session); err != nil { // :1111
+	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :1111
 		return nil, spec.Errorf(im.StatusFailure, "%v", err)
 	}
 	resp := wpdef.ProvideOfferResponse{WebRtcSessionId: session.Id}
@@ -602,10 +637,13 @@ func (p *Provider) endSession(ctx context.Context, fields any) (any, error) {
 	if _, ok := p.matchingSession(ctx, req.WebRtcSessionId); !ok { // :1211
 		return nil, spec.Errorf(im.StatusNotFound, "WebRtcTransportProvider: session %d not found", req.WebRtcSessionId)
 	}
-	perr := p.port.EndSession(ctx, req.WebRtcSessionId, req.Reason) // :1215
-	p.removeSession(contract.OriginCommand, req.WebRtcSessionId)    // :1218
+	perr := p.port.EndSession(ctx, req.WebRtcSessionId, req.Reason)      // :1215
+	serr := p.removeSession(contract.OriginCommand, req.WebRtcSessionId) // :1218
 	if perr != nil {
 		return nil, portError("EndSession", perr)
+	}
+	if serr != nil {
+		return nil, spec.Errorf(im.StatusFailure, "%v", serr)
 	}
 	return nil, nil
 }

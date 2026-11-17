@@ -11,7 +11,6 @@ import (
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 
 	"github.com/SukramJ/go-fabric/cluster/thermo"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -198,14 +197,15 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerInvalidCommand(t *testing.T
 	ctx := context.Background()
 	// Mode values come from SetpointRaiseLowerModeEnum in matter.js
 	// packages/model/src/standard/elements/thermostat-cluster.element.ts:510-514:
-	// Heat 0x0, Cool 0x1, Both 0x2 — the constants in cluster/wire pin them.
+	// Heat 0x0, Cool 0x1, Both 0x2 — the generated constants of
+	// cluster/spec/thermostat pin them.
 	cases := []struct {
 		name string
 		srv  *thermo.ThermostatServer
-		mode uint8
+		mode tdef.SetpointRaiseLowerModeEnum
 	}{
-		{"cool-only forbids mode=Heat(0)", newCoolOnly(), clusterwire.ThermostatSetpointModeHeat},
-		{"heat-only forbids mode=Cool(1)", newHeatOnly(), clusterwire.ThermostatSetpointModeCool},
+		{"cool-only forbids mode=Heat(0)", newCoolOnly(), tdef.SetpointRaiseLowerModeHeat},
+		{"heat-only forbids mode=Cool(1)", newHeatOnly(), tdef.SetpointRaiseLowerModeCool},
 	}
 
 	for _, tc := range cases {
@@ -240,7 +240,7 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerAppliesDelta(t *testing.T) 
 	srv := newHeatOnly() // initial occupHeat = 2000
 	// mode=Heat (0x0, thermostat-cluster.element.ts:511), amount=5 →
 	// delta = 5*10 = 50 → new = 2050. Bridge tag-map shape.
-	fields := map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(5)}
+	fields := map[uint8]any{0: uint64(tdef.SetpointRaiseLowerModeHeat), 1: int64(5)}
 	if _, err := srv.MatterInvoke(ctx, 0x00, fields); err != nil {
 		t.Fatalf("SetpointRaiseLower: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerClampsToLimits(t *testing.T
 	// amount=100 → delta=1000 → 2000+1000=3000; with mode=Heat (0x0)
 	// this is the boundary, so drive further with a second call that
 	// must clamp: 3000+1000=4000 > 3000 → 3000.
-	fields := map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(100)}
+	fields := map[uint8]any{0: uint64(tdef.SetpointRaiseLowerModeHeat), 1: int64(100)}
 	if _, err := srv.MatterInvoke(ctx, 0x00, fields); err != nil {
 		t.Fatalf("SetpointRaiseLower clamp (first): %v", err)
 	}
@@ -286,13 +286,13 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerModeEnum(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		mode     uint8
+		mode     tdef.SetpointRaiseLowerModeEnum
 		wantHeat int16
 		wantCool int16
 	}{
-		{"Heat moves only the heating setpoint", clusterwire.ThermostatSetpointModeHeat, 2030, 2600},
-		{"Cool moves only the cooling setpoint", clusterwire.ThermostatSetpointModeCool, 2000, 2630},
-		{"Both moves both setpoints", clusterwire.ThermostatSetpointModeBoth, 2030, 2630},
+		{"Heat moves only the heating setpoint", tdef.SetpointRaiseLowerModeHeat, 2030, 2600},
+		{"Cool moves only the cooling setpoint", tdef.SetpointRaiseLowerModeCool, 2000, 2630},
+		{"Both moves both setpoints", tdef.SetpointRaiseLowerModeBoth, 2030, 2630},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -322,9 +322,9 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerAcceptsEveryPayloadShape(t 
 		name   string
 		fields any
 	}{
-		{"typed request", tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeHeat), Amount: 5}},
-		{"typed request pointer", &tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeHeat), Amount: 5}},
-		{"bridge tag map", map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(5)}},
+		{"typed request", tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeHeat, Amount: 5}},
+		{"typed request pointer", &tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeHeat, Amount: 5}},
+		{"bridge tag map", map[uint8]any{0: uint64(tdef.SetpointRaiseLowerModeHeat), 1: int64(5)}},
 	}
 	for _, tc := range shapes {
 		t.Run(tc.name, func(t *testing.T) {

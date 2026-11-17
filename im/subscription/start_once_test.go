@@ -22,7 +22,7 @@ import (
 // at the first count of one). Not parallel: the count is the process's.
 func TestStart_SecondCallStartsNoSecondEngine(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		m := subscription.NewManager(subscription.Config{TickInterval: time.Hour}, nil, nil)
+		m := newManager(subscription.Config{TickInterval: time.Hour}, nil)
 		t.Cleanup(m.Stop)
 		m.Start(t.Context())
 		m.Start(t.Context())

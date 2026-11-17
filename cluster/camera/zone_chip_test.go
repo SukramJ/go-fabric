@@ -224,7 +224,8 @@ func TestChipZoneManagement(t *testing.T) { //nolint:funlen // one subtest per c
 	})
 	t.Run("StartupLoadsPersistedZonesAndTriggersFromDelegate", func(t *testing.T) { // :317-347
 		tri := triangle(0)
-		z, _ := newChipZones(t, 0, func(cfg *camera.ZonesConfig) {
+		// A 2D Cartesian zone needs TWODCART (R2-P6-par-1304).
+		z, _ := newChipZones(t, camera.FeatureTwoDimensionalCartesianZone, func(cfg *camera.ZonesConfig) {
 			cfg.Zones = []camera.Zone{{
 				ZoneId: 55, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceMfg,
 				TwoDCartesianZone: &camera.TwoDZone{Name: "Entry", Use: zmdef.ZoneUseMotion, Vertices: tri},

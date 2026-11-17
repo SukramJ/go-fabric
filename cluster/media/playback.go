@@ -37,12 +37,6 @@ func playbackValues(st PlaybackState) map[uint32]any {
 	}
 }
 
-func clonePlayback(st PlaybackState) PlaybackState {
-	st.AvailableAudioTracks = cloneList(st.AvailableAudioTracks)
-	st.AvailableTextTracks = cloneList(st.AvailableTextTracks)
-	return st
-}
-
 // Playback is the MediaPlayback host port (the generated
 // [mpdef.Playback], the declaration's Playback): the three mandatory
 // transport commands (media-playback.element.ts:96-98), each answering a
@@ -97,7 +91,6 @@ type PlaybackConfig struct {
 type PlaybackServer struct {
 	*spec.Server
 	stateful[PlaybackState]
-	events
 }
 
 // NewPlayback builds a MediaPlayback server over cfg.Port.
@@ -183,7 +176,7 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 		Features: uint32(cfg.Features),
 		Commands: optionalCommands(cmds),
 		Events:   cfg.Events,
-	}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
 	}
@@ -191,7 +184,7 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, playbackValues, clonePlayback, storeState[PlaybackState]); err != nil {
+	if err := s.init(srv, cfg.Initial, playbackValues, PlaybackState.Clone, storeState[PlaybackState]); err != nil {
 		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
 	}
 	if err := checkState(srv); err != nil {
@@ -210,9 +203,5 @@ func (s *PlaybackServer) EmitStateChanged(ev mpdef.StateChangedEvent) error {
 }
 
 // SetEndpoint implements [contract.EndpointReceiver]: the endpoint the
-// server's events are addressed to, for its own events and the store's
-// EmitEvent alike.
-func (s *PlaybackServer) SetEndpoint(endpoint uint16) {
-	s.events.SetEndpoint(endpoint)
-	s.Server.SetEndpoint(endpoint)
-}
+// server's events are addressed to, the store's ([spec.Server.EmitEvent]).
+func (s *PlaybackServer) SetEndpoint(endpoint uint16) { s.Server.SetEndpoint(endpoint) }

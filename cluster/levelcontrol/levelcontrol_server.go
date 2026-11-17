@@ -334,6 +334,11 @@ type Config struct {
 	// device changed on its own reaches a subscriber the moment the host
 	// bumps it, and the version survives server reconstruction; when nil
 	// an embedded tracker is used.
+	//
+	// Deprecated: no controller reads this tracker — the wire carries the
+	// endpoint's DataVersion for the cluster, which the bridge keeps
+	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
+	// minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Lighting advertises the LT feature: MinLevel 1, RemainingTime,
 	// StartUpCurrentLevel and the CoupleColorTempToLevel option
@@ -422,8 +427,14 @@ type Server struct {
 	// reported once, by the quieter rules.
 	level      uint8
 	levelKnown bool
-	// coupling is what the running transition couples to.
-	coupling coupling
+	// coupling is what the running transition couples to, recorded under
+	// couplingGen, the generation of the command that started it
+	// ([Server.nextCoupling]).
+	coupling    coupling
+	couplingGen uint64
+	// observe serialises an observation of CurrentLevel: the read from
+	// the source and the compare-and-store ([Server.noteLevel]).
+	observe sync.Mutex
 	// listeners counts the change listeners and forwards holds the
 	// callbacks [Server.OnMatterValueChanged] forwards the host's
 	// notifications to, in registration order; the host's notifier is
@@ -642,7 +653,12 @@ func Revision() uint16 { return lvldef.Revision }
 // MatterClusterID returns 0x0008.
 func (*Server) MatterClusterID() uint32 { return ClusterID }
 
-// MatterDataVersion implements [contract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion]: the
+// server's own tracker, the host's when it supplied one.
+//
+// Deprecated: no controller reads this version — the wire carries the
+// endpoint's DataVersion for the cluster, which the bridge keeps
+// (decision 165, F-db021da0-46). Removable in the next minor release.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterRead resolves the three conformance-M attributes plus the two
@@ -1320,6 +1336,11 @@ func stepRequestFrom(name string, fields any) (wire.StepRequest, error) {
 	case []byte:
 		req, err := wire.DecodeStep(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status, as MoveToLevel's and Move's (R2-P6-wire-1416).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil
@@ -1372,6 +1393,11 @@ func stopRequestFrom(name string, fields any) (wire.StopRequest, error) {
 	case []byte:
 		req, err := wire.DecodeStop(v)
 		if err != nil {
+			// A field of the wrong type or out of range carries its
+			// status, as MoveToLevel's and Move's (R2-P6-wire-1416).
+			if spec.CarriesStatus(err) {
+				return req, err
+			}
 			return req, invalidCommandErr{fmt.Sprintf("levelcontrol: %s: %v", name, err)}
 		}
 		return req, nil
@@ -1459,8 +1485,8 @@ func optionalBitmap(name string, m map[uint8]any, tag uint8, field string) (uint
 // uint64 and signed ones as int64 (bridge/attribute_value_reader.go
 // primitiveAttributeValue), so a strict assertion on uint8 would reject
 // every value that actually arrives. Out-of-range and negative values
-// are rejected rather than wrapped — [cluster.AsUint8] narrows silently,
-// which would turn level 300 into level 44.
+// are rejected rather than wrapped, which would turn level 300 into
+// level 44.
 func asUint8(v any) (uint8, bool) {
 	n, ok := asInt64(v)
 	if !ok || n < 0 || n > 0xFF {

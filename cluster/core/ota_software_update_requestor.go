@@ -687,7 +687,7 @@ func (r *OTASoftwareUpdateRequestor) MatterInvoke(ctx context.Context, cmdID uin
 	// answer for as long as a query runs.
 	r.mu.Lock()
 	if r.queryRunning {
-		r.announcedDuringQuery = append(r.announcedDuringQuery, otaAnnouncement{ctx: context.WithoutCancel(ctx), fabric: fabric, req: req})
+		r.deferAnnouncementLocked(otaAnnouncement{ctx: context.WithoutCancel(ctx), fabric: fabric, req: req})
 		r.mu.Unlock()
 		r.logger.Info("matter.ota.announcement_after_query", slog.Uint64("provider", req.ProviderNodeId))
 		return nil, nil
@@ -696,12 +696,48 @@ func (r *OTASoftwareUpdateRequestor) MatterInvoke(ctx context.Context, cmdID uin
 	return nil, r.announceOtaProvider(ctx, fabric, req)
 }
 
+// otaActiveProvidersPerFabric is the share of the active provider list one
+// fabric's announcements hold, and of the announcements deferred behind a
+// query. matter.js bounds the list nowhere (#addActiveOtaProvider pushes,
+// OtaSoftwareUpdateRequestorServer.ts:423-438 at db021da0) and handles an
+// announcement inline (:376-420); one fabric's Administer subject could
+// grow the list —
+// and the state stored with each announcement — for every fabric. The
+// number is the module's: one DefaultOTAProviders entry per fabric and
+// room for three announced providers beside it (review II,
+// R2-P6-bound-1205, decision 134).
+const otaActiveProvidersPerFabric = 4
+
 // otaAnnouncement is an AnnounceOTAProvider handled after the running
 // query.
 type otaAnnouncement struct {
 	ctx    context.Context
 	fabric uint8
 	req    otadef.AnnounceOtaProviderRequest
+}
+
+// deferAnnouncementLocked queues a for the end of the running query: the
+// latest announcement of a (fabric, provider) replaces an earlier one, and
+// a fabric's deferred announcements are held to
+// otaActiveProvidersPerFabric, the oldest dropped (review II,
+// R2-P6-bound-1205). Caller holds mu.
+func (r *OTASoftwareUpdateRequestor) deferAnnouncementLocked(a otaAnnouncement) {
+	q := slices.DeleteFunc(r.announcedDuringQuery, func(e otaAnnouncement) bool {
+		return e.fabric == a.fabric && e.req.ProviderNodeId == a.req.ProviderNodeId
+	})
+	n := 0
+	for _, e := range q {
+		if e.fabric == a.fabric {
+			n++
+		}
+	}
+	if n >= otaActiveProvidersPerFabric {
+		if i := slices.IndexFunc(q, func(e otaAnnouncement) bool { return e.fabric == a.fabric }); i >= 0 {
+			q = slices.Delete(q, i, i+1)
+		}
+	}
+	r.announcedDuringQuery = q
+	r.announcedDuringQuery = append(r.announcedDuringQuery, a)
 }
 
 // announceOtaProvider mirrors announceOtaProvider (:376-420).
@@ -743,12 +779,43 @@ func (r *OTASoftwareUpdateRequestor) addActiveOtaProvider(ctx context.Context, p
 	entry := activeProvider{Location: p, MetadataForNode: metadata}
 	i := r.activeIndexLocked(p)
 	if i < 0 {
+		r.evictForLocked(p)
 		r.active = append(r.active, entry)
 	} else {
 		r.active[i] = entry
 	}
 	r.mu.Unlock()
 	r.persist(ctx)
+}
+
+// evictForLocked makes room for a new active provider of p's fabric when
+// the fabric holds its otaActiveProvidersPerFabric share: the entry queried
+// longest ago leaves, or — none queried yet — the earliest added; the
+// fabric's DefaultOTAProviders entry stays (review II, R2-P6-bound-1205).
+// Caller holds mu.
+func (r *OTASoftwareUpdateRequestor) evictForLocked(p otadef.ProviderLocation) {
+	held, victim := 0, -1
+	for i, a := range r.active {
+		if a.Location.FabricIndex != p.FabricIndex {
+			continue
+		}
+		held++
+		if slices.ContainsFunc(r.defaults, func(d otadef.ProviderLocation) bool {
+			return d.FabricIndex == p.FabricIndex && d.ProviderNodeId == a.Location.ProviderNodeId
+		}) {
+			continue
+		}
+		switch {
+		case victim < 0:
+			victim = i
+		case a.PreviousQueryTimestamp == nil:
+		case r.active[victim].PreviousQueryTimestamp == nil || *a.PreviousQueryTimestamp < *r.active[victim].PreviousQueryTimestamp:
+			victim = i
+		}
+	}
+	if held >= otaActiveProvidersPerFabric && victim >= 0 {
+		r.active = slices.Delete(r.active, victim, victim+1)
+	}
 }
 
 func (r *OTASoftwareUpdateRequestor) activeIndexLocked(p otadef.ProviderLocation) int {
@@ -815,8 +882,20 @@ func (r *OTASoftwareUpdateRequestor) markActiveOtaProviderNoUpdate(ctx context.C
 
 // FabricRemoved drops the removed fabric's DefaultOTAProviders entries, as
 // the removal of a fabric drops every fabric-scoped entry it owned. The
-// store's rows go with the fabric's own row.
+// store's rows go with the fabric's own row. Its active providers, the
+// provider an announcement of it selected and its announcements deferred
+// behind a query go too, and the stored state is written without them: a
+// later fabric that receives the index inherits none (review II,
+// R2-P6-store-1204 — matter.js keeps activeOtaProviders node-wide and has
+// no fabric-removal handling, OtaSoftwareUpdateRequestorServer.ts:109-116
+// at db021da0). An update in progress keeps its provider location: the
+// apply it names is already under way.
 func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
+	r.fabricRemoved(context.Background(), fabricIndex)
+}
+
+// fabricRemoved is FabricRemoved with ctx for the store.
+func (r *OTASoftwareUpdateRequestor) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	r.mu.Lock()
 	kept := r.defaults[:0:0]
 	for _, d := range r.defaults {
@@ -826,25 +905,39 @@ func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
 	}
 	changed := len(kept) != len(r.defaults)
 	r.defaults = kept
+	n := len(r.active)
+	r.active = slices.DeleteFunc(r.active, func(a activeProvider) bool { return a.Location.FabricIndex == fabricIndex })
+	activeChanged := len(r.active) != n
+	if r.selected != nil && r.selected.FabricIndex == fabricIndex {
+		r.selected = nil
+	}
+	r.announcedDuringQuery = slices.DeleteFunc(r.announcedDuringQuery, func(a otaAnnouncement) bool { return a.fabric == fabricIndex })
 	r.mu.Unlock()
 	if changed {
 		r.changed(otadef.AttrDefaultOtaProviders)
+	}
+	if activeChanged {
+		r.persist(ctx)
 	}
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]:
 // [OTASoftwareUpdateRequestor.FabricRemoved].
-func (r *OTASoftwareUpdateRequestor) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
-	r.FabricRemoved(fabricIndex)
+func (r *OTASoftwareUpdateRequestor) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	r.fabricRemoved(ctx, fabricIndex)
 	return nil
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
-// of the DefaultOTAProviders entries.
+// of the DefaultOTAProviders entries and of the active providers (review
+// II, R2-P6-store-1204).
 func (r *OTASoftwareUpdateRequestor) MatterHeldFabrics() []uint8 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return fabricsOf(r.defaults, func(d otadef.ProviderLocation) uint8 { return d.FabricIndex })
+	out := fabricsOf(r.defaults, func(d otadef.ProviderLocation) uint8 { return d.FabricIndex })
+	out = append(out, fabricsOf(r.active, func(a activeProvider) uint8 { return a.Location.FabricIndex })...)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // SetUpdatePossible changes UpdatePossible, which starts or stops the

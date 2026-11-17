@@ -107,6 +107,28 @@ func (v *ErrorStateStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ErrorStateStruct) Clone() ErrorStateStruct {
+	c := v
+	c.ErrorStateLabel = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ErrorStateLabel)
+	c.ErrorStateDetails = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ErrorStateDetails)
+	return c
+}
+
 // ErrorStateStructDef describes ErrorStateStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -161,6 +183,21 @@ func (v *OperationalStateStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "OperationalStateId", true, &v.OperationalStateId, spec.DecodeUint[OperationalStateEnum](8)),
 		spec.Bind(1, "OperationalStateLabel", false, &v.OperationalStateLabel, spec.DecodeOptional(spec.DecodeStringIn(0, 64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OperationalStateStruct) Clone() OperationalStateStruct {
+	c := v
+	c.OperationalStateLabel = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OperationalStateLabel)
+	return c
 }
 
 // OperationalStateStructDef describes OperationalStateStruct.
@@ -238,6 +275,15 @@ func (v *OperationalCommandResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OperationalCommandResponse) Clone() OperationalCommandResponse {
+	c := v
+	c.CommandResponseState = v.CommandResponseState.Clone()
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (OperationalCommandResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdOperationalCommandResponse
@@ -260,6 +306,15 @@ func (v *OperationalErrorEvent) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "OperationalError",
 		spec.Bind(0, "ErrorState", true, &v.ErrorState, spec.DecodeStruct[ErrorStateStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OperationalErrorEvent) Clone() OperationalErrorEvent {
+	c := v
+	c.ErrorState = v.ErrorState.Clone()
+	return c
 }
 
 // OperationCompletionEvent is the OperationCompletion event payload.
@@ -285,6 +340,28 @@ func (v *OperationCompletionEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "TotalOperationalTime", false, &v.TotalOperationalTime, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint32](32)))),
 		spec.Bind(2, "PausedTime", false, &v.PausedTime, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint32](32)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OperationCompletionEvent) Clone() OperationCompletionEvent {
+	c := v
+	c.TotalOperationalTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TotalOperationalTime)
+	c.PausedTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PausedTime)
+	return c
 }
 
 func decodePauseRequest(n spec.Node) (any, error) { return spec.DecodeStruct[PauseRequest](n) }

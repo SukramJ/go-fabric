@@ -61,9 +61,11 @@ func TestSetAttributesStopsAtASetterThatRefuses(t *testing.T) {
 		srv := opServer(t)
 		// The error is applied before the state; its event is where the
 		// state list shrinks.
-		srv.SetMatterEventEmitter(afterEmit(func() { srv.states = []StateEntry{{ID: StateError}} }))
+		// (An error beside a state other than Error is refused up front,
+		// R2-P6-fsm-1568, so the state given is Error.)
+		srv.SetMatterEventEmitter(afterEmit(func() { srv.states = []StateEntry{{ID: StateRunning}} }))
 		err := srv.SetAttributes(map[uint32]any{
-			opdef.AttrOperationalError: failure, opdef.AttrOperationalState: uint8(StateRunning),
+			opdef.AttrOperationalError: failure, opdef.AttrOperationalState: uint8(StateError),
 		})
 		if !errors.Is(err, ErrStateNotListed) {
 			t.Errorf("SetAttributes = %v, want ErrStateNotListed", err)

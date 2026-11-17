@@ -49,6 +49,29 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrCurrentChannel, ChannelInfoStruct{MajorNumber: uint16(1), MinorNumber: uint16(1), Name: spectest.Ptr("x"), CallSign: spectest.Ptr("x"), AffiliateCallSign: spectest.Ptr("x"), Identifier: spectest.Ptr("x"), Type: spectest.Ptr(ChannelTypeEnum(0))})
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[ChannelInfoStruct],
+		spectest.CheckClone[ChannelPagingStruct],
+		spectest.CheckClone[PageTokenStruct],
+		spectest.CheckClone[LineupInfoStruct],
+		spectest.CheckClone[ProgramCategoryStruct],
+		spectest.CheckClone[ProgramStruct],
+		spectest.CheckClone[ChangeChannelResponse],
+		spectest.CheckClone[GetProgramGuideRequest],
+		spectest.CheckClone[ProgramGuideResponse],
+		spectest.CheckClone[RecordProgramRequest],
+		spectest.CheckClone[CancelRecordProgramRequest],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

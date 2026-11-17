@@ -192,10 +192,12 @@ func (l *Listener) LocalAddr() *net.UDPAddr {
 // Serve runs the receive loop until ctx is cancelled or the connection
 // errors out. It is safe to call Serve at most once per Listener.
 //
-// Datagrams larger than [MaxDatagramSize] are still delivered to the
-// handler — the protocol layer is responsible for rejecting them per
-// the Matter framing rules. The listener does not silently drop
-// over-sized inbound traffic so diagnostics see the actual wire bytes.
+// Every datagram is read into a buffer of [MaxDatagramSize]+64 bytes. One
+// up to that size is delivered whole, one larger than [MaxDatagramSize]
+// included — the protocol layer is responsible for rejecting it per the
+// Matter framing rules. One larger than the buffer is truncated by the
+// read and delivered cut, its first [MaxDatagramSize]+64 bytes only; the
+// listener cannot tell it from a datagram of exactly that size.
 func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 	if handler == nil {
 		return errors.New("udp: nil handler")
@@ -401,8 +403,6 @@ func (l *Listener) isClosed() bool {
 	return l.closed
 }
 
-// logger is the Listener's logger; a value built without its constructor
-// logs through slog.Default().
 // maxConsecutiveReadErrors bounds how many reads in a row may fail before
 // [Listener.Serve] gives up on the socket; readErrorPause spaces them so a
 // failing socket does not spin.
@@ -417,6 +417,8 @@ func socketGone(err error) bool {
 	return errors.Is(err, syscall.EBADF) || errors.Is(err, syscall.ENOTSOCK)
 }
 
+// logger is the Listener's logger; a value built without its constructor
+// logs through slog.Default().
 func (l *Listener) logger() *slog.Logger {
 	if l.log != nil {
 		return l.log

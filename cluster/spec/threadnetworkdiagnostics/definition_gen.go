@@ -482,6 +482,30 @@ func (v *NetworkFaultChangeEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NetworkFaultChangeEvent) Clone() NetworkFaultChangeEvent {
+	c := v
+	c.Current = func(s []NetworkFaultEnum) []NetworkFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Current)
+	c.Previous = func(s []NetworkFaultEnum) []NetworkFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.Previous)
+	return c
+}
+
 func decodeResetCountsRequest(n spec.Node) (any, error) {
 	return spec.DecodeStruct[ResetCountsRequest](n)
 }

@@ -137,6 +137,38 @@ func (v *AudioCapabilitiesStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AudioCapabilitiesStruct) Clone() AudioCapabilitiesStruct {
+	c := v
+	c.SupportedCodecs = func(s []AudioCodecEnum) []AudioCodecEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]AudioCodecEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.SupportedCodecs)
+	c.SupportedSampleRates = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.SupportedSampleRates)
+	c.SupportedBitDepths = func(s []uint8) []uint8 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint8, len(s))
+		copy(out, s)
+		return out
+	}(v.SupportedBitDepths)
+	return c
+}
+
 // AudioCapabilitiesStructDef describes AudioCapabilitiesStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -269,6 +301,49 @@ func (v *AVMetadataStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "BlackAndWhiteActive", false, &v.BlackAndWhiteActive, spec.DecodeOptional(spec.DecodeBool)),
 		spec.Bind(4, "UserDefined", false, &v.UserDefined, spec.DecodeOptional(spec.DecodeBytesIn(0, 256))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AVMetadataStruct) Clone() AVMetadataStruct {
+	c := v
+	c.MotionZonesActive = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.MotionZonesActive)
+	c.BlackAndWhiteActive = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.BlackAndWhiteActive)
+	c.UserDefined = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.UserDefined)
+	return c
 }
 
 // AVMetadataStructDef describes AVMetadataStruct.
@@ -418,6 +493,21 @@ func (v *SnapshotCapabilitiesStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SnapshotCapabilitiesStruct) Clone() SnapshotCapabilitiesStruct {
+	c := v
+	c.RequiresHardwareEncoder = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.RequiresHardwareEncoder)
+	return c
+}
+
 // SnapshotCapabilitiesStructDef describes SnapshotCapabilitiesStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -476,6 +566,28 @@ func (v *SnapshotStreamStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(9, "WatermarkEnabled", false, &v.WatermarkEnabled, spec.DecodeOptional(spec.DecodeBool)),
 		spec.Bind(10, "OsdEnabled", false, &v.OsdEnabled, spec.DecodeOptional(spec.DecodeBool)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SnapshotStreamStruct) Clone() SnapshotStreamStruct {
+	c := v
+	c.WatermarkEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WatermarkEnabled)
+	c.OsdEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OsdEnabled)
+	return c
 }
 
 // SnapshotStreamStructDef describes SnapshotStreamStruct.
@@ -565,6 +677,21 @@ func (v *VideoSensorParamsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v VideoSensorParamsStruct) Clone() VideoSensorParamsStruct {
+	c := v
+	c.MaxHdrfps = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxHdrfps)
+	return c
+}
+
 // VideoSensorParamsStructDef describes VideoSensorParamsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -628,6 +755,28 @@ func (v *VideoStreamStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(11, "OsdEnabled", false, &v.OsdEnabled, spec.DecodeOptional(spec.DecodeBool)),
 		spec.Bind(12, "ReferenceCount", true, &v.ReferenceCount, spec.DecodeUint[uint8](8)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v VideoStreamStruct) Clone() VideoStreamStruct {
+	c := v
+	c.WatermarkEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WatermarkEnabled)
+	c.OsdEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OsdEnabled)
+	return c
 }
 
 // VideoStreamStructDef describes VideoStreamStruct.
@@ -836,6 +985,28 @@ func (v *VideoStreamAllocateRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v VideoStreamAllocateRequest) Clone() VideoStreamAllocateRequest {
+	c := v
+	c.WatermarkEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WatermarkEnabled)
+	c.OsdEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OsdEnabled)
+	return c
+}
+
 // VideoStreamAllocateResponse is the VideoStreamAllocateResponse command payload.
 type VideoStreamAllocateResponse struct {
 	VideoStreamId uint16 // 0: VideoStreamID, M
@@ -883,6 +1054,28 @@ func (v *VideoStreamModifyRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "WatermarkEnabled", false, &v.WatermarkEnabled, spec.DecodeOptional(spec.DecodeBool)),
 		spec.Bind(2, "OsdEnabled", false, &v.OsdEnabled, spec.DecodeOptional(spec.DecodeBool)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v VideoStreamModifyRequest) Clone() VideoStreamModifyRequest {
+	c := v
+	c.WatermarkEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WatermarkEnabled)
+	c.OsdEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OsdEnabled)
+	return c
 }
 
 // VideoStreamDeallocateRequest is the VideoStreamDeallocate command payload.
@@ -941,6 +1134,28 @@ func (v *SnapshotStreamAllocateRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SnapshotStreamAllocateRequest) Clone() SnapshotStreamAllocateRequest {
+	c := v
+	c.WatermarkEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WatermarkEnabled)
+	c.OsdEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OsdEnabled)
+	return c
+}
+
 // SnapshotStreamAllocateResponse is the SnapshotStreamAllocateResponse command payload.
 type SnapshotStreamAllocateResponse struct {
 	SnapshotStreamId uint16 // 0: SnapshotStreamID, M
@@ -990,6 +1205,28 @@ func (v *SnapshotStreamModifyRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SnapshotStreamModifyRequest) Clone() SnapshotStreamModifyRequest {
+	c := v
+	c.WatermarkEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WatermarkEnabled)
+	c.OsdEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OsdEnabled)
+	return c
+}
+
 // SnapshotStreamDeallocateRequest is the SnapshotStreamDeallocate command payload.
 type SnapshotStreamDeallocateRequest struct {
 	SnapshotStreamId uint16 // 0: SnapshotStreamID, M
@@ -1026,6 +1263,22 @@ func (v *SetStreamPrioritiesRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "SetStreamPriorities",
 		spec.Bind(0, "StreamPriorities", true, &v.StreamPriorities, spec.DecodeList(spec.DecodeUint[StreamUsageEnum](8))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetStreamPrioritiesRequest) Clone() SetStreamPrioritiesRequest {
+	c := v
+	c.StreamPriorities = func(s []StreamUsageEnum) []StreamUsageEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]StreamUsageEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.StreamPriorities)
+	return c
 }
 
 // CaptureSnapshotRequest is the CaptureSnapshot command payload.
@@ -1073,6 +1326,22 @@ func (v *CaptureSnapshotResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "ImageCodec", true, &v.ImageCodec, spec.DecodeUint[ImageCodecEnum](8)),
 		spec.Bind(2, "Resolution", true, &v.Resolution, spec.DecodeStruct[VideoResolutionStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CaptureSnapshotResponse) Clone() CaptureSnapshotResponse {
+	c := v
+	c.Data = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Data)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

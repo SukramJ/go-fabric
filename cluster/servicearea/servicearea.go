@@ -62,6 +62,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -164,6 +166,11 @@ type Config struct {
 	EstimatedEndTime bool
 
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Clock paces the EstimatedEndTime quieter; nil is [clock.System].
 	Clock clock.Clock
@@ -186,10 +193,20 @@ var (
 type Server struct {
 	*spec.Instance
 	cluster.AttributeChanges
-	hooks spec.Hooks
-	// cause is the contract.Origin of the changes a command makes
-	// (OriginCommand), zero outside one.
-	cause atomic.Uint32
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([Server.Handle]) ahead of the server's own logic
+	// (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
+	// commands counts the commands whose handlers run: the changes made
+	// meanwhile are OriginCommand — the handler moves the state through
+	// the host setters, which take no context. A count, not a flag, so a
+	// command that ends does not clear another's (R2-P6-conc-1509); a host
+	// setter on another goroutine while a command runs is still counted
+	// as the command's.
+	commands atomic.Int32
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -247,12 +264,12 @@ func New(cfg Config) (*Server, error) {
 	if cfg.InitialCurrentArea != nil && !cfg.CurrentArea {
 		return nil, fmt.Errorf("%w: InitialCurrentArea without CurrentArea", ErrConfig)
 	}
-	inst, err := spec.New(sa.Definition, opts)
+	s := &Server{ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
+	srv, err := newHeld(sa.Definition, opts, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("servicearea: %w", err)
 	}
-	s := &Server{Instance: inst, ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
-	s.hooks.Init(inst)
+	s.Instance, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	s.quiet = &cluster.Quieter{Report: func() { s.reported(sa.AttrEstimatedEndTime) }, Clock: cfg.Clock}
 	if len(cfg.SupportedMaps) > 0 && !s.Serves(sa.AttrSupportedMaps) {
 		return nil, fmt.Errorf("%w: SupportedMaps without MAPS", ErrConfig)
@@ -276,7 +293,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.selected = slices.Clone(cfg.SelectedAreas)
 	s.current = clonePtr(cfg.InitialCurrentArea)
-	s.progress = slices.Clone(cfg.Progress)
+	s.progress = deepcopy.Each(cfg.Progress)
 	return s, nil
 }
 
@@ -489,8 +506,8 @@ func (s *Server) reported(attrIDs ...uint32) {
 // origin is where the change being reported comes from: a command's
 // while it runs, the device's own otherwise.
 func (s *Server) origin() contract.Origin {
-	if c := s.cause.Load(); c != 0 {
-		return contract.Origin(c) //nolint:gosec // only an Origin is stored
+	if s.commands.Load() > 0 {
+		return contract.OriginCommand
 	}
 	return contract.OriginHostSet
 }
@@ -534,7 +551,7 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 		return nullable(s.endTime), true
 	}
 	// Progress, the last attribute Serves admits.
-	return spec.List[Progress](slices.Clone(s.progress)), true
+	return spec.List[Progress](deepcopy.Each(s.progress)), true
 }
 
 // nullable is a nullable uint32 in its read form: nil for null.
@@ -552,7 +569,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, v)
+	return s.veto.Check(ctx, attrID, spec.Stored(sa.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
@@ -567,11 +584,14 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("servicearea: command 0x%02X is not supported", cmdID)
 	}
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
-	s.cause.Store(uint32(contract.OriginCommand))
-	defer s.cause.Store(0)
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own SelectAreas and SkipArea, which
+// [spec.InvokeHeld] runs when the host registered no handler.
+func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	s.commands.Add(1)
+	defer s.commands.Add(-1)
 	if cmdID == sa.CmdSelectAreas {
 		req, ok := request[sa.SelectAreasRequest](fields)
 		if !ok {
@@ -628,6 +648,18 @@ func (s *Server) selectAreas(ctx context.Context, newAreas []uint32) (any, error
 	}
 	changed := []uint32{sa.AttrSelectedAreas}
 	s.mu.Lock()
+	// The host's setters take no command lock: re-check the selection on
+	// the areas as they are after the port, so a selection never names an
+	// area the host removed meanwhile (R2-P6-conc-1510).
+	for _, id := range validated {
+		if !s.supported(id) {
+			s.mu.Unlock()
+			return sa.SelectAreasResponse{
+				Status:     SelectAreasUnsupportedArea,
+				StatusText: fmt.Sprintf("AreaID %d left the supported areas list while the device took the selection", id),
+			}, nil
+		}
+	}
 	s.selected = validated
 	if s.Serves(sa.AttrProgress) && len(validated) > 0 {
 		progress := make([]Progress, 0, len(validated))
@@ -767,7 +799,7 @@ func (s *Server) SetProgress(progress []Progress) error {
 		s.mu.Unlock()
 		return err
 	}
-	s.progress = slices.Clone(progress)
+	s.progress = deepcopy.Each(progress)
 	s.mu.Unlock()
 	s.changed(sa.AttrProgress)
 	return nil

@@ -30,6 +30,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/operational"
@@ -194,6 +195,8 @@ type reportSeen struct {
 	subID     uint32
 	sessionID uint16
 	attrs     int
+	// payload is the ReportData's TLV, for a test that reads more.
+	payload []byte
 }
 
 // fakeController plays the controller: a subscriber over a CASE session,
@@ -313,11 +316,13 @@ func (c *fakeController) handle(datagram []byte) {
 		c.mu.Lock()
 		answer := c.answer
 		c.mu.Unlock()
+		// Seen before it is answered: once the bridge has the answer, the
+		// report is in the channel.
+		c.reports <- reportSeen{subID: subID, sessionID: hdr.SessionID, attrs: attrs, payload: slices.Clone(payload)}
 		if !reportSuppressesResponse(payload) && answer != silentAnswer {
 			sr, _ := EncodeStatusResponse(im.StatusResponse{Status: answer})
 			c.sendSecureAck(proto, hdr.MessageCounter, im.OpcodeStatusResponse, sr)
 		}
-		c.reports <- reportSeen{subID: subID, sessionID: hdr.SessionID, attrs: attrs}
 	case im.OpcodeSubscribeResponse:
 		subID, _ := decodeReportSummary(payload) // SubscriptionId is tag 0 in both
 		c.subResp <- subID
@@ -561,16 +566,23 @@ func (nopResumptionStore) RemoveResumption(context.Context, uint8, uint64) error
 
 func startResumeDevice(t *testing.T, st SubscriptionStore, configure func(*Bridge, *operational.Manager)) *resumeDevice {
 	t.Helper()
+	return startResumeDeviceWith(t, st, []store.ACLEntry{{FabricIndex: resumeFabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE}}, nil, configure)
+}
+
+// startResumeDeviceWith is [startResumeDevice] with the fabric's ACL
+// entries and further root cluster servers beside AccessControl.
+func startResumeDeviceWith(t *testing.T, st SubscriptionStore, entries []store.ACLEntry, extra []contract.ClusterServer, configure func(*Bridge, *operational.Manager)) *resumeDevice {
+	t.Helper()
 	br, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	acl := &aclStoreFake{entries: []store.ACLEntry{{FabricIndex: resumeFabricIndex, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE}}}
+	acl := &aclStoreFake{entries: entries}
 	ac, err := core.NewAccessControl(acl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	br.AttachRootClusters([]contract.ClusterServer{ac})
+	br.AttachRootClusters(append([]contract.ClusterServer{ac}, extra...))
 	br.AttachACLLister(acl)
 	sessions := operational.NewManager(nopResumptionStore{})
 	br.AttachSessionLookup(NewOperationalSessionLookup(func(id uint16) (*channel.Session, bool) {
@@ -592,8 +604,7 @@ func startResumeDevice(t *testing.T, st SubscriptionStore, configure func(*Bridg
 		}
 		return e.Session.PeerNodeID(), e.Session.PeerCATs(), true
 	}))
-	subs := subscription.NewManager(subscription.Config{TickInterval: 20 * time.Millisecond}, br.SubscriptionReporter(), nil)
-	subs.SetEventReporter(br.SubscriptionEventReporter())
+	subs := subscription.NewManager(subscription.Config{TickInterval: 20 * time.Millisecond}, nil, nil)
 	br.AttachSubscriptionManager(subs)
 	sessions.SetOnSessionClose(subs.CloseSession)
 	br.AttachSessionRegistry(sessions)
@@ -660,7 +671,7 @@ func resumeInitiatorProvider(fab resumeFabric, sessions *operational.Manager) Ca
 			Initiator:          ini,
 			CompressedFabricID: fab.cfid,
 			OnEstablished: func(_ context.Context, res sigma.InitiatorResult) error {
-				_, err := sessions.OpenFromSigmaAsInitiatorWithID(stake.ID, fabricIndex, resumeDeviceNode, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+				_, err := sessions.OpenFromSigmaAsInitiatorWithStake(stake, fabricIndex, resumeDeviceNode, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
 				return err
 			},
 			OnAbandoned: func() { sessions.ReleaseStake(stake) },
@@ -673,10 +684,22 @@ func resumeInitiatorProvider(fab resumeFabric, sessions *operational.Manager) Ca
 // SubscribeRequest over the wire. Returns the subscription id.
 func subscribeOverCASE(t *testing.T, dev *resumeDevice, ctrl *fakeController) uint32 {
 	t.Helper()
+	return subscribeOverCASEWith(t, dev, ctrl, im.SubscribeRequest{
+		KeepSubscriptions:  true,
+		MinIntervalFloor:   0,
+		MaxIntervalCeiling: 120,
+		FabricFiltered:     true,
+		AttributeRequests:  []im.ConcreteAttributePath{accessControlACLPath()},
+	})
+}
+
+// subscribeOverCASEWith is [subscribeOverCASE] with req.
+func subscribeOverCASEWith(t *testing.T, dev *resumeDevice, ctrl *fakeController, req im.SubscribeRequest) uint32 {
+	t.Helper()
 	var keys sigma.SessionKeys
 	_, _ = rand.Read(keys.I2RKey[:])
 	_, _ = rand.Read(keys.R2IKey[:])
-	if _, err := dev.sessions.OpenFromSigmaWithID(resumeDeviceSIDRun, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, resumeCtrlSIDRun1, nil, keys); err != nil {
+	if _, err := sessionseam.OpenAt(dev.sessions, resumeDeviceSIDRun, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, resumeCtrlSIDRun1, nil, keys); err != nil {
 		t.Fatal(err)
 	}
 	sess, err := channel.New(channel.Config{
@@ -687,13 +710,7 @@ func subscribeOverCASE(t *testing.T, dev *resumeDevice, ctrl *fakeController) ui
 		t.Fatal(err)
 	}
 	ctrl.setSession(sess, resumeCtrlSIDRun1, resumeDeviceSIDRun)
-	ctrl.subscribe(im.SubscribeRequest{
-		KeepSubscriptions:  true,
-		MinIntervalFloor:   0,
-		MaxIntervalCeiling: 120,
-		FabricFiltered:     true,
-		AttributeRequests:  []im.ConcreteAttributePath{accessControlACLPath()},
-	})
+	ctrl.subscribe(req)
 	priming := ctrl.nextReport(t, 3*time.Second)
 	if priming.attrs == 0 {
 		t.Fatal("first-run priming report carried no attribute")

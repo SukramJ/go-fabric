@@ -99,7 +99,8 @@ dev, err := device.NewElectricalSensor(device.Options{
   measurement applies to the endpoint itself, is the smallest choice that
   conforms.
 - ElectricalPowerMeasurement needs AC or DC, and the host states its
-  `Accuracy` (one entry for ActivePower) and its `NumberOfMeasurementTypes`.
+  `Accuracy` (an entry for ActivePower and one for every other measurement
+  type it serves) and its `NumberOfMeasurementTypes`.
   matter.js has no defaults for either.
 - PowerSource's `EndpointList` names the device's own endpoint. The kit
   fills it, together with Status, Description and BatChargeLevel. The host

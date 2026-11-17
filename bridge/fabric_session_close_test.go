@@ -12,6 +12,7 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -64,7 +65,7 @@ func TestCloseFabricSessionsExcept_TellsEachOtherSession(t *testing.T) {
 		sid    uint16
 		fabric uint8
 	}{{invoking, resumeFabricIndex}, {sibling, resumeFabricIndex}, {unrouted, resumeFabricIndex}, {other, resumeFabricIndex + 1}} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(s.sid, s.fabric, resumeDeviceNode, resumeCtrlNode+uint64(s.sid), s.sid+0x100, nil, peerLossKeys(t)); err != nil {
+		if _, err := sessionseam.OpenAt(dev.sessions, s.sid, false, s.fabric, resumeDeviceNode, resumeCtrlNode+uint64(s.sid), s.sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		if s.sid != unrouted {
@@ -111,7 +112,7 @@ func TestEmitFabricRemovedContext_InvokingSessionLast(t *testing.T) {
 		sibling  = uint16(0x1102)
 	)
 	for _, sid := range []uint16{invoking, sibling} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil {
+		if _, err := sessionseam.OpenAt(dev.sessions, sid, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		dev.br.bindSessionRoute(sid, peerAddr)
@@ -135,7 +136,7 @@ func TestEmitFabricRemovedContext_InvokingSessionLast(t *testing.T) {
 
 	// Outside a command: every session of the fabric is told.
 	const lone = uint16(0x1103)
-	if _, err := dev.sessions.OpenFromSigmaWithID(lone, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, lone+0x100, nil, peerLossKeys(t)); err != nil {
+	if _, err := sessionseam.OpenAt(dev.sessions, lone, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, lone+0x100, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
 	dev.br.bindSessionRoute(lone, peerAddr)
@@ -185,7 +186,7 @@ func TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo(t *testing.T
 		sibling  = uint16(0x0E02)
 	)
 	for _, sid := range []uint16{invoking, sibling} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil {
+		if _, err := sessionseam.OpenAt(dev.sessions, sid, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		dev.br.bindSessionRoute(sid, peerAddr)
@@ -217,12 +218,12 @@ func TestSettleHandshake_BindsUDPSessionAtEstablishment(t *testing.T) {
 	dev := startResumeDevice(t, newMemSubscriptionStore(), nil)
 	src := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 47000}
 	ok := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil)
-	dev.br.settleHandshake(src, 0x51, establishedReporter(0x0D01), mrp.SCOpcodeStatusReport, ok, nil)
+	dev.br.settleHandshake(src, onExchange(0x51), establishedReporter(0x0D01), mrp.SCOpcodeStatusReport, ok, nil)
 	if got := dev.br.resolveSessionPeerAddr(0x0D01); got == nil || got.String() != src.String() {
 		t.Fatalf("peer address of the established UDP session = %v, want %v", got, src)
 	}
 	// A failed or unfinished step binds nothing.
-	dev.br.settleHandshake(src, 0x52, establishedReporter(0x0D02), mrp.SCOpcodeSigma2, []byte{1}, nil)
+	dev.br.settleHandshake(src, onExchange(0x52), establishedReporter(0x0D02), mrp.SCOpcodeSigma2, []byte{1}, nil)
 	if got := dev.br.resolveSessionPeerAddr(0x0D02); got != nil {
 		t.Errorf("a Sigma2 bound session 0x0D02 to %v", got)
 	}

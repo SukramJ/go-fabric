@@ -116,6 +116,24 @@ func (v *ModeOptionStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ModeOptionStruct) Clone() ModeOptionStruct {
+	c := v
+	c.ModeTags = func(s []ModeTagStruct) []ModeTagStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ModeTagStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ModeTags)
+	return c
+}
+
 // ModeOptionStructDef describes ModeOptionStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -145,6 +163,21 @@ func (v *ModeTagStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "MfgCode", false, &v.MfgCode, spec.DecodeOptional(spec.DecodeUint[uint16](16))),
 		spec.Bind(1, "Value", true, &v.Value, spec.DecodeUint[ModeTag](16)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ModeTagStruct) Clone() ModeTagStruct {
+	c := v
+	c.MfgCode = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MfgCode)
+	return c
 }
 
 // ModeTagStructDef describes ModeTagStruct.

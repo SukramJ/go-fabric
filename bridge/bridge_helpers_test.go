@@ -89,14 +89,14 @@ func TestSignalStatusResponseRX_ClosesChannel(t *testing.T) {
 		sess = uint16(1)
 		exch = uint16(42)
 	)
-	ch := make(chan im.StatusCode, 1)
+	ch := make(chan statusAnswer, 1)
 	b.routing.statusResponseWaits.Store(mrp.ExchangeKey{SessionID: sess, ExchangeID: exch, Initiator: true}, ch)
 	b.signalStatusResponseRX(sess, exch, true, im.StatusInvalidSubscription)
 	// The channel should carry the status and be closed.
 	select {
-	case status, open := <-ch:
-		if !open || status != im.StatusInvalidSubscription {
-			t.Errorf("waiter received (%v, open=%v), want the signalled status InvalidSubscription", status, open)
+	case answer, open := <-ch:
+		if !open || answer.status != im.StatusInvalidSubscription || answer.undecodable {
+			t.Errorf("waiter received (%+v, open=%v), want the signalled status InvalidSubscription", answer, open)
 		}
 	default:
 		t.Error("signalStatusResponseRX did not release the registered channel")
@@ -117,7 +117,7 @@ func TestSignalStatusResponseRX_IdempotentOnClosedChannel(t *testing.T) {
 		sess = uint16(1)
 		exch = uint16(55)
 	)
-	ch := make(chan im.StatusCode, 1)
+	ch := make(chan statusAnswer, 1)
 	close(ch) // already closed
 	b.routing.statusResponseWaits.Store(mrp.ExchangeKey{SessionID: sess, ExchangeID: exch, Initiator: true}, ch)
 	// Must not panic despite closed channel.

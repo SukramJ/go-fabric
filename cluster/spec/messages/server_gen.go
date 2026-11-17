@@ -24,6 +24,31 @@ type State struct {
 	ActiveMessageIds [][]byte // attribute 0x0001: list[MessageID], M, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.ActiveMessageIds = func(s [][]byte) [][]byte {
+		if s == nil {
+			return nil
+		}
+		out := make([][]byte, len(s))
+		for i := range s {
+			out[i] = func(s []byte) []byte {
+				if s == nil {
+					return nil
+				}
+				out := make([]byte, len(s))
+				copy(out, s)
+				return out
+			}(s[i])
+		}
+		return out
+	}(st.ActiveMessageIds)
+	return c
+}
+
 // Patch is a change to the Messages state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

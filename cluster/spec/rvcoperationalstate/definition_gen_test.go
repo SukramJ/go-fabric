@@ -41,6 +41,23 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrOperationalError, ErrorStateStruct{ErrorStateId: ErrorStateEnum(0), ErrorStateLabel: spectest.Ptr("x"), ErrorStateDetails: spectest.Ptr("x")})
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[ErrorStateStruct],
+		spectest.CheckClone[OperationalStateStruct],
+		spectest.CheckClone[OperationalCommandResponse],
+		spectest.CheckClone[OperationalErrorEvent],
+		spectest.CheckClone[OperationCompletionEvent],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

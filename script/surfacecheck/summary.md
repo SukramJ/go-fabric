@@ -10,7 +10,7 @@ without endpoint numbers, so a change of that encoding moves it as well.
 
 | Metric | Value |
 |---|---|
-| Effective surface digest | `ec157a7e63385f77fcacad68b7e79a5ca9148a425c99bcfdc256cb987b8047f1` |
+| Effective surface digest | `13181573dd8d04c6fdc908f7315751690f907f5408a0b5ac1842baf59862922b` |
 | Policies digest | `fc6822f08d6c5d98a1632f05ea480c2666bc0701ab657f56500011c73e050c24` |
 | Specification level | 1.6.1 |
 | Endpoints (the root included) | 45 |

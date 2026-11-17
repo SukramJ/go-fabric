@@ -9,7 +9,7 @@
 // joint commissioning window, its ICAC and its trust verification of a
 // commissioner that announces itself (the JCMCommissionee).
 //
-// matter.js has no logic for either at its pin 862ad75f
+// matter.js has no logic for either at its pin db021da0
 // (JointFabricDatastoreServer.ts:14 and JointFabricAdministratorServer.ts:14
 // are the empty subclasses); the rules are connectedhomeip's at 6170af84:
 // src/app/server/JointFabricDatastore.cpp and

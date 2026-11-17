@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
+	"slices"
 	"sync"
 )
 
@@ -19,6 +21,21 @@ type OrderedHandler func(buf []byte, src *net.UDPAddr, release func())
 
 // maxOrderedBacklog bounds the datagrams queued behind one key; beyond it
 // a datagram is dropped, as the unordered pool drops one when saturated.
+//
+// A full backlog drops from its longest sub-queue (review II,
+// R2-P6-bound-0211). The stream key is the cleartext session id, read
+// before any decryption, so a party on the link that floods forged
+// datagrams carrying an active session's id from its own address would
+// otherwise fill the stream's backlog and the genuine peer's datagrams of
+// that session would be dropped. A source — an address, whatever its
+// ports — alone in a stream may fill the whole backlog; when it is full, a
+// datagram of a source holding fewer queued datagrams than the largest
+// holder takes the place of that holder's newest, so the genuine peer
+// keeps at least a 1/(sources+1) share against a few flooding addresses.
+// Not held off: a party that forges the peer's source address, and a
+// party that changes its source address per datagram — addresses cost it
+// nothing on the link, and 256 of them leave the peer one place, more
+// none. The shared budget of maxConcurrentDispatch is not per source.
 const maxOrderedBacklog = 256
 
 // ServeOrdered is [Listener.Serve] for a protocol whose datagrams fall into
@@ -44,6 +61,18 @@ type orderedItem struct {
 type orderedQueue struct {
 	items   []orderedItem
 	running bool
+	// bySource counts items by source (sourceOf), for the
+	// longest-sub-queue drop.
+	bySource map[netip.Addr]int
+}
+
+// sourceOf is the key of src's sub-queue: its address, whatever the port;
+// a nil source (the engine's own call, tests) is one source.
+func sourceOf(src *net.UDPAddr) netip.Addr {
+	if src == nil {
+		return netip.Addr{}
+	}
+	return src.AddrPort().Addr().Unmap()
 }
 
 // orderedDispatch runs one drain goroutine per stream with pending
@@ -74,10 +103,13 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 	defer o.mu.Unlock()
 	q := o.queues[key]
 	if q == nil {
-		q = &orderedQueue{}
+		q = &orderedQueue{bySource: map[netip.Addr]int{}}
 		o.queues[key] = q
 	}
-	if len(q.items) >= maxOrderedBacklog || o.pending >= maxConcurrentDispatch {
+	from := sourceOf(src)
+	if len(q.items) >= maxOrderedBacklog && o.displaceLocked(l, q, from) {
+		// A place was freed: fall through and queue the datagram.
+	} else if len(q.items) >= maxOrderedBacklog || o.pending >= maxConcurrentDispatch {
 		if len(q.items) == 0 && !q.running {
 			delete(o.queues, key)
 		}
@@ -89,10 +121,44 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 	// queued behind a running one.
 	l.inflight.Add(1)
 	q.items = append(q.items, orderedItem{buf: buf, src: src})
+	q.bySource[from]++
 	if !q.running {
 		q.running = true
 		go o.drain(l, key, q)
 	}
+}
+
+// displaceLocked makes room in q's full backlog for a datagram of
+// newcomer: it drops the newest queued datagram of the source holding the
+// most, freeing its place and its budget — false, and nothing dropped,
+// when newcomer holds as many as that source. o.mu is held.
+func (o *orderedDispatch) displaceLocked(l *Listener, q *orderedQueue, newcomer netip.Addr) bool {
+	var longest netip.Addr
+	most := -1
+	for src, n := range q.bySource {
+		if n > most {
+			longest, most = src, n
+		}
+	}
+	if q.bySource[newcomer] >= most {
+		return false
+	}
+	for i := len(q.items) - 1; i >= 0; i-- {
+		if sourceOf(q.items[i].src) != longest {
+			continue
+		}
+		q.items = slices.Delete(q.items, i, i+1)
+		if q.bySource[longest] <= 1 {
+			delete(q.bySource, longest)
+		} else {
+			q.bySource[longest]--
+		}
+		o.pending--
+		l.inflight.Done()
+		l.done()
+		return true
+	}
+	return false
 }
 
 // drain hands the stream's datagrams to the handler one at a time. Each
@@ -108,7 +174,13 @@ func (o *orderedDispatch) drain(l *Listener, key uint32, q *orderedQueue) {
 			return
 		}
 		it := q.items[0]
+		q.items[0] = orderedItem{}
 		q.items = q.items[1:]
+		if from := sourceOf(it.src); q.bySource[from] <= 1 {
+			delete(q.bySource, from)
+		} else {
+			q.bySource[from]--
+		}
 		o.mu.Unlock()
 
 		turn := make(chan struct{})

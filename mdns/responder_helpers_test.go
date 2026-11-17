@@ -53,6 +53,9 @@ type fakeWire struct {
 	// every source, so a test that does not exercise the check needs no
 	// prefixes for its querier.
 	nets map[int][]*net.IPNet
+	// linkReads counts the calls of link, the per-interface read that is
+	// two syscalls on the real sockets.
+	linkReads int
 }
 
 func newFakeWire(addrsByLink map[int][]string) *fakeWire {
@@ -83,6 +86,7 @@ func (w *fakeWire) links() []link {
 func (w *fakeWire) link(ifIndex int) link {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.linkReads++
 	return w.linkLocked(ifIndex)
 }
 

@@ -65,7 +65,7 @@ write, per the contract.
 ## Tier 2 — MEDIUM
 
 **Core clusters**
-- SetRegulatoryConfig ignores CountryCode (Location stays "XX"). `cluster/core/general_commissioning.go:629` vs `GeneralCommissioningServer.ts:210`. **Still open (2026-10-13):** deferred by batch 1 with its reason (Apple Home sent RemoveFabric after a non-empty Location); `bridge/fields_reader.go` (`decodeSetRegulatoryConfigRequest`) reads the field as octets while a UTF-8 string lands in `el.String`, so CountryCode is always empty, and `general_commissioning.go` (`handleSetRegulatoryConfig`) checks only the length. Fix package: decode the string, store it as Location, and verify against Apple Home in concept v2 phase 5 before it ships.
+- SetRegulatoryConfig ignores CountryCode (Location stays "XX"). `cluster/core/general_commissioning.go:629` vs `GeneralCommissioningServer.ts:210`. **Still open (2026-10-13):** deferred by batch 1 with its reason (Apple Home sent RemoveFabric after a non-empty Location); `bridge/fields_reader.go` (`decodeSetRegulatoryConfigRequest`) reads the field as octets while a UTF-8 string lands in `el.String`, so CountryCode is always empty, and `general_commissioning.go` (`handleSetRegulatoryConfig`) checks only the length. Fix package: decode the string, store it as Location, and verify against Apple Home in concept v2 phase 5 before it ships. **Review II, phase 6a (decision 127):** still true — owner decision pending (the revert's reason is Apple Home, outside matter.js); `bridge/fields_reader.go` still reads `el.Octets` for the UTF-8 field, and `handleSetRegulatoryConfig` is `cluster/core/general_commissioning.go:1133-1173` at `1a0d8ba9` (R2-P6-doc-1019). The matter.js lines of the row were not re-read at the pin (unverified).
 
 ---
 
@@ -86,7 +86,7 @@ group sender in `groups/`. What remains:
 
 - **Field conformance does not hold the host's own values.** matter.js validates every commit, the host's included (`ValueValidator.ts:392-467`, `conformance.ts:19-60` at `862ad75f`). Since brief CT `spec.Instance.CheckConformance` holds a controller's write of a struct attribute on a generic server; the host's `Initial`/`Set` and the checks self-held servers call are not held, because the reference bridge's CHIP-mirrored tariff thresholds (both `O.b`) and DEM forecasts fail the check. Route: correct the samples (a chip-tool families run of SETRF and DEM decides what they publish), then hold the host path; brief CT report, question 1. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **A command response is held to field presence only.** matter.js validates the whole response payload (`ProtocolService.ts:725-740` at `862ad75f`; DoorLock switches the constraint off per response, `DoorLockServer.ts:704-707`); the Go server checks which fields a response carries, not their enum values or nested structs. Route: a response check of its own — the request check closed without it (review II, phase 4, owner decision 64), and matter.js's response relaxations (Groups' AddGroupResponse, ViewGroupResponse and RemoveGroupResponse, `GroupsServer.ts:43-49` at `db021da0`) are not in the relaxation table. (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **Groupcast's membership quota does not follow a raised `MaxGroupsPerFabric`.** matter.js derives `MaxMembershipCount` from `maxGroupsPerFabric × 2` (`GroupcastServer.ts:928` at `862ad75f`), so the Groupcast per-fabric quota `floor(MaxMembershipCount/2)` always equals the group cap. The module's `groupcastMaxMembershipCount = 44` is a constant (`cluster/core/groupcast.go:52`); since brief CC a host can set `node.Config.Limits.MaxGroupsPerFabric` above 22 and is then still held to Groupcast's quota of 22. Route: derive the Groupcast constants from the configured group limit when the Groupcast server is composed (the wave that next touches `groups/`; M5). (Triage 2026-10-29: wave H1, the device IM and write path.)
+- **Groupcast's membership quota does not follow a raised `MaxGroupsPerFabric`.** At `db021da0` matter.js states `MaxMembershipCount` as a constant, `override maxMembershipCount = 44;` (`packages/node/src/behaviors/groupcast/GroupcastServer.ts:947`; the comment `:944` "Set to 2 * GKM.maxGroupsPerFabric (44)"; `GroupKeyManagementServer.ts:614` `maxGroupsPerFabric = 22`) — no derivation (review II, phase 6a, R2-P6-doc-1707: the row's "derives … from `maxGroupsPerFabric × 2`" was wrong for this pin). What remains is the module's own coherence with a raised limit. The module's `groupcastMaxMembershipCount = 44` is a constant (`cluster/core/groupcast.go:52`); since brief CC a host can set `node.Config.Limits.MaxGroupsPerFabric` above 22 and is then still held to Groupcast's quota of 22. Route: derive the Groupcast constants from the configured group limit when the Groupcast server is composed (the wave that next touches `groups/`; M5). (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **Groupcast has not met a real controller.** The evidence is the in-process
   end-to-end test (`bridge/groupcast_e2e_test.go`) and the wire fixtures
   matter.js produced (`bridge/testdata/groupcast-wire-fixtures.json`).
@@ -96,7 +96,7 @@ group sender in `groups/`. What remains:
   on `UseAuxiliaryAcl` instead of writing a Group ACL entry; and that
   chip-tool's `groupcast` commands encode the optional fields as matter.js
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
-  multicast `onoff toggle`, `groupcast leave-group`).
+  multicast `onoff toggle`, `groupcast leave-group`). **Review II, phase 6a (decision 127, at `16a8f6e5`):** still true — an evidence gap, not a code row; no `internal/chiptool` groupcast leg was looked for (unverified).
 
 ## matter.js pin 862ad75f — open items (pin lift 2026-10-18)
 
@@ -117,18 +117,7 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   `mdns.Advertiser.Publish` carries no event. Fix: an event on the publish
   (or a `Publish` variant the bridge calls with "retransmit" when the
   subscription manager holds a subscription of the fabric), with a parity
-  case for a restart that re-establishes subscriptions (issue #362).
-- **A closed PASE session does not resume the commissionable broadcast on
-  the responder.** matter.js's `sessions.deleted` observer restarts the
-  commissioning advertisement with "startup" when a PASE session closes
-  while the node is in commissioning mode (`DeviceAdvertiser.ts:152-161`,
-  `:248-260` at `862ad75f`). The operational manager fires its reannounce
-  trigger with fabric index 0 for a PASE victim; on an advertiser with the
-  broadcast events (`mdns.Responder`) the bridge starts no event for it
-  (`bridge/securechannel.go`, `triggerSessionReannounce`), and only the
-  `TriggerReannounce` and per-record fallbacks re-announce the
-  commissionable record. Fix: on index 0, start the responder's
-  "startup" schedule for the active commissionable service (issue #362).
+  case for a restart that re-establishes subscriptions (issue #362). **Review II, phase 6a (decision 127, at `16a8f6e5`):** still true as far as read — `Bridge.AnnounceFabric` publishes, and the responder has the retransmit event (`mdns/responder.go`) but the publish carries none. `DeviceAdvertiser.ts:356-380` was cited at `862ad75f` and not re-read at the pin (unverified).
 - **A subscription that ends while the node runs stays persisted.**
   `im/subscription/manager.go` (`Manager.Release`, `finishClose`) keeps the former matter.js line: closed
   on session close = not terminated = re-established after a restart.
@@ -137,7 +126,7 @@ Device side:. (Triage 2026-10-29: owner's hand test (manual test list C5), no wa
   (`Subscription.ts:21-40`, `ServerSubscription.ts:766-812`,
   SubscriptionsServerTest "drops the stored subscription when the peer closes
   its session while the node keeps running"). Fix: terminate on every close
-  except the one `Stop` performs. (Triage 2026-10-29: wave H1, the device IM and write path.)
+  except the one `Stop` performs. (Triage 2026-10-29: wave H1, the device IM and write path.) **Review II, phase 6a (decision 127, at `16a8f6e5`):** still true — `Manager.CloseSession` closes without terminating (`im/subscription/manager.go`), called for a session that went away (`node/security.go`). matter.js at the pin: `close()` is `#close(true, …)` and marks terminated, only `closeForShutdown` does not (`packages/node/src/node/server/ServerSubscription.ts:768-774`, `:800-809` at `db021da0`); the store's drop on termination (`SubscriptionsServer.ts`) was not re-read (unverified).
 - **Utility component on the composing endpoint is not a candidate.**
   `endpoint/devicetype_conformance.go:842-850` `candidatesOf` iterates the
   composition scope; matter.js #4745 prepends the composing endpoint when it
@@ -177,7 +166,7 @@ Device side:. (Triage 2026-10-29: wave C1, the controller remainder two.)
   (`bridge/commissioning_window.go:724-727`); matter.js expires the
   fail-safe when the PASE session that armed it is closed by the peer
   before CommissioningComplete (`common/FailsafeContext.ts:77-86`).
-  Crosses `secure/channel` and `bridge`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
+  Crosses `secure/channel` and `bridge`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).) **Review II, phase 6a (decision 127, at `16a8f6e5`):** still true as far as read — matter.js `packages/protocol/src/common/FailsafeContext.ts:77-86` at `db021da0` (`session.closedByPeer` → `#failSafeExpired`); here the PASE close hook is wired to the re-announce only (`bridge/securechannel.go`), and `ExpireFailSafeArmedOverPASE` has one caller, the revoke (`bridge/commissioning_window.go`; no other caller found by grep, inferred).
 - **Session parameters: a local MaxPathsPerInvoke of 0 is not refused and
   an oversized wire value is masked.** `secure/sessionparams/sessionparams.go:182`
   keeps the low 16 bits; matter.js refuses the local value
@@ -217,24 +206,6 @@ Device side:. (Triage 2026-10-29: wave H2, commissioning and security (Fable), o
   with a StatusResponse of INVALID_ACTION
   (`action/server/AttributeWriteResponse.ts:278-285`, `:305-312`; chip
   `WriteHandler.cpp` `GetConcreteAttributePath` → `SuccessOrExit`). (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **A closed PASE session does not restart the commissioning
-  advertisement.** The device keeps its commissionable record during PASE
-  and publishes nothing when the session closes; matter.js starts a
-  commissioning advertisement round on every PASE session that closes
-  while the window is open (`protocol/DeviceAdvertiser.ts:131-162`). (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
-- **A host-initiated RemoveFabric does not flush the Leave event.**
-  `node/node.go:707` `RemoveFabric` closes the fabric's subscriptions
-  without a last report; matter.js `Fabric.leave` closes each session
-  through `closeSubscriptions(true)` so the Leave event reaches the
-  controller (`fabric/Fabric.ts:447-457`; ClientNodeTest "erases node
-  after leave event"). (Triage 2026-10-29: wave H1, the device IM and write path.)
-- **Data versions are drawn anew at every start.**
-  `contract.DataVersionTracker` is the host's, and the module's own
-  trackers start random; matter.js loads a persistent cluster's version
-  from its store and draws one only when the store has none
-  (`behavior/state/managed/Datasource.ts:597`, `:802`), so a controller's
-  cache survives a device restart where this side sends every cluster
-  again. (Triage 2026-10-29: wave H1, the device IM and write path.)
 - **SetRegulatoryConfig's CountryCode never reaches Location.**
   `bridge/fields_reader.go` (`decodeSetRegulatoryConfigRequest`) drops the field on decode, a deliberate
   revert after an Apple Home regression; matter.js writes it to
@@ -272,7 +243,9 @@ Line numbers at `862ad75f`. (Triage 2026-10-29: owner: a re-audit with Apple Hom
   `FailSafeMaxSeconds` at 900 (`cluster/core/general_commissioning.go:226-232`)
   and refuses a longer ArmFailSafe with ValueOutsideRange (`:594-599`), a
   check matter.js has not. (Milestone 3, phase 19; decide together with the
-  SetRegulatoryConfig CountryCode item below.)
+  SetRegulatoryConfig CountryCode item below.) Review II, phase 6a
+  (R2-P6-doc-1019): still true; the floor is
+  `cluster/core/general_commissioning.go:327-334` at `1a0d8ba9`.
 
 Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
 `862ad75f`. (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
@@ -298,7 +271,7 @@ Found by the phase-19 port (brief BR, 2026-10-20). Line numbers at
   (`EventsBehaviorTest.ts:45-54`); the Go node's event log lives in
   memory and persists only the event-number ceiling. One
   `EventsBehaviorTest.ts` case is `missing` for this. (Milestone 4, a
-  node option over the store.)
+  node option over the store.) **Review II, phase 6a (decision 127, at `16a8f6e5`):** still true — `im/eventlog.go` persists only the number's ceiling, not the records; matter.js has `NonvolatileEventStore.ts` at the pin (file present; not read).
 
 Found by the phase-18d Binding port (brief BQ, PR #189, 2026-10-20).
 Line numbers at `862ad75f`. (Triage 2026-10-29: wave H3, node options and the embedding layer.)
@@ -389,14 +362,6 @@ Identify, WindowCovering and ServiceArea tests (brief BJ, PR #170,
 Found by the phase-31 port of `packages/node/test` (brief phase 31,
 2026-11-03). Line numbers at `862ad75f`.
 
-- **No generic sanitisation of fabric-scoped data on fabric removal.**
-  matter.js strips every fabric-scoped list entry of a removed fabric from
-  every behavior's state (`ServerEnvironment.ts:187-195`,
-  `limitNodeDataToAllowedFabrics`); Go drops it only in servers that
-  implement `MatterFabricRemoved` (`bridge/bridge.go:1317-1322`), and the
-  WebRTC Transport Provider (`cluster/camera/provider.go`) keeps a removed
-  fabric's `CurrentSessions` (ServerNodeTest.ts:1549-1580 "removes the
-  entries of a removed fabric from a fabric-sensitive list" stays missing).
 - **A corrupt endpoint allocation counter fails the allocation.**
   `endpoint/sqlitestore` `allocate` refuses a counter below the first part
   number (and a non-integer one fails its scan); matter.js starts over from
@@ -405,7 +370,7 @@ Found by the phase-31 port of `packages/node/test` (brief phase 31,
 - **No flushing close of a subscription.** `Manager.Close` drops the
   queued changes; matter.js's close of a subscription sends a report queued
   behind the one in flight first, despite a deferral
-  (ServerSubscriptionTest.ts:1123-1195 and :499-555 stay missing).
+  (ServerSubscriptionTest.ts:1123-1195 and :499-555 stay missing). **Review II, phase 6a (decision 127, at `16a8f6e5`):** narrowed — the flush exists for a leaving fabric and a session rollover (`Manager.FlushFabric`, `FlushSession`, `im/subscription/manager.go`). What remains: the two `ServerSubscriptionTest.ts` cases the row names; `script/testparity/register.json` holds one `partial` entry for the whole file, so the two could not be told apart (not performable from the register as it is). How the flush differs is R2-P6-par-0702.
 
 Found by the phase-32 port of `packages/node/test/behaviors/ota/OtaTest.ts`
 (brief phase 32, 2026-11-04). Line numbers at `862ad75f`.
@@ -463,18 +428,6 @@ with a port of the named case.
   `forWriteInteraction`); `spec.EncodeJSON` writes it when present. The server overwrites it with the accessing
   fabric, so the wire difference is the field's bytes. Route: strip field
   254 on the controller's write encoding.
-- **Numeric bounds compare as float64.** `cluster/spec`'s constraint check
-  (`Instance.satisfies`, `bound_expr.go` `evalBound`) and `Bound.Int`
-  (int64) hold a bound beyond 2^53 inexactly: 2^62 + 1 compares equal to
-  2^62, and a uint64 bound above int64 cannot be stated. matter.js keeps
-  such bounds as bigints (`TlvOfModelTest.ts` "refuses a value beyond the
-  computed bound", "refuses the value above it", "states a bound beyond
-  the safe integers as a bigint"; `ConstraintTest.ts` "keeps the magnitude
-  of a decimal / hexadecimal / negative bound", "judges a value against a
-  bound only a bigint states" and its value tests at 2^53 ± 1 and 2^62 ± 1).
-  No served attribute states such a bound at the pin. Route: compare integers as integers (uint64/int64 or
-  math/big) where the type is a 64-bit integer.
-
 - **Defaults matter.js derives without a stated one.** matter.js's
   `DefaultValue` gives a list whose type permits no entries the empty list,
   builds a bitmap's default from its members' defaults (bit placement
@@ -494,140 +447,6 @@ with a port of the named case.
 
 ## matter.js pin db021da0 — open items (pin lift 2026-11-06)
 
-- **F-db021da0-3: a failed subscription report is retried one MinIntervalFloor later.**
-  matter.js, after a report that could not be sent, owes the data again and
-  schedules nothing: the attribute filter goes back through
-  `#addOutstandingAttributes`, which only fills the set
-  (`packages/node/src/node/server/ServerSubscription.ts:346-357` at
-  `db021da0`), the event number is set back (`:582-584`), and neither calls
-  `#prepareDataUpdate` as the change handler does (`:380-382`); the send loop
-  ends unless another update was queued behind the failed one (`:610-612`).
-  The retry leaves with whatever starts the next report — a change, an urgent
-  event, the send interval — and after three failed updates a subscription
-  whose error is a communication error is given up (`:569`, `:585-603`).
-  This module asks for a report again:
-  `Subscription.RequeueAttributes` marks the paths dirty and
-  `Subscription.RequeueEvents` marks the owed events urgent
-  (`im/subscription/subscription.go`), so the retry goes out once
-  MinIntervalFloor has elapsed since the failed report. Not deliberate: it
-  is what the attribute path did before events shared its report, and the
-  event half was kept the same so that one report has one rule (review II,
-  W2-conc-05). Pinned as it is by the subtest "events owed again after a
-  failed report are retried when the floor ends" of
-  `im/subscription:TestEventReportParityMatterJS`. After three failed
-  updates in a row the subscription ends and the peer's sessions stay, as
-  in matter.js (`noteSubscriptionSendError`, `noteReportUndelivered`,
-  `bridge/subscribe.go:1018`, `:1135`; review II, R2-P4-imread-04, owner
-  decision 60; `bridge:TestUndeliveredReportIsOneFailedUpdateParity`);
-  what is left of this row is when the retry leaves. Fix: requeue without asking for a report — the paths and the
-  event number are owed and leave with the next pass something else starts —
-  and move the subtest onto matter.js's rule. Found in review II, phase 0.
-- **F-db021da0-4: what is outstanding when a subscription is activated waits for MinIntervalFloor.**
-  matter.js sends what is outstanding at activation at once: `activate`
-  calls `#triggerSendUpdate()` when an attribute update or an event number
-  is outstanding
-  (`packages/node/src/node/server/ServerSubscription.ts:443-445` at
-  `db021da0`), and `#triggerSendUpdate` starts `#sendUpdate` directly —
-  no floor, no send delay (`:520-529`); an event the initial report already
-  carried is not owed again (`:431-437`). `Subscription.EndPriming`
-  (`im/subscription/subscription.go`) stamps `lastReport` with the end of
-  the priming report and marks the events fired meanwhile urgent, so the
-  changes and events of the priming window go out once MinIntervalFloor has
-  elapsed since the priming report. Not deliberate: no entry of
-  `by_design.md` gives a reason, and the function's comment states the
-  difference without one. Pinned as it is by the subtest "an event fired
-  while the subscription was priming is reported after the floor" of
-  `im/subscription:TestEventReportParityMatterJS`. Fix: when priming ends
-  with a dirty path or an owed event, the first report is due at once, and
-  the floor counts from that report; move the subtest. Found in review II,
-  phase 0 (W2-conc-05).
-- **F-db021da0-7: a handshake's failure StatusReport is sent while its previous reply is unacknowledged.**
-  Both references send none. matter.js: `PaseServer.cancelPairing` skips
-  the report "when a sent message is still unacked"
-  (`packages/protocol/src/session/pase/PaseServer.ts:208-210` at
-  `db021da0`), `CaseServer` returns before any `sendError` when
-  `exchange.considerClosed || exchange.hasUnackedMessage`
-  (`packages/protocol/src/session/case/CaseServer.ts:82-86`), and the two
-  initiators test the same
-  (`packages/protocol/src/session/case/CaseClient.ts:86-90`,
-  `packages/protocol/src/session/pase/PaseClient.ts:97-100`);
-  `hasUnackedMessage` is `#sentMessageToAck !== undefined`
-  (`packages/protocol/src/protocol/MessageExchange.ts:450-452`), and the
-  comments give the reason: "the send would only fail with a flow error".
-  connectedhomeip, read at `6170af84`: a retransmit-table entry sets its
-  exchange's waiting-for-ack flag when it is made and clears it when it is
-  destroyed (`src/messaging/ReliableMessageMgr.cpp:53-62`), and it is
-  destroyed with the acknowledgement
-  (`src/messaging/ReliableMessageContext.cpp:89-95`,
-  `ReliableMessageMgr.cpp:340-351`); while the flag is set, a message on the
-  exchange that carries no acknowledgement for it is dropped before the
-  delegate sees it — "Dropping message without piggyback ack when we are
-  waiting for an ack." (`src/messaging/ExchangeContext.cpp:585-595`) — so
-  the pairing session is not handed the message that would make it fail;
-  and a `SendMessage` in that state fails with `CHIP_ERROR_INCORRECT_STATE`
-  in `AddToRetransTable` (`ReliableMessageMgr.cpp:254-256`), before the
-  message is sent (`src/messaging/ExchangeMessageDispatch.cpp:54-64`),
-  which `SendStatusReport` logs and returns
-  (`src/protocols/secure_channel/PairingSession.h:183-189`). Not
-  established for connectedhomeip (unverified): whether a failure that does
-  not come from a received message — a timeout of the pairing session's
-  own — reaches `SendStatusReport` in that state at all. This module drops
-  what the handshake left unacknowledged on the exchange and then sends the
-  report as a reliable message: `Bridge.sendHandshakeFailureReport`
-  (`bridge/securechannel.go`, `abandonHandshakeReplies` first), and the
-  handshake this node opened abandons before it sends its report the same
-  way (`bridge/case_initiator.go`). The cases coincide for an initiator
-  that acknowledges a reply with its next message, which is what makes a
-  handshake fail in the ordinary run (a Pake3 that does not confirm, a
-  Sigma3 that does not verify); they differ when the handshake fails while
-  its last reply is still unacknowledged. Which peers and failures reach
-  that state was not exercised (unverified). Not decided: the report was
-  made reliable by `e98028e4` (before, it left without the R flag, which
-  neither reference does either), and whether to skip it as the references
-  do or to keep it under a `by_design` entry is an open question of that
-  rework. Fix: skip the report while an entry of the exchange is still
-  unacknowledged, with a case for each role beside
-  `bridge:TestUnsecuredRetransmitEntriesEndWithTheirHandshake`. Found in
-  review II, phase 0 (the rework of R2-P0-rv-A04).
-- **F-db021da0-8: a report pass that leaves nothing for the subscriber sends no DataReport.**
-  matter.js takes what is outstanding, stamps the time of the last update
-  before it sends
-  (`packages/node/src/node/server/ServerSubscription.ts:549-551` at
-  `db021da0`) and takes the data branch whenever an attribute filter or an
-  event number is outstanding (`:909`, `:921-936`), with
-  `suppressEmptyReport: onlyWithData` (`:935`); `onlyWithData` is false for
-  the pass the send delay or the send interval starts (`:198-200`,
-  `:480-484`, the default of `:520`) and true only for a flush (`:757`) and
-  for a queued follow-up with no keep-alive owed (`:622`), and the
-  messenger leaves a report out only when that flag is set and the report
-  is empty (`packages/protocol/src/interaction/InteractionMessenger.ts:794-796`).
-  So a pass whose data is all filtered for the subscriber goes out as an
-  empty DataReport with `suppressResponse: false` (`:928`) and counts as
-  the last update — under a TODO of matter.js's own, "Add correct handling
-  for reports that would have data but in the end not send any because of
-  filtered out" (`:923-925`). Here the bridge's event reporter sends
-  nothing when its access check leaves no event and no attribute for the
-  subscriber and says so (`Subscription.NothingSent`,
-  `im/subscription/subscription.go`; `reportSubscriptionEvents`,
-  `bridge/subscribe.go`), and the engine then sends the keep-alive when the
-  pass was the send interval's and otherwise puts the time of the last
-  report back (`dueReport`, `im/subscription/engine.go`); an event drain
-  that yields no event is no report either (`758fb3ec`). Since `16495f81`
-  the keep-alive due in such a pass is sent — before, the pass counted and
-  a subscriber heard nothing for two send intervals (review II,
-  R2-P0-rv-A03) — so what still differs is the empty DataReport itself and
-  the send interval it restarts. The attribute path of this module goes the
-  other way: `reportSubscription` sends the report empty when every dirty
-  path was filtered (`bridge/subscribe.go`, "An empty report is a
-  max-interval keepalive"), as matter.js does. The doc of `NothingSent`
-  calls its rule the module's own; no entry of `by_design.md` gives a
-  reason, so it stands here. Pinned as it is by
-  `im/subscription:TestKeepAliveAndAReportThatSendsNothing` and
-  `bridge:TestReportWhoseEventsAreAllFilteredLeavesTheKeepAliveDue`. Fix:
-  one rule for both paths — send the filtered pass as an empty DataReport
-  and count it, as matter.js, together with the keep-alive entry of the
-  `862ad75f` section (`SuppressResponse`), or keep the silence under a
-  `by_design` entry; the owner's decision. Found in review II, phase 0.
 - **F-db021da0-9: `Identify.Close` during a running identify does not tell the host to stop.**
   matter.js's `IdentifyServer[Symbol.asyncDispose]` calls
   `#stopIdentifying()`
@@ -650,31 +469,6 @@ with a port of the named case.
   that test, and `contract/identify.go` says so; whether that call gets a
   context `Close` ends is the open question beside it. Found in review II,
   phase 0 (the rework of R2-P0-rv-B04).
-- **F-db021da0-10: a ConnectNetwork whose result outlives its fail-safe
-  is still answered with the driver's result.** matter.js has no logic
-  here (`packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts:18`
-  at `db021da0` is the empty subclass; `BD-chip-WiFiNetworkCommissioningServer`),
-  so connectedhomeip decides. Its fail-safe expiry releases the pending
-  command handle (`mAsyncCommandHandle.Release()`,
-  `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1002`
-  at `6170af84`): the release ends the command's pending work
-  (`src/app/CommandHandler.cpp:40-47`) and, with none left, finalizes the
-  response message and closes the handler
-  (`src/app/CommandHandlerImpl.cpp:461-489`) — nothing was added for the
-  ConnectNetwork path at that point. The driver's late result finds the
-  handle gone and returns before it builds a ConnectNetworkResponse
-  (`NetworkCommissioningCluster.cpp:845-857`, under
-  `CHIP_DEVICE_CONFIG_SUPPORTS_CONCURRENT_CONNECTION`). What the finalized
-  message carries for a path nothing was added to was not traced
-  (unverified). Since `3b77e4e8` this module's late result touches neither
-  the reverted networks nor the Breadcrumb, but the command still answers
-  a ConnectNetworkResponse with the driver's status, after the expiry
-  (`cluster/core/network_commissioning_wifi.go`, `connect`). Fix: decide
-  what the invoke answers once its fail-safe has expired — the handler here
-  returns only when the driver does, so ending the interaction at the
-  expiry needs the expiry to end the handler's wait — and pin it with
-  `TestWiFiNetworkCommissioningConnectAfterExpiryIsDropped`. Found in
-  review II, phase 1 (the fix of R2-P1-core-06).
 - **F-db021da0-11: RemoveFabric answers InvalidFabricIndex for every
   failure.** matter.js answers `InvalidFabricIndex` when the fabric is
   unknown (`packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:412-419`
@@ -707,7 +501,7 @@ with a port of the named case.
   peer's idle interval, active interval and threshold. Fix: the port
   hands all three and the peer term uses `maxScheduleTime` as the local
   one does; `TestChunkStatusResponseTimeoutSumsBothDirections` gains the
-  case. Found in review II, phase 1 (the fix of R2-P1-req2-12).
+  case. Found in review II, phase 1 (the fix of R2-P1-req2-12). Read again in review II, phase 6a (R2-P6-par-0707): the row's 'called for the peer at `:102`' is true of the formula, not of this wait — `maxPeerResponseTimeOf` adds the peer's schedule only when peer parameters are handed (`packages/protocol/src/protocol/MRP.ts:101-109`, the test at `:102`, at `db021da0`), and the wait for the next message hands none (`MessageExchange.ts:872-886`, `undefined` at `:882`; `MessageChannel.ts:231-249`, `:240`). The peer term is this module's own (`BD-Matter-Subscription-ReportWaitBound`), so the gap is not against matter.js's wait but against the schedule the term is meant to cover: summed on one base interval and without a pad, it can end before the module's last retransmission could be acknowledged and answered, and the update of a slow or sleepy peer is counted failed early (inferred from the read; the retransmission path's interval per transmission was not read).
 - **F-db021da0-15: the controller holds reported values to their
   constraints, and fails on a malformed one, where matter.js decodes by
   shape and skips.** matter.js decodes each attribute of a data report
@@ -731,51 +525,45 @@ with a port of the named case.
   the generated decoders — and the skip-and-continue rule, each with a
   parity case; phase 4. Found by CAMERA-GO-1.1 on a CI runner of pull
   request 525.
-- **F-db021da0-17: a DataVersion here is never 0.** A
-  `contract.DataVersionTracker` starts at a random value that is not 0,
-  `Bump` skips 0 on its way round, and `Current` uses 0 for "not installed
-  yet" (`contract/dataversion.go`). matter.js starts a server datasource's
-  version at `entropy.randomUint32`, which can be 0
-  (`packages/node/src/behavior/state/managed/Datasource.ts:597` at
-  `db021da0`), and `advanceVersion` wraps past 0xFFFF_FFFF to 0
-  (`:690-699`). A version taken from a store (`:796-805`, `:837`:
-  `this.version = store.version`) is only that of a
-  `Datasource.ExternallyMutableStore` (`:291-294`), the client-side cache
-  of a peer's values (`packages/node/src/storage/client/DatasourceCache.ts:28`,
-  checked in `packages/node/src/behavior/internal/ClientBehaviorBacking.ts:81`);
-  no file under `packages/node/src/storage/server` names it. So both stacks
-  draw a new version at every start and prime whole after a restart, and
-  no controller can tell the two apart there. What remains is the zero
-  value, one in 2^32. Since owner decision 46 the wire and the filters
-  treat 0 as an ordinary version; the tracker's own zero state is what is
-  left of the sentinel. Fix: a `by_design` sentence for the never-zero
-  tracker (reason: 0 is the tracker's not-installed state), or the tracker
-  holds "installed" beside the value and 0 becomes a version. Found in
-  review II, phase 2; the restart half was struck in phase 4
-  (R2-P4-cert-11): until then this row said matter.js's versions come back
-  from its store.
 - **F-db021da0-20: whether the request check of DoorLock's ten validated commands refuses exactly what matter.js's validation refuses was not compared.** matter.js validates every command that has a schema against the model (`packages/node/src/node/integration/ProtocolService.ts:351-368`, `:662-671` at `db021da0`); a failure goes to the command's `onValidationError` where its Supervision config has one (`:659-660`, `:673-674`) and is otherwise logged while the command runs (`:675-677`), and the one `onValidationError` at the pin is DoorLock's, which answers INVALID_COMMAND for setUser, getUser, clearUser, setCredential and the six schedule commands (`packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1511`). Since review II, phase 5b (owner decision 113, `13f1a70a`) the definition's request check (`spec.Instance.CheckRequest`: types, constraints, enum values, field conformance) holds every request before any handler, refuses DoorLock's ten with INVALID_COMMAND (`Check.Refusal`, `cluster/spec/doorlock/definition_gen.go`) and logs the failures of other commands while they run, as matter.js; DoorLock's other commands are not checked: matter.js skips the TLV-level validation for a cluster with a configured command (`ProtocolService.ts:343-348`) and its model validation only logs for them (`:662-679`). Whether matter.js's validator refuses exactly what `CheckRequest` refuses for the ten — an enum value outside a member-list constraint, reserved bitmap bits — was not compared (unverified). Fix: a parity case per kind of refusal, or a `by_design` line where they differ. Found in review II, phase 4 (the fix of owner decision 64); narrowed in phase 5b.
-- **F-db021da0-21: the thermostat does not follow the temperature or the occupancy of a sibling endpoint.** matter.js couples its Thermostat to two sibling clusters, once, when the node goes online (`reactTo(node.lifecycle.online, #nodeOnline)`, `packages/node/src/behaviors/thermostat/ThermostatServer.ts:168`, `:177-182` at `db021da0`; later structure changes are not followed, the TODO at `:178-179`): the endpoint named by the state field `localIndoorTemperatureMeasurementEndpoint` (`:467`, declared `:1618-1622`) feeds LocalTemperature from its TemperatureMeasurement `measuredValue` (`:480-484`), and the one named by `localOccupancyMeasurementEndpoint` (`:539`, declared `:1631-1635`) feeds Occupancy from its OccupancySensing `occupancy` (`:552-553`, `:577-579`); each is taken over the external state unless a RemoteSensing bit selects the external source (`:455`, `:468`, `:538`, `:540`). Since review II, phase 5b the Go server has the external temperature input with its calibration and the LocalTemperatureNotExposed rule — `ThermostatServer.SetMeasuredTemperature`, the mirror of `externalMeasuredIndoorTemperature` (`:497-501` → `:511-527`) — so the calibration this row first named is applied; occupancy comes from the host (`SetOccupied`). Neither sibling coupling is built: a host that composes a thermostat with such a sensor wires the two itself. Fix: the couplings, from an endpoint the host names. Found in review II, phase 4 (R2-P4-appclim-05); narrowed in phase 5b, when the row of the `862ad75f` section on the OccupancySensing coupling joined it.
-- **F-db021da0-28: BridgedDeviceBasicInformation serves NodeLabel and SerialNumber whatever the host set.** Both are optional in the model (`packages/model/src/standard/elements/bridged-device-basic-information.element.ts:30`, `:40` at `db021da0`); that matter.js lists an optional attribute only when its state holds a value was the fix's reading of `ValidatedElements.ts:247-279` and was not repeated (unverified). Here NodeLabel is always served, empty when the host gave none (`cluster/core/bridged_device_basic_information.go:245`), and SerialNumber is filled from the UniqueID when the host gave none (`:179-181`) — the pair matter.js warns about, "uniqueId and serialNumber shall not be the same" (`basic-information-validators.ts:42-44`). A VendorID of 0 or above 0xFFF4 and a ProductID of 0 are warnings here (`:281-301`) where matter.js's validator, which the bridged server runs (`BridgedDeviceBasicInformationServer.ts:45`), throws (`basic-information-validators.ts:32-40`). The code gives Apple's HAP mapper as the reason for SerialNumber, as the root's `BD-Matter-BasicInfo-SerialNumberAlwaysServed`; for NodeLabel it gives none. Not decided: follow matter.js, or a `by_design` entry with the owner's reason. Found in review II, phase 4 (R2-P4-coresys-05).
-- **F-db021da0-35: a group message whose authenticated payload does not parse ends at its first candidate key.** matter.js fails a candidate whose authenticated payload does not parse and tries the next, "As in the CHIP SDK" (`packages/protocol/src/session/GroupSession.ts:435-442` at `db021da0`). `groups.Decode` returns the message of the first candidate that authenticates and that GroupKeyMap allows, without parsing its payload (`groups/decode.go:232-253`); the bridge parses it afterwards and ends the message with an error, without a GroupcastTesting result, when it does not parse (`bridge/group_messaging.go:307-310`). Who sees it (read, not run): only a message a candidate key authenticates and whose payload does not parse — matter.js goes on to the next candidate, this module does not. Fix: the payload parse inside the candidate loop; the cases of SecureSessionTest.ts's "GroupKeyMap check" that stay missing in the test register go with it. Placed in phase 6 of review II. Found in review II, phase 4 (R2-P4-nw-07b).
-- **F-db021da0-38: a GroupKeyMap write of the held entries in another order is no change.** matter.js judges a write by `isDeepEqual` of the written and the held value (`#noteIfChanged`, `packages/node/src/behavior/state/managed/Datasource.ts:1476-1481` at `db021da0`), which compares two arrays property by property, so the place of an entry counts (`packages/general/src/util/DeepEqual.ts:57-84`). GroupKeyManagement compares the written list with the fabric's mappings per group (`sameGroupKeyMap`, `cluster/core/group_key_management.go:645-660`; "the order of the written entries does not count", `:576-577`): the held entries in another order answer unchanged, store nothing and advance no version. Whether matter.js holds a differently ordered list after such a write depends on how its fabric-scoped list builds the stored array on a REPLACE, which was not traced (unverified); nothing was run on either side. Who sees it: a controller that writes its fabric's GroupKeyMap entries in another order gets no new DataVersion and no report here. Fix: with that trace, either the order is kept and compared or the difference becomes a `by_design` entry. Not placed. Found in review II, phase 4 (the citation pass on owner decision 78).
+- **F-db021da0-28: BridgedDeviceBasicInformation serves NodeLabel and SerialNumber whatever the host set.** Both are optional in the model (`packages/model/src/standard/elements/bridged-device-basic-information.element.ts:30`, `:40` at `db021da0`); that matter.js lists an optional attribute only when its state holds a value was the fix's reading of `ValidatedElements.ts:247-279` and was not repeated (unverified). Here NodeLabel is always served, empty when the host gave none (`cluster/core/bridged_device_basic_information.go:245`), and SerialNumber is filled from the UniqueID when the host gave none (`:179-181`) — the pair matter.js warns about, "uniqueId and serialNumber shall not be the same" (`basic-information-validators.ts:42-44`). A VendorID of 0 or above 0xFFF4 and a ProductID of 0 are warnings here (`:281-301`) where matter.js's validator, which the bridged server runs (`BridgedDeviceBasicInformationServer.ts:45`), throws (`basic-information-validators.ts:32-40`). The code gives Apple's HAP mapper as the reason for SerialNumber, as the root's `BD-Matter-BasicInfo-SerialNumberAlwaysServed`; for NodeLabel it gives none. Not decided: follow matter.js, or a `by_design` entry with the owner's reason. Found in review II, phase 4 (R2-P4-coresys-05). **Review II, phase 6a (owner decisions 143 and 166):** the NodeLabel and SerialNumber half is closed — the bridged server lists an optional attribute only when its state holds a value, as matter.js (`packages/node/src/behavior/cluster/ValidatedElements.ts:252`, skip `:270-275`, add `:277-278` at `db021da0`), and backfills nothing but UniqueID (`BridgedDeviceBasicInformationServer.ts:39-43`) (`09c32c85`); the root serves SerialNumber only when stated (`5e97e2a1`). The VendorID / ProductID half was not part of the decision and stays open.
+- **F-db021da0-35: a group message whose authenticated payload does not parse ends at its first candidate key.** **Review II, phase 6a (decision 127, at `16a8f6e5`):** still true — `bridge/group_messaging.go`; matter.js parses inside the candidate loop and continues on `UnexpectedDataError` (`packages/protocol/src/session/GroupSession.ts:435-442` at `db021da0`). matter.js fails a candidate whose authenticated payload does not parse and tries the next, "As in the CHIP SDK" (`packages/protocol/src/session/GroupSession.ts:435-442` at `db021da0`). `groups.Decode` returns the message of the first candidate that authenticates and that GroupKeyMap allows, without parsing its payload (`groups/decode.go:232-253`); the bridge parses it afterwards and ends the message with an error, without a GroupcastTesting result, when it does not parse (`bridge/group_messaging.go:307-310`). Who sees it (read, not run): only a message a candidate key authenticates and whose payload does not parse — matter.js goes on to the next candidate, this module does not. Fix: the payload parse inside the candidate loop; the cases of SecureSessionTest.ts's "GroupKeyMap check" that stay missing in the test register go with it. Placed in phase 6 of review II. Found in review II, phase 4 (R2-P4-nw-07b).
 - **F-db021da0-42: the Groupcast commands change a fabric's GroupKeyMap outside the mutex that serialises its writes.** In matter.js the Groupcast server assigns GroupKeyManagement's `groupKeyMap` state (`#setGroupKeyMapping`, `#removeGroupKeyMappings`, `packages/node/src/behaviors/groupcast/GroupcastServer.ts:777-792` at `db021da0`), a managed write that takes the datasource into its transaction as a resource (`#startWrite`, `packages/node/src/behavior/state/managed/Datasource.ts:1345-1350`), as a controller's write of the attribute does; how two transactions on one resource wait for each other is `BD-Matter-Invoke-HoldsHostReports`'s reading and was not repeated (unverified). Here a controller's GroupKeyMap write reads the held mappings, compares and stores under `writeMu` (`cluster/core/group_key_management.go:610-640`), while `setGroupKeyMapping` and `removeGroupKeyMapping`, which the Groupcast commands reach, check and store without it (`:1179-1198`). A Groupcast change of a fabric beside a GroupKeyMap write of the same fabric can fall between the write's read and its store: the write's verdict and its removals are then judged against a list that has moved, and each path checks the fabric's group count on its own. Both advance the version, so no change goes unversioned. Read from the lines, not run; whether a Groupcast path reaches the mutators from inside the group table's reload, which the write runs under `writeMu` (`syncGroups`, `:640`), was not read (unverified). Who sees it: two administrators of one fabric that change its group mappings at the same moment. Fix: the mutators under `writeMu`, once the lock order is read; phase 6 of review II. Found in review II, phase 4 (the survey for R2-P4-fr-ver-01).
 - **F-db021da0-43: two NodeLabel writes to one bridged device at the same moment are each judged against their own copy of the label.** A bridged endpoint's BridgedDeviceBasicInformation server is built for every dispatch, seeded with the endpoint's label (`endpoint/materialize.go:210-231`, `NodeLabel: ep.NodeLabel()`), and the mutex that makes the comparison, the store and the host's hook one step belongs to that instance (`writeMu`, `cluster/core/bridged_device_basic_information.go:50-55`, `:494-495`). Two writes dispatched at the same moment run on two instances: both can answer changed for one label, and the host's `OnNodeLabelWrite` can hear two labels in another order than the endpoint keeps them. Read from the lines, not run. matter.js keeps one datasource per behavior and takes it into a write's transaction (`packages/node/src/behavior/state/managed/Datasource.ts:1345-1350` at `db021da0`); how its transactions wait for each other was not repeated (unverified, as for F-db021da0-42). Who sees it: two controllers that rename one bridged device at the same moment. Fix: the comparison against the endpoint's label under one lock — the endpoint's, or a server kept across dispatches; phase 6 of review II. Found in review II, phase 4 (R2-P4-fr-ver-01, second round).
 - **F-db021da0-44: a hand-off LevelControl whose port is also the endpoint's source notifier is told of a host change on two subscriptions whose order the host decides.** The bridge subscribes the endpoint's source notifier for the paths of the source's own cluster (`bridge/subscribe.go:2091-2120`), and a LevelControl server without the transition engine subscribes to its port's notifier itself once it has a change listener (`reconcileHost`, `cluster/levelcontrol/levelcontrol_server.go:611-635`), handing a notification to its forwarded callbacks before its listeners (`onHost`, `:586-607`). When port and source are one notifier, the bridge's callback and the server's are two callbacks of the host's notifier, in the order the host calls them. By the fix's reading the server's change, when it comes first, advances the version and takes the value into the notification's memory (`quieterChanged`, `bridge/subscribe.go:2472`; `settlerFor`, `:2495`), so the notification after it finds nothing moved and reports nothing; with the bridge's half of the fix alone that showed as an advance without a report in 7 of 60 runs of `bridge:TestHostChangeAdvancesOnceOnAHandOffServer`, in a wiring where the server forwards the notifier. For the wiring of this row nothing was run, and the reading was not repeated (unverified). matter.js has one datasource per behavior, whose commit advances and broadcasts together (`packages/node/src/behavior/state/managed/Datasource.ts:1456-1457`, `:1319` at `db021da0`). Who would see it: a subscriber of CurrentLevel on such a device misses a host change until the next one. Fix: one subscription per host notifier and endpoint, or the settlement told which callback comes last; phase 6 of review II. Found in review II, phase 4 (R2-P4-fr-ver-01, second round).
-- **F-db021da0-46: the hand-off advance of LevelControl and ModeSelect moves a version no controller reads.** A note, not a wire gap. The dispatcher serves a server's own version only on the root and the Aggregator (`ownDataVersion`, `endpoint/dispatcher.go:39-45`); on every other endpoint the served version is the endpoint's (`clusterDataVersionFor`, `:55-63`), and `clusterDataVersion` (`:24-29`) has no caller outside tests. LevelControl and ModeSelect are mounted on neither, so the rule `53c68d85` gave their own trackers — a command handed to the host's port advances when the value it leaves differs from the one the last host notification read (R2-P4-rr-im-01) — and the tests that pin it hold `MatterDataVersion()`, which the wire does not carry. On the wire the bridge's command commit advances the endpoint's version once for the same case (`BD-Matter-Invoke-HoldsHostReports`). Fix: none for the wire; the tests say which version they hold, or the trackers of servers that are never served by them go. Not placed. Found in review II, phase 4 (R2-P4-fr-im-03). Since review II, phase 5b (`c1028573`) `spec.Server`'s `ServerConfig.DataVersion` and `MatterDataVersion` state that the wire carries a server's own version on the root endpoint and the Aggregator only; LevelControl's and ModeSelect's own trackers and the tests that hold their `MatterDataVersion()` say nothing of it yet (`cluster/levelcontrol/levelcontrol_server.go`, `cluster/modeselect/modeselect_server.go`).
+- **F-db021da0-46: the hand-off advance of LevelControl and ModeSelect moves a version no controller reads.** A note, not a wire gap. The dispatcher serves a server's own version only on the root and the Aggregator (`ownDataVersion`, `endpoint/dispatcher.go:39-45`); on every other endpoint the served version is the endpoint's (`clusterDataVersionFor`, `:55-63`), and `clusterDataVersion` (`:24-29`) has no caller outside tests. LevelControl and ModeSelect are mounted on neither, so the rule `53c68d85` gave their own trackers — a command handed to the host's port advances when the value it leaves differs from the one the last host notification read (R2-P4-rr-im-01) — and the tests that pin it hold `MatterDataVersion()`, which the wire does not carry. On the wire the bridge's command commit advances the endpoint's version once for the same case (`BD-Matter-Invoke-HoldsHostReports`). Fix: none for the wire; the tests say which version they hold, or the trackers of servers that are never served by them go. Not placed. Found in review II, phase 4 (R2-P4-fr-im-03). Since review II, phase 5b (`c1028573`) `spec.Server`'s `ServerConfig.DataVersion` and `MatterDataVersion` state that the wire carries a server's own version on the root endpoint and the Aggregator only; LevelControl's and ModeSelect's own trackers and the tests that hold their `MatterDataVersion()` say nothing of it yet (`cluster/levelcontrol/levelcontrol_server.go`, `cluster/modeselect/modeselect_server.go`). Review II, phase 6a (owner decision 165): every host-owned tracker is `Deprecated:` — LevelControl's, ModeSelect's and modebase's `Config.DataVersion`, `HeldConfig.DataVersion`, `MatterDataVersion`, `spec.ServerConfig.DataVersion` and the server `Config.DataVersion` fields that pass one in; the row closes when they are removed after the deprecation window.
 - **F-db021da0-47: the node's persister stores a held value the store does not hold yet.** matter.js hands the store only the fields a commit noted as changed against the held value (`#computePostCommitChanges`, `Datasource.ts:1446-1452`; `#noteIfChanged`, `:1476-1481` at `db021da0`). `PersistWrite` compares the written value with the stored one, not with the one the server holds (`node/nonvolatile.go:252-258`), so a write of the value a server holds from its declaration, under a key never stored, is written to the settings store once. Read from the lines, not run. Who sees it: no controller; the host's store takes one write per key for a value that did not change. Narrowed 2026-11-16 (review II, phase 5b, wave F, `1976e84a`): a write of the value the store already holds stores nothing (`node:TestNonVolatileWriteOfTheStoredValueStoresNothing`).
-- **F-db021da0-48: the hand-written list readers accept an array element with a tag.** matter.js's array schema refuses an array whose element carries a tag (`packages/types/src/tlv/TlvArray.ts:77-78` at `db021da0`, "Array element tags should be anonymous."), and connectedhomeip's reader refuses it for every array it reads (`src/lib/core/TLVReader.cpp:873-875` at `6170af84`). Here the tree reader behind the generated decoders refuses it since review II, phase 4 (`spec.ReadContainer`, `cluster/spec/codec.go`, `ErrArrayElementTag`), but `tlv.Decoder.Next` itself reports the element with its tag, and a reader written by hand over the decoder does not look at it: `decodeACLList` takes a tagged structure as an entry (`bridge/attribute_value_reader.go:177-195`). Not deliberate; which hand-written readers of the bridge and of `cluster/wire` read an array this way was not listed. Placed in phase 6 (the full pass); the one place to close it is the decoder, which knows the container it is in.
+- **F-db021da0-48: the hand-written list readers accept an array element with a tag.** **Review II, phase 6a (decision 127, at `16a8f6e5`):** still true as far as read — `tlv.Validate` holds the rule (`tlv/decode.go`) but no inbound reader of `bridge` or `im` called it (grep, inferred); `decodeACLList` and the matter.js and chip lines of the row were not re-read (unverified). Wave 2 of phase 6a (decision 161) made a tagged array element of a written attribute value end the write interaction with FAILURE; the hand readers of other paths were not re-read after it. matter.js's array schema refuses an array whose element carries a tag (`packages/types/src/tlv/TlvArray.ts:77-78` at `db021da0`, "Array element tags should be anonymous."), and connectedhomeip's reader refuses it for every array it reads (`src/lib/core/TLVReader.cpp:873-875` at `6170af84`). Here the tree reader behind the generated decoders refuses it since review II, phase 4 (`spec.ReadContainer`, `cluster/spec/codec.go`, `ErrArrayElementTag`), but `tlv.Decoder.Next` itself reports the element with its tag, and a reader written by hand over the decoder does not look at it: `decodeACLList` takes a tagged structure as an entry (`bridge/attribute_value_reader.go:177-195`). Not deliberate; which hand-written readers of the bridge and of `cluster/wire` read an array this way was not listed. Placed in phase 6 (the full pass); the one place to close it is the decoder, which knows the container it is in.
 - **F-db021da0-49: a certificate's vendor and product id are read from a string-typed DN value only.** matter.js reads the attribute value's raw bytes as text whatever its DER tag (`packages/protocol/src/certificate/kinds/Certificate.ts:326` at `db021da0`). `internal/attestids` takes the value through `pkix` as a Go string (`Value.(string)`), and `encoding/asn1` decodes a T61String and a BMPString to a string too; so, inferred and not measured, a BMPString `FFF1` is accepted here and malformed in matter.js, and an OCTET STRING holding `FFF1` is malformed here and accepted in matter.js. "A value that is not a string counts as malformed" is this module's own rule. Fix: read the value's bytes as matter.js does, with a parity case per tag. Found in review II, phase 5b (the reference read of wave F); older than the wave.
 - **F-db021da0-50: the re-establishment of former subscriptions connects over UDP only.** matter.js prefers TCP for it when the peer's last known operational address was TCP (`packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts:298-309` at `db021da0`). Here the ADR 0008 initiator resolves and handshakes over UDP (`connectPeer`, `runCASEInitiator`, `bridge/case_initiator.go`). Not deliberate: the order of the steps (ADR 0032, Shape 1). Fix: the re-establishment on the one session path; the single session layer ADR 0032 names as the direction closes it. Found in review II, phase 5b (wave B).
 - **F-db021da0-51: a request on a session a node's client stack opened is served with the bridge's gates, not with the rest of the bridge's server.** The node serves its endpoint tree there with the bridge's dispatcher, ACL, privilege, existence, timed and Large Message gates and the same request facts (`clientServerConfig`, `node/client.go`; review II, wave B), but a write there runs in a fresh `im.WriteTransaction` of its own, not under the bridge's write holds, so it is not answered BUSY for an attribute a chunked write on a bridge session holds; a chunked write on such a session is applied chunk by chunk as separate writes (the server's exchange ends after the first chunk, `MoreChunkedMessages` is not read), so a chunked ACL replace leaves the list at its first chunk; none of the bridge's per-session bounds (chunk waits, chunked writes per session) applies, and a read's whole report is built before its first chunk is sent; a SubscribeRequest is answered INVALID_ACTION, a read reports no events, an invoke's before-and-after snapshot of the invoked clusters does not run (a change reaches the subscriptions through the servers' own notifications only), and a CommissioningComplete there does not close the PASE sessions as the bridge does after it (`closePASESessionsOnCommissioningComplete`). The session is named to the clusters by its identity (`core.WithInvokeSession`), never by a bridge id. Not deliberate: the order of the steps (ADR 0032, Shape 1). Fix: the single session layer, or earlier the bridge's write holds and bounds handed to the client stack's server. Found in review II, phase 5b (wave B).
-- **F-db021da0-52: a request whose decode fails as a whole is answered differently by the two stacks.** For a reader error that carries no status the bridge answers with the error's status, FAILURE by default, and honours SuppressResponse (`bridge/receive.go`); the client stack's server answers INVALID_ACTION always and sends the status whatever SuppressResponse says (`client/interaction/server.go`). Both refuse the request. Which one matter.js answers was not read (unverified). Fix: one answer for both stacks, matter.js's once read. Found in review II, phase 5b (the reference read of wave B).
 - **F-db021da0-53: a pairing hint with any of bits 16 to 22 set is no hint at all to a commissioner built on connectedhomeip.** matter.js models 23 hint bits, the last `powerCycleUntilIndication`, bit 22 (`packages/protocol/src/advertisement/PairingHintBitmap.ts:145` at `db021da0`). connectedhomeip reads PH with `MakeU16FromAsciiDecimal` (`src/lib/dnssd/TxtFields.cpp:195-198` at `6170af84`), which returns 0 for a value that does not fit 16 bits (`:104-108`), and stores that (`:274-275`): a PH above 65535 is read as 0, the whole hint. Whether another connectedhomeip path parses PH was not read (unverified). The module advertises the bits the host sets, as matter.js, and its docs state the consequence (`mdns.PairingHints`, `node.Commissioning.PairingHints`). Who sees it: a chip-based commissioner shown a device whose host set a hint of bit 16 or above, which sees no hint. Fix: none in this module while the two references differ; a host that wants every commissioner to see its hint keeps to bits 0 to 15. Found in review II, phase 5b (the reference read of wave A2).
 - **F-db021da0-54: matter.js's set of hints that need a PairingInstruction leaves out bits 20 to 22.** matter.js's bitmap comments say the PairingInstruction SHALL carry the value for bits 20, 21 and 22 (`packages/protocol/src/advertisement/PairingHintBitmap.ts:128-145` at `db021da0`), but its instruction set names eleven bits without them (`PAIRING_HINTS_REQUIRING_INSTRUCTION`, `packages/protocol/src/mdns/MdnsConsts.ts:20-32`). The module mirrors the set (`mdns.PairingHints`): bit 20 with a PairingInstruction is refused, as in matter.js. A gap of matter.js's, mirrored; the row closes when matter.js's set changes, and the mirror follows. Found in review II, phase 5b (the reference read of wave A2).
 - **F-db021da0-55: a manufacturer-specific fabric-scoped list on a cluster of the schema snapshot is not scoped by the dispatcher.** For a cluster of the snapshot the generated table is the whole fabric scope (`fabricScopeFor`, `endpoint/dispatcher.go`); a manufacturer-specific attribute a server adds to such a cluster cannot be declared, since `contract.FabricScopeDeclarer` is not asked, and the dispatcher applies no scope to it, as `contract/fabric_scope.go` states. No module server is affected. Fix: ask the declarer for an attribute id in the manufacturer range that the table does not hold, or refuse such an attribute at assembly. Found in review II, phase 5b (wave A).
-- **F-db021da0-56: a host's change during a later attribute data of a written cluster gets no advance of its own.** matter.js commits one transaction per attribute data (`packages/protocol/src/action/server/AttributeWriteResponse.ts:433-435` at `db021da0`), and each advances the version once when it noted a change (`packages/node/src/behavior/state/managed/Datasource.ts:1456-1457`); a change in another transaction is another commit and another advance. The bridge's write hold spans the message and the endpoint, and a held path gets no advance of its own when any write of the message changed its cluster (`settleWrite`, `bridge/write_hold.go`): for a WriteRequest `[X.a (changes), X.c (unchanged)]` with a host change of `X.b` during the second, matter.js advances twice and the module once, and the same rule merges a host change made beside the write into the write's advance. Read from the lines, not run; whether a Read can be served between the dispatcher's advance and the settle was not read (unverified). A change-only notifier's mark before the advance is F-db021da0-59. Fix: the hold per attribute data. Found in review II, phase 5b (the reference read of wave C).
-- **F-db021da0-57: WindowCovering and FanControl answer one verdict for the cluster, not the attributes their write changed.** matter.js broadcasts the names its commit changed (`packages/node/src/behavior/state/managed/Datasource.ts:1476-1484`, `:1319` at `db021da0`), and since review II, phase 5b a server names them here through `contract.ChangeNamingWriter`. `cluster/cover` already computes the attributes a write changed and `cluster/fan` moves PercentSetting and SpeedSetting with FanMode, but both answer one verdict for the cluster (`MatterWriteChanged`), recorded under the written attribute, so the written attribute is marked when only a sibling moved. No kit write was found that changes a sibling and leaves the written attribute (the wave's read, not a search of every host). Fix: both servers onto `ChangeNamingWriter`. Found in review II, phase 5b (wave C).
+- **F-db021da0-57: WindowCovering and FanControl answer one verdict for the cluster, not the attributes their write changed.** matter.js broadcasts the names its commit changed (`packages/node/src/behavior/state/managed/Datasource.ts:1476-1484`, `:1319` at `db021da0`), and since review II, phase 5b a server names them here through `contract.ChangeNamingWriter`. `cluster/cover` already computes the attributes a write changed and `cluster/fan` moves PercentSetting and SpeedSetting with FanMode, but both answer one verdict for the cluster (`MatterWriteChanged`), recorded under the written attribute, so the written attribute is marked when only a sibling moved. No kit write was found that changes a sibling and leaves the written attribute (the wave's read, not a search of every host). Fix: both servers onto `ChangeNamingWriter`. Found in review II, phase 5b (wave C). Review II, phase 6a: still true (only `spec.Server` implements `ChangeNamingWriter`).
 - **F-db021da0-58: `fabrictest:TestControllerRecoversFromASilentRestart` failed once under load.** Test quality, not a behaviour gap. Its subscription case failed once ("session … not dropped") in a guard run beside six agents and passed 35 times on a rerun under `-race`. Fix: none known; the row records the failure until it recurs or its cause is found. Found in review II, phase 5b (the guards at `1a3b760f`).
 - **F-db021da0-59: a controller's write to a server that reports its changes through its change notifier alone is marked before the dispatcher advances the version.** matter.js advances a datasource's version before it broadcasts the commit's change list (`packages/node/src/behavior/state/managed/Datasource.ts:1456-1457`, `:1319` at `db021da0`). Since review II, phase 5b a server with a report view has a change it names as the controller's write held until the write's report marks it after the advance (`reportServerChange`, `bridge/subscribe.go`; `settleWrite`, `bridge/write_hold.go`; `bridge:TestWrittenAttributeIsNotReportedBeforeTheWriteAdvances`). A server without a report view is wired to advance on its own (`wireAttributeNotifiers`), and a change it names as the controller's write is marked at once and the host hook runs, before the dispatcher advances the endpoint's version after the server returns (`endpoint/dispatcher.go`). Servers that name the controller's write from inside `MatterWrite` and have no report view: Thermostat (`cluster/thermo/thermostat_server.go`), WindowCovering (`cluster/cover/windowcovering_server.go`) and OccupancySensing's HoldTime (`cluster/sensing/occupancy.go`). A report built in that window carries the new value with the cluster's old version, the next one the same value with the new version. Read, not measured; whether a report is built inside the window in production was not read (unverified). Distinct from F-db021da0-56, where a held host change gets no advance of its own. Fix: hold a controller-write change of these servers as a report view's is held, or give them a report view. Found in review II, phase 5b (the reference read of wave C).
+- **N4-d4wifi-1: ConnectNetwork on a Wi-Fi interface whose InterfaceEnabled is false joins and leaves the attribute false.** That also keeps the rejoin of the committed network disarmed (`cluster/core/network_commissioning_wifi.go` setInterfaceEnabledLocked / armRejoinLocked). connectedhomeip's cluster reads InterfaceEnabled in neither ScanNetworks nor ConnectNetwork (`src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:333-367`, `:635-683`; the attribute only at `:1084-1085`, `:1120-1132` at `6170af84`), and the one driver that models it re-enables the interface before it connects (`src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp:209-213`). Open: whether the Wi-Fi server's ConnectNetwork sets InterfaceEnabled true as that driver does. `wifi/wpasupplicant` does not implement the switch. matter.js's server was not read for it. Found in review II, phase 4; recorded in phase 6a.
+- **R2-P6-par-1360: a field conformance that compares a field with the null literal never conforms.** `performComparison` is conformant only when both sides are non-null (`packages/node/src/behavior/state/validation/conformance-util.ts:183-209` at `db021da0`), and this module's comparison is the same (`cluster/spec/field_conformance.go`). At the pin this hits WebRtcTransportProvider ProvideOffer's five fields (`MetadataEnabled` disallowed even with a null session id); the device only logs the misfit, because ProvideOffer states no Refusal. A gap of matter.js's, mirrored; the row closes when matter.js compares with null, and the mirror follows. Found in review II, phase 6a.
+- **R2-P6-fsm-1401: a "with On/Off" LevelControl transition re-runs its On/Off coupling on every step.** An Off from the On/Off cluster during a MoveToLevelWithOnOff upward fade is undone at the next step and the fade continues (`cluster/levelcontrol/transitions.go`, `transition` OnStep → `couple`). matter.js the same: `packages/node/src/behaviors/level-control/LevelControlServer.ts:545-547` (onStep → couple), `:589-591` (`#turnOnForLevel` when not turnsOff), `:597-603` (onOff = true when off); `handleOnOffChange(false)` returns without touching the transition (`:664`) at `db021da0`. A gap of matter.js's, mirrored; the row closes when matter.js ends the fade on an Off, and the mirror follows. Found in review II, phase 6a.
+- **R2-P6-fsm-1402: a command that replaces a running transition with an immediate one, or with one to the value already reached, ends it without a RemainingTime report or Settled.** matter.js the same: `packages/node/src/behavior/Transitions.ts:124` (`stop(name)`), returns at `:128-130` and `:133-148` with no `#updateRemainingTime`; `stop` `:263-284` emits nothing (at `db021da0`). Here `cluster/transition/transition.go` `startLocked`. A gap of matter.js's, mirrored; the row closes when matter.js reports the end, and the mirror follows. Found in review II, phase 6a.
+- **R2-P6-fsm-1412: a mode switch or a MoveToHueAndSaturation over a colour loop stops its transition but leaves ColorLoopActive 1; ColorLoopSet or a scene with Time 0 sets Active with an infinite rate that moves nothing.** matter.js `stopAllColorMovement` leaves `colorLoopActive` (`packages/node/src/behaviors/color-control/ColorControlServer.ts:843-848` at `db021da0`); `startColorLoopLogic` passes `Math.floor(MAX_ENHANCED_HUE_VALUE / this.state.colorLoopTime)` (`:1201-1210`, the constant 0xffff at `:59`), infinite at Time 0, which `packages/node/src/behavior/Transitions.ts:133-136` returns from without a target. A gap of matter.js's, mirrored; the row closes when matter.js clears the loop, and the mirror follows. Found in review II, phase 6a.
+- **R2-P6-err-1415: an Apply error during a step clears every transition without a RemainingTime 0 report.** matter.js: a step error calls `this.stop()` (`packages/node/src/behavior/Transitions.ts:594-600` at `db021da0`), `stop()` clears without `#updateRemainingTime` (`:263-284`); only `cancel()` reports 0 (`:340-376`). Here `cluster/transition`. A gap of matter.js's, mirrored; the row closes when matter.js reports the end, and the mirror follows. Found in review II, phase 6a.
+- **R2-P6-err-1404 (follow-on): a scene recall of an active colour loop no longer invalidates the scene in passing.** `MatterApplySceneValues` calls `colorLoopSet` directly (`cluster/light/colorcontrol_scenes.go`), whose invalidation mark only `MatterInvoke` reads; matter.js invalidates there (`packages/node/src/behaviors/color-control/ColorControlServer.ts:1869` → `:1145` at `db021da0`). The net state is equal — core activates the scene after applying (`cluster/core/scenes_management.go`) — only the intermediate invalid state is gone. Inferred from the read, not run. Found in review II, phase 6a.
+- **R2-P6-par-1466 (follow-on): ElectricalPowerMeasurement's Accuracy entries are a stub.** One entry per served measurement type (Voltage, ActiveCurrent, ActivePower, Frequency; three without Frequency for DC), as the model's text asks (`packages/model/src/standard/resources/electrical-power-measurement.resource.ts:57-59` at `db021da0`), but each states the attribute's constraint as its Min/MaxMeasuredValue and FixedMax 1 (`cluster/measurement/measurement.go`): no source carries a meter's accuracy — the contract has none, matter.js's server is empty and connectedhomeip's values were not taken. Fix: a host-supplied accuracy, a contract capability. Found in review II, phase 6a.
+- **R2-P6-sec-1513: the door lock's credential data are sealed without associated data, under a key kept in the same store.** As matter.js (`packages/general/src/crypto/Cipher.ts:34-49`, `packages/node/src/behaviors/door-lock/DoorLockServer.ts:153-155`, `:1569-1573` at `db021da0`); the module's store-wide sealing is `BD-Matter-SealedAtRest`. Reaching it needs store access; no network party gains. A gap of matter.js's, mirrored. Found in review II, phase 6a.
+- **R2-P6-fsm-1593: an area's MapID need not name a supported map.** As matter.js (`packages/node/src/behaviors/service-area/ServiceAreaServer.ts:117-143` at `db021da0`). A gap of matter.js's, mirrored; the row closes when matter.js checks it, and the mirror follows. Found in review II, phase 6a.
+- **R2-P6-err-1560: a host preset setter between the candidate check and the apply can still make the apply refuse after the presets were stored.** `checkCandidate` and `applySet` do not run under one hold of `mu` (`cluster/thermo/thermostat_typed.go`). Closing it needs the preset setters under the same hold, which the `op` / `persist` order forbids for the inbound path. This module's own; no reference sentence. Found in review II, phase 6a.
+- **R2-P6-store-1501: the wait on the preset store takes no context.** A `SavePresets` that never returns blocks every inbound setpoint setter, which did not wait on the store before; stated on the exported `thermo.PresetStore` doc. This module's own. Found in review II, phase 6a.
+- **R2-P6-conc-1606 (follow-on): a command in flight across `MatterQuiesce` arms its timer after the quiesce.** PushTransport (`commitAllocation` → `scheduleLocked`) and DeviceEnergyManagement (`armPowerAdjustLocked` after the manager hook released `mu`) arm a timer the quiesce no longer stops, as EvseServer documents for its own (the next EnableCharging arms the timer again). If the bridge does not drain commands before quiescing, that timer reaches the port after the stop. This module's own; no reference sentence. Found in review II, phase 6a.
+- **F56-n: a host change that arrives outside an attribute data of a write — between two, or after the last — gets no advance of its own when the write changed its cluster.** The bridge's hold table stamps such a change with no attribute data and settles it against the whole record (`bridge/write_hold.go` `open`, `settleWrite`; measured by run at `7eea3b49`'s code, Fable's read of the F-db021da0-56 rework: no advance after an attribute data that changed the cluster, none before a later one that does); matter.js would give a change after a commit its own commit and advance (inferred from `packages/node/src/behavior/state/managed/Datasource.ts:1456-1457` at `db021da0`). Found in review II, phase 6a.
+- **hs 4b (BDX remainder): a BDX message tracked on an exchange whose earlier message awaits its acknowledgement takes that message's place.** `outboundReliableTracker.Track` / `TrackWithMargin` (`bridge/outbound_reliable.go`) keep the supersede for BDX; matter.js refuses the new message (`packages/protocol/src/protocol/MessageExchange.ts:701-705` at `db021da0`). The interaction path refuses as matter.js since phase 6a (`TrackOnExchange`, `f94b30a3`). Found in review II, phase 6a.
+- **R2-P6-par-0444: a fabric-scoped event that is not fabric-sensitive is not filtered by a fabric-filtered read.** matter.js filters a fabric-sensitive event to the accessing fabric whatever the read's FabricFiltered flag (`packages/protocol/src/action/server/EventReadResponse.ts:344-352` at `db021da0`), and a fabric-scoped event that is not fabric-sensitive only when the read is fabric-filtered (`:353-364`); the module has the first rule only (`im/read.go`). No effect at this pin — no such event in the snapshot; held by `im:TestEveryFabricScopedEventIsFabricSensitive`, which fails when one appears. Found in review II, phase 6a.
+- **R2-P6-sec-1103 (follow-on, decision 152): a requester a `contract.ReadAccessDeclarer` refuses is answered UNSUPPORTED_ACCESS for an attribute the server does not list, before its existence is known.** matter.js answers UNSUPPORTED_ATTRIBUTE before the attribute's read-level check (`packages/protocol/src/action/server/AttributeReadResponse.ts:263-266` before `:272` at `db021da0`). Fail-closed; the capability is the module's own (`BD-Matter-ReadAccessCapability`). Found in review II, phase 6a.
+- **R2-P6-acl-0402 (follow-on): the accessing-fabric stamp of a written fabric-scoped entry finds the field by its Go name `FabricIndex`.** A host struct that names field 254 otherwise passes unstamped (`endpoint/dispatcher.go` `WriteAuthorized`), while `contract/matter.go`'s `MatterWrite` doc states the condition since review II, phase 6a. matter.js injects the accessing fabric into every decoded write (`packages/protocol/src/action/server/AttributeWriteResponse.ts:466-473`, "We always inject the current fabricIndex for writes", `:471` at `db021da0`). No in-tree server is exposed. Found in review II, phase 6a.
+- **R2-P6-wire-0442 (follow-on): a write to a cluster without a definition hands the server the bridge's undecoded value.** `writtenHeld` answers Success without a definition (`endpoint/dispatcher.go`), so a host server without one receives the bridge-private `undecodedValue`; the module does not refuse it. Found in review II, phase 6a.
+- **R2-P6-bound-0405 (follow-on): a wildcard read with WildcardPathFlags reads ConfigurationVersion under the subject's read check.** Since decision 162 a subject without View on BasicInformation at endpoint 0 keeps its wildcard flags where the version would have dropped them (`im/wildcard_path_flags.go`) — fewer results, never more. matter.js reads it with `readState(this.session)` (`packages/protocol/src/action/server/AttributeReadResponse.ts:137-144` at `db021da0`); whether that checks access was not read. Found in review II, phase 6a.
+- **Review II, phase 6a (stake, decision 157): the sealed store's v11 baseline is a hand list.** `store` `TestSecretsAddedAfterV11ShipAnUpgradeStep` holds `sealedAtBaseline` equal to the sealed lists at `fcfbcb3c`; that it is exactly v11's rests on v11 being unreleased with all of them (the canary `f4de428e`, the RI key `425207e1`, the same day), not on a tag. The guard proves an upgrade step by the name of a package test, not by what it does; adding a secret together with its baseline line passes — only review stops that.
 ## Tier 3 — LOW
 
 
@@ -870,6 +658,23 @@ What `endpoint.ValidateDeviceTypes`
 the module builds itself (`endpoint/devicetype_module_test.go` pins each).
 
 ## Verified sound (no action)
+
+- **GroupcastTesting keeps one FabricUnderTest for the node.** Any fabric's command replaces or clears it, and removing the fabric under test does not end the test before its timer — as matter.js (`packages/node/src/behaviors/groupcast/GroupcastServer.ts:404-430`, `:522-525` at `db021da0`). Mirrored; no `by_design` entry; clearing on removal would be ahead of matter.js (review II, phase 6a, R2-P6-fsm-1018).
+- **The BTP idle timer runs on the central only.** A peripheral session whose central completed the handshake and then sends nothing has no idle timer (`transport/btp/session.go`), as in matter.js, whose "Central Device Idle Timer" (`packages/protocol/src/ble/BtpSessionHandler.ts:48` at `db021da0`) is restarted only for the central role (`:495-500`). A silent central is bounded by `bridge/ble.go` `watchBLEPASE` until a secure session exists, then by the commissioning window and its fail-safe (review II, phase 6a, R2-P6-fsm-0212).
+- **Bitmap bit conformance is judged for a host value only.** A controller's write is not held to it (`cluster/spec/write.go`), as matter.js enforces bit conformance only for a local actor (`packages/node/src/behavior/state/validation/ValueValidator.ts:286-300`, the gate `hasLocalActor` at `:295`, at `db021da0`). Mirrored; no `by_design` entry (review II, phase 6a, R2-P6-par-1305).
+- **A repeated context tag in a decoded payload: the last one wins; a NaN float decodes.** Both are matter.js's shape: a repeat throws only with `preserveDataOrdering` (`packages/types/src/tlv/TlvObject.ts:229-232` at `db021da0`), and `TlvNumber.ts` has no NaN check (`cluster/spec/codec.go` `DecodeFields`, `DecodeFloat64`; review II, phase 6a, R2-P6-wire-1313).
+- **The controller's untyped JSON keys parse with a base prefix, and a repeated tag is encoded twice.** As chip-tool: `std::stoul(id, nullptr, 0)` and no repeated-tag check (`examples/chip-tool/commands/clusters/CustomArgument.h:133-138` at `6170af84`; `cluster/spec/json.go` `encodeAny`; review II, phase 6a, R2-P6-wire-1365).
+- **A decoded TLV payload's container nesting has no depth bound.** `cluster/spec/codec.go` `ReadContainer` recurses per level and `tlv/` has no depth limit; neither reference bounds it — no depth in connectedhomeip's `TLVReader.h/.cpp`, `TLVCommon.h` at `6170af84`, nor in matter.js's `TlvAny.ts`, `TlvCodec.ts`, `TlvObject.ts`, `TlvArray.ts` at `db021da0` (grep). The message size bounds it (review II, phase 6a, R2-P6-bound-1312).
+- **An emitted event's payload is not validated before it is recorded.** `cluster/spec/server.go` `EmitEvent`, as matter.js: `OnlineEvent`'s trigger hands the payload as given to `occurrenceManager.add` (`packages/node/src/behavior/Events.ts:203-208` at `db021da0`) and broadcasts it (`:219-228`); the only check is the TLV encoder's mandatory-field check at report time (`packages/types/src/tlv/TlvObject.ts:128-134`). A payload check would be ahead of matter.js (review II, phase 6a, R2-P6-par-1315).
+- **RvcRunMode refuses a mode with two or more of Idle, Cleaning and Mapping.** `cluster/modebase` `checkRvcRun` (`n > 1`), as matter.js `packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts:39-46` (`exclusiveModeCounter > 1`, `:45` at `db021da0`); the error text "…together in one mode" is matter.js's own (`:49`). No defect (review II, phase 6a, R2-P6-par-1469).
+- **Door lock schedule commands do not compare the accessing fabric with the user's creator.** As matter.js (`packages/node/src/behaviors/door-lock/DoorLockServer.ts:653-692` set, `:734-745` clear, `#requireValidUser` `:1365-1373` at `db021da0`) and connectedhomeip's set handler, which checks that the user exists only (`src/app/clusters/door-lock-server/CodegenIntegration.cpp:1051-1135`, `userExists` `:1091` at `6170af84`) (review II, phase 6a, R2-P6-acl-1566).
+- **The reference daemon's DEM test-event forecasts state values chip's trigger file does not.** The adjustment fields on slots other than 0 (ForecastAdjustment's 20 / 2000 / 120 / 240; chip sets them on slot 0 only, `examples/energy-management/energy-management-triggers/DEMTestEventTriggers.cpp:267-270` at `6170af84`), and on the two "clear" triggers `EarliestStartTime` null with `LatestEndTime = EndTime` under STA where chip clears both (`:218-219`, `:252-253`). Conforming, the daemon's own values (`examples/reference-bridge/fleet_evse.go` `demoDem.conform`); TC_DEM_2_5 reads `slots[0]` only; the other DEM Python cases were not read (review II, phase 6a, the 1304 conformance fix).
+- **AwaitNextAction repeats without a bound.** As matter.js (`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:801-814` at `db021da0`) (review II, phase 6a, R2-P6-fsm-1210).
+- **A SimpleAnnouncement schedules without a provider.** It resets the retry count and keeps a running timer, as matter.js: the announcement schedules with no provider (`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:413-416` at `db021da0`), which resets the retry count (`:491-493`) and keeps a running timer (`:495-499`) (review II, phase 6a, R2-P6-fsm-1211).
+- **Any fabric's AnnounceOTAProvider chooses the next provider the node-wide requestor queries.** Mirrored, both references: matter.js builds the provider from the accessing fabric (`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:384-391` at `db021da0`), adds it to the node-wide list with `previousQueryTimestamp: null` (`:423-438`, `:430`); a non-simple announcement schedules with it (`:408-412`) → `selectedProviderLocation` (`:486-487`) → used once (`:527-531`), else the oldest timestamp across all fabrics (`:535-540`); access "F A" (`ota-software-update-requestor.element.ts:65`). connectedhomeip takes the location from the accessing fabric (`src/app/clusters/ota-requestor/DefaultOTARequestor.cpp:332-334`) and hands it to the driver (`:347`), which, when idle, queries the announced provider (`DefaultOTARequestorDriver.cpp:323-329`) at `6170af84`. Preferring the fabric's own default would be ahead of both (review II, phase 6a, TM R3.5).
+- **UnitLocalization refuses a duplicate SupportedTemperatureUnits entry at construction.** The model's text requires unique entries (`packages/model/src/standard/resources/unit-localization.resource.ts:43-45` at `db021da0`); neither matter.js's constraint (`unit-localization.element.ts:30-31`) nor connectedhomeip (`UnitLocalizationCluster.cpp:52-66` at `6170af84`) checks it. Host configuration only, ahead of both (review II, phase 6a, R2-P6-err-1268).
+- **A secure session's exchanges end with it.** The bridge's BDX, OTA and Invoke exchanges are keyed by (session id, exchange id) and end when their session closes; they never pass to a later session given the same id, and a session keeps at most 30 exchanges, the least recently active ending — as matter.js, which keys its exchanges by the `Session` object (`packages/protocol/src/protocol/ExchangeManager.ts:569-576` at `db021da0`), so a later session finds none of an earlier one's, closes a force-closed session's exchanges (`packages/protocol/src/session/Session.ts:336-342`), and keeps at most 30 non-closed exchanges per secure session (`ExchangeManager.ts:63`, `:578-595`) (review II, phase 6a, R2-P6-sec-0302, R2-P6-bound-0303). One message per exchange awaits its acknowledgement, as matter.js: a reply or report of an interaction is refused while an earlier message of the exchange awaits its ack (`TrackOnExchange`, `f94b30a3`), as matter.js's `#send` throws "has not been acked yet, cannot send a new message" (`packages/protocol/src/protocol/MessageExchange.ts:701-705`) and its receive side refuses a message that carries no ack while one is owed (`:521-525`); BDX keeps the supersede (the open row above).
+- **A null written to a non-nullable scalar attribute ends the write interaction with FAILURE.** As matter.js: the write decodes with the attribute's `TlvOfModel` schema, which wraps `TlvNullable` only for a nullable model (`packages/types/src/tlv/TlvOfModel.ts:234-236`, `:242-244`), before the value is assigned (`packages/protocol/src/action/server/AttributeWriteResponse.ts:429`, `:433-434` at `db021da0`); `packages/types/src/tlv/TlvNumber.ts:124-131` throws `UnexpectedDataError` for a TLV null (likewise `TlvBoolean.ts:22-23`, `TlvString.ts:57-58`), which is no `StatusResponseError`: the write's catch rethrows it (`AttributeWriteResponse.ts:452-460`, `:459`) and it ends as StatusResponse FAILURE (`packages/protocol/src/interaction/InteractionMessenger.ts:431`, `:458-460`) — read from the lines, not run. Here through decision 161's `im.UndecodableValue` (`bridge/attribute_value_reader.go`, `126d4566`) (review II, phase 6a, R4-1, owner decision 170).
 
 - **A subscription is persisted after its SubscribeResponse, so a Stop in the same instant loses it.** `bridge/subscribe.go:1062-1071` records the subscription once the response is sent; matter.js's `SubscriptionsServer.#addSubscription` fires on `subscriptionAdded`, which the InteractionServer emits after the SubscribeResponse (`SubscriptionsServer.ts:54`, `:133-140`). Same timing; a test waits until it is stored (report S, question 7).
 

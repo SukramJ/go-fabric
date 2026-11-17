@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/transport/tcp"
 )
 
 // TestControllerConnectsAgainAfterItsIdleTCPConnectionWasReplaced: a
@@ -66,6 +67,10 @@ func TestControllerConnectsAgainAfterItsIdleTCPConnectionWasReplaced(t *testing.
 	case <-ctx.Done():
 		t.Fatal("the controller's TCP session stayed open after the device gave its idle connection's place to a new one")
 	}
+	// The silent connection now holds the one place; past the age that
+	// spares a fresh connection (a fraction of tcp.NewConnectionIdleTimeout,
+	// review II R2-P6-bound-0203) the controller's next connection takes it.
+	fake.Set(fake.Now().Add(tcp.NewConnectionIdleTimeout / 2))
 
 	readLarge()
 	again := p.NewestSessionOn(exchange.TransportTCP)

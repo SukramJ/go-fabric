@@ -393,13 +393,21 @@ func TestCurrentStateReporting(t *testing.T) {
 	cfg.DataVersion = dv
 	srv := newDimension(t, cfg)
 	var mu sync.Mutex
-	var reports int
-	srv.OnAttributeChange(func(change contract.Change) {
-		ids := change.Attributes
+	var reports, changes int
+	// The wire's reports, and the change listeners, which see a held-back
+	// change too: it advances the data version (R2-P6-wire-1583).
+	srv.OnAttributeReport(func(change contract.Change) {
 		mu.Lock()
 		defer mu.Unlock()
-		if slices.Contains(ids, cd.AttrCurrentState) {
+		if slices.Contains(change.Attributes, cd.AttrCurrentState) {
 			reports++
+		}
+	})
+	srv.OnAttributeChange(func(change contract.Change) {
+		mu.Lock()
+		defer mu.Unlock()
+		if slices.Contains(change.Attributes, cd.AttrCurrentState) {
+			changes++
 		}
 	})
 	set := func(p uint16, l bool) {
@@ -413,9 +421,13 @@ func TestCurrentStateReporting(t *testing.T) {
 		t.Fatalf("latch change: %d reports", reports)
 	}
 	set(8000, false) // first Position change: no earlier report to wait for
+	held := srv.MatterDataVersion()
 	set(6000, false) // within 5 s: held back
 	if reports != 2 {
 		t.Errorf("position changes inside 5 s: %d reports, want 2", reports)
+	}
+	if changes != 3 || srv.MatterDataVersion() == held {
+		t.Errorf("a held-back change: %d changes, version %d → %d; want it told to the change listeners and the version advanced", changes, held, srv.MatterDataVersion())
 	}
 	if v, _ := srv.MatterRead(cd.AttrCurrentState); v.(closure.DimensionState).Position.Value != 6000 {
 		t.Error("a held-back value does not read")

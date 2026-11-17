@@ -75,10 +75,12 @@ type subjectCtxKey struct{}
 
 // WithSubject stamps the operational peer subject — NodeID lifted out
 // of the peer NOC plus the set of CASE Authenticated Tags from the
-// same NOC — into ctx so [TopologyDispatcher.CheckACL] can enforce
-// per-subject ACEs (Matter §9.10.5.6). PASE sessions stamp NodeID=0
-// and nil CATs; the ACL gate bypasses subject matching on PASE via
-// the fabricIndex==0 check.
+// same NOC — into ctx so the ACL check (endpoint.TopologyDispatcher.CheckACL)
+// can enforce per-subject ACEs (Matter §9.10.5.6). PASE sessions stamp
+// NodeID=0 and nil CATs; the ACL gates grant a PASE session by its auth
+// mode ([WithAuthModePASE]), not by its fabric, and refuse a request
+// without an accessing fabric that is not PASE (review II,
+// R2-P6-doc-0561).
 //
 // Mirrors connectedhomeip/src/access/AccessControl.cpp:441 — the
 // `subjectDescriptor` the access check uses carries (fabricIndex,
@@ -185,6 +187,35 @@ func checkSubjectACL(ctx context.Context, c ACLChecker, fabricIndex uint8, subje
 	return c.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
 }
 
+// aclCheckerOf returns d's [ACLChecker], or one that denies every location
+// when d has none ([ACLChecker]; review II, R2-P6-sec-0560).
+func aclCheckerOf(d Dispatcher) ACLChecker {
+	if c, ok := d.(ACLChecker); ok {
+		return c
+	}
+	return denyingACL{}
+}
+
+// denyingACL is the access check of a [Dispatcher] without an
+// [ACLChecker]: nothing is granted.
+type denyingACL struct{}
+
+func (denyingACL) CheckACL(context.Context, uint8, uint64, []uint32, uint16, uint32, uint8) StatusCode {
+	return StatusUnsupportedAccess
+}
+
+// deniedReads is the dispatcher a read of a [Dispatcher] without an
+// [ACLChecker] runs against: nothing is read, a concrete path is denied and
+// a wildcard selects nothing.
+type deniedReads struct{ Dispatcher }
+
+func (deniedReads) Read(_ context.Context, path ConcreteAttributePath) []ReadResult {
+	if path.HasEndpoint && path.HasCluster && path.HasAttribute {
+		return []ReadResult{{Path: path, Status: StatusUnsupportedAccess}}
+	}
+	return nil
+}
+
 // HasAccessingFabric reports whether fabricIndex names a fabric — the one
 // reading of "no accessing fabric" every gate of this package uses: the
 // subject's access check, the fabric-scoped write and invoke gates, the
@@ -204,8 +235,8 @@ func HasAccessingFabric(fabricIndex uint8) bool {
 	return fabricIndex >= 1 && fabricIndex <= 254
 }
 
-// timedCtxKey carries whether an Invoke or a Write runs inside a valid timed
-// interaction.
+// largeMessageCtxKey carries whether the request's session carries Large
+// Messages ([WithLargeMessageSession]).
 type largeMessageCtxKey struct{}
 
 // WithLargeMessageSession stamps whether the session the request arrived on
@@ -237,6 +268,8 @@ func LargeMessageSessionFromContext(ctx context.Context) (largeMessage, known bo
 	return largeMessage, known
 }
 
+// timedCtxKey carries whether an Invoke or a Write runs inside a valid timed
+// interaction (review II, R2-P6-doc-0563).
 type timedCtxKey struct{}
 
 // WithTimedInteraction stamps whether the request runs inside a valid

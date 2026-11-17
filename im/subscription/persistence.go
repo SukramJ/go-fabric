@@ -87,7 +87,8 @@ func (s *Subscription) PeerSubscription(isFabricFiltered bool) PeerSubscription 
 // review II, R2-P1-dr-req-06.
 //
 // Restore enforces the per-fabric quota and refuses an id that already
-// names a live subscription ([ErrIDInUse]). A restored subscription fires
+// names a live subscription ([ErrIDInUse]), and refuses while the manager
+// has no report sender ([ErrNoReportSender]). A restored subscription fires
 // the session-subscriptions-changed hook
 // ([Manager.SetOnSessionSubscriptionsChanged]) as Subscribe does.
 func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, error) {
@@ -99,6 +100,9 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 	}
 	if err := m.validateCadence(p.MinIntervalFloor, p.MaxInterval); err != nil {
 		return nil, err
+	}
+	if m.senderFor(false) == nil {
+		return nil, ErrNoReportSender
 	}
 	m.mu.Lock()
 	if _, taken := m.byID[p.SubscriptionID]; taken {
@@ -119,7 +123,7 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 		KeepSubscriptions:    true,
 		AttributePaths:       append([]im.ConcreteAttributePath(nil), p.AttributeRequests...),
 		EventPaths:           append([]im.ConcreteEventPath(nil), p.EventRequests...),
-		sendIntervalOverride: p.SendInterval,
+		sendIntervalOverride: restoredSendInterval(p.SendInterval, p.MinIntervalFloor),
 		// As in Subscribe: the priming report is the first report, so the
 		// engine must not fire a keep-alive into it.
 		lastReport: m.cfg.Clock.Now(),
@@ -142,6 +146,20 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 		slog.Duration("send_interval", p.SendInterval),
 	)
 	return sub, nil
+}
+
+// restoredSendInterval bounds a persisted send interval as
+// [Subscription.SendInterval] bounds a derived one: at most
+// maxSendInterval, then at least the floor and the granted minimum. This
+// module writes only bounded values; a foreign or corrupted record must
+// not put the keep-alives past the session idle reaper (review II,
+// R2-P6-store-0518). Zero stays zero: the interval is derived.
+func restoredSendInterval(d time.Duration, minIntervalFloor uint16) time.Duration {
+	if d <= 0 {
+		return 0
+	}
+	d = min(d, maxSendInterval)
+	return max(d, time.Duration(minIntervalFloor)*time.Second, minGrantedIntervalSeconds*time.Second)
 }
 
 // peerSubscriptionWireVersion versions the persisted encoding.
@@ -171,12 +189,20 @@ type peerAddressWire struct {
 	NodeID      uint64 `json:"nodeId"`
 }
 
+// attributePathWire is one persisted attribute path. WildcardPathFlags is
+// kept with its path, as matter.js persists `wildcardPathFlags` with each
+// attribute path (packages/node/src/behavior/system/subscriptions/
+// SubscriptionsServer.ts:87-106 at db021da0), so a re-established
+// wildcard subscription skips what the controller asked it to skip
+// (review II, R2-P6-store-0501). The WildcardFilterConfigurationVersion
+// is not kept: the same entry there carries none (:95-106).
 type attributePathWire struct {
-	NodeID      *uint64 `json:"nodeId,omitempty"`
-	EndpointID  *uint16 `json:"endpointId,omitempty"`
-	ClusterID   *uint32 `json:"clusterId,omitempty"`
-	AttributeID *uint32 `json:"attributeId,omitempty"`
-	ListIndex   *uint16 `json:"listIndex,omitempty"`
+	NodeID            *uint64 `json:"nodeId,omitempty"`
+	EndpointID        *uint16 `json:"endpointId,omitempty"`
+	ClusterID         *uint32 `json:"clusterId,omitempty"`
+	AttributeID       *uint32 `json:"attributeId,omitempty"`
+	ListIndex         *uint16 `json:"listIndex,omitempty"`
+	WildcardPathFlags *uint32 `json:"wildcardPathFlags,omitempty"`
 }
 
 type eventPathWire struct {
@@ -223,6 +249,8 @@ func MarshalPeerSubscription(p PeerSubscription) ([]byte, error) {
 			ClusterID:   ptrIf(a.HasCluster, a.Cluster),
 			AttributeID: ptrIf(a.HasAttribute, a.Attribute),
 			ListIndex:   ptrIf(a.HasListIndex, a.ListIndex),
+			// Zero is the absent field (im.ConcreteAttributePath).
+			WildcardPathFlags: ptrIf(a.WildcardPathFlags != 0, a.WildcardPathFlags),
 		})
 	}
 	for _, e := range p.EventRequests {
@@ -280,6 +308,7 @@ func UnmarshalPeerSubscription(b []byte) (PeerSubscription, error) {
 		path.Cluster, path.HasCluster = valOf(a.ClusterID)
 		path.Attribute, path.HasAttribute = valOf(a.AttributeID)
 		path.ListIndex, path.HasListIndex = valOf(a.ListIndex)
+		path.WildcardPathFlags, _ = valOf(a.WildcardPathFlags)
 		p.AttributeRequests = append(p.AttributeRequests, path)
 	}
 	for _, e := range w.EventRequests {

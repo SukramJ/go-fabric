@@ -40,6 +40,13 @@ type Config struct {
 	// as in matter.js (GroupsServer keeps it in the root's
 	// GroupKeyManagementServer). nil keeps whatever the source supplies.
 	Groups *groups.Manager
+	// Fabrics is the node's fabric list (the node passes its store): the
+	// assembler hands it to every Binding server an endpoint serves
+	// ([mattercore.Binding.SetFabricSource]), which checks a request's
+	// write against it. nil leaves the Binding servers without a source,
+	// and they refuse every request write — fail closed (review II,
+	// R2-P6-store-1010, decision 158).
+	Fabrics mattercore.FabricSource
 	// Persistence keeps a bridged endpoint's controller-written
 	// NodeLabel and its scene table across restarts ([Persistence]); the
 	// host hands a restored label back as [Spec.NodeLabel]. With Groups
@@ -292,6 +299,7 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		ep.BridgeVendorID = topology.VendorID
 		ep.BridgeProductID = topology.ProductID
 		ep.BridgeVendorName = topology.VendorName
+		ep.fabrics = a.cfg.Fabrics
 	}
 	return topology, nil
 }
@@ -374,6 +382,9 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		Scope:          scope,
 		DeviceAddress:  spec.DeviceAddress,
 		VendorName:     spec.VendorName,
+		// What the host states of the bridged device's basic information
+		// (R2-P5-apidev-02).
+		BridgedBasicInformation: spec.BridgedBasicInformation,
 		// Reuse the state bound to this stable source key so the
 		// endpoint's per-cluster version and Identify server survive
 		// reassembly.
@@ -391,6 +402,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		OptIn:               append([]uint32(nil), spec.OptIn...),
 		groups:              a.cfg.Groups,
 		persistence:         a.cfg.persistence(),
+		log:                 a.logger,
 	}, nil
 }
 
@@ -412,8 +424,30 @@ func (a *Assembler) restoredState(spec *Spec) *endpointState {
 
 // assignOrReuseID looks up the existing endpoint_id for sourceKey;
 // allocates a fresh one otherwise. Updates device_type either way so
-// a profile change in the model side migrates cleanly.
+// a profile change in the model side migrates cleanly. A number outside
+// [Record]'s range [2, 65534] is an error naming the key.
 func (a *Assembler) assignOrReuseID(ctx context.Context, scope string, sourceKey SourceKey, deviceType uint16) (uint16, error) {
+	id, err := a.lookupOrAssignID(ctx, scope, sourceKey, deviceType)
+	if err != nil {
+		return 0, err
+	}
+	// A Store's number is held to [Record]'s range: 0 and 1 would put a
+	// second root or Aggregator into the topology, 65535 is reserved
+	// (R2-P6-store-0448).
+	if id < recordIDMin || id > recordIDMax {
+		return 0, fmt.Errorf("endpoint: store answered endpoint id %d for %q, outside [%d, %d]", id, sourceKey.String(), recordIDMin, recordIDMax)
+	}
+	return id, nil
+}
+
+// recordIDMin and recordIDMax bound a stored [Record.EndpointID].
+const (
+	recordIDMin uint16 = 2
+	recordIDMax uint16 = 65534
+)
+
+// lookupOrAssignID is [Assembler.assignOrReuseID] before the range check.
+func (a *Assembler) lookupOrAssignID(ctx context.Context, scope string, sourceKey SourceKey, deviceType uint16) (uint16, error) {
 	rec, err := a.store.GetEndpoint(ctx, sourceKey)
 	switch {
 	case err == nil:

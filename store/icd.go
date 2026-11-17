@@ -115,6 +115,9 @@ func (s *Store) ReplaceICDRegistrations(ctx context.Context, fabricIndex uint8, 
 	}
 	var aead cipher.AEAD
 	if len(regs) > 0 && s.sealer == nil {
+		if err := s.refuseClearSecretWrite(ctx, tx); err != nil {
+			return fmt.Errorf("store: replace icd registrations: %w", err)
+		}
 		if aead, err = s.icdAEAD(ctx, tx); err != nil {
 			return err
 		}

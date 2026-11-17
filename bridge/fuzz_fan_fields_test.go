@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -31,7 +32,7 @@ func FuzzFanStepFieldsReader(f *testing.F) {
 			f.Add(b)
 		}
 	}
-	path := im.ConcreteCommandPath{Cluster: clusterwire.FanControlClusterID, Command: clusterwire.FanControlCmdStep}
+	path := im.ConcreteCommandPath{Cluster: fandef.ClusterID, Command: fandef.CmdStep}
 	f.Fuzz(func(t *testing.T, payload []byte) {
 		dec := tlv.NewDecoder(payload)
 		open, err := dec.Next()

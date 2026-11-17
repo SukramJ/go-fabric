@@ -20,11 +20,11 @@ func TestMessagingStateReceptionStateFor(t *testing.T) {
 		t.Parallel()
 		m, _ := newTestManager(t)
 		key := []byte{1, 2, 3} // MessagingStateTest.ts:11
-		first := m.receptionWindow(key, 1)
-		if m.receptionWindow(key, 1) != first {
+		first := window(m, key, 1)
+		if window(m, key, 1) != first {
 			t.Error("receptionStateFor(1, key) returned a new instance")
 		}
-		if m.receptionWindow(key, 2) == first {
+		if window(m, key, 2) == first {
 			t.Error("receptionStateFor(2, key) returned the instance of node 1")
 		}
 	})

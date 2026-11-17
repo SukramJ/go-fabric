@@ -46,6 +46,8 @@ import (
 	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
 	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
 	rvcrundef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
+	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -396,7 +398,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			} {
 				return newWindowCoveringServer()
 			},
-			attrID:     wire.WindowCoveringAttrMode, // 0x0017
+			attrID:     wcdef.AttrMode, // 0x0017
 			value:      uint8(16),
 			wantStatus: im.StatusConstraintError,
 		},
@@ -410,7 +412,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			} {
 				return newWindowCoveringServer()
 			},
-			attrID:     wire.WindowCoveringAttrMode, // 0x0017
+			attrID:     wcdef.AttrMode, // 0x0017
 			value:      uint8(0x02),
 			wantStatus: im.StatusConstraintError,
 		},
@@ -685,7 +687,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 				return newCoolOnlyServer()
 			},
 			cmdID:      0x00, // SetpointRaiseLower
-			fields:     map[uint8]any{0: uint64(wire.ThermostatSetpointModeHeat), 1: int64(5)},
+			fields:     map[uint8]any{0: uint64(tdef.SetpointRaiseLowerModeHeat), 1: int64(5)},
 			wantStatus: im.StatusInvalidCommand,
 		},
 		{
@@ -699,7 +701,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 				return newRefusingThermostatServer()
 			},
 			cmdID:      0x00, // SetpointRaiseLower
-			fields:     map[uint8]any{0: uint64(wire.ThermostatSetpointModeBoth), 1: int64(5)},
+			fields:     map[uint8]any{0: uint64(tdef.SetpointRaiseLowerModeBoth), 1: int64(5)},
 			wantStatus: im.StatusFailure,
 		},
 		{
@@ -711,7 +713,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 			} {
 				return newWindowCoveringServer()
 			},
-			cmdID: wire.WindowCoveringCmdGoToLiftPercentage, // 0x05
+			cmdID: wcdef.CmdGoToLiftPercentage, // 0x05
 			fields: map[string]any{
 				"percent": uint16(10001),
 			},
@@ -725,12 +727,12 @@ func TestNegativeInvokeParity(t *testing.T) {
 				MatterInvoke(context.Context, uint32, any) (any, error)
 			} {
 				srv := newWindowCoveringServer()
-				if err := srv.MatterWrite(context.Background(), wire.WindowCoveringAttrMode, uint8(0x04)); err != nil {
+				if err := srv.MatterWrite(context.Background(), wcdef.AttrMode, uint8(0x04)); err != nil {
 					panic(err)
 				}
 				return srv
 			},
-			cmdID:      wire.WindowCoveringCmdDownOrClose,
+			cmdID:      wcdef.CmdDownOrClose,
 			fields:     nil,
 			wantStatus: im.StatusBusy,
 		},
@@ -744,7 +746,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 			} {
 				return cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05, Mover: refusingMover{}})
 			},
-			cmdID:      wire.WindowCoveringCmdUpOrOpen,
+			cmdID:      wcdef.CmdUpOrOpen,
 			wantStatus: im.StatusFailure,
 		},
 		{
@@ -843,10 +845,10 @@ func TestPositiveWriteControl(t *testing.T) {
 		t.Parallel()
 		// Mode constraint max 15; write exactly 15 → must succeed.
 		srv := newWindowCoveringServer()
-		if err := srv.MatterWrite(context.Background(), wire.WindowCoveringAttrMode, uint8(15)); err != nil {
+		if err := srv.MatterWrite(context.Background(), wcdef.AttrMode, uint8(15)); err != nil {
 			t.Fatalf("write Mode=15 (boundary): %v", err)
 		}
-		v, ok := srv.MatterRead(wire.WindowCoveringAttrMode)
+		v, ok := srv.MatterRead(wcdef.AttrMode)
 		if !ok {
 			t.Fatal("Mode read after boundary write: ok=false")
 		}
@@ -937,13 +939,13 @@ func TestPositiveInvokeControl(t *testing.T) {
 		srv := newWindowCoveringServer()
 		_, err := srv.MatterInvoke(
 			context.Background(),
-			wire.WindowCoveringCmdGoToLiftPercentage,
+			wcdef.CmdGoToLiftPercentage,
 			map[string]any{"percent": uint16(10000)},
 		)
 		if err != nil {
 			t.Fatalf("GoToLiftPercentage(10000) boundary: %v", err)
 		}
-		v, ok := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+		v, ok := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 		if !ok {
 			t.Fatal("CurrentPositionLiftPercent100ths read after invoke: ok=false")
 		}

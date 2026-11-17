@@ -5,6 +5,7 @@ package measurement_test
 
 import (
 	"context"
+	"math"
 	"slices"
 	"testing"
 
@@ -2414,6 +2415,25 @@ func TestMomentarySwitchFeaturesFollowTheSource(t *testing.T) {
 		}
 		if c, _ := srv.MatterRead(swdef.AttrCurrentPosition); c != tc.currentWant {
 			t.Errorf("%s: CurrentPosition = %v, want %d", tc.name, c, tc.currentWant)
+		}
+	}
+}
+
+// TestWhToMilliWattHoursSaturatesAtTheBound holds R2-P6-wire-1417: 2^63
+// mWh is beyond int64, and float64(math.MaxInt64) is 2^63 itself, so the
+// bound saturates it rather than converting it (implementation-defined:
+// MinInt64 on amd64).
+func TestWhToMilliWattHoursSaturatesAtTheBound(t *testing.T) {
+	for _, tc := range []struct {
+		wh   float64
+		want int64
+	}{
+		{math.Exp2(63) / 1000, math.MaxInt64},
+		{-math.Exp2(63) / 1000, math.MinInt64},
+		{1.5, 1500},
+	} {
+		if got := measurement.WhToMilliWattHours(tc.wh); got != tc.want {
+			t.Errorf("whToMilliWattHours(%v) = %d, want %d", tc.wh, got, tc.want)
 		}
 	}
 }

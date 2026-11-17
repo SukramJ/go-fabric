@@ -32,11 +32,23 @@ func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	s.mu.Lock()
 	prev, gen := s.st, s.setGen
 	s.mu.Unlock()
+	s.endsScene = false
 	err := s.invoke(ctx, cmdID, fields)
 	if err != nil {
 		s.rollback(prev, gen)
+		return nil, err
 	}
-	return nil, err
+	// The scene ends with the command's success, never before it: a
+	// command that fails afterwards keeps the scene with the rest of the
+	// state its rollback restores, as LevelControl's
+	// transitionAndInvalidate does (R2-P6-err-1404).
+	// matter.js invalidates where the command marks (ColorControlServer.ts:597), inside the command's
+	// transaction, whose rollback (CommandInvokeResponse.ts:516) restores state, sceneValid included
+	// (ScenesManagementServer.ts:972; inferred, not run).
+	if s.endsScene {
+		s.invalidateScenes()
+	}
+	return nil, nil
 }
 
 // rollback restores the state a failed command started from — its mode
@@ -155,12 +167,20 @@ func (s *ColorControlServer) hueTransition(target float64, direction ccdef.Direc
 	if enhanced {
 		name, maxHue = propEnhancedHue, maxEnhancedHueValue
 	}
-	current, _ := s.state().property(name)
 	dir := transition.HueDirection(direction)
+	// The rate from the engine's own read of the current hue (RateFrom), so
+	// a step of a running transition cannot land between the read and the
+	// start (R2-P6-conc-1407); the state's hue is the fallback the engine
+	// keeps for an unknown value.
+	rate := func(current float64) float64 {
+		return transition.HueDistance(current, target, dir, maxHue) / transitionTime * 10
+	}
+	current, _ := s.state().property(name)
 	return transition.Transition{
-		Name:   name,
-		Rate:   transition.HueDistance(current, target, dir, maxHue) / transitionTime * 10,
-		Target: target,
+		Name:     name,
+		Rate:     rate(current),
+		RateFrom: rate,
+		Target:   target,
 		CyclicDistance: func(c, t float64) float64 {
 			return transition.HueDistance(c, t, dir, maxHue)
 		},
@@ -245,16 +265,23 @@ func (s *ColorControlServer) stepHueLogic(mode ccdef.StepModeEnum, step, transit
 	if enhanced {
 		name, maxHue = propEnhancedHue, maxEnhancedHueValue
 	}
-	current, _ := s.state().property(name)
 	sign := moveSign(mode, ccdef.StepModeUp)
 	dir := transition.HueDown
 	if mode == ccdef.StepModeUp {
 		dir = transition.HueUp
 	}
+	// The target from the engine's own read of the current hue
+	// (TargetFrom, decision 164), the state's hue the fallback for an
+	// unknown value.
+	target := func(current float64) float64 {
+		return transition.AddWithOverflow(current, step*sign, minHueValue, maxHue)
+	}
+	current, _ := s.state().property(name)
 	return s.startTransition(transition.Transition{
-		Name:   name,
-		Rate:   step / transitionTime * 10 * sign,
-		Target: transition.AddWithOverflow(current, step*sign, minHueValue, maxHue),
+		Name:       name,
+		Rate:       step / transitionTime * 10 * sign,
+		Target:     target(current),
+		TargetFrom: target,
 		CyclicDistance: func(c, t float64) float64 {
 			return transition.HueDistance(c, t, dir, maxHue)
 		},
@@ -269,7 +296,7 @@ func (s *ColorControlServer) moveToSaturation(ctx context.Context, fields any) e
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setColorMode(ctx, ColorModeHueSaturation); err != nil {
 		return err
 	}
@@ -334,9 +361,11 @@ func (s *ColorControlServer) stepSaturation(ctx context.Context, fields any) err
 	// the transition ends.
 	sign := moveSign(r.StepMode, ccdef.StepModeUp)
 	step := float64(r.StepSize)
+	// The target from the engine's own read (TargetFrom, decision 164).
+	target := func(current float64) float64 { return current + step*sign }
 	return s.startTransition(transition.Transition{
 		Name: propSaturation, Rate: step / float64(r.TransitionTime) * 10 * sign,
-		Target: float64(s.state().saturation) + step*sign,
+		Target: target(float64(s.state().saturation)), TargetFrom: target,
 	})
 }
 
@@ -348,7 +377,7 @@ func (s *ColorControlServer) moveToHueAndSaturation(ctx context.Context, fields 
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setColorMode(ctx, ColorModeHueSaturation); err != nil {
 		return err
 	}
@@ -405,7 +434,7 @@ func (s *ColorControlServer) enhancedMoveToHueAndSaturation(ctx context.Context,
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setEnhancedColorMode(ctx, ColorModeEnhancedHueSaturation); err != nil {
 		return err
 	}
@@ -422,7 +451,7 @@ func (s *ColorControlServer) moveToColor(ctx context.Context, fields any) error 
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	if err := s.setColorMode(ctx, ColorModeXY); err != nil {
 		return err
 	}
@@ -435,10 +464,15 @@ func (s *ColorControlServer) moveToColor(ctx context.Context, fields any) error 
 // immediate move applies both in one update — one write to the
 // ColorWriter with both targets (#84).
 func (s *ColorControlServer) moveToColorLogic(x, y, transitionTime float64) error {
+	// The rates from the engine's own read of x and y (RateFrom), as
+	// hueTransition (R2-P6-conc-1407).
+	toward := func(target float64) func(float64) float64 {
+		return func(current float64) float64 { return (target - current) / transitionTime * 10 }
+	}
 	st := s.state()
 	return s.startTransitions(
-		transition.Transition{Name: propX, Rate: (x - float64(st.x)) / transitionTime * 10, Target: x},
-		transition.Transition{Name: propY, Rate: (y - float64(st.y)) / transitionTime * 10, Target: y},
+		transition.Transition{Name: propX, Rate: toward(x)(float64(st.x)), RateFrom: toward(x), Target: x},
+		transition.Transition{Name: propY, Rate: toward(y)(float64(st.y)), RateFrom: toward(y), Target: y},
 	)
 }
 
@@ -491,14 +525,18 @@ func (s *ColorControlServer) stepColor(ctx context.Context, fields any) error {
 	}
 	tt := float64(r.TransitionTime)
 	st := s.state()
+	// The targets from the engine's own reads (TargetFrom, decision 164).
+	by := func(step float64) func(float64) float64 {
+		return func(current float64) float64 { return current + step }
+	}
 	var ts []transition.Transition
 	if r.StepX != 0 {
 		step := float64(r.StepX)
-		ts = append(ts, transition.Transition{Name: propX, Rate: step / tt * 10, Target: float64(st.x) + step})
+		ts = append(ts, transition.Transition{Name: propX, Rate: step / tt * 10, Target: float64(st.x) + step, TargetFrom: by(step)})
 	}
 	if r.StepY != 0 {
 		step := float64(r.StepY)
-		ts = append(ts, transition.Transition{Name: propY, Rate: step / tt * 10, Target: float64(st.y) + step})
+		ts = append(ts, transition.Transition{Name: propY, Rate: step / tt * 10, Target: float64(st.y) + step, TargetFrom: by(step)})
 	}
 	return s.startTransitions(ts...)
 }
@@ -535,8 +573,17 @@ func (s *ColorControlServer) moveToColorTemperatureLogic(target, transitionTime 
 // moveColorTemperature is matter.js moveColorTemperature and
 // moveColorTemperatureLogic: Up or Down at Rate mireds per second towards
 // the bound the command names (0 is the physical one), a zero Rate
-// refused. Stop ends the hue and saturation movements only — as in
-// matter.js, a colour temperature move keeps running.
+// refused. Stop ends every colour movement, the colour temperature move
+// included, as connectedhomeip's MoveColorTemperature does
+// (src/app/clusters/color-control-server/codegen/color-control-server.cpp:2704-2707
+// at 6170af84: stopAllColorTransitions, then done for kStop). matter.js
+// ends the hue and saturation movements only, which leaves a controller's
+// Stop without effect on the move it names; this is a deliberate
+// divergence, limited to the set of movements Stop ends (R2-P6-par-1413,
+// decision 149). The colour mode switch before it stays matter.js's (chip
+// returns before its mode switch), and RemainingTime reads 0 afterwards
+// because the engine is idle — go-fabric's value; chip leaves the last
+// value, and neither reports it.
 func (s *ColorControlServer) moveColorTemperature(ctx context.Context, fields any) error {
 	r, err := moveColorTemperatureFields(fields)
 	if err != nil {
@@ -552,7 +599,7 @@ func (s *ColorControlServer) moveColorTemperature(ctx context.Context, fields an
 		return err
 	}
 	if r.MoveMode == ccdef.MoveModeStop {
-		s.stopHueAndSaturationMovement()
+		s.stopAllColorMovement()
 		return nil
 	}
 	lower, upper := s.commandBounds(r.ColorTemperatureMinimumMireds, r.ColorTemperatureMaximumMireds)
@@ -586,9 +633,11 @@ func (s *ColorControlServer) stepColorTemperature(ctx context.Context, fields an
 	}
 	lower, upper := s.commandBounds(r.ColorTemperatureMinimumMireds, r.ColorTemperatureMaximumMireds)
 	sign := moveSign(r.StepMode, ccdef.StepModeUp)
+	// The target from the engine's own read (TargetFrom, decision 164).
+	target := func(current float64) float64 { return cropValue(current+step*sign, lower, upper) }
 	return s.startTransition(transition.Transition{
 		Name: propColorTemperature, Rate: step / float64(r.TransitionTime) * 10 * sign,
-		Target: cropValue(float64(s.state().mireds)+step*sign, lower, upper),
+		Target: target(float64(s.state().mireds)), TargetFrom: target,
 	})
 }
 
@@ -621,7 +670,7 @@ func (s *ColorControlServer) colorLoopSet(ctx context.Context, fields any) error
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
-	s.invalidateScenes()
+	s.endScene()
 	changed := false
 	if err := s.update(ctx, func(st *colorState) {
 		if r.UpdateFlags&ccdef.UpdateFlagsUpdateDirection != 0 && st.loopDirection != uint8(r.Direction) {

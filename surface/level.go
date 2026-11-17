@@ -254,7 +254,17 @@ func (p *levelPolicy) checkFeatureSet(k clusterKey, feats []Element, clusters ma
 	}
 	el, ok := clusters[k]
 	if !ok {
-		el = Element{Endpoint: k.endpoint, Cluster: k.cluster, Kind: KindCluster, ID: k.cluster}
+		// No cluster candidate came with the features: the withheld
+		// element is made up, with the provenance of the first feature
+		// that states one, so the report that names it marshals
+		// (review II, R2-P6-err-1361).
+		el = Element{Endpoint: k.endpoint, Cluster: k.cluster, Kind: KindCluster, ID: k.cluster, Provenance: ProvenanceKitDefault}
+		for _, f := range feats {
+			if f.Provenance != 0 {
+				el.Provenance = f.Provenance
+				break
+			}
+		}
 	}
 	if !slices.Contains(p.withheld, el) {
 		p.withheld = append(p.withheld, el)

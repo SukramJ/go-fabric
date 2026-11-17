@@ -153,11 +153,13 @@ func TestReassembleOverlappingStopLeavesNoTimerArmed(t *testing.T) {
 }
 
 // TestConcurrentReassemblesLeaveTheLiveServerRunning (review II,
-// R2-P1-rw-04, the variant): two Reassembles run at once — R2 keeps the
-// server, R1 removes it. R2's SetEndpoint runs first (the server is live,
-// nothing to re-arm), then R1 swaps its topology in and quiesces the
-// server, then R2 swaps in the topology that carries it. The server the
-// live topology serves must run.
+// R2-P1-rw-04, the variant; R2-P6-conc-0603): two Reassembles overlap —
+// R2 keeps the server and holds in its SetEndpoint, R1 removes it. R1
+// waits for R2's assembly (the assemblies run one at a time from the
+// snapshot to the swap) and takes its snapshot after it, so R1's topology
+// is installed last, and the server it no longer carries is quiesced.
+// Before R2-P6-conc-0603, R1 swapped in first and R2's older snapshot
+// replaced it; the server the live topology serves still had to run.
 func TestConcurrentReassemblesLeaveTheLiveServerRunning(t *testing.T) {
 	t.Parallel()
 	srv := &rearmingServer{armed: true}
@@ -178,18 +180,20 @@ func TestConcurrentReassemblesLeaveTheLiveServerRunning(t *testing.T) {
 	go func() { r2 <- b.Reassemble(ctx) }() // keeps the server
 	await(ctx, t, inR2, "R2 never reached the server's SetEndpoint")
 	snap.set(false, 0)
-	if err := b.Reassemble(ctx); err != nil { // R1 removes it
-		t.Fatalf("R1: %v", err)
-	}
+	r1 := make(chan error, 1)
+	go func() { r1 <- b.Reassemble(ctx) }() // removes it, after R2
 	close(releaseR2)
 	if err := <-r2; err != nil {
 		t.Fatalf("R2: %v", err)
 	}
-	if !topologyCarries(b.Topology(), srv) {
-		t.Fatal("R2's swap did not come last: the scenario needs the live topology to carry the server")
+	if err := <-r1; err != nil {
+		t.Fatalf("R1: %v", err)
 	}
-	if q, armed := srv.state(); q || !armed {
-		t.Fatalf("the server the live topology serves: quiesced %v, armed %v; want running", q, armed)
+	if topologyCarries(b.Topology(), srv) {
+		t.Fatal("R1's swap did not come last: the topology installed last is the one snapshotted last")
+	}
+	if q, armed := srv.state(); !q || armed {
+		t.Fatalf("the server the live topology no longer serves: quiesced %v, armed %v; want quiesced", q, armed)
 	}
 }
 

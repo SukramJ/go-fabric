@@ -47,9 +47,13 @@ func rateDistortionTradeOffPoints() []csdef.RateDistortionTradeOffPointsStruct {
 }
 
 func snapshotCapabilities() []csdef.SnapshotCapabilitiesStruct {
+	// RequiresHardwareEncoder is "RequiresEncodedPixels == true": the
+	// first capability, a snapshot taken from a video stream's encoded
+	// pixels without a hardware encoder, states both (review II,
+	// R2-P6-par-1304; before it named no encoded pixels).
 	f, t := false, true
 	return []csdef.SnapshotCapabilitiesStruct{
-		{Resolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxFrameRate: 30, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: false, RequiresHardwareEncoder: &f},
+		{Resolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxFrameRate: 30, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: true, RequiresHardwareEncoder: &f},
 		{Resolution: csdef.VideoResolutionStruct{Width: 1280, Height: 720}, MaxFrameRate: 30, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: true, RequiresHardwareEncoder: &t},
 	}
 }

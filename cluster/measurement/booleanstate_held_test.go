@@ -5,6 +5,7 @@ package measurement_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
@@ -90,4 +91,52 @@ func TestHeldBooleanStateOrigin(t *testing.T) {
 			}
 		}},
 	)
+}
+
+// lockedEvents records StateChange payloads from concurrent sets.
+type lockedEvents struct {
+	mu     sync.Mutex
+	values []bool
+}
+
+func (e *lockedEvents) MatterEmitEvent(_ uint16, _, _ uint32, data any, _ contract.EventPriority) {
+	ev, _ := data.(bsdef.StateChangeEvent)
+	e.mu.Lock()
+	e.values = append(e.values, ev.StateValue)
+	e.mu.Unlock()
+}
+
+// TestHeldBooleanStateEventCarriesItsChange holds R2-P6-conc-1462: each
+// StateChange carries the value of the change it reports, also when two
+// host goroutines set StateValue at once — only a change emits, so the
+// payloads alternate; two equal payloads in a row are one change reported
+// twice with a value read after the next one.
+func TestHeldBooleanStateEventCarriesItsChange(t *testing.T) {
+	t.Parallel()
+	srv, err := measurement.NewHeldBooleanState(measurement.HeldBooleanStateConfig{Features: bsdef.FeatureChangeEvent})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev := &lockedEvents{}
+	srv.SetMatterEventEmitter(ev)
+	srv.SetEndpoint(1)
+	typed := bsdef.Wrap(srv)
+	var wg sync.WaitGroup
+	for _, v := range []bool{true, false} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 2000 {
+				_ = typed.Set(bsdef.Patch{StateValue: &v})
+			}
+		}()
+	}
+	wg.Wait()
+	ev.mu.Lock()
+	defer ev.mu.Unlock()
+	for i := 1; i < len(ev.values); i++ {
+		if ev.values[i] == ev.values[i-1] {
+			t.Fatalf("events %d and %d both carry %v: a change reported with another change's value", i-1, i, ev.values[i])
+		}
+	}
 }

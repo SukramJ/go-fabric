@@ -21,6 +21,24 @@ type State struct {
 	CurrentSessions []WebRTCSessionStruct // attribute 0x0000: list[WebRtcTransportDefinitions.WebRTCSessionStruct], M, R S M
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.CurrentSessions = func(s []WebRTCSessionStruct) []WebRTCSessionStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]WebRTCSessionStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.CurrentSessions)
+	return c
+}
+
 // Patch is a change to the WebRtcTransportProvider state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
@@ -224,10 +242,22 @@ type OfferArgs struct {
 // CameraAvStreamManagement, the requestor's session — before it
 // calls the port, and keeps CurrentSessions. SolicitOffer and
 // ProvideOffer return the session to store; deferredOffer reports a
-// camera in standby that sends its offer later. The host counts the
-// streams a session uses (the AvStream's reference counts). An error
-// answers its status, FAILURE without one; EndSession's ends the
-// session too.
+// camera in standby that sends its offer later. The session is
+// stored as the port returns it — its Id, PeerNodeId and FabricIndex
+// are the port's to keep to the OfferArgs — and only when the schema
+// admits it. Other than chip, which stores the delegate's session
+// unconditionally (WebRTCTransportProviderCluster.cpp:811, :1111), a
+// session the schema refuses — one naming no stream ("O.a+") — is
+// not stored and the command answers FAILURE; the port has then
+// started a session the server does not list, and ends it itself.
+// The server bounds sessions by the
+// id space alone; a per-fabric or total bound is the port's
+// (RESOURCE_EXHAUSTED), and so is ending a session whose requestor
+// is gone: the server ends sessions on EndSession, on the host's
+// RemoveSession and with their fabric, not when a CASE session
+// closes. The host counts the streams a session uses (the
+// AvStream's reference counts). An error answers its status, FAILURE
+// without one; EndSession's ends the session too.
 type ProviderPort interface {
 	SolicitOffer(ctx context.Context, args OfferArgs) (session WebRTCSessionStruct, deferredOffer bool, err error)
 	ProvideOffer(ctx context.Context, args OfferArgs) (session WebRTCSessionStruct, err error)

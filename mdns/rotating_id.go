@@ -10,11 +10,14 @@ import (
 	"fmt"
 )
 
-// RotatingIDUniqueIDLength is the byte length of the platform-provided
-// Unique-ID input used by the rotating-device-id derivation. Per
-// Matter Core Spec §5.4.2.4 / §11.1.5.5 the Unique-ID is "at least 16
-// bytes of random data" generated once at first boot and persisted
-// across the lifetime of the device.
+// RotatingIDUniqueIDLength is the least byte length of the Unique-ID input
+// of the rotating-device-id derivation: connectedhomeip's
+// CHIP_DEVICE_CONFIG_ROTATING_DEVICE_ID_UNIQUE_ID_LENGTH 16, "The value
+// should be 16-bytes or longer" (src/include/platform/CHIPDeviceConfig.h:380-384
+// at 6170af84), and its kMinRotatingDeviceIDUniqueIDLength
+// (src/include/platform/ConfigurationManager.h:80-81). The node draws it
+// at random once and keeps it in its store
+// (node.Commissioning.RotatingDeviceID).
 const RotatingIDUniqueIDLength = 16
 
 // rotatingIDSuffixLength is the number of trailing SHA-256 bytes
@@ -23,23 +26,17 @@ const RotatingIDUniqueIDLength = 16
 // RotatingDeviceId::kHashSuffixLength = 16`.
 const rotatingIDSuffixLength = 16
 
-// GenerateRotatingID builds the rotating-device-id hex string per the
-// chip + Matter Core Spec formula:
+// GenerateRotatingID builds the rotating-device-id hex string:
 //
 //	RDI = uint16_le(LifetimeCounter) || SHA-256(UniqueID || uint16_le(LifetimeCounter))[-16:]
 //	RotatingID(hex) = uppercase(hex(RDI))
 //
-// The 2-byte counter is little-endian (chip
-// `setup_payload/AdditionalDataPayloadGenerator.cpp:43 using namespace
-// chip::Encoding::LittleEndian` → all `Put16` calls in the generator
-// use LE).
-//
-// Total binary length is 18 bytes (2-byte counter prefix + 16-byte
-// hash suffix); hex representation is 36 uppercase characters. Apple
-// Home, chip-tool, and matter.js commissioners accept this format —
-// it is the protocol-defined Rotating Device Id surface that ships
-// in the `RI` TXT key of `_matterc._udp` commissionable mDNS records
-// (Matter §4.3.1.6).
+// Follows connectedhomeip src/setup_payload/AdditionalDataPayloadGenerator.cpp:81-111
+// (generateRotatingDeviceIdAsBinary): the identifier is the 2-byte
+// lifetime counter followed by the last 16 bytes of SHA-256(unique id ‖
+// counter, little-endian); the TXT value RI is those 18 bytes as 36
+// uppercase hex characters (:113-127). It is the `RI` TXT key of the
+// `_matterc._udp` commissionable record.
 //
 // uniqueID must be at least [RotatingIDUniqueIDLength] bytes; the
 // function returns the empty string when uniqueID is too short so
@@ -55,17 +52,17 @@ func GenerateRotatingID(uniqueID []byte, lifetimeCounter uint16) string {
 	if len(uniqueID) < RotatingIDUniqueIDLength {
 		return ""
 	}
-	var counterBE [2]byte
-	binary.LittleEndian.PutUint16(counterBE[:], lifetimeCounter)
+	var counterLE [2]byte
+	binary.LittleEndian.PutUint16(counterLE[:], lifetimeCounter)
 
 	h := sha256.New()
 	h.Write(uniqueID)
-	h.Write(counterBE[:])
+	h.Write(counterLE[:])
 	digest := h.Sum(nil)
 
 	const total = 2 + rotatingIDSuffixLength
 	var binBuf [total]byte
-	copy(binBuf[:2], counterBE[:])
+	copy(binBuf[:2], counterLE[:])
 	copy(binBuf[2:], digest[len(digest)-rotatingIDSuffixLength:])
 
 	out := make([]byte, total*2)
@@ -96,24 +93,21 @@ func MustGenerateRotatingID(uniqueID []byte, lifetimeCounter uint16) string {
 }
 
 // DeriveUniqueIDFromIdentity computes a deterministic 16-byte
-// UniqueID for the rotating-device-id derivation from the bridge's
-// stable identity tuple (VendorID, ProductID, SerialNumber,
-// optional NodeLabel). The result is the first 16 bytes of
-// SHA-256(vendor || product || serial || label). Stable across
-// daemon restarts, distinct per bridge identity, and entirely
-// stateless — no extra persistence required.
+// UniqueID from an identity tuple (VendorID, ProductID, SerialNumber,
+// optional NodeLabel): the first 16 bytes of
+// SHA-256(vendor || product || serial || label).
 //
-// This is a pragmatic v1.0 alternative to the "16 random bytes
-// persisted at first boot" approach mandated by Matter §11.1.5.5 /
-// chip's `kRotatingDeviceIDUniqueIDLength`. It satisfies the
-// commissionable surface for every controller observed (Apple Home,
-// chip-tool) because the spec only requires *uniqueness per
-// commissionable device* and *stability across reboots* — both of
-// which a SHA-256 over the bridge identity provides.
+// The value is no secret: anyone who knows the four inputs — a
+// commissioner, any fabric's administrator, often the label on the
+// device — computes it, and with it every RI it yields, so an RI built on
+// it identifies the device instead of rotating (review II,
+// R2-P6-sec-0207). A unique id for [GenerateRotatingID] is random, drawn
+// once and persisted, as node.Commissioning.RotatingDeviceID does.
 //
-// Callers that want a truly random UniqueID (e.g. multi-bridge
-// deployments with identical config) should persist their own
-// 16-byte blob and pass it to [GenerateRotatingID] directly.
+// Deprecated: use 16 random bytes drawn once and persisted as the unique
+// id passed to [GenerateRotatingID] (node.Commissioning.RotatingDeviceID
+// does both and advances a persisted lifetime counter). Removable in the
+// next minor release.
 func DeriveUniqueIDFromIdentity(vendorID, productID uint16, serialNumber, nodeLabel string) []byte {
 	h := sha256.New()
 	var idBytes [4]byte

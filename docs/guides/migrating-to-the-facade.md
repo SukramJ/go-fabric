@@ -395,6 +395,63 @@ request, whatever the server returns ([ports](ports.md)).
 | an entry of a fabric-scoped list without a `FabricIndex`, or with one outside 1 to 254 | the request is answered `FAILURE` for the attribute's path: give every entry its owning fabric |
 | fabric-sensitive events gated per cluster | gated per event from the generated table (`schema.EventReadScope`), with the event's own read privilege |
 
+## Changed after v0.22.2: store sealing, the RI and the core security servers
+
+Review II, phase 6a. Every deprecated identifier keeps its behaviour until
+it is removed in the next minor release; the behaviour changes are the
+rows marked *changed* or *breaking*.
+
+| Before | Now |
+| --- | --- |
+| *breaking:* a handle given to `store.Apply`, `store.Upgrade` or `node.Store.DB` without `PRAGMA foreign_keys` on | `_pragma=foreign_keys(1)` in its DSN (`store.OpenSQLite` sets it); without it they return `store.ErrForeignKeysOff`. A host that runs `store.Migrations()` with its own tool and then `store.Upgrade` opens that handle with the pragma too |
+| a host that carries the schema in its own migrations | applies `store/migrations/v11.up.sql` (`matter_group_key_map.position`, `matter_resumption.write_seq`) |
+| a host's own `store.Port` implementation | lists the GroupKeyMap in the order it was written (storetest `group-keys/map-order`) and keeps at most 16 resumption records per fabric, the one written longest ago evicted first (storetest `resumption/cap-per-fabric`) |
+| *changed:* `store.New` on a database a `store.NewSealed` has marked | refuses to write a secret (`store.ErrNoSealer`): open it with `NewSealed` and its sealer; `store.Reseal` rotates the key |
+| `mdns.DeriveUniqueIDFromIdentity` | `node.Commissioning.RotatingDeviceID`; a host that builds the record itself draws 16 random bytes once, persists them and passes them to `mdns.GenerateRotatingID` with a persisted lifetime counter |
+| *changed:* the commissionable record's RI, carried by default | carried only with `node.Commissioning.RotatingDeviceID` |
+| `commissioning` (the package) | nothing to wire: the node serves PASE through its commissioning window (`node.Node.OpenBasicWindow`, `OpenOwnWindow`) and attestation and CSR through `cluster/core.OperationalCredentials`; a host that needs the pieces uses `secure/spake2`, `secure/mattercert.CreateCSR` and, as a commissioner, `controller/attestation.Validate` |
+| `(*core.OperationalCredentials).SetCurrentFabric`, `(*core.GroupKeyManagement).SetCurrentFabric`, `(*core.AccessControl).SetCurrentFabric` | drop the call; pass the fabric in the context with `im.WithFabricFilter` |
+| *changed:* a direct `MatterInvoke` of UpdateNOC, UpdateFabricLabel or a GroupKeyManagement command without an accessing fabric | answers UnsupportedAccess: pass the fabric with `im.WithFabricFilter` |
+| *changed:* a `jointfabric.Datastore` wired outside the node | calls `Datastore.AttachNode` with the node's fabric table and forwards every fabric removal and install to it (`MatterDropFabric`); without a table every peer is refused. A datastore without a JointFabricAdministrator serves peers after `SetAnchorFabricIndex` |
+| *changed:* `spec.Register` of a different definition under a cluster id already registered (it replaced the first) | panics: register a vendor cluster under its own id; registering the held definition again is a no-op |
+| *changed:* `cluster.AsUint8`, `cluster.AsInt16` wrapping a value outside their width | refuse it (`false`), and a non-whole float too |
+
+## Changed after v0.22.2: the session stake, self-held servers and the wire ids
+
+Review II, phase 6a, second wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release.
+
+| Before | Now |
+| --- | --- |
+| `id, _ := m.AllocateID(); m.OpenFromSigmaWithID(id, …)` (and `OpenFromSigmaAsInitiatorWithID`) | `s, _ := m.AllocateStake(); m.OpenFromSigmaWithStake(s, …)` (`OpenFromSigmaAsInitiatorWithStake`), `ReleaseStake(s)` on abort; handle `operational.ErrStakeLost` as a failed handshake |
+| `id, _ := m.AllocateID(); m.OpenFromPaseWithID(id, …)` | `s, _ := m.AllocateStake(); m.OpenFromPaseWithStake(s, …)`; `s.ID` where the id is announced |
+| a self-held server on `spec.Hooks` | a `spec.Server` over the server's state — `ServerConfig.Source` answering its reads, a handler per request command — with MatterInvoke routed through `spec.InvokeHeld` over `spec.NewSelfHeld`; events through `spec.Events`, the veto through `spec.WriteVeto` |
+| `closure.ControlServer.Hooks.Handle`, `.Emit`, `.EmitEvent`, `.SetBeforeWrite` | the same methods on `ControlServer`. The field keeps its behaviour until it is removed: `Handle` and `SetBeforeWrite` are mirrored into it, and a handler registered on the field answers its command when `Handle` registered none (decision 177) |
+| `modebase.Server.Hooks`, `Init`, `Invoke`, `CheckWrite` | `Server.Handle` (host handler), `Server.MatterInvoke` (the checked command path); the server needs no `Init`. A handler registered on the field answers ChangeToMode through `MatterInvoke` when `Handle` registered none (decision 177) |
+| a `cluster/wire` id that duplicates a generated one (`wire.ColorCtrlCmdMoveToHue`, `wire.WindowCoveringClusterID`, …) | the constant of `cluster/spec/<cluster>` (`colorcontrol.CmdMoveToHue`, `windowcovering.ClusterID`, …) |
+
+One change needs wiring rather than a rename: a host that assembles endpoints
+with `bridge/` and `endpoint/` but without the node sets `endpoint.Config.Fabrics`
+to its fabric store. A Binding without that source refuses every write, where it
+used to store an entry for any fabric index (decision 158). The node sets it.
+
+## Changed after v0.22.2: subscription reports, access and the wire
+
+Review II, phase 6a, third wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release; the behaviour
+changes are the rows marked *changed*.
+
+| Before | Now |
+| --- | --- |
+| `subscription.NewManager(cfg, br.SubscriptionReporter(), log)`, then `m.SetEventReporter(br.SubscriptionEventReporter())` and `m.SetFlushReporter(br.SubscriptionFlushReporter())` | `subscription.NewManager(cfg, nil, log)`, then `br.AttachSubscriptionManager(m)`, which installs the bridge's report sender; a host without the bridge sets its own with `m.SetReportSender(func(ctx context.Context, sub *subscription.Subscription, r subscription.Report) subscription.ReportOutcome { … })` |
+| *changed:* a `subscription.Manager` with no reporter that admitted subscriptions and sent nothing | refuses `Subscribe` and `Restore` with `subscription.ErrNoReportSender` until a sender is set: attach it (or call `SetReportSender`) before the first `Subscribe` or `Restore`; a test that wants silence sets a sender that returns `subscription.NothingForSubscriber` |
+| `Subscription.TakeDuePaths`, `Subscription.NothingSent` in a host's own reporter | `Report.Paths`; return `NothingForSubscriber` when nothing of the report was for the subscriber |
+| *changed:* `Subscription.RequeueAttributes`, `RequeueEvents` asked for the next report | they owe what they are given: it leaves with the next report another cause starts |
+| *changed:* a host's own `im.Dispatcher` without `CheckACL`, or an `im.EventReadAuthorizer` without a `Checker`, that let every request through | denies every request of a session that is not PASE: implement `im.ACLChecker`, or dispatch through `endpoint.TopologyDispatcher` with `SetACLLister(endpoint.UnenforcedACL{})` to run without access control on purpose |
+| *changed:* a `contract.DataVersionTracker` whose 0 meant "no version" | 0 is an ordinary version, and `Bump` wraps to it |
+| `bridgetest.EstablishSubscriptionTarget(b, subID, target)` in a test | subscribe through a commissioned `bridgetest.Session` (`Session.Subscribe`): the real SubscribeRequest sets the route and anchors the peer's counter window |
+| `bridge.ErrAckWaitTimeout` compared from a host | nothing: no function returns it |
+
 ## Changed after v0.18.0: the exchange receive notifier
 
 `exchange.Options.OnReceive` in `client/exchange` takes the message the

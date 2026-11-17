@@ -24,6 +24,35 @@ type State struct {
 	Tolerance        uint16  // attribute 0x0003: uint16, O, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.MeasuredValue = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MeasuredValue)
+	c.MinMeasuredValue = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinMeasuredValue)
+	c.MaxMeasuredValue = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxMeasuredValue)
+	return c
+}
+
 // Patch is a change to the FlowMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

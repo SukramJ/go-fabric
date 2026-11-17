@@ -14,32 +14,32 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// AdministratorCommissioning implements Matter cluster 0x003C per
-// Matter Core Specification 1.5.1 §11.19. The cluster surfaces the
-// "open commissioning window" command-set Matter controllers use to
-// share a fabric with another commissioner.
+// AdministratorCommissioning implements Matter cluster 0x003C
+// (Matter 1.6.1 §11.19). The cluster surfaces the "open commissioning
+// window" command-set Matter controllers use to share a fabric with
+// another commissioner.
 //
-// v1.1 implementation: read-only attribute surface mirrors the
-// bridge's current PASE state; commands route to a programmatic
-// [WindowController] hook the daemon plumbs in (typically
-// `bridge.Bridge.OpenCommissioningWindow`). When no controller is
-// wired the commands return Status `BUSY` so commissioners can
-// gracefully retry.
+// The read-only attribute surface mirrors the bridge's current PASE
+// state; commands route to a programmatic [WindowController] hook the
+// daemon plumbs in (typically `bridge.Bridge.OpenCommissioningWindow`).
+// When no controller is wired a command answers FAILURE with the cluster
+// status Busy (0x02, [ErrAdmCommBusy]), so a commissioner can retry.
 //
 // Mandatory attributes (Matter §11.19.5):
 //
 //   - 0x0000 WindowStatus      (CommissioningWindowStatus enum, mandatory)
 //   - 0x0001 AdminFabricIndex  (FabricIndex, nullable, mandatory)
 //   - 0x0002 AdminVendorId     (VendorId, nullable, mandatory)
-//   - 0xFFFC FeatureMap        (uint32; v1.1 advertises 0 — no
-//     basic-commissioning-method support yet)
-//   - 0xFFFD ClusterRevision   (uint16 = 1)
+//   - 0xFFFC FeatureMap        (uint32; bit 0 BC when
+//     [AdministratorCommissioningConfig].BasicCommissioning selects it,
+//     else 0)
+//   - 0xFFFD ClusterRevision   (the generated definition's)
 //
 // Commands (Matter §11.19.8):
 //
 //   - 0x00 OpenCommissioningWindow      (enhanced; verifier-driven)
-//   - 0x01 OpenBasicCommissioningWindow (BC feature; not in v1.1
-//     FeatureMap, returns UnsupportedCommand)
+//   - 0x01 OpenBasicCommissioningWindow (BC feature: served when
+//     selected, UnsupportedCommand without it)
 //   - 0x02 RevokeCommissioning          (no fields)
 //
 // The cluster's identity is its generated definition (cluster/spec/
@@ -260,8 +260,9 @@ func (a *AdministratorCommissioning) MatterDataVersion() uint32 {
 }
 
 // NewAdministratorCommissioning constructs the cluster with no
-// controller wired — every command returns Status BUSY until the
-// daemon plumbs a [WindowController] in via [SetController].
+// controller wired — every command answers FAILURE with the cluster status
+// Busy until the daemon plumbs a [WindowController] in via
+// [SetController].
 func NewAdministratorCommissioning() *AdministratorCommissioning {
 	return NewAdministratorCommissioningWith(AdministratorCommissioningConfig{})
 }
@@ -284,7 +285,7 @@ func (a *AdministratorCommissioning) instance() *spec.Instance {
 }
 
 // SetController wires the bridge-side window controller. Pass nil to
-// detach (commands then return BUSY).
+// detach (commands then answer FAILURE with the cluster status Busy).
 func (a *AdministratorCommissioning) SetController(c WindowController) {
 	a.mu.Lock()
 	a.controller = c
@@ -469,7 +470,7 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		// VendorID left at zero (no resolver wired, or one that answers
 		// 0) is what the bridge controller surfaces as AdminVendorIsNull.
 		params.AdminFabricIndex = fabIdx
-		if fabIdx != 0 && vr != nil && params.AdminVendorID == 0 {
+		if vr != nil && params.AdminVendorID == 0 {
 			params.AdminVendorID = vr(ctx, fabIdx)
 		}
 		// Determine whether the bridge is uncommissioned (FabricCount == 0)
@@ -721,7 +722,7 @@ var (
 	errAdmCommUnsupportedCommand = im.UnsupportedCommandf("wire: AdministratorCommissioning command unsupported")
 	errAdmCommInvalidFields      = admCommInvalidFieldsErr{}
 	// errAdmCommPakeParameter mirrors Matter §11.19.7.3
-	// PakeParameterError (0x02). Surfaces when OpenCommissioningWindow
+	// PakeParameterError (0x03). Surfaces when OpenCommissioningWindow
 	// receives Iterations / Salt / PAKEPasscodeVerifier values outside
 	// the spec-mandated ranges.
 	errAdmCommPakeParameter = admCommPakeErr{}
@@ -730,9 +731,9 @@ var (
 	errAdmCommWindowNotOpen = admCommWindowNotOpenErr{}
 )
 
-// ErrAdmCommBusy is exported so the bridge dispatcher can translate
-// it into the §11.19.7.1 BUSY wire status when the cluster command
-// returns it.
+// ErrAdmCommBusy is exported so a caller can answer the cluster's Busy:
+// the dispatcher puts FAILURE with the cluster status Busy (0x02) on the
+// wire, not the IM-level BUSY.
 var ErrAdmCommBusy im.StatusCodeError = errAdmCommBusy
 
 // ErrAdmCommPakeParameter is exported so the bridge dispatcher can
@@ -757,9 +758,9 @@ const (
 )
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
-// OpenCommissioningWindow and RevokeCommissioning. OpenBasicCommissioningWindow
-// (0x01) is conformance BC, which the FeatureMap does not advertise; its
-// handler answers UnsupportedCommand.
+// OpenCommissioningWindow and RevokeCommissioning, and
+// OpenBasicCommissioningWindow (0x01, conformance BC) when the Basic
+// feature is selected; without it the command answers UnsupportedCommand.
 func (a *AdministratorCommissioning) MatterAcceptedCommands() []uint32 {
 	return a.instance().MatterAcceptedCommands()
 }

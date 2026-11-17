@@ -234,6 +234,35 @@ func (v *TrackAttributesStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TrackAttributesStruct) Clone() TrackAttributesStruct {
+	c := v
+	c.Characteristics = func(p *spec.Nullable[[]CharacteristicEnum]) *spec.Nullable[[]CharacteristicEnum] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]CharacteristicEnum]{Value: func(s []CharacteristicEnum) []CharacteristicEnum {
+			if s == nil {
+				return nil
+			}
+			out := make([]CharacteristicEnum, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.Characteristics)
+	c.DisplayName = func(p *spec.Nullable[string]) *spec.Nullable[string] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DisplayName)
+	return c
+}
+
 // TrackAttributesStructDef describes TrackAttributesStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -263,6 +292,15 @@ func (v *TrackStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Id", true, &v.Id, spec.DecodeStringIn(0, 32)),
 		spec.Bind(1, "TrackAttributes", true, &v.TrackAttributes, spec.DecodeStruct[TrackAttributesStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TrackStruct) Clone() TrackStruct {
+	c := v
+	c.TrackAttributes = v.TrackAttributes.Clone()
+	return c
 }
 
 // TrackStructDef describes TrackStruct.
@@ -364,6 +402,21 @@ func (v *RewindRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RewindRequest) Clone() RewindRequest {
+	c := v
+	c.AudioAdvanceUnmuted = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioAdvanceUnmuted)
+	return c
+}
+
 // FastForwardRequest is the FastForward command payload.
 type FastForwardRequest struct {
 	AudioAdvanceUnmuted *bool // 0: bool, AA
@@ -381,6 +434,21 @@ func (v *FastForwardRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "FastForward",
 		spec.Bind(0, "AudioAdvanceUnmuted", false, &v.AudioAdvanceUnmuted, spec.DecodeOptional(spec.DecodeBool)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v FastForwardRequest) Clone() FastForwardRequest {
+	c := v
+	c.AudioAdvanceUnmuted = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioAdvanceUnmuted)
+	return c
 }
 
 // SkipForwardRequest is the SkipForward command payload.
@@ -443,6 +511,21 @@ func (v *PlaybackResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PlaybackResponse) Clone() PlaybackResponse {
+	c := v
+	c.Data = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Data)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (PlaybackResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdPlaybackResponse
@@ -487,6 +570,21 @@ func (v *ActivateAudioTrackRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "TrackId", true, &v.TrackId, spec.DecodeStringIn(0, 32)),
 		spec.Bind(1, "AudioOutputIndex", false, &v.AudioOutputIndex, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint8](8)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ActivateAudioTrackRequest) Clone() ActivateAudioTrackRequest {
+	c := v
+	c.AudioOutputIndex = func(p *spec.Nullable[uint8]) *spec.Nullable[uint8] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioOutputIndex)
+	return c
 }
 
 // ActivateTextTrackRequest is the ActivateTextTrack command payload.
@@ -563,6 +661,77 @@ func (v *StateChangedEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(7, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeBytesIn(0, 900))),
 		spec.Bind(8, "AudioAdvanceUnmuted", false, &v.AudioAdvanceUnmuted, spec.DecodeOptional(spec.DecodeBool)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StateChangedEvent) Clone() StateChangedEvent {
+	c := v
+	c.StartTime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartTime)
+	c.Duration = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Duration)
+	c.SampledPosition = func(p *PlaybackPositionStruct) *PlaybackPositionStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SampledPosition)
+	c.PlaybackSpeed = func(p *float32) *float32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PlaybackSpeed)
+	c.SeekRangeEnd = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SeekRangeEnd)
+	c.SeekRangeStart = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SeekRangeStart)
+	c.Data = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Data)
+	c.AudioAdvanceUnmuted = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioAdvanceUnmuted)
+	return c
 }
 
 func decodePlayRequest(n spec.Node) (any, error) { return spec.DecodeStruct[PlayRequest](n) }

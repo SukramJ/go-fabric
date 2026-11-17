@@ -38,7 +38,7 @@ func TestEvictedCASEResponderReleasesOnlyItsOwnConnectionHold(t *testing.T) {
 		proto := message.ProtocolHeader{
 			Initiator: true, NeedsAck: true, Opcode: mrp.SCOpcodeSigma1, ExchangeID: exchange, ProtocolID: mrp.SecureChannelProtocolID,
 		}
-		if err := b.dispatchSecureChannel(route, hdr, proto, []byte{0x15, 0x18}); err != nil {
+		if err := b.dispatchSecureChannel(route, hdr, proto, distinctSigma1(i)); err != nil { // a Sigma1 is held once across keys
 			t.Fatalf("Sigma1 of %#x: %v", peers[i].nodeID, err)
 		}
 	}

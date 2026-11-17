@@ -19,7 +19,6 @@
 package setup
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -373,5 +372,3 @@ func IsValidSetupPIN(passcode uint32) bool {
 	}
 	return true
 }
-
-var _ = binary.LittleEndian // reserved for future endian-explicit helpers

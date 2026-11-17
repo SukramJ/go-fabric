@@ -59,6 +59,22 @@ func (s *Store) GetSetting(ctx context.Context, key string) (value string, ok bo
 	return value, ok, nil
 }
 
+// errReservedSetting is a Settings write of the seal canary's key.
+var errReservedSetting = errors.New("store: the key is the store's seal canary (reserved)")
+
+// checkSettingWrite refuses a write of the seal canary's key, and a secret
+// setting a Store without a sealer would write in clear into a sealed
+// database ([ErrNoSealer]).
+func (s *Store) checkSettingWrite(ctx context.Context, q sqlExecQuerier, key string) error {
+	if key == settingSealCanary {
+		return errReservedSetting
+	}
+	if isSealedSetting(key) {
+		return s.refuseClearSecretWrite(ctx, q)
+	}
+	return nil
+}
+
 // upsertSetting is the statement of SetSetting and SetSettings.
 const upsertSetting = `
 INSERT INTO matter_settings (key, value, sealed) VALUES (?, ?, ?)
@@ -67,6 +83,9 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value, sealed = excluded.sealed`
 // SetSetting upserts the persisted string for key, sealed when the store
 // has a sealer and the key holds a secret ([NewSealed]).
 func (s *Store) SetSetting(ctx context.Context, key, value string) error {
+	if err := s.checkSettingWrite(ctx, s.db, key); err != nil {
+		return fmt.Errorf("store: set setting %q: %w", key, err)
+	}
 	stored, sealed, err := s.sealSetting(key, value)
 	if err != nil {
 		return fmt.Errorf("store: set setting %q: %w", key, err)
@@ -90,6 +109,9 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, k := range slices.Sorted(maps.Keys(values)) {
+		if err := s.checkSettingWrite(ctx, tx, k); err != nil {
+			return fmt.Errorf("store: set settings: %q: %w", k, err)
+		}
 		stored, sealed, err := s.sealSetting(k, values[k])
 		if err != nil {
 			return fmt.Errorf("store: set settings: %q: %w", k, err)
@@ -109,7 +131,7 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 // Deprecated: use [Store.DeleteSettings], which every [Settings] backend
 // implements. Removable in the next minor release.
 func (s *Store) DeleteSetting(ctx context.Context, key string) error {
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, key); err != nil {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ? AND key <> ?`, key, settingSealCanary); err != nil {
 		return fmt.Errorf("store: delete setting %q: %w", key, err)
 	}
 	return nil
@@ -127,7 +149,7 @@ func (s *Store) DeleteSettings(ctx context.Context, keys ...string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, k := range keys {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, k); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ? AND key <> ?`, k, settingSealCanary); err != nil {
 			return fmt.Errorf("store: delete settings: %q: %w", k, err)
 		}
 	}
@@ -145,8 +167,8 @@ func (s *Store) DeleteSettingsWithPrefix(ctx context.Context, prefix string) err
 	if err := checkSettingsPrefix(prefix); err != nil {
 		return err
 	}
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key >= ? AND key < ?`,
-		prefix, settingsPrefixEnd(prefix)); err != nil {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key >= ? AND key < ? AND key <> ?`,
+		prefix, settingsPrefixEnd(prefix), settingSealCanary); err != nil {
 		return fmt.Errorf("store: delete settings with prefix %q: %w", prefix, err)
 	}
 	return nil

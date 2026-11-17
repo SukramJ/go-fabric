@@ -12,8 +12,9 @@ import (
 	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 )
 
-// The typed server's optional interfaces: Handle, Emit and SetBeforeWrite
-// come from the embedded [spec.Hooks]; SetAttributes is the setters'.
+// The typed server's optional interfaces: Handle ([spec.SelfHeld]), Emit
+// ([spec.Events]) and SetBeforeWrite ([spec.WriteVeto]); SetAttributes is
+// the setters'.
 var (
 	_ spec.AttributeSetter   = (*DimensionServer)(nil)
 	_ spec.CommandRegistrar  = (*DimensionServer)(nil)

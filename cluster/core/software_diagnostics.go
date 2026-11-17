@@ -49,6 +49,11 @@ type SoftwareDiagnosticsConfig struct {
 	// Watermarks, when set, turns on the WTRMRK feature.
 	Watermarks WatermarkReporter
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -70,7 +75,7 @@ func NewSoftwareDiagnostics(cfg SoftwareDiagnosticsConfig) (*spec.Server, error)
 		opts.Features = uint32(swdiagdef.FeatureWatermarks)
 	}
 	src := softwareDiagnosticsSource{heap: cfg.Heap, marks: cfg.Watermarks}
-	sc := spec.ServerConfig{DataVersion: cfg.DataVersion, Source: src}
+	sc := spec.ServerConfig{DataVersion: cfg.DataVersion, Source: src} //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if cfg.Watermarks != nil {
 		sc.Handlers = map[uint32]spec.CommandHandler{swdiagdef.CmdResetWatermarks: func(ctx context.Context, _ any) (any, error) {
 			if err := cfg.Watermarks.ResetWatermarks(ctx); err != nil {

@@ -135,8 +135,15 @@ func (o *OperationalCredentials) recoverPendingNOCKey(ctx context.Context, key s
 		}
 		// The release's revertAddNOC: the ACL entries, the group keys and
 		// the fabric; the fabric's VID data is part of its row now.
-		_ = o.store.ReplaceACL(ctx, idx, nil)
-		_ = o.store.RemoveGroupKeysByFabric(ctx, idx)
+		// A failure of either is logged: the removal of the fabric that
+		// follows takes the rows it owns with it (review II,
+		// R2-P6-err-1022).
+		if err := o.store.ReplaceACL(ctx, idx, nil); err != nil {
+			o.logger().Warn("matter.opcreds.pending_noc.acl_clear_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+		}
+		if err := o.store.RemoveGroupKeysByFabric(ctx, idx); err != nil {
+			o.logger().Warn("matter.opcreds.pending_noc.group_keys_clear_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+		}
 		if err := o.store.RemoveFabric(ctx, idx); err != nil && !errors.Is(err, store.ErrFabricNotFound) {
 			return fmt.Errorf("core: OperationalCredentials: remove the uncommitted fabric %d: %w", idx, err)
 		}

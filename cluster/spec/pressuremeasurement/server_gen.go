@@ -29,6 +29,56 @@ type State struct {
 	Scale            int8   // attribute 0x0014: int8, EXT, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.MeasuredValue = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MeasuredValue)
+	c.MinMeasuredValue = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinMeasuredValue)
+	c.MaxMeasuredValue = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxMeasuredValue)
+	c.ScaledValue = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ScaledValue)
+	c.MinScaledValue = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinScaledValue)
+	c.MaxScaledValue = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxScaledValue)
+	return c
+}
+
 // Patch is a change to the PressureMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

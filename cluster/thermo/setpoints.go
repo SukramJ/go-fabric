@@ -21,7 +21,7 @@ import (
 type setpointState struct {
 	// occ is the Occupancy feature: the Unoccupied setpoints take part
 	// (matter.js #setpointViolation and #fixSetpoints skip them without
-	// it, ThermostatServer.ts:956-958, :1069-1072 at 862ad75f).
+	// it, ThermostatServer.ts:956-958, :1069-1072 at db021da0).
 	heat, cool, auto, occ bool
 	// deadband is MinSetpointDeadBand in the setpoints' 0.01 °C unit
 	// (matter.js setpointDeadBand: minSetpointDeadBand * 10; 0 without
@@ -202,7 +202,7 @@ func (st *setpointState) effectiveLimits(heat bool) (minV, maxV int) {
 }
 
 // assertLimitWithinAbs is matter.js #assertLimitWithinAbs
-// (ThermostatServer.ts:909-916 at 862ad75f): a written user setpoint limit
+// (ThermostatServer.ts:909-916 at db021da0): a written user setpoint limit
 // outside its own mode's absolute range is a hard CONSTRAINT_ERROR (chip
 // ChangeLimits). The text is matter.js's.
 func (st *setpointState) assertLimitWithinAbs(heat bool, v int) error {
@@ -218,7 +218,7 @@ func (st *setpointState) assertLimitWithinAbs(heat bool, v int) error {
 }
 
 // assertSetpointWithinLimits is matter.js #assertSetpointWithinLimits
-// (ThermostatServer.ts:890-903 at 862ad75f): a directly written setpoint
+// (ThermostatServer.ts:890-903 at db021da0): a directly written setpoint
 // within the effective limits. The text is matter.js's.
 func (st *setpointState) assertSetpointWithinLimits(heat, unoccupied bool, v int) error {
 	lo, hi := st.effectiveLimits(heat)
@@ -239,7 +239,7 @@ func (st *setpointState) assertSetpointWithinLimits(heat, unoccupied bool, v int
 }
 
 // assertUserSetpointLimits is matter.js #assertUserSetpointLimits
-// (ThermostatServer.ts:830-853 at 862ad75f): an absolute limit a device
+// (ThermostatServer.ts:830-853 at db021da0): an absolute limit a device
 // changes keeps absMin <= min <= max <= absMax. The texts are matter.js's.
 func (st *setpointState) assertUserSetpointLimits(heat bool) error {
 	scope, absMin, absMax := "Cool", st.absMinCool, st.absMaxCool
@@ -274,7 +274,7 @@ func (c changedKeys) has(keys ...string) bool {
 
 // violation describes the first violated setpoint invariant, "" when all
 // hold. Mirrors matter.js packages/node/src/behaviors/thermostat/
-// ThermostatServer.ts:941-986 at 862ad75f (#setpointViolation, chip
+// ThermostatServer.ts:941-986 at db021da0 (#setpointViolation, chip
 // Setpoints::Valid()): per served mode, ordered absolute limits, user
 // limits ordered and nested in them, the occupied — and with OCC the
 // unoccupied — setpoint within the user limits; with AUTO, the deadband
@@ -349,10 +349,11 @@ func (st *setpointState) reconcile(changed string) error {
 // MinCoolSetpointLimit are the "changed" set, so the other side moves
 // first. It returns the violation found ("" when the configuration was
 // valid) and the adjustments as "key before -> after"; an error when a
-// violation remains. Mirrors matter.js 0ceb202d packages/node/src/
+// violation remains. Mirrors matter.js db021da0 packages/node/src/
 // behaviors/thermostat/ThermostatServer.ts:1015-1042
-// (#reconcileInitialSetpoints; the unoccupied setpoint of its set is not
-// served here).
+// (#reconcileInitialSetpoints). The changed set names the kept side's
+// unoccupied setpoint too; without OCC it takes no part
+// ([setpointState] occ).
 func (st *setpointState) reconcileInitial() (violation string, adjusted []string, err error) {
 	violation = st.violation()
 	if violation == "" {
@@ -393,7 +394,7 @@ func (st *setpointState) reconcileInitial() (violation string, adjusted []string
 func adjustedText(adjusted []string) string { return strings.Join(adjusted, ", ") }
 
 // fixSetpoints is matter.js #fixSetpoints (ThermostatServer.ts:1058-1073
-// at 862ad75f): user limits, then the AUTO limit deadband (max, then min),
+// at db021da0): user limits, then the AUTO limit deadband (max, then min),
 // then the occupied setpoint range and, with OCC, the unoccupied one.
 func (st *setpointState) fixSetpoints(changed changedKeys) {
 	if st.heat {
@@ -481,7 +482,7 @@ func (st *setpointState) fixLimitDeadband(upper bool, changed changedKeys) {
 }
 
 // fixSetpointRange is matter.js #fixSetpointRange (chip FixRange,
-// ThermostatServer.ts:1142-1183 at 862ad75f) for the occupied or the
+// ThermostatServer.ts:1142-1183 at db021da0) for the occupied or the
 // unoccupied setpoints.
 func (st *setpointState) fixSetpointRange(unoccupied bool, changed changedKeys) {
 	heatKey, coolKey := setpointKey(true, unoccupied), setpointKey(false, unoccupied)

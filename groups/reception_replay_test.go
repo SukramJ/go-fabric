@@ -4,11 +4,12 @@
 package groups
 
 // The reception state of group messages is one replay window per
-// operational key and source node id, without a bound, as matter.js keeps
-// it (packages/protocol/src/groups/MessagingState.ts:19, :80-90 at
-// db021da0: a Map per operational key, one entry set per source node id,
-// removed by forgetReceptionState :97-99 alone). These cases pin what that
-// buys, which a bounded table with eviction cannot give (review II,
+// operational key and source node id, as matter.js keeps it
+// (packages/protocol/src/groups/MessagingState.ts:19, :80-90 at db021da0:
+// a Map per operational key, one entry set per source node id, removed by
+// forgetReceptionState :97-99 alone), bounded per key without eviction
+// (decision 133, maxGroupSendersPerKey). These cases pin what that buys,
+// which a bounded table with eviction cannot give (review II,
 // R2-P0-rv-B01, owner decision 22): a recorded datagram stays a duplicate
 // for as long as its key is held, however many other senders were seen
 // since, and only a message that authenticates under a mapped key adds an
@@ -37,7 +38,9 @@ func receptionEntries(m *Manager, key []byte) int {
 // a party without the group key holds one recorded datagram of each of n
 // senders and presents them again, round-robin and oldest first. With the
 // table bounded at 15 senders and the least recently accepted one evicted,
-// every such replay of 16 or more senders came back as a new message.
+// every such replay of 16 or more senders came back as a new message. With
+// the bound that evicts nobody, a sender beyond it is refused from its
+// first message on, and no replay is ever taken for a new one.
 func TestRecordedGroupMessageStaysADuplicate(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -47,10 +50,17 @@ func TestRecordedGroupMessageStaysADuplicate(t *testing.T) {
 		t.Run(fmt.Sprintf("%d senders", senders), func(t *testing.T) {
 			t.Parallel()
 			m, _ := newTestManager(t)
+			held := min(senders, maxGroupSendersPerKey)
 			recorded := make([][]byte, senders)
 			for s := range recorded {
 				recorded[s] = sealGroup(t, op, sid, 0x0101, uint64(s+1), 7, true, []byte("toggle"))
 				msg, err := m.Decode(ctx, recorded[s])
+				if s >= held {
+					if !errors.Is(err, errReceptionFull) {
+						t.Fatalf("the message of sender %d beyond the bound: err %v, want errReceptionFull", s+1, err)
+					}
+					continue
+				}
 				if err != nil {
 					t.Fatalf("the message of sender %d: %v", s+1, err)
 				}
@@ -58,14 +68,20 @@ func TestRecordedGroupMessageStaysADuplicate(t *testing.T) {
 					t.Fatalf("the first message of sender %d was taken for a replay", s+1)
 				}
 			}
-			if got := receptionEntries(m, op); got != senders {
-				t.Errorf("%d reception windows after %d senders, want one each", got, senders)
+			if got := receptionEntries(m, op); got != held {
+				t.Errorf("%d reception windows after %d senders, want %d", got, senders, held)
 			}
 
 			accepted := 0
 			for range 3 {
 				for s := range recorded {
 					msg, err := m.Decode(ctx, recorded[s])
+					if s >= held {
+						if !errors.Is(err, errReceptionFull) {
+							t.Fatalf("the replay of sender %d beyond the bound: err %v, want errReceptionFull", s+1, err)
+						}
+						continue
+					}
 					if err != nil {
 						t.Fatalf("the replay of sender %d: %v", s+1, err)
 					}
@@ -80,7 +96,7 @@ func TestRecordedGroupMessageStaysADuplicate(t *testing.T) {
 
 			// A real sender is not lost among them: its next counter is new,
 			// and the one before stays refused.
-			for _, source := range []uint64{1, uint64(senders)} {
+			for _, source := range []uint64{1, uint64(held)} {
 				next, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, source, 8, true, []byte("toggle")))
 				if err != nil || next.Duplicate {
 					t.Fatalf("the next message of sender %d: err %v, duplicate %v", source, err, next != nil && next.Duplicate)
@@ -103,16 +119,16 @@ func TestReceptionStateOfOneKeyIsNotAnothers(t *testing.T) {
 	op, sid := opKeyOf(t, 0xA1)
 	m, _ := newTestManager(t)
 	other := []byte{9, 9, 9}
-	if !m.receptionWindow(other, 1).Accept(1000) {
+	if !window(m, other, 1).Accept(1000) {
 		t.Fatal("precondition: the first counter under the other key was refused")
 	}
-	for source := uint64(1); source <= 100; source++ {
+	for source := uint64(1); source <= maxGroupSendersPerKey; source++ {
 		if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, source, 1, true, []byte("x"))); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if m.receptionWindow(other, 1).Accept(1000) {
-		t.Fatal("a replay under one key was accepted after 100 senders under another")
+	if window(m, other, 1).Accept(1000) {
+		t.Fatal("a replay under one key was accepted after a full table of senders under another")
 	}
 	if got := receptionEntries(m, other); got != 1 {
 		t.Fatalf("%d reception windows under the other key, want 1", got)

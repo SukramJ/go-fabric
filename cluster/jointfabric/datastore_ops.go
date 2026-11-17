@@ -238,7 +238,7 @@ func (d *Datastore) updateNodeKeySetListLocked(ks GroupKeySet, p *[]pushFn) {
 			d.markLocked(dsdef.AttrNodeKeySetList)
 			return
 		}
-		*p = append(*p, d.pushKeySet(e.NodeId, cloneKeySet(ks)))
+		*p = append(*p, d.pushKeySet(e.NodeId, ks.Clone()))
 	}
 }
 
@@ -246,17 +246,19 @@ func (d *Datastore) updateNodeKeySetListLocked(ks GroupKeySet, p *[]pushFn) {
 // entry of it (:1311-1322, :841-853).
 func (d *Datastore) pushKeySet(nodeID uint64, ks GroupKeySet) pushFn {
 	return func(ctx context.Context) error {
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncGroupKeySet(ctx, nodeID, ks); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			if markCommitted(d.t.NodeKeySets, nodeKeySetStatus, func(e NodeKeySetEntry) bool {
 				return e.NodeId == nodeID && e.GroupKeySetId == ks.GroupKeySetId
 			}) {
 				d.markLocked(dsdef.AttrNodeKeySetList)
 			}
 		})
-		return nil
 	}
 }
 
@@ -342,7 +344,9 @@ func reservedCAT(cat spec.Nullable[uint16]) bool {
 }
 
 // AddGroup adds a group: a group id already held, or the administrator or
-// anchor CAT, is a ConstraintError. Mirrors :1360-1385.
+// anchor CAT, is a ConstraintError; a GroupList at MaxGroups is refused
+// (ErrNoMemory), as the datastore's other lists are — the module's bound
+// (R2-P6-bound-1113). Mirrors :1360-1385 otherwise.
 func (d *Datastore) AddGroup(ctx context.Context, req AddGroupRequest) error {
 	return d.update(ctx, func() error { return d.addGroupLocked(req, true) })
 }
@@ -361,6 +365,9 @@ func (d *Datastore) addGroupLocked(req AddGroupRequest, checkCAT bool) error {
 	}
 	if checkCAT && reservedCAT(req.GroupCat) { // :1367-1371
 		return constraintError("group %d: the administrator and anchor CATs are reserved", req.GroupId)
+	}
+	if len(d.t.Groups) >= MaxGroups {
+		return ErrNoMemory
 	}
 	d.t.Groups = append(d.t.Groups, GroupEntry{
 		GroupId: uint64(req.GroupId), FriendlyName: req.FriendlyName, GroupKeySetId: req.GroupKeySetId,
@@ -390,6 +397,10 @@ func (d *Datastore) updateGroupLocked(req UpdateGroupRequest, p *[]pushFn) error
 		return constraintError("group %d is not in the datastore", req.GroupId)
 	}
 	g := &d.t.Groups[gi]
+	// Mirrors connectedhomeip src/app/server/JointFabricDatastore.cpp:1418-1423
+	// and :1491-1500 at 6170af84: UpdateGroup refuses a group whose stored
+	// CAT is the Administrator or the Anchor CAT, and takes the request's
+	// GroupCAT unchecked (AddGroup, :1367, checks the request's).
 	if reservedCAT(g.GroupCat) { // :1418-1423
 		return constraintError("group %d: the administrator and anchor CATs are reserved", req.GroupId)
 	}
@@ -447,30 +458,34 @@ func (d *Datastore) updateGroupLocked(req UpdateGroupRequest, p *[]pushFn) error
 // pushEndpointGroup pushes a membership and commits it (:1447-1457).
 func (d *Datastore) pushEndpointGroup(nodeID uint64, e EndpointGroupIDEntry) pushFn {
 	return func(ctx context.Context) error {
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncEndpointGroupID(ctx, nodeID, e); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			if markCommitted(d.t.EndpointGroupIDs, endpointGroupStatus, func(x EndpointGroupIDEntry) bool { return sameEndpointGroup(x, e) }) {
 				d.markLocked(dsdef.AttrEndpointGroupIdList)
 			}
 		})
-		return nil
 	}
 }
 
 // pushACL pushes an ACL entry and commits it (:1568-1578, :2169-2185).
 func (d *Datastore) pushACL(nodeID uint64, e ACLEntry) pushFn {
 	return func(ctx context.Context) error {
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncACL(ctx, nodeID, e); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			if markCommitted(d.t.ACLs, aclStatus, func(x aclEntry) bool { return x.NodeID == e.NodeId && x.ListID == e.ListId }) {
 				d.markLocked(dsdef.AttrNodeAclList)
 			}
 		})
-		return nil
 	}
 }
 
@@ -543,6 +558,9 @@ func (d *Datastore) addGroupIDToEndpointLocked(nodeID uint64, endpointID, groupI
 			d.markLocked(dsdef.AttrNodeKeySetList)
 			groupPush := d.pushEndpointGroup(nodeID, entry)
 			*p = append(*p, func(ctx context.Context) error {
+				if err := d.live(ctx); err != nil {
+					return err
+				}
 				// The key set entry stays Pending: the refresh finalises it
 				// (:1726-1727); the membership is pushed once it is there.
 				if err := d.sync.SyncNodeKeySet(ctx, nodeID, nks); err != nil {
@@ -581,16 +599,18 @@ func (d *Datastore) removeGroupIDFromEndpointLocked(nodeID uint64, endpointID, g
 	d.markLocked(dsdef.AttrEndpointGroupIdList)
 	e := d.t.EndpointGroupIDs[i]
 	*p = append(*p, func(ctx context.Context) error { // :1774-1789
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncEndpointGroupID(ctx, nodeID, e); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			if j := slices.IndexFunc(d.t.EndpointGroupIDs, func(x EndpointGroupIDEntry) bool { return sameEndpointGroup(x, e) }); j >= 0 {
 				d.t.EndpointGroupIDs = slices.Delete(d.t.EndpointGroupIDs, j, j+1)
 				d.markLocked(dsdef.AttrEndpointGroupIdList)
 			}
 		})
-		return nil
 	})
 	if gi := d.groupIndexLocked(groupID); gi >= 0 && !d.t.Groups[gi].GroupKeySetId.Null { // :1791-1820
 		ks := d.t.Groups[gi].GroupKeySetId.Value
@@ -608,35 +628,54 @@ func (d *Datastore) removeGroupIDFromEndpointLocked(nodeID uint64, endpointID, g
 // erases it (:1801-1815, :2307-2319).
 func (d *Datastore) pushNodeKeySetRemoval(nodeID uint64, sent NodeKeySetEntry, eraseNode uint64, eraseID uint16) pushFn {
 	return func(ctx context.Context) error {
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncNodeKeySet(ctx, nodeID, sent); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			n := len(d.t.NodeKeySets)
 			d.t.NodeKeySets = slices.DeleteFunc(d.t.NodeKeySets, sameNodeKeySet(eraseNode, eraseID))
 			if len(d.t.NodeKeySets) != n {
 				d.markLocked(dsdef.AttrNodeKeySetList)
 			}
 		})
-		return nil
 	}
 }
 
-// nextListIDLocked is GenerateAndAssignAUniqueListID (:1829-1851): one
-// above the highest list id of the bindings and the ACL entries.
+// nextListIDLocked is one above the highest list id of the bindings and
+// the ACL entries (GenerateAndAssignAUniqueListID, :1829-1851); when the
+// highest is 0xFFFF, the lowest id no entry holds — one always exists,
+// the two lists together hold at most MaxGroups + MaxACLs entries. The
+// fallback is the module's: max+1 would wrap to 0, which an entry may
+// hold (R2-P6-bound-1116).
 func (d *Datastore) nextListIDLocked() uint16 {
-	var next uint16
-	for _, e := range d.t.Bindings {
-		if e.ListId >= next {
-			next = e.ListId + 1
+	held := make(map[uint16]bool, len(d.t.Bindings)+len(d.t.ACLs))
+	highest, seen := uint16(0), false
+	note := func(id uint16) {
+		held[id] = true
+		if !seen || id > highest {
+			highest, seen = id, true
 		}
+	}
+	for _, e := range d.t.Bindings {
+		note(e.ListId)
 	}
 	for _, e := range d.t.ACLs {
-		if e.ListID >= next {
-			next = e.ListID + 1
-		}
+		note(e.ListID)
 	}
-	return next
+	switch {
+	case !seen:
+		return 0
+	case highest < 0xFFFF:
+		return highest + 1
+	}
+	var id uint16
+	for held[id] {
+		id++
+	}
+	return id
 }
 
 func optEqual[T comparable](a, b *T) bool {
@@ -650,29 +689,6 @@ func optEqual[T comparable](a, b *T) bool {
 // cluster each absent on both or present and equal.
 func bindingMatches(a, b BindingTarget) bool {
 	return optEqual(a.Node, b.Node) && optEqual(a.Group, b.Group) && optEqual(a.Endpoint, b.Endpoint) && optEqual(a.Cluster, b.Cluster)
-}
-
-func cloneBinding(b BindingTarget) BindingTarget {
-	clonePtr := func(p *uint64) *uint64 {
-		if p == nil {
-			return nil
-		}
-		v := *p
-		return &v
-	}
-	clone16 := func(p *uint16) *uint16 {
-		if p == nil {
-			return nil
-		}
-		v := *p
-		return &v
-	}
-	var c *uint32
-	if b.Cluster != nil {
-		v := *b.Cluster
-		c = &v
-	}
-	return BindingTarget{Node: clonePtr(b.Node), Group: clone16(b.Group), Endpoint: clone16(b.Endpoint), Cluster: c}
 }
 
 // AddBindingToEndpointForNode adds a binding to a node's endpoint, Pending
@@ -699,21 +715,23 @@ func (d *Datastore) addBindingLocked(nodeID uint64, endpointID uint16, binding B
 	if len(d.t.Bindings) >= MaxGroups { // :1930
 		return ErrNoMemory
 	}
-	entry := EndpointBindingEntry{NodeId: nodeID, EndpointId: endpointID, Binding: cloneBinding(binding), ListId: d.nextListIDLocked(), StatusEntry: StatusEntry{State: statePending}}
+	entry := EndpointBindingEntry{NodeId: nodeID, EndpointId: endpointID, Binding: binding.Clone(), ListId: d.nextListIDLocked(), StatusEntry: StatusEntry{State: statePending}}
 	d.t.Bindings = append(d.t.Bindings, entry)
 	d.markLocked(dsdef.AttrEndpointBindingList)
 	*p = append(*p, func(ctx context.Context) error { // :1943-1952
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.pushBinding(ctx, nodeID, entry); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			if markCommitted(d.t.Bindings, bindingStatus, func(e EndpointBindingEntry) bool {
 				return e.NodeId == nodeID && e.EndpointId == endpointID && e.ListId == entry.ListId
 			}) {
 				d.markLocked(dsdef.AttrEndpointBindingList)
 			}
 		})
-		return nil
 	})
 	return nil
 }
@@ -743,17 +761,19 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 	d.markLocked(dsdef.AttrEndpointBindingList)
 	e := d.t.Bindings[i]
 	*p = append(*p, func(ctx context.Context) error { // :1970-1981
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.pushBinding(ctx, nodeID, e); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			n := len(d.t.Bindings)
 			d.t.Bindings = slices.DeleteFunc(d.t.Bindings, match)
 			if len(d.t.Bindings) != n {
 				d.markLocked(dsdef.AttrEndpointBindingList)
 			}
 		})
-		return nil
 	})
 	return nil
 }
@@ -765,8 +785,8 @@ func (d *Datastore) removeBindingLocked(listID uint16, nodeID uint64, endpointID
 // 6170af84): the endpoint's current bindings are fetched (:1717-1719), a
 // DeletePending entry removes the entries whose target matches
 // (:1731-1741, the fields BindingMatches compares), any other entry is
-// appended (:1744) unless the list holds a matching one already, and the
-// list is written (:1747). A fetch that fails is
+// appended (:1744 — unconditionally there; here not when the list holds a
+// matching one already, see below), and the list is written (:1747). A fetch that fails is
 // the push's error, so the entry stays Pending or DeletePending for the
 // next RefreshNode — jf-admin-app writes the one entry over an empty list
 // instead (:1726-1730 at 6170af84), which would drop the node's other
@@ -788,6 +808,9 @@ func (d *Datastore) pushBinding(ctx context.Context, nodeID uint64, e EndpointBi
 		return fmt.Errorf("binding list of node %d endpoint %d: %w", nodeID, e.EndpointId, err)
 	}
 	defer unlock()
+	if err := d.live(ctx); err != nil { // the push waited behind the lock across a wipe
+		return err
+	}
 	current, err := d.sync.FetchEndpointBindingList(ctx, nodeID, e.EndpointId)
 	if err != nil {
 		return fmt.Errorf("FetchEndpointBindingList: %w", err)
@@ -905,17 +928,19 @@ func (d *Datastore) removeACLLocked(listID uint16, nodeID uint64, p *[]pushFn) e
 	d.markLocked(dsdef.AttrNodeAclList)
 	sent := ACLEntry{NodeId: nodeID, ListId: listID, StatusEntry: StatusEntry{State: stateDeletePending}} // :2203-2206
 	*p = append(*p, func(ctx context.Context) error {
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncACL(ctx, nodeID, sent); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			n := len(d.t.ACLs)
 			d.t.ACLs = slices.DeleteFunc(d.t.ACLs, match)
 			if len(d.t.ACLs) != n {
 				d.markLocked(dsdef.AttrNodeAclList)
 			}
 		})
-		return nil
 	})
 	return nil
 }
@@ -955,15 +980,17 @@ func (d *Datastore) addNodeKeySetEntryLocked(groupID, ks uint16, p *[]pushFn) er
 // pushNodeKeySet pushes a node's key set entry and commits it (:2268-2275).
 func (d *Datastore) pushNodeKeySet(nodeID uint64, e NodeKeySetEntry) pushFn {
 	return func(ctx context.Context) error {
+		if err := d.live(ctx); err != nil {
+			return err
+		}
 		if err := d.sync.SyncNodeKeySet(ctx, nodeID, e); err != nil {
 			return err
 		}
-		d.commit(ctx, func() {
+		return d.commit(ctx, func() {
 			if markCommitted(d.t.NodeKeySets, nodeKeySetStatus, sameNodeKeySet(nodeID, e.GroupKeySetId)) {
 				d.markLocked(dsdef.AttrNodeKeySetList)
 			}
 		})
-		return nil
 	}
 }
 

@@ -32,6 +32,46 @@ type State struct {
 	PredictedActivity           []PredictedActivityStruct  // attribute 0x000B: list[PredictedActivityStruct], P, PRED, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.AmbientContextType = func(s []AmbientContextTypeStruct) []AmbientContextTypeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AmbientContextTypeStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.AmbientContextType)
+	c.AmbientContextTypeSupported = func(s []Semtag) []Semtag {
+		if s == nil {
+			return nil
+		}
+		out := make([]Semtag, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.AmbientContextTypeSupported)
+	c.ObjectCountConfig = st.ObjectCountConfig.Clone()
+	c.HoldTimeLimits = st.HoldTimeLimits.Clone()
+	c.PredictedActivity = func(s []PredictedActivityStruct) []PredictedActivityStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]PredictedActivityStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.PredictedActivity)
+	return c
+}
+
 // Patch is a change to the AmbientContextSensing state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

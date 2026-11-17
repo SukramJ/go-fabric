@@ -77,6 +77,21 @@ func (v *ContentAppMessageRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ContentAppMessageRequest) Clone() ContentAppMessageRequest {
+	c := v
+	c.EncodingHint = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EncodingHint)
+	return c
+}
+
 // ContentAppMessageResponse is the ContentAppMessageResponse command payload.
 type ContentAppMessageResponse struct {
 	Status       StatusEnum // 0: StatusEnum, M
@@ -100,6 +115,28 @@ func (v *ContentAppMessageResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeStringIn(0, 500))),
 		spec.Bind(2, "EncodingHint", false, &v.EncodingHint, spec.DecodeOptional(spec.DecodeStringIn(0, 100))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ContentAppMessageResponse) Clone() ContentAppMessageResponse {
+	c := v
+	c.Data = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Data)
+	c.EncodingHint = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EncodingHint)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

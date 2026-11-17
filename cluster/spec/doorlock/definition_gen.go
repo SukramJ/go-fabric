@@ -912,6 +912,28 @@ func (v *LockDoorRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LockDoorRequest) Clone() LockDoorRequest {
+	c := v
+	c.PinCode = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.PinCode)
+	return c
+}
+
 // UnlockDoorRequest is the UnlockDoor command payload.
 type UnlockDoorRequest struct {
 	PinCode *[]byte // 0: octstr, [COTA & PIN]
@@ -929,6 +951,28 @@ func (v *UnlockDoorRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "UnlockDoor",
 		spec.Bind(0, "PinCode", false, &v.PinCode, spec.DecodeOptional(spec.DecodeBytes)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UnlockDoorRequest) Clone() UnlockDoorRequest {
+	c := v
+	c.PinCode = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.PinCode)
+	return c
 }
 
 // ToggleRequest is the Toggle command payload.
@@ -963,6 +1007,28 @@ func (v *UnlockWithTimeoutRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Timeout", true, &v.Timeout, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "PinCode", false, &v.PinCode, spec.DecodeOptional(spec.DecodeBytes)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UnlockWithTimeoutRequest) Clone() UnlockWithTimeoutRequest {
+	c := v
+	c.PinCode = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.PinCode)
+	return c
 }
 
 // SetWeekDayScheduleRequest is the SetWeekDaySchedule command payload.
@@ -1062,6 +1128,49 @@ func (v *GetWeekDayScheduleResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(6, "EndHour", false, &v.EndHour, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 0, 23))),
 		spec.Bind(7, "EndMinute", false, &v.EndMinute, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 0, 59))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetWeekDayScheduleResponse) Clone() GetWeekDayScheduleResponse {
+	c := v
+	c.DaysMask = func(p *DaysMaskBitmap) *DaysMaskBitmap {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DaysMask)
+	c.StartHour = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartHour)
+	c.StartMinute = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartMinute)
+	c.EndHour = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndHour)
+	c.EndMinute = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndMinute)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -1172,6 +1281,28 @@ func (v *GetYearDayScheduleResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetYearDayScheduleResponse) Clone() GetYearDayScheduleResponse {
+	c := v
+	c.LocalStartTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LocalStartTime)
+	c.LocalEndTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LocalEndTime)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (GetYearDayScheduleResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdGetYearDayScheduleResponse
@@ -1275,6 +1406,35 @@ func (v *GetHolidayScheduleResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "LocalEndTime", false, &v.LocalEndTime, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint32](32)))),
 		spec.Bind(4, "OperatingMode", false, &v.OperatingMode, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[OperatingModeEnum](8)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetHolidayScheduleResponse) Clone() GetHolidayScheduleResponse {
+	c := v
+	c.LocalStartTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LocalStartTime)
+	c.LocalEndTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LocalEndTime)
+	c.OperatingMode = func(p *spec.Nullable[OperatingModeEnum]) *spec.Nullable[OperatingModeEnum] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OperatingMode)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -1403,6 +1563,22 @@ func (v *GetUserResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetUserResponse) Clone() GetUserResponse {
+	c := v
+	c.Credentials = spec.Nullable[[]CredentialStruct]{Value: func(s []CredentialStruct) []CredentialStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]CredentialStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Credentials.Value), Null: v.Credentials.Null}
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (GetUserResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdGetUserResponse
@@ -1461,6 +1637,22 @@ func (v *SetCredentialRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetCredentialRequest) Clone() SetCredentialRequest {
+	c := v
+	c.CredentialData = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.CredentialData)
+	return c
+}
+
 // SetCredentialResponse is the SetCredentialResponse command payload.
 type SetCredentialResponse struct {
 	Status              Status                 // 0: status, M, desc
@@ -1484,6 +1676,21 @@ func (v *SetCredentialResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "UserIndex", true, &v.UserIndex, spec.DecodeNullable(spec.DecodeUintIn[uint16](16, 1, 65535))),
 		spec.Bind(2, "NextCredentialIndex", false, &v.NextCredentialIndex, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint16](16)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetCredentialResponse) Clone() SetCredentialResponse {
+	c := v
+	c.NextCredentialIndex = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.NextCredentialIndex)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -1544,6 +1751,35 @@ func (v *GetCredentialStatusResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetCredentialStatusResponse) Clone() GetCredentialStatusResponse {
+	c := v
+	c.NextCredentialIndex = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.NextCredentialIndex)
+	c.CredentialData = func(p *spec.Nullable[[]byte]) *spec.Nullable[[]byte] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.CredentialData)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (GetCredentialStatusResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdGetCredentialStatusResponse
@@ -1587,6 +1823,28 @@ func (v *UnboltDoorRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UnboltDoorRequest) Clone() UnboltDoorRequest {
+	c := v
+	c.PinCode = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.PinCode)
+	return c
+}
+
 // SetAliroReaderConfigRequest is the SetAliroReaderConfig command payload.
 type SetAliroReaderConfigRequest struct {
 	SigningKey        []byte  // 0: octstr, M, 32
@@ -1613,6 +1871,52 @@ func (v *SetAliroReaderConfigRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "GroupIdentifier", true, &v.GroupIdentifier, spec.DecodeBytes),
 		spec.Bind(3, "GroupResolvingKey", false, &v.GroupResolvingKey, spec.DecodeOptional(spec.DecodeBytes)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetAliroReaderConfigRequest) Clone() SetAliroReaderConfigRequest {
+	c := v
+	c.SigningKey = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.SigningKey)
+	c.VerificationKey = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.VerificationKey)
+	c.GroupIdentifier = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.GroupIdentifier)
+	c.GroupResolvingKey = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.GroupResolvingKey)
+	return c
 }
 
 // ClearAliroReaderConfigRequest is the ClearAliroReaderConfig command payload.
@@ -1701,6 +2005,28 @@ func (v *LockOperationEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LockOperationEvent) Clone() LockOperationEvent {
+	c := v
+	c.Credentials = func(p *spec.Nullable[[]CredentialStruct]) *spec.Nullable[[]CredentialStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]CredentialStruct]{Value: func(s []CredentialStruct) []CredentialStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]CredentialStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.Credentials)
+	return c
+}
+
 // LockOperationErrorEvent is the LockOperationError event payload.
 type LockOperationErrorEvent struct {
 	LockOperationType LockOperationTypeEnum              // 0: LockOperationTypeEnum, M
@@ -1736,6 +2062,28 @@ func (v *LockOperationErrorEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(5, "SourceNode", true, &v.SourceNode, spec.DecodeNullable(spec.DecodeUint[uint64](64))),
 		spec.Bind(6, "Credentials", false, &v.Credentials, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeListIn(spec.DecodeStruct[CredentialStruct], 1, 2147483647)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LockOperationErrorEvent) Clone() LockOperationErrorEvent {
+	c := v
+	c.Credentials = func(p *spec.Nullable[[]CredentialStruct]) *spec.Nullable[[]CredentialStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]CredentialStruct]{Value: func(s []CredentialStruct) []CredentialStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]CredentialStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.Credentials)
+	return c
 }
 
 // LockUserChangeEvent is the LockUserChange event payload.

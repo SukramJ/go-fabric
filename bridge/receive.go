@@ -106,7 +106,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// A group message is authenticated under an operational group key,
 	// not a session: it takes its own path before any unicast handling
 	// (matter.js ExchangeManager #receiveMessage branches on the session
-	// type the same way). maybeUnmaskPrivacy below therefore only ever
+	// type the same way). refuseUnicastPrivacy below therefore only ever
 	// sees unicast frames, where it drops one carrying the P bit.
 	if isGroupDatagram(buf) {
 		// One group datagram at a time, in arrival order. The listener
@@ -129,16 +129,9 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		defer b.groupRx.Unlock()
 		return b.dispatchGroupMessage(ctx, buf, udpAddrOf(src))
 	}
-	// Privacy unmask: when Security Flags carries the P bit, the
-	// header bytes from offset 4 onwards (MessageCounter + optional
-	// NodeIDs) are XOR-masked with an AES-ECB-derived key (Matter
-	// §4.7.3.1). Inbound Privacy frames need the unmask BEFORE
-	// UnmarshalHeader can read MessageCounter / NodeIDs. SessionID
-	// (bytes 1-2) and Security Flags (byte 3) are unprotected, so we
-	// can peek at them first to determine whether to apply the unmask.
-	if err := b.maybeUnmaskPrivacy(buf); err != nil {
-		// Unmask failures are diagnostic only — drop the datagram.
-		// chip-tool retransmits per MRP if it cares.
+	// A unicast frame carrying the P bit is dropped before its header is
+	// read ([refuseUnicastPrivacy]).
+	if err := refuseUnicastPrivacy(buf); err != nil {
 		b.logger.Debug("matter.rx.privacy_unmask",
 			slog.String("src", srcString(src)),
 			slog.Any("err", err))

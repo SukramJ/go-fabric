@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
@@ -21,7 +23,7 @@ import (
 // programs, the active one, SetActiveScheduleRequest and the atomic write
 // of Schedules. matter.js does not implement it ("MatterScheduleConfiguration:
 // This feature is not implemented yet", packages/node/src/behaviors/
-// thermostat/ThermostatServer.ts:82 at 862ad75f); the behaviour follows
+// thermostat/ThermostatServer.ts:82 at db021da0); the behaviour follows
 // connectedhomeip's ThermostatSchedules
 // (src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp at
 // 645b267a — the harness image's CHIP commit 6170af84 has no schedules
@@ -56,49 +58,6 @@ type SchedulePort = tdef.SchedulePort
 // server refuses: ScheduleTypes or a count outside its constraints, or
 // configured schedules without a unique handle.
 var ErrSchedules = errors.New("thermo: schedule configuration refused")
-
-// cloneSchedules deep-copies schedules.
-func cloneSchedules(in []Schedule) []Schedule {
-	if in == nil {
-		return nil
-	}
-	out := make([]Schedule, len(in))
-	for i, sc := range in {
-		out[i] = sc
-		if !sc.ScheduleHandle.Null {
-			out[i].ScheduleHandle.Value = bytes.Clone(sc.ScheduleHandle.Value)
-		}
-		if sc.Name != nil {
-			n := *sc.Name
-			out[i].Name = &n
-		}
-		if sc.PresetHandle != nil {
-			h := bytes.Clone(*sc.PresetHandle)
-			out[i].PresetHandle = &h
-		}
-		out[i].Transitions = make([]ScheduleTransition, len(sc.Transitions))
-		for j, t := range sc.Transitions {
-			out[i].Transitions[j] = t
-			if t.PresetHandle != nil {
-				h := bytes.Clone(*t.PresetHandle)
-				out[i].Transitions[j].PresetHandle = &h
-			}
-			if t.SystemMode != nil {
-				m := *t.SystemMode
-				out[i].Transitions[j].SystemMode = &m
-			}
-			if t.CoolingSetpoint != nil {
-				c := *t.CoolingSetpoint
-				out[i].Transitions[j].CoolingSetpoint = &c
-			}
-			if t.HeatingSetpoint != nil {
-				h := *t.HeatingSetpoint
-				out[i].Transitions[j].HeatingSetpoint = &h
-			}
-		}
-	}
-	return out
-}
 
 // schedulesValue is a Schedules value as the server handles it: the
 // bridge decodes a write as spec.List, a host may pass a plain slice.
@@ -169,7 +128,7 @@ func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 // (ThermostatClusterSchedules.h:74-83); the handle rule is what its
 // SetActiveSchedule and PrecommitSchedules need of it.
 func (s *ThermostatServer) hostSchedules(list []Schedule) ([]Schedule, error) {
-	out := cloneSchedules(list)
+	out := deepcopy.Each(list)
 	if out == nil {
 		out = []Schedule{}
 	}
@@ -251,7 +210,7 @@ func (s *ThermostatServer) SetActiveScheduleHandle(handle []byte) error {
 func (s *ThermostatServer) Schedules() []Schedule {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return cloneSchedules(s.schedules)
+	return deepcopy.Each(s.schedules)
 }
 
 // ActiveScheduleHandle returns the ActiveScheduleHandle, nil for null.
@@ -303,6 +262,13 @@ func (s *ThermostatServer) handleSetActiveScheduleRequest(ctx context.Context, f
 		}
 	}
 	s.mu.Lock()
+	// SetSchedules takes no op: a list the host stored while the port ran
+	// may have dropped the handle, and a dangling one is never stored
+	// (R2-P6-conc-1510).
+	if _, ok := scheduleWithHandle(s.schedules, handle); !ok {
+		s.mu.Unlock()
+		return spec.Errorf(im.StatusInvalidCommand, "thermo: schedule handle %s was removed while the device switched to it", handleKey(handle))
+	}
 	previous := s.activeScheduleHandle
 	s.activeScheduleHandle = handle
 	s.mu.Unlock()

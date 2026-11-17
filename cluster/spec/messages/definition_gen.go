@@ -200,6 +200,36 @@ func (v *MessageStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MessageStruct) Clone() MessageStruct {
+	c := v
+	c.MessageId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.MessageId)
+	c.Responses = func(p *[]MessageResponseOptionStruct) *[]MessageResponseOptionStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []MessageResponseOptionStruct) []MessageResponseOptionStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]MessageResponseOptionStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Responses)
+	return c
+}
+
 // MessageStructDef describes MessageStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -251,6 +281,36 @@ func (v *PresentMessagesRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PresentMessagesRequestRequest) Clone() PresentMessagesRequestRequest {
+	c := v
+	c.MessageId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.MessageId)
+	c.Responses = func(p *[]MessageResponseOptionStruct) *[]MessageResponseOptionStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []MessageResponseOptionStruct) []MessageResponseOptionStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]MessageResponseOptionStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Responses)
+	return c
+}
+
 // CancelMessagesRequestRequest is the CancelMessagesRequest command payload.
 type CancelMessagesRequestRequest struct {
 	MessageIds [][]byte // 0: list[MessageID], M, max 8
@@ -268,6 +328,31 @@ func (v *CancelMessagesRequestRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "CancelMessagesRequest",
 		spec.Bind(0, "MessageIds", true, &v.MessageIds, spec.DecodeListIn(spec.DecodeBytesIn(16, 16), 0, 8)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CancelMessagesRequestRequest) Clone() CancelMessagesRequestRequest {
+	c := v
+	c.MessageIds = func(s [][]byte) [][]byte {
+		if s == nil {
+			return nil
+		}
+		out := make([][]byte, len(s))
+		for i := range s {
+			out[i] = func(s []byte) []byte {
+				if s == nil {
+					return nil
+				}
+				out := make([]byte, len(s))
+				copy(out, s)
+				return out
+			}(s[i])
+		}
+		return out
+	}(v.MessageIds)
+	return c
 }
 
 // MessageQueuedEvent is the MessageQueued event payload.
@@ -292,6 +377,22 @@ func (v *MessageQueuedEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MessageQueuedEvent) Clone() MessageQueuedEvent {
+	c := v
+	c.MessageId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.MessageId)
+	return c
+}
+
 // MessagePresentedEvent is the MessagePresented event payload.
 type MessagePresentedEvent struct {
 	MessageId   []byte // 0: MessageID, M, 16
@@ -312,6 +413,22 @@ func (v *MessagePresentedEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "MessageId", true, &v.MessageId, spec.DecodeBytesIn(16, 16)),
 		spec.Bind(254, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MessagePresentedEvent) Clone() MessagePresentedEvent {
+	c := v
+	c.MessageId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.MessageId)
+	return c
 }
 
 // MessageCompleteEvent is the MessageComplete event payload.
@@ -343,6 +460,36 @@ func (v *MessageCompleteEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "FutureMessagesPreference", true, &v.FutureMessagesPreference, spec.DecodeNullable(spec.DecodeUint[FutureMessagePreferenceEnum](8))),
 		spec.Bind(254, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MessageCompleteEvent) Clone() MessageCompleteEvent {
+	c := v
+	c.MessageId = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.MessageId)
+	c.ResponseId = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ResponseId)
+	c.Reply = func(p *spec.Nullable[string]) *spec.Nullable[string] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Reply)
+	return c
 }
 
 func decodePresentMessagesRequestRequest(n spec.Node) (any, error) {

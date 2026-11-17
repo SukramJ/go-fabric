@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -134,16 +136,34 @@ func TestGroupCommandPayloadsMatchMatterJS(t *testing.T) {
 				if err := json.Unmarshal(f.Fixture, &fx); err != nil {
 					t.Fatal(err)
 				}
-				got, ok := decodeCommandFields(t, 0x003F, 0x00, f.BytesHex).(mattercore.KeySetWriteRequest)
+				// The request decodes into the generated type, whose
+				// nullable fields keep a null apart from a 0 (R2-P6-par-1013).
+				got, ok := decodeCommandFields(t, 0x003F, 0x00, f.BytesHex).(gkmdef.KeySetWriteRequest)
 				if !ok {
-					t.Fatalf("decoded %T, want KeySetWriteRequest", got)
+					t.Fatalf("decoded %T, want the generated KeySetWriteRequest", got)
 				}
 				want := fx.toStruct(t)
-				if g := got.GroupKeySet; g.GroupKeySetID != want.GroupKeySetID || g.GroupKeySecurityPolicy != want.GroupKeySecurityPolicy ||
-					!slices.Equal(g.EpochKey0, want.EpochKey0) || g.EpochStartTime0 != want.EpochStartTime0 ||
-					!slices.Equal(g.EpochKey1, want.EpochKey1) || g.EpochStartTime1 != want.EpochStartTime1 ||
-					!slices.Equal(g.EpochKey2, want.EpochKey2) || g.EpochStartTime2 != want.EpochStartTime2 ||
-					g.GroupKeyMulticastPolicy != want.GroupKeyMulticastPolicy {
+				key := func(n spec.Nullable[[]byte]) []byte {
+					if n.Null {
+						return nil
+					}
+					return n.Value
+				}
+				start := func(n spec.Nullable[uint64], fixture *uint64) bool {
+					if fixture == nil {
+						return n.Null
+					}
+					return !n.Null && n.Value == *fixture
+				}
+				var multicast uint8
+				if got.GroupKeySet.GroupKeyMulticastPolicy != nil {
+					multicast = uint8(*got.GroupKeySet.GroupKeyMulticastPolicy)
+				}
+				if g := got.GroupKeySet; g.GroupKeySetId != want.GroupKeySetID || uint8(g.GroupKeySecurityPolicy) != want.GroupKeySecurityPolicy ||
+					!slices.Equal(key(g.EpochKey0), want.EpochKey0) || !start(g.EpochStartTime0, fx.EpochStartTime0) ||
+					!slices.Equal(key(g.EpochKey1), want.EpochKey1) || !start(g.EpochStartTime1, fx.EpochStartTime1) ||
+					!slices.Equal(key(g.EpochKey2), want.EpochKey2) || !start(g.EpochStartTime2, fx.EpochStartTime2) ||
+					multicast != want.GroupKeyMulticastPolicy {
 					t.Fatalf("decoded %+v, want %+v", g, want)
 				}
 			case "KeySetReadResponse":

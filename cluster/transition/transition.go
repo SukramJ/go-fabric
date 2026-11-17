@@ -156,6 +156,12 @@ type Transition struct {
 	// Target is the value the transition ends at. ±Inf is allowed and
 	// means the bound in that direction (LevelControl Move).
 	Target float64
+	// TargetFrom computes Target from the property's current value, read
+	// inside [Engine.Start] under the engine's lock, and replaces Target
+	// when set — the twin of RateFrom for a command whose target is a step
+	// from the current value (decision 164). Optional; a property whose
+	// value is unknown keeps Target, and NoTarget ignores it.
+	TargetFrom func(current float64) float64
 	// NoTarget leaves Target unset: a bounded property then moves to the
 	// bound in the direction of Rate, a cyclic one moves until stopped.
 	NoTarget bool
@@ -257,6 +263,9 @@ func (e *Engine) startLocked(t Transition) (Change, bool) {
 	e.stopLocked(t.Name)
 
 	current, known := e.cfg.Read(t.Name)
+	if t.TargetFrom != nil && known && !t.NoTarget {
+		t.Target = t.TargetFrom(current)
+	}
 	if t.RateFrom != nil && known {
 		t.Rate = t.RateFrom(current)
 	}

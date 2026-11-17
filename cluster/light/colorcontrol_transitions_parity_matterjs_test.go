@@ -14,7 +14,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/light"
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -68,9 +67,9 @@ func managedCT(on bool) (*light.ColorControlServer, *ctReports, *onOff) {
 			v, _ := srv.MatterRead(id)
 			r.mu.Lock()
 			switch id {
-			case wire.ColorCtrlAttrColorTemperatureMireds:
+			case ccdef.AttrColorTemperatureMireds:
 				r.mireds = append(r.mireds, v.(uint16))
-			case wire.ColorCtrlAttrRemainingTime:
+			case ccdef.AttrRemainingTime:
 				r.times = append(r.times, v.(uint16))
 			}
 			r.mu.Unlock()
@@ -99,7 +98,7 @@ func ctInvoke(t *testing.T, srv *light.ColorControlServer, cmd uint32, fields an
 
 func remainingCT(t *testing.T, srv *light.ColorControlServer) uint16 {
 	t.Helper()
-	v, _ := srv.MatterRead(wire.ColorCtrlAttrRemainingTime)
+	v, _ := srv.MatterRead(ccdef.AttrRemainingTime)
 	return v.(uint16)
 }
 
@@ -134,10 +133,10 @@ func TestMoveColorTemperatureReadsPartWay(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, _ := managedCT(true)
 		rate := uint64((370 - 153) / 20)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 153}); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 153}); err != nil {
 			t.Fatal(err)
 		}
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(1, rate, 153, 370)); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(1, rate, 153, 370)); err != nil {
 			t.Fatal(err)
 		}
 		ctSleep(10 * time.Second)
@@ -148,7 +147,7 @@ func TestMoveColorTemperatureReadsPartWay(t *testing.T) {
 		if m := currentMireds(t, srv); m != 370 {
 			t.Errorf("after 25 s: %d, want the maximum 370", m)
 		}
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(3, rate, 0, 0)); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(3, rate, 0, 0)); err != nil {
 			t.Fatal(err)
 		}
 		ctSleep(10 * time.Second)
@@ -160,7 +159,7 @@ func TestMoveColorTemperatureReadsPartWay(t *testing.T) {
 			t.Errorf("down after 25 s: %d, want the minimum 153", m)
 		}
 		// At the maximum rate the move lands within a step (step 7-8).
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(1, 65535, 153, 0)); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(1, 65535, 153, 0)); err != nil {
 			t.Fatal(err)
 		}
 		ctSleep(time.Second)
@@ -171,30 +170,36 @@ func TestMoveColorTemperatureReadsPartWay(t *testing.T) {
 }
 
 // TestMoveColorTemperatureRateAndStop pins matter.js #assertRate (Up or
-// Down at Rate 0 is INVALID_COMMAND, Stop at Rate 0 is not) and its Stop
-// branch, which ends hue and saturation moves only — a colour temperature
-// move keeps running (ColorControlServer.moveColorTemperature).
+// Down at Rate 0 is INVALID_COMMAND, Stop at Rate 0 is not) and the Stop
+// branch, which ends the colour temperature move with every other colour
+// movement, as connectedhomeip's MoveColorTemperature does — the
+// deliberate divergence from matter.js of R2-P6-par-1413 (decision 149).
+// RemainingTime reading 0 after the Stop is go-fabric's own (the engine is
+// idle); chip leaves the last value.
 func TestMoveColorTemperatureRateAndStop(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, _ := managedCT(true)
 		for _, mode := range []uint64{1, 3} {
-			if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(mode, 0, 0, 0)); !statusIs(err, im.StatusInvalidCommand) {
+			if err := ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(mode, 0, 0, 0)); !statusIs(err, im.StatusInvalidCommand) {
 				t.Errorf("MoveMode %d at Rate 0 = %v, want INVALID_COMMAND", mode, err)
 			}
 		}
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(2, 10, 0, 0)); !statusIs(err, im.StatusConstraintError) {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(2, 10, 0, 0)); !statusIs(err, im.StatusConstraintError) {
 			t.Errorf("MoveMode 2 = %v, want CONSTRAINT_ERROR (not in MoveModeEnum)", err)
 		}
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(0, 0, 0, 0)); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(0, 0, 0, 0)); err != nil {
 			t.Errorf("Stop at Rate 0 = %v, want success", err)
 		}
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(1, 10, 0, 0))
+		_ = ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(1, 10, 0, 0))
 		ctSleep(time.Second)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(0, 0, 0, 0))
+		_ = ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(0, 0, 0, 0))
 		before := currentMireds(t, srv)
 		ctSleep(time.Second)
-		if after := currentMireds(t, srv); after <= before {
-			t.Errorf("MoveMode Stop halted the colour temperature move (%d → %d); matter.js leaves it running", before, after)
+		if after := currentMireds(t, srv); after != before {
+			t.Errorf("MoveMode Stop left the colour temperature move running (%d → %d); Stop ends it", before, after)
+		}
+		if got := remainingCT(t, srv); got != 0 {
+			t.Errorf("RemainingTime after Stop = %d, want 0", got)
 		}
 	})
 }
@@ -206,7 +211,7 @@ func TestMoveColorTemperatureRateAndStop(t *testing.T) {
 func TestStepColorTemperatureReadsPartWay(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, _ := managedCT(true)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdStepColorTemperature, stepCT(1, 100, 200, 0, 0)); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdStepColorTemperature, stepCT(1, 100, 200, 0, 0)); err != nil {
 			t.Fatal(err)
 		}
 		if got := remainingCT(t, srv); got != 200 {
@@ -220,14 +225,14 @@ func TestStepColorTemperatureReadsPartWay(t *testing.T) {
 		if m := currentMireds(t, srv); m != 350 {
 			t.Errorf("after 25 s: %d, want 350", m)
 		}
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdStepColorTemperature, stepCT(3, 300, 0, 200, 0)); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdStepColorTemperature, stepCT(3, 300, 0, 200, 0)); err != nil {
 			t.Fatal(err)
 		}
 		if m := currentMireds(t, srv); m != 200 {
 			t.Errorf("a step below the command's minimum = %d, want 200 (ColorTemperatureMinimumMireds)", m)
 		}
 		for _, mode := range []uint64{1, 3} {
-			if err := ctInvoke(t, srv, wire.ColorCtrlCmdStepColorTemperature, stepCT(mode, 0, 0, 0, 0)); !statusIs(err, im.StatusInvalidCommand) {
+			if err := ctInvoke(t, srv, ccdef.CmdStepColorTemperature, stepCT(mode, 0, 0, 0, 0)); !statusIs(err, im.StatusInvalidCommand) {
 				t.Errorf("StepSize 0 = %v, want INVALID_COMMAND", err)
 			}
 		}
@@ -243,9 +248,9 @@ func TestStepColorTemperatureReadsPartWay(t *testing.T) {
 func TestColorTemperatureReportsQuietly(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, r, _ := managedCT(true)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(3, 65535, 0, 0))
+		_ = ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(3, 65535, 0, 0))
 		ctSleep(time.Second)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
 			t.Fatal(err)
 		}
 		ctSleep(20 * time.Second)
@@ -257,12 +262,12 @@ func TestColorTemperatureReportsQuietly(t *testing.T) {
 			t.Errorf("RemainingTime reports %v, want [100 0] (the fast move reports none)", times)
 		}
 
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(3, 65535, 0, 0))
+		_ = ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(3, 65535, 0, 0))
 		ctSleep(time.Second)
 		r.reset()
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370 / 2, TransitionTime: 100})
+		_ = ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370 / 2, TransitionTime: 100})
 		ctSleep(5 * time.Second)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 150})
+		_ = ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 150})
 		ctSleep(20 * time.Second)
 		if _, times := r.snapshot(); len(times) != 3 || times[0] < 95 || times[0] > 100 || times[1] < 145 || times[1] > 150 || times[2] != 0 {
 			t.Errorf("RemainingTime reports %v, want [~100 ~150 0]", times)
@@ -277,11 +282,11 @@ func TestColorTemperatureReportsQuietly(t *testing.T) {
 func TestStopMoveStepReportsZero(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, r, _ := managedCT(true)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100}); err != nil {
 			t.Fatal(err)
 		}
 		ctSleep(2 * time.Second)
-		if err := ctInvoke(t, srv, wire.ColorCtrlCmdStopMoveStep, map[uint8]any{0: uint64(0), 1: uint64(0)}); err != nil {
+		if err := ctInvoke(t, srv, ccdef.CmdStopMoveStep, map[uint8]any{0: uint64(0), 1: uint64(0)}); err != nil {
 			t.Fatal(err)
 		}
 		at := currentMireds(t, srv)
@@ -300,24 +305,24 @@ func TestStopMoveStepReportsZero(t *testing.T) {
 func TestColorControlExecuteIfOff(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, _, o := managedCT(false)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
+		_ = ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
 		if m := currentMireds(t, srv); m != 250 {
 			t.Errorf("an off device took MoveToColorTemperature: %d", m)
 		}
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300, OptionsMask: 1, OptionsOverride: 1})
+		_ = ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300, OptionsMask: 1, OptionsOverride: 1})
 		if m := currentMireds(t, srv); m != 300 {
 			t.Errorf("ExecuteIfOff override: %d, want 300", m)
 		}
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, map[uint8]any{0: uint64(1), 1: uint64(10), 4: uint64(1), 5: uint64(1)})
+		_ = ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, map[uint8]any{0: uint64(1), 1: uint64(10), 2: uint64(0), 3: uint64(0), 4: uint64(1), 5: uint64(1)})
 		ctSleep(time.Second)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdStopMoveStep, nil)
+		_ = ctInvoke(t, srv, ccdef.CmdStopMoveStep, nil)
 		if remainingCT(t, srv) == 0 {
 			t.Error("StopMoveStep on an off device ended the move")
 		}
 		o.mu.Lock()
 		o.on = true
 		o.mu.Unlock()
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdStopMoveStep, nil)
+		_ = ctInvoke(t, srv, ccdef.CmdStopMoveStep, nil)
 		if remainingCT(t, srv) != 0 {
 			t.Error("StopMoveStep on an on device left the move running")
 		}
@@ -331,13 +336,13 @@ func TestUnmanagedCommandsApplyAtOnce(t *testing.T) {
 	srv := light.NewColorControlServer(light.ColorControlServerConfig{MinMireds: 153, MaxMireds: 370, InitialMireds: 250})
 	w := &stepWriter{}
 	srv.SetWriter(w)
-	if err := ctInvoke(t, srv, wire.ColorCtrlCmdMoveColorTemperature, moveCT(1, 1, 0, 0)); err != nil {
+	if err := ctInvoke(t, srv, ccdef.CmdMoveColorTemperature, moveCT(1, 1, 0, 0)); err != nil {
 		t.Fatal(err)
 	}
 	if m := currentMireds(t, srv); m != 370 || remainingCT(t, srv) != 0 {
 		t.Errorf("unmanaged Move up: %d (RemainingTime %d), want 370 at once", m, remainingCT(t, srv))
 	}
-	if err := ctInvoke(t, srv, wire.ColorCtrlCmdStepColorTemperature, stepCT(3, 20, 600, 0, 0)); err != nil {
+	if err := ctInvoke(t, srv, ccdef.CmdStepColorTemperature, stepCT(3, 20, 600, 0, 0)); err != nil {
 		t.Fatal(err)
 	}
 	if m := currentMireds(t, srv); m != 350 {
@@ -346,13 +351,13 @@ func TestUnmanagedCommandsApplyAtOnce(t *testing.T) {
 	if !slices.Equal(w.values, []uint16{370, 350}) {
 		t.Errorf("writer received %v, want [370 350]", w.values)
 	}
-	if err := ctInvoke(t, srv, wire.ColorCtrlCmdStopMoveStep, nil); err != nil {
+	if err := ctInvoke(t, srv, ccdef.CmdStopMoveStep, nil); err != nil {
 		t.Error(err)
 	}
 	if err := ctInvoke(t, srv, 0x00, nil); err == nil {
 		t.Error("MoveToHue accepted by a CT-only server")
 	}
-	for _, cmd := range []uint32{wire.ColorCtrlCmdMoveToColorTemperature, wire.ColorCtrlCmdMoveColorTemperature, wire.ColorCtrlCmdStepColorTemperature} {
+	for _, cmd := range []uint32{ccdef.CmdMoveToColorTemperature, ccdef.CmdMoveColorTemperature, ccdef.CmdStepColorTemperature} {
 		if err := ctInvoke(t, srv, cmd, "bogus"); !statusIs(err, im.StatusInvalidCommand) {
 			t.Errorf("command 0x%02X with a bogus payload = %v, want INVALID_COMMAND", cmd, err)
 		}
@@ -383,7 +388,7 @@ func TestColorTransitionWriterAndQuiesce(t *testing.T) {
 		srv, r, _ := managedCT(true)
 		w := &stepWriter{}
 		srv.SetWriter(w)
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 350, TransitionTime: 100})
+		_ = ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 350, TransitionTime: 100})
 		ctSleep(time.Second)
 		w.mu.Lock()
 		steps := len(w.values)
@@ -400,7 +405,7 @@ func TestColorTransitionWriterAndQuiesce(t *testing.T) {
 		if _, times := r.snapshot(); !slices.Equal(times, []uint16{100}) {
 			t.Errorf("RemainingTime reports %v, want [100]", times)
 		}
-		_ = ctInvoke(t, srv, wire.ColorCtrlCmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 160, TransitionTime: 100})
+		_ = ctInvoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 160, TransitionTime: 100})
 		w.mu.Lock()
 		w.err = errors.New("lamp gone")
 		w.mu.Unlock()
@@ -408,7 +413,7 @@ func TestColorTransitionWriterAndQuiesce(t *testing.T) {
 		if remainingCT(t, srv) != 0 || currentMireds(t, srv) != at {
 			t.Error("a refused step changed the value or left the transition running")
 		}
-		if got := srv.MatterSelfReportedAttributes(); !slices.Equal(got, []uint32{wire.ColorCtrlAttrColorTemperatureMireds, wire.ColorCtrlAttrRemainingTime}) {
+		if got := srv.MatterSelfReportedAttributes(); !slices.Equal(got, []uint32{ccdef.AttrColorTemperatureMireds, ccdef.AttrRemainingTime}) {
 			t.Errorf("self-reported %v", got)
 		}
 		if len(srv.MatterReportable()) != 0 {

@@ -13,7 +13,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -184,8 +183,8 @@ func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 	t.Parallel()
 	sink := &recordingThermoSink{}
 	srv := newSinkHeatCool(sink)
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 3)
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeHeat, -2)
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeBoth, 3)
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeHeat, -2)
 	want := []sinkCall{
 		{
 			attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2630,
@@ -206,7 +205,7 @@ func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 	refusing := &recordingThermoSink{err: errors.New("no")}
 	srv = newSinkHeatCool(refusing)
 	_, err := srv.MatterInvoke(context.Background(), tdef.CmdSetpointRaiseLower,
-		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(clusterwire.ThermostatSetpointModeBoth), Amount: 3})
+		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeBoth, Amount: 3})
 	if got := sinkStatus(t, err); got != im.StatusFailure {
 		t.Errorf("refused SetpointRaiseLower: status %s, want FAILURE", got)
 	}
@@ -238,7 +237,7 @@ func TestUnchangedValueDoesNotCallTheSink(t *testing.T) {
 	if err := srv.MatterWrite(ctx, tdef.AttrSystemMode, uint8(tdef.SystemModeAuto)); err != nil {
 		t.Errorf("unchanged SystemMode: %v", err)
 	}
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 0)
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeBoth, 0)
 	if n := len(sink.recorded()); n != 0 {
 		t.Errorf("Sink called %d times for unchanged values, want 0", n)
 	}
@@ -252,7 +251,7 @@ func TestUnchangedValueDoesNotCallTheSink(t *testing.T) {
 		Sink:                    coolSink,
 	}
 	cool := thermo.NewThermostatServer(cfg)
-	invokeSetpointRaiseLower(t, cool, clusterwire.ThermostatSetpointModeBoth, 1)
+	invokeSetpointRaiseLower(t, cool, tdef.SetpointRaiseLowerModeBoth, 1)
 	want := []sinkCall{{attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2610}}
 	if got := coolSink.recorded(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Sink calls = %+v, want %+v", got, want)
@@ -328,10 +327,10 @@ func TestInboundSystemModeTheSelectionCannotServe(t *testing.T) {
 func TestSetpointRaiseLowerKeepsTheDeadband(t *testing.T) {
 	t.Parallel()
 	sink := &recordingThermoSink{}
-	srv := newSinkHeatCool(sink)                                                  // heat 2000, cool 2600, deadband 200
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeHeat, 50)  // heat 2500: cool must reach 2700
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeCool, -60) // cool 2100: heat must reach 1900
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeCool, 10)  // cool 2200: deadband kept, heat stays
+	srv := newSinkHeatCool(sink)                                           // heat 2000, cool 2600, deadband 200
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeHeat, 50)  // heat 2500: cool must reach 2700
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeCool, -60) // cool 2100: heat must reach 1900
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeCool, 10)  // cool 2200: deadband kept, heat stays
 	want := []sinkCall{
 		{
 			attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2700,

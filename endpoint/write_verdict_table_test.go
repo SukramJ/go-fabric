@@ -132,7 +132,7 @@ func verdictCases() []verdictCase {
 			return must(t, s, err)
 		}, bdbidef.AttrNodeLabel, "desk"},
 		{
-			"core.Binding", false, func(*testing.T) contract.ClusterServer { return mattercore.NewBinding() },
+			"core.Binding", false, func(*testing.T) contract.ClusterServer { return sourcedBinding() },
 			bindingdef.AttrBinding,
 			spec.List[bindingdef.TargetStruct]{{Node: ptr(uint64(0x1234)), Endpoint: ptr(uint16(1)), Cluster: ptr(uint32(6))}},
 		},

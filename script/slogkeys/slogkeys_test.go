@@ -80,14 +80,14 @@ var areaKeys = []string{
 	"check", "chunk", "chunks", "cleared", "client_node_id",
 	"camera", "closed", "cluster_set", "code", "color_mode", "command", "command_name",
 	"concurrent", "configured_ms", "conn", "consecutive_errors", "context",
-	"count", "counter", "counter_start", "country", "ctx_fabric_index",
-	"current", "current_fabric_index", "datagram_bytes", "debug", "delay",
+	"count", "counter", "counter_start", "country",
+	"current", "datagram_bytes", "debug", "delay",
 	"detail", "device_type", "discriminator", "dropped", "duplicate",
 	"endpoint_set", "endpoints", "entries", "event", "event_paths",
 	"event_reports", "events", "examined", "exchanges", "expected",
 	"fabric_filtered", "fabric_id", "fallback", "family", "features", "field", "file", "final",
 	"floor", "force", "former", "formerly", "fragment_size", "from",
-	"general_code", "github", "grace", "hint", "holds", "hook", "host",
+	"general_code", "github", "go_type", "grace", "hint", "holds", "hook", "host",
 	"icac_bytes", "ideal", "ids", "iface", "ignored", "in",
 	"incoming", "initial_events", "initial_reports", "instance", "interval",
 	"invoke_fabric_index", "invokes", "ipk_len", "ipv4", "ipv6", "iterations",
@@ -103,13 +103,13 @@ var areaKeys = []string{
 	"protocol_code", "protocol_id", "provider",
 	"queued", "reachable", "rearm_for", "recovered_total",
 	"reestablished", "registered", "reports", "req_paths", "request_id",
-	"requested", "requirement", "resp", "response_type", "responses",
+	"requested", "requirement", "resp", "responder", "response_type", "responses",
 	"result", "resumed", "retained", "retransmission", "retry", "retry_in", "retry_limit",
-	"role", "running", "schedule_handle", "scope", "send_failures", "send_interval", "service",
+	"role", "running", "schedule_handle", "scope", "send_failures", "send_interval", "served", "served_as", "service",
 	"sessions", "since_last_restart", "skid", "source", "source_endpoint",
 	"source_node_id", "ssid", "stack", "stage", "state", "status_code",
 	// client/discovery sessions and the DCL vendor info (brief 27-A).
-	"built_at", "discovery", "instead_of", "transport", "vendors",
+	"built_at", "discovery", "instead_of", "superseded", "transport", "vendors",
 	// ble/esphome (brief BP1): the proxy, its advertisement and its link.
 	"encrypted", "feature_flags", "note", "proxy", "rssi", "silent",
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",
@@ -125,6 +125,9 @@ var areaKeys = []string{
 	"connect_error", "connected", "network_name", "networking_status", "partition_id",
 	"valid_mapping", "value", "value_type", "vendor_id", "version",
 	"violation", "what", "with_paths",
+	// bridge (review II, 6a wave 3): whether the StatusResponse answering a
+	// flushed report could not be decoded (matter.tx.*.flush_answered).
+	"undecodable",
 }
 
 // skippedTop are the top-level directories the guard does not judge.

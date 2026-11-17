@@ -25,7 +25,7 @@ func TestEventWatermarkParity(t *testing.T) {
 	urgentPath.IsUrgent = true
 	subscribe := func(t *testing.T, floor uint16) (*Manager, *im.EventLog, *Subscription) {
 		t.Helper()
-		m := NewManager(Config{}, nil, nil)
+		m := newTestManager(Config{})
 		log := im.NewEventLog()
 		m.SetEventSource(log)
 		sub, err := m.Subscribe(SubscribeArgs{

@@ -17,7 +17,7 @@ import (
 func TestMarkDirtyAfterCloseIsIgnored(t *testing.T) {
 	t.Parallel()
 	path := im.ConcreteAttributePath{HasEndpoint: true, HasCluster: true, HasAttribute: true, Endpoint: 1, Cluster: 0x0006, Attribute: 0x0000}
-	m := NewManager(Config{}, nil, nil)
+	m := newTestManager(Config{})
 	sub, err := m.Subscribe(SubscribeArgs{
 		FabricIndex: 1, PeerNodeID: 1, SessionID: 1,
 		MinIntervalFloor: 0, MaxIntervalCeiling: 3600,

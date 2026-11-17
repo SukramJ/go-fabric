@@ -154,8 +154,10 @@ func NewRing(capacity int) *Ring {
 }
 
 // defaultCapacity is what an unset or nonsensical capacity becomes —
-// enough to cover a pairing attempt and the minute around it.
-const defaultCapacity = 200
+// enough to cover a pairing attempt and the minute around it. It is the
+// same number as diag.DefaultDiagnosticsCapacity (package diag imports this
+// one, so it cannot be named here); diag's tests hold the two equal.
+const defaultCapacity = 256
 
 // Record appends an event, dropping the oldest when full.
 //

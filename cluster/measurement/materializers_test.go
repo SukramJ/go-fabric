@@ -137,3 +137,18 @@ func TestEveryMeasurementDeviceTypeHasASchemaName(t *testing.T) {
 		t.Errorf("schema.DeviceTypeName(0x0045) = %q, want SoilSensor", name)
 	}
 }
+
+// TestAirQualityServersOrder holds R2-P6-doc-1464: an air quality class
+// materialises the AirQuality server first, then its concentration
+// server — the order the ServerList keeps and the comment states.
+func TestAirQualityServersOrder(t *testing.T) {
+	t.Parallel()
+	srvs := measurement.FromMeasurementClass(contract.MeasurementCO2, fakeFloat{class: contract.MeasurementCO2, val: 400, obs: true}, contract.MeasurementContext{})
+	if len(srvs) != 2 || srvs[0].MatterClusterID() != measurement.ClusterAirQuality || srvs[1].MatterClusterID() != measurement.ClusterCO2Concentration {
+		ids := make([]uint32, len(srvs))
+		for i, s := range srvs {
+			ids[i] = s.MatterClusterID()
+		}
+		t.Errorf("CO2 materialises clusters %#x, want AirQuality then CO2Concentration", ids)
+	}
+}

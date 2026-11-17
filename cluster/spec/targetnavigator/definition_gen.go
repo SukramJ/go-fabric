@@ -120,6 +120,21 @@ func (v *NavigateTargetRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NavigateTargetRequest) Clone() NavigateTargetRequest {
+	c := v
+	c.Data = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Data)
+	return c
+}
+
 // NavigateTargetResponse is the NavigateTargetResponse command payload.
 type NavigateTargetResponse struct {
 	Status StatusEnum // 0: StatusEnum, M
@@ -140,6 +155,21 @@ func (v *NavigateTargetResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Status", true, &v.Status, spec.DecodeUint[StatusEnum](8)),
 		spec.Bind(1, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeString)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NavigateTargetResponse) Clone() NavigateTargetResponse {
+	c := v
+	c.Data = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Data)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -170,6 +200,49 @@ func (v *TargetUpdatedEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "CurrentTarget", false, &v.CurrentTarget, spec.DecodeOptional(spec.DecodeUint[uint8](8))),
 		spec.Bind(2, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeBytesIn(0, 900))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TargetUpdatedEvent) Clone() TargetUpdatedEvent {
+	c := v
+	c.TargetList = func(p *[]TargetInfoStruct) *[]TargetInfoStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []TargetInfoStruct) []TargetInfoStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TargetInfoStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.TargetList)
+	c.CurrentTarget = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CurrentTarget)
+	c.Data = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Data)
+	return c
 }
 
 func decodeNavigateTargetRequest(n spec.Node) (any, error) {

@@ -4,7 +4,6 @@
 package im
 
 import (
-	"context"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/tlv"
@@ -19,7 +18,7 @@ func TestReadParity_DataVersionFilterOnEveryVersion(t *testing.T) {
 	path := ConcreteAttributePath{Endpoint: 1, HasEndpoint: true, Cluster: 0x0006, HasCluster: true, Attribute: 0, HasAttribute: true}
 	for _, v := range []uint32{0, 1, 2} {
 		d := &dataVersionDispatcher{readVal: AttributeValue{Value: true}, readStat: StatusSuccess, dataVersion: v}
-		rd := HandleReadRequest(context.Background(), d, ReadRequest{
+		rd := HandleReadRequest(unchecked(), d, ReadRequest{
 			AttributeRequests:  []ConcreteAttributePath{path},
 			DataVersionFilters: []DataVersionFilter{{Endpoint: 1, Cluster: 0x0006, DataVersion: v}},
 		})
@@ -28,7 +27,7 @@ func TestReadParity_DataVersionFilterOnEveryVersion(t *testing.T) {
 		}
 	}
 	unversioned := &fakeDispatcher{readVal: AttributeValue{Value: true}, readStat: StatusSuccess}
-	rd := HandleReadRequest(context.Background(), unversioned, ReadRequest{
+	rd := HandleReadRequest(unchecked(), unversioned, ReadRequest{
 		AttributeRequests:  []ConcreteAttributePath{path},
 		DataVersionFilters: []DataVersionFilter{{Endpoint: 1, Cluster: 0x0006, DataVersion: 0}},
 	})
@@ -65,7 +64,7 @@ func TestReadParity_DataVersionFilterForAnotherNodeIgnored(t *testing.T) {
 		t.Fatalf("decoded filters %+v, want one naming node %#x", decoded.DataVersionFilters, other)
 	}
 	d := &dataVersionDispatcher{readVal: AttributeValue{Value: true}, readStat: StatusSuccess, dataVersion: 5}
-	ctx := WithLocalNodeID(context.Background(), local)
+	ctx := WithLocalNodeID(unchecked(), local)
 	if rd := HandleReadRequest(ctx, d, decoded); len(rd.Reports) != 1 {
 		t.Fatalf("filter for another node: %d reports, want 1", len(rd.Reports))
 	}

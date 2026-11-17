@@ -46,11 +46,19 @@ import (
 //   - Step: an unknown Direction or zero NumberOfSteps is CONSTRAINT_ERROR
 //     (:566-567); a null CurrentState or Position, or a latched closure,
 //     is INVALID_IN_STATE (:589-605); the new target is the current
-//     Position moved by NumberOfSteps × StepValue, clamped to 0 / 100.00 %
-//     or to LimitRange with LM (:607-653);
+//     Position moved by NumberOfSteps × StepValue, a decrease clamped at 0
+//     (LimitRange.Min with LM) and an increase at 100.00 % (LimitRange.Max
+//     with LM) — one bound each, so a Position outside LimitRange can step
+//     to a target still outside it (:607-653, :632-646; R2-P6-fsm-1587) —
+//     and put on no Resolution grid;
 //   - the host's handler runs before TargetState changes, and its error is
 //     FAILURE (:555, :656), as is a target TargetState refuses (:557,
-//     :659);
+//     :659) — after the handler ran: a SetTarget Position the rounding
+//     takes above 100.00 % (a Resolution that does not divide 10000) and
+//     a Step target off the Resolution grid (a StepValue, a current
+//     Position or a ceiling that is not a multiple of Resolution) move the
+//     device and answer FAILURE with TargetState unchanged (R2-P6-fsm-1581,
+//     -1582);
 //   - TargetState: a Position above 100.00 % or off the Resolution grid,
 //     or a field of a feature the server lacks, is refused (:326-378);
 //   - CurrentState (quality Q) is reported when it changes to or from
@@ -114,7 +122,14 @@ const positionQuietInterval = 5 * time.Second
 
 // DimensionHandler carries out the commands on the device. It is called
 // after the server's checks and before TargetState changes; an error
-// answers FAILURE and leaves TargetState as it was.
+// answers FAILURE and leaves TargetState as it was. Its success does not
+// make the command succeed: a target TargetState refuses after it — a
+// SetTarget Position rounded above 100.00 %, a Step target off the
+// Resolution grid — answers FAILURE with TargetState unchanged though the
+// device acted, as connectedhomeip's server does
+// (ClosureDimensionCluster.cpp:496-505, :555, :557, :607-659 at 6170af84;
+// R2-P6-fsm-1581, -1582). A Resolution that divides 10000 and a StepValue
+// on its grid avoid both.
 type DimensionHandler = cd.DimensionHandler
 
 // DimensionConfig carries the construction parameters.
@@ -124,7 +139,10 @@ type DimensionConfig struct {
 	// Handler carries out SetTarget and Step; required.
 	Handler DimensionHandler
 
-	// Resolution and StepValue (PS, fixed) are in 0.01 %, 1 to 10000.
+	// Resolution and StepValue (PS, fixed) are in 0.01 %, 1 to 10000. A
+	// Resolution that does not divide 10000, or a StepValue that is not a
+	// multiple of it, is admitted, and a command can then move the device
+	// and answer FAILURE ([DimensionHandler]).
 	Resolution, StepValue uint16
 	// Unit (UT, fixed) and UnitRange (UT, nullable: nil is null).
 	Unit      cd.ClosureUnitEnum
@@ -145,6 +163,11 @@ type DimensionConfig struct {
 	CurrentState, TargetState *DimensionState
 
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Clock is the server's time source. Nil is [clock.System].
 	Clock clock.Clock
@@ -164,10 +187,20 @@ var (
 type DimensionServer struct {
 	*spec.Instance
 	cluster.AttributeChanges
-	hooks spec.Hooks
-	// cause is the contract.Origin of the changes a command makes
-	// (OriginCommand), zero outside one.
-	cause atomic.Uint32
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([DimensionServer.Handle]) ahead of the server's own
+	// logic (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
+	// commands counts the commands whose handlers run: the changes made
+	// meanwhile are OriginCommand — the handler moves the state through
+	// the host setters, which take no context. A count, not a flag, so a
+	// command that ends does not clear another's (R2-P6-conc-1509); a host
+	// setter on another goroutine while a command runs is still counted
+	// as the command's.
+	commands atomic.Int32
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -199,13 +232,13 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 	if cfg.Handler == nil {
 		return nil, ErrNoDimensionHandler
 	}
-	inst, err := spec.New(cd.Definition, spec.Options{Features: uint32(cfg.Features)})
+	cfg.Clock = clock.Or(cfg.Clock)
+	s := &DimensionServer{ext: cfg.DataVersion, cfg: cfg}
+	srv, err := newHeld(cd.Definition, spec.Options{Features: uint32(cfg.Features)}, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("closure: %w", err)
 	}
-	cfg.Clock = clock.Or(cfg.Clock)
-	s := &DimensionServer{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
-	s.hooks.Init(inst)
+	s.Instance, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	if err := s.checkFixed(); err != nil {
 		return nil, err
 	}
@@ -225,13 +258,13 @@ func NewDimension(cfg DimensionConfig) (*DimensionServer, error) {
 		if err := s.checkState(*cfg.CurrentState, false); err != nil {
 			return nil, err
 		}
-		s.current = clone(cfg.CurrentState)
+		s.current = cloneState(cfg.CurrentState)
 	}
 	if cfg.TargetState != nil {
 		if err := s.checkState(*cfg.TargetState, true); err != nil {
 			return nil, err
 		}
-		s.target = clone(cfg.TargetState)
+		s.target = cloneState(cfg.TargetState)
 	}
 	return s, nil
 }
@@ -243,6 +276,17 @@ func clone[T any](p *T) *T {
 		return nil
 	}
 	v := *p
+	return &v
+}
+
+// cloneState is a deep copy of a DimensionState, nil for nil: the
+// generated Clone, so a state handed in or out shares no field with the
+// one the server holds (decision 142).
+func cloneState(p *DimensionState) *DimensionState {
+	if p == nil {
+		return nil
+	}
+	v := p.Clone()
 	return &v
 }
 
@@ -357,28 +401,33 @@ func (s *DimensionServer) tracker() *cluster.DataVersionTracker {
 // changed advances the data version and reports attrIDs: a change a
 // command makes is the command's, any other the device's own report.
 func (s *DimensionServer) changed(attrIDs ...uint32) {
-	origin := contract.OriginHostSet
-	if c := s.cause.Load(); c != 0 {
-		origin = contract.Origin(c) //nolint:gosec // only an Origin is stored
-	}
 	s.tracker().Bump()
-	s.NotifyFrom(origin, attrIDs...)
+	s.NotifyFrom(s.origin(), attrIDs...)
 }
 
-// Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
+// origin is where a change comes from: a command's while one runs, the
+// device's own otherwise.
+func (s *DimensionServer) origin() contract.Origin {
+	if s.commands.Load() > 0 {
+		return contract.OriginCommand
+	}
+	return contract.OriginHostSet
+}
+
+// Handle implements [spec.CommandRegistrar] ([spec.SelfHeld.Handle]).
 func (s *DimensionServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
-	return s.hooks.Handle(cmdID, fn)
+	return s.held.Handle(cmdID, fn)
 }
 
 // Emit implements [spec.EventEmitting]: ClosureDimension defines no
 // event, so every one is [spec.ErrNotEmitted].
 func (s *DimensionServer) Emit(endpoint uint16, eventID uint32, data any) error {
-	return s.hooks.Emit(endpoint, eventID, data)
+	return s.events.Emit(s.Instance, endpoint, eventID, data)
 }
 
-// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.Hooks]).
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.WriteVeto]).
 func (s *DimensionServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
-	s.hooks.SetBeforeWrite(fn)
+	s.veto.Set(fn)
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -456,7 +505,7 @@ func (s *DimensionServer) MatterWrite(ctx context.Context, attrID uint32, value 
 	if err != nil {
 		return err
 	}
-	return s.hooks.CheckWrite(ctx, attrID, v)
+	return s.veto.Check(ctx, attrID, spec.Stored(cd.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
@@ -471,11 +520,14 @@ func (s *DimensionServer) MatterInvoke(ctx context.Context, cmdID uint32, fields
 	if !s.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("closure: command 0x%02X is not supported", cmdID)
 	}
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
-	s.cause.Store(uint32(contract.OriginCommand))
-	defer s.cause.Store(0)
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own SetTarget and Step, which [spec.InvokeHeld]
+// runs when the host registered no handler.
+func (s *DimensionServer) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	s.commands.Add(1)
+	defer s.commands.Add(-1)
 	if cmdID == cd.CmdSetTarget {
 		req, ok := dimRequest[cd.SetTargetRequest](fields)
 		if !ok {
@@ -511,13 +563,12 @@ func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest
 		return spec.Errorf(im.StatusInvalidCommand, "closure: SetTarget without a field")
 	}
 	s.mu.Lock()
-	target := DimensionState{}
-	if s.target != nil {
-		target = *s.target
-	}
-	current := clone(s.current)
+	current := cloneState(s.current)
 	s.mu.Unlock()
 
+	// The fields the command sets; they are merged into the target as it
+	// is after the handler ran (mergeTarget).
+	var target DimensionState
 	position := clone(req.Position)
 	if position != nil && s.has(cd.FeaturePositioning) {
 		if *position > Percent100thsMax {
@@ -562,10 +613,53 @@ func (s *DimensionServer) setTarget(ctx context.Context, req cd.SetTargetRequest
 	if err := s.cfg.Handler.SetTarget(ctx, position, req.Latch, req.Speed); err != nil {
 		return handlerRefusal("SetTarget", err)
 	}
-	if err := s.SetTargetState(&target); err != nil {
+	if err := s.mergeTarget(target); err != nil {
 		return spec.Errorf(im.StatusFailure, "closure: SetTarget: %v", err)
 	}
 	return nil
+}
+
+// mergeTarget stores the fields set gives — Position, Latch, Speed, each
+// when not nil — into TargetState as it is when the command stores it, so a
+// field the host's SetTargetState changed while the handler ran, and the
+// command did not set, survives (R2-P6-conc-1585). The merged state is
+// checked as SetTargetState checks one; a target that moved again between
+// the read and the store is merged again.
+func (s *DimensionServer) mergeTarget(set DimensionState) error {
+	for {
+		s.mu.Lock()
+		before := cloneState(s.target)
+		s.mu.Unlock()
+		next := DimensionState{}
+		if before != nil {
+			next = *before
+		}
+		if set.Position != nil {
+			next.Position = set.Position
+		}
+		if set.Latch != nil {
+			next.Latch = set.Latch
+		}
+		if set.Speed != nil {
+			next.Speed = set.Speed
+		}
+		if err := s.checkState(next, true); err != nil {
+			return err
+		}
+		s.mu.Lock()
+		if !equalState(s.target, before) {
+			s.mu.Unlock()
+			continue
+		}
+		if equalState(s.target, &next) {
+			s.mu.Unlock()
+			return nil
+		}
+		s.target = cloneState(&next)
+		s.mu.Unlock()
+		s.changed(cd.AttrTargetState)
+		return nil
+	}
 }
 
 // handlerRefusal is the answer to a handler's refusal of cmd: the status
@@ -592,13 +686,11 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 		return spec.Errorf(im.StatusConstraintError, "closure: NumberOfSteps 0")
 	}
 	s.mu.Lock()
-	target := DimensionState{}
-	if s.target != nil {
-		target = *s.target
-	}
-	current := clone(s.current)
+	current := cloneState(s.current)
 	limit := s.limit
 	s.mu.Unlock()
+
+	var target DimensionState // the fields Step sets (mergeTarget)
 
 	if req.Speed != nil && s.has(cd.FeatureSpeed) {
 		if !s.EnumSupported(cd.ThreeLevelAutoEnumDef, uint64(*req.Speed)) {
@@ -631,7 +723,7 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 		return handlerRefusal("Step", err)
 	}
 	target.Position = &spec.Nullable[uint16]{Value: uint16(pos)} //nolint:gosec // at most the ceiling, 10000
-	if err := s.SetTargetState(&target); err != nil {
+	if err := s.mergeTarget(target); err != nil {
 		return spec.Errorf(im.StatusFailure, "closure: Step: %v", err)
 	}
 	return nil
@@ -641,14 +733,14 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 func (s *DimensionServer) CurrentState() *DimensionState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return clone(s.current)
+	return cloneState(s.current)
 }
 
 // TargetState returns the target state; nil is null.
 func (s *DimensionServer) TargetState() *DimensionState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return clone(s.target)
+	return cloneState(s.target)
 }
 
 // SetCurrentState records the device's state; nil is null. It is refused
@@ -656,8 +748,14 @@ func (s *DimensionServer) TargetState() *DimensionState {
 // its rules (:210-222, :247-316): at once when CurrentState or its
 // Position changes to or from null, when the Position reaches the
 // target's, when Latch or Speed changes; any other Position change at
-// most once every 5 s. A change held back is stored and read, but neither
-// bumps the data version nor is reported.
+// most once every 5 s. A change held back is stored and read, and advances
+// the data version — the change listeners are told — but is not reported,
+// then or later: chip's quiet change (R2-P6-wire-1583). Mirrors
+// connectedhomeip ClosureDimensionCluster.cpp:320-321 at 6170af84, which
+// notifies a held-back Position with kQuiet, and DefaultServerCluster.cpp:100-102,
+// which increases the data version for every notification type
+// (AttributeChangeListener.h:42-48: kQuiet is visible on a read, not
+// reported).
 func (s *DimensionServer) SetCurrentState(st *DimensionState) error {
 	if st != nil {
 		if err := s.checkState(*st, false); err != nil {
@@ -689,10 +787,13 @@ func (s *DimensionServer) SetCurrentState(st *DimensionState) error {
 			}
 		}
 	}
-	s.current = clone(st)
+	s.current = cloneState(st)
 	s.mu.Unlock()
 	if dirty {
 		s.changed(cd.AttrCurrentState)
+	} else {
+		s.tracker().Bump()
+		s.ChangedFrom(s.origin(), cd.AttrCurrentState)
 	}
 	return nil
 }
@@ -711,7 +812,7 @@ func (s *DimensionServer) SetTargetState(st *DimensionState) error {
 		s.mu.Unlock()
 		return nil
 	}
-	s.target = clone(st)
+	s.target = cloneState(st)
 	s.mu.Unlock()
 	s.changed(cd.AttrTargetState)
 	return nil

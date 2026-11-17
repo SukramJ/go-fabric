@@ -13,6 +13,8 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
@@ -50,6 +52,14 @@ const presetHandleLength = 16
 // when nothing was saved, and the server then seeds from
 // [ThermostatConfig.Presets]. store.ThermostatPresetStore implements it on
 // the module's store.
+//
+// SavePresets runs while the server holds the presets' save in turn: every
+// change of Presets or ActivePresetHandle — a write, a command, the
+// host's direct setpoint change that ends the active preset — waits for
+// it, so each save writes the pair current when it runs
+// (R2-P6-store-1501). SavePresets must therefore not call back into the
+// server's setters, which would wait for itself, and should return in
+// bounded time: the wait takes no context.
 type PresetStore = tdef.PresetStore
 
 // EncodePresets is the TLV encoding of a Presets list a [PresetStore]
@@ -82,35 +92,6 @@ func asStatus(err error) (im.StatusCode, bool) {
 		return spec.StatusOf(err), true
 	}
 	return 0, false
-}
-
-// clonePresets deep-copies presets: a write normalises the presets it is
-// given, and the caller's slice is the caller's (matter.js deepCopy,
-// ThermostatServer.ts:49-51).
-func clonePresets(in []Preset) []Preset {
-	if in == nil {
-		return nil
-	}
-	out := make([]Preset, len(in))
-	for i, p := range in {
-		out[i] = p
-		if !p.PresetHandle.Null {
-			out[i].PresetHandle.Value = bytes.Clone(p.PresetHandle.Value)
-		}
-		if p.Name != nil {
-			n := *p.Name
-			out[i].Name = &n
-		}
-		if p.CoolingSetpoint != nil {
-			c := *p.CoolingSetpoint
-			out[i].CoolingSetpoint = &c
-		}
-		if p.HeatingSetpoint != nil {
-			h := *p.HeatingSetpoint
-			out[i].HeatingSetpoint = &h
-		}
-	}
-	return out
 }
 
 // presetsValue is a Presets value as the server handles it: the bridge
@@ -335,8 +316,15 @@ func normalizePresetCommit(presets, old []Preset, seeding bool, issued map[strin
 	return nil
 }
 
+// lockPersist takes [ThermostatServer.persist]; unlockPersist releases it.
+func (s *ThermostatServer) lockPersist()   { s.persist <- struct{}{} }
+func (s *ThermostatServer) unlockPersist() { <-s.persist }
+
 // savePresets hands presets and the active handle to the PresetStore; a
-// server without one keeps them in memory only.
+// server without one keeps them in memory only. After construction the
+// caller holds persist, read the pair under it and stores what it saved
+// before it releases it (R2-P6-store-1501); see [PresetStore] for what
+// that asks of the store.
 func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, active []byte) error {
 	if s.presetStore == nil {
 		return nil
@@ -353,6 +341,8 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 // commit). The caller holds s.op; presets are the caller's and are
 // normalised in place.
 func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) error {
+	s.lockPersist()
+	defer s.unlockPersist()
 	s.mu.RLock()
 	old := s.presets
 	active := bytes.Clone(s.activePresetHandle)
@@ -385,7 +375,7 @@ func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) e
 // the Presets setter stores for a command (:1687-1690,
 // AtomicWriteHandler.ts:299). The caller holds s.op.
 func (s *ThermostatServer) commitPresets(ctx context.Context, staged []Preset) error {
-	return s.applyPresets(ctx, clonePresets(staged))
+	return s.applyPresets(ctx, deepcopy.Each(staged))
 }
 
 // SetPresets is a local write of the Presets attribute — matter.js
@@ -403,7 +393,7 @@ func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) err
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.applyPresets(ctx, clonePresets(presets))
+	return s.applyPresets(ctx, deepcopy.Each(presets))
 }
 
 // Presets returns a copy of the stored presets (matter.js
@@ -411,7 +401,7 @@ func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) err
 func (s *ThermostatServer) Presets() []Preset {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return clonePresets(s.presets)
+	return deepcopy.Each(s.presets)
 }
 
 // ActivePresetHandle returns the ActivePresetHandle, nil for null.
@@ -441,6 +431,8 @@ func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []b
 // storeActiveHandle saves and stores the active handle; the caller holds
 // s.op.
 func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte) error {
+	s.lockPersist()
+	defer s.unlockPersist()
 	s.mu.RLock()
 	presets := s.presets
 	same := bytes.Equal(s.activePresetHandle, handle) && (s.activePresetHandle == nil) == (handle == nil)
@@ -462,22 +454,27 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 // (not a command's) setpoint change of the setpoints in effect — matter.js
 // #assert(Un)occupied*SetpointChanging (ThermostatServer.ts:682-706,
 // :744-768 at db021da0): a setpoint someone set by hand is no longer the
-// preset's. It takes s.mu only, so the inbound setters may call it while a
-// write waits on the Sink.
+// preset's. It takes persist and s.mu, never s.op, so the inbound setters
+// may call it while a write waits on the Sink (issue #63); persist keeps
+// its save from overtaking a preset write's (R2-P6-store-1501).
 func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) {
 	if s.features&ThermostatFeaturePRES == 0 {
 		return
 	}
+	s.lockPersist()
 	s.mu.Lock()
 	if s.activePresetHandle == nil || s.occupiedLocked() == unoccupied {
 		s.mu.Unlock()
+		s.unlockPersist()
 		return
 	}
 	previous := s.activePresetHandle
 	s.activePresetHandle = nil
 	presets := s.presets
 	s.mu.Unlock()
-	if err := s.savePresets(ctx, presets, nil); err != nil {
+	err := s.savePresets(ctx, presets, nil)
+	s.unlockPersist()
+	if err != nil {
 		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
 	}
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
@@ -617,7 +614,7 @@ func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 		}
 	}
 	if !loaded {
-		presets = clonePresets(cfg.Presets)
+		presets = deepcopy.Each(cfg.Presets)
 		if presets == nil {
 			presets = []Preset{}
 		}

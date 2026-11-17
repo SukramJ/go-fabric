@@ -31,6 +31,60 @@ type State struct {
 	ThreadVersion           uint16                          // attribute 0x000A: uint16, TH, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.Networks = func(s []NetworkInfoStruct) []NetworkInfoStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkInfoStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Networks)
+	c.LastNetworkingStatus = func(p *NetworkCommissioningStatusEnum) *NetworkCommissioningStatusEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LastNetworkingStatus)
+	c.LastNetworkId = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.LastNetworkId)
+	c.LastConnectErrorValue = func(p *int32) *int32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LastConnectErrorValue)
+	c.SupportedWiFiBands = func(s []WiFiBandEnum) []WiFiBandEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]WiFiBandEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedWiFiBands)
+	return c
+}
+
 // Patch is a change to the NetworkCommissioning state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

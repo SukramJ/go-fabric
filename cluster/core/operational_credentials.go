@@ -119,7 +119,8 @@ type OperationalCredentials struct {
 	pendingFabric uint8
 
 	// nocMu serialises AddNOC, UpdateNOC, CSRRequest's draw and record of
-	// the fail-safe's key pair, RemoveFabric's store removal, the
+	// the fail-safe's key pair, AddTrustedRootCertificate from its
+	// fail-safe check to its store of the root, RemoveFabric's store removal, the
 	// fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
 	// its rollback ([OperationalCredentials.OnFailSafeExpiry]): a fail-safe
 	// that ends while a NOC command is between its fail-safe check and its
@@ -131,6 +132,9 @@ type OperationalCredentials struct {
 	// report a removal or an update of the rollback and of RemoveFabric run
 	// after it is released.
 	nocMu sync.Mutex
+	// csrBuilder, when set, replaces buildPKCS10CSR: a test's way to fail
+	// the CSR build (export_test.go). Guarded by nocMu.
+	csrBuilder func(*ecdsa.PrivateKey) ([]byte, error)
 	// nocContended, when set, runs when the rollback finds nocMu held by
 	// a NOC command and is about to wait for it: a test's observation
 	// point (export_test.go), so a race test decides on the wait itself
@@ -280,8 +284,20 @@ type invokeSessionKeyCtxKey struct{}
 // (OperationalCredentialsServer.ts:143-146 → FailsafeContext.ts:176-185 at
 // db021da0, compared at OperationalCredentialsServer.ts:240-245), its ids
 // drawn from one SessionManager for every session (SessionManager.ts:581-606).
+//
+// A key that is neither nil nor a pointer is a stack's wiring mistake: it
+// stamps nothing as before, and is logged, since a request bound by no id
+// either matches only a CSR that named none (review II, 5b-peer R4-1b).
 func WithInvokeSession(ctx context.Context, key any) context.Context {
-	if key == nil || reflect.TypeOf(key).Kind() != reflect.Pointer || reflect.ValueOf(key).IsNil() {
+	if key == nil {
+		return ctx
+	}
+	if reflect.TypeOf(key).Kind() != reflect.Pointer {
+		slog.Default().Warn("matter.invoke_session.key_dropped", //nolint:forbidigo // a context helper without a component logger
+			slog.String("type", reflect.TypeOf(key).String()), slog.String("reason", "the session identity must be a pointer"))
+		return ctx
+	}
+	if reflect.ValueOf(key).IsNil() {
 		return ctx
 	}
 	return context.WithValue(ctx, invokeSessionKeyCtxKey{}, key)
@@ -1252,10 +1268,8 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		}
 		return out, true
 	case opcredsAttrSupportedFabrics:
-		// Return the configured value (clamped to the spec floor of 5
-		// in NewOperationalCredentials). The previous hardcoded 16 was
-		// superseded now that OpcredsConfig.SupportedFabrics is stored
-		// on the struct. Default in cfg: 5 (Matter §11.18.6.4 floor).
+		// The configured OpcredsConfig.SupportedFabrics; 254 when none is
+		// configured (NewOperationalCredentials).
 		return o.supportedFabrics, true
 	case opcredsAttrCommissionedFabrics:
 		fabrics, err := o.store.ListFabrics(ctx)
@@ -1969,13 +1983,27 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	// packages/protocol/src/common/FailsafeContext.ts:61 (FabricBuilder.create
 	// once per context) and :176-185 (createCertificateSigningRequest over
 	// the builder's pair, packages/protocol/src/fabric/Fabric.ts:549-551).
-	priv, err := o.failSafeKeyPair()
+	priv, drawn, err := o.failSafeKeyPair()
 	if err != nil {
 		o.nocMu.Unlock()
 		return nil, err
 	}
-	csr, err := buildPKCS10CSR(priv)
+	build := buildPKCS10CSR
+	if o.csrBuilder != nil {
+		build = o.csrBuilder
+	}
+	csr, err := build(priv)
 	if err != nil {
+		if drawn {
+			// The pair this request drew has no CSR behind it: it goes,
+			// so a NOC command finds no key pair (MissingCsr) rather than
+			// one without a CSR session (review II, N4-coresec-2).
+			o.mu.Lock()
+			if o.pendingPrivKey == priv {
+				o.pendingPrivKey = nil
+			}
+			o.mu.Unlock()
+		}
 		o.nocMu.Unlock()
 		return nil, fmt.Errorf("core: CSRRequest: build CSR: %w", err)
 	}
@@ -2009,18 +2037,20 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 }
 
 // failSafeKeyPair returns the fail-safe context's pending operational key
-// pair, drawing it on the context's first CSRRequest. nocMu is held.
-func (o *OperationalCredentials) failSafeKeyPair() (*ecdsa.PrivateKey, error) {
+// pair, drawing it on the context's first CSRRequest; drawn reports that
+// this call drew it. nocMu is held.
+func (o *OperationalCredentials) failSafeKeyPair() (priv *ecdsa.PrivateKey, drawn bool, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.pendingPrivKey == nil {
 		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return nil, fmt.Errorf("core: CSRRequest: generate key: %w", err)
+			return nil, false, fmt.Errorf("core: CSRRequest: generate key: %w", err)
 		}
 		o.pendingPrivKey = priv
+		drawn = true
 	}
-	return o.pendingPrivKey, nil
+	return o.pendingPrivKey, drawn, nil
 }
 
 // buildPKCS10CSR creates the DER-encoded PKCS#10 certification request
@@ -2122,9 +2152,15 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		return nil, opcredsInvalidCommandErr{msg: fmt.Sprintf("core: AdminVendorId 0x%04X is reserved", req.AdminVendorID)}
 	}
 	// From the fail-safe check to the last write, one with the commit and
-	// the rollback (nocMu).
+	// the rollback (nocMu). The rollbacks the command settles at its entry
+	// are reported after nocMu is released, as the rule at nocMu says: the
+	// report runs the host's fabric hooks (review II, R2-P6-conc-1003).
+	var settledAdded, settledUpdated []store.FabricRecord
 	o.nocMu.Lock()
-	defer o.nocMu.Unlock()
+	defer func() {
+		o.nocMu.Unlock()
+		o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	}()
 	// Matter §11.18.6.8 requires Status::FailsafeRequired when AddNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:399 and matter.js
@@ -2148,8 +2184,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// succeeded in it): an earlier rollback could not land. It goes first,
 	// so the TableFull guard and the conflict check below see the table as
 	// it is once it landed (review II, R2-P1-rw-01).
-	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
-	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	settledAdded, settledUpdated, _ = o.rollbackPendingLocked(ctx)
 	// Mirrors matter.js db021da0 packages/node/src/behaviors/
 	// operational-credentials/OperationalCredentialsServer.ts:233-260 and
 	// FailsafeContext.ts:236-240 / Fabric.ts:614-624. Guard order: trust
@@ -2373,12 +2408,24 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		EpochStart0:    0, // sentinel: IPK epoch start is 0 per Matter §11.18.6.8.6
 	}
 	if err := o.store.UpsertGroupKeySet(ctx, ipkRec); err != nil {
-		// Non-fatal: the identity and fabric rows are already committed;
-		// log and continue so the pair does not fail over a GKM write
-		// error. Matches chip's tolerant handling of secondary state.
+		// Follows connectedhomeip
+		// src/app/clusters/operational-credentials-server/OperationalCredentialsCluster.cpp:528-529
+		// and :572-584 at 6170af84: a failed write of the IPK key set fails
+		// AddNOC, and the pending operational certificates, the fabric's group
+		// keys and its ACL entries are reverted; the trusted root stays. matter.js
+		// keeps the IPK in the fabric
+		// (packages/protocol/src/common/FailsafeContext.ts:251-256 at db021da0)
+		// and deletes the new fabric when a later step of addNoc throws
+		// (OperationalCredentialsServer.ts:300-305).
+		//
+		// The pending row goes with everything it owns, and the answer is
+		// the NOCResponse the store failures around this step give (review
+		// II, R2-P6-err-1004).
 		o.logger().Warn("matter.opcreds.addnoc.ipk_gkm_write_failed",
 			slog.Int("fabric_index", int(idx)),
 			slog.Any("err", err))
+		o.rollbackFailedAddNOC(ctx, idx)
+		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode
 	}
 
 	// Per Matter Core §11.18.6.8.1 the AddNOC implementation MUST
@@ -2545,9 +2592,14 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 		return nil, fmt.Errorf("%w: UpdateNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
 	// From the fail-safe check to the write, one with the commit and the
-	// rollback (nocMu).
+	// rollback (nocMu); the settled rollbacks are reported after it is
+	// released, as in AddNOC (R2-P6-conc-1003).
+	var settledAdded, settledUpdated []store.FabricRecord
 	o.nocMu.Lock()
-	defer o.nocMu.Unlock()
+	defer func() {
+		o.nocMu.Unlock()
+		o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	}()
 	// Matter §11.18.6.9 requires Status::FailsafeRequired when UpdateNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:HandleUpdateNOC FailSafe check.
@@ -2575,8 +2627,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// As AddNOC: a row an earlier rollback could not land goes first, so
 	// the fabric this update reads is the restored one (review II,
 	// R2-P1-rw-01).
-	settledAdded, settledUpdated, _ := o.rollbackPendingLocked(ctx)
-	defer o.reportRolledBack(ctx, settledAdded, settledUpdated)
+	settledAdded, settledUpdated, _ = o.rollbackPendingLocked(ctx)
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
 	}
@@ -2617,14 +2668,14 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// currentFabric (only ever set on a successful AddNOC). Mirrors
 	// matter.js OperationalCredentialsServer.ts:#updateNoc which reads
 	// `session.fabric.fabricIndex`.
+	// A request without an accessing fabric is refused, as
+	// SetVIDVerificationStatement refuses it: no server-wide fabric stands
+	// in for the request's (review II, R2-P6-sec-1006). The IM gate
+	// refuses such a request before the server; this is the answer on a
+	// direct call.
 	_, idx := im.FabricFilterFromContext(ctx)
 	if idx == 0 {
-		o.mu.RLock()
-		idx = o.currentFabric
-		o.mu.RUnlock()
-	}
-	if idx == 0 {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: "no current fabric"}, nil
+		return nil, opcredsUnsupportedAccessErr{"core: UpdateNOC needs an accessing fabric"}
 	}
 	// Validate the new NOC before persisting anything. UpdateNOC has no
 	// AddTrustedRootCertificate step — the trust anchor is the fabric's
@@ -2732,21 +2783,16 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	// every retry — the controller kept retransmitting the same
 	// Invoke at the MRP retry cadence because the bridge never
 	// confirmed the label-write with StatusCode=OK.
-	_, ctxIdx := im.FabricFilterFromContext(ctx)
-	o.mu.RLock()
-	curIdx := o.currentFabric
-	o.mu.RUnlock()
-	idx := ctxIdx
-	if idx == 0 {
-		idx = curIdx
-	}
+	//
+	// A request without an accessing fabric is refused with
+	// UnsupportedAccess: no server-wide fabric stands in for it (review II,
+	// R2-P6-sec-1006).
+	_, idx := im.FabricFilterFromContext(ctx)
 	o.logger().Debug("matter.opcreds.update_fabric_label",
-		slog.Int("ctx_fabric_index", int(ctxIdx)),
-		slog.Int("current_fabric_index", int(curIdx)),
 		slog.Int("fabric_index", int(idx)),
 		slog.String("label", req.Label))
 	if idx == 0 {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: "no current fabric"}, nil
+		return nil, opcredsUnsupportedAccessErr{"core: UpdateFabricLabel needs an accessing fabric"}
 	}
 	// A label another fabric on this node already carries — the empty
 	// label every fabric starts with included — is answered LabelConflict.
@@ -2792,7 +2838,13 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 	}
 	if err := o.RemoveFabric(ctx, req.FabricIndex); err != nil {
 		// matter.js answers InvalidFabricIndex for a fabric it does not
-		// hold (OperationalCredentialsServer.ts:412-419).
+		// hold (OperationalCredentialsServer.ts:412-419). Any other error —
+		// the store could not remove a fabric it holds — is the command's
+		// FAILURE: the fabric exists, and the controller may retry (review
+		// II, R2-P6-err-1027).
+		if !errors.Is(err, store.ErrFabricNotFound) {
+			return nil, spec.Errorf(im.StatusFailure, "core: RemoveFabric %d: %v", req.FabricIndex, err)
+		}
 		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: req.FabricIndex}, nil
@@ -2897,6 +2949,14 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(ctx context.Con
 	// operational-credentials-server.cpp ~line 612
 	// (HandleAddTrustedRootCertificate VerifyOrExit on IsFailSafeArmed);
 	// armed for the accessing fabric, chip :760 (failSafeRequired).
+	//
+	// From the fail-safe check to the store of the root, one with the NOC
+	// commands, the commit and the rollback (nocMu), as CSRRequest: a
+	// fail-safe that ends in between rolls back after the root is stored
+	// and clears it, and a second command sees the first one's root
+	// (review II, R2-P6-conc-1005).
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	if o.failSafeRequired(ctx) {
 		return nil, errOpcredsFailsafeRequired
 	}
@@ -2991,9 +3051,16 @@ func (o *OperationalCredentials) notifyFabricRemoved(fabricIndex uint8) {
 	o.dataVersion.Bump()
 }
 
-// SetCurrentFabric is called by the message dispatcher before
-// invoking a fabric-scoped command, so MatterRead's
-// CurrentFabricIndex returns the right value.
+// SetCurrentFabric sets the value the unfiltered read of
+// CurrentFabricIndex ([OperationalCredentials.MatterRead]) returns until
+// the next AddNOC. No command falls back to it: UpdateNOC and
+// UpdateFabricLabel without an accessing fabric answer UnsupportedAccess,
+// and a request's read of CurrentFabricIndex is its own fabric. Nothing
+// in this module calls it.
+//
+// Deprecated: a fabric-scoped command or read takes its fabric from the
+// request ([im.WithFabricFilter]); there is no replacement. Removable in
+// the next minor release.
 func (o *OperationalCredentials) SetCurrentFabric(idx uint8) {
 	o.mu.Lock()
 	o.currentFabric = idx

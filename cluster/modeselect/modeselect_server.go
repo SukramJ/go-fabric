@@ -70,8 +70,20 @@ const featureMap uint32 = 0
 // instance is the definition bound to [featureMap] with no optional
 // element declared: the four mandatory attributes and ChangeToMode. The
 // selection is conformant, so New has nothing to refuse; the parity test
-// holds the server against it (spectest.CheckServer).
-var instance, _ = spec.New(msdef.Definition, spec.Options{Features: featureMap})
+// holds the server against it (spectest.CheckServer). A definition that
+// refused it would be a programming error, reported at init where it is
+// made rather than as a nil instance at its first use (R2-P6-err-1468), as
+// cluster/measurement's mustInstance does.
+var instance = must(spec.New(msdef.Definition, spec.Options{Features: featureMap}))
+
+// must is a construction over the package's fixed selection: an error is
+// a programming error, reported where it is made.
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(fmt.Sprintf("modeselect: the fixed selection: %v", err))
+	}
+	return v
+}
 
 // DescriptionMaxBytes is the Description constraint "max 64"
 // (matter.js mode-select-cluster.element.ts:25-28). The bound is applied
@@ -133,14 +145,22 @@ type Config struct {
 	// mode the device changed on its own reaches a subscriber the
 	// moment the host bumps it, and the version survives server
 	// reconstruction; when nil an embedded tracker is used.
+	//
+	// Deprecated: no controller reads this tracker — the wire carries the
+	// endpoint's DataVersion for the cluster, which the bridge keeps
+	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
+	// minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
 // Server implements [contract.ClusterServer] for the Matter ModeSelect
 // cluster (0x0050).
 type Server struct {
-	src   ModeSource
-	hooks spec.Hooks
+	src ModeSource
+	// held is the generated store beside the server's own reads: it reads
+	// the ModeSource through [modeSource] and carries the typed server's
+	// command path ([spec.InvokeHeld], decision 154).
+	held spec.SelfHeld
 
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
@@ -173,8 +193,26 @@ var (
 // NewServer constructs a ModeSelect server over cfg.Source.
 func NewServer(cfg Config) *Server {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
-	s.hooks.Init(instance)
+	// The selection is the fixed one [instance] was built from.
+	srv := must(spec.NewServer(msdef.Definition, spec.Options{Features: featureMap}, spec.ServerConfig{
+		DataVersion: s.tracker(), Source: modeSource{s}, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
+		Handlers: map[uint32]spec.CommandHandler{CmdChangeToMode: s.changeToMode},
+	}))
+	s.held = spec.NewSelfHeld(srv)
 	return s
+}
+
+// modeSource answers the store's reads of the four served attributes from
+// the ModeSource, as [Server.MatterRead] does.
+type modeSource struct{ s *Server }
+
+// MatterAttribute implements [spec.Source].
+func (m modeSource) MatterAttribute(attrID uint32) (any, bool) {
+	switch attrID {
+	case AttrDescription, AttrStandardNamespace, AttrSupportedModes, AttrCurrentMode:
+		return m.s.MatterRead(attrID)
+	}
+	return nil, false
 }
 
 // SetAttributes implements [spec.AttributeSetter]: every attribute is the
@@ -187,19 +225,19 @@ func (*Server) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
-// Handle implements [spec.CommandRegistrar] ([spec.Hooks]).
-func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.hooks.Handle(cmdID, fn) }
+// Handle implements [spec.CommandRegistrar] ([spec.SelfHeld]).
+func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error { return s.held.Handle(cmdID, fn) }
 
 // Emit implements [spec.EventEmitting]: ModeSelect defines no event, so
 // every one is [spec.ErrNotEmitted].
 func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
-	return s.hooks.Emit(endpoint, eventID, data)
+	return s.held.Emit(endpoint, eventID, data)
 }
 
-// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.Hooks]); the
-// served attributes are read-only, so no write reaches it.
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.SelfHeld]);
+// the served attributes are read-only, so no write reaches it.
 func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
-	s.hooks.SetBeforeWrite(fn)
+	s.held.SetBeforeWrite(fn)
 }
 
 // The typed server's optional interfaces.
@@ -254,7 +292,12 @@ func Revision() uint16 { return msdef.Revision }
 // MatterClusterID returns 0x0050 (ModeSelect).
 func (*Server) MatterClusterID() uint32 { return ClusterID }
 
-// MatterDataVersion implements [contract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion]: the
+// server's own tracker, the host's when it supplied one.
+//
+// Deprecated: no controller reads this version — the wire carries the
+// endpoint's DataVersion for the cluster, which the bridge keeps
+// (decision 165, F-db021da0-46). Removable in the next minor release.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterRead resolves the four conformance-M attributes plus the two
@@ -354,13 +397,16 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 // INVALID_COMMAND status response" (matter.js
 // packages/model/src/standard/resources/mode-select-cluster.resource.ts,
 // ChangeToMode details).
+//
+// The request is held to the definition first, then a host's handler
+// ([Server.Handle]) or the server's own runs, its response checked
+// ([spec.InvokeHeld], decision 154).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (response any, err error) {
-	if cmdID != CmdChangeToMode {
-		return nil, im.UnsupportedCommandf("modeselect: unknown command 0x%02X", cmdID)
-	}
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// changeToMode is the server's own ChangeToMode.
+func (s *Server) changeToMode(ctx context.Context, fields any) (any, error) {
 	req, err := changeToModeRequest(fields)
 	if err != nil {
 		return nil, err

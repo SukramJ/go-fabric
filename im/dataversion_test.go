@@ -71,7 +71,7 @@ func TestRead_DataVersionStampedFromCluster(t *testing.T) {
 		},
 	}
 
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if len(rd.Reports) != 1 {
 		t.Fatalf("reports=%d, want 1", len(rd.Reports))
 	}
@@ -115,7 +115,7 @@ func TestRead_DataVersionFilterMatching_SkipsCluster(t *testing.T) {
 		},
 	}
 
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if len(rd.Reports) != 0 {
 		t.Errorf("reports=%d, want 0 (cluster filtered)", len(rd.Reports))
 	}
@@ -145,7 +145,7 @@ func TestRead_DataVersionFilterMismatch_EmitsAttributes(t *testing.T) {
 		},
 	}
 
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if len(rd.Reports) != 1 {
 		t.Fatalf("reports=%d, want 1 (version mismatch → emit data)", len(rd.Reports))
 	}

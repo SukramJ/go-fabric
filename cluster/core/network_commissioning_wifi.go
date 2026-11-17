@@ -76,7 +76,17 @@ type WiFiNetworkCommissioning struct {
 	// commit, which OnCommissioningComplete then commits in memory without
 	// a second write; nil when none is outstanding.
 	stored []wifiNetwork
-	busy   bool
+	// busy is the driver's turn: a command's scan or connect, claimed in
+	// the same hold as MatterInvoke's check and released by the command
+	// when it returns — also after a fail-safe expiry abandoned it — or a
+	// rejoin attempt (rejoining). busyGen names the holder (review II,
+	// N3-net-1, N3-finnet-2).
+	busy    bool
+	busyGen uint64
+	// cmdCancel cancels the driver call of the ConnectNetwork that runs;
+	// the fail-safe's expiry abandons it with this (review II,
+	// R2-P6-conc-1021). nil while none runs.
+	cmdCancel context.CancelFunc
 	// link is the SSID the driver last joined; after a join that failed,
 	// the network a [contract.WiFiLinkReporter] driver reports the radio on,
 	// nil without one (the cluster cannot tell where the radio is then). A
@@ -219,7 +229,12 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 // starts with no network in force and refuses to store a list
 // ([WiFiNetworkCommissioning.StoreNetworks]), so the stored value is
 // never overwritten with one built over a list it could not read (review
-// II, seal F5).
+// II, seal F5). That refusal fails a commissioning closed only where
+// StoreNetworks runs inside the fail-safe's durable commit
+// ([GeneralCommissioning.SetFailSafeCommit], as the node wires it):
+// without that wiring OnCommissioningComplete's own save refuses the same
+// way, but its failure is only logged and the commissioning completes
+// with the networks in force in memory alone (review II, DR5b-F-04).
 func (w *WiFiNetworkCommissioning) loadCommitted(ctx context.Context) ([]wifiNetwork, error) {
 	if w.store == nil {
 		return nil, nil
@@ -380,6 +395,7 @@ func (w *WiFiNetworkCommissioning) Start(ctx context.Context) {
 func (w *WiFiNetworkCommissioning) beginAttemptLocked(parent context.Context) context.Context {
 	attempt, cancel := context.WithCancel(parent)
 	w.busy, w.rejoining = true, true
+	w.busyGen++
 	w.rejoinCancel, w.rejoinDone = cancel, make(chan struct{})
 	return attempt
 }
@@ -906,7 +922,8 @@ func netcommStatus(code im.StatusCode, format string, args ...any) error {
 }
 
 // MatterInvoke implements [contract.ClusterServer] (InvokeCommand,
-// :1138-1194): Busy while a command's scan or connect runs. A rejoin
+// :1138-1194): Busy while a command's scan or connect runs — the command
+// claims the driver in the hold of this check (review II, N3-net-1). A rejoin
 // attempt of the committed network that runs is cancelled instead and
 // the command waits for it to end, then takes its turn: neither
 // reference's commissioner retries a failed command at the network step —
@@ -934,6 +951,13 @@ func (w *WiFiNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uint3
 			return nil, netcommStatus(im.StatusBusy, "core: NetworkCommissioning is busy")
 		}
 		w.mu.Lock()
+	}
+	if cmdID == netcommdef.CmdScanNetworks || cmdID == netcommdef.CmdConnectNetwork {
+		// The driver's turn is claimed in the hold that found it free
+		// (review II, N3-net-1).
+		w.busy = true
+		w.busyGen++
+		defer w.releaseCommand(w.busyGen, w.expiries)
 	}
 	w.mu.Unlock()
 	switch cmdID {
@@ -969,6 +993,22 @@ func (w *WiFiNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uint3
 		return w.reorder(req)
 	}
 	return nil, im.UnsupportedCommandf("core: NetworkCommissioning command 0x%02X not supported (Wi-Fi)", cmdID)
+}
+
+// releaseCommand ends the command's turn gen. A command a fail-safe expiry
+// overtook (the count moved from window) held the driver past the expiry,
+// so the rejoin the expiry armed waited for it: it starts now (review II,
+// R2-P6-conc-1021, N3-finnet-2).
+func (w *WiFiNetworkCommissioning) releaseCommand(gen, window uint64) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.busyGen != gen {
+		return
+	}
+	w.busy = false
+	if w.expiries != window {
+		w.rejoinNowLocked()
+	}
 }
 
 func (w *WiFiNetworkCommissioning) breadcrumb(bc *uint64) {
@@ -1038,21 +1078,18 @@ func (w *WiFiNetworkCommissioning) scanNetworks(ctx context.Context, req netcomm
 		w.mu.Unlock()
 		return nil, netcommStatus(im.StatusConstraintError, "core: ScanNetworks SSID of %d bytes", len(ssid))
 	}
-	w.busy = true
+	scanMax := w.scanMax
 	w.mu.Unlock()
-	code, text, results := w.driver.ScanNetworks(ctx, ssid)
+	// The driver's scan is bounded by the ScanMaxTimeSeconds the server
+	// advertises (review II, R2-P6-bound-1012).
+	sctx, cancel := context.WithTimeout(ctx, time.Duration(scanMax)*time.Second)
+	code, text, results := w.driver.ScanNetworks(sctx, ssid)
+	cancel()
 	status := netcommdef.NetworkCommissioningStatusEnum(code)
 	if statusOK(status) && len(ssid) > 0 && len(results) == 0 {
 		status = netcommdef.NetworkCommissioningStatusNetworkNotFound
 	}
 	w.mu.Lock()
-	if !w.rejoining {
-		// A rejoin attempt a fail-safe expiry started while the scan ran
-		// (OnFailSafeExpired frees the turn of a command, not of an
-		// attempt) holds the driver until it ends (review II,
-		// R2-P3-rr-dev-05).
-		w.busy = false
-	}
 	w.setStatusLocked(status)
 	w.dataVersion.Bump()
 	w.mu.Unlock()
@@ -1230,9 +1267,14 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	window := w.expiries
 	i := w.indexLocked(req.NetworkId)
 	var target wifiNetwork
+	// The driver's join is bounded by the ConnectMaxTimeSeconds the server
+	// advertises (review II, R2-P6-bound-1012), and the fail-safe's expiry
+	// cancels it (cmdCancel).
+	join, cancel := context.WithTimeout(ctx, time.Duration(w.connectMax)*time.Second)
+	defer cancel()
 	if i >= 0 {
 		target = w.networks[i]
-		w.busy = true
+		w.cmdCancel = cancel
 	}
 	w.mu.Unlock()
 	status := netcommdef.NetworkCommissioningStatusNetworkIdNotFound
@@ -1241,29 +1283,31 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	var link []byte
 	if i >= 0 {
 		var code uint8
-		code, text, errValue = w.driver.ConnectNetwork(ctx, target.ssid, target.credentials)
+		code, text, errValue = w.driver.ConnectNetwork(join, target.ssid, target.credentials)
 		status = netcommdef.NetworkCommissioningStatusEnum(code)
 		if !statusOK(status) {
 			link = w.linkAfterFailure(ctx)
 		}
 	}
 	w.mu.Lock()
+	w.cmdCancel = nil
 	resp := netcommdef.ConnectNetworkResponse{NetworkingStatus: status, DebugText: debugText(text), ErrorValue: spec.Nullable[int32]{Null: true}}
 	if w.expiries != window {
 		// The fail-safe that admitted the command expired while the driver
 		// ran, and OnFailSafeExpired reverted the networks: the result
-		// touches neither the reverted state nor the Breadcrumb.
-		// connectedhomeip releases the pending command on the expiry
-		// (NetworkCommissioningCluster.cpp:1002 at 6170af84) and its
-		// OnResult returns on the released handle (:850-857) (review II,
-		// R2-P1-core-06).
+		// touches neither the reverted state nor the Breadcrumb, and the
+		// command is answered with nothing ([im.NoResponse]; review II,
+		// R2-P1-core-06, R2-P6-fsm-1001, F-db021da0-10).
+		// Follows connectedhomeip
+		// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
+		// at 6170af84: the fail-safe expiry reverts the driver and releases
+		// the pending command handle (:1001-1002), and a driver result that
+		// arrives afterwards returns before it writes LastNetworkID,
+		// LastNetworkingStatus, LastConnectErrorValue or the Breadcrumb and
+		// before it adds a ConnectNetworkResponse (:845-857).
 		w.mu.Unlock()
-		if !statusOK(status) {
-			resp.ErrorValue = spec.Nullable[int32]{Value: errValue}
-		}
-		return resp, nil
+		return im.NoResponse{}, nil
 	}
-	w.busy = false
 	if statusOK(status) {
 		w.lastConnectErr = nil
 		w.link = bytes.Clone(req.NetworkId)
@@ -1335,10 +1379,18 @@ func (w *WiFiNetworkCommissioning) OnFailSafeExpired() {
 	w.stored = nil
 	w.networks = slices.Clone(w.committed)
 	w.markConnectedLocked()
-	if !w.rejoining {
-		// A command's join the expiry abandons (its result is dropped,
-		// connect) frees the driver's turn; a rejoin attempt still holds the
-		// driver and keeps it until it ends (review II, R2-P3-dr-net-05).
+	switch {
+	case w.cmdCancel != nil:
+		// The ConnectNetwork this window admitted is abandoned: its join is
+		// cancelled, its result dropped (connect), and it keeps the driver's
+		// turn until it returned; the rejoin armed below waits for it, so
+		// two joins never run on the driver at once (review II,
+		// R2-P6-conc-1021, N3-finnet-2).
+		w.cmdCancel()
+	case !w.rejoining:
+		// A scan's turn is freed for the rejoin, as before; a rejoin
+		// attempt keeps the driver until it ends (R2-P3-dr-net-05,
+		// R2-P3-rr-dev-05).
 		w.busy = false
 	}
 	if len(w.networks) == 0 {

@@ -41,6 +41,19 @@ var errChunkRejected = errors.New("bridge: peer rejected ReportData chunk")
 // the whole report.
 var errChunkUnanswered = errors.New("bridge: peer did not answer ReportData chunk")
 
+// errChunkAnswerUndecodable is returned by a chunk loop when the peer
+// answered a ReportData chunk with a StatusResponse whose Status could not
+// be decoded: no status of the peer's, so no refusal either (review II,
+// R2-P6-wire-0503, owner decision 176). matter.js decodes the Status
+// strictly and the decode error is not a StatusResponseError (fable-6a-w3
+// H2: packages/types/src/tlv/TlvNumber.ts:124-131,
+// packages/general/src/MatterError.ts:188 at db021da0): on the request's
+// own exchange the interaction answers FAILURE and closes the exchange
+// (packages/protocol/src/interaction/InteractionMessenger.ts:431,
+// :458-463); on a subscription update it is a failed send that is retried
+// (packages/node/src/node/server/ServerSubscription.ts:938-944, :558-608).
+var errChunkAnswerUndecodable = errors.New("bridge: peer's answer to a ReportData chunk is undecodable")
+
 // errChunkWaitDisarmed ends a chunk wait disarmed by another hand: the
 // close of its session. It is an [errChunkWaitAborted] too.
 var errChunkWaitDisarmed = errors.New("bridge: chunk wait disarmed")
@@ -72,8 +85,9 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// throwIfErrorStatusMessage) and throws on anything else; an
 	// undecodable one is treated as Failure so the waiting interaction
 	// stops rather than carries on blind.
-	status := im.StatusFailure
+	status, undecodable := im.StatusFailure, false
 	if sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(payload)); err != nil {
+		undecodable = true
 		b.logger.Warn("matter.rx.im.status_decode",
 			slog.String("src", srcString(src)),
 			slog.Int("exchange_id", int(proto.ExchangeID)),
@@ -105,7 +119,15 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// fires past Apple's state-machine and
 	// `ProcessSubscribeResponse` never triggers (Run 19 of the
 	// Apple-pair-diagnose cycle).
-	waited := b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	// An undecodable one reaches the waiter as such: the waiter decides —
+	// a failed send of a subscription update, FAILURE on the request's
+	// own exchange (owner decision 176; [errChunkAnswerUndecodable]).
+	var waited bool
+	if undecodable {
+		waited = b.signalUndecodableStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	} else {
+		waited = b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	}
 	// A StatusResponse that opens an exchange — the peer speaks as the
 	// initiator and no exchange of ours waits for it — is no answer to
 	// anything: it is answered like any other unsupported opcode.
@@ -135,7 +157,11 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// subscription on either, as on any other error status (:947);
 	// nothing else ever would, because the report itself was
 	// MRP-acked and the reply refreshes the session's activity.
-	if !status.IsSuccess() && !proto.Initiator {
+	// A reporter that waits for this answer got it and ends the
+	// subscription itself (closeRefusedSubscription): only an answer nobody
+	// waits for ends it here, once (review II, DR5b-c1-04). An undecodable
+	// answer is no refusal and ends nothing (owner decision 176).
+	if !waited && !undecodable && !status.IsSuccess() && !proto.Initiator {
 		b.closeSubscriptionByExchange(requestHdr.SessionID, proto.ExchangeID, status)
 	}
 	b.logger.Debug("matter.rx.im.status_ack",
@@ -361,6 +387,11 @@ func (b *Bridge) sendReadChunk(ctx context.Context, src net.Addr, requestHdr *me
 		wait = chunkNoWait
 	}
 	if _, err := b.sendChunk(b.replyChunkLeg(ctx, "read", src, requestHdr, proto, im.OpcodeReportData), i, body, chunk, wait); err != nil {
+		if errors.Is(err, errChunkAnswerUndecodable) {
+			// The peer's answer carried no status: the read ends with
+			// FAILURE on its exchange (owner decision 176).
+			_ = b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_answer_undecodable", im.StatusFailure)
+		}
 		return err
 	}
 	b.logger.Debug("matter.rx.im.read.chunk",
@@ -442,7 +473,7 @@ var errChunkWaitAborted = errors.New("bridge: chunk wait aborted")
 // and when the wait is disarmed by another hand: the close of its session
 // ([Bridge.SessionClosed]; [errChunkWaitDisarmed] too). Review II,
 // R2-P1-req2-01.
-func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abort <-chan struct{}, waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
+func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abort <-chan struct{}, waitCh <-chan statusAnswer, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	select {
@@ -452,7 +483,7 @@ func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abo
 	case <-abort:
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		return fmt.Errorf("%w: exchange %d chunk %d", errChunkWaitAborted, exchangeID, chunkIdx)
-	case status, ok := <-waitCh:
+	case answer, ok := <-waitCh:
 		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
 		if !ok {
 			// Disarmed without an answer: the zero status would read
@@ -460,6 +491,14 @@ func (b *Bridge) awaitChunkStatusResponseWithin(timeout time.Duration, done, abo
 			// is gone.
 			return fmt.Errorf("%w: %w: exchange %d chunk %d", errChunkWaitAborted, errChunkWaitDisarmed, exchangeID, chunkIdx)
 		}
+		if answer.undecodable {
+			b.logger.Debug("matter.tx."+op+".chunk_answer_undecodable",
+				slog.String("src", srcString(src)),
+				slog.Int("chunk", chunkIdx),
+				slog.Int("exchange_id", int(exchangeID)))
+			return fmt.Errorf("%w: exchange %d chunk %d", errChunkAnswerUndecodable, exchangeID, chunkIdx)
+		}
+		status := answer.status
 		if status.IsSuccess() {
 			return nil
 		}
@@ -608,7 +647,7 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 		b.reportWrittenAttributes(outcome.Results)
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_ended", resp.Status)
 	}
-	b.routing.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
+	b.endWriteChunk(txKey, tx, req.MoreChunkedMessages)
 	b.reportWrittenAttributes(outcome.Results)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
@@ -664,6 +703,17 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 			slog.Uint64("fabric_index", uint64(writeFabricIndex)))
 	}
 	return nil
+}
+
+// allConcreteInvokes reports whether every command of a request names its
+// endpoint.
+func allConcreteInvokes(invokes []im.CommandInvocation) bool {
+	for _, inv := range invokes {
+		if !inv.Path.HasEndpoint {
+			return false
+		}
+	}
+	return true
 }
 
 // Timed interactions, as matter.js splits them: the interaction-level gate
@@ -786,6 +836,29 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// HandleInvokeRequest; we only elide the wire reply and send the owed
 	// MRP ack (the controller opted out of the StatusResponse handshake, so the
 	// Standalone Ack is all it expects; [Bridge.ackUnansweredRequest]).
+	// Every command of the request was answered with nothing — a handler
+	// returned [im.NoResponse], which leaves its command out: no
+	// InvokeResponse is sent, only the owed acknowledgement (review II,
+	// R2-P6-fsm-1001, F-db021da0-10; the NetworkCommissioning server's
+	// ConnectNetwork that outlived its fail-safe, as connectedhomeip). A
+	// concrete command always leaves an entry otherwise, so the test is
+	// exact for a request of concrete commands. A request with a
+	// wildcard-endpoint command is always answered, a target that
+	// returned [im.NoResponse] left out of the response message — empty when
+	// every target did (decision 182): matter.js expands a path without
+	// an endpoint and answers every target it invokes
+	// (packages/protocol/src/action/server/CommandInvokeResponse.ts:78-85,
+	// :495-508 at db021da0), and connectedhomeip never dispatches such a
+	// unicast command (src/app/CommandHandlerImpl.cpp:278-282 at
+	// 6170af84), so leaving a target out is this module's rule
+	// (by_design).
+	if len(resp.Responses) == 0 && len(req.Invokes) > 0 && allConcreteInvokes(req.Invokes) {
+		b.ackUnansweredRequest(requestHdr, proto)
+		b.logger.Debug("matter.rx.im.invoke.no_response",
+			slog.String("src", srcString(src)),
+			slog.Int("invokes", len(req.Invokes)))
+		return nil
+	}
 	if req.SuppressResponse && !resp.HasCommandData() {
 		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.suppressed",
@@ -959,29 +1032,62 @@ type invokedCluster struct {
 	cluster  uint32
 }
 
-// snapshotInvokedClusters reads every attribute of each cluster a
-// concrete invoke path names, before the commands run, and opens the
-// commit of each ([invokeCommitTable]) that [Bridge.reportInvokeChanges]
-// ends. A subscription manager is required for the comparison to matter;
-// without one this is a no-op.
+// snapshotInvokedClusters reads every attribute of each cluster an invoke
+// path reaches, before the commands run, and opens the commit of each
+// ([invokeCommitTable]) that [Bridge.reportInvokeChanges] ends. A concrete
+// path reaches its endpoint; a wildcard-endpoint path — a group command's
+// only shape — every endpoint the command may run at ([commandEndpoints]),
+// so its change is one commit for subscribers and the DataVersion as a
+// concrete path's is (R2-P6-par-0401): matter.js runs and commits a
+// wildcard-endpoint or group invoke per endpoint exactly as a concrete
+// one, and the commit is what advances the DataVersion and announces the
+// change (CommandInvokeResponse.ts:330-358, :493; Datasource.ts:1455-1457,
+// :1319 at db021da0). A subscription manager is required for the
+// comparison to matter; without one this is a no-op.
 func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]attributeReading {
 	if b.subscriptionManagerLocked() == nil {
 		return nil
 	}
 	out := map[invokedCluster]map[uint32]attributeReading{}
 	for _, inv := range req.Invokes {
-		if !inv.Path.HasEndpoint {
-			continue
-		}
-		key := invokedCluster{inv.Path.Endpoint, inv.Path.Cluster}
-		if _, done := out[key]; !done {
-			out[key] = readCluster(ctx, d, key)
+		for _, endpoint := range commandEndpoints(ctx, d, inv.Path) {
+			key := invokedCluster{endpoint, inv.Path.Cluster}
+			if _, done := out[key]; !done {
+				out[key] = readCluster(ctx, d, key)
+			}
 		}
 	}
 	for key := range out {
 		b.invokeCommits.begin(key)
 	}
 	return out
+}
+
+// commandTargetLister is the part of a dispatcher that names the
+// endpoints a wildcard-endpoint command runs at
+// (endpoint.TopologyDispatcher.CommandTargets).
+type commandTargetLister interface {
+	CommandTargets(path im.ConcreteCommandPath, authorize im.CommandAuthorizer) []uint16
+}
+
+// commandEndpoints is the endpoints path may run at: its own for a
+// concrete path; for a wildcard one every endpoint whose server accepts
+// the command, narrowed to the group's endpoints for a group command. The
+// access check is not asked — a snapshot of an endpoint the command then
+// does not reach compares equal and reports nothing.
+func commandEndpoints(ctx context.Context, d im.Dispatcher, path im.ConcreteCommandPath) []uint16 {
+	if path.HasEndpoint {
+		return []uint16{path.Endpoint}
+	}
+	lister, ok := d.(commandTargetLister)
+	if !ok || !path.HasCluster || !path.HasCommand {
+		return nil
+	}
+	targets := lister.CommandTargets(path, nil)
+	if group, isGroup := im.GroupSubjectFromContext(ctx); isGroup {
+		targets = slices.DeleteFunc(slices.Clone(targets), func(e uint16) bool { return !slices.Contains(group.Endpoints, e) })
+	}
+	return targets
 }
 
 // invokeCommitTable makes a command one commit with one DataVersion
@@ -1082,13 +1188,11 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 	if len(before) == 0 {
 		return
 	}
+	// A manager detached while the command ran still gets the advance:
+	// the commit changed the cluster whether or not anyone subscribes, and
+	// a later read with a DataVersionFilter must see it; only the marks
+	// need a manager (N-findev-2).
 	mgr := b.subscriptionManagerLocked()
-	if mgr == nil {
-		for key := range before {
-			b.invokeCommits.end(key)
-		}
-		return
-	}
 	topo := b.Topology()
 	// Each commit ends after its cluster's read, so a report between the
 	// two is returned by end, not taken twice. A read that panics still
@@ -1138,7 +1242,7 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 // reportCommandChange advances key's DataVersion once and marks changed
 // dirty; advance owes the advance with nothing to mark — a quieter
 // attribute whose report waits for its throttle — and nothing changed
-// without it moves nothing. matter.js advances the version at the commit
+// without it moves nothing. A nil mgr advances without marking. matter.js advances the version at the commit
 // that changed a value, a quieter one's included
 // (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457 at
 // db021da0).
@@ -1150,6 +1254,9 @@ func reportCommandChange(topo *endpointpkg.Topology, mgr *subscription.Manager, 
 		if ep := topo.FindByID(key.endpoint); ep != nil {
 			ep.BumpDataVersionOf(key.cluster)
 		}
+	}
+	if mgr == nil {
+		return
 	}
 	for _, attr := range changed {
 		mgr.OnAttributeChanged(im.ConcreteAttributePath{
@@ -1192,9 +1299,18 @@ func selfReportedAttributes(topo *endpointpkg.Topology, key invokedCluster) map[
 
 // readCluster reads every attribute of one cluster instance and captures
 // each value for comparison.
-func readCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[uint32]attributeReading {
+//
+// The snapshot is the bridge's own and is never delivered, so it reads
+// without the request behind the command: a request-free read sees every
+// attribute whole — no access check, no read-access refusal, no fabric
+// filter — and a change the command makes is seen whoever invoked it; each
+// subscriber's report stays filtered by its own request (fable-read-6a-gate
+// §6).
+func readCluster(_ context.Context, d im.Dispatcher, key invokedCluster) map[uint32]attributeReading {
 	out := map[uint32]attributeReading{}
-	for _, r := range d.Read(ctx, im.ConcreteAttributePath{Endpoint: key.endpoint, Cluster: key.cluster, HasEndpoint: true, HasCluster: true}) {
+	path := im.ConcreteAttributePath{Endpoint: key.endpoint, Cluster: key.cluster, HasEndpoint: true, HasCluster: true}
+	//nolint:contextcheck // the snapshot reads without the request behind the command (above)
+	for _, r := range d.Read(context.Background(), path) {
 		if r.Status == im.StatusSuccess {
 			out[r.Path.Attribute] = readingOf(r.Value)
 		}
@@ -1330,6 +1446,29 @@ func (b *Bridge) adoptPASESessionOnAddNOC(sessionID uint16, resp im.InvokeRespon
 
 // lookupSession is the live session of the id, nil for none (or the
 // unsecured id 0).
+// endWriteChunk is [exchangeRouting.endWriteChunk] for a chunk of the
+// session key names, then ends the session's chunked writes when the
+// session is gone: a chunk that announces more and stored its transaction
+// after the session's close dropped the table's entries
+// ([exchangeRouting.dropSessionWriteTxs]) would otherwise keep its hold
+// until a later write's sweep (N-req3-1). Without a session registry
+// nothing is known to be gone.
+func (b *Bridge) endWriteChunk(key mrp.ExchangeKey, tx *im.WriteTransaction, more bool) {
+	b.routing.endWriteChunk(key, tx, more)
+	if !more {
+		return
+	}
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if lookup == nil {
+		return
+	}
+	if _, live := lookup.Lookup(key.SessionID); !live {
+		b.routing.dropSessionWriteTxs(key.SessionID)
+	}
+}
+
 func (b *Bridge) lookupSession(sessionID uint16) *channel.Session {
 	if sessionID == 0 {
 		return nil

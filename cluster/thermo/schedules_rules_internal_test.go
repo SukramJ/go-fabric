@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/im"
@@ -148,15 +150,15 @@ func TestScheduleRulesAppendPending(t *testing.T) {
 }
 
 func TestScheduleHelpersInternal(t *testing.T) {
-	// cloneSchedules copies every pointer field and nil stays nil.
-	if cloneSchedules(nil) != nil {
-		t.Fatal("cloneSchedules(nil) is not nil")
+	// deepcopy.Each copies every pointer field and nil stays nil.
+	if deepcopy.Each[Schedule](nil) != nil {
+		t.Fatal("deepcopy.Each(nil) is not nil")
 	}
 	h := []byte{1}
 	in := []Schedule{{ScheduleHandle: spec.ValueOf([]byte{2}), Name: ptr("n"), PresetHandle: &h, Transitions: []ScheduleTransition{
 		{PresetHandle: &h, SystemMode: ptr(tdef.SystemModeHeat), CoolingSetpoint: ptr[int16](1), HeatingSetpoint: ptr[int16](2)},
 	}}}
-	out := cloneSchedules(in)
+	out := deepcopy.Each(in)
 	if &out[0].Transitions[0] == &in[0].Transitions[0] || out[0].PresetHandle == in[0].PresetHandle ||
 		out[0].Transitions[0].PresetHandle == in[0].Transitions[0].PresetHandle || out[0].Name == in[0].Name ||
 		out[0].Transitions[0].SystemMode == in[0].Transitions[0].SystemMode ||

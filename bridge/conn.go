@@ -5,7 +5,6 @@ package bridge
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,7 +17,6 @@ import (
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport"
-	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -243,6 +241,7 @@ func (b *Bridge) bindSessionRoute(sid uint16, dst net.Addr) {
 	if sess != nil {
 		b.sessionRouteOwners.Store(sid, sess)
 	}
+	noteSessionTraffic(dst)
 	var closeConn *connRoute
 	if !loaded || prevAddr != dst {
 		if r, ok := dst.(*connRoute); ok && r != nil {
@@ -259,14 +258,35 @@ func (b *Bridge) bindSessionRoute(sid uint16, dst net.Addr) {
 	b.closeConnRoute(closeConn)
 }
 
+// sessionTrafficNoter is the capability of a connection whose listener
+// measures idleness by the host's notes of session traffic
+// (transport/tcp Conn.NoteSessionTraffic).
+type sessionTrafficNoter interface {
+	NoteSessionTraffic()
+}
+
+// noteSessionTraffic tells the connection behind route, when it takes the
+// note, that it just carried a secure session's message: every
+// authenticated message with a new counter binds its session's route
+// ([Bridge.bindSessionRoute]), and so does a session's establishment. The
+// TCP listener then keeps the connection's place at its bound by these
+// messages, not by any frame a peer sends (review II, N3-finnet-4).
+func noteSessionTraffic(route net.Addr) {
+	if r, ok := route.(*connRoute); ok && r != nil {
+		if n, ok := r.conn.(sessionTrafficNoter); ok {
+			n.NoteSessionTraffic()
+		}
+	}
+}
+
 // unbindSessionRoute forgets the route of secure session sid, which is
 // closing or closed. When the route is a connection and sid was the last
 // session bound to it, the connection is closed — the Go translation of
-// matter.js ExchangeManager.ts:674-681 #closeTcpChannelIfLastSession
-// ("Mimics CHIP SDK behavior: close TCP connection when last session is
-// removed"), scheduled from :691-708 #deleteSession for every session
-// whose transport channel is TCP. matter.js recounts the live sessions on
-// the channel (#sessionsOnChannel, :629-643); the bridge keeps the count
+// matter.js ExchangeManager.ts:739-746 at db021da0
+// #closeTcpChannelIfLastSession, scheduled from :761-779 #deleteSession
+// for every session whose transport channel is TCP. matter.js recounts the
+// live sessions on the channel (#sessionsOnChannel, :699-713); the bridge
+// keeps the count
 // on the route instead. The 10 s first-message timer of the listener is
 // not involved: it covers only a connection that never carried a message.
 func (b *Bridge) unbindSessionRoute(sid uint16) {
@@ -286,11 +306,11 @@ func (b *Bridge) unbindSessionRoute(sid uint16) {
 // otherwise. The caller holds b.routeBindMu.
 //
 // matter.js counts the unsecured sessions on the channel with the secure
-// ones (ExchangeManager.ts:634-648 #sessionsOnChannel, both loops at
-// :644-645), so #closeTcpChannelIfLastSession (:674-681) keeps a
+// ones (ExchangeManager.ts:699-713 at db021da0 #sessionsOnChannel, both
+// loops at :709-710), so #closeTcpChannelIfLastSession (:739-746) keeps a
 // connection that carries a handshake. A handshake's own end closes
 // nothing: only a secure session's removal schedules the check
-// (#deleteSession :691-708; #addSession :678-689 observes NodeSessions
+// (#deleteSession :761-779; #addSession :748-759 observes NodeSessions
 // only).
 func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
 	r.sessions--
@@ -337,15 +357,20 @@ func (b *Bridge) holdHandshake(src net.Addr, key HandshakeKey, pase bool) {
 	r.handshakes[key.ExchangeID] = handshakeHold{pase: pase, initiator: key.InitiatorNodeID, since: b.clk().Now()}
 }
 
-// releaseHandshake ends the hold of the handshake on exchangeID over src.
-// It never closes the connection — see [Bridge.releaseConnRouteLocked].
-func (b *Bridge) releaseHandshake(src net.Addr, exchangeID uint16) {
+// releaseHandshake ends the hold of the handshake key over src: a hold on
+// key's exchange id of another initiator stays, so a message sent under
+// another source node id ends no handshake's hold (review II,
+// R2-P6-sec-0304, N3-fixrrdev-2). It never closes the connection — see
+// [Bridge.releaseConnRouteLocked].
+func (b *Bridge) releaseHandshake(src net.Addr, key HandshakeKey) {
 	r, ok := src.(*connRoute)
 	if !ok || r == nil {
 		return
 	}
 	b.routeBindMu.Lock()
-	delete(r.handshakes, exchangeID)
+	if h, held := r.handshakes[key.ExchangeID]; held && h.initiator == key.InitiatorNodeID {
+		delete(r.handshakes, key.ExchangeID)
+	}
 	b.routeBindMu.Unlock()
 }
 
@@ -392,7 +417,7 @@ type establishedSessionReporter interface {
 // authenticated message yet still has an address for its CloseSession on
 // fabric removal or NOC rotation; the session's first authenticated
 // message rebinds it as before (receive.go). Only a connection is held.
-func (b *Bridge) settleHandshake(src net.Addr, exchangeID uint16, h any, respOpcode uint8, respPayload []byte, err error) {
+func (b *Bridge) settleHandshake(src net.Addr, key HandshakeKey, h any, respOpcode uint8, respPayload []byte, err error) {
 	if !isConnRoute(src) {
 		if src != nil && err == nil && establishedBy(respOpcode, respPayload) {
 			b.bindEstablishedSession(src, h)
@@ -413,7 +438,7 @@ func (b *Bridge) settleHandshake(src net.Addr, exchangeID uint16, h any, respOpc
 	default:
 		return // PBKDFParamResponse, Pake2, Sigma2: the handshake goes on
 	}
-	b.releaseHandshake(src, exchangeID)
+	b.releaseHandshake(src, key)
 }
 
 // establishedBy reports whether a handshake reply establishes the session:
@@ -508,7 +533,7 @@ func (b *Bridge) sessionHoldsSubscription(sessionID uint16) bool {
 // deadlines, exchange reply routes and ack obligations
 // ([Bridge.purgeSessionState]), forgets the session's route and closes a TCP
 // connection whose last session this was (unbindSessionRoute;
-// matter.js ExchangeManager.ts:674-681). Calling it for a session the
+// matter.js ExchangeManager.ts:739-746 at db021da0). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
 	b.purgeSessionState(sessionID)
@@ -532,6 +557,10 @@ func (b *Bridge) purgeSessionState(sessionID uint16) {
 	// Its exchanges die with it, so no timed deadline it registered can
 	// be consumed.
 	b.routing.dropSessionTimedDeadlines(sessionID)
+	// The exchanges a peer opened for BDX and the ones this node opened
+	// end with it; a later session given its id inherits none (review II,
+	// R2-P6-sec-0302).
+	b.endSessionExchanges(sessionID)
 	b.mu.RLock()
 	outbound, tracker := b.outboundReliable, b.ackTracker
 	b.mu.RUnlock()
@@ -581,21 +610,9 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 		// (sendVia) without MRP (routeUsesMRP). The handshake holds the
 		// connection open while it runs (holdHandshake, settleHandshake),
 		// as matter.js counts the unsecured session on the channel
-		// (ExchangeManager.ts:634-648).
+		// (ExchangeManager.ts:699-713 at db021da0).
 	}
 	return b.dispatch(ctx, buf, route)
-}
-
-// isUnsecuredUnicast reports whether buf is a message of the unsecured
-// session (unicast session type, session id 0).
-func isUnsecuredUnicast(buf []byte) bool {
-	if len(buf) < 4 {
-		return false
-	}
-	if message.SessionType(buf[3]&secFlagSessionTypeBits) != message.SessionUnsecured {
-		return false
-	}
-	return binary.LittleEndian.Uint16(buf[1:3]) == 0
 }
 
 // handleTCPMessage is the TCP listener's handler: the dispatch context
@@ -607,10 +624,9 @@ func (b *Bridge) handleTCPMessage(c *tcp.Conn, msg []byte, release func()) {
 }
 
 // handleTCPClose evicts every session bound to a dropped connection —
-// the Go translation of matter.js ExchangeManager.ts:655-670
-// #onConnectionDisconnect ("Mimics CHIP SDK behavior: evict all
-// sessions when TCP connection drops"), subscribed to the transport's
-// disconnect event at :600-609.
+// the Go translation of matter.js ExchangeManager.ts:715-731 at db021da0
+// #onConnectionDisconnect, subscribed to the transport's disconnect event
+// at :665-674.
 func (b *Bridge) handleTCPClose(c *tcp.Conn) {
 	b.evictConn(c)
 }
@@ -641,8 +657,8 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 		slog.Int("sessions", len(sids)))
 	for _, sid := range sids {
 		// One line per evicted session, as matter.js
-		// packages/protocol/src/protocol/ExchangeManager.ts:655 logs
-		// "Evicting session due to TCP disconnect".
+		// packages/protocol/src/protocol/ExchangeManager.ts:720 at
+		// db021da0 logs per session.
 		b.logger.Debug("matter.tcp.evict.session",
 			slog.String("conn", route.String()),
 			slog.Int("session_id", int(sid)))
@@ -655,7 +671,7 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 // first its exchanges, then the session itself without a CloseSession
 // farewell (the peer is lost), which cascades to its subscriptions
 // through the registry's close hook. Mirrors matter.js
-// ExchangeManager.ts:659-669 (close every exchange, then
+// ExchangeManager.ts:722-729 at db021da0 (close every exchange, then
 // Session.initiateForceClose, Session.ts:310-331, which closes the
 // subscriptions and does not notify the peer — NodeSession.ts:363-366
 // marks it lost).

@@ -346,9 +346,13 @@ func (s *sockets) multicast(pkt []byte, l link) (reach, error) {
 	return reachOf(tried, ok), errors.Join(errs...)
 }
 
-// unicast implements [wire]: the querier at its source address and port —
-// 5353 for an mDNS querier, the legacy querier's own port otherwise
-// (RFC 6762 §6.7).
+// unicast implements [wire]: the packet goes to dst, the query's source
+// address and port. The responder answers by unicast only a query whose
+// every question carries the QU bit (answer.go); it does not branch on the
+// source port, so a legacy querier (RFC 6762 §6.7, a source port other
+// than 5353) is not recognised and gets no answer in that section's
+// legacy shape — a query of its without the QU bit is answered by
+// multicast like any other.
 func (s *sockets) unicast(pkt []byte, ifIndex int, dst *net.UDPAddr) (reach, error) {
 	if dst == nil {
 		return reachNone, nil

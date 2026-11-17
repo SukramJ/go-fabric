@@ -192,7 +192,7 @@ func TestHandleReadRequestSuccessProducesData(t *testing.T) {
 			{Endpoint: 1, HasEndpoint: true, Cluster: 0x0006, HasCluster: true, Attribute: 0, HasAttribute: true},
 		},
 	}
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if len(rd.Reports) != 1 {
 		t.Fatalf("reports=%d, want 1", len(rd.Reports))
 	}
@@ -213,7 +213,7 @@ func TestHandleReadRequestFailureProducesStatus(t *testing.T) {
 			{Endpoint: 1, HasEndpoint: true, Cluster: 0x0006, HasCluster: true, Attribute: 0x99, HasAttribute: true},
 		},
 	}
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if len(rd.Reports) != 1 || !rd.Reports[0].IsStatus {
 		t.Fatalf("expected one status report, got %+v", rd.Reports)
 	}
@@ -238,7 +238,7 @@ func TestHandleWriteRequestRoutesValue(t *testing.T) {
 			},
 		},
 	}
-	wr := HandleWriteRequest(context.Background(), d, req)
+	wr := HandleWriteRequest(unchecked(), d, req)
 	if len(wr.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(wr.Responses))
 	}
@@ -260,7 +260,7 @@ func TestHandleInvokeRequestSuccessWithResponse(t *testing.T) {
 			{Path: ConcreteCommandPath{Cluster: 0x0006, HasCluster: true, Command: 1, HasCommand: true}},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 1 || ir.Responses[0].IsStatus {
 		t.Fatalf("expected one data response, got %+v", ir.Responses)
 	}
@@ -280,7 +280,7 @@ func TestHandleInvokeRequestStatusOnlySuccess(t *testing.T) {
 			{Path: ConcreteCommandPath{Cluster: 0x0006, HasCluster: true, Command: 0, HasCommand: true}},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 1 || !ir.Responses[0].IsStatus {
 		t.Fatalf("expected one status-only response, got %+v", ir.Responses)
 	}
@@ -298,7 +298,7 @@ func TestHandleInvokeRequestFailureProducesStatusIB(t *testing.T) {
 			{Path: ConcreteCommandPath{Cluster: 0x0006, HasCluster: true, Command: 0xFF, HasCommand: true}},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if !ir.Responses[0].IsStatus || ir.Responses[0].Status.Status != StatusUnsupportedCommand {
 		t.Fatalf("got %+v", ir.Responses[0])
 	}
@@ -397,7 +397,7 @@ func TestHandleInvokeRequest_CommandRef_AbsentWhenNotInRequest(t *testing.T) {
 				{Path: path},
 			},
 		}
-		ir := HandleInvokeRequest(context.Background(), d, req)
+		ir := HandleInvokeRequest(unchecked(), d, req)
 		if len(ir.Responses) != 1 {
 			t.Fatalf("responses=%d, want 1", len(ir.Responses))
 		}
@@ -417,7 +417,7 @@ func TestHandleInvokeRequest_CommandRef_AbsentWhenNotInRequest(t *testing.T) {
 				{Path: path, CommandRef: wantRef, HasCommandRef: true},
 			},
 		}
-		ir := HandleInvokeRequest(context.Background(), d, req)
+		ir := HandleInvokeRequest(unchecked(), d, req)
 		if len(ir.Responses) != 1 {
 			t.Fatalf("responses=%d, want 1", len(ir.Responses))
 		}

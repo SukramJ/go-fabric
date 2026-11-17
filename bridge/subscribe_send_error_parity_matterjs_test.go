@@ -21,6 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -50,7 +51,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 			r.mu.Unlock()
 			r.b.reportSubscription(ctx, sub, paths)
 		}, nil)
-		r.m.SetEventReporter(func(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
+		r.m.SetEventReporter(func(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 			r.mu.Lock()
 			r.events = append(r.events, events)
 			r.mu.Unlock()
@@ -82,7 +83,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		t0 := time.Now()
 		r.m.OnAttributeChanged(attrPath)
 		r.m.Tick(context.Background(), t0)
-		r.m.Tick(context.Background(), t0.Add(time.Second))
+		r.m.Tick(context.Background(), t0.Add(r.sub.SendInterval())) // the next report: the send interval's (F-db021da0-3)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		if len(r.paths) != 2 {
@@ -99,7 +100,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		t0 := time.Now()
 		r.b.EmitEvent(1, 0x003B, 0x01, uint8(1), contract.EventPriority(im.EventPriorityInfo))
 		r.m.Tick(context.Background(), t0)
-		r.m.Tick(context.Background(), t0.Add(time.Second))
+		r.m.Tick(context.Background(), t0.Add(r.sub.SendInterval())) // the next report: the send interval's (F-db021da0-3)
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		if len(r.events) != 2 {
@@ -119,11 +120,11 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		r.m.Tick(context.Background(), t0)
 		// The failed report took the path with its event; both are owed
 		// again and leave together in the retry.
-		r.m.Tick(context.Background(), t0.Add(time.Second))
+		r.m.Tick(context.Background(), t0.Add(r.sub.SendInterval())) // the next report: the send interval's (F-db021da0-3)
 		// What the failed retry owes again, read through a flush.
 		var owedEvents []im.EventReport
 		var owedPaths []im.ConcreteAttributePath
-		r.m.SetFlushReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport, paths []im.ConcreteAttributePath) {
+		r.m.SetFlushReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport, paths []im.ConcreteAttributePath) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 			owedEvents, owedPaths = events, paths
 		})
 		r.m.FlushFabric(context.Background(), 1, 0)
@@ -138,7 +139,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		if len(r.events[1]) != 1 || r.events[1][0].Number != r.events[0][0].Number {
 			t.Errorf("retry reported %+v, want event %d again", r.events[1], r.events[0][0].Number)
 		}
-		if r.sub.TakeDuePaths() != nil {
+		if r.sub.TakeDuePaths() != nil { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 			t.Error("paths left on the subscription after the reports")
 		}
 	})
@@ -175,7 +176,7 @@ func newUndeliveredReportRig(t *testing.T, base uint16) *undeliveredReportRig {
 		t.Fatalf("peer address %T", silent.LocalAddr())
 	}
 	for _, sid := range []uint16{r.reportSID, r.siblingSID} {
-		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, sid+0x100, nil, peerLossKeys(t)); err != nil {
+		if _, err := sessionseam.OpenAt(dev.sessions, sid, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, sid+0x100, nil, peerLossKeys(t)); err != nil {
 			t.Fatal(err)
 		}
 		dev.br.sessionPeerAddrs.Store(sid, peerAddr)
@@ -321,6 +322,11 @@ func TestUndeliveredReportIsOneFailedUpdateParity(t *testing.T) {
 	r := newUndeliveredReportRig(t, 0x1401)
 	r.report(t)
 	for failed := 1; failed <= 3; failed++ {
+		if failed > 1 {
+			// The failed update's data is owed, not due: a change starts
+			// the next update, which carries it (F-db021da0-3).
+			r.dev.subs.OnAttributeChanged(undeliveredReportPath)
+		}
 		r.pending(t)
 		r.exhaust()
 		r.sessionsKept(t, fmt.Sprintf("after %d failed updates", failed))
@@ -349,6 +355,9 @@ func TestDeliveredReportRestartsTheFailedUpdateCount(t *testing.T) {
 	for range 2 {
 		r.pending(t)
 		r.exhaust()
+		// The failed update's data is owed, not due: a change starts
+		// the next update (F-db021da0-3).
+		r.dev.subs.OnAttributeChanged(undeliveredReportPath)
 	}
 	counter := r.pending(t)
 	if !r.outbound.Ack(r.reportSID, counter) {
@@ -364,9 +373,12 @@ func TestDeliveredReportRestartsTheFailedUpdateCount(t *testing.T) {
 		return !counted
 	})
 	r.report(t)
-	for range 2 {
+	for i := range 2 {
 		r.pending(t)
 		r.exhaust()
+		if i == 0 {
+			r.dev.subs.OnAttributeChanged(undeliveredReportPath)
+		}
 	}
 	if _, err := r.dev.subs.Get(r.sub.ID); err != nil {
 		t.Fatalf("subscription ended after two failed updates following a delivered one: %v", err)

@@ -22,6 +22,22 @@ type State struct {
 	CurrentTarget uint8              // attribute 0x0001: uint8, O, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.TargetList = func(s []TargetInfoStruct) []TargetInfoStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TargetInfoStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.TargetList)
+	return c
+}
+
 // Patch is a change to the TargetNavigator state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

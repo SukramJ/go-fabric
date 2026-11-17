@@ -47,7 +47,7 @@ func NewKeypad(cfg KeypadConfig) (*KeypadServer, error) {
 		return port.SendKey(ctx, req)
 	})
 	srv, err := newServer(keypaddef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: KeypadInput: %w", err)
 	}

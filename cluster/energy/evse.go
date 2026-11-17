@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -140,7 +142,8 @@ const (
 // (examples/evse-app/evse-common/src/EVSEManufacturerImpl.cpp:485-525).
 type EvseHost interface {
 	// EvseEnergyMeter returns the cumulative imported (discharging false)
-	// or exported energy in mWh.
+	// or exported energy in mWh. The transfer events read it; the session
+	// energy attributes do not (stopSessionLocked).
 	EvseEnergyMeter(discharging bool) int64
 	EvseChanged(change EvseChange)
 }
@@ -162,6 +165,11 @@ type EvseConfig struct {
 	// enable timer runs on. Nil is [clock.System].
 	Clock clock.Clock
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -266,7 +274,7 @@ func NewEnergyEvse(cfg EvseConfig) (*EvseServer, error) {
 		evse.CmdGetTargets:        s.getTargets,
 		evse.CmdClearTargets:      s.clearTargets,
 	}
-	srv, err := spec.NewServer(evse.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: s.version, Sink: s})
+	srv, err := spec.NewServer(evse.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: s.version, Sink: s}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
@@ -493,15 +501,15 @@ func (s *EvseServer) IsPluggedIn() bool {
 func (s *EvseServer) Targets() []ChargingTargetSchedule {
 	s.lock()
 	defer s.unlock()
-	return cloneSchedules(s.targets)
+	return nonNilSchedules(deepcopy.Each(s.targets))
 }
 
-func cloneSchedules(in []ChargingTargetSchedule) []ChargingTargetSchedule {
-	out := make([]ChargingTargetSchedule, len(in))
-	for i, sch := range in {
-		out[i] = ChargingTargetSchedule{DayOfWeekForSequence: sch.DayOfWeekForSequence, ChargingTargets: append([]ChargingTarget(nil), sch.ChargingTargets...)}
+// nonNilSchedules is an empty list for none.
+func nonNilSchedules(in []ChargingTargetSchedule) []ChargingTargetSchedule {
+	if in == nil {
+		return []ChargingTargetSchedule{}
 	}
-	return out
+	return in
 }
 
 // --- the attribute setters with their checks (EvseCluster.cpp:47-289) ----
@@ -908,7 +916,13 @@ func (s *EvseServer) faultRaisedLocked() {
 	s.setSupplyStateLocked(SupplyDisabledError)
 }
 
-// faultClearedLocked is HandleFaultCleared (:1192-1214).
+// faultClearedLocked is HandleFaultCleared (:1192-1214): the State and
+// SupplyState saved when the fault was raised come back as they were,
+// whatever the hardware did meanwhile — an EV unplugged during the fault
+// reads PluggedInCharging with ChargingEnabled after the clear, with no
+// session — as chip's HwSetState drives the state machine during a fault
+// (:609-619) and the clear restores what it saved (review II,
+// R2-P6-fsm-1603, kept as chip's).
 func (s *EvseServer) faultClearedLocked() error {
 	if s.stateBeforeFault == nil || s.supplyBeforeFault == nil {
 		return demFailure("no state recorded before the fault")
@@ -1024,7 +1038,12 @@ func (s *EvseServer) startSessionLocked() {
 }
 
 // stopSessionLocked is EvseSession::StopSession (:1792-1797), called with
-// meter values 0 (:925).
+// meter values 0 (:925). SessionEnergyCharged and SessionEnergyDischarged
+// therefore read 0 for every session: nothing else writes them, as chip's
+// UpdateEnergyCharged / Discharged are called only from StopSession
+// (EnergyEvseDelegateImpl.cpp:1795-1796). The host's EvseEnergyMeter feeds
+// the EnergyTransferStarted / Stopped events only (review II,
+// R2-P6-fsm-1615, kept as chip's).
 func (s *EvseServer) stopSessionLocked() {
 	s.recalculateSessionDurationLocked()
 	s.forceLocked(evse.AttrSessionEnergyCharged, -s.session.chargedAtStart)
@@ -1172,7 +1191,12 @@ func (s *EvseServer) disableLocked() error {
 }
 
 // enableCharging is HandleEnableCharging (EvseCluster.cpp:472-487) over
-// EnableCharging (EvseDelegate.cpp:72-117).
+// EnableCharging (EvseDelegate.cpp:72-117). ChargingEnabledUntil, the
+// command's limit and MinimumChargeCurrent are stored and
+// MaximumChargeCurrent recomputed before HandleChargingEnabledEvent checks
+// the fault and the diagnostics (:1010-1016): a faulted EVSE answers
+// FAILURE with those changes kept, in chip's order (review II,
+// R2-P6-fsm-1616). EnableDischarging alike.
 func (s *EvseServer) enableCharging(_ context.Context, fields any) (any, error) {
 	r, err := energyRequest[evse.EnableChargingRequest]("EnableCharging", fields)
 	if err != nil {
@@ -1299,10 +1323,14 @@ func (s *EvseServer) setTargets(_ context.Context, fields any) (any, error) {
 // inside the new days takes the new targets (and keeps its own days); any
 // other loses the new days. A new schedule that replaced none is
 // appended; an eighth is RESOURCE_EXHAUSTED (:345, CHIP_ERROR_NO_MEMORY →
-// EvseDelegate.cpp:387-390). As in chip, a stored schedule whose days are
-// all taken away stays, with no days.
+// EvseDelegate.cpp:387-390). As in chip, a new schedule that replaced a
+// stored one is not appended for the days that one did not cover: with
+// Monday stored, SetTargets Monday+Tuesday leaves Monday with the new
+// targets and Tuesday stored nowhere (review II, R2-P6-fsm-1604, kept as
+// chip's; a stored schedule cannot lose all its days — its days inside the
+// new ones are the replaced case).
 func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSchedule, error) {
-	list := cloneSchedules(current)
+	list := nonNilSchedules(deepcopy.Each(current))
 	for _, n := range updates {
 		newMask := uint8(n.DayOfWeekForSequence) & evseDayOfWeekMask // :271-272
 		found := false
@@ -1311,7 +1339,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 			cur := uint8(c.DayOfWeekForSequence) & evseDayOfWeekMask // :285-286
 			a, b := cur&newMask, cur&^newMask                        // :293-294
 			if cur == a {                                            // :298-314
-				next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: TargetDays(a), ChargingTargets: append([]ChargingTarget(nil), n.ChargingTargets...)})
+				next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: TargetDays(a), ChargingTargets: deepcopy.Each(n.ChargingTargets)})
 				found = true
 				continue
 			}
@@ -1321,7 +1349,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 			if len(next) >= evseMaxTargetsDays {
 				return nil, spec.Errorf(im.StatusResourceExhausted, "energy: more than %d target schedules", evseMaxTargetsDays)
 			}
-			next = append(next, ChargingTargetSchedule{DayOfWeekForSequence: n.DayOfWeekForSequence, ChargingTargets: append([]ChargingTarget(nil), n.ChargingTargets...)})
+			next = append(next, n.Clone())
 		}
 		list = next
 	}
@@ -1332,7 +1360,7 @@ func mergeTargets(current, updates []ChargingTargetSchedule) ([]ChargingTargetSc
 func (s *EvseServer) getTargets(_ context.Context, _ any) (any, error) {
 	s.lock()
 	defer s.unlock()
-	return evse.GetTargetsResponse{ChargingTargetSchedules: cloneSchedules(s.targets)}, nil
+	return evse.GetTargetsResponse{ChargingTargetSchedules: nonNilSchedules(deepcopy.Each(s.targets))}, nil
 }
 
 // clearTargets is HandleClearTargets (EvseCluster.cpp:600-604) over
@@ -1386,11 +1414,13 @@ func (s *EvseServer) SetEndpoint(endpoint uint16) {
 	s.lock()
 	defer s.unlock()
 	s.endpoint = endpoint
+	// The store is stamped before the check, which may disable at once
+	// (review II, appinfra round 3).
+	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 	if s.quiesced {
 		s.quiesced = false
 		s.scheduleEnabledCheckLocked()
 	}
-	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 }
 
 // Close stops the enabled-until timer.

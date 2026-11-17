@@ -9,3 +9,10 @@ import "database/sql"
 // key check and its upgrade — so a test reads a sealed database under
 // another key row by row.
 func SealedWithoutCheck(db *sql.DB, s Sealer) *Store { return &Store{db: db, sealer: s} }
+
+// FabricOwnedTables are the tables RemoveFabric deletes a fabric's rows
+// from.
+func FabricOwnedTables() []string { return append([]string(nil), fabricOwnedTables...) }
+
+// SettingSealCanary is the reserved settings key of the seal mark.
+const SettingSealCanary = settingSealCanary

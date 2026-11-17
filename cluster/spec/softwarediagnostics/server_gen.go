@@ -24,6 +24,24 @@ type State struct {
 	CurrentHeapHighWatermark uint64                // attribute 0x0003: uint64, WTRMRK, R V, C
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.ThreadMetrics = func(s []ThreadMetricsStruct) []ThreadMetricsStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ThreadMetricsStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.ThreadMetrics)
+	return c
+}
+
 // Patch is a change to the SoftwareDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

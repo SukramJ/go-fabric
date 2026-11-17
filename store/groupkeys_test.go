@@ -377,8 +377,8 @@ func TestGroupKeyMapping_Remove(t *testing.T) {
 	}
 }
 
-// TestGroupKeyMapping_ListSortedByGroupID verifies ListGroupKeyMappings order.
-func TestGroupKeyMapping_ListSortedByGroupID(t *testing.T) {
+// TestGroupKeyMapping_ListInWrittenOrder verifies ListGroupKeyMappings reads the order SetGroupKeyMapping wrote (decision 148).
+func TestGroupKeyMapping_ListInWrittenOrder(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	s := store.New(openTestDB(t))
@@ -407,7 +407,7 @@ func TestGroupKeyMapping_ListSortedByGroupID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListGroupKeyMappings: %v", err)
 	}
-	expected := []uint16{1, 3, 5, 7, 9}
+	expected := []uint16{9, 3, 7, 1, 5} // the written order (decision 148)
 	for i, m := range list {
 		if m.GroupID != expected[i] {
 			t.Errorf("list[%d].GroupID=%d want %d", i, m.GroupID, expected[i])

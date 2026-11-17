@@ -5,6 +5,7 @@ package light_test
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/light"
@@ -14,8 +15,13 @@ import (
 
 // TestColorControlFieldShapes: every command takes its fields as the
 // generated request (value or pointer), as the generic tag map an
-// in-process caller hands over; any other shape is INVALID_COMMAND, and a
-// tag map value outside its field's type reads as 0.
+// in-process caller hands over; any other shape is INVALID_COMMAND. A tag
+// map is held to the statuses the generated decoder gives the wire form
+// (R2-P6-api-1411): every field is mandatory, so an absent one is
+// INVALID_COMMAND, a value that is not an integer of the field's
+// signedness is INVALID_COMMAND, and one wider than the field is
+// CONSTRAINT_ERROR. The table is the guard over every decoder: each tag of
+// each command's map is dropped in turn.
 func TestColorControlFieldShapes(t *testing.T) {
 	t.Parallel()
 	u := func(v uint64) uint64 { return v }
@@ -145,18 +151,37 @@ func TestColorControlFieldShapes(t *testing.T) {
 		if _, err := srv.MatterInvoke(context.Background(), tc.cmd, "fields"); !statusIs(err, im.StatusInvalidCommand) {
 			t.Errorf("command 0x%02X with a string: %v, want INVALID_COMMAND", tc.cmd, err)
 		}
+		for tag := range tc.tagMap {
+			m := maps.Clone(tc.tagMap)
+			delete(m, tag)
+			if _, err := srv.MatterInvoke(context.Background(), tc.cmd, m); !statusIs(err, im.StatusInvalidCommand) {
+				t.Errorf("command 0x%02X without tag %d: %v, want INVALID_COMMAND", tc.cmd, tag, err)
+			}
+			m = maps.Clone(tc.tagMap)
+			m[tag] = "x"
+			if _, err := srv.MatterInvoke(context.Background(), tc.cmd, m); !statusIs(err, im.StatusInvalidCommand) {
+				t.Errorf("command 0x%02X with a string at tag %d: %v, want INVALID_COMMAND", tc.cmd, tag, err)
+			}
+		}
 	}
-	// A tag-map value wider than its field reads as 0.
-	if _, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveToColor,
-		map[uint8]any{0: uint64(1 << 20), 1: int64(-1), 2: uint64(0), 3: uint64(0), 4: uint64(0)}); err != nil {
-		t.Fatal(err)
+	before := srv.Color()
+	for _, tc := range []struct {
+		name   string
+		cmd    uint32
+		fields map[uint8]any
+		want   im.StatusCode
+	}{
+		{"ColorX wider than uint16", ccdef.CmdMoveToColor, map[uint8]any{0: uint64(1 << 20), 1: uint64(0), 2: uint64(0), 3: uint64(0), 4: uint64(0)}, im.StatusConstraintError},
+		{"ColorY negative", ccdef.CmdMoveToColor, map[uint8]any{0: uint64(0), 1: int64(-1), 2: uint64(0), 3: uint64(0), 4: uint64(0)}, im.StatusInvalidCommand},
+		{"RateX beyond int16", ccdef.CmdMoveColor, map[uint8]any{0: uint64(1 << 63), 1: int64(0), 2: uint64(0), 3: uint64(0)}, im.StatusConstraintError},
+		{"RateY beyond int16", ccdef.CmdMoveColor, map[uint8]any{0: int64(0), 1: int64(40000), 2: uint64(0), 3: uint64(0)}, im.StatusConstraintError},
+	} {
+		if _, err := srv.MatterInvoke(context.Background(), tc.cmd, tc.fields); !statusIs(err, tc.want) {
+			t.Errorf("%s: %v, want %v", tc.name, err, tc.want)
+		}
 	}
-	if c := srv.Color(); c.X != 0 || c.Y != 0 {
-		t.Errorf("over-wide tag map values gave %d/%d, want 0/0", c.X, c.Y)
-	}
-	if _, err := srv.MatterInvoke(context.Background(), ccdef.CmdMoveColor,
-		map[uint8]any{0: uint64(1 << 63), 1: int64(40000), 2: uint64(0), 3: uint64(0)}); err != nil {
-		t.Fatal(err)
+	if c := srv.Color(); c != before {
+		t.Errorf("a refused tag map moved the colour: %+v → %+v", before, c)
 	}
 }
 

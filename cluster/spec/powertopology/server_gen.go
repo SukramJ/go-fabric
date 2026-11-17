@@ -22,6 +22,30 @@ type State struct {
 	ActiveEndpoints    []uint16 // attribute 0x0001: list[endpoint-no], DYPF, R V, N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.AvailableEndpoints = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(st.AvailableEndpoints)
+	c.ActiveEndpoints = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveEndpoints)
+	return c
+}
+
 // Patch is a change to the PowerTopology state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

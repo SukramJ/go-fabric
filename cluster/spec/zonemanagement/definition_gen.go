@@ -123,6 +123,29 @@ func (v *TwoDCartesianZoneStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TwoDCartesianZoneStruct) Clone() TwoDCartesianZoneStruct {
+	c := v
+	c.Vertices = func(s []TwoDCartesianVertexStruct) []TwoDCartesianVertexStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TwoDCartesianVertexStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Vertices)
+	c.Color = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Color)
+	return c
+}
+
 // TwoDCartesianZoneStructDef describes TwoDCartesianZoneStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -218,6 +241,21 @@ func (v *ZoneInformationStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ZoneInformationStruct) Clone() ZoneInformationStruct {
+	c := v
+	c.TwoDCartesianZone = func(p *TwoDCartesianZoneStruct) *TwoDCartesianZoneStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.TwoDCartesianZone)
+	return c
+}
+
 // ZoneInformationStructDef describes ZoneInformationStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -298,6 +336,21 @@ func (v *ZoneTriggerControlStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ZoneTriggerControlStruct) Clone() ZoneTriggerControlStruct {
+	c := v
+	c.Sensitivity = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Sensitivity)
+	return c
+}
+
 // ZoneTriggerControlStructDef describes ZoneTriggerControlStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -327,6 +380,15 @@ func (v *CreateTwoDCartesianZoneRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "CreateTwoDCartesianZone",
 		spec.Bind(0, "Zone", true, &v.Zone, spec.DecodeStruct[TwoDCartesianZoneStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CreateTwoDCartesianZoneRequest) Clone() CreateTwoDCartesianZoneRequest {
+	c := v
+	c.Zone = v.Zone.Clone()
+	return c
 }
 
 // CreateTwoDCartesianZoneResponse is the CreateTwoDCartesianZoneResponse command payload.
@@ -375,6 +437,15 @@ func (v *UpdateTwoDCartesianZoneRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UpdateTwoDCartesianZoneRequest) Clone() UpdateTwoDCartesianZoneRequest {
+	c := v
+	c.Zone = v.Zone.Clone()
+	return c
+}
+
 // RemoveZoneRequest is the RemoveZone command payload.
 type RemoveZoneRequest struct {
 	ZoneId uint16 // 0: ZoneID, M
@@ -411,6 +482,15 @@ func (v *CreateOrUpdateTriggerRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "CreateOrUpdateTrigger",
 		spec.Bind(0, "Trigger", true, &v.Trigger, spec.DecodeStruct[ZoneTriggerControlStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CreateOrUpdateTriggerRequest) Clone() CreateOrUpdateTriggerRequest {
+	c := v
+	c.Trigger = v.Trigger.Clone()
+	return c
 }
 
 // RemoveTriggerRequest is the RemoveTrigger command payload.

@@ -246,7 +246,9 @@ func TestTransferAnchorAnswersSuccess(t *testing.T) {
 
 // TestAnchorOnCommissioningComplete: a fabric with the administrator and
 // anchor CATs becomes AdministratorFabricIndex and the datastore's anchor
-// (JFAManager.cpp:95-157); its removal wipes the datastore.
+// (JFAManager.cpp:95-157); its removal, as the node tells it (the
+// administrator's OnFabricRemoved, the datastore's MatterDropFabric),
+// wipes the datastore and sets the attribute null.
 func TestAnchorOnCommissioningComplete(t *testing.T) {
 	ctx := t.Context()
 	d := newStore(t, nil)
@@ -265,8 +267,12 @@ func TestAnchorOnCommissioningComplete(t *testing.T) {
 	}
 	mustOK(t, d.AddPendingNode(ctx, 9, "n"))
 	fx.a.OnFabricRemoved(ctx, 4)
+	mustOK(t, d.MatterDropFabric(ctx, 4))
 	if len(d.NodeList()) != 0 || d.AnchorFabricIndex() != 0 {
 		t.Fatal("the anchor fabric's removal left the datastore")
+	}
+	if got := fx.a.administratorFabricIndex(); got != 0 {
+		t.Fatalf("AdministratorFabricIndex %d after its fabric's removal", got)
 	}
 }
 

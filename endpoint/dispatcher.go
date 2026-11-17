@@ -11,7 +11,9 @@ import (
 	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
@@ -299,10 +301,62 @@ func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.Co
 	case cluster.AttrGlobalAttributeList, cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList:
 		return im.StatusSuccess
 	}
-	if lister, ok := srv.(contract.ClusterAttributeLister); ok && slices.Contains(lister.MatterAttributes(), path.Attribute) {
+	// matter.js answers the existence statuses before the attribute's
+	// read-level check (AttributeReadResponse.ts:255-270 before :272).
+	// Here a listed attribute is known to exist and the access checks
+	// decide; an attribute the server does not list is known only by
+	// reading it, which a refused request does not get to do — so a
+	// refused requester is answered UNSUPPORTED_ACCESS for an attribute
+	// that may not exist, where matter.js answers UNSUPPORTED_ATTRIBUTE.
+	// Fail-closed; recorded (fable-read-6a-gate §1).
+	listed := false
+	if lister, ok := srv.(contract.ClusterAttributeLister); ok {
+		listed = slices.Contains(lister.MatterAttributes(), path.Attribute)
+	}
+	if !d.readAuthorized(ctx, path) || !readAllowed(ctx, srv, path.Attribute) {
+		return im.StatusUnsupportedAccess
+	}
+	if listed {
 		return im.StatusSuccess
 	}
 	return readOne(ctx, ep, srv, path).Status
+}
+
+// readAuthorized asks the subject's access check the request carries
+// ([im.LookupAuthority]) at path's resolved location with the attribute's
+// read privilege, before the server is read there: a subject without the
+// grant drives no read of the server (R2-P6-bound-0405). matter.js
+// authorises a location before it reads the value
+// (packages/protocol/src/action/server/AttributeReadResponse.ts:250, :272
+// at db021da0). A request without a stamped check — PASE, a local caller,
+// an im without an ACL checker — is not asked here; im's per-result check
+// stays the gate of what is reported.
+func (d *TopologyDispatcher) readAuthorized(ctx context.Context, path im.ConcreteAttributePath) bool {
+	authority, ok := im.LookupAuthority(ctx)
+	if !ok {
+		return true
+	}
+	return authority(path.Endpoint, path.Cluster, d.MinReadPrivilege(path.Endpoint, path.Cluster, path.Attribute)).IsSuccess()
+}
+
+// readAllowed asks a [contract.ReadAccessDeclarer] whether the request
+// behind ctx may read attrID, before the server's read runs (decision
+// 152, R2-P6-sec-1103's read half). A read without a request behind it
+// — a local caller ([im.LookupFabricFilter]) — and a server that
+// declares nothing are allowed. The refusal is answered as the access
+// check's: UNSUPPORTED_ACCESS on a fully concrete path, the attribute
+// skipped under a wildcard — matter.js AttributeReadResponse.ts:272 with
+// :473-475 (concrete path: UNSUPPORTED_ACCESS) and :406-413 (wildcard:
+// the attribute is skipped), and chip src/app/reporting/Engine.cpp:81-88.
+func readAllowed(ctx context.Context, srv contract.ClusterServer, attrID uint32) bool {
+	decl, ok := srv.(contract.ReadAccessDeclarer)
+	if !ok {
+		return true
+	}
+	if _, _, request := im.LookupFabricFilter(ctx); !request {
+		return true
+	}
+	return decl.MatterReadAllowed(ctx, attrID)
 }
 
 // ExpansionEndpoints implements [im.EndpointExpander]: the ids of the
@@ -354,6 +408,7 @@ func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.C
 		}
 		return append(results, im.ReadResult{Path: ePath, Status: im.StatusUnsupportedCluster})
 	}
+	concrete := path.HasEndpoint && path.HasCluster && path.HasAttribute
 	for _, srv := range servers {
 		cPath := ePath
 		cPath.Cluster = srv.MatterClusterID()
@@ -364,6 +419,12 @@ func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.C
 			aPath := cPath
 			aPath.Attribute = attrID
 			aPath.HasAttribute = true
+			if !d.readAuthorized(ctx, aPath) || !readAllowed(ctx, srv, attrID) {
+				if concrete {
+					results = append(results, im.ReadResult{Path: aPath, Status: im.StatusUnsupportedAccess})
+				}
+				continue
+			}
 			res := readOne(ctx, ep, srv, aPath)
 			if wildcardEndpoint && res.Status != im.StatusSuccess {
 				continue
@@ -507,20 +568,33 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// An attribute with the timed access quality outside a
 				// timed interaction (the check below the access gate).
 				timedRefused := timedKnown && !timed && d.isTimedWrite(aPath.Cluster, aPath.Attribute)
-				// A path with a numeric ListIndex meets the timed check
-				// before authorize: im's authorizer for it ends the
-				// interaction where the value would be written
-				// (im.listIndexGate), which matter.js does in writeValue,
-				// after the timed check
-				// (packages/protocol/src/action/server/AttributeWriteResponse.ts:243-247,
-				// :343-345 before :419-424 at db021da0). The order against
+				// The accessing-fabric gate of a fabric-scoped attribute
+				// (RW-i3): a request without an accessing fabric does not
+				// write it, for every server, a declarer's attribute
+				// included — im's gate knows only the snapshot's.
+				// matter.js answers it after the timed check
+				// (AttributeWriteResponse.ts:248-251 at db021da0).
+				scope := fabricScopeFor(ctx, srv, attrID)
+				noFabric := scope != nil && !im.HasAccessingFabric(scope.Fabric)
+				// A path whose value im's authorizer ends the interaction
+				// at — a numeric ListIndex, a value its type cannot decode
+				// (im.UndecodableValue) — meets the timed and fabric checks
+				// before authorize, so the gate fires where the value would
+				// be written, which matter.js does in writeValue
+				// (packages/protocol/src/action/server/AttributeWriteResponse.ts:243-251,
+				// :343-345 before :419-429 at db021da0). The order against
 				// the access check is kept: on a concrete path im decided
 				// access before dispatch and the authorizer is the gate
-				// alone, on a wildcard path both refusals skip the
+				// alone, on a wildcard path every refusal skips the
 				// attribute without a status.
-				if timedRefused && path.HasListIndex && !path.ListAppend {
+				gated := (path.HasListIndex && !path.ListAppend) || im.IsUndecodable(value)
+				if gated && (timedRefused || noFabric) {
 					if !wildcardEndpoint && path.HasAttribute {
-						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusNeedsTimedInteraction})
+						status := im.StatusNeedsTimedInteraction
+						if !timedRefused {
+							status = im.StatusUnsupportedAccess
+						}
+						results = append(results, im.WriteResult{Path: aPath, Status: status})
 					}
 					continue
 				}
@@ -557,6 +631,20 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					}
 					continue
 				}
+				if noFabric {
+					if !wildcardEndpoint && path.HasAttribute {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedAccess})
+					}
+					continue
+				}
+				// A value its attribute's type cannot decode reaches no
+				// server (owner decision 161). Behind im's gate this place
+				// is not reached; a caller without one gets FAILURE for
+				// the path.
+				if im.IsUndecodable(value) {
+					results = append(results, im.WriteResult{Path: aPath, Status: im.StatusFailure})
+					continue
+				}
 
 				writeCtx := ctx
 				// The value written at this location: the request's own
@@ -579,6 +667,16 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					// only the last element is new (AccessControl reports
 					// just that one as Added).
 					writeCtx = im.WithListAppendWrite(ctx)
+				}
+				// Every entry of a written fabric-scoped value carries the
+				// accessing fabric, whatever the request wrote
+				// (R2-P6-acl-0402). matter.js injects
+				// the accessing fabric into every decoded write value
+				// ("We always inject the current fabricIndex for writes",
+				// packages/protocol/src/action/server/AttributeWriteResponse.ts:466-473
+				// at db021da0) before the behaviour sees it.
+				if scope != nil {
+					v.Value = stampAccessingFabric(v.Value, scope.Fabric)
 				}
 				// The written value against the cluster's definition,
 				// before any server runs (owner decision 64): what
@@ -616,11 +714,12 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 	return results
 }
 
-// Invoke implements [im.Dispatcher]. CommandPath has no wildcard
-// fields in our supported subset (Matter §10.6.7 lets EndpointID
-// wildcard for InvokeRequest only when the cluster is universally
-// addressable — none of ours are), so this is always a concrete
-// dispatch returning exactly one [im.InvokeResult].
+// Invoke implements [im.Dispatcher]. It dispatches a concrete command
+// path and returns exactly one [im.InvokeResult]; a path without an
+// endpoint is answered UnsupportedEndpoint here. A wildcard-endpoint
+// command — a group command's only shape — goes through
+// [TopologyDispatcher.InvokeAuthorized] instead, which dispatches it to
+// every endpoint that hosts the cluster (R2-P6-doc-0407).
 func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields any) im.InvokeResult {
 	if !path.HasEndpoint {
 		return im.InvokeResult{Path: path, Status: im.StatusUnsupportedEndpoint}
@@ -656,7 +755,7 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 		return im.StatusUnsupportedEndpoint
 	}
 	for _, srv := range ClusterServers(ep) {
-		if srv == nil || srv.MatterClusterID() != path.Cluster {
+		if srv.MatterClusterID() != path.Cluster {
 			continue
 		}
 		if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), path.Command) {
@@ -685,7 +784,7 @@ func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.Statu
 		return im.StatusUnsupportedEndpoint
 	}
 	for _, srv := range ClusterServers(ep) {
-		if srv == nil || srv.MatterClusterID() != path.Cluster {
+		if srv.MatterClusterID() != path.Cluster {
 			continue
 		}
 		var events []uint32
@@ -723,6 +822,13 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
 		if err != nil {
 			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err)
+		} else {
+			// As the concrete path does ([TopologyDispatcher.Invoke]):
+			// matter.js runs a wildcard-endpoint or group invoke per
+			// endpoint exactly as a concrete one
+			// (CommandInvokeResponse.ts:330-358), and the scene
+			// invalidation is the command's (R2-P6-par-0404).
+			t.ep.invalidateSceneOnCommand(t.srv, path.Cluster)
 		}
 		results = append(results, res)
 	}
@@ -755,7 +861,7 @@ func (d *TopologyDispatcher) commandTargets(path im.ConcreteCommandPath, authori
 	var out []commandTarget
 	for _, ep := range d.resolveEndpoints(im.ConcreteAttributePath{}) {
 		for _, srv := range ClusterServers(ep) {
-			if srv == nil || srv.MatterClusterID() != path.Cluster {
+			if srv.MatterClusterID() != path.Cluster {
 				continue
 			}
 			if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), path.Command) {
@@ -962,8 +1068,9 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 	}
 	// Cluster did not handle the read. Try synthesising the value if
 	// it is a global-attribute ID — this lets every cluster expose
-	// AttributeList / AcceptedCommandList / GeneratedCommandList /
-	// EventList automatically. The cluster-internal MatterRead still
+	// AttributeList / AcceptedCommandList / GeneratedCommandList
+	// automatically (EventList is not synthesised, see
+	// [synthesizeGlobalRead]). The cluster-internal MatterRead still
 	// wins when it returns a value (so clusters that want a richer
 	// AcceptedCommandList can override).
 	if synth, synthOK := synthesizeGlobalRead(srv, path.Attribute); synthOK {
@@ -1055,8 +1162,9 @@ func fabricScopedReadFailed(ctx context.Context, srv contract.ClusterServer, att
 func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool) {
 	switch attrID {
 	case cluster.AttrGlobalAttributeList:
-		// EventList (0xFFFA) intentionally omitted — see comment in
-		// expandWildcardForCluster. Apple's iOS Matter SDK rejects the
+		// EventList (0xFFFA) intentionally omitted — see the EventList
+		// arm below and [TopologyDispatcher.attributesFor], which leaves
+		// it out of a wildcard read's expansion. Apple's iOS Matter SDK rejects the
 		// whole ReportData stream when AttributeList advertises
 		// EventList but the SDK lacks the Matter 1.4 schema for it.
 		seen := map[uint32]struct{}{
@@ -1108,9 +1216,12 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 		// other value) makes Apple drop the whole ReportData stream
 		// with `MTRErrorDomain Code=12 "No known schema for decoding
 		// attribute value."` and abort the pair via HAPErrorDomain
-		// Code=14. Treat the attribute as unsupported (return false)
-		// so the dispatcher emits StatusUnsupportedAttribute, which
-		// Apple's IM-Decoder handles cleanly. matter.js / chip-tool
+		// Code=14. Treat the attribute as unsupported (return false):
+		// a concrete read of it is answered StatusUnsupportedAttribute,
+		// which Apple's IM-Decoder handles cleanly; a wildcard read never
+		// names it (attributesFor leaves it out), and an attribute a
+		// wildcard endpoint cannot serve is skipped, not reported
+		// (N4-read-1). matter.js / chip-tool
 		// tolerate the absence; re-enable once Apple advances to
 		// Matter 1.4 SDK schema.
 		return nil, false
@@ -1551,7 +1662,7 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		}
 		return checkGroupACL(entries, group, ep, endpoint, clusterID, requiredPrivilege, auxEnabled)
 	}
-	var best store.Privilege
+	var granted privilegeSet
 	for _, e := range entries {
 		// Operational unicast sessions are CASE-authenticated; only CASE
 		// entries apply (Group = multicast, PASE = commissioning).
@@ -1564,11 +1675,9 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		if !aclTargetMatches(e.Targets, ep, endpoint, clusterID) {
 			continue
 		}
-		if e.Privilege > best {
-			best = e.Privilege
-		}
+		granted |= grantedBy(e.Privilege)
 	}
-	if privilegeRank(uint8(best)) >= privilegeRank(requiredPrivilege) {
+	if granted.grants(requiredPrivilege) {
 		return im.StatusSuccess
 	}
 	return im.StatusUnsupportedAccess
@@ -1589,7 +1698,7 @@ func (d *TopologyDispatcher) auxiliaryAdvertised() bool {
 		return false
 	}
 	for _, srv := range ClusterServers(root) {
-		if srv == nil || srv.MatterClusterID() != 0x001F {
+		if srv.MatterClusterID() != 0x001F {
 			continue
 		}
 		v, ok := srv.MatterRead(0xFFFC)
@@ -1617,10 +1726,15 @@ func (d *TopologyDispatcher) auxiliaryAdvertised() bool {
 // (FabricAccessControl #getGrantedPrivileges: "Group subjects cannot grant
 // access to Endpoint 0 when Auxiliary feature is enabled").
 func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint, endpoint uint16, clusterID uint32, requiredPrivilege uint8, auxEnabled bool) im.StatusCode {
+	// The module's one producer of a GroupSubject always sets the mapping
+	// (bridge/group_messaging.go from groups.Message), so this branch has
+	// no case in its own wiring; it is the fail-closed default of a
+	// public type whose zero value must deny (N4-w3gc-1).
 	if !group.HasValidMapping {
 		return im.StatusUnsupportedAccess
 	}
-	var best store.Privilege
+	var granted privilegeSet
+	sawAdminister := false
 	for _, e := range entries {
 		if e.AuthMode != store.AuthModeGroup {
 			continue
@@ -1634,14 +1748,15 @@ func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint
 		if !aclTargetMatches(e.Targets, ep, endpoint, clusterID) {
 			continue
 		}
-		if e.Privilege > best {
-			best = e.Privilege
+		if e.Privilege == store.PrivilegeAdminister {
+			sawAdminister = true
 		}
+		granted |= grantedBy(e.Privilege)
 	}
-	if best == store.PrivilegeAdminister {
+	if sawAdminister {
 		return im.StatusUnsupportedAccess
 	}
-	if privilegeRank(uint8(best)) >= privilegeRank(requiredPrivilege) {
+	if granted.grants(requiredPrivilege) {
 		return im.StatusSuccess
 	}
 	return im.StatusUnsupportedAccess
@@ -1672,9 +1787,16 @@ func aclSubjectMatches(subjects []uint64, subjectNodeID uint64, subjectCATs []ui
 			}
 			continue
 		}
-		// Operational node id: exact match. Group ids cannot appear under
-		// AuthMode=CASE — chip src/access/AccessControl.cpp:492 enforces
-		// the AuthMode-vs-subject coupling; we conservatively drop them.
+		// Operational node id: exact match. A subject of another kind
+		// under AuthMode=CASE (a group id, say) matches no one here and the
+		// check goes on to the entry's other subjects and the other
+		// entries. chip ends the whole check instead — its
+		// VerifyOrReturnError(..., CHIP_ERROR_INCORRECT_STATE) at
+		// src/access/AccessControl.cpp:475, :484, :493 (and :500-504 for
+		// any other subject) at 6170af84 returns an error out of CheckACL,
+		// so no later entry is consulted; the subject grants nothing in
+		// either (R2-P6-doc-0445). The ACL write validation should never
+		// store such an entry.
 		if subjectNodeID != 0 && s == subjectNodeID {
 			return true
 		}
@@ -1732,24 +1854,54 @@ func matchesCATSubject(entryCAT uint32, subjectCATs []uint32) bool {
 // its Descriptor DeviceTypeList — the resolver behind device-type ACL
 // targets (chip AccessControl.h:53 DeviceTypeResolver /
 // ProviderDeviceTypeResolver.h:34, backed by the data model's
-// per-endpoint device-type list). The list mirrors what the Descriptor
-// cluster serves: RootNode for EP 0, Aggregator for EP 1, and the
-// primary device type + BridgedNode for bridged endpoints (see
-// materialize.go DeviceTypeList assembly).
+// per-endpoint device-type list). It answers from the endpoint's whole
+// list, not its primary device type alone (R2-P6-acl-0443): a bridged
+// endpoint or a part from [listedDeviceTypes], the one function its
+// Descriptor is built from, so the two cannot disagree; the root, the
+// Aggregator and a bare endpoint from the DeviceTypeList of the
+// Descriptor published on them, and — when none is published — RootNode,
+// Aggregator or the endpoint's own device type.
 func endpointHasDeviceType(ep *Endpoint, deviceType uint32) bool {
 	if ep == nil {
 		return false
 	}
-	switch {
-	case ep.IsRoot():
-		return deviceType == deviceTypeRootNode
-	case ep.IsAggregator():
-		return deviceType == deviceTypeAggregator
-	case ep.Part:
-		return deviceType == uint32(ep.DeviceType)
-	default:
-		return deviceType == uint32(ep.DeviceType) || deviceType == matterDeviceTypeBridgedNode
+	if ep.IsRoot() || ep.IsAggregator() || ep.IsBare() {
+		if listed, ok := attachedDescriptorDeviceTypes(ep); ok {
+			for _, dt := range listed {
+				if dt.DeviceType == deviceType {
+					return true
+				}
+			}
+			return false
+		}
+		switch {
+		case ep.IsRoot():
+			return deviceType == deviceTypeRootNode
+		case ep.IsAggregator():
+			return deviceType == deviceTypeAggregator
+		default:
+			return deviceType == uint32(ep.DeviceType)
+		}
 	}
+	return deviceType <= 0xFFFF && slices.Contains(listedDeviceTypes(ep), uint16(deviceType))
+}
+
+// attachedDescriptorDeviceTypes returns the DeviceTypeList of the
+// Descriptor published on ep, false when none is published.
+func attachedDescriptorDeviceTypes(ep *Endpoint) ([]mattercore.DeviceTypeStruct, bool) {
+	for _, srv := range ep.AttachedClusterServers() {
+		desc, ok := srv.(*mattercore.Descriptor)
+		if !ok {
+			continue
+		}
+		v, ok := desc.MatterRead(descdef.AttrDeviceTypeList)
+		if !ok {
+			return nil, false
+		}
+		list, ok := v.([]mattercore.DeviceTypeStruct)
+		return list, ok
+	}
+	return nil, false
 }
 
 // aclTargetMatches reports whether an ACL entry's target list covers
@@ -1778,22 +1930,38 @@ func aclTargetMatches(targets []store.ACLTarget, ep *Endpoint, endpoint uint16, 
 	return false
 }
 
-// privilegeRank maps a Matter privilege to its hierarchy rank so a higher
-// privilege satisfies a lower requirement (Administer > Manage > Operate >
-// View; ProxyView grants View-level access). Matter §9.10.5.3.
-func privilegeRank(p uint8) int {
-	switch store.Privilege(p) {
-	case store.PrivilegeAdminister:
-		return 4
-	case store.PrivilegeManage:
-		return 3
+// privilegeSet is the set of privileges an access check granted, one bit
+// per [store.Privilege] value.
+type privilegeSet uint8
+
+// grantedBy returns the privileges an entry of privilege p grants: each
+// one the privileges it subsumes, as a set rather than a rank because
+// ProxyView sits beside the hierarchy — it brings View, and Operate,
+// Manage and Administer do not bring it (R2-P6-acl-0408; matter.js
+// packages/protocol/src/interaction/FabricAccessControl.ts:148-173,
+// #addGrantedPrivilege). An unknown value grants nothing.
+func grantedBy(p store.Privilege) privilegeSet {
+	bit := func(q store.Privilege) privilegeSet { return 1 << q }
+	switch p {
+	case store.PrivilegeView:
+		return bit(store.PrivilegeView)
+	case store.PrivilegeProxyView:
+		return bit(store.PrivilegeProxyView) | bit(store.PrivilegeView)
 	case store.PrivilegeOperate:
-		return 2
-	case store.PrivilegeView, store.PrivilegeProxyView:
-		return 1
+		return bit(store.PrivilegeOperate) | bit(store.PrivilegeView)
+	case store.PrivilegeManage:
+		return bit(store.PrivilegeManage) | bit(store.PrivilegeOperate) | bit(store.PrivilegeView)
+	case store.PrivilegeAdminister:
+		return bit(store.PrivilegeAdminister) | bit(store.PrivilegeManage) | bit(store.PrivilegeOperate) | bit(store.PrivilegeView)
 	default:
 		return 0
 	}
+}
+
+// grants reports whether the set holds the required privilege. A
+// requirement outside the five privileges is satisfied by nothing.
+func (s privilegeSet) grants(required uint8) bool {
+	return required >= uint8(store.PrivilegeView) && required <= uint8(store.PrivilegeAdminister) && s&(1<<required) != 0
 }
 
 // CurrentDataVersion implements [im.DataVersionReader]. It looks up the
@@ -1933,4 +2101,82 @@ func writersEntries(list reflect.Value, fabric uint8, filteredRead bool) (reflec
 		}
 	}
 	return out, im.StatusSuccess
+}
+
+// stampAccessingFabric returns value with the FabricIndex of every entry
+// set to fabric: a list (or a single struct) whose element is a struct, or
+// a pointer to one, with a field FabricIndex of type uint8 or *uint8 —
+// the name every generated struct gives field 254 (cluster/spec/*/
+// definition_gen.go), and the module's hand-decoded entry types. The
+// result is a copy: the request's value, which a group write hands every
+// resolved location, is not changed. A value of any other shape is
+// returned as it is.
+func stampAccessingFabric(value any, fabric uint8) any {
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() {
+		return value
+	}
+	switch rv.Kind() {
+	case reflect.Slice:
+		if _, octets := value.([]byte); octets || !stampable(rv.Type().Elem()) {
+			return value
+		}
+		out := reflect.MakeSlice(rv.Type(), rv.Len(), rv.Len())
+		for i := range rv.Len() {
+			out.Index(i).Set(stampedCopy(rv.Index(i), fabric))
+		}
+		return out.Interface()
+	case reflect.Struct, reflect.Pointer:
+		if !stampable(rv.Type()) {
+			return value
+		}
+		return stampedCopy(rv, fabric).Interface()
+	default:
+		return value
+	}
+}
+
+// stampable reports whether t is a struct, or a pointer to one, with a
+// settable FabricIndex field of type uint8 or *uint8.
+func stampable(t reflect.Type) bool {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return false
+	}
+	f, ok := t.FieldByName("FabricIndex")
+	if !ok || !f.IsExported() || len(f.Index) != 1 {
+		return false
+	}
+	u8 := reflect.TypeFor[uint8]()
+	return f.Type == u8 || (f.Type.Kind() == reflect.Pointer && f.Type.Elem() == u8)
+}
+
+// stampedCopy returns a copy of the struct (or of the struct behind the
+// pointer) el with FabricIndex set to fabric; a nil pointer stays nil.
+func stampedCopy(el reflect.Value, fabric uint8) reflect.Value {
+	if el.Kind() == reflect.Pointer {
+		if el.IsNil() {
+			return el
+		}
+		cp := reflect.New(el.Type().Elem())
+		cp.Elem().Set(el.Elem())
+		setFabricIndex(cp.Elem(), fabric)
+		return cp
+	}
+	cp := reflect.New(el.Type()).Elem()
+	cp.Set(el)
+	setFabricIndex(cp, fabric)
+	return cp
+}
+
+func setFabricIndex(st reflect.Value, fabric uint8) {
+	f := st.FieldByName("FabricIndex")
+	if f.Kind() == reflect.Pointer {
+		v := fabric
+		f.Set(reflect.ValueOf(&v))
+		return
+	}
+	f.SetUint(uint64(fabric))
 }

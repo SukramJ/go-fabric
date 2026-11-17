@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/operational"
 )
 
@@ -27,12 +28,16 @@ func TestLivePeerSessionNewestByPeerActivity(t *testing.T) {
 		olderSID = uint16(0x0B01)
 		newerSID = uint16(0x0B02)
 	)
-	older, err := dev.sessions.OpenFromSigmaWithID(olderSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C01, nil, peerLossKeys(t))
+	olderEntry, err := sessionseam.OpenAt(dev.sessions, olderSID, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C01, nil, peerLossKeys(t))
 	if err != nil {
 		t.Fatal(err)
 	}
+	older, ok := olderEntry.(*operational.Entry)
+	if !ok {
+		t.Fatalf("OpenAt installed %T", olderEntry)
+	}
 	stamp.step(time.Millisecond)
-	if _, err := dev.sessions.OpenFromSigmaWithID(newerSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C02, nil, peerLossKeys(t)); err != nil {
+	if _, err := sessionseam.OpenAt(dev.sessions, newerSID, false, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, 0x0C02, nil, peerLossKeys(t)); err != nil {
 		t.Fatal(err)
 	}
 	udp := &net.UDPAddr{IP: net.IPv6loopback, Port: 5541}

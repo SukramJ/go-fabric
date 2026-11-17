@@ -73,12 +73,11 @@ func New(opts Options) (*Camera, error) {
 	}
 	port := opts.Port
 	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView, csdef.StreamUsageRecording}
-	off := false
 	streams := []csdef.VideoStreamStruct{{
 		VideoStreamId: AllocatedVideoStream, StreamUsage: csdef.StreamUsageLiveView, VideoCodec: csdef.VideoCodecH264,
 		MinFrameRate: 15, MaxFrameRate: 30,
 		MinResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxResolution: csdef.VideoResolutionStruct{Width: 1280, Height: 720},
-		MinBitRate: 100_000, MaxBitRate: 2_000_000, KeyFrameInterval: 4000, WatermarkEnabled: &off, OsdEnabled: &off,
+		MinBitRate: 100_000, MaxBitRate: 2_000_000, KeyFrameInterval: 4000, // no WatermarkEnabled, OSDEnabled: the camera has neither WMARK nor OSD (R2-P6-par-1304)
 	}}
 	points := []csdef.RateDistortionTradeOffPointsStruct{{Codec: csdef.VideoCodecH264, Resolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MinBitRate: 100_000}}
 	sensor := csdef.VideoSensorParamsStruct{SensorWidth: 1920, SensorHeight: 1080, MaxFps: 30}

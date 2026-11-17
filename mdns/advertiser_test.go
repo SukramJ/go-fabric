@@ -6,6 +6,8 @@ package mdns_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"sync"
 	"testing"
 
@@ -211,4 +213,39 @@ func TestNoop_Concurrent_Race(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// TestNoop_Active_PublishOrder holds R2-P6-api-0228: Noop lists in
+// publish order, a re-published service in its first place and a
+// withdrawn one gone, as Responder.Active does.
+func TestNoop_Active_PublishOrder(t *testing.T) {
+	t.Parallel()
+	n := mdns.NewNoop()
+	ctx := context.Background()
+	var want []string
+	for i := range 24 {
+		svc := validService(t)
+		svc.InstanceName = fmt.Sprintf("inst-%02d", i)
+		if err := n.Publish(ctx, svc); err != nil {
+			t.Fatalf("Publish %d: %v", i, err)
+		}
+		want = append(want, svc.InstanceName)
+	}
+	again := validService(t)
+	again.InstanceName = "inst-05"
+	if err := n.Publish(ctx, again); err != nil {
+		t.Fatalf("re-Publish: %v", err)
+	}
+	if err := n.Withdraw(ctx, "inst-10", again.ServiceType); err != nil {
+		t.Fatalf("Withdraw: %v", err)
+	}
+	want = slices.DeleteFunc(want, func(s string) bool { return s == "inst-10" })
+	active := n.Active()
+	got := make([]string, 0, len(active))
+	for _, s := range active {
+		got = append(got, s.InstanceName)
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Active order = %v, want publish order %v", got, want)
+	}
 }

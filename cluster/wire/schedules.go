@@ -169,17 +169,17 @@ func (s *SchedulesServer) MatterRead(attrID uint32) (any, bool) {
 		// Optional attribute; this bridge does not assign programming handles.
 		return nil, false
 	case SchedulesAttrNextScheduleHandle:
-		// Optional attribute; the CCU drives schedule activation, not Matter.
+		// Optional attribute; the host drives schedule activation, not Matter.
 		return nil, false
 	case SchedulesAttrNumberOfSchedules:
 		groups := groupByDay(s.src.MatterScheduleEntries())
 		return uint8(len(groups)), true //nolint:gosec // count bounded by number of week days (≤7); see #20
 	case SchedulesAttrNumberOfScheduleTransitions:
 		entries := s.src.MatterScheduleEntries()
-		return uint8(len(entries)), true //nolint:gosec // count bounded by CCU profile capacity (≤168); see #20
+		return uint8(len(entries)), true //nolint:gosec // wraps past 255 entries: the stub is deprecated and kept as it is for its window (R2-P6-api-1215)
 	case SchedulesAttrNumberOfScheduleTransitionsPerDay:
 		groups := groupByDay(s.src.MatterScheduleEntries())
-		return uint8(maxPerDay(groups)), true //nolint:gosec // per-day max bounded by CCU profile; see #20
+		return uint8(maxPerDay(groups)), true //nolint:gosec // wraps past 255 entries: the stub is deprecated and kept as it is for its window (R2-P6-api-1215)
 	case SchedulesAttrSchedules:
 		groups := groupByDay(s.src.MatterScheduleEntries())
 		if len(groups) == 0 {

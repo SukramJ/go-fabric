@@ -46,6 +46,32 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrFabrics, spec.List[FabricDescriptorStruct]([]FabricDescriptorStruct{FabricDescriptorStruct{RootPublicKey: []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, VendorId: uint16(1), FabricId: uint64(1), NodeId: uint64(1), Label: "x", VidVerificationStatement: spectest.Ptr([]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}), FabricIndex: uint8(1)}}))
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[FabricDescriptorStruct],
+		spectest.CheckClone[NOCStruct],
+		spectest.CheckClone[AttestationRequestRequest],
+		spectest.CheckClone[AttestationResponse],
+		spectest.CheckClone[CertificateChainResponse],
+		spectest.CheckClone[CsrRequestRequest],
+		spectest.CheckClone[CsrResponse],
+		spectest.CheckClone[AddNocRequest],
+		spectest.CheckClone[UpdateNocRequest],
+		spectest.CheckClone[NocResponse],
+		spectest.CheckClone[AddTrustedRootCertificateRequest],
+		spectest.CheckClone[SetVidVerificationStatementRequest],
+		spectest.CheckClone[SignVidVerificationRequestRequest],
+		spectest.CheckClone[SignVidVerificationResponse],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedState holds Patch, State and StateFrom against each other.
 func TestTypedState(t *testing.T) {
 	t.Parallel()

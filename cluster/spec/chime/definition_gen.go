@@ -96,6 +96,21 @@ func (v *PlayChimeSoundRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PlayChimeSoundRequest) Clone() PlayChimeSoundRequest {
+	c := v
+	c.ChimeId = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ChimeId)
+	return c
+}
+
 // ChimeStartedPlayingEvent is the ChimeStartedPlaying event payload.
 type ChimeStartedPlayingEvent struct {
 	ChimeId uint8 // 0: uint8, M

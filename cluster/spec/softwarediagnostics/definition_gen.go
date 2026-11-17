@@ -84,6 +84,42 @@ func (v *ThreadMetricsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ThreadMetricsStruct) Clone() ThreadMetricsStruct {
+	c := v
+	c.Name = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Name)
+	c.StackFreeCurrent = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StackFreeCurrent)
+	c.StackFreeMinimum = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StackFreeMinimum)
+	c.StackSize = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StackSize)
+	return c
+}
+
 // ThreadMetricsStructDef describes ThreadMetricsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -132,6 +168,35 @@ func (v *SoftwareFaultEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Name", false, &v.Name, spec.DecodeOptional(spec.DecodeStringIn(0, 8))),
 		spec.Bind(2, "FaultRecording", false, &v.FaultRecording, spec.DecodeOptional(spec.DecodeBytesIn(0, 1024))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SoftwareFaultEvent) Clone() SoftwareFaultEvent {
+	c := v
+	c.Name = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Name)
+	c.FaultRecording = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.FaultRecording)
+	return c
 }
 
 func decodeResetWatermarksRequest(n spec.Node) (any, error) {

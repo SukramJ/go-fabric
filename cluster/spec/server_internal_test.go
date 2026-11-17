@@ -3,7 +3,10 @@
 
 package spec
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 // TestStoredForm holds the Go type a checked value is kept in to the
 // width the definition states.
@@ -62,5 +65,19 @@ func TestUnderlying(t *testing.T) {
 	}
 	if got, ok := underlying(bytes).([]byte); !ok || &got[0] != &bytes[0] {
 		t.Errorf("a slice is returned as given: %#v", got)
+	}
+}
+
+// TestCheckInStateRefusesAnUndefinedAttribute: a device-side value for an
+// attribute the definition does not define is refused as an invalid value,
+// before any check reads it (review II, wave 1's sibling-bound checks).
+func TestCheckInStateRefusesAnUndefinedAttribute(t *testing.T) {
+	t.Parallel()
+	srv, err := NewServer(&Cluster{ID: 0xFFF1FC0E, Name: "Empty", Revision: 1}, Options{}, ServerConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.checkInState(0x10, uint8(1), unresolvedPeers); !errors.Is(err, ErrInvalidValue) {
+		t.Errorf("checkInState of an undefined attribute = %v, want ErrInvalidValue", err)
 	}
 }

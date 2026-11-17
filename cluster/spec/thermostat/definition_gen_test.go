@@ -59,6 +59,34 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrCurrentThermostatSuggestion, ThermostatSuggestionStruct{UniqueId: uint8(1), PresetHandle: []byte{1}, EffectiveTime: uint32(1), ExpirationTime: uint32(1)})
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[PresetStruct],
+		spectest.CheckClone[ScheduleStruct],
+		spectest.CheckClone[ScheduleTransitionStruct],
+		spectest.CheckClone[ThermostatSuggestionStruct],
+		spectest.CheckClone[SetActiveScheduleRequestRequest],
+		spectest.CheckClone[SetActivePresetRequestRequest],
+		spectest.CheckClone[AddThermostatSuggestionRequest],
+		spectest.CheckClone[AtomicResponse],
+		spectest.CheckClone[AtomicRequestRequest],
+		spectest.CheckClone[SystemModeChangeEvent],
+		spectest.CheckClone[OccupancyChangeEvent],
+		spectest.CheckClone[SetpointChangeEvent],
+		spectest.CheckClone[RunningStateChangeEvent],
+		spectest.CheckClone[RunningModeChangeEvent],
+		spectest.CheckClone[ActiveScheduleChangeEvent],
+		spectest.CheckClone[ActivePresetChangeEvent],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

@@ -320,11 +320,7 @@ next:
 func cloneTags(tags []SemanticTag) []SemanticTag {
 	out := make([]SemanticTag, len(tags))
 	for i, t := range tags {
-		if t.Label != nil {
-			l := *t.Label
-			t.Label = &l
-		}
-		out[i] = t
+		out[i] = t.Clone() // the generated deep copy (decision 142)
 	}
 	return out
 }
@@ -373,14 +369,14 @@ func (d *Descriptor) MatterReportable() []uint32 {
 //
 // FeatureMap (0xFFFC) and ClusterRevision (0xFFFD) are included explicitly
 // here in addition to being prepended by the dispatcher's global-attribute
-// expansion (dispatcher.go:265). The explicit listing ensures that any
+// expansion (the attributesFor and synthesizeGlobalRead lists of
+// endpoint/dispatcher.go). The explicit listing ensures that any
 // Subscribe wildcard on a Descriptor cluster sees these attributes even if
 // the dispatcher's global prepend behaviour changes, and closes the Apple
 // cache-drop for EP14/EP28 Descriptor.FeatureMap / ClusterRevision.
-// Mirrors chip src/app/clusters/descriptor/descriptor.cpp which serves
-// FeatureMap=0 and ClusterRevision via the standard
-// AttributeAccessInterface global-attribute mechanism on every
-// endpoint, including bridged ones.
+// Mirrors chip src/app/clusters/descriptor/DescriptorCluster.cpp:191-205 (DescriptorCluster::ReadAttribute):
+// FeatureMap carries the TagList bit only when the endpoint has semantic tags, 0 otherwise, and
+// ClusterRevision is Descriptor::kRevision.
 func (d *Descriptor) MatterAttributes() []uint32 {
 	// TagList (0x0004) intentionally omitted: it is gated behind the
 	// TAGLIST FeatureMap bit (Matter 1.4 §9.5.4.1) which we do not

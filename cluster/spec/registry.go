@@ -16,8 +16,13 @@ import (
 // through a generated definition without importing the cluster packages.
 var registry sync.Map // uint32 → *Cluster
 
-// Register adds definitions to the registry; a later registration of the
-// same cluster id replaces the earlier one.
+// Register adds definitions to the registry. Registering the definition a
+// cluster id already holds is a no-op; a different definition under an id
+// already registered is a programming error and panics, as
+// database/sql.Register does for a driver name — a definition replaced
+// silently would change the request decoding of every server of that
+// cluster in the process (review II, R2-P6-api-1311). Register a vendor
+// cluster under its own (vendor-prefixed) id.
 //
 // A hand-written definition (a vendor cluster) is supported beside the
 // generated ones. Its request commands' Decode turns a payload into its
@@ -29,7 +34,13 @@ var registry sync.Map // uint32 → *Cluster
 // does not fit with it, every other command logs the failure and runs.
 func Register(defs ...*Cluster) {
 	for _, d := range defs {
-		registry.Store(d.ID, d)
+		if held, loaded := registry.LoadOrStore(d.ID, d); loaded && held != d {
+			name := ""
+			if h, ok := held.(*Cluster); ok {
+				name = h.Name
+			}
+			panic(fmt.Sprintf("spec: cluster 0x%04X registered twice (%s, then %s)", d.ID, name, d.Name))
+		}
 	}
 }
 

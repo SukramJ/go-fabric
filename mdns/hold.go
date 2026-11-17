@@ -214,8 +214,8 @@ func (st *linkState) stopDeferred() {
 // holds r.mu.
 func (r *Responder) sendDeferredLocked(ifIndex int, st *linkState) {
 	now := r.clock.Load().Now()
-	l := r.wire.link(ifIndex)
-	lr := r.recordsForLocked(ifIndex, l.addrsFunc())
+	lr := r.recordsForLocked(ifIndex, r.addrsOf(ifIndex))
+	l := r.linkLocked(ifIndex)
 	deferrals := st.deferred
 	st.deferred = map[string]*deferral{}
 

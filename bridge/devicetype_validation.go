@@ -33,7 +33,11 @@ import (
 // [Bridge.Reassemble] returns the *endpoint.DeviceTypeConformanceError,
 // naming every endpoint, device type and requirement, and the bridge keeps
 // serving the topology it had. Call before [Bridge.Start]; a later call
-// takes effect at the next Reassemble and forgets what was reported.
+// takes effect at the next Reassemble and forgets what was reported —
+// and which endpoints were served: that Reassemble judges every endpoint
+// as an addition, so in strict mode it refuses a new violation on an
+// endpoint already served, which strict otherwise refuses only where an
+// addition may have caused it (review II, R2-P6-api-0611).
 func (b *Bridge) SetDeviceTypeValidation(mode endpoint.DeviceTypeValidationMode) {
 	b.mu.Lock()
 	b.deviceTypes = endpoint.NewDeviceTypeValidator(mode)

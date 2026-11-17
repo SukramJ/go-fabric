@@ -34,6 +34,56 @@ type State struct {
 	SafetyStatus                     SafetyStatusBitmap      // attribute 0x001A: SafetyStatusBitmap, O, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.CurrentPositionLiftPercentage = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentPositionLiftPercentage)
+	c.CurrentPositionTiltPercentage = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentPositionTiltPercentage)
+	c.TargetPositionLiftPercent100ths = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TargetPositionLiftPercent100ths)
+	c.TargetPositionTiltPercent100ths = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TargetPositionTiltPercent100ths)
+	c.CurrentPositionLiftPercent100ths = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentPositionLiftPercent100ths)
+	c.CurrentPositionTiltPercent100ths = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentPositionTiltPercent100ths)
+	return c
+}
+
 // Patch is a change to the WindowCovering state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

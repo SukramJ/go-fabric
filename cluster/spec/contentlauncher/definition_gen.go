@@ -116,6 +116,49 @@ func (v *BrandingInformationStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v BrandingInformationStruct) Clone() BrandingInformationStruct {
+	c := v
+	c.Background = func(p *StyleInformationStruct) *StyleInformationStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.Background)
+	c.Logo = func(p *StyleInformationStruct) *StyleInformationStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.Logo)
+	c.ProgressBar = func(p *StyleInformationStruct) *StyleInformationStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.ProgressBar)
+	c.Splash = func(p *StyleInformationStruct) *StyleInformationStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.Splash)
+	c.Watermark = func(p *StyleInformationStruct) *StyleInformationStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.Watermark)
+	return c
+}
+
 // BrandingInformationStructDef describes BrandingInformationStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -151,6 +194,35 @@ func (v *StyleInformationStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Color", false, &v.Color, spec.DecodeOptional(spec.DecodeString)),
 		spec.Bind(2, "Size", false, &v.Size, spec.DecodeOptional(spec.DecodeStruct[DimensionStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StyleInformationStruct) Clone() StyleInformationStruct {
+	c := v
+	c.ImageUrl = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ImageUrl)
+	c.Color = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Color)
+	c.Size = func(p *DimensionStruct) *DimensionStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Size)
+	return c
 }
 
 // StyleInformationStructDef describes StyleInformationStruct.
@@ -234,6 +306,24 @@ func (v *ContentSearchStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ContentSearchStruct) Clone() ContentSearchStruct {
+	c := v
+	c.ParameterList = func(s []ParameterStruct) []ParameterStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ParameterStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ParameterList)
+	return c
+}
+
 // ContentSearchStructDef describes ContentSearchStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -264,6 +354,28 @@ func (v *ParameterStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Value", true, &v.Value, spec.DecodeStringIn(0, 1024)),
 		spec.Bind(2, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeList(spec.DecodeStruct[AdditionalInfoStruct]))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ParameterStruct) Clone() ParameterStruct {
+	c := v
+	c.ExternalIdList = func(p *[]AdditionalInfoStruct) *[]AdditionalInfoStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []AdditionalInfoStruct) []AdditionalInfoStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]AdditionalInfoStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.ExternalIdList)
+	return c
 }
 
 // ParameterStructDef describes ParameterStruct.
@@ -349,6 +461,44 @@ func (v *PlaybackPreferencesStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PlaybackPreferencesStruct) Clone() PlaybackPreferencesStruct {
+	c := v
+	c.PlaybackPosition = func(p *spec.Nullable[uint64]) *spec.Nullable[uint64] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PlaybackPosition)
+	c.TextTrack = func(p *spec.Nullable[TrackPreferenceStruct]) *spec.Nullable[TrackPreferenceStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[TrackPreferenceStruct]{Value: (*p).Value.Clone(), Null: (*p).Null}
+		return &x
+	}(v.TextTrack)
+	c.AudioTracks = func(p *spec.Nullable[[]TrackPreferenceStruct]) *spec.Nullable[[]TrackPreferenceStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]TrackPreferenceStruct]{Value: func(s []TrackPreferenceStruct) []TrackPreferenceStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]TrackPreferenceStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.AudioTracks)
+	return c
+}
+
 // PlaybackPreferencesStructDef describes PlaybackPreferencesStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -381,6 +531,35 @@ func (v *TrackPreferenceStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Characteristics", false, &v.Characteristics, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeList(spec.DecodeUint[uint8](8))))),
 		spec.Bind(2, "AudioOutputIndex", false, &v.AudioOutputIndex, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint8](8)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TrackPreferenceStruct) Clone() TrackPreferenceStruct {
+	c := v
+	c.Characteristics = func(p *spec.Nullable[[]uint8]) *spec.Nullable[[]uint8] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[[]uint8]{Value: func(s []uint8) []uint8 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint8, len(s))
+			copy(out, s)
+			return out
+		}((*p).Value), Null: (*p).Null}
+		return &x
+	}(v.Characteristics)
+	c.AudioOutputIndex = func(p *spec.Nullable[uint8]) *spec.Nullable[uint8] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioOutputIndex)
+	return c
 }
 
 // TrackPreferenceStructDef describes TrackPreferenceStruct.
@@ -467,6 +646,36 @@ func (v *LaunchContentRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LaunchContentRequest) Clone() LaunchContentRequest {
+	c := v
+	c.Search = v.Search.Clone()
+	c.Data = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Data)
+	c.PlaybackPreferences = func(p *PlaybackPreferencesStruct) *PlaybackPreferencesStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.PlaybackPreferences)
+	c.UseCurrentContext = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.UseCurrentContext)
+	return c
+}
+
 // LaunchUrlRequest is the LaunchUrl command payload.
 type LaunchUrlRequest struct {
 	ContentUrl          string                     // 0: string, M, max 8192
@@ -495,6 +704,35 @@ func (v *LaunchUrlRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LaunchUrlRequest) Clone() LaunchUrlRequest {
+	c := v
+	c.DisplayString = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DisplayString)
+	c.BrandingInformation = func(p *BrandingInformationStruct) *BrandingInformationStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.BrandingInformation)
+	c.PlaybackPreferences = func(p *PlaybackPreferencesStruct) *PlaybackPreferencesStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.PlaybackPreferences)
+	return c
+}
+
 // LauncherResponse is the LauncherResponse command payload.
 type LauncherResponse struct {
 	Status StatusEnum // 0: StatusEnum, M
@@ -515,6 +753,21 @@ func (v *LauncherResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Status", true, &v.Status, spec.DecodeUint[StatusEnum](8)),
 		spec.Bind(1, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeString)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LauncherResponse) Clone() LauncherResponse {
+	c := v
+	c.Data = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Data)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

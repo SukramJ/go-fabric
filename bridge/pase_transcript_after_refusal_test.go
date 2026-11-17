@@ -21,7 +21,10 @@ import (
 // router already drops that Pake1 (the handshake no longer holds the
 // claim, resolvePaseContinuation); the singleton handler of
 // AttachPaseHandler is handed every Pake1, so there the adapter is the
-// one that refuses it (R2-P5 Fable F3).
+// one that refuses it (R2-P5 Fable F3). A further PBKDFParamRequest of the
+// handshake ends the pairing at the router, counted, before it reaches the
+// adapter (TestRepeatedPBKDFParamRequestEndsThePairing, review II
+// R2-P6-sec-0304).
 func TestPaseRefusalEndsTheTranscript(t *testing.T) {
 	t.Parallel()
 	prover, err := spake2.NewProver(20202021, failureCountTestSalt(), failureCountTestIterations, nil, nil, nil)

@@ -52,13 +52,23 @@ func (a *AccessControl) registerAuxiliaryProvider(ctx context.Context, src Auxil
 	a.mu.Lock()
 	a.auxSource = src
 	a.mu.Unlock()
-	a.syncAuxiliary(ctx, false)
-	src.OnGroupcastChanged(func(changeCtx context.Context, _ uint8) {
-		a.mu.RLock()
+	a.syncAuxiliary(ctx, false, nil)
+	src.OnGroupcastChanged(func(changeCtx context.Context, fabric uint8) {
+		a.mu.Lock()
 		batched := a.auxBatch > 0
-		a.mu.RUnlock()
+		// Only a change a request made names a node: a change without one
+		// — GroupKeyManagement's retry of a stale group state, a forget —
+		// neither records a context nor displaces the one a request
+		// recorded (review II, R2-P6-err-1701 R3-1).
+		if _, _, request := im.LookupFabricFilter(changeCtx); batched && request {
+			if a.auxDeferred == nil {
+				a.auxDeferred = make(map[uint8]context.Context)
+			}
+			a.auxDeferred[fabric] = changeCtx
+		}
+		a.mu.Unlock()
 		if !batched {
-			a.syncAuxiliary(changeCtx, true)
+			a.syncAuxiliary(changeCtx, true, nil)
 		}
 	})
 }
@@ -72,33 +82,44 @@ func (a *AccessControl) beginAuxiliaryBatch() {
 }
 
 // endAuxiliaryBatch closes a batch and, once no batch is open,
-// synchronises once with ctx naming the administering node.
+// synchronises once: a change of the closing command's own fabric names
+// the node of ctx, a change another source signalled meanwhile the node
+// of its own context (auxDeferred).
 func (a *AccessControl) endAuxiliaryBatch(ctx context.Context) {
 	a.mu.Lock()
 	if a.auxBatch > 0 {
 		a.auxBatch--
 	}
 	open := a.auxBatch > 0
+	var deferred map[uint8]context.Context
+	if !open {
+		deferred, a.auxDeferred = a.auxDeferred, nil
+	}
 	a.mu.Unlock()
 	if !open {
-		a.syncAuxiliary(ctx, true)
+		a.syncAuxiliary(ctx, true, deferred)
 	}
 }
 
 // syncAuxiliary recomputes the auxiliary entries and, for every fabric whose
 // entries changed, bumps the DataVersion and — with emit — fires
-// AuxiliaryAccessUpdated naming the administering node of ctx. A fabric
-// that no longer exists gets no event. Mirrors matter.js AccessControlServer
+// AuxiliaryAccessUpdated naming the administering node: the node of the
+// change's own context in deferred, else the node of ctx when ctx is a
+// request of that fabric, else none — a fabric's event never names a node
+// of another fabric's request (review II, R2-P6-conc-1007). A fabric that
+// no longer exists gets no event. Mirrors matter.js AccessControlServer
 // #syncAuxAcl.
-func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool) {
+func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred map[uint8]context.Context) {
 	a.mu.RLock()
 	src := a.auxSource
 	a.mu.RUnlock()
 	if src == nil {
 		return
 	}
+	a.auxSyncMu.Lock()
 	entries, err := src.AuxiliaryACL(ctx, 0)
 	if err != nil {
+		a.auxSyncMu.Unlock()
 		a.logger().Warn("matter.access_control.auxiliary_sync", slog.Any("err", err))
 		return
 	}
@@ -111,6 +132,7 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool) {
 	a.auxApplied = next
 	emitter, endpoint := a.emitter, a.endpoint
 	a.mu.Unlock()
+	a.auxSyncMu.Unlock()
 
 	var changed []uint8
 	for fabric := range unionKeys(prev, next) {
@@ -130,10 +152,17 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool) {
 	if err != nil {
 		return
 	}
-	admin := adminNodeIDOf(ctx)
+	_, accessing := im.FabricFilterFromContext(ctx)
 	for _, fabric := range changed {
 		if !slices.Contains(known, fabric) {
 			continue
+		}
+		var admin *uint64
+		switch own, ok := deferred[fabric]; {
+		case ok:
+			admin = adminNodeIDOf(own) //nolint:contextcheck // own is the deferred change's request context, read for its subject only
+		case accessing == fabric:
+			admin = adminNodeIDOf(ctx)
 		}
 		emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventAuxiliaryAccessUpd,
 			AuxiliaryAccessUpdatedEvent{AdminNodeID: admin, FabricIndex: fabric}, contract.EventPriorityInfo)

@@ -64,6 +64,10 @@ const (
 
 	// ResumptionIDSize is the canonical 16-byte length of a resumption id.
 	ResumptionIDSize = 16
+
+	// transcriptSignatureSize is the raw r || s form of the ECDSA P-256
+	// transcript signature a TBE2 or TBE3 carries ([unpackECDSASig]).
+	transcriptSignatureSize = 64
 )
 
 // Errors.
@@ -528,9 +532,21 @@ func marshalTBE2(p TBE2Plaintext) []byte {
 	return enc.bytes()
 }
 
-// unmarshalTBE2 is the inverse of [marshalTBE2].
+// unmarshalTBE2 is the inverse of [marshalTBE2]. The responder's NOC
+// (tag 1), its transcript signature (tag 3, 64 bytes) and the resumption
+// id (tag 4, 16 bytes) are mandatory octet strings, the ICAC (tag 2) an
+// optional one: a TBE2 that lacks one or carries one of another type or
+// length is refused here, before the initiator keeps a resumption id the
+// store would refuse later (R2-P6-wire-0102). Mirrors matter.js
+// packages/protocol/src/session/case/CaseMessages.ts:78-83 at db021da0,
+// decoded with validation (CaseClient.ts:273): another
+// TLV type is refused (packages/types/src/tlv/TlvString.ts:58), a missing
+// mandatory member (TlvObject.ts:257-261), a wrong length
+// (TlvString.ts:82-90). connectedhomeip makes the same refusals
+// (src/protocols/secure_channel/CASESession.cpp:1648-1689 at 6170af84).
 func unmarshalTBE2(b []byte) (TBE2Plaintext, error) {
 	var p TBE2Plaintext
+	var hasNOC, hasSignature, hasResumptionID bool
 	dec := sigmaTLVDecoder(b)
 	if err := dec.openStruct(); err != nil {
 		return p, fmt.Errorf("tbe2 open struct: %w", err)
@@ -545,13 +561,24 @@ func unmarshalTBE2(b []byte) (TBE2Plaintext, error) {
 		}
 		switch tag {
 		case 1:
-			p.ResponderNOC = append([]byte(nil), val.octets...)
+			if p.ResponderNOC, err = octetsOf(val, anyLength); err != nil {
+				return p, fmt.Errorf("tbe2 responderNoc: %w", err)
+			}
+			hasNOC = true
 		case 2:
-			p.ResponderICAC = append([]byte(nil), val.octets...)
+			if p.ResponderICAC, err = octetsOf(val, anyLength); err != nil {
+				return p, fmt.Errorf("tbe2 responderIcac: %w", err)
+			}
 		case 3:
-			p.Signature = append([]byte(nil), val.octets...)
+			if p.Signature, err = octetsOf(val, transcriptSignatureSize); err != nil {
+				return p, fmt.Errorf("tbe2 signature: %w", err)
+			}
+			hasSignature = true
 		case 4:
-			p.ResumptionID = append([]byte(nil), val.octets...)
+			if p.ResumptionID, err = octetsOf(val, ResumptionIDSize); err != nil {
+				return p, fmt.Errorf("tbe2 resumptionId: %w", err)
+			}
+			hasResumptionID = true
 		default:
 			if val.container {
 				if err := dec.skipContainer(); err != nil {
@@ -559,6 +586,10 @@ func unmarshalTBE2(b []byte) (TBE2Plaintext, error) {
 				}
 			}
 		}
+	}
+	if !hasNOC || !hasSignature || !hasResumptionID {
+		return p, fmt.Errorf("sigma: tbe2 missing a mandatory field (responderNoc=%t, signature=%t, resumptionId=%t)",
+			hasNOC, hasSignature, hasResumptionID)
 	}
 	return p, nil
 }
@@ -640,8 +671,15 @@ func marshalTBE3(p TBE3Plaintext) []byte {
 	return enc.bytes()
 }
 
+// unmarshalTBE3 is the inverse of [marshalTBE3]. The initiator's NOC
+// (tag 1) and its transcript signature (tag 3, 64 bytes) are mandatory
+// octet strings, the ICAC (tag 2) an optional one; a TBE3 that lacks one
+// or carries one of another type or length is refused (R2-P6-wire-0102).
+// Mirrors matter.js CaseMessages.ts:87-91 at db021da0, decoded with
+// validation (CaseServer.ts:290) and refused as for TBE2; connectedhomeip the same (CASESession.cpp:2066-2096 at 6170af84).
 func unmarshalTBE3(b []byte) (TBE3Plaintext, error) {
 	var p TBE3Plaintext
+	var hasNOC, hasSignature bool
 	dec := sigmaTLVDecoder(b)
 	if err := dec.openStruct(); err != nil {
 		return p, fmt.Errorf("tbe3 open struct: %w", err)
@@ -656,11 +694,19 @@ func unmarshalTBE3(b []byte) (TBE3Plaintext, error) {
 		}
 		switch tag {
 		case 1:
-			p.InitiatorNOC = append([]byte(nil), val.octets...)
+			if p.InitiatorNOC, err = octetsOf(val, anyLength); err != nil {
+				return p, fmt.Errorf("tbe3 initiatorNoc: %w", err)
+			}
+			hasNOC = true
 		case 2:
-			p.InitiatorICAC = append([]byte(nil), val.octets...)
+			if p.InitiatorICAC, err = octetsOf(val, anyLength); err != nil {
+				return p, fmt.Errorf("tbe3 initiatorIcac: %w", err)
+			}
 		case 3:
-			p.Signature = append([]byte(nil), val.octets...)
+			if p.Signature, err = octetsOf(val, transcriptSignatureSize); err != nil {
+				return p, fmt.Errorf("tbe3 signature: %w", err)
+			}
+			hasSignature = true
 		default:
 			if val.container {
 				if err := dec.skipContainer(); err != nil {
@@ -668,6 +714,9 @@ func unmarshalTBE3(b []byte) (TBE3Plaintext, error) {
 				}
 			}
 		}
+	}
+	if !hasNOC || !hasSignature {
+		return p, fmt.Errorf("sigma: tbe3 missing a mandatory field (initiatorNoc=%t, signature=%t)", hasNOC, hasSignature)
 	}
 	return p, nil
 }

@@ -507,14 +507,12 @@ func TestCommandFieldsReader_CommissioningComplete(t *testing.T) {
 // (0x04) — decode a payload whose TransitionTime context tag 1 is
 // entirely ABSENT (no TLV Null placeholder) into the generated request
 // with TransitionTime null, its fallback (bridge/fields_definition.go
-// requestFallbacks). Google Home's
-// brightness slider sends exactly this shape, so the absent-tag wire
-// form is a controller-interop contract for the dispatch path, not a
-// decoder corner case. Mirrors matter.js
-// packages/types/src/tlv/TlvObject.ts:205 decodeTlvInternalValue and
-// packages/node/src/behaviors/level-control/LevelControlServer.ts:297
-// moveToLevelLogic (unset transition time falls back to the device
-// default).
+// requestFallbacks) — a deliberate divergence recorded as
+// BD-Matter-LevelControl-LenientDecoders: matter.js refuses the absent
+// mandatory field (requestTlv.validate, CommandInvokeResponse.ts:486,
+// answered INVALID_COMMAND at :529-535 at db021da0), connectedhomeip reads
+// it as null (LevelControlCluster.cpp:371 at 6170af84). Whether the
+// dispatch path stays lenient is the owner's (review II, R2-P6-wire-1209).
 func TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -1002,16 +1000,12 @@ func TestDecodeMoveToLevelRequest_NullTransitionTime(t *testing.T) {
 
 // TestDecodeMoveToLevelRequest_AbsentTransitionTime verifies that a
 // payload with the TransitionTime context tag 1 entirely ABSENT (not
-// TLV Null) decodes successfully and leaves TransitionTime nil. Google
-// Home's brightness slider omits the transitionTime field altogether,
-// so the tag-walking decoder's tolerance for a missing tag is
-// load-bearing controller interop — a strict "all spec tags present"
-// refactor would silently break Google Home dimming. Mirrors matter.js
-// packages/types/src/tlv/TlvObject.ts:205 decodeTlvInternalValue
-// (structure decode leaves a missing member unset instead of erroring)
-// and packages/node/src/behaviors/level-control/LevelControlServer.ts:297
-// moveToLevelLogic (`transitionTime ?? onOffTransitionTime ?? null` —
-// an unset transition time means "use the device default").
+// TLV Null) decodes successfully on the dispatch path and leaves
+// TransitionTime nil — BD-Matter-LevelControl-LenientDecoders, a
+// divergence from matter.js, which refuses the absent mandatory field
+// (CommandInvokeResponse.ts:486, :529-535 at db021da0); connectedhomeip
+// reads it as null (LevelControlCluster.cpp:371 at 6170af84). Review II,
+// R2-P6-wire-1209: the owner decides the dispatch path.
 func TestDecodeMoveToLevelRequest_AbsentTransitionTime(t *testing.T) {
 	t.Parallel()
 	dec := buildDecoderAfterStructOpen(func(enc *tlv.Encoder) {
@@ -1355,7 +1349,7 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 }
 
 // TestCommandFieldsReader_LevelControlStepAbsentTransitionTime pins that
-// LevelControl's Step / StepWithOnOff decode Google Home's shape —
+// LevelControl's Step / StepWithOnOff decode a payload with
 // TransitionTime absent, not null — through the generated definition:
 // the omitted field takes its fallback, null, instead of the schema's
 // INVALID_COMMAND (notes/parity/by_design.md

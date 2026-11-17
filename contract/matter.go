@@ -77,6 +77,20 @@ type ClusterServer interface {
 	// MatterWrite applies an attribute write. The bridge has already
 	// decoded the TLV; `value` carries the cluster-native type.
 	//
+	// A write of a fabric-scoped list — an attribute the schema or the
+	// server's [FabricScopeDeclarer] scopes — comes from a request with
+	// an accessing fabric; one without is refused before the server is
+	// called. The value the server receives is that fabric's entries
+	// alone, each with its FabricIndex field set to the accessing fabric
+	// by the dispatcher (the Go field named FabricIndex, of type uint8 or
+	// *uint8, of a struct entry or a pointer to one — the name every
+	// generated struct gives field 254; an entry type without such a field
+	// is handed on as written), whatever the request wrote (for an append: the
+	// fabric's current entries and the new one). It replaces that
+	// fabric's entries; the other fabrics' entries are not in the value
+	// and stay as the server holds them. The accessing fabric is also in
+	// ctx ([AccessingFabric]).
+	//
 	// The southbound urgency is not a parameter: every write reaching
 	// a cluster server comes from a controller acting on a user's
 	// behalf, so implementations queue it at one fixed priority rather
@@ -684,6 +698,17 @@ type ElectricalReadings interface {
 	HasEnergy() bool
 }
 
+// ElectricalCurrentSource is the optional capability of an
+// [ElectricalReadings], or of the [FloatMeasurementSource] of a power
+// reading, that states the kind of current the meter measures: the
+// ElectricalPowerMeasurement cluster's PowerMode and its
+// alternating-current or direct-current feature. A source without it is an
+// alternating-current meter ([WiredCurrentAC], the zero value). The kind
+// is part of the endpoint's surface: a host that changes it reassembles.
+type ElectricalCurrentSource interface {
+	MatterElectricalCurrent() WiredCurrent
+}
+
 // MeasurementSource is implemented by Generic / Calculated DPs
 // that project to a single Matter measurement cluster. The endpoint
 // assembler uses this to decide whether to build a standalone sensor
@@ -783,9 +808,24 @@ const (
 	WiredCurrentDC
 )
 
+// BatteryReplaceability is how a battery-powered device's battery is
+// replaced: the PowerSource cluster's BatReplaceability.
+type BatteryReplaceability uint8
+
+// The battery replaceabilities; the zero value is a battery the user
+// replaces.
+const (
+	BatteryUserReplaceable BatteryReplaceability = iota
+	BatteryNotReplaceable
+	BatteryFactoryReplaceable
+	// BatteryReplaceabilityUnspecified states that the device does not
+	// say.
+	BatteryReplaceabilityUnspecified
+)
+
 // PowerSourceSelection is what a device's power source serves of the
-// PowerSource cluster. The zero value is a battery, its reading the
-// source's [BoolMeasurementSource] (low battery) or
+// PowerSource cluster. The zero value is a battery the user replaces, its
+// reading the source's [BoolMeasurementSource] (low battery) or
 // [FloatMeasurementSource] (percentage remaining).
 type PowerSourceSelection struct {
 	// Wired is a mains-powered device: the Wired feature in place of
@@ -794,6 +834,10 @@ type PowerSourceSelection struct {
 	Wired bool
 	// WiredCurrent is the current a wired source draws; zero is AC.
 	WiredCurrent WiredCurrent
+	// BatteryReplaceability is how a battery source's battery is
+	// replaced; the zero value is [BatteryUserReplaceable]. A wired source
+	// serves no battery attribute and ignores it.
+	BatteryReplaceability BatteryReplaceability
 }
 
 // PowerSourceSelectionSource is the optional capability of a
@@ -914,6 +958,10 @@ type ConcentrationReadingsSource interface {
 // itself may take the bridge's locks; do not call it, or wait for it,
 // while holding a lock the bridge's readers of this source need. The
 // same holds for [AttributeChangeNotifier] and [AttributeReportNotifier].
+//
+// A host's notifier does not re-wire from inside its registration or its
+// unsubscribe closure (the bridge's Reassemble, AttachSubscriptionManager):
+// the second wiring would wait for the first on the same goroutine.
 type ChangeNotifier interface {
 	OnMatterValueChanged(cb func()) (unsubscribe func())
 }
@@ -941,7 +989,7 @@ type ChangeNotifier interface {
 // Each change carries the attributes that moved and where the change came
 // from ([Change], [Origin]) — the session matter.js hands every change
 // observer with the new and the old value
-// (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476);
+// (packages/node/src/behavior/state/managed/Datasource.ts:1488-1491);
 // a server that cannot tell reports [OriginUnknown]. The ids are the
 // listener's own.
 //

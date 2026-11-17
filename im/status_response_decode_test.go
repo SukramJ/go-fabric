@@ -66,3 +66,30 @@ func TestUnmarshalStatusResponseTLV_Malformed(t *testing.T) {
 		}
 	}
 }
+
+// TestUnmarshalStatusResponseTLV_WrongType (review II, R2-P6-wire-0503):
+// a Status that is not an unsigned integer is refused, as matter.js's
+// TlvEnum (a TlvUInt32) throws on another TLV type
+// (packages/types/src/tlv/TlvNumber.ts:289, :124-131 at db021da0) — it used to
+// decode as Success.
+func TestUnmarshalStatusResponseTLV_WrongType(t *testing.T) {
+	t.Parallel()
+	for name, put := range map[string]func(*tlv.Encoder){
+		"signed":    func(e *tlv.Encoder) { e.PutInt(tlv.ContextTag(tagStatusResponseStatus), 1) },
+		"bool":      func(e *tlv.Encoder) { e.PutBool(tlv.ContextTag(tagStatusResponseStatus), true) },
+		"null":      func(e *tlv.Encoder) { e.PutNull(tlv.ContextTag(tagStatusResponseStatus)) },
+		"structure": func(e *tlv.Encoder) { e.StartStruct(tlv.ContextTag(tagStatusResponseStatus)); _ = e.EndContainer() },
+	} {
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		put(enc)
+		_ = enc.EndContainer()
+		wire, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sr, err := UnmarshalStatusResponseTLV(tlv.NewDecoder(wire)); !errors.Is(err, ErrInvalidStatusResponse) {
+			t.Errorf("%s: decoded %+v, err %v; want ErrInvalidStatusResponse", name, sr, err)
+		}
+	}
+}

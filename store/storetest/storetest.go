@@ -75,15 +75,18 @@ var cases = []testCase{
 	{"fabrics/update-refused", fabricsUpdateRefused},
 	{"fabrics/pending-not-found", fabricsPendingNotFound},
 	{"fabrics/concurrent-updates", fabricsConcurrentUpdates},
+	{"fabrics/add-beside-writer", fabricsAddBesideWriter},
 	{"identity", identityCase},
 	{"acl", aclCase},
 	{"group-keys", groupKeysCase},
 	{"group-keys/ordering", groupKeysOrdering},
 	{"group-keys/replace-mappings", groupKeysReplaceMappingsCase},
+	{"group-keys/map-order", groupKeyMapOrder},
 	{"key-lengths", keyLengthsCase},
 	{"groups", groupsCase},
 	{"resumption", resumptionCase},
 	{"resumption/session-parameters", resumptionSessionParametersCase},
+	{"resumption/cap-per-fabric", resumptionCapPerFabric},
 	{"server-subscriptions", serverSubscriptionsCase},
 	{"server-subscriptions/save-order", serverSubscriptionsSaveOrder},
 	{"settings", settingsCase},
@@ -93,6 +96,7 @@ var cases = []testCase{
 	{"ota", otaCase},
 	{"thermostat-presets", presetsCase},
 	{"door-locks", doorLocksCase},
+	{"door-locks/concurrent", doorLocksConcurrent},
 	{"icd", icdCase},
 	{"unknown-fabric-refused", unknownFabricRefused},
 	{"constraints", constraintsCase},
@@ -544,9 +548,9 @@ func groupKeysCase(ctx context.Context, t *testing.T, p store.Port) {
 	maps, err := p.ListGroupKeyMappings(ctx, f)
 	must(t, err)
 	wantEqual(t, "ListGroupKeyMappings", maps, []store.GroupKeyMapping{
+		{FabricIndex: f, GroupID: 0x30, GroupKeySetID: 2},
 		{FabricIndex: f, GroupID: 0x10, GroupKeySetID: 1},
 		{FabricIndex: f, GroupID: 0x20, GroupKeySetID: 1},
-		{FabricIndex: f, GroupID: 0x30, GroupKeySetID: 2},
 	})
 
 	// Removing a set takes the map entries naming it along, and only those.

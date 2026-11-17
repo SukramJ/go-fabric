@@ -152,6 +152,28 @@ func (v *OpenRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OpenRequest) Clone() OpenRequest {
+	c := v
+	c.OpenDuration = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OpenDuration)
+	c.TargetLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TargetLevel)
+	return c
+}
+
 // CloseRequest is the Close command payload.
 type CloseRequest struct{}
 
@@ -184,6 +206,21 @@ func (v *ValveStateChangedEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "ValveState", true, &v.ValveState, spec.DecodeUint[ValveStateEnum](8)),
 		spec.Bind(1, "ValveLevel", false, &v.ValveLevel, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 0, 100))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ValveStateChangedEvent) Clone() ValveStateChangedEvent {
+	c := v
+	c.ValveLevel = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ValveLevel)
+	return c
 }
 
 // ValveFaultEvent is the ValveFault event payload.

@@ -34,6 +34,102 @@ type State struct {
 	NodeEndpointList    []DatastoreEndpointEntryStruct                 // attribute 0x000D: list[DatastoreEndpointEntryStruct], M, R A, N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.AnchorRootCa = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(st.AnchorRootCa)
+	c.GroupKeySetList = func(s []DatastoreGroupKeySetStruct) []DatastoreGroupKeySetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreGroupKeySetStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.GroupKeySetList)
+	c.GroupList = func(s []DatastoreGroupInformationEntryStruct) []DatastoreGroupInformationEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreGroupInformationEntryStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.GroupList)
+	c.NodeList = func(s []DatastoreNodeInformationEntryStruct) []DatastoreNodeInformationEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreNodeInformationEntryStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.NodeList)
+	c.AdminList = func(s []DatastoreAdministratorInformationEntryStruct) []DatastoreAdministratorInformationEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreAdministratorInformationEntryStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.AdminList)
+	c.EndpointGroupIdList = func(s []DatastoreEndpointGroupIDEntryStruct) []DatastoreEndpointGroupIDEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreEndpointGroupIDEntryStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.EndpointGroupIdList)
+	c.EndpointBindingList = func(s []DatastoreEndpointBindingEntryStruct) []DatastoreEndpointBindingEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreEndpointBindingEntryStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.EndpointBindingList)
+	c.NodeKeySetList = func(s []DatastoreNodeKeySetEntryStruct) []DatastoreNodeKeySetEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreNodeKeySetEntryStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.NodeKeySetList)
+	c.NodeAclList = func(s []DatastoreACLEntryStruct) []DatastoreACLEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreACLEntryStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.NodeAclList)
+	c.NodeEndpointList = func(s []DatastoreEndpointEntryStruct) []DatastoreEndpointEntryStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreEndpointEntryStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.NodeEndpointList)
+	return c
+}
+
 // Patch is a change to the JointFabricDatastore state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

@@ -22,6 +22,29 @@ type State struct {
 	CurrentApp  *ApplicationEPStruct // attribute 0x0001: ApplicationEPStruct, O, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.CatalogList = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(st.CatalogList)
+	c.CurrentApp = func(p *ApplicationEPStruct) *ApplicationEPStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.CurrentApp)
+	return c
+}
+
 // Patch is a change to the ApplicationLauncher state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

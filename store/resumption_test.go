@@ -465,3 +465,49 @@ func TestResumption_NilCASEAuthTagsRoundTrip(t *testing.T) {
 		t.Errorf("FabricIndex=%d want 2", got.FabricIndex)
 	}
 }
+
+// TestResumptionCapIgnoresTheClock (Fable read R1): the per-fabric cap
+// evicts by the store's own write sequence, not by last_used_at: with the
+// fabric's records stamped in the future (a clock that stepped back) and
+// the file vacuumed (Scrub, which may renumber rowids), the record just
+// written stays and the first one written goes.
+func TestResumptionCapIgnoresTheClock(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openTestDB(t)
+	s := mstore.New(db)
+	idx, err := s.AddFabric(ctx, newFabricRecord(0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const capPerFabric = 16
+	rec := func(peer uint64) mstore.ResumptionRecord {
+		id := bytes.Repeat([]byte{0x5a}, 16)
+		id[0], id[1] = byte(peer), byte(peer>>8)
+		return mstore.ResumptionRecord{FabricIndex: idx, PeerNodeID: peer, ResumptionID: id, SharedSecret: bytes.Repeat([]byte{1}, 32)}
+	}
+	for peer := range uint64(capPerFabric) {
+		if err := s.UpsertResumption(ctx, rec(peer)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE matter_resumption SET last_used_at = '2099-01-01 00:00:00.000'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := mstore.Scrub(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertResumption(ctx, rec(99)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetResumptionByPeer(ctx, idx, 99); err != nil {
+		t.Errorf("the record just written, beside records stamped in the future: %v", err)
+	}
+	if _, err := s.GetResumptionByPeer(ctx, idx, 0); !errors.Is(err, mstore.ErrResumptionNotFound) {
+		t.Errorf("the first record written after one more = %v, want evicted", err)
+	}
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_resumption WHERE fabric_index = ?`, idx).Scan(&n); err != nil || n != capPerFabric {
+		t.Errorf("records held = %d, %v; want %d", n, err, capPerFabric)
+	}
+}

@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
@@ -28,11 +27,6 @@ func channelValues(st ChannelState) map[uint32]any {
 		channeldef.AttrLineup:         nullOr(st.Lineup),
 		channeldef.AttrCurrentChannel: nullOr(st.CurrentChannel),
 	}
-}
-
-func cloneChannel(st ChannelState) ChannelState {
-	st.ChannelList = slices.Clone(st.ChannelList)
-	return st
 }
 
 // Channels is the Channel host port (the generated [channeldef.Channels],
@@ -104,7 +98,7 @@ func NewChannels(cfg ChannelsConfig) (*ChannelsServer, error) {
 		handleState(h, &s.stateful, channeldef.CmdCancelRecordProgram, statusOnly(recorder.CancelRecordProgram))
 	}
 	srv, err := newServer(channeldef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: cfg.Attributes},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: Channel: %w", err)
 	}
@@ -112,7 +106,7 @@ func NewChannels(cfg ChannelsConfig) (*ChannelsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, channelValues, cloneChannel, storeState[ChannelState]); err != nil {
+	if err := s.init(srv, cfg.Initial, channelValues, ChannelState.Clone, storeState[ChannelState]); err != nil {
 		return nil, fmt.Errorf("media: Channel: %w", err)
 	}
 	return s, nil

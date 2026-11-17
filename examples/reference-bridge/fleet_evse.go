@@ -621,8 +621,62 @@ func (d *demoDem) configureForecast(numSlots int) {
 
 func ptr[T any](v T) *T { return &v }
 
+// conform is a copy of a trigger's forecast held to the fields'
+// conformance under the device's features, which the server holds every
+// stored value to (review II, R2-P6-par-1304): chip's trigger file fills
+// the slots whatever the features. EarliestStartTime and LatestEndTime are
+// "STA" — a cleared one is null and the EndTime under STA, absent
+// without; the pause fields "PAU", the power fields "PFR", the
+// manufacturer state "SFR", the duration adjustments "FA" and the power
+// adjustments "FA & PFR", which take ForecastAdjustment's values
+// (DEMTestEventTriggers.cpp:261-275) on a slot that names none.
+func (d *demoDem) conform(f dem.ForecastStruct) dem.ForecastStruct {
+	f = f.Clone()
+	has := func(feature dem.Feature) bool { return d.features&feature != 0 }
+	sta, pau, pfr, sfr, fa := has(dem.FeatureStartTimeAdjustment), has(dem.FeaturePausable),
+		has(dem.FeaturePowerForecastReporting), has(dem.FeatureStateForecastReporting), has(dem.FeatureForecastAdjustment)
+	switch {
+	case !sta:
+		f.EarliestStartTime, f.LatestEndTime = nil, nil
+	default:
+		if f.EarliestStartTime == nil {
+			f.EarliestStartTime = ptr(spec.NullOf[uint32]())
+		}
+		if f.LatestEndTime == nil {
+			f.LatestEndTime = ptr(f.EndTime)
+		}
+	}
+	if f.Slots == nil {
+		f.Slots = []dem.SlotStruct{}
+	}
+	for i := range f.Slots {
+		s := &f.Slots[i]
+		if !pau {
+			s.SlotIsPausable, s.MinPauseDuration, s.MaxPauseDuration = nil, nil, nil
+		}
+		if !pfr {
+			s.NominalPower, s.MinPower, s.MaxPower, s.NominalEnergy = nil, nil, nil, nil
+		}
+		if !sfr {
+			s.ManufacturerEsaState = nil
+		}
+		if !fa {
+			s.MinDurationAdjustment, s.MaxDurationAdjustment = nil, nil
+		} else if s.MinDurationAdjustment == nil || s.MaxDurationAdjustment == nil {
+			s.MinDurationAdjustment, s.MaxDurationAdjustment = ptr(uint32(120)), ptr(uint32(240))
+		}
+		if !fa || !pfr {
+			s.MinPowerAdjustment, s.MaxPowerAdjustment = nil, nil
+		} else if s.MinPowerAdjustment == nil || s.MaxPowerAdjustment == nil {
+			s.MinPowerAdjustment, s.MaxPowerAdjustment = ptr(int64(20)), ptr(int64(2000))
+		}
+	}
+	return f
+}
+
 func (d *demoDem) setForecast(f *dem.ForecastStruct) {
-	if err := d.srv.Set(dem.Patch{Forecast: f}); err != nil {
+	conformed := d.conform(*f)
+	if err := d.srv.Set(dem.Patch{Forecast: &conformed}); err != nil {
 		slog.Warn("evse.dem.forecast", slog.String("device", d.name), slog.Any("err", err))
 	}
 }

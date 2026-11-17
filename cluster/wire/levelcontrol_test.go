@@ -63,17 +63,17 @@ func TestDecodeMoveToLevelNullTransitionTime(t *testing.T) {
 }
 
 // TestDecodeMoveToLevelOmitsTransitionTime verifies that a payload with
-// the TransitionTime context tag 1 entirely ABSENT (not TLV Null)
-// decodes successfully and leaves TransitionTime nil. Google Home's
-// brightness slider emits MoveToLevel / MoveToLevelWithOnOff (both
-// command IDs route through DecodeMoveToLevel) without the
-// transitionTime field at all, so the absent-tag shape is load-bearing
-// controller interop, not just decoder leniency. Mirrors matter.js
-// packages/types/src/tlv/TlvObject.ts:205 decodeTlvInternalValue
-// (structure decode leaves a missing member unset instead of erroring)
-// and packages/node/src/behaviors/level-control/LevelControlServer.ts:297
-// moveToLevelLogic (`transitionTime ?? onOffTransitionTime ?? null` —
-// an unset transition time means "use the device default").
+// the TransitionTime context tag 1 entirely ABSENT (not TLV Null) decodes
+// and leaves TransitionTime nil: absent is read as null, as the bridge's
+// definition path fills it (BD-Matter-LevelControl-LenientDecoders; review
+// II, R2-P6-wire-1209, decision 168). connectedhomeip accepts the shape as
+// null: its decoder has no presence check
+// (zzz_generated/app-common/clusters/LevelControl/Commands.ipp:44-73) and
+// the cluster reads the field with a fallback (LevelControlCluster.cpp:371,
+// Step :517, at 6170af84). matter.js refuses it: the request's validate
+// (CommandInvokeResponse.ts:486) answers a missing mandatory field
+// INVALID_COMMAND (:529-535 at db021da0). No capture of a controller that
+// sends this shape is on record.
 func TestDecodeMoveToLevelOmitsTransitionTime(t *testing.T) {
 	t.Parallel()
 	payload := buildPayload(t, func(e *tlv.Encoder) {
@@ -221,13 +221,10 @@ func TestDecodeStepNullTransitionTime(t *testing.T) {
 
 // TestDecodeStepOmitsTransitionTime verifies that a Step / StepWithOnOff
 // payload with the TransitionTime context tag 2 entirely ABSENT (not TLV
-// Null) decodes successfully and leaves TransitionTime nil. Google
-// Home's relative-brightness commands omit the transitionTime field
-// rather than encoding TLV Null, so the absent-tag shape must keep
-// decoding. Mirrors matter.js packages/types/src/tlv/TlvObject.ts:205
-// decodeTlvInternalValue (absent member stays unset at decode) and
-// packages/node/src/behaviors/level-control/LevelControlServer.ts:417
-// stepLogic (a null transition time means "move as fast as able").
+// Null) decodes and leaves TransitionTime nil: absent is read as null, as
+// [TestDecodeMoveToLevelOmitsTransitionTime] states with the references
+// (BD-Matter-LevelControl-LenientDecoders; review II, R2-P6-wire-1209,
+// decision 168).
 func TestDecodeStepOmitsTransitionTime(t *testing.T) {
 	t.Parallel()
 	payload := buildPayload(t, func(e *tlv.Encoder) {

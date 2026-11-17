@@ -113,6 +113,24 @@ func (v *ChargingTargetScheduleStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ChargingTargetScheduleStruct) Clone() ChargingTargetScheduleStruct {
+	c := v
+	c.ChargingTargets = func(s []ChargingTargetStruct) []ChargingTargetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ChargingTargetStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ChargingTargets)
+	return c
+}
+
 // ChargingTargetScheduleStructDef describes ChargingTargetScheduleStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -173,6 +191,28 @@ func (v *ChargingTargetStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "TargetSoC", false, &v.TargetSoC, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 0, 100))),
 		spec.Bind(2, "AddedEnergy", false, &v.AddedEnergy, spec.DecodeOptional(spec.DecodeIntIn[int64](64, 0, 9223372036854775807))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ChargingTargetStruct) Clone() ChargingTargetStruct {
+	c := v
+	c.TargetSoC = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TargetSoC)
+	c.AddedEnergy = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AddedEnergy)
+	return c
 }
 
 // ChargingTargetStructDef describes ChargingTargetStruct.
@@ -329,6 +369,24 @@ func (v *GetTargetsResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetTargetsResponse) Clone() GetTargetsResponse {
+	c := v
+	c.ChargingTargetSchedules = func(s []ChargingTargetScheduleStruct) []ChargingTargetScheduleStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ChargingTargetScheduleStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ChargingTargetSchedules)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (GetTargetsResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdGetTargetsResponse
@@ -426,6 +484,24 @@ func (v *SetTargetsRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetTargetsRequest) Clone() SetTargetsRequest {
+	c := v
+	c.ChargingTargetSchedules = func(s []ChargingTargetScheduleStruct) []ChargingTargetScheduleStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ChargingTargetScheduleStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ChargingTargetSchedules)
+	return c
+}
+
 // GetTargetsRequest is the GetTargets command payload.
 type GetTargetsRequest struct{}
 
@@ -502,6 +578,21 @@ func (v *EvNotDetectedEvent) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EvNotDetectedEvent) Clone() EvNotDetectedEvent {
+	c := v
+	c.SessionEnergyDischarged = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SessionEnergyDischarged)
+	return c
+}
+
 // EnergyTransferStartedEvent is the EnergyTransferStarted event payload.
 type EnergyTransferStartedEvent struct {
 	SessionId               uint32    // 0: uint32, M
@@ -528,6 +619,21 @@ func (v *EnergyTransferStartedEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "MaximumCurrent", true, &v.MaximumCurrent, spec.DecodeIntIn[int64](64, 0, 9223372036854775807)),
 		spec.Bind(3, "MaximumDischargeCurrent", false, &v.MaximumDischargeCurrent, spec.DecodeOptional(spec.DecodeIntIn[int64](64, 0, 9223372036854775807))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EnergyTransferStartedEvent) Clone() EnergyTransferStartedEvent {
+	c := v
+	c.MaximumDischargeCurrent = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaximumDischargeCurrent)
+	return c
 }
 
 // EnergyTransferStoppedEvent is the EnergyTransferStopped event payload.
@@ -559,6 +665,21 @@ func (v *EnergyTransferStoppedEvent) DecodeTLV(n spec.Node) error {
 		spec.Bind(4, "EnergyTransferred", true, &v.EnergyTransferred, spec.DecodeIntIn[int64](64, 0, 9223372036854775807)),
 		spec.Bind(5, "EnergyDischarged", false, &v.EnergyDischarged, spec.DecodeOptional(spec.DecodeIntIn[int64](64, 0, 9223372036854775807))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v EnergyTransferStoppedEvent) Clone() EnergyTransferStoppedEvent {
+	c := v
+	c.EnergyDischarged = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EnergyDischarged)
+	return c
 }
 
 // FaultEvent is the Fault event payload.
@@ -606,6 +727,22 @@ func (v *RfidEvent) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "Rfid",
 		spec.Bind(0, "Uid", true, &v.Uid, spec.DecodeBytesIn(0, 10)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RfidEvent) Clone() RfidEvent {
+	c := v
+	c.Uid = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Uid)
+	return c
 }
 
 func decodeGetTargetsResponse(n spec.Node) (any, error) {

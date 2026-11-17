@@ -136,11 +136,25 @@ type ResumptionRecord struct {
 	PeerCATs []uint32
 }
 
+// sharedSecretSize is the length of a P-256 ECDH shared secret, the
+// only secret a [ResumptionRecord] can carry.
+const sharedSecretSize = 32
+
+// wellFormed reports whether r has the shape a record of a finished CASE
+// session has: a 32-byte shared secret and a 16-byte resumption id. A
+// record of another shape is treated as absent on both sides of the
+// handshake.
+func (r *ResumptionRecord) wellFormed() bool {
+	return r != nil && len(r.SharedSecret) == sharedSecretSize && len(r.ResumptionID) == ResumptionIDSize
+}
+
 // ResumptionStore is the read side the Responder requires during
 // ProcessSigma1 to attempt Sigma2_Resume. GetByID must return a
 // ResumptionRecord and nil when the id is known; it must return nil
 // record and a non-nil error when the id is unknown so the responder can
 // fall through to Full Sigma. Implementations must be safe for concurrent use.
+// A record of another shape than a finished session leaves (a 32-byte
+// secret, a 16-byte id) is treated as unknown.
 type ResumptionStore interface {
 	GetByID(resumptionID []byte) (*ResumptionRecord, error)
 }
@@ -342,7 +356,7 @@ func (r *Responder) PeerCATs() []uint32 {
 // SessionIdentity returns the (FabricIndex, NodeID) the multi-fabric
 // destination resolver landed on for the current exchange. ok==false
 // before Sigma1 has been processed. Bridge callers feed these values
-// into [operational.Manager.OpenFromSigmaWithID] so the secure session
+// into [operational.Manager.OpenFromSigmaWithStake] so the secure session
 // is registered under the actually-selected fabric — without this, a
 // Sigma1 that the resolver routed to fabric #1 would still be tagged
 // with the factory-time fabric #2 (the bridge's last-installed default),
@@ -582,6 +596,13 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 		// propagating would turn a transient store error into a failed
 		// CASE establishment.
 		return Sigma1ProcessResult{}, false, nil //nolint:nilerr // miss is non-fatal; caller retries with full Sigma
+	}
+	// A record of another shape is no record: with an empty or short
+	// secret the resume MICs are computable from the public random and
+	// resumption id. The module's store checks the shape on write and
+	// read; a [ResumptionStore] of another kind may not (R2-P6-sec-0113).
+	if !rec.wellFormed() {
+		return Sigma1ProcessResult{}, false, nil
 	}
 
 	// KDFSR1: peerResumeKey = HKDF(sharedSecret,

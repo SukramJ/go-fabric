@@ -81,9 +81,12 @@ func (p *pipelinePeer) recv(want uint8, what string) (payload []byte, counter ui
 	buf := make([]byte, 1500)
 	for {
 		_ = p.conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-		n, _, err := p.conn.ReadFromUDP(buf)
+		n, from, err := p.conn.ReadFromUDP(buf)
 		if err != nil {
 			p.t.Fatalf("%s: nothing reached the peer: %v", what, err)
+		}
+		if !unsecuredFromBridge(p.b, from, buf[:n]) {
+			continue
 		}
 		hdr, hl, err := message.UnmarshalHeader(buf[:n])
 		if err != nil {
@@ -101,6 +104,22 @@ func (p *pipelinePeer) recv(want uint8, what string) (payload []byte, counter ui
 		}
 		return append([]byte(nil), buf[hl+protocolHeaderSize(proto):n]...), hdr.MessageCounter, proto.NeedsAck
 	}
+}
+
+// unsecuredFromBridge reports whether datagram, read from a test peer's
+// socket, is one the bridge b sent on the unsecured session: it came from
+// the bridge's listener and its header names session 0. Anything else — a
+// secured datagram of another test's bridge that reached a reused port
+// under load — is not the bridge's reply and is skipped; decoded as one,
+// its ciphertext failed the protocol header with ErrExtensionLength
+// (review II, R2-P6-test-0310, N5b-guard-3).
+func unsecuredFromBridge(b *Bridge, from *net.UDPAddr, datagram []byte) bool {
+	listen, err := net.ResolveUDPAddr("udp", b.LocalAddr())
+	if err != nil || from == nil || from.Port != listen.Port || !from.IP.Equal(listen.IP) {
+		return false
+	}
+	hdr, _, err := message.UnmarshalHeader(datagram)
+	return err == nil && hdr.SessionID == 0
 }
 
 // pendingOnUnsecuredExchange counts the unsecured session's entries of
@@ -370,4 +389,37 @@ func TestSigma1FloodDoesNotStopLegitimateHandshakes(t *testing.T) {
 	if got := r.pending(); got > unsecuredEntryLimit {
 		t.Errorf("%d entries pending after the flood, want at most %d", got, unsecuredEntryLimit)
 	}
+}
+
+// TestPipelinePeerSkipsAStrayDatagram: a secured datagram another sender
+// puts on a test peer's socket ahead of the bridge's reply is skipped, and
+// the peer reads the bridge's reply (review II, R2-P6-test-0310,
+// N5b-guard-3).
+func TestPipelinePeerSkipsAStrayDatagram(t *testing.T) {
+	t.Parallel()
+	r := newUnsecuredRig(t)
+	provider := NewPerExchangePaseProvider(func() *PaseAdapter {
+		a := newPaseAdapterWithVerifier(t)
+		a.SetPBKDFParams(1000, []byte("SPAKE2P Key Salt"), 1)
+		return a
+	})
+	r.b.AttachPaseHandlerProvider(provider.Resolve)
+	p := newPipelinePeer(t, r.b, 0x9000)
+	other, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = other.Close() })
+	// A secure-session header and a body as a ciphertext would be: read
+	// as a protocol header, its exchange flags carry the SX bit and a
+	// length beyond the datagram.
+	stray := append((&message.Header{SessionID: 0x1234, MessageCounter: 7}).Marshal(), 0x08|0x01, 0x40, 0x34, 0x12, 0x00, 0x00, 0xFF, 0xFF, 0xAA, 0xBB)
+	if _, err := other.WriteToUDP(stray, p.conn.LocalAddr().(*net.UDPAddr)); err != nil {
+		t.Fatal(err)
+	}
+	initRand := make([]byte, spake2.PBKDFRandomSize)
+	if err := p.send(mrp.SCOpcodePBKDFParamRequest, 0x0505, buildTestPBKDFParamRequest(t, initRand), nil); err != nil {
+		t.Fatal(err)
+	}
+	p.recv(mrp.SCOpcodePBKDFParamResponse, "the bridge's reply behind a stray datagram")
 }

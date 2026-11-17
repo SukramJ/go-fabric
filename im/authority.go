@@ -37,6 +37,19 @@ func AuthorityAt(ctx context.Context, endpoint uint16, clusterID uint32, privile
 	return fn(endpoint, clusterID, privilege)
 }
 
+// LookupAuthority returns the access check [WithAuthority] stamped on ctx;
+// ok is false when none is — a request whose access is not checked (a PASE
+// session's, a local caller's), which [AuthorityAt] cannot tell from a
+// denial. [NewReadReports] stamps
+// the subject's read check, so a dispatcher authorises a location before
+// it reads the server there (R2-P6-bound-0405), as matter.js authorises a
+// location before it reads the value (AttributeReadResponse.ts:250, :272
+// at db021da0).
+func LookupAuthority(ctx context.Context) (AuthorityFunc, bool) {
+	fn, ok := ctx.Value(authorityCtxKey{}).(AuthorityFunc)
+	return fn, ok && fn != nil
+}
+
 type commandPathCtxKey struct{}
 
 // WithCommandPath stamps the concrete path of the command ctx belongs to:

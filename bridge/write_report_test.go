@@ -207,7 +207,7 @@ func TestCommandChangedAttributeReachesASubscriber(t *testing.T) {
 		Path: im.ConcreteCommandPath{Endpoint: 0, Cluster: 0x0030, Command: 0x00, HasEndpoint: true, HasCluster: true, HasCommand: true},
 	}}}
 	before := b.snapshotInvokedClusters(context.Background(), d, req)
-	_ = im.HandleInvokeRequest(context.Background(), d, req)
+	_ = im.HandleInvokeRequest(im.WithAuthModePASE(context.Background()), d, req)
 	b.reportInvokeChanges(context.Background(), d, before)
 
 	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))

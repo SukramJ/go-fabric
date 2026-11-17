@@ -11,3 +11,6 @@ func HasBuiltinMaterializer(class contract.MeasurementClass) bool {
 	_, ok := builtinMaterializers[class]
 	return ok
 }
+
+// WhToMilliWattHours exposes the energy conversion's bounds to the tests.
+var WhToMilliWattHours = whToMilliWattHours

@@ -126,6 +126,21 @@ func (v *RetrieveLogsRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RetrieveLogsRequestRequest) Clone() RetrieveLogsRequestRequest {
+	c := v
+	c.TransferFileDesignator = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TransferFileDesignator)
+	return c
+}
+
 // RetrieveLogsResponse is the RetrieveLogsResponse command payload.
 type RetrieveLogsResponse struct {
 	Status        StatusEnum // 0: StatusEnum, M
@@ -152,6 +167,36 @@ func (v *RetrieveLogsResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "UtcTimeStamp", false, &v.UtcTimeStamp, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 		spec.Bind(3, "TimeSinceBoot", false, &v.TimeSinceBoot, spec.DecodeOptional(spec.DecodeUint[uint64](64))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RetrieveLogsResponse) Clone() RetrieveLogsResponse {
+	c := v
+	c.LogContent = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.LogContent)
+	c.UtcTimeStamp = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.UtcTimeStamp)
+	c.TimeSinceBoot = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TimeSinceBoot)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

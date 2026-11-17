@@ -115,11 +115,11 @@ func TestMigrationsMatchApply(t *testing.T) {
 func TestMigrationsPin(t *testing.T) {
 	t.Parallel()
 	ms := store.Migrations()
-	if len(ms) != 10 {
-		t.Fatalf("len(Migrations()) = %d, want 10", len(ms))
+	if len(ms) != 11 {
+		t.Fatalf("len(Migrations()) = %d, want 11", len(ms))
 	}
-	if last := ms[len(ms)-1].Version; last != "v10" {
-		t.Errorf("last migration = %s, want v10", last)
+	if last := ms[len(ms)-1].Version; last != "v11" {
+		t.Errorf("last migration = %s, want v11", last)
 	}
 	seen := map[string]bool{}
 	for _, m := range ms {
@@ -135,7 +135,7 @@ func TestMigrationsPin(t *testing.T) {
 // it: record the new value in the CHANGELOG entry of that change.
 func TestSchemaFingerprintRelease(t *testing.T) {
 	t.Parallel()
-	const want = "94e47453a6bc73ead08d7b267fd41b7e18220b083d1e740a75ba273eeaaee015"
+	const want = "891c60c399943bef8c2d5962e2a6b7f783a119bb740b975226c893be817f47b5"
 	if got := fingerprint(t, openTestDB(t)); got != want {
 		t.Errorf("SchemaFingerprint after Apply = %s, want %s", got, want)
 	}
@@ -259,31 +259,29 @@ func TestMigrationV3RebuildKeepsRows(t *testing.T) {
 	ctx := t.Context()
 	db := openEmptyDB(t)
 	applyUp(t, db, "v2")
-	s := store.New(db)
 	insertLegacyFabric(t, db, 1, 1)
 	insertLegacyKeySet(t, db, 1, 5)
-	if err := s.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: 1, GroupID: 0x0101, GroupKeySetID: 5}); err != nil {
+	if err := insertLegacyMapping(t, db, 1, 0x0101, 5); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: 1, GroupID: 0x0202, GroupKeySetID: 9}); err == nil {
+	if err := insertLegacyMapping(t, db, 1, 0x0202, 9); err == nil {
 		t.Fatal("v2 accepted a mapping to a missing key set; v1 carries the foreign key")
 	}
 	m := store.Migrations()[2]
 	if _, err := db.ExecContext(ctx, m.Up); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: 1, GroupID: 0x0202, GroupKeySetID: 9}); err != nil {
+	if err := insertLegacyMapping(t, db, 1, 0x0202, 9); err != nil {
 		t.Fatalf("v3 refused a mapping to a missing key set: %v", err)
 	}
-	if got, _ := s.ListGroupKeyMappings(ctx, 1); len(got) != 2 {
-		t.Fatalf("mappings after v3 = %+v, want 2", got)
+	if n, _ := legacyMappings(t, db, 1); n != 2 {
+		t.Fatalf("mappings after v3 = %d, want 2", n)
 	}
 	if _, err := db.ExecContext(ctx, m.Down); err != nil {
 		t.Fatal(err)
 	}
-	got, _ := s.ListGroupKeyMappings(ctx, 1)
-	if len(got) != 1 || got[0].GroupKeySetID != 5 {
-		t.Errorf("mappings after v3 down = %+v, want only the one naming set 5", got)
+	if n, set := legacyMappings(t, db, 1); n != 1 || set != 5 {
+		t.Errorf("mappings after v3 down = %d (first set %d), want only the one naming set 5", n, set)
 	}
 }
 
@@ -403,5 +401,57 @@ VALUES (1, 0, X'0000000000000011', X'0000000000000022', ?, 0)`, key); err != nil
 				t.Errorf("ListICDRegistrations after Apply = %+v, %v; want the key", got, err)
 			}
 		})
+	}
+}
+
+// TestMigrationV11KeepsKeyMapRows: key-map entries stored on a v10
+// database read back after Apply by GroupID, as they did (position 0); a
+// map written after it reads in its written order; v11's Down keeps the
+// entries and drops their order.
+func TestMigrationV11KeepsKeyMapRows(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openEmptyDB(t)
+	applyUp(t, db, "v10")
+	insertLegacyFabric(t, db, 1, 1)
+	insertLegacyFabric(t, db, 2, 2)
+	for _, g := range []uint16{0x0300, 0x0100, 0x0200} {
+		if err := insertLegacyMapping(t, db, 1, g, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	s := store.New(db)
+	groups := func(f uint8) []uint16 {
+		maps, err := s.ListGroupKeyMappings(ctx, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := make([]uint16, 0, len(maps))
+		for _, m := range maps {
+			out = append(out, m.GroupID)
+		}
+		return out
+	}
+	if got := groups(1); !slices.Equal(got, []uint16{0x0100, 0x0200, 0x0300}) {
+		t.Errorf("v10 entries after Apply = %x, want by GroupID", got)
+	}
+	if err := s.ReplaceGroupKeyMappings(ctx, 2, []store.GroupKeyMapping{{GroupID: 0x0200, GroupKeySetID: 1}, {GroupID: 0x0100, GroupKeySetID: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := groups(2); !slices.Equal(got, []uint16{0x0200, 0x0100}) {
+		t.Errorf("a map written after v11 = %x, want its written order", got)
+	}
+	m := store.Migrations()[10]
+	if m.Version != "v11" {
+		t.Fatalf("step 11 is %s", m.Version)
+	}
+	if _, err := db.ExecContext(ctx, m.Down); err != nil {
+		t.Fatalf("v11 down: %v", err)
+	}
+	if n, _ := legacyMappings(t, db, 2); n != 2 {
+		t.Errorf("fabric 2's entries after v11 down = %d, want 2", n)
 	}
 }

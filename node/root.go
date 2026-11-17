@@ -268,6 +268,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		MaxGroupKeysPerFabric: cfg.Limits.MaxGroupKeysPerFabric,
 		Groups:                d.groups,
 		Logger:                d.logger,
+		Clock:                 cfg.Clock,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("group key management: %w", err)
@@ -737,7 +738,11 @@ func wireFailSafeHooks(generalCom *mattercore.GeneralCommissioning, opCreds *mat
 // expiredFabric is the fabric the expired fail-safe was armed for at its
 // end — the one an AddNOC under it added, else the one whose session armed
 // it (0 for PASE): the fabric OperationalCredentials' rollback and the
-// participants take.
+// participants are handed. Neither chooses by it: the rollback rolls back
+// every row the store lists as pending, and the participants revert their
+// own state. So an AddNOC the expiry overtook before it re-stamped the
+// fail-safe — reported as the armed fabric, its row pending — is rolled
+// back all the same (review II, R2-P6-fsm-1024).
 func expiredFabric(e mattercore.FailSafeExpiry) uint8 {
 	if e.AddedFabric != 0 {
 		return e.AddedFabric

@@ -18,7 +18,8 @@ import (
 // fabric's stay (review II, R2-P2-fabric-04).
 func TestProviderDropFabricEndsItsSessions(t *testing.T) {
 	p, m := newProvider(t, nil)
-	for _, s := range []camera.ProviderSession{{Id: 1, PeerNodeId: 7, FabricIndex: 1}, {Id: 2, PeerNodeId: 8, FabricIndex: 2}} {
+	video := []uint16{1} // a session names a stream ("O.a+", R2-P6-par-1304)
+	for _, s := range []camera.ProviderSession{{Id: 1, PeerNodeId: 7, FabricIndex: 1, VideoStreams: &video}, {Id: 2, PeerNodeId: 8, FabricIndex: 2, VideoStreams: &video}} {
 		if err := p.UpsertSession(s); err != nil {
 			t.Fatal(err)
 		}

@@ -148,6 +148,70 @@ func (v *MeasurementRangeStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MeasurementRangeStruct) Clone() MeasurementRangeStruct {
+	c := v
+	c.StartTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartTimestamp)
+	c.EndTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndTimestamp)
+	c.MinTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinTimestamp)
+	c.MaxTimestamp = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxTimestamp)
+	c.StartSystime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartSystime)
+	c.EndSystime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EndSystime)
+	c.MinSystime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinSystime)
+	c.MaxSystime = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MaxSystime)
+	return c
+}
+
 // MeasurementRangeStructDef describes MeasurementRangeStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -266,6 +330,24 @@ func (v *MeasurementAccuracyStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MeasurementAccuracyStruct) Clone() MeasurementAccuracyStruct {
+	c := v
+	c.AccuracyRanges = func(s []MeasurementAccuracyRangeStruct) []MeasurementAccuracyRangeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]MeasurementAccuracyRangeStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.AccuracyRanges)
+	return c
+}
+
 // MeasurementAccuracyStructDef describes MeasurementAccuracyStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -317,6 +399,56 @@ func (v *MeasurementAccuracyRangeStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MeasurementAccuracyRangeStruct) Clone() MeasurementAccuracyRangeStruct {
+	c := v
+	c.PercentMax = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PercentMax)
+	c.PercentMin = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PercentMin)
+	c.PercentTypical = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PercentTypical)
+	c.FixedMax = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FixedMax)
+	c.FixedMin = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FixedMin)
+	c.FixedTypical = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FixedTypical)
+	return c
+}
+
 // MeasurementAccuracyRangeStructDef describes MeasurementAccuracyRangeStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -348,6 +480,24 @@ func (v *MeasurementPeriodRangesEvent) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "MeasurementPeriodRanges",
 		spec.Bind(0, "Ranges", true, &v.Ranges, spec.DecodeListIn(spec.DecodeStruct[MeasurementRangeStruct], 1, 2147483647)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v MeasurementPeriodRangesEvent) Clone() MeasurementPeriodRangesEvent {
+	c := v
+	c.Ranges = func(s []MeasurementRangeStruct) []MeasurementRangeStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]MeasurementRangeStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.Ranges)
+	return c
 }
 
 func decodeMeasurementPeriodRangesEvent(n spec.Node) (any, error) {

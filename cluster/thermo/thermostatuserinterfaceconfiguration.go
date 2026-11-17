@@ -5,6 +5,7 @@ package thermo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -90,6 +91,11 @@ type ThermostatUIConfig struct {
 	// setting); an error refuses the write.
 	Sink spec.Sink
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -183,7 +189,7 @@ func NewThermostatUserInterfaceConfiguration(cfg ThermostatUIConfig) (*Thermosta
 		sink = cfg.Sink
 	}
 	srv, err := spec.NewServer(tsuic.Definition, opts, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Sink:        sink,
 		Initial:     initial,
 	})
@@ -199,18 +205,30 @@ func (s *ThermostatUIServer) Set(attrID uint32, value any) error {
 	return s.SetAttributes(map[uint32]any{attrID: value})
 }
 
-// SetAttributes is [spec.Server.SetAttributes]; a KeypadLockout it changes
-// is saved to the Settings.
+// SetAttributes is [spec.Server.SetAttributes]; a KeypadLockout it sets
+// is saved to the Settings first, as a controller's write is
+// (persistingSink): a failed save refuses the call and nothing is stored
+// (R2-P6-store-1563). When the store then refuses another value of the
+// call, the saved KeypadLockout is put back.
 func (s *ThermostatUIServer) SetAttributes(values map[uint32]any) error {
-	if err := s.Server.SetAttributes(values); err != nil {
-		return err
+	given, ok := values[tsuic.AttrKeypadLockout]
+	if !ok || s.settings == nil {
+		return s.Server.SetAttributes(values)
 	}
-	if _, ok := values[tsuic.AttrKeypadLockout]; !ok || s.settings == nil {
-		return nil
+	v, err := s.CheckSet(tsuic.AttrKeypadLockout, given, s.MatterRead)
+	if err != nil {
+		return fmt.Errorf("thermostatuserinterfaceconfiguration: %w", err)
 	}
-	v, _ := s.Value(tsuic.AttrKeypadLockout)
-	if err := s.settings.SetSetting(context.Background(), s.key, fmt.Sprintf("%d", v)); err != nil {
+	old, _ := s.Value(tsuic.AttrKeypadLockout)
+	ctx := context.Background()
+	if err := s.settings.SetSetting(ctx, s.key, fmt.Sprintf("%d", v)); err != nil {
 		return fmt.Errorf("thermostatuserinterfaceconfiguration: save KeypadLockout: %w", err)
+	}
+	if err := s.Server.SetAttributes(values); err != nil {
+		if rerr := s.settings.SetSetting(ctx, s.key, fmt.Sprintf("%d", old)); rerr != nil {
+			return errors.Join(err, fmt.Errorf("thermostatuserinterfaceconfiguration: restore KeypadLockout: %w", rerr))
+		}
+		return err
 	}
 	return nil
 }

@@ -65,7 +65,7 @@ func TestFabriclessPASESessionReadsNoFabricSensitiveData(t *testing.T) {
 		[]mattercore.AccessControlExtensionEntry{{Data: []byte{0x17, 0x18}}}); err != nil {
 		t.Fatal(err)
 	}
-	acl.SetCurrentFabric(h.fabric)
+	acl.SetCurrentFabric(h.fabric) //nolint:staticcheck // SA1019: the server-wide fabric the old fall-back read answered with stays set while the method exists; goes with it
 
 	// Control: the owning fabric's CASE session sees its entry whole.
 	if own := aclRead(t, h, 0x0000, true); len(own.Children) != 1 || len(own.Children[0].Children) < 2 {

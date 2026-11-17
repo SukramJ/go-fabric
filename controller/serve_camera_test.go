@@ -138,6 +138,7 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 	// test registers the session the camera will answer on.
 	if err := c.CameraRequestor().UpsertSession(camera.WebRTCSession{
 		Id: session, PeerNodeId: cameraNodeID, PeerEndpointId: ep, StreamUsage: wrdef.StreamUsageEnum(usage), FabricIndex: c.Fabric().FabricIndex,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", review II R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -191,12 +192,11 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 func newTestCamera(t *testing.T, port *testCameraPort) *device.Camera {
 	t.Helper()
 	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView}
-	off := false
 	streams := []csdef.VideoStreamStruct{{
 		VideoStreamId: 1, StreamUsage: csdef.StreamUsageLiveView, VideoCodec: csdef.VideoCodecH264,
 		MinFrameRate: 15, MaxFrameRate: 30,
 		MinResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxResolution: csdef.VideoResolutionStruct{Width: 1280, Height: 720},
-		MinBitRate: 100_000, MaxBitRate: 2_000_000, KeyFrameInterval: 4000, WatermarkEnabled: &off, OsdEnabled: &off,
+		MinBitRate: 100_000, MaxBitRate: 2_000_000, KeyFrameInterval: 4000, // no WatermarkEnabled, OSDEnabled: neither WMARK nor OSD (R2-P6-par-1304)
 	}}
 	cam, err := device.NewCamera(device.Options{StableKey: device.StringKey("camera"), Name: "Camera"},
 		csdef.Declare{

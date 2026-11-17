@@ -5,7 +5,6 @@ package media
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
@@ -21,11 +20,6 @@ func outputValues(st OutputState) map[uint32]any {
 		outputdef.AttrOutputList:    listOr(st.OutputList),
 		outputdef.AttrCurrentOutput: st.CurrentOutput,
 	}
-}
-
-func cloneOutput(st OutputState) OutputState {
-	st.OutputList = slices.Clone(st.OutputList)
-	return st
 }
 
 // Outputs is the AudioOutput host port (the generated [outputdef.Outputs],
@@ -70,7 +64,7 @@ func NewOutputs(cfg OutputsConfig) (*OutputsServer, error) {
 		handleState(h, &s.stateful, outputdef.CmdRenameOutput, statusOnly(renamer.RenameOutput))
 	}
 	srv, err := newServer(outputdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: AudioOutput: %w", err)
 	}
@@ -78,7 +72,7 @@ func NewOutputs(cfg OutputsConfig) (*OutputsServer, error) {
 		return nil, err
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, outputValues, cloneOutput, storeState[OutputState]); err != nil {
+	if err := s.init(srv, cfg.Initial, outputValues, OutputState.Clone, storeState[OutputState]); err != nil {
 		return nil, fmt.Errorf("media: AudioOutput: %w", err)
 	}
 	if err := checkState(srv); err != nil {

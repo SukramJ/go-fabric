@@ -406,9 +406,6 @@ func TestReceiveOverReliableServesUnsecuredDropsGroup(t *testing.T) {
 	if len(c.sent) != sentBefore {
 		t.Fatalf("%d replies to a dropped group message", len(c.sent)-sentBefore)
 	}
-	if isUnsecuredUnicast([]byte{0}) {
-		t.Fatal("short buffer read as unsecured")
-	}
 }
 
 // TestBindSessionRouteNeverSwitchesTransport: matter.js replaces a
@@ -524,5 +521,61 @@ func TestRouteHelpers(t *testing.T) {
 	}
 	if tcpBindAddr("", false, 5540) != "[::]:5540" || tcpBindAddr("", true, 1) != "0.0.0.0:1" || tcpBindAddr("127.0.0.1:0", false, 7) != "127.0.0.1:7" {
 		t.Fatal("tcpBindAddr")
+	}
+}
+
+// TestReboundSessionMovesItsConnectionCount: a session id a new session
+// reuses binds afresh, and the binding moves from the connection the old
+// session's entry named to the new one — the new connection counts the
+// session, the old one no longer does (R2-P6-test-0819).
+func TestReboundSessionMovesItsConnectionCount(t *testing.T) {
+	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
+	old, err := channel.New(channel.Config{EncryptKey: make([]byte, 16), DecryptKey: make([]byte, 16)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lookup := &harnessLookup{session: old}
+	b.AttachSessionLookup(lookup)
+	sid := harnessLocalSessionID
+	routeA, okA := b.routeFor(&fakeConn{}).(*connRoute)
+	routeB, okB := b.routeFor(&fakeConn{}).(*connRoute)
+	if !okA || !okB {
+		t.Fatal("routes are not connection routes")
+	}
+	count := func(r *connRoute) int {
+		b.routeBindMu.Lock()
+		defer b.routeBindMu.Unlock()
+		return r.sessions
+	}
+	b.bindSessionRoute(sid, routeA)
+	if count(routeA) != 1 {
+		t.Fatalf("connection A counts %d sessions after the bind, want 1", count(routeA))
+	}
+	next, err := channel.New(channel.Config{EncryptKey: make([]byte, 16), DecryptKey: make([]byte, 16)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lookup.mu.Lock()
+	lookup.session = next
+	lookup.mu.Unlock()
+	b.bindSessionRoute(sid, routeB)
+	if a, bb := count(routeA), count(routeB); a != 0 || bb != 1 {
+		t.Fatalf("after the rebind A counts %d and B %d sessions, want 0 and 1", a, bb)
+	}
+}
+
+// TestHandshakeHoldNeedsAConnection: a route without a connection, or a
+// nil route, takes no handshake hold — nothing is held open on it
+// (R2-P6-test-0819).
+func TestHandshakeHoldNeedsAConnection(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
+	r := &connRoute{}
+	b.holdHandshake(r, HandshakeKey{InitiatorNodeID: 0x5A5A, ExchangeID: 1}, false)
+	b.holdHandshake((*connRoute)(nil), HandshakeKey{InitiatorNodeID: 0x5A5A, ExchangeID: 1}, false) // a nil route: nothing to hold, no panic
+	b.routeBindMu.Lock()
+	defer b.routeBindMu.Unlock()
+	if len(r.handshakes) != 0 {
+		t.Fatalf("a route without a connection holds %d handshakes", len(r.handshakes))
 	}
 }

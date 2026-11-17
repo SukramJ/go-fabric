@@ -41,7 +41,14 @@ func (st AppBasicState) values() map[uint32]any {
 	}
 }
 
+// clone is a deep copy of st: the generated ApplicationStruct holds two
+// values and has no Clone, so a copy of it shares nothing; a snapshot that
+// gives it a list fails appBasicClone's CheckClone guard.
 func (st AppBasicState) clone() AppBasicState {
+	if st.Application != nil {
+		a := *st.Application
+		st.Application = &a
+	}
 	st.AllowedVendorList = slices.Clone(st.AllowedVendorList)
 	return st
 }
@@ -69,7 +76,7 @@ type AppBasicServer struct {
 // NewAppBasic builds an ApplicationBasic server.
 func NewAppBasic(cfg AppBasicConfig) (*AppBasicServer, error) {
 	srv, err := spec.NewServer(basicdef.Definition, spec.Options{Attributes: cfg.Attributes},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+		spec.ServerConfig{DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: ApplicationBasic: %w", err)
 	}

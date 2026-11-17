@@ -72,8 +72,10 @@ const (
 // :198-224), plus the default expected processing time and the response
 // buffer — and adds the formula's peer term, the peer's retransmission
 // schedule, which matter.js leaves at 0 for this wait
-// (MessageExchange.ts:875-886 passes no includeMaximumSendingTime, :882;
-// MessageChannel.ts:240): the module's one timer runs from the send, not
+// (packages/protocol/src/protocol/MessageExchange.ts:878-885 passes
+// undefined for includeMaximumSendingTime, :882; MessageChannel.ts:239-240
+// then hands no peerSessionParameters; MRP.ts:102 makes the term 0 — review
+// II, R2-P6-par-0707): the module's one timer runs from the send, not
 // from the report's acknowledgement (notes/parity/by_design.md,
 // BD-Matter-Subscription-ReportWaitBound; review II, R2-P1-req2-12).
 //
@@ -144,12 +146,19 @@ func maxScheduleTime(idle, active, threshold time.Duration, isActive bool, pad t
 //     the freshly-allocated SubscriptionID).
 //  2. SubscribeResponse carrying SubscriptionID + MaxInterval.
 //
-// The manager's engine ticks ongoing reports through the
-// [Bridge.SubscriptionReporter] callback the daemon plumbs into
-// [subscription.NewManager]; that callback re-reads the cached
-// values and ships a fresh ReportData over the original commissioner
-// session, looked up via [exchangeRouting.subTargets] (populated here on
-// successful Subscribe).
+// The attach installs the bridge's [subscription.ReportSender] on m
+// ([subscription.Manager.SetReportSender]): every report of the manager —
+// the ongoing reports with their events and attribute changes, the
+// keep-alives, the flush before a fabric or a session leaves — goes out
+// through it, re-reading the values and shipping a fresh ReportData over
+// the original commissioner session, looked up via
+// [exchangeRouting.subTargets] (populated here on successful Subscribe).
+// Nothing else is to wire: a manager built with
+// subscription.NewManager(cfg, nil, logger) and attached here reports
+// everything (review II, R2-P6-api-0508, owner decision 138). A manager
+// the host wired with the deprecated hooks ([Bridge.SubscriptionReporter],
+// [Bridge.SubscriptionEventReporter], [Bridge.SubscriptionFlushReporter])
+// keeps reporting through them for the deprecation window.
 //
 // Pass nil to revert to noop. The initial ReportData is still built
 // and streamed in full — buildInitialReport runs off the dispatcher and
@@ -211,7 +220,29 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// them from the bridge's log (matter.js ServerSubscription.ts
 		// :541-542 reads the occurrence store at send time).
 		m.SetEventSource(b.eventLog)
+		// The one hook every report goes through.
+		m.SetReportSender(b.sendSubscriptionReport)
 	}
+}
+
+// sendSubscriptionReport is the bridge's [subscription.ReportSender]: a
+// flush goes out as the flush's one ReportData ([Bridge.reportSubscriptionFlush]),
+// a report with events as one ReportData of the events and the attribute
+// changes due with them ([Bridge.reportSubscriptionEvents]), anything else
+// as an attribute report, empty for a keep-alive
+// ([Bridge.reportSubscription]). It sends a pass whose data is all filtered
+// for the subscriber empty and counts it (owner decision 169), so its
+// outcome is always [subscription.Sent].
+func (b *Bridge) sendSubscriptionReport(ctx context.Context, sub *subscription.Subscription, r subscription.Report) subscription.ReportOutcome {
+	switch {
+	case r.Flush:
+		b.reportSubscriptionFlush(ctx, sub, r.Events, r.Paths)
+	case len(r.Events) > 0:
+		b.reportEventsWith(ctx, sub, r.Events, func() []im.ConcreteAttributePath { return r.Paths })
+	default:
+		b.reportSubscription(ctx, sub, r.Paths)
+	}
+	return subscription.Sent
 }
 
 // releaseSubscriptionRouting drops every bridge-side table entry that
@@ -244,9 +275,10 @@ func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
 // peerSourceNodeID is the value the commissioner stamped into
 // SourceNodeID on the original SubscribeRequest header — the bridge
 // echoes it as DestNodeID in every outbound report (Matter §4.4.1.2).
-// sessionID is the operational session under which the reports
-// travel; SessionID==0 means PASE (unencrypted), >0 means CASE
-// (AES-CCM-sealed via [channel.Session]).
+// sessionID is the secure session under which the reports travel,
+// AES-CCM-sealed via [channel.Session] — a CASE or a PASE one ([subTarget.pase]
+// tells them apart). Session 0 is the unsecured session, which carries no
+// IM ([Bridge.resolveSessionPASE]); review II, R2-P6-doc-0515.
 type subTarget struct {
 	src                 net.Addr
 	hasPeerSourceNodeID bool
@@ -310,6 +342,10 @@ type subTarget struct {
 // manager's dirty-flag re-emission rather than a side replay buffer
 // — every attribute change re-marks the path dirty, so the next
 // healthy tick ships a fresh ReportData.
+//
+// Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
+// [subscription.ReportSender] itself; pass nil as
+// [subscription.NewManager]'s reporter. Removable in the next minor release.
 func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 	return b.reportSubscription
 }
@@ -324,6 +360,10 @@ func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 // [subTarget] used for attribute reports, and takes the attribute changes
 // that are due with them ([subscription.Subscription.TakeDuePaths]): one
 // ReportData carries both ([Bridge.reportSubscriptionEvents]).
+//
+// Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
+// [subscription.ReportSender] itself, which reports events too. Removable
+// in the next minor release.
 func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 	return b.reportSubscriptionEvents
 }
@@ -334,6 +374,10 @@ func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 // one subscription owes — events and attributes together — and it ships
 // them as one ReportData and waits for the peer's answer
 // ([Bridge.reportSubscriptionFlush]).
+//
+// Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
+// [subscription.ReportSender] itself, which reports the flush too.
+// Removable in the next minor release.
 func (b *Bridge) SubscriptionFlushReporter() subscription.FlushReporter {
 	return b.reportSubscriptionFlush
 }
@@ -355,9 +399,10 @@ func (b *Bridge) subscriptionTargetOf(sub *subscription.Subscription) (subTarget
 // eventReadAuthorizer builds the ACL + fabric-sensitive gate for event reads
 // and subscriptions from the requesting session's identity, using dispatcher's
 // optional [im.ACLChecker]. A PASE session (fabricIndex==0 before AddNOC,
-// pase==true after it adopted the session onto the new fabric) or a
-// dispatcher without an ACLChecker passes the ACL gate inside
-// [im.AuthorizeEventReports]; its fabric-sensitive drop applies to every
+// pase==true after it adopted the session onto the new fabric) passes the
+// ACL gate inside [im.AuthorizeEventReports]; any other session of a
+// dispatcher without an ACLChecker reads no event (owner decision 136);
+// its fabric-sensitive drop applies to every
 // session — a fabric-sensitive record reaches only the fabric that owns it,
 // none for a PASE session before AddNOC. Shared by
 // the plain event read (receive_dispatch), the Subscribe-Initial priming report
@@ -379,8 +424,9 @@ func (b *Bridge) eventReadAuthorizer(dispatcher im.Dispatcher, fabricIndex uint8
 // authorizedEventReports filters events down to those the subscribing subject
 // (captured on target) is permitted to read AND drops fabric-sensitive records
 // owned by another fabric, as [im.AuthorizeEventReports] does. A PASE session
-// or a dispatcher without an [im.ACLChecker] passes the ACL gate; the
-// fabric-sensitive drop applies to every session. Each event is gated at its
+// passes the ACL gate, and a dispatcher without an [im.ACLChecker] grants
+// any other session nothing; the fabric-sensitive drop applies to every
+// session. Each event is gated at its
 // read privilege — View, the Matter default, for most clusters — and a
 // fabric-sensitive record (AccessControl's among them, Matter §8.4.3.2 /
 // §9.10.7.1) is dropped when its FabricIndex differs from the subscribing
@@ -391,16 +437,22 @@ func (b *Bridge) authorizedEventReports(ctx context.Context, target subTarget, e
 	return im.AuthorizeEventReports(ctx, auth, events)
 }
 
-// reportSubscriptionEvents assembles + ships the ReportData of a report
-// of sub that carries events: the events, and in the same message the
-// attribute changes that are due with them
-// ([subscription.Subscription.TakeDuePaths]). Called by the manager's
-// engine tick. Mirrors matter.js
+// reportSubscriptionEvents is the deprecated [subscription.EventReporter]
+// over [Bridge.reportEventsWith]: it takes the attribute changes due with
+// the events from the subscription ([subscription.Subscription.TakeDuePaths]).
+func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
+	b.reportEventsWith(ctx, sub, events, sub.TakeDuePaths) //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
+}
+
+// reportEventsWith assembles + ships the ReportData of a report of sub
+// that carries events: the events, and in the same message the attribute
+// changes that are due with them, which takePaths hands over once the
+// report is going out. Called through the manager's engine tick. Mirrors matter.js
 // packages/node/src/node/server/ServerSubscription.ts:539-555 at db021da0
 // (#sendUpdate takes the attribute filter and the events' minimum number
 // together) and :860-887, :926-936 (#iterateDataUpdate yields the
 // attributes, then the events, into one DataReport).
-func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
+func (b *Bridge) reportEventsWith(ctx context.Context, sub *subscription.Subscription, events []im.EventReport, takePaths func() []im.ConcreteAttributePath) {
 	if sub == nil || len(events) == 0 {
 		return
 	}
@@ -412,8 +464,8 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		return
 	}
 	// The attribute changes due in this report are this reporter's from
-	// here on: sent below, or marked dirty again when the send fails.
-	paths := sub.TakeDuePaths()
+	// here on: sent below, or owed again when the send fails.
+	paths := takePaths()
 
 	// Authorize each event against the subscribing subject: a CASE
 	// subject only receives events on (endpoint, cluster) it holds at
@@ -421,9 +473,9 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// privilege, default View; AccessControlEntryChanged is Administer).
 	// Without this an ACE-less subject would stream every fired event.
 	// A PASE subscriber passes the ACL gate (the auth mode, not fabric
-	// index 0, which alone is refused), and so does every subscriber of a
-	// dispatcher without an ACLChecker; the fabric-sensitive drop applies
-	// to every subscriber.
+	// index 0, which alone is refused); a dispatcher without an
+	// ACLChecker grants any other subscriber nothing (decision 136). The
+	// fabric-sensitive drop applies to every subscriber.
 	report := im.ReportData{
 		HasSubscription: true,
 		SubscriptionID:  sub.ID,
@@ -432,22 +484,26 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	if dispatcher := b.Dispatcher(); dispatcher != nil && len(paths) > 0 {
 		report.Reports = b.subscriptionAttributeReports(ctx, dispatcher, target, sub, paths)
 	}
-	if len(report.EventReports) == 0 && len(report.Reports) == 0 {
-		// Nothing of the report is for this subscriber: no message is
-		// sent, and the engine is told, so that the pass does not count
-		// as the subscription's last report and the keep-alive due with
-		// it is sent ([subscription.Subscription.NothingSent]; review II,
-		// R2-P0-rv-A03). matter.js sends the DataReport empty here
-		// (packages/node/src/node/server/ServerSubscription.ts:921-936 at
-		// db021da0: `suppressEmptyReport: onlyWithData`, which is false
-		// for the pass a change or the send interval starts, :198-200;
-		// its TODO at :923-925 names the case).
-		sub.NothingSent()
-		return
-	}
+	// A pass whose data is all filtered for this subscriber — the access
+	// check, a fabric-sensitive event of another fabric — sends the
+	// ReportData empty and counts as the subscription's report, as the
+	// attribute path does: one rule, both references' (owner decision 169,
+	// which replaced decision 145; review II, F-db021da0-8). matter.js
+	// sends the DataReport empty here
+	// (packages/node/src/node/server/ServerSubscription.ts:921-936 at
+	// db021da0, `suppressEmptyReport: onlyWithData`, false for the pass a
+	// change or the send interval starts, :198-200; the messenger omits it
+	// only with that flag set, InteractionMessenger.ts:794-796), and so
+	// does connectedhomeip for a dirtied subscription whose pass encodes
+	// nothing, restarting both the min and the max interval
+	// (src/app/reporting/Engine.cpp:818-853, src/app/ReadHandler.cpp:352-362,
+	// src/app/reporting/ReportScheduler.h:141-147 at 6170af84).
 
-	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
-	target.abort = ctx.Done()
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06),
+	// and so does the subscription's close (R2-P6-fsm-0513).
+	abort, endAbort := b.reportAbort(ctx, sub.ID)
+	defer endAbort()
+	target.abort = abort
 
 	// Same bridge-initiated exchange as the attribute path: the
 	// commissioner closed its Subscribe exchange when the
@@ -549,8 +605,8 @@ func (b *Bridge) MatterEmitEvent(endpoint uint16, cluster, event uint32, data an
 // authorized to read, mirroring the per-result ACL gate in
 // [im.HandleReadRequest]. A PASE session — fabricIndex==0 before AddNOC,
 // [im.IsPASEFromContext] after it adopted the session onto the new fabric
-// — or a dispatcher without an [im.ACLChecker] returns every result
-// unchanged.
+// — returns every result; a dispatcher without an [im.ACLChecker] returns
+// none to any other session, as it denies a Read (owner decision 136).
 //
 // This closes the subscribe-path ACL bypass: unlike HandleReadRequest,
 // the subscription read paths (initial + ongoing) call dispatcher.Read
@@ -580,8 +636,9 @@ func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispat
 
 // readResultAuthorizer is the gate [Bridge.readAuthorizedResults] applies
 // to each result, for the subject ctx carries: nil when every result
-// passes (PASE, or a dispatcher without an ACL), else a func reporting
-// whether the subject may read the result's attribute.
+// passes (PASE), else a func reporting whether the subject may read the
+// result's attribute — one that refuses every result for a dispatcher
+// without an [im.ACLChecker] (owner decision 136).
 func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im.ReadResult) bool {
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	if im.IsPASEFromContext(ctx) {
@@ -589,7 +646,7 @@ func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im
 	}
 	aclChecker, hasACL := dispatcher.(im.ACLChecker)
 	if !hasACL {
-		return nil
+		return func(im.ReadResult) bool { return false }
 	}
 	if !im.HasAccessingFabric(fabricIndex) {
 		// No accessing fabric and not PASE: no subject the ACL could grant
@@ -614,6 +671,46 @@ func readResultAuthorizer(ctx context.Context, dispatcher im.Dispatcher) func(im
 	}
 }
 
+// withSessionAuthMode stamps the PASE auth mode on ctx when sessionID was
+// established over PASE ([Bridge.resolveSessionPASE]).
+func (b *Bridge) withSessionAuthMode(ctx context.Context, sessionID uint16) context.Context {
+	if b.resolveSessionPASE(sessionID) {
+		return im.WithAuthModePASE(ctx)
+	}
+	return ctx
+}
+
+// withReadAuthority stamps on ctx the subject's read check
+// ([im.WithAuthority]) that [readResultAuthorizer] applies to the
+// results, so the dispatcher authorises a location before it reads the
+// server there ([im.LookupAuthority]): a subscriber without the grant
+// drives no server read in its priming report or its reports, as a
+// Read's subject drives none since R2-P6-bound-0405 (decision 162;
+// review II, wave 3, the gate's hand-over). The per-result filter stays
+// the gate of what is reported. A PASE session gets no stamp — nothing is
+// checked for it; a dispatcher without an [im.ACLChecker] and a session
+// without an accessing fabric get one that refuses every location, as the
+// filter refuses every result.
+func withReadAuthority(ctx context.Context, dispatcher im.Dispatcher) context.Context {
+	if im.IsPASEFromContext(ctx) {
+		return ctx
+	}
+	refuse := func(uint16, uint32, uint8) im.StatusCode { return im.StatusUnsupportedAccess }
+	aclChecker, hasACL := dispatcher.(im.ACLChecker)
+	if !hasACL {
+		return im.WithAuthority(ctx, refuse)
+	}
+	_, fabricIndex := im.FabricFilterFromContext(ctx)
+	if !im.HasAccessingFabric(fabricIndex) {
+		return im.WithAuthority(ctx, refuse)
+	}
+	subjectNodeID, subjectCATs := im.SubjectFromContext(ctx)
+	base := ctx
+	return im.WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) im.StatusCode {
+		return aclChecker.CheckACL(base, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
+	})
+}
+
 // reportSubscription assembles + ships a ReportData for sub. Called
 // by the manager's engine tick.
 func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subscription, paths []im.ConcreteAttributePath) {
@@ -629,8 +726,11 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		return
 	}
 
-	// The engine's stop ends the wait for a chunk's answer (W2-conc-06).
-	target.abort = ctx.Done()
+	// The engine's stop ends the wait for a chunk's answer (W2-conc-06),
+	// and so does the subscription's close (R2-P6-fsm-0513).
+	abort, endAbort := b.reportAbort(ctx, sub.ID)
+	defer endAbort()
+	target.abort = abort
 
 	report := im.ReportData{
 		HasSubscription: true,
@@ -742,6 +842,13 @@ func (b *Bridge) subjectReadsNothing(ctx context.Context, dispatcher im.Dispatch
 		return false
 	}
 	raw, _ := b.subAccess.LoadOrStore(sub.ID, &subjectAccess{})
+	if sub.IsClosed() {
+		// Closed meanwhile: its routing release may have run before the
+		// entry was stored, and nothing else would drop it (review II,
+		// R2-P6-conc-0512). A close after this check releases it.
+		b.subAccess.Delete(sub.ID)
+		return false
+	}
 	st, ok := raw.(*subjectAccess)
 	if !ok {
 		return false
@@ -785,30 +892,62 @@ const (
 // subjectRefusedEveryPath walks the subscription's paths, as ctx's subject
 // under its pinned ACL, and reports whether at least one is refused and
 // none may be read; it stops at the first path the subject may read. For
-// a refusal, served fingerprints the paths the walk found served — every
-// concrete attribute path and event cluster it judged, in walk order.
+// a refusal, served fingerprints the locations the walk judged — the
+// (endpoint, cluster, privilege) of every attribute location and the
+// (endpoint, cluster) of every event cluster, in walk order.
+//
+// The walk judges a location without reading the server there: it stamps
+// a recording access check ([im.WithAuthority]) that the dispatcher asks
+// before each read ([im.LookupAuthority]), so a denied location is noted
+// and not read, and the first granted one ends the walk (Fable's read of
+// sub round 1, A-1; decision 162). The dispatcher asks once the endpoint
+// and the cluster exist, so a path to an endpoint or cluster the node does
+// not serve stays no refusal (R2-P3-dr-dev-04); a concrete attribute the
+// cluster does not serve is judged by the cluster's access, as a Read
+// answers it (Fable's read of sub round 2, A-2). A dispatcher that never
+// asks the check has read each location already; its results are judged
+// as they come.
 func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChecker, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) (refused bool, served [sha256.Size]byte) {
 	digest := sha256.New()
-	note := func(kind byte, endpoint uint16, cluster, attribute uint32) {
+	note := func(kind byte, endpoint uint16, cluster, detail uint32) {
 		var rec [11]byte
 		rec[0] = kind
 		binary.BigEndian.PutUint16(rec[1:], endpoint)
 		binary.BigEndian.PutUint32(rec[3:], cluster)
-		binary.BigEndian.PutUint32(rec[7:], attribute)
+		binary.BigEndian.PutUint32(rec[7:], detail)
 		digest.Write(rec[:])
 	}
 	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
 	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
+	granted, asked := false, false
+	attrCtx := im.WithAuthority(readCtx, func(endpoint uint16, clusterID uint32, privilege uint8) im.StatusCode {
+		asked = true
+		if granted {
+			// The walk's answer is known; read nothing more.
+			return im.StatusUnsupportedAccess
+		}
+		st := checker.CheckACL(readCtx, target.fabricIndex, target.subjectNodeID, target.subjectCATs, endpoint, clusterID, privilege)
+		if st != im.StatusUnsupportedAccess {
+			granted = true
+			return st
+		}
+		note('a', endpoint, clusterID, uint32(privilege))
+		refused = true
+		return st
+	})
+	exp := im.NewAttributeExpansion(im.WithElementQualities(attrCtx, specElementQualities{}), dispatcher, sub.AttributePaths)
 	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
-	exp := im.NewAttributeExpansion(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, sub.AttributePaths)
-	for {
+	for !granted {
 		_, rr, ok := exp.Next()
 		if !ok {
 			break
 		}
-		if notServed(rr.Status) {
-			continue // nothing the node serves: no refusal (R2-P3-dr-dev-04)
+		if asked || notServed(rr.Status) {
+			continue
 		}
+		// A dispatcher that never asks the stamped check (not an
+		// [endpoint.TopologyDispatcher]) has read the location already;
+		// the result is judged as it comes back.
 		var priv uint8 = 1 // View default
 		if hasPriv {
 			priv = privProvider.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
@@ -819,15 +958,34 @@ func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChec
 		note('a', rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
 		refused = true
 	}
+	if granted {
+		return false, served
+	}
 	auth := b.eventReadAuthorizer(dispatcher, target.fabricIndex, false, target.subjectNodeID, target.subjectCATs)
+	eventCtx := im.WithAuthority(readCtx, func(endpoint uint16, clusterID uint32, _ uint8) im.StatusCode {
+		asked = true
+		if granted {
+			return im.StatusUnsupportedAccess
+		}
+		if auth.Allows(readCtx, endpoint, clusterID) {
+			granted = true
+			return im.StatusSuccess
+		}
+		note('e', endpoint, clusterID, 0)
+		refused = true
+		return im.StatusUnsupportedAccess
+	})
 	for _, p := range sub.EventPaths {
 		probe := im.ConcreteAttributePath{
 			Endpoint: p.Endpoint, HasEndpoint: p.HasEndpoint,
 			Cluster: p.Cluster, HasCluster: p.HasCluster,
 			Attribute: clusterRevisionAttributeID, HasAttribute: true,
 		}
-		for _, rr := range dispatcher.Read(readCtx, probe) {
-			if rr.Status != im.StatusSuccess {
+		for _, rr := range dispatcher.Read(eventCtx, probe) {
+			if granted {
+				return false, served
+			}
+			if asked || rr.Status != im.StatusSuccess {
 				continue
 			}
 			if auth.Allows(readCtx, rr.Path.Endpoint, rr.Path.Cluster) {
@@ -835,6 +993,9 @@ func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChec
 			}
 			note('e', rr.Path.Endpoint, rr.Path.Cluster, 0)
 			refused = true
+		}
+		if granted {
+			return false, served
 		}
 	}
 	digest.Sum(served[:0])
@@ -907,6 +1068,7 @@ func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im
 	if target.pase {
 		readCtx = im.WithAuthModePASE(readCtx)
 	}
+	readCtx = withReadAuthority(readCtx, dispatcher)
 	var reports []im.AttributeReport
 	for _, path := range b.unskippedChangedPaths(readCtx, dispatcher, sub, paths) {
 		for _, rr := range b.readAuthorizedResults(readCtx, dispatcher, path) {
@@ -1158,6 +1320,14 @@ func (o *owedReport) requeue(sub *subscription.Subscription) {
 // :221-227); an error status ends the subscription
 // (ServerSubscription.ts:938-950), a missing answer is a failed update
 // (:558-608).
+//
+// A session's close disarms its waits ([Bridge.endSessionChunkWaits]): a
+// chunk before the last then ends aborted and its data is owed again
+// uncounted, while the last message's wait ends unanswered and counts as
+// a failed update when the subscription still routes — the bridge's
+// SessionClosed ran before the manager's CloseSession. The subscription
+// closes with its session either way; the count reaches nothing on the
+// wire (review II, DR5b-c1-06).
 func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target subTarget, report im.ReportData, owed *owedReport, op string) (exchangeID uint16, delivered bool) {
 	owed.subID = sub.ID
 	counters, exch, wait, err := b.sendInitiatedReportArmed(target, report, true)
@@ -1180,7 +1350,8 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 	owed.exchangeID = exch
 	b.rememberReportExchange(sub.ID, target.sessionID, exch)
 	key := b.recordOngoingReport(target.sessionID, counters, owed)
-	status, answered, aborted := b.awaitReportAnswer(target, exch, wait, op)
+	answer, answered, aborted := b.awaitReportAnswer(target, exch, wait, op)
+	status := answer.status
 	if key != 0 {
 		b.reportCounterOwner.CompareAndDelete(key, owed)
 	}
@@ -1192,6 +1363,11 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 	}
 	switch {
 	case aborted:
+		owed.requeue(sub)
+	case answered && answer.undecodable:
+		// No status of the peer's, so no refusal: a failed update, its
+		// data owed again (owner decision 176; [errChunkAnswerUndecodable]).
+		b.noteSubscriptionSendError(sub.ID, op, fmt.Errorf("%w: exchange %d", errChunkAnswerUndecodable, exch))
 		owed.requeue(sub)
 	case answered && status.IsSuccess():
 		b.noteUpdateDelivered(sub.ID)
@@ -1242,7 +1418,7 @@ var reportAnswerBoundForTests time.Duration
 // without an answer (the session's close, the ACK pump giving the message
 // up) — or aborted by the engine's stop. An answer's standalone ack goes
 // out at once: nothing of ours follows on the exchange to piggyback it on.
-func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-chan im.StatusCode, op string) (status im.StatusCode, answered, aborted bool) {
+func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-chan statusAnswer, op string) (answer statusAnswer, answered, aborted bool) {
 	// One timer from the send, on [Bridge.chunkStatusResponseTimeout]'s
 	// bound: over UDP the sum of two schedule terms — this node's own
 	// retransmissions (with its sender pad) and the peer's, summed on one
@@ -1265,18 +1441,18 @@ func (b *Bridge) awaitReportAnswer(target subTarget, exchangeID uint16, wait <-c
 			b.logger.Debug("matter.tx.subscribe."+op+".unanswered",
 				slog.Int("exchange_id", int(exchangeID)),
 				slog.String("hint", "wait ended without an answer"))
-			return 0, false, false
+			return statusAnswer{}, false, false
 		}
 		b.expediteDuplicateAck(target.sessionID, exchangeID, true)
 		b.RunAckPumpOnce(b.clk().Now())
 		return st, true, false
 	case <-target.abort:
-		return 0, false, true
+		return statusAnswer{}, false, true
 	case <-timer.C():
 		b.logger.Debug("matter.tx.subscribe."+op+".unanswered",
 			slog.Int("exchange_id", int(exchangeID)),
 			slog.String("timeout", timeout.String()))
-		return 0, false, false
+		return statusAnswer{}, false, false
 	}
 }
 
@@ -1459,13 +1635,15 @@ func (b *Bridge) captureSubTarget(subID uint32, src net.Addr, requestHdr *messag
 //
 // An id is re-used only after the whole 16-bit space has been consumed.
 // matter.js also skips an id an open exchange it started on the same
-// session still holds (ExchangeManager.ts:189-197, #freeExchangeIdFor);
-// the bridge keeps no table of its own initiated exchanges to consult.
+// session still holds (ExchangeManager.ts:189-197 at db021da0,
+// #freeExchangeIdFor); the bridge does so for the exchanges it keeps a
+// table of — the ones it opens on a secure session for BDX and Invoke
+// ([Bridge.openInitiatedExchange]; review II, R2-P2-ctr-03).
 func (b *Bridge) nextOutboundExchangeID() uint16 {
 	return uint16(b.outboundExchangeID.Add(1)) //nolint:gosec // G115: the truncation to 16 bits is the wrap past 0xFFFF to 0
 }
 
-// sendReportChunks splits report into per-datagram chunks and ships
+// sendReportChunksNotify splits report into per-datagram chunks and ships
 // them in order on target's exchange, returning the MRP counter of
 // every chunk that was tracked (empty when the bridge sends
 // best-effort). All chunks but the last carry MoreChunkedMessages
@@ -1493,18 +1671,13 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // attribute reports to it (TC-IDM-4.3 step 10). A single-chunk report — the
 // common case — still does not wait: its StatusResponse is consumed by the
 // subscription's own report bookkeeping.
-func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
-	counters, _, err := b.sendReportChunksNotify(target, report, false)
-	return counters, err
-}
-
-// sendReportChunksNotify is [Bridge.sendReportChunks] that, with armFinal,
-// also arms the wait for the peer's StatusResponse to the last chunk just
+//
+// With armFinal it also arms the wait for the peer's StatusResponse to the last chunk just
 // before that chunk goes out and returns it as finalWait — the waits for
 // the chunks before it are this loop's own, on the same key, so arming the
 // final wait up front would have the first of them replace and close it.
 // A failed send disarms it.
-func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, armFinal bool) (counters []uint32, finalWait <-chan im.StatusCode, err error) {
+func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, armFinal bool) (counters []uint32, finalWait <-chan statusAnswer, err error) {
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
 	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
@@ -1574,7 +1747,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 	return counters, finalWait, nil
 }
 
-// sendInitiatedReport ships report on a **fresh bridge-initiated
+// sendInitiatedReportArmed ships report on a **fresh bridge-initiated
 // exchange** instead of reusing the commissioner's Subscribe exchange.
 // Use this for ongoing subscribe reports (matter.js's
 // ServerSubscription.#sendUpdateMessage pattern,
@@ -1596,19 +1769,14 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 // "subscription stays alive across exchanges" expectation via the
 // negotiated SubscriptionID — which matches the commissioner's
 // expectation regardless of which exchange carries the report.
-func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (counters []uint32, exchangeID uint16, err error) {
-	counters, exchangeID, _, err = b.sendInitiatedReportArmed(target, report, false)
-	return counters, exchangeID, err
-}
-
-// sendInitiatedReportArmed is [Bridge.sendInitiatedReport] that, with
-// arm, also arms the wait for the peer's StatusResponse to the report's
+//
+// With arm it also arms the wait for the peer's StatusResponse to the report's
 // last chunk on the fresh exchange, just before that chunk goes out
 // ([Bridge.sendReportChunksNotify] armFinal), so the answer cannot land
 // before the waiter exists; the caller receives on wait through
 // [Bridge.awaitFlushedReport], which disarms it. A failed send disarms
 // it here.
-func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData, arm bool) (counters []uint32, exchangeID uint16, wait <-chan im.StatusCode, err error) {
+func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData, arm bool) (counters []uint32, exchangeID uint16, wait <-chan statusAnswer, err error) {
 	freshExchangeID := b.nextOutboundExchangeID()
 	freshTarget := target
 	freshTarget.exchangeID = freshExchangeID
@@ -1654,18 +1822,19 @@ const flushStatusResponseTimeout = 500 * time.Millisecond
 // after [flushStatusResponseTimeout]; the answer's standalone ack goes
 // out at once, as for a StatusResponse no chunk loop waited for
 // (receive_dispatch's absorbStatusResponse).
-func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan im.StatusCode) {
+func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan statusAnswer) {
 	timeout := flushStatusResponseTimeout
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	defer b.disarmStatusResponseWait(sessionID, exchangeID, true)
 	select {
-	case status := <-wait:
+	case answer := <-wait:
 		b.expediteDuplicateAck(sessionID, exchangeID, true)
 		b.RunAckPumpOnce(b.clk().Now())
 		b.logger.Debug("matter.tx."+op+".flush_answered",
 			slog.Int("exchange_id", int(exchangeID)),
-			slog.String("status", status.String()))
+			slog.String("status", answer.status.String()),
+			slog.Bool("undecodable", answer.undecodable))
 	case <-ctx.Done():
 		b.logger.Debug("matter.tx."+op+".flush_abandoned",
 			slog.Int("exchange_id", int(exchangeID)),
@@ -1717,9 +1886,9 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 
 	// sendUnsolicitedIM is the low-level primitive that ships an IM
 	// datagram on whichever exchange the caller has prepared in `target`.
-	// sendReportChunks is the caller; both ongoing reporters (attributes
-	// and events) and the flush reach it through sendInitiatedReport or
-	// sendInitiatedReportArmed, which forge a fresh bridge-opened exchange
+	// sendReportChunksNotify is the caller; both ongoing reporters
+	// (attributes and events) and the flush reach it through
+	// sendInitiatedReportArmed, which forges a fresh bridge-opened exchange
 	// (target.peerInitiator=false → Initiator=true). A target with peerInitiator=true would answer on
 	// the peer-opened exchange instead — only meaningful while that
 	// exchange is still open on the peer's side.
@@ -1789,7 +1958,11 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// entry, a no-op ([outboundReliableTracker.Ack]).
 	track := tracker != nil && respProto.NeedsAck && !target.flush
 	if track {
-		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, b.clk().Now())
+		// Not sent while an earlier message of the exchange waits for its
+		// acknowledgement ([outboundReliableTracker.TrackOnExchange]; hs 4b).
+		if err := tracker.TrackOnExchange(counter, target.sessionID, target.exchangeID, !target.peerInitiator, datagram, dest, b.clk().Now()); err != nil {
+			return 0, err
+		}
 	}
 	if err := b.sendRouted(listener, dest, target.sessionID, datagram); err != nil {
 		if track {
@@ -1837,10 +2010,14 @@ func (b *Bridge) currentPeerAddr(sessionID uint16, fallback net.Addr) net.Addr {
 // abandonPrimingSubscription closes a subscription whose priming report
 // or SubscribeResponse did not go out: the controller never saw it
 // established, and a priming subscription would otherwise sit silent in
-// the manager until its session closed.
+// the manager until its session closed. It never became active, so it is
+// released, not terminated: no row was persisted for it and the fabric is
+// not re-announced, as the re-establishment unwinds the same state
+// (review II, R2-P6-sec-0509). A CASE peer that subscribes to nothing
+// does not start one re-announcement per request.
 func (b *Bridge) abandonPrimingSubscription(subID uint32) {
 	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
-		_ = m.Close(subID)
+		_ = m.Release(subID)
 	}
 }
 
@@ -1926,9 +2103,7 @@ func (b *Bridge) subscribeWith(
 	// session's fabric only (review II, R2-P2-alloc-07).
 	subLocalNodeID := b.localNodeIDFor(requestHdr.SessionID, subFabricIndex)
 	subCtx = im.WithLocalNodeID(subCtx, subLocalNodeID)
-	if b.resolveSessionPASE(requestHdr.SessionID) {
-		subCtx = im.WithAuthModePASE(subCtx)
-	}
+	subCtx = withReadAuthority(b.withSessionAuthMode(subCtx, requestHdr.SessionID), dispatcher)
 
 	// A normal subscribe from this peer has begun: a re-establishment of
 	// its former subscriptions still in flight must leave it alone.
@@ -2009,7 +2184,7 @@ func (b *Bridge) subscribeWith(
 	var events func() []im.EventReport
 	if len(primingReq.EventRequests) > 0 {
 		events = func() []im.EventReport {
-			primed.EventReports = b.primingEvents(subCtx, dispatcher, primingReq)
+			primed.EventReports = b.primingEvents(subCtx, dispatcher, primingReq, false)
 			return primed.EventReports
 		}
 	}
@@ -2275,7 +2450,25 @@ func (l *listenerSet) add(unsub func()) {
 // the generation only: a wiring a later one overtook while it registered
 // is detached again instead of installed, so the last one wins. It
 // returns the generation it wired under.
+//
+// Wirings run one after the other (rewireMu): one that starts while
+// another registers waits for it and then detaches what it installed, so
+// it takes up the quieter paths that wiring parks, with the changes their
+// throttles hold back, and the host's notifiers never hold the listeners
+// of two wirings. Before, two wirings at once left the later one with
+// fresh throttles while the earlier one, overtaken, parked its paths
+// where nothing took them up (review II, N4-rwsub-2). A host's notifier
+// does not re-wire from inside its registration or its unsubscribe
+// closure: the second wiring would wait for the first on the same
+// goroutine (contract.ChangeNotifier; Fable's read of sub round 2, R-1).
 func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
+	if !b.rewireMu.TryLock() {
+		if hook := b.rewireQueuedForTest; hook != nil {
+			hook()
+		}
+		b.rewireMu.Lock()
+	}
+	defer b.rewireMu.Unlock()
 	b.mu.Lock()
 	stale := b.measurementUnsubscribers
 	b.measurementUnsubscribers = nil
@@ -2433,7 +2626,8 @@ func (b *Bridge) wireRootNotifiers(set *listenerSet, mgr *subscription.Manager, 
 // observable (ServerBehaviorBacking.ts:253-261 at db021da0) — and the version
 // advanced through OnAttributeChange, which tells of every change at once
 // ([quieterVersion]); any other server is subscribed through
-// OnAttributeChange alone. Caller holds b.mu.
+// OnAttributeChange alone. It takes no lock of b's; the rewire calls it
+// without b.mu (review II, R2-P6-doc-0515).
 func (b *Bridge) wireAttributeNotifiers(set *listenerSet, mgr *subscription.Manager, topology *endpointpkg.Topology) {
 	for _, ep := range topology.Endpoints {
 		if ep == nil {
@@ -2626,6 +2820,14 @@ func (l *listenerSet) settlerFor(ep *endpointpkg.Endpoint, cluster uint32) func(
 	}
 }
 
+// isOpen reports whether a command's commit of (endpoint, cluster) is open.
+func (t *invokeCommitTable) isOpen(endpoint uint16, cluster uint32) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, ok := t.open[invokedCluster{endpoint, cluster}]
+	return ok
+}
+
 // advanceAtEnd records in the open commit of (endpoint, cluster) that it
 // advances the version when it ends, marking nothing dirty for it, and
 // reports true; false when no commit is open.
@@ -2713,7 +2915,22 @@ func (b *Bridge) wireMeasurementNotifier(set *listenerSet, mgr *subscription.Man
 			mgr.OnAttributeChanged(p)
 		}
 		for _, qp := range quiet {
-			if !b.invokeCommits.hold(epID, qp.path.Cluster, []uint32{qp.path.Attribute}) && !b.writeHolds.holdQuiet(epID, qp) {
+			// A command running against the cluster advances its version
+			// once when it ends; the report still waits for the throttle,
+			// so the commit owes the advance alone (advanceAtEnd), not a
+			// mark that would pass the throttle (review II, N4-x3-1).
+			if b.invokeCommits.isOpen(epID, qp.path.Cluster) {
+				inCommit := map[uint32]struct{}{qp.path.Cluster: {}}
+				if qp.check(inCommit) && !b.invokeCommits.advanceAtEnd(epID, qp.path.Cluster) {
+					// The commit ended meanwhile: the change is its own.
+					if _, done := bumped[qp.path.Cluster]; !done {
+						ep.BumpClusterDataVersion(qp.path.Cluster)
+						bumped[qp.path.Cluster] = struct{}{}
+					}
+				}
+				continue
+			}
+			if !b.writeHolds.holdQuiet(epID, qp) {
 				qp.check(bumped)
 			}
 		}
@@ -2933,20 +3150,21 @@ func (qp *quietPath) read() (attributeReading, bool) {
 
 // check reads the value of a bound quietPath and, on a change, advances the cluster's
 // DataVersion — unless bumped holds the cluster, advanced by this
-// notification already, which check adds it to — and tells the throttle,
-// with the nullness of the old and the new value; a value no server
-// answers counts as null.
-func (qp *quietPath) check(bumped map[uint32]struct{}) {
+// notification already (or owed by a command's commit), which check adds
+// it to — and tells the throttle, with the nullness of the old and the new
+// value; a value no server answers counts as null. It reports whether the
+// value changed.
+func (qp *quietPath) check(bumped map[uint32]struct{}) bool {
 	qp.mu.Lock()
 	defer qp.mu.Unlock()
 	if qp.ep == nil {
-		return // parked: the next wiring sees the change
+		return false // parked: the next wiring sees the change
 	}
 	cur, ok := qp.read()
 	wasNull := !qp.had || qp.last.raw == nil
 	isNull := !ok || cur.raw == nil
 	if (wasNull && isNull) || (ok && qp.had && qp.last.equal(cur)) {
-		return
+		return false
 	}
 	qp.last, qp.had = cur, ok
 	if _, done := bumped[qp.path.Cluster]; !done {
@@ -2954,6 +3172,7 @@ func (qp *quietPath) check(bumped map[uint32]struct{}) {
 		bumped[qp.path.Cluster] = struct{}{}
 	}
 	qp.q.Changed(wasNull, isNull)
+	return true
 }
 
 // settle reads the value of a bound quietPath into its memory without
@@ -3521,6 +3740,11 @@ func (b *Bridge) unskippedChangedPaths(ctx context.Context, dispatcher im.Dispat
 		return paths
 	}
 	qctx := im.WithElementQualities(ctx, specElementQualities{})
+	// A flagged path with a WildcardFilterConfigurationVersion reads the
+	// node's ConfigurationVersion each time its flags are asked; one
+	// report asks once per (changed path × covering subscribed path), so
+	// the reads are taken once per report (review II, R2-P6-bound-0565).
+	reads := &reportReads{Dispatcher: dispatcher}
 	out := make([]im.ConcreteAttributePath, 0, len(paths))
 	for _, p := range paths {
 		if !p.HasEndpoint || !p.HasCluster || !p.HasAttribute {
@@ -3528,13 +3752,33 @@ func (b *Bridge) unskippedChangedPaths(ctx context.Context, dispatcher im.Dispat
 			continue
 		}
 		for _, sp := range sub.AttributePaths {
-			if subscribedPathCovers(sp, p) && !im.WildcardPathFlagsSkip(qctx, dispatcher, sp, p) {
+			if subscribedPathCovers(sp, p) && !im.WildcardPathFlagsSkip(qctx, reads, sp, p) {
 				out = append(out, p)
 				break
 			}
 		}
 	}
 	return out
+}
+
+// reportReads is a dispatcher whose reads are taken once for the one
+// report it serves: a second read of a path answers the first's results.
+// One goroutine uses it, for one report's path filter.
+type reportReads struct {
+	im.Dispatcher
+	reads map[im.ConcreteAttributePath][]im.ReadResult
+}
+
+func (r *reportReads) Read(ctx context.Context, path im.ConcreteAttributePath) []im.ReadResult {
+	if res, ok := r.reads[path]; ok {
+		return res
+	}
+	res := r.Dispatcher.Read(ctx, path)
+	if r.reads == nil {
+		r.reads = make(map[im.ConcreteAttributePath][]im.ReadResult)
+	}
+	r.reads[path] = res
+	return res
 }
 
 // subscribedPathCovers reports whether the subscribed (possibly wildcard)

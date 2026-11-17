@@ -69,6 +69,11 @@ type ClientManagementConfig struct {
 	Store Store
 	Key   string
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -91,10 +96,24 @@ type ClientManagement struct {
 	key   string
 	cfg   ClientManagementConfig
 
-	// mu guards the state below.
+	// mu guards the state below; every locked section runs through
+	// [ClientManagement.locked] (TestEveryLockIsDeferred). ProvisionEndpoint
+	// asks Certificates with mu held, so its check and its insert are one
+	// step against a RemoveRootCertificate or RemoveClientCertificate,
+	// whose dependency check takes mu: the lock order is this server's mu
+	// before the lookup's, and a [CertificateLookup] must not call back
+	// into this server.
 	mu  sync.Mutex
 	rec endpointRecord
 	ids idAllocator
+}
+
+// locked runs f with mu held; the deferred unlock frees the lock however
+// f ends, a panic included (R2-P6-conc-1101).
+func (m *ClientManagement) locked(f func()) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f()
 }
 
 // Compile-time assertions.
@@ -127,13 +146,16 @@ func NewClientManagement(ctx context.Context, cfg ClientManagementConfig) (*Clie
 	if err := load(ctx, cfg.Store, m.key, &m.rec); err != nil {
 		return nil, err
 	}
+	if err := m.rec.validate(m.key); err != nil {
+		return nil, err
+	}
 	m.ids.next = m.rec.Next
 	handlers := map[uint32]spec.CommandHandler{
 		tcldef.CmdProvisionEndpoint: m.provision,
 		tcldef.CmdFindEndpoint:      m.find,
 		tcldef.CmdRemoveEndpoint:    m.remove,
 	}
-	srv, err := spec.NewServer(tcldef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(tcldef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrClientConfig, err)
 	}
@@ -145,11 +167,11 @@ func NewClientManagement(ctx context.Context, cfg ClientManagementConfig) (*Clie
 		return nil, fmt.Errorf("%w: %w", ErrClientConfig, err)
 	}
 	if cm, ok := cfg.Certificates.(*CertificateManagement); ok {
-		cm.mu.Lock()
-		if cm.checker == nil {
-			cm.checker = m
-		}
-		cm.mu.Unlock()
+		cm.locked(func() {
+			if cm.checker == nil {
+				cm.checker = m
+			}
+		})
 	}
 	return m, nil
 }
@@ -192,9 +214,8 @@ func (m *ClientManagement) commitLocked(ctx context.Context, prev endpointRecord
 }
 
 func (m *ClientManagement) publish() {
-	m.mu.Lock()
-	v := m.listValue()
-	m.mu.Unlock()
+	var v spec.List[Endpoint]
+	m.locked(func() { v = m.listValue() })
 	_ = m.srv.SetAttributesFrom(contract.OriginCommand, map[uint32]any{tcldef.AttrProvisionedEndpoints: v})
 }
 
@@ -218,25 +239,26 @@ func (m *ClientManagement) ProvisionedEndpoint(fabricIndex uint8, endpointID uin
 // count, never below 0; past 255 is [ErrReferenceCount]. Mirrors chip's
 // example delegate (tls-client-management-instance.cpp:410-432).
 func (m *ClientManagement) MutateEndpointReferenceCount(fabricIndex uint8, endpointID uint16, delta int8) error {
-	m.mu.Lock()
-	i := m.index(fabricIndex, endpointID)
-	if i < 0 {
-		m.mu.Unlock()
-		return ErrNoEndpoint
-	}
-	prev := cloneEndpoints(m.rec)
-	e := &m.rec.Endpoints[i]
-	if -int(delta) <= int(e.ReferenceCount) { // :418
-		if int(delta)+int(e.ReferenceCount) > 255 { // :420-421
-			m.mu.Unlock()
-			return ErrReferenceCount
+	var err error
+	m.locked(func() {
+		i := m.index(fabricIndex, endpointID)
+		if i < 0 {
+			err = ErrNoEndpoint
+			return
 		}
-		e.ReferenceCount = uint8(int(e.ReferenceCount) + int(delta)) //nolint:gosec // 0..255, checked above
-	} else {
-		e.ReferenceCount = 0 // :426
-	}
-	err := m.commitLocked(context.Background(), prev)
-	m.mu.Unlock()
+		prev := cloneEndpoints(m.rec)
+		e := &m.rec.Endpoints[i]
+		if -int(delta) <= int(e.ReferenceCount) { // :418
+			if int(delta)+int(e.ReferenceCount) > 255 { // :420-421
+				err = ErrReferenceCount
+				return
+			}
+			e.ReferenceCount = uint8(int(e.ReferenceCount) + int(delta)) //nolint:gosec // 0..255, checked above
+		} else {
+			e.ReferenceCount = 0 // :426
+		}
+		err = m.commitLocked(context.Background(), prev)
+	})
 	if err != nil {
 		return err
 	}
@@ -286,6 +308,15 @@ var _ im.MatterClusterStatusError = clusterStatus{}
 // EndpointID adds an endpoint within MaxProvisioned, an EndpointID replaces
 // the fabric's entry of it (NOT_FOUND without one) with its reference
 // count reset.
+//
+// The reset is chip's example delegate's (tls-client-management-instance.cpp
+// :320, `endpointStruct.referenceCount = 0;` after both the new and the
+// update branch), mirrored (decision 150, R2-P6-fsm-1108): an endpoint a
+// push transport holds can be re-provisioned, even with the same values,
+// and is then removable, and so are the root and client certificates it
+// names. The reference count and the [DependencyChecker] keep an
+// endpoint and its certificates only until such a re-provision; the
+// holder of the endpoint does not learn of it.
 func (m *ClientManagement) provision(ctx context.Context, fields any) (any, error) {
 	req, err := requestOf[tcldef.ProvisionEndpointRequest](fields, "TlsClientManagement", "ProvisionEndpoint")
 	if err != nil {
@@ -298,13 +329,25 @@ func (m *ClientManagement) provision(ctx context.Context, fields any) (any, erro
 		return nil, spec.Errorf(im.StatusConstraintError, "TlsClientManagement: CAID %d", req.Caid)
 	}
 	fabric := accessingFabric(ctx)
+	var id uint16
+	m.locked(func() { id, err = m.provisionLocked(ctx, fabric, req) })
+	if err != nil {
+		return nil, err
+	}
+	m.publish() // :209
+	return tcldef.ProvisionEndpointResponse{EndpointId: id}, nil
+}
+
+// provisionLocked is ProvisionEndpoint's checks and its insert in one
+// step, the certificate lookups included (R2-P6-conc-1109); the caller
+// holds mu.
+func (m *ClientManagement) provisionLocked(ctx context.Context, fabric uint8, req tcldef.ProvisionEndpointRequest) (uint16, error) {
 	if !m.hasRoot(fabric, req.Caid) { // :193-196
-		return nil, clusterStatus{tcldef.StatusCodeRootCertificateNotFound, fmt.Sprintf("TlsClientManagement: root certificate %d not found", req.Caid)}
+		return 0, clusterStatus{tcldef.StatusCodeRootCertificateNotFound, fmt.Sprintf("TlsClientManagement: root certificate %d not found", req.Caid)}
 	}
 	if !req.Ccdid.Null && !m.hasClient(fabric, req.Ccdid.Value) { // :197-200
-		return nil, clusterStatus{tcldef.StatusCodeClientCertificateNotFound, fmt.Sprintf("TlsClientManagement: client certificate %d not found", req.Ccdid.Value)}
+		return 0, clusterStatus{tcldef.StatusCodeClientCertificateNotFound, fmt.Sprintf("TlsClientManagement: client certificate %d not found", req.Ccdid.Value)}
 	}
-	m.mu.Lock()
 	inFabric := 0
 	for _, e := range m.rec.Endpoints {
 		if e.Fabric != fabric {
@@ -312,8 +355,7 @@ func (m *ClientManagement) provision(ctx context.Context, fields any) (any, erro
 		}
 		inFabric++
 		if bytes.Equal(e.Hostname, req.Hostname) && e.Port == req.Port && (req.EndpointId.Null || req.EndpointId.Value != e.EndpointID) { // :280-288
-			m.mu.Unlock()
-			return nil, clusterStatus{tcldef.StatusCodeEndpointAlreadyInstalled, "TlsClientManagement: the hostname and port are provisioned"}
+			return 0, clusterStatus{tcldef.StatusCodeEndpointAlreadyInstalled, "TlsClientManagement: the hostname and port are provisioned"}
 		}
 	}
 	prev := cloneEndpoints(m.rec)
@@ -325,34 +367,28 @@ func (m *ClientManagement) provision(ctx context.Context, fields any) (any, erro
 	entry := endpointEntry{Fabric: fabric, Hostname: bytes.Clone(req.Hostname), Port: req.Port, CAID: req.Caid, CCDID: ccdid} // :315-321
 	if req.EndpointId.Null {
 		if inFabric >= int(m.cfg.MaxProvisioned) { // :296-297
-			m.mu.Unlock()
-			return nil, spec.Errorf(im.StatusResourceExhausted, "TlsClientManagement: %d endpoints", inFabric)
+			return 0, spec.Errorf(im.StatusResourceExhausted, "TlsClientManagement: %d endpoints", inFabric)
 		}
 		id, ok := m.ids.allocate(func(id uint16) bool {
 			return slices.ContainsFunc(m.rec.Endpoints, func(e endpointEntry) bool { return e.EndpointID == id })
 		})
 		if !ok { // :302
-			m.mu.Unlock()
-			return nil, spec.Errorf(im.StatusResourceExhausted, "TlsClientManagement: no free endpoint id")
+			return 0, spec.Errorf(im.StatusResourceExhausted, "TlsClientManagement: no free endpoint id")
 		}
 		entry.EndpointID = id
 		m.rec.Endpoints = append(m.rec.Endpoints, entry)
 	} else {
 		i := m.index(fabric, req.EndpointId.Value)
 		if i < 0 { // :309-311
-			m.mu.Unlock()
-			return nil, spec.Errorf(im.StatusNotFound, "TlsClientManagement: endpoint %d not found", req.EndpointId.Value)
+			return 0, spec.Errorf(im.StatusNotFound, "TlsClientManagement: endpoint %d not found", req.EndpointId.Value)
 		}
 		entry.EndpointID = req.EndpointId.Value
 		m.rec.Endpoints[i] = entry
 	}
-	if err = m.commitLocked(ctx, prev); err != nil {
-		m.mu.Unlock()
-		return nil, err
+	if err := m.commitLocked(ctx, prev); err != nil {
+		return 0, err
 	}
-	m.mu.Unlock()
-	m.publish() // :209
-	return tcldef.ProvisionEndpointResponse{EndpointId: entry.EndpointID}, nil
+	return entry.EndpointID, nil
 }
 
 func (m *ClientManagement) hasRoot(fabric uint8, caid uint16) bool {
@@ -403,20 +439,20 @@ func (m *ClientManagement) remove(ctx context.Context, fields any) (any, error) 
 		return nil, spec.Errorf(im.StatusConstraintError, "TlsClientManagement: endpoint id %d", req.EndpointId)
 	}
 	fabric := accessingFabric(ctx)
-	m.mu.Lock()
-	i := m.index(fabric, req.EndpointId)
-	switch {
-	case i < 0: // :350
-		m.mu.Unlock()
-		return nil, spec.Errorf(im.StatusNotFound, "TlsClientManagement: endpoint %d not found", req.EndpointId)
-	case m.rec.Endpoints[i].ReferenceCount != 0: // :352
-		m.mu.Unlock()
-		return nil, clusterStatus{tcldef.StatusCodeEndpointInUse, fmt.Sprintf("TlsClientManagement: endpoint %d is in use", req.EndpointId)}
-	}
-	prev := cloneEndpoints(m.rec)
-	m.rec.Endpoints = slices.Delete(m.rec.Endpoints, i, i+1)
-	err = m.commitLocked(ctx, prev)
-	m.mu.Unlock()
+	m.locked(func() {
+		i := m.index(fabric, req.EndpointId)
+		switch {
+		case i < 0: // :350
+			err = spec.Errorf(im.StatusNotFound, "TlsClientManagement: endpoint %d not found", req.EndpointId)
+			return
+		case m.rec.Endpoints[i].ReferenceCount != 0: // :352
+			err = clusterStatus{tcldef.StatusCodeEndpointInUse, fmt.Sprintf("TlsClientManagement: endpoint %d is in use", req.EndpointId)}
+			return
+		}
+		prev := cloneEndpoints(m.rec)
+		m.rec.Endpoints = slices.Delete(m.rec.Endpoints, i, i+1)
+		err = m.commitLocked(ctx, prev)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -440,18 +476,20 @@ func (m *ClientManagement) FabricRemoved(ctx context.Context, fabricIndex uint8)
 // endpoints leave ([ClientManagement.MatterFabricRemoved]); the error is
 // the store's.
 func (m *ClientManagement) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
-	m.mu.Lock()
-	prev := cloneEndpoints(m.rec)
-	m.rec.Endpoints = slices.DeleteFunc(m.rec.Endpoints, func(e endpointEntry) bool { return e.Fabric == fabricIndex })
-	if len(prev.Endpoints) == len(m.rec.Endpoints) {
-		m.mu.Unlock()
-		return nil
-	}
-	// A refused save keeps the table as it was (commitLocked); the next
-	// reconcile drops it again.
-	err := m.commitLocked(ctx, prev)
-	m.mu.Unlock()
-	if err != nil {
+	var err error
+	changed := false
+	m.locked(func() {
+		prev := cloneEndpoints(m.rec)
+		m.rec.Endpoints = slices.DeleteFunc(m.rec.Endpoints, func(e endpointEntry) bool { return e.Fabric == fabricIndex })
+		if len(prev.Endpoints) == len(m.rec.Endpoints) {
+			return
+		}
+		changed = true
+		// A refused save keeps the table as it was (commitLocked); the
+		// next reconcile drops it again.
+		err = m.commitLocked(ctx, prev)
+	})
+	if !changed || err != nil {
 		return err
 	}
 	m.publish()

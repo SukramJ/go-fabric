@@ -50,6 +50,11 @@ type HeldConfig struct {
 	// layer sets it, as it sets onoff.Config.Bridged.
 	Bridged bool
 	// DataVersion is an optional host-owned tracker, as [Config.DataVersion].
+	//
+	// Deprecated: no controller reads this tracker — the wire carries the
+	// endpoint's DataVersion for the cluster, which the bridge keeps
+	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
+	// minor release.
 	DataVersion *cluster.DataVersionTracker
 	// ManageTransitions runs the commands as gradual transitions, stepping
 	// the level every StepInterval and reporting RemainingTime (matter.js

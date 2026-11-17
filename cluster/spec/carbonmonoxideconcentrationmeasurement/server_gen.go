@@ -31,6 +31,49 @@ type State struct {
 	LevelValue                 LevelValueEnum        // attribute 0x000A: LevelValueEnum, LEV, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.MeasuredValue = func(p *float32) *float32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MeasuredValue)
+	c.MinMeasuredValue = func(p *float32) *float32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MinMeasuredValue)
+	c.MaxMeasuredValue = func(p *float32) *float32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.MaxMeasuredValue)
+	c.PeakMeasuredValue = func(p *float32) *float32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PeakMeasuredValue)
+	c.AverageMeasuredValue = func(p *float32) *float32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.AverageMeasuredValue)
+	return c
+}
+
 // Patch is a change to the CarbonMonoxideConcentrationMeasurement state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

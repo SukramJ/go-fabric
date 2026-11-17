@@ -191,10 +191,8 @@ func TestBasicInfo_ReadAllAttributes(t *testing.T) {
 func TestBasicInfo_OptionalAttributesAbsentWhenUnset(t *testing.T) {
 	t.Parallel()
 	// Contract: optional attributes return (nil, false) when the
-	// Config field is empty/zero — except SerialNumber, which
-	// always returns a value (when no SerialNumber is configured,
-	// the UniqueID-derived fallback is served so Apple's HAP-mapper
-	// cache is pre-populated), and ProductLabel, which defaults to the
+	// Config field is empty/zero — SerialNumber included (no value is
+	// derived, decision 166) — except ProductLabel, which defaults to the
 	// ProductName as matter.js's (TestParityMatterJS_BasicInfoServer_InitializeDefaults).
 	optionalIDs := []uint32{
 		0x000B, // ManufacturingDate
@@ -211,28 +209,14 @@ func TestBasicInfo_OptionalAttributesAbsentWhenUnset(t *testing.T) {
 	}
 }
 
-// TestBasicInfo_SerialNumberFallback locks the SerialNumber fallback:
-// when no SerialNumber is configured, MatterRead serves a deterministic
-// fallback derived from UniqueID. Apple Home's HAP-mapper caches
-// EP0:0x28:0x000F on the initial Subscribe; without the fallback
-// the cache stays empty and `could not find cached attribute
-// values for EP0:0x28:0x000F` is the symptom.
+// TestBasicInfo_SerialNumberFallback: without a configured SerialNumber
+// the root serves none — no value is derived from UniqueID (owner
+// decision 166; TestParityMatterJS_BasicInfoServer_SerialNumberOnlyWhenStated).
 func TestBasicInfo_SerialNumberFallback(t *testing.T) {
 	t.Parallel()
 	b := newValidBasicInfo(t)
-	v, ok := b.MatterRead(0x000F)
-	if !ok {
-		t.Fatalf("MatterRead(SerialNumber) returned false — fallback missing")
-	}
-	s, isString := v.(string)
-	if !isString {
-		t.Fatalf("MatterRead(SerialNumber) = %T, want string", v)
-	}
-	if s == "" {
-		t.Fatalf("MatterRead(SerialNumber) returned empty fallback")
-	}
-	if len(s) > 32 {
-		t.Errorf("SerialNumber fallback len=%d, exceeds spec ceiling 32", len(s))
+	if v, ok := b.MatterRead(0x000F); ok {
+		t.Fatalf("MatterRead(SerialNumber) = %v, want not served", v)
 	}
 }
 
@@ -1038,26 +1022,6 @@ func TestBasicInfo_MatterRead_UnknownAttr(t *testing.T) {
 	}
 }
 
-// TestBasicInfo_MatterRead_SerialTruncated verifies that when the uniqueID
-// component produces a long serial, basicInfoSerialFromUniqueID truncates it.
-// uniqueID() always returns a 32-char hex string (> 16 chars) so the uid[:16]
-// branch always executes here.
-func TestBasicInfo_MatterRead_SerialTruncated(t *testing.T) {
-	t.Parallel()
-	bi := newValidBasicInfo(t)
-	v, ok := bi.MatterRead(0x000F) // basicInfoAttrSerialNumber
-	if !ok {
-		t.Fatal("MatterRead(SerialNumber): ok=false")
-	}
-	s, ok2 := v.(string)
-	if !ok2 {
-		t.Fatalf("MatterRead(SerialNumber): type=%T, want string", v)
-	}
-	if len(s) > 16 {
-		t.Errorf("MatterRead(SerialNumber): len=%d > 16 (truncation did not apply)", len(s))
-	}
-}
-
 // TestBasicInfo_MatterWrite_LocationTypeMismatch exercises the error branch
 // when MatterWrite(Location) receives a non-string value.
 func TestBasicInfo_MatterWrite_LocationTypeMismatch(t *testing.T) {
@@ -1239,14 +1203,14 @@ func TestBasicInfo_SoftwareVersionDerivedFromVersionString(t *testing.T) {
 }
 
 // TestBasicInfo_UniqueIDSurvivesNodeLabelWrite pins Matter §11.1.5.13
-// quality F on UniqueID (0x0012) and on the SerialNumber (0x000F)
-// fallback derived from it: a controller renaming the bridge writes
+// quality F on UniqueID (0x0012): a controller renaming the bridge writes
 // NodeLabel with Manage privilege, and the node's identity must not move
-// under the controller's cache when it does.
+// under the controller's cache when it does. SerialNumber (0x000F), not
+// configured here, stays unserved before and after.
 func TestBasicInfo_UniqueIDSurvivesNodeLabelWrite(t *testing.T) {
 	t.Parallel()
 	cfg := validBasicInfoConfig()
-	cfg.SerialNumber = "" // force the UniqueID-derived SerialNumber fallback
+	cfg.SerialNumber = "" // none configured: none served (decision 166)
 	b, err := core.NewBasicInformation(cfg)
 	if err != nil {
 		t.Fatalf("NewBasicInformation: %v", err)
@@ -1274,13 +1238,13 @@ func TestBasicInfo_UniqueIDSurvivesNodeLabelWrite(t *testing.T) {
 // TestBasicInfo_UniqueIDSurvivesRestoredNodeLabel covers the boot path a
 // MatterWrite test cannot reach: the daemon constructs the cluster from
 // the configured label and only afterwards restores the commissioner-
-// written NodeLabel it persisted on an earlier run. UniqueID (and the
-// SerialNumber fallback derived from it) must not move when it does —
-// both carry quality F (Matter §11.1.5.13).
+// written NodeLabel it persisted on an earlier run. UniqueID must not move
+// when it does — it carries quality F (Matter §11.1.5.13); SerialNumber,
+// not configured here, is not served (decision 166).
 func TestBasicInfo_UniqueIDSurvivesRestoredNodeLabel(t *testing.T) {
 	t.Parallel()
 	cfg := validBasicInfoConfig()
-	cfg.SerialNumber = "" // force the UniqueID-derived SerialNumber fallback
+	cfg.SerialNumber = "" // none configured: none served (decision 166)
 	b, err := core.NewBasicInformation(cfg)
 	if err != nil {
 		t.Fatalf("NewBasicInformation: %v", err)
@@ -1327,9 +1291,8 @@ func TestBasicInfo_PinnedUniqueIDIsAuthoritative(t *testing.T) {
 	if got, _ := b.MatterRead(0x0012); got != persisted {
 		t.Errorf("UniqueID = %v, want the persisted %q — the attribute is quality F and must not follow the label", got, persisted)
 	}
-	want := persisted[:16]
-	if got, _ := b.MatterRead(0x000F); got != want {
-		t.Errorf("SerialNumber = %v, want the pinned-UniqueID slice %q", got, want)
+	if got, ok := b.MatterRead(0x000F); ok {
+		t.Errorf("SerialNumber = %v, want none: it is no longer derived from UniqueID (decision 166)", got)
 	}
 }
 

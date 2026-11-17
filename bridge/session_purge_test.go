@@ -40,7 +40,7 @@ func sessionStateCounts(b *Bridge, sessionID uint16) (outbound, timed, routes in
 // TestSessionClosedPurgesTheSessionsState: the close of a session — every
 // close path reaches SessionClosed — drops all the bridge holds for it:
 // its outbound reliable entries (nothing it sent is retransmitted any
-// more, a waiter on one is woken), its timed deadlines, its exchange reply
+// more), its timed deadlines, its exchange reply
 // routes and the ack obligations they route. Another session's state
 // stays. Review II, R2-P2-sess-06 and R2-P2-sess-10 (S-21).
 func TestSessionClosedPurgesTheSessionsState(t *testing.T) {
@@ -60,13 +60,6 @@ func TestSessionClosedPurgesTheSessionsState(t *testing.T) {
 			&message.Header{SessionID: sid, MessageCounter: 700},
 			message.ProtocolHeader{ProtocolID: mrp.SecureChannelProtocolID, ExchangeID: exchangeID, Initiator: true, NeedsAck: true})
 	}
-	// A WaitForAck caller blocked on the closing session's entry, as
-	// WaitForAck registers one.
-	waiter := make(chan error, 1)
-	b.outboundReliable.mu.Lock()
-	b.outboundReliable.waiters[outboundKey{closing, 100}] = waiter
-	b.outboundReliable.mu.Unlock()
-
 	b.SessionClosed(closing)
 
 	if o, td, r := sessionStateCounts(b, closing); o != 0 || td != 0 || r != 0 {
@@ -80,13 +73,5 @@ func TestSessionClosedPurgesTheSessionsState(t *testing.T) {
 	}
 	if !tracker.Owes(other, exchangeID, false) {
 		t.Fatal("the other session's ack obligation went with the closed one")
-	}
-	select {
-	case err, ok := <-waiter:
-		if !ok || err == nil {
-			t.Fatal("the waiter on the closed session's entry was told of an acknowledgement")
-		}
-	default:
-		t.Fatal("the waiter on the closed session's entry was not woken")
 	}
 }

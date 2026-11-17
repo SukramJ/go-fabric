@@ -15,7 +15,8 @@ import (
 
 // TestBridgedEndpointWithoutNameServesDescriptor: a bridged endpoint whose
 // spec carries no FriendlyName (a device.Options without Name) serves its
-// Descriptor and a BridgedDeviceBasicInformation with an empty NodeLabel.
+// Descriptor and a BridgedDeviceBasicInformation without NodeLabel, which
+// the host did not state (decision 143).
 // matter.js: every attribute of the bridged basic information cluster but
 // Reachable is optional (BridgedDeviceBasicInformationServer.ts:20 at
 // 862ad75f). Before
@@ -55,8 +56,9 @@ func TestBridgedEndpointWithoutNameServesDescriptor(t *testing.T) {
 	if r := read(0x001D, 0x0001); r.Status != im.StatusSuccess {
 		t.Fatalf("Descriptor.ServerList: status %v", r.Status)
 	}
-	if r := read(0x0039, 0x0005); r.Status != im.StatusSuccess || r.Value.Value != "" {
-		t.Fatalf("BridgedDeviceBasicInformation.NodeLabel = %v (status %v), want \"\"", r.Value.Value, r.Status)
+	// No name stated: NodeLabel is not served (decision 143).
+	if r := read(0x0039, 0x0005); r.Status != im.StatusUnsupportedAttribute {
+		t.Fatalf("BridgedDeviceBasicInformation.NodeLabel = %v (status %v), want UNSUPPORTED_ATTRIBUTE", r.Value.Value, r.Status)
 	}
 	clusters := endpoint.ClusterServers(ep)
 	if !hasCluster(clusters, 0x001D) || !hasCluster(clusters, 0x0039) {

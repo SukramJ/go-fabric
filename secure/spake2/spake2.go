@@ -145,7 +145,7 @@ func hexNibble(b byte) (byte, error) {
 	case b >= 'A' && b <= 'F':
 		return b - 'A' + 10, nil
 	}
-	return 0, fmt.Errorf("hex: bad nibble %q", b)
+	return 0, fmt.Errorf("spake2: hex: bad nibble %q", b)
 }
 
 // unmarshalUncompressed decodes a hex-encoded uncompressed P-256
@@ -370,6 +370,12 @@ func (v *Verifier) ProcessPake1(pA []byte) (*Pake2Output, error) {
 	if v.state != verifierStateInit {
 		return nil, fmt.Errorf("%w: ProcessPake1 already called", ErrSessionState)
 	}
+	// A context built by hand rather than by NewVerifierContext or
+	// NewVerifierFromValue is held to their shape here: W0 a scalar of at
+	// most 32 bytes, L present (R2-P6-api-0115).
+	if v.ctx == nil || v.ctx.W0 == nil || v.ctx.W0.Sign() < 0 || v.ctx.W0.BitLen() > 8*ScalarSize || v.ctx.L == nil {
+		return nil, fmt.Errorf("%w: the verifier context has no 32-byte w0 or no L", ErrInvalidPasscode)
+	}
 	xPoint, err := unmarshalAndValidate(pA)
 	if err != nil {
 		return nil, err
@@ -451,7 +457,8 @@ func (v *Verifier) ProcessPake1(pA []byte) (*Pake2Output, error) {
 	cB := hmacSHA256(v.kcB, v.xMarshal)
 	zero(v.kcB)
 	v.state = verifierStatePake1Processed
-	return &Pake2Output{Y: v.yMarshal, CB: cB[:ConfirmTagSize]}, nil
+	// Y is the caller's copy: cA is checked against the verifier's own.
+	return &Pake2Output{Y: append([]byte(nil), v.yMarshal...), CB: cB[:ConfirmTagSize]}, nil
 }
 
 // ProcessPake3 verifies the prover's cA tag and finalises the

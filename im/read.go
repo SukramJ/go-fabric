@@ -117,12 +117,16 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 	}
 	var req ReadRequest
 	hasFabricFiltered := false
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return ReadRequest{}, later.first
+			}
 			// IsFabricFiltered is mandatory: matter.js
 			// packages/types/src/protocol/messages/TlvReadRequest.ts:30
 			// (TlvField); chip src/app/ReadHandler.cpp:498. Review
@@ -132,8 +136,8 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 			}
 			return req, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagReadReqAttributeRequests:
@@ -141,7 +145,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				return ReadRequest{}, fmt.Errorf("%w: AttributeRequests not array", ErrInvalidReadRequest)
 			}
 			paths, err := readPathArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.AttributeRequests = paths
@@ -150,7 +154,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				return ReadRequest{}, fmt.Errorf("%w: EventRequests not array", ErrInvalidReadRequest)
 			}
 			paths, err := readEventPathArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.EventRequests = paths
@@ -175,7 +179,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				continue
 			}
 			filters, err := readEventFilterArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.EventFilters = filters
@@ -190,7 +194,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				return ReadRequest{}, fmt.Errorf("%w: DataVersionFilters not array", ErrInvalidReadRequest)
 			}
 			filters, err := readDataVersionFilterArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.DataVersionFilters = filters
@@ -209,6 +213,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 // EndContainer.
 func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 	var paths []ConcreteAttributePath
+	var later laterErrors
 	for {
 		// Peek the next element via Next; if it's the array's end,
 		// return. Otherwise the element MUST be a List opener — the
@@ -218,6 +223,9 @@ func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 			return nil, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return nil, later.first
+			}
 			return paths, nil
 		}
 		if !el.IsContainer || el.Type != tlv.TypeList {
@@ -227,7 +235,7 @@ func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 		// inline the field-loop body of UnmarshalAttributePathTLV
 		// because the opener has been consumed.
 		p, err := readAttributePathFields(dec)
-		if err != nil {
+		if err := later.keep(err); err != nil {
 			return nil, err
 		}
 		paths = append(paths, p)
@@ -238,16 +246,22 @@ func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 // — used when the caller has already consumed the list opener.
 func readAttributePathFields(dec *tlv.Decoder) (ConcreteAttributePath, error) {
 	var p ConcreteAttributePath
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ConcreteAttributePath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return ConcreteAttributePath{}, later.first
+			}
 			return p, nil
 		}
 		if err := readAttributePathField(dec, el, &p); err != nil {
-			return ConcreteAttributePath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
+			if err := later.keep(fmt.Errorf("%w: %w", ErrInvalidPath, err)); err != nil {
+				return ConcreteAttributePath{}, err
+			}
 		}
 	}
 }
@@ -259,10 +273,15 @@ func readAttributePathFields(dec *tlv.Decoder) (ConcreteAttributePath, error) {
 // packages/types/src/protocol/types/TlvAttributePath.ts:19-26 (bounded
 // TlvEndpointNumber / TlvClusterId / TlvAttributeId, nullable TlvUInt16
 // listIndex) and chip src/app/MessageDef/AttributePathIB.cpp:220-275. A
-// field of a foreign tag is skipped, as TlvObject skips an unknown one.
+// member with a context tag the switch does not know is skipped whole, a
+// member of any other tag refuses the path ([contextMember]): the path is
+// a TlvTaggedList (TlvAttributePath.ts:19), the same ObjectSchema as
+// TlvObject (packages/types/src/tlv/TlvObject.ts:381-382), whose decoder
+// refuses a profile and an anonymous tag (:205-214 at db021da0; review
+// II, R2-P6-wire-0504, Fable's read of sub round 1, H-5).
 func readAttributePathField(dec *tlv.Decoder, el tlv.Element, p *ConcreteAttributePath) error {
-	if el.Tag.Kind != tlv.TagKindContext {
-		return skipField(dec, el)
+	if err := contextMember(el); err != nil {
+		return err
 	}
 	var err error
 	switch uint8(el.Tag.Number & 0xFF) {
@@ -600,8 +619,8 @@ func minEventNumberFromFilters(filters []EventMinimumNumber) uint64 {
 // attributes. It mirrors the path-expansion + deduplication logic in
 // matter.js packages/protocol/src/action/server/EventReadResponse.ts
 // (EventReadResponse.process → #readAllowedEvents) and the event
-// retrieval in matter.js packages/protocol/src/interaction/EventHandler.ts
-// (getEvents). Wildcard-expand-then-filter semantics and sort-by-Number
+// retrieval in matter.js packages/protocol/src/events/OccurrenceManager.ts:250-285
+// at db021da0 (get; review II, R2-P6-doc-0703). Wildcard-expand-then-filter semantics and sort-by-Number
 // ascending output order match the matter.js reference implementation.
 //
 // Each [ConcreteEventPath] is evaluated independently; results are
@@ -720,8 +739,8 @@ func EventPathsForNode(paths []ConcreteEventPath, localNodeID uint64) []Concrete
 //
 // Mirrors matter.js packages/protocol/src/action/server/EventReadResponse.ts
 // (EventReadResponse.process) for the request-level dispatch and
-// matter.js packages/protocol/src/interaction/EventHandler.ts (getEvents)
-// for the per-path log query. Passes req.EventFilters to [BuildEventReports]
+// matter.js packages/protocol/src/events/OccurrenceManager.ts:250-285 at
+// db021da0 (get) for the log query (review II, R2-P6-doc-0703). Passes req.EventFilters to [BuildEventReports]
 // for minimum-event-number gating; the caller selects them for this node
 // with [EventFiltersFor] first.
 func HandleReadEventRequest(req ReadRequest, log *EventLog) []EventReport {
@@ -736,9 +755,10 @@ func HandleReadEventRequest(req ReadRequest, log *EventLog) []EventReport {
 // grant is keyed on that auth mode
 // (matter.js packages/protocol/src/interaction/FabricAccessControl.ts:189-191),
 // never on the FabricIndex: a zero FabricIndex without PASE is no grant and
-// is refused (checkSubjectACL). A nil Checker disables the ACL gate
-// (fail-open, matching the attribute path's "dispatcher without ACLChecker"
-// fallback). Neither lifts the fabric-sensitive drop of
+// is refused (checkSubjectACL). A nil Checker denies every event to a
+// session that is not PASE, as a [Dispatcher] without an [ACLChecker]
+// denies its reads (review II, R2-P6-sec-0560, owner decision 136). PASE
+// does not lift the fabric-sensitive drop of
 // [AuthorizeEventReports], which compares a record's fabric with
 // FabricIndex for every session.
 type EventReadAuthorizer struct {
@@ -769,9 +789,9 @@ type EventPathChecker interface {
 // Allows reports whether the accessing subject may read the events of
 // (endpoint, cluster): the lowest read privilege among the cluster's events
 // in the model ([schema.ClusterEventScope]; View for a cluster it does not
-// hold) checked against the ACL. A PASE session or a missing checker
-// allows, as AuthorizeEventReports does; a session without an accessing
-// fabric that is not PASE is denied.
+// hold) checked against the ACL. A PASE session allows, as
+// AuthorizeEventReports does; without a Checker, or without an accessing
+// fabric, a session that is not PASE is denied.
 func (a EventReadAuthorizer) Allows(ctx context.Context, endpoint uint16, cluster uint32) bool {
 	return a.allowsAt(ctx, endpoint, cluster, schema.ClusterEventScope(cluster).ReadPrivilege)
 }
@@ -782,8 +802,11 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
 	// keys it on `authMode === Pase && isCommissioning`, never on a
 	// missing fabric (review 2026-11 W2-sec-03).
-	if a.PASE || IsPASEFromContext(ctx) || a.Checker == nil {
+	if a.PASE || IsPASEFromContext(ctx) {
 		return true
+	}
+	if a.Checker == nil {
+		return false
 	}
 	return checkSubjectACL(ctx, a.Checker, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, privilege).IsSuccess()
 }
@@ -793,8 +816,8 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 // Denied paths/records are SILENTLY OMITTED — a wildcard event read discloses
 // only authorized events (Matter §8.4.3.2), never an error status. A PASE
 // session (PASE / [IsPASEFromContext], also once AddNOC adopted it onto a
-// fabric) or a nil Checker passes the ACL gate (a) for every event; a
-// session without an accessing fabric that is not PASE reads none. The
+// fabric) passes the ACL gate (a) for every event; a session that is not
+// PASE reads none without a Checker or an accessing fabric. The
 // fabric-sensitive drop (b) applies to every session.
 //
 // (a) ACL gate: each event is gated at its read privilege — the event's
@@ -818,7 +841,10 @@ func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, clus
 //	#readAllowedEvents skips a record whose payload.fabricIndex differs; the
 //	file has no auth-mode exception.
 func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events []EventReport) []EventReport {
-	aclBypass := auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil
+	aclBypass := auth.PASE || IsPASEFromContext(ctx)
+	if !aclBypass && auth.Checker == nil {
+		return []EventReport{} // no access check: nothing is granted (decision 136)
+	}
 	out := make([]EventReport, 0, len(events))
 	for _, ev := range events {
 		if !aclBypass {
@@ -879,7 +905,13 @@ func eventPayloadFabricIndex(payload any) (uint8, bool) {
 	}
 	switch f.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return uint8(f.Uint() & 0xFF), true
+		// A value no fabric index can take is no fabric: masking it would
+		// disclose the record to the fabric its low byte names (review
+		// II, R2-P6-sec-0511).
+		if f.Uint() > 0xFF {
+			return 0, false
+		}
+		return uint8(f.Uint()), true //nolint:gosec // G115: checked ≤ 0xFF above
 	default:
 		return 0, false
 	}

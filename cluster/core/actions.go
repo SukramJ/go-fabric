@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
@@ -132,7 +134,7 @@ func NewActions(cfg ActionsConfig) (*Actions, error) {
 	}
 	srv, err := spec.NewServer(actionsdef.Definition, opts, spec.ServerConfig{
 		Handlers:    handlers,
-		DataVersion: &a.dv,
+		DataVersion: &a.dv, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Source:      actionsSource{cfg.Host},
 		Initial:     initial,
 	})
@@ -275,7 +277,7 @@ func (s actionsSource) MatterAttribute(attrID uint32) (any, bool) {
 		return spec.List[actionsdef.ActionStruct](append([]actionsdef.ActionStruct{}, boundActionList(s.host.ActionList())...)), true
 	case actionsdef.AttrEndpointLists:
 		l := s.host.EndpointLists()
-		return spec.List[actionsdef.EndpointListStruct](append([]actionsdef.EndpointListStruct{}, l[:min(len(l), actionsMaxListLength)]...)), true
+		return spec.List[actionsdef.EndpointListStruct](append([]actionsdef.EndpointListStruct{}, deepcopy.Each(l[:min(len(l), actionsMaxListLength)])...)), true
 	}
 	return nil, false
 }

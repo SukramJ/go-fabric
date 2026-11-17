@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/caseauth"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -102,6 +103,11 @@ type AdministratorConfig struct {
 	// AdministratorFabricIndex and the datastore records the anchor.
 	Datastore *Datastore
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -114,7 +120,7 @@ type AdministratorConfig struct {
 // The rules are connectedhomeip's joint-fabric-administrator-server.cpp
 // (:172-449) and JointFabricAdministrator.h at 6170af84; matter.js's
 // JointFabricAdministratorServer is the generated behaviour
-// (JointFabricAdministratorServer.ts:14 at 862ad75f).
+// (JointFabricAdministratorServer.ts:14 at db021da0).
 type Administrator struct {
 	*spec.Instance
 	spec.SelfHeld
@@ -141,10 +147,15 @@ type Administrator struct {
 	// addICACInvoked is the fail-safe's AddICAC flag
 	// (FailSafeContext::AddICACCommandHasBeenInvoked).
 	addICACInvoked bool
-	// announce cancels the AnnounceJointFabricAdministrator in progress
-	// (mActiveCommissionee, :102-103).
-	announce context.CancelFunc
+	// announce is the AnnounceJointFabricAdministrator in progress
+	// (mActiveCommissionee, :102-103); each announcement clears only its
+	// own (R2-P6-conc-1112).
+	announce *announcement
 }
+
+// announcement is an AnnounceJointFabricAdministrator in progress: the
+// cancel of its run.
+type announcement struct{ cancel context.CancelFunc }
 
 // Compile-time assertions.
 var (
@@ -169,7 +180,7 @@ func NewAdministrator(cfg AdministratorConfig) (*Administrator, error) {
 		jfadef.CmdTransferAnchorRequest:            a.transferAnchorRequest,
 		jfadef.CmdTransferAnchorComplete:           a.transferAnchorComplete,
 	}
-	srv, err := spec.NewServer(jfadef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(jfadef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("jointfabric: %w", err)
 	}
@@ -179,11 +190,77 @@ func NewAdministrator(cfg AdministratorConfig) (*Administrator, error) {
 
 // AttachNode hands the administrator the node's fabric table and its
 // commissioning window; the node calls it as the endpoint joins the
-// topology.
+// topology. A null AdministratorFabricIndex is derived then
+// ([Administrator.restoreFabricIndex], R2-P6-store-1105).
 func (a *Administrator) AttachNode(fabrics FabricTable, window wire.WindowController) {
 	a.mu.Lock()
 	a.fabrics, a.window = fabrics, window
 	a.mu.Unlock()
+	a.restoreFabricIndex(context.Background(), fabrics)
+}
+
+// restoreFabricIndex derives a null AdministratorFabricIndex after a
+// restart, which keeps the attribute in memory only ([Administrator.takeAnchor]).
+func (a *Administrator) restoreFabricIndex(ctx context.Context, fabrics FabricTable) {
+	if fabrics == nil || a.administratorFabricIndex() != 0 {
+		return
+	}
+	a.takeAnchor(ctx, fabrics)
+}
+
+// takeAnchor sets a null AdministratorFabricIndex from the anchor. With a
+// Datastore that records an anchor, that fabric, when the fabric table
+// still holds it with the recorded identity (a reused index with another
+// root wipes the datastore, [Datastore.checkAnchor]) — an anchored datastore is never re-pointed to another
+// fabric, whatever CATs its NOC carries; its stale anchor is the
+// reconcile's to wipe. With a Datastore that records none, the fabric
+// whose NOC carries the administrator and anchor CATs, recorded in the
+// datastore first; the attribute is set only once the datastore took it,
+// so the attribute never names an anchor the datastore refuses. Without
+// a Datastore, that fabric (R2-P6-fsm-1104, -store-1105).
+func (a *Administrator) takeAnchor(ctx context.Context, fabrics FabricTable) {
+	d := a.datastore
+	if d != nil {
+		// The anchor is held against the table — its index and identity;
+		// a stale anchor of a reused index is wiped there (checkAnchor).
+		if anchor := d.checkAnchor(ctx, fabrics); anchor != 0 {
+			_ = a.srv.SetAttributes(map[uint32]any{jfadef.AttrAdministratorFabricIndex: anchor})
+			return
+		}
+		if d.AnchorFabricIndex() != 0 {
+			return
+		}
+	}
+	f, ok := anchorFabric(ctx, fabrics)
+	if !ok {
+		return
+	}
+	if d != nil {
+		if err := d.recordAnchor(ctx, f); err != nil { // :113-149
+			return
+		}
+	}
+	_ = a.srv.SetAttributes(map[uint32]any{jfadef.AttrAdministratorFabricIndex: f.FabricIndex}) // :107-108
+}
+
+// anchorFabric is the first fabric whose NOC carries the administrator
+// and the anchor CAT (JFAManager.cpp:105).
+func anchorFabric(ctx context.Context, fabrics FabricTable) (store.FabricRecord, bool) {
+	list, err := fabrics.ListFabrics(ctx)
+	if err != nil {
+		return store.FabricRecord{}, false
+	}
+	for i := range list {
+		id, err := fabrics.GetIdentity(ctx, list[i].FabricIndex)
+		if err != nil {
+			continue
+		}
+		cats := nocCATs(id.NOC)
+		if hasCATIdentifier(cats, AdminCATIdentifier) && hasCATIdentifier(cats, AnchorCATIdentifier) { // :105
+			return list[i], true
+		}
+	}
+	return store.FabricRecord{}, false
 }
 
 // AttachCommissionerReach gives the administrator the node's reach of
@@ -238,7 +315,7 @@ func (a *Administrator) OnFailSafeExpired(context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.announce != nil {
-		a.announce()
+		a.announce.cancel()
 		a.announce = nil
 	}
 	a.vidVerified, a.peerEndpoint, a.addICACInvoked = 0, jcm.InvalidEndpointID, false
@@ -247,8 +324,10 @@ func (a *Administrator) OnFailSafeExpired(context.Context) {
 // OnCommissioningComplete ends the fail-safe's AddICAC; a fabric whose
 // NOC carries the administrator and anchor CATs, while no
 // AdministratorFabricIndex is set, becomes the administrator's fabric
-// and, with a Datastore, its anchor: the fabric index, root certificate,
-// node id and vendor id. Mirrors the administrator application's
+// and, with a Datastore that records no anchor, its anchor: the fabric
+// index, root certificate, node id and vendor id, recorded before the
+// attribute is set. A Datastore that records an anchor is never
+// re-pointed ([Administrator.takeAnchor]). Mirrors the administrator application's
 // HandleCommissioningCompleteEvent
 // (examples/jf-admin-app/linux/JFAManager.cpp:95-157 at 6170af84); the
 // rest of its setup (friendly name, status, default groups, key set and
@@ -262,44 +341,28 @@ func (a *Administrator) OnCommissioningComplete(ctx context.Context) {
 	if fabrics == nil || a.administratorFabricIndex() != 0 {
 		return
 	}
-	list, err := fabrics.ListFabrics(ctx)
-	if err != nil {
-		return
-	}
-	for i := range list {
-		f := &list[i]
-		id, err := fabrics.GetIdentity(ctx, f.FabricIndex)
-		if err != nil {
-			continue
-		}
-		cats := nocCATs(id.NOC)
-		if !hasCATIdentifier(cats, AdminCATIdentifier) || !hasCATIdentifier(cats, AnchorCATIdentifier) { // :105
-			continue
-		}
-		_ = a.srv.SetAttributes(map[uint32]any{jfadef.AttrAdministratorFabricIndex: f.FabricIndex}) // :107-108
-		if d := a.datastore; d != nil {
-			_ = d.SetAnchorFabricIndex(ctx, f.FabricIndex) // :113
-			_ = d.SetAnchorRootCA(ctx, f.RootCert)         // :117-122
-			if f.NodeID != 0 {
-				_ = d.SetAnchorNodeID(ctx, f.NodeID) // :131-136
-			}
-			if f.VendorID != 0 {
-				_ = d.SetAnchorVendorID(ctx, f.VendorID) // :144-149
-			}
-		}
-		return
-	}
+	a.takeAnchor(ctx, fabrics)
 }
 
 // OnFabricRemoved forgets the VID verification of the removed fabric
-// (JointFabricAdministrator.h:60-66) and hands the removal to the
-// Datastore.
+// (JointFabricAdministrator.h:60-66), sets AdministratorFabricIndex null
+// when the removed fabric is its, so that no command passes the "index
+// set" check on a fabric that is gone (R2-P6-fsm-1104; the recording of
+// the anchor is the module's, so is its end), and hands the removal to
+// the Datastore — a host that wires the two outside the node reaches the
+// datastore through this call. The node also reaches the datastore as a
+// [contract.FabricScopedState]; its removal is idempotent
+// ([Datastore.MatterDropFabric]), so the second call changes nothing
+// (R2-P6-err-1120).
 func (a *Administrator) OnFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	a.mu.Lock()
 	if a.vidVerified == fabricIndex {
 		a.vidVerified = 0
 	}
 	a.mu.Unlock()
+	if fabricIndex != invalidFabricByte && a.administratorFabricIndex() == fabricIndex {
+		_ = a.srv.SetAttributes(map[uint32]any{jfadef.AttrAdministratorFabricIndex: nil})
+	}
 	if a.datastore != nil {
 		a.datastore.OnFabricRemoved(ctx, fabricIndex)
 	}
@@ -347,10 +410,12 @@ func (a *Administrator) administratorFabricIndex() uint8 {
 }
 
 // accessing is the accessing fabric and whether the invoke arrived over
-// CASE.
+// CASE (the checks at joint-fabric-administrator-server.cpp:322, :366 the
+// handlers cite), the module's one rule ([caseauth.IsCASE]; R2-P6-sec-1111:
+// a group message has a fabric and is not PASE).
 func accessing(ctx context.Context) (fabricIndex uint8, isCASE bool) {
 	_, fabricIndex = im.FabricFilterFromContext(ctx)
-	return fabricIndex, fabricIndex != 0 && !im.IsPASEFromContext(ctx)
+	return fabricIndex, caseauth.IsCASE(ctx)
 }
 
 func (a *Administrator) node() (FabricTable, wire.WindowController, bool) {
@@ -445,12 +510,13 @@ func (a *Administrator) announceJointFabricAdministrator(ctx context.Context, fi
 		return nil, statusErr(im.StatusBusy, "an announcement is in progress")
 	}
 	run, cancel := context.WithCancel(ctx)
-	a.announce = cancel
+	tok := &announcement{cancel: cancel}
+	a.announce = tok
 	a.mu.Unlock()
 	defer func() {
+		cancel()
 		a.mu.Lock()
-		if a.announce != nil {
-			a.announce()
+		if a.announce == tok { // the fail-safe's expiry may have ended it, and another begun
 			a.announce = nil
 		}
 		a.mu.Unlock()
@@ -461,12 +527,15 @@ func (a *Administrator) announceJointFabricAdministrator(ctx context.Context, fi
 	nodeID, _ := im.SubjectFromContext(ctx)
 	c.peer = CommissionerPeer{FabricIndex: fabricIndex, NodeID: nodeID}
 	result := c.run(run)
-	if result != jcm.Success || run.Err() != nil { // :256-266
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	// The check and the mark are one step against the fail-safe's expiry,
+	// which ends the announcement under the lock: a verification the
+	// expiry ended is not marked after it.
+	if result != jcm.Success || run.Err() != nil || a.announce != tok { // :256-266
 		return nil, statusErr(im.StatusFailure, "trust verification: %s", result)
 	}
-	a.mu.Lock()
 	a.vidVerified = fabricIndex // :259
-	a.mu.Unlock()
 	return nil, nil
 }
 

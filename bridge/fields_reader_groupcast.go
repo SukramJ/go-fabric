@@ -45,21 +45,17 @@ func groupcastFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder) (field
 type fieldDecoder func(el tlv.Element) error
 
 // walkCommandFields walks a command's fields: each context tag with a
-// decoder is handed to it, every other element is skipped, and a missing
-// mandatory tag answers InvalidCommand once the container ends.
-func walkCommandFields(dec *tlv.Decoder, cmd string, fields map[uint64]fieldDecoder, mandatory ...uint64) error {
-	seen := make(map[uint64]bool, len(fields))
+// decoder is handed to it, every other element is skipped. The request
+// passed its definition's check (heldByDefinition): the mandatory fields
+// are present and every field has its type, so the decoders only read
+// (R2-P6-test-0811).
+func walkCommandFields(dec *tlv.Decoder, cmd string, fields map[uint64]fieldDecoder) error {
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return fmt.Errorf("%s: %w", cmd, err)
 		}
 		if el.IsEndContainer {
-			for _, tag := range mandatory {
-				if !seen[tag] {
-					return fieldInvalidCommandError{msg: fmt.Sprintf("%s: mandatory field %d missing", cmd, tag), consumed: true}
-				}
-			}
 			return nil
 		}
 		fd, known := fields[uint64(el.Tag.Number)]
@@ -72,71 +68,45 @@ func walkCommandFields(dec *tlv.Decoder, cmd string, fields map[uint64]fieldDeco
 		if err := fd(el); err != nil {
 			return err
 		}
-		seen[uint64(el.Tag.Number)] = true
 	}
 }
 
-// uint16Field decodes a mandatory or optional uint16 field into dst.
-func uint16Field(dec *tlv.Decoder, cmd, name string, dst *uint16) fieldDecoder {
+// uint16Field decodes a uint16 field into dst.
+func uint16Field(dst *uint16) fieldDecoder {
 	return func(el tlv.Element) error {
-		v, err := decodeUint16Field(cmd, name, el)
-		if err != nil {
-			_ = skipValue(dec, el)
-			return err
-		}
-		*dst = v
+		*dst = uint16(el.Uint) //nolint:gosec // the definition held the width
 		return nil
 	}
 }
 
 // enum8Field decodes an enum8 field into dst.
-func enum8Field(dec *tlv.Decoder, cmd, name string, dst *uint8) fieldDecoder {
+func enum8Field(dst *uint8) fieldDecoder {
 	return func(el tlv.Element) error {
-		if !isUnsignedInt(el) {
-			_ = skipValue(dec, el)
-			return fieldInvalidCommandError{msg: fmt.Sprintf("%s: %s is not an unsigned integer (type=0x%02X)", cmd, name, el.Type)}
-		}
-		v, err := fieldUint8(cmd, name, el)
-		if err != nil {
-			return err
-		}
-		*dst = v
+		*dst = uint8(el.Uint) //nolint:gosec // the definition held the width
 		return nil
 	}
 }
 
 // boolField decodes a bool field into dst.
-func boolField(dec *tlv.Decoder, cmd, name string, dst *bool) fieldDecoder {
+func boolField(dst *bool) fieldDecoder {
 	return func(el tlv.Element) error {
-		if el.Type != tlv.TypeBoolFalse && el.Type != tlv.TypeBoolTrue {
-			_ = skipValue(dec, el)
-			return fieldInvalidCommandError{msg: fmt.Sprintf("%s: %s is not a boolean (type=0x%02X)", cmd, name, el.Type)}
-		}
 		*dst = el.Bool
 		return nil
 	}
 }
 
 // octetsField decodes an octet string field into dst (never nil once set).
-func octetsField(dec *tlv.Decoder, cmd, name string, dst *[]byte) fieldDecoder {
+func octetsField(dst *[]byte) fieldDecoder {
 	return func(el tlv.Element) error {
-		if !isOctetString(el) {
-			_ = skipValue(dec, el)
-			return fieldInvalidCommandError{msg: fmt.Sprintf("%s: %s is not an octet string (type=0x%02X)", cmd, name, el.Type)}
-		}
 		*dst = append([]byte{}, el.Octets...)
 		return nil
 	}
 }
 
 // endpointListField decodes a list<endpoint-no> field into dst (never nil
-// once set), consuming the list also when an entry is malformed.
-func endpointListField(dec *tlv.Decoder, cmd, name string, dst *[]uint16) fieldDecoder {
+// once set).
+func endpointListField(dec *tlv.Decoder, cmd string, dst *[]uint16) fieldDecoder {
 	return func(el tlv.Element) error {
-		if !el.IsContainer || el.Type != tlv.TypeArray {
-			_ = skipValue(dec, el)
-			return fieldInvalidCommandError{msg: fmt.Sprintf("%s: %s is not a list (type=0x%02X)", cmd, name, el.Type)}
-		}
 		out := []uint16{}
 		for {
 			item, err := dec.Next()
@@ -147,15 +117,7 @@ func endpointListField(dec *tlv.Decoder, cmd, name string, dst *[]uint16) fieldD
 				*dst = out
 				return nil
 			}
-			ep, ferr := decodeUint16Field(cmd, name+" entry", item)
-			if ferr != nil {
-				_ = skipValue(dec, item)
-				if err := drainContainer(dec); err != nil {
-					return fmt.Errorf("%s: %w", cmd, err)
-				}
-				return ferr
-			}
-			out = append(out, ep)
+			out = append(out, uint16(item.Uint)) //nolint:gosec // the definition held the width
 		}
 	}
 }
@@ -171,18 +133,18 @@ func decodeJoinGroupRequest(dec *tlv.Decoder) (mattercore.JoinGroupRequest, erro
 		policy          uint8
 		hasAux, hasRepl bool
 		hasPolicy       bool
-		auxDec, replDec = boolField(dec, cmd, "UseAuxiliaryAcl", &useAux), boolField(dec, cmd, "ReplaceEndpoints", &replace)
-		policyDec       = enum8Field(dec, cmd, "McastAddrPolicy", &policy)
+		auxDec, replDec = boolField(&useAux), boolField(&replace)
+		policyDec       = enum8Field(&policy)
 	)
 	err := walkCommandFields(dec, cmd, map[uint64]fieldDecoder{
-		0: uint16Field(dec, cmd, "GroupId", &req.GroupID),
-		1: endpointListField(dec, cmd, "Endpoints", &req.Endpoints),
-		2: uint16Field(dec, cmd, "KeySetId", &req.KeySetID),
-		3: octetsField(dec, cmd, "Key", &req.Key),
+		0: uint16Field(&req.GroupID),
+		1: endpointListField(dec, cmd, &req.Endpoints),
+		2: uint16Field(&req.KeySetID),
+		3: octetsField(&req.Key),
 		4: func(el tlv.Element) error { hasAux = true; return auxDec(el) },
 		5: func(el tlv.Element) error { hasRepl = true; return replDec(el) },
 		6: func(el tlv.Element) error { hasPolicy = true; return policyDec(el) },
-	}, 0, 1, 2)
+	})
 	if hasAux {
 		req.UseAuxiliaryACL = &useAux
 	}
@@ -200,11 +162,11 @@ func decodeJoinGroupRequest(dec *tlv.Decoder) (mattercore.JoinGroupRequest, erro
 func decodeLeaveGroupRequest(dec *tlv.Decoder) (mattercore.LeaveGroupRequest, error) {
 	const cmd = "LeaveGroup"
 	var req mattercore.LeaveGroupRequest
-	epDec := endpointListField(dec, cmd, "Endpoints", &req.Endpoints)
+	epDec := endpointListField(dec, cmd, &req.Endpoints)
 	err := walkCommandFields(dec, cmd, map[uint64]fieldDecoder{
-		0: uint16Field(dec, cmd, "GroupId", &req.GroupID),
+		0: uint16Field(&req.GroupID),
 		1: func(el tlv.Element) error { req.HasEndpoints = true; return epDec(el) },
-	}, 0)
+	})
 	return req, err
 }
 
@@ -214,10 +176,10 @@ func decodeUpdateGroupKeyRequest(dec *tlv.Decoder) (mattercore.UpdateGroupKeyReq
 	const cmd = "UpdateGroupKey"
 	var req mattercore.UpdateGroupKeyRequest
 	err := walkCommandFields(dec, cmd, map[uint64]fieldDecoder{
-		0: uint16Field(dec, cmd, "GroupId", &req.GroupID),
-		1: uint16Field(dec, cmd, "KeySetId", &req.KeySetID),
-		2: octetsField(dec, cmd, "Key", &req.Key),
-	}, 0, 1)
+		0: uint16Field(&req.GroupID),
+		1: uint16Field(&req.KeySetID),
+		2: octetsField(&req.Key),
+	})
 	return req, err
 }
 
@@ -227,9 +189,9 @@ func decodeConfigureAuxiliaryACLRequest(dec *tlv.Decoder) (mattercore.ConfigureA
 	const cmd = "ConfigureAuxiliaryAcl"
 	var req mattercore.ConfigureAuxiliaryACLRequest
 	err := walkCommandFields(dec, cmd, map[uint64]fieldDecoder{
-		0: uint16Field(dec, cmd, "GroupId", &req.GroupID),
-		1: boolField(dec, cmd, "UseAuxiliaryAcl", &req.UseAuxiliaryACL),
-	}, 0, 1)
+		0: uint16Field(&req.GroupID),
+		1: boolField(&req.UseAuxiliaryACL),
+	})
 	return req, err
 }
 
@@ -242,11 +204,11 @@ func decodeGroupcastTestingRequest(dec *tlv.Decoder) (mattercore.GroupcastTestin
 		duration uint16
 		has      bool
 	)
-	durDec := uint16Field(dec, cmd, "DurationSeconds", &duration)
+	durDec := uint16Field(&duration)
 	err := walkCommandFields(dec, cmd, map[uint64]fieldDecoder{
-		0: enum8Field(dec, cmd, "TestOperation", &req.TestOperation),
+		0: enum8Field(&req.TestOperation),
 		1: func(el tlv.Element) error { has = true; return durDec(el) },
-	}, 0)
+	})
 	if has {
 		req.DurationSeconds = &duration
 	}

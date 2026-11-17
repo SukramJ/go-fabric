@@ -4,7 +4,6 @@
 package sigma
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/tlv"
@@ -88,14 +87,21 @@ func sigmaTLVDecoder(b []byte) *sigmaDecoder {
 }
 
 // openStruct reads the leading anonymous-structure container marker.
-// Returns an error when the wire bytes do not start with a struct.
+// Returns an error when the wire bytes do not start with a structure: an
+// Array or a List is refused as well, not read as if it were one — the
+// rule [sessionParamsOf] states for the nested session parameters
+// (R2-P6-wire-0101). Mirrors matter.js, which refuses another top-level
+// type (packages/types/src/tlv/TlvObject.ts:205-207 at db021da0);
+// connectedhomeip does the same for TBE2 and TBE3
+// (src/protocols/secure_channel/CASESession.cpp:1651-1653, :2069-2070 at
+// 6170af84).
 func (d *sigmaDecoder) openStruct() error {
 	el, err := d.dec.Next()
 	if err != nil {
 		return fmt.Errorf("read struct: %w", err)
 	}
-	if !el.IsContainer {
-		return errors.New("sigma: expected struct container")
+	if el.Type != tlv.TypeStructure {
+		return fmt.Errorf("sigma: expected a structure, got TLV type 0x%02X", uint8(el.Type))
 	}
 	d.depth = 1
 	return nil
@@ -122,10 +128,10 @@ func (d *sigmaDecoder) next() (tag uint8, val sigmaValue, end bool, err error) {
 		return 0, sigmaValue{}, true, nil
 	}
 	if el.Tag.Kind != tlv.TagKindContext {
-		return 0, sigmaValue{}, false, fmt.Errorf("expected context tag, got kind=%d", el.Tag.Kind)
+		return 0, sigmaValue{}, false, fmt.Errorf("sigma: expected context tag, got kind=%d", el.Tag.Kind)
 	}
 	if el.Tag.Number > 255 {
-		return 0, sigmaValue{}, false, fmt.Errorf("context tag out of range: %d", el.Tag.Number)
+		return 0, sigmaValue{}, false, fmt.Errorf("sigma: context tag out of range: %d", el.Tag.Number)
 	}
 	return uint8(el.Tag.Number & 0xFF), sigmaValue{
 		octets:    el.Octets,
@@ -150,6 +156,25 @@ func sessionIDOf(v sigmaValue) (uint16, error) {
 		return 0, fmt.Errorf("sigma: session id: value %d exceeds 16 bits", v.u)
 	}
 	return uint16(v.u & 0xFFFF), nil
+}
+
+// anyLength is [octetsOf]'s want for a member of any length.
+const anyLength = -1
+
+// octetsOf is an octet-string member's value. Any other element — a
+// UTF-8 string, an integer or a container — refuses the message rather
+// than reading as an empty value (R2-P6-wire-0102). want is the exact
+// length the member must have, or [anyLength].
+func octetsOf(v sigmaValue, want int) ([]byte, error) {
+	switch v.elemType {
+	case tlv.TypeOctetStr1, tlv.TypeOctetStr2, tlv.TypeOctetStr4, tlv.TypeOctetStr8:
+	default:
+		return nil, fmt.Errorf("sigma: TLV type 0x%02X, want an octet string", uint8(v.elemType))
+	}
+	if want != anyLength && len(v.octets) != want {
+		return nil, fmt.Errorf("sigma: length %d, want %d", len(v.octets), want)
+	}
+	return append([]byte(nil), v.octets...), nil
 }
 
 // sessionParamsOf reads the session-parameters member whose header v is:

@@ -35,11 +35,18 @@ type DataVersionReader interface {
 	CurrentDataVersion(ctx context.Context, endpoint uint16, clusterID uint32) (uint32, bool)
 }
 
-// ACLChecker is an optional interface a [Dispatcher] implementation may
-// provide to gate Write and Invoke calls against the AccessControl cluster's
-// ACL table. When nil / not implemented, all writes and invokes are allowed
-// (permissive default — preserves v1.0 behaviour for callers that have not
-// wired an ACL store).
+// ACLChecker is the interface a [Dispatcher] implementation provides to
+// gate Read, Write and Invoke calls against the AccessControl cluster's
+// ACL table. A Dispatcher without one denies every request of a session
+// that is not PASE (UNSUPPORTED_ACCESS), as the group path and
+// [AuthorityAt] deny: a privilege nobody could verify is not held, and
+// matter.js judges every peer's request by an access control that grants
+// nothing without an entry (packages/node/src/behavior/context/server/
+// RemoteActorContext.ts:86-87, packages/protocol/src/interaction/
+// FabricAccessControl.ts:186-205 at db021da0). A node that means to run
+// without access control says so with a checker that grants —
+// endpoint.UnenforcedACL. Review II, R2-P6-sec-0560, owner decision 136;
+// it was permissive.
 //
 // Mirrors connectedhomeip src/access/AccessControl.cpp:359-554 at 6170af84
 // (Check, CheckACL) and the
@@ -56,8 +63,12 @@ type ACLChecker interface {
 	// is granted.
 	//
 	// fabricIndex is the requesting fabric index extracted from the session
-	// context (via [FabricFilterFromContext]). fabricIndex==0 means PASE /
-	// pre-commissioning — ACL does not yet apply (always granted).
+	// context (via [FabricFilterFromContext]); it names a fabric (1 to
+	// 254). The gates ask only for a request that is not on a PASE
+	// session — a PASE session keeps its implicit grant by its auth mode
+	// ([IsPASEFromContext]) — and refuse a request without an accessing
+	// fabric before the checker is asked ([HasAccessingFabric]; review II,
+	// R2-P6-doc-0561).
 	//
 	// subjectNodeID + subjectCATs identify the requesting peer for per-
 	// subject ACE matching (Matter §9.10.5.6). For CASE sessions both are
@@ -182,9 +193,10 @@ type CommandPathChecker interface {
 }
 
 // Dispatcher is the cluster-server-side surface the IM layer routes
-// Read / Write / Invoke requests through. The endpoint assembler in
-// [..]/north/matter/endpoint constructs and registers a Dispatcher
-// that walks the model registry to satisfy each call.
+// Read / Write / Invoke requests through. Package endpoint's
+// TopologyDispatcher (endpoint.TopologyDispatcher), which the bridge
+// builds for its topology, is the one in this module (review II,
+// R2-P6-doc-0563).
 //
 // Implementations:
 //

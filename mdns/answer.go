@@ -186,11 +186,28 @@ type linkRecords struct {
 	setKeys  map[string]bool
 	complete []dns.RR
 	at       time.Time
-	// nets are the interface's prefixes, read at the first query the
-	// record sets answer (netsRead), so they go with them when the
-	// interface's addresses change.
-	nets     []*net.IPNet
-	netsRead bool
+	// link is the interface as read at the first query the record sets
+	// answer (linkRead) — its prefixes for the on-link check, and what
+	// every answer packet is sent with — so it goes with them when the
+	// interface's addresses change, and a query does not read the
+	// interface again (two syscalls under r.mu) for each packet it is
+	// answered with.
+	link     link
+	linkRead bool
+}
+
+// linkLocked is the interface ifIndex as the record sets on it read it
+// (linkRecords.link), read once per record cache; an interface without
+// cached record sets is read afresh. Caller holds r.mu.
+func (r *Responder) linkLocked(ifIndex int) link {
+	lr, ok := r.links[ifIndex]
+	if !ok {
+		return r.wire.link(ifIndex)
+	}
+	if !lr.linkRead {
+		lr.link, lr.linkRead = r.wire.link(ifIndex), true
+	}
+	return lr.link
 }
 
 // recordsForLocked returns the record sets on ifIndex, from the cache while
@@ -257,12 +274,9 @@ func (r *Responder) receiveLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) {
 	if len(lr.byService) == 0 {
 		return
 	}
-	if !lr.netsRead {
-		lr.nets, lr.netsRead = r.wire.link(ifIndex).nets, true
-	}
 	// The sockets hand no packet without a source; a nil one is the
 	// engine's own call.
-	if src != nil && !onLink(src.IP, lr.nets) {
+	if src != nil && !onLink(src.IP, r.linkLocked(ifIndex).nets) {
 		return
 	}
 	query := r.prepareLocked(msg, ifIndex, src)
@@ -465,7 +479,7 @@ func (r *Responder) answerNextLocked(query *dns.Msg, ifIndex int, src *net.UDPAd
 		if unicast {
 			dst = src
 		}
-		l := r.wire.link(ifIndex)
+		l := r.linkLocked(ifIndex)
 		r.sendLocked(splitResponse(query.Id, sendable(sentAnswers, all, unicast), sendable(sentAdditional, all, unicast)), l, dst, sentAnswers)
 		if !slices.ContainsFunc(r.order, func(k string) bool { return !visited[k] }) {
 			return

@@ -121,7 +121,7 @@ func newPumpServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	cfg := pump.Config{
 		Source: d.StateSource, Features: pump.Feature(b.opts.Features), Optional: pump.OptionalFor(b.opts.Attributes),
-		Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion,
+		Events: slices.Clone(b.opts.Events),
 	}
 	// A limit the declaration's Initial sets is in the selection whether
 	// its own feature mandates it or AUTO offers it ("SPD, [AUTO]"); the
@@ -146,7 +146,7 @@ func newValveServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("valve: %w", errNoPort))
 	}
 	cfg := valve.Config{
-		Source: d.StateSource, Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion,
+		Source: d.StateSource, Events: slices.Clone(b.opts.Events),
 		Features: b.opts.Features, Attributes: slices.Clone(b.opts.Attributes),
 	}
 	configFrom(&cfg, b.def, b.initial)
@@ -166,7 +166,7 @@ func newModeSelectServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("modeselect: %w", errNoPort))
 	}
 	hostState(b.initial)
-	return modeselect.NewServer(modeselect.Config{Source: d.ModeSource, DataVersion: b.cfg.DataVersion}), nil
+	return modeselect.NewServer(modeselect.Config{Source: d.ModeSource}), nil
 }
 
 // newServiceAreaServer is the module's ServiceArea server
@@ -181,7 +181,7 @@ func newServiceAreaServer(b defaultBuild) (contract.ClusterServer, error) {
 		Features: servicearea.Feature(b.opts.Features), Selector: d.Selector, Skipper: d.Skipper,
 		CurrentArea:      slices.Contains(b.opts.Attributes, sadef.AttrCurrentArea),
 		EstimatedEndTime: slices.Contains(b.opts.Attributes, sadef.AttrEstimatedEndTime),
-		DataVersion:      b.cfg.DataVersion, Clock: b.clock,
+		Clock:            b.clock,
 	}
 	if v, ok := b.initial[sadef.AttrCurrentArea]; ok {
 		delete(b.initial, sadef.AttrCurrentArea)
@@ -217,7 +217,7 @@ func newClosureDimensionServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	cfg := closure.DimensionConfig{
 		Features: closure.DimensionFeature(b.opts.Features), Handler: d.DimensionHandler,
-		DataVersion: b.cfg.DataVersion, Clock: b.clock,
+		Clock: b.clock,
 	}
 	configFrom(&cfg, b.def, b.initial)
 	return closure.NewDimension(cfg)
@@ -232,7 +232,7 @@ func newTemperatureControlServer(b defaultBuild) (contract.ClusterServer, error)
 		return nil, notServed(fmt.Errorf("temperaturecontrol: %w", errNoPort))
 	}
 	cfg := thermo.TemperatureControlConfig{
-		Features: thermo.TemperatureControlFeature(b.opts.Features), Setter: d.TemperatureSetter, DataVersion: b.cfg.DataVersion,
+		Features: thermo.TemperatureControlFeature(b.opts.Features), Setter: d.TemperatureSetter,
 	}
 	configFrom(&cfg, b.def, b.initial)
 	return thermo.NewTemperatureControl(cfg)
@@ -247,7 +247,7 @@ func newMicrowaveControlServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("microwaveovencontrol: %w", errNoPort))
 	}
 	cfg := appliance.MicrowaveConfig{
-		Features: b.opts.Features, Oven: d.Oven, DataVersion: b.cfg.DataVersion,
+		Features: b.opts.Features, Oven: d.Oven,
 		AddMoreTime: slices.Contains(b.opts.Commands, mwocdef.CmdAddMoreTime),
 	}
 	configFrom(&cfg, b.def, b.initial)
@@ -264,7 +264,7 @@ func newMicrowaveModeServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(errors.New("device: microwaveovenmode: the declaration's Initial carries no SupportedModes"))
 	}
 	delete(b.initial, modeAttrSupportedModes)
-	cfg := modebase.Config{SupportedModes: modeOptionsOf(v), Features: modebase.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	cfg := modebase.Config{SupportedModes: modeOptionsOf(v), Features: modebase.Feature(b.opts.Features)}
 	if m, ok := consume8(b.initial, modeAttrCurrentMode); ok {
 		cfg.CurrentMode = m
 	}
@@ -279,7 +279,7 @@ func newWaterHeaterServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.Booster == nil {
 		return nil, notServed(fmt.Errorf("waterheatermanagement: %w", errNoPort))
 	}
-	cfg := energy.WaterHeaterConfig{Features: energy.WaterHeaterFeature(b.opts.Features), Booster: d.Booster, DataVersion: b.cfg.DataVersion}
+	cfg := energy.WaterHeaterConfig{Features: energy.WaterHeaterFeature(b.opts.Features), Booster: d.Booster}
 	configFrom(&cfg, b.def, b.initial)
 	return energy.NewWaterHeaterManagement(cfg)
 }
@@ -293,7 +293,7 @@ func newDeviceEnergyManagementServer(b defaultBuild) (contract.ClusterServer, er
 		return nil, notServed(fmt.Errorf("deviceenergymanagement: %w", errNoPort))
 	}
 	cfg := energy.DeviceEnergyConfig{
-		Features: energy.DemFeature(b.opts.Features), Manager: d.DemManager, Clock: b.clock, DataVersion: b.cfg.DataVersion,
+		Features: energy.DemFeature(b.opts.Features), Manager: d.DemManager, Clock: b.clock,
 	}
 	configFrom(&cfg, b.def, b.initial)
 	return energy.NewDeviceEnergyManagement(cfg)
@@ -307,7 +307,7 @@ func newDryerControlsServer(b defaultBuild) (contract.ClusterServer, error) {
 	if _, ok := b.initial[ldcdef.AttrSupportedDrynessLevels]; !ok {
 		return nil, notServed(errors.New("device: laundrydryercontrols: the declaration's Initial carries no SupportedDrynessLevels"))
 	}
-	cfg := appliance.DryerConfig{DataVersion: b.cfg.DataVersion}
+	cfg := appliance.DryerConfig{}
 	configFrom(&cfg, b.def, b.initial)
 	return appliance.NewLaundryDryerControls(cfg)
 }
@@ -323,7 +323,6 @@ func newSmokeCoAlarmServer(b defaultBuild) (contract.ClusterServer, error) {
 	hostState(b.initial)
 	return alarm.NewServer(alarm.Config{
 		Source: d.StateSource, Features: alarm.Feature(b.opts.Features), Optional: alarm.OptionalFor(b.opts.Attributes),
-		DataVersion: b.cfg.DataVersion,
 	})
 }
 
@@ -340,7 +339,7 @@ func newCommodityTariffServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	srv, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{
 		Features: energy.TariffFeature(b.opts.Features), Clock: clk, ClockDeclared: d.TimeSource != nil,
-		SyncInterval: tariffSyncInterval, DataVersion: b.cfg.DataVersion,
+		SyncInterval: tariffSyncInterval,
 	})
 	if err != nil {
 		return nil, notServed(err)
@@ -367,7 +366,7 @@ func (c sourceClock) Now() time.Time { return c.now() }
 // ChangeEvent feature; the host sets StateValue through the typed Set.
 func newBooleanStateServer(b defaultBuild) (contract.ClusterServer, error) {
 	return measurement.NewHeldBooleanState(measurement.HeldBooleanStateConfig{
-		Features: bsdef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion,
+		Features: bsdef.Feature(b.opts.Features),
 	})
 }
 
@@ -376,7 +375,7 @@ func newBooleanStateServer(b defaultBuild) (contract.ClusterServer, error) {
 // declaration's Initial; a selection whose lists it lacks keeps the
 // generated server.
 func newEnergyPreferenceServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := energy.PreferenceConfig{Features: energy.PreferenceFeature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	cfg := energy.PreferenceConfig{Features: energy.PreferenceFeature(b.opts.Features)}
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := energy.NewEnergyPreference(cfg)
 	if err != nil {

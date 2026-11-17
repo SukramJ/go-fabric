@@ -76,6 +76,11 @@ type CommodityPriceConfig struct {
 	DetailedPrice    bool
 	DetailedForecast bool
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -138,7 +143,7 @@ func NewCommodityPrice(cfg CommodityPriceConfig) (*CommodityPriceServer, error) 
 		cp.CmdGetDetailedPriceRequest:    s.getDetailedPrice,
 		cp.CmdGetDetailedForecastRequest: s.getDetailedForecast,
 	}
-	srv, err := spec.NewServer(cp.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial})
+	srv, err := spec.NewServer(cp.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
@@ -227,19 +232,21 @@ func (s *CommodityPriceServer) SetCurrentPrice(p *CommodityPrice) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var stored any
+	var current *CommodityPrice
 	event := cp.PriceChangeEvent{CurrentPrice: spec.NullOf[CommodityPrice]()}
 	if p != nil {
-		full := *p
-		s.current = &full
+		full := p.Clone()
+		current = &full
 		filtered := filterDetails(full, 0)
 		stored = filtered
 		event.CurrentPrice = spec.ValueOf(filtered)
-	} else {
-		s.current = nil
 	}
+	// The store first: a value it refuses leaves the price the detail
+	// request answers as it was (review II, R2-P6-err-1612).
 	if err := s.srv.Set(cp.AttrCurrentPrice, stored); err != nil {
 		return err
 	}
+	s.current = current
 	// A server not in the topology (spec.ErrNotMounted) has no event log
 	// to record in: the state change stands, the event is dropped.
 	if err := s.srv.EmitEvent(cp.EventPriceChange, event); !errors.Is(err, spec.ErrNotMounted) {
@@ -266,12 +273,18 @@ func (s *CommodityPriceServer) SetForecast(forecast []CommodityPrice) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.forecast = append([]CommodityPrice(nil), forecast...)
 	filtered := make([]CommodityPrice, len(forecast))
 	for i, p := range forecast {
 		filtered[i] = filterDetails(p, 0)
 	}
-	return s.srv.Set(cp.AttrPriceForecast, filtered)
+	if err := s.srv.Set(cp.AttrPriceForecast, filtered); err != nil {
+		return err // the forecast the detail request answers stays as it was (R2-P6-err-1612)
+	}
+	s.forecast = make([]CommodityPrice, len(forecast))
+	for i, p := range forecast {
+		s.forecast[i] = p.Clone()
+	}
+	return nil
 }
 
 // CurrentPrice returns the full current price; nil while null.
@@ -281,7 +294,7 @@ func (s *CommodityPriceServer) CurrentPrice() *CommodityPrice {
 	if s.current == nil {
 		return nil
 	}
-	p := *s.current
+	p := s.current.Clone()
 	return &p
 }
 

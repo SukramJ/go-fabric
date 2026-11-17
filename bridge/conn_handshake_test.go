@@ -157,15 +157,15 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 
 	b.holdHandshake(route, onExchange(1), false)
 	b.holdHandshake(route, onExchange(1), false) // a retransmitted Sigma1 counts once
-	b.settleHandshake(route, 1, nil, mrp.SCOpcodeSigma2, []byte{1}, nil)
-	b.settleHandshake(route, 1, nil, 0, nil, sigma.ErrSessionState)
-	b.settleHandshake(route, 1, nil, 0, nil, spake2.ErrSessionState)
+	b.settleHandshake(route, onExchange(1), nil, mrp.SCOpcodeSigma2, []byte{1}, nil)
+	b.settleHandshake(route, onExchange(1), nil, 0, nil, sigma.ErrSessionState)
+	b.settleHandshake(route, onExchange(1), nil, 0, nil, spake2.ErrSessionState)
 	if n := held(); n != 1 {
 		t.Fatalf("%d holds after a continuing and two replayed steps, want 1", n)
 	}
-	b.settleHandshake(route, 1, nil, mrp.SCOpcodeStatusReport, failure, nil)
+	b.settleHandshake(route, onExchange(1), nil, mrp.SCOpcodeStatusReport, failure, nil)
 	b.holdHandshake(route, onExchange(2), false)
-	b.settleHandshake(route, 2, nil, 0, nil, errors.New("decode"))
+	b.settleHandshake(route, onExchange(2), nil, 0, nil, errors.New("decode"))
 	b.holdHandshake(route, onExchange(3), false)
 	b.ForgetSigma1Replied(onExchange(3))
 	if n := held(); n != 0 {
@@ -173,7 +173,7 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 	}
 
 	// The peer's failure StatusReport on the handshake's exchange.
-	b.holdHandshake(route, onExchange(4), true)
+	b.holdHandshake(route, HandshakeKey{InitiatorNodeID: 0x5A5A, ExchangeID: 4}, true)
 	hdr := &message.Header{SessionID: 0, MessageCounter: 9, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
 	if err := b.dispatchSecureChannel(route, hdr, scProto(mrp.SCOpcodeStatusReport, 4, false, 0), failure); err != nil {
 		t.Fatal(err)
@@ -185,7 +185,7 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 	// A resume establishes at once; without a named session the hold
 	// just ends.
 	b.holdHandshake(route, onExchange(5), false)
-	b.settleHandshake(route, 5, nil, mrp.SCOpcodeSigma2Resume, []byte{1}, nil)
+	b.settleHandshake(route, onExchange(5), nil, mrp.SCOpcodeSigma2Resume, []byte{1}, nil)
 	if n := held(); n != 0 {
 		t.Fatalf("%d holds after a resume, want 0", n)
 	}
@@ -215,9 +215,9 @@ func TestHandshakeHoldLifecycle(t *testing.T) {
 	// Over UDP nothing is held.
 	udp := loopbackSrc()
 	b.holdHandshake(udp, onExchange(8), false)
-	b.settleHandshake(udp, 8, nil, mrp.SCOpcodeStatusReport, failure, nil)
-	b.releaseHandshake(udp, 8)
-	b.releaseHandshake(nil, 8)
+	b.settleHandshake(udp, onExchange(8), nil, mrp.SCOpcodeStatusReport, failure, nil)
+	b.releaseHandshake(udp, onExchange(8))
+	b.releaseHandshake(nil, onExchange(8))
 }
 
 // TestAdaptersNameTheirEstablishedSession: the CASE and PASE adapters name
@@ -240,5 +240,50 @@ func TestAdaptersNameTheirEstablishedSession(t *testing.T) {
 	pa.established = true
 	if sid, ok := pa.establishedSession(); !ok || sid != 0x55 {
 		t.Fatalf("PASE adapter established %#x %v", sid, ok)
+	}
+}
+
+// TestSuccessStatusReportKeepsTheHandshakeHold: on the unsecured session
+// only a failure StatusReport ends the TCP hold of the handshake it names
+// (R2-P6-test-0821) — a success report (the initiator's after Sigma2_Resume
+// or Sigma3 is answered) is no end of the peer's interest in the
+// connection.
+func TestSuccessStatusReportKeepsTheHandshakeHold(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
+	route := b.routeFor(&fakeConn{})
+	r, ok := route.(*connRoute)
+	if !ok {
+		t.Fatalf("route %T", route)
+	}
+	held := func() int {
+		b.routeBindMu.Lock()
+		defer b.routeBindMu.Unlock()
+		return r.liveHandshakesLocked(time.Now())
+	}
+	key := HandshakeKey{InitiatorNodeID: 0x5A5B, ExchangeID: 4}
+	b.holdHandshake(route, key, false)
+	hdr := &message.Header{SessionID: 0, MessageCounter: 9, HasSourceNodeID: true, SourceNodeID: key.InitiatorNodeID}
+	success := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)
+	if err := b.dispatchSecureChannel(route, hdr, scProto(mrp.SCOpcodeStatusReport, key.ExchangeID, false, 0), success); err != nil {
+		t.Fatal(err)
+	}
+	if n := held(); n != 1 {
+		t.Fatalf("%d holds after the peer's success report, want 1", n)
+	}
+}
+
+// TestPASEHoldCountsUntilItsTimeoutPasses: a PASE handshake's TCP hold
+// still counts at exactly pasePairingTimeout and lapses only past it
+// (R2-P6-bound-0813).
+func TestPASEHoldCountsUntilItsTimeoutPasses(t *testing.T) {
+	t.Parallel()
+	since := time.Unix(1_700_000_000, 0)
+	r := &connRoute{handshakes: map[uint16]handshakeHold{1: {pase: true, since: since}}}
+	if n := r.liveHandshakesLocked(since.Add(pasePairingTimeout)); n != 1 {
+		t.Fatalf("%d live holds at exactly the timeout, want 1", n)
+	}
+	if n := r.liveHandshakesLocked(since.Add(pasePairingTimeout + time.Nanosecond)); n != 0 {
+		t.Fatalf("%d live holds past the timeout, want 0", n)
 	}
 }

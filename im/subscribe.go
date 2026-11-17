@@ -92,8 +92,9 @@ type SubscribeRequest struct {
 	// EventFilters carries per-source minimum-event-number hints the
 	// controller sends to avoid re-receiving events it has already seen
 	// (Matter §10.6.9 EventFilterIB). The bridge evaluates the filters
-	// in BuildEventReports and skips events whose Number ≤ the
-	// supplied EventMin.
+	// in BuildEventReports and skips events whose Number < the
+	// supplied EventMin: EventMin is inclusive (review II,
+	// R2-P6-doc-0562).
 	EventFilters   []EventMinimumNumber
 	FabricFiltered bool
 	// DataVersionFilters carries per-cluster version hints the
@@ -136,12 +137,16 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 	}
 	var req SubscribeRequest
 	var hasKeep, hasMin, hasMax, hasFabricFiltered bool
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return SubscribeRequest{}, later.first
+			}
 			// KeepSubscriptions, both intervals and IsFabricFiltered are
 			// mandatory: matter.js
 			// packages/types/src/protocol/messages/TlvSubscribeRequest.ts
@@ -162,8 +167,8 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 			}
 			return req, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagSubReqKeepSubscriptions:
@@ -175,12 +180,16 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 			// TlvUInt16, never masked (matter.js packages/types/src/protocol/messages/TlvSubscribeRequest.ts:24-27;
 			// review 2026-11 W2-wire-03).
 			if req.MinIntervalFloor, err = uint16Field(el); err != nil {
-				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+				if err := later.keep(fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)); err != nil {
+					return SubscribeRequest{}, err
+				}
 			}
 			hasMin = true
 		case tagSubReqMaxIntervalCeiling:
 			if req.MaxIntervalCeiling, err = uint16Field(el); err != nil {
-				return SubscribeRequest{}, fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)
+				if err := later.keep(fmt.Errorf("%w: %w", ErrInvalidSubscribeRequest, err)); err != nil {
+					return SubscribeRequest{}, err
+				}
 			}
 			hasMax = true
 		case tagSubReqAttributeRequests:
@@ -188,7 +197,7 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 				return SubscribeRequest{}, fmt.Errorf("%w: AttributeRequests not array", ErrInvalidSubscribeRequest)
 			}
 			paths, err := readPathArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return SubscribeRequest{}, err
 			}
 			req.AttributeRequests = paths
@@ -197,7 +206,7 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 				return SubscribeRequest{}, fmt.Errorf("%w: EventRequests not array", ErrInvalidSubscribeRequest)
 			}
 			eventPaths, err := readEventPathArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return SubscribeRequest{}, err
 			}
 			req.EventRequests = eventPaths
@@ -220,7 +229,7 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 				continue
 			}
 			filters, err := readEventFilterArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return SubscribeRequest{}, err
 			}
 			req.EventFilters = filters
@@ -234,7 +243,7 @@ func UnmarshalSubscribeRequestTLV(dec *tlv.Decoder) (SubscribeRequest, error) { 
 				return SubscribeRequest{}, fmt.Errorf("%w: DataVersionFilters not array", ErrInvalidSubscribeRequest)
 			}
 			filters, err := readDataVersionFilterArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return SubscribeRequest{}, err
 			}
 			req.DataVersionFilters = filters

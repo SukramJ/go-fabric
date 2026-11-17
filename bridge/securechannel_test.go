@@ -881,3 +881,37 @@ func TestHandlePase_MissingHandler_NoStatusReport(t *testing.T) {
 		t.Errorf("want ErrPaseHandlerMissing, got %v", err)
 	}
 }
+
+// TestCloseSessionNeedsGeneralSuccess: a StatusReport closes the secure
+// session it rides on only as the full CloseSession triple — general
+// Success, the Secure Channel protocol, code CloseSession — so a report that
+// differs in any one of them closes nothing (R2-P6-test-0819).
+func TestCloseSessionNeedsGeneralSuccess(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name     string
+		general  uint16
+		protocol uint32
+		code     uint16
+		closes   bool
+	}{
+		{"CloseSession", mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), scStatusProtocolCloseSession, true},
+		{"general failure", mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), scStatusProtocolCloseSession, false},
+		{"another protocol", mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID) + 1, scStatusProtocolCloseSession, false},
+		{"another code", mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			b := newStartedBridge(t)
+			reg := &fakeSessionRegistry{}
+			b.AttachSessionRegistry(reg)
+			report := mrp.EncodeStatusReport(c.general, c.protocol, c.code, nil)
+			if err := b.dispatchSecureChannel(loopbackSrc(), &message.Header{SessionID: 9, MessageCounter: 1}, scProto(mrp.SCOpcodeStatusReport, 5, false, 0), report); err != nil {
+				t.Fatal(err)
+			}
+			if got := len(reg.closedSessions()) == 1; got != c.closes {
+				t.Fatalf("closed %v, want closed=%v", reg.closedSessions(), c.closes)
+			}
+		})
+	}
+}

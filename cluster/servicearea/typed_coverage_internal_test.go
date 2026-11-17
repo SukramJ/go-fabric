@@ -22,12 +22,12 @@ func definitionWith(tb testing.TB, edit func(attrs []spec.Attribute)) *Server {
 	def := *sa.Definition
 	def.Attributes = append([]spec.Attribute(nil), sa.Definition.Attributes...)
 	edit(def.Attributes)
-	inst, err := spec.New(&def, spec.Options{})
+	s := &Server{}
+	srv, err := newHeld(&def, spec.Options{}, s.MatterRead, s.invoke)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	s := &Server{Instance: inst}
-	s.hooks.Init(inst)
+	s.Instance, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	return s
 }
 

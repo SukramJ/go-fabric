@@ -366,7 +366,10 @@ func (c *demoCamera) build() error {
 	speakerCaps := audioCaps
 	no, yes := false, true
 	snapshotCaps := []csdef.SnapshotCapabilitiesStruct{
-		{Resolution: minViewport, MaxFrameRate: camSnapshotFrameRate, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: false, RequiresHardwareEncoder: &no},
+		// RequiresHardwareEncoder is "RequiresEncodedPixels == true"
+		// (review II, R2-P6-par-1304): the capability without encoded
+		// pixels names no encoder.
+		{Resolution: minViewport, MaxFrameRate: camSnapshotFrameRate, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: false},
 		{Resolution: csdef.VideoResolutionStruct{Width: cam720Width, Height: cam720Height}, MaxFrameRate: camSnapshotFrameRate, ImageCodec: csdef.ImageCodecJpeg, RequiresEncodedPixels: true, RequiresHardwareEncoder: &yes},
 	}
 	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView, csdef.StreamUsageRecording}
@@ -788,13 +791,42 @@ func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (
 
 // ProvideOffer keeps the session, RESOURCE_EXHAUSTED over the capacity
 // (:470-477); the answer would come from a media stack this simulation
-// does not have.
+// does not have. A re-offer — its id already in CurrentSessions — starts
+// from that session (chip WebRTCTransportProviderCluster.cpp:926 at
+// 6170af84, outSession = *existingSession) and sets what
+// HandleProvideOffer sets (webrtc-provider-manager.cpp:407-445): the
+// peer, the usage, the fabric and the deprecated stream ids, null
+// without one. The session's stream lists stay, so a re-offer that
+// carries no deprecated id still names its streams ("O.a+", which the
+// server holds CurrentSessions to; TC-WEBRTCP-2.30 step 7).
 func (p camProviderPort) ProvideOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
 	if p.c.addSession(args.SessionID) > camMaxWebRTCSessions {
 		p.c.dropSession(args.SessionID)
 		return wpdef.WebRTCSessionStruct{}, statusErr(im.StatusResourceExhausted, "%d WebRTC sessions", camMaxWebRTCSessions)
 	}
-	return camSession(args), nil
+	s, reoffer := p.c.currentSession(args.SessionID)
+	if !reoffer {
+		return camSession(args), nil
+	}
+	s.Id, s.PeerNodeId, s.PeerEndpointId, s.StreamUsage, s.FabricIndex = args.SessionID, args.PeerNodeID, args.OriginatingEndpointID, args.StreamUsage, args.FabricIndex
+	s.VideoStreamId, s.AudioStreamId = camFirst(args.VideoStreams), camFirst(args.AudioStreams)
+	return s, nil
+}
+
+// currentSession returns the provider's CurrentSessions entry of id, a
+// copy. The server calls the port outside its table lock, so the read
+// does not wait on the command that asks.
+func (c *demoCamera) currentSession(id uint16) (wpdef.WebRTCSessionStruct, bool) {
+	p, ok := c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider)
+	if !ok {
+		return wpdef.WebRTCSessionStruct{}, false
+	}
+	for _, s := range p.Sessions() {
+		if s.Id == id {
+			return s, true
+		}
+	}
+	return wpdef.WebRTCSessionStruct{}, false
 }
 
 func (camProviderPort) ProvideAnswer(context.Context, uint16, string) error { return nil }

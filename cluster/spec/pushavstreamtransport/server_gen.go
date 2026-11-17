@@ -24,6 +24,32 @@ type State struct {
 	CurrentConnections []TransportConfigurationStruct // attribute 0x0001: list[TransportConfigurationStruct], M, R S V, N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedFormats = func(s []SupportedFormatStruct) []SupportedFormatStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]SupportedFormatStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedFormats)
+	c.CurrentConnections = func(s []TransportConfigurationStruct) []TransportConfigurationStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TransportConfigurationStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.CurrentConnections)
+	return c
+}
+
 // Patch is a change to the PushAvStreamTransport state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {
@@ -277,10 +303,22 @@ type TLSCredentials struct {
 // PushTransportPort is the camera's push uploader (cluster/camera
 // PushTransport, after connectedhomeip's PushAvStreamTransportDelegate,
 // push-av-stream-transport-delegate.h:42-348): the kit's server
-// validates each command — the transport options, the TLS endpoint,
-// the URL, the streams against the camera's CameraAvStreamManagement
-// and the motion zones against its ZoneManagement — before it calls
-// the port, and keeps CurrentConnections. TransportBusy reports a
+// validates each command before it calls the port, and keeps
+// CurrentConnections. AllocatePushTransport is checked whole — the
+// transport options, the accessing fabric's TLS endpoint, the URL, the
+// stream usage, the streams against the camera's
+// CameraAvStreamManagement, the motion zones against its
+// ZoneManagement, the segment, bandwidth and pre-roll rules.
+// ModifyPushTransport, as connectedhomeip's HandleModifyPushTransport
+// (PushAVStreamTransportLogic.cpp:1291, :1326-1332, :1335 at
+// 6170af84), runs the transport options' constraint checks and the
+// stream checks only. What AllocatePushTransport checks beyond them is
+// not checked: the TLS endpoint is not looked up, the URL's form, the
+// stream usage against the supported ones, the zone ids against
+// ZoneManagement, the segment duration and the pre-roll length are not
+// validated, and ValidateBandwidthLimit is not called. The port
+// resolves a TLS endpoint within the connection's fabric (fabricIndex
+// of AllocatePushTransport). TransportBusy reports a
 // connection that uploads now; ValidateBandwidthLimit refuses a
 // transport the network cannot carry; CMAFSessionNumber is the CMAF
 // session number of the events. An error answers its status,

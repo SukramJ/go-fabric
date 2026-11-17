@@ -4,6 +4,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -20,7 +21,9 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/caseauth"
 )
 
 // OTAProvider is the OTA Software Update Provider (0x0029): it answers an
@@ -271,6 +274,10 @@ var (
 	ErrNoNodeID      = errors.New("core: OTA provider with BDX needs the node id lookup")
 )
 
+// The provider's in-progress entries and consents are fabric-scoped state
+// (owner decision 167).
+var _ contract.FabricScopedState = (*OTAProvider)(nil)
+
 // otaProviderInst is the definition the provider serves: no attribute but
 // the globals, the three commands and their responses.
 var otaProviderInst = mustInstance(provdef.Definition, spec.Options{})
@@ -352,13 +359,14 @@ func (s *otaImageStorage) Open(ctx context.Context, name string) (bdx.Blob, erro
 
 // remotePeer is OP's assertRemoteActor + NodeSession.assert: the
 // requestor of a command, its fabric and node, and the session id the
-// command arrived on.
+// command arrived on. CASE is told apart by internal/caseauth, the one
+// rule every CASE-only server of the module shares.
 func remotePeer(ctx context.Context) (OTAPeer, uint16, error) {
-	_, fabric := im.FabricFilterFromContext(ctx)
-	node, _ := im.SubjectFromContext(ctx)
-	if fabric == 0 || node == 0 || im.IsPASEFromContext(ctx) {
+	if !caseauth.IsCASE(ctx) {
 		return OTAPeer{}, 0, otaStatusError{im.StatusUnsupportedAccess, "OTA provider commands need a CASE session"}
 	}
+	_, fabric := im.FabricFilterFromContext(ctx)
+	node, _ := im.SubjectFromContext(ctx)
 	return OTAPeer{FabricIndex: fabric, NodeID: node}, InvokeSessionIDFromContext(ctx), nil
 }
 
@@ -823,6 +831,64 @@ func (p *OTAProvider) cancelUnlessSettled(peer OTAPeer, token []byte, version ui
 	}
 }
 
+// MatterDropFabric implements [contract.FabricScopedState]: a removed
+// fabric's in-progress entries leave (their cleanup run, outside p.mu),
+// its consents with them, and each of its peers loses the BDX scope its
+// query enabled — a transfer of it that still runs is closed — so a later
+// fabric that receives the index inherits none of it (review II,
+// R2-P6-bound-1206, owner decision 167). matter.js removes only stale
+// entries, on the peer's next lookup (OtaSoftwareUpdateProviderServer.ts:566-568
+// at db021da0), and nothing at a fabric's removal.
+func (p *OTAProvider) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
+	p.mu.Lock()
+	var cleanups []func()
+	var peers []OTAPeer
+	for key, d := range p.inProgress {
+		if d.peer.FabricIndex == fabricIndex {
+			if d.cleanup != nil {
+				cleanups = append(cleanups, d.cleanup)
+			}
+			peers = append(peers, d.peer)
+			delete(p.inProgress, key)
+		}
+	}
+	for peer := range p.consents {
+		if peer.FabricIndex == fabricIndex {
+			peers = append(peers, peer)
+			delete(p.consents, peer)
+		}
+	}
+	p.mu.Unlock()
+	for _, fn := range cleanups {
+		fn()
+	}
+	if p.cfg.BDX != nil {
+		slices.SortFunc(peers, func(a, b OTAPeer) int { return cmp.Compare(a.NodeID, b.NodeID) })
+		for _, peer := range slices.Compact(peers) {
+			if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
+				p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
+			}
+		}
+	}
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// of the in-progress entries and of the consents, ascending.
+func (p *OTAProvider) MatterHeldFabrics() []uint8 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]uint8, 0, len(p.inProgress)+len(p.consents))
+	for _, d := range p.inProgress {
+		out = append(out, d.peer.FabricIndex)
+	}
+	for peer := range p.consents {
+		out = append(out, peer.FabricIndex)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
 // otaStatusUpdate is what updateInProgressLocked leaves to do once p.mu is
 // released: the log, the status hook and the terminal entry's cleanup.
 type otaStatusUpdate struct {
@@ -830,7 +896,46 @@ type otaStatusUpdate struct {
 	state, previous OTAUpdateStatus
 	applied         uint32
 	cleanup         func()
+	// evicted is the cleanup of the entry a new one displaced
+	// (otaInProgressPerFabric).
+	evicted func()
 }
+
+// evictForLocked makes room for a new entry of fabric when the fabric holds
+// its otaInProgressPerFabric share: the entry touched longest ago leaves,
+// and its cleanup is returned to run once p.mu is released. p.mu is held.
+func (p *OTAProvider) evictForLocked(fabric uint8) func() {
+	held, victim := 0, ""
+	for _, key := range p.sortedKeysLocked() {
+		d := p.inProgress[key]
+		if d.peer.FabricIndex != fabric {
+			continue
+		}
+		held++
+		if victim == "" || d.timestamp.Before(p.inProgress[victim].timestamp) {
+			victim = key
+		}
+	}
+	if held < otaInProgressPerFabric {
+		return nil
+	}
+	d := p.inProgress[victim]
+	delete(p.inProgress, victim)
+	p.logger.Info("ota.provider.entry_evicted", slog.Uint64("node_id", d.peer.NodeID), slog.Int("fabric_index", int(fabric)))
+	return d.cleanup
+}
+
+// otaInProgressPerFabric is the share of in-progress entries one fabric's
+// requestors hold. matter.js keeps an entry for a token it never issued
+// when the peer holds a consent for the version
+// (OtaSoftwareUpdateProviderServer.ts:417-420, :444, :474-481, created
+// :605-614, stored :635 at db021da0); without one the entry is created and
+// deleted in the same call (:452-458, :644-647). It drops a peer's stale
+// entries on that peer's next lookup (:556-557, :565-577) and none at a
+// fabric's removal. The number is the module's: room for that many
+// concurrent updates on one fabric (review II, R2-P6-bound-1206, decision
+// 134).
+const otaInProgressPerFabric = 16
 
 // updateInProgressLocked is updateInProgress's write; p.mu is held.
 func (p *OTAProvider) updateInProgressLocked(peer OTAPeer, token []byte, state OTAUpdateStatus, version *uint32, directConsent bool) otaStatusUpdate {
@@ -838,6 +943,10 @@ func (p *OTAProvider) updateInProgressLocked(peer OTAPeer, token []byte, state O
 	d := p.inProgress[key]
 	u := otaStatusUpdate{peer: peer, state: state, previous: OTAUpdateUnknown}
 	if d == nil {
+		if state != OTAUpdateDone && state != OTAUpdateCancelled {
+			// A terminal state's entry goes at once and displaces none.
+			u.evicted = p.evictForLocked(peer.FabricIndex)
+		}
 		d = &otaInProgress{peer: peer}
 	} else {
 		u.previous = d.lastState
@@ -873,6 +982,9 @@ func (p *OTAProvider) announce(u otaStatusUpdate) {
 	}
 	if u.cleanup != nil {
 		u.cleanup()
+	}
+	if u.evicted != nil {
+		u.evicted()
 	}
 }
 

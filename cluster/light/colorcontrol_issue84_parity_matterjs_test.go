@@ -30,17 +30,17 @@ func TestIssue84_OneWritePerCommand(t *testing.T) {
 	}{
 		{
 			"MoveToColor", ccdef.CmdMoveToColor,
-			map[uint8]any{0: uint64(45914), 1: uint64(19615), 3: uint64(1), 4: uint64(1)},
+			map[uint8]any{0: uint64(45914), 1: uint64(19615), 2: uint64(0), 3: uint64(1), 4: uint64(1)},
 			light.Color{Mode: light.ColorModeXY, X: 45914, Y: 19615},
 		},
 		{
 			"StepColor", ccdef.CmdStepColor,
-			map[uint8]any{0: int64(1000), 1: int64(-2000), 3: uint64(1), 4: uint64(1)},
+			map[uint8]any{0: int64(1000), 1: int64(-2000), 2: uint64(0), 3: uint64(1), 4: uint64(1)},
 			light.Color{Mode: light.ColorModeXY, X: 13102 + 1000, Y: 22196 - 2000},
 		},
 		{
 			"MoveToHueAndSaturation", ccdef.CmdMoveToHueAndSaturation,
-			map[uint8]any{0: uint64(40), 1: uint64(200), 3: uint64(1), 4: uint64(1)},
+			map[uint8]any{0: uint64(40), 1: uint64(200), 2: uint64(0), 3: uint64(1), 4: uint64(1)},
 			light.Color{Mode: light.ColorModeHueSaturation, Hue: 40, Saturation: 200},
 		},
 	} {

@@ -15,6 +15,7 @@ package jcm_test
 // matter.js's six check it end to end (verifyStatement).
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -106,8 +107,14 @@ func anchorCert(t *testing.T, key *ecdsa.PrivateKey) []byte {
 		Subject:   mattercert.DistinguishedName{MatterRCACID: 1, HasRCACID: true},
 		NotBefore: 1, NotAfter: 0x7FFF_FFFF,
 		PublicKeyAlgorithm: mattercert.PubKeyAlgoEC, EllipticCurveID: mattercert.CurvePrime256v1, PublicKey: pubOf(t, key),
-		Extensions: mattercert.CertificateExtensions{HasBasicConstraints: true, BasicConstraintsIsCA: true, HasKeyUsage: true, KeyUsage: 0x0060},
-		Signature:  make([]byte, 64),
+		Extensions: mattercert.CertificateExtensions{
+			HasBasicConstraints: true, BasicConstraintsIsCA: true, HasKeyUsage: true, KeyUsage: 0x0060,
+			// The key identifiers every certificate carries
+			// (mattercert.Decode); equal on a self-signed anchor.
+			HasSubjectKeyID: true, SubjectKeyID: bytes.Repeat([]byte{0xA5}, 20),
+			HasAuthorityKeyID: true, AuthorityKeyID: bytes.Repeat([]byte{0xA5}, 20),
+		},
+		Signature: make([]byte, 64),
 	})
 	if err != nil {
 		t.Fatal(err)

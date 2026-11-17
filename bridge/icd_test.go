@@ -143,3 +143,98 @@ func TestICDSeams(t *testing.T) {
 		}
 	})
 }
+
+// sessionTable resolves each session id to the fabric and subject it names,
+// and nothing for an id it does not hold.
+type sessionTable map[uint16]tableSession
+
+type tableSession struct {
+	fabric uint8
+	node   uint64
+}
+
+func (sessionTable) Lookup(uint16) (*channel.Session, bool) { return nil, false }
+
+func (s sessionTable) FabricFor(id uint16) (uint8, bool) {
+	e, ok := s[id]
+	return e.fabric, ok
+}
+
+func (s sessionTable) SubjectFor(id uint16) (nodeID uint64, cats []uint32, ok bool) {
+	e, ok := s[id]
+	return e.node, nil, ok
+}
+
+// TestPeerSessionAddressIsPerFabric holds the fabric filter of
+// PeerSessionAddress (R2-P6-test-0814): one controller node id on two
+// fabrics is two peers, so each fabric's Check-In address is its own
+// session's; a fabric the bridge holds no session on answers nil; and a
+// session whose address is not recorded hides no other session's.
+func TestPeerSessionAddressIsPerFabric(t *testing.T) {
+	t.Parallel()
+	const node = 0x1122_3344
+	a1 := &net.UDPAddr{IP: net.IPv6loopback, Port: 5541}
+	a2 := &net.UDPAddr{IP: net.IPv6loopback, Port: 5542}
+	// A sync.Map's Range order is fixed per map and random across maps:
+	// fresh bridges, and many unrecorded sessions beside the one recorded,
+	// make an order-dependent answer show.
+	for range 8 {
+		table := sessionTable{7: {1, node}, 8: {2, node}}
+		b := &Bridge{}
+		b.sessionPeerAddrs.Store(uint16(7), a1)
+		b.sessionPeerAddrs.Store(uint16(8), a2)
+		for id := uint16(20); id < 36; id++ {
+			table[id] = tableSession{2, node}
+			b.sessionPeerAddrs.Store(id, (*net.UDPAddr)(nil))
+		}
+		b.sessions = table
+		if got := b.PeerSessionAddress(1, node); got != a1 {
+			t.Fatalf("fabric 1: %v, want %v", got, a1)
+		}
+		if got := b.PeerSessionAddress(2, node); got != a2 {
+			t.Fatalf("fabric 2: %v, want %v", got, a2)
+		}
+		if got := b.PeerSessionAddress(3, node); got != nil {
+			t.Fatalf("fabric 3 (no session): %v", got)
+		}
+	}
+}
+
+// emptyResolver answers a resolve with no address and no error.
+type emptyResolver struct{}
+
+func (emptyResolver) ResolveOperational(context.Context, [8]byte, uint64) ([]*net.UDPAddr, error) {
+	return nil, nil
+}
+
+// TestResolveOperationalAddressEmptyAnswer: a resolver that finds nothing
+// and reports no error leaves the address nil (R2-P6-test-0815).
+func TestResolveOperationalAddressEmptyAnswer(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	b.AttachOperationalResolver(emptyResolver{})
+	if a, err := b.ResolveOperationalAddress(context.Background(), [8]byte{}, 1); a != nil || err != nil {
+		t.Fatal(a, err)
+	}
+}
+
+// TestActiveSubscriptionSubjectsSkipsPASEAndDuplicates: a subscription on a
+// PASE session is no active subscriber for Check-In suppression even when
+// its session resolves to the fabric, and two subscriptions of one session
+// count once (R2-P6-test-0815).
+func TestActiveSubscriptionSubjectsSkipsPASEAndDuplicates(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	b.mu.Lock()
+	b.sessions = sessionTable{7: {1, 0x1234}, 10: {1, 0x9999}}
+	b.mu.Unlock()
+	b.routing.subTargets.Store(uint32(1), subTarget{sessionID: 7, fabricIndex: 1, subjectNodeID: 0x1234})
+	b.routing.subTargets.Store(uint32(2), subTarget{sessionID: 7, fabricIndex: 1, subjectNodeID: 0x1234})
+	b.routing.subTargets.Store(uint32(3), subTarget{sessionID: 10, fabricIndex: 1, subjectNodeID: 0x9999, pase: true})
+	for range 8 {
+		got := b.ActiveSubscriptionSubjects(1)
+		if len(got) != 1 || got[0].NodeID != 0x1234 {
+			t.Fatalf("subjects %+v, want the one CASE subject 0x1234", got)
+		}
+	}
+}

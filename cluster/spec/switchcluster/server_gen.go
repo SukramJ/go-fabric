@@ -24,6 +24,14 @@ type State struct {
 	MultiPressMax     uint8 // attribute 0x0002: uint8, MSM, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	return c
+}
+
 // Patch is a change to the Switch state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

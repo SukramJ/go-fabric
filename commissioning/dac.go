@@ -14,18 +14,34 @@ import (
 var (
 	// ErrDACMalformed is returned when DAC / PAI / PAA bytes do not
 	// parse as valid X.509 DER.
+	//
+	// Deprecated: use controller/attestation.Validate with a
+	// controller/attestation.PAAStore, the commissioner's device attestation
+	// check; removable in the next minor release.
 	ErrDACMalformed = errors.New("commissioning: DAC certificate malformed")
 	// ErrDACChainBroken is returned when the chain's signatures do
 	// not link up.
+	//
+	// Deprecated: use controller/attestation.Validate with a
+	// controller/attestation.PAAStore, the commissioner's device attestation
+	// check; removable in the next minor release.
 	ErrDACChainBroken = errors.New("commissioning: DAC chain broken")
 	// ErrDACExpired is returned when any cert in the chain is outside
 	// its NotBefore..NotAfter window.
+	//
+	// Deprecated: use controller/attestation.Validate with a
+	// controller/attestation.PAAStore, the commissioner's device attestation
+	// check; removable in the next minor release.
 	ErrDACExpired = errors.New("commissioning: DAC certificate expired or not yet valid")
 )
 
 // DACChain bundles the device-side attestation chain. The PAI is
 // optional in some Matter profiles; go-fabric ships a full chain
 // and the validator expects all three.
+//
+// Deprecated: use controller/attestation.Validate with a
+// controller/attestation.PAAStore, the commissioner's device attestation
+// check; removable in the next minor release.
 type DACChain struct {
 	// DAC is the Device Attestation Certificate (Matter §6.2). DER.
 	DAC []byte
@@ -41,6 +57,10 @@ type DACChain struct {
 // Returns the parsed *x509.Certificate trio (dac, pai, paa) plus the
 // PAA that was actually used as anchor. Any chain or expiry failure
 // surfaces as one of the package-level errors.
+//
+// Deprecated: use controller/attestation.Validate with a
+// controller/attestation.PAAStore, the commissioner's device attestation
+// check; removable in the next minor release.
 func VerifyChain(chain DACChain, paaPool *x509.CertPool, now time.Time) (dac, pai, paa *x509.Certificate, err error) {
 	if paaPool == nil {
 		return nil, nil, nil, fmt.Errorf("%w: PAA pool is nil", ErrDACChainBroken)
@@ -90,6 +110,10 @@ func VerifyChain(chain DACChain, paaPool *x509.CertPool, now time.Time) (dac, pa
 // LoadPAAPoolFromPEM is a convenience for tests / small deployments.
 // Production code reads the PAA list from a configured directory and
 // passes the resulting *x509.CertPool in.
+//
+// Deprecated: use controller/attestation.Validate with a
+// controller/attestation.PAAStore, the commissioner's device attestation
+// check; removable in the next minor release.
 func LoadPAAPoolFromPEM(pemBytes []byte) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(pemBytes) {

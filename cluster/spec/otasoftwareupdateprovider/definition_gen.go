@@ -146,6 +146,57 @@ func (v *QueryImageRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v QueryImageRequest) Clone() QueryImageRequest {
+	c := v
+	c.ProtocolsSupported = func(s []DownloadProtocolEnum) []DownloadProtocolEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]DownloadProtocolEnum, len(s))
+		copy(out, s)
+		return out
+	}(v.ProtocolsSupported)
+	c.HardwareVersion = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.HardwareVersion)
+	c.Location = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Location)
+	c.RequestorCanConsent = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.RequestorCanConsent)
+	c.MetadataForProvider = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.MetadataForProvider)
+	return c
+}
+
 // QueryImageResponse is the QueryImageResponse command payload.
 type QueryImageResponse struct {
 	Status                StatusEnum // 0: StatusEnum, M
@@ -186,6 +237,77 @@ func (v *QueryImageResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v QueryImageResponse) Clone() QueryImageResponse {
+	c := v
+	c.DelayedActionTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DelayedActionTime)
+	c.ImageUri = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ImageUri)
+	c.SoftwareVersion = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SoftwareVersion)
+	c.SoftwareVersionString = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SoftwareVersionString)
+	c.UpdateToken = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.UpdateToken)
+	c.UserConsentNeeded = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.UserConsentNeeded)
+	c.MetadataForRequestor = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.MetadataForRequestor)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (QueryImageResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdQueryImageResponse
@@ -211,6 +333,22 @@ func (v *ApplyUpdateRequestRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "UpdateToken", true, &v.UpdateToken, spec.DecodeBytesIn(8, 32)),
 		spec.Bind(1, "NewVersion", true, &v.NewVersion, spec.DecodeUint[uint32](32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ApplyUpdateRequestRequest) Clone() ApplyUpdateRequestRequest {
+	c := v
+	c.UpdateToken = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.UpdateToken)
+	return c
 }
 
 // ApplyUpdateResponse is the ApplyUpdateResponse command payload.
@@ -260,6 +398,22 @@ func (v *NotifyUpdateAppliedRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "UpdateToken", true, &v.UpdateToken, spec.DecodeBytesIn(8, 32)),
 		spec.Bind(1, "SoftwareVersion", true, &v.SoftwareVersion, spec.DecodeUint[uint32](32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NotifyUpdateAppliedRequest) Clone() NotifyUpdateAppliedRequest {
+	c := v
+	c.UpdateToken = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.UpdateToken)
+	return c
 }
 
 func decodeQueryImageRequest(n spec.Node) (any, error) {

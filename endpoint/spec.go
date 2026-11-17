@@ -58,6 +58,15 @@ type Spec struct {
 	// 32 bytes). The vendor is the host's knowledge, never the module's.
 	// Empty serves the node's own VendorName ([Config.VendorName]).
 	VendorName string
+	// BridgedBasicInformation is what the host states of the bridged
+	// device's BridgedDeviceBasicInformation (the typed declaration's
+	// Initial, device.New): an attribute it sets is served with that
+	// value, ahead of the assembler's fallbacks. SerialNumber is served
+	// only when stated, and NodeLabel only when stated here or as
+	// FriendlyName or a host name (review II, R2-P5-apidev-02,
+	// F-db021da0-28, decision 143). Reachable, UniqueId and
+	// ConfigurationVersion stay the assembler's.
+	BridgedBasicInformation bdbidef.Patch
 	// FriendlyName is the finished BridgedDeviceBasicInformation
 	// NodeLabel. The assembly caps it at the Matter 32-byte maximum but
 	// never derives it — naming is the owner's authority.

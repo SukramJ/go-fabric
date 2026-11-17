@@ -32,6 +32,11 @@ type TimeFormatLocalizationConfig struct {
 	// the host persists it here. An error refuses the write.
 	OnWrite func(ctx context.Context, attrID uint32, value uint8) error
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -67,7 +72,7 @@ func NewTimeFormatLocalization(cfg TimeFormatLocalizationConfig) (*spec.Server, 
 		return nil, fmt.Errorf("%w: TimeFormatLocalization: ActiveCalendarType %d not in SupportedCalendarTypes %v", ErrLocalizationConfig, cfg.ActiveCalendarType, supported)
 	}
 	srv, err := spec.NewServer(tfldef.Definition, spec.Options{Features: uint32(tfldef.FeatureCalendarFormat)}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Sink:        calendarSink{onWrite: cfg.OnWrite},
 		Initial: map[uint32]any{
 			tfldef.AttrHourFormat:             cfg.HourFormat,

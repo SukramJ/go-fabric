@@ -19,7 +19,7 @@ import (
 // target endpoint.
 func TestBinding_EndpointAndClusterZeroArePresent(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	node, endpoint, cluster := uint64(0x11), uint16(0), uint32(0)
 	write := []bindingdef.TargetStruct{{Node: &node, Endpoint: &endpoint, Cluster: &cluster, FabricIndex: 1}}
 	if err := b.MatterWrite(context.Background(), bindingdef.AttrBinding, write); err != nil {

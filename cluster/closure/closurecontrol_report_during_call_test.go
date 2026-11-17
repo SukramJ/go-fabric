@@ -127,6 +127,42 @@ func TestClosureControlReportDuringTheCallIsKept(t *testing.T) {
 					t.Errorf("MainState %d, want Error (3) as the drive reported", got)
 				}
 			})
+			// Every host writer of MainState is a report (R2-P6-fsm-1580):
+			// ReportError and SetEngaged as SetMainState.
+			for _, rc := range []struct {
+				name     string
+				cmd      uint32
+				features uint32
+				report   func(*closure.ControlServer)
+				want     wire.ClosureMainState
+			}{
+				{"MoveTo: ReportError", closuredef.CmdMoveTo, 0, func(s *closure.ControlServer) {
+					s.ReportError(wire.ClosureErrorList{wire.ClosureErrorBlockedBySensor})
+				}, wire.ClosureMainStateError},
+				{"MoveTo: SetEngaged(false)", closuredef.CmdMoveTo, wire.ClosureControlFeatureManuallyOperable, func(s *closure.ControlServer) {
+					s.SetEngaged(false)
+				}, wire.ClosureMainStateDisengaged},
+				{"Calibrate: ReportError", closuredef.CmdCalibrate, wire.ClosureControlFeatureCalibration, func(s *closure.ControlServer) {
+					s.ReportError(wire.ClosureErrorList{wire.ClosureErrorBlockedBySensor})
+				}, wire.ClosureMainStateError},
+				{"Calibrate: SetEngaged(false)", closuredef.CmdCalibrate, wire.ClosureControlFeatureCalibration | wire.ClosureControlFeatureManuallyOperable, func(s *closure.ControlServer) {
+					s.SetEngaged(false)
+				}, wire.ClosureMainStateDisengaged},
+			} {
+				t.Run(rc.name, func(t *testing.T) {
+					t.Parallel()
+					srv, m := newServer(t, rc.features)
+					m.report = func() { rc.report(srv) }
+					var fields any
+					if rc.cmd == closuredef.CmdMoveTo {
+						fields = closuredef.MoveToRequest{Position: &fullyOpen}
+					}
+					invoke(t, srv, rc.cmd, fields)
+					if got := mainState(t, srv); got != rc.want {
+						t.Errorf("MainState %d, want %d as the drive reported", got, rc.want)
+					}
+				})
+			}
 			t.Run("MoveTo: a position on the way keeps Moving and the target", func(t *testing.T) {
 				t.Parallel()
 				srv, m := newServer(t, 0)

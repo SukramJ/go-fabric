@@ -4,6 +4,7 @@
 package im
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -106,7 +107,9 @@ func requestBoolField(el tlv.Element, name string) (bool, error) {
 // handleRequest answers Failure (InteractionMessenger.ts:425-460, :431).
 // A value out of bounds throws ValidationOutOfBoundsError
 // (TlvNumber.ts:145-155), a ValidationError whose code is ConstraintError
-// (packages/types/src/common/ValidationError.ts:16-29).
+// (packages/types/src/common/ValidationError.ts:16-29). A request decoder
+// keeps that error for the end of its container, so a later type error
+// answers first ([laterErrors]; review II, 5a-2 A1-d).
 func uintField(el tlv.Element, maxValue uint64) (uint64, error) {
 	switch el.Type {
 	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:
@@ -150,6 +153,29 @@ func uint32Field(el tlv.Element) (uint32, error) {
 // alone.
 func uint64Field(el tlv.Element) (uint64, error) {
 	return uintField(el, math.MaxUint64)
+}
+
+// errNonContextMember refuses a structure member that carries no context
+// tag ([contextMember]).
+var errNonContextMember = errors.New("im: structure member without a context tag")
+
+// contextMember is the rule every request decoder of this package, the
+// path lists, StatusIB and StatusResponse apply to a member before their
+// switch (the client's report decoders keep skipping a non-context
+// member): a member with a context tag is the
+// decoder's to read — one whose tag it does not know is skipped whole by
+// the switch's default arm ([skipField]) — and a member with any other tag
+// refuses the structure. matter.js TlvObject refuses a non-context tag and
+// skips an unknown context tag as a whole element
+// (packages/types/src/tlv/TlvObject.ts:212-219 at db021da0); a nested
+// container read field by field as the enclosing structure's used to end
+// that structure early (review II, R2-P6-wire-0504). The refusal is a plain
+// error: the request is answered FAILURE.
+func contextMember(el tlv.Element) error {
+	if el.Tag.Kind == tlv.TagKindContext {
+		return nil
+	}
+	return fmt.Errorf("%w (tag kind %d)", errNonContextMember, el.Tag.Kind)
 }
 
 // skipField drains el when it opens a container, so an ignored field

@@ -12,6 +12,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -384,8 +386,8 @@ func TestNewSealedSealsAClearDatabase(t *testing.T) {
 		}
 	}
 	var settings int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_settings WHERE sealed = 1`).Scan(&settings); err != nil || settings != 4 {
-		t.Errorf("sealed settings = %d, %v; want the Wi-Fi networks, the DoorLock key, the ICD key and the joint fabric record", settings, err)
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_settings WHERE sealed = 1`).Scan(&settings); err != nil || settings != 5 {
+		t.Errorf("sealed settings = %d, %v; want the Wi-Fi networks, the DoorLock key, the ICD key, the joint fabric record and the seal canary", settings, err)
 	}
 	// The pending update reads back and rolls back under the sealer.
 	if id, err := s.GetIdentity(ctx, w.fabric); err != nil || !bytes.Equal(id.PrivateKey, w.secrets["key 4"]) {
@@ -418,25 +420,26 @@ func TestNewSealedSealsAClearDatabase(t *testing.T) {
 		t.Error("a second NewSealed sealed a sealed key again")
 	}
 
-	// A clear row a Store without the sealer adds is refused by the sealed
-	// store and sealed by the next NewSealed.
+	// The database carries the seal canary now: a Store without the sealer
+	// writes no clear row into it (decision 130), a clear row planted in
+	// the file is refused by the sealed store and by the next NewSealed,
+	// which does not adopt it.
 	added := randomSecret(16)
-	if err := unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: w.fabric, GroupKeySetID: 2, EpochKey0: added, EpochStart0: 1}); err != nil {
+	if err := unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: w.fabric, GroupKeySetID: 2, EpochKey0: added, EpochStart0: 1}); !errors.Is(err, store.ErrNoSealer) {
+		t.Fatalf("a clear key set into the sealed database = %v, want ErrNoSealer", err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_group_keys (fabric_index, group_key_set_id, security_policy, epoch_key_0, epoch_start_0) VALUES (?, 2, 0, ?, 1)`, w.fabric, added); err != nil {
 		t.Fatal(err)
 	}
 	if ks, err := s.GetGroupKeySet(ctx, w.fabric, 2); !errors.Is(err, store.ErrUnseal) {
 		t.Errorf("a clear row under the sealer = %x, %v; want ErrUnseal", ks.EpochKey0, err)
 	}
-	next, err := store.NewSealed(ctx, db, testSealer(t, 3))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ks, err := next.GetGroupKeySet(ctx, w.fabric, 2); err != nil || !bytes.Equal(ks.EpochKey0, added) {
-		t.Errorf("the row after the next NewSealed = %x, %v", ks.EpochKey0, err)
+	if _, err := store.NewSealed(ctx, db, testSealer(t, 3)); !errors.Is(err, store.ErrUnseal) {
+		t.Errorf("the next NewSealed over the planted row = %v, want ErrUnseal", err)
 	}
 	var n int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_group_keys WHERE sealed = 0`).Scan(&n); err != nil || n != 0 {
-		t.Errorf("clear key sets after the next NewSealed: %d, %v", n, err)
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_group_keys WHERE sealed = 0`).Scan(&n); err != nil || n != 1 {
+		t.Errorf("clear key sets after the refused NewSealed: %d, %v; want the planted one, as it was", n, err)
 	}
 }
 
@@ -577,6 +580,13 @@ func TestSealedSettingsNameTheirSources(t *testing.T) {
 			t.Errorf("controller/ca no longer declares %s: update store's sealedSettings", decl)
 		}
 	}
+	b, err = os.ReadFile(filepath.Join("..", "node", "node.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`settingRotatingIDUniqueID\s+= "commissioning\.rotating_device_id\.unique_id"`).Match(b) {
+		t.Error("node no longer declares settingRotatingIDUniqueID as the store seals it")
+	}
 }
 
 // failingSealer seals with an AES-GCM sealer until fail is set, then
@@ -707,10 +717,14 @@ func TestSealedStoreRefusesClearRows(t *testing.T) {
 		t.Errorf("GetSetting of a flipped mark = %q, %v; want ErrUnseal", v, err)
 	}
 
-	// Planted clear rows: a store without the sealer writes them.
+	// Planted clear rows: the seal canary deleted from the file (not tamper
+	// protection, decision 130), a store without the sealer writes them.
 	other := openTestDB(t)
 	sealed := sealedOver(t, other)
 	pw := writeSecrets(t, sealed)
+	if _, err := other.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ?`, store.SettingSealCanary); err != nil {
+		t.Fatal(err)
+	}
 	unsealed := store.New(other)
 	for name, err := range map[string]error{
 		"UpsertGroupKeySet": unsealed.UpsertGroupKeySet(ctx, store.GroupKeySet{FabricIndex: pw.fabric, GroupKeySetID: 1, EpochKey0: randomSecret(16), EpochStart0: 1}),
@@ -813,19 +827,33 @@ func sealedOver(t *testing.T, db *sql.DB) *store.Store {
 	return s
 }
 
-// TestNewSealedLeavesNoClearSecretPerJournalMode (Fable F4): the sealing
-// upgrade's residue claim in the journal modes it holds in — WAL
-// (TestNewSealedSealsAClearDatabase too) and the rollback journal's DELETE
-// (SQLite's default) and TRUNCATE forms: after NewSealed over a clear
-// database, no clear secret is in any file of the directory, the handle
-// open and after Close. journal_mode(PERSIST) is left out because the claim
-// does not hold there: measured, the kept -journal still holds clear
-// pre-images of the settings page after the scrub; the documentation limits
-// the claim to these modes.
+// TestNewSealedLeavesNoClearSecretPerJournalMode (Fable F4, sec Q2): the
+// sealing upgrade's and Reseal's residue claims in the journal modes:
+// WAL (TestNewSealedSealsAClearDatabase too), the rollback journal's DELETE
+// (SQLite's default), TRUNCATE, PERSIST, MEMORY and OFF forms, and under
+// locking_mode(EXCLUSIVE), which keeps a rollback -journal between
+// transactions as PERSIST does, the default, PERSIST, TRUNCATE, WAL and
+// MEMORY forms: after NewSealed over a clear database no clear secret, and
+// after Reseal no value sealed under the old key, is in any file of the
+// directory, the handle open and after Close. An EXCLUSIVE handle is one connection: the lock it holds keeps
+// every other connection of a pool out.
 func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 	t.Parallel()
-	for _, mode := range []string{"", "journal_mode(DELETE)", "journal_mode(TRUNCATE)", walMode} {
-		name := mode
+	for _, mode := range [][]string{
+		nil,
+		{"journal_mode(DELETE)"},
+		{"journal_mode(TRUNCATE)"},
+		{"journal_mode(PERSIST)"},
+		{walMode},
+		{"journal_mode(MEMORY)"},
+		{"journal_mode(OFF)"},
+		{"locking_mode(EXCLUSIVE)"},
+		{"locking_mode(EXCLUSIVE)", "journal_mode(PERSIST)"},
+		{"locking_mode(EXCLUSIVE)", "journal_mode(TRUNCATE)"},
+		{"locking_mode(EXCLUSIVE)", walMode},
+		{"locking_mode(EXCLUSIVE)", "journal_mode(MEMORY)"},
+	} {
+		name := strings.Join(mode, ",")
 		if name == "" {
 			name = "default"
 		}
@@ -833,15 +861,14 @@ func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
 			dir := t.TempDir()
-			var pragmas []string
-			if mode != "" {
-				pragmas = append(pragmas, mode)
-			}
-			db, err := store.OpenSQLite(filepath.Join(dir, "matter.db"), pragmas...)
+			db, err := store.OpenSQLite(filepath.Join(dir, "matter.db"), mode...)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() { _ = db.Close() }()
+			if slices.Contains(mode, "locking_mode(EXCLUSIVE)") {
+				db.SetMaxOpenConns(1)
+			}
 			if err := store.Apply(ctx, db); err != nil {
 				t.Fatal(err)
 			}
@@ -862,11 +889,30 @@ func TestNewSealedLeavesNoClearSecretPerJournalMode(t *testing.T) {
 			if hits := clearSecretsIn(t, dir, w.secrets); len(hits) > 0 {
 				t.Errorf("clear secrets on disk after NewSealed, handle open: %v", hits)
 			}
+			// Reseal in the same mode: no value sealed under the old key is
+			// left in any file (decision 131).
+			var oldKey, oldSecret []byte
+			if err := db.QueryRowContext(ctx, `SELECT private_key FROM matter_node_identities`).Scan(&oldKey); err != nil {
+				t.Fatal(err)
+			}
+			if err := db.QueryRowContext(ctx, `SELECT shared_secret FROM matter_resumption`).Scan(&oldSecret); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Reseal(ctx, db, testSealer(t, 6), testSealer(t, 7)); err != nil {
+				t.Fatal(err)
+			}
+			old := map[string][]byte{"old sealed key": oldKey, "old sealed resumption": oldSecret}
+			if hits := clearSecretsIn(t, dir, old); len(hits) > 0 {
+				t.Errorf("old-key values on disk after Reseal, handle open: %v", hits)
+			}
 			if err := db.Close(); err != nil {
 				t.Fatal(err)
 			}
 			if hits := clearSecretsIn(t, dir, w.secrets); len(hits) > 0 {
 				t.Errorf("clear secrets on disk after NewSealed and Close: %v", hits)
+			}
+			if hits := clearSecretsIn(t, dir, old); len(hits) > 0 {
+				t.Errorf("old-key values on disk after Reseal and Close: %v", hits)
 			}
 		})
 	}
@@ -981,7 +1027,7 @@ func TestNewSealedChecksTheKey(t *testing.T) {
 	if err := s.SetSetting(ctx, store.SettingICDKey, "k"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.New(db).SetSetting(ctx, "netcomm.wifi.networks", "[]"); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO matter_settings (key, value, sealed) VALUES ('netcomm.wifi.networks', '[]', 0)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.NewSealed(ctx, db, testSealer(t, 2)); !errors.Is(err, store.ErrUnseal) {

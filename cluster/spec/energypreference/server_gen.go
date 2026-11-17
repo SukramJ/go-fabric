@@ -25,6 +25,42 @@ type State struct {
 	CurrentLowPowerModeSensitivity uint8                // attribute 0x0004: uint8, LPMS, RW VO, N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.EnergyBalances = func(s []BalanceStruct) []BalanceStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]BalanceStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.EnergyBalances)
+	c.EnergyPriorities = func(s []EnergyPriorityEnum) []EnergyPriorityEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]EnergyPriorityEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.EnergyPriorities)
+	c.LowPowerModeSensitivities = func(s []BalanceStruct) []BalanceStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]BalanceStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.LowPowerModeSensitivities)
+	return c
+}
+
 // Patch is a change to the EnergyPreference state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

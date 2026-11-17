@@ -104,15 +104,6 @@ const (
 	FeatureLevel = uint32(valvedef.FeatureLevel)
 )
 
-// featureMapNone is the FeatureMap of a valve that only opens and closes:
-// TS is conformance "desc" and LVL is optional, so zero is conformant.
-const featureMapNone uint32 = 0
-
-// instance is the definition bound to [featureMapNone] with no optional
-// element declared: the five mandatory attributes, Open and Close — what
-// [Server.MatterRead] answers the globals from.
-var instance, _ = spec.New(valvedef.Definition, spec.Options{Features: featureMapNone})
-
 // maxLevel is the full level, 100 %: the level of an Open without
 // TargetLevel and DefaultOpenLevel, and a level that complies with any
 // LevelStep (connectedhomeip kMaxLevelValuePercent).
@@ -120,8 +111,10 @@ const maxLevel uint8 = 100
 
 // ErrSelection reports a Config whose selection the server cannot serve on
 // its StateSource: a feature or optional attribute whose interface the
-// source lacks, TS without the node's time, or a selection the definition
-// refuses.
+// source lacks, or a selection the definition refuses — an event id it
+// does not define among them. A TS valve without the node's time is the
+// node's to refuse ([Server.RequiresMatterTime]), not New's
+// (R2-P6-doc-1589).
 var ErrSelection = errors.New("valve: selection not served")
 
 // State is the ValveStateEnum (enum8) a controller reads from
@@ -188,6 +181,11 @@ type Config struct {
 	// non-nil the server bumps and reports the caller's counter, so the
 	// version survives server reconstruction; when nil an embedded
 	// tracker is used.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Events are the optional events the server declares
 	// (ValveStateChanged, ValveFault), which the host emits through the
@@ -214,7 +212,13 @@ type Server struct {
 	ext      *cluster.DataVersionTracker
 	src      StateSource
 	inst     *spec.Instance // the definition with the selection and Config.Events
-	hooks    spec.Hooks
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([Server.Handle]) ahead of the server's own logic
+	// (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
 
 	level     LevelSource            // nil without LVL
 	defaults  DefaultOpenLevelSource // nil without DefaultOpenLevel
@@ -247,7 +251,8 @@ var (
 // server cannot serve is refused with [ErrSelection], naming the missing
 // interface: LVL without a [LevelSource], DefaultOpenLevel without a
 // [DefaultOpenLevelSource], a LevelStep outside 1 to 50, or a selection
-// the definition refuses. TS reads the node's Matter time, which the node
+// the definition refuses — an event id outside it too, as pump refuses one
+// (R2-P6-api-1588). TS reads the node's Matter time, which the node
 // hands the server as it joins the topology ([Server.AttachMatterTime]).
 func New(cfg Config) (*Server, error) {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion}
@@ -278,17 +283,11 @@ func New(cfg Config) (*Server, error) {
 			return nil, fmt.Errorf("%w: LevelStep %d is outside 1 to 50", ErrSelection, s.levelStep)
 		}
 	}
-	inst, err := spec.New(valvedef.Definition, spec.Options{Features: cfg.Features, Attributes: cfg.Attributes, Events: cfg.Events})
+	srv, err := newHeld(valvedef.Definition, spec.Options{Features: cfg.Features, Attributes: cfg.Attributes, Events: cfg.Events}, s.MatterRead, s.invoke)
 	if err != nil {
-		if len(cfg.Events) == 0 || cfg.Features != 0 || len(cfg.Attributes) != 0 {
-			return nil, fmt.Errorf("%w: %w", ErrSelection, err)
-		}
-		// An event id outside the definition leaves the EventList empty,
-		// as without Events.
-		inst = instance
+		return nil, fmt.Errorf("%w: %w", ErrSelection, err)
 	}
-	s.inst = inst
-	s.hooks.Init(s.inst)
+	s.inst, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	return s, nil
 }
 
@@ -441,8 +440,10 @@ func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value an
 		return false, err
 	}
 	// The host's veto hears a change only, after the comparison with the
-	// value in effect ([spec.Hooks.CheckWrite]).
-	veto := func() error { return s.hooks.CheckWrite(ctx, attrID, v) }
+	// value in effect ([spec.WriteVeto.Check]).
+	veto := func() error {
+		return s.veto.Check(ctx, attrID, spec.Stored(valvedef.Definition.Attribute(attrID).Type, v))
+	}
 	if attrID == valvedef.AttrDefaultOpenLevel {
 		return s.writeDefaultOpenLevel(ctx, v, veto)
 	}
@@ -511,9 +512,12 @@ func (s *Server) compliesWithLevelStep(level uint8) bool {
 // nothing in the port says a refusal came from a valve fault, and
 // claiming one would put a diagnosis on the wire that was never measured.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	if resp, handled, err := s.hooks.Invoke(ctx, cmdID, fields); handled {
-		return resp, err
-	}
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own Open and Close, which [spec.InvokeHeld] runs
+// when the host registered no handler.
+func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case CmdOpen:
 		req, err := openRequestFrom(fields)
@@ -535,7 +539,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		s.setAutoClose(at)
 		s.tracker().Bump()
 		return nil, nil
-	case CmdClose:
+	default: // Close, the one other command [spec.InvokeHeld] hands over
 		if s.src == nil {
 			return nil, errNoSource("Close")
 		}
@@ -547,8 +551,6 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		s.setAutoClose(nil)
 		s.tracker().Bump()
 		return nil, nil
-	default:
-		return nil, im.UnsupportedCommandf("valve: unknown command 0x%02X", cmdID)
 	}
 }
 

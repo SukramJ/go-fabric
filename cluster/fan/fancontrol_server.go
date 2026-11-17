@@ -42,8 +42,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"slices"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -282,6 +284,11 @@ type Config struct {
 	// DIR (extractor-hood.element.ts).
 	DeviceType uint16
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -311,6 +318,11 @@ type Server struct {
 	host     spec.HostHandlers
 	events   spec.Events
 	veto     spec.WriteVeto
+
+	// fanMode and airflow are the last FanMode and AirflowDirection the
+	// host reported that the selection admits, served in place of one it
+	// does not (R2-P6-wire-1564); zero is Off and Forward, both mandatory.
+	fanMode, airflow atomic.Uint32
 }
 
 // Compile-time assertions.
@@ -400,9 +412,14 @@ func (s *Server) MatterGeneratedCommands() []uint32 { return s.inst.MatterGenera
 // every writable attribute is "RW VO".
 func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWritePrivilege(attrID) }
 
-// MatterRead resolves an attribute. Host values are clamped to the
+// MatterRead resolves an attribute. Host values are held to the
 // attribute constraints on the way out, so a device reporting 120 % or a
-// speed above SpeedMax cannot put a constraint violation on the wire.
+// speed above SpeedMax cannot put a constraint violation on the wire: the
+// percentages and speeds are clamped, RockSetting and WindSetting masked
+// to the Support bitmaps, and a FanMode or AirflowDirection the selection
+// does not admit (a value outside the enum, Auto without the Auto
+// feature) is logged and the last admitted one served instead — Off and
+// Forward before the host reported one (R2-P6-wire-1564).
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	if v, ok := s.inst.ReadGlobal(attrID); ok {
 		return v, true
@@ -413,7 +430,7 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	st := s.src.FanState()
 	switch attrID {
 	case AttrFanMode:
-		return uint8(st.FanMode), true
+		return s.admitted(AttrFanMode, uint8(st.FanMode), &s.fanMode), true
 	case AttrFanModeSequence:
 		return uint8(s.cfg.Sequence), true
 	case AttrPercentSetting:
@@ -435,8 +452,25 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	case AttrWindSetting:
 		return uint8(st.WindSetting & s.cfg.WindSupport), true
 	default: // AttrAirflowDirection, the last one MatterAttributes can list
-		return uint8(st.AirflowDirection), true
+		return s.admitted(AttrAirflowDirection, uint8(st.AirflowDirection), &s.airflow), true
 	}
+}
+
+// logger is the server's logger: the process default (Config carries
+// none).
+func (*Server) logger() *slog.Logger { return slog.Default() }
+
+// admitted is the host's enum value v of attrID when the selection admits
+// it, remembered in last; the last admitted one otherwise, with a warning.
+func (s *Server) admitted(attrID uint32, v uint8, last *atomic.Uint32) uint8 {
+	if _, err := s.inst.CheckValue(attrID, uint64(v), nil); err == nil {
+		last.Store(uint32(v))
+		return v
+	}
+	served := uint8(last.Load()) //nolint:gosec // a stored uint8
+	s.logger().Warn("matter.fancontrol.inbound_value_not_admitted",
+		slog.Int("attribute", int(attrID)), slog.Int("value", int(v)), slog.Int("served", int(served)))
+	return served
 }
 
 func nullableCapped(v *uint8, ceiling uint8) (any, bool) {
@@ -499,7 +533,9 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (st
 	}
 	// The host's veto hears a change only: each case below compares with
 	// the held value first ([spec.WriteVeto.Check]).
-	veto := func() error { return s.veto.Check(ctx, attrID, storedForm(v)) }
+	veto := func() error {
+		return s.veto.Check(ctx, attrID, spec.Stored(fandef.Definition.Attribute(attrID).Type, v))
+	}
 	n, isNum := v.(uint64) // per ValidateWrite: nil only for a nullable null
 	switch attrID {
 	case AttrPercentSetting:
@@ -672,7 +708,7 @@ func (s *Server) writeFanMode(ctx context.Context, value any) (stored bool, err 
 	if s.src.FanState().FanMode == m {
 		return false, nil
 	}
-	if err := s.veto.Check(ctx, AttrFanMode, m); err != nil {
+	if err := s.veto.Check(ctx, AttrFanMode, spec.Stored(fandef.Definition.Attribute(AttrFanMode).Type, m)); err != nil {
 		return false, err
 	}
 	return true, s.apply(ctx, "FanMode write", s.fanModeSettings(m))
@@ -921,17 +957,6 @@ func fromStepRequest(v fandef.StepRequest) clusterwire.FanStepRequest {
 		req.LowestOff = *v.LowestOff
 	}
 	return req
-}
-
-// storedForm is a value [spec.Instance.ValidateWrite] normalised, in the
-// stored form a write veto receives: FanControl's writable attributes are
-// all 8 bits wide (percent, uint8, the two map8 bitmaps, an enum8), and
-// nil is a nullable null.
-func storedForm(v any) any {
-	if n, ok := v.(uint64); ok {
-		return uint8(n) //nolint:gosec // an 8-bit attribute per ValidateWrite
-	}
-	return v
 }
 
 // SetAttributes implements [spec.AttributeSetter]. The values are checked

@@ -59,7 +59,9 @@ func TestReportAbandonedBeforeItsRecordIsAFailedUpdate(t *testing.T) {
 	if !counted || failures != 1 {
 		t.Fatalf("failed updates = %v (counted %v), want 1: a report abandoned before its record is a failed update", failures, counted)
 	}
-	// What it carried is owed again: the subscription engine sends it.
+	// What it carried is owed again, and the next update carries it — a
+	// change starts it (F-db021da0-3).
+	r.dev.subs.OnAttributeChanged(undeliveredReportPath)
 	r.pending(t)
 	r.sessionsKept(t, "after the failed update")
 }

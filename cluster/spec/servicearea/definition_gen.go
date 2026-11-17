@@ -266,6 +266,28 @@ func (v *ProgressStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProgressStruct) Clone() ProgressStruct {
+	c := v
+	c.TotalOperationalTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TotalOperationalTime)
+	c.EstimatedTime = func(p *spec.Nullable[uint32]) *spec.Nullable[uint32] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EstimatedTime)
+	return c
+}
+
 // ProgressStructDef describes ProgressStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -339,6 +361,22 @@ func (v *SelectAreasRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "SelectAreas",
 		spec.Bind(0, "NewAreas", true, &v.NewAreas, spec.DecodeList(spec.DecodeUint[uint32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SelectAreasRequest) Clone() SelectAreasRequest {
+	c := v
+	c.NewAreas = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.NewAreas)
+	return c
 }
 
 // SelectAreasResponse is the SelectAreasResponse command payload.

@@ -87,6 +87,49 @@ func (v *SetCookingParametersRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetCookingParametersRequest) Clone() SetCookingParametersRequest {
+	c := v
+	c.CookMode = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CookMode)
+	c.CookTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CookTime)
+	c.PowerSetting = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PowerSetting)
+	c.WattSettingIndex = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.WattSettingIndex)
+	c.StartAfterSetting = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StartAfterSetting)
+	return c
+}
+
 // AddMoreTimeRequest is the AddMoreTime command payload.
 type AddMoreTimeRequest struct {
 	TimeToAdd uint32 // 0: elapsed-s, M, 1 to maxCookTime

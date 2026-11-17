@@ -85,6 +85,185 @@ type State struct {
 	Rloc16                            *uint16                       // attribute 0x0040: uint16, P, M, R V, X
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.Channel = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Channel)
+	c.RoutingRole = func(p *RoutingRoleEnum) *RoutingRoleEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.RoutingRole)
+	c.NetworkName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NetworkName)
+	c.PanId = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PanId)
+	c.ExtendedPanId = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ExtendedPanId)
+	c.MeshLocalPrefix = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.MeshLocalPrefix)
+	c.NeighborTable = func(s []NeighborTableStruct) []NeighborTableStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]NeighborTableStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.NeighborTable)
+	c.RouteTable = func(s []RouteTableStruct) []RouteTableStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]RouteTableStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.RouteTable)
+	c.PartitionId = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PartitionId)
+	c.Weighting = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Weighting)
+	c.DataVersion = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.DataVersion)
+	c.StableDataVersion = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.StableDataVersion)
+	c.LeaderRouterId = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.LeaderRouterId)
+	c.ActiveTimestamp = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ActiveTimestamp)
+	c.PendingTimestamp = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.PendingTimestamp)
+	c.Delay = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Delay)
+	c.SecurityPolicy = func(p *SecurityPolicy) *SecurityPolicy {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.SecurityPolicy)
+	c.ChannelPage0Mask = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(st.ChannelPage0Mask)
+	c.OperationalDatasetComponents = func(p *OperationalDatasetComponents) *OperationalDatasetComponents {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.OperationalDatasetComponents)
+	c.ActiveNetworkFaultsList = func(s []NetworkFaultEnum) []NetworkFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]NetworkFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveNetworkFaultsList)
+	c.ExtAddress = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.ExtAddress)
+	c.Rloc16 = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.Rloc16)
+	return c
+}
+
 // Patch is a change to the ThreadNetworkDiagnostics state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

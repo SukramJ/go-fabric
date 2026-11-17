@@ -80,7 +80,8 @@ type MicrowaveConfig struct {
 	MaxCookTime uint32
 	// CookTime is the initial CookTime; zero starts at DefaultCookTime.
 	CookTime uint32
-	// PowerSetting (PWRNUM) is the initial power setting.
+	// PowerSetting (PWRNUM) is the initial power setting; zero starts at
+	// the maximum power (MaxPower with PWRLMTS, [DefaultMaxPower] without).
 	PowerSetting uint8
 	// MinPower, MaxPower and PowerStep (PWRLMTS, fixed) bound PowerSetting.
 	MinPower, MaxPower, PowerStep uint8
@@ -92,6 +93,11 @@ type MicrowaveConfig struct {
 	WattRating *uint16
 
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -146,7 +152,7 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 		mwo.CmdSetCookingParameters: s.setCookingParameters,
 		mwo.CmdAddMoreTime:          s.addMoreTime,
 	}
-	srv, err := spec.NewServer(mwo.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(mwo.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("appliance: %w", err)
 	}
@@ -178,10 +184,20 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 		return nil, fmt.Errorf("%w: %w", ErrMicrowaveValue, err)
 	}
 	if s.HasFeature("PWRNUM") {
-		if err := s.checkPower(cfg.PowerSetting); err != nil {
+		power := cfg.PowerSetting
+		if power == 0 {
+			// The cluster holds no start value: PowerSetting is the
+			// delegate's (connectedhomeip MicrowaveOvenControlCluster.cpp:109
+			// at 6170af84), and its example delegates start at kMaxPowerNum
+			// (chef-microwave-oven-control.h:96-98, microwave-oven-device.h:234,
+			// :248) — the start a zero takes here, as a zero CookTime takes
+			// DefaultCookTime (R2-P6-api-1592).
+			_, power, _ = s.powerLimits()
+		}
+		if err := s.checkPower(power); err != nil {
 			return nil, fmt.Errorf("%w: PowerSetting: %w", ErrMicrowaveValue, err)
 		}
-		if err := srv.Set(mwo.AttrPowerSetting, cfg.PowerSetting); err != nil {
+		if err := srv.Set(mwo.AttrPowerSetting, power); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrMicrowaveValue, err)
 		}
 	}

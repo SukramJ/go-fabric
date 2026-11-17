@@ -101,6 +101,22 @@ func (v *DatasetResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DatasetResponse) Clone() DatasetResponse {
+	c := v
+	c.Dataset = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Dataset)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (DatasetResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdDatasetResponse
@@ -128,6 +144,29 @@ func (v *SetActiveDatasetRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetActiveDatasetRequestRequest) Clone() SetActiveDatasetRequestRequest {
+	c := v
+	c.ActiveDataset = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ActiveDataset)
+	c.Breadcrumb = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Breadcrumb)
+	return c
+}
+
 // SetPendingDatasetRequestRequest is the SetPendingDatasetRequest command payload.
 type SetPendingDatasetRequestRequest struct {
 	PendingDataset []byte // 0: octstr, M, max 254
@@ -145,6 +184,22 @@ func (v *SetPendingDatasetRequestRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "SetPendingDatasetRequest",
 		spec.Bind(0, "PendingDataset", true, &v.PendingDataset, spec.DecodeBytesIn(0, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetPendingDatasetRequestRequest) Clone() SetPendingDatasetRequestRequest {
+	c := v
+	c.PendingDataset = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.PendingDataset)
+	return c
 }
 
 func decodeGetActiveDatasetRequestRequest(n spec.Node) (any, error) {

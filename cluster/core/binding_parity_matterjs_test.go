@@ -89,7 +89,7 @@ func TestBindingServerParityMatterJS(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(m.Close)
-		b := core.NewBinding()
+		b := sourcedBinding()
 		stored := []core.TargetStruct{{FabricIndex: 1, Node: 100, Endpoint: 1}}
 		if err := b.Persist(core.BindingConfig{
 			Load: func() ([]core.TargetStruct, error) { return slices.Clone(stored), nil },

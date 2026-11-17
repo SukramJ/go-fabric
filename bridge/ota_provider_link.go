@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -62,6 +63,20 @@ const matterMessageOverhead = 26 + 12 + 16
 
 // ErrExchangeClosed is a send or receive on an exchange already closed.
 var ErrExchangeClosed = errors.New("bridge: exchange closed")
+
+var (
+	// errExchangeSessionGone is why an exchange ended when its session
+	// did: the session closed ([Bridge.endSessionExchanges]), or its id
+	// now names another session ([initiatedSecureExchange.boundTo]).
+	errExchangeSessionGone = errors.New("bridge: the exchange's session is gone")
+	// errExchangeEvicted is why an exchange ended when its session opened
+	// more than [maxExchangesPerSession] ([Bridge.boundSessionExchanges]).
+	errExchangeEvicted = errors.New("bridge: the exchange lost its place to a newer exchange of its session")
+	// errExchangeIDsExhausted is an exchange this node cannot open: every
+	// exchange id of the session is held by an open exchange it opened
+	// ([Bridge.openInitiatedExchange]).
+	errExchangeIDsExhausted = errors.New("bridge: every exchange id of the session is held by an open exchange")
+)
 
 // ErrPayloadTooLarge is an Invoke whose request does not fit one message
 // of the session it would go over: over UDP [exchangeMaxPayloadSize], over
@@ -285,7 +300,13 @@ func (s *PeerSession) Invoke(ctx context.Context, endpoint uint16, clusterID, co
 	}
 }
 
-// decodeInvokeResult takes the one response of a single-command invoke.
+// decodeInvokeResult takes the one response of a single-command invoke,
+// whatever path it names: the response is attributed to the one request,
+// as matter.js attributes the response of a single command by its
+// singleCommandRef and only logs its path
+// (packages/protocol/src/action/client/ClientInteraction.ts:513, :538-539
+// at db021da0). Comparing the path would be ahead of matter.js (review
+// II, R2-P6-err-0313).
 func decodeInvokeResult(payload []byte, commandID uint32) (*spec.Node, error) {
 	resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(payload), func(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
 		if !el.IsContainer {
@@ -340,6 +361,17 @@ type initiatedSecureExchange struct {
 	sessionID  uint16
 	addr       net.Addr
 	exchangeID uint16
+	// session is the session the exchange was opened on. A session id is
+	// handed out again once its session closed, so the id alone does not
+	// name it: a message or a send under the id finds another session
+	// object once the session closed, and the exchange ends instead of
+	// passing to that session ([initiatedSecureExchange.boundTo]). nil on
+	// an exchange built without a session lookup (tests).
+	session *channel.Session
+	// lastActive orders the exchanges of a session by their latest
+	// message, in or out ([Bridge.boundSessionExchanges]): a value of
+	// bdxRouting.activity.
+	lastActive atomic.Uint64
 	// createdAt bounds the peer-loss sweep this exchange may trigger:
 	// a session the peer established after the exchange was opened is
 	// not what went unanswered (matter.js ExchangeManager.ts:554 takes
@@ -397,6 +429,7 @@ func (e *initiatedSecureExchange) enqueue(msg bdx.Message) bool {
 	if e.ended() || len(e.in) == cap(e.in) {
 		return false
 	}
+	e.touch()
 	if fn := e.notify.Load(); fn != nil {
 		(*fn)(msg)
 	}
@@ -411,7 +444,7 @@ func (e *initiatedSecureExchange) enqueue(msg bdx.Message) bool {
 // SetPeerAdditionalMrpDelay sets the margin every later message of the
 // exchange adds to the peer's MRP base interval before the backoff
 // amplifies it. Mirrors matter.js MessageExchange.peerAdditionalMrpDelay
-// (MessageExchange.ts:352-363 at 862ad75f), the setter for an exchange the
+// (MessageExchange.ts:377-379 at db021da0), the setter for an exchange the
 // peer initiated, which the BDX responder calls on an inbound init
 // (BdxProtocol.ts:139-142). It implements [bdx.MrpDelayExchange].
 func (e *initiatedSecureExchange) SetPeerAdditionalMrpDelay(d time.Duration) {
@@ -444,6 +477,39 @@ func (e *initiatedSecureExchange) closedErr() error {
 	return ErrExchangeClosed
 }
 
+// touch records activity on the exchange ([Bridge.boundSessionExchanges]).
+func (e *initiatedSecureExchange) touch() {
+	if e.b != nil {
+		e.lastActive.Store(e.b.bdx.activity.Add(1))
+	}
+}
+
+// boundTo reports whether sess — what the session lookup holds under the
+// exchange's session id now — is the session the exchange was opened on.
+// When it is not, the session closed and its id went to another session:
+// the exchange ends ([errExchangeSessionGone]) rather than take that
+// session's messages or seal its own under that session's keys (review II,
+// R2-P6-sec-0302).
+func (e *initiatedSecureExchange) boundTo(sess *channel.Session, live bool) bool {
+	if e.session == nil || (live && sess == e.session) {
+		return true
+	}
+	e.fail(errExchangeSessionGone)
+	return false
+}
+
+// sessionNow is the session the lookup holds under the exchange's session
+// id, and whether it holds one.
+func (b *Bridge) sessionNow(sessionID uint16) (*channel.Session, bool) {
+	b.mu.RLock()
+	sessions := b.sessions
+	b.mu.RUnlock()
+	if sessions == nil {
+		return nil, false
+	}
+	return sessions.Lookup(sessionID)
+}
+
 func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange, error) {
 	b.mu.RLock()
 	sessions := b.sessions
@@ -451,15 +517,27 @@ func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange,
 	if sessions == nil {
 		return nil, ErrUnsolicitedSessionMissing
 	}
-	if _, ok := sessions.Lookup(link.sessionID); !ok {
+	sess, ok := sessions.Lookup(link.sessionID)
+	if !ok {
 		return nil, ErrUnsolicitedSessionMissing
 	}
 	ex := &initiatedSecureExchange{
-		b: b, sessionID: link.sessionID, addr: link.addr, exchangeID: b.nextOutboundExchangeID(),
+		b: b, sessionID: link.sessionID, addr: link.addr, session: sess,
 		createdAt: b.clk().Now(), createdAtMono: clock.MonotonicOf(b.clk()), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
-	b.resumption.initiated.Store(secureExchangeKey{sessionID: ex.sessionID, exchangeID: ex.exchangeID}, ex)
-	return ex, nil
+	ex.touch()
+	// The id skips one an open exchange this node opened on the session
+	// holds, so the counter coming round never gives two open exchanges
+	// one key (review II, R2-P2-ctr-03). Every id held means 65536 open
+	// exchanges on one session, past any bound; the open fails.
+	for range 1 << 16 {
+		ex.exchangeID = b.nextOutboundExchangeID()
+		if _, held := b.resumption.initiated.LoadOrStore(secureExchangeKey{sessionID: ex.sessionID, exchangeID: ex.exchangeID}, ex); !held {
+			b.boundSessionExchanges(ex.sessionID, ex)
+			return ex, nil
+		}
+	}
+	return nil, errExchangeIDsExhausted
 }
 
 // peerLossCloser is the optional [SessionRegistry] capability that
@@ -556,6 +634,12 @@ func (b *Bridge) deliverInitiatedSecure(hdr *message.Header, proto message.Proto
 	if !ok {
 		return false
 	}
+	if !ex.boundTo(b.sessionNow(hdr.SessionID)) {
+		// The exchange's session closed and its id names another
+		// session now: the message is that session's, for the ordinary
+		// dispatch.
+		return false
+	}
 	msg := bdx.Message{ProtocolID: proto.ProtocolID, Opcode: proto.Opcode, Payload: append([]byte(nil), payload...)}
 	if !ex.enqueue(msg) && !ex.ended() {
 		b.logger.Debug("matter.exchange.initiated.overflow",
@@ -609,9 +693,13 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 		return ErrUnsolicitedSessionMissing
 	}
 	sess, ok := sessions.Lookup(e.sessionID)
+	if !e.boundTo(sess, ok) {
+		return e.closedErr()
+	}
 	if !ok {
 		return ErrUnsolicitedSessionMissing
 	}
+	e.touch()
 	proto := message.ProtocolHeader{
 		Initiator:  !e.responder,
 		Opcode:     opcode,
@@ -634,6 +722,15 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
 	if tracker != nil {
 		tracker.TrackWithMargin(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load()))
+		// The session may have closed since the check above, its entries
+		// dropped by the purge before this one was tracked: the entry is
+		// taken back and the exchange ends, so none of a closed session
+		// stays under its bare id (R2-P6-sec-0302).
+		if now, live := b.sessionNow(e.sessionID); e.session != nil && (!live || now != e.session) {
+			tracker.Untrack(e.sessionID, hdr.MessageCounter)
+			e.fail(errExchangeSessionGone)
+			return e.closedErr()
+		}
 	}
 	if err := e.b.sendRouted(listener, dest, e.sessionID, datagram); err != nil {
 		if tracker != nil {
@@ -643,7 +740,7 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 			// A send on a connection that is gone is the reliable
 			// transport's "retransmissions exhausted": the peer is lost
 			// on that session, as matter.js's send reports peerLost on a
-			// failed send (MessageExchange.ts:605-624 at 862ad75f) — the
+			// failed send (MessageExchange.ts:643-651 at db021da0) — the
 			// next connection to the peer runs a fresh CASE.
 			b.handleInitiatedPeerLoss(e.sessionID, e.exchangeID)
 		}
@@ -706,11 +803,12 @@ func (b *Bridge) invokeMaxPayloadSize(route net.Addr, sessionID uint16) int {
 func (e *initiatedSecureExchange) Close() error {
 	e.closeOnce.Do(func() {
 		close(e.done)
+		// Its own entry only: the key may name a newer exchange by now.
 		key := secureExchangeKey{sessionID: e.sessionID, exchangeID: e.exchangeID}
 		if e.responder {
-			e.b.bdx.exchanges.Delete(key)
+			e.b.bdx.exchanges.CompareAndDelete(key, e)
 		} else {
-			e.b.resumption.initiated.Delete(key)
+			e.b.resumption.initiated.CompareAndDelete(key, e)
 		}
 		e.b.expediteDuplicateAck(e.sessionID, e.exchangeID, !e.responder)
 		e.b.RunAckPumpOnce(e.b.clk().Now())

@@ -478,7 +478,18 @@ type storedBinding struct {
 // matter.js packages/model/src/standard/elements/binding.element.ts:
 // 21-25), persisted as UserLabel's list is (buildLabels).
 func (p persisted) bindingConfig(ctx context.Context, key string) mattercore.BindingConfig {
+	// The node's fabric list, the source AccessControl checks a write's
+	// fabric against: the node's store.Port lists its fabrics. A settings
+	// store without the list leaves Fabrics nil, the persisted Binding
+	// refuses every request write (fail closed), and the log says why
+	// (review II, R2-P6-store-1010, decision 158).
+	fabrics, ok := p.st.(mattercore.FabricSource)
+	if !ok {
+		p.logger.Warn("binding.no_fabric_source", slog.String("key", key),
+			slog.String("reason", "the store lists no fabrics; request writes to this Binding are refused"))
+	}
 	return mattercore.BindingConfig{
+		Fabrics: fabrics,
 		Load: func() ([]mattercore.TargetStruct, error) {
 			v, ok, err := p.st.GetSetting(ctx, key)
 			if err != nil || !ok {

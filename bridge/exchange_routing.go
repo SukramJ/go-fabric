@@ -138,15 +138,16 @@ type exchangeRouting struct {
 	// StatusResponse branch), and torn down by the caller's
 	// [Bridge.disarmStatusResponseWait] on timeout / completion.
 	//
-	// map[mrp.ExchangeKey]chan im.StatusCode (buffered 1, carries the
-	// status the peer answered with)
+	// map[mrp.ExchangeKey]chan statusAnswer (buffered 1, carries the
+	// status the peer answered with, or that its Status was undecodable)
 	statusResponseWaits sync.Map
 
 	// chunkWaits counts the interactions per session that wait for a
 	// chunk's StatusResponse ([maxChunkWaitsPerSession], chunk_waits.go).
 	chunkWaits chunkWaitClaims
-	// primingAborts ends the chunk waits of a priming report when its
-	// subscription closes ([Bridge.primingAbort]).
+	// primingAborts ends the chunk waits of a priming report, and of an
+	// ongoing report ([Bridge.reportAbort]), when its subscription closes
+	// ([Bridge.primingAbort]).
 	//
 	// map[uint32]chan struct{} (subscription id → closed on close)
 	primingAborts sync.Map

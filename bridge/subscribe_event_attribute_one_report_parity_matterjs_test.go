@@ -110,8 +110,7 @@ func TestEventAndAttributeChangeDueTogetherAreOneReportData(t *testing.T) {
 		t.Fatal("the topology has no reportable attribute")
 	}
 
-	m := subscription.NewManager(subscription.Config{}, b.SubscriptionReporter(), nil)
-	m.SetEventReporter(b.SubscriptionEventReporter())
+	m := subscription.NewManager(subscription.Config{}, nil, nil)
 	b.AttachSubscriptionManager(m)
 	sub, err := m.Subscribe(subscription.SubscribeArgs{
 		FabricIndex: 1, PeerNodeID: 0xBBBB4444, SessionID: sessionID,

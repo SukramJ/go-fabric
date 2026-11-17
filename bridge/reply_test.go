@@ -999,3 +999,32 @@ func TestChunkReportData_OversizedListEntryFailsTheAttribute(t *testing.T) {
 		t.Fatalf("status path %+v, want the attribute's path without a list index", got.Path)
 	}
 }
+
+// TestSecureReplyCarriesNoDestNodeID holds the node ids of a unicast
+// reply's header (R2-P6-test-0819): a reply on a secure session carries
+// none, whatever the request carried; on the unsecured session it carries
+// exactly one — the peer's source as the destination, or, when the peer
+// named only a destination, that as the source.
+func TestSecureReplyCarriesNoDestNodeID(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name              string
+		req               message.Header
+		wantDest, wantSrc bool
+		destNode, srcNode uint64
+	}{
+		{"secure, source named", message.Header{SessionID: 7, HasSourceNodeID: true, SourceNodeID: 0x11}, false, false, 0, 0},
+		{"secure, destination named", message.Header{SessionID: 7, DestSize: message.DestNodeID, DestNodeID: 0x22}, false, false, 0, 0},
+		{"unsecured, source named", message.Header{HasSourceNodeID: true, SourceNodeID: 0x11}, true, false, 0x11, 0},
+		{"unsecured, destination named", message.Header{DestSize: message.DestNodeID, DestNodeID: 0x22}, false, true, 0, 0x22},
+		{"unsecured, neither", message.Header{}, false, false, 0, 0},
+	} {
+		got := unicastReplyHeader(&c.req)
+		if hasDest := got.DestSize == message.DestNodeID; hasDest != c.wantDest || (hasDest && got.DestNodeID != c.destNode) {
+			t.Errorf("%s: destination %v %#x, want %v %#x", c.name, hasDest, got.DestNodeID, c.wantDest, c.destNode)
+		}
+		if got.HasSourceNodeID != c.wantSrc || (c.wantSrc && got.SourceNodeID != c.srcNode) {
+			t.Errorf("%s: source %v %#x, want %v %#x", c.name, got.HasSourceNodeID, got.SourceNodeID, c.wantSrc, c.srcNode)
+		}
+	}
+}

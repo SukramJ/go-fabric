@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -42,9 +43,12 @@ var (
 // [contract.EndpointSource]; [Device.Spec] hands it to the endpoint
 // assembler.
 type Device struct {
-	typ     *Type
-	opts    Options
-	servers []contract.ClusterServer
+	// bridgedInfo is what the host declared of the device's
+	// BridgedDeviceBasicInformation ([endpoint.Spec.BridgedBasicInformation]).
+	bridgedInfo bdbidef.Patch
+	typ         *Type
+	opts        Options
+	servers     []contract.ClusterServer
 	// source is what Spec hands the assembler: the device itself, or the
 	// device with the host's change notifier ([WithChangeNotifier]).
 	source contract.EndpointSource
@@ -167,6 +171,9 @@ func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 			return nil, fmt.Errorf("%s: %w", t.Name, err)
 		}
 	}
+	if err := checkBridgedInfoOptions(opts, s.bridgedInfo); err != nil {
+		return nil, fmt.Errorf("%s: %w", t.Name, err)
+	}
 	s.clock = &deviceClock{}
 	return buildDevice(t, opts, s)
 }
@@ -200,7 +207,10 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	}
 	d := &Device{
 		typ: t, opts: opts, clients: slices.Clone(s.clients), measured: m,
-		clock: clk, queue: newQueue(clk), bridgedPowerSource: bridgedPS,
+		clock: clk, queue: newQueue(clk, s.logger), bridgedPowerSource: bridgedPS,
+	}
+	if s.bridgedInfo != nil {
+		d.bridgedInfo = *s.bridgedInfo
 	}
 	d.reachable.Store(true)
 	for id := range optInMounted {
@@ -802,22 +812,28 @@ func (d *Device) Spec() endpoint.Spec {
 	d.mu.Lock()
 	name, deviceAddress, channelAddress := d.opts.Name, d.opts.DeviceAddress, d.opts.ChannelAddress
 	d.mu.Unlock()
+	// A declared NodeLabel is the name while no Rename gave another
+	// (Options.Name is refused beside it, R2-P5-apidev-02).
+	if name == "" && d.bridgedInfo.NodeLabel != nil {
+		name = endpoint.ComposeNodeLabel(*d.bridgedInfo.NodeLabel, "")
+	}
 	s := endpoint.Spec{
-		StableKey:        d.opts.StableKey,
-		DeviceAddress:    deviceAddress,
-		DeviceType:       uint16(d.typ.ID),
-		VendorName:       d.opts.Vendor,
-		FriendlyName:     name,
-		ChannelAddress:   channelAddress,
-		Availability:     d.available,
-		Source:           d.source,
-		DeviceConditions: slices.Clone(d.opts.Conditions),
-		DeviceTypes:      d.deviceTypes(),
-		Tags:             slices.Clone(d.opts.Tags),
-		ClientClusters:   d.clientClusters(),
-		OptIn:            slices.Clone(d.optIn),
-		Measurement:      d.measured.source,
-		PowerSource:      d.measured.battery,
+		BridgedBasicInformation: copyPatch(d.bridgedInfo),
+		StableKey:               d.opts.StableKey,
+		DeviceAddress:           deviceAddress,
+		DeviceType:              uint16(d.typ.ID),
+		VendorName:              d.opts.Vendor,
+		FriendlyName:            name,
+		ChannelAddress:          channelAddress,
+		Availability:            d.available,
+		Source:                  d.source,
+		DeviceConditions:        slices.Clone(d.opts.Conditions),
+		DeviceTypes:             d.deviceTypes(),
+		Tags:                    slices.Clone(d.opts.Tags),
+		ClientClusters:          d.clientClusters(),
+		OptIn:                   slices.Clone(d.optIn),
+		Measurement:             d.measured.source,
+		PowerSource:             d.measured.battery,
 	}
 	for _, p := range d.Parts() {
 		s.Parts = append(s.Parts, p.Spec())

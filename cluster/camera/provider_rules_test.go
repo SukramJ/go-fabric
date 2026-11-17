@@ -255,7 +255,8 @@ func TestSignallingRules(t *testing.T) {
 
 func TestProviderHostSessions(t *testing.T) {
 	p, _ := newProvider(t, nil)
-	s := camera.ProviderSession{Id: 4, PeerNodeId: 1, FabricIndex: 1, StreamUsage: wpdef.StreamUsageLiveView}
+	// A session names a stream: CurrentSessions' "O.a+" (R2-P6-par-1304).
+	s := camera.ProviderSession{Id: 4, PeerNodeId: 1, FabricIndex: 1, StreamUsage: wpdef.StreamUsageLiveView, VideoStreams: &[]uint16{1}}
 	if err := p.UpsertSession(s); err != nil {
 		t.Fatal(err)
 	}

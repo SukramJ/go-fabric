@@ -23,7 +23,7 @@ func TestPrimedEventsAreNotReportedAgain(t *testing.T) {
 	path := im.ConcreteEventPath{HasEndpoint: true, HasCluster: true, HasEvent: true, Endpoint: 1, Cluster: 0x003B, Event: 0x01}
 	setup := func(t *testing.T) (*Manager, *im.EventLog, *Subscription) {
 		t.Helper()
-		m := NewManager(Config{}, nil, nil)
+		m := newTestManager(Config{})
 		log := im.NewEventLog()
 		m.SetEventSource(log)
 		sub, err := m.Subscribe(SubscribeArgs{

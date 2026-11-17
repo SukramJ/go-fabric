@@ -6,7 +6,9 @@ package wire
 import (
 	"errors"
 	"fmt"
+	"slices"
 
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -71,10 +73,15 @@ type StopRequest struct {
 }
 
 // DecodeMoveToLevel parses MoveToLevel / MoveToLevelWithOnOff payloads.
-// A field of the wrong type or outside its width is refused ([fieldUint]).
+// A field of the wrong type or outside its width is refused ([fieldUint]);
+// a payload without Level, OptionsMask or OptionsOverride is refused
+// INVALID_COMMAND. An absent TransitionTime decodes as null (nil), as the
+// bridge's definition path fills it (BD-Matter-LevelControl-LenientDecoders;
+// the references, on TestDecodeMoveToLevelOmitsTransitionTime; review II,
+// R2-P6-wire-1209, decision 168).
 func DecodeMoveToLevel(payload []byte) (MoveToLevelRequest, error) {
 	var req MoveToLevelRequest
-	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 2, 3}, func(tag uint32, el tlv.Element) (err error) {
 		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
@@ -94,7 +101,7 @@ func DecodeMoveToLevel(payload []byte) (MoveToLevelRequest, error) {
 // DecodeMove parses Move / MoveWithOnOff payloads.
 func DecodeMove(payload []byte) (MoveRequest, error) {
 	var req MoveRequest
-	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 1, 2, 3}, func(tag uint32, el tlv.Element) (err error) {
 		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
@@ -116,10 +123,14 @@ func DecodeMove(payload []byte) (MoveRequest, error) {
 	return req, err
 }
 
-// DecodeStep parses Step / StepWithOnOff payloads.
+// DecodeStep parses Step / StepWithOnOff payloads. A payload without
+// StepMode, StepSize, OptionsMask or OptionsOverride is refused
+// INVALID_COMMAND; an absent TransitionTime decodes as null (nil), as
+// [DecodeMoveToLevel] (BD-Matter-LevelControl-LenientDecoders; review II,
+// R2-P6-wire-1209, decision 168).
 func DecodeStep(payload []byte) (StepRequest, error) {
 	var req StepRequest
-	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 1, 3, 4}, func(tag uint32, el tlv.Element) (err error) {
 		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
@@ -141,7 +152,7 @@ func DecodeStep(payload []byte) (StepRequest, error) {
 // DecodeStop parses Stop / StopWithOnOff payloads.
 func DecodeStop(payload []byte) (StopRequest, error) {
 	var req StopRequest
-	err := walkContext(payload, ErrLevelControlMalformed, func(tag uint32, el tlv.Element) (err error) {
+	err := walkContext(payload, ErrLevelControlMalformed, []uint32{0, 1}, func(tag uint32, el tlv.Element) (err error) {
 		s := ErrLevelControlMalformed
 		switch tag {
 		case 0:
@@ -157,8 +168,13 @@ func DecodeStop(payload []byte) (StopRequest, error) {
 // walkContext is the common Structure-walker for context-tagged
 // payloads. It opens the top struct, calls visit(tag, element) for
 // each child, and stops at EndContainer or at the first field visit
-// refuses.
-func walkContext(payload []byte, sentinel error, visit func(tag uint32, el tlv.Element) error) error {
+// refuses. A container child — one visit did not refuse, as no visitor
+// reads into one — is skipped whole, so its members are never taken for
+// the command's fields (review II, R2-P6-wire-1208). A payload without
+// one of the mandatory tags is refused INVALID_COMMAND, as the generated
+// decoders refuse it (cluster/spec/codec.go, decodeFields; review II,
+// R2-P6-wire-1209).
+func walkContext(payload []byte, sentinel error, mandatory []uint32, visit func(tag uint32, el tlv.Element) error) error {
 	d := tlv.NewDecoder(payload)
 	open, err := d.Next()
 	if err != nil {
@@ -167,19 +183,49 @@ func walkContext(payload []byte, sentinel error, visit func(tag uint32, el tlv.E
 	if open.Type != tlv.TypeStructure {
 		return fmt.Errorf("%w: top must be Structure", sentinel)
 	}
+	var seen []uint32
 	for {
 		el, err := d.Next()
 		if err != nil {
 			return fmt.Errorf("%w: %w", sentinel, err)
 		}
 		if el.IsEndContainer {
-			return nil
+			break
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if el.Tag.Kind == tlv.TagKindContext {
+			if err := visit(el.Tag.Number, el); err != nil {
+				return err
+			}
+			seen = append(seen, el.Tag.Number)
 		}
-		if err := visit(el.Tag.Number, el); err != nil {
-			return err
+		if el.IsContainer {
+			if err := skipMembers(d); err != nil {
+				return fmt.Errorf("%w: %w", sentinel, err)
+			}
 		}
 	}
+	for _, tag := range mandatory {
+		if !slices.Contains(seen, tag) {
+			return &fieldError{sentinel: sentinel, status: im.StatusInvalidCommand, reason: fmt.Sprintf("mandatory field %d missing", tag)}
+		}
+	}
+	return nil
+}
+
+// skipMembers consumes the members of the container whose opener d just
+// read, through its end marker.
+func skipMembers(d *tlv.Decoder) error {
+	for depth := 1; depth > 0; {
+		el, err := d.Next()
+		if err != nil {
+			return err
+		}
+		switch {
+		case el.IsEndContainer:
+			depth--
+		case el.IsContainer:
+			depth++
+		}
+	}
+	return nil
 }

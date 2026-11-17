@@ -329,6 +329,7 @@ func (g *generator) stateTypes(w *writer, fields []hullField, omitted []hullOmit
 	}
 	w.p("}")
 	w.p("")
+	g.stateClone(w, fields)
 
 	w.p("// Patch is a change to the %s state: each non-nil field is set, the", c.Name)
 	w.p("// others are left as they are.")
@@ -346,6 +347,31 @@ func (g *generator) stateTypes(w *writer, fields []hullField, omitted []hullOmit
 	w.p("")
 	g.stateValues(w, fields)
 	g.patchValues(w, fields, nullable)
+}
+
+// stateClone renders State.Clone, on every State whatever its fields
+// hold, so a server copies its state by one call that stays deep when a
+// snapshot adds a list (decision 142, review II, R2-P6-err-1460): each
+// list, octet string, nullable attribute's pointer and nested struct of
+// the copy is its own, through the structs' generated Clone.
+func (g *generator) stateClone(w *writer, fields []hullField) {
+	w.p("// Clone returns a deep copy of st: every list, octet string, nullable")
+	w.p("// attribute and nested struct of the copy is its own, so a change to")
+	w.p("// the copy does not reach st.")
+	w.p("func (st State) Clone() State {")
+	w.p("\tc := st")
+	for _, f := range fields {
+		t := g.attrType[f.a.ID]
+		switch {
+		case f.nullable:
+			w.p("\tc.%s = %s", f.goName, pointerCloneExpr(f.base, t, false, "st."+f.goName))
+		case typeNeedsClone(t, map[*dataInfo]bool{}):
+			w.p("\tc.%s = %s", f.goName, valueCloneExpr(t, false, "st."+f.goName))
+		}
+	}
+	w.p("\treturn c")
+	w.p("}")
+	w.p("")
 }
 
 // stateOnly renders state_gen.go, the typed state of a definition-only

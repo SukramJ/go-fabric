@@ -27,13 +27,25 @@ const (
 var (
 	// ErrAttestationNonce is returned when [BuildAttestation] receives
 	// a nonce that is not exactly 32 bytes.
+	//
+	// Deprecated: use cluster/core.OperationalCredentials
+	// (core.NewOperationalCredentials), which answers AttestationRequest on
+	// the node; removable in the next minor release.
 	ErrAttestationNonce = errors.New("commissioning: attestation nonce must be 32 bytes")
 	// ErrAttestationChallenge is returned when AttestationChallenge
 	// is not exactly 16 bytes.
+	//
+	// Deprecated: use cluster/core.OperationalCredentials
+	// (core.NewOperationalCredentials), which answers AttestationRequest on
+	// the node; removable in the next minor release.
 	ErrAttestationChallenge = errors.New("commissioning: attestation challenge must be 16 bytes")
 )
 
 // AttestationInput drives [BuildAttestation].
+//
+// Deprecated: use cluster/core.OperationalCredentials
+// (core.NewOperationalCredentials), which answers AttestationRequest on the
+// node; removable in the next minor release.
 type AttestationInput struct {
 	// CertificationDeclaration is the CMS-signed CD bytes (Matter
 	// §6.3). Pre-flashed at the factory; the bridge stores it as
@@ -61,6 +73,10 @@ type AttestationInput struct {
 
 // AttestationResult bundles the elements TLV blob and its signature.
 // Caller wires both into the AttestationResponse fields.
+//
+// Deprecated: use cluster/core.OperationalCredentials
+// (core.NewOperationalCredentials), which answers AttestationRequest on the
+// node; removable in the next minor release.
 type AttestationResult struct {
 	Elements  []byte // TLV-encoded (cert-declaration, nonce, timestamp, firmware)
 	Signature []byte // 64-byte r||s ECDSA-P256 over SHA256(elements || challenge)
@@ -68,7 +84,13 @@ type AttestationResult struct {
 
 // BuildAttestation produces the AttestationResponse payload. The
 // elements TLV is deterministic so the commissioner can re-derive
-// the signature input and verify it.
+// the signature input and verify it. Its timestamp is the Unix time in
+// seconds at the smallest width, where the node's own
+// AttestationResponse carries a 4-byte 0 (R2-P6-par-0105).
+//
+// Deprecated: use cluster/core.OperationalCredentials
+// (core.NewOperationalCredentials), which answers AttestationRequest on the
+// node; removable in the next minor release.
 func BuildAttestation(in AttestationInput) (*AttestationResult, error) {
 	if len(in.AttestationNonce) != 32 {
 		return nil, fmt.Errorf("%w: got %d", ErrAttestationNonce, len(in.AttestationNonce))

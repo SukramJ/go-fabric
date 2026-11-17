@@ -46,6 +46,9 @@ func (s *Store) UpsertGroupKeySet(ctx context.Context, rec GroupKeySet) error {
 	if err != nil {
 		return fmt.Errorf("store: upsert group key set: %w", err)
 	}
+	if err := s.refuseClearSecretWrite(ctx, s.db); err != nil {
+		return fmt.Errorf("store: upsert group key set: %w", err)
+	}
 	var keys [3][]byte
 	for i, k := range [3][]byte{rec.EpochKey0, rec.EpochKey1, rec.EpochKey2} {
 		var err error
@@ -198,22 +201,24 @@ type GroupKeyMapping struct {
 }
 
 // SetGroupKeyMapping upserts a GroupID → GroupKeySetID binding for
-// fabricIndex. The fabric must exist (FK); the key set need not — see the
-// matter_group_key_map comment in schema.sql.
+// fabricIndex: a GroupID the map holds keeps its place, a new one goes
+// after the last. The fabric must exist (FK); the key set need not — see
+// the matter_group_key_map comment in schema.sql.
 func (s *Store) SetGroupKeyMapping(ctx context.Context, m GroupKeyMapping) error {
 	if _, err := s.db.ExecContext(ctx, `
-INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id)
-VALUES (?, ?, ?)
+INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id, position)
+VALUES (?, ?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM matter_group_key_map WHERE fabric_index = ?))
 ON CONFLICT(fabric_index, group_id) DO UPDATE SET
     group_key_set_id = excluded.group_key_set_id`,
-		m.FabricIndex, m.GroupID, m.GroupKeySetID); err != nil {
+		m.FabricIndex, m.GroupID, m.GroupKeySetID, m.FabricIndex); err != nil {
 		return fmt.Errorf("store: set group key mapping: %w", err)
 	}
 	return nil
 }
 
 // ReplaceGroupKeyMappings implements [GroupKeys] in one transaction: the
-// fabric's rows are deleted and mappings inserted in input order; a
+// fabric's rows are deleted and mappings inserted in input order, each
+// with its index as its position; a
 // duplicate GroupID fails the primary key, an unknown fabric the foreign
 // key, and either rolls the whole write back.
 func (s *Store) ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, mappings []GroupKeyMapping) error {
@@ -227,8 +232,8 @@ func (s *Store) ReplaceGroupKeyMappings(ctx context.Context, fabricIndex uint8, 
 	}
 	for i, m := range mappings {
 		if _, err := tx.ExecContext(ctx, `
-INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id) VALUES (?, ?, ?)`,
-			fabricIndex, m.GroupID, m.GroupKeySetID); err != nil {
+INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id, position) VALUES (?, ?, ?, ?)`,
+			fabricIndex, m.GroupID, m.GroupKeySetID, i); err != nil {
 			return fmt.Errorf("store: replace group key mappings: insert %d (group %d): %w", i, m.GroupID, err)
 		}
 	}
@@ -249,12 +254,13 @@ DELETE FROM matter_group_key_map WHERE fabric_index = ? AND group_id = ?`,
 }
 
 // ListGroupKeyMappings returns every (group_id → group_key_set_id) row
-// for fabricIndex ordered by group_id ascending.
+// for fabricIndex in the order the map was written (position, then
+// group_id for the rows a release before v11 stored).
 func (s *Store) ListGroupKeyMappings(ctx context.Context, fabricIndex uint8) ([]GroupKeyMapping, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT fabric_index, group_id, group_key_set_id
 FROM matter_group_key_map WHERE fabric_index = ?
-ORDER BY group_id ASC`, fabricIndex)
+ORDER BY position ASC, group_id ASC`, fabricIndex)
 	if err != nil {
 		return nil, fmt.Errorf("store: list group key mappings: %w", err)
 	}

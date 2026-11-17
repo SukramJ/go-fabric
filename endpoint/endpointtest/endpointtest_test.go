@@ -6,6 +6,7 @@ package endpointtest_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -75,5 +76,67 @@ func TestFakeStoreErase(t *testing.T) {
 	}
 	if id, err := s.UpsertEndpointAssigning(ctx, endpoint.Record{Key: endpoint.StringKey("c"), Scope: "s"}); err != nil || id != 2 {
 		t.Fatalf("first number after the erase %d (%v), want 2", id, err)
+	}
+}
+
+// TestEveryFabricListsEveryIndex: the fabric source a test's Binding
+// servers take lists the indexes 1 to 254, once each (review II,
+// R2-P6-store-1010, decision 158).
+func TestEveryFabricListsEveryIndex(t *testing.T) {
+	t.Parallel()
+	got, err := endpointtest.EveryFabric.ListFabrics(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 254 {
+		t.Fatalf("%d fabrics, want 254", len(got))
+	}
+	for i, f := range got {
+		if int(f.FabricIndex) != i+1 {
+			t.Fatalf("entry %d is fabric %d, want %d", i, f.FabricIndex, i+1)
+		}
+	}
+	if c := endpointtest.AssemblerConfig(); c.Fabrics != endpointtest.EveryFabric {
+		t.Error("the assembler config does not carry EveryFabric")
+	}
+}
+
+// TestFakeStoreNumbersAsThePortRequires: the fake keeps the number stored
+// for a source when a record re-states it with 0 — before, it handed out a
+// fresh one, which no real store does — lists ascending by number, and
+// wraps past the top skipping the numbers still held (review II,
+// R2-P6-test-0612).
+func TestFakeStoreNumbersAsThePortRequires(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := endpointtest.NewFakeStore()
+	upsert := func(key string, id uint16) uint16 {
+		t.Helper()
+		got, err := s.UpsertEndpointAssigning(ctx, endpoint.Record{Key: endpoint.StringKey(key), Scope: "s", EndpointID: id})
+		if err != nil {
+			t.Fatalf("UpsertEndpointAssigning(%s, %d): %v", key, id, err)
+		}
+		return got
+	}
+	first := upsert("a", 0)
+	if again := upsert("a", 0); again != first {
+		t.Errorf("a known source re-stated with 0 got %d, want its stored %d", again, first)
+	}
+	if top := upsert("top", 65534); top != 65534 {
+		t.Fatalf("explicit top number: %d", top)
+	}
+	if wrapped := upsert("b", 0); wrapped != first+1 {
+		t.Errorf("the allocation past the top got %d, want %d (wrapped to 2, %d held)", wrapped, first+1, first)
+	}
+	recs, err := s.ListEndpoints(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := make([]uint16, 0, len(recs))
+	for _, r := range recs {
+		ids = append(ids, r.EndpointID)
+	}
+	if !slices.IsSorted(ids) || len(ids) != 3 {
+		t.Errorf("ListEndpoints numbers %v, want three, ascending", ids)
 	}
 }

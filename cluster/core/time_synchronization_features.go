@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	timesyncdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
@@ -161,13 +163,48 @@ func NewTimeSynchronizationWith(cfg TimeSynchronizationConfig) (*TimeSynchroniza
 	}
 	var tz []timesyncdef.TimeZoneStruct
 	if ok := t.load(ctx, timeSyncKeyTimeZone, &tz); ok && len(tz) > 0 {
-		t.state.timeZone = tz
+		if tz = t.loadedTimeZone(tz); len(tz) > 0 {
+			t.state.timeZone = tz
+		}
 	}
 	var dst []timesyncdef.DSTOffsetStruct
 	if ok := t.load(ctx, timeSyncKeyDSTOffset, &dst); ok {
-		t.state.dstOffset = dst
+		t.state.dstOffset = t.loadedDSTOffset(dst)
 	}
 	return t, nil
+}
+
+// loadedTimeZone holds a stored TimeZone list to SetTimeZone's rules: cut
+// to timeZoneListMaxSize, and dropped whole — the default zone served —
+// when an entry breaks one; either is logged (review II,
+// R2-P6-store-1267).
+func (t *TimeSynchronization) loadedTimeZone(list []timesyncdef.TimeZoneStruct) []timesyncdef.TimeZoneStruct {
+	if len(list) > timeZoneListMaxSize {
+		t.logger().Warn("matter.timesync.stored_list_cut", slog.String("what", "TimeZone"), slog.Int("stored", len(list)), slog.Int("max", timeZoneListMaxSize))
+		list = list[:timeZoneListMaxSize]
+	}
+	for i, tz := range list {
+		if err := checkTimeZoneEntry(i, tz); err != nil {
+			t.logger().Warn("matter.timesync.stored_list_dropped", slog.String("what", "TimeZone"), slog.String("reason", err.Error()))
+			return nil
+		}
+	}
+	return list
+}
+
+// loadedDSTOffset holds a stored DSTOffset list to SetDSTOffset's rules:
+// cut to dstOffsetListMaxSize, and dropped whole when validDSTOffsets
+// refuses it; either is logged (review II, R2-P6-store-1267).
+func (t *TimeSynchronization) loadedDSTOffset(list []timesyncdef.DSTOffsetStruct) []timesyncdef.DSTOffsetStruct {
+	if len(list) > dstOffsetListMaxSize {
+		t.logger().Warn("matter.timesync.stored_list_cut", slog.String("what", "DSTOffset"), slog.Int("stored", len(list)), slog.Int("max", dstOffsetListMaxSize))
+		list = list[:dstOffsetListMaxSize]
+	}
+	if err := validDSTOffsets(list); err != nil {
+		t.logger().Warn("matter.timesync.stored_list_dropped", slog.String("what", "DSTOffset"), slog.String("reason", err.Error()))
+		return nil
+	}
+	return list
 }
 
 // defaultTimeZone is chip's InitTimeZone (:608-617): one entry, offset 0,
@@ -194,16 +231,25 @@ func (t *TimeSynchronization) logger() *slog.Logger {
 }
 
 // load reads one stored value; false when none is stored or it does not
-// decode.
+// decode. A read error or a value that does not decode is logged: either
+// is served as "none stored" (review II, R2-P6-store-1267).
 func (t *TimeSynchronization) load(ctx context.Context, key string, into any) bool {
 	if t.cfg.Store == nil {
 		return false
 	}
 	raw, ok, err := t.cfg.Store.GetSetting(ctx, key)
-	if err != nil || !ok {
+	if err != nil {
+		t.logger().Warn("matter.timesync.load_failed", slog.String("key", key), slog.String("reason", err.Error()))
 		return false
 	}
-	return json.Unmarshal([]byte(raw), into) == nil
+	if !ok {
+		return false
+	}
+	if err := json.Unmarshal([]byte(raw), into); err != nil {
+		t.logger().Warn("matter.timesync.load_failed", slog.String("key", key), slog.String("reason", err.Error()))
+		return false
+	}
+	return true
 }
 
 // save stores one value; nil v clears it (stored as JSON null).
@@ -273,7 +319,7 @@ func (t *TimeSynchronization) updateTimeZoneStateLocked(ctx context.Context) tim
 	if active == 0 {
 		return timeStateActive
 	}
-	t.state.timeZone = slices.Clone(tz[active:])
+	t.state.timeZone = deepcopy.Each(tz[active:])
 	if err := t.save(ctx, timeSyncKeyTimeZone, t.state.timeZone); err != nil {
 		return timeStateInvalid
 	}
@@ -412,7 +458,7 @@ func (t *TimeSynchronization) readFeatureLocked(attrID uint32) (any, bool) {
 		}
 		return *t.state.defaultNTP, true
 	case timesyncdef.AttrTimeZone:
-		return spec.List[timesyncdef.TimeZoneStruct](slices.Clone(t.state.timeZone)), true
+		return spec.List[timesyncdef.TimeZoneStruct](deepcopy.Each(t.state.timeZone)), true
 	case timesyncdef.AttrDstOffset:
 		return spec.List[timesyncdef.DSTOffsetStruct](slices.Clone(t.state.dstOffset)), true
 	case timesyncdef.AttrTimeZoneDatabase:
@@ -547,15 +593,8 @@ func (t *TimeSynchronization) setTimeZoneLocked(ctx context.Context, list []time
 	}
 	next := make([]timesyncdef.TimeZoneStruct, 0, len(list))
 	for i, tz := range list {
-		switch {
-		case tz.Offset < timeZoneOffsetMin || tz.Offset > timeZoneOffsetMax:
-			return false, fmt.Errorf("%w: offset %d outside %d to %d", errTimeSyncInvalid, tz.Offset, timeZoneOffsetMin, timeZoneOffsetMax)
-		case i == 0 && tz.ValidAt != 0:
-			return false, fmt.Errorf("%w: the first time zone is valid at %d, not 0", errTimeSyncInvalid, tz.ValidAt)
-		case i != 0 && tz.ValidAt == 0:
-			return false, fmt.Errorf("%w: time zone %d is valid at 0", errTimeSyncInvalid, i)
-		case tz.Name != nil && len(*tz.Name) > timeZoneNameMaxLen:
-			return false, fmt.Errorf("%w: name of %d bytes, at most %d", errTimeSyncInvalid, len(*tz.Name), timeZoneNameMaxLen)
+		if err := checkTimeZoneEntry(i, tz); err != nil {
+			return false, err
 		}
 		entry := timesyncdef.TimeZoneStruct{Offset: tz.Offset, ValidAt: tz.ValidAt}
 		if tz.Name != nil && *tz.Name != "" { // an empty name is no name (:681-698)
@@ -574,6 +613,23 @@ func (t *TimeSynchronization) setTimeZoneLocked(ctx context.Context, list []time
 	return statusChanged, t.save(ctx, timeSyncKeyTimeZone, t.state.timeZone)
 }
 
+// checkTimeZoneEntry is SetTimeZone's rule for the entry at i: the offset
+// within -43200 to 50400, the first valid at 0 and every later one at a
+// set time, the name at most 64 bytes.
+func checkTimeZoneEntry(i int, tz timesyncdef.TimeZoneStruct) error {
+	switch {
+	case tz.Offset < timeZoneOffsetMin || tz.Offset > timeZoneOffsetMax:
+		return fmt.Errorf("%w: offset %d outside %d to %d", errTimeSyncInvalid, tz.Offset, timeZoneOffsetMin, timeZoneOffsetMax)
+	case i == 0 && tz.ValidAt != 0:
+		return fmt.Errorf("%w: the first time zone is valid at %d, not 0", errTimeSyncInvalid, tz.ValidAt)
+	case i != 0 && tz.ValidAt == 0:
+		return fmt.Errorf("%w: time zone %d is valid at 0", errTimeSyncInvalid, i)
+	case tz.Name != nil && len(*tz.Name) > timeZoneNameMaxLen:
+		return fmt.Errorf("%w: name of %d bytes, at most %d", errTimeSyncInvalid, len(*tz.Name), timeZoneNameMaxLen)
+	}
+	return nil
+}
+
 // handleSetTimeZone is chip's HandleSetTimeZone (:1161-1213).
 func (t *TimeSynchronization) handleSetTimeZone(ctx context.Context, fields any) (any, error) {
 	req, ok := requestFields[timesyncdef.SetTimeZoneRequest](fields)
@@ -586,7 +642,7 @@ func (t *TimeSynchronization) handleSetTimeZone(ctx context.Context, fields any)
 		t.mu.Unlock()
 		t.flush(contract.OriginFrom(ctx), &p)
 	}()
-	saved := slices.Clone(t.state.timeZone)
+	saved := deepcopy.Each(t.state.timeZone)
 	statusChanged, err := t.setTimeZoneLocked(ctx, req.TimeZone, &p)
 	if err != nil {
 		t.state.timeZone = saved
@@ -656,9 +712,17 @@ func (t *TimeSynchronization) setDSTOffsetLocked(ctx context.Context, list []tim
 	if err := validDSTOffsets(list); err != nil {
 		return err
 	}
-	t.state.dstOffset = slices.Clone(list)
+	// The list is stored first and served once stored: a refused store
+	// keeps the previous list and reports nothing — chip notifies only on
+	// success (TimeSynchronizationCluster.cpp:812-815 at 6170af84; review
+	// II, R2-P6-store-1207).
+	next := slices.Clone(list)
+	if err := t.save(ctx, timeSyncKeyDSTOffset, next); err != nil {
+		return err
+	}
+	t.state.dstOffset = next
 	p.changed(timesyncdef.AttrDstOffset)
-	return t.save(ctx, timeSyncKeyDSTOffset, t.state.dstOffset)
+	return nil
 }
 
 // handleSetDSTOffset is chip's HandleSetDSTOffset (:1216-1243): a change
@@ -711,11 +775,15 @@ func (t *TimeSynchronization) handleSetDefaultNTP(ctx context.Context, fields an
 	if err := t.checkDefaultNTP(ntp); err != nil {
 		return err
 	}
+	// Stored first, served once stored: chip stores the address and holds
+	// no copy (TimeSynchronizationCluster.cpp:600-605 at 6170af84), so a
+	// refused store leaves the previous address served (review II,
+	// R2-P6-store-1207).
 	var p pending
 	t.mu.Lock()
-	t.state.defaultNTP = ntp
 	err := t.save(ctx, timeSyncKeyDefaultNTP, ntp)
 	if err == nil {
+		t.state.defaultNTP = ntp
 		p.changed(timesyncdef.AttrDefaultNtp)
 	}
 	t.mu.Unlock()

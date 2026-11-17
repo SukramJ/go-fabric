@@ -9,7 +9,6 @@ import (
 
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 )
 
 func newHeatCool() *thermo.ThermostatServer {
@@ -157,12 +156,12 @@ func TestThermostatServer_LTNE_HidesLocalTemperatureCalibration(t *testing.T) {
 
 // invokeSetpointRaiseLower is a helper that calls SetpointRaiseLower
 // via MatterInvoke and fails the test on error.
-func invokeSetpointRaiseLower(t *testing.T, srv *thermo.ThermostatServer, mode uint8, amount int8) {
+func invokeSetpointRaiseLower(t *testing.T, srv *thermo.ThermostatServer, mode tdef.SetpointRaiseLowerModeEnum, amount int8) {
 	t.Helper()
 	_, err := srv.MatterInvoke(
 		context.Background(),
 		0x00,
-		tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeEnum(mode), Amount: amount},
+		tdef.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},
 	)
 	if err != nil {
 		t.Fatalf("SetpointRaiseLower(mode=%d, amount=%d): %v", mode, amount, err)
@@ -191,7 +190,7 @@ func TestSetpointRaiseLower_Both_NoClamp(t *testing.T) {
 	srv := newHeatCool()
 
 	// amount=3 → delta=30; 2000+30=2030 (within 700-3000), 2600+30=2630 (within 1600-3200)
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 3)
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeBoth, 3)
 
 	gotHeat := readSetpoint(t, srv, 0x0012, "OccupiedHeatingSetpoint")
 	gotCool := readSetpoint(t, srv, 0x0011, "OccupiedCoolingSetpoint")
@@ -239,7 +238,7 @@ func TestSetpointRaiseLower_Both_HeatingLimited(t *testing.T) {
 	srv := thermo.NewThermostatServer(cfg)
 
 	// amount=+12 → delta=+120; heating overshoots by 20, cooling has room
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 12)
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeBoth, 12)
 
 	gotHeat := readSetpoint(t, srv, 0x0012, "OccupiedHeatingSetpoint")
 	gotCool := readSetpoint(t, srv, 0x0011, "OccupiedCoolingSetpoint")
@@ -289,7 +288,7 @@ func TestSetpointRaiseLower_Both_CoolingLimited(t *testing.T) {
 	srv := thermo.NewThermostatServer(cfg)
 
 	// amount=+12 → delta=+120; cooling overshoots by 20, heating has room
-	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 12)
+	invokeSetpointRaiseLower(t, srv, tdef.SetpointRaiseLowerModeBoth, 12)
 
 	gotHeat := readSetpoint(t, srv, 0x0012, "OccupiedHeatingSetpoint")
 	gotCool := readSetpoint(t, srv, 0x0011, "OccupiedCoolingSetpoint")

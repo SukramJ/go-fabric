@@ -68,7 +68,6 @@ import (
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/cluster/transition"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -281,8 +280,8 @@ func DefaultColorControlServerConfig() ColorControlServerConfig {
 // ([ColorControlServerConfig.InitialMireds],
 // [ColorControlServerConfig.StartUpColorTemperatureMireds]), which the
 // host applies itself. Implementations translate the cropped mired
-// value into the device's native unit — HM exposes COLOR_TEMPERATURE in
-// Kelvin (mireds = 1_000_000 / Kelvin) — and push it to the device. A
+// value into the device's native unit — a device that takes Kelvin gets
+// 1_000_000 / mireds — and push it to the device. A
 // write error fails the command, or ends the transition, and leaves the
 // in-process ColorTemperatureMireds attribute unchanged, so the reported
 // state never claims a value the device did not accept.
@@ -363,6 +362,9 @@ type ColorControlServer struct {
 	veto   spec.WriteVeto
 	// cmd serialises the commands.
 	cmd sync.Mutex
+	// endsScene is set by a command, under cmd, that ends the current
+	// scene when it succeeds ([ColorControlServer.endScene]).
+	endsScene bool
 	// commit serialises the changes of the colour state, which reach it
 	// from commands and from transition steps.
 	commit sync.Mutex
@@ -523,7 +525,7 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 			return s.st.property(name)
 		},
 		Apply:                s.applyChanges,
-		RemainingTimeChanged: func() { s.changes.NotifyFrom(contract.OriginCommand, wire.ColorCtrlAttrRemainingTime) },
+		RemainingTimeChanged: func() { s.changes.NotifyFrom(contract.OriginCommand, ccdef.AttrRemainingTime) },
 		Settled: func(name string) {
 			if q := s.quiet[propAttribute[name]]; q != nil {
 				q.EmitNow()
@@ -632,7 +634,7 @@ func (s *ColorControlServer) Color() Color {
 }
 
 // MatterClusterID returns the ColorControl cluster ID (0x0300).
-func (s *ColorControlServer) MatterClusterID() uint32 { return wire.ColorControlClusterID }
+func (s *ColorControlServer) MatterClusterID() uint32 { return ccdef.ClusterID }
 
 // MatterRead returns the value of a served attribute. Returns (nil, false)
 // for an attribute the feature selection does not serve, so the IM
@@ -894,3 +896,11 @@ func (s *ColorControlServer) invalidateScenes() {
 		r.sc.MakeAllFabricSceneInfoEntriesInvalid()
 	}
 }
+
+// endScene marks the running command as one that ends the current scene
+// once it succeeds ([ColorControlServer.MatterInvoke]). The caller holds
+// cmd. A scene recall that runs ColorLoopSet directly
+// (MatterApplySceneValues) marks too; nothing reads that mark, and the
+// next MatterInvoke resets it — the recall does not end the scene it
+// applies.
+func (s *ColorControlServer) endScene() { s.endsScene = true }

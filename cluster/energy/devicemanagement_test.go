@@ -146,12 +146,21 @@ func triggerForecast(now uint32) *energy.Forecast {
 	energy0, energy1 := int64(2000), int64(4000)
 	minP0, maxP0, minP1, maxP1 := uint32(10), uint32(60), uint32(2), uint32(120)
 	earliest, latest := spec.ValueOf(now), now*3
+	// Under FA and PFR each slot states its adjustment range, "FA & PFR"
+	// and "FA" (review II, R2-P6-par-1304).
+	adjLo, adjHi, durLo, durHi := int64(1000000), int64(7600000), uint32(5), uint32(30)
 	return &energy.Forecast{
 		StartTime: now + 60, EarliestStartTime: &earliest, EndTime: now * 3, LatestEndTime: &latest,
 		IsPausable: true, ActiveSlotNumber: spec.ValueOf(uint16(0)),
 		Slots: []energy.ForecastSlot{
-			{MinDuration: 10, MaxDuration: 20, DefaultDuration: 15, SlotIsPausable: &yes, MinPauseDuration: &minP0, MaxPauseDuration: &maxP0, NominalPower: &nominal, MinPower: &lo, MaxPower: &hi, NominalEnergy: &energy0},
-			{MinDuration: 20, MaxDuration: 40, DefaultDuration: 30, SlotIsPausable: &no, MinPauseDuration: &minP1, MaxPauseDuration: &maxP1, NominalPower: &nominal, MinPower: &lo, MaxPower: &hi, NominalEnergy: &energy1},
+			{
+				MinDuration: 10, MaxDuration: 20, DefaultDuration: 15, SlotIsPausable: &yes, MinPauseDuration: &minP0, MaxPauseDuration: &maxP0, NominalPower: &nominal, MinPower: &lo, MaxPower: &hi, NominalEnergy: &energy0,
+				MinPowerAdjustment: &adjLo, MaxPowerAdjustment: &adjHi, MinDurationAdjustment: &durLo, MaxDurationAdjustment: &durHi,
+			},
+			{
+				MinDuration: 20, MaxDuration: 40, DefaultDuration: 30, SlotIsPausable: &no, MinPauseDuration: &minP1, MaxPauseDuration: &maxP1, NominalPower: &nominal, MinPower: &lo, MaxPower: &hi, NominalEnergy: &energy1,
+				MinPowerAdjustment: &adjLo, MaxPowerAdjustment: &adjHi, MinDurationAdjustment: &durLo, MaxDurationAdjustment: &durHi,
+			},
 		},
 	}
 }

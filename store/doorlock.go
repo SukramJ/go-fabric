@@ -122,25 +122,33 @@ const (
 
 // LoadDoorLockAuth returns the records of the lock endpoint endpointKey.
 // saved is false when [Store.SaveDoorLockAuth] never ran for it; the lock
-// then starts from its configured initial records.
+// then starts from its configured initial records. Its reads share one
+// transaction, so a save beside it is read whole or not at all.
 func (s *Store) LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth DoorLockAuth, saved bool, err error) {
-	if _, saved, err = s.GetSetting(ctx, settingDoorLockSaved+endpointKey); err != nil || !saved {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return DoorLockAuth{}, false, fmt.Errorf("store: load door lock records: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, saved, err = s.readSetting(ctx, tx, settingDoorLockSaved+endpointKey); err != nil {
+		return DoorLockAuth{}, false, fmt.Errorf("store: load door lock records: %w", err)
+	} else if !saved {
+		return DoorLockAuth{}, false, nil
+	}
+	if auth.Users, err = s.loadDoorLockUsers(ctx, tx, endpointKey); err != nil {
 		return DoorLockAuth{}, false, err
 	}
-	if auth.Users, err = s.loadDoorLockUsers(ctx, endpointKey); err != nil {
+	if auth.Credentials, err = s.loadDoorLockCredentials(ctx, tx, endpointKey); err != nil {
 		return DoorLockAuth{}, false, err
 	}
-	if auth.Credentials, err = s.loadDoorLockCredentials(ctx, endpointKey); err != nil {
-		return DoorLockAuth{}, false, err
-	}
-	if lerr := s.loadDoorLockSchedules(ctx, endpointKey, &auth); lerr != nil {
+	if lerr := s.loadDoorLockSchedules(ctx, tx, endpointKey, &auth); lerr != nil {
 		return DoorLockAuth{}, false, lerr
 	}
 	return auth, true, nil
 }
 
-func (s *Store) loadDoorLockUsers(ctx context.Context, endpointKey string) ([]DoorLockUser, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func (s *Store) loadDoorLockUsers(ctx context.Context, tx *sql.Tx, endpointKey string) ([]DoorLockUser, error) {
+	rows, err := tx.QueryContext(ctx, `
 SELECT user_index, user_name, user_unique_id, user_status, user_type, credential_rule,
        credentials_json, creator_fabric_index, last_modified_fabric_index, expiring_user_expires_at,
        created_through_matter, modified_through_matter
@@ -181,8 +189,8 @@ FROM matter_doorlock_users WHERE endpoint_key = ? ORDER BY user_index`, endpoint
 	return out, nil
 }
 
-func (s *Store) loadDoorLockCredentials(ctx context.Context, endpointKey string) ([]DoorLockCredential, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func (s *Store) loadDoorLockCredentials(ctx context.Context, tx *sql.Tx, endpointKey string) ([]DoorLockCredential, error) {
+	rows, err := tx.QueryContext(ctx, `
 SELECT credential_type, credential_index, credential_data, creator_fabric_index, last_modified_fabric_index,
        created_through_matter, modified_through_matter, sealed
 FROM matter_doorlock_credentials WHERE endpoint_key = ? ORDER BY credential_type, credential_index`, endpointKey)
@@ -213,8 +221,8 @@ FROM matter_doorlock_credentials WHERE endpoint_key = ? ORDER BY credential_type
 	return out, nil
 }
 
-func (s *Store) loadDoorLockSchedules(ctx context.Context, endpointKey string, auth *DoorLockAuth) error {
-	rows, err := s.db.QueryContext(ctx, `
+func (s *Store) loadDoorLockSchedules(ctx context.Context, tx *sql.Tx, endpointKey string, auth *DoorLockAuth) error {
+	rows, err := tx.QueryContext(ctx, `
 SELECT kind, schedule_index, user_index, days_mask, start_hour, start_minute, end_hour, end_minute,
        local_start_time, local_end_time, operating_mode
 FROM matter_doorlock_schedules WHERE endpoint_key = ? ORDER BY kind, user_index, schedule_index`, endpointKey)
@@ -266,6 +274,14 @@ func (s *Store) SaveDoorLockAuth(ctx context.Context, endpointKey string, auth D
 		return fmt.Errorf("store: save door lock: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	for _, c := range auth.Credentials {
+		if c.Data != nil {
+			if err := s.refuseClearSecretWrite(ctx, tx); err != nil {
+				return fmt.Errorf("store: save door lock: %w", err)
+			}
+			break
+		}
+	}
 	for _, table := range []string{"matter_doorlock_users", "matter_doorlock_credentials", "matter_doorlock_schedules"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE endpoint_key = ?`, endpointKey); err != nil { //nolint:gosec // table is one of the three constants above
 			return fmt.Errorf("store: save door lock: clear %s: %w", table, err)

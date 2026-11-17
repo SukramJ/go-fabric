@@ -125,8 +125,7 @@ func TestOutboundReliable_TickGivesUp(t *testing.T) {
 // TestOutboundReliable_AbandonExchange verifies that AbandonExchange
 // drops every pending entry tagged with the matching exchangeID,
 // leaves untagged / different-exchange entries in place, returns the
-// drop count, and wakes a WaitForAck caller blocked on a dropped
-// counter with ErrAckWaitTimeout. Mirrors the Sigma3-receive cleanup
+// drop count. Mirrors the Sigma3-receive cleanup
 // path: once the commissioner has progressed past Sigma2 the bridge
 // must stop retransmitting the now-superseded Sigma2 datagrams.
 func TestOutboundReliable_AbandonExchange(t *testing.T) {
@@ -148,16 +147,6 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 			t.Fatalf("Pending before abandon: got %d, want 5", tr.Pending())
 		}
 
-		// Block a waiter on counter=2 (target exchange) to verify it gets
-		// unblocked when AbandonUnsecuredExchange runs.
-		waitErrCh := make(chan error, 1)
-		go func() {
-			waitErrCh <- tr.WaitForAck(t.Context(), 0, 2)
-		}()
-		// The goroutine has installed its waiter channel once the bubble
-		// settles.
-		synctest.Wait()
-
 		cleared := tr.AbandonUnsecuredExchange(onExchange(targetExchange))
 		if cleared != 3 {
 			t.Errorf("AbandonUnsecuredExchange: cleared %d, want 3", cleared)
@@ -174,18 +163,6 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 		}
 		if tr.Pending() != 0 {
 			t.Errorf("Pending after acking survivors: got %d, want 0", tr.Pending())
-		}
-
-		// The blocked waiter must have been released. ErrAckWaitTimeout is
-		// the abandon marker; a nil-return is also acceptable (channel
-		// close on best-effort path) since both signal "stop waiting".
-		select {
-		case err := <-waitErrCh:
-			if err != nil && !errors.Is(err, ErrAckWaitTimeout) {
-				t.Errorf("waiter resolved with unexpected err: %v", err)
-			}
-		case <-time.After(time.Second):
-			t.Fatal("AbandonUnsecuredExchange did not release the WaitForAck waiter within 1s")
 		}
 
 		// Abandoning an unknown exchange is a no-op.
@@ -407,34 +384,6 @@ func TestSubscription_ReleaseCounterOnPeerAck(t *testing.T) {
 	}
 }
 
-// TestOutboundReliable_AckStrayWithWaiter verifies that a stray Ack on a
-// counter that has no pending entry but does have a waiter closes the channel
-// and returns false.
-func TestOutboundReliable_AckStrayWithWaiter(t *testing.T) {
-	t.Parallel()
-	tr := newOutboundReliableTracker(nil, nil)
-	// Install a waiter directly without a matching pending entry.
-	ch := make(chan error, 1)
-	const sessionID = uint16(0)
-	tr.mu.Lock()
-	tr.waiters[outboundKey{sessionID: sessionID, counter: 888}] = ch
-	tr.mu.Unlock()
-
-	// Ack the counter — no pending entry, but waiter exists.
-	if got := tr.Ack(sessionID, 888); got {
-		t.Error("Ack returned true for stray counter; want false")
-	}
-	// Channel must be closed.
-	select {
-	case _, ok := <-ch:
-		if ok {
-			t.Error("channel should be closed (receive would block on non-closed)")
-		}
-	default:
-		t.Error("channel was not closed after stray Ack with waiter")
-	}
-}
-
 // TestOutboundReliable_TickSendError verifies that a send error is reported
 // in the result slice but the entry is NOT removed from the pending map
 // (it is retried at its backoff).
@@ -462,79 +411,6 @@ func TestOutboundReliable_TickSendError(t *testing.T) {
 	if tr.Pending() != 1 {
 		t.Errorf("Pending after send error: %d, want 1 (entry must stay)", tr.Pending())
 	}
-}
-
-// TestWaitForAck_NotPending_ReturnsNilImmediately verifies that calling
-// WaitForAck on a counter that was never tracked (or already acked)
-// returns nil immediately without blocking.
-func TestWaitForAck_NotPending_ReturnsNilImmediately(t *testing.T) {
-	t.Parallel()
-	tr := newOutboundReliableTracker(nil, nil)
-	// Counter 999 was never tracked.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	if err := tr.WaitForAck(ctx, 0, 999); err != nil {
-		t.Errorf("not-pending counter: want nil, got %v", err)
-	}
-}
-
-// TestWaitForAck_ContextCancelled verifies that WaitForAck returns
-// ctx.Err() when the context is cancelled before the ACK arrives.
-func TestWaitForAck_ContextCancelled(t *testing.T) {
-	t.Parallel()
-	tr := newOutboundReliableTracker(nil, nil)
-	dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}
-	tr.Track(77, 0, 0, []byte{0x01}, dest, time.Now())
-
-	ctx, cancel := context.WithCancel(context.Background())
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- tr.WaitForAck(ctx, 0, 77)
-	}()
-	// Cancel the context — unblocks WaitForAck.
-	cancel()
-
-	select {
-	case err := <-errCh:
-		if err == nil {
-			t.Error("WaitForAck after cancel: want non-nil, got nil")
-		}
-	case <-time.After(time.Second):
-		t.Fatal("WaitForAck did not return after context cancel")
-	}
-}
-
-// TestWaitForAck_AckClosesChannel verifies that WaitForAck returns nil
-// when the ACK arrives (channel closed by Ack) while the goroutine is
-// blocked on the wait.
-func TestWaitForAck_AckClosesChannel(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		tr := newOutboundReliableTracker(nil, nil)
-		dest := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5678}
-		const counter = uint32(88)
-		tr.Track(counter, 0, 0, []byte{0xAA}, dest, time.Now())
-
-		errCh := make(chan error, 1)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		go func() {
-			errCh <- tr.WaitForAck(ctx, 0, counter)
-		}()
-		// The goroutine has installed its waiter once the bubble settles;
-		// then Ack.
-		synctest.Wait()
-		tr.Ack(0, counter)
-
-		select {
-		case err := <-errCh:
-			if err != nil {
-				t.Errorf("WaitForAck after Ack: want nil, got %v", err)
-			}
-		case <-time.After(time.Second):
-			t.Fatal("WaitForAck did not return after Ack")
-		}
-	})
 }
 
 // TestArmStatusResponseWait_OrphanPreviousWaiter verifies that arming a
@@ -597,6 +473,7 @@ func TestReport_PeerUnreachable_ClosesSubscriptionWithoutMRP(t *testing.T) {
 
 	b := newStartedBridge(t)
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	mgr.SetReportSender(b.sendSubscriptionReport) // the manager is not attached
 
 	b.mu.Lock()
 	b.subManager = mgr
@@ -658,6 +535,7 @@ func TestReport_PeerUnreachable_RetriesBeforeEviction(t *testing.T) {
 
 	b := newStartedBridge(t)
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	mgr.SetReportSender(b.sendSubscriptionReport) // the manager is not attached
 
 	b.mu.Lock()
 	b.subManager = mgr
@@ -708,5 +586,17 @@ func TestReport_PeerUnreachable_RetriesBeforeEviction(t *testing.T) {
 	}
 	if mgr.Active() != 0 {
 		t.Errorf("manager.Active()=%d after 3 send errors, want 0", mgr.Active())
+	}
+}
+
+// TestDeprecatedAckWaitTimeoutKeepsItsText: nothing returns
+// ErrAckWaitTimeout any more (owner decision 174); for the deprecation
+// window it stays the same sentinel with the same text, so a host that
+// still compares against it or logs it sees no change.
+func TestDeprecatedAckWaitTimeoutKeepsItsText(t *testing.T) {
+	t.Parallel()
+	//nolint:staticcheck // SA1019: the deprecated sentinel is what this test holds.
+	if got := ErrAckWaitTimeout.Error(); got != "bridge: outbound ack wait: timeout" {
+		t.Fatalf("ErrAckWaitTimeout = %q, want the text it had before its deprecation", got)
 	}
 }

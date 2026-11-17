@@ -27,6 +27,34 @@ type State struct {
 	TwoDCartesianMax    TwoDCartesianVertexStruct  // attribute 0x0006: TwoDCartesianVertexStruct, TWODCART, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.Zones = func(s []ZoneInformationStruct) []ZoneInformationStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ZoneInformationStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Zones)
+	c.Triggers = func(s []ZoneTriggerControlStruct) []ZoneTriggerControlStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ZoneTriggerControlStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Triggers)
+	return c
+}
+
 // Patch is a change to the ZoneManagement state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

@@ -140,9 +140,18 @@ func TestWriteRequestDecodeRefusals(t *testing.T) {
 			enc.StartStruct(tlv.ContextTag(9))
 			enc.PutBool(tlv.ContextTag(0), true)
 			_ = enc.EndContainer()
-			enc.PutBool(tlv.AnonymousTag(), true)
 			_ = enc.EndContainer()
 		}, 0, false},
+		// A member without a context tag refuses the message
+		// (R2-P6-wire-0504).
+		{"a member without a context tag", func(enc *tlv.Encoder) {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutBool(tlv.ContextTag(1), false)
+			enc.StartArray(tlv.ContextTag(2))
+			_ = enc.EndContainer()
+			enc.PutBool(tlv.AnonymousTag(), true)
+			_ = enc.EndContainer()
+		}, 0, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

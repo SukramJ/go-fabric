@@ -339,9 +339,65 @@ extraction — give both to one agent. C2 and H7 are the same defect.
   the embedding layer.)
   Closed 2026-11-16 (review II, phase 5b): joined F-db021da0-21 of [`matter_behaviour_findings.md`](./matter_behaviour_findings.md), which states both sibling couplings at `db021da0`.
 
+- **A closed PASE session does not resume the commissionable broadcast on
+  the responder.** matter.js's `sessions.deleted` observer restarts the
+  commissioning advertisement with "startup" when a PASE session closes
+  while the node is in commissioning mode (`DeviceAdvertiser.ts:152-161`,
+  `:248-260` at `862ad75f`). The operational manager fires its reannounce
+  trigger with fabric index 0 for a PASE victim; on an advertiser with the
+  broadcast events (`mdns.Responder`) the bridge starts no event for it
+  (`bridge/securechannel.go`, `triggerSessionReannounce`), and only the
+  `TriggerReannounce` and per-record fallbacks re-announce the
+  commissionable record. Fix: on index 0, start the responder's
+  "startup" schedule for the active commissionable service (issue #362).
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): fixed by `8feaa508` — the session registry's PASE close hook starts the round (`secure/operational/manager.go`, wired in `bridge/securechannel.go`, `triggerCommissioningReannounce`).
+- **A closed PASE session does not restart the commissioning
+  advertisement.** The device keeps its commissionable record during PASE
+  and publishes nothing when the session closes; matter.js starts a
+  commissioning advertisement round on every PASE session that closes
+  while the window is open (`protocol/DeviceAdvertiser.ts:131-162`). (Triage 2026-10-29: wave H2, commissioning and security (Fable).)
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): fixed by `8feaa508`, as the row above.
+- **A host-initiated RemoveFabric does not flush the Leave event.**
+  `node/node.go:707` `RemoveFabric` closes the fabric's subscriptions
+  without a last report; matter.js `Fabric.leave` closes each session
+  through `closeSubscriptions(true)` so the Leave event reaches the
+  controller (`fabric/Fabric.ts:447-457`; ClientNodeTest "erases node
+  after leave event"). (Triage 2026-10-29: wave H1, the device IM and write path.)
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): `Node.RemoveFabric` runs the command's own path, whose leaving hook flushes (`node/node.go`, `Bridge.EmitFabricLeavingContext`).
+- **Data versions are drawn anew at every start.**
+  `contract.DataVersionTracker` is the host's, and the module's own
+  trackers start random; matter.js loads a persistent cluster's version
+  from its store and draws one only when the store has none
+  (`behavior/state/managed/Datasource.ts:597`, `:802`), so a controller's
+  cache survives a device restart where this side sends every cluster
+  again. (Triage 2026-10-29: wave H1, the device IM and write path.)
+  Struck 2026-11-16 (review II, phase 6a, R2-P6-doc-0706): the reference statement is false at `db021da0` — a server datasource draws `entropy.randomUint32` at construction and takes a store's version only from an `ExternallyMutableStore`, the client-side cache (`packages/node/src/behavior/state/managed/Datasource.ts:597`, `:796-803`, `:291-294`; no hit for `ExternallyMutableStore` or `.version` under `packages/node/src/storage/server`); it contradicted F-db021da0-17 of the open register.
+
+- **No generic sanitisation of fabric-scoped data on fabric removal.**
+  matter.js strips every fabric-scoped list entry of a removed fabric from
+  every behavior's state (`ServerEnvironment.ts:187-195`,
+  `limitNodeDataToAllowedFabrics`); Go drops it only in servers that
+  implement `MatterFabricRemoved` (`bridge/bridge.go:1317-1322`), and the
+  WebRTC Transport Provider (`cluster/camera/provider.go`) keeps a removed
+  fabric's `CurrentSessions` (ServerNodeTest.ts:1549-1580 "removes the
+  entries of a removed fabric from a fabric-sensitive list" stays missing).
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-doc-1707): the WebRTC Transport Provider drops a removed fabric's sessions (`cluster/camera/fabric_state.go`, `Provider.MatterDropFabric`, since `8c9088ee`), and the removal path is `contract.FabricScopedState`, which each server that holds fabric state implements — the per-server form of matter.js's generic strip (`packages/node/src/node/server/ServerEnvironment.ts:187-196` at `db021da0`), recorded as `BD-Matter-FabricState-ReconciledWithoutFabrics`.
+
 ## Phase 33 — the general, model and types test roots (matter.js 862ad75f)
 
 - **The responder sockets keep the surviving IP family** — closed 2026-11-05: `BD-Matter-MdnsResponderKeepsTheSurvivingFamily` (owner decision).
+- **Numeric bounds compare as float64.** `cluster/spec`'s constraint check
+  (`Instance.satisfies`, `bound_expr.go` `evalBound`) and `Bound.Int`
+  (int64) hold a bound beyond 2^53 inexactly: 2^62 + 1 compares equal to
+  2^62, and a uint64 bound above int64 cannot be stated. matter.js keeps
+  such bounds as bigints (`TlvOfModelTest.ts` "refuses a value beyond the
+  computed bound", "refuses the value above it", "states a bound beyond
+  the safe integers as a bigint"; `ConstraintTest.ts` "keeps the magnitude
+  of a decimal / hexadecimal / negative bound", "judges a value against a
+  bound only a bigint states" and its value tests at 2^53 ± 1 and 2^62 ± 1).
+  No served attribute states such a bound at the pin. Route: compare integers as integers (uint64/int64 or
+  math/big) where the type is a 64-bit integer.
+  Closed 2026-11-16 (review II, phase 6a, R2-P6-par-1306): integer values compare exactly (`cluster/spec/write.go` `satisfiesInt`, `bound_expr.go` `evalBoundExact` / `exactOp`). The sentence "No served attribute states such a bound at the pin" was false: ElectricalEnergyMeasurement's served energy fields state "0 to 2^62" (the snapshot's definition texts hold "-2^62 to 2^62" 18 times — 29 string values with the `constraint` copies —, "0 to 2^62" three times, "max (2^62) - 1" once). matter.js takes a BigInt power when the result exceeds `Number.MAX_SAFE_INTEGER`, for a whole base and a whole exponent ≥ 0 (`packages/model/src/aspects/Constraint.ts:1049-1058` at `db021da0`), and "+", "-", "*" propagate a BigInt (`:989-1027`); its "/" with a BigInt operand is `undefined` (numbers only) and a division by zero ±Infinity (`:1029-1036`), where this module divides exactly and refuses a division by zero — no such bound at the pin.
 
 ## matter.js pin db021da0 — open items (pin lift 2026-11-06)
 
@@ -563,6 +619,227 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 - **F-db021da0-41: a GroupKeyMap write that fails part-way has stored some of its mappings and advances no version.** GroupKeyManagement sets the written mappings one by one and then removes the dropped ones (`MatterWriteChanged`, `cluster/core/group_key_management.go:619-635`); a store error at any step answers the write with that error and no change, after the earlier steps were stored, and the version advances only after the last (`:639`). matter.js hands a commit's changes to the store as one step and rolls back on a failure — `BD-Matter-NonVolatileWrite-StoredBeforeApplied`'s reading of `Datasource.ts` and `Tx.ts`, not repeated for this row (unverified). Who sees it (read, not run): after a store fault a fabric's GroupKeyMap holds part of the written list under the DataVersion it had, so a DataVersionFilter with that version still matches. Fix: one store transaction for the write, a method of the store port; phase 5 of review II, with the store API. Found in review II, phase 4 (the survey for R2-P4-fr-ver-01).
   Closed 2026-11-16 (review II, phase 5b, wave F, `73236af5`): a GroupKeyMap write is one store write — `GroupKeys.ReplaceGroupKeyMappings` (`store/port.go:185-191`), one transaction in the SQLite store (`store/groupkeys.go:215-240`) and one swap under the lock in memstore — and GroupKeyManagement advances its version only after it succeeded (`MatterWriteChanged`, `cluster/core/group_key_management.go:621-634`), so a store that refuses the write keeps the map the fabric held, under its DataVersion. Pinned by `cluster/core:TestGKMGroupKeyMapWriteFailingMidReplaceKeepsTheOldMap` and the storetest case `group-keys/replace-mappings`.
 - **F-db021da0-45: a change a host makes from inside a controller's write is held only when a change notification tells the bridge of it.** While a controller's write is applied, the bridge holds the notifications of the written endpoints' sources and of the servers that forward a port's notifier, and settles them against the write's record (`writeHoldTable`, `bridge/write_hold.go:33-41`; `wireMeasurementNotifier`, `bridge/subscribe.go:2610`, `:2622`; R2-P4-fr-im-01). A root server's change notifier (`wireRootNotifiers`, `:2314-2348`) and a change a server names itself with a host origin (`wireAttributeNotifiers`, `:2380-2413`; `reportServerChange`, `:2423-2446`) are held for a command (`invokeCommits.hold`) and not for a write. A host that changes an attribute of the written cluster from inside the write — a setter or Sink that sets another attribute of its server — therefore advances the version a second time and is reported on its own, where matter.js commits what a write's transaction changed once (`packages/node/src/behavior/state/managed/Datasource.ts:1446-1457` at `db021da0`; that a reactor's change joins the write's transaction there was not read: unverified). Read from the lines, not run; no kit server or host was looked for that does it. Who would see it: a subscriber gets two DataVersions for one write. Fix: the write hold over these two wirings as well. Not placed. Found in review II, phase 4 (R2-P4-fr-im-01, "not held"). Closed 2026-11-16 (review II, phase 5b, wave C): while a write to the endpoint runs, the bridge also holds a server's change of another origin, a quieter attribute's advance and a root server's change notifier (`reportServerChange`, `quieterChanged`, `wireRootNotifiers`; `bridge/write_hold.go`), and `spec.Server` takes the changes its Sink makes inside the write into the write's commit, one controller write's veto, Sink and store at a time (`MatterWriteCommit`), so a host's change of the written cluster from inside the write is one advance, as matter.js commits one transaction per attribute data (`AttributeWriteResponse.ts:433-435`; `Datasource.ts:1456-1457` at `db021da0`). What is left is F-db021da0-56 of `matter_behaviour_findings.md`. Pinned by `bridge:TestHostChangeInsideAWriteAdvancesOnce`, `TestHostChangeInsideARootWriteAdvancesOnce`, `TestRootNotifierInsideAWriteAdvancesOnce` and `cluster/spec:TestWriteCommitNamesTheSiblingItsSinkMoves`.
+
+- **F-db021da0-21: the thermostat does not follow the temperature or the occupancy of a sibling endpoint.** matter.js couples its Thermostat to two sibling clusters, once, when the node goes online (`reactTo(node.lifecycle.online, #nodeOnline)`, `packages/node/src/behaviors/thermostat/ThermostatServer.ts:168`, `:177-182` at `db021da0`; later structure changes are not followed, the TODO at `:178-179`): the endpoint named by the state field `localIndoorTemperatureMeasurementEndpoint` (`:467`, declared `:1618-1622`) feeds LocalTemperature from its TemperatureMeasurement `measuredValue` (`:480-484`), and the one named by `localOccupancyMeasurementEndpoint` (`:539`, declared `:1631-1635`) feeds Occupancy from its OccupancySensing `occupancy` (`:552-553`, `:577-579`); each is taken over the external state unless a RemoteSensing bit selects the external source (`:455`, `:468`, `:538`, `:540`). Since review II, phase 5b the Go server has the external temperature input with its calibration and the LocalTemperatureNotExposed rule — `ThermostatServer.SetMeasuredTemperature`, the mirror of `externalMeasuredIndoorTemperature` (`:497-501` → `:511-527`) — so the calibration this row first named is applied; occupancy comes from the host (`SetOccupied`). Neither sibling coupling is built: a host that composes a thermostat with such a sensor wires the two itself. Fix: the couplings, from an endpoint the host names. Found in review II, phase 4 (R2-P4-appclim-05); narrowed in phase 5b, when the row of the `862ad75f` section on the OccupancySensing coupling joined it.
+  Closed 2026-11-16 (review II, phase 6a, owner decision 147): the couplings stay the host's, recorded as `BD-Matter-Thermostat-HostWiresSiblings` in [`by_design.md`](./by_design.md).
+
+- **F-db021da0-4: what is outstanding when a subscription is activated waits for MinIntervalFloor.**
+  matter.js sends what is outstanding at activation at once: `activate`
+  calls `#triggerSendUpdate()` when an attribute update or an event number
+  is outstanding
+  (`packages/node/src/node/server/ServerSubscription.ts:443-445` at
+  `db021da0`), and `#triggerSendUpdate` starts `#sendUpdate` directly —
+  no floor, no send delay (`:520-529`); an event the initial report already
+  carried is not owed again (`:431-437`). `Subscription.EndPriming`
+  (`im/subscription/subscription.go`) stamps `lastReport` with the end of
+  the priming report and marks the events fired meanwhile urgent, so the
+  changes and events of the priming window go out once MinIntervalFloor has
+  elapsed since the priming report. Not deliberate: no entry of
+  `by_design.md` gives a reason, and the function's comment states the
+  difference without one. Pinned as it is by the subtest "an event fired
+  while the subscription was priming is reported after the floor" of
+  `im/subscription:TestEventReportParityMatterJS`. Fix: when priming ends
+  with a dirty path or an owed event, the first report is due at once, and
+  the floor counts from that report; move the subtest. Found in review II,
+  phase 0 (W2-conc-05).
+  Closed 2026-11-16 (review II, phase 6a, owner decision 144): the floor is kept as connectedhomeip's and recorded as `BD-chip-SubscriptionFloorAfterPriming` in [`by_design.md`](./by_design.md).
+
+- **F-db021da0-38: a GroupKeyMap write of the held entries in another order is no change.** matter.js judges a write by `isDeepEqual` of the written and the held value (`#noteIfChanged`, `packages/node/src/behavior/state/managed/Datasource.ts:1476-1481` at `db021da0`), which compares two arrays property by property, so the place of an entry counts (`packages/general/src/util/DeepEqual.ts:57-84`). GroupKeyManagement compares the written list with the fabric's mappings per group (`sameGroupKeyMap`, `cluster/core/group_key_management.go:645-660`; "the order of the written entries does not count", `:576-577`): the held entries in another order answer unchanged, store nothing and advance no version. Whether matter.js holds a differently ordered list after such a write depends on how its fabric-scoped list builds the stored array on a REPLACE, which was not traced (unverified); nothing was run on either side. Who sees it: a controller that writes its fabric's GroupKeyMap entries in another order gets no new DataVersion and no report here. Fix: with that trace, either the order is kept and compared or the difference becomes a `by_design` entry. Not placed. Found in review II, phase 4 (the citation pass on owner decision 78).
+  Closed 2026-11-16 (review II, phase 6a, owner decision 148): the written order is kept, as matter.js keeps a list's order (`packages/node/src/behavior/state/managed/values/ListManager.ts:559-577` at `db021da0`): the store carries each mapping's position (schema v11, `matter_group_key_map.position`; `ListGroupKeyMappings` returns the map in the order it was written, rows from before v11 by GroupID), and `sameGroupKeyMap` compares entry for entry in order, so a write that only reorders the entries is a change, stored with a new DataVersion (`cluster/core/group_key_management.go`; `TestGKMGroupKeyMapReorderIsAChange`).
+
+- **F-db021da0-3: a failed subscription report is retried one MinIntervalFloor later.**
+  matter.js, after a report that could not be sent, owes the data again and
+  schedules nothing: the attribute filter goes back through
+  `#addOutstandingAttributes`, which only fills the set
+  (`packages/node/src/node/server/ServerSubscription.ts:346-357` at
+  `db021da0`), the event number is set back (`:582-584`), and neither calls
+  `#prepareDataUpdate` as the change handler does (`:380-382`); the send loop
+  ends unless another update was queued behind the failed one (`:610-612`).
+  The retry leaves with whatever starts the next report — a change, an urgent
+  event, the send interval — and after three failed updates a subscription
+  whose error is a communication error is given up (`:569`, `:585-603`).
+  This module asks for a report again:
+  `Subscription.RequeueAttributes` marks the paths dirty and
+  `Subscription.RequeueEvents` marks the owed events urgent
+  (`im/subscription/subscription.go`), so the retry goes out once
+  MinIntervalFloor has elapsed since the failed report. Not deliberate: it
+  is what the attribute path did before events shared its report, and the
+  event half was kept the same so that one report has one rule (review II,
+  W2-conc-05). Pinned as it is by the subtest "events owed again after a
+  failed report are retried when the floor ends" of
+  `im/subscription:TestEventReportParityMatterJS`. After three failed
+  updates in a row the subscription ends and the peer's sessions stay, as
+  in matter.js (`noteSubscriptionSendError`, `noteReportUndelivered`,
+  `bridge/subscribe.go:1018`, `:1135`; review II, R2-P4-imread-04, owner
+  decision 60; `bridge:TestUndeliveredReportIsOneFailedUpdateParity`);
+  what is left of this row is when the retry leaves. Fix: requeue without asking for a report — the paths and the
+  event number are owed and leave with the next pass something else starts —
+  and move the subtest onto matter.js's rule. Found in review II, phase 0.
+  Closed 2026-11-17 (review II, phase 6a, `bc31e6ff`): a failed update's data is owed, not due — its paths go back to an owed set that leaves with the next report another cause starts, and its events lose their urgency (`im/subscription/subscription.go` `RequeueAttributes`, `RequeueEvents`), as matter.js puts them back (`packages/node/src/node/server/ServerSubscription.ts:569-584`), `#addOutstandingAttributes` only fills (`:346-357`), the catch calls no `#prepareDataUpdate` (`:558-608`) — the change handler (`:380-382`), an urgent event (`:396-398`) and the send-interval timer (`:480-484`) do —, and the loop goes on only if another update was noted meanwhile (`:610-613`, at `db021da0`).
+- **F-db021da0-8: a report pass that leaves nothing for the subscriber sends no DataReport.**
+  matter.js takes what is outstanding, stamps the time of the last update
+  before it sends
+  (`packages/node/src/node/server/ServerSubscription.ts:549-551` at
+  `db021da0`) and takes the data branch whenever an attribute filter or an
+  event number is outstanding (`:909`, `:921-936`), with
+  `suppressEmptyReport: onlyWithData` (`:935`); `onlyWithData` is false for
+  the pass the send delay or the send interval starts (`:198-200`,
+  `:480-484`, the default of `:520`) and true only for a flush (`:757`) and
+  for a queued follow-up with no keep-alive owed (`:622`), and the
+  messenger leaves a report out only when that flag is set and the report
+  is empty (`packages/protocol/src/interaction/InteractionMessenger.ts:794-796`).
+  So a pass whose data is all filtered for the subscriber goes out as an
+  empty DataReport with `suppressResponse: false` (`:928`) and counts as
+  the last update — under a TODO of matter.js's own, "Add correct handling
+  for reports that would have data but in the end not send any because of
+  filtered out" (`:923-925`). Here the bridge's event reporter sends
+  nothing when its access check leaves no event and no attribute for the
+  subscriber and says so (`Subscription.NothingSent`,
+  `im/subscription/subscription.go`; `reportSubscriptionEvents`,
+  `bridge/subscribe.go`), and the engine then sends the keep-alive when the
+  pass was the send interval's and otherwise puts the time of the last
+  report back (`dueReport`, `im/subscription/engine.go`); an event drain
+  that yields no event is no report either (`758fb3ec`). Since `16495f81`
+  the keep-alive due in such a pass is sent — before, the pass counted and
+  a subscriber heard nothing for two send intervals (review II,
+  R2-P0-rv-A03) — so what still differs is the empty DataReport itself and
+  the send interval it restarts. The attribute path of this module goes the
+  other way: `reportSubscription` sends the report empty when every dirty
+  path was filtered (`bridge/subscribe.go`, "An empty report is a
+  max-interval keepalive"), as matter.js does. The doc of `NothingSent`
+  calls its rule the module's own; no entry of `by_design.md` gives a
+  reason, so it stands here. Pinned as it is by
+  `im/subscription:TestKeepAliveAndAReportThatSendsNothing` and
+  `bridge:TestReportWhoseEventsAreAllFilteredLeavesTheKeepAliveDue`. Fix:
+  one rule for both paths — send the filtered pass as an empty DataReport
+  and count it, as matter.js, together with the keep-alive entry of the
+  `862ad75f` section (`SuppressResponse`), or keep the silence under a
+  `by_design` entry; the owner's decision. Found in review II, phase 0.
+  Closed 2026-11-17 (review II, phase 6a, owner decision 169, `9397f619`): a pass whose data is all filtered out sends the empty ReportData on the attribute and on the event path and counts — its stamp is kept, so min and max restart from the pass's start —, as both references: matter.js (`packages/node/src/node/server/ServerSubscription.ts:921-936`, `suppressEmptyReport: onlyWithData`; `:549-551`; `packages/protocol/src/interaction/InteractionMessenger.ts:794-796` at `db021da0`) and connectedhomeip (`src/app/reporting/Engine.cpp:818-853`, `src/app/ReadHandler.cpp:352-362` at `6170af84`). The flush still sends nothing when all is filtered, as matter.js's `onlyWithData` flush (`ServerSubscription.ts:757`). No Ahead row (decision 169 supersedes 145).
+- **F-db021da0-10: a ConnectNetwork whose result outlives its fail-safe
+  is still answered with the driver's result.** matter.js has no logic
+  here (`packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts:18`
+  at `db021da0` is the empty subclass; `BD-chip-WiFiNetworkCommissioningServer`),
+  so connectedhomeip decides. Its fail-safe expiry releases the pending
+  command handle (`mAsyncCommandHandle.Release()`,
+  `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1002`
+  at `6170af84`): the release ends the command's pending work
+  (`src/app/CommandHandler.cpp:40-47`) and, with none left, finalizes the
+  response message and closes the handler
+  (`src/app/CommandHandlerImpl.cpp:461-489`) — nothing was added for the
+  ConnectNetwork path at that point. The driver's late result finds the
+  handle gone and returns before it builds a ConnectNetworkResponse
+  (`NetworkCommissioningCluster.cpp:845-857`, under
+  `CHIP_DEVICE_CONFIG_SUPPORTS_CONCURRENT_CONNECTION`, which
+  `src/include/platform/CHIPDeviceConfig.h:337` defines to 1). Nothing is
+  sent, at the expiry or afterwards: `HandleConnectNetwork` adds nothing
+  (`NetworkCommissioningCluster.cpp:649`, `:682`), so finalizing returns
+  `CHIP_ERROR_INCORRECT_STATE` (`src/app/CommandHandlerImpl.cpp:1000`), and
+  the response sender, with nothing to send, logs "Failed to send
+  InvokeResponseMessage" and sends no Failure StatusResponse either
+  (`src/app/CommandResponseSender.cpp:82-103`, `:88-100`, under
+  `TODO(#30453)`); the client's invoke runs into its own timeout (read end
+  to end, not executed; an invoke batch whose other commands added a
+  response, and a build without concurrent connection, were not covered).
+  Since `3b77e4e8` this module's late result touches neither the reverted
+  networks nor the Breadcrumb, and since `cf5da000` the Thread server's
+  neither: both servers match connectedhomeip in state. The answer still
+  differs: the command answers a ConnectNetworkResponse with the driver's
+  status, after the expiry (`cluster/core/network_commissioning_wifi.go`,
+  `connect`; `network_commissioning_thread.go`, `OnFailSafeExpired`).
+  Answering nothing needs a way for a server to end the interaction
+  without a response, an `im` move (review II, phase 6a, R2-P6-fsm-1001). Fix: decide
+  what the invoke answers once its fail-safe has expired — the handler here
+  returns only when the driver does, so ending the interaction at the
+  expiry needs the expiry to end the handler's wait — and pin it with
+  `TestWiFiNetworkCommissioningConnectAfterExpiryIsDropped`. Found in
+  review II, phase 1 (the fix of R2-P1-core-06).
+  Closed 2026-11-17 (review II, phase 6a, `e3723cc6`, R2-P6-fsm-1001): a ConnectNetwork whose fail-safe expired is answered with nothing (`im.NoResponse`), on the Wi-Fi and the Thread server, as connectedhomeip sends nothing for it (`NetworkCommissioningCluster.cpp:1001-1002`, `:845-857`; `src/app/CommandHandlerImpl.cpp:481-488`; `src/app/CommandResponseSender.cpp:82-102`, no status under `TODO(#30453)`, at `6170af84`); the bridge sends no InvokeResponse for a request of concrete commands none of which is answered. Under a wildcard endpoint such a target is left out of the InvokeResponse — `BD-Matter-Invoke-WildcardLeavesNoResponseOut` (owner decision 182).
+- **F-db021da0-17: a DataVersion here is never 0.** A
+  `contract.DataVersionTracker` starts at a random value that is not 0,
+  `Bump` skips 0 on its way round, and `Current` uses 0 for "not installed
+  yet" (`contract/dataversion.go`). matter.js starts a server datasource's
+  version at `entropy.randomUint32`, which can be 0
+  (`packages/node/src/behavior/state/managed/Datasource.ts:597` at
+  `db021da0`), and `advanceVersion` wraps past 0xFFFF_FFFF to 0
+  (`:690-699`). A version taken from a store (`:796-805`, `:837`:
+  `this.version = store.version`) is only that of a
+  `Datasource.ExternallyMutableStore` (`:291-294`), the client-side cache
+  of a peer's values (`packages/node/src/storage/client/DatasourceCache.ts:28`,
+  checked in `packages/node/src/behavior/internal/ClientBehaviorBacking.ts:81`);
+  no file under `packages/node/src/storage/server` names it. So both stacks
+  draw a new version at every start and prime whole after a restart, and
+  no controller can tell the two apart there. What remains is the zero
+  value, one in 2^32. Since owner decision 46 the wire and the filters
+  treat 0 as an ordinary version; the tracker's own zero state is what is
+  left of the sentinel. Fix: a `by_design` sentence for the never-zero
+  tracker (reason: 0 is the tracker's not-installed state), or the tracker
+  holds "installed" beside the value and 0 becomes a version. Found in
+  review II, phase 2; the restart half was struck in phase 4
+  (R2-P4-cert-11): until then this row said matter.js's versions come back
+  from its store.
+  Closed 2026-11-17 (review II, phase 6a, owner decision 146, `d382fb1d`): the DataVersion tracker holds "installed" beside the value, so 0 is an ordinary value reached by initialisation or by wrap, as matter.js: a datasource starts at `entropy.randomUint32` (`packages/node/src/behavior/state/managed/Datasource.ts:597-598` at `db021da0`; `packages/general/src/util/Entropy.ts:26-28`, the full range, 0 included) and `advanceVersion` wraps above 0xFFFF_FFFF to 0 (`Datasource.ts:690-699`) (`contract/dataversion.go`; `contract:TestDataVersionTracker_Bump_WrapsToZero`).
+- **F-db021da0-52: a request whose decode fails as a whole is answered differently by the two stacks.** For a reader error that carries no status the bridge answers with the error's status, FAILURE by default, and honours SuppressResponse (`bridge/receive.go`); the client stack's server answers INVALID_ACTION always and sends the status whatever SuppressResponse says (`client/interaction/server.go`). Both refuse the request. matter.js answers the status the decode error carries when it is a `StatusResponseError`, FAILURE otherwise (`packages/protocol/src/interaction/InteractionMessenger.ts:431-435` at `db021da0`), sends it unless the session is a group session (`:458-460`), and sends nothing when the request suppressed its response (`sendStatus`, `:317-322`) — a flag it reads even from a Write or Invoke request whose other fields break the schema (`#decodeRequest`, `:333-342`; `suppressResponseOf`, `:153-162`, unreadable → not suppressed). Read, Subscribe and Timed requests are decoded without it (`:360`, `:389`, `:407`). The bridge does the same (`bridge/receive.go`, read at `16a8f6e5`, not re-read here); the gap is the client stack's server alone (`client/interaction/server.go`; R2-P6-par-0701). Fix: the client stack's server answers as the bridge (review II, phase 6a). Found in review II, phase 5b (the reference read of wave B).
+  Closed 2026-11-17 (review II, phase 6a, `27513f6a`, R2-P6-par-0701): the client stack's server answers an undecodable request as the bridge does — the error's status, FAILURE by default, nothing when a Write or Invoke suppressed its response (`client/interaction/server.go`), the lines of matter.js above.
+- **F-db021da0-56: a host's change during a later attribute data of a written cluster gets no advance of its own.** matter.js commits one transaction per attribute data (`packages/protocol/src/action/server/AttributeWriteResponse.ts:433-435` at `db021da0`), and each advances the version once when it noted a change (`packages/node/src/behavior/state/managed/Datasource.ts:1456-1457`); a change in another transaction is another commit and another advance. The bridge's write hold spans the message and the endpoint, and a held path gets no advance of its own when any write of the message changed its cluster (`settleWrite`, `bridge/write_hold.go`): for a WriteRequest `[X.a (changes), X.c (unchanged)]` with a host change of `X.b` during the second, matter.js advances twice and the module once, and the same rule merges a host change made beside the write into the write's advance. Read from the lines, not run; whether a Read can be served between the dispatcher's advance and the settle was not read (unverified). A change-only notifier's mark before the advance is F-db021da0-59. Fix: the hold per attribute data. Found in review II, phase 5b (the reference read of wave C).
+  Closed 2026-11-17 (review II, phase 6a, owner decision 146, `a23efd7c`, `7eea3b49`): the bridge's hold table numbers the attribute data of a write, and a host change held by the write advances its cluster once per attribute data unless that attribute data changed the cluster itself; a hold outside any attribute data (a group write, before the first, between two, after the last) follows the whole record (`bridge/write_hold.go` `settleWrite`), as matter.js commits one transaction per attribute data and advances a datasource once per commit that changed it (`packages/protocol/src/action/server/AttributeWriteResponse.ts:426-435`, `:444-450`; `packages/node/src/behavior/state/managed/Datasource.ts:1446-1457`, `:1476-1481` at `db021da0`). A dispatcher that is no `endpoint.TopologyDispatcher` keeps the per-message rule.
+- **F-db021da0-7: a handshake's failure StatusReport is sent while its previous reply is unacknowledged.**
+  Both references send none. matter.js: `PaseServer.cancelPairing` skips
+  the report "when a sent message is still unacked"
+  (`packages/protocol/src/session/pase/PaseServer.ts:208-210` at
+  `db021da0`), `CaseServer` returns before any `sendError` when
+  `exchange.considerClosed || exchange.hasUnackedMessage`
+  (`packages/protocol/src/session/case/CaseServer.ts:82-86`), and the two
+  initiators test the same
+  (`packages/protocol/src/session/case/CaseClient.ts:86-90`,
+  `packages/protocol/src/session/pase/PaseClient.ts:97-100`);
+  `hasUnackedMessage` is `#sentMessageToAck !== undefined`
+  (`packages/protocol/src/protocol/MessageExchange.ts:450-452`), and the
+  comments give the reason: "the send would only fail with a flow error".
+  connectedhomeip, read at `6170af84`: a retransmit-table entry sets its
+  exchange's waiting-for-ack flag when it is made and clears it when it is
+  destroyed (`src/messaging/ReliableMessageMgr.cpp:53-62`), and it is
+  destroyed with the acknowledgement
+  (`src/messaging/ReliableMessageContext.cpp:89-95`,
+  `ReliableMessageMgr.cpp:340-351`); while the flag is set, a message on the
+  exchange that carries no acknowledgement for it is dropped before the
+  delegate sees it — "Dropping message without piggyback ack when we are
+  waiting for an ack." (`src/messaging/ExchangeContext.cpp:585-595`) — so
+  the pairing session is not handed the message that would make it fail;
+  and a `SendMessage` in that state fails with `CHIP_ERROR_INCORRECT_STATE`
+  in `AddToRetransTable` (`ReliableMessageMgr.cpp:254-256`), before the
+  message is sent (`src/messaging/ExchangeMessageDispatch.cpp:54-64`),
+  which `SendStatusReport` logs and returns
+  (`src/protocols/secure_channel/PairingSession.h:183-189`). A failure that
+  does not come from a received message sends no StatusReport in
+  connectedhomeip: the pairing session's own response timeout clears the
+  session and notifies the delegate — `PASESession::OnResponseTimeout`
+  (`src/protocols/secure_channel/PASESession.cpp:296-308` at `6170af84`:
+  `Clear()`, `NotifySessionEstablishmentError(CHIP_ERROR_TIMEOUT)`) and
+  `CASESession::OnResponseTimeout` (`CASESession.cpp:575-585`) through
+  `AbortPendingEstablish` (`:587-596`) — with no `SendStatusReport` in
+  either. That connectedhomeip never sends a failure report while an
+  acknowledgement is owed stays inferred: the failure-report sites and the
+  two Sigma3 work completions were not read (review II, phase 6a,
+  R2-P6-par-0780). This module drops
+  what the handshake left unacknowledged on the exchange and then sends the
+  report as a reliable message: `Bridge.sendHandshakeFailureReport`
+  (`bridge/securechannel.go`, `abandonHandshakeReplies` first), and the
+  handshake this node opened abandons before it sends its report the same
+  way (`bridge/case_initiator.go`). The cases coincide for an initiator
+  that acknowledges a reply with its next message, which is what makes a
+  handshake fail in the ordinary run (a Pake3 that does not confirm, a
+  Sigma3 that does not verify); they differ when the handshake fails while
+  its last reply is still unacknowledged. Which peers and failures reach
+  that state was not exercised (unverified). Not decided: the report was
+  made reliable by `e98028e4` (before, it left without the R flag, which
+  neither reference does either), and whether to skip it as the references
+  do or to keep it under a `by_design` entry is an open question of that
+  rework. Fix: skip the report while an entry of the exchange is still
+  unacknowledged, with a case for each role beside
+  `bridge:TestUnsecuredRetransmitEntriesEndWithTheirHandshake`. Found in
+  review II, phase 0 (the rework of R2-P0-rv-A04).
+  Closed 2026-11-17 (review II, phase 6a, owner decision 173, `2d3b7092`, `2c28b613`): both roles skip the report while an entry of the exchange is unacknowledged (`Bridge.endHandshakeUnreported`, `sendCASEError`'s `sigma1Unacked`), and that entry goes on being retransmitted until it is acknowledged or its retransmissions are spent: in both references the message that fails here does not reach the handshake, which goes on and keeps its reply in retransmission (matter.js `packages/protocol/src/protocol/MessageExchange.ts:521-525` at `db021da0`; connectedhomeip `src/messaging/ExchangeContext.cpp:585-595` at `6170af84`), and matter.js goes on retransmitting a message whose send still waits for its acknowledgement when its exchange is closed without a cause (`MessageExchange.ts:1165-1193`, `:937-943`); connectedhomeip leaves it in the retransmit table unless the exchange is aborted (`ExchangeContext.cpp:219-252`, `:261-270`, `ExchangeHolder.h:122-139`). The report stays reliable otherwise. The message that fails the handshake is acknowledged (by the ACK pump, the obligation registered in `bridge/receive.go`), as connectedhomeip schedules that message's ack before it drops it (`src/messaging/ExchangeContext.cpp:549-553` `HandleNeedsAck`, `ReliableMessageContext.cpp:106-112`; the drop at `:585-595`, at `6170af84`); matter.js throws before it records the ack (`MessageExchange.ts:521-525`, the ack scheduled only at `:552-560`, at `db021da0`). The references differ; the module follows connectedhomeip. Pinned by `bridge:TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged`, `TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged`.
 
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 

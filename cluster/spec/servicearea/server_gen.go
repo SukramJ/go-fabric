@@ -26,6 +26,62 @@ type State struct {
 	Progress         []ProgressStruct // attribute 0x0005: list[ProgressStruct], PROG, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.SupportedAreas = func(s []AreaStruct) []AreaStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AreaStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedAreas)
+	c.SupportedMaps = func(s []MapStruct) []MapStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]MapStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.SupportedMaps)
+	c.SelectedAreas = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(st.SelectedAreas)
+	c.CurrentArea = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CurrentArea)
+	c.EstimatedEndTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.EstimatedEndTime)
+	c.Progress = func(s []ProgressStruct) []ProgressStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ProgressStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.Progress)
+	return c
+}
+
 // Patch is a change to the ServiceArea state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

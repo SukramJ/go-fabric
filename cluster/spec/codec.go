@@ -92,16 +92,32 @@ func ReadElement(dec *tlv.Decoder) (Node, error) {
 	return ReadContainer(dec, el)
 }
 
+// ErrWrongType is the class of a [FieldError] for a value of another TLV
+// type than its field's — a string where a number belongs, a signed
+// integer for an unsigned field, an element that is not a structure where
+// a structure belongs, a TLV list where an array belongs. A write path
+// tells it apart from a value of the right type that fails its constraint
+// with errors.Is: matter.js throws UnexpectedDataError for it, not a
+// status error (TlvNumber.ts:124-131, TlvObject.ts:205-207 at db021da0).
+var ErrWrongType = errors.New("spec: value of another type than its field's")
+
 // FieldError rejects a payload with an IM status. The payload's container
 // has been read completely when one is returned, so it also reports
 // [im.FieldsContainerConsumed].
 type FieldError struct {
 	Status im.StatusCode
 	Msg    string
+	// class is the error's class for errors.Is ([ErrWrongType]); nil for
+	// any other refusal.
+	class error
 }
 
 // Error implements error.
 func (e *FieldError) Error() string { return e.Msg }
+
+// Unwrap returns the error's class ([ErrWrongType]), nil for another
+// refusal.
+func (e *FieldError) Unwrap() error { return e.class }
 
 // MatterStatusCode implements [im.StatusCodeError].
 func (e *FieldError) MatterStatusCode() im.StatusCode { return e.Status }
@@ -113,6 +129,11 @@ var _ im.FieldsContainerConsumed = (*FieldError)(nil)
 
 func invalid(format string, args ...any) error {
 	return &FieldError{Status: im.StatusInvalidCommand, Msg: fmt.Sprintf(format, args...)}
+}
+
+// wrongType is [invalid] of class [ErrWrongType].
+func wrongType(format string, args ...any) error {
+	return &FieldError{Status: im.StatusInvalidCommand, Msg: fmt.Sprintf(format, args...), class: ErrWrongType}
 }
 
 func outOfRange(format string, args ...any) error {
@@ -148,7 +169,7 @@ func DecodeUintIn[T Unsigned](bits int, lo, hi uint64) Decoder[T] {
 	return func(n Node) (T, error) {
 		el := n.El
 		if el.Type < tlv.TypeUnsignedInt1 || el.Type > tlv.TypeUnsignedInt8 {
-			return 0, invalid("value is not an unsigned integer (type 0x%02X)", el.Type)
+			return 0, wrongType("value is not an unsigned integer (type 0x%02X)", el.Type)
 		}
 		if el.Uint > UintMax(bits, false) || el.Uint < lo || el.Uint > hi {
 			return 0, outOfRange("%d outside %d..%d", el.Uint, lo, min(hi, UintMax(bits, false)))
@@ -172,7 +193,7 @@ func DecodeIntIn[T Signed](bits int, lo, hi int64) Decoder[T] {
 	return func(n Node) (T, error) {
 		el := n.El
 		if el.Type > tlv.TypeSignedInt8 {
-			return 0, invalid("value is not a signed integer (type 0x%02X)", el.Type)
+			return 0, wrongType("value is not a signed integer (type 0x%02X)", el.Type)
 		}
 		if el.Int < lo || el.Int > hi {
 			return 0, outOfRange("%d outside %d..%d", el.Int, lo, hi)
@@ -184,7 +205,7 @@ func DecodeIntIn[T Signed](bits int, lo, hi int64) Decoder[T] {
 // DecodeBool decodes a boolean.
 func DecodeBool(n Node) (bool, error) {
 	if n.El.Type != tlv.TypeBoolFalse && n.El.Type != tlv.TypeBoolTrue {
-		return false, invalid("value is not a boolean (type 0x%02X)", n.El.Type)
+		return false, wrongType("value is not a boolean (type 0x%02X)", n.El.Type)
 	}
 	return n.El.Bool, nil
 }
@@ -202,10 +223,14 @@ func DecodeFloat32(n Node) (float32, error) {
 	return float32(f), nil
 }
 
-// DecodeFloat64 decodes a double-precision float.
+// DecodeFloat64 decodes a double-precision float. A NaN is decoded as it
+// arrives — matter.js's TlvNumber has no NaN check either (review II,
+// R2-P6-wire-1313) — and refused where a value is held to its type
+// ([Instance.CheckValue]); a request field is held to it by the request
+// gate, which refuses only for a command stating a [RequestCheck.Refusal].
 func DecodeFloat64(n Node) (float64, error) {
 	if n.El.Type != tlv.TypeFloat4 && n.El.Type != tlv.TypeFloat8 {
-		return 0, invalid("value is not a float (type 0x%02X)", n.El.Type)
+		return 0, wrongType("value is not a float (type 0x%02X)", n.El.Type)
 	}
 	return n.El.Float, nil
 }
@@ -218,7 +243,7 @@ func DecodeString(n Node) (string, error) { return DecodeStringIn(0, math.MaxInt
 func DecodeStringIn(lo, hi int) Decoder[string] {
 	return func(n Node) (string, error) {
 		if n.El.Type < tlv.TypeUTF8Str1 || n.El.Type > tlv.TypeUTF8Str8 {
-			return "", invalid("value is not a string (type 0x%02X)", n.El.Type)
+			return "", wrongType("value is not a string (type 0x%02X)", n.El.Type)
 		}
 		if !utf8.ValidString(n.El.String) {
 			return "", invalid("string is not valid UTF-8")
@@ -243,7 +268,7 @@ func DecodeBytes(n Node) ([]byte, error) { return DecodeBytesIn(0, math.MaxInt)(
 func DecodeBytesIn(lo, hi int) Decoder[[]byte] {
 	return func(n Node) ([]byte, error) {
 		if n.El.Type < tlv.TypeOctetStr1 || n.El.Type > tlv.TypeOctetStr8 {
-			return nil, invalid("value is not an octet string (type 0x%02X)", n.El.Type)
+			return nil, wrongType("value is not an octet string (type 0x%02X)", n.El.Type)
 		}
 		if l := len(n.El.Octets); l < lo || l > hi {
 			return nil, outOfRange("octet string length %d outside %d..%d", l, lo, hi)
@@ -271,8 +296,11 @@ func DecodeList[T any](entry Decoder[T]) Decoder[[]T] { return DecodeListIn(entr
 // fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeListIn[T any](entry Decoder[T], lo, hi int) Decoder[[]T] {
 	return func(n Node) ([]T, error) {
-		if n.El.Type != tlv.TypeArray && n.El.Type != tlv.TypeList {
-			return nil, invalid("value is not a list (type 0x%02X)", n.El.Type)
+		// A list is a TLV array: a TLV list (0x17) is another type, as
+		// matter.js's TlvArray refuses every type but an array
+		// (packages/types/src/tlv/TlvArray.ts:73-74 at db021da0).
+		if n.El.Type != tlv.TypeArray {
+			return nil, wrongType("value is not a list (type 0x%02X)", n.El.Type)
 		}
 		if l := len(n.Children); l < lo || l > hi {
 			return nil, outOfRange("list length %d outside %d..%d", l, lo, hi)
@@ -365,10 +393,14 @@ func Bind[T any](id uint32, name string, mandatory bool, dst *T, d Decoder[T]) F
 
 // DecodeFields decodes a structure node into fields: each context-tagged
 // member whose tag is a field id, members it does not know skipped, and a
-// mandatory field that is absent rejected.
+// mandatory field that is absent rejected. A field whose tag occurs twice
+// is decoded twice and the last one wins, as matter.js's TlvObject decodes
+// it (a repeat throws only with preserveDataOrdering,
+// packages/types/src/tlv/TlvObject.ts:229-232 at db021da0; review II,
+// R2-P6-wire-1313).
 func DecodeFields(n Node, what string, fields ...FieldSpec) error {
 	if n.El.Type != tlv.TypeStructure {
-		return invalid("%s: payload is not a structure (type 0x%02X)", what, n.El.Type)
+		return wrongType("%s: payload is not a structure (type 0x%02X)", what, n.El.Type)
 	}
 	seen := make([]bool, len(fields))
 	for _, c := range n.Children {
@@ -396,7 +428,7 @@ func DecodeFields(n Node, what string, fields ...FieldSpec) error {
 func wrapField(what, field string, err error) error {
 	var fe *FieldError
 	if errors.As(err, &fe) {
-		return &FieldError{Status: fe.Status, Msg: fmt.Sprintf("%s.%s: %s", what, field, fe.Msg)}
+		return &FieldError{Status: fe.Status, Msg: fmt.Sprintf("%s.%s: %s", what, field, fe.Msg), class: fe.class}
 	}
 	return fmt.Errorf("%s.%s: %w", what, field, err)
 }

@@ -8,10 +8,12 @@ import (
 	"encoding/json"
 	"log/slog"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/cluster/camera"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
@@ -254,10 +256,15 @@ func TestCameraSimAudioAndSnapshotStreams(t *testing.T) {
 // stream's again after a restart (camera.go build).
 func TestCameraSimRestoresItsAllocations(t *testing.T) {
 	t.Parallel()
+	off := false
 	kept := csdef.Patch{
-		AllocatedVideoStreams:    &[]csdef.VideoStreamStruct{camVideo(2, cam60fps, camMaxVideoFrameRate, cam720Width, cam720Height, camMaxWidth, camMaxHeight)},
-		AllocatedAudioStreams:    &[]csdef.AudioStreamStruct{{AudioStreamId: 3, StreamUsage: csdef.StreamUsageLiveView, AudioCodec: csdef.AudioCodecOpus, ChannelCount: 8, SampleRate: 48000, BitRate: 64000, BitDepth: 24}},
-		AllocatedSnapshotStreams: &[]csdef.SnapshotStreamStruct{{SnapshotStreamId: 4, ImageCodec: csdef.ImageCodecJpeg, FrameRate: 30, MinResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, MaxResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, Quality: 90}},
+		AllocatedVideoStreams: &[]csdef.VideoStreamStruct{camVideo(2, cam60fps, camMaxVideoFrameRate, cam720Width, cam720Height, camMaxWidth, camMaxHeight)},
+		AllocatedAudioStreams: &[]csdef.AudioStreamStruct{{AudioStreamId: 3, StreamUsage: csdef.StreamUsageLiveView, AudioCodec: csdef.AudioCodecOpus, ChannelCount: 8, SampleRate: 48000, BitRate: 64000, BitDepth: 24}},
+		AllocatedSnapshotStreams: &[]csdef.SnapshotStreamStruct{{
+			SnapshotStreamId: 4, ImageCodec: csdef.ImageCodecJpeg, FrameRate: 30, MinResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480},
+			MaxResolution: csdef.VideoResolutionStruct{Width: 640, Height: 480}, Quality: 90,
+			WatermarkEnabled: &off, OsdEnabled: &off, // "WMARK", "OSD" (review II, R2-P6-par-1304)
+		}},
 	}
 	raw, err := json.Marshal(kept)
 	if err != nil {
@@ -346,6 +353,71 @@ func TestCameraSimWebRTCProvider(t *testing.T) {
 	}
 }
 
+// TestCameraSimWebRTCReOffer: TC-WEBRTCP-2.30 against the provider server
+// and the daemon's port — a re-offer that names no deprecated stream id
+// keeps the session's streams and answers its id.
+func TestCameraSimWebRTCReOffer(t *testing.T) {
+	t.Parallel()
+	c, _, _ := simCamera(t, cameraOptions{})
+	avsm := c.camera.CameraAvStreamManagement().Underlying()
+	provider := c.camera.WebRtcTransportProvider().Underlying()
+
+	// TC_WEBRTCP_2_30.py:117-122 at 6170af84: one audio and one video
+	// stream.
+	resp, status := simInvoke(avsm, csdef.CmdVideoStreamAllocate, simVideoRequest())
+	if status != im.StatusSuccess {
+		t.Fatalf("VideoStreamAllocate: %v", status)
+	}
+	video := resp.(csdef.VideoStreamAllocateResponse).VideoStreamId
+	mono := csdef.AudioStreamAllocateRequest{StreamUsage: csdef.StreamUsageLiveView, AudioCodec: csdef.AudioCodecOpus, ChannelCount: 1, SampleRate: 48000, BitRate: 20000, BitDepth: 24}
+	resp, status = simInvoke(avsm, csdef.CmdAudioStreamAllocate, mono)
+	if status != im.StatusSuccess {
+		t.Fatalf("AudioStreamAllocate: %v", status)
+	}
+	audio := resp.(csdef.AudioStreamAllocateResponse).AudioStreamId
+
+	usage := wpdef.StreamUsageLiveView
+	origin := uint16(2)
+	offer := func(id spec.Nullable[uint16]) wpdef.ProvideOfferRequest {
+		return wpdef.ProvideOfferRequest{
+			WebRtcSessionId: id, Sdp: "v=0", StreamUsage: &usage, OriginatingEndpointId: &origin,
+			VideoStreams: &[]uint16{video}, AudioStreams: &[]uint16{audio},
+		}
+	}
+
+	// TC_WEBRTCP_2_30.py:141-155 at 6170af84 (step 4): a new session.
+	resp, status = simInvoke(provider, wpdef.CmdProvideOffer, offer(spec.NullOf[uint16]()))
+	if status != im.StatusSuccess {
+		t.Fatalf("ProvideOffer with a null session id: %v", status)
+	}
+	saved := resp.(wpdef.ProvideOfferResponse).WebRtcSessionId
+
+	// TC_WEBRTCP_2_30.py:183-197 at 6170af84 (step 7): the re-offer of the
+	// saved id, its streams as VideoStreams/AudioStreams, which a re-offer
+	// does not read (chip WebRTCTransportProviderCluster.cpp:931-951 reads
+	// only the deprecated ids), answers ProvideOfferResponse with the same
+	// id.
+	resp, status = simInvoke(provider, wpdef.CmdProvideOffer, offer(spec.Nullable[uint16]{Value: saved}))
+	if status != im.StatusSuccess {
+		t.Fatalf("the re-offer of session %d: %v, want ProvideOfferResponse", saved, status)
+	}
+	if got := resp.(wpdef.ProvideOfferResponse).WebRtcSessionId; got != saved {
+		t.Fatalf("the re-offer answered session %d, want %d", got, saved)
+	}
+	// Mirrors chip WebRTCTransportProviderCluster.cpp:926 (outSession =
+	// *existingSession) and the camera-app's HandleProvideOffer
+	// (webrtc-provider-manager.cpp:407-445), which sets the deprecated ids
+	// and leaves the session's stream lists: the session keeps its streams.
+	sessions := c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider).Sessions()
+	if len(sessions) != 1 || sessions[0].VideoStreams == nil || !slices.Equal(*sessions[0].VideoStreams, []uint16{video}) ||
+		sessions[0].AudioStreams == nil || !slices.Equal(*sessions[0].AudioStreams, []uint16{audio}) {
+		t.Fatalf("CurrentSessions after the re-offer = %+v, want the session with its streams", sessions)
+	}
+	if s := sessions[0]; s.VideoStreamId == nil || !s.VideoStreamId.Null || s.AudioStreamId == nil || !s.AudioStreamId.Null {
+		t.Fatalf("the re-offered session's deprecated ids = %v, %v; want null (no deprecated id in the re-offer)", s.VideoStreamId, s.AudioStreamId)
+	}
+}
+
 // waitFor waits for cond, which goroutines the step started make true.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
@@ -362,24 +434,27 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 // simConnections are three kept push transports of fabric 1: 1 continuous,
 // 2 motion-triggered, 3 command-triggered, all CMAF and Inactive.
 func simConnections() json.RawMessage {
+	noPreRoll := uint16(0) // MaxPreRollLen is "TriggerType == Command | TriggerType == Motion" (R2-P6-par-1304)
 	conn := func(id uint16, trigger padef.TransportTriggerOptionsStruct) padef.TransportConfigurationStruct {
 		return padef.TransportConfigurationStruct{
 			ConnectionId: id, TransportStatus: padef.TransportStatusInactive, FabricIndex: 1,
 			TransportOptions: &padef.TransportOptionsStruct{
 				StreamUsage: padef.StreamUsageRecording, TlsEndpointId: 1, Url: "https://camera.example/push/",
 				TriggerOptions: trigger, IngestMethod: padef.IngestMethodsCmafIngest,
-				ContainerOptions: padef.ContainerOptionsStruct{ContainerType: padef.ContainerFormatCmaf},
+				// CMAF options are "ContainerType == CMAF" (review II, R2-P6-par-1304).
+				ContainerOptions: padef.ContainerOptionsStruct{ContainerType: padef.ContainerFormatCmaf, CmafContainerOptions: &padef.CMAFContainerOptionsStruct{SegmentDuration: 4000, ChunkDuration: 1000}},
 			},
 		}
 	}
 	motion := padef.TransportTriggerOptionsStruct{
 		TriggerType:       padef.TransportTriggerTypeMotion,
 		MotionTimeControl: &padef.TransportMotionTriggerTimeControlStruct{InitialDuration: 4, AugmentationDuration: 4, MaxDuration: 7, BlindDuration: 3},
+		MaxPreRollLen:     &noPreRoll,
 	}
 	raw, _ := json.Marshal(padef.Patch{CurrentConnections: &[]padef.TransportConfigurationStruct{
 		conn(1, padef.TransportTriggerOptionsStruct{TriggerType: padef.TransportTriggerTypeContinuous}),
 		conn(2, motion),
-		conn(3, padef.TransportTriggerOptionsStruct{TriggerType: padef.TransportTriggerTypeCommand}),
+		conn(3, padef.TransportTriggerOptionsStruct{TriggerType: padef.TransportTriggerTypeCommand, MaxPreRollLen: &noPreRoll}),
 	}})
 	return raw
 }

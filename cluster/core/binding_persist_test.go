@@ -45,8 +45,11 @@ func (s *bindingStore) stored() []core.TargetStruct {
 	return slices.Clone(s.list)
 }
 
+// config persists through s; the node's fabric list holds fabrics 1 to 4
+// (a persisted Binding takes a request's write only for a listed fabric,
+// R2-P6-store-1010).
 func (s *bindingStore) config() core.BindingConfig {
-	return core.BindingConfig{Load: s.load, Save: s.save}
+	return core.BindingConfig{Load: s.load, Save: s.save, Fabrics: fabricList{1, 2, 3, 4}}
 }
 
 // TestBindingPersist: a write is saved, a new server restores it before
@@ -55,7 +58,7 @@ func (s *bindingStore) config() core.BindingConfig {
 func TestBindingPersist(t *testing.T) {
 	t.Parallel()
 	st := &bindingStore{}
-	b := core.NewBinding()
+	b := sourcedBinding()
 	if err := b.Persist(st.config()); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +75,7 @@ func TestBindingPersist(t *testing.T) {
 
 	// The restart: a new server restores the list before an observer
 	// registers (BindingServer.ts:120-126).
-	restarted := core.NewBinding()
+	restarted := sourcedBinding()
 	if err := restarted.Persist(st.config()); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +95,7 @@ func TestBindingPersist(t *testing.T) {
 	}
 
 	// Nothing stored keeps the list; a stored empty list empties it.
-	kept := core.NewBinding()
+	kept := sourcedBinding()
 	if err := kept.MatterWrite(fabricCtx(1), 0, entries); err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +124,7 @@ func TestBindingPersist(t *testing.T) {
 // entries whatever the save answers.
 func TestBindingPersistFailures(t *testing.T) {
 	t.Parallel()
-	b := core.NewBinding()
+	b := sourcedBinding()
 	if err := b.Persist(core.BindingConfig{
 		Load: func() ([]core.TargetStruct, error) { return nil, errors.New("corrupt") },
 		Save: func([]core.TargetStruct) error { t.Error("Save installed by a failed Persist"); return nil },

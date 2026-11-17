@@ -103,6 +103,21 @@ func (v *Semtag) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v Semtag) Clone() Semtag {
+	c := v
+	c.Label = func(p *spec.Nullable[string]) *spec.Nullable[string] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Label)
+	return c
+}
+
 // SemtagDef describes semtag.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"

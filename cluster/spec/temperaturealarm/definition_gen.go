@@ -170,6 +170,56 @@ func (v *SetTemperatureAlarmThresholdsRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetTemperatureAlarmThresholdsRequest) Clone() SetTemperatureAlarmThresholdsRequest {
+	c := v
+	c.CriticalOverTemperatureThreshold = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CriticalOverTemperatureThreshold)
+	c.MajorOverTemperatureThreshold = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MajorOverTemperatureThreshold)
+	c.MinorOverTemperatureThreshold = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinorOverTemperatureThreshold)
+	c.MinorUnderTemperatureThreshold = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MinorUnderTemperatureThreshold)
+	c.MajorUnderTemperatureThreshold = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MajorUnderTemperatureThreshold)
+	c.CriticalUnderTemperatureThreshold = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CriticalUnderTemperatureThreshold)
+	return c
+}
+
 // NotifyEvent is the Notify event payload.
 type NotifyEvent struct {
 	Active   AlarmBitmap // 0: AlarmBitmap, M

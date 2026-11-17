@@ -377,7 +377,7 @@ func (c *Command) DecodeRequest(n Node) (any, error) {
 		return fields, err
 	}
 	if fe, ok := errors.AsType[*FieldError](err); ok {
-		return nil, &FieldError{Status: c.Check.Refusal, Msg: fe.Msg}
+		return nil, &FieldError{Status: c.Check.Refusal, Msg: fe.Msg, class: fe.class}
 	}
 	return fields, err
 }

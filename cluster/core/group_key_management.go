@@ -10,7 +10,9 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
@@ -47,12 +49,38 @@ type GroupKeyManagement struct {
 	// :1446-1457 at db021da0). It is taken before mu, never under it, and
 	// the store is called under it.
 	writeMu sync.Mutex
+	// keySetMu makes a key set's budget check and its store one step —
+	// KeySetWrite's and Groupcast's key creation alike — so concurrent
+	// creations never exceed MaxGroupKeysPerFabric (review II,
+	// R2-P6-bound-1015). It is taken before mu, never under it, and the
+	// store is called under it.
+	keySetMu sync.Mutex
 	// mu guards the fields below: the request's fabric, the limits and
 	// the cached key-set state.
 	mu                    sync.RWMutex
 	currentFabric         uint8
 	maxGroupsPerFabric    uint16
 	maxGroupKeysPerFabric uint16
+	// staleGroups are the fabrics whose operational group state a reload
+	// could not refresh after a stored change (syncGroups); the retry on
+	// the clock and each later command or write of the server reload them
+	// again. retryTimer is the armed retry (nil while none), retryDelay the
+	// wait of the next one.
+	staleGroups map[uint8]bool
+	retryTimer  clock.Timer
+	retryDelay  time.Duration
+	clk         clock.Clock
+	// retrySeq names the armed retry: a callback whose number is not the
+	// armed one (stopped or superseded) does nothing. quiesceEpoch counts
+	// MatterQuiesce calls: a retry that was running when the server was
+	// quiesced arms no next one (review II, R2-P6-err-1701 R3-a).
+	retrySeq     uint64
+	quiesceEpoch uint64
+	// reloadMu serialises reloadGroups: a failed reload's forget never
+	// lands after a concurrent reload that succeeded and found nothing
+	// stale to re-announce (review II, R2-P6-err-1701 R2-a). It is taken
+	// before mu, never under it.
+	reloadMu sync.Mutex
 
 	// logger receives the server's diagnostics (GroupKeyMgmtConfig.Logger).
 	logger *slog.Logger
@@ -147,7 +175,19 @@ type GroupKeyMgmtConfig struct {
 	Groups *groups.Manager
 	// Logger receives the server's diagnostics; nil uses slog.Default().
 	Logger *slog.Logger
+	// Clock runs the retry of a group state whose reload failed
+	// (staleRetryFirst, doubling up to staleRetryMax); nil is
+	// [clock.System].
+	Clock clock.Clock
 }
+
+// The retry of a fabric's group state after a reload failed: the first
+// after staleRetryFirst, each next one doubled up to staleRetryMax, while
+// any fabric is marked stale (review II, R2-P6-err-1701 R2-1).
+const (
+	staleRetryFirst = time.Second
+	staleRetryMax   = time.Minute
+)
 
 // matter.js defaults — see GroupKeyManagementServer.ts:613-614 at db021da0 (the
 // server overrides the schema minimums: maxGroupKeysPerFabric = 20,
@@ -178,6 +218,7 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 		maxGroupsPerFabric:    cfg.MaxGroupsPerFabric,
 		maxGroupKeysPerFabric: cfg.MaxGroupKeysPerFabric,
 		logger:                logger,
+		clk:                   clock.Or(cfg.Clock),
 	}
 	// Seed DataVersion at a non-zero sentinel on construction so
 	// DataVersionFilter=0 does not produce a false-positive cache hit on
@@ -242,9 +283,7 @@ func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
 				slog.String("hint", "a GroupKeyMap entry mapped the group to key set 0, the IPK; the group has no key set mapped now"))
 		}
 		if dropped {
-			if err := g.syncGroups(ctx, fabric); err != nil {
-				g.logger.Warn("matter.group_key_management.keyset0_mapping_drop_failed", slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
-			}
+			g.syncGroups(ctx, fabric)
 		}
 	}
 }
@@ -254,14 +293,177 @@ func (g *GroupKeyManagement) dropMappingsToKeySet0(ctx context.Context) {
 // GroupKeyManagementServer (keySetWrite → setFromGroupKeySet,
 // keySetRemove → removeGroupKeySet, #updateGroupKeyMap →
 // groupKeyIdMap).
-func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) error {
+//
+// matter.js derives the group state inside the command, after the state
+// assignment and before the transaction commits
+// (GroupKeyManagementServer.ts:368-385, FabricGroups.ts:140-170 at
+// db021da0), so it has no "stored but not derived" outcome; here the store
+// has already taken the write, so the command succeeds and the stale group
+// state is reloaded.
+//
+// A reload that fails is logged, the fabric marked stale and its group
+// state dropped, failing closed (reloadGroups); the change answers success
+// for what is stored, and the next command or write of this server
+// reloads the fabric again (reloadStale) (review II, R2-P6-err-1701,
+// R2-P6-err-1014).
+func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) {
 	if g.groups == nil {
-		return nil
+		return
 	}
-	if err := g.groups.Reload(ctx, fabric); err != nil {
-		return fmt.Errorf("core: GroupKeyManagement: refresh group state: %w", err)
+	g.reloadStale(ctx)
+	g.reloadGroups(ctx, fabric)
+}
+
+// reloadGroups reloads fabric's operational group state. A reload that
+// fails leaves the fabric marked stale and fails closed: the fabric's
+// group state leaves the manager at once (groups.Manager.ForgetFabric) —
+// its keys, so a key set the store no longer holds stops authenticating
+// group messages whether or not the next reload succeeds, and the
+// reception state of every key of the fabric, the surviving key sets'
+// too, so their senders re-synchronise on the first counter seen, as
+// after a restart. The manager loads the fabric from the store again on
+// its next use, and the retry on the clock (armRetryLocked) reloads it
+// until a reload succeeds (review II, R2-P6-err-1701 R-1, R2-1). The
+// reload that succeeds after a stale mark re-announces the memberships
+// the forget withdrew (groups.Manager.Load). A fabric the store no longer
+// holds is unmarked and forgotten as well. Serialised by reloadMu.
+func (g *GroupKeyManagement) reloadGroups(ctx context.Context, fabric uint8) {
+	g.reloadMu.Lock()
+	defer g.reloadMu.Unlock()
+	err := g.groups.Reload(ctx, fabric)
+	g.mu.Lock()
+	was := g.staleGroups[fabric]
+	switch {
+	case err == nil && was:
+		// The memberships the forget withdrew are announced again; the
+		// fabric is unmarked — and the retry stopped and its backoff reset
+		// — only once that succeeded. A failed announcement keeps the mark
+		// and the retry owed, its backoff going on (review II,
+		// R2-P6-err-1701 R3-2, R4-1).
+		g.mu.Unlock()
+		lerr := g.groups.Load(ctx)
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		if lerr != nil {
+			g.logger.Warn("matter.group_key_management.group_state_reannounce_failed",
+				slog.Int("fabric_index", int(fabric)), slog.Any("err", lerr))
+			g.markStaleLocked(ctx, fabric)
+			return
+		}
+		g.unmarkLocked(fabric)
+		return
+	case err == nil, errors.Is(err, groups.ErrNoFabric):
+		g.unmarkLocked(fabric)
+		g.mu.Unlock()
+		if err != nil {
+			g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
+		}
+		return
 	}
-	return nil
+	g.markStaleLocked(ctx, fabric)
+	g.mu.Unlock()
+	g.logger.Warn("matter.group_key_management.group_state_stale",
+		slog.Int("fabric_index", int(fabric)), slog.Any("err", err))
+	g.groups.ForgetFabric(fabric) //nolint:contextcheck // ForgetFabric takes no context; it drops in-memory state only
+}
+
+// unmarkLocked unmarks fabric and, with no fabric stale any more, stops
+// the retry and resets its backoff. g.mu is held.
+func (g *GroupKeyManagement) unmarkLocked(fabric uint8) {
+	delete(g.staleGroups, fabric)
+	if len(g.staleGroups) == 0 {
+		g.stopRetryLocked()
+	}
+}
+
+// armRetryLocked arms the retry of the stale fabrics unless one is armed:
+// after staleRetryFirst, then doubled per failed retry up to staleRetryMax.
+// g.mu is held.
+func (g *GroupKeyManagement) armRetryLocked() {
+	if g.retryTimer != nil {
+		return
+	}
+	if g.retryDelay == 0 {
+		g.retryDelay = staleRetryFirst
+	}
+	g.retrySeq++
+	seq := g.retrySeq
+	g.retryTimer = g.clk.AfterFunc(g.retryDelay, func() { g.retryStale(seq) })
+}
+
+// stopRetryLocked disarms the retry and resets its backoff; a callback of
+// the disarmed retry that already fired finds its number superseded. g.mu
+// is held.
+func (g *GroupKeyManagement) stopRetryLocked() {
+	if g.retryTimer != nil {
+		g.retryTimer.Stop()
+		g.retryTimer = nil
+	}
+	g.retrySeq++
+	g.retryDelay = 0
+}
+
+// retryEpochKey marks the context of a retry with the quiesce epoch it
+// started in (reloadGroups arms no next retry once the epoch moved).
+type retryEpochKey struct{}
+
+// retryStale is the retry seq on the clock: it reloads every stale fabric
+// and, while one stays stale, the failed reload arms the next retry with
+// the doubled wait. A callback that is not the armed retry — stopped,
+// quiesced or superseded by a newer arm — does nothing, so it neither
+// clears a newer timer nor starts a chain of its own.
+func (g *GroupKeyManagement) retryStale(seq uint64) {
+	g.mu.Lock()
+	if seq != g.retrySeq || g.retryTimer == nil {
+		g.mu.Unlock()
+		return
+	}
+	g.retryTimer = nil
+	// A reload that fails again arms the next retry with the doubled wait.
+	g.retryDelay = min(2*g.retryDelay, staleRetryMax)
+	epoch := g.quiesceEpoch
+	g.mu.Unlock()
+	g.reloadStale(context.WithValue(context.Background(), retryEpochKey{}, epoch))
+}
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: the retry of a
+// stale group state is disarmed, and a retry already running when it is
+// called arms no next one. The stale marks stay; the server's next command
+// or write reloads them and arms the retry again when that fails.
+func (g *GroupKeyManagement) MatterQuiesce() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.quiesceEpoch++
+	g.stopRetryLocked()
+}
+
+// markStaleLocked marks fabric stale and arms the retry — unless ctx is a
+// retry's that MatterQuiesce overtook. g.mu is held.
+func (g *GroupKeyManagement) markStaleLocked(ctx context.Context, fabric uint8) {
+	if g.staleGroups == nil {
+		g.staleGroups = map[uint8]bool{}
+	}
+	g.staleGroups[fabric] = true
+	if epoch, retry := ctx.Value(retryEpochKey{}).(uint64); retry && epoch != g.quiesceEpoch {
+		return
+	}
+	g.armRetryLocked() //nolint:contextcheck // the retry runs on the clock, outside any request; its context is its own (retryStale)
+}
+
+// reloadStale reloads every fabric syncGroups marked stale.
+func (g *GroupKeyManagement) reloadStale(ctx context.Context) {
+	if g.groups == nil {
+		return
+	}
+	g.mu.RLock()
+	stale := make([]uint8, 0, len(g.staleGroups))
+	for f := range g.staleGroups {
+		stale = append(stale, f)
+	}
+	g.mu.RUnlock()
+	for _, f := range stale {
+		g.reloadGroups(ctx, f)
+	}
 }
 
 // Compile-time assertions.
@@ -271,6 +473,7 @@ var (
 	_ contract.ClusterDataVersion             = (*GroupKeyManagement)(nil)
 	_ contract.ClusterCommandInvokePrivilege  = (*GroupKeyManagement)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*GroupKeyManagement)(nil)
+	_ contract.ClusterQuiescer                = (*GroupKeyManagement)(nil)
 )
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -576,9 +779,10 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 // equal to the held ones are not stored and leave the server's own
 // version (matter.js Datasource.ts:1456-1457, :1476-1492 at db021da0: an
 // equal value is no change); the read, the comparison and the store hold
-// writeMu. The bindings are kept per group, so the order of the written
-// entries does not count.
+// writeMu. The written order counts: the same bindings in another order
+// are a change (sameGroupKeyMap).
 func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	g.reloadStale(ctx)
 	if attrID != groupKeyMgmtAttrGroupKeyMap {
 		return false, spec.Errorf(im.StatusUnsupportedWrite, "core: GroupKeyManagement attribute 0x%04X is read-only", attrID)
 	}
@@ -632,24 +836,22 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	// evaluation detects the cluster changed; one written as it was held
 	// returned above.
 	g.dataVersion.Bump()
-	return true, g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return true, nil
 }
 
-// sameGroupKeyMap reports whether the written list binds the groups the
-// held mappings bind, each to the same key set.
+// sameGroupKeyMap reports whether the written list is the held one entry
+// for entry, in its order: the GroupKeyMap keeps its written order (owner
+// decision 148, F-38; the store keeps the order it was given), so a write
+// that only reorders the entries is a change and is stored.
 func sameGroupKeyMap(held []store.GroupKeyMapping, list []GroupKeyMapStruct) bool {
 	if len(held) != len(list) {
 		return false
 	}
-	bound := make(map[uint16]uint16, len(held))
-	for _, m := range held {
-		bound[m.GroupID] = m.GroupKeySetID
-	}
-	for _, m := range list {
-		if ks, ok := bound[m.GroupID]; !ok || ks != m.GroupKeySetID {
+	for i, m := range list {
+		if held[i].GroupID != m.GroupID || held[i].GroupKeySetID != m.GroupKeySetID {
 			return false
 		}
-		delete(bound, m.GroupID)
 	}
 	return true
 }
@@ -732,6 +934,106 @@ type KeySetWriteRequest struct {
 	GroupKeySet GroupKeySetStruct
 }
 
+// keySetWriteFields is the key set of a KeySetWrite request — the module's
+// [KeySetWriteRequest], or the generated one, whose nullable start times
+// say whether EpochStartTime1 and EpochStartTime2 are set (a 0 that is
+// not null is set).
+func keySetWriteFields(fields any) (gks GroupKeySetStruct, start1Set, start2Set, ok bool) {
+	switch req := fields.(type) {
+	case KeySetWriteRequest:
+		return req.GroupKeySet, false, false, true
+	case gkmdef.KeySetWriteRequest:
+		in := req.GroupKeySet
+		gks = GroupKeySetStruct{
+			GroupKeySetID:          in.GroupKeySetId,
+			GroupKeySecurityPolicy: uint8(in.GroupKeySecurityPolicy),
+			EpochKey0:              nullableBytes(in.EpochKey0),
+			EpochStartTime0:        in.EpochStartTime0.Value,
+			EpochKey1:              nullableBytes(in.EpochKey1),
+			EpochStartTime1:        in.EpochStartTime1.Value,
+			EpochKey2:              nullableBytes(in.EpochKey2),
+			EpochStartTime2:        in.EpochStartTime2.Value,
+		}
+		if in.EpochStartTime0.Null {
+			gks.EpochStartTime0 = 0
+		}
+		if in.EpochStartTime1.Null {
+			gks.EpochStartTime1 = 0
+		}
+		if in.EpochStartTime2.Null {
+			gks.EpochStartTime2 = 0
+		}
+		if in.GroupKeyMulticastPolicy != nil {
+			gks.GroupKeyMulticastPolicy = uint8(*in.GroupKeyMulticastPolicy)
+		}
+		return gks, !in.EpochStartTime1.Null, !in.EpochStartTime2.Null, true
+	}
+	return GroupKeySetStruct{}, false, false, false
+}
+
+// validateKeySet is KeySetWrite's key and start-time validation of gks,
+// whose disabled slots (MAX_64BIT_TIME) are already cleared; start1Set and
+// start2Set say that a start time is not null.
+func validateKeySet(gks GroupKeySetStruct, start1Set, start2Set bool) error {
+	// EpochKey length constraint: each non-nil key must be exactly 16 bytes.
+	// Mirrors chip src/app/clusters/group-key-mgmt-server/
+	// GroupKeyManagementCluster.cpp: VerifyOrExit(epochKey.size() == 16,
+	// err = CHIP_ERROR_INVALID_ARGUMENT), answered as
+	// Status::ConstraintError: the error below carries that status.
+	const epochKeyLen = 16
+	if len(gks.EpochKey0) > 0 && len(gks.EpochKey0) != epochKeyLen {
+		return spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
+	}
+	if len(gks.EpochKey1) > 0 && len(gks.EpochKey1) != epochKeyLen {
+		return spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
+	}
+	if len(gks.EpochKey2) > 0 && len(gks.EpochKey2) != epochKeyLen {
+		return spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
+	}
+
+	if len(gks.EpochKey0) == 0 || gks.EpochStartTime0 == 0 {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
+	}
+	if gks.EpochStartTime0 <= ipkDefaultEpochStartTime {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
+	}
+
+	if len(gks.EpochKey1) > 0 && (gks.EpochStartTime1 == 0 || gks.EpochStartTime1 <= gks.EpochStartTime0) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
+	}
+	// A null key with a start time that is not null — 0 included — is
+	// refused, as matter.js refuses it (GroupKeyManagementServer.ts:335-337,
+	// :351-353 at db021da0); a request in the module's own struct carries
+	// no null, and there a start time of 0 reads as absent (review II,
+	// R2-P6-par-1013).
+	if len(gks.EpochKey1) == 0 && (start1Set || gks.EpochStartTime1 != 0) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
+	}
+
+	if len(gks.EpochKey2) > 0 && len(gks.EpochKey1) == 0 {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
+	}
+	if len(gks.EpochKey2) > 0 && (gks.EpochStartTime2 == 0 || gks.EpochStartTime1 == 0 || gks.EpochStartTime2 <= gks.EpochStartTime1) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
+	}
+	if len(gks.EpochKey2) == 0 && (start2Set || gks.EpochStartTime2 != 0) {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
+	}
+
+	if store.SecurityPolicy(gks.GroupKeySecurityPolicy) != store.SecurityPolicyTrustFirst {
+		return spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
+	}
+	return nil
+}
+
+// nullableBytes is v's bytes, nil for null.
+func nullableBytes(v spec.Nullable[[]byte]) []byte {
+	if v.Null {
+		return nil
+	}
+	return v.Value
+}
+
 // KeySetReadRequest mirrors Matter §11.2.10.6.2.
 type KeySetReadRequest struct {
 	GroupKeySetID uint16
@@ -754,19 +1056,11 @@ type KeySetReadAllIndicesResponse struct {
 
 // MatterInvoke implements [contract.ClusterServer].
 func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	// Resolve fabric from IM dispatcher context: SetCurrentFabric has no
-	// production caller, so every KeySetWrite / KeySetRead / KeySetRemove /
-	// KeySetReadAllIndices command arriving on a post-AddNOC CASE session
-	// previously saw fabric=0 and returned "command without active fabric" —
-	// which commissioners retransmit-loop on. FabricFilterFromContext returns
-	// the session's fabric (CASE > 0) and falls through to the legacy
-	// currentFabric only when no IM context is wired (test paths).
+	g.reloadStale(ctx)
+	// The fabric is the request's accessing fabric
+	// (FabricFilterFromContext), never a server-wide value: a command
+	// without one is refused (review II, R2-P6-sec-1006).
 	_, fabric := im.FabricFilterFromContext(ctx)
-	if fabric == 0 {
-		g.mu.RLock()
-		fabric = g.currentFabric
-		g.mu.RUnlock()
-	}
 	if fabric == 0 {
 		// A fabric-scoped operation without an accessing fabric is
 		// UNSUPPORTED_ACCESS, matter.js's AccessDeniedError
@@ -853,11 +1147,16 @@ func (g *GroupKeyManagement) MatterGeneratedCommands() []uint32 {
 	}
 }
 
-// SetCurrentFabric sets the fabric a local call — [GroupKeyManagement.MatterInvoke]
-// or [GroupKeyManagement.MatterWrite] with no accessing fabric in its
-// context — runs against. It scopes no read: a read with no request
-// behind it covers every fabric, and a request's read is scoped by the
-// request's own fabric. Nothing in this module calls it.
+// SetCurrentFabric sets the fabric a local write —
+// [GroupKeyManagement.MatterWrite] with no request in its context — lands
+// on. It scopes no command — [GroupKeyManagement.MatterInvoke] without an
+// accessing fabric answers UnsupportedAccess — and no read: a read with
+// no request behind it covers every fabric, and a request's read is
+// scoped by the request's own fabric. Nothing in this module calls it.
+//
+// Deprecated: a fabric-scoped write takes its fabric from the request
+// ([im.WithFabricFilter]); there is no replacement. Removable in the next
+// minor release.
 func (g *GroupKeyManagement) SetCurrentFabric(idx uint8) {
 	g.mu.Lock()
 	g.currentFabric = idx
@@ -876,11 +1175,10 @@ const max64BitTime uint64 = 0xFFFFFFFFFFFFFFFF
 const ipkDefaultEpochStartTime uint64 = 0
 
 func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8, fields any) (any, error) {
-	req, ok := fields.(KeySetWriteRequest)
+	gks, start1Set, start2Set, ok := keySetWriteFields(fields)
 	if !ok {
 		return nil, fmt.Errorf("%w: KeySetWriteRequest expected, got %T", errGroupKeyMgmtInvalidArg, fields)
 	}
-	gks := req.GroupKeySet
 
 	// Mirrors matter.js packages/node/src/behaviors/group-key-management/
 	// GroupKeyManagementServer.ts:291-357 at db021da0. Five validation classes,
@@ -905,60 +1203,24 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	if gks.EpochStartTime1 == max64BitTime {
 		gks.EpochStartTime1 = 0
 		gks.EpochKey1 = nil
+		start1Set = false
 	}
 	if gks.EpochStartTime2 == max64BitTime {
 		gks.EpochStartTime2 = 0
 		gks.EpochKey2 = nil
+		start2Set = false
 	}
 
-	// EpochKey length constraint: each non-nil key must be exactly 16 bytes.
-	// Mirrors chip src/app/clusters/group-key-mgmt-server/
-	// GroupKeyManagementCluster.cpp: VerifyOrExit(epochKey.size() == 16,
-	// err = CHIP_ERROR_INVALID_ARGUMENT), answered as
-	// Status::ConstraintError: the error below carries that status.
-	const epochKeyLen = 16
-	if len(gks.EpochKey0) > 0 && len(gks.EpochKey0) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey0 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey0))
-	}
-	if len(gks.EpochKey1) > 0 && len(gks.EpochKey1) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey1 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey1))
-	}
-	if len(gks.EpochKey2) > 0 && len(gks.EpochKey2) != epochKeyLen {
-		return nil, spec.Errorf(im.StatusConstraintError, "core: KeySetWrite: constraint error: EpochKey2 must be exactly %d bytes, got %d", epochKeyLen, len(gks.EpochKey2))
-	}
-
-	if len(gks.EpochKey0) == 0 || gks.EpochStartTime0 == 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey0 and EpochStartTime0 must be set")
-	}
-	if gks.EpochStartTime0 <= ipkDefaultEpochStartTime {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime0 must be > IPK default")
-	}
-
-	if len(gks.EpochKey1) > 0 && (gks.EpochStartTime1 == 0 || gks.EpochStartTime1 <= gks.EpochStartTime0) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime1 must be set and greater than EpochStartTime0")
-	}
-	if len(gks.EpochKey1) == 0 && gks.EpochStartTime1 != 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochStartTime1 is set")
-	}
-
-	if len(gks.EpochKey2) > 0 && len(gks.EpochKey1) == 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey1 must be set if EpochKey2 is set")
-	}
-	if len(gks.EpochKey2) > 0 && (gks.EpochStartTime2 == 0 || gks.EpochStartTime1 == 0 || gks.EpochStartTime2 <= gks.EpochStartTime1) {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochStartTime2 must be set and greater than EpochStartTime1")
-	}
-	if len(gks.EpochKey2) == 0 && gks.EpochStartTime2 != 0 {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: EpochKey2 must be set if EpochStartTime2 is set")
-	}
-
-	if store.SecurityPolicy(gks.GroupKeySecurityPolicy) != store.SecurityPolicyTrustFirst {
-		return nil, spec.Errorf(im.StatusInvalidCommand, "core: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
+	if err := validateKeySet(gks, start1Set, start2Set); err != nil {
+		return nil, err
 	}
 	// GroupKeyMulticastPolicy (field 8) is accepted whatever its value and
 	// never stored — matter.js 452d6f5c dropped the PerGroupID-only check
 	// (GroupKeyManagementServer.ts:keySetWrite → withoutMulticastPolicy).
 
+	g.keySetMu.Lock()
 	if err := g.enforceKeySetBudget(ctx, fabric, gks.GroupKeySetID); err != nil {
+		g.keySetMu.Unlock()
 		return nil, err
 	}
 
@@ -973,13 +1235,16 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 		EpochKey2:      gks.EpochKey2,
 		EpochStart2:    gks.EpochStartTime2,
 	}
-	if err := g.store.UpsertGroupKeySet(ctx, rec); err != nil {
+	err := g.store.UpsertGroupKeySet(ctx, rec)
+	g.keySetMu.Unlock()
+	if err != nil {
 		return nil, fmt.Errorf("core: KeySetWrite: %w", err)
 	}
 	// Bump DataVersion after a successful KeySetWrite so DataVersionFilter
 	// evaluation correctly detects the cluster changed.
 	g.dataVersion.Bump()
-	return nil, g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil, nil
 }
 
 // enforceKeySetBudget rejects ADDING a new key-set id once the
@@ -1004,8 +1269,11 @@ func (g *GroupKeyManagement) enforceKeySetBudget(ctx context.Context, fabric uin
 			written++
 		}
 	}
-	if written+1 >= int(g.maxGroupKeysPerFabric) {
-		return groupKeyExhaustedErr{maxKeys: g.maxGroupKeysPerFabric}
+	g.mu.RLock()
+	limit := g.maxGroupKeysPerFabric
+	g.mu.RUnlock()
+	if written+1 >= int(limit) {
+		return groupKeyExhaustedErr{maxKeys: limit}
 	}
 	return nil
 }
@@ -1071,7 +1339,8 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 	// set in the same transaction (core§11.2.7.4.1; matter.js keySetRemove
 	// filters them out of groupKeyMap).
 	g.dataVersion.Bump()
-	return nil, g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil, nil
 }
 
 func (g *GroupKeyManagement) handleKeySetReadAllIndices(ctx context.Context, fabric uint8) (any, error) {
@@ -1123,17 +1392,22 @@ func (g *GroupKeyManagement) validateKeySetID(ctx context.Context, fabric uint8,
 // MaxGroupKeysPerFabric budget. Mirrors matter.js
 // GroupKeyManagementServer.createKeySetForGroupcast.
 func (g *GroupKeyManagement) createKeySetForGroupcast(ctx context.Context, fabric uint8, id uint16, key []byte) error {
+	g.keySetMu.Lock()
 	if err := g.enforceKeySetBudget(ctx, fabric, id); err != nil {
+		g.keySetMu.Unlock()
 		return err
 	}
-	if err := g.store.UpsertGroupKeySet(ctx, store.GroupKeySet{
+	err := g.store.UpsertGroupKeySet(ctx, store.GroupKeySet{
 		FabricIndex: fabric, GroupKeySetID: id, SecurityPolicy: store.SecurityPolicyTrustFirst,
 		EpochKey0: slices.Clone(key), EpochStart0: groupcastKeyEpochStartTime,
-	}); err != nil {
+	})
+	g.keySetMu.Unlock()
+	if err != nil {
 		return fmt.Errorf("core: GroupKeyManagement: create Groupcast key set: %w", err)
 	}
 	g.dataVersion.Bump()
-	return g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil
 }
 
 // checkGroupKeyMapping applies the GroupKeyMap validation a Groupcast
@@ -1179,7 +1453,8 @@ func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	g.dataVersion.Bump()
-	return g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil
 }
 
 // removeGroupKeyMapping drops the fabric's binding of groupID. Mirrors
@@ -1189,5 +1464,6 @@ func (g *GroupKeyManagement) removeGroupKeyMapping(ctx context.Context, fabric u
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
 	g.dataVersion.Bump()
-	return g.syncGroups(ctx, fabric)
+	g.syncGroups(ctx, fabric)
+	return nil
 }

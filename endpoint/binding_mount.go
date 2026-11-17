@@ -4,6 +4,8 @@
 package endpoint
 
 import (
+	"slices"
+
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -83,15 +85,28 @@ func baseMandatesBinding(deviceTypes []uint16, clients []uint32) bool {
 // cluster set. A source that serves Binding itself (a device-layer device
 // type that mandates it) keeps its own.
 func mountBinding(ep *Endpoint, inner []contract.ClusterServer) []contract.ClusterServer {
+	out := slices.Clone(inner)
+	mounted := false
 	for _, srv := range inner {
 		if srv != nil && srv.MatterClusterID() == bindingClusterID {
-			return inner
+			mounted = true
+			break
 		}
 	}
-	if !baseMandatesBinding(listedDeviceTypes(ep), ep.ClientClusters) {
-		return inner
+	if !mounted && baseMandatesBinding(listedDeviceTypes(ep), ep.ClientClusters) {
+		out = append(out, ep.endpointState().bindingServer())
 	}
-	return append(inner, ep.endpointState().bindingServer())
+	// Every Binding server the endpoint serves — the stack's or one a
+	// device supplies — checks a request's write against the node's
+	// fabric list ([Config.Fabrics]; R2-P6-store-1010, decision 158).
+	if ep.fabrics != nil {
+		for _, srv := range out {
+			if b, ok := srv.(*mattercore.Binding); ok {
+				b.SetFabricSource(ep.fabrics)
+			}
+		}
+	}
+	return out
 }
 
 // bindingServer returns (lazily creating) the endpoint identity's Binding

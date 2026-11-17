@@ -85,12 +85,16 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 	}
 	var req WriteRequest
 	var hasTimed, hasWrites bool
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return WriteRequest{}, later.first
+			}
 			// TimedRequest and WriteRequests are mandatory: matter.js
 			// packages/types/src/protocol/messages/TlvWriteRequest.ts:21, :24
 			// at db021da0 (TlvField; SuppressResponse :18 is optional).
@@ -102,8 +106,8 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 			}
 			return req, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagWriteReqSuppressResponse:
@@ -131,7 +135,7 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 				return WriteRequest{}, fmt.Errorf("%w: WriteRequests not array", ErrInvalidWriteRequest)
 			}
 			ws, err := readAttributeWrites(dec, valueReader)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return WriteRequest{}, err
 			}
 			req.Writes = ws
@@ -148,34 +152,55 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 
 func readAttributeWrites(dec *tlv.Decoder, valueReader AttributeValueReader) ([]AttributeWrite, error) {
 	var out []AttributeWrite
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return nil, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return nil, later.first
+			}
 			return out, nil
 		}
 		if !el.IsContainer || el.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: AttributeDataIB not struct", ErrInvalidWriteRequest)
 		}
 		w, err := readAttributeData(dec, valueReader)
-		if err != nil {
+		if err := later.keep(err); err != nil {
 			return nil, err
 		}
 		out = append(out, w)
 	}
 }
 
+// readAttributeData reads one AttributeDataIB after its opener. Its
+// members are taken by tag in any order, and the Data is decoded once the
+// structure has ended, against the final path: the bridge's value reader
+// picks its decoder by the path, so a Data member ahead of its Path used
+// to be decoded against the zero path (review II, R2-P6-wire-0505).
+// matter.js takes the fields by id and keeps the Data as raw TLV, decoded
+// later with the path (packages/types/src/tlv/TlvObject.ts:215-233,
+// packages/types/src/protocol/types/TlvAttributeData.ts:19 TlvAny,
+// packages/protocol/src/action/server/AttributeWriteResponse.ts:429 at db021da0). The
+// Data member is replayed from a copy of the decoder taken before it —
+// a [tlv.Decoder] is its buffer and a read position.
 func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (AttributeWrite, error) {
 	var w AttributeWrite
 	var hasPath, hasData bool
+	var dataAt tlv.Decoder
+	var later laterErrors
 	for {
+		mark := *dec
 		el, err := dec.Next()
 		if err != nil {
 			return AttributeWrite{}, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return AttributeWrite{}, later.first
+			}
 			// Path and Data are mandatory: matter.js
 			// packages/types/src/protocol/types/TlvAttributeData.ts:18-19 at
 			// db021da0 (TlvField). Without the check an AttributeDataIB
@@ -186,17 +211,34 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			case !hasData:
 				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, missingField(tagAttributeDataValue, "AttributeDataIB.Data"))
 			}
+			if valueReader == nil {
+				// Without a cluster-aware reader the element tree cannot
+				// become a Go value: the downstream Dispatcher.Write sees
+				// a nil Value and answers UnsupportedWrite.
+				return w, nil
+			}
+			data, err := dataAt.Next()
+			if err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: value: %w", ErrInvalidWriteRequest, err)
+			}
+			v, err := valueReader(w.Path, data, &dataAt)
+			if err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: value: %w", ErrInvalidWriteRequest, err)
+			}
+			w.Value = v
 			return w, nil
 		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
+		if err := contextMember(el); err != nil {
+			return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagAttributeDataDataVersion:
 			// TlvUInt32, never masked (review 2026-11 W2-wire-03).
 			v, err := uint32Field(el)
 			if err != nil {
-				return AttributeWrite{}, fmt.Errorf("%w: DataVersion: %w", ErrInvalidWriteRequest, err)
+				if err := later.keep(fmt.Errorf("%w: DataVersion: %w", ErrInvalidWriteRequest, err)); err != nil {
+					return AttributeWrite{}, err
+				}
 			}
 			w.DataVersion = v
 			w.HasDataVersion = true
@@ -205,31 +247,21 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 				return AttributeWrite{}, fmt.Errorf("%w: path not list", ErrInvalidWriteRequest)
 			}
 			p, err := readAttributePathFields(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return AttributeWrite{}, err
 			}
 			w.Path = p
 			hasPath = true
 		case tagAttributeDataValue:
-			hasData = true
-			if valueReader == nil {
-				// Without a cluster-aware reader we cannot turn the
-				// element tree into a Go value. Drain the container so
-				// the surrounding decoder loop continues — the
-				// downstream Dispatcher.Write will see a nil Value and
-				// answer UnsupportedWrite.
-				if el.IsContainer {
-					if err := skipContainer(dec); err != nil {
-						return AttributeWrite{}, fmt.Errorf("%w: drain value: %w", ErrInvalidWriteRequest, err)
-					}
-				}
-				continue
+			// Read once the structure ends, with the final path.
+			hasData, dataAt = true, mark
+			if err := skipField(dec, el); err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: drain value: %w", ErrInvalidWriteRequest, err)
 			}
-			v, err := valueReader(w.Path, el, dec)
-			if err != nil {
-				return AttributeWrite{}, fmt.Errorf("%w: value: %w", ErrInvalidWriteRequest, err)
+		default:
+			if err := skipField(dec, el); err != nil {
+				return AttributeWrite{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 			}
-			w.Value = v
 		}
 	}
 }
@@ -323,7 +355,7 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	pase := IsPASEFromContext(ctx)
-	aclChecker, hasACL := d.(ACLChecker)
+	aclChecker, hasACL := aclCheckerOf(d), true
 	privProvider, hasPrivProvider := d.(AttributeWritePrivilegeProvider)
 	authWriter, hasAuthWriter := d.(AuthorizingWriter)
 	dvReader, hasDV := d.(DataVersionReader)
@@ -540,23 +572,23 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 		// interaction's chunked write holds (matter.js
 		// AttributeWriteResponse.ts:355-358 isHeldByOtherWrite).
 		//
-		// A path with a numeric ListIndex is never written: where its
-		// value would be written — past every other gate, the dispatcher's
-		// existence, writability, access and timed checks included — the
-		// interaction ends with InvalidAction ([listIndexGate]).
+		// A path with a numeric ListIndex, and a value its attribute's type
+		// cannot decode, is never written: where its value would be written
+		// — past every other gate, the dispatcher's existence, writability,
+		// access, timed and fabric checks included — the interaction ends
+		// ([valueGate]).
 		var results []WriteResult
-		var indexGate listIndexGate
-		numericIndex := w.Path.HasListIndex && !w.Path.ListAppend
+		gate := valueGateFor(w)
 		switch {
-		case w.Path.HasEndpoint && numericIndex && hasAuthWriter:
-			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(nil))
-		case numericIndex && !hasAuthWriter:
+		case w.Path.HasEndpoint && gate != nil && hasAuthWriter:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, gate.wrap(nil))
+		case gate != nil && !hasAuthWriter:
 			// No dispatcher gate to wait for: the element ends here.
-			indexGate.reached = true
+			gate.reached = true
 		case w.Path.HasEndpoint:
 			results = d.Write(ctx, w.Path, w.Value)
-		case hasAuthWriter && numericIndex:
-			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, indexGate.wrap(authorizeWildcard))
+		case hasAuthWriter && gate != nil:
+			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, gate.wrap(authorizeWildcard))
 		case hasAuthWriter:
 			results = authWriter.WriteAuthorized(ctx, w.Path, w.Value, authorizeWildcard)
 		case !aclActive:
@@ -572,8 +604,8 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 			})
 			continue
 		}
-		if indexGate.reached {
-			wr.Status = StatusInvalidAction
+		if gate != nil && gate.reached {
+			wr.Status = gate.status
 			break
 		}
 		lastWritten = nil
@@ -611,22 +643,44 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 	return WriteOutcome{Response: wr, Results: applied}
 }
 
-// listIndexGate ends a write whose path carries a numeric ListIndex at the
-// point its value would be written. matter.js answers such a path in
-// writeValue, after the existence, writability, access, timed and
-// DataVersion checks and outside the try that turns errors into a path
-// status, so the interaction ends with StatusResponse(InvalidAction) and
-// nothing is written for the path (packages/protocol/src/action/server/
-// AttributeWriteResponse.ts:419-424 at db021da0, "Unsupported Write path
-// provided: listIndex"); on a wildcard or group path the first endpoint
-// that reaches writeValue ends it (:360). The gate rides on the
-// dispatcher's authorizer, which endpoint.TopologyDispatcher asks for such
-// a path after its timed check, not before it.
-type listIndexGate struct{ reached bool }
+// valueGate ends a write interaction at the point a path's value would be
+// written, with status. Two kinds of element take it:
+//
+//   - a path with a numeric ListIndex: matter.js answers such a path in
+//     writeValue, after the existence, writability, access, timed and
+//     DataVersion checks and outside the try that turns errors into a path
+//     status, so the interaction ends with StatusResponse(InvalidAction)
+//     and nothing is written for the path
+//     (packages/protocol/src/action/server/AttributeWriteResponse.ts:419-424
+//     at db021da0, "Unsupported Write path provided: listIndex"); on a
+//     wildcard or group path the first endpoint that reaches writeValue
+//     ends it (:360);
+//   - an [UndecodableValue], which ends it with FAILURE (R2-P6-wire-0442,
+//     -1703; the matter.js lines at [UndecodableValue]). A numeric
+//     ListIndex is answered first (:419-424 before :429).
+//
+// The gate rides on the dispatcher's authorizer, which
+// endpoint.TopologyDispatcher asks for such a path after its timed and
+// accessing-fabric checks, not before them.
+type valueGate struct {
+	reached bool
+	status  StatusCode
+}
+
+// valueGateFor is the gate of w, nil for an element that takes none.
+func valueGateFor(w AttributeWrite) *valueGate {
+	switch {
+	case w.Path.HasListIndex && !w.Path.ListAppend:
+		return &valueGate{status: StatusInvalidAction}
+	case IsUndecodable(w.Value):
+		return &valueGate{status: StatusFailure}
+	}
+	return nil
+}
 
 // wrap returns the authorizer the dispatcher asks where the value would be
 // written: inner's verdict first, then the end of the interaction.
-func (g *listIndexGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
+func (g *valueGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
 	return func(endpoint uint16, clusterID, attrID uint32) StatusCode {
 		if inner != nil {
 			if status := inner(endpoint, clusterID, attrID); !status.IsSuccess() {
@@ -634,7 +688,7 @@ func (g *listIndexGate) wrap(inner WriteAuthorizer) WriteAuthorizer {
 			}
 		}
 		g.reached = true
-		return StatusInvalidAction
+		return g.status
 	}
 }
 

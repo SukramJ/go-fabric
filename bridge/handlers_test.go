@@ -1179,3 +1179,21 @@ func TestPaseProviderDropClosesTheVerifier(t *testing.T) {
 		})
 	}
 }
+
+// TestPaseAdapter_PBKDFParamsNeedBoth: the PBKDFParamResponse needs both
+// an iteration count and a salt; with either one missing the adapter
+// answers ErrPBKDFParamsMissing (R2-P6-test-0819).
+func TestPaseAdapter_PBKDFParamsNeedBoth(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name       string
+		iterations uint32
+		salt       []byte
+	}{{"no salt", 1000, nil}, {"no iterations", 0, []byte("SPAKE2P Key Salt")}} {
+		a := NewPaseAdapter(nil)
+		a.SetPBKDFParams(c.iterations, c.salt, 1)
+		if _, _, err := a.ProcessPBKDFParamRequest([]byte{}); !errors.Is(err, ErrPBKDFParamsMissing) {
+			t.Errorf("%s: err = %v, want ErrPBKDFParamsMissing", c.name, err)
+		}
+	}
+}

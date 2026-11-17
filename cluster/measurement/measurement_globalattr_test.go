@@ -13,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -452,5 +453,43 @@ func TestElectricalEnergyServer_MatterRead_Unknown(t *testing.T) {
 	_, ok := s.MatterRead(0x9999)
 	if ok {
 		t.Fatal("unknown attr: want ok=false")
+	}
+}
+
+// TestElectricalPowerAccuracyPerServedType holds R2-P6-par-1466: Accuracy
+// has one entry per measurement type the server serves — Voltage,
+// ActiveCurrent, ActivePower and Frequency, each within its attribute's
+// constraint — and NumberOfMeasurementTypes is their count, as the
+// cluster's model text asks ("an entry for ActivePower, as well as any
+// other measurement types implemented by this server").
+func TestElectricalPowerAccuracyPerServedType(t *testing.T) {
+	t.Parallel()
+	s := measurement.NewElectricalPowerServer(fakeFloat{val: 1500, obs: true})
+	v, _ := s.MatterRead(epmdef.AttrAccuracy)
+	list, ok := v.([]measurement.AccuracyStruct)
+	if !ok {
+		t.Fatalf("Accuracy = %T", v)
+	}
+	want := []struct {
+		typ      epmdef.MeasurementTypeEnum
+		min, max int64
+	}{
+		{epmdef.MeasurementTypeVoltage, -(1 << 62), 1 << 62},
+		{epmdef.MeasurementTypeActiveCurrent, -(1 << 62), 1 << 62},
+		{epmdef.MeasurementTypeActivePower, -(1 << 62), 1 << 62},
+		{epmdef.MeasurementTypeFrequency, 0, 1_000_000},
+	}
+	if len(list) != len(want) {
+		t.Fatalf("Accuracy has %d entries, want %d", len(list), len(want))
+	}
+	for i, w := range want {
+		e := list[i]
+		if e.MeasurementType != uint16(w.typ) || e.MinMeasuredValue != w.min || e.MaxMeasuredValue != w.max ||
+			len(e.AccuracyRanges) != 1 || e.AccuracyRanges[0].RangeMin != w.min || e.AccuracyRanges[0].RangeMax != w.max {
+			t.Errorf("Accuracy[%d] = %+v, want type %d over %d..%d", i, e, w.typ, w.min, w.max)
+		}
+	}
+	if n, _ := s.MatterRead(epmdef.AttrNumberOfMeasurementTypes); n != uint8(len(list)) {
+		t.Errorf("NumberOfMeasurementTypes = %v, want %d", n, len(list))
 	}
 }

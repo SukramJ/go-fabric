@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/transport"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // TestChunkStatusResponseTimeoutSumsBothDirections (review II,
@@ -66,5 +67,51 @@ func TestChunkStatusResponseTimeoutOverAConnection(t *testing.T) {
 	}
 	if got := b.chunkStatusResponseTimeout(&net.UDPAddr{IP: net.IPv6loopback, Port: 5540}, 1); got == 35*time.Second {
 		t.Fatal("a UDP peer took the connection's bound")
+	}
+}
+
+// TestChunkStatusResponseTimeoutDefaultsZeroIntervals: a zero local idle,
+// active interval or active threshold is unset and takes its default, so
+// the bound equals the one with the defaults stated (R2-P6-bound-0813).
+func TestChunkStatusResponseTimeoutDefaultsZeroIntervals(t *testing.T) {
+	t.Parallel()
+	bound := func(si SessionIntervals) time.Duration {
+		b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0", SessionIntervals: si}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b.chunkStatusResponseTimeout(nil, 0)
+	}
+	defaults := SessionIntervals{Idle: mrp.SessionIdleIntervalDefault, Active: mrp.SessionActiveIntervalDefault, ActiveThreshold: mrp.SessionActiveThresholdDefault}
+	// A threshold short enough that the schedule reaches the idle interval.
+	short := defaults
+	short.ActiveThreshold = time.Second
+	for _, c := range []struct {
+		name       string
+		si, stated SessionIntervals
+	}{
+		{"idle 0", SessionIntervals{Active: short.Active, ActiveThreshold: short.ActiveThreshold}, short},
+		{"active 0", SessionIntervals{Idle: short.Idle, ActiveThreshold: short.ActiveThreshold}, short},
+		{"threshold 0", SessionIntervals{Idle: defaults.Idle, Active: defaults.Active}, defaults},
+	} {
+		if got, want := bound(c.si), bound(c.stated); got != want {
+			t.Errorf("%s: bound %v, want %v (the defaults')", c.name, got, want)
+		}
+	}
+}
+
+// TestMaxScheduleTimeLeavesActiveOnlyPastTheThreshold: the schedule stays
+// on the active interval while the wait has reached the threshold exactly
+// and goes idle only once it passes it (R2-P6-bound-0813).
+func TestMaxScheduleTimeLeavesActiveOnlyPastTheThreshold(t *testing.T) {
+	t.Parallel()
+	idle, active := 500*time.Millisecond, 300*time.Millisecond
+	first := mrp.BackoffDuration(active, 0, func() float64 { return 1 })
+	at := maxScheduleTime(idle, active, first, true, 0)
+	if above := maxScheduleTime(idle, active, first+time.Nanosecond, true, 0); at != above {
+		t.Errorf("a threshold the wait reaches exactly: %v; one it does not reach: %v — want equal", at, above)
+	}
+	if below := maxScheduleTime(idle, active, first-time.Nanosecond, true, 0); below <= at {
+		t.Errorf("a threshold the wait passes: %v, want more than %v (idle from the second send)", below, at)
 	}
 }

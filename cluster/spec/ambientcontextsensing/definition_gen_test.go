@@ -41,6 +41,25 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrPredictedActivity, spec.List[PredictedActivityStruct]([]PredictedActivityStruct{PredictedActivityStruct{StartTimestamp: spectest.Ptr(uint32(1)), EndTimestamp: spectest.Ptr(uint32(1)), AmbientContextType: spectest.Ptr([]Semtag{Semtag{MfgCode: spec.ValueOf(uint16(1)), NamespaceId: Namespace(1), Tag: uint8(1), Label: spectest.Ptr(spec.ValueOf("x"))}}), CrowdDetected: spectest.Ptr(true), CrowdCount: spectest.Ptr(uint8(1)), Confidence: spectest.Ptr(uint8(1))}}))
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[AmbientContextTypeStruct],
+		spectest.CheckClone[Semtag],
+		spectest.CheckClone[HoldTimeLimitsStruct],
+		spectest.CheckClone[ObjectCountConfigStruct],
+		spectest.CheckClone[PredictedActivityStruct],
+		spectest.CheckClone[AmbientContextDetectStartedEvent],
+		spectest.CheckClone[AmbientContextDetectEndedEvent],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

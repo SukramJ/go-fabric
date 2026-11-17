@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"reflect"
 	"strings"
 	"unicode"
@@ -135,7 +136,9 @@ func (i *Instance) ValidateWrite(attrID uint32, value any, peers Peers) (any, er
 		return nil, Errorf(im.StatusUnsupportedWrite, "%s: attribute %s is read-only", i.def.Name, a.Name)
 	}
 	t, c := held(a.Type, a.Constraint, a.Relaxed)
-	v, err := i.checkValue(a.Name, t, a.Quality.Nullable, c, value, peers)
+	// A named scalar type is judged by its underlying kind, as CheckValue
+	// and CheckWritten judge it (review II, R2-P6-api-1309).
+	v, err := i.checkValue(a.Name, t, a.Quality.Nullable, c, underlying(value), peers)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +286,7 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 		return nil, fmt.Sprintf("0x%X sets the most-significant bit a nullable bitmap reserves", n)
 	case t.Kind == KindBitmap && t.Bitmap != nil && n&^t.Bitmap.Defined() != 0:
 		return nil, fmt.Sprintf("0x%X sets reserved %s bits", n, t.Bitmap.Name)
-	case !i.satisfies(c, float64(n), peers):
+	case !i.satisfiesInt(c, new(big.Int).SetUint64(n), peers):
 		return nil, fmt.Sprintf("%d violates %q", n, c.Text)
 	}
 	return n, ""
@@ -341,7 +344,7 @@ func (i *Instance) checkSigned(t Type, nullable bool, c Constraint, value any, p
 	switch {
 	case !ok || n < lo || n > hi:
 		return nil, fmt.Sprintf("%v outside %d..%d", value, lo, hi)
-	case !i.satisfies(c, float64(n), peers):
+	case !i.satisfiesInt(c, big.NewInt(n), peers):
 		return nil, fmt.Sprintf("%d violates %q", n, c.Text)
 	}
 	return n, ""
@@ -550,6 +553,89 @@ func (i *Instance) satisfies(c Constraint, v float64, peers Peers) bool {
 		return false
 	}
 	return true
+}
+
+// satisfiesInt is [Instance.satisfies] for an integer value: the value and
+// every bound are compared exactly, not as float64, so a 64-bit value
+// beyond 2^53 is not admitted by a bound it exceeds within float64's
+// spacing ("0 to 2^62" admitted 2^62 + 512, review II, R2-P6-par-1306). A
+// bound the runtime cannot evaluate holds, as in satisfies.
+func (i *Instance) satisfiesInt(c Constraint, v *big.Int, peers Peers) bool {
+	if len(c.Parts) > 0 {
+		for _, p := range c.Parts {
+			if i.satisfiesInt(p, v, peers) {
+				return true
+			}
+		}
+		return false
+	}
+	var r *big.Rat
+	cmp := func(b *Bound) (int, bool) {
+		if b == nil {
+			return 0, false
+		}
+		if b.IsInt() && v.IsInt64() {
+			switch n := v.Int64(); {
+			case n < b.Int:
+				return -1, true
+			case n > b.Int:
+				return 1, true
+			}
+			return 0, true
+		}
+		x, ok := i.boundExact(b, peers)
+		if !ok {
+			return 0, false
+		}
+		if r == nil {
+			r = new(big.Rat).SetInt(v)
+		}
+		return r.Cmp(x), true
+	}
+	if d, ok := cmp(c.Value); ok && d != 0 {
+		return false
+	}
+	if d, ok := cmp(c.Min); ok && d < 0 {
+		return false
+	}
+	if d, ok := cmp(c.Max); ok && d > 0 {
+		return false
+	}
+	return true
+}
+
+// boundExact is [Instance.bound] computed exactly ([Instance.evalBoundExact]).
+func (i *Instance) boundExact(b *Bound, peers Peers) (*big.Rat, bool) {
+	switch {
+	case b == nil:
+		return nil, false
+	case b.Expr != "":
+		return i.evalBoundExact(parseBoundExpr(b.Expr), peers)
+	case b.Ref == "":
+		return new(big.Rat).SetInt64(b.Int), true
+	}
+	v, ok := i.resolveName(b.Ref, peers)
+	if !ok {
+		return nil, false
+	}
+	return ratOf(v)
+}
+
+// ratOf is a numeric value as an exact rational: an integer of any width
+// exactly, a float as the binary value it holds; NaN, an infinity and a
+// value that is no number have none.
+func ratOf(v any) (*big.Rat, bool) {
+	v = underlying(v)
+	if n, ok := asInt(v); ok {
+		return new(big.Rat).SetInt64(n), true
+	}
+	if n, ok := asUint(v); ok {
+		return new(big.Rat).SetInt(new(big.Int).SetUint64(n)), true
+	}
+	if f, ok := asFloat(v); ok && !math.IsNaN(f) && !math.IsInf(f, 0) {
+		return new(big.Rat).SetFloat64(f), true
+	}
+	return nil, false
 }
 
 func (i *Instance) bound(b *Bound, peers Peers) (float64, bool) {

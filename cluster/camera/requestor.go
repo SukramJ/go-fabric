@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -41,6 +43,11 @@ type RequestorConfig struct {
 	// checked and answered).
 	Port RequestorPort
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -99,7 +106,7 @@ func NewRequestor(cfg RequestorConfig) (*Requestor, error) {
 		wrdef.CmdIceCandidates: r.iceCandidates,
 		wrdef.CmdEnd:           r.end,
 	}
-	srv, err := spec.NewServer(wrdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
+	srv, err := spec.NewServer(wrdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("camera: %w", err)
 	}
@@ -110,11 +117,12 @@ func NewRequestor(cfg RequestorConfig) (*Requestor, error) {
 	return r, nil
 }
 
-// Sessions returns the tracked sessions, in the order they were added.
+// Sessions returns the tracked sessions, in the order they were added: a
+// deep copy, which the caller may change.
 func (r *Requestor) Sessions() []WebRTCSession {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return slices.Clone(r.sessions)
+	return deepcopy.Each(r.sessions)
 }
 
 // UpsertSession registers or updates a session the host initiated with a
@@ -128,7 +136,7 @@ func (r *Requestor) Sessions() []WebRTCSession {
 //
 // It must not be called from the server's own change notification.
 func (r *Requestor) UpsertSession(session WebRTCSession) error {
-	enriched := session
+	enriched := session.Clone()
 	enriched.VideoStreamId = firstStream(session.VideoStreams) // :104
 	enriched.AudioStreamId = firstStream(session.AudioStreams) // :105
 	return r.change(contract.OriginHostSet, func(sessions []WebRTCSession) ([]WebRTCSession, bool) {

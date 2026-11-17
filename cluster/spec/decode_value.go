@@ -86,7 +86,7 @@ func relaxedInteger(n Node, signed bool) Node {
 
 func decodeListValue(t Type, n Node) (any, error) {
 	if n.El.Type != tlv.TypeArray && n.El.Type != tlv.TypeList {
-		return nil, invalid("value is not a list (type 0x%02X)", n.El.Type)
+		return nil, wrongType("value is not a list (type 0x%02X)", n.El.Type)
 	}
 	var entry Type
 	if t.Entry != nil {
@@ -105,7 +105,7 @@ func decodeListValue(t Type, n Node) (any, error) {
 
 func decodeStructValue(t Type, n Node) (any, error) {
 	if n.El.Type != tlv.TypeStructure {
-		return nil, invalid("value is not a struct (type 0x%02X)", n.El.Type)
+		return nil, wrongType("value is not a struct (type 0x%02X)", n.El.Type)
 	}
 	if t.Struct == nil {
 		return n, nil

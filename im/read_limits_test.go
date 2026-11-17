@@ -68,7 +68,7 @@ func TestHandleReadRequest_IdenticalPathsAreReadOnce(t *testing.T) {
 	t.Parallel()
 	d := &countingDispatcher{readVal: AttributeValue{Value: true}}
 	req := ReadRequest{AttributeRequests: wildcardPaths(50)}
-	rd := HandleReadRequest(context.Background(), d, req)
+	rd := HandleReadRequest(unchecked(), d, req)
 	if d.reads != 1 {
 		t.Errorf("dispatcher.Read called %d times for 50 identical paths, want 1", d.reads)
 	}

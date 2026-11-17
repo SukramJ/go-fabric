@@ -31,6 +31,62 @@ type State struct {
 	BlockContentTimeWindow          []TimeWindowStruct   // attribute 0x000A: list[TimeWindowStruct], BTW, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.OnDemandRatings = func(s []RatingNameStruct) []RatingNameStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]RatingNameStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.OnDemandRatings)
+	c.ScheduledContentRatings = func(s []RatingNameStruct) []RatingNameStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]RatingNameStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.ScheduledContentRatings)
+	c.BlockChannelList = func(s []BlockChannelStruct) []BlockChannelStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]BlockChannelStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.BlockChannelList)
+	c.BlockApplicationList = func(s []AppInfoStruct) []AppInfoStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AppInfoStruct, len(s))
+		copy(out, s)
+		return out
+	}(st.BlockApplicationList)
+	c.BlockContentTimeWindow = func(s []TimeWindowStruct) []TimeWindowStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TimeWindowStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.BlockContentTimeWindow)
+	return c
+}
+
 // Patch is a change to the ContentControl state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

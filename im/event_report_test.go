@@ -675,7 +675,7 @@ func TestBuildEventReports_EmptyPaths(t *testing.T) {
 // TestBuildEventReports_OneEvent verifies that a single concrete path
 // produces one [EventReport] with the correct Priority and Path fields.
 // Mirrors matter.js packages/protocol/src/action/server/EventReadResponse.ts
-// (EventReadResponse.#asValue) and EventHandler.ts (getEvents) for the
+// (EventReadResponse.#asValue) and OccurrenceManager.ts (get) for the
 // per-path log query + EventReport construction.
 func TestBuildEventReports_OneEvent(t *testing.T) {
 	t.Parallel()

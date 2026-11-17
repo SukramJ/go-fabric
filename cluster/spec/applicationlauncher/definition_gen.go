@@ -71,6 +71,21 @@ func (v *ApplicationEPStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ApplicationEPStruct) Clone() ApplicationEPStruct {
+	c := v
+	c.Endpoint = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Endpoint)
+	return c
+}
+
 // ApplicationEPStructDef describes ApplicationEPStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -158,6 +173,35 @@ func (v *LaunchAppRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LaunchAppRequest) Clone() LaunchAppRequest {
+	c := v
+	c.Application = func(p *ApplicationStruct) *ApplicationStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Application)
+	c.Data = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Data)
+	return c
+}
+
 // StopAppRequest is the StopApp command payload.
 type StopAppRequest struct {
 	Application *ApplicationStruct // 0: ApplicationStruct, AP, desc
@@ -177,6 +221,21 @@ func (v *StopAppRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v StopAppRequest) Clone() StopAppRequest {
+	c := v
+	c.Application = func(p *ApplicationStruct) *ApplicationStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Application)
+	return c
+}
+
 // HideAppRequest is the HideApp command payload.
 type HideAppRequest struct {
 	Application *ApplicationStruct // 0: ApplicationStruct, AP, desc
@@ -194,6 +253,21 @@ func (v *HideAppRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "HideApp",
 		spec.Bind(0, "Application", false, &v.Application, spec.DecodeOptional(spec.DecodeStruct[ApplicationStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v HideAppRequest) Clone() HideAppRequest {
+	c := v
+	c.Application = func(p *ApplicationStruct) *ApplicationStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Application)
+	return c
 }
 
 // LauncherResponse is the LauncherResponse command payload.
@@ -216,6 +290,28 @@ func (v *LauncherResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Status", true, &v.Status, spec.DecodeUint[StatusEnum](8)),
 		spec.Bind(1, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeBytes)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LauncherResponse) Clone() LauncherResponse {
+	c := v
+	c.Data = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Data)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

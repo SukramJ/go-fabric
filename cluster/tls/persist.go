@@ -91,6 +91,48 @@ func load(ctx context.Context, s Store, key string, v any) error {
 	return nil
 }
 
+// validate refuses a loaded certificate record this server cannot have
+// written: an id at or past [MaxCertificateID] (the allocator never hands
+// it out), an id two entries hold (the ids are node-wide), or an
+// allocator position past the bound — with one, the allocator would hand
+// out an id above the bound or, every id below taken, never return
+// (R2-P6-store-1119). An entry of fabric 0 is not refused: the node's
+// reconcile against the fabric table drops it ([contract.FabricScopedState]).
+func (r certificateRecord) validate(key string) error {
+	if r.NextRoot > MaxCertificateID || r.NextClient > MaxCertificateID {
+		return fmt.Errorf("%w: decode %s: allocator at %d / %d", ErrStore, key, r.NextRoot, r.NextClient)
+	}
+	roots := make(map[uint16]bool, len(r.Roots))
+	for _, e := range r.Roots {
+		if e.CAID >= MaxCertificateID || roots[e.CAID] {
+			return fmt.Errorf("%w: decode %s: CAID %d", ErrStore, key, e.CAID)
+		}
+		roots[e.CAID] = true
+	}
+	clients := make(map[uint16]bool, len(r.Clients))
+	for _, e := range r.Clients {
+		if e.CCDID >= MaxCertificateID || clients[e.CCDID] {
+			return fmt.Errorf("%w: decode %s: CCDID %d", ErrStore, key, e.CCDID)
+		}
+		clients[e.CCDID] = true
+	}
+	return nil
+}
+
+// validate refuses a loaded endpoint record this server cannot have
+// written: the id 0xFFFF (the allocator's bound) or an id two entries
+// hold (R2-P6-store-1119).
+func (r endpointRecord) validate(key string) error {
+	ids := make(map[uint16]bool, len(r.Endpoints))
+	for _, e := range r.Endpoints {
+		if e.EndpointID == 0xFFFF || ids[e.EndpointID] {
+			return fmt.Errorf("%w: decode %s: endpoint id %d", ErrStore, key, e.EndpointID)
+		}
+		ids[e.EndpointID] = true
+	}
+	return nil
+}
+
 // save writes v under key.
 func save(ctx context.Context, s Store, key string, v any) error {
 	if s == nil {

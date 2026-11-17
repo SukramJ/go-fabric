@@ -30,6 +30,10 @@
 //     timedWritePaths (every attribute whose effective access carries it)
 //   - large_message_gen.go — largeMessageCommands (every request command
 //     whose effective quality carries "L", the Large Message quality)
+//   - invoke_access_gen.go — fabricScopedInvokePaths (every request command
+//     whose effective access is fabric-scoped, "F") and
+//     elevatedInvokePrivileges (every request command whose effective
+//     invoke privilege is above Operate)
 //   - attribute_order_gen.go — attributeOrder (each cluster's attribute
 //     ids ranked in the order matter.js serves them, the snapshot's
 //     attributeOrder) and globalAttributeOrder
@@ -83,6 +87,7 @@ const (
 	namesFile       = "schema/element_names_gen.go"
 	orderFile       = "schema/attribute_order_gen.go"
 	fabricScopeFile = "schema/fabric_scope_gen.go"
+	invokeFile      = "schema/invoke_access_gen.go"
 )
 
 // moduleRoot returns the directory holding this module's go.mod, found by
@@ -256,8 +261,12 @@ type snapshotCommand struct {
 		// override of a base command (RvcOperationalState's Pause) states
 		// none of its own and inherits the base's here.
 		Direction string `json:"direction"`
-		Access    struct {
-			Timed bool `json:"timed"`
+		// Access is the command's effective access: Fabric "F" for a
+		// fabric-scoped command, WritePriv its invoke privilege.
+		Access struct {
+			Timed     bool   `json:"timed"`
+			Fabric    string `json:"fabric"`
+			WritePriv string `json:"writePriv"`
 		} `json:"access"`
 		Quality struct {
 			LargeMessage bool `json:"largeMessage"`
@@ -423,6 +432,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s\n", largeMsgFile)
+
+	if err := writeInvokeAccessFile(snap.Clusters); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", invokeFile, err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s\n", invokeFile)
 
 	if err := writeNamesFile(snap.Clusters); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", namesFile, err)
@@ -1117,6 +1132,107 @@ func writeLargeMessageFile(clusters []snapshotCluster) error {
 		return err
 	}
 	return writeIfChanged(largeMsgFile, out)
+}
+
+// writeInvokeAccessFile emits the two command tables the invoke gates read,
+// both from each request command's effective access (the command's
+// effective direction, commandDirection):
+//
+//   - fabricScopedInvokePaths: access fabric "F". A command without an
+//     accessing fabric answers UNSUPPORTED_ACCESS (im/invoke.go).
+//   - elevatedInvokePrivileges: writePriv "M" (4 Manage) or "A"
+//     (5 Administer); "O" is the Operate default and stays out.
+//
+// A fabric quality other than "F", or a writePriv this table does not know,
+// is an error: the generator states no access the snapshot does not carry
+// (review II, R2-P6-acl-1301, -1302: the tables were hand-written and
+// missed 28 fabric-scoped and 83 elevated commands).
+func writeInvokeAccessFile(clusters []snapshotCluster) error {
+	type row struct {
+		id   uint32
+		name string
+		priv uint8
+	}
+	type clusterRows struct {
+		c      snapshotCluster
+		scoped []row
+		priv   []row
+	}
+	var all []clusterRows
+	for _, c := range clusters {
+		cmds := slices.Clone(c.Commands)
+		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
+		cr := clusterRows{c: c}
+		for _, m := range cmds {
+			if commandDirection(m) != "request" {
+				continue
+			}
+			if m.Effective == nil {
+				// No effective access: the tables would leave the command
+				// out (fail open), so the generation stops instead.
+				return fmt.Errorf("%s.%s: request command without an effective block: no access to generate from", c.Name, m.Name)
+			}
+			acc := m.Effective.Access
+			switch acc.Fabric {
+			case "":
+			case "F":
+				cr.scoped = append(cr.scoped, row{id: m.ID, name: m.Name})
+			default:
+				return fmt.Errorf("%s.%s: command fabric quality %q, want \"F\" or none", c.Name, m.Name, acc.Fabric)
+			}
+			switch acc.WritePriv {
+			case "O":
+			case "M":
+				cr.priv = append(cr.priv, row{id: m.ID, name: m.Name, priv: 4})
+			case "A":
+				cr.priv = append(cr.priv, row{id: m.ID, name: m.Name, priv: 5})
+			default:
+				return fmt.Errorf("%s.%s: command writePriv %q, want O, M or A", c.Name, m.Name, acc.WritePriv)
+			}
+		}
+		all = append(all, cr)
+	}
+	var buf bytes.Buffer
+	buf.WriteString(fileHeaderTpl)
+	buf.WriteString("// fabricScopedInvokePaths lists every request command whose effective\n")
+	buf.WriteString("// access in parity/schema.json is fabric-scoped (\"F\"): invoked on a\n")
+	buf.WriteString("// session with no accessing fabric it answers UNSUPPORTED_ACCESS.\n")
+	buf.WriteString("var fabricScopedInvokePaths = map[uint32]map[uint32]struct{}{\n")
+	for _, cr := range all {
+		if len(cr.scoped) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", cr.c.ID, cr.c.Name)
+		for _, r := range cr.scoped {
+			fmt.Fprintf(&buf, "\t\t0x%02X: {}, // %s\n", r.id, r.name)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	buf.WriteString("// elevatedInvokePrivileges lists every request command whose effective\n")
+	buf.WriteString("// invoke privilege (writePriv) in parity/schema.json is above the Operate\n")
+	buf.WriteString("// default: 4 Manage (\"M\") or 5 Administer (\"A\").\n")
+	buf.WriteString("var elevatedInvokePrivileges = map[uint32]map[uint32]uint8{\n")
+	for _, cr := range all {
+		if len(cr.priv) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", cr.c.ID, cr.c.Name)
+		for _, r := range cr.priv {
+			name := "PrivilegeManage"
+			if r.priv == 5 {
+				name = "PrivilegeAdminister"
+			}
+			fmt.Fprintf(&buf, "\t\t0x%02X: %s, // %s\n", r.id, name, r.name)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n")
+	out, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return writeIfChanged(invokeFile, out)
 }
 
 // hasQuality reports whether a matter.js quality string carries flag as a

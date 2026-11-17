@@ -66,7 +66,7 @@ func newMediaPlaybackServer(b defaultBuild) (contract.ClusterServer, error) {
 		return nil, notServed(fmt.Errorf("mediaplayback: %w", errNoPort))
 	}
 	cfg := media.PlaybackConfig{
-		Port: d.Playback, Features: mpdef.Feature(b.opts.Features), Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion,
+		Port: d.Playback, Features: mpdef.Feature(b.opts.Features), Events: slices.Clone(b.opts.Events),
 	}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewPlayback(cfg)
@@ -79,7 +79,7 @@ func newKeypadInputServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.Keypad == nil {
 		return nil, notServed(fmt.Errorf("keypadinput: %w", errNoPort))
 	}
-	return media.NewKeypad(media.KeypadConfig{Port: d.Keypad, Features: keypaddef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion})
+	return media.NewKeypad(media.KeypadConfig{Port: d.Keypad, Features: keypaddef.Feature(b.opts.Features)})
 }
 
 // newContentLauncherServer is the module's ContentLauncher server
@@ -89,7 +89,7 @@ func newContentLauncherServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.ContentLauncher == nil {
 		return nil, notServed(fmt.Errorf("contentlauncher: %w", errNoPort))
 	}
-	cfg := media.ContentLauncherConfig{Port: d.ContentLauncher, Features: launchdef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	cfg := media.ContentLauncherConfig{Port: d.ContentLauncher, Features: launchdef.Feature(b.opts.Features)}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewContentLauncher(cfg)
 }
@@ -103,7 +103,6 @@ func newApplicationLauncherServer(b defaultBuild) (contract.ClusterServer, error
 	}
 	cfg := media.AppLauncherConfig{
 		Port: d.AppLauncher, Features: launcherdef.Feature(b.opts.Features), Attributes: slices.Clone(b.opts.Attributes),
-		DataVersion: b.cfg.DataVersion,
 	}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewAppLauncher(cfg)
@@ -116,7 +115,7 @@ func newMediaInputServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.Inputs == nil {
 		return nil, notServed(fmt.Errorf("mediainput: %w", errNoPort))
 	}
-	cfg := media.InputsConfig{Port: d.Inputs, Features: inputdef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	cfg := media.InputsConfig{Port: d.Inputs, Features: inputdef.Feature(b.opts.Features)}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewInputs(cfg)
 }
@@ -128,7 +127,7 @@ func newAudioOutputServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.Outputs == nil {
 		return nil, notServed(fmt.Errorf("audiooutput: %w", errNoPort))
 	}
-	cfg := media.OutputsConfig{Port: d.Outputs, Features: outputdef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	cfg := media.OutputsConfig{Port: d.Outputs, Features: outputdef.Feature(b.opts.Features)}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewOutputs(cfg)
 }
@@ -142,7 +141,6 @@ func newChannelServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	cfg := media.ChannelsConfig{
 		Port: d.Channels, Features: channeldef.Feature(b.opts.Features), Attributes: slices.Clone(b.opts.Attributes),
-		DataVersion: b.cfg.DataVersion,
 	}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewChannels(cfg)
@@ -157,7 +155,6 @@ func newTargetNavigatorServer(b defaultBuild) (contract.ClusterServer, error) {
 	}
 	cfg := media.TargetsConfig{
 		Port: d.Targets, Attributes: slices.Clone(b.opts.Attributes), Events: slices.Clone(b.opts.Events),
-		DataVersion: b.cfg.DataVersion,
 	}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewTargets(cfg)
@@ -170,7 +167,7 @@ func newLowPowerServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.LowPower == nil {
 		return nil, notServed(fmt.Errorf("lowpower: %w", errNoPort))
 	}
-	return media.NewLowPower(media.LowPowerConfig{Port: d.LowPower, DataVersion: b.cfg.DataVersion})
+	return media.NewLowPower(media.LowPowerConfig{Port: d.LowPower})
 }
 
 // newAccountLoginServer is the module's AccountLogin server
@@ -180,13 +177,13 @@ func newAccountLoginServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.AccountLogin == nil {
 		return nil, notServed(fmt.Errorf("accountlogin: %w", errNoPort))
 	}
-	return media.NewAccountLogin(media.AccountLoginConfig{Port: d.AccountLogin, Events: slices.Clone(b.opts.Events), DataVersion: b.cfg.DataVersion})
+	return media.NewAccountLogin(media.AccountLoginConfig{Port: d.AccountLogin, Events: slices.Clone(b.opts.Events)})
 }
 
 // newWakeOnLanServer is the module's WakeOnLan server
 // ([media.NewWakeOnLan]), its state from the declaration's Initial.
 func newWakeOnLanServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := media.WakeOnLanConfig{Attributes: slices.Clone(b.opts.Attributes), DataVersion: b.cfg.DataVersion}
+	cfg := media.WakeOnLanConfig{Attributes: slices.Clone(b.opts.Attributes)}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewWakeOnLan(cfg)
 }
@@ -196,7 +193,7 @@ func newWakeOnLanServer(b defaultBuild) (contract.ClusterServer, error) {
 // Application and AllowedVendorList it has no default for; the generated
 // server until then.
 func newApplicationBasicServer(b defaultBuild) (contract.ClusterServer, error) {
-	cfg := media.AppBasicConfig{Attributes: slices.Clone(b.opts.Attributes), DataVersion: b.cfg.DataVersion}
+	cfg := media.AppBasicConfig{Attributes: slices.Clone(b.opts.Attributes)}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	srv, err := media.NewAppBasic(cfg)
 	if errors.Is(err, media.ErrMissingState) {
@@ -213,7 +210,7 @@ func newContentControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.ContentControl == nil {
 		return nil, notServed(fmt.Errorf("contentcontrol: %w", errNoPort))
 	}
-	cfg := media.ContentControlConfig{Port: d.ContentControl, Features: ccdef.Feature(b.opts.Features), DataVersion: b.cfg.DataVersion}
+	cfg := media.ContentControlConfig{Port: d.ContentControl, Features: ccdef.Feature(b.opts.Features)}
 	configFrom(&cfg.Initial, b.def, b.initial)
 	return media.NewContentControl(cfg)
 }

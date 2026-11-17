@@ -29,10 +29,10 @@ func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 // aliases through the definition's event decoders.
 func TestSwitchEventsAreTheGeneratedPayloads(t *testing.T) {
 	t.Parallel()
-	spectest.RoundTripEvent(t, swdef.Definition, wire.MatterEventInitialPress, wire.SwitchInitialPressEvent{NewPosition: 1})
-	spectest.RoundTripEvent(t, swdef.Definition, wire.MatterEventLongPress, wire.SwitchLongPressEvent{NewPosition: 1})
-	spectest.RoundTripEvent(t, swdef.Definition, wire.MatterEventShortRelease, wire.SwitchShortReleaseEvent{PreviousPosition: 1})
-	spectest.RoundTripEvent(t, swdef.Definition, wire.MatterEventLongRelease, wire.SwitchLongReleaseEvent{PreviousPosition: 1})
+	spectest.RoundTripEvent(t, swdef.Definition, swdef.EventInitialPress, wire.SwitchInitialPressEvent{NewPosition: 1})
+	spectest.RoundTripEvent(t, swdef.Definition, swdef.EventLongPress, wire.SwitchLongPressEvent{NewPosition: 1})
+	spectest.RoundTripEvent(t, swdef.Definition, swdef.EventShortRelease, wire.SwitchShortReleaseEvent{PreviousPosition: 1})
+	spectest.RoundTripEvent(t, swdef.Definition, swdef.EventLongRelease, wire.SwitchLongReleaseEvent{PreviousPosition: 1})
 }
 
 // TestAdmCommTakesTheGeneratedOpenWindowRequest pins that an in-process

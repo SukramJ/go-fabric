@@ -691,7 +691,7 @@ func TestGroupcastTestingParityMatterJS(t *testing.T) {
 
 	// EnableSenderTesting (conformance SD) is accepted like
 	// EnableListenerTesting: FabricUnderTest is the accessing fabric for
-	// 60 s by default (GroupcastServer.ts:405-431).
+	// 60 s by default (GroupcastServer.ts:404-424, :80).
 	if _, st := f.invoke(as(2, 5), 0x05, core.GroupcastTestingRequest{TestOperation: 2}); st != im.StatusSuccess {
 		t.Fatalf("EnableSenderTesting: %v", st)
 	}

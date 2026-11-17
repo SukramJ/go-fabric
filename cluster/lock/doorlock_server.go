@@ -4,7 +4,7 @@
 // Package lock contains the DoorLock cluster server (0x0101): a semantic
 // port of matter.js DoorLockBaseServer (packages/node/src/behaviors/
 // door-lock/DoorLockServer.ts, LockAuth.ts and LockSchedule.ts at
-// 862ad75f).
+// db021da0).
 //
 // The cluster's identity is the generated definition (cluster/spec/
 // doorlock, ADR 0013): ids, revision, the enums, the attribute, command
@@ -39,6 +39,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -228,6 +229,11 @@ type DoorLockConfig struct {
 	// tracker for [MatterDataVersion] and [MatterInvoke] bumps so the
 	// counter survives server reconstruction across [MatterClusterServers]
 	// calls. When nil, an embedded tracker is used (prior behaviour).
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 
 	// Features is the FeatureMap selection; zero is none, matter.js's
@@ -497,7 +503,7 @@ func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 
 	opts := spec.Options{Features: uint32(features), Commands: []uint32{lockdef.CmdUnlockWithTimeout}}
 	initial := s.initialAttributes(cfg, mode, supported, &opts)
-	srvCfg := spec.ServerConfig{DataVersion: s.tracker, Initial: initial, Sink: s, Handlers: s.handlers()}
+	srvCfg := spec.ServerConfig{DataVersion: s.tracker, Initial: initial, Sink: s, Handlers: s.handlers()} //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if s.src != nil {
 		srvCfg.Source = sourceAdapter{s.src}
 	}
@@ -793,8 +799,9 @@ func (s *DoorLockServer) SetLockState(state lockdef.LockStateEnum) error {
 // when they are served. Mirrors matter.js DoorLockServer.ts:1345-1361
 // (#handleDoorStateChange, the doorState$Changed reactor :179). A state
 // equal to the stored one is no change: matter.js's $Changed does not
-// fire for it (packages/node/src/behavior/state/managed/Datasource.ts:823-825
-// at 862ad75f), so nothing is emitted or counted (W3-clua2-03).
+// fire for it (packages/node/src/behavior/state/managed/Datasource.ts:1476-1481
+// at db021da0, #noteIfChanged: an equal value notes no change), so
+// nothing is emitted or counted (W3-clua2-03).
 func (s *DoorLockServer) SetDoorState(state lockdef.DoorStateEnum) error {
 	if v, ok := s.Value(lockdef.AttrDoorState); ok && v == uint8(state) {
 		return nil
@@ -843,7 +850,12 @@ func (s *DoorLockServer) lockCommand(actuation Actuation) spec.CommandHandler {
 		// (DoorLockServer.ts:198-201, :1049-1080 at db021da0).
 		s.op.Lock()
 		defer s.op.Unlock()
-		if err := s.actuate(ctx, actuation, pinCode); err != nil {
+		err = s.actuate(ctx, actuation, pinCode)
+		// The lock moved but its records were not saved: the physical
+		// outcome stands, so the relock follows the lock as after a
+		// success, and the command answers FAILURE (R2-P6-err-1504).
+		var unsaved notSavedError
+		if err != nil && !errors.As(err, &unsaved) {
 			return nil, err
 		}
 		s.mu.Lock()
@@ -853,9 +865,25 @@ func (s *DoorLockServer) lockCommand(actuation Actuation) spec.CommandHandler {
 			s.scheduleAutoRelockLocked(timeout)
 		}
 		s.mu.Unlock()
-		return nil, nil
+		return nil, err
 	}
 }
+
+// notSavedError is a lock operation the hardware carried out whose records
+// the AuthStore refused to save. The physical outcome stands: the records
+// keep what the operation did — a DisposableUser stays disabled, the lock
+// state is the hardware's — and the auto-relock follows the lock. The
+// command answers FAILURE, as matter.js answers a commit that fails after
+// the hardware moved: it moves the hardware inside the command
+// (DoorLockServer.ts:1033-1041 at db021da0), saves at the transaction
+// commit after it (CommandInvokeResponse.ts:493) and answers a failed
+// commit FAILURE (:509-520) with the state rolled back
+// (Datasource.ts:1331-1341), where go-fabric keeps it (R2-P6-err-1504).
+type notSavedError struct{ err error }
+
+func (e notSavedError) Error() string                 { return "lock: save records: " + e.err.Error() }
+func (e notSavedError) Unwrap() error                 { return e.err }
+func (notSavedError) MatterStatusCode() im.StatusCode { return im.StatusFailure }
 
 // lockRequest reads the PINCode and the UnlockWithTimeout timeout of a
 // lock command; a command without fields carries neither.
@@ -944,9 +972,8 @@ func (s *DoorLockServer) actuate(ctx context.Context, actuation Actuation, pinCo
 	if err := s.setActuated(locking); err != nil {
 		return err
 	}
-	return s.commit(ctx, func() error {
+	return s.commitMoved(ctx, func() {
 		s.completeOperationLocked(ctx, opType, req)
-		return nil
 	})
 }
 
@@ -1399,6 +1426,42 @@ func (s *DoorLockServer) commit(ctx context.Context, fn func() error) error {
 			s.mu.Unlock()
 			s.emit(events)
 			return spec.Errorf(im.StatusFailure, "lock: save records: %v", perr)
+		}
+	}
+	s.emit(events)
+	return err
+}
+
+// logger is the server's logger: the process default (DoorLockConfig
+// carries none).
+func (*DoorLockServer) logger() *slog.Logger { return slog.Default() }
+
+// commitMoved runs fn under mu after the hardware moved and saves the
+// records it changed. A failed save keeps them — the physical outcome
+// stands — and dirty, so the next commit saves them; it is logged and
+// answers [notSavedError] (R2-P6-err-1504). The events fn queued leave
+// either way. The caller holds op.
+func (s *DoorLockServer) commitMoved(ctx context.Context, fn func()) error {
+	s.mu.Lock()
+	fn()
+	dirty := s.dirty
+	s.dirty = false
+	var snapshot store.DoorLockAuth
+	if dirty {
+		snapshot = cloneAuth(s.data)
+	}
+	events := s.takeQueueLocked()
+	s.mu.Unlock()
+	var err error
+	if dirty && s.auth != nil {
+		if perr := s.auth.SaveDoorLockAuth(ctx, s.authKey, snapshot); perr != nil {
+			s.logger().Warn("matter.doorlock.records_not_saved", slog.String("reason", perr.Error()))
+			err = notSavedError{perr}
+			// The records stay dirty, so the next commit saves them: a
+			// restart before it would bring back what the store refused.
+			s.mu.Lock()
+			s.dirty = true
+			s.mu.Unlock()
 		}
 	}
 	s.emit(events)

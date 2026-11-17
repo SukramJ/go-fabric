@@ -489,16 +489,29 @@ func readAttributeReport(dec *tlv.Decoder, valueReader AttributeValueReader) (At
 }
 
 // readAttributeReportData reads an AttributeDataIB after its opener into
-// rep. The path precedes the data on the wire (TlvAttributeReportData.ts
-// field order), so the reader sees the path.
+// rep. Its members are taken in any order; the Data is read once the
+// structure ends, so the reader sees the final path whatever the order on
+// the wire, as the server's write decoder ([readAttributeData]; review
+// II, R2-P6-wire-0505).
 func readAttributeReportData(dec *tlv.Decoder, rep *AttributeReport, valueReader AttributeValueReader) error {
+	var dataAt tlv.Decoder
+	hasData := false
 	for {
+		mark := *dec
 		el, err := dec.Next()
 		if err != nil {
 			return err
 		}
 		if el.IsEndContainer {
-			return nil
+			if !hasData || valueReader == nil {
+				return nil
+			}
+			data, err := dataAt.Next()
+			if err != nil {
+				return err
+			}
+			rep.Value, err = valueReader(rep.Path, data, &dataAt)
+			return err
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
 			if err := skipElement(dec, el); err != nil {
@@ -522,13 +535,8 @@ func readAttributeReportData(dec *tlv.Decoder, rep *AttributeReport, valueReader
 				return err
 			}
 		case tagAttributeDataValue:
-			if valueReader == nil {
-				if err := skipElement(dec, el); err != nil {
-					return err
-				}
-				continue
-			}
-			if rep.Value, err = valueReader(rep.Path, el, dec); err != nil {
+			hasData, dataAt = true, mark
+			if err := skipElement(dec, el); err != nil {
 				return err
 			}
 		default:
@@ -554,12 +562,19 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 			return nil, errors.New("im: EventReportIB is not a structure")
 		}
 		var rep EventReport
+		// Exactly one of EventStatusIB and EventDataIB, as the
+		// AttributeReportIB decoder holds its two ([readAttributeReport];
+		// review II, R2-P6-wire-0516).
+		members := 0
 		for {
 			el, err := dec.Next()
 			if err != nil {
 				return nil, err
 			}
 			if el.IsEndContainer {
+				if members != 1 {
+					return nil, fmt.Errorf("im: EventReportIB carries %d of EventStatusIB and EventDataIB, want one", members)
+				}
 				break
 			}
 			switch {
@@ -568,10 +583,12 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 					return nil, err
 				}
 				rep.IsStatus = true
+				members++
 			case el.Tag.Kind == tlv.TagKindContext && el.Tag.Number == uint32(tagEventReportData) && el.IsContainer && el.Type == tlv.TypeStructure:
 				if err := readEventDataFields(dec, &rep, eventReader); err != nil {
 					return nil, err
 				}
+				members++
 			default:
 				if err := skipElement(dec, el); err != nil {
 					return nil, err
@@ -585,12 +602,18 @@ func readEventReports(dec *tlv.Decoder, eventReader EventDataReader) ([]EventRep
 // readEventStatusFields reads an EventStatusIB after its opener
 // (TlvEventStatus.ts: Path (0), Status (1)).
 func readEventStatusFields(dec *tlv.Decoder, rep *EventReport) error {
+	var hasPath, hasStatus bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return err
 		}
 		if el.IsEndContainer {
+			// Path and Status are both required, as the attribute side
+			// requires its status's (R2-P6-wire-0516).
+			if !hasPath || !hasStatus {
+				return errors.New("im: EventStatusIB without its path or its status")
+			}
 			return nil
 		}
 		switch {
@@ -598,10 +621,12 @@ func readEventStatusFields(dec *tlv.Decoder, rep *EventReport) error {
 			if rep.Path, err = readEventPathFields(dec); err != nil {
 				return err
 			}
+			hasPath = true
 		case el.Tag.Kind == tlv.TagKindContext && el.Tag.Number == uint32(tagEventStatusStatus) && el.IsContainer && el.Type == tlv.TypeStructure:
 			if err := readStatusIBFields(dec, &rep.Status); err != nil {
 				return err
 			}
+			hasStatus = true
 		default:
 			if err := skipElement(dec, el); err != nil {
 				return err

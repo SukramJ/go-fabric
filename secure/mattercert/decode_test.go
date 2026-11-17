@@ -96,16 +96,21 @@ func buildTestCert(t *testing.T, opts certOptions) []byte {
 		e.PutOctets(tlv.ContextTag(9), pubKey)
 	}
 
-	// tag 10: Extensions (empty list unless a pathLen is asked for)
+	// tag 10: Extensions — the four every certificate must carry
+	// (basic constraints with the asked pathLen, key usage, both key
+	// identifiers).
 	e.StartList(tlv.ContextTag(10))
+	e.StartStruct(tlv.ContextTag(1))
+	e.PutBool(tlv.ContextTag(1), true)
 	if opts.bcPathLen != nil {
-		e.StartStruct(tlv.ContextTag(1))
-		e.PutBool(tlv.ContextTag(1), true)
 		e.PutUint(tlv.ContextTag(2), *opts.bcPathLen)
-		if err := e.EndContainer(); err != nil {
-			t.Fatalf("EndContainer basic-constraints: %v", err)
-		}
 	}
+	if err := e.EndContainer(); err != nil {
+		t.Fatalf("EndContainer basic-constraints: %v", err)
+	}
+	e.PutUint(tlv.ContextTag(2), 0x0060)
+	e.PutOctets(tlv.ContextTag(4), make([]byte, 20))
+	e.PutOctets(tlv.ContextTag(5), make([]byte, 20))
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer extensions: %v", err)
 	}
@@ -524,12 +529,12 @@ func TestDecode_PathLenBeyond8BitsRejected(t *testing.T) {
 	for _, v := range []uint64{256, 0x101, math.MaxUint64} {
 		opts := makeRootCertOpts()
 		opts.bcPathLen = &v
-		if c, err := Decode(buildTestCert(t, opts)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "exceeds 255") {
+		if c, err := Decode(buildTestCert(t, opts)); !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "exceeds 8 bits") {
 			got := "<no certificate>"
 			if c != nil {
 				got = fmt.Sprintf("pathLen %d (has %v)", c.Extensions.BasicConstraintsPathLen, c.Extensions.BasicConstraintsHasPathLen)
 			}
-			t.Fatalf("Decode(pathLen %d) = %v, %s; want ErrMalformed (exceeds 255)", v, err, got)
+			t.Fatalf("Decode(pathLen %d) = %v, %s; want ErrMalformed (exceeds 8 bits)", v, err, got)
 		}
 	}
 	v := uint64(math.MaxUint8)

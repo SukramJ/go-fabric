@@ -31,6 +31,11 @@ type Subscription struct {
 	// matter.js ServerSubscription #triggerSendUpdate defers an update
 	// while #currentUpdatePromise is pending.
 	reporting atomic.Bool
+	// reportEnded, when non-nil, is closed when the reporting flag clears
+	// or the subscription closes ([Subscription.endReport]): a flush that
+	// waits for the report in flight wakes on it (review II,
+	// R2-P6-bound-0517). Guarded by mu.
+	reportEnded chan struct{}
 	// ID is the bridge-allocated 32-bit subscription identifier
 	// returned in SubscribeResponse (Matter §8.5.5).
 	ID uint32
@@ -86,6 +91,13 @@ type Subscription struct {
 	// held.
 	deferredUntil time.Time
 	pendingDirty  map[im.ConcreteAttributePath]struct{}
+	// owedPaths are the attribute paths of a failed update
+	// ([Subscription.RequeueAttributes]): owed to the next report, which
+	// they do not ask for (review II, F-db021da0-3).
+	owedPaths map[im.ConcreteAttributePath]struct{}
+	// failedUpdates counts the requeues of failed updates: a flush that
+	// waited for a report in flight sees whether it failed.
+	failedUpdates uint64
 	// The events the subscription owes are one number, not a queue: the
 	// lowest unreported event number (eventsMin, valid while
 	// eventsPending) and whether one of them asks for a report
@@ -111,13 +123,13 @@ type Subscription struct {
 	// subscription was priming ([Subscription.PrimedEvents]).
 	primingEventsMax uint64
 	// duePaths are the dirty attribute paths the engine drained together
-	// with the events it is handing to the [EventReporter], until the
-	// reporter takes them ([Subscription.TakeDuePaths]).
+	// with the events it is handing to a deprecated [EventReporter], until
+	// the reporter takes them ([Subscription.TakeDuePaths]).
 	duePaths []im.ConcreteAttributePath
-	// sentNothing is the [EventReporter]'s word that the report the
-	// engine handed it was not sent because nothing of it was left for
-	// the subscriber ([Subscription.NothingSent]), until the engine reads
-	// it.
+	// sentNothing is a deprecated [EventReporter]'s word that the report
+	// the engine handed it was not sent because nothing of it was left for
+	// the subscriber ([Subscription.NothingSent]), until the adapter
+	// ([legacyHooks.sender]) reads it.
 	sentNothing bool
 	closed      bool
 }
@@ -126,19 +138,27 @@ type Subscription struct {
 // [EventReporter] was not sent, because nothing of it was left for this
 // subscriber: every event, and every attribute change due with them, was
 // filtered — by the access check, or as a fabric-sensitive event of
-// another fabric. The reporter calls it instead of sending an empty
-// ReportData. The engine then sends the keep-alive when the pass was the
-// send interval's, and otherwise does not count the pass as a report: the
-// time of the last report stays, so the next keep-alive is due a send
-// interval after the last report that reached the subscriber.
-//
-// A reporter that never calls it is taken to have sent what it was
-// handed. This is the module's own rule: matter.js sends an empty
-// report in such a pass and counts it
+// another fabric. A reporter that sends nothing for such a pass calls it;
+// the bridge's does not since owner decision 169 — it sends the empty
+// report, as matter.js
 // (packages/node/src/node/server/ServerSubscription.ts:549-551 and
 // :921-936, packages/protocol/src/interaction/InteractionMessenger.ts:794-796
-// at db021da0), with a TODO of its own for the case
-// (ServerSubscription.ts:923-925).
+// at db021da0) and connectedhomeip (src/app/reporting/Engine.cpp:818-853,
+// src/app/ReadHandler.cpp:352-362 at 6170af84). When it is called, the
+// engine sends the keep-alive when the pass was the send interval's, and
+// otherwise does
+// not count the pass as a report: the time of the last report stays, so
+// the next keep-alive is due a send interval after the last report that
+// reached the subscriber.
+//
+// A reporter that never calls it is taken to have sent what it was
+// handed.
+//
+// It acts only inside a deprecated [EventReporter]'s call; a
+// [ReportSender] returns [NothingForSubscriber] instead.
+//
+// Deprecated: Use [ReportSender] and return [NothingForSubscriber].
+// Removable in the next minor release.
 func (s *Subscription) NothingSent() {
 	s.mu.Lock()
 	s.sentNothing = true
@@ -176,7 +196,11 @@ func (s *Subscription) revokeReport(work dueWork) {
 // #outstandingEventsMinNumber together and calls #sendUpdateMessage once.
 // An [EventReporter] that does not call it sends its events alone; the
 // engine then marks the paths dirty again, and they follow in an attribute
-// report of their own once MinIntervalFloor has elapsed.
+// report of their own once MinIntervalFloor has elapsed. A [ReportSender]
+// gets the paths in its [Report]; for it this returns nil.
+//
+// Deprecated: Use [ReportSender]: [Report.Paths] carries the paths due with
+// the events. Removable in the next minor release.
 func (s *Subscription) TakeDuePaths() []im.ConcreteAttributePath {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -305,7 +329,35 @@ func (s *Subscription) Close() {
 	s.mu.Lock()
 	s.closed = true
 	s.pendingDirty = nil
+	s.owedPaths = nil
+	s.wakeReportWaitersLocked()
 	s.mu.Unlock()
+}
+
+// endReport clears the reporting flag and wakes a flush waiting for it.
+func (s *Subscription) endReport() {
+	s.reporting.Store(false)
+	s.mu.Lock()
+	s.wakeReportWaitersLocked()
+	s.mu.Unlock()
+}
+
+// reportEndedCh returns the channel the next [Subscription.endReport] or
+// close closes.
+func (s *Subscription) reportEndedCh() <-chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.reportEnded == nil {
+		s.reportEnded = make(chan struct{})
+	}
+	return s.reportEnded
+}
+
+func (s *Subscription) wakeReportWaitersLocked() {
+	if s.reportEnded != nil {
+		close(s.reportEnded)
+		s.reportEnded = nil
+	}
 }
 
 // IsClosed reports whether [Close] was called.
@@ -333,7 +385,15 @@ func (s *Subscription) touchLastReport(now time.Time) {
 // The events fired in that window go with them, urgent or not: matter.js
 // sends whatever is outstanding at activation, attribute changes and
 // events alike (ServerSubscription.ts:443-445 at db021da0). There they
-// go at once; here they wait for MinIntervalFloor.
+// go at once; here they wait for MinIntervalFloor, as connectedhomeip
+// holds the floor from the establishment: the priming done, the handler
+// is registered with the scheduler at now (src/app/ReadHandler.cpp:249-259,
+// reporting/ReportSchedulerImpl.cpp:93-111 at 6170af84), its
+// mMinTimestamp = now + minInterval (reporting/ReportScheduler.h:141-147),
+// it is reportable only from then (:120-125), a dirty handler inside the
+// floor is scheduled for its end (ReportSchedulerImpl.cpp:190-204), and an
+// urgent event waits too (reporting/Engine.cpp:1234). Owner decision 144
+// keeps chip's floor (review II, F-db021da0-4, R2-P6-par-0779).
 func (s *Subscription) EndPriming(now time.Time) {
 	s.mu.Lock()
 	s.priming = false
@@ -431,9 +491,10 @@ type dueWork struct {
 // subscription's paths — is not a report: the time of the last report
 // stays, so a dirty attribute past its floor and the keep-alive are not
 // held back by a report that was never sent. The same holds for a pass
-// whose events the reporter filters down to nothing, which only the
-// reporter can see: [Subscription.NothingSent] and
-// [Subscription.revokeReport].
+// whose data a sender filters down to nothing and does not send, which
+// only the sender can see: [NothingForSubscriber] and
+// [Subscription.revokeReport]. The bridge's sender sends the empty report
+// instead and the pass counts (owner decision 169).
 func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (work dueWork, due bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -450,6 +511,14 @@ func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (wor
 	}
 	if takeData {
 		work.events = s.takeEventsLocked(src)
+		// The data of a failed update leaves with this report.
+		for p := range s.owedPaths {
+			if s.pendingDirty == nil {
+				s.pendingDirty = make(map[im.ConcreteAttributePath]struct{}, len(s.owedPaths))
+			}
+			s.pendingDirty[p] = struct{}{}
+		}
+		s.owedPaths = nil
 		work.paths = s.takeDirtyLocked()
 	}
 	if len(work.events) == 0 && len(work.paths) == 0 && !work.keepAlive {
@@ -476,15 +545,24 @@ func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 	if len(s.pendingDirty) == 0 {
 		return nil
 	}
-	out := make([]im.ConcreteAttributePath, 0, len(s.pendingDirty))
+	// Each path's first request-path index is taken once per drain, not in
+	// every comparison: the sort runs under s.mu, which every markDirty
+	// waits on, and a linear scan per comparison cost tens of
+	// milliseconds for a large subscription (review II, R2-P6-bound-0507).
+	type ranked struct {
+		path  im.ConcreteAttributePath
+		index int
+	}
+	rs := make([]ranked, 0, len(s.pendingDirty))
 	for p := range s.pendingDirty {
-		out = append(out, p)
+		rs = append(rs, ranked{path: p, index: s.requestPathIndex(p)})
 	}
 	s.pendingDirty = nil
-	slices.SortFunc(out, func(a, b im.ConcreteAttributePath) int {
-		if c := cmp.Compare(s.requestPathIndex(a), s.requestPathIndex(b)); c != 0 {
+	slices.SortFunc(rs, func(x, y ranked) int {
+		if c := cmp.Compare(x.index, y.index); c != 0 {
 			return c
 		}
+		a, b := x.path, y.path
 		if c := cmp.Compare(a.Endpoint, b.Endpoint); c != 0 {
 			return c
 		}
@@ -493,6 +571,10 @@ func (s *Subscription) takeDirtyLocked() []im.ConcreteAttributePath {
 		}
 		return im.CompareAttributeIDs(a.Cluster, a.Attribute, b.Attribute)
 	})
+	out := make([]im.ConcreteAttributePath, len(rs))
+	for i, r := range rs {
+		out[i] = r.path
+	}
 	return out
 }
 
@@ -507,8 +589,8 @@ func (s *Subscription) requestPathIndex(p im.ConcreteAttributePath) int {
 	return len(s.AttributePaths)
 }
 
-// offerDuePaths holds paths for the [EventReporter] the engine is about
-// to call ([Subscription.TakeDuePaths]).
+// offerDuePaths holds paths for the deprecated [EventReporter] the
+// adapter is about to call ([Subscription.TakeDuePaths]).
 func (s *Subscription) offerDuePaths(paths []im.ConcreteAttributePath) {
 	s.mu.Lock()
 	s.duePaths = paths
@@ -565,25 +647,28 @@ func (s *Subscription) eventUrgency(path im.ConcreteEventPath) (selected, urgent
 
 // RequeueEvents owes the subscriber every selected event from number
 // fromNumber on again: the reporter calls it when a report carrying
-// them could not be sent. Mirrors matter.js ServerSubscription.ts:582-584
-// at db021da0 ("newer number are always higher, so we can just set it").
-// The events ask for a report again, urgent or not, so the retry goes out
-// once MinIntervalFloor has elapsed since the failed report — as the
-// paths of [Subscription.RequeueAttributes] do, and as both did before
-// events were reported by urgency. matter.js schedules nothing there
-// (:569-584 never calls #prepareDataUpdate): its retry waits for the next
-// change, urgent event or send interval.
+// them could not be sent. The events are owed, not due: they leave with
+// the next report another cause starts — a change, an urgent event, the
+// send interval — as [Subscription.RequeueAttributes]'s paths do.
+// Mirrors matter.js at db021da0: after a failed update it puts the
+// attribute filter back through #addOutstandingAttributes, which only
+// fills the set (packages/node/src/node/server/ServerSubscription.ts:571-581,
+// :346-357), sets the event number back (:582-584) and schedules nothing
+// — #prepareDataUpdate is called by the change handler (:380-382), an
+// urgent event (:396-398) and the send-interval timer (:480-484), not
+// there. It reported the retry once MinIntervalFloor had elapsed since the
+// failed report (review II, F-db021da0-3).
 func (s *Subscription) RequeueEvents(fromNumber uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return
 	}
+	s.failedUpdates++
 	if !s.eventsPending || fromNumber < s.eventsMin {
 		s.eventsMin = fromNumber
 	}
 	s.eventsPending = true
-	s.eventsUrgent = true
 	if s.eventsHaveReported && s.eventsReported >= fromNumber {
 		if fromNumber == 0 {
 			s.eventsHaveReported = false
@@ -593,13 +678,29 @@ func (s *Subscription) RequeueEvents(fromNumber uint64) {
 	}
 }
 
-// RequeueAttributes marks paths dirty again: the reporter calls it when
-// a report carrying them could not be sent, so the next report retries
-// them. Mirrors matter.js ServerSubscription.ts:567-577, which puts the
-// attribute filter back with #addOutstandingAttributes.
+// failedUpdateCount is the number of failed updates requeued so far.
+func (s *Subscription) failedUpdateCount() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.failedUpdates
+}
+
+// RequeueAttributes owes paths to the next report again: the reporter
+// calls it when a report carrying them could not be sent. They do not ask
+// for a report — the next one another cause starts takes them
+// ([Subscription.RequeueEvents]; review II, F-db021da0-3).
 func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.failedUpdates++
 	for _, p := range paths {
-		s.markDirty(p)
+		if s.owedPaths == nil {
+			s.owedPaths = make(map[im.ConcreteAttributePath]struct{})
+		}
+		s.owedPaths[p] = struct{}{}
 	}
 }
 

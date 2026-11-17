@@ -37,7 +37,7 @@ func TestInvokeParity_HandlerEncodeSimpleCommandData(t *testing.T) {
 			{Path: ConcreteCommandPath{Endpoint: 1, HasEndpoint: true, Cluster: 0x0006, HasCluster: true, Command: 0x00, HasCommand: true}},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(ir.Responses))
 	}
@@ -68,7 +68,7 @@ func TestInvokeParity_HandlerEncodeSimpleStatusCode(t *testing.T) {
 			{Path: ConcreteCommandPath{Endpoint: 1, HasEndpoint: true, Cluster: 0x0006, HasCluster: true, Command: 0x01, HasCommand: true}},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(ir.Responses))
 	}
@@ -101,7 +101,7 @@ func TestInvokeParity_HandlerNotExistCommand(t *testing.T) {
 			}},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(ir.Responses))
 	}
@@ -174,7 +174,7 @@ func TestInvokeParity_HandlerEmptyDataMsg_TimedMismatch(t *testing.T) {
 		}
 		// Simulate "transaction requires timed" by having the dispatcher
 		// return NeedsTimedInteraction.
-		ir := HandleInvokeRequest(context.Background(), d, req)
+		ir := HandleInvokeRequest(unchecked(), d, req)
 		if len(ir.Responses) != 1 || !ir.Responses[0].IsStatus {
 			t.Fatalf("expected status-only response, got %+v", ir.Responses)
 		}
@@ -224,7 +224,7 @@ func TestInvokeParity_CommandSender_ExtendableCallbackBatchCommandRefEcho(t *tes
 			{Path: ConcreteCommandPath{Cluster: 0x0006, HasCluster: true, Command: 0x02, HasCommand: true}, CommandRef: ref2, HasCommandRef: true},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 2 {
 		t.Fatalf("responses=%d, want 2", len(ir.Responses))
 	}
@@ -266,7 +266,7 @@ func TestInvokeParity_CommandSender_CommandRefAbsent(t *testing.T) {
 			},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 1 {
 		t.Fatalf("responses=%d, want 1", len(ir.Responses))
 	}
@@ -291,7 +291,7 @@ func TestInvokeParity_CommandHandler_FillsUpResponse(t *testing.T) {
 			{Path: ConcreteCommandPath{Cluster: 0x0006, HasCluster: true, Command: 0x02, HasCommand: true}},
 		},
 	}
-	ir := HandleInvokeRequest(context.Background(), d, req)
+	ir := HandleInvokeRequest(unchecked(), d, req)
 	if len(ir.Responses) != 3 {
 		t.Fatalf("responses=%d, want 3 (one per invocation)", len(ir.Responses))
 	}

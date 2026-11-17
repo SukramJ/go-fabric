@@ -59,6 +59,30 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrNextTariffComponents, spec.List[TariffComponentStruct]([]TariffComponentStruct{TariffComponentStruct{TariffComponentId: uint32(1), Price: spectest.Ptr(spec.ValueOf(TariffPriceStruct{PriceType: TariffPriceTypeEnum(0), Price: spectest.Ptr(int64(1)), PriceLevel: spectest.Ptr(int16(1))})), FriendlyCredit: spectest.Ptr(true), AuxiliaryLoad: spectest.Ptr(AuxiliaryLoadSwitchSettingsStruct{Number: uint8(1), RequiredState: AuxiliaryLoadSettingEnum(0)}), PeakPeriod: spectest.Ptr(PeakPeriodStruct{Severity: PeakPeriodSeverityEnum(0), PeakPeriod: uint16(1)}), PowerThreshold: spectest.Ptr(PowerThresholdStruct{PowerThreshold: spectest.Ptr(int64(1)), ApparentPowerThreshold: spectest.Ptr(int64(1)), PowerThresholdSource: spec.ValueOf(PowerThresholdSourceEnum(0))}), Threshold: spec.ValueOf(int64(1)), Label: spectest.Ptr(spec.ValueOf("x")), Predicted: spectest.Ptr(true)}}))
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[AuxiliaryLoadSwitchesSettingsStruct],
+		spectest.CheckClone[CalendarPeriodStruct],
+		spectest.CheckClone[DayEntryStruct],
+		spectest.CheckClone[DayPatternStruct],
+		spectest.CheckClone[DayStruct],
+		spectest.CheckClone[TariffComponentStruct],
+		spectest.CheckClone[TariffPriceStruct],
+		spectest.CheckClone[PowerThresholdStruct],
+		spectest.CheckClone[TariffInformationStruct],
+		spectest.CheckClone[TariffPeriodStruct],
+		spectest.CheckClone[GetTariffComponentResponse],
+		spectest.CheckClone[GetDayEntryResponse],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

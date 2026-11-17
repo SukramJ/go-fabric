@@ -40,6 +40,23 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrGroupcastAdoption, spec.List[GroupcastAdoptionStruct]([]GroupcastAdoptionStruct{GroupcastAdoptionStruct{GroupcastAdopted: true, FabricIndex: uint8(1)}}))
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[GroupInfoMapStruct],
+		spectest.CheckClone[GroupKeySetStruct],
+		spectest.CheckClone[KeySetWriteRequest],
+		spectest.CheckClone[KeySetReadResponse],
+		spectest.CheckClone[KeySetReadAllIndicesResponse],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedState holds Patch, State and StateFrom against each other.
 func TestTypedState(t *testing.T) {
 	t.Parallel()

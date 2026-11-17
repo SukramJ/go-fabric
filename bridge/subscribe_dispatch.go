@@ -37,7 +37,7 @@ func (b *Bridge) buildInitialReport(
 	matched := src.matched
 	if len(req.EventRequests) > 0 {
 		matched += b.primingEventPaths(subCtx, dispatcher, req)
-		report.EventReports = b.primingEvents(subCtx, dispatcher, req)
+		report.EventReports = b.primingEvents(subCtx, dispatcher, req, false)
 	}
 	return report, matched
 }
@@ -344,11 +344,20 @@ func eventPathsForThisNode(ctx context.Context, paths []im.ConcreteEventPath) []
 // subject sees no AccessControl events (Matter §8.4.3.2 / §9.10.7.1).
 // Mirrors matter.js EventReadResponse.ts #readAllowedEvents; subCtx
 // carries the requesting fabric + subject.
-func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest) []im.EventReport {
+//
+// suppressStatuses leaves the concrete event paths' statuses out, as a
+// re-established subscription's priming report leaves its attribute
+// statuses out ([primingSource.suppressStatuses]): matter.js suppresses
+// both with one flag (ServerSubscription.ts:681-684 beside :647-650 at
+// db021da0; review II, R2-P6-wire-0510, N-rw3req-2).
+func (b *Bridge) primingEvents(subCtx context.Context, dispatcher im.Dispatcher, req im.SubscribeRequest, suppressStatuses bool) []im.EventReport {
 	raw := im.BuildEventReports(eventPathsForThisNode(subCtx, req.EventRequests), b.eventLog, req.EventFilters)
 	auth := b.primingEventAuthorizer(subCtx, dispatcher)
-	return append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests),
-		im.AuthorizeEventReports(subCtx, auth, raw)...)
+	allowed := im.AuthorizeEventReports(subCtx, auth, raw)
+	if suppressStatuses {
+		return allowed
+	}
+	return append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests), allowed...)
 }
 
 // primingMatches reports whether req establishes a subscription: one of
@@ -402,10 +411,9 @@ func (b *Bridge) registerSubscriptionAt(
 	evictAtQuota bool,
 ) (uint32, error) {
 	// Subscribe in the manager so quota + cadence bookkeeping is
-	// centralised there. The report pump is wired in the daemon bring-up
-	// (SetEventReporter / SubscriptionReporter in daemon_matter.go); the
-	// manager's engine tick drives delivery through the per-subscription
-	// subTarget.
+	// centralised there. The report pump is the bridge's report sender,
+	// installed by AttachSubscriptionManager; the manager's engine tick
+	// drives delivery through the per-subscription subTarget.
 	var subID uint32
 	if m := b.subscriptionManagerLocked(); m != nil {
 		fabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
@@ -732,6 +740,12 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
 		// MessageExchange.ts:855-863).
 		if _, err := b.sendChunk(leg, i, body, chunk, chunkWaitHere); err != nil {
+			if errors.Is(err, errChunkAnswerUndecodable) {
+				// The peer's answer carried no status: the interaction
+				// ends with FAILURE on its own exchange (owner decision
+				// 176; [errChunkAnswerUndecodable]).
+				_ = b.rejectSubscribeStatus(src, requestHdr, proto, "priming_answer_undecodable", im.StatusFailure)
+			}
 			return err
 		}
 

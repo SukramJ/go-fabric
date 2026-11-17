@@ -366,6 +366,8 @@ func TestRawPayloadGoesThroughTheWireDecoders(t *testing.T) {
 			build: func(e *tlv.Encoder) {
 				e.PutUint(tlv.ContextTag(0), 77)
 				e.PutUint(tlv.ContextTag(1), 10)
+				e.PutUint(tlv.ContextTag(2), 0) // OptionsMask, mandatory (R2-P6-wire-1209)
+				e.PutUint(tlv.ContextTag(3), 0) // OptionsOverride
 			},
 			verify: func(t *testing.T, got any) {
 				t.Helper()
@@ -384,6 +386,8 @@ func TestRawPayloadGoesThroughTheWireDecoders(t *testing.T) {
 			build: func(e *tlv.Encoder) {
 				e.PutUint(tlv.ContextTag(0), uint64(levelcontrol.MoveModeDown))
 				e.PutNull(tlv.ContextTag(1))
+				e.PutUint(tlv.ContextTag(2), 0) // OptionsMask, mandatory (R2-P6-wire-1209)
+				e.PutUint(tlv.ContextTag(3), 0) // OptionsOverride
 			},
 			verify: func(t *testing.T, got any) {
 				t.Helper()
@@ -403,6 +407,8 @@ func TestRawPayloadGoesThroughTheWireDecoders(t *testing.T) {
 				e.PutUint(tlv.ContextTag(0), uint64(levelcontrol.StepModeUp))
 				e.PutUint(tlv.ContextTag(1), 3)
 				e.PutUint(tlv.ContextTag(2), 25)
+				e.PutUint(tlv.ContextTag(3), 0) // OptionsMask, mandatory (R2-P6-wire-1209)
+				e.PutUint(tlv.ContextTag(4), 0) // OptionsOverride
 			},
 			verify: func(t *testing.T, got any) {
 				t.Helper()

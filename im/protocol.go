@@ -12,9 +12,10 @@ const InteractionModelProtocolID uint16 = 0x0001
 // IM message opcodes per Matter Core Spec §10.5 Table 18. These are
 // the values the ProtocolHeader.Opcode field takes when ProtocolID
 // is [InteractionModelProtocolID]. Receivers fan out by opcode into
-// [HandleReadRequest] / [HandleWriteRequest] / [HandleInvokeRequest] /
-// [HandleSubscribeRequest] (the latter currently routes through the
-// subscription manager directly; see [..]/im/subscription).
+// [HandleReadRequest] / [HandleWriteRequest] / [HandleInvokeRequest]; a
+// SubscribeRequest is decoded here ([UnmarshalSubscribeRequestTLV]) and
+// served by the bridge through the subscription manager
+// (im/subscription.Manager; review II, R2-P6-doc-0563).
 const (
 	OpcodeStatusResponse    uint8 = 0x01
 	OpcodeReadRequest       uint8 = 0x02

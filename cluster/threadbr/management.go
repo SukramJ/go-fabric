@@ -18,6 +18,7 @@ import (
 	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/caseauth"
 	"github.com/SukramJ/go-fabric/thread"
 )
 
@@ -87,6 +88,11 @@ type ManagementConfig struct {
 	// activation completed (:286-289); nil writes none.
 	SetBreadcrumb func(uint64)
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Logger receives what chip logs (LogErrorOnFailure, :321) and the
 	// refreshes that fail; slog.Default when nil. A dataset is never
@@ -122,7 +128,7 @@ type ManagementServer struct {
 	panChange bool
 	logger    *slog.Logger
 
-	// mu guards armed, setBreadcrumb, seq, pending and running.
+	// mu guards failSafe, setBreadcrumb, seq, pending and running.
 	mu            sync.Mutex
 	failSafe      func() (fabricIndex uint8, armed bool)
 	setBreadcrumb func(uint64)
@@ -177,7 +183,7 @@ func NewManagement(ctx context.Context, cfg ManagementConfig) (*ManagementServer
 		handlers[tbrm.CmdSetPendingDatasetRequest] = s.setPendingDataset
 	}
 	srv, err := spec.NewServer(tbrm.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial:     initial,
 		Handlers:    handlers,
 	})
@@ -493,22 +499,9 @@ func (s *ManagementServer) setPendingDataset(ctx context.Context, fields any) (a
 }
 
 // isCASE reports whether a request arrived over a CASE session: chip's
-// `GetSubjectDescriptor().authMode != Access::AuthMode::kCase` (:151). The
-// bridge stamps the session's fabric and subject and marks a PASE session
-// and a group message; a CASE request is one with a fabric and a node
-// subject that is neither, the rule cluster/netinfra's isCASE and
-// cluster/core's OTA provider apply.
-func isCASE(ctx context.Context) bool {
-	if im.IsPASEFromContext(ctx) {
-		return false
-	}
-	if _, group := im.GroupSubjectFromContext(ctx); group {
-		return false
-	}
-	_, fabric := im.FabricFilterFromContext(ctx)
-	node, _ := im.SubjectFromContext(ctx)
-	return fabric != 0 && node != 0
-}
+// `GetSubjectDescriptor().authMode != Access::AuthMode::kCase` (:151), the
+// module's one rule ([caseauth.IsCASE]).
+func isCASE(ctx context.Context) bool { return caseauth.IsCASE(ctx) }
 
 // SetAttributes implements [spec.AttributeSetter]: every attribute is the
 // border router's ([spec.ErrNotHeld] for a value other than the one

@@ -10,6 +10,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -311,7 +313,7 @@ func TestAttachDetachClose(t *testing.T) {
 	h := newHarness(t, nil)
 	h.topo.setClients(3, 0x0006)
 	h.listen()
-	b := mattercore.NewBinding()
+	b := sourcedBinding()
 	ctx := im.WithFabricFilter(context.Background(), false, 1)
 	a := mattercore.TargetStruct{Node: 100, Endpoint: 2}
 	if err := b.MatterWrite(ctx, 0, []mattercore.TargetStruct{a}); err != nil {
@@ -334,7 +336,7 @@ func TestAttachDetachClose(t *testing.T) {
 	if got := h.takeRemoved(); len(got) != 1 || got[0].Entry.Key() != "1/100//2/" {
 		t.Fatalf("removed after the change %+v", got)
 	}
-	b3 := mattercore.NewBinding()
+	b3 := sourcedBinding()
 	if err := b3.MatterWrite(ctx, 0, []mattercore.TargetStruct{{Node: 100, Endpoint: 2}}); err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +368,7 @@ func TestAttachDetachClose(t *testing.T) {
 	h.m.Close() // idempotent
 	h.m.Register(1, a)
 	h.m.GroupKeysChanged(1)
-	h.m.Attach(4, mattercore.NewBinding())
+	h.m.Attach(4, sourcedBinding())
 	if len(h.m.Attached()) != 0 {
 		t.Fatal("attached after Close")
 	}
@@ -379,7 +381,7 @@ func TestReplaceAttachedServer(t *testing.T) {
 	h := newHarness(t, nil)
 	h.listen()
 	ctx := im.WithFabricFilter(context.Background(), false, 1)
-	first, second := mattercore.NewBinding(), mattercore.NewBinding()
+	first, second := sourcedBinding(), sourcedBinding()
 	if err := first.MatterWrite(ctx, 0, []mattercore.TargetStruct{{Node: 100, Endpoint: 2}}); err != nil {
 		t.Fatal(err)
 	}
@@ -407,4 +409,12 @@ func TestKindString(t *testing.T) {
 	if g, err := f.Sender(context.Background(), 1, 1); err != nil || g == nil {
 		t.Fatal(err)
 	}
+}
+
+// sourcedBinding is NewBinding with every fabric as its source (a Binding
+// without one refuses every request write, decision 158).
+func sourcedBinding() *mattercore.Binding {
+	b := mattercore.NewBinding()
+	b.SetFabricSource(endpointtest.EveryFabric)
+	return b
 }

@@ -6,6 +6,8 @@ package store_test
 import (
 	"bytes"
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/store"
@@ -147,5 +149,34 @@ func TestICDKeysSealedAtRest(t *testing.T) {
 	}
 	if _, err := s.ListICDRegistrations(ctx); err == nil {
 		t.Fatal("a sealed key moved to another registration opened")
+	}
+}
+
+// TestICDKeyNotStoredErrorWrapsNothing (R2-P6-err-0111): when the ICD key
+// is not readable after its INSERT OR IGNORE and the read itself did not
+// fail — a trigger deletes the row here — the error names the missing key
+// and carries no %w of a nil error.
+func TestICDKeyNotStoredErrorWrapsNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openTestDB(t)
+	s := store.New(db)
+	idx, err := s.AddFabric(ctx, store.FabricRecord{
+		FabricID: 1, NodeID: 2, RootPublicKey: uncompressedP256Fixture(1), RootCert: []byte{0x15, 0x18},
+		VendorID: 0xFFF1, CompressedID: [8]byte{1, 2, 3, 4, 5, 6, 7, 8},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `CREATE TRIGGER drop_icd_key AFTER INSERT ON matter_settings WHEN NEW.key = '`+store.SettingICDKey+`'
+BEGIN DELETE FROM matter_settings WHERE key = NEW.key; END`); err != nil {
+		t.Fatal(err)
+	}
+	err = s.ReplaceICDRegistrations(ctx, idx, []store.ICDRegistration{{CheckInNodeID: 1, MonitoredSubject: 1, Key: bytes.Repeat([]byte{1}, 16)}})
+	if err == nil {
+		t.Fatal("a registration without a readable ICD key succeeded")
+	}
+	if strings.Contains(err.Error(), "%!") || errors.Unwrap(err) != nil {
+		t.Errorf("error = %q (unwraps to %v); want a plain message", err, errors.Unwrap(err))
 	}
 }

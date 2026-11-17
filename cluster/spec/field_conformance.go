@@ -565,8 +565,16 @@ func (c *confCompiler) createComparisonOp(op ConformanceOp, lhs, rhs Conformance
 			}
 			e := f.Type.Enum
 			c.nameRef = func(name string) confNode {
+				// The member is matched by its camelized name, as matter.js
+				// resolves it: field.memberNamed(name)
+				// (packages/node/src/behavior/state/validation/
+				// conformance-compiler.ts:691 at db021da0) → members(name)
+				// (packages/model/src/models/ValueModel.ts:206-211) →
+				// #names.get(camelize(key)) (packages/model/src/logic/
+				// ModelIndex.ts:218), so "TwoDCARTZone" names the member
+				// "TwoDcartZone" and "CMAF" the member "Cmaf".
 				for vi := range e.Values {
-					if e.Values[vi].Name == name {
+					if sameName(e.Values[vi].Name, name) {
 						return confNode{code: codeValue, value: confValue{v: e.Values[vi].Value, defined: true}}
 					}
 				}

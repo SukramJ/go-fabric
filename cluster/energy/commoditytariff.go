@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/internal/deepcopy"
+
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -167,25 +169,25 @@ func (t *Tariff) values() [len(tariffAttrs)]any {
 		v[3] = uint8(*t.DefaultRandomizationType)
 	}
 	if t.TariffInfo != nil {
-		v[4] = *t.TariffInfo
+		v[4] = t.TariffInfo.Clone()
 	}
 	if t.DayEntries != nil {
-		v[5] = slices.Clone(t.DayEntries)
+		v[5] = deepcopy.Each(t.DayEntries)
 	}
 	if t.DayPatterns != nil {
-		v[6] = slices.Clone(t.DayPatterns)
+		v[6] = deepcopy.Each(t.DayPatterns)
 	}
 	if t.TariffComponents != nil {
-		v[7] = slices.Clone(t.TariffComponents)
+		v[7] = deepcopy.Each(t.TariffComponents)
 	}
 	if t.TariffPeriods != nil {
-		v[8] = slices.Clone(t.TariffPeriods)
+		v[8] = deepcopy.Each(t.TariffPeriods)
 	}
 	if t.IndividualDays != nil {
-		v[9] = slices.Clone(t.IndividualDays)
+		v[9] = deepcopy.Each(t.IndividualDays)
 	}
 	if t.CalendarPeriods != nil {
-		v[10] = slices.Clone(t.CalendarPeriods)
+		v[10] = deepcopy.Each(t.CalendarPeriods)
 	}
 	return v
 }
@@ -213,6 +215,11 @@ type CommodityTariffConfig struct {
 	// host.
 	SyncInterval time.Duration
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -235,9 +242,12 @@ type CommodityTariffServer struct {
 	// ahead of the node's Matter time.
 	declared bool
 
-	// mu guards active, assigned, pending and syncTimer.
+	// mu guards active, assigned, pending, syncTimer and quiesced.
 	mu        sync.Mutex
 	syncTimer clock.Timer
+	// quiesced is set by a MatterQuiesce that stopped the sync;
+	// SetEndpoint starts it again.
+	quiesced bool
 	// active is a tariff the current attributes are derived from —
 	// mServerTariffAttrsCtx.mTariffProvider != nullptr (Server.cpp:896-904).
 	active bool
@@ -284,7 +294,7 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		ct.CmdGetDayEntry:        s.getDayEntry,
 	}
 	srv, err := spec.NewServer(ct.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial})
+		spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
@@ -479,6 +489,11 @@ func (s *CommodityTariffServer) ClearTariff() error {
 func (s *CommodityTariffServer) SyncTime() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.syncTimeLocked()
+}
+
+// syncTimeLocked is [CommodityTariffServer.SyncTime]; the caller holds mu.
+func (s *CommodityTariffServer) syncTimeLocked() error {
 	now, ok := s.nowEpoch()
 	if !ok { // UpdateCurrentAttrs, :928-934
 		return ErrNoTime
@@ -1172,7 +1187,10 @@ func (s *CommodityTariffServer) getTariffComponent(_ context.Context, fields any
 				}
 				label = append(label, ';', ' ')
 			}
-			n := min(len(p.Label.Value), tariffDefaultStringValuesMaxBuf-len(label)) // :1151-1157
+			// A byte count, as chip's memcpy (:1151-1157): a label cut
+			// inside a multi-byte character answers a string that is not
+			// valid UTF-8 (review II, R2-P6-wire-1624, kept as chip's).
+			n := min(len(p.Label.Value), tariffDefaultStringValuesMaxBuf-len(label))
 			label = append(label, p.Label.Value[:n]...)
 			first = false
 			if len(label) >= tariffDefaultStringValuesMaxBuf { // :1161-1165

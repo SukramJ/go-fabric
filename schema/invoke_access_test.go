@@ -9,12 +9,11 @@ import (
 	"github.com/SukramJ/go-fabric/schema"
 )
 
-// TestInvokeAccessSpotChecks pins the command access tables without a
-// matter.js checkout, so their coverage and behaviour do not depend on one
-// (TestFabricScopedInvokeMatchesMatterJS and
-// TestInvokePrivilegeMatchesMatterJS hold the whole tables to matter.js's
-// element files where the checkout exists). The expectations are the
-// access strings of those element files.
+// TestInvokeAccessSpotChecks pins a few rows of the generated command
+// access tables by hand (TestFabricScopedInvokeMatchesSnapshot and
+// TestInvokePrivilegeMatchesSnapshot hold the whole tables to
+// parity/schema.json). The expectations are the effective access strings
+// of the snapshot.
 func TestInvokeAccessSpotChecks(t *testing.T) {
 	t.Parallel()
 	scoped := []struct {
@@ -25,6 +24,7 @@ func TestInvokeAccessSpotChecks(t *testing.T) {
 		{0x003E, 0x0A, false}, // RemoveFabric "A", not fabric-scoped
 		{0x0004, 0x00, true},  // Groups AddGroup "F M"
 		{0x0062, 0x40, true},  // ScenesManagement CopyScene "F M"
+		{0x0801, 0x00, true},  // TlsCertificateManagement ProvisionRootCertificate "F A"
 		{0x0006, 0x00, false}, // OnOff Off — no fabric quality
 		{0x9999, 0x00, false}, // an unknown cluster
 	}
@@ -40,6 +40,7 @@ func TestInvokeAccessSpotChecks(t *testing.T) {
 		{0x003F, 0x00, schema.PrivilegeAdminister}, // KeySetWrite "F A"
 		{0x0062, 0x00, schema.PrivilegeManage},     // AddScene "F M"
 		{0x0101, 0x1A, schema.PrivilegeAdminister}, // DoorLock SetUser "A T"
+		{0x0752, 0x00, schema.PrivilegeAdminister}, // JointFabricDatastore AddKeySet "A"
 		{0x0006, 0x02, schema.PrivilegeOperate},    // OnOff Toggle: the default
 		{0x9999, 0x00, schema.PrivilegeOperate},    // an unknown cluster
 	}

@@ -98,9 +98,9 @@ func groupKeysReplaceMappingsCase(ctx context.Context, t *testing.T, p store.Por
 		{GroupID: 1, GroupKeySetID: 2},
 	}))
 	want := []store.GroupKeyMapping{
-		{FabricIndex: f, GroupID: 1, GroupKeySetID: 2},
-		{FabricIndex: f, GroupID: 3, GroupKeySetID: 5},
 		{FabricIndex: f, GroupID: 7, GroupKeySetID: 2},
+		{FabricIndex: f, GroupID: 3, GroupKeySetID: 5},
+		{FabricIndex: f, GroupID: 1, GroupKeySetID: 2},
 	}
 	got, err := p.ListGroupKeyMappings(ctx, f)
 	must(t, err)

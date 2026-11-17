@@ -32,6 +32,20 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrSoilMoistureMeasurementLimits, MeasurementAccuracyStruct{MeasurementType: MeasurementTypeEnum(0), Measured: true, MinMeasuredValue: int64(1), MaxMeasuredValue: int64(1), AccuracyRanges: []MeasurementAccuracyRangeStruct{MeasurementAccuracyRangeStruct{RangeMin: int64(1), RangeMax: int64(1), PercentMax: spectest.Ptr(uint16(1)), PercentMin: spectest.Ptr(uint16(1)), PercentTypical: spectest.Ptr(uint16(1)), FixedMax: spectest.Ptr(uint64(1)), FixedMin: spectest.Ptr(uint64(1)), FixedTypical: spectest.Ptr(uint64(1))}}})
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[MeasurementAccuracyStruct],
+		spectest.CheckClone[MeasurementAccuracyRangeStruct],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

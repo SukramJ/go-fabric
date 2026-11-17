@@ -83,6 +83,7 @@ func newCameraPeers(ctx context.Context, t *testing.T, camTCP, ctlTCP *node.TCPC
 	}
 	if err := cp.prov.UpsertSession(camera.ProviderSession{
 		Id: 1, PeerNodeId: cp.ctlFabric.NodeID, PeerEndpointId: ctlEp, FabricIndex: cp.camFabric.FabricIndex, StreamUsage: wpdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", review II R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -93,6 +94,7 @@ func newCameraPeers(ctx context.Context, t *testing.T, camTCP, ctlTCP *node.TCPC
 	camEp, _ := pair.Device.EndpointOf("cam:1")
 	if err := req.UpsertSession(camera.WebRTCSession{
 		Id: 1, PeerNodeId: cp.camFabric.NodeID, PeerEndpointId: camEp, FabricIndex: cp.ctlFabric.FabricIndex, StreamUsage: wrdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1}, // a session names a stream ("O.a+", review II R2-P6-par-1304)
 	}); err != nil {
 		t.Fatal(err)
 	}

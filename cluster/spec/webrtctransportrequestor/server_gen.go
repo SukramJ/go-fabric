@@ -21,6 +21,24 @@ type State struct {
 	CurrentSessions []WebRTCSessionStruct // attribute 0x0000: list[WebRtcTransportDefinitions.WebRTCSessionStruct], M, R S A
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.CurrentSessions = func(s []WebRTCSessionStruct) []WebRTCSessionStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]WebRTCSessionStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.CurrentSessions)
+	return c
+}
+
 // Patch is a change to the WebRtcTransportRequestor state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

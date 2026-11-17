@@ -52,6 +52,102 @@ type State struct {
 	EndpointList                []uint16                 // attribute 0x001F: list[endpoint-no], M, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.WiredAssessedInputVoltage = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.WiredAssessedInputVoltage)
+	c.WiredAssessedInputFrequency = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.WiredAssessedInputFrequency)
+	c.WiredAssessedCurrent = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.WiredAssessedCurrent)
+	c.ActiveWiredFaults = func(s []WiredFaultEnum) []WiredFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]WiredFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveWiredFaults)
+	c.BatVoltage = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BatVoltage)
+	c.BatPercentRemaining = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BatPercentRemaining)
+	c.BatTimeRemaining = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BatTimeRemaining)
+	c.ActiveBatFaults = func(s []BatFaultEnum) []BatFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]BatFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveBatFaults)
+	c.BatTimeToFullCharge = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BatTimeToFullCharge)
+	c.BatChargingCurrent = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.BatChargingCurrent)
+	c.ActiveBatChargeFaults = func(s []BatChargeFaultEnum) []BatChargeFaultEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]BatChargeFaultEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.ActiveBatChargeFaults)
+	c.EndpointList = func(s []uint16) []uint16 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint16, len(s))
+		copy(out, s)
+		return out
+	}(st.EndpointList)
+	return c
+}
+
 // Patch is a change to the PowerSource state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

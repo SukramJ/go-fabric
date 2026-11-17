@@ -87,7 +87,8 @@ func FabricSensitiveLists(def *spec.Cluster) []FabricSensitiveList {
 //     (packages/types/src/tlv/TlvObject.ts:128-134).
 //
 // owner must differ from reader. Every entry of remote that is not the
-// reader's carries no fabric-sensitive field, and owner's entries are
+// reader's carries no fabric-sensitive field — and for an "S" list is not
+// there at all, whichever fabric owns it — and owner's entries are
 // own's, in order, without those fields ("F") or absent ("S"). It reports
 // each difference with tb.Errorf and returns the number of owner's
 // entries: the entries the read checked. A caller that finds it 0 has not
@@ -125,6 +126,13 @@ func CheckWithheld(tb testing.TB, l FabricSensitiveList, own, remote []byte, own
 			continue
 		}
 		if reader != 0 && f == reader {
+			continue
+		}
+		if l.Attribute.Access.Fabric == "S" && f != owner {
+			// A fabric-sensitive list lists the reader's entries alone,
+			// whether or not the entry carries a sensitive field (the
+			// owner's are counted below).
+			tb.Errorf("%s: unfiltered read by fabric %d, entry %d of fabric %d: a fabric-sensitive list lists only the reader's entries: % X", l, reader, i, f, encodeNode(e))
 			continue
 		}
 		if leaked := sensitiveIn(e, l.Sensitive); len(leaked) > 0 {

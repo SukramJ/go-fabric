@@ -127,13 +127,31 @@ type Manager struct {
 	maxGroups int
 	fabrics   map[uint8]*fabricGroups
 	allLoaded bool
+	// owed holds the fabrics ForgetFabric dropped whose reload from the
+	// store is owed (reloadOwed): each is loaded again on its own, so a
+	// store failure leaves only that fabric absent.
+	owed map[uint8]bool
+	// owedRetryAt and owedBackoff pace reloadOwed on the receive path
+	// (owedDueLocked): a failing load is tried again owedBackoff later,
+	// on the send clock's monotonic reading; Load does not wait.
+	owedRetryAt time.Duration
+	owedBackoff time.Duration
 
 	// reception is matter.js MessagingState: the replay-protection
-	// window per operational key and source node, without a bound on the
-	// source nodes of a key ([Manager.receptionWindow] says what that
-	// keeps and what it costs). In memory only, as in matter.js.
+	// window per operational key and source node, at most
+	// maxGroupSendersPerKey source nodes a key, none evicted
+	// ([Manager.receptionWindow] says what that keeps and what it costs).
+	// In memory only, as in matter.js.
 	receptionMu sync.Mutex
 	reception   map[string]map[uint64]*mrp.Window
+	// receptionFull marks the keys that refused a sender at
+	// maxGroupSendersPerKey, so the refusal is logged once per key.
+	receptionFull map[string]bool
+	// parkedReception holds, per forgotten fabric, the replay windows
+	// ForgetFabric dropped with it, by operational key, until the fabric
+	// is loaded again (restoreParked): a key the load brings back under
+	// the same key set id gets its windows back, every other is dropped.
+	parkedReception map[uint8]map[string]parkedKey
 
 	// observersMu guards observers and tableObservers.
 	observersMu        sync.Mutex
@@ -165,7 +183,9 @@ type Manager struct {
 }
 
 // SetClock sets the clock that selects the current epoch key of a group
-// send; nil is [clock.System]. Call it before the first send.
+// send and paces the retry of a fabric reload [Manager.ForgetFabric] left
+// owed; nil is [clock.System]. Call it before the first send and before
+// the first forget.
 func (m *Manager) SetClock(c clock.Clock) {
 	m.senderMu.Lock()
 	defer m.senderMu.Unlock()
@@ -186,6 +206,10 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		maxGroups: DefaultMaxGroupsPerFabric,
 		fabrics:   make(map[uint8]*fabricGroups),
 		reception: make(map[string]map[uint64]*mrp.Window),
+
+		owed:            make(map[uint8]bool),
+		receptionFull:   make(map[string]bool),
+		parkedReception: make(map[uint8]map[string]parkedKey),
 
 		counterRandom: randomCounterStart,
 		senders:       make(map[senderKey]*Sender),
@@ -366,10 +390,68 @@ func (m *Manager) fabricStore(ctx context.Context, idx uint8) (*fabricGroups, er
 	if err != nil {
 		return nil, err
 	}
-	m.mu.Lock()
-	m.fabrics[idx] = f
-	m.mu.Unlock()
+	m.installLocked(f)
 	return f, nil
+}
+
+// installLocked publishes the fabric f just loaded: its parked replay
+// windows are restored first (restoreParked), so no decode can pick the
+// fabric's keys before their windows are back. m.storeMu is held.
+func (m *Manager) installLocked(f *fabricGroups) {
+	m.restoreParked(f)
+	m.mu.Lock()
+	m.fabrics[f.index] = f
+	delete(m.owed, f.index)
+	m.mu.Unlock()
+}
+
+// reloadOwed loads again every fabric ForgetFabric left owed, each on its
+// own: one the store no longer holds is no longer owed and its parked
+// windows go; one whose load fails stays owed and absent, its error in the
+// result; the others are not touched.
+func (m *Manager) reloadOwed(ctx context.Context) error {
+	m.mu.RLock()
+	n := len(m.owed)
+	m.mu.RUnlock()
+	if n == 0 {
+		return nil
+	}
+	m.storeMu.Lock()
+	defer m.storeMu.Unlock()
+	m.mu.Lock()
+	idxs := make([]uint8, 0, len(m.owed))
+	for idx := range m.owed {
+		idxs = append(idxs, idx)
+	}
+	slices.Sort(idxs)
+	for _, idx := range idxs {
+		if _, loaded := m.fabrics[idx]; loaded { // a lazy load came first
+			delete(m.owed, idx)
+		}
+	}
+	m.mu.Unlock()
+	var errs []error
+	for _, idx := range idxs {
+		m.mu.RLock()
+		still := m.owed[idx]
+		m.mu.RUnlock()
+		if !still {
+			continue
+		}
+		f, err := m.loadFabric(ctx, idx)
+		switch {
+		case errors.Is(err, ErrNoFabric):
+			m.mu.Lock()
+			delete(m.owed, idx)
+			m.mu.Unlock()
+			m.dropParked(idx)
+		case err != nil:
+			errs = append(errs, err)
+		default:
+			m.installLocked(f)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // rlockFabric returns the loaded fabric with m.mu held for reading; the
@@ -397,10 +479,27 @@ func (m *Manager) rlockFabric(ctx context.Context, idx uint8) (*fabricGroups, er
 // which restores the key sets, the key map and the group endpoint map of
 // every fabric at startup ("fd65e989: restore group endpoint mappings").
 func (m *Manager) ensureAllLoaded(ctx context.Context) error {
+	return m.loadAll(ctx, true)
+}
+
+// loadAll is ensureAllLoaded; paced false leaves an owed reload to the
+// caller ([Manager.Load] runs it itself, once).
+func (m *Manager) loadAll(ctx context.Context, paced bool) error {
 	m.mu.RLock()
 	done := m.allLoaded
 	m.mu.RUnlock()
+	if done && !paced {
+		return nil
+	}
 	if done {
+		// A fabric ForgetFabric left owed is tried on its own; its failure
+		// leaves it absent and does not fail the call for the others
+		// ([Manager.Load] returns it). The receive path tries at most once
+		// per interval, so a group sender cannot drive a store read per
+		// datagram while the store fails.
+		if m.owedDue() {
+			m.noteOwedResult(m.reloadOwed(ctx))
+		}
 		return nil
 	}
 	m.storeMu.Lock()
@@ -415,14 +514,44 @@ func (m *Manager) ensureAllLoaded(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("groups: list fabrics: %w", err)
 	}
+	listed := make(map[uint8]bool, len(recs))
+	var failed []error
 	for i := range recs {
-		if _, err := m.fabricStore(ctx, recs[i].FabricIndex); err != nil {
-			return err
+		idx := recs[i].FabricIndex
+		listed[idx] = true
+		if _, err := m.fabricStore(ctx, idx); err != nil {
+			// The fabric the store cannot read stays absent and owed —
+			// tried again on its own, paced, as a fabric ForgetFabric
+			// dropped is — and the others load and serve (review II,
+			// R2-P6-fsm-0315).
+			m.logger.Warn("groups.load_failed",
+				slog.Int("fabric_index", int(idx)),
+				slog.Any("err", err))
+			m.mu.Lock()
+			m.owed[idx] = true
+			m.mu.Unlock()
+			failed = append(failed, err)
 		}
+	}
+	if len(failed) > 0 {
+		m.noteOwedResult(errors.Join(failed...))
 	}
 	m.mu.Lock()
 	m.allLoaded = true
+	for idx := range m.owed {
+		if !listed[idx] {
+			delete(m.owed, idx)
+		}
+	}
 	m.mu.Unlock()
+	// The parked windows of a fabric the store no longer lists go.
+	m.receptionMu.Lock()
+	for idx := range m.parkedReception {
+		if !listed[idx] {
+			delete(m.parkedReception, idx)
+		}
+	}
+	m.receptionMu.Unlock()
 	return nil
 }
 
@@ -430,12 +559,74 @@ func (m *Manager) ensureAllLoaded(ctx context.Context) error {
 // manager loads on demand; a host calls Load at start-up so the multicast
 // memberships of persisted groups are joined before the first group
 // message is due.
+//
+// A fabric [Manager.ForgetFabric] dropped while the store still holds it
+// is loaded again here, at once — or by a receive once the retry interval
+// has passed (1 s after a failure, doubling to 60 s). Load returns the
+// error of one that fails, which stays absent while the others serve.
+// Only Load announces the multicast memberships again; a receive-path
+// reload restores the keys, not the memberships.
 func (m *Manager) Load(ctx context.Context) error {
-	if err := m.ensureAllLoaded(ctx); err != nil {
+	if err := m.loadAll(ctx, false); err != nil {
 		return err
 	}
+	err := m.reloadOwed(ctx)
+	m.noteOwedResult(err)
 	m.notify()
-	return nil
+	return err
+}
+
+// Pacing of an owed reload that keeps failing: the first retry after
+// owedRetryFirst, doubling up to owedRetryMax.
+const (
+	owedRetryFirst = time.Second
+	owedRetryMax   = time.Minute
+)
+
+// owedDue reports whether an owed reload is due on the receive path and,
+// when it is, claims the attempt: concurrent receives do not try it twice.
+func (m *Manager) owedDue() bool {
+	m.mu.RLock()
+	n := len(m.owed)
+	m.mu.RUnlock()
+	if n == 0 {
+		return false
+	}
+	now := m.monotonic()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.owed) == 0 || now < m.owedRetryAt {
+		return false
+	}
+	m.owedRetryAt = now + max(m.owedBackoff, owedRetryFirst)
+	return true
+}
+
+// noteOwedResult sets the next receive-path attempt after one ended with
+// err: none owed after a success, owedRetryFirst doubling up to
+// owedRetryMax after a failure.
+func (m *Manager) noteOwedResult(err error) {
+	now := m.monotonic()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err == nil {
+		m.owedBackoff, m.owedRetryAt = 0, 0
+		return
+	}
+	switch {
+	case m.owedBackoff == 0:
+		m.owedBackoff = owedRetryFirst
+	case m.owedBackoff < owedRetryMax:
+		m.owedBackoff = min(2*m.owedBackoff, owedRetryMax)
+	}
+	m.owedRetryAt = now + m.owedBackoff
+}
+
+// monotonic is the send clock's monotonic reading.
+func (m *Manager) monotonic() time.Duration {
+	m.senderMu.Lock()
+	defer m.senderMu.Unlock()
+	return clock.MonotonicOf(m.clock)
 }
 
 // Reload re-reads one fabric's key sets and GroupKeyMap from the store
@@ -461,10 +652,12 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 		f.table = prev.table
 		f.props = prev.props
 	}
-	m.fabrics[fabricIndex] = f
 	m.mu.Unlock()
-	m.storeMu.Unlock()
+	m.installLocked(f)
+	// Under storeMu: its live-key snapshot and its drop cannot straddle
+	// another fabric's install, whose restored windows it would drop.
 	m.forgetUnreferenced()
+	m.storeMu.Unlock()
 	// A GroupKeyMap change moves Membership's KeySetId. Mirrors
 	// GroupcastServer's groupKeyMap$Changed reactor (#deriveNow).
 	m.notifyGroupcast(ctx, fabricIndex)
@@ -479,15 +672,45 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 // The fabric's Groupcast properties go with it, as matter.js
 // GroupcastServer #handleFabricDeleted drops the departed fabric's
 // groupProperties.
+//
+// The replay windows the fabric's keys held are parked, not discarded:
+// a fail-closed path forgets a fabric and loads it again from the store,
+// and an unprimed window takes the first counter it sees, so a recorded
+// datagram would be admitted once after the reload. The next load of the
+// fabric index gives a key it brings back under the same key set id its
+// windows again and drops the rest (restoreParked).
+//
+// The fabric's reload from the store is owed (reloadOwed): the next
+// [Manager.Load] loads it again on its own at once, a receive once the
+// retry interval has passed (the first receive after the forget, then 1 s
+// after a failure, doubling to 60 s). For a removed fabric that finds no
+// row, and its parked windows go; a fabric the store still holds comes
+// back — its keys on either path, its multicast memberships only through
+// Load. While its load fails it stays absent and the other fabrics serve
+// from memory. ForgetFabric waits for a store read in progress (storeMu),
+// as every mutation does.
 func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	m.storeMu.Lock() // no load or mutation installs the fabric again meanwhile
 	m.mu.Lock()
-	_, had := m.fabrics[fabricIndex]
+	f, had := m.fabrics[fabricIndex]
 	delete(m.fabrics, fabricIndex)
+	// Its reload is owed: the next Load or receive loads this fabric again
+	// on its own (reloadOwed) — a fabric the store still holds (a
+	// fail-closed path forgets it and loads it again) comes back, a
+	// removed one does not, and a store failure leaves only it absent.
+	if len(m.owed) == 0 {
+		// A new debt starts unpaced: a deadline left by a debt another
+		// route cleared (Reload, a lazy load) does not hold it back. A
+		// repeated forget of an owed fabric keeps the pacing.
+		m.owedRetryAt, m.owedBackoff = 0, 0
+	}
+	m.owed[fabricIndex] = true
 	m.mu.Unlock()
+	// Under storeMu: no load can restore the fabric before its windows
+	// are parked.
+	m.park(fabricIndex, f, m.forgetUnreferenced())
 	m.storeMu.Unlock()
 	m.closeSenders(fabricIndex)
-	m.forgetUnreferenced()
 	if had {
 		m.notify()
 		m.notifyGroupcast(context.Background(), fabricIndex)
@@ -495,8 +718,8 @@ func (m *Manager) ForgetFabric(fabricIndex uint8) {
 }
 
 // forgetUnreferenced drops reception state for operational keys no
-// loaded key set derives.
-func (m *Manager) forgetUnreferenced() {
+// loaded key set derives and returns what it dropped, by key.
+func (m *Manager) forgetUnreferenced() map[string]map[uint64]*mrp.Window {
 	live := make(map[string]struct{})
 	m.mu.RLock()
 	for _, f := range m.fabrics {
@@ -508,12 +731,101 @@ func (m *Manager) forgetUnreferenced() {
 	}
 	m.mu.RUnlock()
 	m.receptionMu.Lock()
-	for k := range m.reception {
+	dropped := map[string]map[uint64]*mrp.Window{}
+	for k, w := range m.reception {
 		if _, ok := live[k]; !ok {
+			dropped[k] = w
 			delete(m.reception, k)
 		}
 	}
+	for k := range m.receptionFull {
+		if _, ok := live[k]; !ok {
+			delete(m.receptionFull, k)
+		}
+	}
 	m.receptionMu.Unlock()
+	return dropped
+}
+
+// dropParked discards what ForgetFabric parked for idx.
+func (m *Manager) dropParked(idx uint8) {
+	m.receptionMu.Lock()
+	delete(m.parkedReception, idx)
+	m.receptionMu.Unlock()
+}
+
+// parkedKey is one operational key's replay windows, parked by
+// ForgetFabric, and the ids of the fabric's key sets that derived it.
+type parkedKey struct {
+	keySets []uint16
+	windows map[uint64]*mrp.Window
+}
+
+// park keeps the windows of dropped that f's key sets derived, for the
+// next load of fabric idx; whatever an earlier forget parked for idx is
+// replaced. f nil (a fabric that was not loaded) parks nothing and keeps
+// what an earlier forget parked.
+func (m *Manager) park(idx uint8, f *fabricGroups, dropped map[string]map[uint64]*mrp.Window) {
+	if f == nil {
+		// Not loaded since an earlier forget (its load failed): what that
+		// forget parked stays for the load that succeeds.
+		return
+	}
+	m.receptionMu.Lock()
+	defer m.receptionMu.Unlock()
+	delete(m.parkedReception, idx)
+	if len(dropped) == 0 {
+		return
+	}
+	parked := map[string]parkedKey{}
+	for id, ks := range f.keySets {
+		for _, e := range ks.epochs {
+			k := hex.EncodeToString(e.key)
+			w, ok := dropped[k]
+			if !ok {
+				continue
+			}
+			pk := parked[k]
+			pk.windows = w
+			pk.keySets = append(pk.keySets, id)
+			parked[k] = pk
+		}
+	}
+	if len(parked) > 0 {
+		m.parkedReception[idx] = parked
+	}
+}
+
+// restoreParked gives the fabric f just loaded the windows ForgetFabric
+// parked for its index: a key one of its key sets derives under the same
+// key set id gets them back — merged into a window set a decode in flight
+// across the forget may have created, the parked window winning per
+// source node; every other parked window is dropped.
+func (m *Manager) restoreParked(f *fabricGroups) {
+	m.receptionMu.Lock()
+	defer m.receptionMu.Unlock()
+	parked, ok := m.parkedReception[f.index]
+	if !ok {
+		return
+	}
+	delete(m.parkedReception, f.index)
+	for id, ks := range f.keySets {
+		for _, e := range ks.epochs {
+			k := hex.EncodeToString(e.key)
+			pk, ok := parked[k]
+			if !ok || !slices.Contains(pk.keySets, id) {
+				continue
+			}
+			cur, held := m.reception[k]
+			if !held {
+				m.reception[k] = pk.windows
+				continue
+			}
+			for src, w := range pk.windows {
+				cur[src] = w
+			}
+		}
+	}
 }
 
 // Fabrics returns the index of every fabric the store knows, ascending,

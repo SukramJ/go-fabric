@@ -497,13 +497,10 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 	// matter.js's per-session SII/SAI emission (NodeSession.ts:153
 	// `Duration.format(this.idleInterval)`).
 	//
-	// The operational defaults differ from the commissionable defaults
-	// (SII=5000ms, SAI=300ms). chip (src/lib/dnssd/Advertiser_ImplMinimalMdns.cpp)
-	// and matter.js (packages/protocol/src/session/SessionIntervals.ts
-	// MATTER_OPERATION_*_DEFAULT) both emit operational SII=500ms / SAI=300ms
-	// (the post-CASE MRP-window tuning); the higher 5000ms applies to the
-	// commissionable record so battery-backed commissioners can power
-	// down between scans.
+	// The operational defaults are SII=500ms / SAI=300ms
+	// (defaultOperationalSII / defaultOperationalSAI), the same values the
+	// commissionable record uses (defaultCommissionableSII /
+	// defaultCommissionableSAI); there is no separate 5000ms default.
 	sii := cfg.SessionIdleInterval
 	if sii == 0 {
 		sii = defaultOperationalSII
@@ -618,9 +615,9 @@ type CommissionableServiceConfig struct {
 	// SessionIdleInterval / SessionActiveInterval are the MRP tuning
 	// hints added to the commissioning TXT record in Matter 1.4
 	// (`SII` / `SAI` keys per §4.3.1.6 and matter.js
-	// packages/protocol/src/session/SessionIntervals.ts). The spec
-	// recommends SII=5000 ms, SAI=300 ms as default values. Zero
-	// triggers the defaults.
+	// packages/protocol/src/session/SessionIntervals.ts). Zero
+	// triggers the defaults, SII=500 ms (defaultCommissionableSII) and
+	// SAI=300 ms (defaultCommissionableSAI).
 	SessionIdleInterval   uint32
 	SessionActiveInterval uint32
 	// SessionActiveThreshold is the SAT TXT key (Matter 1.4) — see
@@ -783,9 +780,9 @@ const defaultCommissionableSAI uint32 = 300
 // the operational `_matter._tcp` record (Matter §4.3.1.6). chip emits
 // 500 ms (src/lib/dnssd/Advertiser_ImplMinimalMdns.cpp) and matter.js
 // emits 500 ms (packages/protocol/src/session/SessionIntervals.ts
-// MATTER_OPERATION_SII_DEFAULT). The operational value is tighter than
-// the commissionable 5000 ms because post-CASE traffic is bounded by
-// MRP retransmit windows, not battery-backed commissioner scans.
+// MATTER_OPERATION_SII_DEFAULT). It equals defaultCommissionableSII;
+// the two constants are kept apart because the two records are
+// configured apart.
 const defaultOperationalSII uint32 = 500
 
 // defaultOperationalSAI is the recommended Session Active Interval for

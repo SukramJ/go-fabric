@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
@@ -28,11 +27,6 @@ func contentLauncherValues(st ContentLauncherState) map[uint32]any {
 		launchdef.AttrAcceptHeader:                header,
 		launchdef.AttrSupportedStreamingProtocols: st.SupportedStreamingProtocols,
 	}
-}
-
-func cloneContentLauncher(st ContentLauncherState) ContentLauncherState {
-	st.AcceptHeader = slices.Clone(st.AcceptHeader)
-	return st
 }
 
 // ContentLauncher is the ContentLauncher host port (the generated
@@ -76,12 +70,12 @@ func NewContentLauncher(cfg ContentLauncherConfig) (*ContentLauncherServer, erro
 		return port.LaunchURL(ctx, st, req)
 	})
 	srv, err := newServer(launchdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, contentLauncherValues, cloneContentLauncher, storeState[ContentLauncherState]); err != nil {
+	if err := s.init(srv, cfg.Initial, contentLauncherValues, ContentLauncherState.Clone, storeState[ContentLauncherState]); err != nil {
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
 	return s, nil

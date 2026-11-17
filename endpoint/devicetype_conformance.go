@@ -101,10 +101,18 @@ func (p *dtPass) of(ep uint16) *dtResolved {
 		return r
 	}
 	r := &dtResolved{ep: ep, p: p, servers: map[uint32]bool{}, clients: map[uint32]bool{}, features: map[uint32][]string{}}
+	listed := map[uint32]bool{}
 	for _, id := range p.facts.deviceTypeIDs(ep) {
 		// A device type the model does not define states no requirement
-		// that could be checked.
-		if dt, ok := p.l.m.deviceTypes[id]; ok {
+		// that could be checked. One the list names twice counts once —
+		// toward Base's Duplicate condition, where matter.js tallies each
+		// endpoint's application device types as a set
+		// (packages/model/src/logic/device-types/ConditionAssertions.ts:715-727
+		// applicationDeviceTypeIdsOf returns a Set, tallied at :699-703, at
+		// db021da0), and in what the endpoint is judged against (review II,
+		// R2-P6-par-0660).
+		if dt, ok := p.l.m.deviceTypes[id]; ok && !listed[id] {
+			listed[id] = true
 			r.deviceTypes = append(r.deviceTypes, dt)
 		}
 	}
@@ -407,9 +415,16 @@ type dtScopeConditions struct {
 	p              *dtPass
 	nodeEp         uint16
 	nodeConditions map[string]bool
-	underived      map[uint16]map[string]bool
-	assertions     map[uint16][]dtAssertion
-	conditions     map[uint16]map[string]bool
+	// unknownNodeConditions are the network-interface conditions the scope
+	// cannot answer yet: a NetworkCommissioning server's FeatureMap has not
+	// arrived, and no other server establishes them (review II,
+	// R2-P6-err-0661). A conformance naming one is left conditional, as a
+	// requirement nested in a cluster whose FeatureMap is unknown is
+	// ([ClusterShape]).
+	unknownNodeConditions map[string]bool
+	underived             map[uint16]map[string]bool
+	assertions            map[uint16][]dtAssertion
+	conditions            map[uint16]map[string]bool
 	// rootAsserted are the names among the node endpoint's conditions that
 	// hold only because an endpoint of the scope asserts them at Root
 	// (ConditionAssertions ScopeConditions #rootAsserted).
@@ -433,7 +448,10 @@ func (p *dtPass) collect(nodeEp uint16) *dtScopeConditions {
 
 // nodeConditionsOf: what the node's configuration answers — the facts'
 // node conditions and the network interfaces a NetworkCommissioning server
-// in the node scope supports.
+// in the node scope supports. A NetworkCommissioning server whose
+// FeatureMap is not known leaves the interface conditions no other source
+// makes true unknown ([dtScopeConditions.unknownNodeConditionsOf]), not
+// false.
 func (s *dtScopeConditions) nodeConditionsOf() map[string]bool {
 	if s.nodeConditions != nil {
 		return s.nodeConditions
@@ -442,15 +460,47 @@ func (s *dtScopeConditions) nodeConditionsOf() map[string]bool {
 	for _, c := range s.p.facts.nodeConditions(s.nodeEp) {
 		conds[c] = true
 	}
+	featuresUnknown := false
 	for _, ep := range s.p.nodeScopeOf(s.nodeEp) {
-		for _, f := range s.p.of(ep).featuresOf(networkCommissioningClusterID) {
+		r := s.p.of(ep)
+		if r.servers[networkCommissioningClusterID] && !s.p.facts.judgeable(ep, networkCommissioningClusterID, schema.RequirementFeature) {
+			featuresUnknown = true
+			continue
+		}
+		for _, f := range r.featuresOf(networkCommissioningClusterID) {
 			if c, ok := interfaceConditions[f]; ok {
 				conds[c] = true
 			}
 		}
 	}
+	unknown := map[string]bool{}
+	if featuresUnknown {
+		for _, c := range interfaceConditions {
+			if !conds[c] {
+				unknown[c] = true
+			}
+		}
+	}
 	s.nodeConditions = conds
+	s.unknownNodeConditions = unknown
 	return conds
+}
+
+// unknownNodeConditionsOf: the node conditions the scope cannot answer
+// yet (unknownNodeConditions).
+func (s *dtScopeConditions) unknownNodeConditionsOf() map[string]bool {
+	s.nodeConditionsOf()
+	return s.unknownNodeConditions
+}
+
+// unknownConditionsOf: the conditions ep's node scope cannot answer yet;
+// none outside a node scope.
+func (p *dtPass) unknownConditionsOf(ep uint16) map[string]bool {
+	nodeEp, ok := p.nodeEndpointOf(ep)
+	if !ok {
+		return nil
+	}
+	return p.collect(nodeEp).unknownNodeConditionsOf()
 }
 
 // underivedOf: structural, node and stated conditions of ep.
@@ -480,8 +530,12 @@ func (s *dtScopeConditions) assertionsOf(ep uint16) []dtAssertion {
 	}
 	var out []dtAssertion
 	names := s.underivedOf(ep)
+	unknown := s.unknownNodeConditionsOf()
 	for _, dt := range s.p.of(ep).deviceTypes {
 		known := s.p.l.scopeNames(dt)
+		for n := range unknown {
+			delete(known, n)
+		}
 		for i := range dt.Requirements {
 			r := &dt.Requirements[i]
 			if r.Element != schema.RequirementCondition || !r.Referent.Resolved {
@@ -615,8 +669,11 @@ type dtContext struct {
 	deviceType *schema.DeviceTypeDefinition
 	scope      *schema.DeviceTypeDefinition
 	conditions map[string]bool
-	waived     map[string]bool
-	p          *dtPass
+	// unknown are the conditions the endpoint's node scope cannot answer
+	// yet ([dtPass.unknownConditionsOf]).
+	unknown map[string]bool
+	waived  map[string]bool
+	p       *dtPass
 	// memoize reads the composing endpoint's components from the pass's
 	// cache; the re-check under other conditions groups them afresh.
 	memoize bool
@@ -706,7 +763,7 @@ func (p *dtPass) checkDeviceTypes(facts *dtResolved, conditions map[string]bool,
 		if dt.Classification == "base" {
 			waived = p.baseWaivers(facts)
 		}
-		ctx := &dtContext{violations: &violations, facts: facts, deviceType: dt, scope: dt, conditions: conditions, waived: waived, p: p, memoize: memoize}
+		ctx := &dtContext{violations: &violations, facts: facts, deviceType: dt, scope: dt, conditions: conditions, unknown: p.unknownConditionsOf(facts.ep), waived: waived, p: p, memoize: memoize}
 		ctx.checkClusters(dt.Requirements)
 		ctx.checkComposition(collection)
 	}
@@ -746,7 +803,7 @@ func (c *dtContext) checkCluster(r *schema.DeviceTypeRequirement, side string) {
 	for _, f := range features {
 		trueNames[f] = true
 	}
-	scope := reqScope{dt: c.scope, cluster: cluster, hasCluster: true}
+	scope := reqScope{dt: c.scope, cluster: cluster, hasCluster: true, unknown: c.unknown}
 	for i := range r.Requirements {
 		nested := &r.Requirements[i]
 		if !nested.Referent.Resolved || !c.p.facts.judgeable(c.facts.ep, cluster, nested.Element) {
@@ -785,7 +842,7 @@ func (c *dtContext) judgeCluster(r *schema.DeviceTypeRequirement, side string) (
 		path = "client:" + r.Referent.Name
 	}
 	kind = c.judge(judgement{
-		req: r, applicability: c.p.l.applicabilityOf(r, c.conditions, reqScope{dt: c.scope}), trueNames: c.conditions,
+		req: r, applicability: c.p.l.applicabilityOf(r, c.conditions, reqScope{dt: c.scope, unknown: c.unknown}), trueNames: c.conditions,
 		present: present, path: path, subject: side + " cluster " + r.Referent.Name,
 		cluster: r.Referent.ID, hasCluster: true, clusterRequirement: true,
 	})
@@ -887,14 +944,15 @@ func (p *dtPass) componentsOf(composing uint16, dt *schema.DeviceTypeDefinition,
 	if found, ok := byDT[dt]; ok {
 		return found
 	}
-	found := p.groupComponents(dt, conditions)
+	found := p.groupComponents(dt, conditions, p.unknownConditionsOf(composing))
 	byDT[dt] = found
 	return found
 }
 
 // groupComponents groups dt's component requirements by component device
-// type under conditions (DeviceTypeConformance.ts groupComponents).
-func (p *dtPass) groupComponents(dt *schema.DeviceTypeDefinition, conditions map[string]bool) []*dtComponent {
+// type under conditions, unknown left conditional
+// (DeviceTypeConformance.ts groupComponents).
+func (p *dtPass) groupComponents(dt *schema.DeviceTypeDefinition, conditions, unknown map[string]bool) []*dtComponent {
 	var found []*dtComponent
 	index := map[uint32]*dtComponent{}
 	for i := range dt.Requirements {
@@ -903,7 +961,7 @@ func (p *dtPass) groupComponents(dt *schema.DeviceTypeDefinition, conditions map
 		if comp == nil {
 			continue
 		}
-		a := p.l.applicabilityOf(r, conditions, reqScope{dt: dt})
+		a := p.l.applicabilityOf(r, conditions, reqScope{dt: dt, unknown: unknown})
 		entry, ok := index[comp.ID]
 		if !ok {
 			entry = &dtComponent{deviceType: comp, disallowed: true}
@@ -944,7 +1002,7 @@ func (p *dtPass) failuresOf(candidate *dtResolved, instance *schema.DeviceTypeRe
 	violations := []DeviceTypeViolation{}
 	ctx := &dtContext{
 		violations: &violations, facts: candidate, deviceType: composing, scope: p.l.componentOf(instance),
-		conditions: collection.conditionsOf(candidate.ep), waived: map[string]bool{}, p: p,
+		conditions: collection.conditionsOf(candidate.ep), unknown: p.unknownConditionsOf(candidate.ep), waived: map[string]bool{}, p: p,
 	}
 	ctx.checkClusters(instance.Requirements)
 	byInstance[instance] = violations
@@ -958,7 +1016,7 @@ func (c *dtContext) checkComposition(collection *dtScopeConditions) {
 	if c.memoize {
 		comps = c.p.componentsOf(c.facts.ep, c.deviceType, c.conditions)
 	} else {
-		comps = c.p.groupComponents(c.deviceType, c.conditions)
+		comps = c.p.groupComponents(c.deviceType, c.conditions, c.unknown)
 	}
 	candidates := map[*dtComponent][]*dtResolved{}
 	for _, comp := range comps {

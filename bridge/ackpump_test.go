@@ -722,3 +722,50 @@ func TestAckPump_TimedRequestWakesThePump(t *testing.T) {
 		requireTicker(t, fake, "a timed deadline")
 	})
 }
+
+// TestUnsecuredStandaloneAckCarriesOneNodeID: a standalone acknowledgement
+// on the unsecured session carries exactly one node id — the peer's source
+// as the destination (also when it named a destination too), or, when the
+// peer named only a destination, that as the source (R2-P6-test-0819).
+func TestUnsecuredStandaloneAckCarriesOneNodeID(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name     string
+		hdr      message.Header
+		wantDest bool
+		node     uint64
+	}{
+		{"peer named its source", message.Header{MessageCounter: 0x4242, HasSourceNodeID: true, SourceNodeID: 0x5A5A}, true, 0x5A5A},
+		{"peer named only a destination", message.Header{MessageCounter: 0x4242, DestSize: message.DestNodeID, DestNodeID: 0x7777}, false, 0x7777},
+		{"peer named both", message.Header{MessageCounter: 0x4242, HasSourceNodeID: true, SourceNodeID: 0x5A5A, DestSize: message.DestNodeID, DestNodeID: 0x7777}, true, 0x5A5A},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			b := newStartedBridge(t)
+			b.AttachAckTracker(mrp.NewAckTracker(0))
+			peerConn, peerAddr := openPeerSocket(t)
+			defer peerConn.Close()
+			b.owedInboundAck(peerAddr, &c.hdr, buildNeedsAckProto(88, c.hdr.MessageCounter))
+			if n := b.RunAckPumpOnce(time.Now().Add(time.Second)); n != 1 {
+				t.Fatalf("RunAckPumpOnce = %d, want 1", n)
+			}
+			_ = peerConn.SetReadDeadline(time.Now().Add(time.Second))
+			buf := make([]byte, 512)
+			n, _, err := peerConn.ReadFromUDP(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, _, err := message.UnmarshalHeader(buf[:n])
+			if err != nil {
+				t.Fatal(err)
+			}
+			hasDest := got.DestSize == message.DestNodeID
+			if hasDest != c.wantDest || got.HasSourceNodeID == c.wantDest {
+				t.Fatalf("destination %v, source %v; want exactly the %s", hasDest, got.HasSourceNodeID, map[bool]string{true: "destination", false: "source"}[c.wantDest])
+			}
+			if id := map[bool]uint64{true: got.DestNodeID, false: got.SourceNodeID}[c.wantDest]; id != c.node {
+				t.Fatalf("node id %#x, want %#x", id, c.node)
+			}
+		})
+	}
+}

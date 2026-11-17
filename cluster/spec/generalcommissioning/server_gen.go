@@ -33,6 +33,36 @@ type State struct {
 	IsCommissioningWithoutPower  bool                       // attribute 0x000C: bool, O, R V
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.TcUpdateDeadline = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.TcUpdateDeadline)
+	c.RecoveryIdentifier = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(st.RecoveryIdentifier)
+	c.NetworkRecoveryReason = func(p *NetworkRecoveryReasonEnum) *NetworkRecoveryReasonEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.NetworkRecoveryReason)
+	return c
+}
+
 // Patch is a change to the GeneralCommissioning state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

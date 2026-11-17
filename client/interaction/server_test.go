@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
+	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 // servedCluster is the manufacturer-specific cluster the fake dispatcher
@@ -61,6 +62,12 @@ func (d *fakeDispatcher) Write(ctx context.Context, p im.ConcreteAttributePath, 
 	d.writes = append(d.writes, timedOf(ctx))
 	d.mu.Unlock()
 	return []im.WriteResult{{Path: p, Status: im.StatusSuccess}}
+}
+
+// CheckACL grants: the role's ACL is not what these tests are about, and
+// a dispatcher without a checker denies (review II, R2-P6-sec-0560).
+func (*fakeDispatcher) CheckACL(context.Context, uint8, uint64, []uint32, uint16, uint32, uint8) im.StatusCode {
+	return im.StatusSuccess
 }
 
 func (d *fakeDispatcher) Invoke(ctx context.Context, p im.ConcreteCommandPath, _ any) im.InvokeResult {
@@ -269,9 +276,12 @@ func TestServeReadChunkRefused(t *testing.T) {
 	})
 }
 
-// TestServeRefusals: an undecodable request and a read path with a
-// wildcard cluster are InvalidAction; a SubscribeRequest stays with the
-// report-only handler; a nil Dispatcher uninstalls the server.
+// TestServeRefusals: an undecodable request is answered FAILURE, or the
+// status its decode error carries, and nothing when it is a Write or an
+// Invoke that asks to suppress its response — as the bridge answers it
+// (review II, R2-P6-par-0701); a read path with a wildcard cluster is
+// InvalidAction; a SubscribeRequest stays with the report-only handler; a
+// nil Dispatcher uninstalls the server.
 func TestServeRefusals(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -279,7 +289,50 @@ func TestServeRefusals(t *testing.T) {
 		garbage := []byte{0x15, 0x24}
 		for i, op := range []uint8{im.OpcodeReadRequest, im.OpcodeWriteRequest, im.OpcodeInvokeRequest, im.OpcodeTimedRequest} {
 			s.push(t, 0x7220+uint16(i), op, garbage)
-			s.ackPushed(t, expectStatus(t, s, im.StatusInvalidAction))
+			s.ackPushed(t, expectStatus(t, s, im.StatusFailure))
+		}
+		// A typed decode error answers its own status: an endpoint beyond
+		// 16 bits is CONSTRAINT_ERROR.
+		wide := encode(t, func(e *tlv.Encoder) {
+			e.StartStruct(tlv.AnonymousTag())
+			e.StartArray(tlv.ContextTag(0))
+			e.StartList(tlv.AnonymousTag())
+			e.PutUint(tlv.ContextTag(2), 70000)
+			_ = e.EndContainer()
+			_ = e.EndContainer()
+			e.PutBool(tlv.ContextTag(3), true)
+			_ = e.EndContainer()
+		})
+		s.push(t, 0x722B, im.OpcodeReadRequest, wide)
+		s.ackPushed(t, expectStatus(t, s, im.StatusConstraintError))
+		// A Write and an Invoke that do not decode but ask to suppress
+		// their response are answered with nothing.
+		suppressed := encode(t, func(e *tlv.Encoder) {
+			e.StartStruct(tlv.AnonymousTag())
+			e.PutBool(tlv.ContextTag(0), true)
+			_ = e.EndContainer()
+		})
+		for i, op := range []uint8{im.OpcodeWriteRequest, im.OpcodeInvokeRequest} {
+			s.push(t, 0x722C+uint16(i), op, suppressed)
+			synctest.Wait()
+			for done := false; !done; {
+				select {
+				case b := <-s.conn.ch:
+					hdr, hl, err := message.UnmarshalHeader(b)
+					if err != nil {
+						t.Fatal(err)
+					}
+					plain, _, err := s.peer.Decrypt(&hdr, hdr.NonceSecurityFlags(), b[hl:])
+					if err != nil {
+						t.Fatal(err)
+					}
+					if proto, _, err := message.UnmarshalProtocolHeader(plain); err == nil && proto.ProtocolID == im.InteractionModelProtocolID {
+						t.Fatalf("opcode 0x%02X: a suppressed request that does not decode was answered with opcode 0x%02X", op, proto.Opcode)
+					}
+				default:
+					done = true
+				}
+			}
 		}
 		wild := im.ReadRequest{AttributeRequests: []im.ConcreteAttributePath{{Endpoint: 1, HasEndpoint: true, Attribute: 0, HasAttribute: true}}}
 		s.push(t, 0x7228, im.OpcodeReadRequest, encode(t, func(e *tlv.Encoder) { wild.MarshalTLV(e) }))

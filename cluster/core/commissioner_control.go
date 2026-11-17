@@ -115,12 +115,19 @@ type CommissionerControlConfig struct {
 	SupportedDeviceCategories commctrldef.SupportedDeviceCategoryBitmap
 	// ApprovalTimeout bounds the Approver's decision; past it the result
 	// is TIMEOUT. 0 waits for the Approver, as connectedhomeip's delegate
-	// (which decides at once) never times out.
+	// (which decides at once) never times out: an Approver that never
+	// returns holds the node's one request slot until a restart.
 	ApprovalTimeout time.Duration
 	// ApprovalValidity is how long an approved request stays valid for
-	// CommissionNode; past it CommissionNode answers FAILURE. 0 keeps it
-	// until it is used or replaced, as connectedhomeip's delegate does
-	// (kWaitCommissionNodeRequest, CommissionerControlDelegate.cpp:121).
+	// CommissionNode; past it the approving client's CommissionNode answers
+	// FAILURE and frees the slot. The server holds one request for the node
+	// (kWaitCommissionNodeRequest, CommissionerControlDelegate.cpp:121):
+	// while it waits, every RequestCommissioningApproval — of any client and
+	// any fabric — answers FAILURE, and nothing replaces it. The slot is
+	// freed only by the approving client's CommissionNode (used, or found
+	// past ApprovalValidity) or a restart; 0 never expires it, and neither
+	// the clock nor the removal of the request's fabric frees it (review
+	// II, R2-P6-sup-1009).
 	ApprovalValidity time.Duration
 	// Rand mints the passcode, discriminator and salt; nil is
 	// crypto/rand.
@@ -219,7 +226,7 @@ func NewCommissionerControl(cfg CommissionerControlConfig) (*CommissionerControl
 		Commands: []uint32{commctrldef.CmdRequestCommissioningApproval, commctrldef.CmdCommissionNode},
 	}, spec.ServerConfig{
 		Handlers:    handlers,
-		DataVersion: &c.dv,
+		DataVersion: &c.dv, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial:     map[uint32]any{commctrldef.AttrSupportedDeviceCategories: cfg.SupportedDeviceCategories},
 	})
 	if err != nil {

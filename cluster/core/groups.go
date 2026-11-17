@@ -346,9 +346,9 @@ func (s *Groups) getGroupMembership(ctx context.Context, fabric uint8, list []ui
 	return GetGroupMembershipResponse{Capacity: capacity, GroupList: filtered}, nil
 }
 
-// removeGroup mirrors GroupsServer.removeGroup. Scenes of the group would
-// be removed with it (removeScenesForGroupOnFabric); the ScenesManagement
-// stub keeps no scenes, so there is nothing to remove.
+// removeGroup mirrors GroupsServer.removeGroup. The scenes of the group go
+// with it (removeScenesForGroupOnFabric) when a ScenesManagement server is
+// attached.
 func (s *Groups) removeGroup(ctx context.Context, fabric uint8, groupID uint16) (any, error) {
 	if groupID < 1 {
 		return RemoveGroupResponse{Status: im.StatusConstraintError, GroupID: groupID}, nil

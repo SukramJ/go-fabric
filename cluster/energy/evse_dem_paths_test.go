@@ -6,7 +6,7 @@ package energy_test
 import (
 	"context"
 	"errors"
-	"slices"
+	"reflect"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -41,13 +41,15 @@ func TestDEMRefusals(t *testing.T) {
 	demWantStatus(t, "modify, no forecast", demInvoke(srv, dem.CmdModifyForecastRequest, dem.ModifyForecastRequestRequest{}), im.StatusFailure)
 	demWantStatus(t, "constraints, no forecast", demInvoke(srv, dem.CmdRequestConstraintBasedForecast, dem.RequestConstraintBasedForecastRequest{}), im.StatusFailure)
 
-	// A forecast without EarliestStartTime / LatestEndTime.
+	// A forecast without EarliestStartTime / LatestEndTime: under STA
+	// both are "STA" and the store refuses it, so chip's "no window"
+	// refusal (Cluster.cpp:436-440) has no way in (review II,
+	// R2-P6-par-1304).
 	f := triggerForecast(now)
 	f.EarliestStartTime, f.LatestEndTime = nil, nil
-	if err := srv.SetForecast(f); err != nil {
-		t.Fatal(err)
+	if err := srv.SetForecast(f); !errors.Is(err, spec.ErrConformance) {
+		t.Fatalf("a forecast without its STA fields: %v, want ErrConformance", err)
 	}
-	demWantStatus(t, "start time, no window", demInvoke(srv, dem.CmdStartTimeAdjustRequest, dem.StartTimeAdjustRequestRequest{}), im.StatusFailure)
 	// A null EarliestStartTime means now (Cluster.cpp:446-456).
 	null, latest := spec.NullOf[uint32](), f.EndTime+600
 	f.EarliestStartTime, f.LatestEndTime = &null, &latest
@@ -110,9 +112,13 @@ func TestDEMRefusals(t *testing.T) {
 	_ = srv.SetForecast(g)
 	demWantStatus(t, "pause, active slot beyond", demInvoke(srv, dem.CmdPauseRequest, dem.PauseRequestRequest{Duration: 20}), im.StatusFailure)
 	g.ActiveSlotNumber = spec.ValueOf(uint16(0))
+	// A slot without SlotIsPausable, chip's "pause fields" refusal
+	// (Cluster.cpp:562-578), cannot be stored under PAU, whose field it is
+	// (review II, R2-P6-par-1304).
 	g.Slots[0].SlotIsPausable = nil
-	_ = srv.SetForecast(g)
-	demWantStatus(t, "pause, slot without pause fields", demInvoke(srv, dem.CmdPauseRequest, dem.PauseRequestRequest{Duration: 20}), im.StatusFailure)
+	if err := srv.SetForecast(g); !errors.Is(err, spec.ErrConformance) {
+		t.Fatalf("a slot without SlotIsPausable under PAU: %v, want ErrConformance", err)
+	}
 	if err := srv.SetEsaState(energy.EsaStateFault); err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +298,7 @@ func TestEvseSoCTargets(t *testing.T) {
 	if err := set(target(60, &fifty, nil)); err != nil {
 		t.Fatal(err)
 	}
-	if got := srv.Targets(); len(got) != 1 || !slices.Equal(got[0].ChargingTargets, []energy.ChargingTarget{target(60, &fifty, nil)}) {
+	if got := srv.Targets(); len(got) != 1 || !reflect.DeepEqual(got[0].ChargingTargets, []energy.ChargingTarget{target(60, &fifty, nil)}) {
 		t.Errorf("targets %+v", got)
 	}
 }

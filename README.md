@@ -124,8 +124,8 @@ package, and Go makes all of them unimportable from outside — the one-way
 seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
 `channelseam`, `coreseam`, `deviceseam`, `exchangeseam`, `facadeseam`, `fabrictestseam`,
-`nodeseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
-internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`);
+`nodeseam`, `sessionseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
+internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`, `caseauth`, `deepcopy`);
 and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
@@ -228,6 +228,22 @@ becomes permissible in:
 | `cluster/core.GeneralCommissioning.ArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession` | `v0.23.0` |
 | `device.NewRootNode` | none; the root endpoint is the node's (`node.Node.Root`) | `v0.23.0` |
 | `endpoint.WriteChanges`, `endpoint.WithWriteChanges` (`Unchanged`, `Changed`, `ChangedAttributes`) | `im.HandleWrite`, whose results carry each write's verdict in `im.WriteResult.Commit` | `v0.23.0` |
+| `commissioning` (the package: `PASEConfig`, `PASEResponder`, `NewPASEResponder`, `BuildAttestation`, `AttestationInput`, `AttestationResult`, `BuildCSR`, `CSRInput`, `CSRResult`, `DACChain`, `VerifyChain`, `LoadPAAPoolFromPEM`, `ErrPASE*`, `ErrAttestation*`, `ErrCSRNonce`, `ErrDAC*`) | the node's commissioning window (`node.Node.OpenBasicWindow`, `OpenOwnWindow`) and `cluster/core.OperationalCredentials`; `secure/spake2` and `secure/mattercert.CreateCSR` for the pieces; `controller/attestation.Validate` for the DAC chain | `v0.23.0` |
+| `mdns.DeriveUniqueIDFromIdentity` | `node.Commissioning.RotatingDeviceID`, or 16 random bytes drawn once and persisted, passed to `mdns.GenerateRotatingID` | `v0.23.0` |
+| `cluster/core.OperationalCredentials.SetCurrentFabric`, `cluster/core.GroupKeyManagement.SetCurrentFabric`, `cluster/core.AccessControl.SetCurrentFabric` | none: a fabric-scoped command or write takes its fabric from the request (`im.WithFabricFilter`) | `v0.23.0` |
+| `secure/operational.Manager.OpenFromSigmaWithID`, `Manager.OpenFromSigmaAsInitiatorWithID`, `Manager.OpenFromPaseWithID` | `Manager.AllocateStake` with `OpenFromSigmaWithStake`, `OpenFromSigmaAsInitiatorWithStake`, `OpenFromPaseWithStake`, which install only while the handshake still holds its id (`ErrStakeLost` otherwise) | `v0.23.0` |
+| `secure/operational.Manager.AllocateID` | `Manager.AllocateStake` (`Stake.ID` where the id is announced) | `v0.23.0` |
+| `cluster/spec.Hooks` | a `spec.Server` over the server's own state, MatterInvoke routed through `spec.InvokeHeld` over `spec.NewSelfHeld`; events `spec.Events`, veto `spec.WriteVeto` | `v0.23.0` |
+| `cluster/closure.ControlServer.Hooks` (the embedded field) | `ControlServer.Handle`, `Emit`, `EmitEvent`, `SetBeforeWrite` | `v0.23.0` |
+| `cluster/modebase.Server.Hooks`, `Server.Init`, `Server.Invoke`, `Server.CheckWrite` | `Server.Handle` for a host handler, `Server.MatterInvoke` for the checked command path; `Init` needs none, `CheckWrite` none (no controller write reaches a veto) | `v0.23.0` |
+| `cluster/wire` ids that duplicate a generated constant (`ColorCtrl…`, `ColorHueDir…`, `ColorMoveMode…`, `ColorStepMode…`, `FanControl…`, `MatterEvent…`, `OperationalState…`, `RvcOperationalState…`, `Thermostat…`, `WindowCovering…`; CHANGELOG names each) | the `ClusterID` / `Attr…` / `Cmd…` / `Event…` / enum constant of `cluster/spec/<cluster>` | `v0.23.0` |
+| `cluster/wire.ThermostatCmdSetWeeklySchedule`, `ThermostatCmdGetWeeklySchedule`, `ThermostatCmdClearWeeklySchedule`, `WindowCoveringCmdGoToLiftValue`, `WindowCoveringCmdGoToTiltValue`, `GoToLiftValueRequest`, `GoToTiltValueRequest`, `DecodeGoToLiftValue`, `DecodeGoToTiltValue`, `ErrWindowCoveringMalformed` | none: the commands are not in the model the module serves | `v0.23.0` |
+| `cluster/spec.ServerConfig.DataVersion`, every server `Config.DataVersion` (and `levelcontrol.HeldConfig.DataVersion`), `MatterDataVersion` of `levelcontrol.Server`, `modeselect.Server`, `modebase.Server` | none: leave the field nil; the wire carries the endpoint's DataVersion for the cluster, or the server's own where it serves one | `v0.23.0` |
+| `im/subscription.Reporter`, `EventReporter`, `FlushReporter`, `Manager.SetEventReporter`, `Manager.SetFlushReporter` | `ReportSender` set with `Manager.SetReportSender`; a flush is a `Report` with `Flush` set | `v0.23.0` |
+| `im/subscription.Subscription.TakeDuePaths`, `Subscription.NothingSent` | `Report.Paths`; a `ReportSender` with nothing for the subscriber returns `NothingForSubscriber` | `v0.23.0` |
+| `bridge.Bridge.SubscriptionReporter`, `SubscriptionEventReporter`, `SubscriptionFlushReporter` | none needed: `Bridge.AttachSubscriptionManager` installs the bridge's sender; pass nil as `subscription.NewManager`'s reporter | `v0.23.0` |
+| `bridge/bridgetest.EstablishSubscriptionTarget`, `SubscriptionTarget`, `SubscriptionTarget.PeerCounter`, `ErrNoPeerCounter`, `ErrNoSubscriptionID`, `ErrNoPeer`, `ErrPeerCounterNotAnchored`, `ErrNotEstablished` | `bridgetest.Session.Subscribe` of the test `Commissioner` | `v0.23.0` |
+| `bridge.ErrAckWaitTimeout` | none: no function returns it | `v0.23.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

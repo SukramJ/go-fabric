@@ -52,7 +52,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -296,15 +295,12 @@ func nullListOr[T spec.Encodable](p *[]T) any {
 	return spec.List[T](*p)
 }
 
-// cloneList copies the list p points to, so a port changing it touches no
-// committed value; nil stays nil.
-func cloneList[T any](p *[]T) *[]T {
-	if p == nil {
-		return nil
-	}
-	l := slices.Clone(*p)
-	return &l
-}
+// The state clones are deep (R2-P6-err-1460, decision 142): a port that
+// changes the copy it is handed — through a list, a pointer or a field
+// nested in either — touches no committed value, and neither does a host
+// that changes the copy [stateful.State] returns. A generated state is
+// copied by its generated State.Clone, [AppBasicState] — the one state of
+// this package's own — by its clone.
 
 // nullOr is *p, or nil (null) when p is nil.
 func nullOr[T any](p *T) any {
@@ -430,20 +426,3 @@ func (s *stateful[S]) transact(fn func(st *S) (any, error)) (any, error) {
 
 // dataVersion is the optional host-owned data version every config takes.
 type dataVersion = *cluster.DataVersionTracker
-
-// events stamps the endpoint a server's events are addressed to; the
-// bridge calls SetEndpoint when it mounts the server.
-type events struct {
-	// epMu guards ep.
-	epMu sync.Mutex
-	ep   uint16
-}
-
-// SetEndpoint stamps the endpoint the server's events are addressed to. A
-// server that embeds a *spec.Server beside events declares its own
-// SetEndpoint, which calls this and the store's.
-func (e *events) SetEndpoint(endpoint uint16) {
-	e.epMu.Lock()
-	e.ep = endpoint
-	e.epMu.Unlock()
-}

@@ -24,6 +24,34 @@ type State struct {
 	ProvisionedClientCertificates []TLSClientCertificateDetailStruct // attribute 0x0003: list[TLSClientCertificateDetailStruct], M, R S V, N
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.ProvisionedRootCertificates = func(s []TLSCertStruct) []TLSCertStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TLSCertStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.ProvisionedRootCertificates)
+	c.ProvisionedClientCertificates = func(s []TLSClientCertificateDetailStruct) []TLSClientCertificateDetailStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]TLSClientCertificateDetailStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(st.ProvisionedClientCertificates)
+	return c
+}
+
 // Patch is a change to the TlsCertificateManagement state: each non-nil field is set, the
 // others are left as they are.
 type Patch struct {

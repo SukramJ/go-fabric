@@ -79,10 +79,10 @@ type BasicInformation struct {
 	// identityLabel is the NodeLabel the cluster was constructed with.
 	// It feeds [BasicInformation.uniqueID] instead of the live
 	// nodeLabel: UniqueID carries quality F (fixed for the lifetime of
-	// the device, Matter §11.1.5.13), and SerialNumber falls back to a
-	// UniqueID slice — deriving either from a value a controller can
-	// write means renaming the bridge in Apple or Google Home silently
-	// changes the node's identity under the controller's cache.
+	// the device, Matter §11.1.5.13) — deriving it from a value a
+	// controller can write means renaming the bridge in Apple or Google
+	// Home silently changes the node's identity under the controller's
+	// cache.
 	identityLabel string
 	// pinnedUniqueID holds a UniqueID the caller persisted on an earlier
 	// boot ([Config.UniqueID]). Empty means the value is derived from the
@@ -378,8 +378,8 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 
 // instanceOptions declares the optional elements this instance serves:
 // the revision-gated attributes, Reachable (Apple's HMAccessory.Reachable signal depends on it),
-// SerialNumber (served with a UniqueID-derived fallback), the four
-// optional strings and ProductAppearance when the host set them (ProductLabel
+// SerialNumber, the four optional strings and ProductAppearance when the
+// host set them (ProductLabel
 // defaulted to the ProductName), and the ShutDown, Leave and
 // ReachableChanged events the server emits. LocalConfigDisabled is not
 // listed — matter.js's bridge sample does not emit it — so a write to it is
@@ -392,7 +392,7 @@ func (b *BasicInformation) instanceOptions() spec.Options {
 		// cluster/spec resolves; they are declared as well, to keep the
 		// list explicit.
 		Attributes: []uint32{
-			basicInfoAttrReachable, basicInfoAttrSerialNumber, basicInfoAttrUniqueID,
+			basicInfoAttrReachable, basicInfoAttrUniqueID,
 			basicInfoAttrSpecificationVersion, basicInfoAttrMaxPathsPerInvoke, basicInfoAttrConfigurationVersion,
 		},
 		Events: []uint32{basicInfoEventShutDown, basicInfoEventLeave, basicInfoEventReachableChanged},
@@ -401,6 +401,7 @@ func (b *BasicInformation) instanceOptions() spec.Options {
 		set  bool
 		attr uint32
 	}{
+		{b.serialNumber != "", basicInfoAttrSerialNumber},
 		{b.manufacturingDate != "", basicInfoAttrManufacturingDate},
 		{b.partNumber != "", basicInfoAttrPartNumber},
 		{b.productURL != "", basicInfoAttrProductURL},
@@ -434,13 +435,16 @@ func (b *BasicInformation) inst() *spec.Instance {
 // `setDefault("softwareVersionString", state.softwareVersion.toString())`)
 // so the pair can never diverge. This bridge's authoritative version is
 // the build string, so the same "one release, two renderings" invariant
-// is held by deriving in the opposite direction with a stable,
-// monotonic encoding:
+// is held by deriving in the opposite direction with a stable encoding:
 //
 //	numeric = major*1_000_000 + minor*1_000 + patch
 //
 // with each component clamped to 999 ("0.32.1" → 32_001, "1.2.3" →
-// 1_002_003). Semver pre-release / build-metadata suffixes are dropped
+// 1_002_003). The encoding is monotonic only inside the domain 0-999 per
+// component: past it distinct versions collapse onto one number
+// ("0.999.0" and "0.1000.0" both 999_000), so a release whose component
+// passes 999 advertises no newer SoftwareVersion; a clamp is logged
+// (review II, R2-P6-api-1269). Semver pre-release / build-metadata suffixes are dropped
 // before parsing ("0.32.0-rc.1" → 32_000): a uint32 cannot express
 // pre-release ordering and controllers only compare the numeric for
 // update detection. A leading "v"/"V" is tolerated. Strings without a
@@ -470,6 +474,8 @@ func SoftwareVersionFromString(version string) uint32 {
 			break
 		}
 		if n > 999 {
+			slog.Default().Warn("matter.basic_information.software_version_clamped", //nolint:forbidigo // a package function without a component logger
+				slog.String("version", version), slog.Uint64("value", n))
 			n = 999
 		}
 		parts[i] = uint32(n)
@@ -496,9 +502,13 @@ func validateBasicInfoAttributes(cfg Config, log *slog.Logger) {
 			slog.String("reason", "pinned UniqueID equals SerialNumber — controller caches key on the pair, so they should differ"))
 	}
 	if cfg.SerialNumber != "" && cfg.SerialNumber == fmt.Sprintf("%04X-%04X", cfg.VendorID, cfg.ProductID) {
+		// The check compares SerialNumber with the VendorID-ProductID
+		// class identifier, not with UniqueID: a serial number that names
+		// the product class is the same for every unit (review II,
+		// R2-P6-doc-1265).
 		log.Debug("matter.basic_information.validate",
-			slog.String("field", "UniqueID/SerialNumber"),
-			slog.String("reason", "UniqueID and SerialNumber are identical — they should differ for controller caches"))
+			slog.String("field", "SerialNumber"),
+			slog.String("reason", "SerialNumber looks like a class identifier (VendorID-ProductID) — it should name the unit"))
 	}
 	if strings.TrimSpace(cfg.VendorName) == "" {
 		log.Debug("matter.basic_information.validate",
@@ -679,18 +689,13 @@ func (b *BasicInformation) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 		}
 		return b.productLabel, true
 	case basicInfoAttrSerialNumber:
-		// When no Config.SerialNumber was provided, derive a deterministic
-		// fallback from UniqueID so Apple Home's HAP-mapper cache for
-		// EP0:0x28:0x000F (BasicInformation.SerialNumber) is pre-populated
-		// by the initial Subscribe. Without the fallback MTRDevice logs
-		// `could not find cached attribute values` and the post-Subscribe
-		// HAP service-build retries pointlessly. Mirrors
-		// BridgedDeviceBasicInformation's same fallback pattern at
-		// NewBridgedDeviceBasicInformation:170-173 and chip bridge-app's
-		// `DeviceLayerBasicInformationPolicy.h:75-77` SerialNumber
-		// non-empty contract.
+		// Served only when the host stated it: matter.js's
+		// BasicInformationServer defaults no serialNumber
+		// (BasicInformationServer.ts:54-75, :89-91 at db021da0), and an
+		// unset optional attribute is not listed (ValidatedElements.ts:252,
+		// :270-278). No value is derived from UniqueID (owner decision 166).
 		if b.serialNumber == "" {
-			return basicInfoSerialFromUniqueID(b.uniqueID()), true
+			return nil, false
 		}
 		return b.serialNumber, true
 	// LocalConfigDisabled (0x10) and ConfigurationVersion (0x18) are
@@ -724,19 +729,6 @@ func (b *BasicInformation) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 		return b.inst().ReadGlobal(attrID)
 	}
 	return nil, false
-}
-
-// basicInfoSerialFromUniqueID slices the UniqueID-derived hex down to
-// the spec's 32-byte SerialNumber ceiling (Matter §11.1.5.20
-// "max 32") so the wire value satisfies both the constraint and
-// Apple's HAP-mapper precondition. 16 hex chars (= 16 bytes) is the
-// natural width of UniqueID's SHA-256 prefix; longer would not
-// improve uniqueness given the same input set.
-func basicInfoSerialFromUniqueID(uid string) string {
-	if len(uid) <= 16 {
-		return uid
-	}
-	return uid[:16]
 }
 
 // DeriveUniqueID computes the deterministic 32-character hex UniqueID

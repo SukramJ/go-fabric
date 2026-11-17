@@ -26,6 +26,43 @@ type State struct {
 	LatchControlModes   LatchControlModesBitmap    // attribute 0x0005: LatchControlModesBitmap, LT, R V, F
 }
 
+// Clone returns a deep copy of st: every list, octet string, nullable
+// attribute and nested struct of the copy is its own, so a change to
+// the copy does not reach st.
+func (st State) Clone() State {
+	c := st
+	c.CountdownTime = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(st.CountdownTime)
+	c.CurrentErrorList = func(s []ClosureErrorEnum) []ClosureErrorEnum {
+		if s == nil {
+			return nil
+		}
+		out := make([]ClosureErrorEnum, len(s))
+		copy(out, s)
+		return out
+	}(st.CurrentErrorList)
+	c.OverallCurrentState = func(p *OverallCurrentStateStruct) *OverallCurrentStateStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.OverallCurrentState)
+	c.OverallTargetState = func(p *OverallTargetStateStruct) *OverallTargetStateStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(st.OverallTargetState)
+	return c
+}
+
 // Patch is a change to the ClosureControl state: each non-nil field is set, the
 // others are left as they are.
 // Null lists the nullable attributes the patch sets to null.

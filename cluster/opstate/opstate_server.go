@@ -194,8 +194,13 @@ const (
 	ErrorNavigationSensorObscured  = ErrorID(rvcdef.ErrorStateNavigationSensorObscured) // RVC
 )
 
-// StateEntry is one OperationalStateList entry. Label is sent for a
-// manufacturer-specific id (0x80-0xBF) only.
+// StateEntry is one OperationalStateList entry. Label belongs to a
+// manufacturer-specific id (0x80-0xBF): it is sent for one, an empty one
+// as an empty string, and refused for any other id at construction with
+// [spec.ErrInvalidValue] — the OperationalStateLabel conformance
+// "OperationalStateID >= 128 & OperationalStateID <= 191" (matter.js
+// operational-state.element.ts:94-97 at db021da0), where it was dropped
+// silently (R2-P6-par-1567).
 type StateEntry struct {
 	ID    State
 	Label string
@@ -283,6 +288,11 @@ type Config struct {
 	// checked against the cluster; zero skips the check.
 	DeviceType uint16
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Clock paces the CountdownTime quieter; nil is [clock.System].
 	Clock clock.Clock
@@ -442,10 +452,13 @@ type Server struct {
 	quiet    *cluster.Quieter
 	hooks    spec.HostHandlers
 	veto     spec.WriteVeto
-	// cause is the contract.Origin of the changes made while a command's
-	// handler runs (OriginCommand), zero outside one: the handler moves
-	// the state through the host setters, which take no context.
-	cause atomic.Uint32
+	// running counts the commands whose handlers run: the changes made
+	// meanwhile are OriginCommand — the handler moves the state through
+	// the host setters, which take no context. A count, not a flag, so a
+	// command that ends does not clear another's (R2-P6-conc-1509); a host
+	// setter on another goroutine while a command runs is still counted
+	// as the command's.
+	running atomic.Int32
 
 	// mu guards countdown, currentPhase, emitter, endpoint, opError, phases and state.
 	mu           sync.Mutex
@@ -468,7 +481,14 @@ var (
 	_ contract.ClusterEventLister      = (*Server)(nil)
 	_ contract.EventReceiver           = (*Server)(nil)
 	_ contract.AttributeChangeNotifier = (*Server)(nil)
+	_ contract.ClusterQuiescer         = (*Server)(nil)
 )
+
+// MatterQuiesce implements [contract.ClusterQuiescer]: it disarms the
+// CountdownTime throttle's deferred report ([cluster.Quieter.Stop]), the
+// one timer the server runs, so it does not report after the bridge let
+// the server go (R2-P6-conc-1506).
+func (s *Server) MatterQuiesce() { s.quiet.Stop() }
 
 // NewServer builds an OperationalState (0x0060) server.
 func NewServer(cfg Config) (*Server, error) { return newServer(baseVariant, cfg) }
@@ -568,6 +588,9 @@ func checkStates(v variant, cfg Config) error {
 		}
 		if len(e.Label) > LabelMaxBytes || !utf8.ValidString(e.Label) {
 			return fmt.Errorf("%w: label of state 0x%02X", ErrTooLong, uint8(e.ID))
+		}
+		if e.Label != "" && (e.ID < 0x80 || e.ID > 0xBF) {
+			return fmt.Errorf("%w: opstate: a label for the standard state 0x%02X", spec.ErrInvalidValue, uint8(e.ID))
 		}
 		seen[e.ID] = true
 	}
@@ -681,8 +704,8 @@ func (s *Server) reported(attrs ...uint32) {
 // origin is where the change being reported comes from: a command's
 // while its handler runs, the host's otherwise.
 func (s *Server) origin() contract.Origin {
-	if c := s.cause.Load(); c != 0 {
-		return contract.Origin(c) //nolint:gosec // only an Origin is stored
+	if s.running.Load() > 0 {
+		return contract.OriginCommand
 	}
 	return contract.OriginHostSet
 }
@@ -811,9 +834,9 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	if verdict != ErrorNoError || st == target {
 		return response(ErrorState{ID: verdict}), nil
 	}
-	s.cause.Store(uint32(contract.OriginCommand))
+	s.running.Add(1)
 	reply, err := s.handler.HandleOperationalCommand(ctx, cmd)
-	s.cause.Store(0)
+	s.running.Add(-1)
 	if err != nil {
 		return nil, fmt.Errorf("opstate: command 0x%02X: %w", cmdID, err)
 	}

@@ -11,7 +11,6 @@ import (
 	"errors"
 	"net"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -74,9 +73,12 @@ func (r *unsecuredRig) nextMessage(t *testing.T, what string) (message.Header, m
 	buf := make([]byte, 1500)
 	for {
 		_ = r.peer.SetReadDeadline(time.Now().Add(3 * time.Second))
-		n, _, err := r.peer.ReadFromUDP(buf)
+		n, from, err := r.peer.ReadFromUDP(buf)
 		if err != nil {
 			t.Fatalf("%s: nothing reached the peer: %v", what, err)
+		}
+		if !unsecuredFromBridge(r.b, from, buf[:n]) {
+			continue
 		}
 		hdr, hl, err := message.UnmarshalHeader(buf[:n])
 		if err != nil {
@@ -136,9 +138,10 @@ func (r *unsecuredRig) wantOnlyTheStatusReport(t *testing.T, exchangeID uint16) 
 
 // TestUnsecuredRetransmitEntriesEndWithTheirHandshake: a handshake reply
 // waiting for its retransmission on the unsecured session goes when its
-// handshake ends — it fails, it times out, its responder is reaped, it
-// moves on — and the StatusReport that ends the handshake stays, because it
-// is sent after the rest was dropped. connectedhomeip drops an exchange's
+// handshake ends — it times out, its responder is reaped, it moves on —
+// and the StatusReport that ends the handshake stays. A handshake that
+// fails on a message drops nothing: an unacknowledged reply goes on being
+// retransmitted and no report is sent (F-db021da0-7, owner decision 173). connectedhomeip drops an exchange's
 // retransmission entry when the exchange is aborted
 // (src/messaging/ExchangeContext.cpp:241-246 and :277-287 at 6170af84,
 // `DoClose(true)` → `ClearRetransTable(this)`), and releasing a pairing
@@ -174,8 +177,11 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		if err := r.b.handlePase(r.peer.LocalAddr(), hdr, proto, nil, "pake1", refuse, parkedPeer); err == nil {
 			t.Fatal("handlePase accepted a refused Pake1")
 		}
-		// The PBKDFParamResponse is gone, the failure report is not.
-		r.wantOnlyTheStatusReport(t, 0x5001)
+		// Pake1 did not acknowledge the PBKDFParamResponse: no failure
+		// report, and the response goes on being retransmitted
+		// (F-db021da0-7, decision 173; the acknowledged case is
+		// TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged).
+		r.wantUnreportedRetransmitting(t, scKey(0x5001), mrp.SCOpcodePBKDFParamResponse)
 	})
 	t.Run("a CASE handshake that fails", func(t *testing.T) {
 		t.Parallel()
@@ -188,8 +194,9 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		if err := r.b.handleCase(r.peer.LocalAddr(), hdr, proto, nil, "sigma3", refuse, parkedPeer); err == nil {
 			t.Fatal("handleCase accepted a refused Sigma3")
 		}
-		// Sigma2 is gone, the failure report is not.
-		r.wantOnlyTheStatusReport(t, 0x5002)
+		// Sigma3 did not acknowledge Sigma2: no failure report, and Sigma2
+		// goes on being retransmitted (F-db021da0-7, decision 173).
+		r.wantUnreportedRetransmitting(t, scKey(0x5002), mrp.SCOpcodeSigma2)
 	})
 	t.Run("a CASE handshake that completes", func(t *testing.T) {
 		t.Parallel()
@@ -222,7 +229,9 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 		if err := r.b.dispatchSecureChannel(r.peer.LocalAddr(), hdr, proto, []byte{0x15, 0x18}); err != nil {
 			t.Fatalf("Sigma3: %v", err)
 		}
-		r.wantOnlyTheStatusReport(t, 0x5008)
+		// Sigma3 did not acknowledge Sigma2: unreported, Sigma2 retransmitted
+		// (F-db021da0-7, decision 173).
+		r.wantUnreportedRetransmitting(t, scKey(0x5008), mrp.SCOpcodeSigma2)
 	})
 	t.Run("a CASE responder that is reaped", func(t *testing.T) {
 		t.Parallel()
@@ -238,26 +247,40 @@ func TestUnsecuredRetransmitEntriesEndWithTheirHandshake(t *testing.T) {
 			t.Errorf("pending after the responder was reaped = %d, want 0", got)
 		}
 	})
-	t.Run("a PASE handshake whose claim another takes over after the timeout", func(t *testing.T) {
-		t.Parallel()
-		r := newUnsecuredRig(t)
-		if !r.b.claimPaseInFlight(scKey(0x5004)) {
-			t.Fatal("the first PBKDFParamRequest did not get the slot")
-		}
-		hdr, proto := r.request(mrp.SCOpcodePBKDFParamRequest, 0x5004)
-		if err := r.b.handlePase(r.peer.LocalAddr(), hdr, proto, nil, "pbkdf_param_req", reply(mrp.SCOpcodePBKDFParamResponse), parkedPeer); err != nil {
-			t.Fatalf("handlePase: %v", err)
-		}
-		r.b.mu.Lock()
-		r.b.paseInFlightSince = r.b.paseInFlightSince.Add(-pasePairingTimeout - time.Second)
-		r.b.mu.Unlock()
-		if !r.b.claimPaseInFlight(scKey(0x5005)) {
-			t.Fatal("the slot was not free after the pairing timeout")
-		}
-		if got := r.pending(); got != 0 {
-			t.Errorf("pending of the abandoned handshake = %d, want 0", got)
-		}
-	})
+	// A PASE claim that ran out leaves what its handshake sent to MRP when
+	// another handshake takes the slot, as both references leave a reply
+	// at their own timeout (owner decision 173); the same initiator taking
+	// it again on the same exchange drops it, or the old reply would read
+	// as the new handshake's (review II, R7).
+	for _, c := range []struct {
+		name     string
+		next     HandshakeKey
+		wantKept int
+	}{
+		{"a PASE handshake whose claim another handshake takes over after the timeout", scKey(0x5005), 1},
+		{"a PASE handshake whose claim its initiator takes again on the same exchange after the timeout", scKey(0x5004), 0},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			r := newUnsecuredRig(t)
+			if !r.b.claimPaseInFlight(scKey(0x5004)) {
+				t.Fatal("the first PBKDFParamRequest did not get the slot")
+			}
+			hdr, proto := r.request(mrp.SCOpcodePBKDFParamRequest, 0x5004)
+			if err := r.b.handlePase(r.peer.LocalAddr(), hdr, proto, nil, "pbkdf_param_req", reply(mrp.SCOpcodePBKDFParamResponse), parkedPeer); err != nil {
+				t.Fatalf("handlePase: %v", err)
+			}
+			r.b.mu.Lock()
+			r.b.paseInFlightSince = r.b.paseInFlightSince.Add(-pasePairingTimeout - time.Second)
+			r.b.mu.Unlock()
+			if !r.b.claimPaseInFlight(c.next) {
+				t.Fatal("the slot was not free after the pairing timeout")
+			}
+			if got := len(r.tracked(t, 0x5004)); got != c.wantKept {
+				t.Errorf("entries of the timed-out handshake = %d, want %d", got, c.wantKept)
+			}
+		})
+	}
 	t.Run("the timeout, with nobody to take over", func(t *testing.T) {
 		t.Parallel()
 		if unsecuredEntryLifetime != pasePairingTimeout {
@@ -419,38 +442,6 @@ func TestUnsecuredRetransmitTableEvictsItsOldestEntry(t *testing.T) {
 	if len(evicted) != 1 {
 		t.Errorf("%d evictions after a handshake ended and one reply followed, want still 1", len(evicted))
 	}
-}
-
-// TestUnsecuredRetransmitEvictionWakesItsWaiter: a caller waiting for the
-// acknowledgement of an entry that is evicted learns so at once.
-func TestUnsecuredRetransmitEvictionWakesItsWaiter(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		tr := newOutboundReliableTracker(nil, nil)
-		t0 := time.Now()
-		dest := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}
-		tr.trackUnsecured(1, onExchange(0x10), []byte{1}, dest, t0, nil)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		result := make(chan error, 1)
-		go func() { result <- tr.WaitForAck(ctx, 0, 1) }()
-		synctest.Wait()
-		for i := range unsecuredEntryLimit {
-			tr.trackUnsecured(uint32(2+i), onExchange(uint16(0x11+i)), []byte{1}, dest, t0, nil)
-		}
-		synctest.Wait()
-		select {
-		case err := <-result:
-			if !errors.Is(err, errUnsecuredEntryEvicted) {
-				t.Errorf("the waiter of the evicted entry got %v, want errUnsecuredEntryEvicted", err)
-			}
-		default:
-			t.Error("the waiter of the evicted entry is still waiting")
-		}
-		if got := tr.Pending(); got != unsecuredEntryLimit {
-			t.Errorf("pending = %d, want %d", got, unsecuredEntryLimit)
-		}
-	})
 }
 
 // TestInitiatedHandshakeIsTrackedAtAFullTable: a message of a handshake

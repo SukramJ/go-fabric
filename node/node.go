@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -266,7 +267,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{
-		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock), bootReason: cfg.BootReason,
+		cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, callbacks: newCallbackQueue(cfg.Clock, cfg.Logger), bootReason: cfg.BootReason,
 		attestationErr: attestationErr, lifecycle: make(chan struct{}, 1),
 	}
 	n.life, n.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -318,6 +319,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 			VendorName:  bi.VendorName,
 			Groups:      n.groups,
 			Persistence: n.endpoints,
+			// The node's fabric list: every Binding server checks a
+			// request's write against it (R2-P6-store-1010, decision 158).
+			Fabrics: n.st,
 			// The node's own conditions on the root: WiFi with a Wi-Fi
 			// reporter (Network.WiFi).
 			RootDeviceConditions: n.cfg.rootDeviceConditions(),
@@ -447,6 +451,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		ble: cfg.Network.hasBLE(), clk: clock.Or(n.cfg.Clock),
 		onDemand: cm.WindowOnDemand,
 	}
+	if cm.RotatingDeviceID {
+		n.window.rotatingID = (&rotatingDeviceID{st: n.st, logger: n.logger}).next
+	}
 	wireCommissioningWindow(n.windowLife, n.window, n.st) //nolint:contextcheck // the window lives as long as the node: windowLife, not New's ctx
 
 	// --- fabric hooks (main.go:362-414 at b4ea1f96^) ---------------------------------
@@ -543,6 +550,16 @@ func (n *Node) openStores(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			// A sealing whose scrub did not finish opens the store (decision
+			// 132): the rows are sealed, the old bytes may remain in the file
+			// until a later open scrubs it — said once here.
+			if sc.Sealer != nil {
+				if owed, err := st.ScrubOwed(ctx); err != nil || owed {
+					n.logger.Warn("matter.store.seal_scrub_owed",
+						slog.String("detail", "the sealed values' former bytes may remain in the database file until a later start scrubs it"),
+						slog.Any("err", err))
+				}
+			}
 			n.st = st
 			n.builtCredentials = true
 		}
@@ -599,7 +616,7 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 	if _, err := rand.Read(instanceID[:]); err != nil {
 		return bridge.CommissioningAdvertisement{}, fmt.Errorf("node: commissioning instance id: %w", err)
 	}
-	pd, bi := n.cfg.ProductDescription, n.cfg.BasicInformation
+	pd := n.cfg.ProductDescription
 	name := n.cfg.advertisedName()
 	return bridge.CommissioningAdvertisement{
 		InstanceID:    instanceID,
@@ -607,14 +624,99 @@ func (n *Node) advertisement() (bridge.CommissioningAdvertisement, error) {
 		VendorID:      pd.VendorID,
 		ProductID:     pd.ProductID,
 		NodeLabel:     name,
-		RotatingID: mdns.GenerateRotatingID(
-			mdns.DeriveUniqueIDFromIdentity(pd.VendorID, pd.ProductID, bi.SerialNumber, bi.NodeLabel), 0,
-		),
+		// RotatingID is set per advertised window
+		// (commissioningHost.rotatingID, [Commissioning].RotatingDeviceID).
 		CommissioningMode:  1, // §4.3.1.4 CM=1: standard commissioning window
 		DeviceTypeID:       uint32(pd.DeviceType),
 		Hints:              n.cfg.Commissioning.PairingHints,
 		PairingInstruction: n.cfg.Commissioning.PairingInstruction,
 	}, nil
+}
+
+// The Rotating Device Identifier's two values in the node's store: the
+// unique id (hex, drawn once) as a setting — sealed under store.NewSealed
+// (store's sealedSettings holds a copy of the key) — and the lifetime
+// counter as a metadata counter ([Commissioning].RotatingDeviceID).
+const (
+	settingRotatingIDUniqueID          = "commissioning.rotating_device_id.unique_id"
+	metadataKeyRotatingLifetimeCounter = "rotating_device_id_lifetime_counter"
+)
+
+// rotatingDeviceID is the source of the commissionable record's RI. Follows
+// connectedhomeip: the unique id is 16 bytes or longer
+// (src/include/platform/CHIPDeviceConfig.h:380-384 at 6170af84); the
+// lifetime counter advances once per start of a commissioning
+// advertisement (GenericConfigurationManagerImpl.ipp:462-468, called from
+// CommissioningWindowManager.cpp:502-507 StartAdvertisement), is persisted
+// on every advance (src/lib/support/LifetimePersistedCounter.h:92-99) and
+// enters the identifier as its low 16 bits
+// (GenericConfigurationManagerImpl.ipp:581). Unlike connectedhomeip's
+// generic platform, which keeps a compile-time unique id in RAM
+// (GenericConfigurationManagerImpl.h:128-130), the unique id here is
+// random and persisted, so no two nodes share it and it survives a
+// restart. connectedhomeip starts its advertisement again after each
+// failed PASE attempt inside a window (CommissioningWindowManager.cpp:160-173,
+// :313) and advances the counter then too, where
+// CHIP_ENABLE_ADDITIONAL_DATA_ADVERTISING is set (:504); here the counter
+// advances once per advertised window (own, enhanced, basic) — this
+// module's rule, the counter advanced and persisted before the window's
+// record is published, as connectedhomeip advances before it advertises.
+type rotatingDeviceID struct {
+	st     store.Settings
+	logger *slog.Logger
+	// mu serialises next: two windows advertised at once take two
+	// counter values.
+	mu sync.Mutex
+}
+
+// next advances the lifetime counter, persists it and returns the RI for
+// the window being advertised; "" (no RI in the record) when the store
+// fails, logged.
+func (r *rotatingDeviceID) next(ctx context.Context) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	uid, err := r.uniqueID(ctx)
+	if err != nil {
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", err))
+		return ""
+	}
+	counter, _, err := r.st.GetMetadataCounter(ctx, metadataKeyRotatingLifetimeCounter)
+	if err != nil {
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("node: read the RI lifetime counter: %w", err)))
+		return ""
+	}
+	counter++
+	if counter > 1<<62 { // the store's counter bound; the RI takes the low 16 bits only
+		counter = 1
+	}
+	if err := r.st.SetMetadataCounter(ctx, metadataKeyRotatingLifetimeCounter, counter); err != nil {
+		r.logger.Warn("commissioning.rotating_id", slog.Any("err", fmt.Errorf("node: persist the RI lifetime counter: %w", err)))
+		return ""
+	}
+	return mdns.GenerateRotatingID(uid, uint16(counter)) //nolint:gosec // G115: the identifier carries the counter's low 16 bits
+}
+
+// uniqueID is the persisted unique id, drawn and stored at its first use.
+func (r *rotatingDeviceID) uniqueID(ctx context.Context) ([]byte, error) {
+	v, ok, err := r.st.GetSetting(ctx, settingRotatingIDUniqueID)
+	if err != nil {
+		return nil, fmt.Errorf("node: read the RI unique id: %w", err)
+	}
+	if ok {
+		uid, err := hex.DecodeString(v)
+		if err != nil || len(uid) < mdns.RotatingIDUniqueIDLength {
+			return nil, fmt.Errorf("node: the stored RI unique id is not %d hex-encoded bytes or more", mdns.RotatingIDUniqueIDLength)
+		}
+		return uid, nil
+	}
+	uid := make([]byte, mdns.RotatingIDUniqueIDLength)
+	if _, err := rand.Read(uid); err != nil {
+		return nil, fmt.Errorf("node: draw the RI unique id: %w", err)
+	}
+	if err := r.st.SetSetting(ctx, settingRotatingIDUniqueID, hex.EncodeToString(uid)); err != nil {
+		return nil, fmt.Errorf("node: persist the RI unique id: %w", err)
+	}
+	return uid, nil
 }
 
 // fabricInstalled is OperationalCredentials' OnFabricInstalled: the CASE
@@ -1456,9 +1558,11 @@ func (w *countedWork) resume() {
 
 // newCallbackQueue is the node's own `…Async` callback queue; a callback
 // counts as work of the in-flight group clk carries until it returned
-// (internal/inflight DeviceCallbacks).
-func newCallbackQueue(clk clock.Clock) *serialqueue.Queue {
+// (internal/inflight DeviceCallbacks). Its warnings (a dropped callback,
+// the end of an overflow) go to the host's logger (R2-P6-bound-0209).
+func newCallbackQueue(clk clock.Clock, log *slog.Logger) *serialqueue.Queue {
 	q := serialqueue.New()
+	q.SetLogger(log)
 	g := inflight.Of(clk)
 	q.CountIn(func() *inflight.Group { return g })
 	return q

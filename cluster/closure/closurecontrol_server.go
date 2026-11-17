@@ -154,7 +154,35 @@ type ControlServer struct {
 	// change the drive reports between commands (an arrival, an error)
 	// reaches subscribers for exactly those attributes.
 	cluster.AttributeChanges
-	spec.Hooks
+	// Hooks was the server's command, event and veto path. It is kept for
+	// the deprecation window: bound to the server's instance, endpoint and
+	// emitter, with every handler [ControlServer.Handle] registers and
+	// the veto [ControlServer.SetBeforeWrite] installs mirrored into it,
+	// so its promoted Invoke and CheckWrite behave as before; and a
+	// handler registered on the field itself (srv.Hooks.Handle) answers
+	// its command when Handle registered none for it (decision 177).
+	//
+	// Deprecated: the server routes its commands through [spec.InvokeHeld]
+	// and declares Handle, Emit, EmitEvent and SetBeforeWrite itself
+	// (review II, decision 154): register a host handler with
+	// [ControlServer.Handle]. Removable in the next minor release.
+	spec.Hooks //nolint:staticcheck // the deprecated field keeps its exact shape for the deprecation window
+
+	// held routes MatterInvoke through [spec.InvokeHeld] — the request
+	// admitted and the response checked with the server's attributes, a
+	// host handler ([ControlServer.Handle]) ahead of the server's own
+	// logic (decision 154); events and veto are the server's.
+	held   spec.SelfHeld
+	events spec.Events
+	veto   spec.WriteVeto
+
+	// op serialises the commands — MoveTo, Stop, Calibrate — from their
+	// gate to their record, as WindowCovering's queue does, so two cannot
+	// pass the MainState gate together and drive the mover at once
+	// (R2-P6-conc-1511). The host's setters never take it. A one-slot
+	// channel, so that a waiter is durably blocked for a testing/synctest
+	// bubble.
+	op chan struct{}
 
 	// mu guards currentPosition, currentLatch, currentSpeed, errorList,
 	// mainState, secureState, targetPosition, targetLatch and targetSpeed.
@@ -233,12 +261,8 @@ func New(cfg Config) (*ControlServer, error) {
 	}
 	// Positioning holds "O.a+" and "[PS]"; Speed "[PS & !IS]" is the one
 	// conformance a served selection can break, and spec.New refuses it.
-	inst, err := spec.New(closuredef.Definition, spec.Options{Features: fm})
-	if err != nil {
-		return nil, fmt.Errorf("closure: %w", err)
-	}
 	s := &ControlServer{
-		inst:  inst,
+		op:    make(chan struct{}, 1),
 		mover: cfg.Mover,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
 		// and Stopped is a claim about a device we have not heard from.
@@ -246,6 +270,11 @@ func New(cfg Config) (*ControlServer, error) {
 		mainState: wire.ClosureMainStateSetupRequired,
 		errorList: wire.ClosureErrorList{},
 	}
+	srv, err := newHeld(closuredef.Definition, spec.Options{Features: fm}, s.MatterRead, s.invoke)
+	if err != nil {
+		return nil, fmt.Errorf("closure: %w", err)
+	}
+	s.inst, s.held = srv.Instance, spec.NewSelfHeld(srv)
 	if l, ok := cfg.Mover.(closuredef.Latcher); ok && s.has(wire.ClosureControlFeatureMotionLatching) {
 		s.latchModes = l.LatchControlModes()
 	}
@@ -253,8 +282,41 @@ func New(cfg Config) (*ControlServer, error) {
 		cur, tgt := closuredef.ThreeLevelAutoAuto, closuredef.ThreeLevelAutoAuto
 		s.currentSpeed, s.targetSpeed = &cur, &tgt
 	}
-	s.Init(inst)
+	s.Init(s.inst) //nolint:staticcheck // the deprecated Hooks field stays bound for its window
 	return s, nil
+}
+
+// Handle implements [spec.CommandRegistrar] ([spec.SelfHeld.Handle]): the
+// host's handler of cmdID replaces the server's own handling of it, and a
+// handler registered on the deprecated [ControlServer.Hooks] field; nil
+// hands it back. It is mirrored into that field, so the promoted Invoke
+// runs it as before.
+func (s *ControlServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
+	if err := s.held.Handle(cmdID, fn); err != nil {
+		return err
+	}
+	return s.Hooks.Handle(cmdID, fn) //nolint:staticcheck // mirrored into the deprecated field for its window
+}
+
+// Emit implements [spec.EventEmitting]: eventID with data on endpoint at
+// the priority the definition gives it ([spec.Events.Emit]).
+func (s *ControlServer) Emit(endpoint uint16, eventID uint32, data any) error {
+	return s.events.Emit(s.inst, endpoint, eventID, data)
+}
+
+// EmitEvent emits eventID with data on the endpoint the server is mounted
+// on ([spec.Events.EmitEvent]): the call the typed Record<Event> makes.
+func (s *ControlServer) EmitEvent(eventID uint32, data any) error {
+	return s.events.EmitEvent(s.inst, eventID, data)
+}
+
+// SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.WriteVeto]).
+// Every ClosureControl attribute is read-only, so no write reaches it. It
+// is mirrored into the deprecated [ControlServer.Hooks] field, so the
+// promoted CheckWrite runs it as before.
+func (s *ControlServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
+	s.veto.Set(fn)
+	s.Hooks.SetBeforeWrite(fn) //nolint:staticcheck // mirrored into the deprecated field for its window
 }
 
 // has reports whether the advertised FeatureMap carries feature.
@@ -324,22 +386,13 @@ func (s *ControlServer) MatterWrite(ctx context.Context, attrID uint32, value an
 	if err != nil {
 		return err
 	}
-	return s.CheckWrite(ctx, attrID, v)
+	return s.veto.Check(ctx, attrID, spec.Stored(closuredef.Definition.Attribute(attrID).Type, v))
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: every
 // attribute is read-only, so no write changes the server.
 func (s *ControlServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	return false, s.MatterWrite(ctx, attrID, value)
-}
-
-// closureUnsupportedCommandErr is a typed [im.StatusCodeError] for a
-// command the advertised feature set does not include.
-type closureUnsupportedCommandErr struct{ msg string }
-
-func (e closureUnsupportedCommandErr) Error() string { return e.msg }
-func (closureUnsupportedCommandErr) MatterStatusCode() im.StatusCode {
-	return im.StatusUnsupportedCommand
 }
 
 // closureInvalidCommandErr is a typed [im.StatusCodeError] for a MoveTo
@@ -359,7 +412,6 @@ func (closureConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusC
 
 // Compile-time assertions.
 var (
-	_ im.StatusCodeError = closureUnsupportedCommandErr{}
 	_ im.StatusCodeError = closureConstraintErr{}
 )
 
@@ -373,21 +425,32 @@ var (
 func (s *ControlServer) MatterInvoke(
 	ctx context.Context, cmdID uint32, fields any,
 ) (response any, err error) {
-	if resp, handled, err := s.Invoke(ctx, cmdID, fields); handled {
+	return spec.InvokeHeld(ctx, &s.held, cmdID, fields)
+}
+
+// invoke is the server's own MoveTo, Stop and Calibrate, which
+// [spec.InvokeHeld] runs when the host registered no handler with
+// [ControlServer.Handle]; the commands run one at a time (op). A handler
+// registered on the deprecated [ControlServer.Hooks] field answers first,
+// outside op as before decision 154 (decision 177); the request
+// InvokeHeld admitted is not held a second time there.
+func (s *ControlServer) invoke(ctx context.Context, cmdID uint32, fields any) (response any, err error) {
+	if resp, handled, err := s.Hooks.Invoke(ctx, cmdID, fields); handled { //nolint:staticcheck // the deprecated field's handler, honoured for its window
 		return resp, err
 	}
+	s.op <- struct{}{}
+	defer func() { <-s.op }()
+	// [spec.InvokeHeld] hands over an accepted command only: MoveTo,
+	// Calibrate with CL, and Stop, whose "!IS" conformance withdraws it
+	// with the Instantaneous feature (the instance answers that
+	// UNSUPPORTED_COMMAND before this runs).
 	switch cmdID {
 	case closuredef.CmdMoveTo:
 		return nil, s.invokeMoveTo(ctx, fields)
-	case closuredef.CmdStop:
-		if s.has(wire.ClosureControlFeatureInstantaneous) {
-			return nil, closureUnsupportedCommandErr{"closure: Stop is withdrawn by the Instantaneous feature"}
-		}
-		return nil, s.invokeStop(ctx)
 	case closuredef.CmdCalibrate:
 		return nil, s.invokeCalibrate(ctx)
-	default:
-		return nil, im.UnsupportedCommandf("closure: unknown command 0x%02X", cmdID)
+	default: // Stop
+		return nil, s.invokeStop(ctx)
 	}
 }
 
@@ -574,12 +637,11 @@ func (s *ControlServer) drive(ctx context.Context, target *wire.ClosureTargetPos
 // had the command (that report stands) — the drive reports Stopped when
 // it is done. matter.js has
 // no Calibrate logic (ClosureControlServer.ts:17, the empty subclass).
+//
+// Without the Calibration feature the instance does not accept Calibrate
+// ("CL"), and [spec.InvokeHeld] answers UNSUPPORTED_COMMAND before this
+// runs.
 func (s *ControlServer) invokeCalibrate(ctx context.Context) error {
-	if !s.has(wire.ClosureControlFeatureCalibration) {
-		return closureUnsupportedCommandErr{
-			"closure: Calibrate requires the Calibration feature, which this server does not advertise",
-		}
-	}
 	s.mu.RLock()
 	state, stateReports := s.mainState, s.stateReports
 	s.mu.RUnlock()
@@ -924,13 +986,22 @@ func reachedTarget(pos wire.ClosureCurrentPosition, target wire.ClosureTargetPos
 	return false
 }
 
+// reportMainStateLocked is every host report of MainState — SetMainState,
+// ReportError and SetEngaged: it stores the state and counts the report,
+// so a MoveTo or Calibrate the mover holds keeps it rather than
+// overwriting it with Moving or Calibrating (R2-P6-fsm-1580). The caller
+// holds s.mu.
+func (s *ControlServer) reportMainStateLocked(state wire.ClosureMainState) {
+	s.mainState = state
+	s.stateReports++
+}
+
 // SetMainState overrides the operational state. A motion that ends —
 // Moving to Stopped — emits MovementCompleted (conformance !IS).
 func (s *ControlServer) SetMainState(state wire.ClosureMainState) {
 	s.mu.Lock()
 	prev := s.mainState
-	s.mainState = state
-	s.stateReports++
+	s.reportMainStateLocked(state)
 	s.mu.Unlock()
 	if prev != state {
 		s.NotifyFrom(contract.OriginHostSet, wire.ClosureControlAttrMainState)

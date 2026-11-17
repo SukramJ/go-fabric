@@ -6,6 +6,7 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -15,6 +16,7 @@ import (
 	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
 	scenesdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -103,21 +105,40 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 	if err != nil {
 		return nil, fieldsReadError(fmt.Sprintf("%s command 0x%02X", def.Name, path.Command), err)
 	}
-	if cmd := def.Command(path.Command, spec.Request); cmd != nil && cmd.Decode != nil {
+	cmd := def.Command(path.Command, spec.Request)
+	if cmd != nil && cmd.Decode == nil {
+		// A command the definition knows but cannot check: the hand
+		// reader's own checks are gone (R2-P6-test-0811), so it is not
+		// read unchecked — refused, fail-closed. No command of the
+		// hand-read clusters is such today (40 of 40 have a decoder).
+		return nil, &spec.FieldError{Status: im.StatusInvalidCommand, Msg: fmt.Sprintf("%s.%s: no request decoder to hold the request to", def.Name, cmd.Name)}
+	}
+	if cmd != nil {
 		if _, err := cmd.DecodeRequest(n); err != nil {
 			return nil, err
 		}
-	}
-	sub, _, err := reopen(n)
-	if err != nil {
-		return nil, err
-	}
-	fields, ok, err := read(path, sub)
-	if ok {
-		return fields, consumed(err)
-	}
-	if err != nil {
-		return nil, consumed(err)
+		// The hand reader reads the checked request: the top-level fields
+		// the definition defines, each the element the check judged. A
+		// member the definition does not know — skipped whole by its
+		// decoder, as matter.js skips an unknown field
+		// (packages/types/src/tlv/TlvObject.ts:215-217 at db021da0) — never
+		// reaches a reader that would descend into it and read its inner
+		// tags as the command's own (R2-P6-wire-0440).
+		n = definedFields(n, cmd)
+		// Only a request its definition checked reaches a hand reader: a
+		// command the definition does not know goes on to the salvage
+		// below, and the dispatcher answers its path.
+		sub, _, err := reopen(n)
+		if err != nil {
+			return nil, err
+		}
+		fields, ok, err := read(path, sub)
+		if ok {
+			return fields, consumed(err)
+		}
+		if err != nil {
+			return nil, consumed(err)
+		}
 	}
 	sub, open, err := reopen(n)
 	if err != nil {
@@ -129,8 +150,24 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 	if sub, _, err = reopen(n); err != nil {
 		return nil, err
 	}
-	fields, err = decodeGenericTagMap(sub)
+	fields, err := decodeGenericTagMap(sub)
 	return fields, consumed(err)
+}
+
+// definedFields returns the request tree n with only the top-level members
+// whose context tag is one of cmd's fields; anonymous and profile-tagged
+// members, and context tags the command does not define, are left out.
+func definedFields(n spec.Node, cmd *spec.Command) spec.Node {
+	out := spec.Node{El: n.El, Children: make([]spec.Node, 0, len(n.Children))}
+	for _, c := range n.Children {
+		if c.El.Tag.Kind != tlv.TagKindContext {
+			continue
+		}
+		if slices.ContainsFunc(cmd.Fields, func(f spec.Field) bool { return f.ID == c.El.Tag.Number }) {
+			out.Children = append(out.Children, c)
+		}
+	}
+	return out
 }
 
 // fieldsReadError is the refusal of command fields [spec.ReadContainer]
@@ -241,40 +278,6 @@ func operationalCredentialsFieldsReader(path im.ConcreteCommandPath, dec *tlv.De
 	return f, true, err
 }
 
-// fieldConstraintError is the typed reject for a command field whose
-// wire value does not fit the field's schema type. It carries
-// ConstraintError so [im.HandleInvokeRequest] answers the command with
-// a CommandStatusIB instead of executing a truncated value — matter.js
-// validates every request against its TlvSchema before the invoker runs
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:484-487 at db021da0)
-// and TlvNumber.ts:151-156 validateBoundaries throws a ValidationError,
-// whose default code is Status.ConstraintError
-// (packages/types/src/common/ValidationError.ts:16-22).
-type fieldConstraintError struct{ msg string }
-
-func (e fieldConstraintError) Error() string { return e.msg }
-
-// MatterStatusCode implements [im.StatusCodeError].
-func (fieldConstraintError) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
-
-// fieldUint8 narrows el to a uint8 field, rejecting a wider wire value
-// (matter.js TlvUInt8, TlvNumber.ts:270-275: max UINT8_MAX).
-func fieldUint8(cmd, field string, el tlv.Element) (uint8, error) {
-	if el.Uint > 0xFF {
-		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d > uint8 max", cmd, field, el.Uint)}
-	}
-	return uint8(el.Uint), nil
-}
-
-// fieldUint16 narrows el to a uint16 field, rejecting a wider wire value
-// (matter.js TlvUInt16, TlvNumber.ts:277-282: max UINT16_MAX).
-func fieldUint16(cmd, field string, el tlv.Element) (uint16, error) {
-	if el.Uint > 0xFFFF {
-		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d > uint16 max", cmd, field, el.Uint)}
-	}
-	return uint16(el.Uint), nil
-}
-
 // decodeGenericTagMap drains the current container into a
 // map[uint8]any keyed by context-tag number, preserving the field
 // payload for cluster servers that don't yet have a typed decoder.
@@ -341,9 +344,7 @@ func decodeArmFailSafeRequest(dec *tlv.Decoder) (mattercore.ArmFailSafeRequest, 
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			if req.ExpiryLengthSeconds, err = fieldUint16("ArmFailSafe", "ExpiryLengthSeconds", el); err != nil {
-				return req, err
-			}
+			req.ExpiryLengthSeconds = uint16(el.Uint) //nolint:gosec // the definition held the width
 		case 1:
 			req.Breadcrumb = el.Uint
 		}
@@ -368,9 +369,7 @@ func decodeSetRegulatoryConfigRequest(dec *tlv.Decoder) (mattercore.SetRegulator
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			if req.NewRegulatoryConfig, err = fieldUint8("SetRegulatoryConfig", "NewRegulatoryConfig", el); err != nil {
-				return req, err
-			}
+			req.NewRegulatoryConfig = uint8(el.Uint) //nolint:gosec // the definition held the width
 		case 1:
 			// CountryCode is a `TlvUTF8String` (char-string[2] per
 			// §11.10.7.4). TLV decoder lands UTF8 in `el.String`,
@@ -428,9 +427,7 @@ func decodeCertificateChainRequest(dec *tlv.Decoder) (mattercore.CertificateChai
 			continue
 		}
 		if uint8(el.Tag.Number&0xFF) == 0 {
-			if req.CertificateType, err = fieldUint8("CertificateChainRequest", "CertificateType", el); err != nil {
-				return req, err
-			}
+			req.CertificateType = uint8(el.Uint) //nolint:gosec // the definition held the width
 		}
 	}
 }
@@ -485,9 +482,7 @@ func decodeAddNOCRequest(dec *tlv.Decoder) (mattercore.AddNOCRequest, error) {
 		case 3:
 			req.CaseAdminSubject = el.Uint
 		case 4:
-			if req.AdminVendorID, err = fieldUint16("AddNOC", "AdminVendorID", el); err != nil {
-				return req, err
-			}
+			req.AdminVendorID = uint16(el.Uint) //nolint:gosec // the definition held the width
 		}
 	}
 }
@@ -564,9 +559,7 @@ func decodeRemoveFabricRequest(dec *tlv.Decoder) (mattercore.RemoveFabricRequest
 			continue
 		}
 		if uint8(el.Tag.Number&0xFF) == 0 {
-			if req.FabricIndex, err = fieldUint8("RemoveFabric", "FabricIndex", el); err != nil {
-				return req, err
-			}
+			req.FabricIndex = uint8(el.Uint) //nolint:gosec // the definition held the width
 		}
 	}
 }
@@ -616,20 +609,12 @@ func decodeSetVidVerificationStatementRequest(dec *tlv.Decoder) (mattercore.SetV
 		}
 		switch el.Tag.Number {
 		case 0:
-			if req.VendorID, err = fieldUint16(cmd, "VendorID", el); err != nil {
-				return req, err
-			}
+			req.VendorID = uint16(el.Uint) //nolint:gosec // the definition held the width
 			req.HasVendorID = true
 		case 1:
-			if len(el.Octets) > 85 {
-				return req, fieldConstraintError{fmt.Sprintf("%s: VIDVerificationStatement of %d bytes exceeds 85", cmd, len(el.Octets))}
-			}
 			req.VidVerificationStatement = append([]byte{}, el.Octets...)
 			req.HasVidVerificationStatement = true
 		case 2:
-			if len(el.Octets) > 400 {
-				return req, fieldConstraintError{fmt.Sprintf("%s: VVSC of %d bytes exceeds 400", cmd, len(el.Octets))}
-			}
 			req.Vvsc = append([]byte{}, el.Octets...)
 			req.HasVvsc = true
 		default:
@@ -646,16 +631,12 @@ func decodeSetVidVerificationStatementRequest(dec *tlv.Decoder) (mattercore.SetV
 func decodeSignVidVerificationRequest(dec *tlv.Decoder) (mattercore.SignVidVerificationRequest, error) {
 	const cmd = "SignVIDVerificationRequest"
 	var req mattercore.SignVidVerificationRequest
-	var hasIndex, hasChallenge bool
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return req, fmt.Errorf("%s: %w", cmd, err)
 		}
 		if el.IsEndContainer {
-			if !hasIndex || !hasChallenge {
-				return req, fieldInvalidCommandError{msg: cmd + ": mandatory field missing", consumed: true}
-			}
 			return req, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext {
@@ -666,16 +647,9 @@ func decodeSignVidVerificationRequest(dec *tlv.Decoder) (mattercore.SignVidVerif
 		}
 		switch el.Tag.Number {
 		case 0:
-			if req.FabricIndex, err = fieldUint8(cmd, "FabricIndex", el); err != nil {
-				return req, err
-			}
-			hasIndex = true
+			req.FabricIndex = uint8(el.Uint) //nolint:gosec // the definition held the width
 		case 1:
-			if len(el.Octets) != 32 {
-				return req, fieldConstraintError{fmt.Sprintf("%s: ClientChallenge of %d bytes, want 32", cmd, len(el.Octets))}
-			}
 			req.ClientChallenge = append([]byte(nil), el.Octets...)
-			hasChallenge = true
 		default:
 			if err := skipValue(dec, el); err != nil {
 				return req, err
@@ -721,7 +695,7 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 	case mattercore.LeaveGroupResponse:
 		ent.Path.Command = 0x02
 	case wire.OperationalCommandResponse:
-		ent.Path.Command = wire.OperationalStateCmdOperationalCommandResponse
+		ent.Path.Command = opdef.CmdOperationalCommandResponse
 	case wire.ChangeToModeResponse:
 		ent.Path.Command = wire.ModeBaseCmdChangeToModeResponse
 	case spec.ResponsePayload:

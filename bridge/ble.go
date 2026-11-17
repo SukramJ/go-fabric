@@ -652,6 +652,8 @@ type connReceiver struct {
 	prev chan struct{}
 	done bool
 	wg   sync.WaitGroup
+	// evictOnce evicts the connection's sessions once ([connReceiver.wait]).
+	evictOnce sync.Once
 }
 
 // connReceiverMaxInFlight bounds the messages of one connection that are
@@ -703,6 +705,15 @@ func (r *connReceiver) deliver(msg []byte) {
 		defer release()
 		defer r.recoverHandler(len(msg))
 		<-prev
+		// A message queued behind one in dispatch when the connection
+		// closed is not handled: its route would outlive the eviction
+		// (review II, R2-P6-conc-0306).
+		r.mu.Lock()
+		closed := r.done
+		r.mu.Unlock()
+		if closed {
+			return
+		}
 		// As handleTCPMessage: the dispatch context carries the release of
 		// the connection's turn.
 		ctx := context.WithValue(r.b.handlerContext(), sessionTurnKey{}, release)
@@ -728,8 +739,10 @@ func (r *connReceiver) recoverHandler(msgLen int) {
 		slog.String("stack", string(debug.Stack())))
 }
 
-// close stops delivering and evicts every session bound to the
-// connection, as a dropped TCP connection does.
+// close stops delivering: a delivery waiting for a slot ends, and a message
+// queued behind the one in dispatch is not handled. The connection's
+// sessions are evicted by [connReceiver.wait], once the handlers that were
+// running have returned (review II, R2-P6-conc-0306).
 func (r *connReceiver) close() {
 	r.mu.Lock()
 	if !r.done {
@@ -737,11 +750,22 @@ func (r *connReceiver) close() {
 		close(r.stopped)
 	}
 	r.mu.Unlock()
-	r.b.evictConn(r.conn)
 }
 
-// wait waits for every delivered message's handler to return.
-func (r *connReceiver) wait() { r.wg.Wait() }
+// wait waits for every delivered message's handler to return and then, once
+// the receiver is closed, evicts every session bound to the connection, as
+// a dropped TCP connection does: a handler that ran on past the eviction
+// would bind a route of the dead connection that nothing removes (review
+// II, R2-P6-conc-0306). Every close is followed by a wait.
+func (r *connReceiver) wait() {
+	r.wg.Wait()
+	r.mu.Lock()
+	closed := r.done
+	r.mu.Unlock()
+	if closed {
+		r.evictOnce.Do(func() { r.b.evictConn(r.conn) })
+	}
+}
 
 // gattPeripheral is the host's peripheral: [Config].GATT, else the older
 // [Config].BLE adapted to it, nil without either.

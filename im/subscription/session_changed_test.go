@@ -16,7 +16,7 @@ import (
 // subscriptionsChanged, SessionsBehavior.ts:53, :75-93 at 862ad75f).
 func TestSessionSubscriptionsChangedHook(t *testing.T) {
 	t.Parallel()
-	m := NewManager(Config{}, nil, nil)
+	m := newTestManager(Config{})
 	var seen []uint16
 	m.SetOnSessionSubscriptionsChanged(func(id uint16) { seen = append(seen, id) })
 	sub, err := m.Subscribe(SubscribeArgs{
@@ -48,7 +48,7 @@ func TestSessionSubscriptionsChangedHook(t *testing.T) {
 // R2-P2-sess-08).
 func TestSessionSubscriptionsChangedHookOnRestore(t *testing.T) {
 	t.Parallel()
-	m := NewManager(Config{MaxIntervalCeilingSeconds: 60}, nil, nil)
+	m := newTestManager(Config{MaxIntervalCeilingSeconds: 60})
 	var seen []uint16
 	m.SetOnSessionSubscriptionsChanged(func(id uint16) { seen = append(seen, id) })
 	if _, err := m.Restore(samplePeerSubscription(), 0x4242); err != nil {

@@ -25,7 +25,7 @@
 // position-aware feature has no position: UpOrOpen and DownOrClose set
 // its movement in OperationalStatus, StopMotion stops it, as matter.js's
 // WindowCoveringServer does (WindowCoveringServer.ts:123-141, :487-504,
-// :518-560 at 862ad75f). GoToLiftPercentage and GoToTiltPercentage decode through
+// :518-560 at db021da0). GoToLiftPercentage and GoToTiltPercentage decode through
 // the definition; the position arithmetic and the travel are the server's.
 package cover
 
@@ -43,7 +43,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -57,8 +56,9 @@ const ClusterRevision = wcdef.Revision
 // selection makes mandatory — TargetPositionLiftPercent100ths and
 // CurrentPositionLiftPercent100ths are "LF & PA_LF" — plus the optional
 // CurrentPositionLiftPercentage ("[LF & PA_LF]") and SafetyStatus ("O").
-// Lift without PositionAwareLift would disallow the two position
-// attributes the server serves, so an axis is always position-aware here.
+// Lift without PositionAwareLift disallows the two position attributes;
+// the server serves that selection too ([Config.FeatureMap]), without
+// them.
 const ServedFeatureMap = uint32(wcdef.FeatureLift | wcdef.FeaturePositionAwareLift)
 
 // ServedTiltFeatureMap is the tilt-only FeatureMap: Tilt and
@@ -92,7 +92,7 @@ var ErrEnumValue = errors.New("cover: Type or EndProductType not allowed under t
 // Mover is the optional host port: the device that moves. It is the Go
 // form of a matter.js host overriding handleMovement / handleStopMovement
 // (packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338,
-// :487 at matter.js 0ceb202d; "do not invoke super.handleMovement()",
+// :487 at matter.js db021da0; "do not invoke super.handleMovement()",
 // :328): the server validates the command, infers the target (UpOrOpen
 // open, DownOrClose closed — on every served axis, :521-535, :545-559 —
 // GoToLiftPercentage / GoToTiltPercentage the percentage on its axis,
@@ -145,7 +145,7 @@ func servedOptional(features uint32) []uint32 {
 // GoToLiftPercentage on a Lift axis without position awareness ("LF &
 // PA_LF, [LF]") and GoToTiltPercentage likewise, which matter.js's
 // WindowCoveringServer implements for every axis, so its ValidatedElements
-// lists them as supported (WindowCoveringServer.ts:576-618 at 862ad75f;
+// lists them as supported (WindowCoveringServer.ts:576-618 at db021da0;
 // W3-club1-04).
 func servedOptionalCommands(features uint32) []uint32 {
 	var out []uint32
@@ -162,7 +162,7 @@ func servedOptionalCommands(features uint32) []uint32 {
 // awareness: 0 is UpOrOpen, any other value DownOrClose, each moving every
 // served axis as those commands do. Mirrors matter.js
 // packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:586-590,
-// :608-612 at 862ad75f (W3-club1-04).
+// :608-612 at db021da0 (W3-club1-04).
 func openOrClose(pct uint16, both func(uint16) command) command {
 	if pct == 0 {
 		return both(0)
@@ -319,7 +319,7 @@ const (
 // globalStatus is the OperationalStatus bitmap for the given lift and
 // tilt movement: global tracks lift while it moves, otherwise tilt
 // (matter.js #handleOperationalStatusChanging,
-// WindowCoveringServer.ts:203-214 at 0ceb202d).
+// WindowCoveringServer.ts:203-214 at db021da0).
 func globalStatus(lift, tilt uint8) uint8 {
 	global := tilt
 	if lift != movementStopped {
@@ -359,9 +359,12 @@ func (s *WindowCoveringServer) OnAttributeChange(cb func(change contract.Change)
 // (PositionAwareTilt) but not Lift (Tilt) is refused with [ErrFeatureMap]:
 // advertising it would list attributes or commands the server does not
 // serve, or break the features' conformance (PA_LF "LF", PA_TL "TL",
-// window-covering-cluster.element.ts at 862ad75f). A Mover together with
+// window-covering-cluster.element.ts at db021da0). A Mover together with
 // a non-zero MoveStep is refused with [ErrMoverWithMoveStep], a Type or
-// EndProductType the FeatureMap disallows with [ErrEnumValue].
+// EndProductType the FeatureMap disallows with [ErrEnumValue], and an
+// initial position of a position-aware axis above 10000 with
+// [spec.ErrInvalidValue] (R2-P6-err-1562), as a host's report is held to
+// the attribute's "max 10000".
 func New(cfg Config) (*WindowCoveringServer, error) {
 	features := cfg.FeatureMap
 	if features == 0 {
@@ -392,6 +395,21 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	}{{wcdef.AttrType, cfg.Type}, {wcdef.AttrEndProductType, cfg.EndProductType}} {
 		if _, err := inst.CheckValue(v.attr, uint64(v.value), nil); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrEnumValue, err)
+		}
+	}
+	for _, p := range []struct {
+		attr    uint32
+		value   uint16
+		unknown bool
+	}{
+		{wcdef.AttrCurrentPositionLiftPercent100ths, cfg.InitialPositionPercent100ths, cfg.InitialPositionUnknown},
+		{wcdef.AttrCurrentPositionTiltPercent100ths, cfg.InitialTiltPositionPercent100ths, cfg.InitialTiltPositionUnknown},
+	} {
+		if !inst.Serves(p.attr) || p.unknown {
+			continue
+		}
+		if _, err := inst.CheckValue(p.attr, uint64(p.value), nil); err != nil {
+			return nil, fmt.Errorf("%w: cover: initial position: %w", spec.ErrInvalidValue, err)
 		}
 	}
 	s := &WindowCoveringServer{
@@ -453,17 +471,17 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 	defer s.mu.RUnlock()
 
 	switch attrID {
-	case wire.WindowCoveringAttrType:
+	case wcdef.AttrType:
 		return s.wcType, true
-	case wire.WindowCoveringAttrConfigStatus:
+	case wcdef.AttrConfigStatus:
 		return s.configStatusLocked(), true
-	case wire.WindowCoveringAttrOperationalStatus:
+	case wcdef.AttrOperationalStatus:
 		return s.operationalStatus, true
-	case wire.WindowCoveringAttrEndProductType:
+	case wcdef.AttrEndProductType:
 		return s.endProductType, true
-	case wire.WindowCoveringAttrMode:
+	case wcdef.AttrMode:
 		return s.wcMode, true
-	case wire.WindowCoveringAttrSafetyStatus:
+	case wcdef.AttrSafetyStatus:
 		return uint16(0), true
 	}
 	for _, a := range []*axis{s.lift, s.tilt} {
@@ -548,7 +566,10 @@ func (e windowCoveringConstraintErr) Error() string                 { return e.m
 func (windowCoveringConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
 // Compile-time assertion.
-var _ im.StatusCodeError = windowCoveringConstraintErr{}
+var (
+	_ im.StatusCodeError       = windowCoveringConstraintErr{}
+	_ contract.ClusterQuiescer = (*WindowCoveringServer)(nil)
+)
 
 // MatterWrite accepts Mode (0x0017), the one writable attribute ("RW VM");
 // all others are controlled via commands. The definition checks the write
@@ -557,7 +578,7 @@ var _ im.StatusCodeError = windowCoveringConstraintErr{}
 // a Mode outside "max 15" — the four ModeBitmap bits — CONSTRAINT_ERROR.
 //
 // A Mode that passes is synced as matter.js #handleModeChanging does
-// (WindowCoveringServer.ts:162-200 at 0ceb202d): MaintenanceMode takes
+// (WindowCoveringServer.ts:162-200 at db021da0): MaintenanceMode takes
 // priority over CalibrationMode, which is cleared beside it; a
 // CalibrationMode left set is CONSTRAINT_ERROR, as matter.js answers
 // without supportsCalibration (its default, :73, :620) — the server has no
@@ -597,7 +618,9 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 	if held {
 		return false, nil
 	}
-	if err := s.veto.Check(ctx, attrID, uint8(n)); err != nil { //nolint:gosec // ≤ 15 per ValidateWrite
+	// The veto hears the Mode the write stores — normalised, the value a
+	// read answers after it (R2-P6-api-1505).
+	if err := s.veto.Check(ctx, attrID, spec.Stored(wcdef.Definition.Attribute(attrID).Type, mode)); err != nil {
 		return false, err
 	}
 	s.mu.Lock()
@@ -612,10 +635,10 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 	// by postCommit, :1302-1317, at db021da0).
 	var changed []uint32 // ascending: ConfigStatus 0x0007, Mode 0x0017
 	if moved {
-		changed = append(changed, wire.WindowCoveringAttrConfigStatus)
+		changed = append(changed, wcdef.AttrConfigStatus)
 	}
 	if modeChanged {
-		changed = append(changed, wire.WindowCoveringAttrMode)
+		changed = append(changed, wcdef.AttrMode)
 	}
 	s.changes.NotifyFrom(contract.OriginControllerWrite, changed...)
 	return len(changed) > 0, nil
@@ -644,7 +667,7 @@ type command struct {
 
 // parseCommand validates cmdID and fields and infers the targets:
 // UpOrOpen 0 and DownOrClose 10000 on every served axis
-// (WindowCoveringServer.ts:521-535, :545-559 at matter.js 0ceb202d),
+// (WindowCoveringServer.ts:521-535, :545-559 at matter.js db021da0),
 // GoToLiftPercentage / GoToTiltPercentage the value on its axis
 // (:576-584, :598-606), StopMotion a stop (:566-570). A GoTo command of
 // an unserved axis is not in AcceptedCommandList and is refused here too.
@@ -663,11 +686,11 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 	switch cmdID {
 	case wcdef.CmdUpOrOpen:
 		return both(0), nil
-	case wire.WindowCoveringCmdDownOrClose:
+	case wcdef.CmdDownOrClose:
 		return both(10000), nil
-	case wire.WindowCoveringCmdStopMotion:
+	case wcdef.CmdStopMotion:
 		return command{stop: true}, nil
-	case wire.WindowCoveringCmdGoToLiftPercentage:
+	case wcdef.CmdGoToLiftPercentage:
 		if s.lift == nil {
 			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToLiftPercentage without the Lift feature")
 		}
@@ -679,7 +702,7 @@ func (s *WindowCoveringServer) parseCommand(cmdID uint32, fields any) (command, 
 			return openOrClose(pct, both), nil
 		}
 		return command{lift: &pct}, nil
-	case wire.WindowCoveringCmdGoToTiltPercentage:
+	case wcdef.CmdGoToTiltPercentage:
 		if s.tilt == nil {
 			return command{}, spec.Errorf(im.StatusUnsupportedCommand, "cover: GoToTiltPercentage without the Tilt feature")
 		}
@@ -724,7 +747,7 @@ func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, f
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if c.stop {
-		// matter.js handleStopMovement (:487-504 at 862ad75f): each
+		// matter.js handleStopMovement (:487-504 at db021da0): each
 		// position-aware axis stops where it is, and the target follows the
 		// position; with no position-aware axis every movement is Stopped.
 		anyAware := false
@@ -835,7 +858,7 @@ func (s *WindowCoveringServer) SetCurrentPosition(lift, tilt *uint16) {
 // SetTargetPosition records a target the host infers from the device's
 // own movement — a covering a wall button or a programme started, which
 // matter.js has no command for: there every movement starts with a target
-// write (WindowCoveringServer.ts:524, :548, :580, :602 at 0ceb202d) and a
+// write (WindowCoveringServer.ts:524, :548, :580, :602 at db021da0) and a
 // stop snaps the target to the position (:491-496). lift is
 // TargetPositionLiftPercent100ths, tilt TargetPositionTiltPercent100ths;
 // nil leaves an axis unchanged, an unserved axis is ignored, a value
@@ -897,7 +920,7 @@ func (s *WindowCoveringServer) setPositions(lift, tilt *uint16, clampMsg string,
 
 // SetOperationalStatus records the OperationalStatus bitmap the device
 // reports (global in bits 0-1, lift in bits 2-3, tilt in bits 4-5 —
-// window-covering-cluster.element.ts:128-131 at matter.js 0ceb202d),
+// window-covering-cluster.element.ts:128-131 at matter.js db021da0),
 // stored without the [Mover] and reported through the change notifier.
 // Bits above the attribute's "max 63" (:55-56) are dropped and logged.
 func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
@@ -911,7 +934,7 @@ func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
 	s.operationalStatus = status
 	s.mu.Unlock()
 	if changed {
-		s.changes.NotifyFrom(contract.OriginHostSet, wire.WindowCoveringAttrOperationalStatus)
+		s.changes.NotifyFrom(contract.OriginHostSet, wcdef.AttrOperationalStatus)
 	}
 }
 
@@ -924,7 +947,7 @@ func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
 	if !a.aware {
 		// An axis without a position moves in the command's direction
 		// until StopMotion (matter.js #prepareMovement sets the axis's
-		// OperationalStatus, :420-446 at 862ad75f; handleMovement moves
+		// OperationalStatus, :420-446 at db021da0; handleMovement moves
 		// no position, :336-356).
 		dir := movementOpening
 		if target != 0 {
@@ -967,6 +990,20 @@ func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
 	a.move = m
 }
 
+// MatterQuiesce implements [contract.ClusterQuiescer]: a travel in
+// progress stops where it is — its step timer stopped, nothing reported,
+// the position and OperationalStatus as the last step left them — and
+// the next movement command starts again (R2-P6-conc-1507).
+func (s *WindowCoveringServer) MatterQuiesce() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, a := range []*axis{s.lift, s.tilt} {
+		if a != nil {
+			s.stopLocked(a)
+		}
+	}
+}
+
 // stopLocked ends a running movement of the axis. Caller holds s.mu.
 func (s *WindowCoveringServer) stopLocked(a *axis) {
 	if a.move != nil {
@@ -1001,9 +1038,17 @@ func (s *WindowCoveringServer) tick(a *axis, m *movement) {
 		a.current = m.target
 		s.setAxisStatusLocked(a, movementStopped)
 		a.move = nil
-		changed = append(changed, wire.WindowCoveringAttrOperationalStatus)
+		changed = append(changed, wcdef.AttrOperationalStatus)
 	} else {
-		a.current = uint16(int(a.current) + m.increment) //nolint:gosec // six increments of a 0-10000 span stay inside it
+		// A host report during the travel moves the base the steps add to
+		// (SetCurrentPosition does not stop it): a step never passes the
+		// target and never leaves the attribute's 0..10000
+		// (R2-P6-fsm-1502).
+		next := int(a.current) + m.increment
+		if (m.increment > 0 && next > int(m.target)) || (m.increment < 0 && next < int(m.target)) {
+			next = int(m.target)
+		}
+		a.current = uint16(min(max(next, 0), 10000)) //nolint:gosec // clamped to 0..10000
 		m.timer.Reset(s.moveStep)
 	}
 	s.mu.Unlock()

@@ -36,7 +36,7 @@ import (
 // inherit the same requirement.
 //
 // Bridge semantics: go-fabric does not drive any visual or audible
-// indicator on the underlying CCU device, so Identify is implemented
+// indicator on the underlying host device, so Identify is implemented
 // as a no-op surface that:
 //
 //   - reports IdentifyType = None (0x00) — "the device has no
@@ -312,10 +312,16 @@ func (i *Identify) MatterWriteChanged(ctx context.Context, attrID uint32, value 
 // handler first, the stored value when it consents — one step for the
 // countdown (op), which therefore sees the value before the request or
 // after it and never the handler's call without its store. changed is
-// whether the stored value moved.
+// whether the stored value moved. A request waits for the queue only as
+// long as its context lets it: a host handler that does not return holds
+// the queue, not every later request (review II, R2-P6-err-1213).
 func (i *Identify) setIdentifyTime(ctx context.Context, t uint16) (changed bool, err error) {
 	op := i.opQueue()
-	op <- struct{}{}
+	select {
+	case op <- struct{}{}:
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
 	defer func() { <-op }()
 	if h := i.hostHandler(); h != nil {
 		if err := h.MatterIdentify(ctx, t); err != nil {
@@ -339,13 +345,16 @@ func (i *Identify) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (
 		if err != nil {
 			return nil, err
 		}
-		if _, err := i.setIdentifyTime(ctx, t); err != nil {
+		changed, err := i.setIdentifyTime(ctx, t)
+		if err != nil {
 			return nil, err
 		}
 		i.maybeStartCountdown() //nolint:contextcheck // the countdown outlives the request; its stop call has no request behind it
-		// Bump DataVersion after a successful Identify command so
-		// DataVersionFilter evaluation correctly detects the cluster changed.
-		i.dataVersion.Bump()
+		// DataVersion advances when IdentifyTime moved — one rule with
+		// the attribute write (review II, R2-P6-err-1213).
+		if changed {
+			i.dataVersion.Bump()
+		}
 		// Success path returns nil (status-only response).
 		return nil, nil
 	case identifyCmdTriggerEffect:

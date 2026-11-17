@@ -5,6 +5,7 @@ package jointfabric
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -19,27 +20,37 @@ const rootEndpoint uint16 = 0
 // and taken over; each endpoint's groups and bindings are fetched and
 // merged, the root endpoint's too; the pending memberships are pushed,
 // the bindings pushed as the node's whole list; the node's key sets are
-// fetched and taken over, and every node's pending key set entries pushed;
+// fetched and taken into nothing (below), and every node's pending key
+// set entries pushed;
 // its ACL entries are fetched, merged and pushed as the whole list; the
 // node goes Committed. A fetch that fails ends the refresh with the node
 // Pending. Without a Sync, with a refresh running, or for a node not held,
 // it is refused. Mirrors JointFabricDatastore.cpp:241-1130 at 6170af84
 // (RefreshNode, ContinueRefresh) — run through here, where
 // connectedhomeip re-enters ContinueRefresh from each delegate callback.
+//
+// A store that refuses a step's save ends the refresh with its error
+// (ErrStore, R2-P6-err-1120); a wipe of the datastore while the refresh
+// runs ends it before its next step commits (R2-P6-conc-1107); a node
+// that lists more entries in one list than a command lets that list hold
+// ends it with ErrNoMemory before anything is pushed (R2-P6-bound-1113).
 func (d *Datastore) RefreshNode(ctx context.Context, nodeID uint64) error {
-	if err := d.beginRefresh(ctx, nodeID); err != nil {
+	rctx, err := d.beginRefresh(ctx, nodeID)
+	if err != nil {
 		return err
 	}
-	return d.runRefresh(ctx, nodeID)
+	return d.runRefresh(rctx, nodeID)
 }
 
 // beginRefresh is RefreshNode (:241-252) and the Idle state's SetNode
 // (:262): a Sync, no refresh running, the node held and now Pending. A
 // node not held ends the refresh here; connectedhomeip keeps
 // mRefreshingNodeId set on that path (:247-249), which refuses every
-// later refresh.
-func (d *Datastore) beginRefresh(ctx context.Context, nodeID uint64) error {
-	return d.update(ctx, func() error {
+// later refresh. The returned context carries the tables' generation the
+// refresh commits against.
+func (d *Datastore) beginRefresh(ctx context.Context, nodeID uint64) (context.Context, error) {
+	var gen uint64
+	err := d.update(ctx, func() error {
 		if d.sync == nil { // :243
 			return ErrNoSync
 		}
@@ -50,8 +61,13 @@ func (d *Datastore) beginRefresh(ctx context.Context, nodeID uint64) error {
 			return err
 		}
 		d.inRefresh, d.refreshing = true, nodeID
+		gen = d.gen
 		return nil
 	})
+	if err != nil {
+		return ctx, err
+	}
+	return context.WithValue(ctx, genKey{}, gen), nil
 }
 
 // endRefresh tears the refresh down (mRefreshingNodeId = kUndefinedNodeId,
@@ -70,21 +86,29 @@ func (d *Datastore) runRefresh(ctx context.Context, nodeID uint64) (err error) {
 		return fmt.Errorf("%w: FetchEndpointList: %w", ErrSync, err)
 	}
 	var refreshing []uint16
-	d.commit(ctx, func() { refreshing = d.refreshEndpointsLocked(nodeID, endpoints) })
+	if err := d.commit(ctx, func() { refreshing = d.refreshEndpointsLocked(nodeID, endpoints) }); err != nil {
+		return err
+	}
 	for _, ep := range refreshing { // kRefreshingGroups :355-426
 		groups, err := d.sync.FetchEndpointGroupList(ctx, nodeID, ep)
 		if err != nil {
 			continue // :368: a failed fetch leaves the endpoint's memberships
 		}
-		d.commit(ctx, func() { d.mergeGroupsLocked(nodeID, ep, groups) })
+		if err := d.commitMerge(ctx, func() error { return d.mergeGroupsLocked(nodeID, ep, groups) }); err != nil {
+			return err
+		}
 	}
-	d.syncGroupsOfNode(ctx, nodeID) // :428-511
+	if err := d.syncGroupsOfNode(ctx, nodeID); err != nil { // :428-511
+		return err
+	}
 	for _, ep := range refreshing { // kRefreshingBindings :522-600
 		bindings, err := d.sync.FetchEndpointBindingList(ctx, nodeID, ep)
 		if err != nil {
 			continue // :536
 		}
-		d.commit(ctx, func() { d.mergeBindingsLocked(nodeID, ep, bindings) })
+		if err := d.commitMerge(ctx, func() error { return d.mergeBindingsLocked(nodeID, ep, bindings) }); err != nil {
+			return err
+		}
 	}
 	if err := d.syncBindingsOfNode(ctx, nodeID); err != nil { // :602-684
 		return err
@@ -94,19 +118,41 @@ func (d *Datastore) runRefresh(ctx context.Context, nodeID uint64) (err error) {
 		return fmt.Errorf("%w: FetchGroupKeySetList: %w", ErrSync, err)
 	}
 	for _, id := range ids { // kFetchingGroupKeySets :714-767
-		ks, err := d.sync.FetchGroupKeySet(ctx, nodeID, id)
-		if err != nil {
+		// The key set is fetched, as connectedhomeip fetches it, and taken
+		// into nothing: the datastore is the source of the Joint Fabric's
+		// epoch keys, so a held key set's keys and policy are never
+		// replaced by what the node reports (a KeySetRead answers its keys
+		// null), a key set the datastore does not hold is not adopted, and
+		// the node's say-so enrols it as no recipient of a key set
+		// (NodeKeySetList is written by the commands alone). Owner decision
+		// 129, R2-P6-sec-1106; connectedhomeip updates the held entry with
+		// the node's and appends an unknown one
+		// (src/app/server/JointFabricDatastore.cpp:724-743 at 6170af84).
+		if _, err := d.sync.FetchGroupKeySet(ctx, nodeID, id); err != nil {
 			return fmt.Errorf("%w: FetchGroupKeySet %d: %w", ErrSync, id, err)
 		}
-		d.commit(ctx, func() { d.takeKeySetLocked(ks) })
 	}
-	d.syncKeySets(ctx)                            // kRefreshingGroupKeySets :769-916
+	if err := d.syncKeySets(ctx); err != nil { // kRefreshingGroupKeySets :769-916
+		return err
+	}
 	acls, err := d.sync.FetchACLList(ctx, nodeID) // :918-999
 	if err != nil {
 		return fmt.Errorf("%w: FetchACLList: %w", ErrSync, err)
 	}
-	d.commit(ctx, func() { d.mergeACLsLocked(nodeID, acls) })
+	if err := d.commitMerge(ctx, func() error { return d.mergeACLsLocked(nodeID, acls) }); err != nil {
+		return err
+	}
 	return d.syncACLsOfNode(ctx, nodeID) // kRefreshingACLs :1002-1126
+}
+
+// commitMerge commits a merge that refuses before it changes anything;
+// the merge's error, else the commit's.
+func (d *Datastore) commitMerge(ctx context.Context, merge func() error) error {
+	var merr error
+	if err := d.commit(ctx, func() { merr = merge() }); err != nil {
+		return err
+	}
+	return merr
 }
 
 // refreshEndpointsLocked takes over the node's endpoints and returns the
@@ -132,8 +178,15 @@ func (d *Datastore) refreshEndpointsLocked(nodeID uint64, endpoints []EndpointEn
 
 // mergeGroupsLocked adds the endpoint's fetched groups as Committed
 // memberships and drops the Committed or DeletePending memberships of the
-// endpoint the node no longer has (:368-412).
-func (d *Datastore) mergeGroupsLocked(nodeID uint64, ep uint16, groups []GroupEntry) {
+// endpoint the node no longer has (:368-412). A fetched list longer than
+// MaxGroups, the most one list holds through AddGroupIDToEndpointForNode
+// (:1684), is ErrNoMemory before anything changes; the table's total is
+// not bounded, as connectedhomeip's merge appends without one (:389)
+// (R2-P6-bound-1113, the module's per-list bound).
+func (d *Datastore) mergeGroupsLocked(nodeID uint64, ep uint16, groups []GroupEntry) error {
+	if len(groups) > MaxGroups {
+		return fmt.Errorf("%w: node %d endpoint %d lists %d groups", ErrNoMemory, nodeID, ep, len(groups))
+	}
 	for _, g := range groups {
 		e := EndpointGroupIDEntry{NodeId: nodeID, EndpointId: ep, GroupId: uint16(g.GroupId)} //nolint:gosec // a group id (:387)
 		if !slices.ContainsFunc(d.t.EndpointGroupIDs, func(x EndpointGroupIDEntry) bool { return sameEndpointGroup(x, e) }) {
@@ -151,12 +204,14 @@ func (d *Datastore) mergeGroupsLocked(nodeID uint64, ep uint16, groups []GroupEn
 		return !slices.ContainsFunc(groups, func(g GroupEntry) bool { return uint64(e.GroupId) == g.GroupId })
 	})
 	d.markLocked(dsdef.AttrEndpointGroupIdList)
+	return nil
 }
 
 // syncGroupsOfNode pushes the node's Pending memberships, committing each
 // pushed, and the removal of its DeletePending ones as a zero entry,
-// erasing each pushed; a CommitFailed one stays (:428-511).
-func (d *Datastore) syncGroupsOfNode(ctx context.Context, nodeID uint64) {
+// erasing each pushed; a CommitFailed one stays (:428-511). A push that
+// fails is left for the next refresh; a refused save is the error.
+func (d *Datastore) syncGroupsOfNode(ctx context.Context, nodeID uint64) error {
 	d.mu.Lock()
 	var entries []EndpointGroupIDEntry
 	for _, e := range d.t.EndpointGroupIDs {
@@ -167,20 +222,34 @@ func (d *Datastore) syncGroupsOfNode(ctx context.Context, nodeID uint64) {
 	d.mu.Unlock()
 	for _, e := range entries {
 		if e.StatusEntry.State == statePending { // :433-458
-			_ = d.pushEndpointGroup(nodeID, e)(ctx)
+			if err := d.pushEndpointGroup(nodeID, e)(ctx); isCommitError(err) {
+				return err
+			}
 			continue
+		}
+		if err := d.live(ctx); err != nil {
+			return err
 		}
 		if err := d.sync.SyncEndpointGroupID(ctx, nodeID, EndpointGroupIDEntry{}); err != nil { // :460-491
 			continue
 		}
-		d.commit(ctx, func() {
+		if err := d.commit(ctx, func() {
 			n := len(d.t.EndpointGroupIDs)
 			d.t.EndpointGroupIDs = slices.DeleteFunc(d.t.EndpointGroupIDs, func(x EndpointGroupIDEntry) bool { return sameEndpointGroup(x, e) })
 			if len(d.t.EndpointGroupIDs) != n {
 				d.markLocked(dsdef.AttrEndpointGroupIdList)
 			}
-		})
+		}); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+// isCommitError reports a push's error that is its commit's — a refused
+// save or a wipe — not the node's: a refresh ends on it.
+func isCommitError(err error) bool {
+	return errors.Is(err, ErrStore) || errors.Is(err, errWiped)
 }
 
 // mergeBindingsLocked adds the endpoint's fetched bindings as Committed
@@ -188,8 +257,16 @@ func (d *Datastore) syncGroupsOfNode(ctx context.Context, nodeID uint64) {
 // DeletePending bindings the node no longer has (:536-586). The removal
 // is bounded to the endpoint, as the groups' is (:397); connectedhomeip's
 // predicate (:567-585) also drops the other endpoints' bindings of the
-// node.
-func (d *Datastore) mergeBindingsLocked(nodeID uint64, ep uint16, bindings []EndpointBindingEntry) {
+// node. A fetched list longer than MaxGroups, the most one list holds
+// through AddBindingToEndpointForNode (:1930), is ErrNoMemory before
+// anything changes — the refresh then writes no truncated list to the
+// node; the table's total is not bounded, as connectedhomeip's merge
+// appends without one (:562) (R2-P6-bound-1113, the module's per-list
+// bound).
+func (d *Datastore) mergeBindingsLocked(nodeID uint64, ep uint16, bindings []EndpointBindingEntry) error {
+	if len(bindings) > MaxGroups {
+		return fmt.Errorf("%w: node %d endpoint %d lists %d bindings", ErrNoMemory, nodeID, ep, len(bindings))
+	}
 	for _, b := range bindings {
 		if slices.ContainsFunc(d.t.Bindings, func(e EndpointBindingEntry) bool {
 			return e.NodeId == nodeID && e.EndpointId == b.EndpointId && bindingMatches(e.Binding, b.Binding)
@@ -197,7 +274,7 @@ func (d *Datastore) mergeBindingsLocked(nodeID uint64, ep uint16, bindings []End
 			continue
 		}
 		d.t.Bindings = append(d.t.Bindings, EndpointBindingEntry{
-			NodeId: nodeID, EndpointId: b.EndpointId, Binding: cloneBinding(b.Binding), ListId: d.nextListIDLocked(),
+			NodeId: nodeID, EndpointId: b.EndpointId, Binding: b.Binding.Clone(), ListId: d.nextListIDLocked(),
 			StatusEntry: StatusEntry{State: stateCommitted},
 		})
 	}
@@ -213,6 +290,7 @@ func (d *Datastore) mergeBindingsLocked(nodeID uint64, ep uint16, bindings []End
 		})
 	})
 	d.markLocked(dsdef.AttrEndpointBindingList)
+	return nil
 }
 
 // permanent reports a failure a retry would not cure: ConstraintError or
@@ -235,7 +313,7 @@ func (d *Datastore) syncBindingsOfNode(ctx context.Context, nodeID uint64) error
 		return fmt.Errorf("%w: binding list of node %d: %w", ErrSync, nodeID, err)
 	}
 	var list []EndpointBindingEntry
-	d.commit(ctx, func() {
+	if err := d.commit(ctx, func() {
 		d.t.Bindings = slices.DeleteFunc(d.t.Bindings, func(e EndpointBindingEntry) bool {
 			return e.NodeId == nodeID && e.StatusEntry.State == stateCommitFailed && permanent(e.StatusEntry.FailureCode)
 		})
@@ -245,13 +323,16 @@ func (d *Datastore) syncBindingsOfNode(ctx context.Context, nodeID uint64) error
 			}
 		}
 		d.markLocked(dsdef.AttrEndpointBindingList)
-	})
+	}); err != nil {
+		unlock()
+		return err
+	}
 	err = d.sync.SyncBindings(ctx, nodeID, list) // :630-641
 	unlock()
 	if err != nil {
 		return fmt.Errorf("%w: SyncBindings: %w", ErrSync, err)
 	}
-	d.commit(ctx, func() {
+	return d.commit(ctx, func() {
 		for i := range d.t.Bindings { // :642-666
 			e := &d.t.Bindings[i]
 			if e.NodeId != nodeID || (e.StatusEntry.State != statePending && e.StatusEntry.State != stateCommitFailed) {
@@ -274,20 +355,6 @@ func (d *Datastore) syncBindingsOfNode(ctx context.Context, nodeID uint64) error
 		})
 		d.markLocked(dsdef.AttrEndpointBindingList)
 	})
-	return nil
-}
-
-// takeKeySetLocked adds a fetched key set or updates the held one
-// (:724-746); an epoch key over 16 bytes is only logged there.
-func (d *Datastore) takeKeySetLocked(ks GroupKeySet) {
-	if i := d.keySetIndexLocked(ks.GroupKeySetId); i >= 0 {
-		_ = copyKeySet(ks, &d.t.GroupKeySets[i])
-	} else {
-		stored := newKeySet()
-		_ = copyKeySet(ks, &stored)
-		d.t.GroupKeySets = append(d.t.GroupKeySets, stored)
-	}
-	d.markLocked(dsdef.AttrGroupKeySetList)
 }
 
 // syncKeySets pushes, for every held key set, the removal of each node's
@@ -295,8 +362,9 @@ func (d *Datastore) takeKeySetLocked(ks GroupKeySet) {
 // then the key set to each node whose entry of it is Pending or
 // retryably CommitFailed (committed once pushed); a permanently failed
 // entry is erased. The entries are every node's, not only the refreshed
-// one's, as connectedhomeip walks them (:769-916).
-func (d *Datastore) syncKeySets(ctx context.Context) {
+// one's, as connectedhomeip walks them (:769-916). A push that fails is
+// left for the next refresh; a refused save is the error.
+func (d *Datastore) syncKeySets(ctx context.Context) error {
 	type removal struct {
 		node uint64
 		id   uint16
@@ -313,14 +381,16 @@ func (d *Datastore) syncKeySets(ctx context.Context) {
 	}
 	d.mu.Unlock()
 	for _, r := range removals { // :786-824
-		_ = d.pushNodeKeySetRemoval(r.node, NodeKeySetEntry{}, r.node, r.id)(ctx)
+		if err := d.pushNodeKeySetRemoval(r.node, NodeKeySetEntry{}, r.node, r.id)(ctx); isCommitError(err) {
+			return err
+		}
 	}
 	type keyPush struct {
 		node uint64
 		ks   GroupKeySet
 	}
 	var pushes []keyPush
-	d.commit(ctx, func() {
+	if err := d.commit(ctx, func() {
 		for i := range d.t.GroupKeySets { // :826-913
 			ks := &d.t.GroupKeySets[i]
 			d.t.NodeKeySets = slices.DeleteFunc(d.t.NodeKeySets, func(e NodeKeySetEntry) bool {
@@ -328,21 +398,34 @@ func (d *Datastore) syncKeySets(ctx context.Context) {
 			})
 			for _, e := range d.t.NodeKeySets {
 				if e.GroupKeySetId == ks.GroupKeySetId && (e.StatusEntry.State == statePending || e.StatusEntry.State == stateCommitFailed) {
-					pushes = append(pushes, keyPush{e.NodeId, cloneKeySet(*ks)})
+					pushes = append(pushes, keyPush{e.NodeId, ks.Clone()})
 				}
 			}
 		}
 		d.markLocked(dsdef.AttrNodeKeySetList)
-	})
-	for i := range pushes {
-		_ = d.pushKeySet(pushes[i].node, pushes[i].ks)(ctx)
+	}); err != nil {
+		return err
 	}
+	for i := range pushes {
+		if err := d.pushKeySet(pushes[i].node, pushes[i].ks)(ctx); isCommitError(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // mergeACLsLocked adds the node's fetched ACL entries it does not hold by
 // list id as Committed and drops its Committed or DeletePending entries
-// the node no longer has (:923-984).
-func (d *Datastore) mergeACLsLocked(nodeID uint64, acls []ACLEntry) {
+// the node no longer has (:923-984). A fetched list longer than MaxACLs,
+// the most the list holds through AddACLToNode (:2122), is ErrNoMemory
+// before anything changes — the refresh then writes no truncated list to
+// the node; the table's total is not bounded, as connectedhomeip's merge
+// appends without one (:959) (R2-P6-bound-1113, the module's per-list
+// bound).
+func (d *Datastore) mergeACLsLocked(nodeID uint64, acls []ACLEntry) error {
+	if len(acls) > MaxACLs {
+		return fmt.Errorf("%w: node %d lists %d ACL entries", ErrNoMemory, nodeID, len(acls))
+	}
 	for _, a := range acls {
 		if slices.ContainsFunc(d.t.ACLs, func(e aclEntry) bool { return e.NodeID == nodeID && e.ListID == a.ListId }) {
 			continue
@@ -363,6 +446,7 @@ func (d *Datastore) mergeACLsLocked(nodeID uint64, acls []ACLEntry) {
 		return !slices.ContainsFunc(acls, func(a ACLEntry) bool { return e.ListID == a.ListId })
 	})
 	d.markLocked(dsdef.AttrNodeAclList)
+	return nil
 }
 
 // syncACLsOfNode pushes the node's Pending, Committed and retryable
@@ -372,7 +456,7 @@ func (d *Datastore) mergeACLsLocked(nodeID uint64, acls []ACLEntry) {
 // A push that fails ends the refresh (:1002-1126).
 func (d *Datastore) syncACLsOfNode(ctx context.Context, nodeID uint64) error {
 	var list []ACLEntry
-	d.commit(ctx, func() {
+	if err := d.commit(ctx, func() {
 		d.t.ACLs = slices.DeleteFunc(d.t.ACLs, func(e aclEntry) bool {
 			return e.NodeID == nodeID && e.StatusEntry.State == stateCommitFailed && permanent(e.StatusEntry.FailureCode)
 		})
@@ -382,12 +466,14 @@ func (d *Datastore) syncACLsOfNode(ctx context.Context, nodeID uint64) error {
 			}
 		}
 		d.markLocked(dsdef.AttrNodeAclList)
-	})
+	}); err != nil {
+		return err
+	}
 	if err := d.sync.SyncACLs(ctx, nodeID, list); err != nil { // :1062-1072
 		return fmt.Errorf("%w: SyncACLs: %w", ErrSync, err)
 	}
 	var err error
-	d.commit(ctx, func() {
+	if cerr := d.commit(ctx, func() {
 		for i := range d.t.ACLs { // :1073-1088
 			e := &d.t.ACLs[i]
 			if e.NodeID == nodeID && (e.StatusEntry.State == statePending || e.StatusEntry.State == stateCommitFailed) &&
@@ -400,6 +486,8 @@ func (d *Datastore) syncACLsOfNode(ctx context.Context, nodeID uint64) error {
 		})
 		d.markLocked(dsdef.AttrNodeAclList)
 		err = d.setNodeLocked(nodeID, stateCommitted) // :1099-1104
-	})
+	}); cerr != nil {
+		return cerr
+	}
 	return err
 }

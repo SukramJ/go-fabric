@@ -111,6 +111,22 @@ func (v *AuxiliaryLoadSwitchesSettingsStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AuxiliaryLoadSwitchesSettingsStruct) Clone() AuxiliaryLoadSwitchesSettingsStruct {
+	c := v
+	c.SwitchStates = func(s []AuxiliaryLoadSwitchSettingsStruct) []AuxiliaryLoadSwitchSettingsStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]AuxiliaryLoadSwitchSettingsStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.SwitchStates)
+	return c
+}
+
 // AuxiliaryLoadSwitchesSettingsStructDef describes AuxiliaryLoadSwitchesSettingsStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -191,6 +207,22 @@ func (v *CalendarPeriodStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CalendarPeriodStruct) Clone() CalendarPeriodStruct {
+	c := v
+	c.DayPatternIds = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.DayPatternIds)
+	return c
+}
+
 // CalendarPeriodStructDef describes CalendarPeriodStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -253,6 +285,35 @@ func (v *DayEntryStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "RandomizationOffset", false, &v.RandomizationOffset, spec.DecodeOptional(spec.DecodeInt[int16](16))),
 		spec.Bind(4, "RandomizationType", false, &v.RandomizationType, spec.DecodeOptional(spec.DecodeUint[DayEntryRandomizationTypeEnum](8))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DayEntryStruct) Clone() DayEntryStruct {
+	c := v
+	c.Duration = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Duration)
+	c.RandomizationOffset = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.RandomizationOffset)
+	c.RandomizationType = func(p *DayEntryRandomizationTypeEnum) *DayEntryRandomizationTypeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.RandomizationType)
+	return c
 }
 
 // DayEntryStructDef describes DayEntryStruct.
@@ -320,6 +381,22 @@ func (v *DayPatternStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DayPatternStruct) Clone() DayPatternStruct {
+	c := v
+	c.DayEntryIds = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.DayEntryIds)
+	return c
+}
+
 // DayPatternStructDef describes DayPatternStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -352,6 +429,22 @@ func (v *DayStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "DayType", true, &v.DayType, spec.DecodeUint[DayTypeEnum](8)),
 		spec.Bind(2, "DayEntryIds", true, &v.DayEntryIds, spec.DecodeListIn(spec.DecodeUint[uint32](32), 1, 96)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DayStruct) Clone() DayStruct {
+	c := v
+	c.DayEntryIds = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.DayEntryIds)
+	return c
 }
 
 // DayStructDef describes DayStruct.
@@ -482,6 +575,63 @@ func (v *TariffComponentStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TariffComponentStruct) Clone() TariffComponentStruct {
+	c := v
+	c.Price = func(p *spec.Nullable[TariffPriceStruct]) *spec.Nullable[TariffPriceStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[TariffPriceStruct]{Value: (*p).Value.Clone(), Null: (*p).Null}
+		return &x
+	}(v.Price)
+	c.FriendlyCredit = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FriendlyCredit)
+	c.AuxiliaryLoad = func(p *AuxiliaryLoadSwitchSettingsStruct) *AuxiliaryLoadSwitchSettingsStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AuxiliaryLoad)
+	c.PeakPeriod = func(p *PeakPeriodStruct) *PeakPeriodStruct {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PeakPeriod)
+	c.PowerThreshold = func(p *PowerThresholdStruct) *PowerThresholdStruct {
+		if p == nil {
+			return nil
+		}
+		x := (*p).Clone()
+		return &x
+	}(v.PowerThreshold)
+	c.Label = func(p *spec.Nullable[string]) *spec.Nullable[string] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Label)
+	c.Predicted = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Predicted)
+	return c
+}
+
 // TariffComponentStructDef describes TariffComponentStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -520,6 +670,28 @@ func (v *TariffPriceStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "Price", false, &v.Price, spec.DecodeOptional(spec.DecodeInt[int64](64))),
 		spec.Bind(2, "PriceLevel", false, &v.PriceLevel, spec.DecodeOptional(spec.DecodeInt[int16](16))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TariffPriceStruct) Clone() TariffPriceStruct {
+	c := v
+	c.Price = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Price)
+	c.PriceLevel = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PriceLevel)
+	return c
 }
 
 // TariffPriceStructDef describes TariffPriceStruct.
@@ -581,6 +753,28 @@ func (v *PowerThresholdStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PowerThresholdStruct) Clone() PowerThresholdStruct {
+	c := v
+	c.PowerThreshold = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PowerThreshold)
+	c.ApparentPowerThreshold = func(p *int64) *int64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ApparentPowerThreshold)
+	return c
+}
+
 // PowerThresholdStructDef describes PowerThresholdStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -637,6 +831,21 @@ func (v *TariffInformationStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "Currency", false, &v.Currency, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeStruct[Currency]))),
 		spec.Bind(3, "BlockMode", true, &v.BlockMode, spec.DecodeNullable(spec.DecodeUint[BlockModeEnum](8))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TariffInformationStruct) Clone() TariffInformationStruct {
+	c := v
+	c.Currency = func(p *spec.Nullable[Currency]) *spec.Nullable[Currency] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Currency)
+	return c
 }
 
 // TariffInformationStructDef describes TariffInformationStruct.
@@ -702,6 +911,30 @@ func (v *TariffPeriodStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "DayEntryIds", true, &v.DayEntryIds, spec.DecodeListIn(spec.DecodeUint[uint32](32), 1, 20)),
 		spec.Bind(2, "TariffComponentIds", true, &v.TariffComponentIds, spec.DecodeListIn(spec.DecodeUint[uint32](32), 1, 20)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v TariffPeriodStruct) Clone() TariffPeriodStruct {
+	c := v
+	c.DayEntryIds = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.DayEntryIds)
+	c.TariffComponentIds = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.TariffComponentIds)
+	return c
 }
 
 // TariffPeriodStructDef describes TariffPeriodStruct.
@@ -776,6 +1009,23 @@ func (v *GetTariffComponentResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetTariffComponentResponse) Clone() GetTariffComponentResponse {
+	c := v
+	c.DayEntryIds = func(s []uint32) []uint32 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint32, len(s))
+		copy(out, s)
+		return out
+	}(v.DayEntryIds)
+	c.TariffComponent = v.TariffComponent.Clone()
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (GetTariffComponentResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdGetTariffComponentResponse
@@ -817,6 +1067,15 @@ func (v *GetDayEntryResponse) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "GetDayEntryResponse",
 		spec.Bind(0, "DayEntry", true, &v.DayEntry, spec.DecodeStruct[DayEntryStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetDayEntryResponse) Clone() GetDayEntryResponse {
+	c := v
+	c.DayEntry = v.DayEntry.Clone()
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

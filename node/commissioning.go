@@ -71,6 +71,11 @@ type commissioningHost struct {
 	// window only on the host's call, never by itself
 	// (reopenIfDecommissioned and Start's open).
 	onDemand bool
+	// rotatingID advances the Rotating Device Identifier's lifetime
+	// counter and returns the RI of the window being advertised
+	// (rotatingDeviceID.next); nil when [Commissioning].RotatingDeviceID
+	// is off, and the record carries no RI.
+	rotatingID func(context.Context) string
 
 	// basicMu guards basic.
 	basicMu sync.Mutex
@@ -177,6 +182,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 			adv.Discriminator = basic.discriminator
 		}
 		if live {
+			adv = h.withRotatingID(ctx, adv)
 			h.announce(ctx, adv, "commissioning.own_window.announce")
 			h.followOnBLE(ctx, adv)
 		}
@@ -193,7 +199,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 			adv.CommissioningMode = 3
 		}
 		if live {
-			h.announce(ctx, adv, "commissioning.window.announce")
+			h.announce(ctx, h.withRotatingID(ctx, adv), "commissioning.window.announce")
 			// An administrator's window is never on BLE: the node has a
 			// fabric (matter.js BleAdvertiser announces basic windows only,
 			// BleAdvertiser.ts:40-42, and only while uncommissioned,
@@ -213,7 +219,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (:236-256), the status BasicWindowOpen.
 		h.attachPase(h.baseline)
 		if live {
-			h.announce(ctx, h.advertisement(), "commissioning.basic_window.announce")
+			h.announce(ctx, h.withRotatingID(ctx, h.advertisement()), "commissioning.basic_window.announce")
 			h.withdrawBLE(ctx)
 		}
 		h.logger.Info("commissioning.basic_window.open", slog.Int("discriminator", int(h.advert.Discriminator)))
@@ -312,6 +318,16 @@ func (h *commissioningHost) advertisement() bridge.CommissioningAdvertisement {
 	adv := h.advert
 	if adv.DeviceTypeID == 0 && h.deviceType != nil {
 		adv.DeviceTypeID = h.deviceType.resolve()
+	}
+	return adv
+}
+
+// withRotatingID is adv with the RI of the window about to be advertised:
+// each advertised window advances the lifetime counter once
+// (rotatingDeviceID.next). Unchanged when the option is off.
+func (h *commissioningHost) withRotatingID(ctx context.Context, adv bridge.CommissioningAdvertisement) bridge.CommissioningAdvertisement {
+	if h.rotatingID != nil {
+		adv.RotatingID = h.rotatingID(ctx)
 	}
 	return adv
 }

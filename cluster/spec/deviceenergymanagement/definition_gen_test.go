@@ -50,6 +50,26 @@ func TestCodecsRoundTrip(t *testing.T) {
 	spectest.RoundTripAttribute(t, Definition, AttrForecast, ForecastStruct{ForecastId: uint32(1), ActiveSlotNumber: spec.ValueOf(uint16(1)), StartTime: uint32(1), EndTime: uint32(1), EarliestStartTime: spectest.Ptr(spec.ValueOf(uint32(1))), LatestEndTime: spectest.Ptr(uint32(1)), IsPausable: true, Slots: []SlotStruct{SlotStruct{MinDuration: uint32(1), MaxDuration: uint32(1), DefaultDuration: uint32(1), ElapsedSlotTime: uint32(1), RemainingSlotTime: uint32(1), SlotIsPausable: spectest.Ptr(true), MinPauseDuration: spectest.Ptr(uint32(1)), MaxPauseDuration: spectest.Ptr(uint32(1)), ManufacturerEsaState: spectest.Ptr(uint16(1)), NominalPower: spectest.Ptr(int64(1)), MinPower: spectest.Ptr(int64(1)), MaxPower: spectest.Ptr(int64(1)), NominalEnergy: spectest.Ptr(int64(1)), Costs: spectest.Ptr([]CostStruct{CostStruct{CostType: CostTypeEnum(0), Value: int32(1), DecimalPoints: uint8(1), Currency: spectest.Ptr(uint16(1))}}), MinPowerAdjustment: spectest.Ptr(int64(1)), MaxPowerAdjustment: spectest.Ptr(int64(1)), MinDurationAdjustment: spectest.Ptr(uint32(1)), MaxDurationAdjustment: spectest.Ptr(uint32(1))}}, ForecastUpdateReason: ForecastUpdateReasonEnum(0)})
 }
 
+// TestCloneIsDeep holds every generated Clone to a deep copy
+// (decision 142): spectest.CheckClone fills a value to every depth,
+// clones it and overwrites the clone through its lists and pointers.
+func TestCloneIsDeep(t *testing.T) {
+	t.Parallel()
+	for _, check := range []func(testing.TB){
+		spectest.CheckClone[State],
+		spectest.CheckClone[ConstraintsStruct],
+		spectest.CheckClone[CostStruct],
+		spectest.CheckClone[ForecastStruct],
+		spectest.CheckClone[SlotStruct],
+		spectest.CheckClone[PowerAdjustCapabilityStruct],
+		spectest.CheckClone[SlotAdjustmentStruct],
+		spectest.CheckClone[ModifyForecastRequestRequest],
+		spectest.CheckClone[RequestConstraintBasedForecastRequest],
+	} {
+		check(t)
+	}
+}
+
 // TestTypedServer drives every method of the typed server once.
 func TestTypedServer(t *testing.T) {
 	t.Parallel()

@@ -168,6 +168,11 @@ type ThreadDirectoryConfig struct {
 	// none; it must name a stored network.
 	PreferredExtendedPanID []byte
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 	// Logger receives the refusals chip logs (ChipLogError, :274, :295,
 	// :305, :333); slog.Default when nil. A dataset is never logged.
@@ -243,7 +248,7 @@ func NewThreadDirectory(ctx context.Context, cfg ThreadDirectoryConfig) (*Thread
 		return nil, err
 	}
 	srv, err := spec.NewServer(tdir.Definition, spec.Options{}, spec.ServerConfig{
-		DataVersion: cfg.DataVersion,
+		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Initial: map[uint32]any{
 			tdir.AttrPreferredExtendedPanId: preferred,
 			tdir.AttrThreadNetworkTableSize: s.store.Capacity(),
@@ -342,10 +347,13 @@ func (s *ThreadDirectoryServer) load(ctx context.Context) error {
 // the cluster and reports ThreadNetworks when it moved. chip reads the
 // storage on every read (:153-183); this server serves its table, so a
 // host that writes the store directly calls this. A preferred network
-// the store no longer holds is cleared, and the store saves the clearing.
+// the store no longer holds is cleared, and the store saves the clearing;
+// a save that fails refuses the reload and keeps the table the attribute
+// lists (R2-P6-store-1119).
 func (s *ThreadDirectoryServer) ReloadNetworks(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	prevOrder, prevEntries := s.order, s.entries
 	if err := s.load(ctx); err != nil {
 		return err
 	}
@@ -356,6 +364,7 @@ func (s *ThreadDirectoryServer) ReloadNetworks(ctx context.Context) error {
 	if p, ok := s.preferredLocked(); ok {
 		if _, held := s.entries[string(p)]; !held {
 			if err := s.store.SavePreferred(ctx, nil); err != nil {
+				s.order, s.entries = prevOrder, prevEntries
 				return fmt.Errorf("netinfra: clearing the preferred network: %w", err)
 			}
 			changes[tdir.AttrPreferredExtendedPanId] = nil

@@ -114,10 +114,10 @@ func boolServer(build func(contract.BoolMeasurementSource) contract.ClusterServe
 	}
 }
 
-// airQualityServers pairs a concentration cluster with the mandatory
-// AirQualityServer, in that order: the ServerList the assembler derives
-// preserves it, and the AirQuality cluster is the one the device type
-// requires.
+// airQualityServers pairs the mandatory AirQualityServer with a
+// concentration cluster, AirQuality first: the ServerList the assembler
+// derives preserves the order, and the AirQuality cluster is the one the
+// device type requires (R2-P6-doc-1464: the comment named the reverse).
 func airQualityServers(class contract.MeasurementClass, build func(contract.FloatMeasurementSource) contract.ClusterServer) contract.MeasurementMaterializer {
 	return func(src any, _ contract.MeasurementContext) []contract.ClusterServer {
 		f, ok := src.(contract.FloatMeasurementSource)
@@ -135,7 +135,7 @@ func airQualityServers(class contract.MeasurementClass, build func(contract.Floa
 // after construction: the assembler rebuilds these servers on every
 // dispatch, so a stamp applied further out would not survive.
 //
-// Two source shapes project onto PowerSource: a LOWBAT bool
+// Two source shapes project onto PowerSource: a low-battery bool
 // (BatChargeLevel) or a derived battery-percentage float (e.g. an
 // operating-voltage-level sensor — BatPercentRemaining). Checked in this
 // order because both interfaces are structurally possible on a source
@@ -161,6 +161,7 @@ func powerSourceServers(src any, mc contract.MeasurementContext) []contract.Clus
 	if ps == nil {
 		return nil
 	}
+	ps.replaceability = sel.BatteryReplaceability
 	ps.SetEndpoint(mc.EndpointID)
 	return []contract.ClusterServer{ps}
 }

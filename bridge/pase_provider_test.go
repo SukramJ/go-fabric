@@ -217,3 +217,24 @@ func TestPerExchangePaseProvider_FactoryProducesRealAdapter(t *testing.T) {
 		}
 	})
 }
+
+// TestStartReaperRefusesNonPositiveDurations: StartReaper with an interval
+// or a TTL that is not positive starts nothing — no ticker of 0 (which
+// panics), and no reaper that would end every handshake at once
+// (R2-P6-test-0819).
+func TestStartReaperRefusesNonPositiveDurations(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		p := NewPerExchangePaseProvider(func() *PaseAdapter { return NewPaseAdapter(nil) })
+		defer p.Stop()
+		_ = p.Resolve(onExchange(1))
+		p.StartReaper(t.Context(), 0, time.Minute)
+		p.StartReaper(t.Context(), time.Millisecond, 0)
+		p.StartReaper(t.Context(), -time.Millisecond, time.Minute)
+		time.Sleep(10 * time.Millisecond)
+		synctest.Wait()
+		if got := p.Active(); got != 1 {
+			t.Fatalf("Active = %d after StartReaper with non-positive durations, want 1", got)
+		}
+	})
+}

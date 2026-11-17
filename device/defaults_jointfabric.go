@@ -35,7 +35,7 @@ func newJointFabricDatastoreServer(b defaultBuild) (contract.ClusterServer, erro
 		return nil, notServed(fmt.Errorf("joint fabric datastore: %w", errNoPort))
 	}
 	return jointfabric.NewDatastore(context.Background(), jointfabric.DatastoreConfig{
-		Sync: d.Sync, Store: d.Store, Key: b.key, DataVersion: b.cfg.DataVersion,
+		Sync: d.Sync, Store: d.Store, Key: b.key,
 	})
 }
 
@@ -50,6 +50,6 @@ func newJointFabricAdministratorServer(b defaultBuild) (contract.ClusterServer, 
 	}
 	ds, _ := b.sibling(dsdef.ClusterID).(*jointfabric.Datastore)
 	return jointfabric.NewAdministrator(jointfabric.AdministratorConfig{
-		Port: d.AdministratorPort, Reach: d.CommissionerReach, Datastore: ds, DataVersion: b.cfg.DataVersion,
+		Port: d.AdministratorPort, Reach: d.CommissionerReach, Datastore: ds,
 	})
 }

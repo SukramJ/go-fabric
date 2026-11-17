@@ -508,6 +508,20 @@ type Commissioning struct {
 	// (packages/node/src/behavior/system/commissioning/
 	// CommissioningServer.ts:266-273, the field :410 at db021da0).
 	WindowOnDemand bool
+	// RotatingDeviceID advertises the Rotating Device Identifier (TXT key
+	// RI) in the commissionable record: a random 16-byte unique id the
+	// node draws once and keeps in its store, and a lifetime counter the
+	// store keeps too, advanced each time a commissioning window is
+	// advertised, so the identifier changes with every window and across
+	// restarts, and is not computable from the node's public identity.
+	// Off by default, as connectedhomeip's build default
+	// (src/setup_payload/BUILD.gn:19-22 at 6170af84,
+	// chip_enable_rotating_device_id = false); matter.js emits no RI
+	// (packages/protocol/src/advertisement/mdns/
+	// CommissionableMdnsAdvertisement.ts:84-97 at db021da0). A store
+	// failure leaves RI out of that window's record rather than advertise
+	// a value that does not rotate.
+	RotatingDeviceID bool
 	// Flow is the commissioning flow the onboarding payload states
 	// ([FlowStandard], [FlowUserIntent], [FlowCustom]): the QR code's
 	// flow field and, for a flow other than Standard, the long manual
@@ -663,7 +677,10 @@ type Store struct {
 	Path string
 	// DB is a SQLite database the host opened and keeps: the node applies
 	// both schemas to it and opens its stores on it; [Node.FactoryReset]
-	// scrubs it ([store.Scrub]) after the erase. It excludes Path.
+	// scrubs it ([store.Scrub]) after the erase. It excludes Path. Every
+	// pooled connection needs PRAGMA foreign_keys(1) on its DSN
+	// (store.OpenSQLite sets it): store.Apply refuses a handle without it
+	// ([store.ErrForeignKeysOff]), and New returns that error.
 	DB *sql.DB
 	// Credentials overrides the credential store built from DB or Path.
 	// [Node.FactoryReset] erases it through [store.Eraser]; the erase of a
@@ -676,13 +693,17 @@ type Store struct {
 	Endpoints endpoint.Store
 	// Sealer seals the secrets of the credential store the node builds on
 	// DB or Path (opt-in): New applies the schema (store.Apply) and opens
-	// the store with store.NewSealed, which seals the clear rows it finds
-	// and scrubs the file; New returns its error. The key must live
-	// outside the database (docs/security.md, "Sealing at rest"). Every
-	// later start needs the same sealer: under another key New fails
-	// with an error that wraps store.ErrUnseal (NewSealed opens one
-	// sealed value first); a store without one reads a sealed secret as
-	// store.ErrNoSealer. It excludes
+	// the store with store.NewSealed, which seals the clear rows it finds,
+	// marks the database with its seal canary and scrubs the file; New
+	// returns its error. A scrub that cannot finish (a full disk, a reader
+	// on the -wal) is no error: the node logs one warning and a later start
+	// scrubs (store.Store.ScrubOwed). The key must live outside the
+	// database (docs/security.md, "Sealing at rest"); store.Reseal moves the
+	// database to a new key while no node runs on it. Every later start
+	// needs the same sealer: under another key New fails with an error that
+	// wraps store.ErrUnseal (NewSealed opens the canary first); a store
+	// without one reads a sealed secret as store.ErrNoSealer and writes
+	// none. It excludes
 	// Credentials (an override is sealed by the host that built it).
 	Sealer store.Sealer
 }

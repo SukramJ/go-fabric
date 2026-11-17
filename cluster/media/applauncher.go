@@ -6,7 +6,6 @@ package media
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
@@ -24,11 +23,6 @@ func appLauncherValues(st AppLauncherState) map[uint32]any {
 		launcherdef.AttrCatalogList: uint16sOr(st.CatalogList),
 		launcherdef.AttrCurrentApp:  nullOr(st.CurrentApp),
 	}
-}
-
-func cloneAppLauncher(st AppLauncherState) AppLauncherState {
-	st.CatalogList = slices.Clone(st.CatalogList)
-	return st
 }
 
 // AppLauncher is the ApplicationLauncher host port (the generated
@@ -78,12 +72,12 @@ func NewAppLauncher(cfg AppLauncherConfig) (*AppLauncherServer, error) {
 		return port.HideApp(ctx, st, req)
 	})
 	srv, err := newServer(launcherdef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: cfg.Attributes},
-		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: ApplicationLauncher: %w", err)
 	}
 	s.Server = srv
-	if err := s.init(srv, cfg.Initial, appLauncherValues, cloneAppLauncher, storeState[AppLauncherState]); err != nil {
+	if err := s.init(srv, cfg.Initial, appLauncherValues, AppLauncherState.Clone, storeState[AppLauncherState]); err != nil {
 		return nil, fmt.Errorf("media: ApplicationLauncher: %w", err)
 	}
 	if err := checkState(srv); err != nil {

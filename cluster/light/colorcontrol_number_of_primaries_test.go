@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/light"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 )
 
 // TestColorControlServer_NumberOfPrimaries_Null verifies that
@@ -20,7 +20,7 @@ func TestColorControlServer_NumberOfPrimaries_Null(t *testing.T) {
 	t.Parallel()
 	srv := light.NewColorControlServer(light.DefaultColorControlServerConfig())
 
-	val, ok := srv.MatterRead(wire.ColorCtrlAttrNumberOfPrimaries)
+	val, ok := srv.MatterRead(ccdef.AttrNumberOfPrimaries)
 	if !ok {
 		t.Fatal("MatterRead(NumberOfPrimaries 0x0010) returned ok=false; attribute must be present (mandatory, Quality X)")
 	}
@@ -36,8 +36,8 @@ func TestColorControlServer_NumberOfPrimaries_InAttributeList(t *testing.T) {
 	t.Parallel()
 	srv := light.NewColorControlServer(light.DefaultColorControlServerConfig())
 
-	found := slices.Contains(srv.MatterAttributes(), wire.ColorCtrlAttrNumberOfPrimaries)
+	found := slices.Contains(srv.MatterAttributes(), ccdef.AttrNumberOfPrimaries)
 	if !found {
-		t.Errorf("MatterAttributes() missing NumberOfPrimaries (0x%04X)", wire.ColorCtrlAttrNumberOfPrimaries)
+		t.Errorf("MatterAttributes() missing NumberOfPrimaries (0x%04X)", ccdef.AttrNumberOfPrimaries)
 	}
 }

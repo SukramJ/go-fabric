@@ -115,3 +115,52 @@ func TestInitiatedHandshakeTakesRepliesOfItsPeerOnly(t *testing.T) {
 		t.Fatal("the handshake did not end")
 	}
 }
+
+// TestCASEInitiatorRefusesAFailureStatusReport holds the success test of a
+// CASE initiator (R2-P6-fsm-0818): only the triple (general Success, Secure
+// Channel, SessionEstablishmentSuccess) is success. statusReportSuccess,
+// the check after Sigma3, answers ErrCaseRejected for any report off it —
+// a general failure with protocol code 0, another protocol's code 0, a
+// Secure Channel failure code under general Success — and a handshake
+// that gets such a report in place of its Sigma2 ends with ErrCaseRejected.
+func TestCASEInitiatorRefusesAFailureStatusReport(t *testing.T) {
+	t.Parallel()
+	if err := statusReportSuccess(mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)); err != nil {
+		t.Fatalf("the success report: %v", err)
+	}
+	for _, c := range []struct {
+		name     string
+		general  uint16
+		protocol uint32
+		code     uint16
+	}{
+		{"general failure, code 0", mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess},
+		{"another protocol, code 0", mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID) + 1, mrp.SCStatusProtocolSessionEstablishmentSuccess},
+		{"general success, a failure code", mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			report := mrp.EncodeStatusReport(c.general, c.protocol, c.code, nil)
+			if err := statusReportSuccess(report); !errors.Is(err, ErrCaseRejected) {
+				t.Fatalf("statusReportSuccess: %v, want ErrCaseRejected", err)
+			}
+			r := newUnsecuredRig(t)
+			h := startInitiatedHandshake(t, r)
+			proto := message.ProtocolHeader{
+				Opcode: mrp.SCOpcodeStatusReport, ExchangeID: h.exchange.ExchangeID, ProtocolID: mrp.SecureChannelProtocolID,
+				NeedsAck: true, HasAck: true, AckCounter: h.sigma1.MessageCounter,
+			}
+			if err := r.b.dispatch(h.ctx, responderDatagram(77, h.sigma1.SourceNodeID, proto, report), r.peer.LocalAddr()); err != nil {
+				t.Fatalf("dispatch(StatusReport): %v", err)
+			}
+			select {
+			case err := <-h.done:
+				if !errors.Is(err, ErrCaseRejected) {
+					t.Fatalf("the handshake ended with %v, want ErrCaseRejected", err)
+				}
+			case <-h.ctx.Done():
+				t.Fatal("the handshake did not end")
+			}
+		})
+	}
+}

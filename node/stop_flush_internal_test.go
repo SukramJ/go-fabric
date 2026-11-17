@@ -40,7 +40,7 @@ func TestStopFlushesTheShutDownEventToItsSubscribers(t *testing.T) {
 		mu      sync.Mutex
 		flushed []im.ConcreteEventPath
 	)
-	n.sec.subs.SetFlushReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport, _ []im.ConcreteAttributePath) {
+	n.sec.subs.SetFlushReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport, _ []im.ConcreteAttributePath) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 		mu.Lock()
 		defer mu.Unlock()
 		for _, ev := range events {

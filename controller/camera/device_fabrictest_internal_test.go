@@ -469,12 +469,16 @@ func TestDeviceIOImageParityMatterjsServer(t *testing.T) {
 	})
 	t.Run("names the streams a revision-1 camera states as singular ids", func(t *testing.T) {
 		s := d.cameraSession(5, root)
-		s.VideoStreams, s.VideoStreamId = nil, &spec.Nullable[uint16]{Value: 1}
+		// The Provider holds a session to CurrentSessions' "O.a+", one or
+		// both lists of 1 to 16 streams (review II, R2-P6-par-1304): the
+		// session names its audio stream as a list and its video stream as
+		// the singular id only.
+		s.VideoStreams, s.VideoStreamId, s.AudioStreams = nil, &spec.Nullable[uint16]{Value: 1}, &[]uint16{2}
 		if err := d.provider().UpsertSession(s); err != nil {
 			t.Fatal(err)
 		}
 		got := seen(3, 4, 5)
-		if !slices.Equal(got[2].VideoStreams, []uint16{1}) || len(got[2].AudioStreams) != 0 {
+		if !slices.Equal(got[2].VideoStreams, []uint16{1}) || !slices.Equal(got[2].AudioStreams, []uint16{2}) {
 			t.Errorf("%+v", got[2])
 		}
 	})

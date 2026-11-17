@@ -97,6 +97,56 @@ func (v *WebRTCSessionStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v WebRTCSessionStruct) Clone() WebRTCSessionStruct {
+	c := v
+	c.VideoStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VideoStreamId)
+	c.AudioStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioStreamId)
+	c.VideoStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VideoStreams)
+	c.AudioStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.AudioStreams)
+	return c
+}
+
 // WebRTCSessionStructDef describes WebRTCSessionStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -162,6 +212,43 @@ func (v *ICEServerStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "Credential", false, &v.Credential, spec.DecodeOptional(spec.DecodeStringIn(0, 512))),
 		spec.Bind(3, "Caid", false, &v.Caid, spec.DecodeOptional(spec.DecodeUintIn[uint16](16, 0, 65534))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ICEServerStruct) Clone() ICEServerStruct {
+	c := v
+	c.Urls = func(s []string) []string {
+		if s == nil {
+			return nil
+		}
+		out := make([]string, len(s))
+		copy(out, s)
+		return out
+	}(v.Urls)
+	c.Username = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Username)
+	c.Credential = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Credential)
+	c.Caid = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Caid)
+	return c
 }
 
 // ICEServerStructDef describes ICEServerStruct.
@@ -251,6 +338,86 @@ func (v *SolicitOfferRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SolicitOfferRequest) Clone() SolicitOfferRequest {
+	c := v
+	c.VideoStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VideoStreamId)
+	c.AudioStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioStreamId)
+	c.IceServers = func(p *[]ICEServerStruct) *[]ICEServerStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ICEServerStruct) []ICEServerStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ICEServerStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.IceServers)
+	c.IceTransportPolicy = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.IceTransportPolicy)
+	c.MetadataEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MetadataEnabled)
+	c.VideoStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VideoStreams)
+	c.AudioStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.AudioStreams)
+	return c
+}
+
 // SolicitOfferResponse is the SolicitOfferResponse command payload.
 type SolicitOfferResponse struct {
 	WebRtcSessionId uint16                 // 0: WebRtcTransportDefinitions.WebRTCSessionID, M
@@ -277,6 +444,28 @@ func (v *SolicitOfferResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "VideoStreamId", false, &v.VideoStreamId, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint16](16)))),
 		spec.Bind(3, "AudioStreamId", false, &v.AudioStreamId, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint16](16)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SolicitOfferResponse) Clone() SolicitOfferResponse {
+	c := v
+	c.VideoStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VideoStreamId)
+	c.AudioStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioStreamId)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -333,6 +522,100 @@ func (v *ProvideOfferRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProvideOfferRequest) Clone() ProvideOfferRequest {
+	c := v
+	c.StreamUsage = func(p *StreamUsageEnum) *StreamUsageEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.StreamUsage)
+	c.OriginatingEndpointId = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OriginatingEndpointId)
+	c.VideoStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VideoStreamId)
+	c.AudioStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioStreamId)
+	c.IceServers = func(p *[]ICEServerStruct) *[]ICEServerStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ICEServerStruct) []ICEServerStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ICEServerStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.IceServers)
+	c.IceTransportPolicy = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.IceTransportPolicy)
+	c.MetadataEnabled = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.MetadataEnabled)
+	c.VideoStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VideoStreams)
+	c.AudioStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.AudioStreams)
+	return c
+}
+
 // ProvideOfferResponse is the ProvideOfferResponse command payload.
 type ProvideOfferResponse struct {
 	WebRtcSessionId uint16                 // 0: WebRtcTransportDefinitions.WebRTCSessionID, M
@@ -356,6 +639,28 @@ func (v *ProvideOfferResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "VideoStreamId", false, &v.VideoStreamId, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint16](16)))),
 		spec.Bind(2, "AudioStreamId", false, &v.AudioStreamId, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[uint16](16)))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProvideOfferResponse) Clone() ProvideOfferResponse {
+	c := v
+	c.VideoStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VideoStreamId)
+	c.AudioStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioStreamId)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -405,6 +710,22 @@ func (v *ProvideIceCandidatesRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "WebRtcSessionId", true, &v.WebRtcSessionId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "IceCandidates", true, &v.IceCandidates, spec.DecodeListIn(spec.DecodeStruct[ICECandidateStruct], 1, 2147483647)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProvideIceCandidatesRequest) Clone() ProvideIceCandidatesRequest {
+	c := v
+	c.IceCandidates = func(s []ICECandidateStruct) []ICECandidateStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ICECandidateStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.IceCandidates)
+	return c
 }
 
 // EndSessionRequest is the EndSession command payload.

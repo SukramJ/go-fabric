@@ -144,6 +144,30 @@ func (v *DatastoreAccessControlEntryStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DatastoreAccessControlEntryStruct) Clone() DatastoreAccessControlEntryStruct {
+	c := v
+	c.Subjects = spec.Nullable[[]uint64]{Value: func(s []uint64) []uint64 {
+		if s == nil {
+			return nil
+		}
+		out := make([]uint64, len(s))
+		copy(out, s)
+		return out
+	}(v.Subjects.Value), Null: v.Subjects.Null}
+	c.Targets = spec.Nullable[[]DatastoreAccessControlTargetStruct]{Value: func(s []DatastoreAccessControlTargetStruct) []DatastoreAccessControlTargetStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]DatastoreAccessControlTargetStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.Targets.Value), Null: v.Targets.Null}
+	return c
+}
+
 // DatastoreAccessControlEntryStructDef describes DatastoreAccessControlEntryStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -214,6 +238,15 @@ func (v *DatastoreACLEntryStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "AclEntry", true, &v.AclEntry, spec.DecodeStruct[DatastoreAccessControlEntryStruct]),
 		spec.Bind(3, "StatusEntry", true, &v.StatusEntry, spec.DecodeStruct[DatastoreStatusEntryStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DatastoreACLEntryStruct) Clone() DatastoreACLEntryStruct {
+	c := v
+	c.AclEntry = v.AclEntry.Clone()
+	return c
 }
 
 // DatastoreACLEntryStructDef describes DatastoreACLEntryStruct.
@@ -392,6 +425,22 @@ func (v *DatastoreAdministratorInformationEntryStruct) DecodeTLV(n spec.Node) er
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DatastoreAdministratorInformationEntryStruct) Clone() DatastoreAdministratorInformationEntryStruct {
+	c := v
+	c.Icac = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Icac)
+	return c
+}
+
 // DatastoreAdministratorInformationEntryStructDef describes DatastoreAdministratorInformationEntryStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -428,6 +477,42 @@ func (v *DatastoreBindingTargetStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "Endpoint", false, &v.Endpoint, spec.DecodeOptional(spec.DecodeUint[uint16](16))),
 		spec.Bind(4, "Cluster", false, &v.Cluster, spec.DecodeOptional(spec.DecodeUint[uint32](32))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DatastoreBindingTargetStruct) Clone() DatastoreBindingTargetStruct {
+	c := v
+	c.Node = func(p *uint64) *uint64 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Node)
+	c.Group = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Group)
+	c.Endpoint = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Endpoint)
+	c.Cluster = func(p *uint32) *uint32 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Cluster)
+	return c
 }
 
 // DatastoreBindingTargetStructDef describes DatastoreBindingTargetStruct.
@@ -469,6 +554,15 @@ func (v *DatastoreEndpointBindingEntryStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "Binding", true, &v.Binding, spec.DecodeStruct[DatastoreBindingTargetStruct]),
 		spec.Bind(4, "StatusEntry", true, &v.StatusEntry, spec.DecodeStruct[DatastoreStatusEntryStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DatastoreEndpointBindingEntryStruct) Clone() DatastoreEndpointBindingEntryStruct {
+	c := v
+	c.Binding = v.Binding.Clone()
+	return c
 }
 
 // DatastoreEndpointBindingEntryStructDef describes DatastoreEndpointBindingEntryStruct.
@@ -679,6 +773,45 @@ func (v *DatastoreGroupKeySetStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v DatastoreGroupKeySetStruct) Clone() DatastoreGroupKeySetStruct {
+	c := v
+	c.EpochKey0 = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EpochKey0.Value), Null: v.EpochKey0.Null}
+	c.EpochKey1 = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EpochKey1.Value), Null: v.EpochKey1.Null}
+	c.EpochKey2 = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.EpochKey2.Value), Null: v.EpochKey2.Null}
+	c.GroupKeyMulticastPolicy = func(p *DatastoreGroupKeyMulticastPolicyEnum) *DatastoreGroupKeyMulticastPolicyEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.GroupKeyMulticastPolicy)
+	return c
+}
+
 // DatastoreGroupKeySetStructDef describes DatastoreGroupKeySetStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -781,6 +914,15 @@ func (v *AddKeySetRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddKeySetRequest) Clone() AddKeySetRequest {
+	c := v
+	c.GroupKeySet = v.GroupKeySet.Clone()
+	return c
+}
+
 // UpdateKeySetRequest is the UpdateKeySet command payload.
 type UpdateKeySetRequest struct {
 	GroupKeySet DatastoreGroupKeySetStruct // 0: DatastoreGroupKeySetStruct, M
@@ -798,6 +940,15 @@ func (v *UpdateKeySetRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "UpdateKeySet",
 		spec.Bind(0, "GroupKeySet", true, &v.GroupKeySet, spec.DecodeStruct[DatastoreGroupKeySetStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UpdateKeySetRequest) Clone() UpdateKeySetRequest {
+	c := v
+	c.GroupKeySet = v.GroupKeySet.Clone()
+	return c
 }
 
 // RemoveKeySetRequest is the RemoveKeySet command payload.
@@ -934,6 +1085,22 @@ func (v *AddAdminRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddAdminRequest) Clone() AddAdminRequest {
+	c := v
+	c.Icac = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Icac)
+	return c
+}
+
 // UpdateAdminRequest is the UpdateAdmin command payload.
 type UpdateAdminRequest struct {
 	NodeId       uint64  // 0: node-id, M
@@ -957,6 +1124,35 @@ func (v *UpdateAdminRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "FriendlyName", false, &v.FriendlyName, spec.DecodeOptional(spec.DecodeStringIn(0, 32))),
 		spec.Bind(2, "Icac", false, &v.Icac, spec.DecodeOptional(spec.DecodeBytesIn(0, 400))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UpdateAdminRequest) Clone() UpdateAdminRequest {
+	c := v
+	c.FriendlyName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FriendlyName)
+	c.Icac = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Icac)
+	return c
 }
 
 // RemoveAdminRequest is the RemoveAdmin command payload.
@@ -1160,6 +1356,15 @@ func (v *AddBindingToEndpointForNodeRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddBindingToEndpointForNodeRequest) Clone() AddBindingToEndpointForNodeRequest {
+	c := v
+	c.Binding = v.Binding.Clone()
+	return c
+}
+
 // RemoveBindingFromEndpointForNodeRequest is the RemoveBindingFromEndpointForNode command payload.
 type RemoveBindingFromEndpointForNodeRequest struct {
 	ListId     uint16 // 0: uint16, M
@@ -1205,6 +1410,15 @@ func (v *AddAclToNodeRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "NodeId", true, &v.NodeId, spec.DecodeUint[uint64](64)),
 		spec.Bind(1, "AclEntry", true, &v.AclEntry, spec.DecodeStruct[DatastoreAccessControlEntryStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddAclToNodeRequest) Clone() AddAclToNodeRequest {
+	c := v
+	c.AclEntry = v.AclEntry.Clone()
+	return c
 }
 
 // RemoveAclFromNodeRequest is the RemoveAclFromNode command payload.

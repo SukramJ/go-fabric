@@ -30,7 +30,7 @@ func TestTakeDirtyOrderFollowsThePrimingReport(t *testing.T) {
 		// Second request path, the full wildcard: the rest, ascending.
 		at(1, 0x0006, 0x0000), at(2, 0x0006, 0x0000), at(2, 0x0008, 0x0000), at(3, 0x0006, 0x0000),
 	}
-	m := NewManager(Config{}, nil, nil)
+	m := newTestManager(Config{})
 	sub, err := m.Subscribe(SubscribeArgs{
 		FabricIndex: 1, PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
 		AttributePaths: []im.ConcreteAttributePath{{Endpoint: 3, Cluster: 0x0300, HasEndpoint: true, HasCluster: true}, {}},
@@ -48,5 +48,26 @@ func TestTakeDirtyOrderFollowsThePrimingReport(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("round %d: changed paths in order %v, want %v", round, got, want)
 		}
+	}
+}
+
+// BenchmarkTakeDirtyOfALargeSubscription is the cost guard of review II
+// R2-P6-bound-0507: 200 changed paths of a subscription with 10 000
+// concrete request paths are sorted under s.mu, which every markDirty
+// waits on. Each path's request-path index is taken once per drain; a
+// scan per comparison cost about 28 ms a drain.
+func BenchmarkTakeDirtyOfALargeSubscription(b *testing.B) {
+	paths := make([]im.ConcreteAttributePath, 10_000)
+	for i := range paths {
+		paths[i] = im.ConcreteAttributePath{Endpoint: uint16(i / 100), Cluster: 6, Attribute: uint32(i % 100), HasEndpoint: true, HasCluster: true, HasAttribute: true} //nolint:gosec // i < 10 000
+	}
+	sub := &Subscription{AttributePaths: paths}
+	for b.Loop() {
+		for i := range 200 {
+			sub.markDirty(paths[len(paths)-1-i*7])
+		}
+		sub.mu.Lock()
+		_ = sub.takeDirtyLocked()
+		sub.mu.Unlock()
 	}
 }

@@ -789,3 +789,24 @@ func TestCaptureSubTarget_SkipsZeroOrNil(t *testing.T) {
 		t.Errorf("unexpected entries in subTargets: %d", count)
 	}
 }
+
+// TestUnsecuredReplayWindowNeedsASourceNodeID: duplicate detection on the
+// unsecured session is per source node id, so a message that names source
+// node id 0 has no window — two such messages with one counter are both
+// fresh — while a named source's repeated counter is a duplicate
+// (R2-P6-test-0819).
+func TestUnsecuredReplayWindowNeedsASourceNodeID(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	for i := range 2 {
+		if _, dup, err := b.decryptIfNeeded(&message.Header{MessageCounter: 5, HasSourceNodeID: true, SourceNodeID: 0}, []byte{1}); err != nil || dup {
+			t.Fatalf("message %d from source node id 0: duplicate %v, err %v", i+1, dup, err)
+		}
+	}
+	if _, dup, err := b.decryptIfNeeded(&message.Header{MessageCounter: 5, HasSourceNodeID: true, SourceNodeID: 0x77}, []byte{1}); err != nil || dup {
+		t.Fatalf("first message from 0x77: duplicate %v, err %v", dup, err)
+	}
+	if _, dup, _ := b.decryptIfNeeded(&message.Header{MessageCounter: 5, HasSourceNodeID: true, SourceNodeID: 0x77}, []byte{1}); !dup {
+		t.Fatal("0x77's repeated counter was not a duplicate")
+	}
+}

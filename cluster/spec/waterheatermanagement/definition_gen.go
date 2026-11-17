@@ -111,6 +111,49 @@ func (v *WaterHeaterBoostInfoStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v WaterHeaterBoostInfoStruct) Clone() WaterHeaterBoostInfoStruct {
+	c := v
+	c.OneShot = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.OneShot)
+	c.EmergencyBoost = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.EmergencyBoost)
+	c.TemporarySetpoint = func(p *int16) *int16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TemporarySetpoint)
+	c.TargetPercentage = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TargetPercentage)
+	c.TargetReheat = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.TargetReheat)
+	return c
+}
+
 // WaterHeaterBoostInfoStructDef describes WaterHeaterBoostInfoStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -167,6 +210,15 @@ func (v *BoostRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v BoostRequest) Clone() BoostRequest {
+	c := v
+	c.BoostInfo = v.BoostInfo.Clone()
+	return c
+}
+
 // CancelBoostRequest is the CancelBoost command payload.
 type CancelBoostRequest struct{}
 
@@ -196,6 +248,15 @@ func (v *BoostStartedEvent) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "BoostStarted",
 		spec.Bind(0, "BoostInfo", true, &v.BoostInfo, spec.DecodeStruct[WaterHeaterBoostInfoStruct]),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v BoostStartedEvent) Clone() BoostStartedEvent {
+	c := v
+	c.BoostInfo = v.BoostInfo.Clone()
+	return c
 }
 
 // BoostEndedEvent is the BoostEnded event payload.

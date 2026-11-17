@@ -12,9 +12,24 @@ import (
 )
 
 // Logger receives the codec's diagnostics (a string trimmed or truncated to
-// its bound). A host replaces it to route them, once, before it encodes; the
-// default is slog.Default().
-var Logger = slog.Default()
+// its bound). A host replaces it to route them, once, before it encodes.
+// Left at its initial value, or set to nil, the codec logs through
+// slog.Default() as it stands at the time of the log call, so a host that
+// calls slog.SetDefault after this package initialised is followed.
+var Logger = initialLogger
+
+// initialLogger is Logger's value at package initialisation; while Logger
+// still holds it, [logger] resolves slog.Default() per call instead.
+var initialLogger = slog.Default()
+
+// logger is the logger the codec writes through: Logger when the host set
+// one, slog.Default() at call time otherwise.
+func logger() *slog.Logger {
+	if l := Logger; l != nil && l != initialLogger {
+		return l
+	}
+	return slog.Default()
+}
 
 // Encoder builds a TLV byte stream. Use [NewEncoder], emit elements,
 // then call [Encoder.Bytes] to retrieve the wire payload. The encoder
@@ -257,7 +272,7 @@ func (e *Encoder) PutUTF8WithMax(tag Tag, s string, maxBytes int) {
 		for trimmed != "" && !utf8.ValidString(trimmed) {
 			trimmed = trimmed[:len(trimmed)-1]
 		}
-		Logger.Warn(
+		logger().Warn(
 			"tlv.utf8_trimmed",
 			slog.Int("original_bytes", len(s)),
 			slog.Int("max_bytes", maxBytes),
@@ -348,7 +363,7 @@ func (e *Encoder) PutUTF8Bounded(tag Tag, s string, maxBytes int) {
 	for !utf8.Valid(trimmed) {
 		trimmed = trimmed[:len(trimmed)-1]
 	}
-	Logger.Warn("tlv.utf8_truncated",
+	logger().Warn("tlv.utf8_truncated",
 		"original_bytes", len(b),
 		"max_bytes", maxBytes,
 		"trimmed_bytes", len(trimmed))

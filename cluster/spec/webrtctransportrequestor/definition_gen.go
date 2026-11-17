@@ -89,6 +89,56 @@ func (v *WebRTCSessionStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v WebRTCSessionStruct) Clone() WebRTCSessionStruct {
+	c := v
+	c.VideoStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VideoStreamId)
+	c.AudioStreamId = func(p *spec.Nullable[uint16]) *spec.Nullable[uint16] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AudioStreamId)
+	c.VideoStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VideoStreams)
+	c.AudioStreams = func(p *[]uint16) *[]uint16 {
+		if p == nil {
+			return nil
+		}
+		x := func(s []uint16) []uint16 {
+			if s == nil {
+				return nil
+			}
+			out := make([]uint16, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.AudioStreams)
+	return c
+}
+
 // WebRTCSessionStructDef describes WebRTCSessionStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -154,6 +204,43 @@ func (v *ICEServerStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "Credential", false, &v.Credential, spec.DecodeOptional(spec.DecodeStringIn(0, 512))),
 		spec.Bind(3, "Caid", false, &v.Caid, spec.DecodeOptional(spec.DecodeUintIn[uint16](16, 0, 65534))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ICEServerStruct) Clone() ICEServerStruct {
+	c := v
+	c.Urls = func(s []string) []string {
+		if s == nil {
+			return nil
+		}
+		out := make([]string, len(s))
+		copy(out, s)
+		return out
+	}(v.Urls)
+	c.Username = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Username)
+	c.Credential = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Credential)
+	c.Caid = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Caid)
+	return c
 }
 
 // ICEServerStructDef describes ICEServerStruct.
@@ -228,6 +315,37 @@ func (v *OfferRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v OfferRequest) Clone() OfferRequest {
+	c := v
+	c.IceServers = func(p *[]ICEServerStruct) *[]ICEServerStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ICEServerStruct) []ICEServerStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ICEServerStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.IceServers)
+	c.IceTransportPolicy = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.IceTransportPolicy)
+	return c
+}
+
 // AnswerRequest is the Answer command payload.
 type AnswerRequest struct {
 	WebRtcSessionId uint16 // 0: WebRtcTransportDefinitions.WebRTCSessionID, M
@@ -270,6 +388,22 @@ func (v *IceCandidatesRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "WebRtcSessionId", true, &v.WebRtcSessionId, spec.DecodeUint[uint16](16)),
 		spec.Bind(1, "IceCandidates", true, &v.IceCandidates, spec.DecodeListIn(spec.DecodeStruct[ICECandidateStruct], 1, 2147483647)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v IceCandidatesRequest) Clone() IceCandidatesRequest {
+	c := v
+	c.IceCandidates = func(s []ICECandidateStruct) []ICECandidateStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ICECandidateStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.IceCandidates)
+	return c
 }
 
 // EndRequest is the End command payload.

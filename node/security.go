@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
@@ -254,7 +255,8 @@ var errCASEFabricRemoved = errors.New("node: the CASE session's fabric was remov
 // (node.fabricRemoved: forget, then the bridge's EmitFabricRemovedContext),
 // so a removal that lands between the two checks either finds this session
 // open and closes it, or leaves the second check without the identity, and
-// the session is closed here.
+// the session is closed here — the session open returned, only while it
+// still holds its id.
 func (c *caseIdentities) admitSession(sessions *operational.Manager, fabricIndex uint8, open func() (*operational.Entry, error)) (*operational.Entry, error) {
 	if _, ok := c.forFabric(fabricIndex); !ok {
 		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
@@ -264,7 +266,9 @@ func (c *caseIdentities) admitSession(sessions *operational.Manager, fabricIndex
 		return nil, err
 	}
 	if _, ok := c.forFabric(fabricIndex); !ok {
-		_ = sessions.Close(entry.SessionID)
+		// The entry itself, not its id: by now the id may name another
+		// session or another handshake's stake (decision 159).
+		sessionseam.CloseEntry(sessions, entry)
 		return nil, fmt.Errorf("%w: fabric %d", errCASEFabricRemoved, fabricIndex)
 	}
 	return entry, nil
@@ -485,9 +489,9 @@ func wireSecurity(
 	br.AttachSessionLookup(lookup)
 	br.AttachAckTracker(mrp.NewAckTracker(mrp.DefaultStandaloneAckDelay))
 
-	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), br.SubscriptionReporter(), logger)
-	subs.SetEventReporter(br.SubscriptionEventReporter())
-	subs.SetFlushReporter(br.SubscriptionFlushReporter())
+	// The attach installs the bridge's report sender: every report of
+	// the manager goes out through it (review II, R2-P6-api-0508).
+	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), nil, logger)
 	br.AttachSubscriptionManager(subs)
 	// One close hook, two observers: the session's subscriptions fall
 	// with it, and the bridge forgets its route — closing a TCP
@@ -606,7 +610,10 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 			CompressedFabricID: fabric.identity.CompressedFabricID,
 			OnEstablished: func(ctx context.Context, res sigma.InitiatorResult) error {
 				entry, err := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
-					return sessions.OpenFromSigmaAsInitiatorWithID(sessionID, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+					// The install takes the stake, not the bare id: a stake an
+					// allocation at a full table took over installs nothing
+					// (operational.ErrStakeLost, N3-findev-1).
+					return sessions.OpenFromSigmaAsInitiatorWithStake(stake, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
 				})
 				if err != nil {
 					return err
@@ -701,7 +708,10 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		// `ClearSecretData(Kae)`; review II, W1-sec-05, owner decision 6).
 		defer clear(sharedSecret)
 		// PASE predates the fabric, so both node ids are zero.
-		entry, err := sessions.OpenFromPaseWithID(sessionID, 0, 0, peerSessionID, sharedSecret)
+		// The install takes the stake, not the bare id: a stake an
+		// allocation at a full table took over installs nothing
+		// (operational.ErrStakeLost, decision 159).
+		entry, err := sessions.OpenFromPaseWithStake(stake, 0, 0, peerSessionID, sharedSecret)
 		if err != nil {
 			sessions.ReleaseStake(stake)
 			return err
@@ -723,7 +733,7 @@ func buildPaseAdapterFromContext(life context.Context, sessions *operational.Man
 		// 6170af84, MarkForEviction and HandleFailedAttempt; review II,
 		// R2-P3-pase-03).
 		if err := root.GeneralCommissioning.ArmOnPaseSession(life, sessionID); err != nil {
-			_ = sessions.Close(sessionID)
+			sessionseam.CloseEntry(sessions, entry)
 			return fmt.Errorf("node: the PASE session's fail-safe: %w", err)
 		}
 		return nil
@@ -756,6 +766,18 @@ func (h *handshakeStake) renew(uint16) (uint16, bool) {
 	h.mu.Unlock()
 	h.sessions.ReleaseStake(previous)
 	return next.ID, true
+}
+
+// of returns the stake when it is the one of id, the id the handshake
+// announced; otherwise the zero Stake, which every install refuses
+// ([operational.ErrStakeLost]).
+func (h *handshakeStake) of(id uint16) operational.Stake {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.stake.ID != id {
+		return operational.Stake{}
+	}
+	return h.stake
 }
 
 // release releases the stake when it is the one of id, the id the
@@ -847,7 +869,10 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			}
 		}
 		entry, openErr := ids.admitSession(sessions, fabricIndex, func() (*operational.Entry, error) {
-			return sessions.OpenFromSigmaWithID(effectiveID, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
+			// The install takes this handshake's stake, not the bare id:
+			// a stake an allocation at a full table took over installs
+			// nothing (operational.ErrStakeLost, N3-findev-1).
+			return sessions.OpenFromSigmaWithStake(held.of(effectiveID), fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
 		})
 		if openErr != nil {
 			held.release(effectiveID)

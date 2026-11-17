@@ -229,7 +229,7 @@ var variableKeySites = map[string][]string{
 		"timesync.trusted_time_source", "timesync.default_ntp", "timesync.time_zone", "timesync.dst_offset",
 	},
 	// settingPrefix + DatastoreConfig.Key, set by the constructor
-	"cluster/jointfabric/datastore.go:Datastore.saveLocked": {"jointfabric.datastore:<key>"},
+	"cluster/jointfabric/datastore.go:Datastore.persistLocked": {"jointfabric.datastore:<key>"},
 	// ThermostatUIConfig.SettingKey, DefaultKeypadLockoutSetting when empty
 	"cluster/thermo/thermostatuserinterfaceconfiguration.go:persistingSink.MatterWriteAttribute": {"thermostat_user_interface_configuration.keypad_lockout"},
 	"cluster/thermo/thermostatuserinterfaceconfiguration.go:ThermostatUIServer.SetAttributes":    {"thermostat_user_interface_configuration.keypad_lockout"},

@@ -95,7 +95,7 @@ func TestWritesThroughTheDefinition(t *testing.T) {
 	if err := srv.MatterWrite(ctx, tdef.AttrLocalTemperatureCalibration, int8(-5)); err != nil {
 		t.Fatalf("LocalTemperatureCalibration: %v", err)
 	}
-	if v, _ := srv.MatterRead(tdef.AttrLocalTemperatureCalibration); v != int16(-5) {
+	if v, _ := srv.MatterRead(tdef.AttrLocalTemperatureCalibration); v != int8(-5) {
 		t.Errorf("LocalTemperatureCalibration = %v, want -5", v)
 	}
 	if err := srv.MatterWrite(ctx, tdef.AttrSystemMode, uint8(tdef.SystemModeFanOnly)); err != nil {

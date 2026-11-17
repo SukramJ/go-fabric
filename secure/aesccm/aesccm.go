@@ -25,6 +25,11 @@ const (
 	l = 15 - NonceSize // = 2
 )
 
+// maxAADLen is the longest additional data the 2-byte length form of
+// RFC 3610 §2.2 encodes; from 0xFF00 on the RFC switches to a 6-byte
+// form this package does not implement.
+const maxAADLen = 0xFF00 - 1
+
 // Errors.
 var (
 	// ErrKeySize is returned when [New] is called with a non-16-byte
@@ -74,6 +79,9 @@ func (c *CCM) Seal(dst, nonce, plaintext, aad []byte) ([]byte, error) {
 	if len(plaintext) > 0xFFFF {
 		return nil, fmt.Errorf("%w: %d bytes", ErrPlaintextTooLong, len(plaintext))
 	}
+	if len(aad) > maxAADLen {
+		return nil, fmt.Errorf("aesccm: additional data of %d bytes exceeds the %d the 2-byte length form encodes", len(aad), maxAADLen)
+	}
 
 	tag := c.cbcMAC(nonce, plaintext, aad)
 	out := append(dst, plaintext...) //nolint:gocritic // building the result; appendAssign would discard tag
@@ -97,6 +105,12 @@ func (c *CCM) Open(dst, nonce, sealed, aad []byte) ([]byte, error) {
 	cipherTextLen := len(sealed) - TagSize
 	if cipherTextLen > 0xFFFF {
 		return nil, fmt.Errorf("%w: %d bytes", ErrPlaintextTooLong, cipherTextLen)
+	}
+	// No conformant peer produces a tag over additional data the 2-byte
+	// length form cannot encode: refused as the authentication failure
+	// it would be.
+	if len(aad) > maxAADLen {
+		return nil, fmt.Errorf("%w: additional data of %d bytes exceeds %d", ErrAuthFailed, len(aad), maxAADLen)
 	}
 
 	// Recover the plaintext into a scratch buffer that we can hand
@@ -140,21 +154,11 @@ func (c *CCM) cbcMAC(nonce, plaintext, aad []byte) []byte {
 
 	if hasAAD {
 		// AAD prefix: 2-byte big-endian length. RFC 3610 §2.2 switches
-		// to a 6-byte extended encoding at 0xFF00 and up, which we do
-		// not implement because Matter never reaches it.
-		//
-		// That ceiling is a property of the callers, not of this
-		// function — nothing here inspects len(aad). Of the two
-		// packages using aesccm, secure/sigma always passes a nil AAD,
-		// and secure/channel passes a Matter message header: outbound
-		// the marshalled header, at most 24 bytes because no production
-		// path fills MessageExtension; inbound the header slice of a
-		// datagram, bounded by the UDP listener's read buffer. A caller
-		// that ever passed more would truncate the length prefix mod
-		// 2^16 and produce a CBC-MAC no conformant peer can reproduce —
-		// an authentication failure, not a silent acceptance.
+		// to a 6-byte extended encoding at 0xFF00 and up, which this
+		// package does not implement: Seal and Open refuse an AAD
+		// above [maxAADLen] before reaching here (R2-P6-bound-0112).
 		aadBlock := make([]byte, 0, len(aad)+2)
-		aadBlock = binary.BigEndian.AppendUint16(aadBlock, uint16(len(aad))) //nolint:gosec // G115: see the caller-side bound above.
+		aadBlock = binary.BigEndian.AppendUint16(aadBlock, uint16(len(aad))) //nolint:gosec // G115: Seal and Open refuse len(aad) > maxAADLen (< 0xFF00) before calling cbcMAC.
 		aadBlock = append(aadBlock, aad...)
 		state = cbcMacBlocks(c.block, state, aadBlock)
 	}

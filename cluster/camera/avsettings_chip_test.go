@@ -415,7 +415,8 @@ func TestAvSettingsRules(t *testing.T) { //nolint:funlen // one subtest per rule
 	})
 	t.Run("a restored preset holds the next id", func(t *testing.T) {
 		a := newAvSettings(t, func(cfg *camera.AvSettingsConfig) {
-			cfg.MptzPresets = []camera.MPTZPreset{{PresetId: 1, Name: "door", Settings: camera.MPTZ{Pan: ptr(int16(5))}}}
+			// Tilt and Zoom are mandatory with MTILT and MZOOM (R2-P6-par-1304).
+			cfg.MptzPresets = []camera.MPTZPreset{{PresetId: 1, Name: "door", Settings: camera.MPTZ{Pan: ptr(int16(5)), Tilt: ptr(int16(0)), Zoom: ptr(uint8(1))}}}
 		})
 		if id := a.NextPresetID(); id != 2 {
 			t.Fatalf("next preset id %d, want 2", id)

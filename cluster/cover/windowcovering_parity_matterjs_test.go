@@ -15,7 +15,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
@@ -60,9 +59,9 @@ func TestParityMatterJS_WindowCoveringClusterRevision(t *testing.T) {
 
 	schema := loadSchema(t)
 
-	js, ok := clusterEntry(schema, clusterwire.WindowCoveringClusterID)
+	js, ok := clusterEntry(schema, wcdef.ClusterID)
 	if !ok {
-		t.Fatalf("matter.js schema has no cluster 0x%04X (WindowCovering)", clusterwire.WindowCoveringClusterID)
+		t.Fatalf("matter.js schema has no cluster 0x%04X (WindowCovering)", wcdef.ClusterID)
 	}
 
 	if cover.ClusterRevision != js.Revision {
@@ -81,15 +80,15 @@ func TestParityMatterJS_WindowCoveringAttrConstants(t *testing.T) {
 		got      uint32
 		expected uint32
 	}{
-		{"Type", clusterwire.WindowCoveringAttrType, 0x0000},
-		{"ConfigStatus", clusterwire.WindowCoveringAttrConfigStatus, 0x0007},
-		{"CurrentPositionLiftPercentage", clusterwire.WindowCoveringAttrCurrentPositionLiftPercentage, 0x0008},
-		{"OperationalStatus", clusterwire.WindowCoveringAttrOperationalStatus, 0x000A},
-		{"TargetPositionLiftPercent100ths", clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths, 0x000B},
-		{"EndProductType", clusterwire.WindowCoveringAttrEndProductType, 0x000D},
-		{"CurrentPositionLiftPercent100ths", clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths, 0x000E},
-		{"Mode", clusterwire.WindowCoveringAttrMode, 0x0017},
-		{"SafetyStatus", clusterwire.WindowCoveringAttrSafetyStatus, 0x001A},
+		{"Type", wcdef.AttrType, 0x0000},
+		{"ConfigStatus", wcdef.AttrConfigStatus, 0x0007},
+		{"CurrentPositionLiftPercentage", wcdef.AttrCurrentPositionLiftPercentage, 0x0008},
+		{"OperationalStatus", wcdef.AttrOperationalStatus, 0x000A},
+		{"TargetPositionLiftPercent100ths", wcdef.AttrTargetPositionLiftPercent100ths, 0x000B},
+		{"EndProductType", wcdef.AttrEndProductType, 0x000D},
+		{"CurrentPositionLiftPercent100ths", wcdef.AttrCurrentPositionLiftPercent100ths, 0x000E},
+		{"Mode", wcdef.AttrMode, 0x0017},
+		{"SafetyStatus", wcdef.AttrSafetyStatus, 0x001A},
 	}
 
 	for _, c := range cases {
@@ -113,10 +112,10 @@ func TestParityMatterJS_WindowCoveringCmdConstants(t *testing.T) {
 		got      uint32
 		expected uint32
 	}{
-		{"UpOrOpen", clusterwire.WindowCoveringCmdUpOrOpen, 0x00},
-		{"DownOrClose", clusterwire.WindowCoveringCmdDownOrClose, 0x01},
-		{"StopMotion", clusterwire.WindowCoveringCmdStopMotion, 0x02},
-		{"GoToLiftPercentage", clusterwire.WindowCoveringCmdGoToLiftPercentage, 0x05},
+		{"UpOrOpen", wcdef.CmdUpOrOpen, 0x00},
+		{"DownOrClose", wcdef.CmdDownOrClose, 0x01},
+		{"StopMotion", wcdef.CmdStopMotion, 0x02},
+		{"GoToLiftPercentage", wcdef.CmdGoToLiftPercentage, 0x05},
 	}
 
 	for _, c := range cases {
@@ -135,8 +134,8 @@ func TestWindowCoveringServer_ClusterID(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
-	if got := srv.MatterClusterID(); got != clusterwire.WindowCoveringClusterID {
-		t.Errorf("MatterClusterID = 0x%04X, want 0x%04X", got, clusterwire.WindowCoveringClusterID)
+	if got := srv.MatterClusterID(); got != wcdef.ClusterID {
+		t.Errorf("MatterClusterID = 0x%04X, want 0x%04X", got, wcdef.ClusterID)
 	}
 }
 
@@ -153,13 +152,13 @@ func TestWindowCoveringServer_MandatoryAttributeRead(t *testing.T) {
 	})
 
 	mandatory := []uint32{
-		clusterwire.WindowCoveringAttrType,
-		clusterwire.WindowCoveringAttrConfigStatus,
-		clusterwire.WindowCoveringAttrOperationalStatus,
-		clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths,
-		clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths,
-		clusterwire.WindowCoveringAttrEndProductType,
-		clusterwire.WindowCoveringAttrMode,
+		wcdef.AttrType,
+		wcdef.AttrConfigStatus,
+		wcdef.AttrOperationalStatus,
+		wcdef.AttrTargetPositionLiftPercent100ths,
+		wcdef.AttrCurrentPositionLiftPercent100ths,
+		wcdef.AttrEndProductType,
+		wcdef.AttrMode,
 	}
 
 	for _, id := range mandatory {
@@ -182,7 +181,7 @@ func TestWindowCoveringServer_InitialPosition(t *testing.T) {
 	const initial uint16 = 7500
 	srv := cover.NewWindowCoveringServer(cover.Config{InitialPositionPercent100ths: initial})
 
-	v, ok := srv.MatterRead(clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+	v, ok := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 	if !ok {
 		t.Fatal("CurrentPositionLiftPercent100ths: ok = false")
 	}
@@ -191,7 +190,7 @@ func TestWindowCoveringServer_InitialPosition(t *testing.T) {
 		t.Errorf("CurrentPositionLiftPercent100ths = %d, want %d", got, initial)
 	}
 
-	v2, ok := srv.MatterRead(clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths)
+	v2, ok := srv.MatterRead(wcdef.AttrTargetPositionLiftPercent100ths)
 	if !ok {
 		t.Fatal("TargetPositionLiftPercent100ths: ok = false")
 	}
@@ -206,12 +205,12 @@ func TestWindowCoveringServer_UpOrOpen(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{InitialPositionPercent100ths: 10000})
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdUpOrOpen, nil)
+	_, err := srv.MatterInvoke(context.Background(), wcdef.CmdUpOrOpen, nil)
 	if err != nil {
 		t.Fatalf("UpOrOpen: %v", err)
 	}
 
-	v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+	v, _ := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 	if got, _ := v.(uint16); got != 0 {
 		t.Errorf("after UpOrOpen: CurrentPosition = %d, want 0", got)
 	}
@@ -222,12 +221,12 @@ func TestWindowCoveringServer_DownOrClose(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{InitialPositionPercent100ths: 0})
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdDownOrClose, nil)
+	_, err := srv.MatterInvoke(context.Background(), wcdef.CmdDownOrClose, nil)
 	if err != nil {
 		t.Fatalf("DownOrClose: %v", err)
 	}
 
-	v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+	v, _ := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 	if got, _ := v.(uint16); got != 10000 {
 		t.Errorf("after DownOrClose: CurrentPosition = %d, want 10000", got)
 	}
@@ -239,12 +238,12 @@ func TestWindowCoveringServer_StopMotion(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdStopMotion, nil)
+	_, err := srv.MatterInvoke(context.Background(), wcdef.CmdStopMotion, nil)
 	if err != nil {
 		t.Fatalf("StopMotion: %v", err)
 	}
 
-	v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrOperationalStatus)
+	v, _ := srv.MatterRead(wcdef.AttrOperationalStatus)
 	if got, _ := v.(uint8); got != 0 {
 		t.Errorf("after StopMotion: OperationalStatus = %d, want 0", got)
 	}
@@ -257,17 +256,17 @@ func TestWindowCoveringServer_GoToLiftPercentage(t *testing.T) {
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
 	const target uint16 = 3500
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, target)
+	_, err := srv.MatterInvoke(context.Background(), wcdef.CmdGoToLiftPercentage, target)
 	if err != nil {
 		t.Fatalf("GoToLiftPercentage: %v", err)
 	}
 
-	v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+	v, _ := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 	if got, _ := v.(uint16); got != target {
 		t.Errorf("after GoToLiftPercentage(%d): CurrentPosition = %d, want %d", target, got, target)
 	}
 
-	v2, _ := srv.MatterRead(clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths)
+	v2, _ := srv.MatterRead(wcdef.AttrTargetPositionLiftPercent100ths)
 	if got, _ := v2.(uint16); got != target {
 		t.Errorf("after GoToLiftPercentage(%d): TargetPosition = %d, want %d", target, got, target)
 	}
@@ -281,12 +280,12 @@ func TestWindowCoveringServer_GoToLiftPercentageMapPayload(t *testing.T) {
 	srv := cover.NewWindowCoveringServer(cover.Config{})
 	const target uint16 = 2000
 	fields := map[string]any{"percent": target}
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, fields)
+	_, err := srv.MatterInvoke(context.Background(), wcdef.CmdGoToLiftPercentage, fields)
 	if err != nil {
 		t.Fatalf("GoToLiftPercentage(map): %v", err)
 	}
 
-	v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths)
+	v, _ := srv.MatterRead(wcdef.AttrCurrentPositionLiftPercent100ths)
 	if got, _ := v.(uint16); got != target {
 		t.Errorf("CurrentPosition = %d, want %d", got, target)
 	}
@@ -311,7 +310,7 @@ func TestWindowCoveringServer_WriteReturnsError(t *testing.T) {
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
 	// Type (0x0000) is read-only; writes must be rejected.
-	err := srv.MatterWrite(context.Background(), clusterwire.WindowCoveringAttrType, uint8(0))
+	err := srv.MatterWrite(context.Background(), wcdef.AttrType, uint8(0))
 	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
 		t.Errorf("MatterWrite on read-only attribute Type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
@@ -325,10 +324,10 @@ func TestWindowCoveringServer_WriteModeAccepted(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
-	if err := srv.MatterWrite(context.Background(), clusterwire.WindowCoveringAttrMode, uint8(9)); err != nil {
+	if err := srv.MatterWrite(context.Background(), wcdef.AttrMode, uint8(9)); err != nil {
 		t.Fatalf("MatterWrite(Mode, 9): unexpected error: %v", err)
 	}
-	v, ok := srv.MatterRead(clusterwire.WindowCoveringAttrMode)
+	v, ok := srv.MatterRead(wcdef.AttrMode)
 	if !ok {
 		t.Fatal("MatterRead(Mode): ok=false after write")
 	}
@@ -346,7 +345,7 @@ func TestWindowCoveringServer_WriteModeConstraint(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
-	err := srv.MatterWrite(context.Background(), clusterwire.WindowCoveringAttrMode, uint8(16))
+	err := srv.MatterWrite(context.Background(), wcdef.AttrMode, uint8(16))
 	if err == nil {
 		t.Fatal("MatterWrite(Mode, 16) expected ConstraintError, got nil")
 	}
@@ -367,7 +366,7 @@ func TestWindowCoveringServer_GoToLiftPercent_ConstraintMax10000(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, uint16(10001))
+	_, err := srv.MatterInvoke(context.Background(), wcdef.CmdGoToLiftPercentage, uint16(10001))
 	if err == nil {
 		t.Fatal("GoToLiftPercentage(10001) expected ConstraintError, got nil")
 	}
@@ -416,11 +415,11 @@ func TestWindowCoveringServer_MatterReportable(t *testing.T) {
 		return slices.Contains(reportable, id)
 	}
 
-	if !has(clusterwire.WindowCoveringAttrCurrentPositionLiftPercent100ths) {
+	if !has(wcdef.AttrCurrentPositionLiftPercent100ths) {
 		t.Error("MatterReportable missing CurrentPositionLiftPercent100ths (0x000E)")
 	}
 
-	if !has(clusterwire.WindowCoveringAttrOperationalStatus) {
+	if !has(wcdef.AttrOperationalStatus) {
 		t.Error("MatterReportable missing OperationalStatus (0x000A)")
 	}
 }
@@ -437,9 +436,9 @@ func TestParityMatterJS_WindowCoveringServesGlobalAttributes(t *testing.T) {
 	t.Parallel()
 
 	schema := loadSchema(t)
-	js, ok := clusterEntry(schema, clusterwire.WindowCoveringClusterID)
+	js, ok := clusterEntry(schema, wcdef.ClusterID)
 	if !ok {
-		t.Fatalf("matter.js schema has no cluster 0x%04X (WindowCovering)", clusterwire.WindowCoveringClusterID)
+		t.Fatalf("matter.js schema has no cluster 0x%04X (WindowCovering)", wcdef.ClusterID)
 	}
 
 	const featureMap uint32 = 0x05 // LF (bit 0) + PA_LF (bit 2), window-covering-cluster.element.ts:15,17
@@ -483,10 +482,10 @@ func TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap(t
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05})
-			if _, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, tc.fields); err != nil {
+			if _, err := srv.MatterInvoke(context.Background(), wcdef.CmdGoToLiftPercentage, tc.fields); err != nil {
 				t.Fatalf("GoToLiftPercentage(%T): %v", tc.fields, err)
 			}
-			v, ok := srv.MatterRead(clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths)
+			v, ok := srv.MatterRead(wcdef.AttrTargetPositionLiftPercent100ths)
 			if !ok {
 				t.Fatal("TargetPositionLiftPercent100ths: ok=false")
 			}
@@ -498,7 +497,7 @@ func TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap(t
 
 	// The constraint still bites through the tag map.
 	srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05})
-	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, map[uint8]any{0: uint64(10001)})
+	_, err := srv.MatterInvoke(context.Background(), wcdef.CmdGoToLiftPercentage, map[uint8]any{0: uint64(10001)})
 	var sc im.StatusCodeError
 	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
 		t.Fatalf("GoToLiftPercentage(10001 via tag map) error = %v, want ConstraintError", err)
@@ -552,7 +551,7 @@ func TestWindowCoveringMaintenanceMode(t *testing.T) {
 	var notes [][]uint32
 	srv.OnAttributeChange(func(change contract.Change) { ids := change.Attributes; notes = append(notes, ids) })
 	status := func() uint8 {
-		v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrConfigStatus)
+		v, _ := srv.MatterRead(wcdef.AttrConfigStatus)
 		return v.(uint8)
 	}
 	if got := status(); got != 0x09 {
@@ -560,7 +559,7 @@ func TestWindowCoveringMaintenanceMode(t *testing.T) {
 	}
 	write := func(mode uint8) {
 		t.Helper()
-		if err := srv.MatterWrite(ctx, clusterwire.WindowCoveringAttrMode, mode); err != nil {
+		if err := srv.MatterWrite(ctx, wcdef.AttrMode, mode); err != nil {
 			t.Fatalf("MatterWrite(Mode, %d): %v", mode, err)
 		}
 	}
@@ -572,7 +571,7 @@ func TestWindowCoveringMaintenanceMode(t *testing.T) {
 	if got := status(); got != 0x08 {
 		t.Errorf("maintenance: ConfigStatus = 0x%02X, want 0x08", got)
 	}
-	for _, cmd := range []uint32{clusterwire.WindowCoveringCmdDownOrClose, clusterwire.WindowCoveringCmdStopMotion} {
+	for _, cmd := range []uint32{wcdef.CmdDownOrClose, wcdef.CmdStopMotion} {
 		_, err := srv.MatterInvoke(ctx, cmd, nil)
 		var sc im.StatusCodeError
 		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusBusy {
@@ -583,13 +582,13 @@ func TestWindowCoveringMaintenanceMode(t *testing.T) {
 	if got := status(); got != 0x09 {
 		t.Errorf("cleared: ConfigStatus = 0x%02X, want 0x09", got)
 	}
-	if _, err := srv.MatterInvoke(ctx, clusterwire.WindowCoveringCmdDownOrClose, nil); err != nil {
+	if _, err := srv.MatterInvoke(ctx, wcdef.CmdDownOrClose, nil); err != nil {
 		t.Errorf("DownOrClose after maintenance: %v", err)
 	}
 	configNotes := 0
 	for _, ids := range notes {
 		for _, id := range ids {
-			if id == clusterwire.WindowCoveringAttrConfigStatus {
+			if id == wcdef.AttrConfigStatus {
 				configNotes++
 			}
 		}

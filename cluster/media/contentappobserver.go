@@ -42,7 +42,7 @@ func NewContentAppObserver(cfg ContentAppObserverConfig) (*ContentAppObserverSer
 	handle(h, observerdef.CmdContentAppMessage, func(ctx context.Context, req observerdef.ContentAppMessageRequest) (any, error) {
 		return port.ContentAppMessage(ctx, req)
 	})
-	srv, err := newServer(observerdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	srv, err := newServer(observerdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("media: ContentAppObserver: %w", err)
 	}

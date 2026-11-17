@@ -11,6 +11,7 @@ package mdns
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"slices"
@@ -115,8 +116,11 @@ func TestSockets_Lifecycle(t *testing.T) {
 }
 
 // liveHost is the SRV target of the live tests' service, a name nothing
-// else on the link owns.
-const liveHost = "GOFABRICLIVE0000"
+// else on the link owns — this process's own: two test processes on one
+// host (two runs of the package side by side) each publish and withdraw
+// their service, and a goodbye (TTL 0) of the other's would answer this
+// one's query.
+var liveHost = fmt.Sprintf("GOFABRICLIVE%04X", os.Getpid()&0xFFFF)
 
 // livePublish publishes an operational service on a real responder and
 // returns it with the address it advertises on ifi.
@@ -177,7 +181,7 @@ func TestResponder_LiveHostAnswerV4(t *testing.T) {
 	if ifi == nil {
 		t.Skip("no multicast interface of this host carries a primary IPv4 address the responder announces")
 	}
-	livePublish(t, "GOFABRICLIVE-V4")
+	livePublish(t, liveHost+"-V4")
 	conn, err := net.ListenMulticastUDP("udp4", ifi, mdnsGroup4)
 	if err != nil {
 		t.Skipf("this host lets no second socket join the IPv4 mDNS group 224.0.0.251:5353 on %s: %v", ifi.Name, err)
@@ -220,7 +224,7 @@ func TestResponder_LiveHostAnswerV6(t *testing.T) {
 	if ifi == nil {
 		t.Skip("no multicast interface of this host carries a primary IPv6 address the responder announces")
 	}
-	livePublish(t, "GOFABRICLIVE-V6")
+	livePublish(t, liveHost+"-V6")
 	conn, err := net.ListenMulticastUDP("udp6", ifi, mdnsGroup6)
 	if err != nil {
 		t.Skipf("this host lets no second socket join the IPv6 mDNS group [ff02::fb]:5353 on %s: %v", ifi.Name, err)
@@ -254,7 +258,7 @@ func TestResponder_LiveHostAnswerV6(t *testing.T) {
 // for it, the host's A/AAAA — every record 120 s.
 func TestResponder_LiveOperationalRoundTrip(t *testing.T) {
 	skipUnlessMulticastV4(t)
-	const instance = "GOFABRICSMOKE0362"
+	instance := fmt.Sprintf("GOFABRICSMOKE%04X", os.Getpid()&0xFFFF) // this process's own, as liveHost
 	livePublish(t, instance)
 	conn, err := OpenQueryConn()
 	if err != nil {

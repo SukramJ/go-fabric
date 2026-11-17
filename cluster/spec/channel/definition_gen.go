@@ -94,6 +94,49 @@ func (v *ChannelInfoStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ChannelInfoStruct) Clone() ChannelInfoStruct {
+	c := v
+	c.Name = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Name)
+	c.CallSign = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.CallSign)
+	c.AffiliateCallSign = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.AffiliateCallSign)
+	c.Identifier = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Identifier)
+	c.Type = func(p *ChannelTypeEnum) *ChannelTypeEnum {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Type)
+	return c
+}
+
 // ChannelInfoStructDef describes ChannelInfoStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -152,6 +195,28 @@ func (v *ChannelPagingStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ChannelPagingStruct) Clone() ChannelPagingStruct {
+	c := v
+	c.PreviousToken = func(p *spec.Nullable[PageTokenStruct]) *spec.Nullable[PageTokenStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[PageTokenStruct]{Value: (*p).Value.Clone(), Null: (*p).Null}
+		return &x
+	}(v.PreviousToken)
+	c.NextToken = func(p *spec.Nullable[PageTokenStruct]) *spec.Nullable[PageTokenStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[PageTokenStruct]{Value: (*p).Value.Clone(), Null: (*p).Null}
+		return &x
+	}(v.NextToken)
+	return c
+}
+
 // ChannelPagingStructDef describes ChannelPagingStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -183,6 +248,35 @@ func (v *PageTokenStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "After", false, &v.After, spec.DecodeOptional(spec.DecodeStringIn(0, 8192))),
 		spec.Bind(2, "Before", false, &v.Before, spec.DecodeOptional(spec.DecodeStringIn(0, 8192))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v PageTokenStruct) Clone() PageTokenStruct {
+	c := v
+	c.Limit = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Limit)
+	c.After = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.After)
+	c.Before = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Before)
+	return c
 }
 
 // PageTokenStructDef describes PageTokenStruct.
@@ -220,6 +314,28 @@ func (v *LineupInfoStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "PostalCode", false, &v.PostalCode, spec.DecodeOptional(spec.DecodeString)),
 		spec.Bind(3, "LineupInfoType", true, &v.LineupInfoType, spec.DecodeUint[LineupInfoTypeEnum](8)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v LineupInfoStruct) Clone() LineupInfoStruct {
+	c := v
+	c.LineupName = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.LineupName)
+	c.PostalCode = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PostalCode)
+	return c
 }
 
 // LineupInfoStructDef describes LineupInfoStruct.
@@ -301,6 +417,21 @@ func (v *ProgramCategoryStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProgramCategoryStruct) Clone() ProgramCategoryStruct {
+	c := v
+	c.SubCategory = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SubCategory)
+	return c
+}
+
 // ProgramCategoryStructDef describes ProgramCategoryStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -380,6 +511,150 @@ func (v *ProgramStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(17, "CastList", false, &v.CastList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[ProgramCastStruct], 0, 255))),
 		spec.Bind(18, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[AdditionalInfoStruct], 0, 255))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProgramStruct) Clone() ProgramStruct {
+	c := v
+	c.Channel = v.Channel.Clone()
+	c.Subtitle = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Subtitle)
+	c.Description = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Description)
+	c.AudioLanguages = func(p *[]string) *[]string {
+		if p == nil {
+			return nil
+		}
+		x := func(s []string) []string {
+			if s == nil {
+				return nil
+			}
+			out := make([]string, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.AudioLanguages)
+	c.Ratings = func(p *[]string) *[]string {
+		if p == nil {
+			return nil
+		}
+		x := func(s []string) []string {
+			if s == nil {
+				return nil
+			}
+			out := make([]string, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Ratings)
+	c.ThumbnailUrl = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ThumbnailUrl)
+	c.PosterArtUrl = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.PosterArtUrl)
+	c.DvbiUrl = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DvbiUrl)
+	c.ReleaseDate = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ReleaseDate)
+	c.ParentalGuidanceText = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.ParentalGuidanceText)
+	c.RecordingFlag = func(p *RecordingFlagBitmap) *RecordingFlagBitmap {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.RecordingFlag)
+	c.SeriesInfo = func(p *spec.Nullable[SeriesInfoStruct]) *spec.Nullable[SeriesInfoStruct] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.SeriesInfo)
+	c.CategoryList = func(p *[]ProgramCategoryStruct) *[]ProgramCategoryStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ProgramCategoryStruct) []ProgramCategoryStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ProgramCategoryStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.CategoryList)
+	c.CastList = func(p *[]ProgramCastStruct) *[]ProgramCastStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ProgramCastStruct) []ProgramCastStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ProgramCastStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.CastList)
+	c.ExternalIdList = func(p *[]AdditionalInfoStruct) *[]AdditionalInfoStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []AdditionalInfoStruct) []AdditionalInfoStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]AdditionalInfoStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.ExternalIdList)
+	return c
 }
 
 // ProgramStructDef describes ProgramStruct.
@@ -550,6 +825,21 @@ func (v *ChangeChannelResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ChangeChannelResponse) Clone() ChangeChannelResponse {
+	c := v
+	c.Data = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.Data)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (ChangeChannelResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdChangeChannelResponse
@@ -633,6 +923,72 @@ func (v *GetProgramGuideRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v GetProgramGuideRequest) Clone() GetProgramGuideRequest {
+	c := v
+	c.ChannelList = func(p *[]ChannelInfoStruct) *[]ChannelInfoStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []ChannelInfoStruct) []ChannelInfoStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]ChannelInfoStruct, len(s))
+			for i := range s {
+				out[i] = s[i].Clone()
+			}
+			return out
+		}((*p))
+		return &x
+	}(v.ChannelList)
+	c.PageToken = func(p *spec.Nullable[PageTokenStruct]) *spec.Nullable[PageTokenStruct] {
+		if p == nil {
+			return nil
+		}
+		x := spec.Nullable[PageTokenStruct]{Value: (*p).Value.Clone(), Null: (*p).Null}
+		return &x
+	}(v.PageToken)
+	c.RecordingFlag = func(p *spec.Nullable[RecordingFlagBitmap]) *spec.Nullable[RecordingFlagBitmap] {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.RecordingFlag)
+	c.ExternalIdList = func(p *[]AdditionalInfoStruct) *[]AdditionalInfoStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []AdditionalInfoStruct) []AdditionalInfoStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]AdditionalInfoStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.ExternalIdList)
+	c.Data = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Data)
+	return c
+}
+
 // ProgramGuideResponse is the ProgramGuideResponse command payload.
 type ProgramGuideResponse struct {
 	Paging      ChannelPagingStruct // 0: ChannelPagingStruct, M
@@ -653,6 +1009,25 @@ func (v *ProgramGuideResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "Paging", true, &v.Paging, spec.DecodeStruct[ChannelPagingStruct]),
 		spec.Bind(1, "ProgramList", true, &v.ProgramList, spec.DecodeList(spec.DecodeStruct[ProgramStruct])),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ProgramGuideResponse) Clone() ProgramGuideResponse {
+	c := v
+	c.Paging = v.Paging.Clone()
+	c.ProgramList = func(s []ProgramStruct) []ProgramStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]ProgramStruct, len(s))
+		for i := range s {
+			out[i] = s[i].Clone()
+		}
+		return out
+	}(v.ProgramList)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -688,6 +1063,42 @@ func (v *RecordProgramRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v RecordProgramRequest) Clone() RecordProgramRequest {
+	c := v
+	c.ExternalIdList = func(p *[]AdditionalInfoStruct) *[]AdditionalInfoStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []AdditionalInfoStruct) []AdditionalInfoStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]AdditionalInfoStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.ExternalIdList)
+	c.Data = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Data)
+	return c
+}
+
 // CancelRecordProgramRequest is the CancelRecordProgram command payload.
 type CancelRecordProgramRequest struct {
 	ProgramIdentifier  string                  // 0: string, M, max 255
@@ -714,6 +1125,42 @@ func (v *CancelRecordProgramRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[AdditionalInfoStruct], 0, 255))),
 		spec.Bind(3, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeBytesIn(0, 8092))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CancelRecordProgramRequest) Clone() CancelRecordProgramRequest {
+	c := v
+	c.ExternalIdList = func(p *[]AdditionalInfoStruct) *[]AdditionalInfoStruct {
+		if p == nil {
+			return nil
+		}
+		x := func(s []AdditionalInfoStruct) []AdditionalInfoStruct {
+			if s == nil {
+				return nil
+			}
+			out := make([]AdditionalInfoStruct, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.ExternalIdList)
+	c.Data = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Data)
+	return c
 }
 
 func decodeChangeChannelRequest(n spec.Node) (any, error) {

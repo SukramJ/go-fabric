@@ -363,3 +363,54 @@ func TestAddNOC_VersionedCASEAuthTagSubjectIsAccepted(t *testing.T) {
 		t.Fatalf("ACL write-back of the AddNOC default entry: %v", err)
 	}
 }
+
+// upsertGroupKeySetFailStore fails the write of a group key set: AddNOC's
+// write of the IPK as key set 0.
+type upsertGroupKeySetFailStore struct {
+	*fakeStore
+}
+
+func (s *upsertGroupKeySetFailStore) UpsertGroupKeySet(context.Context, mstore.GroupKeySet) error {
+	return errors.New("injected UpsertGroupKeySet failure")
+}
+
+// AddNOC whose write of the IPK key set fails is not OK and leaves no
+// fabric row, as connectedhomeip fails AddNOC there and reverts (review
+// II, R2-P6-err-1004).
+func TestAddNOC_IPKKeySetWriteFailure_FailsAndRollsBack(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	inner := newFakeStore()
+	oc, err := core.NewOperationalCredentials(&upsertGroupKeySetFailStore{fakeStore: inner}, core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oc.SetFailSafe(func() (uint8, bool) { return 0, true })
+	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv)}); err != nil {
+		t.Fatalf("AddTrustedRootCertificate: %v", err)
+	}
+	pendingPub := issueCSRPendingPubKey(ctx, t, oc, false)
+	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+		NOCValue:         buildCoreSignedCertForPubKey(t, pendingPub, false, rootPriv, testDefaultFabricID, testDefaultNodeID),
+		IPKValue:         make([]byte, 16),
+		CaseAdminSubject: testDefaultNodeID,
+		AdminVendorID:    0xFFF1,
+	})
+	if err != nil {
+		t.Fatalf("AddNOC: unexpected IM error: %v", err)
+	}
+	if noc, ok := resp.(core.NOCResponse); !ok || noc.StatusCode != core.NOCStatusInvalidNOC {
+		t.Fatalf("AddNOC = %#v, want NOCResponse InvalidNOC", resp)
+	}
+	fabrics, err := inner.ListFabrics(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fabrics) != 0 {
+		t.Errorf("fabric table after the failed AddNOC: %d rows, want none", len(fabrics))
+	}
+}

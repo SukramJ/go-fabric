@@ -115,6 +115,36 @@ func (v *FabricDescriptorStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v FabricDescriptorStruct) Clone() FabricDescriptorStruct {
+	c := v
+	c.RootPublicKey = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.RootPublicKey)
+	c.VidVerificationStatement = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VidVerificationStatement)
+	return c
+}
+
 // FabricDescriptorStructDef describes FabricDescriptorStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -154,6 +184,44 @@ func (v *NOCStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(3, "Vvsc", false, &v.Vvsc, spec.DecodeOptional(spec.DecodeBytesIn(0, 400))),
 		spec.Bind(254, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NOCStruct) Clone() NOCStruct {
+	c := v
+	c.Noc = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Noc)
+	c.Icac = spec.Nullable[[]byte]{Value: func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Icac.Value), Null: v.Icac.Null}
+	c.Vvsc = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Vvsc)
+	return c
 }
 
 // NOCStructDef describes NOCStruct.
@@ -221,6 +289,22 @@ func (v *AttestationRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AttestationRequestRequest) Clone() AttestationRequestRequest {
+	c := v
+	c.AttestationNonce = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.AttestationNonce)
+	return c
+}
+
 // AttestationResponse is the AttestationResponse command payload.
 type AttestationResponse struct {
 	AttestationElements  []byte // 0: octstr, M, max 900
@@ -241,6 +325,30 @@ func (v *AttestationResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "AttestationElements", true, &v.AttestationElements, spec.DecodeBytesIn(0, 900)),
 		spec.Bind(1, "AttestationSignature", true, &v.AttestationSignature, spec.DecodeBytesIn(64, 64)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AttestationResponse) Clone() AttestationResponse {
+	c := v
+	c.AttestationElements = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.AttestationElements)
+	c.AttestationSignature = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.AttestationSignature)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -286,6 +394,22 @@ func (v *CertificateChainResponse) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CertificateChainResponse) Clone() CertificateChainResponse {
+	c := v
+	c.Certificate = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Certificate)
+	return c
+}
+
 // ResponseCommand implements spec.ResponsePayload.
 func (CertificateChainResponse) ResponseCommand() (clusterID, commandID uint32) {
 	return ClusterID, CmdCertificateChainResponse
@@ -314,6 +438,29 @@ func (v *CsrRequestRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CsrRequestRequest) Clone() CsrRequestRequest {
+	c := v
+	c.CsrNonce = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.CsrNonce)
+	c.IsForUpdateNoc = func(p *bool) *bool {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.IsForUpdateNoc)
+	return c
+}
+
 // CsrResponse is the CsrResponse command payload.
 type CsrResponse struct {
 	NocsrElements        []byte // 0: octstr, M, max 900
@@ -334,6 +481,30 @@ func (v *CsrResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "NocsrElements", true, &v.NocsrElements, spec.DecodeBytesIn(0, 900)),
 		spec.Bind(1, "AttestationSignature", true, &v.AttestationSignature, spec.DecodeBytesIn(64, 64)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v CsrResponse) Clone() CsrResponse {
+	c := v
+	c.NocsrElements = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NocsrElements)
+	c.AttestationSignature = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.AttestationSignature)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -370,6 +541,44 @@ func (v *AddNocRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddNocRequest) Clone() AddNocRequest {
+	c := v
+	c.NocValue = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NocValue)
+	c.IcacValue = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.IcacValue)
+	c.IpkValue = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.IpkValue)
+	return c
+}
+
 // UpdateNocRequest is the UpdateNoc command payload.
 type UpdateNocRequest struct {
 	NocValue  []byte  // 0: octstr, M, max 400
@@ -390,6 +599,36 @@ func (v *UpdateNocRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "NocValue", true, &v.NocValue, spec.DecodeBytesIn(0, 400)),
 		spec.Bind(1, "IcacValue", false, &v.IcacValue, spec.DecodeOptional(spec.DecodeBytesIn(0, 400))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v UpdateNocRequest) Clone() UpdateNocRequest {
+	c := v
+	c.NocValue = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.NocValue)
+	c.IcacValue = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.IcacValue)
+	return c
 }
 
 // NocResponse is the NocResponse command payload.
@@ -415,6 +654,28 @@ func (v *NocResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "FabricIndex", false, &v.FabricIndex, spec.DecodeOptional(spec.DecodeUintIn[uint8](8, 1, 254))),
 		spec.Bind(2, "DebugText", false, &v.DebugText, spec.DecodeOptional(spec.DecodeStringIn(0, 128))),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v NocResponse) Clone() NocResponse {
+	c := v
+	c.FabricIndex = func(p *uint8) *uint8 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.FabricIndex)
+	c.DebugText = func(p *string) *string {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.DebugText)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.
@@ -477,6 +738,22 @@ func (v *AddTrustedRootCertificateRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v AddTrustedRootCertificateRequest) Clone() AddTrustedRootCertificateRequest {
+	c := v
+	c.RootCaCertificate = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.RootCaCertificate)
+	return c
+}
+
 // SetVidVerificationStatementRequest is the SetVidVerificationStatement command payload.
 type SetVidVerificationStatementRequest struct {
 	VendorId                 *uint16 // 0: vendor-id, O.a+
@@ -502,6 +779,49 @@ func (v *SetVidVerificationStatementRequest) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SetVidVerificationStatementRequest) Clone() SetVidVerificationStatementRequest {
+	c := v
+	c.VendorId = func(p *uint16) *uint16 {
+		if p == nil {
+			return nil
+		}
+		x := *p
+		return &x
+	}(v.VendorId)
+	c.VidVerificationStatement = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.VidVerificationStatement)
+	c.Vvsc = func(p *[]byte) *[]byte {
+		if p == nil {
+			return nil
+		}
+		x := func(s []byte) []byte {
+			if s == nil {
+				return nil
+			}
+			out := make([]byte, len(s))
+			copy(out, s)
+			return out
+		}((*p))
+		return &x
+	}(v.Vvsc)
+	return c
+}
+
 // SignVidVerificationRequestRequest is the SignVidVerificationRequest command payload.
 type SignVidVerificationRequestRequest struct {
 	FabricIndex     uint8  // 0: fabric-idx, M, 1 to 254
@@ -522,6 +842,22 @@ func (v *SignVidVerificationRequestRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "FabricIndex", true, &v.FabricIndex, spec.DecodeUintIn[uint8](8, 1, 254)),
 		spec.Bind(1, "ClientChallenge", true, &v.ClientChallenge, spec.DecodeBytesIn(32, 32)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SignVidVerificationRequestRequest) Clone() SignVidVerificationRequestRequest {
+	c := v
+	c.ClientChallenge = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.ClientChallenge)
+	return c
 }
 
 // SignVidVerificationResponse is the SignVidVerificationResponse command payload.
@@ -547,6 +883,22 @@ func (v *SignVidVerificationResponse) DecodeTLV(n spec.Node) error {
 		spec.Bind(1, "FabricBindingVersion", true, &v.FabricBindingVersion, spec.DecodeUintIn[uint8](8, 1, 255)),
 		spec.Bind(2, "Signature", true, &v.Signature, spec.DecodeBytesIn(1, 2147483647)),
 	)
+}
+
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v SignVidVerificationResponse) Clone() SignVidVerificationResponse {
+	c := v
+	c.Signature = func(s []byte) []byte {
+		if s == nil {
+			return nil
+		}
+		out := make([]byte, len(s))
+		copy(out, s)
+		return out
+	}(v.Signature)
+	return c
 }
 
 // ResponseCommand implements spec.ResponsePayload.

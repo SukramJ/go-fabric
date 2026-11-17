@@ -84,9 +84,20 @@ func (s *Server) MarkQuietChanged(attrID uint32) error {
 	s.mu.Lock()
 	wasNull := qa.null
 	qa.null, qa.origin, qa.computed = v == nil, contract.OriginHostSet, true
+	notify := func() {
+		s.AttributeChanges.ChangedFrom(contract.OriginHostSet, attrID)
+		qa.q.Changed(wasNull, v == nil)
+	}
+	// Inside an open commit the change listeners learn of it once the
+	// write left its window, as of a Set there ([Server.MarkChanged]); its
+	// version still advances when the throttle emits.
+	if open := s.commit; open != nil {
+		open.notifies = append(open.notifies, notify)
+		s.mu.Unlock()
+		return nil
+	}
 	s.mu.Unlock()
-	s.AttributeChanges.ChangedFrom(contract.OriginHostSet, attrID)
-	qa.q.Changed(wasNull, v == nil)
+	notify()
 	return nil
 }
 

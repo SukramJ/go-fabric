@@ -68,7 +68,7 @@ const (
 )
 
 // GeneralDiagnostics implements the Matter GeneralDiagnostics cluster
-// (0x0033) per Matter Core Specification 1.5.1 §11.12. Mandatory on
+// (0x0033) per Matter 1.6.1 §11.12. Mandatory on
 // the Root endpoint. Reports basic runtime diagnostics: uptime,
 // reboot reason, hardware faults, network faults.
 //
@@ -391,9 +391,8 @@ func (g *GeneralDiagnostics) UpTimeSeconds() uint64 {
 // pre-current-process TotalOperationalHours from external storage —
 // the daemon's bootstrap loads the values from a SQLite row before
 // the cluster is mounted, then bumps RebootCount and persists the
-// updated state. Without seeding, the cluster reports a hardcoded
-// RebootCount=1 placeholder and TotalOperationalHours == this
-// process's uptime.
+// updated state. Without seeding, the cluster reports RebootCount 0
+// and TotalOperationalHours == this process's uptime.
 //
 // Mirrors matter.js packages/node/src/behaviors/general-diagnostics/
 // GeneralDiagnosticsServer.ts where bootReason / rebootCount are
@@ -1039,8 +1038,9 @@ func (l NetworkInterfaceList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // general-diagnostics.element.ts accepted commands.
 //
 // TestEventTrigger (0x00) is mandatory (conformance M) and is enumerated;
-// the handler always rejects it with ConstraintError (no enable key). Only
-// PayloadTestRequest (0x03, DMTEST) stays unlisted.
+// it is refused unless [GeneralDiagnostics.EnableTestEventTriggers] set an
+// enable key. PayloadTestRequest (0x03) is listed when the server selects
+// DataModelTest (DMTEST), the default.
 func (g *GeneralDiagnostics) MatterAcceptedCommands() []uint32 {
 	return g.def().MatterAcceptedCommands()
 }
@@ -1064,9 +1064,9 @@ func (g *GeneralDiagnostics) MatterReportable() []uint32 {
 // rebuild reads the full attribute set; without this the dispatcher
 // falls back to MatterReportable's two-attribute surface.
 func (g *GeneralDiagnostics) MatterAttributes() []uint32 {
-	// BootReason + 3× ActiveFaults are OPTIONAL per Matter Core
-	// §11.12.6 and matter.js's bridge sample does not advertise them
-	// (verified via Apple-pair-success byte-dump). BootReason
+	// BootReason is not listed, and the three fault lists are listed
+	// only with a fault port ([GeneralDiagnostics.SetFaultSource]): all
+	// four are OPTIONAL per Matter Core §11.12.6. BootReason
 	// surfaces via the §11.12.8.1 BootReason *event* which we emit on
 	// Subscribe-Initial via EmitBootReason() — Apple parses that event
 	// into the `estimated start time` log line and the BootReason

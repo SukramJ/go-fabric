@@ -75,6 +75,22 @@ func (v *ModeOptionStruct) DecodeTLV(n spec.Node) error {
 	)
 }
 
+// Clone returns a deep copy of v: every list, octet string, optional
+// field and nested struct of the copy is its own, so a change to the
+// copy does not reach v. A field of type any is copied as it is.
+func (v ModeOptionStruct) Clone() ModeOptionStruct {
+	c := v
+	c.SemanticTags = func(s []SemanticTagStruct) []SemanticTagStruct {
+		if s == nil {
+			return nil
+		}
+		out := make([]SemanticTagStruct, len(s))
+		copy(out, s)
+		return out
+	}(v.SemanticTags)
+	return c
+}
+
 // ModeOptionStructDef describes ModeOptionStruct.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"

@@ -14,6 +14,11 @@ import (
 )
 
 // PASEConfig drives a PASE-responder run.
+//
+// Deprecated: use the node's commissioning window
+// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
+// a host that runs the handshake itself uses secure/spake2
+// (NewVerifierFromValue, NewVerifier); removable in the next minor release.
 type PASEConfig struct {
 	// Passcode is the 27-bit setup code (Matter §5.1.6.4) the
 	// operator entered into the commissioner. Always between
@@ -43,12 +48,30 @@ type PASEConfig struct {
 var (
 	// ErrPASEStateMismatch is returned when methods are invoked out
 	// of order (e.g. Pake3 before Pake1).
+	//
+	// Deprecated: use the node's commissioning window
+	// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
+	// a host that runs the handshake itself uses secure/spake2
+	// (NewVerifierFromValue, NewVerifier); removable in the next minor
+	// release.
 	ErrPASEStateMismatch = errors.New("commissioning: PASE state mismatch")
 	// ErrPASEInvalidPasscode is returned when [PASEConfig.Passcode]
 	// is outside the allowed setup-code range.
+	//
+	// Deprecated: use the node's commissioning window
+	// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
+	// a host that runs the handshake itself uses secure/spake2
+	// (NewVerifierFromValue, NewVerifier); removable in the next minor
+	// release.
 	ErrPASEInvalidPasscode = errors.New("commissioning: invalid passcode")
 	// ErrPASEInvalidIterations is returned when [PASEConfig.Iterations]
 	// is outside Matter's 1000..100000 range.
+	//
+	// Deprecated: use the node's commissioning window
+	// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
+	// a host that runs the handshake itself uses secure/spake2
+	// (NewVerifierFromValue, NewVerifier); removable in the next minor
+	// release.
 	ErrPASEInvalidIterations = errors.New("commissioning: invalid PBKDF2 iterations")
 )
 
@@ -66,6 +89,11 @@ var (
 // out on every call, until [PASEResponder.Close]. Call Close once the
 // session and the challenge are taken, and on a handshake that is given
 // up. All of it is a best effort within Go's limits (secure/spake2, zero).
+//
+// Deprecated: use the node's commissioning window
+// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
+// a host that runs the handshake itself uses secure/spake2
+// (NewVerifierFromValue, NewVerifier); removable in the next minor release.
 type PASEResponder struct {
 	cfg       PASEConfig
 	verifier  *spake2.Verifier
@@ -79,7 +107,14 @@ type PASEResponder struct {
 
 // NewPASEResponder constructs a responder with cfg validated. The
 // PBKDF / SPAKE2+ initialisation runs eagerly so Pake1 processing is
-// fast.
+// fast. The passcode is held to the range 1..99999998 only: the trivial
+// passcodes secure/setup.IsValidPasscode refuses (the repeated digits,
+// 12345678, 87654321) are taken (R2-P6-sec-0104).
+//
+// Deprecated: use the node's commissioning window
+// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
+// a host that runs the handshake itself uses secure/spake2
+// (NewVerifierFromValue, NewVerifier); removable in the next minor release.
 func NewPASEResponder(cfg PASEConfig) (*PASEResponder, error) {
 	if cfg.Passcode < 1 || cfg.Passcode > 99999998 {
 		// The value is not rendered: the text reaches a log, and a
@@ -163,6 +198,11 @@ func (r *PASEResponder) Close() {
 //
 // The session copies both keys (channel.New), so it outlives
 // [PASEResponder.Close].
+//
+// Every call builds a new session over the same two keys, each with its
+// own random outbound counter: two sessions taken from one responder can
+// seal under one key with the same counter and node id. Call it once
+// (R2-P6-api-0114).
 func (r *PASEResponder) Session() (*channel.Session, error) {
 	if !r.finished || r.closed {
 		return nil, ErrPASEStateMismatch

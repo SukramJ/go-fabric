@@ -317,10 +317,12 @@ func tariffComponent(id uint32, price int64, level int16, threshold spec.Nullabl
 		FriendlyCredit:    ptrTo(false),
 		AuxiliaryLoad:     &ct.AuxiliaryLoadSwitchSettingsStruct{Number: 1},
 		PeakPeriod:        &ct.PeakPeriodStruct{Severity: ct.PeakPeriodSeverityLow, PeakPeriod: 1},
-		PowerThreshold:    &ct.PowerThresholdStruct{PowerThreshold: ptrTo(int64(2400000)), ApparentPowerThreshold: ptrTo(int64(120)), PowerThresholdSource: spec.ValueOf(ct.PowerThresholdSourceContract)},
-		Threshold:         threshold,
-		Label:             ptrTo(spec.ValueOf(label)),
-		Predicted:         ptrTo(false),
+		// PowerThreshold and ApparentPowerThreshold are a choice of one,
+		// "O.b" (review II, R2-P6-par-1304; the app's sample sets both).
+		PowerThreshold: &ct.PowerThresholdStruct{PowerThreshold: ptrTo(int64(2400000)), PowerThresholdSource: spec.ValueOf(ct.PowerThresholdSourceContract)},
+		Threshold:      threshold,
+		Label:          ptrTo(spec.ValueOf(label)),
+		Predicted:      ptrTo(false),
 	}
 }
 

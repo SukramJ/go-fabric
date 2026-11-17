@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // memStore is an in-memory [Store].
@@ -26,8 +27,12 @@ type memStore struct {
 	table   map[uint8]map[uint16]store.GroupTableEntry
 	gcast   map[uint8]map[uint16]store.GroupcastGroup
 	failPut error
-	// failList makes ListFabrics fail.
+	// failList makes ListFabrics fail; failGet makes GetFabric fail.
 	failList bool
+	failGet  error
+	// failGetOf makes GetFabric fail for the fabrics it names.
+	failGetOf map[uint8]error
+	getCalls  int // GetFabric calls
 	// meta is the matter_metadata counter table; failMeta / failMetaSet
 	// make its reads / writes fail.
 	meta        map[string]uint64
@@ -47,6 +52,13 @@ func newMemStore() *memStore {
 func (s *memStore) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.getCalls++
+	if s.failGet != nil {
+		return store.FabricRecord{}, s.failGet
+	}
+	if err := s.failGetOf[idx]; err != nil {
+		return store.FabricRecord{}, err
+	}
 	r, ok := s.fabrics[idx]
 	if !ok {
 		return store.FabricRecord{}, store.ErrFabricNotFound
@@ -243,4 +255,11 @@ func (s *memStore) metaValue(key string) (uint64, bool) {
 	defer s.mu.Unlock()
 	v, ok := s.meta[key]
 	return v, ok
+}
+
+// window is the reception window of (key, source), created on first use;
+// nil when the key's table is full ([Manager.receptionWindow]).
+func window(m *Manager, key []byte, source uint64) *mrp.Window {
+	w, _ := m.receptionWindow(key, source)
+	return w
 }

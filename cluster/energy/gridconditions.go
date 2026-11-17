@@ -41,6 +41,11 @@ const GridConditionsFeatureForecasting = egc.FeatureForecasting
 type GridConditionsConfig struct {
 	Features GridConditionsFeature
 	// DataVersion is an optional host-owned tracker.
+	//
+	// Deprecated: a host-owned tracker adds nothing — the wire carries the
+	// endpoint's DataVersion for the cluster, or the server's own where it
+	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
+	// the next minor release.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -89,7 +94,7 @@ func NewElectricalGridConditions(cfg GridConditionsConfig) (*GridConditionsServe
 	}
 	srv, err := spec.NewServer(egc.Definition,
 		spec.Options{Features: uint32(cfg.Features), Events: []uint32{egc.EventCurrentConditionsChanged}},
-		spec.ServerConfig{DataVersion: cfg.DataVersion, Initial: initial})
+		spec.ServerConfig{DataVersion: cfg.DataVersion, Initial: initial}) //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
@@ -148,7 +153,11 @@ func (s *GridConditionsServer) SetCurrentConditions(c *GridConditions) error {
 // SetForecastConditions records ForecastConditions, FORE only
 // (electrical-grid-conditions-server.cpp:165-174; the read refuses the
 // attribute without the feature, :68-73). chip stores the list as given;
-// the generated server holds it to the definition's constraints.
+// the generated server holds it to the definition's constraints — the
+// carbon levels' enum and at most 56 entries — but not to
+// SetCurrentConditions' period rule: an entry whose PeriodEnd is not after
+// its PeriodStart, and entries out of order, are stored (review II,
+// R2-P6-wire-1613, kept as chip's).
 func (s *GridConditionsServer) SetForecastConditions(forecast []GridConditions) error {
 	if !s.HasFeature("FORE") {
 		return errors.New("energy: ElectricalGridConditions: ForecastConditions needs the Forecasting feature")
