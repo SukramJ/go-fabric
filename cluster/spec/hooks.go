@@ -52,8 +52,11 @@ func (h *Hooks) Handle(cmdID uint32, fn CommandHandler) error {
 // false when the host registered none, and the server's own logic runs.
 // The hooks hold no read of the server's state: a request or response
 // conformance naming one of the cluster's attributes is not resolved.
+// Run from a self-held server's own logic behind [InvokeHeld], for the
+// instance and command InvokeHeld admitted, the request is not held a
+// second time (decision 177).
 func (h *Hooks) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
-	if h.inst != nil {
+	if h.inst != nil && !admittedBy(ctx, h.inst, cmdID) {
 		if err := h.inst.admitRequest(ctx, cmdID, fields, nil); err != nil {
 			return nil, true, err
 		}

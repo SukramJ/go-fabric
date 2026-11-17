@@ -154,13 +154,18 @@ type ControlServer struct {
 	// change the drive reports between commands (an arrival, an error)
 	// reaches subscribers for exactly those attributes.
 	cluster.AttributeChanges
-	// Hooks was the server's command, event and veto path.
+	// Hooks was the server's command, event and veto path. It is kept for
+	// the deprecation window: bound to the server's instance, endpoint and
+	// emitter, with every handler [ControlServer.Handle] registers and
+	// the veto [ControlServer.SetBeforeWrite] installs mirrored into it,
+	// so its promoted Invoke and CheckWrite behave as before; and a
+	// handler registered on the field itself (srv.Hooks.Handle) answers
+	// its command when Handle registered none for it (decision 177).
 	//
 	// Deprecated: the server routes its commands through [spec.InvokeHeld]
 	// and declares Handle, Emit, EmitEvent and SetBeforeWrite itself
-	// (review II, decision 154); the field is still bound to the server's
-	// instance and emitter, but a handler registered or a veto set on it
-	// directly is not consulted. Removable in the next minor release.
+	// (review II, decision 154): register a host handler with
+	// [ControlServer.Handle]. Removable in the next minor release.
 	spec.Hooks //nolint:staticcheck // the deprecated field keeps its exact shape for the deprecation window
 
 	// held routes MatterInvoke through [spec.InvokeHeld] — the request
@@ -282,10 +287,15 @@ func New(cfg Config) (*ControlServer, error) {
 }
 
 // Handle implements [spec.CommandRegistrar] ([spec.SelfHeld.Handle]): the
-// host's handler of cmdID replaces the server's own handling of it; nil
-// hands it back.
+// host's handler of cmdID replaces the server's own handling of it, and a
+// handler registered on the deprecated [ControlServer.Hooks] field; nil
+// hands it back. It is mirrored into that field, so the promoted Invoke
+// runs it as before.
 func (s *ControlServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
-	return s.held.Handle(cmdID, fn)
+	if err := s.held.Handle(cmdID, fn); err != nil {
+		return err
+	}
+	return s.Hooks.Handle(cmdID, fn) //nolint:staticcheck // mirrored into the deprecated field for its window
 }
 
 // Emit implements [spec.EventEmitting]: eventID with data on endpoint at
@@ -301,9 +311,12 @@ func (s *ControlServer) EmitEvent(eventID uint32, data any) error {
 }
 
 // SetBeforeWrite implements [spec.BeforeWriteSetter] ([spec.WriteVeto]).
-// Every ClosureControl attribute is read-only, so no write reaches it.
+// Every ClosureControl attribute is read-only, so no write reaches it. It
+// is mirrored into the deprecated [ControlServer.Hooks] field, so the
+// promoted CheckWrite runs it as before.
 func (s *ControlServer) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, value any) error) {
 	s.veto.Set(fn)
+	s.Hooks.SetBeforeWrite(fn) //nolint:staticcheck // mirrored into the deprecated field for its window
 }
 
 // has reports whether the advertised FeatureMap carries feature.
@@ -416,9 +429,15 @@ func (s *ControlServer) MatterInvoke(
 }
 
 // invoke is the server's own MoveTo, Stop and Calibrate, which
-// [spec.InvokeHeld] runs when the host registered no handler; the
-// commands run one at a time (op).
+// [spec.InvokeHeld] runs when the host registered no handler with
+// [ControlServer.Handle]; the commands run one at a time (op). A handler
+// registered on the deprecated [ControlServer.Hooks] field answers first,
+// outside op as before decision 154 (decision 177); the request
+// InvokeHeld admitted is not held a second time there.
 func (s *ControlServer) invoke(ctx context.Context, cmdID uint32, fields any) (response any, err error) {
+	if resp, handled, err := s.Hooks.Invoke(ctx, cmdID, fields); handled { //nolint:staticcheck // the deprecated field's handler, honoured for its window
+		return resp, err
+	}
 	s.op <- struct{}{}
 	defer func() { <-s.op }()
 	// [spec.InvokeHeld] hands over an accepted command only: MoveTo,

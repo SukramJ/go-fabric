@@ -452,9 +452,9 @@ type Server struct {
 	// for the deprecation window: the server binds it to its instance and
 	// mirrors into it every host handler ([Server.Handle]), write veto
 	// ([Server.SetBeforeWrite]), endpoint and emitter, so its promoted
-	// methods behave as before. MatterInvoke no longer runs through it,
-	// and a handler registered on the field itself (srv.Hooks.Handle)
-	// reaches only the field.
+	// methods behave as before. MatterInvoke runs through [spec.InvokeHeld];
+	// a handler registered on the field itself (srv.Hooks.Handle) answers
+	// ChangeToMode when Handle registered none (decision 177).
 	//
 	// Deprecated: the command path is [spec.SelfHeld] with
 	// [spec.InvokeHeld] (decision 154): register a host handler with
@@ -480,8 +480,10 @@ type Server struct {
 
 // Handle implements [spec.CommandRegistrar]: the host's handler of cmdID
 // replaces the server's own ChangeToMode on the command path
-// ([spec.SelfHeld.Handle]); it is mirrored into the deprecated
-// [Server.Hooks] so that [Server.Invoke] runs it as before.
+// ([spec.SelfHeld.Handle]), and a handler registered on the deprecated
+// [Server.Hooks] field; it is mirrored into that field so that
+// [Server.Invoke] runs it as before, and nil hands the command back on
+// both.
 func (s *Server) Handle(cmdID uint32, fn spec.CommandHandler) error {
 	if err := s.SelfHeld.Handle(cmdID, fn); err != nil {
 		return err
@@ -822,8 +824,16 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	return spec.InvokeHeld(ctx, &s.SelfHeld, cmdID, fields)
 }
 
-// changeToMode is the server's own ChangeToMode.
+// changeToMode is the server's own ChangeToMode, which [spec.InvokeHeld]
+// runs when the host registered no handler with [Server.Handle]. A
+// handler registered on the deprecated [Server.Hooks] field answers
+// first, ahead of the request's decoding and outside cmd as before
+// decision 154 (decision 177); the request InvokeHeld admitted is not
+// held a second time there.
 func (s *Server) changeToMode(ctx context.Context, fields any) (any, error) {
+	if resp, handled, err := s.Hooks.Invoke(ctx, CmdChangeToMode, fields); handled { //nolint:staticcheck // the deprecated field's handler, honoured for its window
+		return resp, err
+	}
 	newMode, ok := changeToModeRequest(fields)
 	if !ok {
 		return nil, statusError{im.StatusInvalidCommand, fmt.Sprintf("modebase: ChangeToMode fields %T", fields)}

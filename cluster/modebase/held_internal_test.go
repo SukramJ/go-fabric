@@ -85,3 +85,54 @@ func TestDeprecatedHooksKeepTheirBehaviour(t *testing.T) {
 		t.Error("an event ModeBase does not define was emitted")
 	}
 }
+
+// TestDeprecatedHooksHandlerAnswersChangeToMode (decision 177): a handler
+// registered through the deprecated Hooks field answers ChangeToMode when
+// no handler is registered with Handle, as it did before decision 154;
+// with both registered, Handle's runs, and Handle(nil) — mirrored into the
+// field — hands the command back to the server's own logic.
+func TestDeprecatedHooksHandlerAnswersChangeToMode(t *testing.T) {
+	s, err := NewRvcRunMode(Config{Changer: heldChanger{}, SupportedModes: []ModeOption{
+		{Label: "Idle", Mode: 0, Tags: []ModeTag{{Value: RvcRunTagIdle}}},
+		{Label: "Cleaning", Mode: 1, Tags: []ModeTag{{Value: RvcRunTagCleaning}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ran []string
+	if err := s.Hooks.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { //nolint:staticcheck // the deprecated field is the subject
+		ran = append(ran, "Hooks")
+		return nil, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	req := rvcrunmode.ChangeToModeRequest{NewMode: 1}
+	if _, err := s.MatterInvoke(context.Background(), CmdChangeToMode, req); err != nil || len(ran) != 1 || currentOf(s) != 0 {
+		t.Fatalf("ChangeToMode with a handler on the deprecated field: %v, ran %v, CurrentMode %d; want the field's handler and no change", err, ran, currentOf(s))
+	}
+	if err := s.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { ran = append(ran, "Handle"); return nil, nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Hooks.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { //nolint:staticcheck // the deprecated field is the subject
+		ran = append(ran, "Hooks")
+		return nil, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MatterInvoke(context.Background(), CmdChangeToMode, req); err != nil || len(ran) != 2 || ran[1] != "Handle" {
+		t.Fatalf("ChangeToMode with both handlers: %v, ran %v; want Handle's", err, ran)
+	}
+	if err := s.Handle(CmdChangeToMode, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MatterInvoke(context.Background(), CmdChangeToMode, req); err != nil || len(ran) != 2 || currentOf(s) != 1 {
+		t.Errorf("ChangeToMode after Handle(nil): %v, ran %v, CurrentMode %d; want the server's own change to 1", err, ran, currentOf(s))
+	}
+}
+
+// currentOf reads the server's CurrentMode under its lock.
+func currentOf(s *Server) uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.current
+}
