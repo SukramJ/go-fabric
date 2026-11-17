@@ -594,11 +594,12 @@ func TestSessionOrderKey(t *testing.T) {
 		key  uint32
 		want bool
 	}{
-		"unicast secure":        {[]byte{0x00, 0x34, 0x12, 0x00}, 0x1234, true},
-		"unsecured, no node id": {unsecured(nil, nil), 0, false},
-		"group":                 {[]byte{0x00, 0x34, 0x12, 0x01}, 0, false},
-		"short":                 {[]byte{0x00, 0x34}, 0, false},
-		"unsecured, short":      {unsecured(&a, nil)[:10], 0, false},
+		"unicast secure":               {[]byte{0x00, 0x34, 0x12, 0x00}, 0x1234, true},
+		"unsecured, no node id":        {unsecured(nil, nil), 0, false},
+		"group":                        {[]byte{0x00, 0x34, 0x12, 0x01}, 0, false},
+		"short":                        {[]byte{0x00, 0x34}, 0, false},
+		"unsecured, short":             {unsecured(&a, nil)[:10], 0, false},
+		"unsecured, short destination": {unsecured(&a, &b)[:20], 0, false},
 	} {
 		key, ok := SessionOrderKey(tc.buf)
 		if ok != tc.want || (ok && key != tc.key) {

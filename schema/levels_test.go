@@ -111,6 +111,19 @@ func TestLevelAccessors(t *testing.T) {
 		!schema.DeviceTypeLevels(0x0301).Has("1.4") {
 		t.Error("an element every level knows is missing")
 	}
+	// Thermostat command 2 is a request up to 1.4.2 and a response from
+	// 1.6.0 (R2-P6-par-2713): the directed lookups keep them apart, the
+	// deprecated union answers both.
+	req, resp := schema.ClusterRequestCommandLevels(thermostat, 2), schema.ClusterResponseCommandLevels(thermostat, 2)
+	if got := req.Levels(); len(got) != 3 || got[0] != "1.4" || got[2] != "1.4.2" {
+		t.Errorf("request 2 levels = %v, want [1.4 1.4.1 1.4.2]", got)
+	}
+	if got := resp.Levels(); len(got) != 2 || got[0] != "1.6.0" || got[1] != "1.6.1" {
+		t.Errorf("response 2 levels = %v, want [1.6.0 1.6.1]", got)
+	}
+	if got := schema.ClusterCommandLevels(thermostat, 2); got != req|resp { //nolint:staticcheck // the deprecated union is pinned until its removal
+		t.Errorf("ClusterCommandLevels(Thermostat, 2) = %v, want the union %v", got.Levels(), (req | resp).Levels())
+	}
 	if schema.ClusterLevels(0xFFFF_FFFF) != 0 || schema.ClusterFeatureLevels(0xFFFF_FFFF, 0) != 0 ||
 		schema.ClusterAttributeLevels(0xFFFF_FFFF, 0) != 0 || schema.ClusterRequestCommandLevels(0xFFFF_FFFF, 0) != 0 ||
 		schema.ClusterResponseCommandLevels(0xFFFF_FFFF, 0) != 0 ||

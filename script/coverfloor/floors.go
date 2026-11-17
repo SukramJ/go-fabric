@@ -169,7 +169,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 93},
 	// Brief BG: measured 86.9; the uncovered part is the error paths of a
 	// host that fails to build or listen, which fail the test through tb.
-	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 88},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
 		min: 90,
@@ -320,7 +320,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/testquality", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/requiredchecks", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/sqlitedsn", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 40, why: "the dump parser, the writer and the table half of run are tested (measured 41.0); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
+	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 59, why: "the dump parser, the writer, the table half of run and measureInternal's deadline are tested (measured 59.7); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen/leveltable", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/script/profilegen", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/surfacecheck", min: 54, why: "the summary and the committed snapshot are tested (measured 50.9); run, which builds and runs the reference daemon, is exercised by make surface-check"},

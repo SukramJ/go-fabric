@@ -428,3 +428,37 @@ func TestPeerOpenedHandshakeOnInitiatedSessionIsRefused(t *testing.T) {
 		})
 	}
 }
+
+// TestHandshakePlaceIsGivenUpOnce: the place a held handshake takes is
+// given up once — a second release of the same exchange reports false and
+// changes nothing — and the session then holds no handshake, so the next
+// Sigma1 is served (review II, R2-P6-par-2902).
+func TestHandshakePlaceIsGivenUpOnce(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		m, _, _ := newTestManager(t, Config{})
+		release := make(chan struct{})
+		defer close(release)
+		h, calls := recordingHandler(release)
+		m.SetProtocolHandler(mrp.SecureChannelProtocolID, h)
+		unsecuredRequest(m, 0xDDDD, 1, 0x6700, mrp.SecureChannelProtocolID, mrp.SCOpcodeSigma1, []byte{0x15, 0x18})
+		synctest.Wait()
+		x := waitHandled(t, calls).x
+		s := x.Session()
+		if held := s.heldHandshake(); held != x {
+			t.Fatalf("the session holds %v, want the Sigma1's exchange", held)
+		}
+		if !s.releaseHandshakeOf(x) {
+			t.Fatal("the held place was not given up")
+		}
+		if s.releaseHandshakeOf(x) {
+			t.Fatal("the place was given up twice")
+		}
+		s.mu.Lock()
+		places := s.handshakes
+		s.mu.Unlock()
+		if held := s.heldHandshake(); held != nil || places != 0 {
+			t.Fatalf("after the release the session holds %v in %d places, want none", held, places)
+		}
+	})
+}
