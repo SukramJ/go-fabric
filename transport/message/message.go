@@ -318,34 +318,35 @@ func SessionOrderKey(datagram []byte) (uint32, bool) {
 	if !ok {
 		return 0, false
 	}
-	return unsecuredOrderKeyBase + (uint32(id)^uint32(id>>32))%(math.MaxUint32-unsecuredOrderKeyBase+1), true
+	fold := binary.LittleEndian.Uint32(id[:4]) ^ binary.LittleEndian.Uint32(id[4:])
+	return unsecuredOrderKeyBase + fold%(math.MaxUint32-unsecuredOrderKeyBase+1), true
 }
 
 // unsecuredOrderKeyBase is the lowest order key of an unsecured message,
 // above every session id ([SessionOrderKey]).
 const unsecuredOrderKeyBase = 1 << 16
 
-// unsecuredInitiatorID is the initiator's node id of an unsecured message:
-// its destination node id when it has a 64-bit one, else its source node id
-// ([SessionOrderKey]).
-func unsecuredInitiatorID(datagram []byte) (uint64, bool) {
+// unsecuredInitiatorID is the initiator's node id of an unsecured message,
+// its eight wire bytes: its destination node id when it has a 64-bit one,
+// else its source node id ([SessionOrderKey]).
+func unsecuredInitiatorID(datagram []byte) (id []byte, ok bool) {
 	const fixed = 1 + 2 + 1 + 4
 	flags := datagram[0]
 	off := fixed
-	var src uint64
+	var src []byte
 	hasSrc := flags&msgFlagSourcePres != 0
 	if hasSrc {
 		if len(datagram) < off+8 {
-			return 0, false
+			return nil, false
 		}
-		src = binary.LittleEndian.Uint64(datagram[off : off+8])
+		src = datagram[off : off+8]
 		off += 8
 	}
 	if DestSize(flags&msgFlagDSizMask) == DestNodeID {
 		if len(datagram) < off+8 {
-			return 0, false
+			return nil, false
 		}
-		return binary.LittleEndian.Uint64(datagram[off : off+8]), true
+		return datagram[off : off+8], true
 	}
 	return src, hasSrc
 }

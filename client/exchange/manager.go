@@ -1252,18 +1252,34 @@ func (m *Manager) answerBusy(s *Session, msg *Message, running *Exchange) {
 	}
 	x.onMessageReceived(msg, false)
 	x.takeFirst(msg)
-	var data [2]byte
-	binary.LittleEndian.PutUint16(data[:], busyWait(running))
-	report := StatusReport{GeneralCode: generalStatusBusy, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: secureChannelStatusBusy, ProtocolData: data[:]}
+	wait := busyWait(running)
+	x.mu.Lock()
+	x.busyWait = wait
+	x.mu.Unlock()
+	// Run as dispatch runs a handler: the exchange closes after it, and
+	// the session with it when nothing else holds it.
+	var h ProtocolHandler = m.sendBusy
 	if !m.goWork(func() {
-		if err := x.Send(context.Background(), mrp.SCOpcodeStatusReport, report.Encode(), SendOptions{}); err != nil {
-			m.log.Debug("matter.controller.busy_answer_failed", slog.Int("exchange_id", int(x.id)), slog.Any("err", err))
-		}
+		h(x, msg)
 		x.Close()
 		<-x.Done()
 		m.releaseInbound(s)
 	}) {
 		x.Close()
+	}
+}
+
+// sendBusy sends the Busy StatusReport of [Manager.answerBusy] on x, the
+// refused Sigma1's exchange, with the minimum wait time answerBusy set.
+func (m *Manager) sendBusy(x *Exchange, _ *Message) {
+	x.mu.Lock()
+	wait := x.busyWait
+	x.mu.Unlock()
+	var data [2]byte
+	binary.LittleEndian.PutUint16(data[:], wait)
+	report := StatusReport{GeneralCode: generalStatusBusy, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: secureChannelStatusBusy, ProtocolData: data[:]}
+	if err := x.Send(context.Background(), mrp.SCOpcodeStatusReport, report.Encode(), SendOptions{}); err != nil {
+		m.log.Debug("matter.controller.busy_answer_failed", slog.Int("exchange_id", int(x.id)), slog.Any("err", err))
 	}
 }
 

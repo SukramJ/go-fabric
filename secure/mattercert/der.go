@@ -60,17 +60,8 @@ func DecodeDER(der []byte) (*Certificate, error) {
 	}
 	idx := 0
 	if fields[idx].Class == asn1.ClassContextSpecific && fields[idx].Tag == 0 {
-		// The version [0]: its first element an INTEGER with content; the
-		// value itself is not refused. Mirrors matter.js
-		// packages/protocol/src/certificate/kinds/Certificate.ts:698-706
-		// and derUnsignedInteger (:399-406) at db021da0 (review II,
-		// R2-P6-par-3208).
-		version, err := derChildren(fields[idx].Bytes)
-		if err != nil || len(version) == 0 || version[0].Class != asn1.ClassUniversal || version[0].Tag != asn1.TagInteger || version[0].IsCompound {
-			return nil, fmt.Errorf("%w: invalid certificate version structure", ErrMalformed)
-		}
-		if len(version[0].Bytes) == 0 {
-			return nil, fmt.Errorf("%w: certificate version is an INTEGER without content", ErrMalformed)
+		if err := derVersion(fields[idx]); err != nil {
+			return nil, err
 		}
 		idx++
 	}
@@ -129,6 +120,21 @@ func DecodeDER(der []byte) (*Certificate, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// derVersion checks the TBSCertificate's version [0]: its first element an
+// INTEGER with content; the value itself is not refused. Mirrors matter.js
+// packages/protocol/src/certificate/kinds/Certificate.ts:698-706 and
+// derUnsignedInteger (:399-406) at db021da0 (review II, R2-P6-par-3208).
+func derVersion(field asn1.RawValue) error {
+	version, err := derChildren(field.Bytes)
+	if err != nil || len(version) == 0 || version[0].Class != asn1.ClassUniversal || version[0].Tag != asn1.TagInteger || version[0].IsCompound {
+		return fmt.Errorf("%w: invalid certificate version structure", ErrMalformed)
+	}
+	if len(version[0].Bytes) == 0 {
+		return fmt.Errorf("%w: certificate version is an INTEGER without content", ErrMalformed)
+	}
+	return nil
 }
 
 // EncodeDER is c as a signed X.509 DER certificate — asSignedDer

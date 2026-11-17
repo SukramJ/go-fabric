@@ -24,7 +24,7 @@ type resumeRig struct {
 	p   *pipelinePeer
 }
 
-func newResumeRig(t *testing.T, provided bool) (*resumeRig, []byte) {
+func newResumeRig(t *testing.T, provided bool) (rr *resumeRig, sigma1 []byte) {
 	t.Helper()
 	clk := clocktest.New(time.Unix(1_700_000_000, 0))
 	r := newUnsecuredRigOn(t, clk)

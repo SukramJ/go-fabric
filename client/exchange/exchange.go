@@ -239,8 +239,12 @@ type Exchange struct {
 	// acknowledgement; waitTimeout the timeout of the last wait for the
 	// peer's next message ([Exchange.Next]). A Sigma1 refused for the
 	// handshake this exchange runs reads both ([Manager.answerBusy]).
-	sentOpcode    uint8
-	waitTimeout   time.Duration
+	sentOpcode  uint8
+	waitTimeout time.Duration
+	// busyWait is, on the exchange of a refused Sigma1, the minimum wait
+	// time its Busy answer states ([Manager.sendBusy]); set before the
+	// answer runs.
+	busyWait      uint16
 	closing       bool
 	closed        bool
 	closeCause    error
