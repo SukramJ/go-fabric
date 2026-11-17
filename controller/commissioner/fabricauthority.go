@@ -34,10 +34,14 @@ type FabricAuthority struct {
 	ca  *ca.CA
 	log *slog.Logger
 
-	mu      sync.Mutex
-	rotated map[uint8]bool // #rotatedFabricIndices (:57)
-	added   map[int]func(*Fabric)
-	nextObs int
+	// mu guards the maps below and is never held across a signer or a
+	// store; rotateMu serialises the rotations, which reach both (review
+	// II, R2-P6-conc-1858 (c), ADR 0026 P6).
+	mu       sync.Mutex
+	rotateMu sync.Mutex
+	rotated  map[uint8]bool // #rotatedFabricIndices (:57)
+	added    map[int]func(*Fabric)
+	nextObs  int
 }
 
 // NewFabricAuthority returns the authority of c; a nil logger discards.
@@ -68,11 +72,25 @@ func (a *FabricAuthority) OnFabricAdded(fn func(*Fabric)) (unsubscribe func()) {
 }
 
 // CreateFabric mints a new fabric under the authority's CA and saves it in
-// cfg.Store, whatever the store held — createFabric (:119-173): our node
-// id, the IPK, the admin vendor id (reserved ones refused), the label, the
-// NOC; then fabricAdded.
+// cfg.Store — createFabric (:119-173): our node id, the IPK, the admin
+// vendor id (reserved ones refused), the label, the NOC; then
+// fabricAdded. A store that holds a fabric already is an error and keeps
+// its record: the store holds one fabric, and replacing it would drop the
+// key, NOC and IPK every node commissioned before trusts — matter.js's
+// createFabric refuses an index in use (:164-167). Replacing a fabric is
+// erasing the controller's state first (review II, R2-P6-api-1859, owner
+// decision 191).
 func (a *FabricAuthority) CreateFabric(cfg FabricConfig) (*Fabric, error) {
 	store := cfg.Store
+	if store != nil {
+		_, found, err := store.LoadFabric()
+		if err != nil {
+			return nil, fmt.Errorf("commissioner: load fabric: %w", err)
+		}
+		if found {
+			return nil, errFabricExists
+		}
+	}
 	cfg.Store = nil
 	f, err := newFabric(a.ca, cfg)
 	if err != nil {
@@ -139,6 +157,9 @@ func (a *FabricAuthority) DefaultFabric(cfg FabricConfig, rotateNOC bool) (*Fabr
 	return f, nil
 }
 
+// errFabricExists is CreateFabric on a store that holds a fabric.
+var errFabricExists = errors.New("commissioner: the store holds a fabric already; CreateFabric does not replace it")
+
 // ErrNodeIDChanged is a stored fabric whose NOC names another node than
 // the fabric's root node id: its key cannot be rotated (:190-193).
 var ErrNodeIDChanged = errors.New("commissioner: cannot rotate the NOC because the node id changed")
@@ -146,9 +167,12 @@ var ErrNodeIDChanged = errors.New("commissioner: cannot rotate the NOC because t
 // rotate is #rotateFabricNocKey (:181-205): once per fabric index and
 // authority.
 func (a *FabricAuthority) rotate(f *Fabric, cfg FabricConfig) (*Fabric, error) {
+	a.rotateMu.Lock()
+	defer a.rotateMu.Unlock()
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.rotated[f.FabricIndex] {
+	done := a.rotated[f.FabricIndex]
+	a.mu.Unlock()
+	if done {
 		return f, nil
 	}
 	noc, err := mattercert.Decode(f.Identity.NOC)
@@ -190,6 +214,8 @@ func (a *FabricAuthority) rotate(f *Fabric, cfg FabricConfig) (*Fabric, error) {
 		}
 	}
 	a.log.Info("matter.controller.fabric.noc_rotated", slog.Int("fabric_index", int(f.FabricIndex)))
+	a.mu.Lock()
 	a.rotated[f.FabricIndex] = true
+	a.mu.Unlock()
 	return rotated, nil
 }
