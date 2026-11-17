@@ -333,11 +333,6 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 			return nil, fmt.Errorf("node: endpoint assembler: %w", err)
 		}
 		n.agg = &Aggregator{n: n}
-		// A forget a refused write or a crash left half done is finished
-		// before the host adds anything (review II, R2-P6-store-2406).
-		if err := n.agg.finishForgets(ctx); err != nil {
-			return nil, err
-		}
 		snapshotter = n.agg.snapshot
 	}
 	// The binding manager reads the topology the bridge serves.
@@ -400,7 +395,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// reads the fabric's KeySets, which GroupKeyManagementServer.keySetWrite
 	// replaced in place).
 	n.groups.OnGroupcastChanged(n.caseIDs.refreshIPK)
-	if err := n.buildLevelledRoot(ctx, rootDeps{
+	if err := n.buildRestoredRoot(ctx, rootDeps{
 		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: peerPath{n},
 		wifiDriver:              n.wifiDriver(),
 		onWiFiConnected:         n.wifiConnected,
@@ -408,9 +403,6 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 		onCommissioningComplete: n.commissioningCompleted,
 		onFailSafeExpired:       n.failSafeExpired,
 	}); err != nil {
-		return nil, err
-	}
-	if err := n.persisted.restoreRoot(ctx, n.root.BasicInformation); err != nil {
 		return nil, err
 	}
 	n.bootReason = n.root.bootReason
@@ -590,6 +582,30 @@ func openCredentials(ctx context.Context, sc Store) (*store.Store, error) {
 		return nil, fmt.Errorf("node: open the sealed store: %w", err)
 	}
 	return st, nil
+}
+
+// buildRestoredRoot builds the root (buildLevelledRoot) and restores what
+// the store keeps for it (restoreStored).
+func (n *Node) buildRestoredRoot(ctx context.Context, d rootDeps) error {
+	if err := n.buildLevelledRoot(ctx, d); err != nil {
+		return err
+	}
+	return n.restoreStored(ctx)
+}
+
+// restoreStored is New's restore of what the store keeps for the node
+// itself: the root's NodeLabel, Location and ConfigurationVersion
+// (restoreRoot), and the forgets a refused write or a crash left half
+// done, finished before the host adds anything (review II,
+// R2-P6-store-2406).
+func (n *Node) restoreStored(ctx context.Context) error {
+	if err := n.persisted.restoreRoot(ctx, n.root.BasicInformation); err != nil {
+		return err
+	}
+	if n.agg != nil {
+		return n.agg.finishForgets(ctx)
+	}
+	return nil
 }
 
 // abandon releases what a New that failed had begun: the node's

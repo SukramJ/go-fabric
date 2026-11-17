@@ -357,14 +357,6 @@ func (c *caseIdentities) admissible(fabricIndex uint8, gen uint64) error {
 	return nil
 }
 
-// generation is the load of fabricIndex's current identity, 0 for none.
-func (c *caseIdentities) generation(fabricIndex uint8) uint64 {
-	if f, ok := c.forFabric(fabricIndex); ok {
-		return f.gen
-	}
-	return 0
-}
-
 // current returns the most recently installed identity, or nil before the
 // first AddNOC.
 func (c *caseIdentities) current() *caseFabric {

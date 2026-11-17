@@ -80,18 +80,17 @@ func (p persisted) reserve(ctx context.Context, tree []string) error {
 	return errors.Join(errs...)
 }
 
-// release drops the reservation key holds, under every key of its tree;
-// it returns the tree (nil without a reservation).
-func (p persisted) release(ctx context.Context, key string) ([]string, error) {
+// release drops the reservation key holds, under every key of its tree.
+func (p persisted) release(ctx context.Context, key string) error {
 	tree, err := p.reservedTree(ctx, key)
 	if err != nil || tree == nil {
-		return nil, err
+		return err
 	}
 	var errs []error
 	for _, k := range tree {
 		errs = append(errs, p.st.SetSetting(ctx, endpointReservedKeyRoot+k, ""))
 	}
-	return tree, errors.Join(errs...)
+	return errors.Join(errs...)
 }
 
 // reservationOp is one change a [Batch] makes to the reservations, applied
@@ -123,8 +122,7 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 		case opReserve:
 			errs = append(errs, p.reserve(ctx, op.tree))
 		case opRelease:
-			_, err := p.release(ctx, op.key)
-			errs = append(errs, err)
+			errs = append(errs, p.release(ctx, op.key))
 		case opErase:
 			errs = append(errs, a.erase(ctx, op))
 		}
@@ -165,7 +163,7 @@ func (a *Aggregator) erase(ctx context.Context, op reservationOp) error {
 func (a *Aggregator) forgetKeys(ctx context.Context, keys []string) error {
 	var errs []error
 	for _, k := range keys {
-		if _, err := a.n.persisted.release(ctx, k); err != nil {
+		if err := a.n.persisted.release(ctx, k); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -278,7 +276,7 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 		if rec.Key == nil {
 			continue
 		}
-		if _, err := a.n.persisted.release(ctx, rec.Key.String()); err != nil {
+		if err := a.n.persisted.release(ctx, rec.Key.String()); err != nil {
 			errs = append(errs, err)
 		}
 		errs = append(errs, store.RemoveEndpoint(ctx, rec.Key))

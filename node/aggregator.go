@@ -551,8 +551,9 @@ func (b *Batch) dropLocked(part *partition, i int, key string) {
 func (a *Aggregator) servesLocked(key string) bool {
 	for _, p := range a.parts {
 		for _, ep := range p.eps {
-			for _, e := range surfaceEntries(ep) {
-				if e.key == key {
+			entries := surfaceEntries(ep)
+			for i := range entries {
+				if entries[i].key == key {
 					return true
 				}
 			}
