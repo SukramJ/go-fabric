@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9880,
+  "entry_points": 9882,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19419,
+    "total_exported": 19421,
     "reachable": 12659,
-    "whitelisted": 6760,
+    "whitelisted": 6762,
     "unreachable": 0
   },
   "by_package": [],
@@ -3856,7 +3856,7 @@
       "identifier": "TestFabricUpdateAbortsPendingInitiation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_initiation_fabric_updated_test.go",
-      "line": 24
+      "line": 25
     },
     {
       "package": "bridge",
@@ -9002,6 +9002,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
       "line": 54
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestHandshakePlaceIsGivenUpOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/unsecured_bounds_test.go",
+      "line": 436
     },
     {
       "package": "client/exchange",
@@ -28062,7 +28069,7 @@
       "identifier": "TestBitRateSearchTerminatesBelowZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/bits32_internal_test.go",
-      "line": 33
+      "line": 37
     },
     {
       "package": "controller/camera",
@@ -28426,7 +28433,7 @@
       "identifier": "TestPixelArithmeticIsInt64",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/bits32_internal_test.go",
-      "line": 94
+      "line": 98
     },
     {
       "package": "controller/camera",
@@ -28559,7 +28566,7 @@
       "identifier": "TestRequestedResolutionIsAtLeastOne",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/bits32_internal_test.go",
-      "line": 121
+      "line": 125
     },
     {
       "package": "controller/camera",
@@ -29035,7 +29042,7 @@
       "identifier": "TestUint32ValuesSaturateAtTheIntCeiling",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/bits32_internal_test.go",
-      "line": 66
+      "line": 70
     },
     {
       "package": "controller/camera",
@@ -36693,14 +36700,14 @@
       "identifier": "TestR2P6Sec3320Concurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/resume_replay_internal_test.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "fabrictest",
       "identifier": "TestR2P6Sec3320Replay",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/resume_replay_internal_test.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "fabrictest",
@@ -39396,6 +39403,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/attestids/attestids_test.go",
       "line": 86
+    },
+    {
+      "package": "internal/attestids",
+      "identifier": "TestFromRawNameStructure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/attestids/raw_name_structure_test.go",
+      "line": 14
     },
     {
       "package": "internal/attestids",
