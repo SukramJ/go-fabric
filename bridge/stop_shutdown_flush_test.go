@@ -69,7 +69,7 @@ func TestStopFlushesTheSubscriptionsBeforeTheSessionsEnd(t *testing.T) {
 	}
 	mgr.OnAttributeChanged(path)
 	flushed := map[uint32]bool{}
-	mgr.SetFlushReporter(func(_ context.Context, sub *subscription.Subscription, _ []im.EventReport, paths []im.ConcreteAttributePath) {
+	mgr.SetFlushReporter(func(_ context.Context, sub *subscription.Subscription, _ []im.EventReport, paths []im.ConcreteAttributePath) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 		mu.Lock()
 		flushed[sub.ID] = len(paths) > 0
 		mu.Unlock()

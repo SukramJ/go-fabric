@@ -489,9 +489,9 @@ func wireSecurity(
 	br.AttachSessionLookup(lookup)
 	br.AttachAckTracker(mrp.NewAckTracker(mrp.DefaultStandaloneAckDelay))
 
-	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), br.SubscriptionReporter(), logger)
-	subs.SetEventReporter(br.SubscriptionEventReporter())
-	subs.SetFlushReporter(br.SubscriptionFlushReporter())
+	// The attach installs the bridge's report sender: every report of
+	// the manager goes out through it (review II, R2-P6-api-0508).
+	subs := subscription.NewManager(limits.subscriptionConfig(br.Clock()), nil, logger)
 	br.AttachSubscriptionManager(subs)
 	// One close hook, two observers: the session's subscriptions fall
 	// with it, and the bridge forgets its route — closing a TCP

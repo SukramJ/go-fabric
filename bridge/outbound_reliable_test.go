@@ -597,6 +597,7 @@ func TestReport_PeerUnreachable_ClosesSubscriptionWithoutMRP(t *testing.T) {
 
 	b := newStartedBridge(t)
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	mgr.SetReportSender(b.sendSubscriptionReport) // the manager is not attached
 
 	b.mu.Lock()
 	b.subManager = mgr
@@ -658,6 +659,7 @@ func TestReport_PeerUnreachable_RetriesBeforeEviction(t *testing.T) {
 
 	b := newStartedBridge(t)
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	mgr.SetReportSender(b.sendSubscriptionReport) // the manager is not attached
 
 	b.mu.Lock()
 	b.subManager = mgr

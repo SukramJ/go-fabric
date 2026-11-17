@@ -44,8 +44,7 @@ func TestReportWhoseEventsAreAllFilteredGoesOutEmpty(t *testing.T) {
 		t.Helper()
 		b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
 		peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
-		m = subscription.NewManager(subscription.Config{}, b.SubscriptionReporter(), nil)
-		m.SetEventReporter(b.SubscriptionEventReporter())
+		m = subscription.NewManager(subscription.Config{}, nil, nil)
 		b.AttachSubscriptionManager(m)
 		sub, err := m.Subscribe(subscription.SubscribeArgs{
 			FabricIndex: 1, PeerNodeID: 0xBBBB5555, SessionID: sessionID,

@@ -31,7 +31,7 @@ func TestEventInThePrimingReportIsNotReportedAgain(t *testing.T) {
 	attachPASETestPeer(t, b)
 	var mu sync.Mutex
 	var later []im.EventReport
-	mgr.SetEventReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport) {
+	mgr.SetEventReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 		mu.Lock()
 		later = append(later, events...)
 		mu.Unlock()
@@ -105,7 +105,7 @@ func TestReestablishedSubscriptionEventInThePrimingReportIsNotReportedAgain(t *t
 	b.AttachSessionLookup(caseOnFabricLookup{SessionLookup: lookup, id: paseTestSessionID, fabric: fabric})
 	var mu sync.Mutex
 	var later []im.EventReport
-	mgr.SetEventReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport) {
+	mgr.SetEventReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 		mu.Lock()
 		later = append(later, events...)
 		mu.Unlock()

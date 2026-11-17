@@ -50,7 +50,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 			r.mu.Unlock()
 			r.b.reportSubscription(ctx, sub, paths)
 		}, nil)
-		r.m.SetEventReporter(func(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
+		r.m.SetEventReporter(func(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 			r.mu.Lock()
 			r.events = append(r.events, events)
 			r.mu.Unlock()
@@ -123,7 +123,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		// What the failed retry owes again, read through a flush.
 		var owedEvents []im.EventReport
 		var owedPaths []im.ConcreteAttributePath
-		r.m.SetFlushReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport, paths []im.ConcreteAttributePath) {
+		r.m.SetFlushReporter(func(_ context.Context, _ *subscription.Subscription, events []im.EventReport, paths []im.ConcreteAttributePath) { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 			owedEvents, owedPaths = events, paths
 		})
 		r.m.FlushFabric(context.Background(), 1, 0)
@@ -138,7 +138,7 @@ func TestFailedReportRetriesTheSameDataParity(t *testing.T) {
 		if len(r.events[1]) != 1 || r.events[1][0].Number != r.events[0][0].Number {
 			t.Errorf("retry reported %+v, want event %d again", r.events[1], r.events[0][0].Number)
 		}
-		if r.sub.TakeDuePaths() != nil {
+		if r.sub.TakeDuePaths() != nil { //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 			t.Error("paths left on the subscription after the reports")
 		}
 	})

@@ -146,12 +146,19 @@ func maxScheduleTime(idle, active, threshold time.Duration, isActive bool, pad t
 //     the freshly-allocated SubscriptionID).
 //  2. SubscribeResponse carrying SubscriptionID + MaxInterval.
 //
-// The manager's engine ticks ongoing reports through the
-// [Bridge.SubscriptionReporter] callback the daemon plumbs into
-// [subscription.NewManager]; that callback re-reads the cached
-// values and ships a fresh ReportData over the original commissioner
-// session, looked up via [exchangeRouting.subTargets] (populated here on
-// successful Subscribe).
+// The attach installs the bridge's [subscription.ReportSender] on m
+// ([subscription.Manager.SetReportSender]): every report of the manager —
+// the ongoing reports with their events and attribute changes, the
+// keep-alives, the flush before a fabric or a session leaves — goes out
+// through it, re-reading the values and shipping a fresh ReportData over
+// the original commissioner session, looked up via
+// [exchangeRouting.subTargets] (populated here on successful Subscribe).
+// Nothing else is to wire: a manager built with
+// subscription.NewManager(cfg, nil, logger) and attached here reports
+// everything (review II, R2-P6-api-0508, owner decision 138). A manager
+// the host wired with the deprecated hooks ([Bridge.SubscriptionReporter],
+// [Bridge.SubscriptionEventReporter], [Bridge.SubscriptionFlushReporter])
+// keeps reporting through them for the deprecation window.
 //
 // Pass nil to revert to noop. The initial ReportData is still built
 // and streamed in full — buildInitialReport runs off the dispatcher and
@@ -213,7 +220,29 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// them from the bridge's log (matter.js ServerSubscription.ts
 		// :541-542 reads the occurrence store at send time).
 		m.SetEventSource(b.eventLog)
+		// The one hook every report goes through.
+		m.SetReportSender(b.sendSubscriptionReport)
 	}
+}
+
+// sendSubscriptionReport is the bridge's [subscription.ReportSender]: a
+// flush goes out as the flush's one ReportData ([Bridge.reportSubscriptionFlush]),
+// a report with events as one ReportData of the events and the attribute
+// changes due with them ([Bridge.reportSubscriptionEvents]), anything else
+// as an attribute report, empty for a keep-alive
+// ([Bridge.reportSubscription]). It sends a pass whose data is all filtered
+// for the subscriber empty and counts it (owner decision 169), so its
+// outcome is always [subscription.Sent].
+func (b *Bridge) sendSubscriptionReport(ctx context.Context, sub *subscription.Subscription, r subscription.Report) subscription.ReportOutcome {
+	switch {
+	case r.Flush:
+		b.reportSubscriptionFlush(ctx, sub, r.Events, r.Paths)
+	case len(r.Events) > 0:
+		b.reportEventsWith(ctx, sub, r.Events, func() []im.ConcreteAttributePath { return r.Paths })
+	default:
+		b.reportSubscription(ctx, sub, r.Paths)
+	}
+	return subscription.Sent
 }
 
 // releaseSubscriptionRouting drops every bridge-side table entry that
@@ -313,6 +342,10 @@ type subTarget struct {
 // manager's dirty-flag re-emission rather than a side replay buffer
 // — every attribute change re-marks the path dirty, so the next
 // healthy tick ships a fresh ReportData.
+//
+// Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
+// [subscription.ReportSender] itself; pass nil as
+// [subscription.NewManager]'s reporter. Removable in the next minor release.
 func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 	return b.reportSubscription
 }
@@ -327,6 +360,10 @@ func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 // [subTarget] used for attribute reports, and takes the attribute changes
 // that are due with them ([subscription.Subscription.TakeDuePaths]): one
 // ReportData carries both ([Bridge.reportSubscriptionEvents]).
+//
+// Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
+// [subscription.ReportSender] itself, which reports events too. Removable
+// in the next minor release.
 func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 	return b.reportSubscriptionEvents
 }
@@ -337,6 +374,10 @@ func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 // one subscription owes — events and attributes together — and it ships
 // them as one ReportData and waits for the peer's answer
 // ([Bridge.reportSubscriptionFlush]).
+//
+// Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
+// [subscription.ReportSender] itself, which reports the flush too.
+// Removable in the next minor release.
 func (b *Bridge) SubscriptionFlushReporter() subscription.FlushReporter {
 	return b.reportSubscriptionFlush
 }
@@ -394,16 +435,22 @@ func (b *Bridge) authorizedEventReports(ctx context.Context, target subTarget, e
 	return im.AuthorizeEventReports(ctx, auth, events)
 }
 
-// reportSubscriptionEvents assembles + ships the ReportData of a report
-// of sub that carries events: the events, and in the same message the
-// attribute changes that are due with them
-// ([subscription.Subscription.TakeDuePaths]). Called by the manager's
-// engine tick. Mirrors matter.js
+// reportSubscriptionEvents is the deprecated [subscription.EventReporter]
+// over [Bridge.reportEventsWith]: it takes the attribute changes due with
+// the events from the subscription ([subscription.Subscription.TakeDuePaths]).
+func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
+	b.reportEventsWith(ctx, sub, events, sub.TakeDuePaths) //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
+}
+
+// reportEventsWith assembles + ships the ReportData of a report of sub
+// that carries events: the events, and in the same message the attribute
+// changes that are due with them, which takePaths hands over once the
+// report is going out. Called through the manager's engine tick. Mirrors matter.js
 // packages/node/src/node/server/ServerSubscription.ts:539-555 at db021da0
 // (#sendUpdate takes the attribute filter and the events' minimum number
 // together) and :860-887, :926-936 (#iterateDataUpdate yields the
 // attributes, then the events, into one DataReport).
-func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription.Subscription, events []im.EventReport) {
+func (b *Bridge) reportEventsWith(ctx context.Context, sub *subscription.Subscription, events []im.EventReport, takePaths func() []im.ConcreteAttributePath) {
 	if sub == nil || len(events) == 0 {
 		return
 	}
@@ -415,8 +462,8 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		return
 	}
 	// The attribute changes due in this report are this reporter's from
-	// here on: sent below, or marked dirty again when the send fails.
-	paths := sub.TakeDuePaths()
+	// here on: sent below, or owed again when the send fails.
+	paths := takePaths()
 
 	// Authorize each event against the subscribing subject: a CASE
 	// subject only receives events on (endpoint, cluster) it holds at

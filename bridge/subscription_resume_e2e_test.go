@@ -603,8 +603,7 @@ func startResumeDeviceWith(t *testing.T, st SubscriptionStore, entries []store.A
 		}
 		return e.Session.PeerNodeID(), e.Session.PeerCATs(), true
 	}))
-	subs := subscription.NewManager(subscription.Config{TickInterval: 20 * time.Millisecond}, br.SubscriptionReporter(), nil)
-	subs.SetEventReporter(br.SubscriptionEventReporter())
+	subs := subscription.NewManager(subscription.Config{TickInterval: 20 * time.Millisecond}, nil, nil)
 	br.AttachSubscriptionManager(subs)
 	sessions.SetOnSessionClose(subs.CloseSession)
 	br.AttachSessionRegistry(sessions)

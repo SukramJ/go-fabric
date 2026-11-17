@@ -101,12 +101,12 @@
 //     but with HasSubscription=false and SubscriptionID=0, and no report
 //     ever follows; EmitEvent still appends to the event log and fans
 //     out to nobody. The controller sees a successful subscribe and a
-//     device that never changes. The manager's SetEventReporter and
-//     SetFlushReporter are the host's to wire too
-//     ([Bridge.SubscriptionEventReporter],
-//     [Bridge.SubscriptionFlushReporter]); without the flush reporter a
-//     fabric leave flushes nothing — no Leave event, no owed attribute —
-//     silently.
+//     device that never changes. The attach is the manager's whole
+//     report wiring: it installs the bridge's report sender
+//     (subscription.Manager.SetReportSender), through which the ongoing
+//     reports, their events, the keep-alives and the flush before a
+//     fabric leaves go out. A manager without a sender refuses every
+//     subscription (subscription.ErrNoReportSender) — fails closed.
 //   - AttachSessionRegistry — silent. Inbound CloseSession stops closing
 //     anything, [Stop] tears sessions down without the CloseSession
 //     farewell (leaving controllers on stale sessions after a restart),
@@ -1736,12 +1736,13 @@ type fabricSessionExceptCloser interface {
 // :186-188), then every session of the fabric runs closeSubscriptions
 // with a flush (NodeSession.ts:312-323, closeSubscriptions). The fabric's
 // delete follows. Each subscription's flush is one report carrying its
-// events and attributes ([Bridge.SubscriptionFlushReporter]), and it
+// events and attributes (the bridge's report sender, a
+// [subscription.Report] with Flush set), and it
 // waits for the peer's StatusResponse before the flush returns, as the
 // matter.js flush awaits its update (ServerSubscription.ts:753-763,
 // #flush), so the CloseSession that follows cannot overtake the report.
-// Needs the subscription manager with the flush reporter wired; without
-// them there is nothing to flush.
+// Needs the subscription manager attached; without it there is nothing
+// to flush.
 func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8) {
 	m := b.subscriptionManagerLocked()
 	if m == nil {

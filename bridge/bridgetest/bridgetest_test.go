@@ -66,7 +66,7 @@ func newPeer(t *testing.T) (*net.UDPConn, *net.UDPAddr) {
 // that the public API already covers.
 func newSubscription(t *testing.T, b *bridge.Bridge) *subscription.Subscription {
 	t.Helper()
-	m := subscription.NewManager(subscription.Config{}, b.SubscriptionReporter(), nil)
+	m := subscription.NewManager(subscription.Config{}, b.SubscriptionReporter(), nil) //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 	b.AttachSubscriptionManager(m)
 	sub, err := m.Subscribe(subscription.SubscribeArgs{
 		MinIntervalFloor:   1,
@@ -120,7 +120,7 @@ func TestEstablishSubscriptionTarget_RoutesAReport(t *testing.T) {
 		t.Fatalf("EstablishSubscriptionTarget: %v", err)
 	}
 
-	b.SubscriptionReporter()(t.Context(), sub, sub.AttributePaths)
+	b.SubscriptionReporter()(t.Context(), sub, sub.AttributePaths) //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 
 	if !awaitDatagram(t, conn, 2*time.Second) {
 		t.Fatal("no report reached the peer after establishing its target")
@@ -138,7 +138,7 @@ func TestReportIsNotRoutedWithoutATarget(t *testing.T) {
 	conn, _ := newPeer(t)
 	sub := newSubscription(t, b)
 
-	b.SubscriptionReporter()(t.Context(), sub, sub.AttributePaths)
+	b.SubscriptionReporter()(t.Context(), sub, sub.AttributePaths) //nolint:staticcheck // the deprecated hook, held for its window (R2-P6-api-0508)
 
 	if awaitDatagram(t, conn, 500*time.Millisecond) {
 		t.Fatal("a report reached the peer although no target was established")

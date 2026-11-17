@@ -411,10 +411,9 @@ func (b *Bridge) registerSubscriptionAt(
 	evictAtQuota bool,
 ) (uint32, error) {
 	// Subscribe in the manager so quota + cadence bookkeeping is
-	// centralised there. The report pump is wired in the daemon bring-up
-	// (SetEventReporter / SubscriptionReporter in daemon_matter.go); the
-	// manager's engine tick drives delivery through the per-subscription
-	// subTarget.
+	// centralised there. The report pump is the bridge's report sender,
+	// installed by AttachSubscriptionManager; the manager's engine tick
+	// drives delivery through the per-subscription subTarget.
 	var subID uint32
 	if m := b.subscriptionManagerLocked(); m != nil {
 		fabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
