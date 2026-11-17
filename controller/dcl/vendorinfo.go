@@ -137,6 +137,12 @@ type VendorInfoService struct {
 	ticker clock.Ticker
 	stop   chan struct{}
 	loop   sync.WaitGroup
+	// periodic is the context of the periodic refresh, cancelled by Close
+	// so that a shutdown waits for the request in flight, not for every
+	// page a ledger keeps answering (review II, R2-P6-conc-1906; as
+	// CertificateStore's, W4-ctlint-12).
+	periodic       context.Context
+	cancelPeriodic context.CancelFunc
 
 	fetchMu  sync.Mutex // one fetch at a time (#fetchPromise, :243-256)
 	fetching chan struct{}
@@ -154,6 +160,7 @@ type VendorInfoService struct {
 // a store that does not load is the error.
 func NewVendorInfoService(ctx context.Context, opts VendorInfoOptions) (*VendorInfoService, error) {
 	s := &VendorInfoService{opts: opts, client: opts.Client, store: opts.Store, log: opts.Logger, index: map[uint16]VendorInfo{}, stop: make(chan struct{})}
+	s.periodic, s.cancelPeriodic = context.WithCancel(context.Background())
 	if s.client == nil {
 		s.client = NewClient(ProductionURL)
 	}
@@ -206,7 +213,7 @@ func (s *VendorInfoService) run(t clock.Ticker) {
 		case <-s.stop:
 			return
 		case <-t.C():
-			_ = s.Update(context.Background())
+			_ = s.Update(s.periodic)
 		}
 	}
 }
@@ -429,8 +436,10 @@ func (s *VendorInfoService) notify(u VendorUpdate) {
 }
 
 // Close stops the periodic refresh and waits for a running one — close
-// (:458-468). Idempotent; a concurrent Close returns once the first has
-// cleaned up.
+// (:458-468). A running periodic refresh is cancelled first, so Close
+// waits for its request in flight; a refresh a caller started runs under
+// the caller's context. Idempotent; a concurrent Close returns once the
+// first has cleaned up.
 func (s *VendorInfoService) Close() {
 	s.mu.Lock()
 	if !s.closed {
@@ -441,6 +450,9 @@ func (s *VendorInfoService) Close() {
 		close(s.stop)
 	}
 	s.mu.Unlock()
+	if s.cancelPeriodic != nil {
+		s.cancelPeriodic()
+	}
 	s.loop.Wait()
 	s.fetchMu.Lock()
 	wait := s.fetching
