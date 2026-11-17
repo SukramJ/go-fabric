@@ -386,10 +386,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         64
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -400,9 +401,10 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -424,13 +426,19 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
         3,
         4,
         5
+      ],
+      "responseCommands": [
+        0,
+        1,
+        2,
+        3
       ],
       "events": [],
       "mandatory": {
@@ -440,13 +448,19 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
           2,
           3,
           4,
           5
+        ],
+        "responseCommands": [
+          0,
+          1,
+          2,
+          3
         ],
         "events": []
       }
@@ -481,7 +495,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -489,6 +503,7 @@
         65,
         66
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -497,9 +512,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -542,7 +558,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -553,6 +569,7 @@
         7,
         8
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -563,7 +580,7 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
           2,
@@ -573,6 +590,7 @@
           6,
           7
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -599,7 +617,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -611,7 +630,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -628,7 +648,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -638,7 +659,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -675,8 +697,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [
@@ -695,7 +719,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -716,7 +741,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -730,6 +755,7 @@
         10,
         11
       ],
+      "responseCommands": [],
       "events": [
         0,
         1
@@ -743,7 +769,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0,
           1
@@ -786,7 +813,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -815,7 +843,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -833,12 +862,14 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
         4
+      ],
+      "responseCommands": [
+        1,
+        3
       ],
       "events": [],
       "mandatory": {
@@ -848,12 +879,14 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
-          3,
           4
+        ],
+        "responseCommands": [
+          1,
+          3
         ],
         "events": []
       }
@@ -874,9 +907,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -893,7 +927,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0,
           1,
@@ -915,7 +950,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -926,7 +962,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -950,7 +987,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -959,7 +997,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -982,7 +1021,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -990,7 +1030,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1007,7 +1048,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -1017,7 +1059,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1082,7 +1125,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -1098,7 +1142,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1136,14 +1181,16 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
         4,
+        6
+      ],
+      "responseCommands": [
+        1,
+        3,
         5,
-        6,
         7
       ],
       "events": [],
@@ -1158,12 +1205,14 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
+          4
+        ],
+        "responseCommands": [
+          1,
           3,
-          4,
           5
         ],
         "events": []
@@ -1205,16 +1254,18 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
         3,
         4,
-        5,
         6,
-        7,
         8
+      ],
+      "responseCommands": [
+        1,
+        5,
+        7
       ],
       "events": [],
       "mandatory": {
@@ -1229,7 +1280,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1245,8 +1297,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -1257,8 +1311,10 @@
           65531,
           65532
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -1292,11 +1348,13 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
+        3
+      ],
+      "responseCommands": [
         2,
-        3,
         4
       ],
       "events": [
@@ -1316,9 +1374,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
+          1
+        ],
+        "responseCommands": [
           2
         ],
         "events": [
@@ -1347,9 +1407,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -1359,7 +1420,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1457,9 +1519,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [
         0,
         1
@@ -1487,7 +1550,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1525,9 +1589,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -1544,7 +1609,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1578,9 +1644,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -1588,7 +1655,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1634,13 +1702,15 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
-        3,
         4,
         5
+      ],
+      "responseCommands": [
+        3
       ],
       "events": [
         0,
@@ -1657,9 +1727,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": [
           3
         ]
@@ -1706,9 +1777,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         128
       ],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -1723,7 +1795,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           3
         ]
@@ -1769,7 +1842,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -1787,7 +1861,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1811,11 +1886,12 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -1826,10 +1902,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           2
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1851,21 +1928,23 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
         4,
-        5,
         6,
         7,
-        8,
         9,
         10,
         11,
         12,
-        13,
+        13
+      ],
+      "responseCommands": [
+        1,
+        3,
+        5,
+        8,
         14
       ],
       "events": [],
@@ -1882,21 +1961,23 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
-          3,
           4,
-          5,
           6,
           7,
-          8,
           9,
           10,
           11,
           12,
-          13,
+          13
+        ],
+        "responseCommands": [
+          1,
+          3,
+          5,
+          8,
           14
         ],
         "events": []
@@ -1928,12 +2009,14 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
-        2,
         3,
-        4,
+        4
+      ],
+      "responseCommands": [
+        2,
         5
       ],
       "events": [],
@@ -1947,12 +2030,14 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
-          2,
           3,
-          4,
+          4
+        ],
+        "responseCommands": [
+          2,
           5
         ],
         "events": []
@@ -1971,7 +2056,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -1981,7 +2067,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -1998,7 +2085,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -2008,7 +2096,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2030,7 +2119,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -2041,7 +2131,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2084,11 +2175,13 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
+        3
+      ],
+      "responseCommands": [
+        1,
         4
       ],
       "events": [],
@@ -2101,7 +2194,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2123,11 +2217,13 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
-        3,
+        3
+      ],
+      "responseCommands": [
         4
       ],
       "events": [
@@ -2146,7 +2242,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -2173,8 +2270,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -2184,8 +2283,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -2205,7 +2306,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -2216,7 +2318,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2243,9 +2346,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -2257,9 +2361,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2284,8 +2389,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -2297,8 +2404,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -2325,8 +2434,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -2338,8 +2449,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -2370,7 +2483,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -2378,7 +2492,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2407,8 +2522,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -2418,8 +2535,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -2450,8 +2569,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -2461,8 +2582,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -2499,9 +2622,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -2509,9 +2633,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2536,10 +2661,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -2552,7 +2678,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -2579,8 +2706,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -2592,8 +2721,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -2629,7 +2760,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -2638,7 +2770,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2677,9 +2810,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -2704,7 +2838,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           2,
           3,
@@ -2735,10 +2870,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -2751,7 +2887,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -2778,8 +2915,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -2789,7 +2928,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2827,10 +2967,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -2840,9 +2981,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -2864,11 +3006,13 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
-        3,
+        3
+      ],
+      "responseCommands": [
         4
       ],
       "events": [
@@ -2887,7 +3031,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -2911,13 +3056,15 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
         3,
-        4,
         128
+      ],
+      "responseCommands": [
+        4
       ],
       "events": [
         0,
@@ -2935,7 +3082,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -2961,13 +3109,22 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
         3,
         4,
         5,
+        6,
+        64
+      ],
+      "responseCommands": [
+        0,
+        1,
+        2,
+        3,
+        4,
         6,
         64
       ],
@@ -2980,13 +3137,21 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
           2,
           3,
           4,
           5,
+          6
+        ],
+        "responseCommands": [
+          0,
+          1,
+          2,
+          3,
+          4,
           6
         ],
         "events": []
@@ -3059,11 +3224,12 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         128
       ],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -3076,7 +3242,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -3112,13 +3279,15 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
-        2,
         3,
         4,
         5
+      ],
+      "responseCommands": [
+        2
       ],
       "events": [
         0
@@ -3134,12 +3303,14 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
-          2,
           3,
           5
+        ],
+        "responseCommands": [
+          2
         ],
         "events": [
           0
@@ -3177,9 +3348,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -3188,7 +3360,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3223,9 +3396,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -3234,7 +3408,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3269,9 +3444,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -3280,7 +3456,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3325,10 +3502,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [
         0,
         1
@@ -3339,7 +3517,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3375,10 +3554,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [
         0,
         1
@@ -3394,10 +3574,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3453,7 +3634,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -3467,7 +3649,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3514,7 +3697,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0,
         1
@@ -3526,7 +3710,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3557,10 +3742,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [
         0,
         1
@@ -3574,10 +3760,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1
         ],
+        "responseCommands": [],
         "events": [
           0,
           1
@@ -3605,10 +3792,12 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
+        2
+      ],
+      "responseCommands": [
         1,
-        2,
         3
       ],
       "events": [
@@ -3623,7 +3812,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3658,10 +3848,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -3675,10 +3866,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1
         ],
+        "responseCommands": [],
         "events": [
           0,
           1,
@@ -3735,7 +3927,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -3745,6 +3937,7 @@
         6,
         7
       ],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -3762,7 +3955,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3822,8 +4016,7 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
         1,
         2,
         3,
@@ -3831,6 +4024,9 @@
         5,
         6,
         7
+      ],
+      "responseCommands": [
+        0
       ],
       "events": [
         0,
@@ -3856,10 +4052,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           1,
           2
         ],
+        "responseCommands": [],
         "events": [
           0,
           1,
@@ -3895,7 +4092,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -3903,7 +4101,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3938,7 +4137,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -3946,7 +4146,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -3971,8 +4172,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -3982,8 +4185,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -4010,8 +4215,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -4021,8 +4228,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -4049,8 +4258,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -4060,8 +4271,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -4087,7 +4300,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -4099,7 +4313,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -4214,7 +4429,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -4230,16 +4445,21 @@
         19,
         26,
         27,
-        28,
         29,
         34,
-        35,
         36,
-        37,
         38,
         39,
         40,
         41
+      ],
+      "responseCommands": [
+        12,
+        15,
+        18,
+        28,
+        35,
+        37
       ],
       "events": [
         0,
@@ -4259,10 +4479,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1
         ],
+        "responseCommands": [],
         "events": [
           0,
           2,
@@ -4313,13 +4534,14 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
         5,
         8
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -4332,11 +4554,12 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
           2
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -4395,11 +4618,12 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2
       ],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -4416,9 +4640,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           1
         ],
+        "responseCommands": [],
         "events": [
           0,
           3
@@ -4482,10 +4707,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -4495,9 +4721,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -4532,10 +4759,12 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
+        2
+      ],
+      "responseCommands": [
         1,
-        2,
         3
       ],
       "events": [],
@@ -4547,8 +4776,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -4619,7 +4850,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0,
         1,
@@ -4652,7 +4884,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -4770,15 +5003,17 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        2,
         5,
         6,
         7,
         8,
-        253,
         254
+      ],
+      "responseCommands": [
+        2,
+        253
       ],
       "events": [
         0,
@@ -4799,9 +5034,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -4854,9 +5090,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -4868,7 +5105,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -4887,7 +5125,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -4898,7 +5137,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -4987,7 +5227,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -5008,6 +5248,7 @@
         75,
         76
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5020,7 +5261,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5041,7 +5283,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5053,7 +5296,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5073,7 +5317,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5085,7 +5330,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5115,7 +5361,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5126,7 +5373,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5146,7 +5394,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5158,7 +5407,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5178,7 +5428,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5190,7 +5441,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5257,7 +5509,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -5268,7 +5521,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5320,7 +5574,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5329,7 +5584,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5381,7 +5637,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5390,7 +5647,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5442,7 +5700,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5451,7 +5710,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5503,7 +5763,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5512,7 +5773,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5564,7 +5826,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5573,7 +5836,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5625,7 +5889,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5634,7 +5899,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5686,7 +5952,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5695,7 +5962,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5747,7 +6015,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5756,7 +6025,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5808,7 +6078,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5817,7 +6088,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5869,7 +6141,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5878,7 +6151,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5896,7 +6170,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -5907,7 +6182,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5956,7 +6232,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [
         0,
         1
@@ -5967,7 +6244,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -5985,8 +6263,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -5999,8 +6279,10 @@
           65531,
           65532
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -6029,12 +6311,14 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
-        2,
         3,
         4
+      ],
+      "responseCommands": [
+        2
       ],
       "events": [],
       "mandatory": {
@@ -6049,11 +6333,13 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
-          2,
           3
+        ],
+        "responseCommands": [
+          2
         ],
         "events": []
       }
@@ -6073,10 +6359,12 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
-        2,
+        2
+      ],
+      "responseCommands": [
         3
       ],
       "events": [],
@@ -6090,10 +6378,12 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
-          2,
+          2
+        ],
+        "responseCommands": [
           3
         ],
         "events": []
@@ -6113,7 +6403,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -6122,7 +6413,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6158,15 +6450,17 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
         3,
         4,
-        5,
         6,
         7
+      ],
+      "responseCommands": [
+        1,
+        5
       ],
       "events": [],
       "mandatory": {
@@ -6175,10 +6469,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           2,
           3
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6196,8 +6491,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [
@@ -6211,8 +6508,10 @@
           65531,
           65532
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -6262,7 +6561,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -6273,11 +6572,13 @@
         7,
         8,
         9,
-        10,
         11,
         12,
         13,
         14
+      ],
+      "responseCommands": [
+        10
       ],
       "events": [
         0
@@ -6289,10 +6590,12 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
-          2,
+          2
+        ],
+        "responseCommands": [
           10
         ],
         "events": []
@@ -6317,12 +6620,13 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
         3
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -6332,11 +6636,12 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
           2
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6352,9 +6657,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -6363,9 +6669,10 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6394,8 +6701,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -6405,8 +6714,10 @@
           65529,
           65531
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -6447,9 +6758,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
+        1
+      ],
+      "responseCommands": [
         2
       ],
       "events": [],
@@ -6459,7 +6772,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6482,10 +6796,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -6495,9 +6810,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6520,10 +6836,12 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
-        2,
+        2
+      ],
+      "responseCommands": [
         3
       ],
       "events": [],
@@ -6533,10 +6851,12 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
-          2,
+          2
+        ],
+        "responseCommands": [
           3
         ],
         "events": []
@@ -6562,7 +6882,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -6576,7 +6897,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6592,11 +6914,13 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
         3
+      ],
+      "responseCommands": [
+        1
       ],
       "events": [
         0
@@ -6608,11 +6932,13 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
           3
+        ],
+        "responseCommands": [
+          1
         ],
         "events": []
       }
@@ -6673,10 +6999,9 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
-        2,
         3,
         4,
         5,
@@ -6692,6 +7017,9 @@
         15,
         16
       ],
+      "responseCommands": [
+        2
+      ],
       "events": [
         0,
         1
@@ -6703,10 +7031,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           3,
           4
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6722,8 +7051,10 @@
         65532,
         65533
       ],
-      "commands": [
-        0,
+      "requestCommands": [
+        0
+      ],
+      "responseCommands": [
         1
       ],
       "events": [],
@@ -6734,8 +7065,10 @@
           65531,
           65532
         ],
-        "commands": [
-          0,
+        "requestCommands": [
+          0
+        ],
+        "responseCommands": [
           1
         ],
         "events": []
@@ -6777,13 +7110,15 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
         3,
         4,
         5
+      ],
+      "responseCommands": [
+        1
       ],
       "events": [
         0,
@@ -6799,10 +7134,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           4,
           5
         ],
+        "responseCommands": [],
         "events": [
           0,
           1
@@ -6908,20 +7244,22 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
         3,
-        4,
         5,
         6,
         7,
-        8,
         9,
         10,
         11,
-        12,
+        12
+      ],
+      "responseCommands": [
+        1,
+        4,
+        8,
         13
       ],
       "events": [],
@@ -6935,9 +7273,10 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           11
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -6984,7 +7323,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -6993,6 +7332,7 @@
         5,
         6
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -7000,7 +7340,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -7022,14 +7363,16 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
         4,
         5,
         6
+      ],
+      "responseCommands": [
+        1,
+        3
       ],
       "events": [],
       "mandatory": {
@@ -7039,14 +7382,16 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
-          3,
           4,
           5,
           6
+        ],
+        "responseCommands": [
+          1,
+          3
         ],
         "events": []
       }
@@ -7064,12 +7409,13 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
         3
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -7079,12 +7425,13 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
           2,
           3
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -7111,14 +7458,16 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
         3,
         4,
         5,
-        6,
+        6
+      ],
+      "responseCommands": [
+        1,
         7
       ],
       "events": [
@@ -7133,14 +7482,16 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
           3,
           4,
           5,
-          6,
+          6
+        ],
+        "responseCommands": [
+          1,
           7
         ],
         "events": [
@@ -7164,9 +7515,10 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0
       ],
+      "responseCommands": [],
       "events": [
         0
       ],
@@ -7180,9 +7532,10 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0
         ],
+        "responseCommands": [],
         "events": [
           0
         ]
@@ -7244,7 +7597,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
+        0,
+        1
+      ],
+      "responseCommands": [
         0,
         1
       ],
@@ -7272,7 +7629,11 @@
           65529,
           65531
         ],
-        "commands": [
+        "requestCommands": [
+          0,
+          1
+        ],
+        "responseCommands": [
           0,
           1
         ],
@@ -7293,7 +7654,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -7304,7 +7666,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -7321,9 +7684,11 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
+        1
+      ],
+      "responseCommands": [
         2
       ],
       "events": [
@@ -7337,9 +7702,11 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
+          1
+        ],
+        "responseCommands": [
           2
         ],
         "events": [
@@ -7373,7 +7740,7 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
         1,
         2,
@@ -7395,6 +7762,7 @@
         18,
         19
       ],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -7417,7 +7785,7 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
           1,
           2,
@@ -7439,6 +7807,7 @@
           18,
           19
         ],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -7455,16 +7824,18 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
         4,
         5,
-        6,
         7,
         8
+      ],
+      "responseCommands": [
+        1,
+        3,
+        6
       ],
       "events": [],
       "mandatory": {
@@ -7475,16 +7846,18 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
-          3,
           4,
           5,
-          6,
           7,
           8
+        ],
+        "responseCommands": [
+          1,
+          3,
+          6
         ],
         "events": []
       }
@@ -7505,22 +7878,24 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
         4,
-        5,
         6,
         7,
-        8,
         9,
         10,
-        11,
         12,
-        13,
         14
+      ],
+      "responseCommands": [
+        1,
+        3,
+        5,
+        8,
+        11,
+        13
       ],
       "events": [],
       "mandatory": {
@@ -7534,22 +7909,24 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
-          3,
           4,
-          5,
           6,
           7,
-          8,
           9,
           10,
-          11,
           12,
-          13,
           14
+        ],
+        "responseCommands": [
+          1,
+          3,
+          5,
+          8,
+          11,
+          13
         ],
         "events": []
       }
@@ -7568,12 +7945,14 @@
         65532,
         65533
       ],
-      "commands": [
+      "requestCommands": [
         0,
-        1,
         2,
-        3,
         4
+      ],
+      "responseCommands": [
+        1,
+        3
       ],
       "events": [],
       "mandatory": {
@@ -7585,12 +7964,14 @@
           65531,
           65532
         ],
-        "commands": [
+        "requestCommands": [
           0,
-          1,
           2,
-          3,
           4
+        ],
+        "responseCommands": [
+          1,
+          3
         ],
         "events": []
       }
@@ -7617,7 +7998,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -7628,7 +8010,8 @@
           65529,
           65531
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     },
@@ -7648,7 +8031,8 @@
         65532,
         65533
       ],
-      "commands": [],
+      "requestCommands": [],
+      "responseCommands": [],
       "events": [],
       "mandatory": {
         "attributes": [
@@ -7661,7 +8045,8 @@
           65531,
           65532
         ],
-        "commands": [],
+        "requestCommands": [],
+        "responseCommands": [],
         "events": []
       }
     }
