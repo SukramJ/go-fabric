@@ -310,9 +310,11 @@ func (n *Name) off(o *nameObserver) {
 
 // parameters builds the TXT parameters: newest TXT record first, entries in
 // wire order, an empty entry or an entry with an empty key skipped, split
-// at the first "=", the first occurrence of a key winning, a key without
-// "=" having an empty value. Mirrors matter.js 0ceb202d
-// packages/general/src/net/dns-sd/DnssdName.ts:76-112.
+// at the first "=", a key without "=" having an empty value, and the first
+// occurrence of a key winning whatever its case. Mirrors matter.js
+// packages/general/src/net/dns-sd/DnssdName.ts:76-107 (the entries) and
+// DnssdParameters.ts:27-34 (first wins, the key folded) at db021da0
+// (review II, R2-P6-doc-2906).
 func (n *Name) parameters() Parameters {
 	if n.params != nil {
 		return n.params
