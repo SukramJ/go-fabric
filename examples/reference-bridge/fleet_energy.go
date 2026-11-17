@@ -77,16 +77,18 @@ const (
 type demoWaterHeater struct {
 	name string
 
-	mu        sync.Mutex
-	whm       *whmgdef.Server
-	modes     *whmdef.Server
-	thermo    *thermostatdef.Server
-	target    int16 // mTargetWaterTemperature
-	water     int16 // mWaterTemperature
-	boosting  bool  // mBoostState == kActive
-	boost     whmgdef.WaterHeaterBoostInfoStruct
-	reached   bool // mBoostTargetTemperatureReached
-	boostEnds *time.Timer
+	mu       sync.Mutex
+	whm      *whmgdef.Server
+	modes    *whmdef.Server
+	thermo   *thermostatdef.Server
+	target   int16 // mTargetWaterTemperature
+	water    int16 // mWaterTemperature
+	boosting bool  // mBoostState == kActive
+	boost    whmgdef.WaterHeaterBoostInfoStruct
+	reached  bool // mBoostTargetTemperatureReached
+	// boostEnds ends the running boost; a stale expiry of a boost a newer
+	// Boost replaced does nothing (latestTimer).
+	boostEnds latestTimer
 }
 
 var (
@@ -148,8 +150,7 @@ func (w *demoWaterHeater) Boost(_ context.Context, info whmgdef.WaterHeaterBoost
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.boost, w.reached, w.boosting = info, false, true
-	w.stopTimerLocked()
-	w.boostEnds = time.AfterFunc(time.Duration(info.Duration)*time.Second, w.boostExpired)
+	w.boostEnds.armLocked(time.Duration(info.Duration)*time.Second, w.boostExpired)
 	slog.Info("waterheater.boost", slog.String("device", w.name), slog.Int("seconds", int(info.Duration)))
 	w.changeHeatingLocked()
 	return nil
@@ -169,25 +170,20 @@ func (w *demoWaterHeater) CancelBoost(context.Context) error {
 }
 
 // boostExpired is the app's HandleBoostTimerExpiry
-// (WaterHeaterDelegateImpl.cpp:234-259).
-func (w *demoWaterHeater) boostExpired() {
+// (WaterHeaterDelegateImpl.cpp:234-259) for the boost armed as gen; the
+// expiry of a boost a newer Boost or a cancel replaced does nothing.
+func (w *demoWaterHeater) boostExpired(gen uint64) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if !w.boosting {
+	if !w.boostEnds.takeLocked(gen) || !w.boosting {
 		return
 	}
 	w.boosting = false
-	w.boostEnds = nil
 	w.changeHeatingLocked()
 	w.endBoostLocked()
 }
 
-func (w *demoWaterHeater) stopTimerLocked() {
-	if w.boostEnds != nil {
-		w.boostEnds.Stop()
-		w.boostEnds = nil
-	}
-}
+func (w *demoWaterHeater) stopTimerLocked() { w.boostEnds.stopLocked() }
 
 func (w *demoWaterHeater) endBoostLocked() {
 	inactive := whmgdef.BoostStateInactive

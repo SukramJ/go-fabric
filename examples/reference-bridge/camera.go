@@ -168,6 +168,9 @@ type demoCamera struct {
 	// sessions are the WebRTC sessions the provider manager holds
 	// (webrtc-provider-manager.cpp mWebrtcTransportMap).
 	sessions map[uint16]bool
+	// pushEvents carries the push transports' Begin and End to the
+	// server in the order the transitions happened (R2-P6-conc-2608).
+	pushEvents orderedQueue
 }
 
 type camAvailableVideo struct {
@@ -190,7 +193,9 @@ type camTransport struct {
 	session   uint64
 	status    padef.TransportStatusEnum
 	streaming bool
-	stop      clock.Timer
+	// stop ends a triggered recording; a stale end of a recording a newer
+	// begin re-armed does nothing (latestTimer, R2-P6-conc-2607).
+	stop latestTimer
 	// activated and detected are the last motion's activation time and
 	// its detected duration (PushAVTransport mClipInfo.mActivationTime,
 	// mMotionDetectedDurationS), kept while the transport is Inactive.
@@ -890,8 +895,8 @@ func (p camPushPort) AllocatePushTransport(_ context.Context, id uint16, _ uint8
 func (p camPushPort) DeallocatePushTransport(_ context.Context, id uint16) error {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
-	if t, ok := p.c.transports[id]; ok && t.stop != nil {
-		t.stop.Stop()
+	if t, ok := p.c.transports[id]; ok {
+		t.stop.stopLocked()
 	}
 	delete(p.c.transports, id)
 	return nil
@@ -987,20 +992,37 @@ func (c *demoCamera) beginTransport(id uint16, reason *padef.TriggerActivationRe
 		t.session++
 	}
 	if d > 0 {
-		if t.stop != nil {
-			t.stop.Stop()
+		if t.stop.after == nil {
+			t.stop.after = c.afterFunc
 		}
-		t.stop = c.clk.AfterFunc(d, func() { c.endTransport(id) })
+		t.stop.armLocked(d, func(gen uint64) { c.endTriggered(id, t, gen) })
+	}
+	if !already {
+		// Posted under c.mu: the queue keeps the transitions' order.
+		c.pushEvents.post(func() {
+			if err := c.pushTransport().TransportStarted(id, trigger, reason); err != nil {
+				c.logger.Info("camerasim.pushbegin", slog.Uint64("connection", uint64(id)), slog.Any("err", err))
+			}
+		})
 	}
 	c.mu.Unlock()
-	if already {
-		return
+}
+
+// afterFunc arms f on the camera's clock, in latestTimer's shape.
+func (c *demoCamera) afterFunc(d time.Duration, f func()) func() bool {
+	return c.clk.AfterFunc(d, f).Stop
+}
+
+// endTriggered is a triggered recording's timer: it ends the recording of
+// transport t armed as gen, and nothing when t was deallocated or a newer
+// begin re-armed it since.
+func (c *demoCamera) endTriggered(id uint16, t *camTransport, gen uint64) {
+	c.mu.Lock()
+	current := c.transports[id] == t && t.stop.takeLocked(gen)
+	c.mu.Unlock()
+	if current {
+		c.endTransport(id)
 	}
-	go func() {
-		if err := c.pushTransport().TransportStarted(id, trigger, reason); err != nil {
-			c.logger.Info("camerasim.pushbegin", slog.Uint64("connection", uint64(id)), slog.Any("err", err))
-		}
-	}()
 }
 
 // endTransport ends a transport's recording: PushTransportEnd.
@@ -1012,16 +1034,13 @@ func (c *demoCamera) endTransport(id uint16) {
 		return
 	}
 	t.streaming = false
-	if t.stop != nil {
-		t.stop.Stop()
-		t.stop = nil
-	}
-	c.mu.Unlock()
-	go func() {
+	t.stop.stopLocked()
+	c.pushEvents.post(func() {
 		if err := c.pushTransport().TransportStopped(id); err != nil {
 			c.logger.Info("camerasim.pushend", slog.Uint64("connection", uint64(id)), slog.Any("err", err))
 		}
-	}()
+	})
+	c.mu.Unlock()
 }
 
 // pushTransport is the camera's push transport server's host side.

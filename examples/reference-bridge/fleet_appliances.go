@@ -90,6 +90,12 @@ type demoWasher struct {
 	// stop channel of the goroutine counting it down while the cycle runs.
 	remaining uint32
 	ticking   chan struct{}
+	// countMu orders the countdown's writes (R2-P6-conc-2651): a tick
+	// checks that its goroutine is still the counting one and writes
+	// CountdownTime under it, and stopCountdown closes the goroutine under
+	// it, so no tick writes after stopCountdown returns — a Stop's null
+	// stays. Taken before mu.
+	countMu sync.Mutex
 }
 
 // washCycleSeconds is the countdown a started cycle begins with. Short,
@@ -283,20 +289,40 @@ func (w *demoWasher) startCountdown() {
 			case <-stop:
 				return
 			case <-tick.C:
-				w.mu.Lock()
-				if w.remaining > 0 {
-					w.remaining--
+				if !w.countdownTick(stop) {
+					return
 				}
-				remaining := w.remaining
-				w.mu.Unlock()
-				_ = w.setCountdown(&remaining)
 			}
 		}
 	}()
 }
 
-// stopCountdown ends the countdown goroutine, if any.
+// countdownTick is one second of the countdown of the goroutine whose stop
+// channel is stop: false, and nothing written, once that goroutine is no
+// longer the counting one — a tick that fired before a stopCountdown and
+// runs after it.
+func (w *demoWasher) countdownTick(stop chan struct{}) bool {
+	w.countMu.Lock()
+	defer w.countMu.Unlock()
+	w.mu.Lock()
+	if w.ticking != stop {
+		w.mu.Unlock()
+		return false
+	}
+	if w.remaining > 0 {
+		w.remaining--
+	}
+	remaining := w.remaining
+	w.mu.Unlock()
+	_ = w.setCountdown(&remaining)
+	return true
+}
+
+// stopCountdown ends the countdown goroutine, if any; once it returns, no
+// tick of it writes CountdownTime.
 func (w *demoWasher) stopCountdown() {
+	w.countMu.Lock()
+	defer w.countMu.Unlock()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.ticking != nil {
