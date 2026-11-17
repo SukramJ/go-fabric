@@ -927,10 +927,34 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 	x.enqueueLocked(msg)
 }
 
+// maxQueuedMessages is how many of the peer's messages an exchange holds
+// for a reader that has not taken them with [Exchange.Next]. Every
+// protocol the controller speaks alternates on an exchange — a message,
+// then the other side's answer — so a reader has one message in hand and
+// a peer that keeps to the protocol at most one beyond it; the number
+// leaves a slow reader room and bounds what a peer that ignores the
+// alternation makes the controller hold at this many times the message
+// size limit. Past it the exchange is aborted with [ErrFlow]: dropping
+// the message would leave its acknowledgement and the peer's view of the
+// exchange apart. The module's own bound, ahead of matter.js, whose
+// exchange queue has none (review II, R2-P6-bound-1807, U3-ctl-dev-1,
+// owner decision 45).
+const maxQueuedMessages = 16
+
 // enqueueLocked queues msg for [Exchange.Next] with x.mu held and releases
 // it: the queue notifier ([Exchange.SetQueueNotifier]) hears of msg first,
-// so it has run before Next can return msg.
+// so it has run before Next can return msg. A queue at
+// [maxQueuedMessages] takes no further message: the queue is dropped and
+// the exchange aborted with [ErrFlow], msg's acknowledgement sent.
 func (x *Exchange) enqueueLocked(msg *Message) {
+	if len(x.queue) >= maxQueuedMessages {
+		x.queue = nil
+		x.mu.Unlock()
+		x.m.log.Warn("matter.controller.exchange_queue_full", slog.Int("exchange_id", int(x.id)), slog.Int("queued", maxQueuedMessages),
+			slog.String("reason", "the peer sent more messages than the reader took"))
+		x.abort(fmt.Errorf("%w: %d messages wait for the reader", ErrFlow, maxQueuedMessages))
+		return
+	}
 	if onQueued := x.onQueued; onQueued != nil {
 		x.mu.Unlock()
 		onQueued(msg)
