@@ -193,16 +193,24 @@ func (s *Session) Signals() <-chan Signal { return s.box.out }
 
 // ProvideAnswer sends the host's SDP answer to a camera's Offer
 // (ModeSolicitOffer); it travels over TCP (the command's Large Message
-// quality).
+// quality). After the service's Close it is [ErrClosed] (review II,
+// R2-P6-api-2207).
 func (s *Session) ProvideAnswer(ctx context.Context, sdp string) error {
+	if s.svc.isClosed() {
+		return ErrClosed
+	}
 	_, err := s.svc.io.invokeProvider(ctx, s.t, callProvideAnswer, wpdef.ProvideAnswerRequest{WebRtcSessionId: s.ID, Sdp: sdp})
 	return err
 }
 
 // ProvideICECandidates sends the host's candidates, in order, in as many
 // ProvideICECandidates as keep each within one Matter message over UDP;
-// every send is made, and the first failure is returned.
+// every send is made, and the first failure is returned. After the
+// service's Close it is [ErrClosed] (review II, R2-P6-api-2207).
 func (s *Session) ProvideICECandidates(ctx context.Context, candidates []wpdef.ICECandidateStruct) error {
+	if s.svc.isClosed() {
+		return ErrClosed
+	}
 	if len(candidates) == 0 {
 		return invalidArguments("ice_candidates names no candidate")
 	}
@@ -230,8 +238,13 @@ func provideCandidates(ctx context.Context, candidates []wpdef.ICECandidateStruc
 // Stop ends the session on the camera; its streams stay allocated for a
 // later start. ended false: the camera no longer held it (NOT_FOUND). A
 // refused EndSession is returned; the session stays open then, and Stop
-// again is the retry.
+// again is the retry. After the service's Close, which ended its
+// sessions, it is [ErrClosed] and sends nothing (review II,
+// R2-P6-api-2207); [Service.Release] retries an end Close could not make.
 func (s *Session) Stop(ctx context.Context) (ended bool, err error) {
+	if s.svc.isClosed() {
+		return false, ErrClosed
+	}
 	return s.svc.m.stopStream(ctx, s.t, s.ID, s.Owner)
 }
 

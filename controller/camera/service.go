@@ -346,10 +346,14 @@ func targetOf(node *client.Node, endpoint uint16) (target, error) {
 	return target{nodeID: addr.NodeID, endpointID: endpoint}, nil
 }
 
-// Capabilities reads what the camera endpoint states and holds. Mirrors
+// Capabilities reads what the camera endpoint states and holds; after
+// Close it is [ErrClosed] (review II, R2-P6-api-2207). Mirrors
 // matterjs-server packages/ws-controller/src/camera/CameraStreamManager.ts:969-1034
 // at 0bd06f2.
 func (s *Service) Capabilities(ctx context.Context, node *client.Node, endpoint uint16) (*Capabilities, error) {
+	if s.isClosed() {
+		return nil, ErrClosed
+	}
 	t, err := targetOf(node, endpoint)
 	if err != nil {
 		return nil, err
@@ -359,10 +363,14 @@ func (s *Service) Capabilities(ctx context.Context, node *client.Node, endpoint 
 
 // ReleaseStream deallocates one stream, passing the camera's answer on;
 // a stream the camera still references is [ErrStreamInUse] (an
-// [*InUseError]). Mirrors matterjs-server
+// [*InUseError]). After Close it is [ErrClosed] and sends nothing (review
+// II, R2-P6-api-2207). Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2702-2736 at
 // 0bd06f2.
 func (s *Service) ReleaseStream(ctx context.Context, node *client.Node, endpoint uint16, kind StreamKind, id uint16) error {
+	if s.isClosed() {
+		return ErrClosed
+	}
 	t, err := targetOf(node, endpoint)
 	if err != nil {
 		return err
@@ -397,10 +405,15 @@ func (s *Service) StopSession(ctx context.Context, node *client.Node, endpoint, 
 // StopByKey stops the session owner started with key on the node and
 // endpoint; a start still running is cancelled (its StartStream fails)
 // and this answers once it gave up. false when the key names no session
-// of the owner, or the camera held none. Mirrors matterjs-server
+// of the owner, or the camera held none. After Close, which ended the
+// service's sessions, it is [ErrClosed] and sends nothing (review II,
+// R2-P6-api-2207). Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2213-2230 at
 // 0bd06f2.
 func (s *Service) StopByKey(ctx context.Context, node *client.Node, endpoint uint16, owner, key string) (bool, error) {
+	if s.isClosed() {
+		return false, ErrClosed
+	}
 	t, err := targetOf(node, endpoint)
 	if err != nil {
 		return false, err
@@ -410,9 +423,9 @@ func (s *Service) StopByKey(ctx context.Context, node *client.Node, endpoint uin
 
 // Release ends every session owner holds or is starting, as a host does
 // when the owner goes away; only EndSession lowers a stream's
-// ReferenceCount. After Close it stays callable: Close claimed every
-// session, so it finds none, or retries the EndSession of one whose end
-// failed at Close. Mirrors matterjs-server
+// ReferenceCount. After Close it stays callable — the one camera-acting
+// method that does: Close claimed every session, so it finds none, or
+// retries the EndSession of one whose end failed at Close. Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2327-2331 at
 // 0bd06f2.
 func (s *Service) Release(ctx context.Context, owner string) {
