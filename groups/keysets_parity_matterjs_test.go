@@ -267,7 +267,7 @@ func TestKeySetsContainsOperationalKey(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return decodeOrRefused(t, m, sealGroup(t, op, sid, gid, 0x99, 1, false, []byte{0x01})) != nil
+		return decodeOrRefused(t, m, sealGroup(t, op, sid, gid, 0x99, 1, false, imPayload([]byte{0x01}))) != nil
 	}
 	seq := make([]byte, 16) // Uint8Array.from({ length: 16 }, (_, i) => i)
 	for i := range seq {

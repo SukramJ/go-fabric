@@ -244,11 +244,11 @@ func TestDecodeRoutesAMappedGroupMessage(t *testing.T) {
 		if !privacy {
 			counter = 200
 		}
-		msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 0x1B669, counter, privacy, []byte("payload")))
+		msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 0x1B669, counter, privacy, imPayload([]byte("payload"))))
 		if err != nil {
 			t.Fatalf("privacy=%v: %v", privacy, err)
 		}
-		if string(msg.Payload) != "payload" || msg.GroupID != 0x0101 || !msg.HasValidMapping ||
+		if string(msg.Payload) != string(imPayload([]byte("payload"))) || msg.GroupID != 0x0101 || !msg.HasValidMapping ||
 			!slices.Equal(msg.Endpoints, []uint16{3}) || msg.FabricIndex != 1 || msg.KeySetID != 0x10 || msg.Duplicate {
 			t.Fatalf("privacy=%v: decoded %+v", privacy, msg)
 		}
@@ -262,7 +262,7 @@ func TestDecodeRejections(t *testing.T) {
 	op, sid := opKeyOf(t, 0xA1)
 
 	// Not a group message.
-	unicast := sealGroup(t, op, sid, 0x0101, 1, 1, false, []byte("x"))
+	unicast := sealGroup(t, op, sid, 0x0101, 1, 1, false, imPayload([]byte("x")))
 	unicast[3] &^= 0x03
 	if _, err := m.Decode(ctx, unicast); !errors.Is(err, ErrNotGroupMessage) {
 		t.Fatalf("unicast: %v", err)
@@ -271,28 +271,28 @@ func TestDecodeRejections(t *testing.T) {
 		t.Fatalf("short: %v", err)
 	}
 	// No candidate key for the session id.
-	if _, err := m.Decode(ctx, sealGroup(t, op, sid^0xFFFF, 0x0101, 1, 1, true, []byte("x"))); !errors.Is(err, ErrNoKey) {
+	if _, err := m.Decode(ctx, sealGroup(t, op, sid^0xFFFF, 0x0101, 1, 1, true, imPayload([]byte("x")))); !errors.Is(err, ErrNoKey) {
 		t.Fatalf("unknown session id: %v", err)
 	}
 	// Right session id, wrong key: fails to authenticate.
 	other, _ := opKeyOf(t, 0x55)
-	if _, err := m.Decode(ctx, sealGroup(t, other, sid, 0x0101, 1, 1, true, []byte("x"))); !errors.Is(err, ErrDecrypt) {
+	if _, err := m.Decode(ctx, sealGroup(t, other, sid, 0x0101, 1, 1, true, imPayload([]byte("x")))); !errors.Is(err, ErrDecrypt) {
 		t.Fatalf("wrong key: %v", err)
 	}
 	// Tampered ciphertext.
-	good := sealGroup(t, op, sid, 0x0101, 1, 2, true, []byte("x"))
+	good := sealGroup(t, op, sid, 0x0101, 1, 2, true, imPayload([]byte("x")))
 	good[len(good)-1] ^= 1
 	if _, err := m.Decode(ctx, good); !errors.Is(err, ErrDecrypt) {
 		t.Fatalf("tampered: %v", err)
 	}
 	// No source node id: there is no nonce.
-	noSource := sealGroup(t, op, sid, 0x0101, 1, 3, false, []byte("x"))
+	noSource := sealGroup(t, op, sid, 0x0101, 1, 3, false, imPayload([]byte("x")))
 	noSource[0] &^= 0x04
 	if _, err := m.Decode(ctx, noSource); !errors.Is(err, ErrMalformed) {
 		t.Fatalf("no source: %v", err)
 	}
 	// Group id 0 authenticates but is no group.
-	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0, 1, 4, true, []byte("x"))); !errors.Is(err, ErrMalformed) {
+	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0, 1, 4, true, imPayload([]byte("x")))); !errors.Is(err, ErrMalformed) {
 		t.Fatalf("group 0: %v", err)
 	}
 	// An unmapped key set does not participate in decryption.
@@ -300,7 +300,7 @@ func TestDecodeRejections(t *testing.T) {
 	if err := m.Reload(ctx, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 5, true, []byte("x"))); !errors.Is(err, ErrNoKey) {
+	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 5, true, imPayload([]byte("x")))); !errors.Is(err, ErrNoKey) {
 		t.Fatalf("unmapped key set: %v", err)
 	}
 }
@@ -322,7 +322,7 @@ func TestDecodeReportsAnInvalidMapping(t *testing.T) {
 		t.Fatal(err)
 	}
 	op, sid := opKeyOf(t, 0xA1)
-	msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 9, true, []byte("x")))
+	msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 9, true, imPayload([]byte("x"))))
 	var rejected *DecodeError
 	if msg != nil || !errors.As(err, &rejected) || !errors.Is(err, ErrDecrypt) {
 		t.Fatalf("Decode = %+v, %v; want a DecodeError", msg, err)
@@ -344,7 +344,7 @@ func TestReplayWindowPerSenderAndKey(t *testing.T) {
 	m, st := newTestManager(t)
 	op, sid := opKeyOf(t, 0xA1)
 	seal := func(source uint64, counter uint32) []byte {
-		return sealGroup(t, op, sid, 0x0101, source, counter, true, []byte("x"))
+		return sealGroup(t, op, sid, 0x0101, source, counter, true, imPayload([]byte("x")))
 	}
 	dup := func(b []byte) bool {
 		t.Helper()
@@ -394,7 +394,7 @@ func TestForgetFabricDropsItsGroups(t *testing.T) {
 		t.Fatalf("notifications = %d, want 1", notified.Load())
 	}
 	op, sid := opKeyOf(t, 0xA1)
-	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 1, true, []byte("x"))); !errors.Is(err, ErrNoKey) {
+	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 1, true, imPayload([]byte("x")))); !errors.Is(err, ErrNoKey) {
 		t.Fatalf("a removed fabric's key still authenticates: %v", err)
 	}
 }
@@ -425,7 +425,7 @@ func TestConcurrentDecodeAndChanges(t *testing.T) {
 	datagrams := make([][][]byte, 4)
 	for w := range datagrams {
 		for i := range 50 {
-			datagrams[w] = append(datagrams[w], sealGroup(t, op, sid, 0x0101, uint64(w+1), uint32(i+1), true, []byte("x")))
+			datagrams[w] = append(datagrams[w], sealGroup(t, op, sid, 0x0101, uint64(w+1), uint32(i+1), true, imPayload([]byte("x"))))
 		}
 	}
 	var wg sync.WaitGroup

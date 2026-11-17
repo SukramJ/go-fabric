@@ -31,7 +31,7 @@ func TestReceptionStateTeardownParity(t *testing.T) {
 	op, sid := opKeyOf(t, 0xA1)
 	duplicate := func(t *testing.T, m *Manager, counter uint32) bool {
 		t.Helper()
-		msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 2, counter, true, []byte("x")))
+		msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 2, counter, true, imPayload([]byte("x"))))
 		if err != nil {
 			t.Fatal(err)
 		}

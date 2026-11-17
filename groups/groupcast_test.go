@@ -382,7 +382,7 @@ func TestDecodeNeverTriesAnUnmappedKeySet(t *testing.T) {
 	if err := m.Reload(ctx, 1); err != nil {
 		t.Fatal(err)
 	}
-	_, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 5, true, []byte("x")))
+	_, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 1, 5, true, imPayload([]byte("x"))))
 	var rejected *DecodeError
 	if !errors.As(err, &rejected) || !errors.Is(err, ErrNoKey) || err.Error() != ErrNoKey.Error() {
 		t.Fatalf("Decode = %v, want a DecodeError without a candidate", err)
@@ -392,7 +392,7 @@ func TestDecodeNeverTriesAnUnmappedKeySet(t *testing.T) {
 	}
 	// A key nobody holds: the plain header's group, without a fabric.
 	other, otherSID := opKeyOf(t, 0x55)
-	_, err = m.Decode(ctx, sealGroup(t, other, otherSID, 0x0101, 1, 6, false, []byte("x")))
+	_, err = m.Decode(ctx, sealGroup(t, other, otherSID, 0x0101, 1, 6, false, imPayload([]byte("x"))))
 	if !errors.As(err, &rejected) || len(rejected.CandidateFabrics) != 0 || !rejected.HasGroupID ||
 		rejected.GroupID != 0x0101 || rejected.GroupFabricIndex != 0 {
 		t.Errorf("unknown key: %v (%+v)", err, rejected)

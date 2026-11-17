@@ -25,7 +25,7 @@ func TestReceptionStateSurvivesForgetAndReload(t *testing.T) {
 	t.Run("the same keys come back", func(t *testing.T) {
 		t.Parallel()
 		m, _ := newTestManager(t)
-		recorded := sealGroup(t, op, sid, 0x0101, 7, 100, true, []byte("toggle"))
+		recorded := sealGroup(t, op, sid, 0x0101, 7, 100, true, imPayload([]byte("toggle")))
 		if msg, err := m.Decode(ctx, recorded); err != nil || msg.Duplicate {
 			t.Fatalf("the first message: err %v", err)
 		}
@@ -45,7 +45,7 @@ func TestReceptionStateSurvivesForgetAndReload(t *testing.T) {
 	t.Run("a key that does not come back loses its windows", func(t *testing.T) {
 		t.Parallel()
 		m, st := newTestManager(t)
-		if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 7, 100, true, []byte("toggle"))); err != nil || msg.Duplicate {
+		if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 7, 100, true, imPayload([]byte("toggle")))); err != nil || msg.Duplicate {
 			t.Fatalf("the first message: err %v", err)
 		}
 		m.ForgetFabric(1)

@@ -224,6 +224,15 @@ func sealGroup(tb testing.TB, opKey []byte, sessionID, groupID uint16, source ui
 	return out
 }
 
+// imPayload is a group message's plaintext: an Interaction Model protocol
+// header (initiator, InvokeRequest) followed by body. Decode fails a
+// candidate whose payload header does not parse (F-db021da0-35), so a
+// message a test means to be accepted carries one.
+func imPayload(body []byte) []byte {
+	ph := message.ProtocolHeader{Initiator: true, Opcode: 0x08, ExchangeID: 1, ProtocolID: 0x0001}
+	return append(ph.Marshal(), body...)
+}
+
 // GetMetadataCounter makes memStore a [CounterStore].
 func (s *memStore) GetMetadataCounter(_ context.Context, key string) (value uint64, ok bool, err error) {
 	s.mu.Lock()

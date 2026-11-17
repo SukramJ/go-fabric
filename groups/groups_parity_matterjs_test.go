@@ -177,7 +177,7 @@ func TestGroupsSubjectForGroup(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return decodeOrRefused(t, mapped(t), sealGroup(t, opKey, sid, gid, 0x1234, 1, false, []byte{0x01}))
+		return decodeOrRefused(t, mapped(t), sealGroup(t, opKey, sid, gid, 0x1234, 1, false, imPayload([]byte{0x01})))
 	}
 
 	t.Run("accepts a session-id collision peer that carries the authenticating key", func(t *testing.T) {

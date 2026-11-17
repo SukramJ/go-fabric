@@ -194,8 +194,9 @@ type candidate struct {
 // is set, then opening the AEAD with the nonce built from the Security
 // Flags, the message counter and the source node id. A candidate that
 // opens the message still fails when GroupKeyMap does not map the
-// message's group to a key set holding its key (:425-433), and the next
-// one is tried; the first that passes wins. Only then does the message
+// message's group to a key set holding its key (:425-433), or when its
+// payload's protocol header does not parse (:435-442), and the next one
+// is tried; the first that passes wins. Only then does the message
 // counter pass the per-key, per-sender reception window (matter.js
 // MessagingState.receptionStateFor, an encrypted-with-rollover window).
 // When none passes, the error is a [*DecodeError] with the candidate
@@ -248,6 +249,20 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 		}
 		if !m.mappingAllows(c, msg.Header.DestGroupID) {
 			continue // GroupSession.ts:431-433
+		}
+		// An authenticated payload whose protocol header does not parse
+		// fails this candidate and the next is tried, before the
+		// reception window takes the counter: matter.js decodes the
+		// payload inside the candidate loop and continues on its
+		// UnexpectedDataError, "As in the CHIP SDK" (GroupSession.ts:435-442
+		// at db021da0); connectedhomeip's group key attempt fails when
+		// SecureMessageCodec::Decrypt, which decodes the payload header
+		// after the decryption, fails, and goes on to the next key
+		// (src/transport/SessionManager.cpp:1148-1151, :1213-1230;
+		// src/transport/SecureMessageCodec.cpp:91-93 at 6170af84). Review
+		// II, F-db021da0-35.
+		if _, _, err := message.UnmarshalProtocolHeader(msg.Payload); err != nil {
+			continue
 		}
 		if err := m.completeMessage(msg, c); err != nil {
 			return nil, err
