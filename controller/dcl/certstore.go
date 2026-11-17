@@ -752,14 +752,15 @@ func (s *CertificateStore) saveIndex(ctx context.Context) {
 // (DclCertificateService.ts:1449-1452, :1460 at db021da0); review II,
 // R2-P6-sec-1902, the Ahead-of-matter.js row of the promotion and of this
 // rule. fromLedger says the bytes are the production ledger's answer
-// (storedCertificate.ProductionLedger). It reports whether it stored.
-func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata, fromLedger bool) bool {
+// (storedCertificate.ProductionLedger).
+func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata, fromLedger bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.storeCertificateLocked(id, der, m, fromLedger)
+	s.storeCertificateLocked(id, der, m, fromLedger)
 }
 
-// storeCertificateLocked is storeCertificate under s.mu.
+// storeCertificateLocked is storeCertificate under s.mu; it reports
+// whether it stored.
 func (s *CertificateStore) storeCertificateLocked(id string, der []byte, m CertificateMetadata, fromLedger bool) bool {
 	existing, ok := s.index[id]
 	if ok && existing.IsProduction && !m.IsProduction {
