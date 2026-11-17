@@ -29,8 +29,10 @@ import (
 // a chunked report waiting for its StatusResponse, the subscription priming
 // loop — releases its turn first (leaveSessionOrder), so the answer it
 // waits for is not queued behind it. Unsecured messages (the PASE / CASE
-// handshakes, session id 0) and group messages, which the bridge
-// serialises itself, are not queued.
+// handshakes, session id 0) are queued by the node id of their initiator,
+// so one initiator's counters reach its unsecured window in arrival order
+// (message.SessionOrderKey; review II, N3-coord-1); group messages, which
+// the bridge serialises itself, are not queued.
 
 type sessionTurnKey struct{}
 

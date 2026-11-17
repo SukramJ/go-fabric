@@ -73,8 +73,15 @@ overtake the message that finished an earlier one: the BlockAckEof that
 completes an OTA download is handled before the ApplyUpdateRequest sent
 after it.
 
-**Everything else runs concurrently:** unsecured messages (the PASE and
-CASE handshakes, session id 0) and group messages. Concurrent unordered
+**Unsecured messages of one initiator are handled in arrival order too.**
+The PASE and CASE handshakes run on session id 0; the listener keys them by
+the node id of the handshake's initiator (the destination node id of a
+response, else the source node id of a request), so one initiator's message
+counters reach its duplicate window in the order they arrived. Messages of
+different initiators run concurrently.
+
+**Everything else runs concurrently:** group messages and an unsecured
+message that names no node id. Concurrent unordered
 handlers are bounded at 1024. A datagram that arrives when every slot is
 taken is dropped, and the peer's MRP retransmits it. Per session, at most
 256 datagrams queue; beyond that a datagram is dropped too.
