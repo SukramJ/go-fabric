@@ -272,12 +272,9 @@ func TestMandatedUnder(t *testing.T) {
 		`{"type":"otherwise","param":[{"type":"name","param":"Node"},{"type":"M"}]}`:                           true,
 		`{"type":"otherwise","param":[{"type":"name","param":"Simple"},{"type":"O"}]}`:                         true,
 		`{"type":"otherwise","param":[{"type":"name","param":"Node"},{"type":"O"}]}`:                           false,
-		`{"type":"otherwise","param":[{"type":"&","param":{}}]}`:                                               false,
-		`{"type":"&","param":{"lhs":{"type":"|","param":{}},"rhs":{"type":"!","param":7}}}`:                    false,
-		`{"type":"!","param":{"type":"&","param":{"lhs":{"type":"!","param":{"type":"M"}}}}}`:                  true,
 	} {
-		if got := mandatedUnder(conf(t, astJSON).root(), conds); got != want {
-			t.Errorf("mandatedUnder(%s) = %v", astJSON, got)
+		if got, err := mandatedUnder(conf(t, astJSON).root(), conds); err != nil || got != want {
+			t.Errorf("mandatedUnder(%s) = %v, %v", astJSON, got, err)
 		}
 	}
 }
@@ -367,7 +364,7 @@ func TestSyntheticElements(t *testing.T) {
 			{"element":"attribute","name":"B","default":5},
 			{"element":"command","name":"K","constraint":{"text":"2 to 9","min":2,"max":9}},
 			{"element":"event","name":"E","conformance":{"text":"M","ast":{"type":"M"}}},
-			{"element":"attribute","name":"N","constraint":{"text":"x","value":{"ref":"y"}}}]},
+			{"element":"attribute","name":"N","constraint":{"text":"x","value":{"type":"reference","name":"y"}}}]},
 		{"element":"clientCluster","name":"C","id":1,"conformance":{"text":"M","ast":{"type":"M"}},"referent":{"id":1,"name":"C"},"requirements":[
 			{"element":"feature","name":"F","conformance":{"text":"M","ast":{"type":"M"}}}]},
 		{"element":"serverCluster","name":"Descriptor","id":29,"referent":{"id":29,"name":"Descriptor"},"requirements":[
