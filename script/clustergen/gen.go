@@ -661,7 +661,7 @@ func (g *generator) source() ([]byte, error) {
 			if err := g.claim(id, "feature "+f.Name); err != nil {
 				return nil, err
 			}
-			w.p("\t%s Feature = 1 << %d // %s, %s", id, f.Bit, f.Name, confText(f.Effective.Conformance))
+			w.p("\t%s Feature = 1 << %d // %s, %s", id, *f.Bit, f.Name, confText(f.Effective.Conformance))
 		}
 		w.p(")")
 		w.p("")
@@ -1279,7 +1279,7 @@ func (g *generator) writeDefinition(w *writer) {
 	if len(c.Features) > 0 {
 		w.p("\tFeatures: []spec.Feature{")
 		for _, f := range c.Features {
-			w.p("\t\t{Name: %q, Title: %q, Bit: %d, Conformance: %s},", f.Name, featureTitle(f), f.Bit, confLiteral(f.Effective.Conformance))
+			w.p("\t\t{Name: %q, Title: %q, Bit: %d, Conformance: %s},", f.Name, featureTitle(f), *f.Bit, confLiteral(f.Effective.Conformance))
 		}
 		w.p("\t},")
 	}
@@ -1377,14 +1377,19 @@ func (g *generator) writeAttribute(w *writer, a *element) {
 	w.p("\t\t},")
 }
 
+// priorityLiteral renders an event priority. A priority other than
+// critical, info or debug — none included — fails the generation
+// ([renderError]) rather than reading as info (R2-P6-par-2705).
 func priorityLiteral(p string) string {
 	switch p {
 	case "critical":
 		return "spec.PriorityCritical"
+	case "info":
+		return "spec.PriorityInfo"
 	case "debug":
 		return "spec.PriorityDebug"
 	}
-	return "spec.PriorityInfo"
+	panic(renderError{fmt.Errorf("event priority %q: want critical, info or debug", p)})
 }
 
 var kindLiteral = map[kind]string{
@@ -1466,6 +1471,21 @@ var privilegeLiteral = map[string]string{
 	"M": "spec.PrivilegeManage", "A": "spec.PrivilegeAdminister",
 }
 
+// privilegeOf is a privilege letter's literal, "" for none. A letter it
+// does not know fails the generation ([renderError]): dropped, the
+// runtime would read the zero privilege as View or Operate, weaker than
+// any stated M or A (R2-P6-acl-2704).
+func privilegeOf(letter string) string {
+	if letter == "" {
+		return ""
+	}
+	p, ok := privilegeLiteral[letter]
+	if !ok {
+		panic(renderError{fmt.Errorf("privilege %q: want V, P, O, M or A", letter)})
+	}
+	return p
+}
+
 func accessLiteral(a *access) string {
 	if a == nil {
 		return ""
@@ -1474,10 +1494,10 @@ func accessLiteral(a *access) string {
 	if a.RW != "" {
 		parts = append(parts, fmt.Sprintf("RW: %q", a.RW))
 	}
-	if p := privilegeLiteral[a.ReadPriv]; p != "" {
+	if p := privilegeOf(a.ReadPriv); p != "" {
 		parts = append(parts, "Read: "+p)
 	}
-	if p := privilegeLiteral[a.WritePriv]; p != "" {
+	if p := privilegeOf(a.WritePriv); p != "" {
 		parts = append(parts, "Write: "+p)
 	}
 	if a.Fabric != "" {
@@ -1524,7 +1544,14 @@ func constraintLiteral(c *constraint, typeName, metatype string) string {
 			parts = append(parts, b.name+": "+lit)
 		}
 	}
-	if ref := referenceOf(c.In); ref != "" {
+	if len(c.In) > 0 {
+		// Only a reference is carried; any other "in" fails the
+		// generation ([renderError]): dropped, the constraint would be
+		// Text alone, which admits every value (R2-P6-par-2706).
+		ref := referenceOf(c.In)
+		if ref == "" {
+			panic(renderError{fmt.Errorf("constraint %q: in %s is no reference", c.Text, compactJSON(c.In))})
+		}
 		parts = append(parts, fmt.Sprintf("In: %q", ref))
 	}
 	if c.CpMax != nil {
@@ -1711,15 +1738,23 @@ func referenceOf(raw json.RawMessage) string {
 // DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
 // list as spec.EmptyListDefault; a reference, an octet string or a
-// non-empty list as spec.UnresolvedDefault. A unit the type name does not
-// scale, and every other field value, is not rendered.
+// non-empty list as spec.UnresolvedDefault. It returns "" only when no
+// default is stated.
+//
+// Any other stated default fails the generation ([renderError], recovered
+// in generate) — a unit the type name does not scale, a struct value
+// ("properties"), "none" and every other field value — rather than
+// rendering as no default: a stated default is told apart from none
+// (W3-clugen-07), and on a struct attribute "no default" would let
+// structDefault build a different one from the fields' own
+// (R2-P6-par-2703, wizard-6b §2 gen Q1).
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 	if len(raw) == 0 {
 		return ""
 	}
 	var v any
-	if json.Unmarshal(raw, &v) != nil {
-		return ""
+	if err := json.Unmarshal(raw, &v); err != nil {
+		panic(renderError{fmt.Errorf("default %s: %w", raw, err)})
 	}
 	switch x := v.(type) {
 	case nil:
@@ -1743,14 +1778,24 @@ func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
 		// stated default is told apart from none (W3-clugen-07).
 		switch x["type"] {
 		case "reference":
-			if name, ok := x["name"].(string); ok {
+			if name, ok := x["name"].(string); ok && name != "" {
 				return fmt.Sprintf("spec.UnresolvedDefault{Kind: %q, Name: %q}", "reference", name)
 			}
 		case "bytes":
 			return `spec.UnresolvedDefault{Kind: "bytes"}`
 		}
 	}
-	return ""
+	panic(renderError{fmt.Errorf("default %s on type %q: a form the generator does not render", compactJSON(raw), typeName)})
+}
+
+// compactJSON is raw without insignificant space, raw itself when it does
+// not parse.
+func compactJSON(raw json.RawMessage) string {
+	var b bytes.Buffer
+	if json.Compact(&b, raw) != nil {
+		return string(raw)
+	}
+	return b.String()
 }
 
 // encodedUnit is a celsius or percent field value in the encoding units of
@@ -1808,8 +1853,12 @@ func confLiteral(c *conformance) string {
 	return fmt.Sprintf("spec.Conformance{Text: %q, %s}", c.Text, body)
 }
 
-// renderError carries a conformance confLiteral or a bound boundLiteral
-// cannot render out of the writers, which return no error, to generate.
+// renderError carries a form a writer cannot render — a conformance
+// (confLiteral), a bound (boundLiteral), a default (defaultLiteral), a
+// privilege (privilegeOf), an event priority (priorityLiteral), an "in"
+// (constraintLiteral), a response (hullCommands) — out of the writers,
+// which return no error, to generate: every generator refuses a form it
+// does not render (wizard-6b §2 gen Q1).
 type renderError struct{ err error }
 
 var opLiteral = map[string]string{

@@ -47,6 +47,23 @@ func TestGenerateRejects(t *testing.T) {
 		// admits every value (R2-P0-par-B05).
 		{"unknown bound node", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"max sqrt(4)","max":{"type":"sqrt","args":[4]}}}}],"commands":[],"events":[]}`, `unknown bound node type "sqrt"`},
 		{"unknown bound node in a struct field", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"S","type":"struct","metatype":"object","primitive":"struct","fields":[{"id":0,"name":"F","type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"min ?","min":{"type":"-","lhs":1}}}]}]}`, `without both operands`},
+		// A form the generator does not render is refused, not dropped
+		// (wizard-6b §2 gen Q1): a stated default it cannot carry
+		// (R2-P6-par-2703), a privilege letter (R2-P6-acl-2704), an event
+		// priority (R2-P6-par-2705), a non-reference "in"
+		// (R2-P6-par-2706), a named response no payload answers
+		// (R2-P6-par-2715), a feature without a bit (R2-P6-par-2714).
+		{"struct default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"struct","metatype":"object","fields":[],"default":{"type":"properties","properties":{"a":1}}}}],"commands":[],"events":[]}`, `default {"type":"properties"`},
+		{"none default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"none"}}}],"commands":[],"events":[]}`, `default {"type":"none"}`},
+		{"unscaled unit default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"int16","metatype":"integer","primitive":"int16","default":{"type":"celsius","value":26}}}],"commands":[],"events":[]}`, `default {"type":"celsius"`},
+		{"unknown default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"x"}}}],"commands":[],"events":[]}`, `default {"type":"x"}`},
+		{"unknown default in a struct field", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"S","type":"struct","metatype":"object","primitive":"struct","fields":[{"id":0,"name":"F","type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"x"}}]}]}`, `default {"type":"x"}`},
+		{"unknown privilege", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"bool","metatype":"boolean","access":{"rw":"R","readPriv":"R"}}}],"commands":[],"events":[]}`, `privilege "R"`},
+		{"unknown write privilege", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"bool","metatype":"boolean","access":{"rw":"RW","readPriv":"V","writePriv":"X"}}}],"commands":[],"events":[]}`, `privilege "X"`},
+		{"unknown priority", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[{"id":0,"name":"E","effective":{"priority":"warning","fields":[]}}]}`, `priority "warning"`},
+		{"no priority", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[{"id":0,"name":"E","effective":{"fields":[]}}]}`, `priority ""`},
+		{"non-reference in", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"in [1, 2]","in":[1,2]}}}],"commands":[],"events":[]}`, `constraint "in [1, 2]": in [1,2]`},
+		{"unanswered response", `{"id":1,"name":"A","attributes":[],"commands":[{"id":0,"name":"C","effective":{"direction":"request","response":"CResponse","fields":[]}}],"events":[]}`, `response "CResponse"`},
 		{"bad named enum", `{"id":1,"name":"A","attributes":[{"id":0,"name":"Feature","effective":{"type":"Feature","metatype":"enum","primitive":"uint8"}}],"commands":[],"events":[],"datatypes":[]}`, ""},
 	}
 	for _, tc := range cases {
@@ -211,5 +228,17 @@ func TestEmitWritesNothingWhenAClusterFails(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Errorf("the output directory holds %d entries after a failed run (first %s)", len(entries), entries[0].Name())
+	}
+}
+
+// TestSnapshotRefusesAFeatureWithoutABit: a feature without a bit would
+// decode as bit 0 and render as the Feature constant 1 << 0; the snapshot
+// is refused instead (R2-P6-par-2714, as devicegen and the schema
+// generator refuse it).
+func TestSnapshotRefusesAFeatureWithoutABit(t *testing.T) {
+	t.Parallel()
+	_, err := parseSnapshot([]byte(`{"clusters":[{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"features":[{"name":"F","effective":{"title":"T"}}]}]}`))
+	if err == nil || !strings.Contains(err.Error(), "A.F") {
+		t.Errorf("parseSnapshot = %v, want a refusal naming A.F", err)
 	}
 }

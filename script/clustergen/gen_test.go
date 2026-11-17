@@ -212,21 +212,39 @@ func TestLiterals(t *testing.T) {
 		t.Error("intOf fraction")
 	}
 	for in, want := range map[string]string{
-		"null": "spec.NullDefault{}", "true": "true", "3": "float64(3)", `"x"`: `"x"`, `{"type":"x"}`: "", "": "", "[": "",
+		"null": "spec.NullDefault{}", "true": "true", "3": "float64(3)", `"x"`: `"x"`, "": "",
 	} {
 		if got := defaultLiteral(raw(in), "uint8", "integer"); got != want {
 			t.Errorf("defaultLiteral(%s) = %q, want %q", in, got, want)
 		}
 	}
+	// A stated default the generator does not render fails the generation
+	// rather than reading as none (R2-P6-par-2703, wizard-6b §2 gen Q1).
+	for _, c := range []struct{ in, typ string }{
+		{`{"type":"x"}`, "uint8"},
+		{`[`, "uint8"},
+		{`{"type":"celsius","value":26}`, "int16"},
+		{`{"type":"percent","value":5}`, "uint8"},
+		{`{"type":"properties","properties":{"a":1}}`, "struct"},
+		{`{"type":"none"}`, "uint8"},
+		{`{"type":"reference"}`, "uint8"},
+	} {
+		func() {
+			defer func() {
+				if _, ok := recover().(renderError); !ok {
+					t.Errorf("defaultLiteral(%s, %s) did not fail", c.in, c.typ)
+				}
+			}()
+			defaultLiteral(raw(c.in), c.typ, "integer")
+		}()
+	}
 	// A unit stated with the default is restated in the type's encoding
-	// units (EncodedValue.ts at 862ad75f); a unit the type does not scale is
-	// not rendered.
+	// units (EncodedValue.ts at 862ad75f).
 	for _, c := range []struct{ in, typ, want string }{
 		{`{"type":"celsius","value":26}`, "temperature", "float64(2600)"},
 		{`{"type":"celsius","value":25.5}`, "UnsignedTemperature", "float64(255)"},
 		{`{"type":"percent","value":0.07}`, "percent100ths", "float64(7)"},
 		{`{"type":"percent","value":50}`, "percent", "float64(50)"},
-		{`{"type":"celsius","value":26}`, "int16", ""},
 		// A field value the runtime does not resolve keeps a marker
 		// (W3-clugen-07).
 		{`{"type":"bytes","value":"00"}`, "octstr", `spec.UnresolvedDefault{Kind: "bytes"}`},
@@ -338,7 +356,7 @@ func TestLiterals(t *testing.T) {
 	if typeText(&value{}) != "untyped" || describe(&value{Type: "bool", Access: &access{RW: "R"}}) != "bool, O, R" {
 		t.Error("typeText / describe")
 	}
-	if priorityLiteral("debug") != "spec.PriorityDebug" || priorityLiteral("critical") != "spec.PriorityCritical" || priorityLiteral("") != "spec.PriorityInfo" {
+	if priorityLiteral("debug") != "spec.PriorityDebug" || priorityLiteral("critical") != "spec.PriorityCritical" || priorityLiteral("info") != "spec.PriorityInfo" {
 		t.Error("priorityLiteral")
 	}
 	if lo, hi, ok := lengthBounds(&constraint{Value: raw("16")}); !ok || lo != 16 || hi != 16 {
