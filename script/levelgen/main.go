@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
 )
@@ -108,6 +109,13 @@ func run(doc bool) (err error) {
 	return writeIfChanged(docPath, out)
 }
 
+// buildTimeout and dumpTimeout bound the reference daemon's build and each
+// of its dumps.
+var (
+	buildTimeout = 10 * time.Minute
+	dumpTimeout  = 2 * time.Minute
+)
+
 // measureInternal runs the reference daemon's dump at every level below
 // the pin and collects its server-internal keep decisions.
 func measureInternal(files []leveltable.File) (map[string][]leveltable.Internal, error) {
@@ -121,22 +129,27 @@ func measureInternal(files []leveltable.File) (map[string][]leveltable.Internal,
 		goTool = "go"
 	}
 	bin := filepath.Join(dir, "reference-bridge")
-	build := exec.CommandContext(context.Background(), goTool, "build", "-o", bin, "./examples/reference-bridge") //nolint:gosec // G204: the go tool the Makefile names
+	// Each child runs under a deadline: a build or a dump that hangs fails
+	// the run, naming the step, instead of hanging make
+	// generate-level(s) without a message (R2-P6-err-2717).
+	buildCtx, cancelBuild := context.WithTimeout(context.Background(), buildTimeout)
+	defer cancelBuild()
+	build := exec.CommandContext(buildCtx, goTool, "build", "-o", bin, "./examples/reference-bridge") //nolint:gosec // G204: the go tool the Makefile names
 	build.Stdout, build.Stderr = os.Stderr, os.Stderr
+	build.WaitDelay = time.Second
 	if err := build.Run(); err != nil {
+		if buildCtx.Err() != nil {
+			err = fmt.Errorf("%w (after the %v deadline)", buildCtx.Err(), buildTimeout)
+		}
 		return nil, fmt.Errorf("build the reference daemon: %w", err)
 	}
 	out := map[string][]leveltable.Internal{}
 	for fi := range files[:len(files)-1] {
 		f := &files[fi]
 		level := f.Matter.Revision
-		dump := exec.CommandContext(context.Background(), bin, "--dump-surface", "--spec-level", level) //nolint:gosec // G204: the binary built above
-		dump.Dir = dir
-		var stderr bytes.Buffer
-		dump.Stderr = &stderr
-		b, err := dump.Output()
+		b, err := dumpLevel(dir, bin, level)
 		if err != nil {
-			return nil, fmt.Errorf("reference-bridge --dump-surface --spec-level %s: %w\n%s", level, err, stderr.String())
+			return nil, err
 		}
 		rows, err := ParseInternal(b)
 		if err != nil {
@@ -145,6 +158,26 @@ func measureInternal(files []leveltable.File) (map[string][]leveltable.Internal,
 		out[level] = rows
 	}
 	return out, nil
+}
+
+// dumpLevel runs the daemon's surface dump at one level under
+// dumpTimeout.
+func dumpLevel(dir, bin, level string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dumpTimeout)
+	defer cancel()
+	dump := exec.CommandContext(ctx, bin, "--dump-surface", "--spec-level", level) //nolint:gosec // G204: the binary built above
+	dump.Dir = dir
+	dump.WaitDelay = time.Second
+	var stderr bytes.Buffer
+	dump.Stderr = &stderr
+	b, err := dump.Output()
+	if err != nil {
+		if ctx.Err() != nil {
+			err = fmt.Errorf("%w (after the %v deadline)", ctx.Err(), dumpTimeout)
+		}
+		return nil, fmt.Errorf("reference-bridge --dump-surface --spec-level %s: %w\n%s", level, err, stderr.String())
+	}
+	return b, nil
 }
 
 // ParseInternal reads the server-internal keep decisions of a surface

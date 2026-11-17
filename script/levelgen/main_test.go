@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
 )
 
 func TestParseInternal(t *testing.T) {
@@ -101,5 +104,27 @@ func TestRunRestoresTheTableWhenTheDocFails(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(goPath); string(b) != stale {
 		t.Errorf("levels_gen.go after a failed run:\n%.200s\nwant the stale file back", b)
+	}
+}
+
+// TestMeasureInternalHasADeadline: a daemon build (or dump) that hangs
+// fails the run after its deadline, naming it, instead of hanging
+// make generate-level(s) without a message (R2-P6-err-2717). GO names a
+// stand-in that sleeps.
+func TestMeasureInternalHasADeadline(t *testing.T) {
+	hang := filepath.Join(t.TempDir(), "hang")
+	if err := os.WriteFile(hang, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil { //nolint:gosec // G306: an executable stand-in
+		t.Fatal(err)
+	}
+	t.Setenv("GO", hang)
+	defer func(d time.Duration) { buildTimeout = d }(buildTimeout)
+	buildTimeout = 200 * time.Millisecond
+	start := time.Now()
+	_, err := measureInternal([]leveltable.File{{}})
+	if err == nil || !strings.Contains(err.Error(), "deadline") {
+		t.Fatalf("measureInternal = %v, want the build's deadline", err)
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("the hanging build returned after %v", d)
 	}
 }
