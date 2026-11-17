@@ -588,3 +588,15 @@ func TestReport_PeerUnreachable_RetriesBeforeEviction(t *testing.T) {
 		t.Errorf("manager.Active()=%d after 3 send errors, want 0", mgr.Active())
 	}
 }
+
+// TestDeprecatedAckWaitTimeoutKeepsItsText: ErrAckWaitTimeout is
+// deprecated with nothing left to return it (owner decision 174); for the
+// deprecation window it stays the same sentinel with the same text, so a
+// host that still compares against it or logs it sees no change.
+func TestDeprecatedAckWaitTimeoutKeepsItsText(t *testing.T) {
+	t.Parallel()
+	//nolint:staticcheck // SA1019: the deprecated sentinel is what this test holds.
+	if got := ErrAckWaitTimeout.Error(); got != "bridge: outbound ack wait: timeout" {
+		t.Fatalf("ErrAckWaitTimeout = %q, want the text it had before its deprecation", got)
+	}
+}
