@@ -288,9 +288,14 @@ testparity-check: ## fail if the test register and the snapshot disagree, a Go t
 	$(GO) test -count=1 -run 'Testparity' ./script/testparity/
 
 .PHONY: ahead-check
-ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.md at the pin and at MATTERJS_REF (weekly: MATTERJS_REF=origin/main)
+ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.md at the pin and at MATTERJS_REF (default the clone's HEAD; weekly: MATTERJS_REF=origin/main)
 	@# Built, not `go run`, for the same reason as cite-check: exit 2 (no clone,
 	@# the pin or the ref unresolvable) must not read as a finding.
+	@# The verdict depends on the clone (R2-P6-test-2813): by default it reads
+	@# the neighbour checkout's HEAD, with MATTERJS_REF=origin/main the ref as
+	@# of its last fetch. The weekly job (matterjs-pin.yml) reads origin/main
+	@# of a fresh clone; the line below names the ref's commit and date.
+	@git -C $(MATTERJS_DIR) log -1 --format='ahead-check: $(MATTERJS_REF) is %h of %cs' $(MATTERJS_REF) 2>/dev/null || true
 	@bin=$$(mktemp -d)/aheadcheck; $(GO) build -o $$bin ./script/aheadcheck || exit 1; \
 	$$bin -matterjs $(MATTERJS_DIR) -ref $(MATTERJS_REF); rc=$$?; rm -rf $$(dirname $$bin); \
 	if [ $$rc -eq 2 ]; then echo "ahead-check: no matter.js clone with the pin and $(MATTERJS_REF) at $(MATTERJS_DIR)"; fi; \
