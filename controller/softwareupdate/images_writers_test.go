@@ -4,7 +4,6 @@
 package softwareupdate
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -59,7 +58,7 @@ func TestImagesOneWriterPerName(t *testing.T) {
 					if calls.Add(1) == 1 { // the first writer: other bytes, late
 						close(entered)
 						<-release
-						_, err := w.Write(bytes.Repeat([]byte{0x00}, len(img)))
+						_, err := w.Write(make([]byte, len(img)))
 						return err
 					}
 					_, err := w.Write(img)
