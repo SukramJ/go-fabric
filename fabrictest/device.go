@@ -534,13 +534,18 @@ func (d *Device) EndpointOf(key string) (uint16, bool) {
 // the local access matter.js's MockServerNode gives a test
 // (mock-server-node.ts): an attribute fn sets on a server is reported to
 // subscribers as a host's change is. Act does not
-// overlap Start, Stop or Restart, and returns fn's error.
+// overlap Start, Stop, Restart or FactoryReset, and returns fn's error; a
+// device that is not running is refused without fn (R2-P6-conc-2520).
+// fn must not call Start, Stop, Restart, FactoryReset, OpenWindow or Act
+// of the same device: each waits for Act to return.
 func (d *Device) Act(fn func(n *node.Node) error) error {
 	d.actMu.Lock()
 	defer d.actMu.Unlock()
-	n := d.Node()
-	if n == nil {
-		return errors.New("fabrictest: the device never started")
+	d.mu.Lock()
+	n, running := d.n, d.running
+	d.mu.Unlock()
+	if n == nil || !running {
+		return errors.New("fabrictest: the device is not running")
 	}
 	return fn(n)
 }

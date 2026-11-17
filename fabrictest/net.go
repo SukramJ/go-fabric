@@ -112,7 +112,10 @@ func (n *Network) Set(opts NetOptions) {
 
 // Filter installs keep, which sees every datagram before the options do
 // and drops it by returning false: a test loses one chosen message
-// rather than a share of all. nil removes the filter.
+// rather than a share of all. nil removes the filter. keep runs on the
+// sender's goroutine without the network's lock, so it may call
+// [Network.Set], [Network.Options] or Filter; it must not modify the
+// datagram's payload.
 func (n *Network) Filter(keep func(Datagram) bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -165,8 +168,13 @@ func (n *Network) listen(addr *net.UDPAddr, g *inflight.Group) (*udp.Listener, e
 func (n *Network) send(src, dst *net.UDPAddr, payload []byte) {
 	n.sent.Add(1)
 	d := Datagram{From: cloneAddr(src), To: cloneAddr(dst), Payload: append([]byte(nil), payload...)}
+	// The filter runs outside the lock: one that reads or sets the
+	// network's options returns (R2-P6-conc-2520).
 	n.mu.Lock()
-	keep := n.filter == nil || n.filter(d)
+	filter := n.filter
+	n.mu.Unlock()
+	keep := filter == nil || filter(d)
+	n.mu.Lock()
 	opts := n.opts
 	lost := keep && opts.Loss > 0 && n.rnd.Float64() < opts.Loss
 	twice := keep && !lost && opts.Duplicate > 0 && n.rnd.Float64() < opts.Duplicate
