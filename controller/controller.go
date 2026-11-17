@@ -407,8 +407,8 @@ type Controller struct {
 	// session hooks, the update manager's session lookup. Those run on
 	// goroutines Close does not wait for, so they read these instead of
 	// the fields Close clears: each is set once its component exists and
-	// cleared by Close before the component closes, and a callback that
-	// finds nil does nothing (review II, R2-P6-conc-2305).
+	// cleared when Close begins its teardown (clearLive), and a callback
+	// that finds nil does nothing (review II, R2-P6-conc-2305).
 	live struct {
 		mgr   atomic.Pointer[exchange.Manager]
 		peers atomic.Pointer[peer.Set]
@@ -540,19 +540,17 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if cfg.TCP.Outgoing {
 		pctx.DialTCP = c.dialTCP()
 	}
-	if c.peers, err = peer.NewSet(pctx); err != nil {
+	if err := c.openPeers(pctx); err != nil {
 		return nil, err
 	}
-	c.live.peers.Store(c.peers)
 	if cfg.OTA != nil {
 		c.armer = peer.NewRebootResubscribeArmer(c.armerContext())
 	}
 	// The registry carries the report bound to every node interaction
 	// bound to it (commissioner.Interaction).
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{
+	c.openSubscriptions(interaction.SubscriptionsConfig{
 		Logger: log, Clock: clk, ReportStarted: c.reportStarted, MaxReportBytesPerSession: cfg.MaxReportBytesPerSession,
 	})
-	c.live.subs.Store(c.subs)
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
 		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
@@ -631,6 +629,45 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 	// A database that ran the own node is migrated whether or not the
 	// controller serves OTA (review II, R2-P1-ctl-03).
 	return c.retireOwnNode(ctx, c.st, c.log)
+}
+
+// openPeers builds the peer set and publishes it to the background
+// callbacks (live).
+func (c *Controller) openPeers(pctx peer.Context) (err error) {
+	if c.peers, err = peer.NewSet(pctx); err != nil {
+		return err
+	}
+	c.live.peers.Store(c.peers)
+	return nil
+}
+
+// openSubscriptions builds the client subscriptions and publishes them to
+// the background callbacks (live).
+func (c *Controller) openSubscriptions(cfg interaction.SubscriptionsConfig) {
+	c.subs = interaction.NewSubscriptions(cfg)
+	c.live.subs.Store(c.subs)
+}
+
+// clearLive takes the components out of the background callbacks' reach
+// before Close closes them: a callback that runs later does nothing.
+func (c *Controller) clearLive() {
+	c.live.subs.Store(nil)
+	c.live.peers.Store(nil)
+	c.live.mgr.Store(nil)
+}
+
+// closeOTA stops the update manager once the NodeDeleted calls the node
+// hooks handed off have returned, and refuses further ones.
+func (c *Controller) closeOTA() {
+	m := c.ota.Swap(nil)
+	if m == nil {
+		return
+	}
+	c.otaDeletedMu.Lock()
+	c.otaDeletedClosed = true
+	c.otaDeletedMu.Unlock()
+	c.otaDeleted.Wait()
+	m.Close()
 }
 
 // openStores builds the controller's store and node registry on cfg.DB,
@@ -787,18 +824,13 @@ func (c *Controller) Close(ctx context.Context) error {
 		_ = c.subs.BlockNewActivity(ctx)
 	}
 	c.unwatchAllICD()
+	c.clearLive()
 	if c.stopDiscover != nil {
 		c.stopDiscover()
 		c.stopDiscover = nil
 	}
 	c.closeVendorInfo()
-	if m := c.ota.Swap(nil); m != nil {
-		c.otaDeletedMu.Lock()
-		c.otaDeletedClosed = true
-		c.otaDeletedMu.Unlock()
-		c.otaDeleted.Wait()
-		m.Close()
-	}
+	c.closeOTA()
 	if c.groups != nil {
 		c.groups.SetTransport(nil)
 		c.groups = nil
@@ -815,7 +847,6 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.reg = nil
 	}
 	if c.subs != nil {
-		c.live.subs.Store(nil)
 		errs = append(errs, c.subs.Close(ctx))
 		c.subs = nil
 	}
@@ -824,7 +855,6 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.com = nil
 	}
 	if c.peers != nil {
-		c.live.peers.Store(nil)
 		c.peers.Close(ctx)
 		c.peers = nil
 	}
@@ -847,7 +877,6 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.stopTCP = nil
 	}
 	if c.mgr != nil {
-		c.live.mgr.Store(nil)
 		c.mgr.Close()
 		c.mgr = nil
 	}

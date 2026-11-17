@@ -66,7 +66,8 @@ func TestTCPMaxMessageSizeRefusals(t *testing.T) {
 	}
 	if math.MaxInt > math.MaxUint32 {
 		big := TCPConfig{Incoming: true}
-		big.MaxMessageSize = int(int64(math.MaxUint32) + 1)
+		above := int64(math.MaxUint32) + 1
+		big.MaxMessageSize = int(above)
 		if big.validMessageSize() {
 			t.Error("a bound above the uint32 maximum was accepted")
 		}

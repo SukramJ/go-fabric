@@ -48,7 +48,7 @@ func TestICDRegistrationIsRedacted(t *testing.T) {
 	reg := client.ICDRegistration{Key: key, PendingKey: pending, CounterStart: 7, MonitoredSubject: 0xabcd}
 	for _, s := range renderings(t, reg, &reg) {
 		for _, k := range [][]byte{key, pending} {
-			for _, form := range []string{hex.EncodeToString(k), strings.ToUpper(hex.EncodeToString(k)), string(k), fmt.Sprint(k)} {
+			for _, form := range []string{hex.EncodeToString(k), strings.ToUpper(hex.EncodeToString(k)), string(k), fmt.Sprintf("%v", k)} {
 				if strings.Contains(s, form) {
 					t.Fatalf("a rendering carries a key: %s", s)
 				}

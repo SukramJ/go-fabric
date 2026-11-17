@@ -204,10 +204,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		}
 		return spec.Node{}, false
 	})
-	type place struct {
-		ep      uint16
-		cluster uint32
-	}
+	type place = imagePlace
 	type key struct {
 		place
 		attr uint32
@@ -256,15 +253,37 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		}
 		after += size
 	}
-	// The Descriptor lists the report carries create structure of their
-	// own: synchronizeServerList a cluster, with its cache, for every id a
-	// ServerList names, synchronizePartsList an endpoint for every part a
-	// PartsList names. The image charges them once they exist, so the
-	// projection charges them now — what a reported list would create, not
-	// only what the report carries values for (review II,
-	// R2-P6-bound-2351, owner decision 54). The structure code that creates
-	// them stays as it is.
-	for _, a := range kept {
+	s.chargeDescriptorLists(kept, newEndpoints, newClusters)
+	after += len(newEndpoints)*imageEndpointBytes + len(newClusters)*imageClusterBytes
+	if quota := s.quota(); after > quota && after > before {
+		if !s.quotaLogged {
+			s.quotaLogged = true
+			s.log.Warn("matter.controller.client.image_quota_reached", slog.Int("bytes", before),
+				slog.Int("total", after), slog.Int("max_bytes", quota),
+				slog.String("reason", "the report's values would raise the node's image above its quota; the report is not applied, and further refusals of the node are not logged"))
+		}
+		return nil
+	}
+	return kept
+}
+
+// imagePlace is a cluster of an endpoint, as admit charges it.
+type imagePlace struct {
+	ep      uint16
+	cluster uint32
+}
+
+// chargeDescriptorLists adds to newEndpoints and newClusters what the
+// Descriptor lists of kept would create. synchronizeServerList creates a
+// cluster, with its cache, for every id a ServerList names,
+// synchronizePartsList an endpoint for every part a PartsList names; the
+// image charges them once they exist, so admit's projection charges them
+// now — what a reported list would create, not only what the report
+// carries values for (review II, R2-P6-bound-2351, owner decision 54).
+// The structure code that creates them stays as it is.
+func (s *structure) chargeDescriptorLists(kept []AttributeData, newEndpoints map[uint16]bool, newClusters map[imagePlace]bool) {
+	for i := range kept {
+		a := &kept[i]
 		if a.Path.Cluster != descriptor.ClusterID || !isList(a.Value) {
 			continue
 		}
@@ -279,7 +298,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 				if !isUint(c) || c.El.Uint > 0xFFFF_FFFF {
 					continue
 				}
-				if at := (place{ep, uint32(c.El.Uint)}); e == nil || e.clusters[at.cluster] == nil {
+				if at := (imagePlace{ep, uint32(c.El.Uint)}); e == nil || e.clusters[at.cluster] == nil {
 					newClusters[at] = true
 				}
 			}
@@ -287,7 +306,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 			for _, c := range a.Value.Children {
 				// EndpointNumber.isValid, 0 to 0xFFFE, as synchronizePartsList;
 				// the root and the endpoint itself are no parts there.
-				if !isUint(c) || c.El.Uint > 0xFFFE || c.El.Uint == 0 || uint16(c.El.Uint) == ep {
+				if !isUint(c) || c.El.Uint > 0xFFFE || c.El.Uint == 0 || c.El.Uint == uint64(ep) {
 					continue
 				}
 				if part := uint16(c.El.Uint); s.endpoints[part] == nil {
@@ -296,17 +315,6 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 			}
 		}
 	}
-	after += len(newEndpoints)*imageEndpointBytes + len(newClusters)*imageClusterBytes
-	if quota := s.quota(); after > quota && after > before {
-		if !s.quotaLogged {
-			s.quotaLogged = true
-			s.log.Warn("matter.controller.client.image_quota_reached", slog.Int("bytes", before),
-				slog.Int("total", after), slog.Int("max_bytes", quota),
-				slog.String("reason", "the report's values would raise the node's image above its quota; the report is not applied, and further refusals of the node are not logged"))
-		}
-		return nil
-	}
-	return kept
 }
 
 // privateCluster is one of the node's own entries the store keeps on
