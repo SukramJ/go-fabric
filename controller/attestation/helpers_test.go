@@ -34,10 +34,10 @@ type chainSpec struct {
 	paiNoVID               bool
 	// dacNoPID leaves the ProductID out of the DAC's subject; paiPID, when
 	// non-nil, puts one into the PAI's.
-	dacNoPID bool
-	paiPID   *uint16
-	paiNotBefore           time.Time
-	dacNotBefore           time.Time
+	dacNoPID     bool
+	paiPID       *uint16
+	paiNotBefore time.Time
+	dacNotBefore time.Time
 	// paiNotAfter and dacNotAfter end the certificate's validity; the
 	// zero value is 9999-12-31T23:59:59Z, the date without a well-defined
 	// expiration.
