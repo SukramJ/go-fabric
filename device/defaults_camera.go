@@ -174,8 +174,9 @@ func newPushTransportServer(b defaultBuild) (contract.ClusterServer, error) {
 	if z, ok := b.sibling(zmdef.ClusterID).(*camera.Zones); ok {
 		cfg.Zones = z
 	}
-	if v, ok := b.initial[padef.AttrCurrentConnections]; ok {
-		spec.Assign(&cfg.Connections, v)
+	// A value of another shape stays for the definition's check to refuse
+	// (R2-P6-err-2506).
+	if v, ok := b.initial[padef.AttrCurrentConnections]; ok && spec.Assign(&cfg.Connections, v) {
 		delete(b.initial, padef.AttrCurrentConnections)
 	}
 	return camera.NewPushTransport(cfg)

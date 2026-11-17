@@ -349,7 +349,7 @@ func colorConfigFrom(cfg *light.ColorControlServerConfig, initial map[uint32]any
 		ccdef.AttrColorTemperatureMireds: &cfg.InitialMireds, ccdef.AttrCoupleColorTempToLevelMinMireds: &cfg.CoupleColorTempToLevelMinMireds,
 		ccdef.AttrCurrentX: &cfg.InitialX, ccdef.AttrCurrentY: &cfg.InitialY, ccdef.AttrEnhancedCurrentHue: &cfg.InitialEnhancedHue,
 	} {
-		if v, ok := consume(initial, id); ok && v <= math.MaxUint16 {
+		if v, ok := consumeMax(initial, id, math.MaxUint16); ok {
 			*dst = uint16(v)
 		}
 	}
@@ -394,10 +394,10 @@ func colorPointsFrom(cfg *light.ColorControlServerConfig, initial map[uint32]any
 		}
 		cfg.Primaries = append(cfg.Primaries, c)
 	}
-	x, hasX := consume(initial, ccdef.AttrWhitePointX)
-	y, hasY := consume(initial, ccdef.AttrWhitePointY)
+	x, hasX := consumeMax(initial, ccdef.AttrWhitePointX, math.MaxUint16)
+	y, hasY := consumeMax(initial, ccdef.AttrWhitePointY, math.MaxUint16)
 	if hasX || hasY {
-		cfg.WhitePoint = &light.CIEPoint{X: uint16(min(x, math.MaxUint16)), Y: uint16(min(y, math.MaxUint16))} //nolint:gosec // bounded
+		cfg.WhitePoint = &light.CIEPoint{X: uint16(x), Y: uint16(y)} //nolint:gosec // consumeMax held both to 0xFFFF
 	}
 	for ids, dst := range map[[3]uint32]**light.Chromaticity{
 		{ccdef.AttrColorPointRx, ccdef.AttrColorPointRy, ccdef.AttrColorPointRIntensity}: &cfg.ColorPointR,
@@ -415,12 +415,12 @@ func colorPointsFrom(cfg *light.ColorControlServerConfig, initial map[uint32]any
 // from initial; ok is false when neither X nor Y is supplied, and an
 // Intensity alone stays for the server to refuse as unserved.
 func chromaticityFrom(initial map[uint32]any, ids [3]uint32) (light.Chromaticity, bool) {
-	x, hasX := consume(initial, ids[0])
-	y, hasY := consume(initial, ids[1])
+	x, hasX := consumeMax(initial, ids[0], math.MaxUint16)
+	y, hasY := consumeMax(initial, ids[1], math.MaxUint16)
 	if !hasX && !hasY {
 		return light.Chromaticity{}, false
 	}
-	c := light.Chromaticity{X: uint16(min(x, math.MaxUint16)), Y: uint16(min(y, math.MaxUint16))} //nolint:gosec // bounded
+	c := light.Chromaticity{X: uint16(x), Y: uint16(y)} //nolint:gosec // consumeMax held both to 0xFFFF
 	if in, hasIn := consume8(initial, ids[2]); hasIn {
 		c.Intensity = &in
 	}
@@ -444,13 +444,13 @@ func newWindowCoveringServer(b defaultBuild) (contract.ClusterServer, error) {
 	// one the position is unknown and reads null, matter.js's default
 	// (window-covering-cluster.element.ts:71-72, :75-76 at db021da0).
 	configFrom(&cfg, b.def, b.initial)
-	if v, ok := consume(b.initial, wcdef.AttrCurrentPositionLiftPercent100ths); ok && v <= math.MaxUint16 {
+	if v, ok := consumeMax(b.initial, wcdef.AttrCurrentPositionLiftPercent100ths, math.MaxUint16); ok {
 		cfg.InitialPositionPercent100ths = uint16(v)
 		delete(b.initial, wcdef.AttrTargetPositionLiftPercent100ths)
 	} else {
 		cfg.InitialPositionUnknown = true
 	}
-	if v, ok := consume(b.initial, wcdef.AttrCurrentPositionTiltPercent100ths); ok && v <= math.MaxUint16 {
+	if v, ok := consumeMax(b.initial, wcdef.AttrCurrentPositionTiltPercent100ths, math.MaxUint16); ok {
 		cfg.InitialTiltPositionPercent100ths = uint16(v)
 		delete(b.initial, wcdef.AttrTargetPositionTiltPercent100ths)
 	} else {
