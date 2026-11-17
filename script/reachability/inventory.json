@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9760,
+  "entry_points": 9764,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19344,
-    "reachable": 12655,
-    "whitelisted": 6689,
+    "total_exported": 19347,
+    "reachable": 12656,
+    "whitelisted": 6691,
     "unreachable": 0
   },
   "by_package": [],
@@ -32574,6 +32574,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestAddPartWaitingOnTheFlipSeesIt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/composition_internal_test.go",
+      "line": 324
+    },
+    {
+      "package": "device",
       "identifier": "TestAheadDeclarationsAreThermo",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
@@ -33761,6 +33768,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
       "line": 170
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestBridgedInfoCheckIsTheServingEndpoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/bridged_info_check_test.go",
+      "line": 70
     },
     {
       "package": "endpoint",
