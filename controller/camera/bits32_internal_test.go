@@ -113,3 +113,18 @@ func TestPixelArithmeticIsInt64(t *testing.T) {
 		t.Errorf("scaleToPixels(65535x65535, 1080p) = %v, over the budget", got)
 	}
 }
+
+// TestRequestedResolutionIsAtLeastOne (review II, R2-P6-doc-2252): the
+// requested size is never larger than the source on a side the source
+// states above 0, and at least 1 on each side — so a side of 0 is asked
+// for as 1, as the comment states. Before, the comment said "never larger
+// than available" without the exception.
+func TestRequestedResolutionIsAtLeastOne(t *testing.T) {
+	t.Parallel()
+	if got := requestedResolution(resolution{0, 480}, &resolutionTarget{width: 320}); got != (resolution{1, 480}) {
+		t.Errorf("requestedResolution(0x480, width 320) = %v, want 1x480", got)
+	}
+	if got := requestedResolution(resolution{640, 480}, &resolutionTarget{width: 320}); got != (resolution{320, 240}) {
+		t.Errorf("requestedResolution(640x480, width 320) = %v, want 320x240", got)
+	}
+}

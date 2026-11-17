@@ -69,7 +69,10 @@ func jsRound(v float64) int { return floorInt(v + 0.5) }
 // requestedResolution is the RequestedResolution (§11.2.8.13.2) for a
 // source of size available: the target fitted inside the source with the
 // source's aspect ratio, so a stated width alone fixes the height; never
-// larger than available, and available itself without a target. Mirrors
+// larger than available — except that each side is at least 1, so a
+// source that states a side of 0 is asked for 1 there, which the camera
+// refuses (review II, R2-P6-doc-2252) — and available itself without a
+// target. Mirrors
 // matterjs-server packages/ws-controller/src/camera/snapshotPolicy.ts:55-71
 // at 0bd06f2.
 func requestedResolution(available resolution, target *resolutionTarget) resolution {
