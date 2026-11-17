@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"net"
 	"strconv"
 	"syscall"
@@ -37,6 +38,40 @@ type TCPConfig struct {
 	// minutes), or is closed when every held one did. Zero is the
 	// controller's default, 256; a negative value is [ErrConfiguration].
 	MaxInboundConnections int
+	// MaxMessageSize is the largest TCP message, its 4-byte length prefix
+	// not counted, the controller accepts and sends: its session
+	// parameters state it as MAX_TCP_MESSAGE_SIZE, and every TCP
+	// connection, inbound and outbound, holds to it. Zero is 64 000
+	// (sessionparams.DefaultMaxTCPMessageSize). With a TCP role, a value
+	// below exchange.MaxUDPMessageSize (1232) or above 2^32−1 is
+	// [ErrConfiguration]; without one it is not used. Mirrors matter.js
+	// NetworkServer.resolveTcpConfig and
+	// SessionParameters.assertMaxTcpMessageSize
+	// (packages/node/src/behavior/system/network/NetworkServer.ts:276-291,
+	// packages/protocol/src/session/SessionParameters.ts:128-137 at
+	// db021da0; review II, R2-P6-par-3209).
+	MaxMessageSize int
+}
+
+// maxMessageSize is the TCP message bound t selects: the configured one,
+// sessionparams.DefaultMaxTCPMessageSize for zero or without a TCP role
+// (resolveTcpConfig, NetworkServer.ts:280-286 at db021da0).
+func (t TCPConfig) maxMessageSize() int {
+	if t.MaxMessageSize == 0 || (!t.Incoming && !t.Outgoing) {
+		return int(sessionparams.DefaultMaxTCPMessageSize)
+	}
+	return t.MaxMessageSize
+}
+
+// validMessageSize reports whether t's MaxMessageSize is one its roles
+// may use: anything without a TCP role, else zero or a whole number from
+// exchange.MaxUDPMessageSize to the uint32 maximum
+// (SessionParameters.ts:128-137 at db021da0).
+func (t TCPConfig) validMessageSize() bool {
+	if (!t.Incoming && !t.Outgoing) || t.MaxMessageSize == 0 {
+		return true
+	}
+	return t.MaxMessageSize >= exchange.MaxUDPMessageSize && int64(t.MaxMessageSize) <= math.MaxUint32
 }
 
 // defaultMaxInboundTCPConnections is the controller's default total bound
@@ -74,7 +109,7 @@ func localParameters(t TCPConfig, s *SessionIntervals) *sessionparams.Parameters
 	if t.Incoming {
 		p.SupportedTransports |= sessionparams.TransportTCPServer
 	}
-	p.MaxTCPMessageSize = sessionparams.DefaultMaxTCPMessageSize
+	p.MaxTCPMessageSize = uint32(t.maxMessageSize()) //nolint:gosec // validMessageSize bounds it to uint32
 	return &p
 }
 
@@ -82,7 +117,7 @@ func localParameters(t TCPConfig, s *SessionIntervals) *sessionparams.Parameters
 // the exchange manager — matter.js TcpTransport.openChannel
 // (packages/protocol/src/transport/tcp/TcpTransport.ts:149-182).
 func (c *Controller) dialTCP() func(ctx context.Context, addr *net.UDPAddr) (exchange.Channel, error) {
-	d := &tcp.Dialer{Logger: c.log}
+	d := &tcp.Dialer{Logger: c.log, MaxPayloadSize: c.tcp.maxMessageSize()}
 	mgr := c.mgr
 	return func(ctx context.Context, addr *net.UDPAddr) (exchange.Channel, error) {
 		conn, err := d.Dial(ctx, addr.String(), func(conn *tcp.Conn, msg []byte, _ func()) {
@@ -134,6 +169,7 @@ func (c *Controller) bindTransports(listen string, given *udp.Listener) (udpList
 			LocalAddr: net.JoinHostPort(ua.IP.String(), strconv.Itoa(ua.Port)),
 			Logger:    c.log, Clock: c.clock,
 			MaxInboundConnections: c.tcp.maxInboundConnections(),
+			MaxPayloadSize:        c.tcp.maxMessageSize(),
 		})
 		if err == nil {
 			return udpListener, tcpListener, nil

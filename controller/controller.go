@@ -36,6 +36,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -423,7 +424,8 @@ type Controller struct {
 }
 
 // checkRequired refuses a configuration without its required fields or
-// with a negative report, image or inbound TCP bound.
+// with a negative report, image or inbound TCP bound, or a TCP message
+// bound its roles cannot use.
 func checkRequired(cfg *Config) error {
 	switch {
 	case cfg.DB == nil:
@@ -436,6 +438,8 @@ func checkRequired(cfg *Config) error {
 		return fmt.Errorf("%w: MaxImageBytesPerNode %d is negative", ErrConfiguration, cfg.MaxImageBytesPerNode)
 	case cfg.TCP.MaxInboundConnections < 0:
 		return fmt.Errorf("%w: TCP.MaxInboundConnections %d is negative", ErrConfiguration, cfg.TCP.MaxInboundConnections)
+	case !cfg.TCP.validMessageSize():
+		return fmt.Errorf("%w: TCP.MaxMessageSize of %d is not a whole number from %d to %d", ErrConfiguration, cfg.TCP.MaxMessageSize, exchange.MaxUDPMessageSize, uint64(math.MaxUint32))
 	}
 	return nil
 }
