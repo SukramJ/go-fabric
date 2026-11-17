@@ -1317,6 +1317,14 @@ func (o *owedReport) requeue(sub *subscription.Subscription) {
 // :221-227); an error status ends the subscription
 // (ServerSubscription.ts:938-950), a missing answer is a failed update
 // (:558-608).
+//
+// A session's close disarms its waits ([Bridge.endSessionChunkWaits]): a
+// chunk before the last then ends aborted and its data is owed again
+// uncounted, while the last message's wait ends unanswered and counts as
+// a failed update when the subscription still routes — the bridge's
+// SessionClosed ran before the manager's CloseSession. The subscription
+// closes with its session either way; the count reaches nothing on the
+// wire (review II, DR5b-c1-06).
 func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target subTarget, report im.ReportData, owed *owedReport, op string) (exchangeID uint16, delivered bool) {
 	owed.subID = sub.ID
 	counters, exch, wait, err := b.sendInitiatedReportArmed(target, report, true)
