@@ -167,23 +167,40 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - the discriminator fits 12 bits;
 - the passcode is in range and not on the trivially-guessable list;
 - the PBKDF iteration count and salt length are what SPAKE2+ accepts;
-- `VendorID` and `ProductID` are set;
+- `VendorID` and `ProductID` are set, and `ProductDescription.DeviceType`,
+  when set, is a device type of the schema;
 - a store is given — `Store.Path`, `Store.DB`, or both `Store.Credentials`
   and `Store.Endpoints` (see below) — and not both `Store.Path` and `Store.DB`;
 - `Attestation.Provider` is not combined with `Files`, `Chain` or the CD,
   `Attestation.Files` is not combined with `Chain` or the CD, and
   `BlockCommissioningOnError` comes with `Files`;
 - `BootReason` is a BootReasonEnum value;
-- `Health.Interval` is not negative;
-- `Limits.SupportedFabrics` is at most 254;
-- `UniqueID` is at most 32 bytes;
+- `Health.Interval` and `Network.InterfaceCheck` are not below 1 s when
+  positive (`Health.Interval` not negative; a negative `InterfaceCheck` turns
+  the check off);
+- `Limits.SupportedFabrics` is at most 254, and a deprecated
+  `Config.SupportedFabrics` or `Config.MaxPathsPerInvoke` set beside its
+  `Limits` field equals it;
+- `Network` takes `GATT` or the deprecated `BLE`, not both;
+- the advertised device name (`ProductDescription.Name`, else
+  `BasicInformation.NodeLabel`) is at most 32 bytes, and `Network.MDNS`'s
+  settings are not combined with an own `Advertiser`;
+- `UniqueID` is at most 32 bytes, and every `BasicInformation` string
+  (VendorName, ProductName, ProductLabel, NodeLabel, SerialNumber,
+  HardwareVersionString, SoftwareVersionString) is inside its attribute's
+  constraint in the generated definition — a SerialNumber longer than 32
+  (UTF-16 code units) fails;
 - `LocationCapability` is a valid regulatory location (zero is IndoorOutdoor,
   matter.js's default), and `IndoorOnly` comes with no other value;
 - `Network.WiFi`, when set, has its `Driver`, its `Reporter` or both;
 - `Network.TCP.MaxInboundConnections` is not negative;
-- every name in `Network.MDNS.Interfaces` is non-empty and named once;
-- `OTA.Dir` is set when `OTA` is;
-- `TLS.CertificatePort` is set when `TLS` is;
+- every name in `Network.MDNS.Interfaces` is non-empty and named once, and
+  `Network.MDNS.HostName`, when set, is one DNS label of at most 40 bytes;
+- `OTA.Dir` is set when `OTA` is, and `OTA.HTTPSMaxImageSize`,
+  `HTTPSIdleTimeout` and `AnnouncedUpdateQueryDelay` are not negative;
+- `TLS.CertificatePort` is set when `TLS` is, and each `TLS` capacity is
+  inside its bound;
+- `EndpointState` is not combined with the deprecated `EndpointPersistence`;
 - `DeviceTypeValidation` is one of warn, strict and off;
 - every `Limits` field is inside its bound and the `Sessions` intervals
   are valid;
