@@ -124,10 +124,10 @@ func TestOperationalHoursSurviveARestart(t *testing.T) {
 // the Ethernet reporter knows nothing.
 func TestRuntimeHeapAndUnknownEthernet(t *testing.T) {
 	t.Parallel()
-	if used, ok := (runtimeHeap{}).CurrentHeapUsed(); !ok || used == 0 {
+	if used, ok := newRuntimeHeap().CurrentHeapUsed(); !ok || used == 0 {
 		t.Errorf("heap used %d", used)
 	}
-	if _, ok := (runtimeHeap{}).CurrentHeapFree(); !ok {
+	if _, ok := newRuntimeHeap().CurrentHeapFree(); !ok {
 		t.Error("heap free unknown")
 	}
 	e := unknownEthernet{}

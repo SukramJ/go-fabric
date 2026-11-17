@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"runtime"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -508,7 +510,7 @@ func buildRootOptional(ctx context.Context, st store.Settings, logger *slog.Logg
 	if err != nil {
 		return nil, err
 	}
-	software, err := mattercore.NewSoftwareDiagnostics(mattercore.SoftwareDiagnosticsConfig{Heap: runtimeHeap{}})
+	software, err := mattercore.NewSoftwareDiagnostics(mattercore.SoftwareDiagnosticsConfig{Heap: newRuntimeHeap()})
 	if err != nil {
 		return nil, err
 	}
@@ -635,23 +637,50 @@ func clusterIDsOf(servers []contract.ClusterServer) func() []uint32 {
 	}
 }
 
-// runtimeHeap reports the Go heap (root_optional.go:129-144 at b4ea1f96^).
-type runtimeHeap struct{}
+// heapSampleAge is how long one reading of the Go heap answers the
+// SoftwareDiagnostics heap attributes: runtime.ReadMemStats stops the
+// world, and a peer that may read the root would otherwise stop it once
+// per attribute it reads, at its own request rate (review II,
+// R2-P6-bound-2453).
+const heapSampleAge = time.Second
 
-func (runtimeHeap) read() runtime.MemStats {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	return m
+// runtimeHeap reports the Go heap (root_optional.go:129-144 at b4ea1f96^),
+// from one reading per heapSampleAge.
+type runtimeHeap struct {
+	// readMemStats reads the heap (runtime.ReadMemStats); now is the
+	// sample's clock (time.Now).
+	readMemStats func(*runtime.MemStats)
+	now          func() time.Time
+	// mu guards at and m: the last reading and when it was taken.
+	mu sync.Mutex
+	at time.Time
+	m  runtime.MemStats
+}
+
+func newRuntimeHeap() *runtimeHeap {
+	return &runtimeHeap{readMemStats: runtime.ReadMemStats, now: time.Now}
+}
+
+// read returns the last reading while it is younger than heapSampleAge,
+// else a new one.
+func (h *runtimeHeap) read() runtime.MemStats {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if now := h.now(); h.at.IsZero() || now.Sub(h.at) >= heapSampleAge || now.Before(h.at) {
+		h.readMemStats(&h.m)
+		h.at = now
+	}
+	return h.m
 }
 
 // CurrentHeapFree implements mattercore.HeapReporter.
-func (h runtimeHeap) CurrentHeapFree() (uint64, bool) {
+func (h *runtimeHeap) CurrentHeapFree() (uint64, bool) {
 	m := h.read()
 	return m.HeapSys - m.HeapReleased - m.HeapAlloc, true
 }
 
 // CurrentHeapUsed implements mattercore.HeapReporter.
-func (h runtimeHeap) CurrentHeapUsed() (uint64, bool) { return h.read().HeapAlloc, true }
+func (h *runtimeHeap) CurrentHeapUsed() (uint64, bool) { return h.read().HeapAlloc, true }
 
 // unknownEthernet is an Ethernet reporter that cannot tell anything: the
 // node binds every interface and knows no single link.
