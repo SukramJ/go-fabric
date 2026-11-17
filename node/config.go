@@ -11,10 +11,13 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	basicdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
@@ -652,6 +655,49 @@ type BasicInformation struct {
 	SoftwareVersionString string
 }
 
+// basicInformationChecks holds a value to the generated BasicInformation
+// definition's type and constraint (spec.Instance.CheckValue): the
+// constraints are the schema's, never stated here.
+var basicInformationChecks = sync.OnceValues(func() (*spec.Instance, error) {
+	return spec.New(basicdef.Definition, spec.Options{})
+})
+
+// constraintErrors refuses each BasicInformation string beyond its
+// attribute's constraint in the generated definition (VendorName,
+// ProductName, ProductLabel, NodeLabel, SerialNumber and the two version
+// strings), naming the attribute and the constraint (review II,
+// R2-P6-api-2407, decision 201): served as it is, an over-long value is a
+// wrong answer to every controller. An empty string is the field's
+// default (NodeLabel the ProductName, a version string the server's
+// fallback) and is not checked here.
+func (b BasicInformation) constraintErrors() []error {
+	inst, err := basicInformationChecks()
+	if err != nil {
+		return []error{fmt.Errorf("node: the BasicInformation definition: %w", err)}
+	}
+	var errs []error
+	for _, f := range []struct {
+		attr  uint32
+		value string
+	}{
+		{basicdef.AttrVendorName, b.VendorName},
+		{basicdef.AttrProductName, b.ProductName},
+		{basicdef.AttrProductLabel, b.ProductLabel},
+		{basicdef.AttrNodeLabel, b.NodeLabel},
+		{basicdef.AttrSerialNumber, b.SerialNumber},
+		{basicdef.AttrHardwareVersionString, b.HardwareVersionString},
+		{basicdef.AttrSoftwareVersionString, b.SoftwareVersionString},
+	} {
+		if f.value == "" {
+			continue
+		}
+		if _, err := inst.CheckValue(f.attr, f.value, nil); err != nil {
+			errs = append(errs, fmt.Errorf("node: BasicInformation.%s (constraint %q): %w", basicdef.Definition.Attribute(f.attr).Name, basicdef.Definition.Attribute(f.attr).Constraint.Text, err))
+		}
+	}
+	return errs
+}
+
 // defaultNodeLabel sets an empty NodeLabel to the ProductName, before
 // anything reads it: the root serves it, the commissionable record
 // advertises it when ProductDescription.Name is empty, and the first
@@ -909,6 +955,7 @@ func (c *Config) Validate() error {
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
 		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
 	}
+	errs = append(errs, c.BasicInformation.constraintErrors()...)
 	errs = append(errs, c.limitsPairErrors()...)
 	errs = append(errs, c.advertisementErrors()...)
 	if c.Network.GATT != nil && c.Network.BLE != nil { //nolint:staticcheck // the deprecated port is still honoured
