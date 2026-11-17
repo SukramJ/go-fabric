@@ -2127,7 +2127,7 @@ var _ = asn1.NullBytes
 // runtime stack.
 func computeCompressedFabricID(rootPubKey []byte, fabricID uint64) ([]byte, error) {
 	if len(rootPubKey) != 65 || rootPubKey[0] != 0x04 {
-		return nil, fmt.Errorf("compressed fabric id: invalid root pub key (len=%d)", len(rootPubKey))
+		return nil, fmt.Errorf("core: compressed fabric id: invalid root pub key (len=%d)", len(rootPubKey))
 	}
 	var salt [8]byte
 	salt[0] = byte((fabricID >> 56) & 0xFF) // big-endian byte extraction

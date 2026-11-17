@@ -171,7 +171,7 @@ func parseECPrivateKey(der []byte) (*ecdsa.PrivateKey, error) {
 
 func checkP256(k *ecdsa.PrivateKey) (*ecdsa.PrivateKey, error) {
 	if k.Curve.Params().Name != "P-256" {
-		return nil, fmt.Errorf("curve %s, want P-256 (Matter §6.2.2)", k.Curve.Params().Name)
+		return nil, fmt.Errorf("attestation: curve %s, want P-256 (Matter §6.2.2)", k.Curve.Params().Name)
 	}
 	return k, nil
 }

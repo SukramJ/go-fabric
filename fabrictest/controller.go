@@ -99,7 +99,7 @@ type ControllerOptions struct {
 
 // errServeEnded is the report of a controller socket's serve that returned
 // no error before the stack stopped it.
-var errServeEnded = errors.New("returned without an error")
+var errServeEnded = errors.New("fabrictest: the serve returned without an error")
 
 // Controller is an in-process Matter controller of a site: the module's
 // own controller stack (controller/, ADR 0020) wired as an application
