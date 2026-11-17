@@ -101,6 +101,7 @@ type Node struct {
 	labelReconciled bool
 	stopObserve     func()
 	warned          map[[2]uint64]bool
+	warnedFull      bool // warned reached maxUnknownWarned, and that was logged
 	// requestObserver is a test seam: it sees each subscription request the
 	// node hands to the interaction.
 	requestObserver func(SubscribePaths)

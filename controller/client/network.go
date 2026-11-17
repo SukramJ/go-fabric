@@ -706,8 +706,19 @@ func (n *Node) deliverEvent(e *EventData) {
 	n.mu.Unlock()
 }
 
+// maxUnknownWarned bounds the unknown clusters and events a node logs:
+// the set of those already logged holds at most this many, then one line
+// says further ones of the node are not logged and nothing more is
+// recorded. A module rule (review II, R2-P6-bound-2357, owner decision
+// 223; Fable fact note fable-6b-w2 G1): matter.js's set has no bound
+// (packages/node/src/node/client/ClientEventEmitter.ts:38, :145-147,
+// :155-157 at db021da0), and a peer that reports events under ever new
+// ids grew it for the node's life, charged to no quota. Event handling
+// is not touched, only the logging.
+const maxUnknownWarned = 256
+
 // noteUnknown logs an unknown cluster, or an unknown event of a cluster,
-// once (ClientEventEmitter.ts:138-156).
+// once (ClientEventEmitter.ts:138-156), up to maxUnknownWarned of them.
 func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 	key := [2]uint64{uint64(cluster), 1 << 32}
 	if isEvent {
@@ -715,8 +726,22 @@ func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 	}
 	n.mu.Lock()
 	seen := n.warned[key]
-	n.warned[key] = true
+	full := !seen && len(n.warned) >= maxUnknownWarned
+	if !seen && !full {
+		n.warned[key] = true
+	}
+	first := full && !n.warnedFull
+	if full {
+		n.warnedFull = true
+	}
 	n.mu.Unlock()
+	if full {
+		if first {
+			n.log.Info("matter.controller.client.unknown_not_logged", slog.Int("logged", maxUnknownWarned),
+				slog.String("reason", "the node reported more unknown clusters and events than are logged; further unknown events of the node are not logged"))
+		}
+		return
+	}
 	if seen {
 		return
 	}
