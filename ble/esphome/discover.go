@@ -61,7 +61,9 @@ var _ Browser = (*discovery.Names)(nil)
 // ("kitchen-proxy") — or by its MAC address in any common spelling
 // ("AA:BB:CC:DD:EE:FF", "aabbccddeeff"), which the TXT record's `mac`
 // carries. A name matches before a MAC; both match without regard to
-// case. A device without a key is used only when it answers plaintext.
+// case. A device without a key is not dialled unless
+// [DiscoverOptions.AllowPlaintext] admits it, and then used only when it
+// answers plaintext.
 type Keys map[string]string
 
 // ParseKey parses name=key — the reference controller's
@@ -116,6 +118,15 @@ type DiscoverOptions struct {
 	Browser Browser
 	// Keys are the discovered devices' API keys.
 	Keys Keys
+	// AllowPlaintext admits a discovered device without a key in Keys,
+	// over the plaintext API. Off — the default — such a device is not
+	// dialled and is logged as ble.esphome.proxy_skipped: the plaintext
+	// API authenticates neither side, so whoever announces
+	// _esphomelib._tcp on the LAN would become a proxy that carries this
+	// central's connections. On, each plaintext proxy found is logged as
+	// the warning ble.esphome.proxy_plaintext. A proxy given to
+	// NewCentral is used as given (R2-P6-sec-2001).
+	AllowPlaintext bool
 	// Rescan is how often the central browses again; 0 is DefaultRescan.
 	// It browses again on every proxy loss as well.
 	Rescan time.Duration
@@ -184,6 +195,24 @@ func candidates(ctx context.Context, b Browser, keys Keys, timeout time.Duration
 	return out, nil
 }
 
+// errPlaintextNotAllowed is a discovered device without a key while
+// DiscoverOptions.AllowPlaintext is off.
+var errPlaintextNotAllowed = errors.New("esphome: no key in Keys for the discovered device, and DiscoverOptions.AllowPlaintext is off")
+
+// admit refuses a keyless candidate unless plaintext is allowed.
+func admit(c candidate, allowPlaintext bool) error {
+	if c.psk == "" && !allowPlaintext {
+		return errPlaintextNotAllowed
+	}
+	return nil
+}
+
+// warnPlaintext logs a discovered proxy used over the plaintext API.
+func warnPlaintext(log *slog.Logger, name string, addrs []string) {
+	log.Warn("ble.esphome.proxy_plaintext", slog.String("proxy", name), slog.Any("addresses", addrs),
+		slog.String("hint", "the plaintext API authenticates neither side; give the device an API key and add it to DiscoverOptions.Keys"))
+}
+
 // skip logs a discovered device that is not used.
 func skip(log *slog.Logger, c candidate, reason error) {
 	log.Info("ble.esphome.proxy_skipped", slog.String("proxy", c.name), slog.Any("addresses", c.addrs), slog.String("reason", reason.Error()))
@@ -193,7 +222,8 @@ func skip(log *slog.Logger, c candidate, reason error) {
 // ([ServiceType]), connects to each once and returns the Bluetooth proxies
 // a central can commission through: those with ACTIVE_CONNECTIONS and
 // REMOTE_CACHING. A device's key comes from keys (by name or by the TXT
-// mac); a device without one is used only when it answers plaintext.
+// mac); a device without one is not dialled unless o.Discover's
+// AllowPlaintext admits it, and then used only when it answers plaintext.
 // o.Discover names the browser, the keys and the browse Timeout (0 is
 // DefaultBrowseTimeout; Rescan is unused); o.Clock paces the browse and
 // the connections, o.Dial opens them. Every device left out is logged on
@@ -219,6 +249,10 @@ func Discover(ctx context.Context, o Options) ([]Proxy, error) {
 	found := make([]*Proxy, len(cs))
 	var wg sync.WaitGroup
 	for i, c := range cs {
+		if err := admit(c, disc.AllowPlaintext); err != nil {
+			skip(o.Logger, c, err)
+			continue
+		}
 		wg.Go(func() {
 			var psk []byte
 			if c.psk != "" {
@@ -237,6 +271,9 @@ func Discover(ctx context.Context, o Options) ([]Proxy, error) {
 				return
 			}
 			a.close(context.Canceled)
+			if psk == nil {
+				warnPlaintext(o.Logger, c.name, c.addrs)
+			}
 			found[i] = &Proxy{Addr: addr, Key: c.psk, Name: c.name}
 		})
 	}
@@ -309,6 +346,12 @@ func (c *Central) rescan(ctx context.Context) {
 		if refused && hash == cd.hash {
 			continue
 		}
+		if err := admit(cd, c.disc.AllowPlaintext); err != nil {
+			// Refused at this configuration: logged once, not at
+			// every browse.
+			c.refuse(cd, err)
+			continue
+		}
 		fresh = append(fresh, cd)
 	}
 	c.join(ctx, fresh)
@@ -370,6 +413,9 @@ func (c *Central) join(ctx context.Context, cs []candidate) {
 			delete(c.skipped, cd.key)
 			c.setMu.Unlock()
 			c.log.Info("ble.esphome.proxy_discovered", slog.String("proxy", p.name), slog.Any("addresses", cd.addrs), slog.Bool("encrypted", p.psk != nil))
+			if p.psk == nil {
+				warnPlaintext(c.log, p.name, cd.addrs)
+			}
 			c.start(p, a)
 		})
 	}

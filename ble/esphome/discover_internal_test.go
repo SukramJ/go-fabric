@@ -36,7 +36,7 @@ func TestDegenerateInstances(t *testing.T) {
 					dials++
 					return nil, errors.New("no dial expected")
 				},
-				Discover: &DiscoverOptions{Browser: staticBrowser{out: []discovery.Instance{in}}, Timeout: time.Millisecond},
+				Discover: &DiscoverOptions{Browser: staticBrowser{out: []discovery.Instance{in}}, AllowPlaintext: true, Timeout: time.Millisecond},
 			}
 			ps, err := Discover(t.Context(), o)
 			if err != nil || len(ps) != 0 {

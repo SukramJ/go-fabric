@@ -8,8 +8,11 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -91,7 +94,8 @@ func proxyNames(ps []esphome.Proxy) []string {
 
 // TestDiscover: of the ESPHome devices advertised, the ones with
 // ACTIVE_CONNECTIONS whose key is known (by name or by the TXT mac) or
-// that answer plaintext are proxies; the rest are skipped with a reason.
+// that answer plaintext, admitted by AllowPlaintext, are proxies; the rest
+// are skipped with a reason.
 func TestDiscover(t *testing.T) {
 	n := esphometest.NewNetwork()
 	plain := fake(t, esphometest.Options{Name: "plain-proxy", MAC: "AABBCCDDEE01"})
@@ -111,7 +115,7 @@ func TestDiscover(t *testing.T) {
 	discover := func(keys esphome.Keys) ([]esphome.Proxy, error) {
 		return esphome.Discover(t.Context(), esphome.Options{
 			Logger:   slog.New(log),
-			Discover: &esphome.DiscoverOptions{Browser: names(t, n), Keys: keys, Timeout: browseWindow},
+			Discover: &esphome.DiscoverOptions{Browser: names(t, n), Keys: keys, AllowPlaintext: true, Timeout: browseWindow},
 		})
 	}
 	got, err := discover(keys)
@@ -137,6 +141,9 @@ func TestDiscover(t *testing.T) {
 		if !ok || r.reason != reason {
 			t.Errorf("%s: skipped %v %q, want %q", name, ok, r.reason, reason)
 		}
+	}
+	if _, ok := log.find("ble.esphome.proxy_plaintext", "plain-proxy"); !ok {
+		t.Error("no proxy_plaintext warning for the plaintext proxy")
 	}
 	// Discover connects once and lets go.
 	eventually(t, "the probes to end", func() bool { return plain.Clients() == 0 && byName.Clients() == 0 })
@@ -199,19 +206,24 @@ func TestCentralDiscovery(t *testing.T) {
 	n := esphometest.NewNetwork()
 	given := fake(t, esphometest.Options{Name: "given-proxy", MAC: "AABBCCDDEE11"}, per)
 	found := fake(t, esphometest.Options{Name: "found-proxy", MAC: "AABBCCDDEE12", Key: testKey}, per)
-	leaving := fake(t, esphometest.Options{Name: "leaving-proxy", MAC: "AABBCCDDEE13"})
+	leaving := fake(t, esphometest.Options{Name: "leaving-proxy", MAC: "AABBCCDDEE13", Key: testKey})
 	for _, f := range []*esphometest.Proxy{given, found, leaving} {
 		n.Advertise(f)
 	}
 	log := &capture{}
 	c := central(t, esphome.Options{Logger: slog.New(log), Discover: &esphome.DiscoverOptions{
-		Browser: names(t, n), Keys: esphome.Keys{"found-proxy": testKey}, Rescan: time.Hour, Timeout: browseWindow,
+		Browser: names(t, n), Keys: esphome.Keys{"found-proxy": testKey, "leaving-proxy": testKey}, Rescan: time.Hour, Timeout: browseWindow,
 	}}, esphome.Proxy{Addr: given.Addr(), Name: "given"})
 	eventually(t, "one client per proxy", func() bool {
 		return given.Clients() == 1 && found.Clients() == 1 && leaving.Clients() == 1
 	})
 	if _, ok := log.find("ble.esphome.proxy_discovered", "given-proxy"); ok {
 		t.Fatal("the given proxy must not be added a second time")
+	}
+	// A given plaintext proxy is used as given, and its advertisement is
+	// that proxy, not a keyless device to refuse.
+	if r, ok := log.find("ble.esphome.proxy_skipped", "given-proxy"); ok {
+		t.Fatalf("the given proxy's advertisement was skipped: %q", r.reason)
 	}
 
 	// Scanning runs through the given and the discovered proxy.
@@ -248,5 +260,82 @@ func TestCentralDiscovery(t *testing.T) {
 	eventually(t, "the given proxy back", func() bool { return count(given.Events(), "subscribe") == 2 })
 	if _, ok := log.find("ble.esphome.proxy_removed", "given"); ok {
 		t.Fatal("a given proxy must stay")
+	}
+}
+
+// dialLog is an Options.Dial that records every address dialled.
+type dialLog struct {
+	mu    sync.Mutex
+	addrs []string
+}
+
+func (d *dialLog) dial(ctx context.Context, network, address string) (net.Conn, error) {
+	d.mu.Lock()
+	d.addrs = append(d.addrs, address)
+	d.mu.Unlock()
+	var nd net.Dialer
+	return nd.DialContext(ctx, network, address)
+}
+
+func (d *dialLog) dialled(addr string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return slices.Contains(d.addrs, addr)
+}
+
+// TestDiscoveredPlaintextNeedsOptIn (R2-P6-sec-2001, decision 196): a
+// discovered device without a key in Keys is not dialled — whoever
+// announces _esphomelib._tcp on the LAN would otherwise become a proxy the
+// central connects through — unless DiscoverOptions.AllowPlaintext admits
+// it, and then each plaintext proxy is a warning. Discover and a central's
+// discovery alike.
+func TestDiscoveredPlaintextNeedsOptIn(t *testing.T) {
+	n := esphometest.NewNetwork()
+	plain := fake(t, esphometest.Options{Name: "plain-proxy", MAC: "AABBCCDDEE21"})
+	keyed := fake(t, esphometest.Options{Name: "keyed-proxy", MAC: "AABBCCDDEE22", Key: testKey})
+	n.Advertise(plain)
+	n.Advertise(keyed)
+	keys := esphome.Keys{"keyed-proxy": testKey}
+	for _, allow := range []bool{false, true} {
+		want := []string{"keyed-proxy"}
+		if allow {
+			want = []string{"keyed-proxy", "plain-proxy"}
+		}
+		check := func(t *testing.T, log *capture, dials *dialLog) {
+			t.Helper()
+			if dials.dialled(plain.Addr()) != allow {
+				t.Errorf("plaintext device dialled %v, want %v", !allow, allow)
+			}
+			r, skipped := log.find("ble.esphome.proxy_skipped", "plain-proxy")
+			if skipped == allow || (!allow && !strings.Contains(r.reason, "AllowPlaintext")) {
+				t.Errorf("plaintext device skipped %v (%q), want %v naming AllowPlaintext", skipped, r.reason, !allow)
+			}
+			if _, warned := log.find("ble.esphome.proxy_plaintext", "plain-proxy"); warned != allow {
+				t.Errorf("plaintext warning %v, want %v", warned, allow)
+			}
+		}
+		t.Run(fmt.Sprintf("Discover/AllowPlaintext=%v", allow), func(t *testing.T) {
+			log, dials := &capture{}, &dialLog{}
+			got, err := esphome.Discover(t.Context(), esphome.Options{
+				Logger: slog.New(log), Dial: dials.dial,
+				Discover: &esphome.DiscoverOptions{Browser: names(t, n), Keys: keys, AllowPlaintext: allow, Timeout: browseWindow},
+			})
+			if err != nil || !slices.Equal(proxyNames(got), want) {
+				t.Fatalf("Discover = %v, %v; want %v", proxyNames(got), err, want)
+			}
+			check(t, log, dials)
+		})
+		t.Run(fmt.Sprintf("Central/AllowPlaintext=%v", allow), func(t *testing.T) {
+			log, dials := &capture{}, &dialLog{}
+			central(t, esphome.Options{Logger: slog.New(log), Dial: dials.dial, Discover: &esphome.DiscoverOptions{
+				Browser: names(t, n), Keys: keys, AllowPlaintext: allow, Rescan: time.Hour, Timeout: browseWindow,
+			}})
+			for _, name := range want {
+				if _, ok := log.find("ble.esphome.proxy_discovered", name); !ok {
+					t.Errorf("%s not discovered", name)
+				}
+			}
+			check(t, log, dials)
+		})
 	}
 }
