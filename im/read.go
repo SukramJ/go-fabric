@@ -117,12 +117,16 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 	}
 	var req ReadRequest
 	hasFabricFiltered := false
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ReadRequest{}, fmt.Errorf("%w: %w", ErrInvalidReadRequest, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return ReadRequest{}, later.first
+			}
 			// IsFabricFiltered is mandatory: matter.js
 			// packages/types/src/protocol/messages/TlvReadRequest.ts:30
 			// (TlvField); chip src/app/ReadHandler.cpp:498. Review
@@ -141,7 +145,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				return ReadRequest{}, fmt.Errorf("%w: AttributeRequests not array", ErrInvalidReadRequest)
 			}
 			paths, err := readPathArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.AttributeRequests = paths
@@ -150,7 +154,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				return ReadRequest{}, fmt.Errorf("%w: EventRequests not array", ErrInvalidReadRequest)
 			}
 			paths, err := readEventPathArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.EventRequests = paths
@@ -175,7 +179,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				continue
 			}
 			filters, err := readEventFilterArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.EventFilters = filters
@@ -190,7 +194,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 				return ReadRequest{}, fmt.Errorf("%w: DataVersionFilters not array", ErrInvalidReadRequest)
 			}
 			filters, err := readDataVersionFilterArray(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return ReadRequest{}, err
 			}
 			req.DataVersionFilters = filters
@@ -209,6 +213,7 @@ func UnmarshalReadRequestTLV(dec *tlv.Decoder) (ReadRequest, error) { //nolint:g
 // EndContainer.
 func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 	var paths []ConcreteAttributePath
+	var later laterErrors
 	for {
 		// Peek the next element via Next; if it's the array's end,
 		// return. Otherwise the element MUST be a List opener — the
@@ -218,6 +223,9 @@ func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 			return nil, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return nil, later.first
+			}
 			return paths, nil
 		}
 		if !el.IsContainer || el.Type != tlv.TypeList {
@@ -227,7 +235,7 @@ func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 		// inline the field-loop body of UnmarshalAttributePathTLV
 		// because the opener has been consumed.
 		p, err := readAttributePathFields(dec)
-		if err != nil {
+		if err := later.keep(err); err != nil {
 			return nil, err
 		}
 		paths = append(paths, p)
@@ -238,16 +246,22 @@ func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 // — used when the caller has already consumed the list opener.
 func readAttributePathFields(dec *tlv.Decoder) (ConcreteAttributePath, error) {
 	var p ConcreteAttributePath
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ConcreteAttributePath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return ConcreteAttributePath{}, later.first
+			}
 			return p, nil
 		}
 		if err := readAttributePathField(dec, el, &p); err != nil {
-			return ConcreteAttributePath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
+			if err := later.keep(fmt.Errorf("%w: %w", ErrInvalidPath, err)); err != nil {
+				return ConcreteAttributePath{}, err
+			}
 		}
 	}
 }

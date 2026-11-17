@@ -175,19 +175,23 @@ type EventDataWriter func(enc *tlv.Encoder, tag tlv.Tag, v AttributeValue)
 // EndContainer.
 func readEventPathArray(dec *tlv.Decoder) ([]ConcreteEventPath, error) {
 	var paths []ConcreteEventPath
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return nil, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return nil, later.first
+			}
 			return paths, nil
 		}
 		if !el.IsContainer || el.Type != tlv.TypeList {
 			return nil, fmt.Errorf("%w: EventPathIB not list, got 0x%02X", ErrInvalidPath, el.Type)
 		}
 		p, err := readEventPathFields(dec)
-		if err != nil {
+		if err := later.keep(err); err != nil {
 			return nil, err
 		}
 		paths = append(paths, p)
@@ -198,12 +202,16 @@ func readEventPathArray(dec *tlv.Decoder) ([]ConcreteEventPath, error) {
 // used when the caller has already consumed the list opener.
 func readEventPathFields(dec *tlv.Decoder) (ConcreteEventPath, error) {
 	var p ConcreteEventPath
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ConcreteEventPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return ConcreteEventPath{}, later.first
+			}
 			return p, nil
 		}
 		// A non-context member refuses the path, as for every path list
@@ -236,7 +244,9 @@ func readEventPathFields(dec *tlv.Decoder) (ConcreteEventPath, error) {
 			err = skipField(dec, el)
 		}
 		if err != nil {
-			return ConcreteEventPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
+			if err := later.keep(fmt.Errorf("%w: %w", ErrInvalidPath, err)); err != nil {
+				return ConcreteEventPath{}, err
+			}
 		}
 	}
 }

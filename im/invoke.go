@@ -113,12 +113,16 @@ func readDelayReportData(dec *tlv.Decoder, el tlv.Element) (*DelayReportData, er
 		return nil, invokeDecodeStatusError{"im: invalid InvokeRequest: DelayReportData not a structure", StatusInvalidAction}
 	}
 	out := &DelayReportData{}
+	var later laterErrors
 	for {
 		f, err := dec.Next()
 		if err != nil {
 			return nil, fmt.Errorf("%w: DelayReportData: %w", ErrInvalidInvokeRequest, err)
 		}
 		if f.IsEndContainer {
+			if later.first != nil {
+				return nil, later.first
+			}
 			return out, nil
 		}
 		if f.IsContainer {
@@ -133,7 +137,8 @@ func readDelayReportData(dec *tlv.Decoder, el tlv.Element) (*DelayReportData, er
 			return nil, invokeDecodeStatusError{"im: invalid InvokeRequest: DelayReportData field is not an unsigned integer", StatusInvalidAction}
 		}
 		if f.Uint > 0xFFFF {
-			return nil, invokeDecodeStatusError{"im: invalid InvokeRequest: DelayReportData field exceeds uint16", StatusConstraintError}
+			_ = later.keep(invokeDecodeStatusError{"im: invalid InvokeRequest: DelayReportData field exceeds uint16", StatusConstraintError})
+			continue
 		}
 		if f.Tag.Number == 0 {
 			out.DelayMinMs = uint16(f.Uint)
@@ -209,12 +214,16 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 	}
 	var req InvokeRequest
 	var hasSuppress, hasTimed, hasInvokes bool
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return InvokeRequest{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return InvokeRequest{}, later.first
+			}
 			// SuppressResponse, TimedRequest and InvokeRequests are
 			// mandatory: matter.js
 			// packages/types/src/protocol/messages/TlvInvokeRequest.ts:19,
@@ -254,14 +263,14 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 				return InvokeRequest{}, fmt.Errorf("%w: InvokeRequests not array", ErrInvalidInvokeRequest)
 			}
 			invokes, err := readCommandData(dec, fieldsReader)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return InvokeRequest{}, err
 			}
 			req.Invokes = invokes
 			hasInvokes = true
 		case tagInvokeReqDelayReportData:
 			drd, err := readDelayReportData(dec, el)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return InvokeRequest{}, err
 			}
 			req.DelayReportData = drd
@@ -281,19 +290,23 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 
 func readCommandData(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]CommandInvocation, error) {
 	var out []CommandInvocation
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return nil, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return nil, later.first
+			}
 			return out, nil
 		}
 		if !el.IsContainer || el.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: CommandDataIB not struct", ErrInvalidInvokeRequest)
 		}
 		inv, err := readCommandInvocation(dec, fieldsReader)
-		if err != nil {
+		if err := later.keep(err); err != nil {
 			return nil, err
 		}
 		out = append(out, inv)
@@ -303,12 +316,16 @@ func readCommandData(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]Comm
 func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (CommandInvocation, error) {
 	var inv CommandInvocation
 	hasPath := false
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return CommandInvocation{}, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return CommandInvocation{}, later.first
+			}
 			// CommandPath is mandatory: matter.js
 			// packages/types/src/protocol/types/TlvCommandData.ts:17 at
 			// db021da0 (TlvField).
@@ -326,7 +343,7 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				return CommandInvocation{}, fmt.Errorf("%w: CommandPathIB not list", ErrInvalidInvokeRequest)
 			}
 			p, err := readCommandPathFields(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return CommandInvocation{}, err
 			}
 			inv.Path = p
@@ -338,7 +355,9 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 		case tagCmdDataRef:
 			ref, err := uint16Field(el)
 			if err != nil {
-				return CommandInvocation{}, fmt.Errorf("%w: CommandRef: %w", ErrInvalidInvokeRequest, err)
+				if err := later.keep(fmt.Errorf("%w: CommandRef: %w", ErrInvalidInvokeRequest, err)); err != nil {
+					return CommandInvocation{}, err
+				}
 			}
 			inv.CommandRef = ref
 			inv.HasCommandRef = true
@@ -421,12 +440,16 @@ func skipNonStructFields(dec *tlv.Decoder, el tlv.Element) (bool, error) {
 
 func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 	var p ConcreteCommandPath
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return ConcreteCommandPath{}, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return ConcreteCommandPath{}, later.first
+			}
 			if !p.HasCluster || !p.HasCommand {
 				return ConcreteCommandPath{}, fmt.Errorf("%w: missing cluster/command", ErrInvalidPath)
 			}
@@ -456,7 +479,9 @@ func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 			err = skipField(dec, el)
 		}
 		if err != nil {
-			return ConcreteCommandPath{}, fmt.Errorf("%w: %w", ErrInvalidPath, err)
+			if err := later.keep(fmt.Errorf("%w: %w", ErrInvalidPath, err)); err != nil {
+				return ConcreteCommandPath{}, err
+			}
 		}
 	}
 }

@@ -85,12 +85,16 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 	}
 	var req WriteRequest
 	var hasTimed, hasWrites bool
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return WriteRequest{}, fmt.Errorf("%w: %w", ErrInvalidWriteRequest, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return WriteRequest{}, later.first
+			}
 			// TimedRequest and WriteRequests are mandatory: matter.js
 			// packages/types/src/protocol/messages/TlvWriteRequest.ts:21, :24
 			// at db021da0 (TlvField; SuppressResponse :18 is optional).
@@ -131,7 +135,7 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 				return WriteRequest{}, fmt.Errorf("%w: WriteRequests not array", ErrInvalidWriteRequest)
 			}
 			ws, err := readAttributeWrites(dec, valueReader)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return WriteRequest{}, err
 			}
 			req.Writes = ws
@@ -148,19 +152,23 @@ func UnmarshalWriteRequestTLV(dec *tlv.Decoder, valueReader AttributeValueReader
 
 func readAttributeWrites(dec *tlv.Decoder, valueReader AttributeValueReader) ([]AttributeWrite, error) {
 	var out []AttributeWrite
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return nil, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return nil, later.first
+			}
 			return out, nil
 		}
 		if !el.IsContainer || el.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: AttributeDataIB not struct", ErrInvalidWriteRequest)
 		}
 		w, err := readAttributeData(dec, valueReader)
-		if err != nil {
+		if err := later.keep(err); err != nil {
 			return nil, err
 		}
 		out = append(out, w)
@@ -182,6 +190,7 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 	var w AttributeWrite
 	var hasPath, hasData bool
 	var dataAt tlv.Decoder
+	var later laterErrors
 	for {
 		mark := *dec
 		el, err := dec.Next()
@@ -189,6 +198,9 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			return AttributeWrite{}, err
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return AttributeWrite{}, later.first
+			}
 			// Path and Data are mandatory: matter.js
 			// packages/types/src/protocol/types/TlvAttributeData.ts:18-19 at
 			// db021da0 (TlvField). Without the check an AttributeDataIB
@@ -224,7 +236,9 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 			// TlvUInt32, never masked (review 2026-11 W2-wire-03).
 			v, err := uint32Field(el)
 			if err != nil {
-				return AttributeWrite{}, fmt.Errorf("%w: DataVersion: %w", ErrInvalidWriteRequest, err)
+				if err := later.keep(fmt.Errorf("%w: DataVersion: %w", ErrInvalidWriteRequest, err)); err != nil {
+					return AttributeWrite{}, err
+				}
 			}
 			w.DataVersion = v
 			w.HasDataVersion = true
@@ -233,7 +247,7 @@ func readAttributeData(dec *tlv.Decoder, valueReader AttributeValueReader) (Attr
 				return AttributeWrite{}, fmt.Errorf("%w: path not list", ErrInvalidWriteRequest)
 			}
 			p, err := readAttributePathFields(dec)
-			if err != nil {
+			if err := later.keep(err); err != nil {
 				return AttributeWrite{}, err
 			}
 			w.Path = p

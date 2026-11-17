@@ -107,7 +107,9 @@ func requestBoolField(el tlv.Element, name string) (bool, error) {
 // handleRequest answers Failure (InteractionMessenger.ts:425-460, :431).
 // A value out of bounds throws ValidationOutOfBoundsError
 // (TlvNumber.ts:145-155), a ValidationError whose code is ConstraintError
-// (packages/types/src/common/ValidationError.ts:16-29).
+// (packages/types/src/common/ValidationError.ts:16-29). A request decoder
+// keeps that error for the end of its container, so a later type error
+// answers first ([laterErrors]; review II, 5a-2 A1-d).
 func uintField(el tlv.Element, maxValue uint64) (uint64, error) {
 	switch el.Type {
 	case tlv.TypeUnsignedInt1, tlv.TypeUnsignedInt2, tlv.TypeUnsignedInt4, tlv.TypeUnsignedInt8:

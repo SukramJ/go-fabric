@@ -75,12 +75,16 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 	if open.Type != tlv.TypeStructure {
 		return req, fmt.Errorf("%w: top must be Structure", ErrInvalidTimedRequest)
 	}
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return req, fmt.Errorf("%w: %w", ErrInvalidTimedRequest, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return TimedRequest{}, later.first
+			}
 			break
 		}
 		if err := contextMember(el); err != nil {
@@ -93,7 +97,9 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 			// not a 4464 ms window (matter.js packages/types/src/protocol/messages/TlvTimedRequest.ts:15; review
 			// 2026-11 W2-wire-03).
 			if req.TimeoutMs, err = uint16Field(el); err != nil {
-				return TimedRequest{}, fmt.Errorf("%w: %w", ErrInvalidTimedRequest, err)
+				if err := later.keep(fmt.Errorf("%w: %w", ErrInvalidTimedRequest, err)); err != nil {
+					return TimedRequest{}, err
+				}
 			}
 		default:
 			// InteractionModelRevision is decoded but not retained — the
@@ -138,12 +144,16 @@ func UnmarshalStatusResponseTLV(dec *tlv.Decoder) (StatusResponse, error) {
 		return sr, fmt.Errorf("%w: top must be Structure", ErrInvalidStatusResponse)
 	}
 	seenStatus := false
+	var later laterErrors
 	for {
 		el, err := dec.Next()
 		if err != nil {
 			return sr, fmt.Errorf("%w: %w", ErrInvalidStatusResponse, err)
 		}
 		if el.IsEndContainer {
+			if later.first != nil {
+				return StatusResponse{}, later.first
+			}
 			break
 		}
 		if err := contextMember(el); err != nil {
@@ -162,7 +172,9 @@ func UnmarshalStatusResponseTLV(dec *tlv.Decoder) (StatusResponse, error) {
 			}
 			v, err := uint8Field(el)
 			if err != nil {
-				return sr, fmt.Errorf("%w: status: %w", ErrInvalidStatusResponse, err)
+				if err := later.keep(fmt.Errorf("%w: status: %w", ErrInvalidStatusResponse, err)); err != nil {
+					return sr, err
+				}
 			}
 			sr.Status = StatusCode(v)
 			seenStatus = true
