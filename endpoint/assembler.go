@@ -329,6 +329,9 @@ const deviceTypeAggregator = 0x000E
 // endpoint itself removed, for a full-family composer; endpoint.parts
 // otherwise; ascending either way).
 func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *Spec, parent uint16, part bool) ([]*Endpoint, error) {
+	if err := checkBridgedInfo(spec, part); err != nil {
+		return nil, err
+	}
 	ep, err := a.buildEndpoint(ctx, scope, spec)
 	if err != nil {
 		return nil, err
@@ -358,9 +361,6 @@ func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *S
 // it resolves the persisted endpoint id for the spec's stable key and
 // binds the per-identity state that has to survive a reassembly.
 func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec) (*Endpoint, error) {
-	if err := checkBridgedInfo(spec, a.cfg.VendorName); err != nil {
-		return nil, err
-	}
 	id, err := a.assignOrReuseID(ctx, scope, spec.StableKey, spec.DeviceType)
 	if err != nil {
 		return nil, err

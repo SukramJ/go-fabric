@@ -61,3 +61,30 @@ func TestAssemblyRefusesBridgedInfoBeyondItsConstraint(t *testing.T) {
 	}
 	t.Fatal("no BridgedDeviceBasicInformation server")
 }
+
+// TestBridgedInfoCheckIsTheServingEndpoints (R2-P6-wire-2502, round 3):
+// the check is held only by a Spec that serves BridgedDeviceBasicInformation.
+// The bridge's own VendorName is the node's configuration, not checked per
+// endpoint, and a part — which serves no such cluster — assembles whatever
+// its Spec states.
+func TestBridgedInfoCheckIsTheServingEndpoints(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("x", 40)
+	src := func() contract.EndpointSource {
+		return deviceTypeSource{dt: 0x0100, servers: []contract.ClusterServer{dtServer{id: 0x0006}}}
+	}
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, VendorName: long}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = a.Assemble(context.Background(), []Snapshot{{Scope: "s", Endpoints: []Spec{{
+		StableKey: StringKey("owner"), DeviceType: 0x0100, FriendlyName: "Owner", Source: src(),
+		Parts: []Spec{{
+			StableKey: StringKey("part"), DeviceType: 0x0100, FriendlyName: "Part", Source: src(),
+			VendorName: long, BridgedBasicInformation: bdbidef.Patch{ProductName: &long},
+		}},
+	}}}})
+	if err != nil {
+		t.Fatalf("a bridge VendorName and a part's statements beyond the constraint: %v, want the assembly", err)
+	}
+}
