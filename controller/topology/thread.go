@@ -21,7 +21,7 @@ import (
 // An extended address is global; an RLOC16 is unique only within one
 // Thread network, so its claim is keyed by the claimant's extended PAN id
 // and looked up with the observer's — matterjs-server's own pattern for
-// its diagnostics path (buildMatterRloc16ByXp, topology-utils.ts:442-451);
+// its diagnostics path (buildMatterRloc16ByXp, topology-utils.ts:442-451 at 0bd06f22);
 // a node without an extended PAN id keeps a claim across networks. Two
 // nodes that claim one extended address, or one RLOC16 within one network,
 // resolve to neither: both are self-reported diagnostics and nothing tells

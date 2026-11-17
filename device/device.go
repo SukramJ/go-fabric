@@ -774,9 +774,9 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // construction (Parts.ts:64-70), which an active one refuses
 // (packages/general/src/util/Construction.ts:284-287) — and Go keeps the
 // state clean where matter.js's owner setter leaves the endpoint without
-// an owner (Endpoint.ts:719-723; R2-P6-fsm-2501, decision 225). The node
-// counts as running from before its first snapshot (deviceseam.Composing),
-// so no move lands between that snapshot and the node's start. Every refusal comes
+// an owner (packages/node/src/endpoint/Endpoint.ts:719-723; R2-P6-fsm-2501,
+// decision 225). The node counts as running from before its first
+// snapshot (deviceseam.Composing), so no move lands between that snapshot and the node's start. Every refusal comes
 // before the move, so a refused AddPart leaves p with its former owner, as
 // matter.js's parts.add checks before it adds (Parts.ts:45-59); nothing
 // after the move can fail, so p is never half-owned. A device a node holds
@@ -815,7 +815,7 @@ func (d *Device) AddPart(p *Device) error {
 		return fmt.Errorf("%w: %s is a part on a running node and does not move; move it before the node starts, or remove its owner first",
 			ErrComposition, p.opts.StableKey)
 	}
-	// The move (Endpoint.ts:710-718): out of the former owner, then in.
+	// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
 	if former != nil {
 		former.mu.Lock()
 		former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })

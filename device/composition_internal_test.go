@@ -23,7 +23,7 @@ func newTestHost(numbers map[string]uint16) *fakeHost {
 // TestAddPartMovesThePart (R2-P6-fsm-2501, decision 225): a part bound to
 // no running node, added to another owner, moves — out of the former
 // owner's parts (the bookkeeping of matter.js's owner setter,
-// Endpoint.ts:706-725), unbound from the former owner's node, and bound
+// packages/node/src/endpoint/Endpoint.ts:706-725), unbound from the former owner's node, and bound
 // with the new owner to its node. Neither node has started here, the case
 // in which matter.js moves too.
 func TestAddPartMovesThePart(t *testing.T) {
