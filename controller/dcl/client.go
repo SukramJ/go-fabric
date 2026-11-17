@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -204,12 +205,28 @@ type guardConfig struct {
 
 // destinationGuard refuses, at the dial, an address that is not public,
 // and before the hand-over to a proxy or the dial, a URL whose host is
-// localhost or such an address; a dial to a proxy its transport was
-// handed is not checked.
+// localhost or such an address; the dial to the proxy a request was
+// handed is not checked — that request's, and no other dial to the same
+// address (review II, 5b-dcl F6).
 type destinationGuard struct {
-	admit   func(netip.AddrPort) bool
-	proxy   func(*http.Request) (*url.URL, error)
-	proxies sync.Map // the proxies' dial addresses, host:port
+	admit func(netip.AddrPort) bool
+	proxy func(*http.Request) (*url.URL, error)
+}
+
+// proxyDialKey is the request context's key of its proxyDial.
+type proxyDialKey struct{}
+
+// proxyDial is the dial address of the proxy one request was handed
+// (proxyFor records it); the dial to exactly that address, under that
+// request's context, is the one the guard does not check.
+type proxyDial struct{ addr atomic.Pointer[string] }
+
+// guardedTransport gives every request, each redirect hop included, its
+// own proxyDial before the transport sees it.
+type guardedTransport struct{ *http.Transport }
+
+func (t guardedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.Transport.RoundTrip(req.WithContext(context.WithValue(req.Context(), proxyDialKey{}, &proxyDial{})))
 }
 
 // control is the dialer's Control: it sees the resolved address of
@@ -243,16 +260,16 @@ func (g *destinationGuard) refusedHost(u *url.URL) error {
 	return g.refusedHostPort(u.Hostname(), port)
 }
 
-// refusedHostPort reports an error when host — lower-cased, a trailing
-// dot dropped — is localhost or an IPv4 or IPv6 address the guard
-// refuses, an IPv4 address in any spelling an inet_aton-style parser
+// refusedHostPort reports an error when host — lower-cased, its leading
+// and trailing dots dropped (review II, 5b-dcl R7) — is localhost or an
+// IPv4 or IPv6 address the guard refuses, an IPv4 address in any spelling an inet_aton-style parser
 // accepts included (ipv4Legacy). A part with a leading 0 is read both as
 // octal, as inet_aton reads it, and as decimal, as a parser that knows no
 // octal reads it; either reading in a refused class refuses the host. Any
 // other host is a name: the dial checks the address it resolves to, or
 // the proxy resolves it.
 func (g *destinationGuard) refusedHostPort(host, port string) error {
-	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	host = strings.Trim(strings.ToLower(host), ".")
 	if host == "localhost" {
 		return fmt.Errorf("%w: %s names localhost (Client.AllowPrivateDestinations admits it)", errDestination, host)
 	}
@@ -364,8 +381,8 @@ func (g *destinationGuard) checkRedirect(req *http.Request, via []*http.Request)
 
 // proxyFor is the transport's Proxy: it refuses a URL whose host the
 // guard refuses (refusedHost), then returns the proxy the environment
-// names for req and records its dial address, so that the dial to it is
-// not checked. A SOCKS proxy is handed the target with no hook between
+// names for req and records its dial address in req's proxyDial, so that
+// the dial to it for req is not checked. A SOCKS proxy is handed the target with no hook between
 // the transport's mapping and the hand-over, so through one a host with
 // characters outside ASCII is refused.
 func (g *destinationGuard) proxyFor(req *http.Request) (*url.URL, error) {
@@ -381,7 +398,10 @@ func (g *destinationGuard) proxyFor(req *http.Request) (*url.URL, error) {
 		if port == "" {
 			port = map[string]string{"http": "80", "https": "443", "socks5": "1080", "socks5h": "1080"}[strings.ToLower(p.Scheme)]
 		}
-		g.proxies.Store(net.JoinHostPort(p.Hostname(), port), struct{}{})
+		if d, ok := req.Context().Value(proxyDialKey{}).(*proxyDial); ok {
+			addr := net.JoinHostPort(p.Hostname(), port)
+			d.addr.Store(&addr)
+		}
 	}
 	return p, err
 }
@@ -396,12 +416,17 @@ func newGuardedClient(cfg guardConfig) *http.Client {
 	}
 	guarded := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver, Control: g.control}
 	direct := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Resolver: cfg.resolver}
-	return &http.Client{CheckRedirect: g.checkRedirect, Transport: &http.Transport{
+	return &http.Client{CheckRedirect: g.checkRedirect, Transport: guardedTransport{&http.Transport{
 		Proxy:                 g.proxyFor,
 		GetProxyConnectHeader: g.connectTarget,
+		// The dial's context carries the request's values, its proxyDial
+		// among them: net/http retains them for the dial
+		// (src/net/http/transport.go:1591-1596 at go1.27.4).
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			if _, ok := g.proxies.Load(addr); ok {
-				return direct.DialContext(ctx, network, addr)
+			if d, ok := ctx.Value(proxyDialKey{}).(*proxyDial); ok {
+				if p := d.addr.Load(); p != nil && *p == addr {
+					return direct.DialContext(ctx, network, addr)
+				}
 			}
 			return guarded.DialContext(ctx, network, addr)
 		},
@@ -411,7 +436,7 @@ func newGuardedClient(cfg guardConfig) *http.Client {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-	}}
+	}}}
 }
 
 // isASCII reports whether s has only ASCII characters.
