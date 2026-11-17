@@ -647,6 +647,200 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 - **F-db021da0-38: a GroupKeyMap write of the held entries in another order is no change.** matter.js judges a write by `isDeepEqual` of the written and the held value (`#noteIfChanged`, `packages/node/src/behavior/state/managed/Datasource.ts:1476-1481` at `db021da0`), which compares two arrays property by property, so the place of an entry counts (`packages/general/src/util/DeepEqual.ts:57-84`). GroupKeyManagement compares the written list with the fabric's mappings per group (`sameGroupKeyMap`, `cluster/core/group_key_management.go:645-660`; "the order of the written entries does not count", `:576-577`): the held entries in another order answer unchanged, store nothing and advance no version. Whether matter.js holds a differently ordered list after such a write depends on how its fabric-scoped list builds the stored array on a REPLACE, which was not traced (unverified); nothing was run on either side. Who sees it: a controller that writes its fabric's GroupKeyMap entries in another order gets no new DataVersion and no report here. Fix: with that trace, either the order is kept and compared or the difference becomes a `by_design` entry. Not placed. Found in review II, phase 4 (the citation pass on owner decision 78).
   Closed 2026-11-16 (review II, phase 6a, owner decision 148): the written order is kept, as matter.js keeps a list's order (`packages/node/src/behavior/state/managed/values/ListManager.ts:559-577` at `db021da0`): the store carries each mapping's position (schema v11, `matter_group_key_map.position`; `ListGroupKeyMappings` returns the map in the order it was written, rows from before v11 by GroupID), and `sameGroupKeyMap` compares entry for entry in order, so a write that only reorders the entries is a change, stored with a new DataVersion (`cluster/core/group_key_management.go`; `TestGKMGroupKeyMapReorderIsAChange`).
 
+- **F-db021da0-3: a failed subscription report is retried one MinIntervalFloor later.**
+  matter.js, after a report that could not be sent, owes the data again and
+  schedules nothing: the attribute filter goes back through
+  `#addOutstandingAttributes`, which only fills the set
+  (`packages/node/src/node/server/ServerSubscription.ts:346-357` at
+  `db021da0`), the event number is set back (`:582-584`), and neither calls
+  `#prepareDataUpdate` as the change handler does (`:380-382`); the send loop
+  ends unless another update was queued behind the failed one (`:610-612`).
+  The retry leaves with whatever starts the next report — a change, an urgent
+  event, the send interval — and after three failed updates a subscription
+  whose error is a communication error is given up (`:569`, `:585-603`).
+  This module asks for a report again:
+  `Subscription.RequeueAttributes` marks the paths dirty and
+  `Subscription.RequeueEvents` marks the owed events urgent
+  (`im/subscription/subscription.go`), so the retry goes out once
+  MinIntervalFloor has elapsed since the failed report. Not deliberate: it
+  is what the attribute path did before events shared its report, and the
+  event half was kept the same so that one report has one rule (review II,
+  W2-conc-05). Pinned as it is by the subtest "events owed again after a
+  failed report are retried when the floor ends" of
+  `im/subscription:TestEventReportParityMatterJS`. After three failed
+  updates in a row the subscription ends and the peer's sessions stay, as
+  in matter.js (`noteSubscriptionSendError`, `noteReportUndelivered`,
+  `bridge/subscribe.go:1018`, `:1135`; review II, R2-P4-imread-04, owner
+  decision 60; `bridge:TestUndeliveredReportIsOneFailedUpdateParity`);
+  what is left of this row is when the retry leaves. Fix: requeue without asking for a report — the paths and the
+  event number are owed and leave with the next pass something else starts —
+  and move the subtest onto matter.js's rule. Found in review II, phase 0.
+  Closed 2026-11-17 (review II, phase 6a, `bc31e6ff`): a failed update's data is owed, not due — its paths go back to an owed set that leaves with the next report another cause starts, and its events lose their urgency (`im/subscription/subscription.go` `RequeueAttributes`), as matter.js puts them back (`packages/node/src/node/server/ServerSubscription.ts:569-584`), `#addOutstandingAttributes` only fills (`:346-357`), `#prepareDataUpdate` runs only from `:380-382`, `:396-398`, `:480-484`, and the loop goes on only if another update was noted meanwhile (`:610-613`, at `db021da0`).
+- **F-db021da0-8: a report pass that leaves nothing for the subscriber sends no DataReport.**
+  matter.js takes what is outstanding, stamps the time of the last update
+  before it sends
+  (`packages/node/src/node/server/ServerSubscription.ts:549-551` at
+  `db021da0`) and takes the data branch whenever an attribute filter or an
+  event number is outstanding (`:909`, `:921-936`), with
+  `suppressEmptyReport: onlyWithData` (`:935`); `onlyWithData` is false for
+  the pass the send delay or the send interval starts (`:198-200`,
+  `:480-484`, the default of `:520`) and true only for a flush (`:757`) and
+  for a queued follow-up with no keep-alive owed (`:622`), and the
+  messenger leaves a report out only when that flag is set and the report
+  is empty (`packages/protocol/src/interaction/InteractionMessenger.ts:794-796`).
+  So a pass whose data is all filtered for the subscriber goes out as an
+  empty DataReport with `suppressResponse: false` (`:928`) and counts as
+  the last update — under a TODO of matter.js's own, "Add correct handling
+  for reports that would have data but in the end not send any because of
+  filtered out" (`:923-925`). Here the bridge's event reporter sends
+  nothing when its access check leaves no event and no attribute for the
+  subscriber and says so (`Subscription.NothingSent`,
+  `im/subscription/subscription.go`; `reportSubscriptionEvents`,
+  `bridge/subscribe.go`), and the engine then sends the keep-alive when the
+  pass was the send interval's and otherwise puts the time of the last
+  report back (`dueReport`, `im/subscription/engine.go`); an event drain
+  that yields no event is no report either (`758fb3ec`). Since `16495f81`
+  the keep-alive due in such a pass is sent — before, the pass counted and
+  a subscriber heard nothing for two send intervals (review II,
+  R2-P0-rv-A03) — so what still differs is the empty DataReport itself and
+  the send interval it restarts. The attribute path of this module goes the
+  other way: `reportSubscription` sends the report empty when every dirty
+  path was filtered (`bridge/subscribe.go`, "An empty report is a
+  max-interval keepalive"), as matter.js does. The doc of `NothingSent`
+  calls its rule the module's own; no entry of `by_design.md` gives a
+  reason, so it stands here. Pinned as it is by
+  `im/subscription:TestKeepAliveAndAReportThatSendsNothing` and
+  `bridge:TestReportWhoseEventsAreAllFilteredLeavesTheKeepAliveDue`. Fix:
+  one rule for both paths — send the filtered pass as an empty DataReport
+  and count it, as matter.js, together with the keep-alive entry of the
+  `862ad75f` section (`SuppressResponse`), or keep the silence under a
+  `by_design` entry; the owner's decision. Found in review II, phase 0.
+  Closed 2026-11-17 (review II, phase 6a, owner decision 169, `9397f619`): a pass whose data is all filtered out sends the empty ReportData on the attribute and on the event path and counts — its stamp is kept, so min and max restart from the pass's start —, as both references: matter.js (`packages/node/src/node/server/ServerSubscription.ts:921-936`, `suppressEmptyReport: onlyWithData`; `:549-551`; `packages/protocol/src/interaction/InteractionMessenger.ts:794-796` at `db021da0`) and connectedhomeip (`src/app/reporting/Engine.cpp:818-853`, `src/app/ReadHandler.cpp:352-362` at `6170af84`). The flush still sends nothing when all is filtered, as matter.js's `onlyWithData` flush (`ServerSubscription.ts:757`). No Ahead row (decision 169 supersedes 145).
+- **F-db021da0-10: a ConnectNetwork whose result outlives its fail-safe
+  is still answered with the driver's result.** matter.js has no logic
+  here (`packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts:18`
+  at `db021da0` is the empty subclass; `BD-chip-WiFiNetworkCommissioningServer`),
+  so connectedhomeip decides. Its fail-safe expiry releases the pending
+  command handle (`mAsyncCommandHandle.Release()`,
+  `src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp:1002`
+  at `6170af84`): the release ends the command's pending work
+  (`src/app/CommandHandler.cpp:40-47`) and, with none left, finalizes the
+  response message and closes the handler
+  (`src/app/CommandHandlerImpl.cpp:461-489`) — nothing was added for the
+  ConnectNetwork path at that point. The driver's late result finds the
+  handle gone and returns before it builds a ConnectNetworkResponse
+  (`NetworkCommissioningCluster.cpp:845-857`, under
+  `CHIP_DEVICE_CONFIG_SUPPORTS_CONCURRENT_CONNECTION`, which
+  `src/include/platform/CHIPDeviceConfig.h:337` defines to 1). Nothing is
+  sent, at the expiry or afterwards: `HandleConnectNetwork` adds nothing
+  (`NetworkCommissioningCluster.cpp:649`, `:682`), so finalizing returns
+  `CHIP_ERROR_INCORRECT_STATE` (`src/app/CommandHandlerImpl.cpp:1000`), and
+  the response sender, with nothing to send, logs "Failed to send
+  InvokeResponseMessage" and sends no Failure StatusResponse either
+  (`src/app/CommandResponseSender.cpp:82-103`, `:88-100`, under
+  `TODO(#30453)`); the client's invoke runs into its own timeout (read end
+  to end, not executed; an invoke batch whose other commands added a
+  response, and a build without concurrent connection, were not covered).
+  Since `3b77e4e8` this module's late result touches neither the reverted
+  networks nor the Breadcrumb, and since `cf5da000` the Thread server's
+  neither: both servers match connectedhomeip in state. The answer still
+  differs: the command answers a ConnectNetworkResponse with the driver's
+  status, after the expiry (`cluster/core/network_commissioning_wifi.go`,
+  `connect`; `network_commissioning_thread.go`, `OnFailSafeExpired`).
+  Answering nothing needs a way for a server to end the interaction
+  without a response, an `im` move (review II, phase 6a, R2-P6-fsm-1001). Fix: decide
+  what the invoke answers once its fail-safe has expired — the handler here
+  returns only when the driver does, so ending the interaction at the
+  expiry needs the expiry to end the handler's wait — and pin it with
+  `TestWiFiNetworkCommissioningConnectAfterExpiryIsDropped`. Found in
+  review II, phase 1 (the fix of R2-P1-core-06).
+  Closed 2026-11-17 (review II, phase 6a, `e3723cc6`, R2-P6-fsm-1001): a ConnectNetwork whose fail-safe expired is answered with nothing (`im.NoResponse`), on the Wi-Fi and the Thread server, as connectedhomeip sends nothing for it (`NetworkCommissioningCluster.cpp:1001-1002`, `:845-857`; `src/app/CommandHandlerImpl.cpp:481-488`; `src/app/CommandResponseSender.cpp:82-102`, no status under `TODO(#30453)`, at `6170af84`); the bridge sends no InvokeResponse for a request of concrete commands none of which is answered. Under a wildcard endpoint such a target is left out of the InvokeResponse — `BD-Matter-Invoke-WildcardLeavesNoResponseOut` (owner decision 182).
+- **F-db021da0-17: a DataVersion here is never 0.** A
+  `contract.DataVersionTracker` starts at a random value that is not 0,
+  `Bump` skips 0 on its way round, and `Current` uses 0 for "not installed
+  yet" (`contract/dataversion.go`). matter.js starts a server datasource's
+  version at `entropy.randomUint32`, which can be 0
+  (`packages/node/src/behavior/state/managed/Datasource.ts:597` at
+  `db021da0`), and `advanceVersion` wraps past 0xFFFF_FFFF to 0
+  (`:690-699`). A version taken from a store (`:796-805`, `:837`:
+  `this.version = store.version`) is only that of a
+  `Datasource.ExternallyMutableStore` (`:291-294`), the client-side cache
+  of a peer's values (`packages/node/src/storage/client/DatasourceCache.ts:28`,
+  checked in `packages/node/src/behavior/internal/ClientBehaviorBacking.ts:81`);
+  no file under `packages/node/src/storage/server` names it. So both stacks
+  draw a new version at every start and prime whole after a restart, and
+  no controller can tell the two apart there. What remains is the zero
+  value, one in 2^32. Since owner decision 46 the wire and the filters
+  treat 0 as an ordinary version; the tracker's own zero state is what is
+  left of the sentinel. Fix: a `by_design` sentence for the never-zero
+  tracker (reason: 0 is the tracker's not-installed state), or the tracker
+  holds "installed" beside the value and 0 becomes a version. Found in
+  review II, phase 2; the restart half was struck in phase 4
+  (R2-P4-cert-11): until then this row said matter.js's versions come back
+  from its store.
+  Closed 2026-11-17 (review II, phase 6a, owner decision 146, `d382fb1d`): the DataVersion tracker holds "installed" beside the value, so 0 is an ordinary value reached by initialisation or by wrap, as matter.js: a datasource starts at `entropy.randomUint32` (`packages/node/src/behavior/state/managed/Datasource.ts:597-598` at `db021da0`; `packages/general/src/util/Entropy.ts:26-28`, the full range, 0 included) and `advanceVersion` wraps above 0xFFFF_FFFF to 0 (`Datasource.ts:690-699`) (`contract/dataversion.go`; `contract:TestDataVersionTracker_Bump_WrapsToZero`).
+- **F-db021da0-52: a request whose decode fails as a whole is answered differently by the two stacks.** For a reader error that carries no status the bridge answers with the error's status, FAILURE by default, and honours SuppressResponse (`bridge/receive.go`); the client stack's server answers INVALID_ACTION always and sends the status whatever SuppressResponse says (`client/interaction/server.go`). Both refuse the request. matter.js answers the status the decode error carries when it is a `StatusResponseError`, FAILURE otherwise (`packages/protocol/src/interaction/InteractionMessenger.ts:431-435` at `db021da0`), sends it unless the session is a group session (`:458-460`), and sends nothing when the request suppressed its response (`sendStatus`, `:317-322`) — a flag it reads even from a Write or Invoke request whose other fields break the schema (`#decodeRequest`, `:333-342`; `suppressResponseOf`, `:153-162`, unreadable → not suppressed). Read, Subscribe and Timed requests are decoded without it (`:360`, `:389`, `:407`). The bridge does the same (`bridge/receive.go`, read at `16a8f6e5`, not re-read here); the gap is the client stack's server alone (`client/interaction/server.go`; R2-P6-par-0701). Fix: the client stack's server answers as the bridge (review II, phase 6a). Found in review II, phase 5b (the reference read of wave B).
+  Closed 2026-11-17 (review II, phase 6a, `27513f6a`, R2-P6-par-0701): the client stack's server answers an undecodable request as the bridge does — the error's status, FAILURE by default, nothing when a Write or Invoke suppressed its response (`client/interaction/server.go`), the lines of matter.js above.
+- **F-db021da0-56: a host's change during a later attribute data of a written cluster gets no advance of its own.** matter.js commits one transaction per attribute data (`packages/protocol/src/action/server/AttributeWriteResponse.ts:433-435` at `db021da0`), and each advances the version once when it noted a change (`packages/node/src/behavior/state/managed/Datasource.ts:1456-1457`); a change in another transaction is another commit and another advance. The bridge's write hold spans the message and the endpoint, and a held path gets no advance of its own when any write of the message changed its cluster (`settleWrite`, `bridge/write_hold.go`): for a WriteRequest `[X.a (changes), X.c (unchanged)]` with a host change of `X.b` during the second, matter.js advances twice and the module once, and the same rule merges a host change made beside the write into the write's advance. Read from the lines, not run; whether a Read can be served between the dispatcher's advance and the settle was not read (unverified). A change-only notifier's mark before the advance is F-db021da0-59. Fix: the hold per attribute data. Found in review II, phase 5b (the reference read of wave C).
+  Closed 2026-11-17 (review II, phase 6a, owner decision 146, `a23efd7c`, `7eea3b49`): the bridge's hold table numbers the attribute data of a write, and a host change held by the write advances its cluster once per attribute data unless that attribute data changed the cluster itself; a hold outside any attribute data (a group write, before the first, between two, after the last) follows the whole record (`bridge/write_hold.go` `settleWrite`), as matter.js commits one transaction per attribute data and advances a datasource once per commit that changed it (`packages/protocol/src/action/server/AttributeWriteResponse.ts:426-435`, `:444-450`; `packages/node/src/behavior/state/managed/Datasource.ts:1446-1457`, `:1476-1481` at `db021da0`). A dispatcher that is no `endpoint.TopologyDispatcher` keeps the per-message rule.
+- **F-db021da0-7: a handshake's failure StatusReport is sent while its previous reply is unacknowledged.**
+  Both references send none. matter.js: `PaseServer.cancelPairing` skips
+  the report "when a sent message is still unacked"
+  (`packages/protocol/src/session/pase/PaseServer.ts:208-210` at
+  `db021da0`), `CaseServer` returns before any `sendError` when
+  `exchange.considerClosed || exchange.hasUnackedMessage`
+  (`packages/protocol/src/session/case/CaseServer.ts:82-86`), and the two
+  initiators test the same
+  (`packages/protocol/src/session/case/CaseClient.ts:86-90`,
+  `packages/protocol/src/session/pase/PaseClient.ts:97-100`);
+  `hasUnackedMessage` is `#sentMessageToAck !== undefined`
+  (`packages/protocol/src/protocol/MessageExchange.ts:450-452`), and the
+  comments give the reason: "the send would only fail with a flow error".
+  connectedhomeip, read at `6170af84`: a retransmit-table entry sets its
+  exchange's waiting-for-ack flag when it is made and clears it when it is
+  destroyed (`src/messaging/ReliableMessageMgr.cpp:53-62`), and it is
+  destroyed with the acknowledgement
+  (`src/messaging/ReliableMessageContext.cpp:89-95`,
+  `ReliableMessageMgr.cpp:340-351`); while the flag is set, a message on the
+  exchange that carries no acknowledgement for it is dropped before the
+  delegate sees it — "Dropping message without piggyback ack when we are
+  waiting for an ack." (`src/messaging/ExchangeContext.cpp:585-595`) — so
+  the pairing session is not handed the message that would make it fail;
+  and a `SendMessage` in that state fails with `CHIP_ERROR_INCORRECT_STATE`
+  in `AddToRetransTable` (`ReliableMessageMgr.cpp:254-256`), before the
+  message is sent (`src/messaging/ExchangeMessageDispatch.cpp:54-64`),
+  which `SendStatusReport` logs and returns
+  (`src/protocols/secure_channel/PairingSession.h:183-189`). A failure that
+  does not come from a received message sends no StatusReport in
+  connectedhomeip: the pairing session's own response timeout clears the
+  session and notifies the delegate — `PASESession::OnResponseTimeout`
+  (`src/protocols/secure_channel/PASESession.cpp:296-308` at `6170af84`:
+  `Clear()`, `NotifySessionEstablishmentError(CHIP_ERROR_TIMEOUT)`) and
+  `CASESession::OnResponseTimeout` (`CASESession.cpp:575-585`) through
+  `AbortPendingEstablish` (`:587-596`) — with no `SendStatusReport` in
+  either. That connectedhomeip never sends a failure report while an
+  acknowledgement is owed stays inferred: the failure-report sites and the
+  two Sigma3 work completions were not read (review II, phase 6a,
+  R2-P6-par-0780). This module drops
+  what the handshake left unacknowledged on the exchange and then sends the
+  report as a reliable message: `Bridge.sendHandshakeFailureReport`
+  (`bridge/securechannel.go`, `abandonHandshakeReplies` first), and the
+  handshake this node opened abandons before it sends its report the same
+  way (`bridge/case_initiator.go`). The cases coincide for an initiator
+  that acknowledges a reply with its next message, which is what makes a
+  handshake fail in the ordinary run (a Pake3 that does not confirm, a
+  Sigma3 that does not verify); they differ when the handshake fails while
+  its last reply is still unacknowledged. Which peers and failures reach
+  that state was not exercised (unverified). Not decided: the report was
+  made reliable by `e98028e4` (before, it left without the R flag, which
+  neither reference does either), and whether to skip it as the references
+  do or to keep it under a `by_design` entry is an open question of that
+  rework. Fix: skip the report while an entry of the exchange is still
+  unacknowledged, with a case for each role beside
+  `bridge:TestUnsecuredRetransmitEntriesEndWithTheirHandshake`. Found in
+  review II, phase 0 (the rework of R2-P0-rv-A04).
+  Closed 2026-11-17 (review II, phase 6a, owner decision 173, `2d3b7092`, `2c28b613`): both roles skip the report while an entry of the exchange is unacknowledged (`Bridge.endHandshakeUnreported`, `sendCASEError`'s `sigma1Unacked`), and that entry goes on being retransmitted until it is acknowledged or its retransmissions are spent: in both references the message that fails here does not reach the handshake, which goes on and keeps its reply in retransmission (matter.js `packages/protocol/src/protocol/MessageExchange.ts:521-525` at `db021da0`; connectedhomeip `src/messaging/ExchangeContext.cpp:585-595` at `6170af84`), and matter.js goes on retransmitting a message whose send still waits for its acknowledgement when its exchange is closed without a cause (`MessageExchange.ts:1165-1193`, `:937-943`); connectedhomeip leaves it in the retransmit table unless the exchange is aborted (`ExchangeContext.cpp:219-252`, `:261-270`, `ExchangeHolder.h:122-139`). The report stays reliable otherwise. The message that fails the handshake is acknowledged (by the ACK pump, the obligation registered in `bridge/receive.go`), as connectedhomeip schedules that message's ack before it drops it (`src/messaging/ExchangeContext.cpp:549-553` `HandleNeedsAck`, `ReliableMessageContext.cpp:106-112`; the drop at `:585-595`, at `6170af84`); matter.js throws before it records the ack (`MessageExchange.ts:521-525`, the ack scheduled only at `:552-560`, at `db021da0`). The references differ; the module follows connectedhomeip. Pinned by `bridge:TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged`, `TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged`.
+
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 
 Every open entry was worked through (briefs AX and AY, the owner's
