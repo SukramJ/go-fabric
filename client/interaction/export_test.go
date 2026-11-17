@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // QueuedInvokes is the number of commands waiting in the batch lanes of c,
@@ -112,3 +114,22 @@ func (r *networkRecorder) maxPathsPerInvoke() int {
 // MaxAssemblyBytesPerSession is the report bytes a session's interactions
 // may hold while their chunks arrive.
 const MaxAssemblyBytesPerSession = DefaultMaxReportBytesPerSession
+
+// ReportChunkCharge is what a ReportData chunk is charged against the
+// report bound: its payload and its values' decoded elements.
+func ReportChunkCharge(payload []byte) int {
+	rd, err := decodeReport(payload)
+	if err != nil {
+		panic(err)
+	}
+	return reportCharge(payload, rd)
+}
+
+// InvokeChunkCharge is ReportChunkCharge for an InvokeResponse chunk.
+func InvokeChunkCharge(payload []byte) int {
+	resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(payload), readFields)
+	if err != nil {
+		panic(err)
+	}
+	return invokeCharge(payload, &resp)
+}

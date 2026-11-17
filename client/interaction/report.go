@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"unsafe"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -542,20 +543,24 @@ var errStopReports = errors.New("interaction: reports stopped")
 
 // ErrReportTooLarge is the error of a read, subscription report or invoke
 // whose chunks would take the report bytes the session's interactions
-// hold past their bound ([DefaultMaxReportBytesPerSession],
+// hold (their payloads and decoded elements) past their bound ([DefaultMaxReportBytesPerSession],
 // [Config].MaxReportBytesPerSession); the peer was answered
 // ResourceExhausted and the partial report dropped.
 var ErrReportTooLarge = errors.New("interaction: report too large")
 
-// DefaultMaxReportBytesPerSession is how many bytes of report chunks (the
-// message payloads) the interactions of one session may hold while the
-// rest of their chunks arrive: reads, subscription reports and invoke
-// responses together, so the 30 exchanges a session may have open do not
-// multiply it. The chunk that would pass it ends its interaction with a
-// StatusResponse ResourceExhausted and [ErrReportTooLarge]; the bytes are
-// released when an interaction ends. A peer reaches it only with its own
-// interactions: a wildcard read of a node of some thousand endpoints
-// stays below it. This module's own rule (review II, R2-P2-alloc-05;
+// DefaultMaxReportBytesPerSession is how many bytes of report chunks the
+// interactions of one session may hold while the rest of their chunks
+// arrive: reads, subscription reports and invoke responses together, so
+// the 30 exchanges a session may have open do not multiply it. A chunk is
+// charged what it holds — its message payload and [decodedNodeBytes] for
+// every decoded element of its values (review II, R2-P6-bound-2102) — so
+// the bound is one on memory, within a factor of two. The chunk that
+// would pass it ends its interaction with a StatusResponse
+// ResourceExhausted and [ErrReportTooLarge]; the bytes are released when
+// an interaction ends. A peer reaches it only with its own interactions:
+// an attribute of a scalar value is charged at most 140 bytes, so a
+// wildcard read of some 15 000 such attributes stays below it. This
+// module's own rule (review II, R2-P2-alloc-05;
 // owner decision 45). matter.js's messenger does not collect a read's
 // chunks — it hands each report on as it arrives
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1012-1053 at
@@ -603,12 +608,67 @@ func releaseAssembly(s *exchange.Session, n int) {
 	}
 }
 
-// holdChunk reserves a received chunk's payload for the interaction on m,
-// which holds held bytes so far; at the bound it answers the peer
-// ResourceExhausted and returns [ErrReportTooLarge].
-func (m *messenger) holdChunk(ctx context.Context, held *int, payload []byte) error {
-	if reserveAssembly(m.x.Session(), len(payload), m.maxReport) {
-		*held += len(payload)
+// decodedNodeBytes is what one decoded TLV element of a value costs while
+// an interaction holds it: one spec.Node (unsafe.Sizeof, 112 bytes on a
+// 64-bit platform), the form every attribute value, event datum and
+// command field is kept in until the last chunk. A chunk is charged its
+// payload and this for every element of its values, so the bound counts
+// what is held, not what arrived: a value of one-byte elements holds some
+// hundred times its payload (review II, R2-P6-bound-2102, R2-P6-bound-2150;
+// owner decision 45). TestReportChargeBoundsTheHeap holds the charge to the
+// heap within a factor of two.
+const decodedNodeBytes = int(unsafe.Sizeof(spec.Node{}))
+
+// nodeCount is the number of elements in v when it is a decoded value
+// (spec.Node), zero otherwise.
+func nodeCount(v any) int {
+	n, ok := v.(spec.Node)
+	if !ok {
+		return 0
+	}
+	return countNodes(n)
+}
+
+func countNodes(n spec.Node) int {
+	c := 1
+	for i := range n.Children {
+		c += countNodes(n.Children[i])
+	}
+	return c
+}
+
+// reportCharge is what a decoded ReportData chunk is charged against the
+// report bound: its payload and its values' elements ([decodedNodeBytes]).
+func reportCharge(payload []byte, rd *im.ReportData) int {
+	nodes := 0
+	for i := range rd.Reports {
+		if !rd.Reports[i].IsStatus {
+			nodes += nodeCount(rd.Reports[i].Value.Value)
+		}
+	}
+	for i := range rd.EventReports {
+		nodes += nodeCount(rd.EventReports[i].Data.Value)
+	}
+	return len(payload) + nodes*decodedNodeBytes
+}
+
+// invokeCharge is reportCharge for a decoded InvokeResponse chunk: its
+// payload and its response commands' fields.
+func invokeCharge(payload []byte, resp *im.InvokeResponse) int {
+	nodes := 0
+	for i := range resp.Responses {
+		nodes += nodeCount(resp.Responses[i].Response)
+	}
+	return len(payload) + nodes*decodedNodeBytes
+}
+
+// holdChunk reserves charge bytes ([reportCharge], [invokeCharge]) of a
+// received chunk for the interaction on m, which holds held bytes so far;
+// at the bound it answers the peer ResourceExhausted and returns
+// [ErrReportTooLarge].
+func (m *messenger) holdChunk(ctx context.Context, held *int, charge int) error {
+	if reserveAssembly(m.x.Session(), charge, m.maxReport) {
+		*held += charge
 		return nil
 	}
 	if err := m.sendStatus(ctx, im.StatusResourceExhausted); err != nil {
@@ -633,7 +693,7 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 	held := 0
 	defer func() { releaseAssembly(m.x.Session(), held) }()
 	if first != nil {
-		if err := m.holdChunk(ctx, &held, firstPayload); err != nil {
+		if err := m.holdChunk(ctx, &held, reportCharge(firstPayload, first)); err != nil {
 			return err
 		}
 	}
@@ -644,10 +704,10 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 			if err != nil {
 				return err
 			}
-			if err := m.holdChunk(ctx, &held, msg.Payload); err != nil {
+			if rd, err = decodeReport(msg.Payload); err != nil {
 				return err
 			}
-			if rd, err = decodeReport(msg.Payload); err != nil {
+			if err := m.holdChunk(ctx, &held, reportCharge(msg.Payload, rd)); err != nil {
 				return err
 			}
 		}

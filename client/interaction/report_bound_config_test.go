@@ -16,8 +16,9 @@ import (
 )
 
 // readPastBound runs a read on c whose peer keeps MoreChunkedMessages set
-// with chunks of 1000-byte values, and returns the bytes it had sent when
-// the client answered ResourceExhausted, and the chunk's size.
+// with chunks of 1000-byte values, and returns what the chunks it had sent
+// were charged against the bound when the client answered
+// ResourceExhausted, and one chunk's charge.
 func readPastBound(t *testing.T, s *scripted, c *interaction.Interaction) (sent, chunkSize int) {
 	t.Helper()
 	done := make(chan error, 1)
@@ -32,12 +33,13 @@ func readPastBound(t *testing.T, s *scripted, c *interaction.Interaction) (sent,
 			MarshalTLV(e, func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) { e.PutOctets(tag, v.Value.([]byte)) })
 	})
 	to := s.next(t)
-	for limit := interaction.MaxAssemblyBytesPerSession/len(chunk) + 2; ; limit-- {
+	charge := interaction.ReportChunkCharge(chunk)
+	for limit := interaction.MaxAssemblyBytesPerSession/charge + 2; ; limit-- {
 		if limit == 0 {
 			t.Fatalf("the client took %d bytes of chunks without ResourceExhausted", sent)
 		}
 		s.reply(t, to, im.InteractionModelProtocolID, im.OpcodeReportData, chunk)
-		sent += len(chunk)
+		sent += charge
 		to = s.next(t)
 		if st := decodeStatus(t, to.payload); st != im.StatusSuccess {
 			if st != im.StatusResourceExhausted {
@@ -50,7 +52,7 @@ func readPastBound(t *testing.T, s *scripted, c *interaction.Interaction) (sent,
 	if err := await(t, done); !errors.Is(err, interaction.ErrReportTooLarge) {
 		t.Fatalf("read returned %v, want ErrReportTooLarge", err)
 	}
-	return sent, len(chunk)
+	return sent, charge
 }
 
 // TestReportBoundFromConfig: Config.MaxReportBytesPerSession replaces the
@@ -95,7 +97,7 @@ func TestPushedReportBoundFromSubscriptions(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		s := newScripted(t)
 		chunk := pushedReport(t, 5, true, true, false, true)
-		reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock, MaxReportBytesPerSession: len(chunk)})
+		reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock, MaxReportBytesPerSession: interaction.ReportChunkCharge(chunk)})
 		reg.Register(s.mgr)
 		t.Cleanup(func() { s.mgr.SetProtocolHandler(im.InteractionModelProtocolID, nil) })
 		// The interaction's own bound lets the priming report through.

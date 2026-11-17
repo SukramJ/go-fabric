@@ -25,8 +25,9 @@ type SubscriptionsConfig struct {
 	// (ClientSubscriptions.ts:152-158).
 	ReportStarted func(s *exchange.Session)
 	// MaxReportBytesPerSession bounds the report chunks a session's
-	// interactions hold while the rest of their chunks arrive
-	// ([ErrReportTooLarge]) — the subscription reports the registry
+	// interactions hold while the rest of their chunks arrive, each charged
+	// its payload and decoded elements ([DefaultMaxReportBytesPerSession],
+	// [ErrReportTooLarge]) — the subscription reports the registry
 	// reads, and the interactions bound to it whose own
 	// [Config].MaxReportBytesPerSession is zero; zero or less is
 	// [DefaultMaxReportBytesPerSession].

@@ -146,8 +146,9 @@ type Config struct {
 	// naming this network share a batch. "" is the peer's medium profile.
 	Network string
 	// MaxReportBytesPerSession bounds the report chunks the session's
-	// interactions hold while the rest of their chunks arrive
-	// ([ErrReportTooLarge]); zero or less is the bound of Subscriptions
+	// interactions hold while the rest of their chunks arrive, each charged
+	// its payload and decoded elements ([DefaultMaxReportBytesPerSession],
+	// [ErrReportTooLarge]); zero or less is the bound of Subscriptions
 	// when it is set, else [DefaultMaxReportBytesPerSession].
 	MaxReportBytesPerSession int
 }

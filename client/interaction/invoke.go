@@ -305,12 +305,12 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 		if err != nil {
 			return nil, err
 		}
-		if err := m.holdChunk(ctx, &held, msg.Payload); err != nil {
-			return nil, err
-		}
 		resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(msg.Payload), readFields)
 		if err != nil {
 			return nil, fmt.Errorf("%w: InvokeResponse: %w", ErrUnexpectedMessage, err)
+		}
+		if err := m.holdChunk(ctx, &held, invokeCharge(msg.Payload, &resp)); err != nil {
+			return nil, err
 		}
 		entries = append(entries, resp.Responses...)
 		if !resp.MoreChunkedMessages {
