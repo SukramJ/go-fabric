@@ -45,9 +45,15 @@ type JointFabricOptions struct {
 	// fail-safe runs.
 	Consent func(info TrustInfo) bool
 	// TrustAnchors finds the globally trusted root of the administrator's
-	// vendor (the DCL's Operational Trust Anchors). nil is the example
-	// controller's placeholder, the administrator's own RCAC
-	// (examples/jf-control-app/commands/pairing/PairingCommand.cpp:935-946).
+	// vendor (the DCL's Operational Trust Anchors). nil fails the Vendor ID
+	// Verification (VENDOR_ID_VERIFICATION_FAILED, cause
+	// [jcm.ErrNoTrustAnchor]) and Consent is not asked: a missing port
+	// must not turn the verification into the device vouching for itself.
+	// [jcm.SelfAnchored] is that vouching as an explicit opt-in — the
+	// administrator's own RCAC, connectedhomeip's example placeholder
+	// (examples/jf-control-app/commands/pairing/PairingCommand.cpp:935-946
+	// at 6170af84) — for tests and the example controller (review II,
+	// R2-P6-sec-1850, owner decision 190).
 	TrustAnchors jcm.TrustAnchorLookup
 	// Progress hears each trust verification stage's result
 	// (TrustVerificationDelegate::OnProgressUpdate).
@@ -95,7 +101,7 @@ func (f *flow) jointFabricTrustVerification(ctx context.Context) (stepResult, er
 		return 0, newError(ErrJointFabric, err.Error(), err)
 	}
 	if r := t.run(ctx); r.Result != jcm.Success {
-		return 0, newError(ErrJointFabric, r.Error(), r)
+		return 0, newError(ErrJointFabric, r.Error(), errors.Join(r, t.cause))
 	}
 	return stepSuccess, nil
 }
@@ -109,7 +115,10 @@ type jcmTrust struct {
 	signer    jcm.Signer
 	machine   *jcm.Machine
 	failure   jcm.Failure
-	done      bool
+	// cause is the error behind a failed stage, joined to the step's
+	// error.
+	cause error
+	done  bool
 	// perform replaces a stage in tests.
 	perform func(ctx context.Context, stage jcm.Stage)
 }
@@ -330,10 +339,12 @@ func (t *jcmTrust) performVendorIDVerification(ctx context.Context) jcm.Result {
 		lookup = t.opts.TrustAnchors
 	}
 	if lookup == nil {
-		rcac := t.info.AdminRCAC
-		lookup = func(context.Context, uint16, []byte) ([]byte, error) { return rcac, nil }
+		// Fail closed, before the device is asked to sign (R2-P6-sec-1850).
+		t.cause = jcm.ErrNoTrustAnchor
+		return jcm.VendorIDVerificationFailed
 	}
 	if err := jcm.VerifyVendorID(ctx, t.signer, &t.info, lookup, nil); err != nil {
+		t.cause = err
 		return jcm.VendorIDVerificationFailed
 	}
 	return jcm.Success

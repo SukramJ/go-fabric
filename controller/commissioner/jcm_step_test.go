@@ -99,19 +99,30 @@ func TestJointFabricStep(t *testing.T) {
 		name    string
 		consent bool
 		noAdmin bool
+		anchors jcm.TrustAnchorLookup
 		want    jcm.Result
 	}{
-		{"consent", true, false, jcm.Success},
-		{"refused", false, false, jcm.UserDeniedConsent},
-		{"no administrator", true, true, 0xFFFF},
+		{"consent", true, false, jcm.SelfAnchored, jcm.Success},
+		{"refused", false, false, jcm.SelfAnchored, jcm.UserDeniedConsent},
+		{"no administrator", true, true, jcm.SelfAnchored, 0xFFFF},
+		// No trust anchors: the stage fails closed and the host is not
+		// asked (review II, R2-P6-sec-1850, owner decision 190).
+		{"no trust anchors", true, false, nil, jcm.VendorIDVerificationFailed},
 	} {
 		dev := &jfbDevice{f: f, noAdmin: c.noAdmin}
 		fl, _ := newTestFlow(t, dev.handle)
 		dev.challenge = func() []byte { return fl.challenge }
 		var asked TrustInfo
-		fl.opts.JointFabric = &JointFabricOptions{Consent: func(info TrustInfo) bool { asked = info; return c.consent }}
+		consented := false
+		fl.opts.JointFabric = &JointFabricOptions{TrustAnchors: c.anchors, Consent: func(info TrustInfo) bool { asked, consented = info, true; return c.consent }}
 		_, err := fl.jointFabricTrustVerification(t.Context())
 		switch c.want {
+		case jcm.VendorIDVerificationFailed:
+			var fail jcm.Failure
+			if !errors.Is(err, ErrJointFabric) || !errors.As(err, &fail) || fail.Result != c.want || fail.Stage != jcm.StagePerformingVendorIDVerification ||
+				!errors.Is(err, jcm.ErrNoTrustAnchor) || consented {
+				t.Errorf("%s: %v (consent asked %v)", c.name, err, consented)
+			}
 		case jcm.Success:
 			if err != nil || asked.AdminVendorID != f.vendorID {
 				t.Errorf("%s: %v, asked %+v", c.name, err, asked)

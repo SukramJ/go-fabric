@@ -125,8 +125,12 @@ reported. chip reports only NodeList.
 
 The global trust anchors of a vendor come from the DCL.
 `AdministratorConfig.TrustAnchors` and `JointFabricOptions.TrustAnchors`
-take that lookup. Without one, both roles use chip's placeholder: the
-other side's own RCAC.
+take that lookup. Without one, the commissioner fails the Vendor ID
+Verification (`VENDOR_ID_VERIFICATION_FAILED`, cause
+`jcm.ErrNoTrustAnchor`) and does not ask for consent; `jcm.SelfAnchored`
+is the explicit opt-in to chip's placeholder, the other side's own RCAC,
+for tests and examples. The administrator still uses that placeholder
+when it has no lookup.
 
 ## The commissioner side
 
