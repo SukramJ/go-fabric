@@ -565,13 +565,19 @@ func (n *Node) Stop(ctx context.Context) error {
 	if stop != nil {
 		stop()
 	}
-	// The subscription's own ActiveChanged(false) finds another owner and
-	// says nothing, so the stop announces it: the default subscription
-	// ends with the behaviour and is reported not subscribed when it was
-	// reported active. Mirrors matter.js NetworkClient's disposal
-	// (packages/node/src/behavior/system/network/NetworkClient.ts:469-471,
-	// #endDefaultSubscription :243-251 at db021da0) (review II,
-	// R2-P6-fsm-2350).
+	// A default subscription reported active is reported not subscribed
+	// when the node goes offline. matter.js announces it through the
+	// subscription's own active observer
+	// (packages/node/src/behavior/system/network/NetworkClient.ts:227-231
+	// at db021da0), fed by the sustained subscription going not live
+	// (packages/protocol/src/action/client/subscription/
+	// SustainedSubscription.ts:329-331, :422-431) when ClientNode's
+	// cancelWithMutex closes the interaction
+	// (packages/node/src/node/ClientNode.ts:291-300), and through
+	// #endDefaultSubscription when the behaviour is disposed still reported
+	// active (NetworkClient.ts:469-471, :243-251). Here Stop clears the owner
+	// first, so the subscription's own ActiveChanged(false) says nothing and
+	// Stop announces it itself (review II, R2-P6-fsm-2350).
 	if wasActive {
 		n.announceSubscriptionStatus(false, nil)
 	}

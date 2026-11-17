@@ -97,9 +97,11 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 		// The newly-commissioned read emits its events and raises the
 		// cursor (NetworkClient.ts:303-308, emitEvents: true). The flag is
 		// cleared once the read succeeded: a read that failed is made
-		// again, as that read, by the caller's next sync — the same call
-		// again. A failed read applied nothing, so its events and cursor
-		// are not ahead. A module rule (review II, R2-P6-err-2363; Fable
+		// again, as that read, by the next sync (SetAutoSubscribe,
+		// SetDefaultSubscription, or Stop and Start). A failed read applied
+		// nothing, so its events and cursor are not ahead. While the flag
+		// stands a sync toward off reads first too, so it fails as long as
+		// the peer does not answer; Stop, then the change, is the way out. A module rule (review II, R2-P6-err-2363; Fable
 		// fact note fable-6b-w2 G1): matter.js clears the flag before its
 		// read (packages/node/src/behavior/system/network/
 		// NetworkClient.ts:147-150 at db021da0). The caller holds subSync,

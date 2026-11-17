@@ -122,3 +122,26 @@ func TestICDDecommissionDuringACommitRemovesThePeer(t *testing.T) {
 		t.Fatalf("fed = %v after decommission, want nil", fed)
 	}
 }
+
+// TestICDClientRefusesWorkOnceDeleted (review II, R2-P6-store-2354,
+// fable-read-6b-ctl item 4): a node the registry deletes refuses ICD work
+// from onDeleted on — before its Close, which runs after the node's stop —
+// so no operation can commit and feed the fabric's ICD table again.
+func TestICDClientRefusesWorkOnceDeleted(t *testing.T) {
+	t.Parallel()
+	c := icdTestClient(t, &MemoryStore{}, nil)
+	c.onDeleted()
+	ran := make(chan struct{}, 1)
+	c.mu.Lock()
+	op, err := c.startLocked(icdRegistering, &ICDRegisterOptions{}, func(*icdOperation) error { ran <- struct{}{}; return nil })
+	c.mu.Unlock()
+	if op != nil || !errors.Is(err, ErrICDAbandoned) {
+		t.Fatalf("startLocked after onDeleted = %v, %v; want ErrICDAbandoned", op, err)
+	}
+	select {
+	case <-ran:
+		t.Fatal("an operation ran after onDeleted")
+	default:
+	}
+	c.close()
+}

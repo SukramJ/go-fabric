@@ -49,13 +49,15 @@ type TCPConfig struct {
 	// SessionParameters.assertMaxTcpMessageSize
 	// (packages/node/src/behavior/system/network/NetworkServer.ts:276-291,
 	// packages/protocol/src/session/SessionParameters.ts:128-137 at
-	// db021da0; review II, R2-P6-par-3209).
+	// db021da0; review II, R2-P6-par-3209), except that matter.js defaults
+	// an absent value and refuses an explicit 0 (:131); here zero is the
+	// absent value.
 	MaxMessageSize int
 }
 
 // maxMessageSize is the TCP message bound t selects: the configured one,
 // sessionparams.DefaultMaxTCPMessageSize for zero or without a TCP role
-// (resolveTcpConfig, NetworkServer.ts:280-286 at db021da0).
+// (resolveTcpConfig, NetworkServer.ts:277-288 at db021da0).
 func (t TCPConfig) maxMessageSize() int {
 	if t.MaxMessageSize == 0 || (!t.Incoming && !t.Outgoing) {
 		return int(sessionparams.DefaultMaxTCPMessageSize)

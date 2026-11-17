@@ -1412,6 +1412,10 @@ func (c *ICDClient) onDecommissioned() {
 // db021da0), and its dispose removes nothing (:930-934).
 func (c *ICDClient) onDeleted() {
 	c.mu.Lock()
+	// Closed at once: until close runs inside the node's Close — after its
+	// stop, which can wait — no operation may start and feed the table
+	// again (an automatic registration, a host's Register).
+	c.closed = true
 	if c.op != nil {
 		c.op.cancel()
 	}

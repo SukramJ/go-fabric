@@ -77,7 +77,7 @@ func (r *Registry) completeOperation(ctx context.Context, n *Node, addr PeerAddr
 		// refused, and the node the first commissioned stays. CommissionedAt,
 		// not IsCommissioned: ForAddress gives the node its peer address,
 		// which is what IsCommissioned tests, while CommissionedAt is set
-		// only by a commissioning that succeeded. A module rule (review II,
+		// only by a commissioning whose device-side flow succeeded. A module rule (review II,
 		// R2-P6-fsm-2310; Fable fact note fable-6b-w2 G1): matter.js checks
 		// before its forAddress only (packages/node/src/node/client/
 		// Peers.ts:263-266 at db021da0).
