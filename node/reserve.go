@@ -139,14 +139,107 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 // tree, the tree it had in the set, and the key itself. The nonvolatile
 // persister lets go of the servers it met at those keys and erases the
 // nonvolatile values and UserLabel lists stored for them.
+//
+// A Forget is several store writes. Before the first, the keys are
+// recorded as a forget in progress (forgetPendingKey); the record goes
+// once every write landed, and the next New finishes a forget that a
+// refused write or a crash left half done ([Aggregator.finishForgets]), so
+// a key's number never survives its values and reservation (review II,
+// R2-P6-store-2406). A store that refuses the record changes nothing.
 func (a *Aggregator) erase(ctx context.Context, op reservationOp) error {
-	tree, err := a.n.persisted.release(ctx, op.key)
-	keys := slices.Concat([]string{op.key}, op.tree, tree)
-	forgetErr := a.n.nonVolatile.forget(ctx, keys)
+	reserved, err := a.n.persisted.reservedTree(ctx, op.key)
 	if err != nil {
-		return errors.Join(err, forgetErr)
+		return err
 	}
-	return errors.Join(forgetErr, a.removeRecords(ctx, "", keys))
+	keys := slices.Compact(slices.Sorted(slices.Values(slices.Concat([]string{op.key}, op.tree, reserved))))
+	if err := a.markForget(ctx, keys, true); err != nil {
+		return err
+	}
+	return a.forgetKeys(ctx, keys)
+}
+
+// forgetKeys is erase's writes for keys, recorded as a forget in progress:
+// the reservations released, the values erased, the endpoint records
+// removed — and then the record of the forget. A refused release leaves
+// the records, as before, for the forget's next run.
+func (a *Aggregator) forgetKeys(ctx context.Context, keys []string) error {
+	var errs []error
+	for _, k := range keys {
+		if _, err := a.n.persisted.release(ctx, k); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	released := len(errs) == 0
+	errs = append(errs, a.n.nonVolatile.forget(ctx, keys))
+	if released {
+		errs = append(errs, a.removeRecords(ctx, "", keys))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	return a.markForget(ctx, keys, false)
+}
+
+// finishForgets runs again every forget a refused write or a crash left
+// half done (erase), at New, before the host adds anything.
+func (a *Aggregator) finishForgets(ctx context.Context) error {
+	pending, err := a.n.persisted.pendingForgets(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, keys := range pending {
+		errs = append(errs, a.forgetKeys(ctx, keys))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("node: finish a forget: %w", err)
+	}
+	return nil
+}
+
+// forgetPendingKey is the setting the forgets in progress are recorded
+// under: a JSON list of their key sets.
+const forgetPendingKey = "aggregator.forget_pending"
+
+// pendingForgets returns the key sets of the forgets in progress.
+func (p persisted) pendingForgets(ctx context.Context) ([][]string, error) {
+	v, ok, err := p.st.GetSetting(ctx, forgetPendingKey)
+	if err != nil {
+		return nil, fmt.Errorf("node: load %s: %w", forgetPendingKey, err)
+	}
+	if !ok || v == "" {
+		return nil, nil
+	}
+	var pending [][]string
+	if err := json.Unmarshal([]byte(v), &pending); err != nil {
+		return nil, fmt.Errorf("node: %s: %w", forgetPendingKey, err)
+	}
+	return pending, nil
+}
+
+// markForget records keys as a forget in progress (on) or done (off); the
+// record is read and written under a.forgetMu.
+func (a *Aggregator) markForget(ctx context.Context, keys []string, on bool) error {
+	a.forgetMu.Lock()
+	defer a.forgetMu.Unlock()
+	p := a.n.persisted
+	pending, err := p.pendingForgets(ctx)
+	if err != nil {
+		return err
+	}
+	pending = slices.DeleteFunc(pending, func(k []string) bool { return slices.Equal(k, keys) })
+	if on {
+		pending = append(pending, keys)
+	}
+	v := ""
+	if len(pending) > 0 {
+		b, err := json.Marshal(pending)
+		if err != nil {
+			return err
+		}
+		v = string(b)
+	}
+	return p.st.SetSetting(ctx, forgetPendingKey, v)
 }
 
 // removeRecords deletes the endpoint store's records of scope ("" is

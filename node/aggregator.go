@@ -113,6 +113,9 @@ type Aggregator struct {
 	// reassemblies counts the successful reassemblies (tests; the
 	// aggregator.reassemblies metric counts beside it).
 	reassemblies atomic.Int64
+	// forgetMu serialises the record of the forgets in progress
+	// (markForget).
+	forgetMu sync.Mutex
 }
 
 // partition is one snapshot scope of the set: its endpoints in insertion

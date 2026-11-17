@@ -333,6 +333,11 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 			return nil, fmt.Errorf("node: endpoint assembler: %w", err)
 		}
 		n.agg = &Aggregator{n: n}
+		// A forget a refused write or a crash left half done is finished
+		// before the host adds anything (review II, R2-P6-store-2406).
+		if err := n.agg.finishForgets(ctx); err != nil {
+			return nil, err
+		}
 		snapshotter = n.agg.snapshot
 	}
 	// The binding manager reads the topology the bridge serves.
