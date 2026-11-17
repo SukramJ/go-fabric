@@ -273,11 +273,13 @@ func (s *allocationScope) returnUnlessSpent(give func(context.Context) error) (s
 // 0bd06f2 in the order and the budget; matterjs-server abandons the chain
 // at the budget and lets it run on, since its invoke takes no abort signal
 // (packages/ws-controller/src/util/deviceCleanupBudget.ts:24-26) — Go's
-// client invoke returns at its context's deadline, so the chain is bounded
-// here, a divergence (review II, R2-P6-conc-2210, decision 207). A cut
-// invoke stops retransmitting once abandoned; what it already sent can
-// still reach the camera after the lock is released, so the late-effect
-// window is narrowed to the one command in flight, not closed.
+// client invoke returns at its context's deadline
+// (client/interaction/invoke_batcher.go, the ctx.Done case), so the chain
+// is bounded here, a divergence (review II, R2-P6-conc-2210, decision
+// 207). A cut invoke's exchange stops retransmitting once every command of
+// its exchange is abandoned; what it already sent can still reach the
+// camera after the lock is released, so the late-effect window is narrowed
+// to the command in flight, not closed.
 func (m *manager) settle(ctx context.Context, s *allocationScope, succeeded bool) {
 	s.mu.Lock()
 	returns := slices.Clone(s.returns)

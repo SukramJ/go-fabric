@@ -321,8 +321,7 @@ const (
 
 // endedSignalsGrace is how long an ended session's box still hands what
 // it holds to a reader before it discards the rest and its pump ends. The
-// module's own choice (neither reference queues signals per session): a
-// host that reads its Signals takes what the camera sent before the end —
+// module's own choice: a host that reads its Signals takes what the camera sent before the end —
 // the End itself, typically — within milliseconds; ten seconds is the
 // device cleanup budget, the time this module gives any teardown. A host
 // that dropped its Session costs one goroutine and its held signals for
