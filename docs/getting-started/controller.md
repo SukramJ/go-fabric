@@ -906,8 +906,9 @@ _, err = c.SoftwareUpdates().AddUpdateConsent(ctx, peer, softwareupdate.Target{
 A store without a ledger offers stored images only. `ImagesConfig.Ledger`
 (a `dcl.OTAVersions` with a `dcl.Client` for the production ledger, the
 test-net ledger or both) turns the ledger lookups and the downloads on:
-`DownloadUpdate` fetches the image a ledger record names and
-`UpdateInfoFromURL` one a URL names, each into memory, verified before it
+`DownloadUpdate` fetches the image a ledger record names, or the one a URL
+names after `UpdateInfoFromURL` has read its header (only the header: that
+download ends once the header is in), into memory, verified before it
 is stored — unless the store's `Blobs` type itself implements
 `softwareupdate.BlobStreamer` (`MemoryBlobs` does not): `DownloadUpdate` then
 writes the image into the backend as it arrives, verifies it by reading it

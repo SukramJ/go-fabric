@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -304,9 +305,9 @@ type ImagesConfig struct {
 	// found, and nothing is downloaded. Its MaxImageSize bounds every
 	// download of the store ([Images.DownloadUpdate],
 	// [Images.UpdateInfoFromURL]) at [dcl.DefaultMaxImageSize] when it
-	// sets none. UpdateInfoFromURL holds its image in memory, and so does
-	// DownloadUpdate until the image is verified unless Blobs is a
-	// [BlobStreamer].
+	// sets none. DownloadUpdate holds the image in memory until it is
+	// verified unless Blobs is a [BlobStreamer]; UpdateInfoFromURL reads
+	// the header only.
 	Ledger *dcl.OTAVersions
 	// Logger receives the store's lines; nil is slog.Default().
 	Logger *slog.Logger
@@ -1105,6 +1106,42 @@ func (i *Images) verifyStored(ctx context.Context, s BlobStreamer, name string, 
 	return verifyHeader(h, info)
 }
 
+// headerPrefix is the OTA file's fixed prefix: file identifier, total
+// size, header size (otaimage.ReadHeader reads it first).
+const headerPrefix = 4 + 8 + 4
+
+// errHeaderRead ends a download once headerWriter holds the header.
+var errHeaderRead = errors.New("softwareupdate: the OTA header is read")
+
+// headerWriter keeps the first bytes of an OTA file up to the end of its
+// header — the prefix and the header size the prefix states — and then
+// refuses more with errHeaderRead, which ends the download. It keeps at
+// most the prefix and otaimage.MaxHeaderSize bytes; a header size above
+// that ends it after the prefix, which otaimage.ReadHeader refuses. A file
+// shorter than its header is kept whole.
+type headerWriter struct{ buf []byte }
+
+// done reports whether buf holds the header the prefix states.
+func (h *headerWriter) done() bool {
+	if len(h.buf) < headerPrefix {
+		return false
+	}
+	n := binary.LittleEndian.Uint32(h.buf[12:headerPrefix])
+	return n > otaimage.MaxHeaderSize || len(h.buf) >= headerPrefix+int(n)
+}
+
+func (h *headerWriter) Write(p []byte) (int, error) {
+	if h.done() {
+		return 0, errHeaderRead
+	}
+	take := min(len(p), headerPrefix+otaimage.MaxHeaderSize-len(h.buf))
+	h.buf = append(h.buf, p[:take]...)
+	if h.done() {
+		return take, errHeaderRead
+	}
+	return take, nil
+}
+
 // LocalImageOptions are the fields of a local image's [UpdateInfo] its
 // header may not carry — updateInfoFromStream's options
 // (DclOtaUpdateService.ts:841-863 at 862ad75f).
@@ -1152,10 +1189,13 @@ func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error
 	return u, nil
 }
 
-// UpdateInfoFromURL fetches the OTA image at the HTTP(S) URL fileURL and
-// returns its update, of [SourceLocal]; [Images.DownloadUpdate] then
-// downloads it from that URL into [ModeLocal] — matter.js
+// UpdateInfoFromURL reads the header of the OTA image at the HTTP(S) URL
+// fileURL and returns its update, of [SourceLocal]; [Images.DownloadUpdate]
+// then downloads it from that URL into [ModeLocal] — matter.js
 // createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at 862ad75f).
+// The download ends once the header's bytes are in (at most
+// [otaimage.MaxHeaderSize] and the 16-byte prefix); the rest of the image
+// is not fetched.
 // Another scheme is refused (a local file is [UpdateInfoFromImage]'s), and
 // so is every URL offline, without a fetch. The host names the URL, so
 // both downloads take [dcl.OTAVersions.DownloadHostURL]: http and a
@@ -1169,11 +1209,13 @@ func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts Loc
 	if i.offline {
 		return UpdateInfo{}, fmt.Errorf("%w: cannot read OTA image from %s: the service is offline, use UpdateInfoFromImage instead", ErrOTA, fileURL)
 	}
-	var buf bytes.Buffer
-	if err := i.ledger.DownloadHostURL(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &buf); err != nil {
+	// Only the header is read: the download ends once its bytes are in
+	// (review II, R2-P6-bound-1903).
+	var head headerWriter
+	if err := i.ledger.DownloadHostURL(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &head); err != nil && !errors.Is(err, errHeaderRead) {
 		return UpdateInfo{}, fmt.Errorf("%w: failed to read OTA image from %s: %w", ErrOTA, fileURL, err)
 	}
-	u, err := UpdateInfoFromImage(&buf, opts)
+	u, err := UpdateInfoFromImage(bytes.NewReader(head.buf), opts)
 	if err != nil {
 		return UpdateInfo{}, fmt.Errorf("failed to read OTA image from %s: %w", fileURL, err)
 	}
