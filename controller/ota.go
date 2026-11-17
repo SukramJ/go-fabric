@@ -80,7 +80,11 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 		Registry: c.reg, Images: images, FabricIndex: c.fabricIndex(), ProviderNodeID: c.fabric.RootNodeID, ProviderEndpoint: OTAProviderEndpoint,
 		VendorID: c.fabric.RootVendorID, Armer: c.armer,
 		SessionID: func(p softwareupdate.Peer) (uint16, bool) {
-			if pp := c.peers.Get(p); pp != nil {
+			peers := c.live.peers.Load()
+			if peers == nil {
+				return 0, false
+			}
+			if pp := peers.Get(p); pp != nil {
 				if s := pp.NewestSession(); s != nil {
 					return s.ID(), true
 				}
@@ -145,7 +149,11 @@ func (c *Controller) armerContext() peer.RebootArmerContext {
 	return peer.RebootArmerContext{
 		Clock: c.clock, Logger: c.log,
 		ClosePeerSessionsBefore: func(p exchange.PeerAddress, t time.Time) {
-			if pp := c.peers.Get(p); pp != nil {
+			peers := c.live.peers.Load()
+			if peers == nil {
+				return
+			}
+			if pp := peers.Get(p); pp != nil {
 				for _, s := range pp.Sessions() {
 					if s.CreatedAt().Before(t) {
 						s.Close()
@@ -153,9 +161,27 @@ func (c *Controller) armerContext() peer.RebootArmerContext {
 				}
 			}
 		},
-		PeerLost:           func(p exchange.PeerAddress) { c.mgr.HandlePeerLoss(p, errRebootReturnTimeout, time.Time{}) },
-		CloseSubscriptions: func(p exchange.PeerAddress) { c.subs.CloseForPeer(p) },
+		// The armer's timers run on the clock's goroutines, which Close does
+		// not wait for: each reads the component it reaches from live and
+		// skips once Close cleared it (review II, R2-P6-conc-2305).
+		PeerLost: func(p exchange.PeerAddress) {
+			if mgr := c.live.mgr.Load(); mgr != nil {
+				mgr.HandlePeerLoss(p, errRebootReturnTimeout, time.Time{})
+			}
+		},
+		CloseSubscriptions: func(p exchange.PeerAddress) {
+			if subs := c.live.subs.Load(); subs != nil {
+				subs.CloseForPeer(p)
+			}
+		},
 	}
+}
+
+// initiated reports whether we initiated s's session, false once Close
+// cleared the peer set (review II, R2-P6-conc-2305).
+func (c *Controller) initiated(s *exchange.Session) bool {
+	peers := c.live.peers.Load()
+	return peers != nil && peers.Initiated(s)
 }
 
 // armerObserver sees the report sessions the reboot armer is fed — a test
@@ -170,7 +196,7 @@ type armerObserver struct {
 // (RebootResubscribeArmer.ts:117-150 at 862ad75f).
 func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 	if c.armer != nil && s.IsSecure() {
-		c.armer.SessionAdded(armerSession{s: s, initiator: c.peers.Initiated(s)})
+		c.armer.SessionAdded(armerSession{s: s, initiator: c.initiated(s)})
 	}
 }
 
@@ -178,7 +204,7 @@ func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 // (RebootResubscribeArmer.ts:68, :165-172).
 func (c *Controller) reportStarted(s *exchange.Session) {
 	if c.armer != nil {
-		as := armerSession{s: s, initiator: c.peers.Initiated(s)}
+		as := armerSession{s: s, initiator: c.initiated(s)}
 		if o := c.armerObs.Load(); o != nil && o.ReportStarted != nil {
 			o.ReportStarted(as)
 		}

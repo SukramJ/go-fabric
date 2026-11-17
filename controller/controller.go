@@ -379,6 +379,18 @@ type Controller struct {
 	diagRing *diagevent.Ring
 	metrics  contract.Metrics
 	peerSet  atomic.Pointer[peer.Set]
+	// live holds the components the background callbacks reach — the
+	// reboot armer's timers, the peer set's and the subscriptions'
+	// session hooks, the update manager's session lookup. Those run on
+	// goroutines Close does not wait for, so they read these instead of
+	// the fields Close clears: each is set once its component exists and
+	// cleared by Close before the component closes, and a callback that
+	// finds nil does nothing (review II, R2-P6-conc-2305).
+	live struct {
+		mgr   atomic.Pointer[exchange.Manager]
+		peers atomic.Pointer[peer.Set]
+		subs  atomic.Pointer[interaction.Subscriptions]
+	}
 	// closeMu is the controller's one closed gate: Close sets closed
 	// under it first, and every public method reads closed — and the
 	// fields Close clears (reg, peers, com, names, adv, groups,
@@ -505,6 +517,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if c.peers, err = peer.NewSet(pctx); err != nil {
 		return nil, err
 	}
+	c.live.peers.Store(c.peers)
 	if cfg.OTA != nil {
 		c.armer = peer.NewRebootResubscribeArmer(c.armerContext())
 	}
@@ -513,6 +526,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{
 		Logger: log, Clock: clk, ReportStarted: c.reportStarted, MaxReportBytesPerSession: cfg.MaxReportBytesPerSession,
 	})
+	c.live.subs.Store(c.subs)
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
 	if c.com, err = commissioner.New(commissioner.Context{
 		Exchanges: c.mgr, Peers: c.peers, Attestation: cfg.Attestation, Logger: log, Clock: clk,
@@ -675,6 +689,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 		_ = l.Close()
 		return err
 	}
+	c.live.mgr.Store(c.mgr)
 	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	served := make(chan struct{})
 	handle := c.mgr.HandleDatagram // bound here: Close clears c.mgr while Serve runs
@@ -758,6 +773,7 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.reg = nil
 	}
 	if c.subs != nil {
+		c.live.subs.Store(nil)
 		errs = append(errs, c.subs.Close(ctx))
 		c.subs = nil
 	}
@@ -766,6 +782,7 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.com = nil
 	}
 	if c.peers != nil {
+		c.live.peers.Store(nil)
 		c.peers.Close(ctx)
 		c.peers = nil
 	}
@@ -788,6 +805,7 @@ func (c *Controller) Close(ctx context.Context) error {
 		c.stopTCP = nil
 	}
 	if c.mgr != nil {
+		c.live.mgr.Store(nil)
 		c.mgr.Close()
 		c.mgr = nil
 	}
