@@ -165,18 +165,25 @@ finish is `store.ErrScrubIncomplete` after the commit and is owed to the
 next `NewSealed`). There is no unseal: the way back to a clear database is
 a factory reset, which drops the canary with every other row, or a restore.
 `Reseal` moves the device store's rows only, not the controller's node
-registry on the same file.
+registry on the same file: a controller's database rotates with
+`controller.Reseal(ctx, db, old, new)`, which reseals both stores in one
+transaction and scrubs once, and a registry kept alone with
+`sqlstore.Reseal`.
 
 The controller takes the same sealer as `controller.Config.Sealer` (opt-in,
 off by default): `New` opens its store with `store.NewSealed` and its node
 registry with `sqlstore.NewSealed`, under the same rules — a database
 written without a sealer is sealed on the way in and its file scrubbed
-(each store records the scrub it owes with its sealing, and a scrub that
-did not finish — `store.ErrScrubIncomplete`, or a process that ended
-first — is run by the next `New`), another key fails `New` with
-`store.ErrUnseal`, and a store without the
-sealer reads a sealed secret as `store.ErrNoSealer` (so `New` without it
-fails reading the sealed CA). What a controller's database holds, sealed or
+(each store records the scrub it owes with its sealing; a scrub that did
+not finish leaves both stores open, owed — `ScrubOwed` on each — and is
+run by the next `New`), another key fails `New` with `store.ErrUnseal`,
+and a store without the sealer reads a sealed secret as
+`store.ErrNoSealer` (so `New` without it fails reading the sealed CA). The
+registry carries its own seal canary (schema v3, the reserved
+`matter_client_metadata` row `sqlstore.seal_canary`): `sqlstore.NewSealed`
+opens it first, a marked registry refuses a clear secret value, and
+`sqlstore.New` refuses to write a secret into it. The controller's factory
+reset (`Controller.Erase`) drops it with the registry's last row. What a controller's database holds, sealed or
 not:
 
 | Sealed under `Config.Sealer` | Where |

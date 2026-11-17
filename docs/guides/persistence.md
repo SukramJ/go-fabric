@@ -322,7 +322,7 @@ and `sqlstore.Apply`:
 | `matter_client_versions` | each stored cluster's DataVersion |
 | `matter_client_values`, cluster `0xFFFFFFFD` | each node's ICD Check-In registration: key, pending key, counter state, monitored subject, client type |
 | `matter_client_values`, cluster `0xFFFFFFFC` | a node's onboarding code, when kept (`Config.KeepOnboardingCodes`) or attached: the code, its source, the time, the checks it passed — a secret, like the keys above |
-| `matter_client_metadata` | the registry's marks: `sqlstore.seal_scrub_owed` while a sealing's scrub of the file has not finished (`sqlstore.NewSealed`) |
+| `matter_client_metadata` | the registry's marks: `sqlstore.seal_scrub_owed` while a sealing's scrub of the file has not finished (`sqlstore.NewSealed`, `Store.ScrubOwed`), and the seal canary `sqlstore.seal_canary`, its sealed value in `data` (v3) |
 
 The two `controller.ca` keys are `ca.SettingStore`'s default; another
 `Key` moves both. The controller keeps one CASE resumption record per node
@@ -331,7 +331,7 @@ running full CASE. With `controller.Config.Sealer` the CA, the fabric, the
 resumption records, the group key sets, the kept onboarding codes and the
 ICD keys are sealed ([security](../security.md#sealing-at-rest)).
 
-*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:34-44`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
+*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-44`, `examples/reference-controller/cli/stack.go:34-44`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
 
 ## Schema changes
 
@@ -344,7 +344,8 @@ Each schema ships three ways:
   release kept elsewhere (the VID settings into `matter_fabrics`). A host
   that runs `Migrations()` with its own tool calls `store.Upgrade` once
   after it, for the moves. `sqlstore.Apply` likewise runs
-  `sqlstore.Upgrade`, which adds v2's seal mark to `matter_client_values`.
+  `sqlstore.Upgrade`, which adds v2's seal mark to `matter_client_values`
+  and v3's `data` column, the seal canary's, to `matter_client_metadata`.
 - **`Migrations()`** returns the same schema as versioned steps (`v1`,
   `v2`, …), each with `Up` and `Down`, for a host that runs its own
   migration tool. A released step never changes. Pin
@@ -366,7 +367,7 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-125`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-150`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
 
 ## Backup
 
