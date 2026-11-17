@@ -52,7 +52,9 @@ type WiFiNetworkCommissioning struct {
 	// ([WiFiNetworkCommissioning.OnAttributeChange]).
 	changes cluster.AttributeChanges
 
-	driver        contract.WiFiDriver
+	driver contract.WiFiDriver
+	// onConnected is WiFiNetworkCommissioningConfig.OnConnected.
+	onConnected   func(ctx context.Context)
 	failSafe      func() (fabricIndex uint8, armed bool)
 	failSafeArmed func() bool
 	setBreadcrumb func(uint64)
@@ -160,6 +162,15 @@ type WiFiNetworkCommissioningConfig struct {
 	// Clock is the clock the rejoin of the committed network backs off
 	// on; nil is [clock.System].
 	Clock clock.Clock
+	// OnConnected, when set, runs after each join Driver reports
+	// successful — a ConnectNetwork command's and the rejoin of the
+	// committed network at Start — on the joining goroutine, without the
+	// server's lock, before the result is recorded. The node re-announces
+	// its DNS-SD records from it. The server asks Driver itself for its
+	// optional ports (contract.WiFiLinkWatcher, WiFiDisconnector,
+	// WiFiLinkReporter, WiFiInterfaceSwitcher), so a host's driver goes
+	// in unwrapped and keeps every one of them (review II, R2-P6-api-2450).
+	OnConnected func(ctx context.Context)
 }
 
 // wifiNetworksKey is the setting the committed networks are stored under.
@@ -201,7 +212,7 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 		return nil, errors.New("core: Wi-Fi NetworkCommissioning needs a driver")
 	}
 	w := &WiFiNetworkCommissioning{
-		driver: cfg.Driver, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
+		driver: cfg.Driver, onConnected: cfg.OnConnected, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
 		maxNetworks: cfg.MaxNetworks, scanMax: cfg.ScanMaxTimeSeconds, connectMax: cfg.ConnectMaxTimeSeconds,
 		store: cfg.Store, logger: cfg.Logger, clk: clock.Or(cfg.Clock), interfaceEnabled: true,
 		life: context.Background(),
@@ -504,6 +515,13 @@ func (w *WiFiNetworkCommissioning) disconnect() {
 	w.changes.Notify(netcommAttrNetworks)
 }
 
+// connected runs the OnConnected hook after a successful join.
+func (w *WiFiNetworkCommissioning) connected(ctx context.Context) {
+	if w.onConnected != nil {
+		w.onConnected(ctx)
+	}
+}
+
 // joinCommitted joins target, bounded by ConnectMaxTimeSeconds, and
 // records the result as Start does; it reports whether the join
 // succeeded. After a failed join the link is where the driver reports the
@@ -516,6 +534,9 @@ func (w *WiFiNetworkCommissioning) joinCommitted(ctx context.Context, target wif
 	code, _, errValue := w.driver.ConnectNetwork(jctx, target.ssid, target.credentials)
 	status := netcommdef.NetworkCommissioningStatusEnum(code)
 	ok := statusOK(status)
+	if ok {
+		w.connected(ctx)
+	}
 	var link []byte
 	if ok {
 		link = bytes.Clone(target.ssid)
@@ -1287,6 +1308,8 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		status = netcommdef.NetworkCommissioningStatusEnum(code)
 		if !statusOK(status) {
 			link = w.linkAfterFailure(ctx)
+		} else {
+			w.connected(ctx)
 		}
 	}
 	w.mu.Lock()

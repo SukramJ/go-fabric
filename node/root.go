@@ -135,9 +135,11 @@ type rootDeps struct {
 	groups     *groups.Manager
 	connector  mattercore.OtaProviderConnector
 	// wifiDriver is [Network].WiFi's Driver as the node hands it to the
-	// Wi-Fi NetworkCommissioning server (reannouncingDriver); nil mounts
-	// the Ethernet server.
+	// Wi-Fi NetworkCommissioning server, unwrapped; nil mounts the
+	// Ethernet server. onWiFiConnected runs after each successful join
+	// (Node.wifiConnected).
 	wifiDriver        contract.WiFiDriver
+	onWiFiConnected   func(ctx context.Context)
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
 	// onCommissioningComplete runs after the root's own
 	// CommissioningComplete handling (the host's observer).
@@ -294,7 +296,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	var netComm contract.ClusterServer
 	if drv := d.wifiDriver; drv != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{ //nolint:contextcheck // the constructor takes no context; it reads the store once
-			Driver: drv, FailSafe: generalCom.FailSafeFabric,
+			Driver: drv, OnConnected: d.onWiFiConnected, FailSafe: generalCom.FailSafeFabric,
 			// The committed network survives a restart, as chip's driver
 			// keeps it (NetworkCommissioningWiFiDriver.cpp:135-167);
 			// Node.Start reconnects to it.

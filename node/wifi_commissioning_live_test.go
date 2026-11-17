@@ -142,7 +142,7 @@ func TestLiveCommissioningOverIPWithWiFi(t *testing.T) {
 }
 
 // joinReannouncer counts the re-announcements the node triggers from the
-// Wi-Fi driver's return (the node's driver wrapper on its call stack) apart
+// Wi-Fi driver's return (the node's connect hook on its call stack) apart
 // from every other: the bridge also re-announces on session events during
 // commissioning (triggerSessionReannounce), which a plain count would
 // include.
@@ -155,7 +155,7 @@ type joinReannouncer struct {
 func (a *joinReannouncer) Enabled() bool { return true }
 
 func (a *joinReannouncer) TriggerReannounce(context.Context) {
-	if !strings.Contains(string(debug.Stack()), "reannouncingDriver.ConnectNetwork") {
+	if !strings.Contains(string(debug.Stack()), "(*Node).wifiConnected") {
 		return
 	}
 	a.mu.Lock()

@@ -403,6 +403,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if err := n.buildLevelledRoot(ctx, rootDeps{
 		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: peerPath{n},
 		wifiDriver:              n.wifiDriver(),
+		onWiFiConnected:         n.wifiConnected,
 		onFabricInstalled:       n.observedFabricInstalled,
 		onCommissioningComplete: n.commissioningCompleted,
 		onFailSafeExpired:       n.failSafeExpired,

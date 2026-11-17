@@ -5,8 +5,6 @@ package node
 
 import (
 	"context"
-	"errors"
-	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -22,136 +20,53 @@ type countingAdvertiser struct {
 
 func (a *countingAdvertiser) TriggerReannounce(context.Context) { a.triggers.Add(1) }
 
-// fixedWiFi answers every connect with one status.
-type fixedWiFi struct{ status uint8 }
+// fullWiFi implements contract.WiFiDriver and every optional port.
+type fullWiFi struct{}
 
-func (fixedWiFi) ScanNetworks(context.Context, []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
+func (fullWiFi) ScanNetworks(context.Context, []byte) (status uint8, debugText string, results []contract.WiFiScanResult) {
 	return 0, "", nil
 }
 
-func (w fixedWiFi) ConnectNetwork(context.Context, []byte, []byte) (status uint8, debugText string, errorValue int32) {
-	if w.status != 0 {
-		return w.status, "refused", 7
-	}
+func (fullWiFi) ConnectNetwork(context.Context, []byte, []byte) (status uint8, debugText string, errorValue int32) {
 	return 0, "", 0
 }
+func (fullWiFi) CurrentNetwork(context.Context) ([]byte, bool)            { return nil, false }
+func (fullWiFi) SetInterfaceEnabled(context.Context, bool) error          { return nil }
+func (fullWiFi) WatchLink(context.Context, func(contract.WiFiLinkChange)) {}
+func (fullWiFi) DisconnectNetwork(context.Context) error                  { return nil }
 
-// TestReannouncingDriver: the driver the node hands the Wi-Fi
-// NetworkCommissioning server re-announces after a successful join and
-// only then, and passes the host driver's answer through unchanged.
-func TestReannouncingDriver(t *testing.T) {
+// TestWiFiDriverHandedOverUnwrapped (review II, R2-P6-api-2450): the node
+// hands the Wi-Fi NetworkCommissioning server the host's driver itself,
+// so the server finds every optional port the driver implements — the
+// link watch and the disconnect among them, which the wrapper before hid.
+func TestWiFiDriverHandedOverUnwrapped(t *testing.T) {
 	t.Parallel()
-	for _, tc := range []struct {
-		name   string
-		status uint8
-		want   int32
-	}{
-		{"success", 0, 1},
-		{"OutOfRange", 1, 0},
-		{"AuthFailure", 7, 0},
-		{"UnknownError", 12, 0},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			adv := &countingAdvertiser{Noop: mdns.NewNoop()}
-			n := &Node{advertiser: adv, cfg: Config{Network: Network{WiFi: &WiFi{Driver: fixedWiFi{status: tc.status}}}}}
-			drv := n.wifiDriver()
-			if drv == nil {
-				t.Fatal("no driver for a WiFi with a Driver")
-			}
-			status, _, errValue := drv.ConnectNetwork(t.Context(), []byte("lab"), []byte("secret12"))
-			if status != tc.status || (tc.status != 0) != (errValue == 7) {
-				t.Errorf("ConnectNetwork = %d, %d; want the host driver's answer", status, errValue)
-			}
-			if got := adv.triggers.Load(); got != tc.want {
-				t.Errorf("re-announced %d times, want %d", got, tc.want)
-			}
-		})
+	var host contract.WiFiDriver = fullWiFi{}
+	n := &Node{cfg: Config{Network: Network{WiFi: &WiFi{Driver: host}}}}
+	drv := n.wifiDriver()
+	if drv != host {
+		t.Fatalf("the node hands the server %T, want the host's driver", drv)
 	}
-	n := &Node{cfg: Config{Network: Network{WiFi: &WiFi{Reporter: nil}}}}
-	if n.wifiDriver() != nil {
+	_, watcher := drv.(contract.WiFiLinkWatcher)
+	_, disconnector := drv.(contract.WiFiDisconnector)
+	_, reporter := drv.(contract.WiFiLinkReporter)
+	_, switcher := drv.(contract.WiFiInterfaceSwitcher)
+	if !watcher || !disconnector || !reporter || !switcher {
+		t.Errorf("as handed to the server: watcher %v disconnector %v reporter %v switcher %v; want all", watcher, disconnector, reporter, switcher)
+	}
+	if (&Node{cfg: Config{Network: Network{WiFi: &WiFi{}}}}).wifiDriver() != nil {
 		t.Error("a driver without Network.WiFi.Driver")
 	}
 }
 
-// reportingWiFi is a fixedWiFi that reports the radio on ssid.
-type reportingWiFi struct {
-	fixedWiFi
-	ssid string
-}
-
-func (w reportingWiFi) CurrentNetwork(context.Context) (ssid []byte, known bool) {
-	return []byte(w.ssid), true
-}
-
-// switchingWiFi is a fixedWiFi whose interface switches, answering err.
-type switchingWiFi struct {
-	fixedWiFi
-	switched *[]bool
-	err      error
-}
-
-func (w switchingWiFi) SetInterfaceEnabled(_ context.Context, enabled bool) error {
-	*w.switched = append(*w.switched, enabled)
-	return w.err
-}
-
-// TestReannouncingDriverForwardsTheInterfaceSwitch: the driver the node
-// hands the cluster switches the interface through the host driver when
-// that driver can (contract.WiFiInterfaceSwitcher), with its answer, and
-// answers errors.ErrUnsupported when it cannot — the cluster's
-// INVALID_ACTION for a write of InterfaceEnabled false.
-func TestReannouncingDriverForwardsTheInterfaceSwitch(t *testing.T) {
+// TestWiFiConnectedReannounces: the node's connect hook re-announces the
+// node's DNS-SD records.
+func TestWiFiConnectedReannounces(t *testing.T) {
 	t.Parallel()
-	var switched []bool
-	refused := errors.New("rfkill")
-	for _, tc := range []struct {
-		name   string
-		driver contract.WiFiDriver
-		want   error
-	}{
-		{"switching", switchingWiFi{switched: &switched}, nil},
-		{"switching, refused", switchingWiFi{switched: &switched, err: refused}, refused},
-		{"not switching", fixedWiFi{}, errors.ErrUnsupported},
-	} {
-		n := &Node{cfg: Config{Network: Network{WiFi: &WiFi{Driver: tc.driver}}}}
-		s, ok := n.wifiDriver().(contract.WiFiInterfaceSwitcher)
-		if !ok {
-			t.Fatal("the node's driver is no contract.WiFiInterfaceSwitcher")
-		}
-		if err := s.SetInterfaceEnabled(t.Context(), false); !errors.Is(err, tc.want) || (tc.want == nil) != (err == nil) {
-			t.Errorf("%s: SetInterfaceEnabled = %v, want %v", tc.name, err, tc.want)
-		}
-	}
-	if !slices.Equal(switched, []bool{false, false}) {
-		t.Errorf("the host driver switched %v, want [false false]", switched)
-	}
-}
-
-// TestReannouncingDriverForwardsTheReportedLink: the driver the node hands
-// the cluster answers CurrentNetwork with the host driver's answer when
-// that driver reports its link, and as not known when it does not.
-func TestReannouncingDriverForwardsTheReportedLink(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name      string
-		driver    contract.WiFiDriver
-		wantSSID  string
-		wantKnown bool
-	}{
-		{"reporting", reportingWiFi{ssid: "home"}, "home", true},
-		{"not reporting", fixedWiFi{}, "", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			n := &Node{cfg: Config{Network: Network{WiFi: &WiFi{Driver: tc.driver}}}}
-			r, ok := n.wifiDriver().(contract.WiFiLinkReporter)
-			if !ok {
-				t.Fatal("the node's driver is no contract.WiFiLinkReporter")
-			}
-			if ssid, known := r.CurrentNetwork(t.Context()); string(ssid) != tc.wantSSID || known != tc.wantKnown {
-				t.Errorf("CurrentNetwork = %q, %v; want %q, %v", ssid, known, tc.wantSSID, tc.wantKnown)
-			}
-		})
+	adv := &countingAdvertiser{Noop: mdns.NewNoop()}
+	n := &Node{advertiser: adv}
+	n.wifiConnected(t.Context())
+	if got := adv.triggers.Load(); got != 1 {
+		t.Errorf("re-announced %d times, want 1", got)
 	}
 }

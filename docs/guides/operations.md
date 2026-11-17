@@ -214,8 +214,13 @@ new driver. When the system-bus connection itself is lost, every later scan
 and join fails at once with UnknownError and the debug text "the driver's
 bus connection is gone" — the same signal to build a new driver. A scan or
 join also ends with its caller's context while it waits for the driver.
+The node hands the host's driver to the server unwrapped, so the server
+finds every optional port it implements — `contract.WiFiLinkWatcher` and
+`contract.WiFiDisconnector` included — and re-announces the node's DNS-SD
+records after each successful join through the server's `OnConnected`
+hook.
 
-*Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
+*Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`wifiDriver`, `wifiConnected`),
 [`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
 [`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`, `CurrentNetwork`).*
 
