@@ -329,8 +329,8 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 // for step 7.2.
 func (s *CertificateStore) boundPoints(akid string, points []RevocationPoint) (_ []RevocationPoint, perVID map[uint16]int, cut bool) {
 	if cut = len(points) > maxCRLPointsPerIssuer; cut {
-		s.log.Warn("dcl.revocation.too_many_points", slog.String("akid", akid), slog.Int("points", len(points)),
-			slog.Int("used", maxCRLPointsPerIssuer),
+		s.log.Warn("dcl.revocation.too_many_points", slog.String("akid", akid), slog.Int("count", len(points)),
+			slog.Int("max", maxCRLPointsPerIssuer),
 			slog.String("message", fmt.Sprintf("DCL lists %d CRL points for AKID %s; the first %d are used and the lookup is incomplete", len(points), akid, maxCRLPointsPerIssuer)))
 		points = points[:maxCRLPointsPerIssuer]
 	}

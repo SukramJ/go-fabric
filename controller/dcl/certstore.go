@@ -834,7 +834,7 @@ func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProductio
 	s.log.Debug("dcl.certificates.roots", slog.Bool("production", isProduction), slog.Int("count", len(refs)))
 	if len(refs) > maxRootsPerUpdate {
 		s.log.Warn("dcl.certificates.too_many_roots", slog.Bool("production", isProduction), slog.Int("count", len(refs)),
-			slog.Int("fetched", maxRootsPerUpdate))
+			slog.Int("max", maxRootsPerUpdate))
 		refs = refs[:maxRootsPerUpdate]
 	}
 	for _, ref := range refs {
@@ -1022,7 +1022,7 @@ func (s *CertificateStore) capGitHubFiles(files []string, dir string) []string {
 		der = append(der, name)
 	}
 	if skipped > 0 {
-		s.log.Warn("dcl.certificates.too_many_github_files", slog.String("dir", dir), slog.Int("fetched", maxGitHubFilesPerUpdate), slog.Int("skipped", skipped))
+		s.log.Warn("dcl.certificates.too_many_github_files", slog.String("path", dir), slog.Int("count", len(der)+skipped), slog.Int("max", maxGitHubFilesPerUpdate))
 	}
 	return der
 }
