@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9538,
+  "entry_points": 9542,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19146,
+    "total_exported": 19150,
     "reachable": 12650,
-    "whitelisted": 6496,
+    "whitelisted": 6500,
     "unreachable": 0
   },
   "by_package": [],
@@ -4182,6 +4182,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestHoldOutsideAnAttributeDataFollowsTheRecord",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_hold_phase_test.go",
+      "line": 68
+    },
+    {
+      "package": "bridge",
       "identifier": "TestHostChangeAdvancesOnceOnAHandOffServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/host_change_version_test.go",
@@ -4325,7 +4332,7 @@
       "identifier": "TestInvokeAnsweredWithNothingSendsNoResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/invoke_no_response_test.go",
-      "line": 28
+      "line": 46
     },
     {
       "package": "bridge",
@@ -5386,6 +5393,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPhasedClustersEndWithTheirEndpointsHold",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_hold_phase_test.go",
+      "line": 103
+    },
+    {
+      "package": "bridge",
       "identifier": "TestPiggybackedAckReleasesTheReplyRoute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_route_release_test.go",
@@ -5607,6 +5621,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
       "line": 220
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestQuieterHeldInTwoAttributeDataAdvancesOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_hold_phase_test.go",
+      "line": 128
     },
     {
       "package": "bridge",
@@ -37338,6 +37359,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_parity_test.go",
       "line": 313
+    },
+    {
+      "package": "im",
+      "identifier": "TestValidationErrorsYieldToALaterTypeError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/decode_later_test.go",
+      "line": 286
     },
     {
       "package": "im",
