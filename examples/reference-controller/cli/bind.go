@@ -5,7 +5,6 @@ package cli
 
 import (
 	"context"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"slices"
@@ -177,7 +176,7 @@ func bindGroup(ctx context.Context, e *env, s *stack, src *client.Node, srcEP ui
 	if err != nil {
 		return err
 	}
-	key, err := hex.DecodeString(g.EpochKey)
+	key, err := groupEpochKey(ctx, s, g)
 	if err != nil {
 		return err
 	}
