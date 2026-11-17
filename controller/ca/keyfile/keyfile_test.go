@@ -142,14 +142,14 @@ func TestCreateSyncsTheFileAndItsDirectory(t *testing.T) {
 	saveFile, saveDir := syncFile, syncDir
 	t.Cleanup(func() { syncFile, syncDir = saveFile, saveDir })
 	var synced []string
-	syncFile = func(f *os.File) error { synced = append(synced, "file:"+filepath.Base(f.Name())); return nil }
-	syncDir = func(dir string) error { synced = append(synced, "dir:"+filepath.Base(dir)); return nil }
+	syncFile = func(f *os.File) error { synced = append(synced, "file="+filepath.Base(f.Name())); return nil }
+	syncDir = func(dir string) error { synced = append(synced, "dir="+filepath.Base(dir)); return nil }
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ca.key")
 	if _, err := create(path, []byte("secret"), nil, minIterations); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"file:ca.key", "dir:" + filepath.Base(dir)}; strings.Join(synced, ",") != strings.Join(want, ",") {
+	if want := []string{"file=ca.key", "dir=" + filepath.Base(dir)}; strings.Join(synced, ",") != strings.Join(want, ",") {
 		t.Fatalf("synced %v, want %v", synced, want)
 	}
 	boom := errors.New("sync failed")
