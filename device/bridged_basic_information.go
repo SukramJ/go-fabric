@@ -36,9 +36,7 @@ func (s *settings) declareBridgedBasicInformation(d Declaration, decl spec.Clust
 	case bdbidef.Declare:
 		o = v
 	case *bdbidef.Declare:
-		if v != nil {
-			o = *v
-		}
+		o = *v // a typed nil is refused before (declare)
 	}
 	if o.OnWrite != nil || o.HandleKeepActive != nil || o.NoFeatures || decl.Server != nil || decl.HasFeatures || hasPorts(decl.Ports) ||
 		len(decl.Elements.Attributes)+len(decl.Elements.Commands)+len(decl.Elements.Events) > 0 {
