@@ -7,10 +7,10 @@ package commissioner
 // the generated definition (cluster/spec/operationalcredentials, ADR 0013,
 // generated from parity/schema.json). What stays here is the decoding the
 // flow needs beyond it: the attestation and CSR responses, whose signature
-// the flow hands to the attestation check at any length up to 64 bytes
-// (the generated decoder requires exactly 64), and the CSR's
-// TlvCertSigningRequest, which is not a cluster payload (review II,
-// R2-P6-doc-1857).
+// is decoded at any length and judged downstream — the generated decoder
+// requires exactly 64 at decode, which is the divergence these two avoid
+// (decodeSignedElements) — and the CSR's TlvCertSigningRequest, which is
+// not a cluster payload (review II, R2-P6-doc-1857).
 
 import (
 	"math"
@@ -57,17 +57,31 @@ func decodeCertificateChainResponse(n spec.Node) ([]byte, error) {
 
 // signedElements is AttestationResponse {[0] AttestationElements, [1]
 // AttestationSignature} or CsrResponse {[0] NocsrElements, [1]
-// AttestationSignature}: elements of at most 900 bytes and a signature
-// of at most 64, whose length the attestation check judges.
+// AttestationSignature}: elements of at most 900 bytes and a signature of
+// any length, the message size its only bound.
 type signedElements struct {
 	elements, signature []byte
 }
 
+// decodeSignedElements enforces no signature length: a length other than
+// 64 is judged downstream — in the AttestationResponse the error finding
+// AttestationSignatureInvalid the policy judges, in the CSRResponse the
+// CSR signature verification failure (an empty one stays unexpected
+// data). Mirrors matter.js, whose client decodes the command fields
+// without validating their bounds
+// (packages/protocol/src/action/client/ClientInteraction.ts:552, :561 at
+// db021da0) and judges the length in EcdsaSignature
+// (packages/general/src/crypto/EcdsaSignature.ts:39-40):
+// DeviceAttestationValidator.ts:295-306 for the attestation,
+// ControllerCommissioningFlow.ts:1419-1421 and :1424-1434 for the CSR.
+// The generated opcredsdef.AttestationResponse and CsrResponse decode
+// the signature at exactly 64 and so are not used here (review II,
+// R2-P6-doc-1857 (b), owner decision 216).
 func decodeSignedElements(n spec.Node, what string) (signedElements, error) {
 	var s signedElements
 	err := spec.DecodeFields(n, what,
 		spec.Bind(0, "Elements", true, &s.elements, spec.DecodeBytesIn(0, 900)),
-		spec.Bind(1, "AttestationSignature", true, &s.signature, spec.DecodeBytesIn(0, 64)))
+		spec.Bind(1, "AttestationSignature", true, &s.signature, spec.DecodeBytesIn(0, math.MaxInt)))
 	return s, err
 }
 
