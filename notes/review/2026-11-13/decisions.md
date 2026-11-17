@@ -186,3 +186,97 @@ by Fable. 120 and 122 depart from the recommended option, the others take it.
 | 126 | Held-back rows #534 fixed | **Nine now**, in a notes pull request at the start of 6a; **the three of the disclosure class** (R2-P5-redact-01, N4-frsec-1, DR5b-F-01) with the release that carries their fix |
 | 127 | The parity backlog | **Placed rows worked** (fixed or recorded as a divergence); every other open entry of `matter_behaviour_findings.md` gets one verdict line from the Fable overlay of its package (true at the pin, stale, or a `by_design` candidate), no fix |
 | 128 | Decision 17 larger than decided (N5b-afacade-1) | **Confirmed as built**: `device.New` refuses what matter.js's init validation refuses; the CHANGELOG names every type |
+
+Wizard round 2 of 6a (2026-11-16), after the review's verify; the briefs and
+options were written by Fable. 137, 143, 146 and 150 depart from the
+recommended option, the others take it.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 129 | Fabric isolation where connectedhomeip has none (R2-P6-sec-1201, -1103, -1106) | **Fence all three, recorded as ahead of chip**: Messages refuses an id another fabric holds; the Joint Fabric datastore answers UNSUPPORTED_ACCESS to any fabric but the recorded anchor fabric; a RefreshNode never replaces a held key set |
+| 130 | The mark of a sealed database | **A sealed canary** in a reserved `matter_settings` row: the mark, the wrong-key check and Reseal's handle; not tamper protection, and the doc says so |
+| 131 | Re-sealing under a new key | **`store.Reseal(ctx, db, old, new Sealer)`**, one transaction, the canary last, then the scrub with its owed mark; no way back to a clear database |
+| 132 | `NewSealed` when the scrub cannot finish (R2-P6-err-0108) | **The store opens sealed and strict, without an error**; the owed scrub can be queried, one warning line is logged and the scrub is retried at the next open |
+| 133 | Group reception state (decision 22) | **A bound per operational key** that refuses a sender it does not hold yet and evicts nobody; an *Ahead of matter.js* row |
+| 134 | Bounds that neither reference has (R2-P6-bound-0106, -0107, -1008, -1205, -1206, -0502, -0203) | **Per fabric (per peer for TCP)**, each an *Ahead of matter.js* row |
+| 135 | A database without `foreign_keys` (R2-P6-sec-0601) | **Both**: explicit deletes in RemoveFabric and RollbackFabric, and `Apply` refuses `foreign_keys = 0` (an announced break) |
+| 136 | Package `im` without an ACL checker (R2-P6-sec-0560) | **Deny**; no ACL only through `endpoint.UnenforcedACL` |
+| 137 | The Rotating Device Identifier (R2-P6-sec-0207) | **The full feature, as connectedhomeip**: a random persisted unique id and a persisted lifetime counter (two store settings, a node option); an *Ahead of matter.js* row. Not the recommended option |
+| 138 | H7, the single reporter hook | **Shape A**: `subscription.ReportSender` through `Manager.SetReportSender`; the old hooks and accessors `Deprecated:` |
+| 139 | Package `commissioning` | **`Deprecated:` now**, removed after the deprecation window |
+| 140 | Three exported surfaces without a production caller (N-ctr-5, R2-P6-sec-1006, R2-P6-api-1261, -par-1262) | **All three `Deprecated:`**; the fallbacks answer UNSUPPORTED_ACCESS; the five wire ids absent from the snapshot go with them |
+| 141 | Host hardware knowledge in `cluster/measurement` (R2-P6-doc-1465) | **Onto `contract/` as additive fields**, today's values the defaults |
+| 142 | Deep copies of generated state (R2-P6-err-1460) | **`clustergen` emits `Clone`**; every stateful server uses it |
+| 143 | F-db021da0-28 with R2-P5-apidev-02 | **Both as matter.js**: NodeLabel and SerialNumber are served only when the host stated them; no SerialNumber backfill, `BD-Matter-BasicInfo-SerialNumberAlwaysServed` goes; a fixture run before the pull request. Not the recommended option |
+| 144 | F-db021da0-4, the floor after priming | **Keep the floor as connectedhomeip**, `BD-chip-SubscriptionFloorAfterPriming`, no code |
+| 145 | F-db021da0-8, a pass whose data is all filtered | **One rule, the event path's**; an *Ahead of matter.js* row; it comes back if connectedhomeip sends the empty report (superseded by 169) |
+| 146 | F-db021da0-17 and -56 | **Fix both**: the tracker holds "installed" beside the value; one advance per attribute data. Not the recommended option |
+| 147 | F-db021da0-21, the Thermostat's sibling coupling | **The host wiring stays**, recorded as a divergence |
+| 148 | F-db021da0-38, the order of GroupKeyMap | **The written order, as matter.js**; the store carries a position (schema v11) |
+| 149 | R2-P6-par-1413, MoveColorTemperature Stop | **Stop as connectedhomeip**; a `by_design` row and an upstream note |
+| 150 | Behaviour mirrored from connectedhomeip that breaks a module guarantee (R2-P6-fsm-1581, -1582, -1615, -err-1002, -sup-1009, -fsm-1108, -sec-1602, -fsm-1603, -1604) | **Mirror all nine, recorded** in the `BD-chip-…-RulesInServer` rows; port docs that over-promise are corrected. Not the recommended option |
+| 151 | The citation defects | **To unit `cite` in 6b** as its ready list; only `bridge/conn.go`'s seven blocks now |
+
+The coordinator's reservations, stated to the owner: 143 — the backfill had an
+ecosystem reason on record, so a reference read checked it before the fix (it
+did not hold); 150 — mirroring 1581/1582 and 1615/1009 keeps behaviour a
+controller can observe as wrong, consistent with the order of authority since
+connectedhomeip is the authority there.
+
+Wizard after 6a's first fix wave (2026-11-16); every option taken was the
+recommended one.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 152 | R2-P6-sec-1103, the read half | **A contract read-access capability** the dispatcher asks before a read or subscribe, answering UNSUPPORTED_ACCESS; the interim empty-values fence stays until it lands |
+| 153 | N3-findev-1 | **`Manager.OpenFromSigmaWithStake` and `OpenFromSigmaAsInitiatorWithStake`** with `ErrStakeLost`; the `…WithID` pair `Deprecated:`; `node/security.go` switches |
+| 154 | R2-P6-api-1307 / DR5b-c2-06 | **The eight `spec.Hooks` servers move to `InvokeHeld`**; `Hooks` `Deprecated:` |
+| 155 | N4-coresec-1 | **The fabric label is counted in bytes** (connectedhomeip: the command's size check and the fabric table's 32-byte label); matter.js's UTF-16 count is recorded as a `by_design` row |
+| 156 | The defects of the deprecated package `commissioning` (R2-P6-sec-0104, -par-0105, -api-0114) | **Documented only**: the deprecated package keeps its behaviour |
+| 157 | A secret table added to a sealed store later | **Strict**; a standing test requires an upgrade step for every new sealed setting or secret table |
+| 158 | R2-P6-store-1010 | **Binding and ICD Management take the fabric-existence source AccessControl uses** (one port, filled by the node), fail-closed without it |
+
+Wizard during 6a's second fix wave (2026-11-16); every option taken was the
+recommended one.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 159 | `OpenFromPaseWithID` installs without a stake | **`OpenFromPaseWithStake`** with `ErrStakeLost` as CASE; `OpenFromPaseWithID` `Deprecated:`; `node/security.go` switches |
+| 160 | `AllocateID` | **`Deprecated:`**; a test-support helper installs under a chosen id; the bridge's test fixtures switch |
+| 161 | R2-P6-wire-0442 / -1703, the status of a malformed write value | **As matter.js**: an exported `im` marker for an undecodable value; the write interaction ends with StatusResponse FAILURE, earlier paths committed |
+| 162 | R2-P6-bound-0405, the read order | **`im.LookupAuthority(ctx)`** over the existing `im.WithAuthority` stamp; `im` stamps it in ReadReports when the ACL is active; the dispatcher authorises before it reads |
+| 163 | R2-P6-doc-1465, the ElectricalReadings half | **An optional capability `contract.ElectricalCurrentSource`**; absent means AC as today, DC sets PowerMode DC |
+| 164 | R2-P6-conc-1407, the step half | **An additive `transition.Transition.TargetFrom`**, the twin of `RateFrom` |
+| 165 | F-db021da0-46 / R2-P6-par-1405, exported trackers | **`Deprecated:` all**: the LevelControl, ModeSelect and modebase DataVersion trackers and `spec.ServerConfig.DataVersion` (the wire carries the endpoint's version); removed after the window |
+| 166 | The root BasicInformation SerialNumber backfill (the rest of 143) | **As matter.js**: the root serves SerialNumber only when the host stated it; `BD-Matter-BasicInfo-SerialNumberAlwaysServed` goes, and the comment's connectedhomeip claim with it |
+| 167 | R2-P6-bound-1206 | **`OTAProvider` implements `contract.FabricScopedState`** (two additive methods); the node drops a removed fabric's entries |
+| 168 | R2-P6-wire-1209 | **Both paths lenient**: the `cluster/wire` raw decoders accept an absent LevelControl TransitionTime again, as the bridge path; `BD-Matter-LevelControl-LenientDecoders` stays, corrected with the reference facts |
+
+Wizard during 6a's third fix wave (2026-11-16/17); every option taken was the
+recommended one. 182 supersedes 181 after a reference read found its premise
+false; 169 supersedes 145.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 169 | F-db021da0-8, the all-filtered pass, again (connectedhomeip sends the empty ReportData and restarts both intervals) | **One rule as both references**: the empty ReportData on the attribute and the event path, the pass counts; no *Ahead* row; supersedes 145 |
+| 170 | TLV null written to a non-nullable scalar | **As matter.js**: handled as an undecodable value through decision 161's mechanism; the interaction ends with FAILURE |
+| 171 | R2-P6-api-0611, SetDeviceTypeValidation after Start | **Doc only**: the mode is a construction-time setting; no exported SetMode |
+| 172 | N-ctr-5, the rest | **`SubscriptionTarget`, `ErrNoSubscriptionID`, `ErrNoPeer`, `ErrPeerCounterNotAnchored`, `ErrNotEstablished` `Deprecated:`** with `EstablishSubscriptionTarget`; `ErrNoBridge` stays |
+| 173 | F-db021da0-7, the unacknowledged handshake reply after a failure | **As both references**: the reply keeps retransmitting until it is acknowledged or MRP gives up; no `by_design` row |
+| 174 | `bridge.ErrAckWaitTimeout` without a producer | **`Deprecated:`**, removable in the next minor release |
+| 175 | R2-P6-bound-0502, the source of the cap | **An additive `(*subscription.Manager).MaxSubscriptionsPerFabric()`**; the bridge's per-fabric cap of persisted rows reads it |
+| 176 | R2-P6-wire-0503, the bridge half | **As matter.js**: the status wait carries "undecodable" — on an ongoing report a failed send that is retried, on priming FAILURE and close |
+| 177 | The deprecated `closure.ControlServer.Hooks` and `modebase.Server.Hooks` handlers no longer consulted | **Honoured for the deprecation window**: a handler registered through the deprecated field is called when no new `Handle` is set; the CHANGELOG line moves to Deprecated |
+| 178 | H7: a subscription manager without a report sender | **Refuse `Subscribe` and `Restore` with `ErrNoReportSender`** (the bridge answers FAILURE); an announced change |
+| 179 | H7: an exported test sender | **No** |
+| 180 | Where 6a's Linux runs go | **`make chiptool-container` locally** after the third wave's integration; the families and the fixture run in CI on the pushed branch before the pull request |
+| 181 | R2-P6-fsm-1001, the bridge half: a wildcard invoke whose every target answers `im.NoResponse` | **Silent by one rule**, with an additive `LeftOut()` — taken on a premise about connectedhomeip that a reference read then found false; superseded by 182 |
+| 182 | 181 put again (connectedhomeip refuses an invoke whose path names no endpoint before any handler; matter.js expands and always answers) | **The wildcard follows matter.js**: the InvokeResponse is always sent and a target that returned `im.NoResponse` is left out of it; silent only on a concrete path, as connectedhomeip; no `LeftOut()`; a `by_design` row for the omission. Supersedes 181 |
+
+Wizard before 6a's pull request (2026-11-17), after the fixture run; both
+options taken were the recommended ones.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 183 | TC-PAVST-2.8 step 4: a FindTransport (quality L) sent over a UDP session meets the large-message gate (INVALID_TRANSPORT_TYPE, as matter.js); connectedhomeip carries the same gate, inert for its code-driven clusters through a generator gap, so the case expects NOT_FOUND | **The gate stays**, one rule as matter.js; the case's step is recorded as a divergence (`by_design`, the certifiability page, the harness's record of the case) and reported upstream |
+| 184 | R2-P6-bound-1312 put again: connectedhomeip caps its recursive `TLV::Utilities::Iterate` at 10 levels, not its reader | **No depth cap**, as decided; the register's wording corrected |
