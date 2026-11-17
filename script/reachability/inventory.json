@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9590,
+  "entry_points": 9595,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19196,
+    "total_exported": 19197,
     "reachable": 12650,
-    "whitelisted": 6546,
+    "whitelisted": 6547,
     "unreachable": 0
   },
   "by_package": [],
@@ -14304,6 +14304,13 @@
     },
     {
       "package": "cluster/modebase",
+      "identifier": "TestDeprecatedHooksHandlerAnswersChangeToMode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/modebase/held_internal_test.go",
+      "line": 94
+    },
+    {
+      "package": "cluster/modebase",
       "identifier": "TestDeprecatedHooksKeepTheirBehaviour",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/modebase/held_internal_test.go",
@@ -14937,7 +14944,7 @@
       "identifier": "RequestOf",
       "reason": "generic: the self-held servers call instantiations of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/selfheld.go",
-      "line": 263
+      "line": 286
     },
     {
       "package": "cluster/spec",
