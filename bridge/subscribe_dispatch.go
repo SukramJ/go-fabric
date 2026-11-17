@@ -740,6 +740,12 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
 		// MessageExchange.ts:855-863).
 		if _, err := b.sendChunk(leg, i, body, chunk, chunkWaitHere); err != nil {
+			if errors.Is(err, errChunkAnswerUndecodable) {
+				// The peer's answer carried no status: the interaction
+				// ends with FAILURE on its own exchange (owner decision
+				// 176; [errChunkAnswerUndecodable]).
+				_ = b.rejectSubscribeStatus(src, requestHdr, proto, "priming_answer_undecodable", im.StatusFailure)
+			}
 			return err
 		}
 

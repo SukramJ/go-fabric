@@ -341,11 +341,6 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	chunks := 0
 	for i := 0; have; i++ {
 		if err := b.sendReadChunk(ctx, src, requestHdr, proto, i, chunk); err != nil {
-			if errors.Is(err, errChunkAnswerUndecodable) {
-				// The peer's answer carried no status: the read ends with
-				// FAILURE on its exchange (owner decision 176).
-				_ = b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_answer_undecodable", im.StatusFailure)
-			}
 			return err
 		}
 		chunks++
@@ -392,6 +387,11 @@ func (b *Bridge) sendReadChunk(ctx context.Context, src net.Addr, requestHdr *me
 		wait = chunkNoWait
 	}
 	if _, err := b.sendChunk(b.replyChunkLeg(ctx, "read", src, requestHdr, proto, im.OpcodeReportData), i, body, chunk, wait); err != nil {
+		if errors.Is(err, errChunkAnswerUndecodable) {
+			// The peer's answer carried no status: the read ends with
+			// FAILURE on its exchange (owner decision 176).
+			_ = b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_answer_undecodable", im.StatusFailure)
+		}
 		return err
 	}
 	b.logger.Debug("matter.rx.im.read.chunk",

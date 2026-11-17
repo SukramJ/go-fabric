@@ -2196,12 +2196,6 @@ func (b *Bridge) subscribeWith(
 	leaveSessionOrder(ctx)
 	if err := b.streamPrimingChunks(ctx, abort, src, requestHdr, proto, subID, chunker); err != nil {
 		b.abandonPrimingSubscription(subID)
-		if errors.Is(err, errChunkAnswerUndecodable) {
-			// The peer's answer carried no status: the interaction ends
-			// with FAILURE on its own exchange (owner decision 176;
-			// [errChunkAnswerUndecodable]).
-			_ = b.rejectSubscribeStatus(src, requestHdr, proto, "priming_answer_undecodable", im.StatusFailure)
-		}
 		return err
 	}
 	b.logger.Debug("matter.tx.subscribe.initial_reports",
