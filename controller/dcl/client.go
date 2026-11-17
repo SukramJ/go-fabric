@@ -116,9 +116,10 @@ type Client struct {
 	// redirect hop — whose host is localhost or an IP address of the
 	// refused classes is refused before it is handed to the proxy or
 	// dialled: the host as net/http sends it (mapped to ASCII for a
-	// CONNECT), lower-cased, a trailing dot dropped, an IPv4 address in
-	// any inet_aton-style spelling (decimal, octal, hexadecimal, short
-	// forms) included. A SOCKS proxy is not handed a host outside ASCII.
+	// CONNECT), lower-cased, leading and trailing dots dropped, an IPv4
+	// address in any inet_aton-style spelling (decimal, octal,
+	// hexadecimal, short forms) included. No proxy is handed a host
+	// outside ASCII.
 	// A host name sent through the proxy is the proxy's to resolve and
 	// connect to; the guard dials only the proxy.
 	AllowPrivateDestinations bool
@@ -349,8 +350,8 @@ func ipv4Legacy(host string, octal bool) (netip.Addr, bool) {
 // target of a CONNECT as the transport writes it (canonicalAddr) before
 // the proxy is asked, and refuses it as refusedHostPort does. net/http
 // maps a host to ASCII where it can; a host it cannot map reaches here
-// unmapped and is refused, as a non-ASCII host is for a SOCKS proxy — a
-// valid international name arrives as its xn-- form.
+// unmapped and is refused. proxyFor refuses a host outside ASCII before
+// any proxy is asked, so this check is a second line.
 func (g *destinationGuard) connectTarget(_ context.Context, _ *url.URL, target string) (http.Header, error) {
 	host, port, err := net.SplitHostPort(target)
 	if err != nil {
@@ -382,16 +383,15 @@ func (g *destinationGuard) checkRedirect(req *http.Request, via []*http.Request)
 // proxyFor is the transport's Proxy: it refuses a URL whose host the
 // guard refuses (refusedHost), then returns the proxy the environment
 // names for req and records its dial address in req's proxyDial, so that
-// the dial to it for req is not checked. A SOCKS proxy is handed the target with no hook between
-// the transport's mapping and the hand-over, so through one a host with
-// characters outside ASCII is refused.
+// the dial to it for req is not checked. Through any proxy a host with
+// characters outside ASCII is refused (review II, 5b-dcl R8).
 func (g *destinationGuard) proxyFor(req *http.Request) (*url.URL, error) {
 	if err := g.refusedHost(req.URL); err != nil {
 		return nil, err
 	}
 	p, err := g.proxy(req)
-	if p != nil && strings.HasPrefix(strings.ToLower(p.Scheme), "socks") && !isASCII(req.URL.Hostname()) {
-		return nil, fmt.Errorf("%w: %s through a SOCKS proxy: a host outside ASCII is not judged before the hand-over", errDestination, req.URL.Redacted())
+	if p != nil && !isASCII(req.URL.Hostname()) {
+		return nil, fmt.Errorf("%w: %s through a proxy: a host outside ASCII is not handed to a proxy", errDestination, req.URL.Redacted())
 	}
 	if p != nil {
 		port := p.Port()

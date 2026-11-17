@@ -70,3 +70,37 @@ func TestGuardDropsTheHostsDots(t *testing.T) {
 		}
 	}
 }
+
+// TestHeld5bDclR8 (review II, 5b-dcl R8, decision 218).
+func TestHeld5bDclR8(t *testing.T) {
+	t.Parallel()
+	var asked atomic.Int32
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked.Add(1)
+		_, _ = w.Write([]byte("crl"))
+	}))
+	t.Cleanup(proxy.Close)
+	proxyURL, err := url.Parse(proxy.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scheme := range []string{"http", "socks5"} {
+		p := *proxyURL
+		p.Scheme = scheme
+		s := &CertificateStore{opts: CertificateOptions{Client: &Client{guard: newGuardedClient(guardConfig{
+			resolver: stubResolver(nil),
+			proxy:    func(*http.Request) (*url.URL, error) { return &p, nil },
+		})}}}
+		for _, u := range []string{
+			"http://１２７.０.０.１/x", "http://ｌｏｃａｌｈｏｓｔ。/x", "http://bücher.example/x",
+			"https://bücher.example/x", "http://127.0.0.1​/x",
+		} {
+			if _, err := s.downloadCRL(t.Context(), u, 0); !errors.Is(err, errDestination) {
+				t.Errorf("%s through a %s proxy: %v, want errDestination", u, scheme, err)
+			}
+		}
+	}
+	if n := asked.Load(); n != 0 {
+		t.Fatalf("the proxy was asked %d times, want never", n)
+	}
+}

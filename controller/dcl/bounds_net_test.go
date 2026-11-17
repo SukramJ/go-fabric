@@ -665,8 +665,8 @@ func TestGitHubNamedURLsConnectToPublicDestinationsOnly(t *testing.T) {
 // address in a legacy spelling a resolver or proxy reads (decimal, hex,
 // octal, short forms, a trailing dot) are refused before the proxy is
 // asked — as the first URL and as a redirect hop; a URL whose host stays a
-// name reaches the proxy as one. A SOCKS proxy is not handed a host
-// outside ASCII.
+// name reaches the proxy as one. No proxy is handed a host outside ASCII
+// (5b-dcl R8).
 func TestGuardJudgesTheHostAsSent(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex
@@ -722,20 +722,19 @@ func TestGuardJudgesTheHostAsSent(t *testing.T) {
 			t.Errorf("a redirect to %s: the proxy was asked %v; want only the first request", to, got)
 		}
 	}
-	// Names stay names: a public-looking name, an all-numeric label that is
-	// no IPv4 spelling, and a host outside ASCII that the plain-http request
-	// line carries as punycode.
+	// Names stay names: a public-looking name and an all-numeric label that
+	// is no IPv4 spelling.
 	for _, u := range []string{"http://crl.example/x", "http://999.0.0.1/x", "http://1.2.3.4.5/x", "http://08.0.0.1/x"} {
 		if _, err := s.downloadCRL(t.Context(), u, 0); err != nil {
 			t.Errorf("%s: err %v; want it handed to the proxy as a name", u, err)
 		}
 	}
 	before := len(seen())
-	_, _ = s.downloadCRL(t.Context(), "http://１２７.０.０.１/x", 0)
-	for _, line := range seen()[before:] {
-		if host := strings.Fields(line)[1]; strings.Contains(host, "127.0.0.1") {
-			t.Errorf("the plain-http request line %q names the mapped address", line)
-		}
+	if _, err := s.downloadCRL(t.Context(), "http://１２７.０.０.１/x", 0); !errors.Is(err, errDestination) {
+		t.Errorf("a host outside ASCII over plain http through the proxy: err %v; want it refused", err)
+	}
+	if got := seen()[before:]; len(got) != 0 {
+		t.Errorf("the proxy was asked %v; want nothing handed over", got)
 	}
 
 	socks := &CertificateStore{opts: CertificateOptions{Client: &Client{guard: newGuardedClient(guardConfig{
