@@ -14,12 +14,8 @@ import (
 	"testing"
 )
 
-// TestGuardChecksADirectDialToAProxyAddress (review II, 5b-dcl F6): the
-// dial the guard does not check is the one to the proxy a request was
-// handed, for that request. A later request the proxy function sends
-// direct, to the same host and port, is dialled as any other: its address
-// is checked.
-func TestGuardChecksADirectDialToAProxyAddress(t *testing.T) {
+// TestHeld5bDclF6 (review II, 5b-dcl F6).
+func TestHeld5bDclF6(t *testing.T) {
 	t.Parallel()
 	var hits atomic.Int32
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -36,7 +32,7 @@ func TestGuardChecksADirectDialToAProxyAddress(t *testing.T) {
 		resolver: stubResolver(map[string][]netip.Addr{"proxy.example": {netip.MustParseAddr("127.0.0.1")}}),
 		proxy: func(r *http.Request) (*url.URL, error) {
 			if r.URL.Hostname() == "proxy.example" {
-				return nil, nil // as NO_PROXY would send it: direct
+				return nil, nil
 			}
 			return proxyURL, nil
 		},
@@ -46,10 +42,10 @@ func TestGuardChecksADirectDialToAProxyAddress(t *testing.T) {
 	}
 	direct := "http://" + net.JoinHostPort("proxy.example", port) + "/x.crl"
 	if _, err := s.downloadCRL(t.Context(), direct, 0); !errors.Is(err, errDestination) {
-		t.Fatalf("a direct request to the proxy's address: %v, want errDestination at the dial", err)
+		t.Fatalf("second request: %v, want errDestination", err)
 	}
 	if n := hits.Load(); n != 1 {
-		t.Fatalf("the proxy's server answered %d requests, want only the proxied one", n)
+		t.Fatalf("the server answered %d requests, want 1", n)
 	}
 }
 

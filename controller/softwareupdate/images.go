@@ -447,8 +447,7 @@ func (i *Images) recordOrigin(ctx context.Context, name string, info *UpdateInfo
 }
 
 // forgetOrigin removes the provenance record of name. A failure other
-// than a missing record is logged and returned: a writer that goes on
-// would leave the former record on the new bytes (review II, 5b-dcl R9).
+// than a missing record is logged and returned (review II, 5b-dcl R9).
 func (i *Images) forgetOrigin(ctx context.Context, name string) error {
 	if err := i.blobs.Delete(ctx, name+originSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		i.log.Warn("ota.images.origin_not_removed", slog.String("file", name), slog.Any("err", err))
