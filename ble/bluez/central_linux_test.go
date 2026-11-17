@@ -616,3 +616,146 @@ func TestCloseWaitsForTheSignalLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestC2QueueBoundedByTheWindow: C2 values a subscriber has not taken are
+// queued up to the largest BTP window; one past it ends the connection and
+// asks BlueZ to drop the link (review II, R2-P6-bound-2005).
+func TestC2QueueBoundedByTheWindow(t *testing.T) {
+	b, d, _, conn, err := connectTo(t, 247, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	defer close(release)
+	var taken sync.WaitGroup
+	taken.Add(1)
+	var once sync.Once
+	if err := conn.SubscribeC2(context.Background(), func([]byte) {
+		once.Do(taken.Done)
+		<-release // a subscriber that does not keep up
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b.setProps(d.char(0x0d), ifaceGattChar, map[string]dbus.Variant{"Value": dbus.MakeVariant([]byte{0})})
+	taken.Wait()
+	k := conn.(*connection)
+	for i := range maxC2Queue {
+		b.setProps(d.char(0x0d), ifaceGattChar, map[string]dbus.Variant{"Value": dbus.MakeVariant([]byte{byte(i)})})
+	}
+	waitFor := func(what string, cond func() bool) {
+		t.Helper()
+		deadline := time.Now().Add(5 * time.Second)
+		for !cond() {
+			if time.Now().After(deadline) {
+				t.Fatalf("waiting for %s", what)
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	waitFor("a full queue", func() bool { k.mu.Lock(); defer k.mu.Unlock(); return len(k.queue) == maxC2Queue })
+	select {
+	case <-conn.Disconnected():
+		t.Fatal("the connection ended within the window")
+	default:
+	}
+	b.setProps(d.char(0x0d), ifaceGattChar, map[string]dbus.Variant{"Value": dbus.MakeVariant([]byte{0xff})})
+	select {
+	case <-conn.Disconnected():
+	case <-time.After(5 * time.Second):
+		t.Fatal("a value past the window did not end the connection")
+	}
+	k.mu.Lock()
+	queued := len(k.queue)
+	k.mu.Unlock()
+	if queued != 0 {
+		t.Fatalf("%d values still queued after the overrun", queued)
+	}
+	if !slices.Contains(b.called(), string(d.path)+" org.bluez.Device1.Disconnect") {
+		t.Fatal("BlueZ was not asked to drop the link")
+	}
+}
+
+// TestConcurrentConnectsOpenOneConnection: a second Connect for a
+// peripheral whose first Connect is still in progress is refused before it
+// reaches BlueZ (review II, R2-P6-conc-2016).
+func TestConcurrentConnectsOpenOneConnection(t *testing.T) {
+	b := newFakeBus()
+	p := &bletest.Peripheral{Address: "AA:BB:CC:DD:EE:01", Discriminator: 3840}
+	d := b.addDevice(p, 247)
+	c := startCentral(t, b)
+	d.advertise(p.ServiceData())
+	b.failWith(string(d.path)+" "+ifaceDevice+".Connect", errHang)
+	first, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errc := make(chan error, 1)
+	go func() {
+		_, err := c.Connect(first, ble.Peripheral{Address: p.Address})
+		errc <- err
+	}()
+	connects := func() int {
+		n := 0
+		for _, call := range b.called() {
+			if call == string(d.path)+" "+ifaceDevice+".Connect" {
+				n++
+			}
+		}
+		return n
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for connects() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the first Connect did not reach BlueZ")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	second, scancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer scancel()
+	if _, err := c.Connect(second, ble.Peripheral{Address: p.Address}); err == nil || !strings.Contains(err.Error(), "already open") {
+		t.Fatalf("second Connect: %v, want a connection already open", err)
+	}
+	if n := connects(); n != 1 {
+		t.Fatalf("%d Device1.Connect calls, want 1", n)
+	}
+	cancel()
+	if err := <-errc; err == nil {
+		t.Fatal("the hanging Connect succeeded")
+	}
+	// The reservation is released with the failed Connect.
+	b.mu.Lock()
+	delete(b.errs, string(d.path)+" "+ifaceDevice+".Connect")
+	b.mu.Unlock()
+	if _, err := c.Connect(context.Background(), ble.Peripheral{Address: p.Address}); err != nil {
+		t.Fatalf("Connect after the failed one: %v", err)
+	}
+}
+
+// TestConnectWithoutAnswerDisconnects: a Device1.Connect that ends without
+// BlueZ's answer is followed by a bounded Device1.Disconnect; one BlueZ
+// refused is not (review II, R2-P6-err-2017).
+func TestConnectWithoutAnswerDisconnects(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		err        error
+		disconnect bool
+	}{
+		{"unanswered", errHang, true},
+		{"refused", dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"refused"}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := newFakeBus()
+			p := &bletest.Peripheral{Address: "AA:BB:CC:DD:EE:01", Discriminator: 3840}
+			d := b.addDevice(p, 247)
+			c := startCentral(t, b)
+			d.advertise(p.ServiceData())
+			b.failWith(string(d.path)+" "+ifaceDevice+".Connect", tc.err)
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+			if _, err := c.Connect(ctx, ble.Peripheral{Address: p.Address}); err == nil {
+				t.Fatal("Connect succeeded")
+			}
+			if got := slices.Contains(b.called(), string(d.path)+" "+ifaceDevice+".Disconnect"); got != tc.disconnect {
+				t.Fatalf("Device1.Disconnect called %v, want %v", got, tc.disconnect)
+			}
+		})
+	}
+}
