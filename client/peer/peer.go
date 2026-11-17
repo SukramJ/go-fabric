@@ -403,6 +403,11 @@ func (p *Peer) save() {
 // parameters replace the descriptor's when it reported any (:176-178),
 // and the session leaves the peer when it begins to close (:168-174).
 func (p *Peer) addSession(s *exchange.Session) {
+	// The discovered addresses are read before the lock: the read waits
+	// for the discovery loop, and the peer's lock held across it would
+	// hold every session read behind a busy loop (review II,
+	// R2-P6-conc-2112).
+	discovered := p.service.Addresses()
 	p.mu.Lock()
 	if p.closed || slices.Contains(p.sessions, s) {
 		p.mu.Unlock()
@@ -410,7 +415,7 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.sessions = append(p.sessions, s)
 	p.busyUntil = time.Time{}
-	p.followAddressLocked(s)
+	p.followAddressLocked(s, discovered)
 	// A later move of the session — a migration, or a new exchange the
 	// node opened from another address — carries the operational address
 	// with it: matter.js Peer.ts:161-163 observes
@@ -464,12 +469,14 @@ func (p *Peer) addSession(s *exchange.Session) {
 // With the address it learns the proven host, ahead of matter.js
 // (learnHostLocked). matter.js follows the address only, at the same two
 // sites (Peer.ts:142-144 and :161-163 at db021da0).
-func (p *Peer) followAddressLocked(s *exchange.Session) {
+//
+// addrs are the service's discovered addresses, read by the caller before
+// it took the lock (addSession).
+func (p *Peer) followAddressLocked(s *exchange.Session, addrs []discovery.Address) {
 	a := s.Addr()
 	if a == nil {
 		return
 	}
-	addrs := p.service.Addresses()
 	if s.Transport() == exchange.TransportTCP {
 		if len(addrs) == 0 {
 			return
@@ -512,9 +519,10 @@ func (p *Peer) learnHost(discovered []discovery.Address) {
 // followAddress makes the session's address, after a migration, the
 // operational address (Peer.ts:161-163, MessageChannel.networkAddressChanged).
 func (p *Peer) followAddress(s *exchange.Session) {
+	discovered := p.service.Addresses()
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.followAddressLocked(s)
+	p.followAddressLocked(s, discovered)
 }
 
 // removeSession drops a closing session; the set's Disconnected hook runs
