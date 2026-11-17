@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9613,
+  "entry_points": 9615,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19215,
+    "total_exported": 19217,
     "reachable": 12650,
-    "whitelisted": 6565,
+    "whitelisted": 6567,
     "unreachable": 0
   },
   "by_package": [],
@@ -34537,77 +34537,84 @@
       "identifier": "TestCameraSimAppPipeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 866
+      "line": 933
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimAudioAndSnapshotStreams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 191
+      "line": 193
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimChime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 839
+      "line": 906
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimDigitalPTZ",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 637
+      "line": 704
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimMechanicalPTZ",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 587
+      "line": 654
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimMotionTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 526
+      "line": 593
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimPushTransportLifecycle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 420
+      "line": 487
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimRestoresItsAllocations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 255
+      "line": 257
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimVideoStreams",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 128
+      "line": 130
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimWebRTCProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 292
+      "line": 294
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimWebRTCReOffer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_sim_test.go",
+      "line": 359
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCameraSimZoneTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 731
+      "line": 798
     },
     {
       "package": "examples/reference-bridge",
@@ -38499,7 +38506,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 550
+      "line": 573
     },
     {
       "package": "internal/chiptool",
@@ -38535,6 +38542,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/pics_expr_test.go",
       "line": 131
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestRecordedFailuresAreExcluded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/certifiability_doc_test.go",
+      "line": 170
     },
     {
       "package": "internal/chiptool",
@@ -38597,7 +38611,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 462
+      "line": 485
     },
     {
       "package": "internal/paritytest",
