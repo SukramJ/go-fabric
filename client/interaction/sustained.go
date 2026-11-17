@@ -50,7 +50,13 @@ type retries struct {
 	cfg  RetrySchedule
 	rand func() float64
 	base time.Duration
+	// establishedAt is when the sustained subscription the schedule paces
+	// was last established (R2-P6-fsm-2110).
+	establishedAt time.Time
 }
+
+// reset starts the schedule over at its initial interval.
+func (r *retries) reset() { r.base = r.cfg.InitialInterval }
 
 func newRetries(cfg RetrySchedule, rand func() float64) *retries {
 	if cfg.InitialInterval == 0 {
@@ -342,7 +348,6 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		}
 
 		var held *icd.PeerWakefulness
-		var establishedAt time.Time
 		for {
 			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
 			if err == nil {
@@ -357,7 +362,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 				// nil branch's "a wakefulness present now is the feed", and the recreate
 				// takes the hold.
 				held = established(outer, inner, wakefulness())
-				establishedAt = c.clock.Now()
+				schedule.establishedAt = c.clock.Now()
 				break
 			}
 			if ctx.Err() != nil {
@@ -390,28 +395,9 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		if ctx.Err() != nil {
 			return
 		}
-		lasted := c.clock.Now().Sub(establishedAt) >= schedule.current()
-		if lasted {
-			schedule = newRetries(DefaultSustainRetries, c.rand)
-		}
-		if !flipped {
-			// A genuine loss: report not live so consumers re-establish. A
-			// deliberate recreate keeps active until it re-established or has
-			// to park (:289-293).
-			outer.setActive(false)
-			c.log.Info("matter.controller.interaction.sustain_replacing", slog.Uint64("node_id", outer.peer.NodeID))
-			if !lasted && !requiresAwait(wakefulness()) {
-				// Dropped before it lasted the schedule's interval: its next
-				// step is waited first (R2-P6-fsm-2110). A peer that requires
-				// awaiting has no timed retry; the gate parks it for its next
-				// wake instead.
-				retry := schedule.next()
-				c.log.Info("matter.controller.interaction.sustain_retry",
-					slog.Uint64("node_id", outer.peer.NodeID), slog.Duration("retry", retry), slog.String("reason", "subscription lost early"))
-				if !c.sleep(ctx, retry) {
-					return
-				}
-			}
+		if replace, ok := c.afterEstablishment(ctx, outer, schedule, !flipped); !ok {
+			return
+		} else if replace {
 			continue
 		}
 		deliberate.Store(true)
@@ -420,6 +406,34 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			slog.String("reason", "ICD operating mode change"))
 		recreatePriority = true
 	}
+}
+
+// afterEstablishment applies the cross-establishment retry rule
+// (R2-P6-fsm-2110) when the subscription established at
+// schedule.establishedAt ended: the schedule starts over when it lasted
+// the schedule's current interval. After a genuine loss (lost) the
+// subscription is reported not live (:289-293) and, when it did not last,
+// the schedule's next step is waited before the re-subscribe — but for a
+// peer that requires awaiting, which has no timed retry and which the gate
+// parks for its next wake. It reports whether the loop replaces the
+// subscription (a loss), and false for ok when ctx ended.
+func (c *Interaction) afterEstablishment(ctx context.Context, outer *Subscription, schedule *retries, lost bool) (replace, ok bool) {
+	lasted := c.clock.Now().Sub(schedule.establishedAt) >= schedule.current()
+	if lasted {
+		schedule.reset()
+	}
+	if !lost {
+		return false, true
+	}
+	outer.setActive(false)
+	c.log.Info("matter.controller.interaction.sustain_replacing", slog.Uint64("node_id", outer.peer.NodeID))
+	if lasted || requiresAwait(outer.wakefulness()) {
+		return true, true
+	}
+	retry := schedule.next()
+	c.log.Info("matter.controller.interaction.sustain_retry",
+		slog.Uint64("node_id", outer.peer.NodeID), slog.Duration("retry", retry), slog.String("reason", "subscription lost early"))
+	return true, c.sleep(ctx, retry)
 }
 
 // wakefulness is the peer's ICD wakefulness, read live on every use so a
