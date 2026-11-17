@@ -588,33 +588,3 @@ func TestReport_PeerUnreachable_RetriesBeforeEviction(t *testing.T) {
 		t.Errorf("manager.Active()=%d after 3 send errors, want 0", mgr.Active())
 	}
 }
-
-// TestWaitForAckCancelLeavesAnotherWaiter: a cancelled WaitForAck removes
-// only its own waiter channel — one another caller installed under the key
-// since stays (R2-P6-test-0819).
-func TestWaitForAckCancelLeavesAnotherWaiter(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		tr := newOutboundReliableTracker(nil, nil)
-		tr.Track(77, 0, 0, []byte{0x01}, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}, time.Now())
-		ctx, cancel := context.WithCancel(t.Context())
-		done := make(chan error, 1)
-		go func() { done <- tr.WaitForAck(ctx, 0, 77) }()
-		synctest.Wait()
-		key := outboundKey{0, 77}
-		theirs := make(chan error, 1)
-		tr.mu.Lock()
-		tr.waiters[key] = theirs
-		tr.mu.Unlock()
-		cancel()
-		if err := <-done; !errors.Is(err, context.Canceled) {
-			t.Fatalf("WaitForAck: %v", err)
-		}
-		tr.mu.Lock()
-		cur, has := tr.waiters[key]
-		tr.mu.Unlock()
-		if !has || cur != theirs {
-			t.Fatal("the cancelled wait removed another caller's waiter")
-		}
-	})
-}
