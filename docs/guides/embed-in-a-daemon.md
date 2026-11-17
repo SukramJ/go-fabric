@@ -9,6 +9,11 @@ the unit's charge level and power. The daemon's pull request
 [SukramJ/go-zendure2mqtt#64](https://github.com/SukramJ/go-zendure2mqtt/pull/64)
 does it in one commit per step, and each step below links its commit.
 
+The walkthrough was written against go-fabric v0.10.8, and its code is
+the daemon's at those commits. A new daemon starts from the latest
+release; the [migration guide](migrating-to-the-facade.md) and the
+[CHANGELOG](../../CHANGELOG.md) name what moved since.
+
 The daemon imports `node`, `device`, `contract` and the `<cluster>def`
 packages, and nothing below them. A test in the daemon holds that
 ([`TestFabricImportsOnlyTheFacade`](https://github.com/SukramJ/go-zendure2mqtt/blob/1d552bf10c895a270780bf5c946cab55dc9fd777/internal/fabric/fabric_test.go)).
@@ -17,10 +22,11 @@ It does the work of go-fabric's `script/archcheck` in one function.
 ## 1. The dependency
 
 ```sh
-go get github.com/SukramJ/go-fabric@v0.10.8
+go get github.com/SukramJ/go-fabric@latest
 ```
 
-A daemon pins a tag, never a commit. go-fabric is Apache-2.0. A daemon
+A daemon pins a tag, never a commit: `@latest` resolves to the newest
+release tag, and `go.mod` records it. go-fabric is Apache-2.0. A daemon
 that imports it links four of its direct dependencies —
 `filippo.io/nistec`, `github.com/miekg/dns`, `golang.org/x/net` and
 `modernc.org/sqlite` — and their indirect modules, all permissive (see

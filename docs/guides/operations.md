@@ -362,7 +362,7 @@ failing. The zero value runs no probe.
 Every table a peer can fill has a fixed size; the [limits page](limits.md)
 lists them all. The three an operator meets first:
 
-- **Fabrics: 5** (`node.Config.SupportedFabrics`, up to 254). Each
+- **Fabrics: 5** (`node.Config.Limits.SupportedFabrics`, up to 254). Each
   controller ecosystem the node is paired with is one fabric; a sixth
   pairing is answered `TableFull`.
 - **PASE failures per commissioning window: 20**, then a lockout of

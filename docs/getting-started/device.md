@@ -175,7 +175,7 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
   `BlockCommissioningOnError` comes with `Files`;
 - `BootReason` is a BootReasonEnum value;
 - `Health.Interval` is not negative;
-- `SupportedFabrics` is at most 254;
+- `Limits.SupportedFabrics` is at most 254;
 - `UniqueID` is at most 32 bytes;
 - `LocationCapability` is a valid regulatory location (zero is IndoorOutdoor,
   matter.js's default), and `IndoorOnly` comes with no other value;
@@ -210,7 +210,7 @@ Defaults worth knowing:
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `DeviceTypeValidation` | matter.js's warn mode |
-| `SupportedFabrics` | 5 (matter.js defaults to 254) |
+| `Limits.SupportedFabrics` | 5 (matter.js defaults to 254) |
 | `BootReason` | Unspecified, matter.js's default; a start into the version the node's own OTA requestor recorded as its update in progress reports SoftwareUpdateCompleted whatever this states |
 | `Commissioning.LocationCapability` | IndoorOutdoor, matter.js's default; `Commissioning.IndoorOnly` states Indoor |
 | `OTAProvider.GrantFabric` | with `OTAProvider` set: the provider's ACL entry is written into no fabric — the fabric's administrator grants the access, or the host returns true for the fabrics it opens the provider to. A grant only adds: an entry written while a grant stood, or by a version that wrote it into every fabric, stays when the grant goes, until the fabric's administrator writes the ACL without it |

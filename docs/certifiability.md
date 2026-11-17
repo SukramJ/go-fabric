@@ -116,8 +116,7 @@ kernel modules and stay weekly, outside that gate.
   mirrored: the reference daemon is the DUT, the module's own controller
   performs the TS file's controller actions, and the TS file's TH-side
   expectations are what the daemon has to satisfy. Each case cites its TS
-  file and the line of every step, as they stand at the snapshot's pin (the
-  two exceptions are named under the DUT role); a step's PICS is the TS's
+  file and the line of every step, as they stand at the snapshot's pin; a step's PICS is the TS's
   mirrored onto the server side (`ACT.C.C00.Tx` → `ACT.S.C00.Rsp`) and evaluated against the
   daemon's own PICS, and a step whose PICS is false is recorded skipped with
   the expression. One port holds a precondition looser than its TS file:
@@ -874,9 +873,10 @@ image (`internal/chiptool/image`, built by `.github/workflows/chip-image.yml`).
 page: every prefix with three cases or more at the harness commit is a
 family row or a row of the table above.
 
-Some families run but have nothing the daemon can be tested on. The root's
-IcdManagement is not mounted (`node/root.go` buildRoot says why), so the
-ICDM cases are not applicable through the device's own PICS (`ICDM.S=0`).
+Some families run but have nothing the daemon can be tested on. The
+default daemon is no ICD, so its root mounts no IcdManagement (`node/root.go`
+buildRoot; the `--icd-lit` daemon above is the ICD variant), and the ICDM
+cases are not applicable through its own PICS (`ICDM.S=0`).
 The OTA Software Update Requestor is mounted since #49 (ADR 0019) and its
 automated SU cases run, against a daemon in harness mode: the suite starts
 every daemon with `--ota-harness` (TESTING ONLY, `internal/chiptool/bridge_test.go`
@@ -888,13 +888,15 @@ SoftwareVersion and the VersionApplied event pass on. Without the flag the
 applier keeps the old version running and the requestor reports a failed
 update after the next restart; a product's applier and its restart into the
 new image are the product's, and these cases do not test them. The image lists
-the DLOG case, the BIND cases and the SU YAML cases as manual, so the
-status block records them as class (c); on substance BIND tests the binding
-client (`BIND.C`, a controller-side role, (d) — proven in-repo since wave 21), and the SU provider cases an
-OTA provider (b — built in wave 23, ADR 0021; the cases stay manual YAML, the
-in-repo proof is the module's requestor downloading from the module's
-provider; the DLOG case stays manual at the pinned image although the
-server now transfers over BDX). BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019) as the
+the DLOG case, the BIND cases and the SU YAML cases as manual. The status
+block records BIND/2.2 and DLOG/2.1 as class (c); BIND/2.1, BIND/2.3 and the
+SU cases run in the Go-TH leg with the module's controller as TH (the table
+above). On substance BIND tests the binding client (`BIND.C`, a
+controller-side role, proven in-repo since wave 21), and the SU provider
+cases an OTA provider (built in wave 23, ADR 0021; the in-repo proof is the
+module's requestor downloading from the module's provider); the DLOG case
+stays manual at the pinned image although the server now transfers over
+BDX. BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019) as the
 receiving side; the sending side came with ADR 0021 in `v0.4.0`, and a
 RetrieveLogsRequest that asks for BDX with a `TransferFileDesignator` is
 now served over BDX as chip does (`BD-chip-DiagLogs-BDX`).

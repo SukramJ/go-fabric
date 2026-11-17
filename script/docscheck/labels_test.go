@@ -5,6 +5,7 @@ package docscheck
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -58,5 +59,37 @@ func TestNoV11LabelInGo(t *testing.T) {
 	}
 	if files < 500 {
 		t.Fatalf("only %d Go files read; the walk is broken", files)
+	}
+}
+
+// TestStoreSeamPagesNameTheLastSchemaVersion: the pages a host that
+// carries the store's schema in its own migrations reads name the store's
+// last schema step, so a new step is not missing from them (review II,
+// R2-P6-doc-3053: advanced-seams stopped at v8 while the store was at
+// v11, and a host following it lacked matter_owed_fabric_events).
+func TestStoreSeamPagesNameTheLastSchemaVersion(t *testing.T) {
+	steps, err := filepath.Glob(filepath.Join(repoRoot, "store", "migrations", "v*.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := 0
+	for _, s := range steps {
+		var n int
+		if _, err := fmt.Sscanf(filepath.Base(s), "v%d.up.sql", &n); err == nil && n > last {
+			last = n
+		}
+	}
+	if last < 11 {
+		t.Fatalf("last schema step v%d; the glob is broken", last)
+	}
+	word := regexp.MustCompile(fmt.Sprintf(`\bv%d\b`, last))
+	for _, page := range []string{"docs/guides/advanced-seams.md", "docs/guides/persistence.md"} {
+		raw, err := os.ReadFile(filepath.Join(repoRoot, page))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !word.Match(raw) {
+			t.Errorf("%s does not name v%d, the store's last schema step (store/migrations/v%d.up.sql)", page, last, last)
+		}
 	}
 }

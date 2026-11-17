@@ -294,6 +294,7 @@ the kit server implements for host inputs: the switch's.
 | ServiceArea | `RemoveSupportedAreasEntry`, `RemoveSupportedMapsEntry` (with what names the area or map) |
 | SmokeCoAlarm | `Refresh` (for a `StateSource` that is no `contract.ChangeNotifier`) |
 | Switch | `contract.SwitchPositionSink` (`SetRawPosition`, `SetCurrentPosition`) and `contract.SwitchEventEmitter` (`FireInitialPress` …), `RawPosition`, `SetDebounceDelay`, `SetLongPressDelay`, `SetMultiPressDelay`, `ResetState` |
+| Thermostat | `SetMeasuredTemperature` (the host's measured temperature; LocalTemperatureCalibration applies before it is served as LocalTemperature), `SetOccupied` (OCC: the Occupancy attribute, and the setpoints in effect) |
 | ThreadBorderRouterManagement, ThreadNetworkDiagnostics | `Refresh` (the host schedules it) |
 | ThreadNetworkDirectory | `ReloadNetworks` |
 | TlsCertificateManagement | `RootCertificate`, `ClientCertificate`, `SetDependencyChecker` |

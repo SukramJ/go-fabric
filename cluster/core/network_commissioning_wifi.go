@@ -374,7 +374,8 @@ const (
 // CommissioningComplete starts when the link is on no committed network.
 // An attempt waits while a fail-safe is armed or a command runs, and holds
 // the driver alone while it runs, the first at Start included: a command
-// answers Busy then, and a fail-safe expiry does not release it. chip
+// cancels it and runs once it ended ([WiFiNetworkCommissioning.MatterInvoke]),
+// and a fail-safe expiry does not release it. chip
 // leaves the reconnect to wpa_supplicant, which holds the network it
 // saved (CommitConfig, :1118-1135 of
 // ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp); this

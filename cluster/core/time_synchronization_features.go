@@ -108,7 +108,10 @@ const (
 	defaultNTPMaxLen     = 128
 )
 
-// The store keys (chip's TimeSyncDataProvider keys, TimeSyncDataProvider.cpp).
+// The store keys: the module's own names for the four values chip's
+// TimeSyncDataProvider persists (TimeSyncDataProvider.cpp; chip's keys are
+// g/ts/tts, g/ts/dntp, g/ts/tz and g/ts/dsto,
+// src/lib/support/DefaultStorageKeyAllocator.h:279-282 at 6170af84).
 const (
 	timeSyncKeyTrustedTimeSource = "timesync.trusted_time_source"
 	timeSyncKeyDefaultNTP        = "timesync.default_ntp"
