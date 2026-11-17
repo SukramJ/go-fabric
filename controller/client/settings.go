@@ -243,5 +243,16 @@ func (o *SubscribeOptions) clone() *SubscribeOptions {
 	if o.Events != nil {
 		c.Events = slices.Clone(o.Events)
 	}
+	// The interval bounds are pointers: the copy gets its own, so a write
+	// through the caller's pointer changes neither the stored setting nor
+	// a clone handed out (review II, R2-P6-api-2356).
+	if o.MinIntervalFloor != nil {
+		v := *o.MinIntervalFloor
+		c.MinIntervalFloor = &v
+	}
+	if o.MaxIntervalCeiling != nil {
+		v := *o.MaxIntervalCeiling
+		c.MaxIntervalCeiling = &v
+	}
 	return &c
 }
