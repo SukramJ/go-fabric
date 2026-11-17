@@ -67,6 +67,10 @@ type apiConn struct {
 	writeTimeout time.Duration
 	// pinging is a keep-alive ping in the write.
 	pinging atomic.Bool
+	// wg counts the connection's goroutines: the reader, the keep-alive
+	// and its ping. Whoever ran start waits for them after the close, so
+	// no handle call outlives the connection's owner (R2-P6-conc-2011).
+	wg sync.WaitGroup
 
 	done      chan struct{}
 	closeOnce sync.Once
@@ -187,10 +191,16 @@ func (a *apiConn) await(want uint16, decode func([]byte) error) error {
 	}
 }
 
+// start runs the connection's reader and keep-alive; wait waits for them
+// once the connection is closed.
+func (a *apiConn) start() { a.wg.Go(a.run) }
+
+func (a *apiConn) wait() { a.wg.Wait() }
+
 // run reads the connection until it ends, answering pings and the device's
 // disconnect itself, and keeps it alive with a ping every pingInterval.
 func (a *apiConn) run() {
-	go a.keepAlive()
+	a.wg.Go(a.keepAlive)
 	for {
 		typ, payload, err := a.f.ReadMessage()
 		if err != nil {
@@ -231,10 +241,10 @@ func (a *apiConn) keepAlive() {
 				return
 			}
 			if a.pinging.CompareAndSwap(false, true) {
-				go func() {
+				a.wg.Go(func() {
 					defer a.pinging.Store(false)
 					_ = a.send(wire.Empty(wire.TypePingRequest))
-				}()
+				})
 			}
 		}
 	}

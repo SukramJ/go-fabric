@@ -320,7 +320,9 @@ func (p *proxy) sleep(d time.Duration) bool {
 
 // attach runs one API connection until it ends and returns its cause: the
 // subscription when the central needs it, the reader, the watch for a
-// subscription another client took.
+// subscription another client took. It returns once the connection's
+// goroutines have, so the central's Close, which waits for the run loop,
+// waits for every handle call as well.
 func (p *proxy) attach(a *apiConn) error {
 	a.handle = p.handle
 	p.mu.Lock()
@@ -328,7 +330,8 @@ func (p *proxy) attach(a *apiConn) error {
 	p.mu.Unlock()
 	p.c.log.Info("ble.esphome.proxy_connected", slog.String("proxy", p.name), slog.String("device", a.name),
 		slog.Bool("encrypted", p.psk != nil), slog.Uint64("feature_flags", uint64(a.flags)))
-	go a.run()
+	a.start()
+	defer a.wait()
 	if p.c.isScanning() {
 		p.subscribe()
 	}

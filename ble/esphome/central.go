@@ -250,7 +250,9 @@ func (c *Central) proxyList() []*proxy {
 }
 
 // Close disconnects from every proxy; the connections through them are
-// gone.
+// gone. It returns once no discovery callback and no C2 handler runs, and
+// none starts after it (R2-P6-conc-2011) — so neither may call Close: it
+// would wait for itself.
 func (c *Central) Close() error {
 	c.cancel()
 	c.wg.Wait()

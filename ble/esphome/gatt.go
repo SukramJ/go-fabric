@@ -455,7 +455,11 @@ func (k *connection) onNotify(handle uint32, data []byte) {
 	k.queue = append(k.queue, data)
 	if !k.delivering {
 		k.delivering = true
-		go k.deliver()
+		// Counted in the central's run loops, so Close waits for a
+		// handler in flight (R2-P6-conc-2011). onNotify runs on the
+		// reader of a connection a run loop holds, so the count is not
+		// zero here.
+		k.p.c.wg.Go(k.deliver)
 	}
 	k.mu.Unlock()
 }
