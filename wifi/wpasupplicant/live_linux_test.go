@@ -126,12 +126,28 @@ func TestLiveWPASupplicant(t *testing.T) {
 			t.Fatalf("Networks: %v", err)
 		}
 		networks, _ := v.Value().([]dbus.ObjectPath)
-		// The join removed the network current before it (connectedhomeip
-		// src/platform/Linux/ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp:861-877
-		// at 6170af84) and the failed one removes its own (removeAdded):
-		// none is left.
-		if len(networks) != 0 {
-			t.Errorf("wpa_supplicant still lists %v after the failed join", networks)
+		// The driver keeps the network current before a join until the
+		// join has ended; the failed join removes the network it added
+		// (removeAdded) and selects the kept one again (restore) — a
+		// deliberate departure from connectedhomeip, which removes the
+		// current network before it adds the new one
+		// (src/platform/Linux/ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp:861-877
+		// at 6170af84), recorded as BD-chip-WpaSupplicantDriver in
+		// notes/parity/by_design.md (review II, R2-P3-net-01). Left: the
+		// raw-PSK join's network, current again (review II,
+		// R2-P6-test-2018).
+		if len(networks) != 1 {
+			t.Fatalf("wpa_supplicant lists %v after the failed join, want the network of the join before it", networks)
+		}
+		cv, err := d.property(ctx, "CurrentNetwork")
+		if err != nil {
+			t.Fatalf("CurrentNetwork: %v", err)
+		}
+		if cur, _ := cv.Value().(dbus.ObjectPath); cur != networks[0] {
+			t.Errorf("CurrentNetwork %s after the failed join, want %s selected again", cur, networks[0])
+		}
+		if got, known := d.CurrentNetwork(ctx); !known || string(got) != ssid {
+			t.Errorf("CurrentNetwork reports %q (known %v), want %q", got, known, ssid)
 		}
 	})
 	t.Run("open network", func(t *testing.T) {
