@@ -796,9 +796,9 @@ func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (
 // 6170af84, outSession = *existingSession) and sets what
 // HandleProvideOffer sets (webrtc-provider-manager.cpp:407-445): the
 // peer, the usage, the fabric and the deprecated stream ids, null
-// without one. The session's stream lists stay, so a re-offer without a
-// deprecated id still names its streams ("O.a+", which the server holds
-// CurrentSessions to; TC-WEBRTCP-2.30 step 7).
+// without one. The session's stream lists stay, so a re-offer that
+// carries no deprecated id still names its streams ("O.a+", which the
+// server holds CurrentSessions to; TC-WEBRTCP-2.30 step 7).
 func (p camProviderPort) ProvideOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
 	if p.c.addSession(args.SessionID) > camMaxWebRTCSessions {
 		p.c.dropSession(args.SessionID)
