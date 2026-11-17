@@ -86,13 +86,16 @@ type Proxy struct {
 	mu          sync.Mutex
 	peripherals []*bletest.Peripheral
 	rssi        map[string]int32
-	sessions    map[*session]bool
-	subscriber  *session
-	slots       map[uint64]*slot
-	events      []string
-	closed      bool
-	stop        chan struct{}
-	wg          sync.WaitGroup
+	// conns are the API connections from accept on, the handshake
+	// included; sessions are those past it (R2-P6-err-2052).
+	conns      map[net.Conn]bool
+	sessions   map[*session]bool
+	subscriber *session
+	slots      map[uint64]*slot
+	events     []string
+	closed     bool
+	stop       chan struct{}
+	wg         sync.WaitGroup
 }
 
 // slot is one connection slot in use.
@@ -134,7 +137,7 @@ func New(opts Options, peripherals ...*bletest.Peripheral) (*Proxy, error) {
 	}
 	p := &Proxy{
 		opts: opts, central: bletest.NewCentral(peripherals...), peripherals: peripherals,
-		rssi: map[string]int32{}, sessions: map[*session]bool{}, slots: map[uint64]*slot{}, stop: make(chan struct{}),
+		rssi: map[string]int32{}, conns: map[net.Conn]bool{}, sessions: map[*session]bool{}, slots: map[uint64]*slot{}, stop: make(chan struct{}),
 	}
 	if opts.Key != "" {
 		k, err := base64.StdEncoding.DecodeString(opts.Key)
@@ -240,16 +243,16 @@ func (p *Proxy) Take() {
 }
 
 // DropClients closes every API connection, as a proxy that reboots or
-// leaves the network does.
+// leaves the network does — one still in the Noise handshake as well.
 func (p *Proxy) DropClients() {
 	p.mu.Lock()
-	ss := make([]*session, 0, len(p.sessions))
-	for s := range p.sessions {
-		ss = append(ss, s)
+	ncs := make([]net.Conn, 0, len(p.conns))
+	for nc := range p.conns {
+		ncs = append(ncs, nc)
 	}
 	p.mu.Unlock()
-	for _, s := range ss {
-		_ = s.nc.Close()
+	for _, nc := range ncs {
+		_ = nc.Close()
 	}
 }
 
@@ -307,10 +310,24 @@ func (p *Proxy) accept(ln net.Listener) {
 	}
 }
 
-// serve runs one API client.
+// serve runs one API client. The connection is known from the accept on,
+// so DropClients and Close reach a client that stalls in the handshake,
+// which has no deadline of its own (R2-P6-err-2052).
 func (p *Proxy) serve(nc net.Conn) {
 	defer p.wg.Done()
 	defer func() { _ = nc.Close() }()
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return
+	}
+	p.conns[nc] = true
+	p.mu.Unlock()
+	defer func() {
+		p.mu.Lock()
+		delete(p.conns, nc)
+		p.mu.Unlock()
+	}()
 	s := &session{nc: nc}
 	if p.psk != nil {
 		n, err := wire.ServerHandshake(nc, p.psk, wire.ServerHello{Name: p.opts.Name, MAC: strings.ToLower(p.opts.MAC)}, nil)
@@ -625,8 +642,14 @@ func (p *Proxy) advertise() {
 			return
 		case <-t.C:
 		}
+		// raw is read with the subscriber, under the lock a resubscribe
+		// writes it under (R2-P6-conc-2050).
 		p.mu.Lock()
 		s := p.subscriber
+		var raw bool
+		if s != nil {
+			raw = s.raw
+		}
 		ps := append([]*bletest.Peripheral(nil), p.peripherals...)
 		rssi := make(map[string]int32, len(p.rssi))
 		for k, v := range p.rssi {
@@ -647,13 +670,13 @@ func (p *Proxy) advertise() {
 				r = v
 			}
 			ad := btp.EncodeAdvertisementData(per.Discriminator, per.VendorID, per.ProductID, false, false)
-			if !s.raw {
+			if !raw {
 				_ = s.f.WriteMessage(&wire.BluetoothLEAdvertisementResponse{Address: addr, RSSI: r, AddressType: 1, ServiceData: []wire.ServiceData{{UUID: btp.ServiceUUID, Data: ad[7:]}}})
 				continue
 			}
 			batch.Advertisements = append(batch.Advertisements, wire.RawAdvertisement{Address: addr, RSSI: r, AddressType: 1, Data: ad})
 		}
-		if s.raw {
+		if raw {
 			_ = s.f.WriteMessage(batch)
 		}
 	}
