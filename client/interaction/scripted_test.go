@@ -506,3 +506,38 @@ func TestInvokeResponseArrived(t *testing.T) {
 		}
 	})
 }
+
+// TestInvokeResultCarriesTheResponsePath: a result carries the path of the
+// entry that answered, as the peer stated it — for a status as for a
+// response command, also when it names another path than the request's —
+// so the caller can tell; the entry is neither compared nor discarded.
+// connectedhomeip hands the response's path to the caller
+// (src/app/CommandSender.cpp:509-513 at 6170af84), and matter.js copies it
+// into its result (ClientInteraction.ts:574-578 at db021da0) (review II,
+// R2-P6-wire-2153).
+func TestInvokeResultCarriesTheResponsePath(t *testing.T) {
+	t.Parallel()
+	for name, entry := range map[string]im.InvokeResponseEntry{
+		"status": {Path: im.ConcreteCommandPath{Endpoint: 3, Cluster: 0x0006, Command: 1, HasEndpoint: true, HasCluster: true, HasCommand: true},
+			IsStatus: true, Status: im.StatusIB{Status: im.StatusSuccess}},
+		"response command": {Path: im.ConcreteCommandPath{Endpoint: 0, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafeResponse, HasEndpoint: true, HasCluster: true, HasCommand: true},
+			HasResponse: true, Response: gencomm.ArmFailSafeResponse{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				s := newScripted(t)
+				c := interaction.New(s.mgr, s.session, nil)
+				done := invokeAsync(c, armPath, gencomm.ArmFailSafeRequest{ExpiryLengthSeconds: 60}, interaction.InvokeOptions{})
+				s.reply(t, s.next(t), im.InteractionModelProtocolID, im.OpcodeInvokeResponse, invokeResponse(t, false, entry))
+				r := await(t, done)
+				if r.err != nil {
+					t.Fatal(r.err)
+				}
+				if r.res.Path != entry.Path {
+					t.Fatalf("result path %+v, want the entry's %+v", r.res.Path, entry.Path)
+				}
+			})
+		})
+	}
+}

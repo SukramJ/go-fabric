@@ -100,6 +100,17 @@ type Result struct {
 	Status im.StatusCode
 	// ClusterStatus is the cluster-specific status, nil when absent.
 	ClusterStatus *uint8
+	// Path is the path of the entry that answered, as the peer stated it:
+	// for a response command its endpoint, cluster and response command
+	// id, for a status the command's endpoint, cluster and command id. The
+	// answer is matched to its command by position, or by CommandRef in a
+	// batch, never by this path, so a caller that must know the answer is
+	// the command's own compares it with the request's. connectedhomeip
+	// hands the response's path to its caller
+	// (src/app/CommandSender.cpp:509-513 at 6170af84), as matter.js copies
+	// it into its result (ClientInteraction.ts:574-578 at db021da0)
+	// (review II, R2-P6-wire-2153).
+	Path im.ConcreteCommandPath
 }
 
 // Invoke invokes one command on a fresh exchange and returns the peer's
@@ -327,14 +338,14 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 // command and its fields, or the status and cluster status.
 func resultOf(e im.InvokeResponseEntry) Result {
 	if e.IsStatus {
-		res := Result{Status: e.Status.Status}
+		res := Result{Status: e.Status.Status, Path: e.Path}
 		if e.Status.HasClusterStatus {
 			cs := e.Status.ClusterStatus
 			res.ClusterStatus = &cs
 		}
 		return res
 	}
-	res := Result{Command: e.Path.Command, Status: im.StatusSuccess}
+	res := Result{Command: e.Path.Command, Status: im.StatusSuccess, Path: e.Path}
 	if n, ok := e.Response.(spec.Node); ok {
 		res.HasFields, res.Fields = true, n
 	}
