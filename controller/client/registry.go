@@ -487,6 +487,12 @@ func (r *Registry) deleteNode(ctx context.Context, n *Node, addr *PeerAddress) e
 		}
 	}
 	r.unbindPeer(n)
+	// The node leaves without a decommission here as well: its ICD client
+	// takes the peer out of the fabric's ICD table (review II,
+	// R2-P6-store-2354).
+	if n.icd != nil {
+		n.icd.onDeleted()
+	}
 	err := n.Close(ctx)
 	// The node's interaction closes with it (ClientNode.ts:291-300,
 	// cancelWithMutex: interaction.close()): every subscription of the peer

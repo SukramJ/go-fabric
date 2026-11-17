@@ -1086,8 +1086,11 @@ func (c *ICDClient) onCheckIn(in icd.ReceivedCheckIn) {
 	c.mu.Lock()
 	reg := c.reg
 	fed := c.fed
+	closed := c.closed
 	c.mu.Unlock()
-	if reg == nil || fed == nil {
+	// A closed client takes no Check-In: it starts nothing (review II,
+	// R2-P6-store-2354, R2-P6-conc-2308).
+	if closed || reg == nil || fed == nil {
 		c.commitMu.Unlock()
 		return
 	}
@@ -1387,6 +1390,42 @@ func (c *ICDClient) onDecommissioned() {
 	c.unwatchAll()
 	c.commitMu.Unlock()
 	c.flushAnnouncements()
+	if fed != nil {
+		if t := c.env.table(fed.FabricIndex); t != nil {
+			t.RemovePeer(fed.NodeID)
+		}
+	}
+	if p := c.n.peer(); p != nil {
+		p.SetICDAwait(nil)
+	}
+}
+
+// onDeleted is onDecommissioned for a node the registry deletes without
+// a decommission (Forget, Erase, the cull): the operation is abandoned,
+// the receive path dropped, the peer removed from the fabric's ICD table
+// and the registration cleared in memory — the store is the registry's to
+// erase, so nothing is written and nothing announced. Close at shutdown
+// keeps the stored registration (close). A module rule (review II,
+// R2-P6-store-2354; Fable fact note fable-6b-w2 G1): matter.js removes
+// the peer on decommission only
+// (packages/node/src/behavior/system/icd/IcdClient.ts:104, :426-437 at
+// db021da0), and its dispose removes nothing (:930-934).
+func (c *ICDClient) onDeleted() {
+	c.mu.Lock()
+	if c.op != nil {
+		c.op.cancel()
+	}
+	c.mu.Unlock()
+	c.commitMu.Lock()
+	c.mu.Lock()
+	fed := c.fed
+	c.fed = nil
+	c.reg = nil
+	c.lastCheckInAt = time.Time{}
+	c.available = false
+	c.mu.Unlock()
+	c.unwatchAll()
+	c.commitMu.Unlock()
 	if fed != nil {
 		if t := c.env.table(fed.FabricIndex); t != nil {
 			t.RemovePeer(fed.NodeID)
