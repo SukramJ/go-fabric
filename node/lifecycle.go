@@ -33,10 +33,27 @@ var _ deviceseam.Host = nodeHost{}
 // Clock implements [deviceseam.Host].
 func (h nodeHost) Clock() clock.Clock { return h.n.cfg.Clock }
 
-// Running implements [deviceseam.Host]: the node started. A stopped node
-// has unbound its devices (Node.Stop), so a bound device's node is either
-// not started yet or running.
-func (h nodeHost) Running() bool { return h.n.started.Load() }
+// Running implements [deviceseam.Host]: the node serves its devices —
+// from before the bridge's start takes its snapshot until a failed start
+// clears it (markDevicesLive). A stopped node has unbound its devices
+// (Node.Stop), so a bound device's node is either not started yet or
+// running.
+func (h nodeHost) Running() bool { return h.n.devicesLive.Load() }
+
+// markDevicesLive sets what [nodeHost.Running] answers, under
+// deviceseam.Composing: an AddPart that moves a part of this node either
+// completed before the flip — the bridge's first snapshot reads the
+// moved tree — or sees the node running and is refused (R2-P6-fsm-2501,
+// decision 225). Start sets it before the bridge's start and clears it
+// when that fails.
+func (n *Node) markDevicesLive(live bool) {
+	flip := func() { n.devicesLive.Store(live) }
+	if deviceseam.Composing == nil {
+		flip()
+		return
+	}
+	deviceseam.Composing(flip)
+}
 
 // EndpointNumber implements [deviceseam.Host].
 func (h nodeHost) EndpointNumber(key endpoint.SourceKey) (uint16, bool) {

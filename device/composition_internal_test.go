@@ -316,3 +316,34 @@ func mustBridgedNode(t *testing.T, name string) *BridgedNode {
 	}
 	return d
 }
+
+// TestAddPartWaitingOnTheFlipSeesIt (decision 225, round 3): the node flips
+// Running under deviceseam.Composing, the lock AddPart holds from its
+// checks to its last change; an AddPart that has to wait for the flip
+// sees the node running and is refused.
+func TestAddPartWaitingOnTheFlipSeesIt(t *testing.T) {
+	t.Parallel()
+	host := newTestHost(map[string]uint16{"test:a": 2, "test:p": 3})
+	a, b, p := mustBridgedNode(t, "a"), mustBridgedNode(t, "b"), mustOnOff(t, "p")
+	if err := a.AddPart(p); err != nil {
+		t.Fatal(err)
+	}
+	detach, _, err := deviceseam.Attach(a, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer detach()
+	done := make(chan error, 1)
+	deviceseam.Composing(func() {
+		go func() { done <- b.AddPart(p) }() // blocks on the lock held here
+		host.mu.Lock()
+		host.running = true
+		host.mu.Unlock()
+	})
+	if err := <-done; !errors.Is(err, ErrComposition) {
+		t.Fatalf("an AddPart that waited for the flip: %v, want ErrComposition", err)
+	}
+	if !slices.Contains(a.Parts(), p) || len(b.Parts()) != 0 {
+		t.Errorf("the refused move changed the owners: a %v, b %v", a.Parts(), b.Parts())
+	}
+}

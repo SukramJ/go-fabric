@@ -209,7 +209,11 @@ type Node struct {
 	// never waits for it (ADR 0026 P6).
 	lifecycle chan struct{}
 	started   atomic.Bool
-	stopped   bool
+	// devicesLive is what the devices' host answers as Running
+	// (node/lifecycle.go markDevicesLive): set before the bridge's start
+	// takes its snapshot, cleared when that start fails.
+	devicesLive atomic.Bool
+	stopped     bool
 	// stopBegun: a Stop took the node's own parts down; stopped is set
 	// only once the bridge stopped too, so a Stop whose bridge stop gave
 	// up is resumed by the next one (review II, R2-P1-dr-req-01).
@@ -1310,7 +1314,11 @@ func (n *Node) startLocked(ctx context.Context) error {
 	n.deliverOwedFabricEvents(ctx)
 	// The bridge's start is the last step that can fail; it leaves
 	// nothing bound or published when it does (bridge.Bridge.Start).
+	// The devices count as served before the bridge's snapshot, so no
+	// part moves between that snapshot and Start's end (decision 225).
+	n.markDevicesLive(true)
 	if err := n.br.Start(ctx); err != nil {
+		n.markDevicesLive(false)
 		n.callbacks.Stop()
 		return fmt.Errorf("node: bridge start: %w", err)
 	}

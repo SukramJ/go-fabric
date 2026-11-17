@@ -41,6 +41,11 @@ var ErrNotBridged = errors.New("device: a part has no BridgedDeviceBasicInformat
 
 func init() {
 	deviceseam.AheadRows = aheadRows
+	deviceseam.Composing = func(fn func()) {
+		composeMu.Lock()
+		defer composeMu.Unlock()
+		fn()
+	}
 	deviceseam.Attach = func(ep any, h deviceseam.Host) (func(), bool, error) {
 		owner, ok := ep.(interface{ base() *Device })
 		if !ok {

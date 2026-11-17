@@ -24,8 +24,10 @@ import (
 type Host interface {
 	// Clock is the node's clock.
 	Clock() clock.Clock
-	// Running reports whether the node has started: a part bound to a
-	// running node does not move (device.Device.AddPart).
+	// Running reports whether the node serves its devices: true from
+	// before the bridge's start takes its first snapshot (set under
+	// [Composing]) — a part bound to a running node does not move
+	// (device.Device.AddPart).
 	Running() bool
 	// EndpointNumber is the endpoint number the node assembled the
 	// endpoint with key under; false before the endpoint is assembled.
@@ -53,6 +55,13 @@ type Host interface {
 // and unbinds; ok false when ep is no device (any other node.Endpoint),
 // and an error when the device is bound to a node already.
 var Attach func(ep any, h Host) (detach func(), ok bool, err error)
+
+// Composing runs fn while no device tree's structure changes: under the
+// lock device.Device.AddPart holds from its checks to its last change.
+// The node flips what [Host.Running] answers inside it, so an AddPart
+// either completed before the flip or sees it. fn must not call a host
+// or a device. Nil until package device installs it.
+var Composing func(fn func())
 
 // AheadRows returns the "Ahead of matter.js" register IDs the device
 // layer's server declarations name, sorted; node.AheadRows unions them
