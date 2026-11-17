@@ -209,3 +209,18 @@ func TestGeneratorWritesNothingWhenItFails(t *testing.T) {
 		t.Errorf("clusters.go was rewritten by a failed run:\n%.200s", got)
 	}
 }
+
+// TestGeneratorRefusesACommandWithoutADirection: a command whose raw and
+// effective layers both state no direction is refused by every writer
+// that selects request commands, not skipped — matter.js reads such a
+// command as a request (CommandModel.ts:23-25 at db021da0, isRequest is
+// "not a response"), so skipping it would leave a timed request out of
+// timedInvokePaths (R2-P6-sec-2701, Fable fable-read-6b-gen R1).
+func TestGeneratorRefusesACommandWithoutADirection(t *testing.T) {
+	t.Parallel()
+	_, out, err := runGenerator(t, synthSnapshot(``,
+		`{"id":1,"name":"Pause","effective":{"access":{"timed":true,"writePriv":"O"}}}`))
+	if err == nil || !strings.Contains(out, "A.Pause") || !strings.Contains(out, "direction") {
+		t.Fatalf("generator: %v, want a refusal of A.Pause's missing direction\n%s", err, out)
+	}
+}

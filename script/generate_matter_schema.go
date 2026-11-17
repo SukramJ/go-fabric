@@ -990,7 +990,11 @@ func writeTimedFile(clusters []snapshotCluster) error {
 		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
 		var rows []string
 		for _, m := range cmds {
-			if commandDirection(m) != "request" {
+			req, err := isRequest(c, m)
+			if err != nil {
+				return err
+			}
+			if !req {
 				continue
 			}
 			if m.Effective == nil {
@@ -1216,7 +1220,11 @@ func writeLargeMessageFile(clusters []snapshotCluster) error {
 		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
 		var rows []string
 		for _, m := range cmds {
-			if commandDirection(m) != "request" {
+			req, err := isRequest(c, m)
+			if err != nil {
+				return err
+			}
+			if !req {
 				continue
 			}
 			if m.Effective == nil {
@@ -1274,7 +1282,11 @@ func writeInvokeAccessFile(clusters []snapshotCluster) error {
 		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
 		cr := clusterRows{c: c}
 		for _, m := range cmds {
-			if commandDirection(m) != "request" {
+			req, err := isRequest(c, m)
+			if err != nil {
+				return err
+			}
+			if !req {
 				continue
 			}
 			if m.Effective == nil {
@@ -1691,6 +1703,23 @@ func schemaConformance(raw json.RawMessage) (string, error) {
 		return "", fmt.Errorf("unknown conformance node %q", node.Type)
 	}
 	return strings.Join(parts, ", "), nil
+}
+
+// isRequest reports whether m is a request command by its effective
+// direction (commandDirection). A command with no direction in either
+// layer is an error, not skipped: matter.js reads it as a request
+// (CommandModel.ts:23-25 at db021da0, isRequest is "not a response"), so
+// a writer that skipped it would leave a timed, Large Message or elevated
+// request out of its table (R2-P6-sec-2701; Fable fable-read-6b-gen R1).
+func isRequest(c snapshotCluster, m snapshotCommand) (bool, error) {
+	switch dir := commandDirection(m); dir {
+	case "request":
+		return true, nil
+	case "response":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s.%s: command direction %q in both layers: want request or response", c.Name, m.Name, dir)
+	}
 }
 
 // errNoEffective refuses a request command without an effective block:
