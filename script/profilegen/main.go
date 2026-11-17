@@ -148,14 +148,24 @@ func parseRegister(doc string) (register, error) {
 		}
 	}
 	cols := map[string]int{}
-	inTable := false
+	inTable, ended := false, false
 	for i := start + 1; i < len(lines); i++ {
 		l := strings.TrimSpace(lines[i])
-		if strings.HasPrefix(l, "## ") || (inTable && !strings.HasPrefix(l, "|")) {
+		if strings.HasPrefix(l, "## ") {
 			break
+		}
+		if inTable && !strings.HasPrefix(l, "|") {
+			ended = true
+			continue
 		}
 		if !strings.HasPrefix(l, "|") {
 			continue
+		}
+		// A row after the table ended — past a blank line or a paragraph
+		// of the section — would be dropped; the register fails on it,
+		// naming the line (R2-P6-err-2711).
+		if ended {
+			return reg, fmt.Errorf("line %d: a table row after the register table ended (one table per %s)", i+1, tableHeading)
 		}
 		cells := splitRow(l)
 		if !inTable {
