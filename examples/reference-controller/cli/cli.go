@@ -92,6 +92,7 @@ type globalOptions struct {
 	nodeListen  string
 	timeout     durationFlag
 	caKey       string
+	sealKey     string
 	trust       string
 	trustDir    string
 }
@@ -117,6 +118,7 @@ func (o *globalOptions) register(fs *flag.FlagSet) {
 	fs.StringVar(&o.nodeListen, "node-listen", o.nodeListen, "deprecated: no effect since v0.18.0, which retired the controller's second node (the group sender and the OTA provider use --listen); will be removed")
 	fs.Var(&o.timeout, "timeout", "how long a command waits for the network (default 60s)")
 	fs.StringVar(&o.caKey, "ca-key", o.caKey, "the CA root key outside the database: file:<path> (passphrase from "+passphraseEnv+")")
+	fs.StringVar(&o.sealKey, "seal-key", o.sealKey, "seal the database's secrets under a key outside it: file:<path>, 64 hex digits (a missing file is created with a new key); every later run needs it")
 }
 
 // command is one subcommand: its usage line and its function.

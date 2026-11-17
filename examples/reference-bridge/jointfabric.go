@@ -43,6 +43,11 @@ import (
 // what that leaves out.
 
 // jfKeySetting is the settings key the administrator key is kept under.
+// It is not one the sealed store seals (store/seal.go sealedSettings; the
+// prefix it seals is the datastore's "jointfabric.datastore:"): with
+// --seal-key this test key stays in clear. A product keeps its private
+// key in a key store of its own, or under a setting key the seal covers
+// (R2-P6-store-2603).
 const jfKeySetting = "jointfabricsim.key"
 
 // demoJointFabric is the --jointfabric-sim endpoint and its simulations.

@@ -95,7 +95,7 @@ type flags struct {
 	appPipe, enableKey, otaDir, dcl                string
 	attestationDir, metricsExpvar                  string
 	wifiSimSSIDs                                   string
-	otbr                                           string
+	otbr, sealKey                                  string
 	passcode, discriminator, customFlow            uint
 	iterations                                     int
 	advertise, osHostName, otaHarness, wifi        bool
@@ -116,6 +116,7 @@ type flags struct {
 func parseFlags() flags {
 	var f flags
 	flag.StringVar(&f.dbPath, "db", "reference-bridge.db", "SQLite file holding fabrics, credentials and endpoint numbers")
+	flag.StringVar(&f.sealKey, "seal-key", "", "seal the secrets of --db under a key outside it (node.Store.Sealer, AES-256-GCM): file:<path> holding 64 hex digits, created with a new random key when missing; every later start needs it; see sealkey.go")
 	flag.StringVar(&f.listen, "listen", ":5540", "UDP listen address for Matter traffic")
 	flag.StringVar(&f.tcp, "tcp", "true", "Matter TCP: true (accept and open connections), false, or incoming / outgoing comma-separated; incoming listens on the UDP port, both are advertised in the operational T key")
 	flag.StringVar(&f.label, "label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
@@ -329,6 +330,9 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	cfg.Health = &node.Health{Interval: node.DefaultProbeInterval}
 	applyTestWiFi(&cfg, f, devices)
 	applyMetrics(&cfg, f.metricsExpvar)
+	if err := applySealKey(&cfg, f, dump); err != nil {
+		return nil, nil, err
+	}
 	if dump != nil {
 		// The surface dump touches neither --db nor the network: it
 		// starts the node to assemble the topology (bridge.Bridge.Start

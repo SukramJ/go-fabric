@@ -34,7 +34,11 @@ import (
 // settings (tlsKeysSetting), so a daemon restarted on the same --db still
 // holds the key of every certificate its tables (the node's store) list.
 
-// tlsKeysSetting is the settings key the client keys are kept under.
+// tlsKeysSetting is the settings key the client keys are kept under. It
+// is not one the sealed store seals (store/seal.go sealedSettings): with
+// --seal-key these test keys stay in clear. A product keeps its private
+// keys in a key store of its own, or under a setting key the seal covers
+// (R2-P6-store-2603).
 const tlsKeysSetting = "tlssim.keys"
 
 // tlsKeys is the CertificatePort of --tls-sim.

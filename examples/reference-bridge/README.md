@@ -369,6 +369,18 @@ names the SQLite file (`--db`), and the node does the rest.
 - **CASE resumption records** persist too, so a controller that reconnects
   after a restart resumes in one round trip; CASE sessions themselves stay
   volatile — Matter treats them so.
+- **Sealing at rest is opt-in: `--seal-key file:<path>`.** Without it the
+  file's `0600` mode is all that protects the keys in it. With it the node
+  opens the file sealed (`node.Store.Sealer` with `store.NewAESGCMSealer`,
+  [`docs/security.md`, "Sealing at rest"](../../docs/security.md#sealing-at-rest)):
+  the operational keys, the resumption secrets, the group keys and the
+  other secrets of the store's list are sealed under a 32-byte key kept in
+  the named file as 64 hex digits — created with a new random key, mode
+  `0600`, when missing; a clear database is sealed on the way in. Keep the
+  key file off the database's disk or backup; every later start needs it,
+  and a database sealed under it does not open without it. The
+  `--tls-sim` and `--jointfabric-sim` test keys are daemon settings the
+  seal does not cover (`tls.go`, `jointfabric.go`).
 
 Delete `reference-bridge.db` to factory-reset.
 
