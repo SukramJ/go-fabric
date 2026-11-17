@@ -1427,6 +1427,56 @@ func (m *Manager) RemoveConsent(p Peer, version uint32) {
 	m.cancelUpdate(p)
 }
 
+// NodeDeleted forgets the node at p at once, when it left the registry
+// (client.Hooks.Deleted): its consents (each reported as
+// [UpdateConsentChanged]), its queued update whatever its state (reported
+// as [UpdateFailed] with [ErrUpdateCancelled], its BDX transfer closed and
+// its reboot arming lifted), and what the manager observed of it. A later
+// node at the same address starts with nothing of it. A node the manager
+// never saw is no error. The next full check drops the same for a node
+// whose deletion was not reported (review II, R2-P6-bound-1914).
+func (m *Manager) NodeDeleted(p Peer) {
+	m.mu.Lock()
+	var removed []Target
+	m.consents = slices.DeleteFunc(m.consents, func(c consent) bool {
+		if c.peer != p {
+			return false
+		}
+		removed = append(removed, c.Target)
+		return true
+	})
+	var cancelled *Target
+	if i := m.indexOfLocked(p); i >= 0 {
+		t := m.queue[i].Target
+		cancelled = &t
+		m.queue = slices.Delete(m.queue, i, i+1)
+	}
+	delete(m.observed, p)
+	delete(m.applyDelays, p)
+	delete(m.known, p)
+	delete(m.startUpSuppress, p)
+	failed := m.cfg.OnUpdateFailed
+	m.mu.Unlock()
+	for _, t := range removed {
+		m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t})
+	}
+	if cancelled == nil {
+		return
+	}
+	if r := m.bdxResponder(); r != nil {
+		_ = r.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
+	}
+	if m.cfg.Armer != nil {
+		m.cfg.Armer.Disarm(p)
+	}
+	m.log.Info("ota.manager.node_deleted", slog.String("node", peerString(p)))
+	if failed != nil {
+		failed(p)
+	}
+	m.emit(UpdateEvent{Kind: UpdateFailed, Peer: p, Target: *cancelled, Err: ErrUpdateCancelled})
+	m.triggerQueuedUpdate()
+}
+
 // SuppressNextStartUp suppresses the node's next StartUp event on session
 // sessionID — suppressNextStartUp (:1239-1241), called by the provider for
 // a QueryImage it took for the node's restart.

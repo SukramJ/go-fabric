@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
 
@@ -243,4 +244,46 @@ func TestQueryUpdatesReturnsTheProductFailures(t *testing.T) {
 	if _, err := r.m.QueryUpdates(context.Background(), nil, true); err != nil {
 		t.Fatalf("QueryUpdates with every product checked: %v", err)
 	}
+}
+
+// TestManagerNodeDeleted (review II, R2-P6-bound-1914, decision 219): a
+// node that left the registry is forgotten at once — its consents and its
+// queued update go (the update reported failed), and nothing of it stays
+// for a later node at the same address; another node keeps its state.
+func TestManagerNodeDeleted(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	other := Peer{FabricIndex: 1, NodeID: 0x22}
+	r.queue(2, statusPtr(mattercore.OTAUpdateDownloading))
+	r.m.mu.Lock()
+	for _, p := range []Peer{testPeer, other} {
+		r.m.observed[p] = 1
+		r.m.applyDelays[p] = time.Minute
+		r.m.known[p] = SoftwareUpdateInfo{}
+		r.m.startUpSuppress[p] = 7
+	}
+	r.m.consents = append(r.m.consents, consent{Target: Target{TargetSoftwareVersion: 3}, peer: other})
+	r.m.mu.Unlock()
+
+	r.m.NodeDeleted(testPeer)
+	if r.m.HasConsent(testPeer, 0) || len(r.m.QueuedUpdates()) != 0 {
+		t.Fatal("the deleted node keeps a consent or its queued update")
+	}
+	if failed, _ := r.counts(); failed != 1 {
+		t.Fatalf("%d updates reported failed, want the deleted node's", failed)
+	}
+	r.m.mu.Lock()
+	_, o := r.m.observed[testPeer]
+	_, a := r.m.applyDelays[testPeer]
+	_, k := r.m.known[testPeer]
+	_, s := r.m.startUpSuppress[testPeer]
+	_, otherKept := r.m.observed[other]
+	r.m.mu.Unlock()
+	if o || a || k || s {
+		t.Fatalf("kept for the deleted node: observed %v, applyDelays %v, known %v, startUpSuppress %v", o, a, k, s)
+	}
+	if !otherKept || !r.m.HasConsent(other, 3) {
+		t.Fatal("another node's state went with it")
+	}
+	r.m.NodeDeleted(Peer{FabricIndex: 9, NodeID: 9}) // never seen: no effect, no panic
 }
