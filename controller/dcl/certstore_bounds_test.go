@@ -90,7 +90,9 @@ func TestCertificateWaitersHonourTheirContext(t *testing.T) {
 	t.Parallel()
 	f := newFakeDCL(t)
 	f.json("/dcl/pki/root-certificates", 200, map[string]any{"approvedRootCertificates": map[string]any{"certs": []any{}, "schemaVersion": 0}})
-	s := openStore(t, CertificateOptions{Client: f.client(), Clock: newManualClock(), UpdateInterval: -1})
+	client := f.client()
+	client.Timeout = time.Hour // the running update ends only when released
+	s := openStore(t, CertificateOptions{Client: client, Clock: newManualClock(), UpdateInterval: -1})
 	release := make(chan struct{})
 	entered := make(chan struct{})
 	f.route("/dcl/pki/root-certificates", func(w http.ResponseWriter, r *http.Request) {
@@ -113,9 +115,11 @@ func TestCertificateWaitersHonourTheirContext(t *testing.T) {
 		defer cancel()
 		done := make(chan struct{})
 		go func() { call(ctx); close(done) }()
+		watchdog, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		defer stop()
 		select {
 		case <-done:
-		case <-time.After(2 * time.Second): // below the request timeout that would end the update
+		case <-watchdog.Done():
 			t.Fatalf("%s waits for the running update past its context", name)
 		}
 	}

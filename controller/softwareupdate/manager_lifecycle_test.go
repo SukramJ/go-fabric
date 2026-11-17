@@ -83,9 +83,11 @@ func TestManagerCloseCancelsAndWaitsForTheTimersCheck(t *testing.T) {
 	<-entered
 	closed := make(chan struct{})
 	go func() { m.Close(); close(closed) }()
+	watchdog, stop := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stop()
 	select {
 	case <-closed:
-	case <-time.After(10 * time.Second):
+	case <-watchdog.Done():
 		t.Fatal("Close did not return: the running check was not cancelled")
 	}
 	if !returned.Load() {

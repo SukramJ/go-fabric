@@ -5,7 +5,6 @@ package dcl
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -14,39 +13,30 @@ import (
 )
 
 // TestVendorInfoCloseCancelsThePeriodicRefresh (review II,
-// R2-P6-conc-1906): a periodic refresh against a ledger that keeps
-// paginating, a page at a time, is cancelled by Close, which returns
-// after the page in flight rather than after every page the ledger would
-// still answer.
+// R2-P6-conc-1906): a periodic refresh whose page the ledger holds open (a
+// request timeout of an hour) is cancelled by Close, which returns with
+// the request rather than after it.
 func TestVendorInfoCloseCancelsThePeriodicRefresh(t *testing.T) {
 	t.Parallel()
-	var pages atomic.Int32
 	var periodic atomic.Bool
 	started := make(chan struct{}, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n := pages.Add(1)
-		if periodic.Load() {
-			select {
-			case started <- struct{}{}:
-			default:
-			}
-		}
-		select {
-		case <-time.After(50 * time.Millisecond):
-		case <-r.Context().Done():
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
 		if !periodic.Load() {
+			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"vendorInfo":[]}`)) // the constructor's refresh ends
 			return
 		}
-		_, _ = fmt.Fprintf(w, `{"vendorInfo":[],"pagination":{"next_key":"k%d"}}`, n)
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-r.Context().Done() // the page is held open until the request ends
 	}))
 	t.Cleanup(srv.Close)
+	t.Cleanup(srv.CloseClientConnections) // runs first: ends a page still held open
 	clk := newManualClock()
 	s, err := NewVendorInfoService(context.Background(), VendorInfoOptions{
-		Client: &Client{BaseURL: srv.URL, HTTPClient: srv.Client()}, Clock: clk, UpdateInterval: time.Hour,
+		Client: &Client{BaseURL: srv.URL, HTTPClient: srv.Client(), Timeout: time.Hour}, Clock: clk, UpdateInterval: time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -56,9 +46,11 @@ func TestVendorInfoCloseCancelsThePeriodicRefresh(t *testing.T) {
 	<-started
 	closed := make(chan struct{})
 	go func() { s.Close(); close(closed) }()
+	watchdog, stop := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stop()
 	select {
 	case <-closed:
-	case <-time.After(10 * time.Second):
-		t.Fatalf("Close still waits after %d pages", pages.Load())
+	case <-watchdog.Done():
+		t.Fatal("Close still waits for the periodic refresh's request")
 	}
 }
