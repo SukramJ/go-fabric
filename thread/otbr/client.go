@@ -463,6 +463,9 @@ func (c *Client) NumOfRouter(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	if _, ok := asNumber(body); !ok {
+		return 0, protocolError("GET /node/num-of-router did not return a number")
+	}
 	n, ok := asUint(body, maxNumOfRouter)
 	if !ok {
 		return 0, protocolError("GET /node/num-of-router out of range")
@@ -470,8 +473,12 @@ func (c *Client) NumOfRouter(ctx context.Context) (int, error) {
 	return int(n), nil //nolint:gosec // G115: bounded by asUint
 }
 
-// maxNumOfRouter bounds a router count the border router reports: the
-// count is held in a byte.
+// maxNumOfRouter bounds a router count the border router reports. The
+// bound is the module's own: a count of a Thread network's routers that is
+// not an integer within a byte is a border router's error, as an
+// out-of-range RLOC16 is. matter.js takes any finite number (review II,
+// R2-P6-wire-2024; notes/parity/by_design.md
+// BD-Matter-OTBR-RouterCountRangeChecked).
 const maxNumOfRouter = math.MaxUint8
 
 // hexEndpoint is a JSON string of n hex bytes at path.
