@@ -180,9 +180,8 @@ type CommissioningWindow struct {
 	// no swap happened).
 	restore func()
 
-	// onTransition gets called every time the window state changes
-	// — typically wired to the AdministratorCommissioning cluster's
-	// SubscriptionEventReporter so subscribers see WindowStatus flip.
+	// onTransition gets called every time the window state changes —
+	// the host's hook, set by [CommissioningWindow.SetTransitionHook].
 	onTransition func()
 	// facadeOnTransition is the node facade's slot of the transition
 	// hook (internal/facadeseam), run before the host's.

@@ -172,9 +172,10 @@ type SubscriptionTarget struct {
 //
 // The subscription itself is not created here. A subscription has two
 // halves — the manager's bookkeeping and this route — and the manager half
-// is already public: create the subscription with
-// subscription.Manager.Subscribe, wire the manager with
-// bridge.Bridge.AttachSubscriptionManager, and pass the ID it allocated.
+// is already public: wire the manager with
+// bridge.Bridge.AttachSubscriptionManager, create the subscription with
+// subscription.Manager.Subscribe, and pass the ID it allocated (a manager
+// without its report sender refuses Subscribe).
 //
 // The identity the ongoing reports authorize against is resolved from
 // target.SessionID through the bridge's own session lookups, exactly as an

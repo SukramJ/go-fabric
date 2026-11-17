@@ -856,7 +856,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.no_response",
 			slog.String("src", srcString(src)),
-			slog.Int("commands", len(req.Invokes)))
+			slog.Int("invokes", len(req.Invokes)))
 		return nil
 	}
 	if req.SuppressResponse && !resp.HasCommandData() {
