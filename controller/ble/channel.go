@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/btp"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // ErrHandshakeTimeout is a peripheral that sent no BTP handshake response
@@ -551,8 +552,27 @@ func (c *Channel) endLost() {
 	c.closeOnce.Do(func() { close(c.closed) })
 }
 
-// deliver hands a reassembled Matter message to the exchange manager.
+// maxInboundMessage is the largest reassembled message deliver hands on:
+// the module's datagram bound, [udp.MaxDatagramSize] — the UDP listener
+// reads into a buffer of that plus 64 bytes (transport/udp/listener.go
+// Serve) — so a BLE peer reaches the exchange layer with no more than a
+// UDP peer can send, and a full exchange queue holds at most 16 such
+// messages (TM R5 5a.5). connectedhomeip reassembles a BTP message in one
+// packet buffer and refuses a larger one, CHIP_ERROR_INBOUND_MESSAGE_TOO_BIG
+// (src/ble/BtpEngine.cpp:305, :312-314, :328-330 at 6170af84); matter.js
+// bounds it by the declared 16-bit length only
+// (packages/protocol/src/ble/BtpSessionHandler.ts:314, :322-330 at
+// db021da0) and sends at most 1232 bytes over BLE (packages/protocol/src/
+// ble/Ble.ts:37 at db021da0), connectedhomeip one packet buffer.
+const maxInboundMessage = udp.MaxDatagramSize
+
+// deliver hands a reassembled Matter message to the exchange manager. A
+// message above [maxInboundMessage] is refused as a protocol violation:
+// the BTP session closes and the channel ends.
 func (c *Channel) deliver(msg []byte) error {
+	if len(msg) > maxInboundMessage {
+		return &btp.ProtocolError{Message: fmt.Sprintf("BTP message of %d bytes exceeds the %d-byte inbound bound", len(msg), maxInboundMessage)}
+	}
 	c.mgr.HandleDatagram(msg, c.addr)
 	return nil
 }

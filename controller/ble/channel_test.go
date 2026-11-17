@@ -329,3 +329,89 @@ func TestSessionCloseEndsTheChannelBeforeTheGATTRelease(t *testing.T) {
 		}
 	})
 }
+
+// sized is a peripheral that answers a Matter message with one of total
+// bytes on the same exchange.
+func sized(t *testing.T, total int) *bletest.Peripheral {
+	t.Helper()
+	return &bletest.Peripheral{
+		Address: "11:22:33:44:55:77", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001, ATTMTU: 247,
+		Serve: func(conn *btp.Conn) (func([]byte), func()) {
+			return func(msg []byte) {
+				hdr, hl, err := message.UnmarshalHeader(msg)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				proto, _, err := message.UnmarshalProtocolHeader(msg[hl:])
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				rh := message.Header{MessageCounter: 9, DestSize: message.DestNodeID, DestNodeID: hdr.SourceNodeID}
+				rp := message.ProtocolHeader{Opcode: mrp.SCOpcodePBKDFParamResponse, ExchangeID: proto.ExchangeID, ProtocolID: proto.ProtocolID}
+				out := append(rh.Marshal(), rp.Marshal()...)
+				// Past Conn.Send's 1232-byte cap: the session takes up to
+				// the 16-bit declared length, as a hostile peer sends.
+				if err := conn.Session().Send(append(out, make([]byte, total-len(out))...)); err != nil {
+					t.Error(err)
+				}
+			}, nil
+		},
+	}
+}
+
+// TestInboundMessageAboveTheDatagramBoundEndsTheChannel: a reassembled
+// BTP message above the module's datagram bound is not delivered — the
+// BTP session closes and the channel ends, as connectedhomeip refuses a
+// message larger than its reassembly buffer
+// (src/ble/BtpEngine.cpp:312-314, :328-330 at 6170af84); one at the bound
+// is delivered (TM R5 5a.5).
+func TestInboundMessageAboveTheDatagramBoundEndsTheChannel(t *testing.T) {
+	for _, tc := range []struct {
+		total     int
+		delivered bool
+	}{{2048, true}, {2049, false}} {
+		p := sized(t, tc.total)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ch, err := ble.Dial(ctx, bletest.NewCentral(p), ble.Peripheral{Address: p.Address}, ble.DialOptions{})
+		if err != nil {
+			cancel()
+			t.Fatal(err)
+		}
+		s, err := ch.Exchanges().NewUnsecuredSession(ch.PeerAddress(), nil)
+		if err != nil {
+			cancel()
+			t.Fatal(err)
+		}
+		x, err := ch.Exchanges().Initiate(s, mrp.SecureChannelProtocolID, exchange.Options{})
+		if err != nil {
+			cancel()
+			t.Fatal(err)
+		}
+		if err := x.Send(ctx, mrp.SCOpcodePBKDFParamRequest, []byte{1}, exchange.SendOptions{}); err != nil {
+			cancel()
+			t.Fatal(err)
+		}
+		if tc.delivered {
+			msg, err := x.Next(ctx, exchange.ReceiveOptions{})
+			if err != nil || msg.Opcode != mrp.SCOpcodePBKDFParamResponse {
+				t.Fatalf("%d bytes: response %+v, %v", tc.total, msg, err)
+			}
+			_ = ch.Close()
+		} else {
+			select {
+			case <-ch.Closed():
+			case <-ctx.Done():
+				t.Fatalf("%d bytes: the channel did not end", tc.total)
+			}
+			nctx, ncancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			msg, err := x.Next(nctx, exchange.ReceiveOptions{})
+			ncancel()
+			if err == nil {
+				t.Fatalf("%d bytes: delivered %+v", tc.total, msg)
+			}
+		}
+		cancel()
+	}
+}
