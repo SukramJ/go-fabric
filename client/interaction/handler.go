@@ -68,6 +68,18 @@ func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Mes
 			return
 		}
 		defer done()
+		// Only a CASE session carries the fabric and subject the request
+		// context is built from (server.requestContext): a request on any
+		// other — a commissionee's PASE session, which has no fabric — is
+		// refused before it is decoded or dispatched, as the access check
+		// would refuse it for want of an accessing fabric (review II,
+		// R2-P6-acl-2108).
+		if x.Session().FabricIndex() == 0 {
+			r.log.Debug("matter.controller.interaction.served_request_without_fabric", slog.Int("opcode", int(first.Opcode)))
+			r.sendStatus(ctx, m, im.StatusUnsupportedAccess)
+			x.Close()
+			return
+		}
 		s.handle(ctx, x, first)
 		return
 	}

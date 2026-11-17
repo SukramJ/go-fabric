@@ -204,8 +204,8 @@ func (s *server) dispatcher() im.Dispatcher {
 
 // requestContext is the context a served request runs under: the
 // session's fabric and subject, as the device-side bridge builds it
-// (bridge/receive_dispatch.go) — a client stack's sessions are CASE, so no
-// PASE mark; our node id on the session's fabric, so a path that names
+// (bridge/receive_dispatch.go) — only a CASE session reaches it
+// (HandleExchange refuses any other), so no PASE mark; our node id on the session's fabric, so a path that names
 // another node is answered as the device side answers it (UnsupportedNode
 // for a concrete path, nothing for a wildcard; review II,
 // R2-P3-ctl-dev-03; matter.js AttributeReadResponse.ts:160-162 and

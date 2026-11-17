@@ -688,3 +688,39 @@ func TestServeReadGeneratesChunkByChunk(t *testing.T) {
 		}
 	})
 }
+
+// TestServeRefusesANonCASESession: a request a peer opens on a session
+// that is not CASE — a commissionee's PASE session carries no fabric — is
+// answered UnsupportedAccess before anything is dispatched, whatever the
+// dispatcher's ACL would say (review II, R2-P6-acl-2108).
+func TestServeRefusesANonCASESession(t *testing.T) {
+	t.Parallel()
+	for name, req := range map[string]struct {
+		opcode  uint8
+		payload func(t *testing.T) []byte
+	}{
+		"read":   {im.OpcodeReadRequest, func(t *testing.T) []byte { return readRequest(t, 20) }},
+		"write":  {im.OpcodeWriteRequest, func(t *testing.T) []byte { return writeRequest(t, false, false) }},
+		"invoke": {im.OpcodeInvokeRequest, func(t *testing.T) []byte { return invokeRequest(t, false, false, 20) }},
+		"timed":  {im.OpcodeTimedRequest, func(t *testing.T) []byte { return timedRequest(t, 1000) }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				s := newScriptedOn(t, nil, 0)
+				reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+				reg.Register(s.mgr)
+				t.Cleanup(func() { s.mgr.SetProtocolHandler(im.InteractionModelProtocolID, nil) })
+				d := &fakeDispatcher{sizes: map[uint32]int{20: 10}}
+				reg.Serve(interaction.ServerConfig{Dispatcher: d, Qualities: plainQualities{}})
+				s.push(t, 0x7301, req.opcode, req.payload(t))
+				expectStatus(t, s, im.StatusUnsupportedAccess)
+				d.mu.Lock()
+				defer d.mu.Unlock()
+				if len(d.writes)+len(d.timed) != 0 {
+					t.Fatalf("dispatched %d writes and %d invokes on a session without a fabric", len(d.writes), len(d.timed))
+				}
+			})
+		})
+	}
+}

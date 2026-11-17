@@ -99,6 +99,13 @@ func newScripted(t *testing.T) *scripted {
 // reported (nil reported nothing).
 func newScriptedWith(t *testing.T, reported *sessionparams.Parameters) *scripted {
 	t.Helper()
+	return newScriptedOn(t, reported, 1)
+}
+
+// newScriptedOn is newScriptedWith on a session of fabricIndex — 0 for a
+// session that is not CASE, as a PASE session with a commissionee is.
+func newScriptedOn(t *testing.T, reported *sessionparams.Parameters, fabricIndex uint8) *scripted {
+	t.Helper()
 	conn := &fakeConn{ch: make(chan []byte, 1024)}
 	clock := newFakeClock()
 	m, err := exchange.NewManager(conn, exchange.Config{Clock: clock, Rand: func() float64 { return 0.5 }})
@@ -108,7 +115,7 @@ func newScriptedWith(t *testing.T, reported *sessionparams.Parameters) *scripted
 	t.Cleanup(m.Close)
 	i2r, r2i := bytes.Repeat([]byte{0x11}, 16), bytes.Repeat([]byte{0x22}, 16)
 	s, err := m.NewSecureSession(exchange.SecureSessionConfig{
-		ID: 0x0101, Addr: peerAddr, FabricIndex: 1,
+		ID: 0x0101, Addr: peerAddr, FabricIndex: fabricIndex,
 		Channel:        channel.Config{EncryptKey: i2r, DecryptKey: r2i, LocalNodeID: 0x1111, PeerNodeID: 0x2222, PeerSessionID: 0x7101},
 		PeerParameters: exchange.PeerParameters(reported),
 	})
