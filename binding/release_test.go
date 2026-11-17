@@ -11,7 +11,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -128,20 +127,11 @@ func TestReleaseStopsConnectingOnly(t *testing.T) {
 		connected <- err
 	}()
 	// The connection process runs once it asks DNS-SD for the node.
-	select {
-	case <-quiet.sent:
-	case <-time.After(10 * time.Second):
-		t.Fatal("the connection process never queried DNS-SD")
-	}
+	receive(t, "the connection process to query DNS-SD", quiet.sent)
 	cancel()
 	realLink{}.release(context.Background(), p)
-	select {
-	case err := <-connected:
-		if err == nil {
-			t.Fatal("Connect succeeded against a peer that answers nothing")
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("the release did not stop the connection process")
+	if err := receive(t, "the release to stop the connection process", connected); err == nil {
+		t.Fatal("Connect succeeded against a peer that answers nothing")
 	}
 	if got := set.Get(addr); got != p {
 		t.Fatalf("the set holds %p for the node after the release, want the same peer %p", got, p)

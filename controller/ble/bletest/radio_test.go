@@ -189,16 +189,25 @@ func TestRadioAcceptsOneAtATime(t *testing.T) {
 				entered <- struct{}{}
 				<-release
 			} else {
-				time.Sleep(10 * time.Millisecond)
+				for range 100 { // the other connects' chance to enter now
+					runtime.Gosched()
+				}
 			}
 			in.Add(-1)
 		})
 	}()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer waitCancel()
 	for {
 		if s, _ := r.Serving(); s {
 			break
 		}
-		time.Sleep(time.Millisecond)
+		select {
+		case <-waitCtx.Done():
+			t.Fatal("not serving")
+		default:
+			runtime.Gosched()
+		}
 	}
 	var wg sync.WaitGroup
 	for range 4 {
@@ -218,10 +227,13 @@ func TestRadioAcceptsOneAtATime(t *testing.T) {
 	wg.Go(func() { _, _ = c.Connect(context.Background(), ble.Peripheral{Address: per.Address}) })
 	<-entered
 	cancel()
+	for range 100 { // Serve's chance to see ctx end and return early
+		runtime.Gosched()
+	}
 	select {
 	case <-serveDone:
 		t.Fatal("Serve returned while an accept ran")
-	case <-time.After(20 * time.Millisecond):
+	default:
 	}
 	close(release)
 	wg.Wait()

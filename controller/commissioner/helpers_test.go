@@ -42,6 +42,22 @@ func eventually(t *testing.T, what string, cond func() bool) {
 	}
 }
 
+// receive waits for a value on ch under [eventually]'s bound, the
+// package's one wall-clock poll.
+func receive[T any](t *testing.T, what string, ch <-chan T) T {
+	t.Helper()
+	var v T
+	eventually(t, what, func() bool {
+		select {
+		case v = <-ch:
+			return true
+		default:
+			return false
+		}
+	})
+	return v
+}
+
 func discard() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
 // deviceConn is the manager's socket in a test: every datagram goes to the

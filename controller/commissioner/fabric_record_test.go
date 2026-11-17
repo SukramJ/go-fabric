@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/SukramJ/go-fabric/controller/ca"
 )
@@ -227,11 +226,7 @@ func TestRotationDoesNotHoldTheObserverLock(t *testing.T) {
 	<-entered
 	observed := make(chan struct{})
 	go func() { a.OnFabricAdded(func(*Fabric) {})(); close(observed) }()
-	select {
-	case <-observed:
-	case <-time.After(5 * time.Second):
-		t.Fatal("OnFabricAdded waits behind the rotation's save")
-	}
+	receive(t, "OnFabricAdded to return while the rotation's save waits", observed)
 	close(release)
 	if err := <-done; err != nil {
 		t.Fatal(err)

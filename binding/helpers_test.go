@@ -378,11 +378,33 @@ func peerAddr(fabricIndex uint8, node uint64) handshake.PeerAddress {
 // waitFor polls cond for up to ten seconds.
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
+	waitUntil(t, "the condition", cond)
+}
+
+// waitUntil polls cond for up to ten seconds, naming what it waits for
+// when it gives up: the package's one wall-clock poll.
+func waitUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
-			t.Fatal("timed out")
+			t.Fatalf("timed out waiting for %s", what)
 		}
 		time.Sleep(time.Millisecond)
 	}
+}
+
+// receive waits for a value on ch under [waitUntil]'s bound.
+func receive[T any](t *testing.T, what string, ch <-chan T) T {
+	t.Helper()
+	var v T
+	waitUntil(t, what, func() bool {
+		select {
+		case v = <-ch:
+			return true
+		default:
+			return false
+		}
+	})
+	return v
 }

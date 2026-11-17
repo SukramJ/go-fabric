@@ -102,13 +102,8 @@ func TestConsentEndsWithTheContext(t *testing.T) {
 	go func() { result <- tr.askUserForConsent(ctx) }()
 	eventually(t, "the re-arm started", f.armIntervalRunning)
 	cancel()
-	select {
-	case r := <-result:
-		if r == jcm.Success || !errors.Is(tr.cause, context.Canceled) {
-			t.Fatalf("consent %s, cause %v; want a failure caused by the cancellation", r, tr.cause)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("the stage waited for a Consent that ignores its context")
+	if r := receive(t, "the stage to end despite a Consent that ignores its context", result); r == jcm.Success || !errors.Is(tr.cause, context.Canceled) {
+		t.Fatalf("consent %s, cause %v; want a failure caused by the cancellation", r, tr.cause)
 	}
 	if f.armIntervalRunning() {
 		t.Fatal("the re-arm outlived the stage")
@@ -167,13 +162,8 @@ func TestConsentEndsWhenTheFailSafeCannotBeKept(t *testing.T) {
 		for range 5 { // 125 s, past the 100 s limit
 			clock.Advance(BTPIdleAliveInterval)
 		}
-		select {
-		case r := <-result:
-			if r == jcm.Success || !errors.Is(tr.cause, ErrCommissioningTimeout) {
-				t.Fatalf("consent %s, cause %v; want the cumulative timeout", r, tr.cause)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("the consent wait outlived the cumulative fail-safe")
+		if r := receive(t, "the consent wait to end with the cumulative fail-safe", result); r == jcm.Success || !errors.Is(tr.cause, ErrCommissioningTimeout) {
+			t.Fatalf("consent %s, cause %v; want the cumulative timeout", r, tr.cause)
 		}
 	})
 	t.Run("a refused re-arm", func(t *testing.T) {
@@ -188,14 +178,9 @@ func TestConsentEndsWhenTheFailSafeCannotBeKept(t *testing.T) {
 		dev.code = gencomm.CommissioningErrorBusyWithOtherAdmin
 		dev.mu.Unlock()
 		clock.Advance(BTPIdleAliveInterval)
-		select {
-		case r := <-result:
-			var ge *GeneralCommissioningError
-			if r == jcm.Success || !errors.As(tr.cause, &ge) {
-				t.Fatalf("consent %s, cause %v; want the refused re-arm", r, tr.cause)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("the consent wait outlived a refused re-arm")
+		var ge *GeneralCommissioningError
+		if r := receive(t, "the consent wait to end with a refused re-arm", result); r == jcm.Success || !errors.As(tr.cause, &ge) {
+			t.Fatalf("consent %s, cause %v; want the refused re-arm", r, tr.cause)
 		}
 	})
 }
@@ -235,11 +220,7 @@ func TestConsentAwaitsAReArmInFlight(t *testing.T) {
 	go clock.Advance(BTPIdleAliveInterval) // the fake clock runs the re-arm inside Advance
 	<-held
 	cancel()
-	select {
-	case <-result:
-	case <-time.After(5 * time.Second):
-		t.Fatal("the stage did not end")
-	}
+	receive(t, "the stage to end", result)
 	if n := ai.active.Load(); n != 0 {
 		t.Fatalf("%d re-arm(s) still in flight when the stage returned", n)
 	}
