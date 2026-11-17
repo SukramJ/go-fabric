@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9764,
+  "entry_points": 9807,
   "entry_packages": [
     ".",
     "bdx",
@@ -294,9 +294,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 19347,
-    "reachable": 12656,
-    "whitelisted": 6691,
+    "total_exported": 19372,
+    "reachable": 12657,
+    "whitelisted": 6715,
     "unreachable": 0
   },
   "by_package": [],
@@ -12565,6 +12565,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_persist_test.go",
       "line": 154
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiOnConnectedRunsAfterASuccessfulJoin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_capabilities_test.go",
+      "line": 178
     },
     {
       "package": "cluster/core",
@@ -27933,10 +27940,17 @@
     },
     {
       "package": "controller/camera",
+      "identifier": "TestBitRateSearchTerminatesBelowZero",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/bits32_internal_test.go",
+      "line": 33
+    },
+    {
+      "package": "controller/camera",
       "identifier": "TestCallsAfterCloseAreRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/calls_after_close_internal_test.go",
-      "line": 24
+      "line": 26
     },
     {
       "package": "controller/camera",
@@ -28028,6 +28042,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/client_io_internal_test.go",
       "line": 20
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestCloseEndsRawSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/close_inflight_internal_test.go",
+      "line": 286
     },
     {
       "package": "controller/camera",
@@ -28136,6 +28157,13 @@
     },
     {
       "package": "controller/camera",
+      "identifier": "TestEndedMailboxDiscardsUnreadSignals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/ended_mailbox_internal_test.go",
+      "line": 32
+    },
+    {
+      "package": "controller/camera",
       "identifier": "TestFailedStartReleasesItsSignals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/start_failure_mailbox_internal_test.go",
@@ -28167,7 +28195,7 @@
       "identifier": "TestFirstCloseBoundedByContext",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/close_inflight_internal_test.go",
-      "line": 106
+      "line": 109
     },
     {
       "package": "controller/camera",
@@ -28220,6 +28248,20 @@
     },
     {
       "package": "controller/camera",
+      "identifier": "TestNewRawSessionCloseWindowLeavesNoEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/close_inflight_internal_test.go",
+      "line": 253
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestNewRefusesReportsInUse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/reports_internal_test.go",
+      "line": 94
+    },
+    {
+      "package": "controller/camera",
       "identifier": "TestOutcomeWaitEndsWithItsContext",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/camera_internal_test.go",
@@ -28259,6 +28301,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/policy_sdp_parity_matterjsserver_test.go",
       "line": 118
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestPixelArithmeticIsInt64",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/bits32_internal_test.go",
+      "line": 94
     },
     {
       "package": "controller/camera",
@@ -28307,14 +28356,14 @@
       "identifier": "TestProviderOfferAnsweredDuringCloseIsEnded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/close_inflight_internal_test.go",
-      "line": 41
+      "line": 44
     },
     {
       "package": "controller/camera",
       "identifier": "TestProviderReOfferAnsweredDuringCloseAddsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/close_inflight_internal_test.go",
-      "line": 140
+      "line": 143
     },
     {
       "package": "controller/camera",
@@ -28346,10 +28395,52 @@
     },
     {
       "package": "controller/camera",
+      "identifier": "TestReOfferCloseWindowLeavesNoEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/close_inflight_internal_test.go",
+      "line": 220
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestRefusedReOfferRestoresTheOffer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/offer_record_internal_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/camera",
       "identifier": "TestRemovedNodeLeavesNoLeases",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/node_removed_leases_internal_test.go",
       "line": 15
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestReportDropsListedRawSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/raw_report_internal_test.go",
+      "line": 22
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestReportsForgetDeletedNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/reports_internal_test.go",
+      "line": 71
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestReportsInstallIsIdempotent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/reports_internal_test.go",
+      "line": 54
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestRequestedResolutionIsAtLeastOne",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/bits32_internal_test.go",
+      "line": 121
     },
     {
       "package": "controller/camera",
@@ -28384,7 +28475,7 @@
       "identifier": "TestSecondCloseWaitsForTheFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/close_inflight_internal_test.go",
-      "line": 71
+      "line": 74
     },
     {
       "package": "controller/camera",
@@ -28546,6 +28637,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/session_watch_parity_matterjsserver_test.go",
       "line": 219
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSettleBoundsItsGiveBacks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/cleanup_deadline_internal_test.go",
+      "line": 25
     },
     {
       "package": "controller/camera",
@@ -28727,21 +28825,21 @@
       "identifier": "TestSliceDAllocateAnsweredOutsideBoundsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 1489
+      "line": 1504
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceDAllocateAnsweredWithExistingStreamParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 1278
+      "line": 1293
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceDDeallocateNotFoundWhileMakingRoomParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 2090
+      "line": 2105
     },
     {
       "package": "controller/camera",
@@ -28755,21 +28853,21 @@
       "identifier": "TestSliceDDeviceFeaturesAndPrivacyParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 584
+      "line": 599
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceDEvictionOrderParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 1920
+      "line": 1935
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceDOverlaysParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 958
+      "line": 973
     },
     {
       "package": "controller/camera",
@@ -28783,14 +28881,14 @@
       "identifier": "TestSliceDStreamListReadAfterExistingStreamParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 2069
+      "line": 2084
     },
     {
       "package": "controller/camera",
       "identifier": "TestSliceDUntrackedSessionEndsParityMatterjsServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/manager_slice_d_parity_matterjsserver_test.go",
-      "line": 2157
+      "line": 2172
     },
     {
       "package": "controller/camera",
@@ -28805,6 +28903,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/watch_stop_internal_test.go",
       "line": 13
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestSweepEndSessionHasTheBudget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/cleanup_deadline_internal_test.go",
+      "line": 84
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestUint32ValuesSaturateAtTheIntCeiling",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/bits32_internal_test.go",
+      "line": 66
     },
     {
       "package": "controller/camera",
@@ -40200,7 +40312,7 @@
       "identifier": "Advertiser",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 32
+      "line": 36
     },
     {
       "package": "node",
@@ -40249,7 +40361,14 @@
       "identifier": "CommissionerReachReports",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 28
+      "line": 43
+    },
+    {
+      "package": "node",
+      "identifier": "CommissionerReachSign",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 24
     },
     {
       "package": "node",
@@ -40326,28 +40445,28 @@
       "identifier": "FailSafeHookCommit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 53
+      "line": 68
     },
     {
       "package": "node",
       "identifier": "FailSafeHookExpiry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 55
+      "line": 70
     },
     {
       "package": "node",
       "identifier": "FailSafeHookStarting",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 54
+      "line": 69
     },
     {
       "package": "node",
       "identifier": "FailSafeHooksForTest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/export_test.go",
-      "line": 62
+      "line": 77
     },
     {
       "package": "node",
@@ -40361,7 +40480,7 @@
       "identifier": "Groups",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 38
+      "line": 42
     },
     {
       "package": "node",
@@ -40375,14 +40494,14 @@
       "identifier": "MDNSFinding",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 61
+      "line": 62
     },
     {
       "package": "node",
       "identifier": "MDNSService",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 65
+      "line": 66
     },
     {
       "package": "node",
@@ -40522,7 +40641,7 @@
       "identifier": "OnReopenCheck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 46
+      "line": 61
     },
     {
       "package": "node",
@@ -40557,7 +40676,7 @@
       "identifier": "Reassemblies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 21
+      "line": 36
     },
     {
       "package": "node",
@@ -40571,7 +40690,7 @@
       "identifier": "ReopenPending",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 66
+      "line": 81
     },
     {
       "package": "node",
@@ -40673,6 +40792,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestAsyncDiagnosticCallbackPanicIsContained",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/queued_callbacks_internal_test.go",
+      "line": 20
+    },
+    {
+      "package": "node",
       "identifier": "TestAttestationBlocksCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/attestation_internal_test.go",
@@ -40708,6 +40834,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestBasicWindowRefusedUnderTheInstallLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/basic_window_race_internal_test.go",
+      "line": 46
+    },
+    {
+      "package": "node",
       "identifier": "TestBuildOtaRequestorTransferProtocols",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/ota_owner_internal_test.go",
@@ -40715,10 +40848,24 @@
     },
     {
       "package": "node",
+      "identifier": "TestCASEHandshakeWithinOneIdentityIsAdmitted",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_fabric_updated_internal_test.go",
+      "line": 109
+    },
+    {
+      "package": "node",
       "identifier": "TestCASEHandshakesThatDoNotFinishLeaveNoSessionIDReserved",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_staked_id_test.go",
       "line": 21
+    },
+    {
+      "package": "node",
+      "identifier": "TestCASEInitiatorRefusesASessionAcrossAnUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_fabric_updated_internal_test.go",
+      "line": 79
     },
     {
       "package": "node",
@@ -40733,6 +40880,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_stake_lost_internal_test.go",
       "line": 90
+    },
+    {
+      "package": "node",
+      "identifier": "TestCASEResponderRefusesASessionAcrossAnUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_fabric_updated_internal_test.go",
+      "line": 35
     },
     {
       "package": "node",
@@ -40820,6 +40974,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestEveryQueuedHostCallbackIsContained",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/queued_callbacks_internal_test.go",
+      "line": 44
+    },
+    {
+      "package": "node",
       "identifier": "TestFabricRemovalDeletesTheClientPeers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/client_fabric_internal_test.go",
@@ -40848,6 +41009,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestHeapReadOncePerSample",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/heap_sample_internal_test.go",
+      "line": 16
+    },
+    {
+      "package": "node",
       "identifier": "TestKeyedSettingRootsAreForgotten",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/keyed_roots_internal_test.go",
@@ -40859,6 +41027,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_keepers_internal_test.go",
       "line": 132
+    },
+    {
+      "package": "node",
+      "identifier": "TestLocalACLEntryTakesTheACLWriteLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/local_acl_internal_test.go",
+      "line": 55
     },
     {
       "package": "node",
@@ -40915,27 +41090,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 104
-    },
-    {
-      "package": "node",
-      "identifier": "TestReannouncingDriver",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "node/wifi_driver_internal_test.go",
-      "line": 42
-    },
-    {
-      "package": "node",
-      "identifier": "TestReannouncingDriverForwardsTheInterfaceSwitch",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "node/wifi_driver_internal_test.go",
-      "line": 104
-    },
-    {
-      "package": "node",
-      "identifier": "TestReannouncingDriverForwardsTheReportedLink",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "node/wifi_driver_internal_test.go",
-      "line": 134
     },
     {
       "package": "node",
@@ -41079,6 +41233,20 @@
     },
     {
       "package": "node",
+      "identifier": "TestWiFiConnectedReannounces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/wifi_driver_internal_test.go",
+      "line": 64
+    },
+    {
+      "package": "node",
+      "identifier": "TestWiFiDriverHandedOverUnwrapped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/wifi_driver_internal_test.go",
+      "line": 42
+    },
+    {
+      "package": "node",
       "identifier": "TestWindowAPIsAfterStop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/stop_window_internal_test.go",
@@ -41131,7 +41299,7 @@
       "identifier": "WithoutFailSafeHooks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 59
+      "line": 74
     },
     {
       "package": "schema",
