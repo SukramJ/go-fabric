@@ -577,8 +577,14 @@ var ErrReportTooLarge = errors.New("interaction: report too large")
 // chunks — it hands each report on as it arrives
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1012-1053 at
 // db021da0) — and accumulates only the chunks of an invoke response,
-// without a bound (:1224-1246); connectedhomeip was not read
-// (unverified). The bound
+// without a bound (:1224-1246). connectedhomeip's ReadClient does not
+// collect a read's chunks either: each ReportData is processed as it
+// arrives and each AttributeReportIB handed to the callback
+// (src/app/ReadClient.cpp:632, :840, :896 at 6170af84), the end reported
+// when no chunk is pending (:714-717); only BufferedReadCallback collects,
+// the items of one chunked list, one packet buffer each
+// (src/app/BufferedReadCallback.cpp:120-134), with no count or byte limit
+// in that file (review II, R2-P6-doc-2908). The bound
 // is configurable ([Config].MaxReportBytesPerSession,
 // [SubscriptionsConfig].MaxReportBytesPerSession; owner decision 48),
 // this its default.

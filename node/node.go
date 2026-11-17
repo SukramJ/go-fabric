@@ -949,7 +949,11 @@ func (n *Node) goKeeper(fn func()) bool {
 // sessions and records towards the fabric's peers
 // ([Node.closeClientFabricSessions]). Mirrors matter.js
 // packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
-// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537).
+// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537);
+// the sessions close by the command itself,
+// `await timedOp.associatedFabric.replaced(this.context.exchange)`
+// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:372-373
+// at db021da0; review II, R2-P6-doc-2910).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	loadErr := n.caseIDs.load(ctx, n.st, fabricIndex)

@@ -393,7 +393,11 @@ func invokingClientSession(ctx context.Context) *exchange.Session {
 // identity moved (Node.fabricUpdated); the peers stay and connect again under the new
 // one. Mirrors matter.js FailsafeContext.ts:167-170 (replaceFabric →
 // SessionManager.deleteResumptionRecordsForFabric) with the fabric's
-// sessions, which every role registers with it (NodeSession.ts:153-156).
+// sessions, which every role registers with it (NodeSession.ts:153-156);
+// the sessions are closed by the command itself, "close all sessions found
+// to the old fabric and just leave the one with this exchange open"
+// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:372-373
+// at db021da0; review II, R2-P6-doc-2910).
 func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8) {
 	invoking := invokingClientSession(ctx)
 	for _, cs := range n.clientStacks() {

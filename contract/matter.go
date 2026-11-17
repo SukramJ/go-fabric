@@ -309,11 +309,13 @@ const (
 // MinReadPrivilege); a server's answer can only raise it, never lower it.
 //
 // Example: AccessControl (0x001F) attributes ACL (0x0000) and Extension
-// (0x0001) require Administer (5) per Matter §9.10.5.3. Mirrors chip
-// src/app/clusters/access-control-server/access-control-server.cpp which
-// checks ADMINISTER privilege for those two attribute reads, and
-// matter.js packages/model/src/standard/elements/access-control.element.ts
-// (acl + extension access: "administer").
+// (0x0001) require Administer (5) per Matter §9.10.5.3. The data model
+// states it for both: matter.js
+// packages/model/src/standard/elements/access-control.element.ts:31, :35
+// at db021da0 (`access: "RW F A"`), and connectedhomeip carries it as
+// attribute metadata, Administer for read and write
+// (zzz_generated/app-common/clusters/AccessControl/Metadata.h:25-27,
+// :30-32 at 6170af84; review II, R2-P6-doc-2901).
 type ClusterAttributeReadPrivilege interface {
 	// MinReadPrivilege returns the minimum Matter privilege level
 	// required to read the given attribute. Return 1 (View) when the
