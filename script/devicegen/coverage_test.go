@@ -122,6 +122,12 @@ func TestSnapshotRefusesAnUnknownConformance(t *testing.T) {
 		"operator without rhs":   `{"type":"&","param":{"lhs":{"type":"name","param":"A"}}}`,
 		"negation of nothing":    `{"type":"!","param":7}`,
 		"unknown under a choice": `{"type":"choice","param":{"name":"a","num":1,"orMore":true,"expr":{"type":"bogus"}}}`,
+		"empty otherwise term":   `{"type":"otherwise","param":[null]}`,
+		"optionalIf of nothing":  `{"type":"optionalIf","param":7}`,
+		"unknown left operand":   `{"type":"&","param":{"lhs":{"type":"bogus"},"rhs":{"type":"M"}}}`,
+		"operator not an object": `{"type":"|","param":7}`,
+		"choice not an object":   `{"type":"choice","param":7}`,
+		"choice without an expr": `{"type":"choice","param":{"name":"a","num":1}}`,
 	} {
 		raw := `{"deviceTypes":[{"id":4096,"name":"T","classification":"simple","revision":1,"effective":{"composition":"tree","requirements":[
 			{"element":"serverCluster","name":"C","id":1,"conformance":{"text":"?","ast":` + ast + `},"requirements":[]}]}}],
@@ -129,6 +135,19 @@ func TestSnapshotRefusesAnUnknownConformance(t *testing.T) {
 		if _, err := parseSnapshot([]byte(raw)); err == nil || !strings.Contains(err.Error(), "T") {
 			t.Errorf("%s: parseSnapshot = %v, want a refusal naming T", name, err)
 		}
+	}
+	// A nested requirement's conformance is checked as well.
+	nested := `{"deviceTypes":[{"id":4096,"name":"T","classification":"simple","revision":1,"effective":{"composition":"tree","requirements":[
+		{"element":"serverCluster","name":"C","id":1,"requirements":[{"element":"attribute","name":"A","conformance":{"text":"?","ast":{"type":"bogus"}}}]}]}}],
+		"clusters":[{"id":1,"name":"C","classification":"application","features":[],"attributes":[],"commands":[],"events":[]}]}`
+	if _, err := parseSnapshot([]byte(nested)); err == nil || !strings.Contains(err.Error(), "attribute A") {
+		t.Errorf("a nested requirement's unknown conformance: parseSnapshot = %v, want a refusal naming attribute A", err)
+	}
+	// So is a feature's.
+	feature := `{"deviceTypes":[{"id":4096,"name":"T","classification":"simple","revision":1,"effective":{"composition":"tree","requirements":[]}}],
+		"clusters":[{"id":1,"name":"C","classification":"application","features":[{"name":"F","bit":0,"effective":{"title":"T","conformance":{"text":"?","ast":{"type":"bogus"}}}}],"attributes":[],"commands":[],"events":[]}]}`
+	if _, err := parseSnapshot([]byte(feature)); err == nil || !strings.Contains(err.Error(), "C.F") {
+		t.Errorf("a feature's unknown conformance: parseSnapshot = %v, want a refusal naming C.F", err)
 	}
 	// A cluster element's conformance is checked as well.
 	raw := `{"deviceTypes":[{"id":4096,"name":"T","classification":"simple","revision":1,"effective":{"composition":"tree","requirements":[]}}],
@@ -199,5 +218,58 @@ func TestRequirementConstraintForms(t *testing.T) {
 		if _, err := ingest(c); err == nil {
 			t.Errorf("%s: no error, want a refusal of the form", c)
 		}
+	}
+}
+
+// TestABaseConditionTheJudgementDoesNotEvaluate: a Base requirement whose
+// conformance mandatedUnder does not evaluate fails the device type's
+// generation, naming the Base type and the requirement (R2-P6-par-2707);
+// an otherwise list none of whose terms applies mandates nothing.
+func TestABaseConditionTheJudgementDoesNotEvaluate(t *testing.T) {
+	t.Parallel()
+
+	raw := `{"deviceTypes":[{"id":4096,"name":"T","classification":"simple","revision":1,"effective":{"composition":"tree","requirements":[]}}],
+		"baseDeviceTypes":[{"name":"Base","classification":"base","revision":1,"effective":{"requirements":[
+			{"element":"serverCluster","name":"C","id":1,"conformance":{"text":"desc","ast":{"type":"desc"}},"requirements":[]}]}}],
+		"clusters":[{"id":1,"name":"C","classification":"utility","features":[],"attributes":[],"commands":[],"events":[]}]}`
+	s, err := parseSnapshot([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &generator{snap: s, defs: map[string]bool{}}
+	if _, err := g.generate("T"); err == nil || !strings.Contains(err.Error(), "Base") {
+		t.Errorf("generate = %v, want the Base requirement's refusal", err)
+	}
+	if got, err := mandatedUnder(conf(t, `{"type":"otherwise","param":[{"type":"name","param":"Node"}]}`).root(), map[string]bool{}); err != nil || got {
+		t.Errorf("an otherwise list without an applying term: %v, %v", got, err)
+	}
+}
+
+// TestWriteAtomicFailures: a write that cannot create its temporary file,
+// or cannot rename it over the target, fails and leaves no temporary file
+// behind.
+func TestWriteAtomicFailures(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := writeAtomic(filepath.Join(dir, "missing", "f.go"), []byte("x")); err == nil {
+		t.Error("a write into a missing directory succeeded")
+	}
+	target := filepath.Join(dir, "d")
+	if err := os.Mkdir(target, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "keep"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAtomic(target, []byte("x")); err == nil {
+		t.Error("a rename over a non-empty directory succeeded")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("%d entries after the failed writes, want the directory alone", len(entries))
 	}
 }
