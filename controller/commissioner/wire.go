@@ -39,7 +39,7 @@ func nocStatusName(status uint8) string {
 }
 
 // addNOCRequest is the AddNoc payload; IcacValue is always sent, empty
-// without an ICAC (ControllerCommissioningFlow.ts:1448).
+// without an ICAC (ControllerCommissioningFlow.ts:1466).
 func addNOCRequest(noc, icac, ipk []byte, caseAdminSubject uint64, adminVendorID uint16) opcredsdef.AddNocRequest {
 	if icac == nil {
 		icac = []byte{}

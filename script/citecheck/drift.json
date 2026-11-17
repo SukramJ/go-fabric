@@ -2301,7 +2301,7 @@
   {
     "file": "controller/commissioner/wire.go",
     "line": 42,
-    "citation": "ControllerCommissioningFlow.ts:1448",
+    "citation": "ControllerCommissioningFlow.ts:1466",
     "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
     "identifier": "AddNoc",
     "nearest": 366,
