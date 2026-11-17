@@ -259,6 +259,20 @@ type CommissionerReach interface {
 	SignVIDVerification(ctx context.Context, peer Peer, fabricIndex uint8, clientChallenge []byte) (resp operationalcredentials.SignVidVerificationResponse, attestationChallenge []byte, err error)
 }
 
+// TrustAnchors finds the globally trusted root of a vendor (the DCL's
+// Operational Trust Anchors) for the Vendor ID Verification of a
+// joint commissioning: the root of vendorID whose subject key id is
+// subjectKeyID. ctx is the verification's; an error, or no port, fails
+// the verification closed and the joint commissioning answers
+// VendorIDVerificationFailed (jointfabric.AdministratorConfig.TrustAnchors,
+// owner decisions 190 and 235). jcm.SelfAnchored, the commissioner's
+// own RCAC, verifies nothing about the vendor: a host that opts into
+// it, for tests or a self-minted fabric, implements this port by
+// calling it with the ctx it is given.
+type TrustAnchors interface {
+	LookupTrustAnchor(ctx context.Context, vendorID uint16, subjectKeyID []byte) (globallyTrustedRoot []byte, err error)
+}
+
 // Declare is the declaration of the JointFabricAdministrator cluster on a device:
 // device.New<Type> and device.FromSpec take it, and every field is
 // optional — the zero value mounts the cluster (an optional one too)
@@ -301,6 +315,8 @@ type Declare struct {
 	AdministratorPort AdministratorPort
 	// CommissionerReach is the host port the kit's server runs on ([CommissionerReach]).
 	CommissionerReach CommissionerReach
+	// TrustAnchors is the host port the kit's server runs on ([TrustAnchors]).
+	TrustAnchors TrustAnchors
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

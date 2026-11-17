@@ -26,6 +26,16 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 )
 
+// selfAnchored is the device kit's TrustAnchors port on jcm.SelfAnchored:
+// the site's fabrics are self-minted, so the vendor id is anchored at the
+// commissioner's own root, an explicit opt-in (owner decisions 190 and
+// 235). The verification's ctx carries that root to it.
+type selfAnchored struct{}
+
+func (selfAnchored) LookupTrustAnchor(ctx context.Context, vendorID uint16, subjectKeyID []byte) ([]byte, error) {
+	return jcm.SelfAnchored(ctx, vendorID, subjectKeyID)
+}
+
 // The node's CommissionerReach (brief 27-B §7): an administrator of the kit
 // whose declaration names no reach announces itself to another one, whose
 // node reads the announcer back over its own client stack — the
@@ -39,14 +49,11 @@ func TestAnnounceThroughTheNodesCommissionerReach(t *testing.T) {
 	defer cancel()
 	kit := func(key string) (*device.JointFabricAdministrator, *jointfabric.Administrator) {
 		jfa, err := device.NewJointFabricAdministrator(device.Options{StableKey: endpoint.StringKey(key), Name: key},
-			dsdef.Declare{Sync: nopSync{}}, jfadef.Declare{AdministratorPort: newKeyPort(t)})
+			dsdef.Declare{Sync: nopSync{}}, jfadef.Declare{AdministratorPort: newKeyPort(t), TrustAnchors: selfAnchored{}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		admin, _ := jfa.Server(jfadef.ClusterID).(*jointfabric.Administrator)
-		// Self-minted fabrics: the vendor id is anchored at the
-		// commissioner's own root, an explicit opt-in (owner decision 190).
-		admin.SetTrustAnchorsForTest(jcm.SelfAnchored)
 		return jfa, admin
 	}
 	withClient := func(cfg *node.Config) { cfg.Client = &node.ClientConfig{} }
