@@ -393,15 +393,20 @@ func (g *destinationGuard) proxyFor(req *http.Request) (*url.URL, error) {
 	if p != nil && !isASCII(req.URL.Hostname()) {
 		return nil, fmt.Errorf("%w: %s through a proxy: a host outside ASCII is not handed to a proxy", errDestination, req.URL.Redacted())
 	}
-	if p != nil {
+	d, _ := req.Context().Value(proxyDialKey{}).(*proxyDial)
+	switch {
+	case d == nil:
+	case p == nil:
+		// The latest answer is the one the dial follows (net/http asks
+		// again on a retry of the request; review II, 5b-dcl F6).
+		d.addr.Store(nil)
+	default:
 		port := p.Port()
 		if port == "" {
 			port = map[string]string{"http": "80", "https": "443", "socks5": "1080", "socks5h": "1080"}[strings.ToLower(p.Scheme)]
 		}
-		if d, ok := req.Context().Value(proxyDialKey{}).(*proxyDial); ok {
-			addr := net.JoinHostPort(p.Hostname(), port)
-			d.addr.Store(&addr)
-		}
+		addr := net.JoinHostPort(p.Hostname(), port)
+		d.addr.Store(&addr)
 	}
 	return p, err
 }
