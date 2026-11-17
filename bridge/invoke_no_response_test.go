@@ -28,7 +28,7 @@ func (noResponseInvoker) Invoke(_ context.Context, p im.ConcreteCommandPath, _ a
 type wildcardNoResponseInvoker struct{ noResponseInvoker }
 
 func (wildcardNoResponseInvoker) InvokeAuthorized(_ context.Context, p im.ConcreteCommandPath, _ any, _ im.CommandAuthorizer) []im.InvokeResult {
-	var out []im.InvokeResult
+	out := make([]im.InvokeResult, 0, 2)
 	for _, ep := range []uint16{0, 1} {
 		q := p
 		q.Endpoint, q.HasEndpoint = ep, true
