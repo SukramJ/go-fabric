@@ -1394,7 +1394,10 @@ func (n *Node) startLocked(ctx context.Context) error {
 }
 
 // Stop takes the node offline and releases what New and Start began, in
-// the daemon's shutdown order (main.go:430-450 at b4ea1f96^): the OTA requestor, the
+// the daemon's shutdown order (main.go:430-450 at b4ea1f96^): an armed
+// fail-safe expired and rolled back (a fabric an unfinished commissioning
+// added goes, and [Observers].OnFabricRemoved runs before Stop returns),
+// the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the session
 // table's idle reaper, the subscription engine, the re-announce loop, the health probe, the
@@ -1491,6 +1494,16 @@ func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	n.keeperMu.Lock()
 	n.stopping = true
 	n.keeperMu.Unlock()
+	// An armed fail-safe expires now, with the rollback its timeout runs:
+	// a fabric an unfinished commissioning added goes, and the host hears
+	// OnFabricRemoved before Stop returns, instead of at the next start
+	// on this store — or never, when none follows. Mirrors matter.js
+	// packages/protocol/src/protocol/DeviceCommissioner.ts:326-340 at
+	// db021da0 (close closes the fail-safe context) and
+	// packages/protocol/src/common/FailsafeContext.ts:194-203 (a close
+	// with the fail-safe armed rolls back). No reopen follows: stopping
+	// is set (review II, R2-P6-fsm-2411).
+	n.root.GeneralCommissioning.ExpireFailSafe(context.WithoutCancel(ctx))
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}

@@ -1026,8 +1026,11 @@ func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fab
 // the PASE close — until it returns or ctx ends, which is the error; from
 // then on no deadline expires the fail-safe. The node calls it when it
 // stops, before its store goes (review II, R2-P2-stop-06): a rollback that
-// began before the stop no longer writes after it. What stays uncommitted
-// is rolled back by the next start. It may be called again after an error.
+// began before the stop no longer writes after it. The node expires an
+// armed fail-safe first ([GeneralCommissioning.ExpireFailSafe]; review II,
+// R2-P6-fsm-2411); Close itself rolls nothing back, and what a host that
+// calls it alone leaves uncommitted is rolled back by the next start. It
+// may be called again after an error.
 func (g *GeneralCommissioning) Close(ctx context.Context) error {
 	g.mu.Lock()
 	g.closed = true
