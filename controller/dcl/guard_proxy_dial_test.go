@@ -93,7 +93,7 @@ func TestHeld5bDclR8(t *testing.T) {
 		})}}}
 		for _, u := range []string{
 			"http://１２７.０.０.１/x", "http://ｌｏｃａｌｈｏｓｔ。/x", "http://bücher.example/x",
-			"https://bücher.example/x", "http://127.0.0.1​/x",
+			"https://bücher.example/x", "http://127.0.0.1\u200b/x",
 		} {
 			if _, err := s.downloadCRL(t.Context(), u, 0); !errors.Is(err, errDestination) {
 				t.Errorf("%s through a %s proxy: %v, want errDestination", u, scheme, err)
