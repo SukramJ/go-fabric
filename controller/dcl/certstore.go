@@ -689,13 +689,18 @@ func (s *CertificateStore) saveIndex(ctx context.Context) {
 }
 
 // storeCertificate is #storeCertificate (:1328-1350): never downgrade a
-// production certificate to test, keep the first FetchedAt.
+// production certificate to test, keep the first FetchedAt. A
+// non-production source (the test ledger, GitHub, a test AddCertificate)
+// never replaces a production entry: the entry, its DER included, stays
+// as the production source stored it, so the bytes [CertificateStore.PAA]
+// reports as production are the production ledger's (review II,
+// R2-P6-sec-1902; an Ahead-of-matter.js row).
 func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	existing, ok := s.index[id]
 	if ok && existing.IsProduction && !m.IsProduction {
-		m.IsProduction = true
+		return
 	}
 	if m.FetchedAt.IsZero() {
 		if ok && !existing.FetchedAt.IsZero() {
@@ -792,17 +797,17 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 	if !force {
 		s.mu.Lock()
 		existing, ok := s.index[refID]
-		if ok {
-			// A test certificate found in the production ledger is upgraded
-			// (:1075-1082).
-			if isProduction && !existing.IsProduction {
-				existing.IsProduction = true
-				s.index[refID] = existing
-			}
-			s.mu.Unlock()
+		s.mu.Unlock()
+		// A stored test certificate the production ledger lists is upgraded
+		// (:1075-1082) by the production ledger's own record: it is fetched
+		// and stored below, its DER replacing the test source's, and the
+		// entry stays a test certificate when that fetch fails. matter.js
+		// sets the flag on the stored entry by key identifier alone
+		// (DclCertificateService.ts:1183-1199 at db021da0); this is ahead
+		// of it (review II, R2-P6-sec-1902).
+		if ok && !(isProduction && !existing.IsProduction) {
 			return true
 		}
-		s.mu.Unlock()
 	}
 	certs, err := client.RootCertificateBySubject(ctx, ref)
 	if err != nil {
