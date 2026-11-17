@@ -31,6 +31,7 @@ import (
 	"time"
 
 	clustercamera "github.com/SukramJ/go-fabric/cluster/camera"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 	"github.com/SukramJ/go-fabric/device"
@@ -115,6 +116,7 @@ func New(opts Options) (*Camera, error) {
 	}
 	port.mu.Lock()
 	port.answer = provider.Answer
+	port.current = provider.Sessions
 	port.mu.Unlock()
 	return &Camera{dev: dev, port: port, provider: provider}, nil
 }
@@ -184,6 +186,9 @@ type Port struct {
 	answer    func(ctx context.Context, sessionID uint16, sdp string) error
 	afterSDP  string
 	afterErrs map[uint16]error
+	// current is the camera's CurrentSessions (the provider's), which a
+	// re-offer starts from; nil for a port no camera serves.
+	current func() []wpdef.WebRTCSessionStruct
 }
 
 // NewPort returns an empty port.
@@ -260,15 +265,18 @@ func (p *Port) refused(op Op) error {
 	return p.refuse[op]
 }
 
-// Offers are the offers the camera accepted, ProvideOffer and
-// SolicitOffer alike, in order.
+// Offers are the offers the port answered with a session, ProvideOffer
+// and SolicitOffer alike, in order. The provider stores the session after
+// the port answered, so an offer whose session it then refuses is here
+// too.
 func (p *Port) Offers() []wpdef.OfferArgs {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return slices.Clone(p.offers)
 }
 
-// LastOffer is the latest accepted offer, the zero value before one.
+// LastOffer is the latest offer the port answered, the zero value before
+// one.
 func (p *Port) LastOffer() wpdef.OfferArgs {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -311,6 +319,44 @@ func (p *Port) session(args wpdef.OfferArgs) wpdef.WebRTCSessionStruct {
 	}
 }
 
+// reOffered is the session a ProvideOffer re-offers — its id already in
+// the camera's CurrentSessions — false for a new one. It starts from that
+// entry and sets the peer, the usage, the fabric and the deprecated
+// stream ids (null without one); the session's stream lists stay, since a
+// re-offer's OfferArgs carry only the deprecated ids. As the reference
+// daemon's port (examples/reference-bridge/camera.go, ProvideOffer; review
+// II, R2-P6-test-2205). The provider calls the port outside its table's
+// lock, so the read does not wait on the command that asks.
+func (p *Port) reOffered(args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool) {
+	p.mu.Lock()
+	current := p.current
+	p.mu.Unlock()
+	if current == nil {
+		return wpdef.WebRTCSessionStruct{}, false
+	}
+	sessions := current()
+	i := slices.IndexFunc(sessions, func(s wpdef.WebRTCSessionStruct) bool { return s.Id == args.SessionID })
+	if i < 0 {
+		return wpdef.WebRTCSessionStruct{}, false
+	}
+	s := sessions[i]
+	s.PeerNodeId, s.PeerEndpointId, s.StreamUsage, s.FabricIndex = args.PeerNodeID, args.OriginatingEndpointID, args.StreamUsage, args.FabricIndex
+	s.VideoStreamId, s.AudioStreamId = firstOf(args.VideoStreams), firstOf(args.AudioStreams)
+	p.mu.Lock()
+	p.offers = append(p.offers, args)
+	p.mu.Unlock()
+	return s, true
+}
+
+// firstOf is a stream list's first id, null without one.
+func firstOf(ids *[]uint16) *spec.Nullable[uint16] {
+	n := spec.NullOf[uint16]()
+	if ids != nil && len(*ids) > 0 {
+		n = spec.ValueOf((*ids)[0])
+	}
+	return &n
+}
+
 func (p *Port) allocate() uint16 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -333,7 +379,10 @@ func (p *Port) ProvideOffer(ctx context.Context, args wpdef.OfferArgs) (wpdef.We
 	if err := p.refused(OpProvideOffer); err != nil {
 		return wpdef.WebRTCSessionStruct{}, err
 	}
-	session := p.session(args)
+	session, ok := p.reOffered(args)
+	if !ok {
+		session = p.session(args)
+	}
 	p.answerAfterResponse(ctx, session.Id)
 	return session, nil
 }
