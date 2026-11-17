@@ -86,17 +86,30 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 		desired = *desire && !n.settings.disabled
 	}
 	newly := n.newlyCommissioned
-	n.newlyCommissioned = false
+	if n.cfg.NoInitialRead {
+		n.newlyCommissioned = false
+	}
 	req := n.defaultRequest()
 	held := n.subOwner != nil
 	n.mu.Unlock()
 	didRead := false
 	if newly && !n.cfg.NoInitialRead {
 		// The newly-commissioned read emits its events and raises the
-		// cursor (NetworkClient.ts:303-308, emitEvents: true).
+		// cursor (NetworkClient.ts:303-308, emitEvents: true). The flag is
+		// cleared once the read succeeded: a read that failed is made
+		// again, as that read, by the caller's next sync — the same call
+		// again. A failed read applied nothing, so its events and cursor
+		// are not ahead. A module rule (review II, R2-P6-err-2363; Fable
+		// fact note fable-6b-w2 G1): matter.js clears the flag before its
+		// read (packages/node/src/behavior/system/network/
+		// NetworkClient.ts:147-150 at db021da0). The caller holds subSync,
+		// so no other sync runs meanwhile.
 		if _, err := n.read(ctx, ReadRequest{ReadRequest: ReadPaths{Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter}}, true); err != nil {
 			return err
 		}
+		n.mu.Lock()
+		n.newlyCommissioned = false
+		n.mu.Unlock()
 		didRead = true
 	}
 	if desired == held {
