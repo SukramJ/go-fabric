@@ -175,8 +175,10 @@ type Service struct {
 // New starts a service over ctrl, attaching to its requestor
 // (ctrl.CameraRequestor) and its signals (ctrl.OnCameraSignal). It
 // refuses a controller without a requestor ([ErrNoRequestor]), without
-// outgoing TCP ([ErrTCPRequired]) and a Config whose Reports were not
-// installed ([ErrReportsNotInstalled]).
+// outgoing TCP ([ErrTCPRequired]), a Config whose Reports were not
+// installed ([ErrReportsNotInstalled]) and one whose Reports a Service
+// that is not closed holds ([ErrInvalidArgument]): the first would stop
+// getting its reports (review II, R2-P6-api-2208).
 func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service, error) {
 	switch {
 	case ctrl.CameraRequestor() == nil:
@@ -185,6 +187,8 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 		return nil, ErrTCPRequired
 	case cfg.Reports == nil || !cfg.Reports.installed():
 		return nil, ErrReportsNotInstalled
+	case !cfg.Reports.claim():
+		return nil, invalidArguments("Config.Reports is held by a camera Service that is not closed; close that Service first, or give this one its own Reports")
 	}
 	log := cfg.Logger
 	if log == nil {

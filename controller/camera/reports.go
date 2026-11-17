@@ -4,6 +4,7 @@
 package camera
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -25,9 +26,16 @@ import (
 //	ctrl, err := controller.New(ctx, cfg)
 //	…
 //	svc, err := camera.New(ctx, ctrl, camera.Config{Reports: &reports})
+//
+// One Service at a time holds a Reports: [New] refuses one a Service that
+// is not closed holds.
 type Reports struct {
 	mu   sync.Mutex
 	done bool
+	// cfgs are the configurations Install wrapped, each once.
+	cfgs []*controller.Config
+	// held: a Service holds the reports, from New's claim to its Close.
+	held bool
 	svc  *Service
 	// known is the operational node id of each client node seen, for a
 	// decommission, whose hook runs once the peer address is cleared.
@@ -36,7 +44,16 @@ type Reports struct {
 
 // Install wraps cfg's node hooks — cfg.HooksFor, else the template
 // cfg.Node.Hooks; the host's hooks run first and keep their behaviour.
+// Installing it again on the same configuration changes nothing (review
+// II, R2-P6-api-2208).
 func (r *Reports) Install(cfg *controller.Config) {
+	r.mu.Lock()
+	if slices.Contains(r.cfgs, cfg) {
+		r.mu.Unlock()
+		return
+	}
+	r.cfgs = append(r.cfgs, cfg)
+	r.mu.Unlock()
 	user := cfg.HooksFor
 	template := cfg.Node.Hooks
 	cfg.HooksFor = func(id string) client.Hooks {
@@ -55,6 +72,18 @@ func (r *Reports) installed() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.done
+}
+
+// claim reserves the reports for the Service New builds; false while
+// another Service holds them (review II, R2-P6-api-2208).
+func (r *Reports) claim() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.held {
+		return false
+	}
+	r.held = true
+	return true
 }
 
 // attach hangs s on the reports and learns the operational node id of
@@ -82,8 +111,16 @@ func (r *Reports) attach(s *Service) {
 func (r *Reports) detach(s *Service) {
 	r.mu.Lock()
 	if r.svc == s {
-		r.svc = nil
+		r.svc, r.held = nil, false
 	}
+	r.mu.Unlock()
+}
+
+// forget drops a node that left the registry from known (review II,
+// R2-P6-bound-2209).
+func (r *Reports) forget(id string) {
+	r.mu.Lock()
+	delete(r.known, id)
 	r.mu.Unlock()
 }
 
@@ -162,12 +199,14 @@ func (r *Reports) wrap(id string, h client.Hooks) client.Hooks {
 	// A node that leaves the registry without a decommission (Forget,
 	// Erase, the cull) fires Deleted only; it is forgotten all the same.
 	// After a decommission this runs a second time and finds nothing left
-	// (review II, R2-P2-fabric-08).
+	// (review II, R2-P2-fabric-08). The node's operational id goes with
+	// it: the node is gone from the registry (R2-P6-bound-2209).
 	h.Deleted = func() {
 		if deleted != nil {
 			deleted()
 		}
 		r.with(id, func(s *Service, nodeID uint64) { s.nodeRemoved(nodeID) })
+		r.forget(id)
 	}
 	return h
 }
