@@ -143,6 +143,16 @@ func (r *Subscriptions) addActive(s *Subscription) {
 
 // AddPeer registers a peer subscription by (peer, id) and restarts the
 // liveness timer (:132-143).
+//
+// A subscription the peer granted an id another one of ours still holds
+// displaces it, and the displaced one is closed — a sustained one then
+// re-establishes. Ahead of matter.js, which replaces the entry silently
+// (ClientSubscriptions.ts:140 at db021da0) and so leaves the displaced
+// one outside the liveness timer, where neither a report nor a timeout
+// reaches it; connectedhomeip arms a liveness timer per subscription, so
+// one that loses its id to a newer one still ends
+// (src/app/ReadClient.cpp:976-993 at 6170af84). It is closed at once
+// rather than at its own timeout (review II, R2-P6-fsm-2105).
 func (r *Subscriptions) AddPeer(s *Subscription) {
 	r.mu.Lock()
 	forPeer := r.peers[s.peer]
@@ -150,8 +160,15 @@ func (r *Subscriptions) AddPeer(s *Subscription) {
 		forPeer = make(map[uint32]*Subscription)
 		r.peers[s.peer] = forPeer
 	}
+	displaced := forPeer[s.ID()]
 	forPeer[s.ID()] = s
 	r.mu.Unlock()
+	if displaced != nil && displaced != s {
+		displaced.log.Info("matter.controller.interaction.subscription_displaced",
+			slog.Uint64("subscription_id", uint64(s.ID())), slog.Int("fabric_index", int(s.peer.FabricIndex)),
+			slog.Uint64("node_id", s.peer.NodeID))
+		displaced.Close()
+	}
 	r.ResetTimer()
 }
 
