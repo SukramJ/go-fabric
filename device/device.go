@@ -148,6 +148,13 @@ var assemblerMounted = map[uint32]string{
 // and returns the same error. A level is an operator's setting; the host
 // decides what to show.
 //
+// New reads the servers it built: the attributes a value is required of
+// (decision 17) and the ones that start at their select default are read
+// through each server's MatterRead. A kit server backed by a declared host
+// port (a valve's or a fan's state source, …) answers that read from the
+// port, so a port the host declares is called from New and must answer
+// then, without blocking (R2-P6-api-2517).
+//
 // Mirrors matter.js's construction of an Endpoint from its generated
 // MutableEndpoint type (packages/node/src/devices/dimmable-light.ts:103-116,
 // packages/node/src/endpoint/Endpoint.ts:596-637).
