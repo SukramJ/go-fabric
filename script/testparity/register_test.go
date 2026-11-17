@@ -241,11 +241,16 @@ const testparityLeftRatchet = 630
 // Wave W8 (#461): NetworkTopologyServiceTest.ts's five border-router cases
 // ported on thread/brdiscovery's registry, the file ported: 19 ported, 1
 // missing.
+// Review II 6b (R2-P6-conc-2210, decision 207): CameraStreamManagerTest.ts's
+// "lets an abandoned deallocate drop a lease that was only reused since"
+// left as by-design — the module cuts the give-back chain at the cleanup
+// budget instead of abandoning it (BD-matterjs-server-CameraStreamManagement):
+// 98 left.
 const (
 	serverPlannedRatchet = 0
 	serverPortedRatchet  = 19
 	serverMissingRatchet = 1
-	serverLeftRatchet    = 97
+	serverLeftRatchet    = 98
 )
 
 // moduleRoot is where the committed artefacts live, seen from this package.

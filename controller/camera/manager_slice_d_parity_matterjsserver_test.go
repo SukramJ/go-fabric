@@ -476,7 +476,12 @@ func TestSliceDDeviceCleanupBudgetParityMatterjsServer(t *testing.T) {
 			t.Fatalf("allocated video = %+v, want stream 9 allocated by this server", caps.Allocated.Video)
 		}
 	})
-	t.Run("lets an abandoned deallocate drop a lease that was only reused since, not allocated again", func(t *testing.T) {
+	// Go's own case in the place of matterjs-server's "lets an abandoned
+	// deallocate drop a lease that was only reused since, not allocated
+	// again" (CameraStreamManagerTest.ts:8151 at 0bd06f2), which the test
+	// register keeps as a by-design left row: there the abandoned
+	// give-back's late answer drops the lease.
+	t.Run("keeps a lease a cut deallocate left until the camera's report no longer names the stream", func(t *testing.T) {
 		ctx := t.Context()
 		entered, answer := sliceDNewGate(), sliceDNewGate()
 		t.Cleanup(answer.open)
@@ -509,10 +514,9 @@ func TestSliceDDeviceCleanupBudgetParityMatterjsServer(t *testing.T) {
 		// Divergence (review II, R2-P6-conc-2210, decision 207): the
 		// give-back was cut at the budget, not abandoned, so its late answer
 		// reaches no one and the lease stays while the camera still
-		// reports the stream. matterjs-server's abandoned give-back drops
-		// it here; in this module the camera's report that the stream is
-		// gone drops it (reconcileLeases: the camera named it, then
-		// stopped naming it).
+		// reports the stream; the camera's report that the stream is gone
+		// drops it (reconcileLeases: the camera named it, then stopped
+		// naming it).
 		answer.open()
 		if !m.ownsStream(tTarget, StreamVideo, 9) {
 			t.Fatal("the cut give-back dropped the lease")
