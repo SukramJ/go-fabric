@@ -525,8 +525,9 @@ func (n *Node) start(ctx context.Context) (started bool, err error) {
 	return true, n.syncAutoSubscribeLocked(ctx, nil)
 }
 
-// Stop takes the node offline: the default subscription closes
-// (NetworkClient.ts:309-313), the peer's signals are released, the
+// Stop takes the node offline: the default subscription closes and, when
+// it was reported subscribed, [Hooks.SubscriptionStatusChanged] gets
+// false, the peer's signals are released, the
 // properties freeze, the store is flushed (ClientCacheBuffer.ts:94-101)
 // and the connection state is recomputed. It waits, within ctx, for the
 // subscription to end and for the node's queued report jobs — their store
@@ -553,8 +554,8 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	n.started = false
 	n.labelReconciled = false
-	sub, stop := n.sub, n.stopObserve
-	n.sub, n.stopObserve, n.subOwner = nil, nil, nil
+	sub, stop, wasActive := n.sub, n.stopObserve, n.subReported
+	n.sub, n.stopObserve, n.subOwner, n.subReported = nil, nil, nil, false
 	if !n.frozen {
 		n.propertiesLocked()
 		n.frozen = true
@@ -562,6 +563,16 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Unlock()
 	if stop != nil {
 		stop()
+	}
+	// The subscription's own ActiveChanged(false) finds another owner and
+	// says nothing, so the stop announces it: the default subscription
+	// ends with the behaviour and is reported not subscribed when it was
+	// reported active. Mirrors matter.js NetworkClient's disposal
+	// (packages/node/src/behavior/system/network/NetworkClient.ts:469-471,
+	// #endDefaultSubscription :243-251 at db021da0) (review II,
+	// R2-P6-fsm-2350).
+	if wasActive {
+		n.announceSubscriptionStatus(false, nil)
 	}
 	// The flush timer stops before anything is waited for: no path out of
 	// Stop leaves it armed (review II, R2-P0-rv-C03).
