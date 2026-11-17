@@ -38,7 +38,8 @@ type InvokeOptions struct {
 	// NEEDS_TIMED_INTERACTION answer needs it.
 	TimedOff bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
-	// [DefaultTimedRequestTimeout] (:439).
+	// [DefaultTimedRequestTimeout] (:439). A negative one makes a timed
+	// invoke fail with [ErrMalformedRequest].
 	TimedTimeout time.Duration
 	// SuppressResponse asks the peer for no InvokeResponse: the send
 	// expects an acknowledgement only and Invoke returns the zero Result.
@@ -352,7 +353,15 @@ func readFields(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any
 // InteractionClientMessenger.sendTimedRequest
 // (InteractionMessenger.ts:1440-1452, TlvTimedRequest: [0] timeout in
 // milliseconds, [255] InteractionModelRevision).
+//
+// A negative timeout is [ErrMalformedRequest] before anything is sent: the
+// TimedRequest's field is unsigned, and the conversion would wrap it to a
+// window of about a minute (review II, R2-P6-err-2154). Every timed write
+// and invoke comes through here.
 func (m *messenger) timed(ctx context.Context, timeout time.Duration) error {
+	if timeout < 0 {
+		return fmt.Errorf("%w: TimedTimeout %v is negative", ErrMalformedRequest, timeout)
+	}
 	enc := tlv.NewEncoder()
 	im.TimedRequest{TimeoutMs: uint16(min(timeout.Milliseconds(), 0xFFFF))}.MarshalTLV(enc) //nolint:gosec // bounded to uint16
 	req, err := enc.Bytes()

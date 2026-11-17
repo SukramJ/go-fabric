@@ -315,3 +315,25 @@ func TestWriteChunksForTheExchangeSession(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// TestNegativeTimedTimeoutIsRefused: a timed write or invoke with a
+// negative TimedTimeout is ErrMalformedRequest before anything is sent,
+// not a TimedRequest of a wrapped timeout (review II, R2-P6-err-2154).
+func TestNegativeTimedTimeoutIsRefused(t *testing.T) {
+	t.Parallel()
+	s := newScripted(t)
+	c := interaction.New(s.mgr, s.session, nil)
+	value := interaction.Raw(spec.Node{El: tlv.Element{Type: tlv.TypeBoolTrue, Bool: true}})
+	for _, timeout := range []time.Duration{-time.Millisecond, -time.Second} {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_, err := c.Write(ctx, []interaction.WriteRequest{{Path: attrPath(1, 6, 0), Value: value}}, interaction.WriteOptions{Timed: true, TimedTimeout: timeout})
+		if !errors.Is(err, interaction.ErrMalformedRequest) {
+			t.Errorf("write with TimedTimeout %v: %v, want ErrMalformedRequest", timeout, err)
+		}
+		_, err = c.Invoke(ctx, im.ConcreteCommandPath{Endpoint: 1, Cluster: 6, Command: 1}, nil, interaction.InvokeOptions{Timed: true, TimedTimeout: timeout})
+		if !errors.Is(err, interaction.ErrMalformedRequest) {
+			t.Errorf("invoke with TimedTimeout %v: %v, want ErrMalformedRequest", timeout, err)
+		}
+		cancel()
+	}
+}

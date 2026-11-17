@@ -52,7 +52,8 @@ type WriteOptions struct {
 	Timed bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
 	// [DefaultTimedRequestTimeout]. A timeout marks the write timed
-	// (Write.ts:74).
+	// (Write.ts:74); a negative one makes a timed write fail with
+	// [ErrMalformedRequest].
 	TimedTimeout time.Duration
 	// SuppressResponse asks the peer for no WriteResponse.
 	SuppressResponse bool
@@ -98,7 +99,9 @@ func (w WriteStatuses) Err() error {
 }
 
 // ErrMalformedRequest is a request matter.js refuses to formulate —
-// MalformedRequestError (action/request/MalformedRequestError.ts).
+// MalformedRequestError (action/request/MalformedRequestError.ts) — and a
+// timed request with a negative TimedTimeout, which this module refuses
+// the same way (review II, R2-P6-err-2154).
 var ErrMalformedRequest = errors.New("interaction: malformed request")
 
 // Write writes attributes on a fresh exchange. Mirrors matter.js
