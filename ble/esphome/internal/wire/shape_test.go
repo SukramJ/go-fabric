@@ -64,7 +64,7 @@ func TestWrongWireTypeIsSkipped(t *testing.T) {
 	svc := GATTService{UUID: UUID{Short: 0x1800}, Handle: 1, Characteristics: []GATTCharacteristic{
 		{UUID: UUID{Short: 0x2a00}, Handle: 2, Properties: 0x02, Descriptors: []GATTDescriptor{{UUID: UUID{Short: 0x2902}, Handle: 3}}},
 	}}
-	cases := []struct {
+	type wireCase struct {
 		name string
 		// good is the message (or nested message) with every field; wrap,
 		// when set, puts a nested message into its outer message.
@@ -72,7 +72,8 @@ func TestWrongWireTypeIsSkipped(t *testing.T) {
 		wrap   func(inner []byte) []byte
 		fields []fieldType
 		decode func([]byte) (any, error)
-	}{
+	}
+	cases := []wireCase{
 		{
 			"HelloRequest", (&HelloRequest{ClientInfo: "c", APIVersionMajor: 1, APIVersionMinor: 19}).Marshal(), nil, fs(b(1), v(2, 3)),
 			func(x []byte) (any, error) { var m HelloRequest; err := m.Unmarshal(x); return m, err },
@@ -196,26 +197,8 @@ func TestWrongWireTypeIsSkipped(t *testing.T) {
 			},
 		},
 	}
-	for _, typ := range []struct {
-		name   string
-		t      uint16
-		fields []fieldType
-	}{
-		{"BluetoothGATTWriteRequest", TypeBluetoothGATTWriteRequest, fs(v(1, 2, 3), b(4))},
-		{"BluetoothGATTNotifyRequest", TypeBluetoothGATTNotifyRequest, v(1, 2, 3)},
-		{"BluetoothGATTErrorResponse", TypeBluetoothGATTErrorResponse, v(1, 2, 3)},
-		{"BluetoothGATTNotifyDataResponse", TypeBluetoothGATTNotifyDataResponse, fs(v(1, 2), b(3))},
-	} {
-		good := (&AddressHandle{MessageType: typ.t, Address: 1, Handle: 2, Flag: true, Error: 3, Data: []byte{4}}).Marshal()
-		cases = append(cases, struct {
-			name   string
-			good   []byte
-			wrap   func(inner []byte) []byte
-			fields []fieldType
-			decode func([]byte) (any, error)
-		}{typ.name, good, nil, typ.fields, func(x []byte) (any, error) { var m AddressHandle; err := m.Unmarshal(typ.t, x); return m, err }})
-	}
-	for _, c := range cases {
+	check := func(c wireCase) {
+		t.Helper()
 		wrap := c.wrap
 		if wrap == nil {
 			wrap = func(in []byte) []byte { return in }
@@ -230,6 +213,27 @@ func TestWrongWireTypeIsSkipped(t *testing.T) {
 				t.Errorf("%s field %d in the wrong wire type: %+v, %v; want %+v", c.name, f.num, got, err, want)
 			}
 		}
+	}
+	for _, c := range cases {
+		check(c)
+	}
+	// AddressHandle: field 3's type is the message type's.
+	for _, typ := range []struct {
+		name   string
+		t      uint16
+		fields []fieldType
+	}{
+		{"BluetoothGATTWriteRequest", TypeBluetoothGATTWriteRequest, fs(v(1, 2, 3), b(4))},
+		{"BluetoothGATTNotifyRequest", TypeBluetoothGATTNotifyRequest, v(1, 2, 3)},
+		{"BluetoothGATTErrorResponse", TypeBluetoothGATTErrorResponse, v(1, 2, 3)},
+		{"BluetoothGATTNotifyDataResponse", TypeBluetoothGATTNotifyDataResponse, fs(v(1, 2), b(3))},
+	} {
+		good := (&AddressHandle{MessageType: typ.t, Address: 1, Handle: 2, Flag: true, Error: 3, Data: []byte{4}}).Marshal()
+		check(wireCase{typ.name, good, nil, typ.fields, func(x []byte) (any, error) {
+			var m AddressHandle
+			err := m.Unmarshal(typ.t, x)
+			return m, err
+		}})
 	}
 }
 
