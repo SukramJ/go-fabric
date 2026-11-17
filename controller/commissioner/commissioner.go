@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/netip"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -244,6 +245,13 @@ type Commissioner struct {
 	ctx        Context
 	log        *slog.Logger
 	caseServer *handshake.CASEServer
+
+	// claimMu guards claimed: the addresses commissionings hold from
+	// determineAddress until commissionConnectedNode returns, so two
+	// concurrent commissionings never get one node id (review II,
+	// R2-P6-conc-1810).
+	claimMu sync.Mutex
+	claimed map[handshake.PeerAddress]bool
 }
 
 // New returns a commissioner over c.
@@ -309,6 +317,16 @@ func (c *Commissioner) Interaction(p *peer.Peer) *interaction.Interaction {
 // (:283-292); the connected node commissioned (:294-298); the PASE session
 // closed on every path, with a CommissioningTransitionError on success and
 // the error on failure (:299-307, #closePaseSession :313-319).
+//
+// ctx bounds the whole call. The flow's own bounds are the ones the
+// device states: each step's timeout, and the total by the device's
+// MaxCumulativeFailsafeSeconds (up to about 18 hours), so a device that
+// answers every step just inside its timeout keeps Commission running
+// that long unless ctx ends first; a caller that wants a shorter bound
+// gives ctx a deadline (review II, R2-P6-bound-1812).
+//
+// A node id the call determines is held until it returns: a concurrent
+// Commission with the same NodeID is [ErrNodeIDConflict].
 func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, error) {
 	if opts.Fabric == nil {
 		return Result{}, errors.New("commissioner: Options.Fabric is required")
@@ -537,12 +555,44 @@ func txtParameters(t discovery.TXTData) *sessionparams.Parameters {
 	return &p
 }
 
-// assertPeerAddress is #assertPeerAddress (:495-499).
+// assertPeerAddress is #assertPeerAddress (:495-499); an address another
+// commissioning holds is a conflict as well (R2-P6-conc-1810).
 func (c *Commissioner) assertPeerAddress(a handshake.PeerAddress) error {
+	c.claimMu.Lock()
+	defer c.claimMu.Unlock()
+	return c.assertPeerAddressLocked(a)
+}
+
+func (c *Commissioner) assertPeerAddressLocked(a handshake.PeerAddress) error {
 	if c.ctx.Peers.Has(a) {
 		return newError(ErrNodeIDConflict, fmt.Sprintf("Node ID %d is already commissioned and can not be reused", a.NodeID), nil)
 	}
+	if c.claimed[a] {
+		return newError(ErrNodeIDConflict, fmt.Sprintf("Node ID %d is being commissioned and can not be reused", a.NodeID), nil)
+	}
 	return nil
+}
+
+// claimAddress holds a for one commissioning, in one step with the check,
+// unless it is a peer or held already.
+func (c *Commissioner) claimAddress(a handshake.PeerAddress) error {
+	c.claimMu.Lock()
+	defer c.claimMu.Unlock()
+	if err := c.assertPeerAddressLocked(a); err != nil {
+		return err
+	}
+	if c.claimed == nil {
+		c.claimed = map[handshake.PeerAddress]bool{}
+	}
+	c.claimed[a] = true
+	return nil
+}
+
+// releaseAddress ends a commissioning's hold of a.
+func (c *Commissioner) releaseAddress(a handshake.PeerAddress) {
+	c.claimMu.Lock()
+	delete(c.claimed, a)
+	c.claimMu.Unlock()
 }
 
 // addressesToCandidates is #addressesToCandidates (:547-566): the distinct
@@ -585,7 +635,10 @@ func addressesToCandidates(addrs []*net.UDPAddr, dd *discovery.Device) []*candid
 }
 
 // determineAddress is #determineAddress (:569-582): the requested node id,
-// or a random operational node id no peer of the fabric has.
+// or a random operational node id no peer of the fabric has — claimed for
+// the caller, who releases it ([Commissioner.releaseAddress]) when its
+// commissioning returns; a second claim is ErrNodeIDConflict
+// (R2-P6-conc-1810).
 func (c *Commissioner) determineAddress(f *Fabric, nodeID uint64) (handshake.PeerAddress, error) {
 	for {
 		id := nodeID
@@ -599,7 +652,7 @@ func (c *Commissioner) determineAddress(f *Fabric, nodeID uint64) (handshake.Pee
 			}
 		}
 		addr := f.AddressOf(id)
-		if err := c.assertPeerAddress(addr); err != nil {
+		if err := c.claimAddress(addr); err != nil {
 			if nodeID != 0 {
 				return handshake.PeerAddress{}, err
 			}
@@ -630,6 +683,7 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 		c.disarmPASE(ctx, pase, opts.Channel)
 		return Result{}, err
 	}
+	defer c.releaseAddress(address)
 	c.log.Info("matter.controller.commissioning.start", slog.Uint64("node_id", address.NodeID), slog.Uint64("fabric_id", opts.Fabric.FabricID))
 	mgr := c.ctx.Exchanges
 	if opts.Channel != nil {
