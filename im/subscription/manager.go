@@ -338,6 +338,13 @@ func (m *Manager) finishClose(victims []*Subscription, terminated bool) {
 	}
 }
 
+// MaxSubscriptionsPerFabric is the number of subscriptions a fabric may
+// hold at once: [Config.MaxSubscriptionsPerFabric], or
+// [DefaultMaxSubscriptionsPerFabric] when the configuration left it zero.
+// The bridge bounds a fabric's persisted subscription rows by it (review
+// II, R2-P6-bound-0502, owner decision 175).
+func (m *Manager) MaxSubscriptionsPerFabric() int { return m.cfg.MaxSubscriptionsPerFabric }
+
 // NewManager constructs a manager. logger may be nil. reporter, a
 // [Reporter], is deprecated and should be nil: every report goes through
 // the [ReportSender] set with [Manager.SetReportSender] (the bridge's

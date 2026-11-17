@@ -158,3 +158,32 @@ func TestPersistSubscriptionSkipsUnattributableTargets(t *testing.T) {
 		}
 	}
 }
+
+// TestPersistedRowsAreCappedAtTheManagersQuota (review II,
+// R2-P6-bound-0502, decision 175): a Subscribe persists its row and the
+// fabric's rows are capped at the quota the manager is configured with
+// ([subscription.Manager.MaxSubscriptionsPerFabric]) — end to end, not
+// only the function that caps.
+func TestPersistedRowsAreCappedAtTheManagersQuota(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	m := subscription.NewManager(subscription.Config{MaxSubscriptionsPerFabric: 3}, nil, nil)
+	b.AttachSubscriptionManager(m)
+	st := memstore.New()
+	b.AttachSubscriptionStore(st)
+	for id := uint32(0x201); id <= 0x205; id++ {
+		seedRow(t, st, id, 1, 0xA1)
+	}
+	seedRow(t, st, 0x301, 2, 0xA1)
+	live := liveSubscription(t, b, m, 0xA1, true)
+	b.persistSubscription(context.Background(), live)
+	if got, want := persistedIDs(t, st), []uint32{0x204, 0x205, 0x301, live}; !slices.Equal(got, want) {
+		t.Fatalf("rows after the subscribe = %#x, want %#x", got, want)
+	}
+	if got := m.MaxSubscriptionsPerFabric(); got != 3 {
+		t.Errorf("MaxSubscriptionsPerFabric = %d, want 3", got)
+	}
+	if got := subscription.NewManager(subscription.Config{}, nil, nil).MaxSubscriptionsPerFabric(); got != subscription.DefaultMaxSubscriptionsPerFabric {
+		t.Errorf("default MaxSubscriptionsPerFabric = %d, want %d", got, subscription.DefaultMaxSubscriptionsPerFabric)
+	}
+}

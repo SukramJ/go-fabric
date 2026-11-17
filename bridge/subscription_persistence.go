@@ -233,13 +233,9 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 }
 
 // persistedRowQuota is the number of rows a fabric may keep: the
-// manager's subscription quota, when the manager states it. Zero leaves
-// the per-fabric cap off (the peer's purge still runs).
+// manager's subscription quota (owner decision 175).
 func persistedRowQuota(m *subscription.Manager) int {
-	if q, ok := any(m).(interface{ MaxSubscriptionsPerFabric() int }); ok {
-		return q.MaxSubscriptionsPerFabric()
-	}
-	return 0
+	return m.MaxSubscriptionsPerFabric()
 }
 
 // boundPersistedSubscriptionsLocked keeps the persisted rows of rec's
