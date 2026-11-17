@@ -552,14 +552,23 @@ var ErrReportTooLarge = errors.New("interaction: report too large")
 // interactions of one session may hold while the rest of their chunks
 // arrive: reads, subscription reports and invoke responses together, so
 // the 30 exchanges a session may have open do not multiply it. A chunk is
-// charged what it holds — its message payload and [decodedNodeBytes] for
-// every decoded element of its values (review II, R2-P6-bound-2102) — so
-// the bound is one on memory, within a factor of two. The chunk that
-// would pass it ends its interaction with a StatusResponse
-// ResourceExhausted and [ErrReportTooLarge]; the bytes are released when
-// an interaction ends. A peer reaches it only with its own interactions:
-// an attribute of a scalar value is charged at most 140 bytes, so a
-// wildcard read of some 120 000 such attributes stays below it. 16 MiB
+// charged what it holds — its message payload, the struct of each entry
+// (an attribute report, an event report, an invoke response entry) and
+// [decodedNodeBytes] for every decoded element of its values; on a 64-bit
+// platform 96, 48 and 112 bytes (review II, R2-P6-bound-2102, Fable F4) —
+// so the bound is one on memory: the heap the kept entries hold stays
+// within twice the charge for the shapes TestReportChargeBoundsTheHeap
+// measures (values of one-byte elements, scalar values, attribute and
+// command statuses). The charge follows the decode: while one chunk is
+// decoded its nodes are held uncharged — bounded by the message, about
+// 112 bytes a one-byte element, so roughly 7 MiB for a 64 000-byte TCP
+// message (arithmetic, not measured), per exchange decoding at that
+// moment (Fable F5). The chunk that would pass the bound ends its
+// interaction with a StatusResponse ResourceExhausted and
+// [ErrReportTooLarge]; the bytes are released when an interaction ends. A
+// peer reaches it only with its own interactions: an attribute of a
+// scalar value is charged at most 240 bytes, so a wildcard read of some
+// 70 000 such attributes stays below it. 16 MiB
 // since the charge counts memory (owner decision 220; it was 2 MiB of
 // payload, decision 48), half of what a node's image may hold
 // (controller/client.DefaultMaxImageBytesPerNode), which charges the same
@@ -613,7 +622,7 @@ func releaseAssembly(s *exchange.Session, n int) {
 
 // decodedNodeBytes is what one decoded TLV element of a value costs while
 // an interaction holds it: one spec.Node (unsafe.Sizeof, 112 bytes on a
-// 64-bit platform), the form every attribute value, event datum and
+// 64-bit platform, less on a 32-bit one), the form every attribute value, event datum and
 // command field is kept in until the last chunk. A chunk is charged its
 // payload and this for every element of its values, so the bound counts
 // what is held, not what arrived: a value of one-byte elements holds some
@@ -640,8 +649,20 @@ func countNodes(n spec.Node) int {
 	return c
 }
 
+// The struct sizes a chunk's entries are charged on top of their values'
+// elements (Fable F4): an entry the interaction keeps costs at least its
+// Go struct, and a status entry has no value to charge. unsafe.Sizeof, so
+// the 64-bit figures (96, 48 and that of im.EventReport) are smaller on a
+// 32-bit build.
+const (
+	attributeEntryBytes = int(unsafe.Sizeof(im.AttributeReport{}))
+	eventEntryBytes     = int(unsafe.Sizeof(im.EventReport{}))
+	invokeEntryBytes    = int(unsafe.Sizeof(im.InvokeResponseEntry{}))
+)
+
 // reportCharge is what a decoded ReportData chunk is charged against the
-// report bound: its payload and its values' elements ([decodedNodeBytes]).
+// report bound: its payload, each attribute and event entry's struct, and
+// its values' elements ([decodedNodeBytes]).
 func reportCharge(payload []byte, rd *im.ReportData) int {
 	nodes := 0
 	for i := range rd.Reports {
@@ -652,17 +673,18 @@ func reportCharge(payload []byte, rd *im.ReportData) int {
 	for i := range rd.EventReports {
 		nodes += nodeCount(rd.EventReports[i].Data.Value)
 	}
-	return len(payload) + nodes*decodedNodeBytes
+	return len(payload) + nodes*decodedNodeBytes +
+		len(rd.Reports)*attributeEntryBytes + len(rd.EventReports)*eventEntryBytes
 }
 
 // invokeCharge is reportCharge for a decoded InvokeResponse chunk: its
-// payload and its response commands' fields.
+// payload, each entry's struct and its response commands' fields.
 func invokeCharge(payload []byte, resp *im.InvokeResponse) int {
 	nodes := 0
 	for i := range resp.Responses {
 		nodes += nodeCount(resp.Responses[i].Response)
 	}
-	return len(payload) + nodes*decodedNodeBytes
+	return len(payload) + nodes*decodedNodeBytes + len(resp.Responses)*invokeEntryBytes
 }
 
 // holdChunk reserves charge bytes ([reportCharge], [invokeCharge]) of a
