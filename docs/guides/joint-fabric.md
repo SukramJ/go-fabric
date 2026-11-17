@@ -132,8 +132,7 @@ the administrator answers an `AnnounceJointFabricAdministrator` with
 `FAILURE`. `jcm.SelfAnchored` is the explicit opt-in to chip's
 placeholder, the other side's own RCAC, for tests and examples. The
 device kit's administrator (`device.NewJointFabricAdministrator`) is
-built without a lookup; a host that needs one mounts its own
-`jointfabric.NewAdministrator` as the declaration's `HostServer`.
+built without a lookup, so it fails the verification.
 
 ## The commissioner side
 
