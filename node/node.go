@@ -1273,11 +1273,17 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// The root's and the Aggregator's live PartsList are the bridge's own
 	// (bridge.Bridge.Start installs both providers).
 	// The fabric hooks the store owes run before anything is served
-	// (R2-P2-comm-03, R2-P5-port-18).
+	// (R2-P2-comm-03, R2-P5-port-18), and the callback queue runs before
+	// them: a delivery acknowledges the event in the store, so an
+	// ObserveAsync hook handed to a queue not yet running would never
+	// hear it (review II, R2-P6-err-2402). A failed bridge start stops
+	// the queue again, after the owed callbacks ran.
+	n.callbacks.Start()
 	n.deliverOwedFabricEvents(ctx)
 	// The bridge's start is the last step that can fail; it leaves
 	// nothing bound or published when it does (bridge.Bridge.Start).
 	if err := n.br.Start(ctx); err != nil {
+		n.callbacks.Stop()
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
 	// The goroutines New leaves unstarted (ADR 0026 principle 5): the
@@ -1289,7 +1295,6 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// The assembled surface against the one a previous run persisted: a
 	// change raises the ConfigurationVersions (surface_stability.go).
 	n.announceSurface(ctx)
-	n.callbacks.Start()
 	if n.agg != nil {
 		n.agg.setStarted()
 	}
