@@ -1,0 +1,21 @@
+{
+  "generator": "generate-session-params-fixtures.ts",
+  "cases": [
+    {
+      "label": "no_tcp",
+      "hex": "1524080018"
+    },
+    {
+      "label": "tcp_client",
+      "hex": "15240802250900fa18"
+    },
+    {
+      "label": "tcp_server",
+      "hex": "15240804250900fa18"
+    },
+    {
+      "label": "tcp_both",
+      "hex": "15240806250900fa18"
+    }
+  ]
+}

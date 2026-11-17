@@ -472,11 +472,12 @@ type security struct {
 // responderSessionParams): bridge.DefaultSessionParameters with the TCP
 // roles the node serves — tcpServer for incoming, tcpClient for outgoing
 // — so a peer learns them during the handshake and may open TCP to us,
-// and nothing when TCP is off. Mirrors matter.js ServerNetworkRuntime.ts:
-// 355-363 (`SessionManager.sessionParameters = {…, supportedTransports:
-// {tcpClient: outgoing, tcpServer: incoming}}` only with a TCP role) at
-// 0ceb202d; the size bound is sessionparams.DefaultMaxTCPMessageSize
-// (bridge.SessionParametersFor).
+// and a bitmap of 0 when TCP is off. Mirrors matter.js
+// packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:204-210
+// at db021da0 (`sessions.sessionParameters = {supportedTransports:
+// {tcpClient: tcpConfig.outgoing, tcpServer: tcpConfig.incoming}, …}`
+// whatever the roles; review II, R2-P6-par-2905); the size bound is
+// sessionparams.DefaultMaxTCPMessageSize (bridge.SessionParametersFor).
 //
 // maxPathsPerInvoke, when non-zero, replaces the default MaxPathsPerInvoke:
 // the session parameters state the node's own (SessionManager

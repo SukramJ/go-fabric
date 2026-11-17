@@ -783,7 +783,8 @@ func (a *PaseAdapter) responderSessionParamsLocked() *sessionparams.Parameters {
 // ([sessionparams.TransportTCPClient], [sessionparams.TransportTCPServer])
 // and, when it names TCP, MaxTCPMessageSize — matter.js's fallback of
 // 64000 bytes unless the host passes its own bound (SessionParameters.ts:58-63,
-// :152). A node without TCP states neither field.
+// :152). A node without TCP states the bitmap as 0 and no size, as matter.js
+// does ([sessionparams.Parameters.Encode]; review II, R2-P6-par-2905).
 func SessionParametersFor(transports uint16, maxTCPMessageSize uint32) sigma.SessionParameters {
 	p := DefaultSessionParameters()
 	p.SupportedTransports = transports
