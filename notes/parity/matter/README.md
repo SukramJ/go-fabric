@@ -17,6 +17,7 @@ fails a test instead of failing a controller.
 | `generate-bdx-wire-fixtures.ts` | Every BDX message (`BdxMessage.encode`/`decode`), the BDX StatusReport, *Init/*Accept payloads matter.js refuses with their BdxStatusCode, OTA images from `OtaImageWriter.create` | [`bdx/testdata/bdx-wire-fixtures.json`](../../../bdx/testdata/bdx-wire-fixtures.json) → `bdx/bdx_parity_matterjs_test.go` |
 | `generate-filter-fixtures.ts` | HepaFilterMonitoring / ActivatedCarbonFilterMonitoring ResetCondition requests and ReplacementProductList values (`TlvOfModel(element)`) | [`bridge/testdata/filter-wire-fixtures.json`](../../../bridge/testdata/filter-wire-fixtures.json) → `bridge/filter_parity_matterjs_test.go` |
 | `generate-group-fixtures.ts groupcast` | Groupcast command payloads, the Membership, AccessControl.AuxiliaryAcl / Acl / Extension and GroupKeyManagement GroupTable / GroupKeyMap values (unfiltered read), the GroupcastTesting / AuxiliaryAccessUpdated events (`TlvOfModel(element)`) | [`bridge/testdata/groupcast-wire-fixtures.json`](../../../bridge/testdata/groupcast-wire-fixtures.json) → `bridge/groupcast_parity_matterjs_test.go` |
+| `generate-session-params-fixtures.ts` | The session parameters a node states with each TCP role (`TlvSessionParameters`, the shape `SessionManager`'s getter hands the PASE and CASE servers) | [`secure/sessionparams/testdata/session-params-fixtures.json`](../../../secure/sessionparams/testdata/session-params-fixtures.json) → `secure/sessionparams/session_params_parity_matterjs_test.go` |
 | `extract-conformance-cases.js` | The AllTests tree of conformanceTest.ts flattened to one case per `it` (describe path, fields, features, selection, record, expected error); plain node, no matter.js build — it reads the test file at the pin | [`cluster/spec/testdata/conformance_matterjs.json`](../../../cluster/spec/testdata/conformance_matterjs.json) → `cluster/spec/conformance_parity_matterjs_test.go` |
 
 The `testdata/` copies are the **masters**: the tests read them, nothing reads
@@ -30,6 +31,9 @@ to run from inside the matter.js checkout, after it is built. Do not pipe
 straight onto the destination file — a throw would truncate it.
 
 ```sh
+# Build at the checkout's HEAD before every regeneration, not once per
+# checkout: the scripts import the build output, which git ignores, so a
+# stale build yields bytes of another commit (review II S-12).
 cd ../matter.js/packages/model && npm run build && cd ../..
 
 export GO_FABRIC=../go-fabric
@@ -64,9 +68,13 @@ node "$GO_FABRIC"/notes/parity/matter/generate-modeselect-fixtures.ts > /tmp/ms.
 # needs packages/protocol transpiled (npm run build there; the transpile step suffices)
 node "$GO_FABRIC"/notes/parity/matter/generate-bdx-wire-fixtures.ts > /tmp/bdx.json \
     && mv /tmp/bdx.json "$GO_FABRIC"/bdx/testdata/bdx-wire-fixtures.json
+
+# reads @matter/protocol's dist; set MATTERJS_DIR when go-fabric is a worktree
+node "$GO_FABRIC"/notes/parity/matter/generate-session-params-fixtures.ts > /tmp/sp.json \
+    && mv /tmp/sp.json "$GO_FABRIC"/secure/sessionparams/testdata/session-params-fixtures.json
 ```
 
-Then run `go test ./tlv/... ./im/... ./bridge/... ./groups/... ./cluster/modeselect/...` from this module's root.
+Then run `go test ./tlv/... ./im/... ./bridge/... ./groups/... ./cluster/modeselect/... ./bdx/... ./secure/sessionparams/...` from this module's root.
 
 **A changed byte is a review decision, not a formatting update.** The whole
 point of the fixtures is that this module's output is pinned; a diff here says
