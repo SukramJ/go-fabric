@@ -23,8 +23,8 @@ import (
 // of package device never reaches this refusal. A part, or a Spec that
 // serves nothing ([ClusterServers]), serves no BridgedDeviceBasicInformation
 // and is not checked. The bridge's own VendorName, the fallback a bridged
-// endpoint serves without one of its own, is the node's configuration and
-// not checked per endpoint.
+// endpoint serves without one of its own, is checked once, by
+// [Config.Validate].
 func checkBridgedInfo(s *Spec, part bool) error {
 	if !servesBridgedInfo(s, part) {
 		return nil

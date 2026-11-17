@@ -13,6 +13,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/groups"
 )
 
@@ -172,6 +174,17 @@ func (c Config) Validate() error {
 	}
 	if c.ProductID == 0 {
 		return errors.New("endpoint: Config.ProductID must be non-zero")
+	}
+	// VendorName is served as every bridged endpoint's
+	// BridgedDeviceBasicInformation VendorName that states none of its
+	// own, uncut: held once here to the generated definition's constraint,
+	// the check checkBridgedInfo applies to an endpoint's own (review II,
+	// R2-P6-wire-2502, decision 201).
+	if c.VendorName != "" {
+		if err := spec.CheckWritten(bdbidef.Definition, 0, bdbidef.AttrVendorName, c.VendorName, nil); err != nil {
+			return fmt.Errorf("endpoint: Config.VendorName (BridgedDeviceBasicInformation VendorName, constraint %q): %w",
+				bdbidef.Definition.Attribute(bdbidef.AttrVendorName).Constraint.Text, err)
+		}
 	}
 	return nil
 }
