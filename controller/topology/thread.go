@@ -4,6 +4,7 @@
 package topology
 
 import (
+	"slices"
 	"strconv"
 
 	"github.com/SukramJ/go-fabric/thread/brdiscovery"
@@ -15,55 +16,128 @@ import (
 // extended address, and by RLOC16 as the fallback — matterjs-server's
 // buildExtAddrMap and buildRloc16Map at 0bd06f22
 // (topology-utils.ts:385-398, :405-418). A node without a known extended
-// address or RLOC16 is absent from that map. An extended address or
-// RLOC16 two nodes claim resolves to neither: both are self-reported
-// diagnostics, and nothing tells which claim is true, so a neighbour
-// entry naming it shows as unknown_<ext> rather than as an edge to the
-// node that claimed it last (review II, R2-P6-bound-2362, owner decision
-// 222). matterjs-server keeps the later node's claim (Map.set).
+// address or RLOC16 is absent from that map.
+//
+// An extended address is global; an RLOC16 is unique only within one
+// Thread network, so its claim is keyed by the claimant's extended PAN id
+// and looked up with the observer's — matterjs-server's own pattern for
+// its diagnostics path (buildMatterRloc16ByXp, topology-utils.ts:442-451);
+// a node without an extended PAN id keeps a claim across networks. Two
+// nodes that claim one extended address, or one RLOC16 within one network,
+// resolve to neither: both are self-reported diagnostics and nothing tells
+// which claim is true, so a neighbour entry naming it shows as
+// unknown_<ext> rather than as an edge to the node that claimed it last
+// (review II, R2-P6-bound-2362, owner decisions 222 and 237).
+// matterjs-server keeps the later node's claim (Map.set) and its neighbour
+// path uses a global RLOC16 map.
 type threadMaps struct {
 	byExt  map[uint64]string
-	byRloc map[uint16]string
+	byRloc map[rlocKey]string
+	// rlocAny is an RLOC16 exactly one node claims across every network,
+	// for an observer that reports no extended PAN id.
+	rlocAny map[uint16]string
+	// collisions are the claims two nodes made, in the order found.
+	collisions []collision
+}
+
+// rlocKey is an RLOC16 within the network of an extended PAN id; network
+// false is a claimant without one.
+type rlocKey struct {
+	xpan    uint64
+	network bool
+	rloc    uint16
+}
+
+// collision is a claim two or more nodes made: an extended address, or an
+// RLOC16 within one network.
+type collision struct {
+	kind, value string
+	nodes       []string
 }
 
 func newThreadMaps(nodes []*Image) threadMaps {
-	m := threadMaps{byExt: map[uint64]string{}, byRloc: map[uint16]string{}}
-	extTaken, rlocTaken := map[uint64]bool{}, map[uint16]bool{}
+	m := threadMaps{byExt: map[uint64]string{}, byRloc: map[rlocKey]string{}, rlocAny: map[uint16]string{}}
+	anyClaims := map[uint16][]string{}
+	extClaims, rlocClaims := map[uint64][]string{}, map[rlocKey][]string{}
+	var extOrder []uint64
+	var rlocOrder []rlocKey
 	for _, img := range nodes {
 		id := strconv.FormatUint(img.NodeID, 10)
 		if ext := threadExtAddress(img.GeneralDiagnostics.NetworkInterfaces); ext != 0 {
-			claim(m.byExt, extTaken, ext, id)
+			if extClaims[ext] == nil {
+				extOrder = append(extOrder, ext)
+			}
+			extClaims[ext] = appendClaim(extClaims[ext], id)
 		}
 		if r := img.ThreadNetworkDiagnostics.Rloc16; r != nil {
-			claim(m.byRloc, rlocTaken, *r, id)
+			k := rlocKey{rloc: *r}
+			if xp := img.ThreadNetworkDiagnostics.ExtendedPanId; xp != nil {
+				k.xpan, k.network = *xp, true
+			}
+			if rlocClaims[k] == nil {
+				rlocOrder = append(rlocOrder, k)
+			}
+			rlocClaims[k] = appendClaim(rlocClaims[k], id)
+			anyClaims[*r] = appendClaim(anyClaims[*r], id)
+		}
+	}
+	for _, ext := range extOrder {
+		if ids := extClaims[ext]; len(ids) == 1 {
+			m.byExt[ext] = ids[0]
+		} else {
+			m.collisions = append(m.collisions, collision{kind: "ext_address", value: hex16(ext), nodes: ids})
+		}
+	}
+	for r, ids := range anyClaims {
+		if len(ids) == 1 {
+			m.rlocAny[r] = ids[0]
+		}
+	}
+	for _, k := range rlocOrder {
+		if ids := rlocClaims[k]; len(ids) == 1 {
+			m.byRloc[k] = ids[0]
+		} else {
+			value := strconv.FormatUint(uint64(k.rloc), 10)
+			if k.network {
+				value = hex16(k.xpan) + ":" + value
+			}
+			m.collisions = append(m.collisions, collision{kind: "rloc16", value: value, nodes: ids})
 		}
 	}
 	return m
 }
 
-// claim records id's claim of key in byKey; a key another node claimed
-// too is removed and stays removed (taken).
-func claim[K comparable](byKey map[K]string, taken map[K]bool, key K, id string) {
-	switch prior, ok := byKey[key]; {
-	case taken[key]:
-	case ok && prior != id:
-		delete(byKey, key)
-		taken[key] = true
-	default:
-		byKey[key] = id
+// appendClaim adds id to ids unless it is there.
+func appendClaim(ids []string, id string) []string {
+	if slices.Contains(ids, id) {
+		return ids
 	}
+	return append(ids, id)
 }
 
-// node is the commissioned node a neighbour entry names, by extended
-// address, else by a non-zero RLOC16.
-func (m threadMaps) node(nb *threaddiagdef.NeighborTableStruct) (string, bool) {
+// node is the commissioned node a neighbour entry of an observer on the
+// network of xpan names: by extended address, else by a non-zero RLOC16
+// claimed within that network, else by one claimed by a node without an
+// extended PAN id; an observer without one (xpan nil) matches an RLOC16
+// only one node claims anywhere.
+func (m threadMaps) node(nb *threaddiagdef.NeighborTableStruct, xpan *uint64) (string, bool) {
 	if id, ok := m.byExt[nb.ExtAddress]; ok {
 		return id, true
 	}
-	if nb.Rloc16 != 0 {
-		if id, ok := m.byRloc[nb.Rloc16]; ok {
+	if nb.Rloc16 == 0 {
+		return "", false
+	}
+	if xpan != nil {
+		if id, ok := m.byRloc[rlocKey{xpan: *xpan, network: true, rloc: nb.Rloc16}]; ok {
 			return id, true
 		}
+	}
+	if id, ok := m.byRloc[rlocKey{rloc: nb.Rloc16}]; ok {
+		return id, true
+	}
+	if xpan == nil {
+		id, ok := m.rlocAny[nb.Rloc16]
+		return id, ok
 	}
 	return "", false
 }
@@ -98,7 +172,7 @@ func (m threadMaps) unknowns(nodes []*Image, brs borderRouterIndex) []*external 
 		}
 		for i := range img.ThreadNetworkDiagnostics.NeighborTable {
 			nb := &img.ThreadNetworkDiagnostics.NeighborTable[i]
-			if _, ok := m.node(nb); ok {
+			if _, ok := m.node(nb, img.ThreadNetworkDiagnostics.ExtendedPanId); ok {
 				continue
 			}
 			e := byExt[nb.ExtAddress]
@@ -147,7 +221,7 @@ func (m threadMaps) pairs(nodes []*Image, externals []*external) []*pair {
 		from := strconv.FormatUint(img.NodeID, 10)
 		for i := range img.ThreadNetworkDiagnostics.NeighborTable {
 			nb := &img.ThreadNetworkDiagnostics.NeighborTable[i]
-			to, ok := m.node(nb)
+			to, ok := m.node(nb, img.ThreadNetworkDiagnostics.ExtendedPanId)
 			if !ok {
 				to, ok = unknown[nb.ExtAddress]
 			}

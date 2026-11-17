@@ -31,6 +31,13 @@ import (
 // border_router node — and pairs from the neighbour tables (:377-395), the
 // Wi-Fi star (:397-428).
 func Build(images []Image, borderRouters []brdiscovery.Entry, now time.Time) Topology {
+	t, _ := build(images, borderRouters, now)
+	return t
+}
+
+// build is Build with the Thread claims two nodes made (threadMaps), for
+// the service to log.
+func build(images []Image, borderRouters []brdiscovery.Entry, now time.Time) (Topology, []collision) {
 	imgs := slices.Clone(images)
 	// matterjs-server keys its Thread nodes by the decimal id in a
 	// Record, which JavaScript iterates in ascending numeric order; the
@@ -52,7 +59,7 @@ func Build(images []Image, borderRouters []brdiscovery.Entry, now time.Time) Top
 		}
 		t.Nodes = append(t.Nodes, n)
 	}
-	addThread(&t, thread, brs)
+	collisions := addThread(&t, thread, brs)
 	addWiFi(&t, radios)
 	// The names come from the nodes and from any LAN host that publishes a
 	// _meshcop record: a control character or an invalid byte in one is
@@ -63,7 +70,7 @@ func Build(images []Image, borderRouters []brdiscovery.Entry, now time.Time) Top
 		n.NetworkName, n.HostName = printable(n.NetworkName), printable(n.HostName)
 		n.VendorName, n.ModelName = printable(n.VendorName), printable(n.ModelName)
 	}
-	return t
+	return t, collisions
 }
 
 // printable is s with each control character and invalid byte escaped
@@ -169,7 +176,7 @@ func matterNode(img *Image, brs borderRouterIndex) Node {
 // an external is published only when a kept pair links it
 // (NetworkTopologyService.ts:377-395, matterjs-server at 0bd06f22), a
 // known border router as mapExternal draws it (:454-479).
-func addThread(t *Topology, thread []*Image, brs borderRouterIndex) {
+func addThread(t *Topology, thread []*Image, brs borderRouterIndex) []collision {
 	m := newThreadMaps(thread)
 	externals := m.unknowns(thread, brs)
 	linked := map[string]bool{}
@@ -200,6 +207,7 @@ func addThread(t *Topology, thread []*Image, brs borderRouterIndex) {
 		}
 		t.Nodes = append(t.Nodes, n)
 	}
+	return m.collisions
 }
 
 // addWiFi adds one access point per BSSID and a link from each station

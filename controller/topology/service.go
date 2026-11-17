@@ -6,6 +6,7 @@ package topology
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -60,6 +61,11 @@ type Config struct {
 	// with and rebuilds on; nil is the controller's own
 	// (controller.Controller.BorderRouters) for [New], none otherwise.
 	BorderRouters BorderRouters
+	// Logger receives the service's diagnostics: once per claim, an
+	// extended address or an RLOC16 within one Thread network two nodes
+	// claim, which the graph resolves to neither
+	// (matter.controller.topology.claim_collision); nil logs nothing.
+	Logger *slog.Logger
 }
 
 // BorderRouters is what the service reads of a border-router registry —
@@ -147,8 +153,11 @@ type Service struct {
 	nextObs   int
 	sources   []Source
 	unwatchBR func()
-	life      context.Context //nolint:containedctx // the service's lifetime, cancelled by Close: a refresh's reads outlive their caller
-	cancel    context.CancelFunc
+	// logged are the claim collisions logged, by kind and value (logMu).
+	logMu  sync.Mutex
+	logged map[string]bool
+	life   context.Context //nolint:containedctx // the service's lifetime, cancelled by Close: a refresh's reads outlive their caller
+	cancel context.CancelFunc
 }
 
 // flight is one refresh, shared by the callers that arrive while it runs.
@@ -228,7 +237,32 @@ func (s *Service) Topology() Topology {
 	if s.cfg.BorderRouters != nil {
 		brs = s.cfg.BorderRouters.List()
 	}
-	return Build(s.images(), brs, s.clk.Now())
+	t, collisions := build(s.images(), brs, s.clk.Now())
+	s.logCollisions(collisions)
+	return t
+}
+
+// logCollisions logs each claim collision once for the service's life
+// (review II, R2-P6-bound-2362, owner decision 222).
+func (s *Service) logCollisions(collisions []collision) {
+	if s.cfg.Logger == nil || len(collisions) == 0 {
+		return
+	}
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	if s.logged == nil {
+		s.logged = map[string]bool{}
+	}
+	for _, c := range collisions {
+		key := c.kind + "/" + c.value
+		if s.logged[key] {
+			continue
+		}
+		s.logged[key] = true
+		s.cfg.Logger.Warn("matter.controller.topology.claim_collision", slog.String("kind", c.kind), slog.String("value", c.value),
+			slog.Any("nodes", c.nodes),
+			slog.String("reason", "two commissioned nodes claim it; the graph resolves it to neither, and a neighbour naming it shows as unknown"))
+	}
 }
 
 // images lists the members' images, then every source's in registration

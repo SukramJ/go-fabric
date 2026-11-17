@@ -373,9 +373,12 @@ cluster: every report schedules a debounced rebuild (matterjs-server
 filters to the four network clusters), so a burst is bounded at five
 debounces, or a node that reports every second would hold every rebuild
 off until the periodic one; the hash keeps an unchanged graph from the
-observers. An extended address or RLOC16 two nodes claim resolves to
-neither (matterjs-server keeps the later claim): a neighbour naming it
-shows as `unknown_<EXTADDR>`. The route-table edges of matterjs-server are not
+observers. An extended address two nodes claim, or an RLOC16 two nodes
+of one Thread network claim (an RLOC16 is unique only within a network,
+so it is keyed by the extended PAN id), resolves to neither
+(matterjs-server keeps the later claim): a neighbour naming it shows as
+`unknown_<EXTADDR>`, and with `topology.Config.Logger` set the service
+logs each such claim once (`matter.controller.topology.claim_collision`). The route-table edges of matterjs-server are not
 built.
 
 **Further sources.** Nodes the controller has not commissioned join the

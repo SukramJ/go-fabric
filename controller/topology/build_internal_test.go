@@ -394,7 +394,7 @@ func TestNetworkTypeAndThresholds(t *testing.T) {
 func TestThreadMatching(t *testing.T) {
 	one := mkThread(1, threadOpts{rloc16: ptr[uint16](1024), ext: 0xAABBCCDDEEFF0011})
 	m := newThreadMaps([]*Image{&one})
-	if m.byExt[0xAABBCCDDEEFF0011] != "1" || m.byRloc[1024] != "1" {
+	if m.byExt[0xAABBCCDDEEFF0011] != "1" || m.byRloc[rlocKey{xpan: extPan, network: true, rloc: 1024}] != "1" {
 		t.Errorf("maps = %+v", m)
 	}
 	a := mkThread(1, threadOpts{rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{neighbour(0, 1025, 3, ptr[int8](-40), false)}})
@@ -572,5 +572,55 @@ func TestBuildCollidingClaimsResolveToNeither(t *testing.T) {
 		if !slices.ContainsFunc(topo.Nodes, func(n Node) bool { return n.ID == want }) {
 			t.Errorf("no node %s for the neighbour whose claim collided", want)
 		}
+	}
+}
+
+// TestBuildRloc16ClaimsAreScopedByNetwork (review II, R2-P6-bound-2362,
+// owner decision 237): an RLOC16 is unique only within one Thread network,
+// so two nodes on two networks that hold the same one are both kept — each
+// observer reaches the node of its own network — while two on one network
+// resolve to neither.
+func TestBuildRloc16ClaimsAreScopedByNetwork(t *testing.T) {
+	t.Parallel()
+	const otherPan = 0x2222222222222222
+	onNet := func(img Image, xpan uint64) Image {
+		img.ThreadNetworkDiagnostics.ExtendedPanId = ptr(xpan)
+		return img
+	}
+	// Each observer lists a neighbour by RLOC16 0x0C00 only (no extended
+	// address it could match).
+	obsA := onNet(mkThread(1, threadOpts{role: role(threaddiagdef.RoutingRoleLeader), rloc16: ptr[uint16](0x0400), ext: 0x1111111111111111, neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(0x0909090909090909, 0x0C00, 3, ptr[int8](-40), true),
+	}}), extPan)
+	onA := onNet(mkThread(2, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x2222222222222222}), extPan)
+	obsB := onNet(mkThread(3, threadOpts{role: role(threaddiagdef.RoutingRoleLeader), rloc16: ptr[uint16](0x0400), ext: 0x3333333333333333, neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(0x0909090909090909, 0x0C00, 3, ptr[int8](-40), true),
+	}}), otherPan)
+	onB := onNet(mkThread(4, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x4444444444444444}), otherPan)
+	topo, collisions := build([]Image{obsA, onA, obsB, onB}, nil, at)
+	if _, ok := connection(topo, "1", "2"); !ok {
+		t.Error("the observer on network A does not reach its RLOC16 neighbour")
+	}
+	if _, ok := connection(topo, "3", "4"); !ok {
+		t.Error("the observer on network B does not reach its RLOC16 neighbour")
+	}
+	for _, c := range collisions {
+		if c.kind == "rloc16" {
+			t.Errorf("an RLOC16 held on two networks counted as a collision: %+v", c)
+		}
+	}
+	// A third node on network A with the same RLOC16: neither on A.
+	twin := onNet(mkThread(5, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x5555555555555555}), extPan)
+	topo, collisions = build([]Image{obsA, onA, obsB, onB, twin}, nil, at)
+	for _, id := range []string{"2", "5"} {
+		if _, ok := connection(topo, "1", id); ok {
+			t.Errorf("an edge 1-%s through an RLOC16 two nodes of one network claim", id)
+		}
+	}
+	if _, ok := connection(topo, "3", "4"); !ok {
+		t.Error("the other network's RLOC16 lost its node")
+	}
+	if len(collisions) != 1 || collisions[0].kind != "rloc16" || len(collisions[0].nodes) != 2 {
+		t.Errorf("collisions %+v, want the one RLOC16 of network A", collisions)
 	}
 }
