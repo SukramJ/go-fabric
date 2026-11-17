@@ -125,11 +125,8 @@ func run(ctx context.Context) error {
 	for i := range devices {
 		slog.Info("bridged", slog.String("name", devices[i].Name), slog.Int("endpoint", int(devices[i].Endpoint)))
 	}
-	if err := b.light.Rename(ctx, "Kitchen ceiling"); err != nil {
-		slog.Warn("rename", slog.Any("err", err))
-	}
-	if err := b.door.SetReachable(ctx, true); err != nil {
-		slog.Warn("reachable", slog.Any("err", err))
+	if err := errors.Join(b.light.Rename(ctx, "Kitchen ceiling"), b.door.SetReachable(ctx, true)); err != nil {
+		slog.Warn("host statement", slog.Any("err", err))
 	}
 	if err := b.doorMoved(false); err != nil {
 		slog.Warn("door", slog.Any("err", err))
