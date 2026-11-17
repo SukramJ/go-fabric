@@ -4,12 +4,14 @@
 package bridge
 
 import (
+	"net"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/secure/sigma"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -119,6 +121,66 @@ func TestR2P6Sec3320KeepsAcknowledged(t *testing.T) {
 		rr.giveUp()
 		if got := rr.closed(); len(got) != 0 {
 			t.Fatalf("closed %v: the session had closed before its Sigma2_Resume was given up", got)
+		}
+	})
+}
+
+// TestR2P6Sec3320Ends: review II, R2-P6-sec-3320 — the other ends of a
+// Sigma2_Resume the initiator did not acknowledge: its time on the
+// unsecured session running out, its send failing, and its handshake ended
+// from outside (the provider letting the adapter go) each close the
+// installed session; an entry that lost its place in the retransmit table
+// to newer ones closes nothing — its datagram went out and the
+// acknowledgement may still come.
+func TestR2P6Sec3320Ends(t *testing.T) {
+	t.Parallel()
+	resumed := func(t *testing.T) *resumeRig {
+		t.Helper()
+		rr, sigma1 := newResumeRig(t, false)
+		if err := rr.p.send(mrp.SCOpcodeSigma1, 0x0400, sigma1, nil); err != nil {
+			t.Fatal(err)
+		}
+		rr.p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+		return rr
+	}
+	t.Run("expired", func(t *testing.T) {
+		t.Parallel()
+		rr := resumed(t)
+		rr.clk.Advance(unsecuredEntryLifetime + time.Second)
+		rr.r.b.tickOutboundReliable(rr.r.b.outboundReliable, rr.clk.Now())
+		if got := rr.closed(); !slices.Equal(got, []uint16{0x2001}) {
+			t.Fatalf("closed %v after the entry's lifetime, want [0x2001]", got)
+		}
+	})
+	t.Run("ended from outside", func(t *testing.T) {
+		t.Parallel()
+		rr := resumed(t)
+		rr.r.b.ForgetSigma1Replied(HandshakeKey{InitiatorNodeID: 0xD00D, ExchangeID: 0x0400})
+		if got := rr.closed(); !slices.Equal(got, []uint16{0x2001}) {
+			t.Fatalf("closed %v after the handshake was ended, want [0x2001]", got)
+		}
+	})
+	t.Run("evicted", func(t *testing.T) {
+		t.Parallel()
+		rr := resumed(t)
+		for i := range unsecuredEntryLimit {
+			rr.r.b.outboundReliable.trackUnsecured(uint32(0x9000+i), HandshakeKey{InitiatorNodeID: 0xE00E, ExchangeID: uint16(0x7000 + i)}, []byte{1}, rr.p.conn.LocalAddr(), rr.clk.Now(), nil)
+		}
+		rr.giveUp()
+		if got := rr.closed(); len(got) != 0 {
+			t.Fatalf("closed %v after the entry lost its place", got)
+		}
+	})
+	t.Run("send failed", func(t *testing.T) {
+		t.Parallel()
+		rr, sigma1 := newResumeRig(t, false)
+		hdr := message.Header{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 0xD00D}
+		proto := message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: mrp.SCOpcodeSigma1, ExchangeID: 0x0400, ProtocolID: mrp.SecureChannelProtocolID}
+		datagram := append(append(hdr.Marshal(), proto.Marshal()...), sigma1...)
+		// A route the bridge cannot send on: the reply's send fails.
+		_ = rr.r.b.dispatch(t.Context(), datagram, &net.IPAddr{IP: net.IPv6loopback})
+		if got := rr.closed(); !slices.Equal(got, []uint16{0x2001}) {
+			t.Fatalf("closed %v after the Sigma2_Resume's send failed, want [0x2001]", got)
 		}
 	})
 }

@@ -650,17 +650,29 @@ func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
 // exchanges in its own unsecured session, ExchangeManager.ts:308-312 and
 // :401 at db021da0).
 func (t *outboundReliableTracker) AbandonUnsecuredExchange(hk HandshakeKey) int {
+	cleared, _ := t.abandonUnsecuredExchange(hk)
+	return cleared
+}
+
+// abandonUnsecuredExchange is [outboundReliableTracker.AbandonUnsecuredExchange]
+// that also returns the secure sessions the dropped entries' handshake
+// installed before the peer acknowledged them
+// ([outboundReliableTracker.trackUnsecuredInstalled]).
+func (t *outboundReliableTracker) abandonUnsecuredExchange(hk HandshakeKey) (cleared int, installed []uint16) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	cleared := 0
 	for _, key := range slices.Clone(t.unsecured) {
-		if e := t.pending[key]; e.exchangeID != hk.ExchangeID || e.initiator != hk.InitiatorNodeID {
+		e := t.pending[key]
+		if e.exchangeID != hk.ExchangeID || e.initiator != hk.InitiatorNodeID {
 			continue
+		}
+		if e.installed != 0 {
+			installed = append(installed, e.installed)
 		}
 		t.dropLocked(key)
 		cleared++
 	}
-	return cleared
+	return cleared, installed
 }
 
 // DropSession drops every entry of the secure session sessionID — the

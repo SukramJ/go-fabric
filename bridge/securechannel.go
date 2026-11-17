@@ -1074,18 +1074,41 @@ func (b *Bridge) paseHandshakeOfAnother(key HandshakeKey) bool {
 // retransmitted until it is acknowledged or its retransmissions are spent
 // ([Bridge.sendHandshakeFailureReport], owner decision 173). The replies
 // of another initiator's handshake on the same exchange id stay.
+//
+// A reply that installed a secure session the peer has not acknowledged
+// yet — a Sigma2_Resume — ends with its handshake, so the session is
+// closed ([Bridge.closeUnacknowledgedResume]); [Bridge.replaceHandshakeReplies]
+// is the one caller that drops replies to send them again.
 func (b *Bridge) abandonHandshakeReplies(key HandshakeKey) {
+	for _, id := range b.dropHandshakeReplies(key) {
+		b.closeUnacknowledgedResume(id)
+	}
+}
+
+// replaceHandshakeReplies drops the replies of the handshake key names
+// because one is sent again in their place ([Bridge.handleSigma3OfCompleted]):
+// the handshake goes on and the peer has just spoken on its exchange, so a
+// session a reply installed stays.
+func (b *Bridge) replaceHandshakeReplies(key HandshakeKey) {
+	_ = b.dropHandshakeReplies(key)
+}
+
+// dropHandshakeReplies drops the replies of the handshake key names and
+// returns the sessions they installed unacknowledged.
+func (b *Bridge) dropHandshakeReplies(key HandshakeKey) []uint16 {
 	b.mu.RLock()
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
 	if tracker == nil {
-		return
+		return nil
 	}
-	if cleared := tracker.AbandonUnsecuredExchange(key); cleared > 0 {
+	cleared, installed := tracker.abandonUnsecuredExchange(key)
+	if cleared > 0 {
 		b.logger.Debug("matter.sc.handshake.abandon_replies",
 			slog.Int("exchange_id", int(key.ExchangeID)),
 			slog.Int("cleared", cleared))
 	}
+	return installed
 }
 
 // handshakeReplyUnacknowledged reports whether a message of the handshake
@@ -2275,7 +2298,7 @@ func (b *Bridge) handleSigma3OfCompleted(src net.Addr, requestHdr *message.Heade
 	// acknowledgement; the record holds until the new one is tracked.
 	release := b.holdCompletedRecord(key)
 	defer release()
-	b.abandonHandshakeReplies(key)
+	b.replaceHandshakeReplies(key)
 	h := completedCaseHandler{params: done.params}
 	return b.handleCase(src, requestHdr, proto, payload, "sigma3", h.ProcessSigma3, h)
 }
