@@ -518,10 +518,14 @@ func TestInvokeResponseArrived(t *testing.T) {
 func TestInvokeResultCarriesTheResponsePath(t *testing.T) {
 	t.Parallel()
 	for name, entry := range map[string]im.InvokeResponseEntry{
-		"status": {Path: im.ConcreteCommandPath{Endpoint: 3, Cluster: 0x0006, Command: 1, HasEndpoint: true, HasCluster: true, HasCommand: true},
-			IsStatus: true, Status: im.StatusIB{Status: im.StatusSuccess}},
-		"response command": {Path: im.ConcreteCommandPath{Endpoint: 0, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafeResponse, HasEndpoint: true, HasCluster: true, HasCommand: true},
-			HasResponse: true, Response: gencomm.ArmFailSafeResponse{}},
+		"status": {
+			Path:     im.ConcreteCommandPath{Endpoint: 3, Cluster: 0x0006, Command: 1, HasEndpoint: true, HasCluster: true, HasCommand: true},
+			IsStatus: true, Status: im.StatusIB{Status: im.StatusSuccess},
+		},
+		"response command": {
+			Path:        im.ConcreteCommandPath{Endpoint: 0, Cluster: gencomm.ClusterID, Command: gencomm.CmdArmFailSafeResponse, HasEndpoint: true, HasCluster: true, HasCommand: true},
+			HasResponse: true, Response: gencomm.ArmFailSafeResponse{},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
