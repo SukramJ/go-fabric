@@ -116,7 +116,7 @@ func (r *Registry) complete(ctx context.Context, n *Node, addr PeerAddress, o Co
 		return &commissioner.CommissioningError{Kind: commissioner.ErrCommissioning, Message: fmt.Sprintf("CommissioningComplete for %d returned no response", addr.NodeID)}
 	}
 	if resp.ErrorCode != gencomm.CommissioningErrorOk {
-		return &commissioner.CommissioningError{Kind: commissioner.ErrCommissioning, Message: fmt.Sprintf("CommissioningComplete failed for %d: %d %s", addr.NodeID, resp.ErrorCode, resp.DebugText)}
+		return &commissioner.CommissioningError{Kind: commissioner.ErrCommissioning, Message: fmt.Sprintf("CommissioningComplete failed for %d: %d %q", addr.NodeID, resp.ErrorCode, resp.DebugText)}
 	}
 	now := r.clock.Now()
 	n.updateRecord(func(rec *Record) { rec.CommissionedAt = now })

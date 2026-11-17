@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -514,5 +515,33 @@ func TestBuildBorderRouters(t *testing.T) {
 	bad.ExtAddress, bad.ExtPanID = "not hex", "short"
 	if n := byID(Build([]Image{node1}, []brdiscovery.Entry{bad}, at))[brUnkID]; n.Kind != KindThreadUnknown || n.NetworkName != "" {
 		t.Errorf("a malformed entry matched: %+v", n)
+	}
+}
+
+// TestBuildEscapesControlCharacters (review II, R2-P6-sec-2311): the
+// border router's names, which any LAN host publishing a _meshcop record
+// controls, reach the graph with their control characters and invalid
+// bytes escaped; printable names stay as they are.
+func TestBuildEscapesControlCharacters(t *testing.T) {
+	t.Parallel()
+	br := makeBr()
+	br.NetworkName, br.HostName, br.VendorName, br.ModelName = "Open\nThread", "Cui\x1bsine.local.", "Ap\xffple", "ee\x00ro"
+	topo := Build(fullMesh(), []brdiscovery.Entry{br}, time.UnixMilli(2000))
+	found := false
+	for _, n := range topo.Nodes {
+		for _, s := range []string{n.NetworkName, n.HostName, n.VendorName, n.ModelName} {
+			if strings.ContainsAny(s, "\n\x1b\x00") || strings.Contains(s, "\xff") {
+				t.Fatalf("node %s carries a control character or an invalid byte: %q", n.ID, s)
+			}
+		}
+		if n.HostName == `Cui\x1bsine` {
+			found = true
+			if n.NetworkName != `Open\nThread` || n.VendorName != `Ap\xffple` || n.ModelName != `ee\x00ro` {
+				t.Fatalf("the border router's names %q %q %q, want them escaped", n.NetworkName, n.VendorName, n.ModelName)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no node carries the border router's escaped host name")
 	}
 }

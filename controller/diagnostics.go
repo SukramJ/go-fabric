@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -185,9 +187,28 @@ func (c *Controller) startTrace() {
 	}
 }
 
-// record adds one event to the trace.
+// record adds one event to the trace. Its texts carry strings that LAN
+// hosts and devices control (a _meshcop record's network and host name,
+// an operational record's target, a device's DebugText in an error): a
+// control character or an invalid byte in one is escaped here, the one
+// boundary every event passes, so a host's view shows it rather than acts
+// on it (review II, R2-P6-sec-2311).
 func (c *Controller) record(kind diagevent.Kind, severity diagevent.Severity, message string, detail map[string]string) {
-	c.diagRing.Record(diagevent.Event{Kind: kind, Severity: severity, Message: message, Detail: detail})
+	for k, v := range detail {
+		detail[k] = printable(v)
+	}
+	c.diagRing.Record(diagevent.Event{Kind: kind, Severity: severity, Message: printable(message), Detail: detail})
+}
+
+// printable is s with each control character and invalid byte escaped
+// as Go escapes it (strconv.QuoteToGraphic, without the quotes); s
+// itself when it has none.
+func printable(s string) string {
+	if utf8.ValidString(s) && !strings.ContainsFunc(s, unicode.IsControl) {
+		return s
+	}
+	q := strconv.QuoteToGraphic(s)
+	return q[1 : len(q)-1]
 }
 
 // nodeHex is a node id as the trace writes it: 16 upper-case hex digits,

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	generaldiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
@@ -53,7 +54,27 @@ func Build(images []Image, borderRouters []brdiscovery.Entry, now time.Time) Top
 	}
 	addThread(&t, thread, brs)
 	addWiFi(&t, radios)
+	// The names come from the nodes and from any LAN host that publishes a
+	// _meshcop record: a control character or an invalid byte in one is
+	// escaped, so a host's view shows it rather than acts on it (review
+	// II, R2-P6-sec-2311). The SSID is filtered already (wifiSSID).
+	for i := range t.Nodes {
+		n := &t.Nodes[i]
+		n.NetworkName, n.HostName = printable(n.NetworkName), printable(n.HostName)
+		n.VendorName, n.ModelName = printable(n.VendorName), printable(n.ModelName)
+	}
 	return t
+}
+
+// printable is s with each control character and invalid byte escaped
+// as Go escapes it (strconv.QuoteToGraphic, without the quotes); s
+// itself when it has none.
+func printable(s string) string {
+	if utf8.ValidString(s) && !strings.ContainsFunc(s, unicode.IsControl) {
+		return s
+	}
+	q := strconv.QuoteToGraphic(s)
+	return q[1 : len(q)-1]
 }
 
 // borderRouterIndex is the registry as the build reads it.
