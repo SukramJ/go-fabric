@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/controller/dcl"
 )
@@ -188,4 +189,50 @@ func TestImagesWriteNeedsTheRecordRemoved(t *testing.T) {
 			t.Fatalf("CreateBlob called %d times; nothing may be written", n)
 		}
 	})
+}
+
+// TestImagesWriterWaitHonoursTheContext (review II, R2-P6-conc-1901): a
+// second writer of a name waits for the first only as long as its own
+// context lasts; it then fails with ErrOTA and the context's error.
+func TestImagesWriterWaitHonoursTheContext(t *testing.T) {
+	t.Parallel()
+	img := createOtaImage(t, 0xfff1, 0x8000, 3)
+	sum := sha256.Sum256(img)
+	info := ledgerUpdate("https://example.invalid/ota.bin", 0xfff1, 0x8000, 3, len(img), 7)
+	info.ledger.OTAChecksum = base64.StdEncoding.EncodeToString(sum[:])
+	info.ledger.OTAChecksumType = 1
+	imgs := NewImages(ImagesConfig{Blobs: &streamAndPutBlobs{}, Ledger: hostLedger(0), Logger: quietLog()})
+	entered, release := make(chan struct{}), make(chan struct{})
+	imgs.download = func(_ context.Context, _ dcl.SoftwareVersion, w io.Writer) error {
+		close(entered)
+		<-release
+		_, err := w.Write(img)
+		return err
+	}
+	first := make(chan error, 1)
+	go func() {
+		_, err := imgs.DownloadUpdate(context.Background(), info, false)
+		first <- err
+	}()
+	<-entered
+	defer func() { close(release); <-first }()
+	for name, write := range map[string]func(context.Context) error{
+		"DownloadUpdate": func(ctx context.Context) error { _, err := imgs.DownloadUpdate(ctx, info, false); return err },
+		"Store":          func(ctx context.Context) error { _, err := imgs.Store(ctx, img, ModeProd, &info); return err },
+	} {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		done := make(chan error, 1)
+		go func() { done <- write(ctx) }()
+		watchdog, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		select {
+		case err := <-done:
+			if !errors.Is(err, ErrOTA) || !errors.Is(err, context.Canceled) {
+				t.Errorf("%s with a cancelled context: %v, want ErrOTA and context.Canceled", name, err)
+			}
+		case <-watchdog.Done():
+			t.Errorf("%s waits for the other writer past its context", name)
+		}
+		stop()
+	}
 }

@@ -264,32 +264,27 @@ type nameLocks struct {
 }
 
 type nameLock struct {
-	held  sync.Mutex
+	held  chan struct{} // a slot of one
 	users int
 }
 
-// lock takes name's lock and returns its release.
-func (n *nameLocks) lock(name string) func() {
+// lock takes name's lock and returns its release, or an error wrapping
+// ErrOTA and ctx's error when ctx ends while another writer of the name
+// holds it.
+func (n *nameLocks) lock(ctx context.Context, name string) (func(), error) {
 	n.mu.Lock()
 	if n.locks == nil {
 		n.locks = map[string]*nameLock{}
 	}
 	l := n.locks[name]
 	if l == nil {
-		l = &nameLock{}
+		l = &nameLock{held: make(chan struct{}, 1)}
 		n.locks[name] = l
 	}
 	l.users++
 	waited := n.waited
 	n.mu.Unlock()
-	if !l.held.TryLock() {
-		if waited != nil {
-			waited(name)
-		}
-		l.held.Lock()
-	}
-	return func() {
-		l.held.Unlock()
+	leave := func() {
 		n.mu.Lock()
 		l.users--
 		if l.users == 0 {
@@ -297,6 +292,23 @@ func (n *nameLocks) lock(name string) func() {
 		}
 		n.mu.Unlock()
 	}
+	select {
+	case l.held <- struct{}{}:
+	default:
+		if waited != nil {
+			waited(name)
+		}
+		select {
+		case l.held <- struct{}{}:
+		case <-ctx.Done():
+			leave()
+			return nil, fmt.Errorf("%w: waiting for another writer of %s: %w", ErrOTA, name, ctx.Err())
+		}
+	}
+	return func() {
+		<-l.held
+		leave()
+	}, nil
 }
 
 // ImagesConfig configures [NewImages].
@@ -505,7 +517,11 @@ func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *Updat
 		return StoredImage{}, err
 	}
 	name := fileName(h.VendorID, h.ProductID, mode, h.SoftwareVersion)
-	defer i.names.lock(name)()
+	unlock, err := i.names.lock(ctx, name)
+	if err != nil {
+		return StoredImage{}, err
+	}
+	defer unlock()
 	return i.store(ctx, name, image, info)
 }
 
@@ -959,7 +975,11 @@ func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateI
 // stored (review II, R2-P6-conc-1901).
 func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
 	name := fileName(info.VendorID, info.ProductID, modeOf(info.Source), info.SoftwareVersion)
-	defer i.names.lock(name)()
+	unlock, err := i.names.lock(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
 	var unverified bool
 	var why string
 	switch {
