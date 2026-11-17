@@ -122,10 +122,9 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 		case opReserve:
 			errs = append(errs, p.reserve(ctx, op.tree))
 		case opRelease:
-			errs = append(errs, p.release(ctx, op.key))
 			// A returning key is no longer forgotten: a forget left half
 			// done for it must not erase it at the next New.
-			errs = append(errs, a.cancelForget(ctx, op.key))
+			errs = append(errs, p.release(ctx, op.key), a.cancelForget(ctx, op.key))
 		case opErase:
 			errs = append(errs, a.erase(ctx, op))
 		}

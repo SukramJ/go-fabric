@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9755,
+  "entry_points": 9757,
   "entry_packages": [
     ".",
     "bdx",
@@ -40221,14 +40221,14 @@
       "identifier": "MDNSFinding",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 61
+      "line": 62
     },
     {
       "package": "node",
       "identifier": "MDNSService",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/mdns.go",
-      "line": 65
+      "line": 66
     },
     {
       "package": "node",
