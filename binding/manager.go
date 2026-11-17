@@ -212,6 +212,20 @@ type bindingPeriod struct {
 	calls  sync.WaitGroup
 }
 
+// connect runs one counted Connect call of the period on its context:
+// none once the period ended, and no error for a call the end
+// interrupted.
+func (b *bindingPeriod) connect(link peerLink, p *peer.Peer) error {
+	defer b.calls.Done()
+	if b.ctx.Err() != nil {
+		return nil // released before the call began
+	}
+	if err := link.connect(b.ctx, p); err != nil && b.ctx.Err() == nil {
+		return err
+	}
+	return nil
+}
+
 // regKey identifies a registered group entry: its source endpoint and its
 // entry key.
 type regKey struct {
@@ -242,7 +256,10 @@ type Manager struct {
 
 	life   context.Context //nolint:containedctx // the manager's lifetime, cancelled by Close
 	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	// unbound is life without its cancel: a release (releaseUnbound)
+	// outlives Close's cancel, and Close waits for it.
+	unbound context.Context //nolint:containedctx // see above
+	wg      sync.WaitGroup
 	// workerOnce starts the worker with the first queued work (startWorker).
 	workerOnce sync.Once
 
@@ -296,6 +313,7 @@ func New(cfg Config) (*Manager, error) {
 		m.cfg.Interaction.Logger = m.log
 	}
 	m.life, m.cancel = context.WithCancel(context.Background())
+	m.unbound = context.WithoutCancel(m.life)
 	return m, nil
 }
 

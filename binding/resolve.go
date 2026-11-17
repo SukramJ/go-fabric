@@ -335,26 +335,22 @@ func (m *Manager) recheckGroups(fabricIndex uint8) {
 func (m *Manager) establishClientKind(it *item, res Resolution) {
 	p := res.Peer
 	m.info("binding.peer.connecting", reasonInitiatingCASE, it)
-	ctx, period := m.life, (*bindingPeriod)(nil)
+	// A peer the manager did not create connects on the manager's
+	// lifetime, in a period no release ends.
+	period := &bindingPeriod{ctx: m.life}
 	m.stateMu.Lock()
 	addr := handshake.PeerAddress{FabricIndex: it.entry.FabricIndex, NodeID: it.entry.Node}
 	if c := m.created[addr]; c != nil && c.peer == p && c.period != nil {
-		period, ctx = c.period, c.period.ctx
-		// Counted on the worker, before the release can look: the release
-		// waits for this call (releaseUnbound).
-		period.calls.Add(1)
+		period = c.period
 	}
+	// Counted on the worker, before the release can look: the release
+	// waits for this call (releaseUnbound).
+	period.calls.Add(1)
 	m.stateMu.Unlock()
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		if period != nil {
-			defer period.calls.Done()
-		}
-		if ctx.Err() != nil {
-			return // released before the call began
-		}
-		if err := m.link.connect(ctx, p); err != nil && ctx.Err() == nil {
+		if err := period.connect(m.link, p); err != nil {
 			m.log.Debug("binding.peer.connect_failed", append([]any{slog.Any("err", err)}, m.entryAttrs(it)...)...)
 		}
 	}()
@@ -577,7 +573,7 @@ func (m *Manager) releaseUnbound() {
 			// The period's Connect calls return on the cancel; one still
 			// running would start the stopped process again.
 			period.calls.Wait()
-			m.link.release(context.WithoutCancel(m.life), p)
+			m.link.release(m.unbound, p)
 		}()
 	}
 }
