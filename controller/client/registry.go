@@ -576,13 +576,18 @@ func (r *Registry) Close(ctx context.Context) error {
 	r.closed = true
 	r.mu.Unlock()
 	r.cancelExpiration()
+	// The registry's context ends before the drain: a reaction holds the
+	// fabric-operation lock while it deletes its node on that context, and
+	// a node whose stop is held would keep it, and this Close, past ctx
+	// (review II, R2-P6-err-2309). Such a node stays closed and in the
+	// registry, its delete left to a later Forget.
+	r.cancel()
 	// The drain of Peers.ts:522: no registration, cull or leave runs past
 	// this point.
 	func() {
 		r.op.Lock()
 		defer r.op.Unlock()
 	}()
-	r.cancel()
 	r.work.Wait()
 	err := r.closeNodes(ctx)
 	// The fabrics' ICD state goes with the registry (Fabric.ts:308-311).
