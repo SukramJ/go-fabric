@@ -1095,9 +1095,18 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 // Check-In (:149-151); on a secure session the installed
 // handler of any protocol but the Secure Channel, whose secure-session
 // handler is built in.
+//
+// An unsecured session this node opened takes none of the three: only a
+// session a peer's initiating message opened ([Session.IsInbound]) does.
+// A Sigma1, PBKDFParamRequest or Check-In naming the ephemeral node id of
+// a handshake this node runs is acknowledged and dropped — no legitimate
+// peer opens an exchange there, and such a session is outside every
+// bound of the inbound sessions. The module's own rule, ahead of
+// matter.js, which looks the session up by the node id alone (review II,
+// R2-P6-sec-1801, R2-P6-bound-1802, owner decision 189).
 func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 	if msg.ProtocolID == mrp.SecureChannelProtocolID {
-		if s.secure != nil {
+		if s.secure != nil || !s.inbound {
 			return nil
 		}
 		switch msg.Opcode {

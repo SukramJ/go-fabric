@@ -188,14 +188,18 @@ func TestParityStatusReport(t *testing.T) {
 // and dispatches Sigma1 to the CaseServer (:146-148) and a
 // PBKDFParamRequest without a PASE server to an InvalidParam answer
 // (:129-137); the IM handlers require a secure session
-// (ClientSubscriptionHandler.ts:25, true).
+// (ClientSubscriptionHandler.ts:25, true). The matter.js cases run on an
+// unsecured session a peer opened; on one this node opened the Secure
+// Channel opens nothing — ahead of matter.js (review II, R2-P6-sec-1801,
+// owner decision 189).
 func TestParityPeerOpenedExchangeDispatch(t *testing.T) {
 	t.Parallel()
 	m, _, _ := newTestManager(t, Config{})
 	installed := func(*Exchange, *Message) {}
 	m.SetProtocolHandler(mrp.SecureChannelProtocolID, installed)
 	m.SetProtocolHandler(im.InteractionModelProtocolID, installed)
-	unsecured := &Session{}
+	unsecured := &Session{inbound: true}
+	initiated := &Session{}
 	secure := &Session{secure: mustChannel(t)}
 	for _, c := range []struct {
 		name     string
@@ -210,6 +214,9 @@ func TestParityPeerOpenedExchangeDispatch(t *testing.T) {
 		{"Sigma1 secure (built-in StatusReport-only handler)", secure, mrp.SecureChannelProtocolID, mrp.SCOpcodeSigma1, "none"},
 		{"ReportData secure (ClientSubscriptionHandler.ts:25)", secure, im.InteractionModelProtocolID, im.OpcodeReportData, "installed"},
 		{"ReportData unsecured (requiresSecureSession mismatch, ExchangeManager.ts:393-405)", unsecured, im.InteractionModelProtocolID, im.OpcodeReportData, "none"},
+		{"Sigma1 on a session this node opened (ahead, R2-P6-sec-1801)", initiated, mrp.SecureChannelProtocolID, mrp.SCOpcodeSigma1, "none"},
+		{"PBKDFParamRequest on a session this node opened (ahead, R2-P6-bound-1802)", initiated, mrp.SecureChannelProtocolID, mrp.SCOpcodePBKDFParamRequest, "none"},
+		{"Check-In on a session this node opened (ahead, R2-P6-sec-1801)", initiated, mrp.SecureChannelProtocolID, mrp.SCOpcodeIcdCheckIn, "none"},
 	} {
 		h := m.handlerFor(c.s, &Message{ProtocolID: c.protocol, Opcode: c.opcode})
 		got := "none"

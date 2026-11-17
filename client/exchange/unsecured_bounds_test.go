@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -179,4 +180,74 @@ func TestInboundUnsecuredSessionHoldsOneHandshake(t *testing.T) {
 			t.Fatalf("the next handshake ran on exchange %#x", next.x.ID())
 		}
 	})
+}
+
+// TestPeerOpenedHandshakeOnInitiatedSessionIsRefused: a Sigma1, a
+// PBKDFParamRequest or an ICD Check-In that names the ephemeral node id of
+// an unsecured session this node opened — as destination or as source —
+// opens no exchange and starts no handler on it: it is acknowledged and
+// dropped, and the session and its own handshake stay. Only a session a
+// peer's initiating message opened takes such a message (review II,
+// R2-P6-sec-1801, R2-P6-bound-1802, owner decision 189). Before, the
+// Sigma1 reached the CASE responder, whose return closed the initiator's
+// session, and every PBKDFParamRequest with a new exchange id started a
+// refusal on a goroutine outside every bound of the inbound sessions.
+func TestPeerOpenedHandshakeOnInitiatedSessionIsRefused(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name   string
+		opcode uint8
+	}{
+		{"Sigma1", mrp.SCOpcodeSigma1},
+		{"PBKDFParamRequest", mrp.SCOpcodePBKDFParamRequest},
+		{"Check-In", mrp.SCOpcodeIcdCheckIn},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				m, conn, _ := newTestManager(t, Config{})
+				h, calls := recordingHandler(nil)
+				m.SetProtocolHandler(mrp.SecureChannelProtocolID, h)
+				m.SetCheckInReceiver(func([]byte) bool { t.Error("the Check-In receiver ran"); return true })
+				s, err := m.NewUnsecuredSession(peerAddr, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				own, err := m.Initiate(s, mrp.SecureChannelProtocolID, Options{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				const n = 8
+				for i := range uint16(n) {
+					hdr := message.Header{MessageCounter: uint32(i) + 1}
+					if i%2 == 0 {
+						hdr.DestSize, hdr.DestNodeID = message.DestNodeID, s.NodeID()
+					} else {
+						hdr.HasSourceNodeID, hdr.SourceNodeID = true, s.NodeID()
+					}
+					proto := message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: c.opcode, ExchangeID: 0x7700 + i, ProtocolID: mrp.SecureChannelProtocolID}
+					m.HandleDatagram(append(append(hdr.Marshal(), proto.Marshal()...), 0x15, 0x18), peerAddr)
+				}
+				synctest.Wait()
+				if len(calls) != 0 {
+					t.Fatalf("%d handlers ran on the initiated session", len(calls))
+				}
+				m.mu.Lock()
+				held := len(m.exchanges)
+				m.mu.Unlock()
+				if held != 1 || s.IsClosed() || s.IsClosing() {
+					t.Fatalf("%d exchanges held, session closed %v closing %v; want the own exchange only, session open", held, s.IsClosed(), s.IsClosing())
+				}
+				for i := range uint16(n) {
+					ack := decodeUnsecured(t, conn.next(t).bytes)
+					if ack.proto.Opcode != mrp.StandaloneAckOpcode || ack.proto.ExchangeID != 0x7700+i {
+						t.Fatalf("datagram %d: answer %+v, want its acknowledgement", i, ack.proto)
+					}
+				}
+				conn.none(t)
+				own.Close()
+				s.Close()
+			})
+		})
+	}
 }
