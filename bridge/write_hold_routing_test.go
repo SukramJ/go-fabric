@@ -69,7 +69,7 @@ func TestEndWriteChunkKeepsAnOpenWritesHolds(t *testing.T) {
 	var r exchangeRouting
 	nodeLabel := im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: 5, HasEndpoint: true, HasCluster: true, HasAttribute: true}
 	write := func(tx *im.WriteTransaction, more bool) im.StatusCode {
-		resp := im.HandleWriteRequest(im.WithWriteTransaction(context.Background(), tx), holdDispatcher{}, im.WriteRequest{
+		resp := im.HandleWriteRequest(im.WithWriteTransaction(im.WithAuthModePASE(context.Background()), tx), holdDispatcher{}, im.WriteRequest{
 			MoreChunkedMessages: more,
 			Writes:              []im.AttributeWrite{{Path: nodeLabel, Value: im.AttributeValue{Value: "x"}}},
 		})
