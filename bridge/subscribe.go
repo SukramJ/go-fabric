@@ -888,30 +888,59 @@ const (
 // subjectRefusedEveryPath walks the subscription's paths, as ctx's subject
 // under its pinned ACL, and reports whether at least one is refused and
 // none may be read; it stops at the first path the subject may read. For
-// a refusal, served fingerprints the paths the walk found served — every
-// concrete attribute path and event cluster it judged, in walk order.
+// a refusal, served fingerprints the locations the walk judged — the
+// (endpoint, cluster, privilege) of every attribute location and the
+// (endpoint, cluster) of every event cluster, in walk order.
+//
+// The walk judges a location without reading the server there: it stamps
+// a recording access check ([im.WithAuthority]) that the dispatcher asks
+// before each read ([im.LookupAuthority]), so a denied location is noted
+// and not read, and the first granted one ends the walk (Fable's read of
+// sub round 1, A-1; decision 162). The dispatcher asks only at a location
+// that exists, so a path that resolves to nothing the node serves stays
+// no refusal (R2-P3-dr-dev-04). A dispatcher that never asks the check
+// has read each location already; its results are judged as they come.
 func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChecker, dispatcher im.Dispatcher, target subTarget, sub *subscription.Subscription) (refused bool, served [sha256.Size]byte) {
 	digest := sha256.New()
-	note := func(kind byte, endpoint uint16, cluster, attribute uint32) {
+	note := func(kind byte, endpoint uint16, cluster, detail uint32) {
 		var rec [11]byte
 		rec[0] = kind
 		binary.BigEndian.PutUint16(rec[1:], endpoint)
 		binary.BigEndian.PutUint32(rec[3:], cluster)
-		binary.BigEndian.PutUint32(rec[7:], attribute)
+		binary.BigEndian.PutUint32(rec[7:], detail)
 		digest.Write(rec[:])
 	}
 	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
 	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
+	granted, asked := false, false
+	attrCtx := im.WithAuthority(readCtx, func(endpoint uint16, clusterID uint32, privilege uint8) im.StatusCode {
+		asked = true
+		if granted {
+			// The walk's answer is known; read nothing more.
+			return im.StatusUnsupportedAccess
+		}
+		st := checker.CheckACL(readCtx, target.fabricIndex, target.subjectNodeID, target.subjectCATs, endpoint, clusterID, privilege)
+		if st != im.StatusUnsupportedAccess {
+			granted = true
+			return st
+		}
+		note('a', endpoint, clusterID, uint32(privilege))
+		refused = true
+		return st
+	})
+	exp := im.NewAttributeExpansion(im.WithElementQualities(attrCtx, specElementQualities{}), dispatcher, sub.AttributePaths)
 	privProvider, hasPriv := dispatcher.(im.AttributeReadPrivilegeProvider)
-	exp := im.NewAttributeExpansion(im.WithElementQualities(readCtx, specElementQualities{}), dispatcher, sub.AttributePaths)
-	for {
+	for !granted {
 		_, rr, ok := exp.Next()
 		if !ok {
 			break
 		}
-		if notServed(rr.Status) {
-			continue // nothing the node serves: no refusal (R2-P3-dr-dev-04)
+		if asked || notServed(rr.Status) {
+			continue
 		}
+		// A dispatcher that never asks the stamped check (not an
+		// [endpoint.TopologyDispatcher]) has read the location already;
+		// the result is judged as it comes back.
 		var priv uint8 = 1 // View default
 		if hasPriv {
 			priv = privProvider.MinReadPrivilege(rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
@@ -922,15 +951,34 @@ func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChec
 		note('a', rr.Path.Endpoint, rr.Path.Cluster, rr.Path.Attribute)
 		refused = true
 	}
+	if granted {
+		return false, served
+	}
 	auth := b.eventReadAuthorizer(dispatcher, target.fabricIndex, false, target.subjectNodeID, target.subjectCATs)
+	eventCtx := im.WithAuthority(readCtx, func(endpoint uint16, clusterID uint32, _ uint8) im.StatusCode {
+		asked = true
+		if granted {
+			return im.StatusUnsupportedAccess
+		}
+		if auth.Allows(readCtx, endpoint, clusterID) {
+			granted = true
+			return im.StatusSuccess
+		}
+		note('e', endpoint, clusterID, 0)
+		refused = true
+		return im.StatusUnsupportedAccess
+	})
 	for _, p := range sub.EventPaths {
 		probe := im.ConcreteAttributePath{
 			Endpoint: p.Endpoint, HasEndpoint: p.HasEndpoint,
 			Cluster: p.Cluster, HasCluster: p.HasCluster,
 			Attribute: clusterRevisionAttributeID, HasAttribute: true,
 		}
-		for _, rr := range dispatcher.Read(readCtx, probe) {
-			if rr.Status != im.StatusSuccess {
+		for _, rr := range dispatcher.Read(eventCtx, probe) {
+			if granted {
+				return false, served
+			}
+			if asked || rr.Status != im.StatusSuccess {
 				continue
 			}
 			if auth.Allows(readCtx, rr.Path.Endpoint, rr.Path.Cluster) {
@@ -938,6 +986,9 @@ func (b *Bridge) subjectRefusedEveryPath(ctx context.Context, checker im.ACLChec
 			}
 			note('e', rr.Path.Endpoint, rr.Path.Cluster, 0)
 			refused = true
+		}
+		if granted {
+			return false, served
 		}
 	}
 	digest.Sum(served[:0])
