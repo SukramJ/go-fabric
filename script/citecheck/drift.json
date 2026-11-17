@@ -100,7 +100,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 476,
+    "line": 494,
     "citation": "BindingManager.ts:147-157",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "sourceEndpoint",
@@ -109,7 +109,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 555,
+    "line": 573,
     "citation": "BindingManager.ts:513-520",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "#scheduleGroupRecheck",
@@ -136,7 +136,7 @@
   },
   {
     "file": "binding/resolve.go",
-    "line": 388,
+    "line": 384,
     "citation": "BindingManager.ts:629-643",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "#clearPending",

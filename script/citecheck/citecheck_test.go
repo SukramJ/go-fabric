@@ -101,12 +101,11 @@ import (
 //
 // 374 after review II, phase 6b wave 1, two rows new and none gone. The
 // rewritten addNOCRequest sentence of controller/commissioner/wire.go
-// names AddNoc, which ControllerCommissioningFlow.ts:1448 does not carry
-// at the pin: :1448 is the addTrustedRootCertificate invoke, the addNoc
-// invoke with its icacValue is :1459-1470 (an off-pin citation, open for
-// its re-cite). controller/dcl/certstore.go's cap comment names GitHub
-// for its :1304-1307 range; the first range, :1144-1147, is the root loop
-// it cites and holds.
+// names AddNoc, which its cited line does not carry at the pin: that line
+// is the addTrustedRootCertificate invoke, the addNoc invoke eleven lines
+// below it (an off-pin citation, open for its re-cite). The cap comment of
+// controller/dcl/certstore.go names GitHub for its second range; its
+// first, the root loop, holds. The lines are in the raising commit.
 const citecheckDriftRatchet = 374
 
 func readDrift(t *testing.T) []driftEntry {
