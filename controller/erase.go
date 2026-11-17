@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/SukramJ/go-fabric/internal/sealseam"
 )
 
 // Erase is the controller's factory reset: it closes the controller and
@@ -69,6 +71,12 @@ func (c *Controller) Erase(ctx context.Context) error {
 		if err := nodes.EraseNode(id); err != nil { //nolint:contextcheck // as above
 			errs = append(errs, fmt.Errorf("controller: erase node %s: %w", id, err))
 		}
+	}
+	// The registry's seal mark goes with its last row, as store's goes
+	// with Erase (R2-P6-store-2304): a factory reset is the way back to an
+	// unsealed database.
+	if err := sealseam.RegistryDropEmptySealMark(ctx, c.db); err != nil {
+		errs = append(errs, fmt.Errorf("controller: erase: %w", err))
 	}
 	if err := c.st.Erase(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("controller: erase: %w", err))

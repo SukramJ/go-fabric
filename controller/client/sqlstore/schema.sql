@@ -34,8 +34,11 @@ CREATE TABLE IF NOT EXISTS matter_client_versions (
 
 -- matter_client_metadata holds the store's own counters and marks
 -- (migration v2): sqlstore.seal_scrub_owed while a sealing's scrub of the
--- file has not finished (sqlstore.NewSealed).
+-- file has not finished (sqlstore.NewSealed); and the seal canary
+-- sqlstore.seal_canary, whose data (migration v3) is a known value sealed
+-- under the registry's sealer. Every other row leaves data NULL.
 CREATE TABLE IF NOT EXISTS matter_client_metadata (
     key         TEXT     PRIMARY KEY NOT NULL,
-    value       INTEGER  NOT NULL
+    value       INTEGER  NOT NULL,
+    data        BLOB
 );

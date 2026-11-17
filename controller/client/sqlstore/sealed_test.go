@@ -219,6 +219,19 @@ var errRefused = errors.New("sealer refused")
 func (refusingSealer) Seal([]byte, []byte) ([]byte, error) { return nil, errRefused }
 func (refusingSealer) Open([]byte, []byte) ([]byte, error) { return nil, errRefused }
 
+// switchSealer is a sealer whose Seal fails while refuse is set.
+type switchSealer struct {
+	store.Sealer
+	refuse bool
+}
+
+func (s *switchSealer) Seal(plain, aad []byte) ([]byte, error) {
+	if s.refuse {
+		return nil, errRefused
+	}
+	return s.Sealer.Seal(plain, aad)
+}
+
 // TestSealedStoreErrors: NewSealed refuses a nil sealer and a database it
 // cannot read; a Seal that fails leaves the clear values as they were on
 // the way in and fails a Save of a secret value with nothing written;
@@ -249,10 +262,13 @@ func TestSealedStoreErrors(t *testing.T) {
 	if err := s.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
 		t.Fatal(err)
 	}
-	failing, err := sqlstore.NewSealed(ctx, openTestDB(t), refusingSealer{})
+	// A Seal that fails once the store is open (NewSealed seals the canary).
+	down := &switchSealer{Sealer: sealerOf(t, 7)}
+	failing, err := sqlstore.NewSealed(ctx, openTestDB(t), down)
 	if err != nil {
 		t.Fatal(err)
 	}
+	down.refuse = true
 	if err := failing.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X"), 1: {4}}, nil); !errors.Is(err, errRefused) {
 		t.Errorf("Save whose Seal fails: %v, want the sealer's error", err)
 	}

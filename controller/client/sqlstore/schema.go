@@ -43,29 +43,49 @@ func Apply(ctx context.Context, db *sql.DB) error {
 // Upgrade rewrites what an idempotent CREATE TABLE cannot reach in a
 // database an earlier release created; a host that runs [Schema] through
 // its own tool still calls it after, so a later step arrives with the
-// dependency bump. Steps:
+// dependency bump. Steps, in order:
 //
 //   - matter_client_values gains migration v2's seal mark when it lacks
 //     it, with v2's statements (matter_client_metadata, which v2 also
 //     creates, comes with the schema's CREATE TABLE IF NOT EXISTS).
+//   - matter_client_metadata gains migration v3's data column, which
+//     holds the seal canary, when it lacks it, with v3's statement.
 func Upgrade(ctx context.Context, db *sql.DB) error {
-	var tables, columns int
+	var tables int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'matter_client_values'`).Scan(&tables); err != nil {
 		return fmt.Errorf("sqlstore: upgrade: %w", err)
 	}
 	if tables == 0 {
 		return nil
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('matter_client_values') WHERE name = 'sealed'`).Scan(&columns); err != nil {
-		return fmt.Errorf("sqlstore: upgrade: %w", err)
-	}
-	if columns > 0 {
-		return nil
-	}
-	if _, err := db.ExecContext(ctx, mustMigrationFile("v2.up.sql")); err != nil {
-		return fmt.Errorf("sqlstore: upgrade: v2: %w", err)
+	for _, step := range []struct{ version, table, column string }{
+		{"v2", "matter_client_values", "sealed"},
+		{"v3", "matter_client_metadata", "data"},
+	} {
+		has, err := hasColumn(ctx, db, step.table, step.column)
+		if err != nil {
+			return fmt.Errorf("sqlstore: upgrade: %w", err)
+		}
+		if has {
+			continue
+		}
+		if _, err := db.ExecContext(ctx, mustMigrationFile(step.version+".up.sql")); err != nil {
+			return fmt.Errorf("sqlstore: upgrade: %s: %w", step.version, err)
+		}
 	}
 	return nil
+}
+
+// hasColumn reports whether q's table has the column.
+func hasColumn(ctx context.Context, q interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}, table, column string,
+) (bool, error) {
+	var n int
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, table, column).Scan(&n); err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // Migration is one versioned step of the matter_client_* schema, for a
@@ -85,7 +105,11 @@ type Migration struct {
 // migrationVersions are the steps, in order:
 //
 //   - v1 — matter_client_values and matter_client_versions (brief AL §8).
-var migrationVersions = []string{"v1", "v2"}
+//   - v2 — the seal mark of matter_client_values and matter_client_metadata
+//     ([NewSealed]).
+//   - v3 — matter_client_metadata's data column, the seal canary's
+//     (R2-P6-store-2304).
+var migrationVersions = []string{"v1", "v2", "v3"}
 
 // Migrations returns the schema's steps in order. Applied one after the
 // other to an empty database they produce the schema [Apply] produces —

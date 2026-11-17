@@ -246,13 +246,18 @@ func TestMigrationsMatchApply(t *testing.T) {
 	}
 }
 
-// TestMigrationsPin is the pin a host keeps: two steps, v1 and v2 (the
-// seal mark); the schema names only matter_client_* tables.
+// TestMigrationsPin is the pin a host keeps: three steps, v1, v2 (the
+// seal mark) and v3 (the seal canary's column); the schema names only
+// matter_client_* tables.
 func TestMigrationsPin(t *testing.T) {
 	t.Parallel()
 	ms := sqlstore.Migrations()
-	if len(ms) != 2 || ms[0].Version != "v1" || ms[1].Version != "v2" {
-		t.Fatalf("migrations %+v", ms)
+	versions := make([]string, 0, len(ms))
+	for _, m := range ms {
+		versions = append(versions, m.Version)
+	}
+	if !slices.Equal(versions, []string{"v1", "v2", "v3"}) {
+		t.Fatalf("migrations %v", versions)
 	}
 	for _, line := range strings.Split(sqlstore.Schema(), "\n") {
 		if strings.HasPrefix(line, "CREATE TABLE") && !strings.Contains(line, " matter_client_") {
