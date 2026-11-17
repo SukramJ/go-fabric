@@ -378,6 +378,8 @@ func (n *Name) installRecord(rec *Record, sourceIntf string, at time.Time) bool 
 
 	if old, ok := n.records.get(key); ok {
 		n.names.unregisterForExpiration(old)
+	} else if rec.Type == TypeA || rec.Type == TypeAAAA {
+		n.boundAddresses()
 	}
 
 	// Retire only once the record is kept; the copy it replaces is
@@ -418,6 +420,35 @@ func (n *Name) installRecord(rec *Record, sourceIntf string, at time.Time) bool 
 
 	n.notify(false, key, &installed)
 	return true
+}
+
+// boundAddresses makes room for one more A/AAAA record: while the name
+// holds [maxCachedAddressesPerHost] of them, the one installed or refreshed
+// longest ago is deleted, as the staging drops its oldest
+// ([Names.stageAddresses]). Called only for an address not yet installed,
+// so the record being refreshed is never the one that goes.
+func (n *Name) boundAddresses() {
+	for {
+		var oldest *Record
+		count := 0
+		for _, r := range n.records.values() {
+			if r.Type != TypeA && r.Type != TypeAAAA {
+				continue
+			}
+			count++
+			if oldest == nil || r.InstalledAt.Before(oldest.InstalledAt) {
+				oldest = r
+			}
+		}
+		if count < maxCachedAddressesPerHost {
+			return
+		}
+		before := n.records.len()
+		n.deleteRecord(oldest)
+		if n.records.len() == before {
+			return
+		}
+	}
 }
 
 // installedFor returns the record installed under rec's key.

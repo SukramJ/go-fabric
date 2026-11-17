@@ -168,3 +168,46 @@ func TestNames_StagedAddressGoesWhenACachedRecordWould(t *testing.T) {
 		t.Fatalf("%d staged addresses past their graced TTL, before the prune interval %v", staged, stagedIPPruneInterval)
 	}
 }
+
+// TestNames_CachedAddressesPerHostAreBounded: a host in the cache holds at
+// most maxCachedAddressesPerHost A/AAAA records, whatever a sender
+// announces for it; past it the address installed longest ago goes, as the
+// staging drops its oldest (review II, R2-P6-bound-2101).
+func TestNames_CachedAddressesPerHostAreBounded(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		perPacket int
+	}{
+		{name: "one packet", perPacket: 50},
+		{name: "one address a packet", perPacket: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			n, _, clk := testNames(t)
+			deliver(t, n, 0, []dns.RR{srvRR(instQ, "victim.local", 5540, 120, true)}, aaaaRR("victim.local", "fd00::1", 120, false))
+			last := ""
+			for p := range 50 / tc.perPacket {
+				clk.Advance(time.Millisecond)
+				var answers []dns.RR
+				for i := range tc.perPacket {
+					last = fmt.Sprintf("fd00::%x:%x", p+1, i+1)
+					answers = append(answers, aaaaRR("victim.local", last, 120, false))
+				}
+				deliver(t, n, 0, answers)
+			}
+			recs := n.Get("victim.local").Records()
+			if len(recs) > maxCachedAddressesPerHost {
+				t.Fatalf("victim.local holds %d addresses, want at most %d", len(recs), maxCachedAddressesPerHost)
+			}
+			var newest, first bool
+			for _, r := range recs {
+				newest = newest || r.IP.String() == last
+				first = first || r.IP.String() == "fd00::1"
+			}
+			if !newest || first {
+				t.Fatalf("records %v: want the newest %s kept and the first fd00::1 gone", recs, last)
+			}
+		})
+	}
+}

@@ -48,6 +48,14 @@ const (
 	// 6170af84. matter.js bounds only the staged hosts (review II,
 	// R2-P3-ctl-lan-01).
 	maxStagedAddressesPerHost = 5
+	// maxCachedAddressesPerHost is how many A/AAAA records one host in the
+	// cache holds; past it the address installed or refreshed longest ago
+	// goes, as the staging drops its oldest. Every cached address becomes
+	// a peer's connection target, so a sender that announces many for a
+	// host it can see named in an SRV would otherwise set the number of a
+	// peer's attempts. This module's own bound (owner decision 45; review
+	// II, R2-P6-bound-2101), at the staging's number.
+	maxCachedAddressesPerHost = maxStagedAddressesPerHost
 )
 
 // Bounds on what unauthenticated senders on the link make the cache hold
