@@ -71,10 +71,7 @@ const repoRoot = "../.."
 
 // cannotFailLeft are the Test functions G1 still counts, as
 // "<file>:<TestName>", with the reason each is left.
-var cannotFailLeft = map[string]string{
-	"secure/sigma/sigma_accessor_test.go:TestResponder_SetSessionParameters_Nil":    "panic-only; secure/sigma's tests are another unit's in review II phase 5a",
-	"secure/sigma/sigma_accessor_test.go:TestResponder_SetSessionParameters_NonNil": "panic-only, the name claims the parameters are stored; secure/sigma's tests are another unit's in review II phase 5a (R2-P5-tassert-05)",
-}
+var cannotFailLeft = map[string]string{}
 
 // cannotFailAllowed are Test functions that fail only under -race (make
 // race runs them) or only at compile time, as "<file>:<TestName>". A row
