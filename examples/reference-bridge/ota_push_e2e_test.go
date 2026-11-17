@@ -40,6 +40,9 @@ func TestOTAPushToTheReferenceDaemon(t *testing.T) {
 	const passcode, discriminator = 20202021, 3840
 	cfg := nodeConfig(flags{dbPath: filepath.Join(dir, "daemon.db"), listen: "127.0.0.1:0", label: "reference-daemon", salt: "go-fabric-ref-salt", iterations: 1000},
 		passcode, discriminator, node.TCPConfig{}, applier, actions, logger)
+	if err := applyOTAHarness(&cfg, applier); err != nil {
+		t.Fatal(err)
+	}
 	daemon := site.AddNode(cfg)
 	n := daemon.Node()
 	applier.basicInfo = n.Root().BasicInformation

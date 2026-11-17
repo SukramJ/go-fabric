@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Command reference-bridge is a runnable Matter bridge assembled only from
-// go-fabric's public API.
+// Command reference-bridge is a runnable Matter bridge assembled from
+// go-fabric's public API — with one TESTING-ONLY exception, --ota-harness,
+// which reaches internal/nodeseam (applyOTAHarness).
 //
 // It bridges a hard-coded fleet of simulated devices — one per surface the
 // module serves: lights, a speaker, a fan, a smoke alarm, a pump, a washer,
@@ -27,11 +28,13 @@
 // health probe (node.Config.Health); it names none of mdns, secure/* or
 // bridge for them, and it lists its endpoints through the facade too
 // (Node.Topology for the banner's count of bridged devices, Node.Endpoints
-// for printTopology). Two things still reach below the facade (review
-// 2026-11 W5-ex-10): the thermostat's preset store
-// (store.NewThermostatPresetStore over Node.Store) and the charger's
+// for printTopology). Three things still reach below the facade (review
+// 2026-11 W5-ex-10, R2-P6-doc-2605): the thermostat's preset store
+// (store.NewThermostatPresetStore over Node.Store), the charger's
 // EnergyEvse with its host port (cluster/energy.NewEnergyEvse as the
-// Declare's HostServer).
+// Declare's HostServer), and, TESTING ONLY, --ota-harness's
+// internal/nodeseam.UseOTAHarness, which no host outside this module can
+// import.
 //
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
@@ -323,6 +326,9 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		return nil, nil, fmt.Errorf("aggregator actions: %w", err)
 	}
 	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
+	if err := applyOTAHarness(&cfg, applier); err != nil {
+		return nil, nil, err
+	}
 	cfg.Attestation = attestationConfig(f.attestationDir)
 	cfg.Surface = policies
 	// The listener's verdict every probe interval (node.Config.Health),
@@ -550,11 +556,22 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		AggregatorServers: []contract.ClusterServer{actions},
 		Logger:            logger,
 	}
-	if applier.harness {
-		// TESTING ONLY: the image applied in place (ota.go).
-		nodeseam.UseOTAHarness(&cfg)
-	}
 	return cfg
+}
+
+// applyOTAHarness is --ota-harness (TESTING ONLY): the requestor applies
+// an image in place (ota.go), through internal/nodeseam — the daemon's
+// one reach below the public API (README). The seam refuses a
+// configuration without an OTA requestor; the flag then fails rather than
+// leaving harness mode silently off (R2-P6-doc-2605).
+func applyOTAHarness(cfg *node.Config, applier *otaApplier) error {
+	if !applier.harness {
+		return nil
+	}
+	if !nodeseam.UseOTAHarness(cfg) {
+		return errors.New("--ota-harness: the node configuration has no OTA requestor to put in harness mode")
+	}
+	return nil
 }
 
 // commissioningFlow is the --custom-flow value as the node's field;

@@ -1,7 +1,9 @@
 # reference-bridge
 
-A runnable Matter bridge built **only from `go-fabric`'s public API** — no
-`internal/`, no `_test.go` helper, no fork. It bridges a hard-coded fleet of
+A runnable Matter bridge built **from `go-fabric`'s public API** — no
+`_test.go` helper, no fork, and no `internal/` but one TESTING-ONLY flag:
+`--ota-harness` reaches `internal/nodeseam` to apply an OTA image in place,
+which a host outside this module cannot import. It bridges a hard-coded fleet of
 simulated devices — one per surface the module serves — advertises itself
 over mDNS, accepts a commissioner over PASE and serves the operational CASE
 session that follows. It is also the device the chip-tool suite

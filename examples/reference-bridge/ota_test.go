@@ -22,6 +22,7 @@ import (
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -272,5 +273,24 @@ func TestOtaHarness_UpdateReportedInPlace(t *testing.T) {
 	}
 	if v, _ := r.MatterRead(otadef.AttrUpdateState); v != uint8(otadef.UpdateStateIdle) {
 		t.Fatalf("state %v", v)
+	}
+}
+
+// TestApplyOTAHarnessFailsWhenTheSeamRefuses holds R2-P6-doc-2605:
+// --ota-harness on a configuration the seam refuses (no OTA requestor) is
+// an error, not harness mode silently off; the daemon's own configuration
+// takes it; without the flag nothing is asked of the seam.
+func TestApplyOTAHarnessFailsWhenTheSeamRefuses(t *testing.T) {
+	harness := &otaApplier{harness: true, dir: t.TempDir()}
+	if err := applyOTAHarness(&node.Config{}, harness); err == nil {
+		t.Error("a configuration without OTA took the harness")
+	}
+	if err := applyOTAHarness(&node.Config{}, &otaApplier{}); err != nil {
+		t.Errorf("no --ota-harness: %v", err)
+	}
+	cfg := nodeConfig(flags{dbPath: filepath.Join(t.TempDir(), "d.db"), salt: "go-fabric-ref-salt", iterations: 1000},
+		20202021, 3840, node.TCPConfig{}, harness, nil, slog.New(slog.DiscardHandler))
+	if err := applyOTAHarness(&cfg, harness); err != nil {
+		t.Errorf("the daemon's configuration: %v", err)
 	}
 }
