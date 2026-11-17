@@ -21,6 +21,10 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 )
 
+// currentNetworkWait bounds the wait for the network a failed join selected
+// again to be the interface's CurrentNetwork (review II, R2-P6-test-2018).
+const currentNetworkWait = 10 * time.Second
+
 // The live test runs the driver against a real wpa_supplicant over the
 // system bus — the ble-virtual job's Wi-Fi variant starts one on a
 // mac80211_hwsim radio with hostapd's access points
@@ -139,15 +143,28 @@ func TestLiveWPASupplicant(t *testing.T) {
 		if len(networks) != 1 {
 			t.Fatalf("wpa_supplicant lists %v after the failed join, want the network of the join before it", networks)
 		}
-		cv, err := d.property(ctx, "CurrentNetwork")
-		if err != nil {
-			t.Fatalf("CurrentNetwork: %v", err)
+		// restore only selects the kept network; when wpa_supplicant sets
+		// CurrentNetwork for it is its own, so the check polls within a
+		// bound instead of reading once.
+		var cur dbus.ObjectPath
+		var got []byte
+		var known bool
+		deadline := time.Now().Add(currentNetworkWait)
+		for {
+			if cv, err := d.property(ctx, "CurrentNetwork"); err == nil {
+				cur, _ = cv.Value().(dbus.ObjectPath)
+			}
+			got, known = d.CurrentNetwork(ctx)
+			if (cur == networks[0] && known && string(got) == ssid) || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
 		}
-		if cur, _ := cv.Value().(dbus.ObjectPath); cur != networks[0] {
-			t.Errorf("CurrentNetwork %s after the failed join, want %s selected again", cur, networks[0])
+		if cur != networks[0] {
+			t.Errorf("CurrentNetwork %s %v after the failed join, want %s selected again", cur, currentNetworkWait, networks[0])
 		}
-		if got, known := d.CurrentNetwork(ctx); !known || string(got) != ssid {
-			t.Errorf("CurrentNetwork reports %q (known %v), want %q", got, known, ssid)
+		if !known || string(got) != ssid {
+			t.Errorf("CurrentNetwork reports %q (known %v) %v after the failed join, want %q", got, known, currentNetworkWait, ssid)
 		}
 	})
 	t.Run("open network", func(t *testing.T) {
