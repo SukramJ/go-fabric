@@ -23,6 +23,7 @@ func TestBackgroundContextsAreNamed(t *testing.T) {
 	t.Parallel()
 	allowed := map[string]string{
 		"dcl/certstore.go OpenCertificateStore":             "the root of the periodic context Close cancels",
+		"dcl/certstore.go Close":                            "Close waits for an update in flight after it cancelled the periodic one",
 		"dcl/certstore.go PAA":                              "attestation.PAAStore takes no context; the lookup is bounded by the client's timeout",
 		"dcl/certstore.go CDSigner":                         "attestation.PAAStore takes no context; the lookup is bounded by the client's timeout",
 		"dcl/revocation.go IsRevoked":                       "attestation.Revocations takes no context; bounded by revocationLookupTimeout",
