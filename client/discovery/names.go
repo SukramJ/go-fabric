@@ -643,11 +643,10 @@ func (n *Names) delStaged(key string) {
 // dropOldestStaged drops the address received longest ago of the host
 // touched longest ago, and the host with its last address.
 func (n *Names) dropOldestStaged() {
-	keys := n.stagedIPs.keys
-	if len(keys) == 0 {
+	key, ok := n.stagedIPs.first()
+	if !ok {
 		return
 	}
-	key := keys[0]
 	staged, _ := n.stagedIPs.get(key)
 	if len(staged) <= 1 {
 		n.delStaged(key)
