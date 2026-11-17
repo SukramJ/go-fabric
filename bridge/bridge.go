@@ -534,6 +534,12 @@ type Bridge struct {
 	// cleanup) or point at stale topology entries (cleanup but no
 	// re-bind).
 	measurementUnsubscribers []func()
+	// rewireMu runs the wirings of the host's value listeners one after
+	// the other ([Bridge.rewireMeasurementListeners]); rewireQueuedForTest,
+	// set by this package's tests only, is called when a wiring waits for
+	// another.
+	rewireMu            sync.Mutex
+	rewireQueuedForTest func()
 	// listenerWiring is the wiring measurementUnsubscribers detach: its
 	// memory of the notifiers' last values, which a controller's write
 	// brings up to date ([Bridge.settleWrite]).

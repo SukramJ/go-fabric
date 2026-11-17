@@ -2453,7 +2453,23 @@ func (l *listenerSet) add(unsub func()) {
 // the generation only: a wiring a later one overtook while it registered
 // is detached again instead of installed, so the last one wins. It
 // returns the generation it wired under.
+//
+// Wirings run one after the other (rewireMu): one that starts while
+// another registers waits for it and then detaches what it installed, so
+// it takes up the quieter paths that wiring parks, with the changes their
+// throttles hold back, and the host's notifiers never hold the listeners
+// of two wirings. Before, two wirings at once left the later one with
+// fresh throttles while the earlier one, overtaken, parked its paths
+// where nothing took them up (review II, N4-rwsub-2). A host's notifier
+// does not re-wire from inside its registration.
 func (b *Bridge) rewireMeasurementListeners() (generation uint64) {
+	if !b.rewireMu.TryLock() {
+		if hook := b.rewireQueuedForTest; hook != nil {
+			hook()
+		}
+		b.rewireMu.Lock()
+	}
+	defer b.rewireMu.Unlock()
 	b.mu.Lock()
 	stale := b.measurementUnsubscribers
 	b.measurementUnsubscribers = nil
