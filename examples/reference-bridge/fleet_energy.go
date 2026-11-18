@@ -448,6 +448,11 @@ var meterPresets = [2]mtrid.State{
 func (m *demoMeter) testEventTrigger(trigger uint64) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.srv == nil {
+		// Not built — withheld by --spec-level: no such device, so not
+		// handled, as demoDem answers unbuilt (R2-P6-err-2650).
+		return false
+	}
 	switch trigger & smokeTriggerMask {
 	case triggerMeterAttributesValueUpdate:
 		if m.saved == nil {

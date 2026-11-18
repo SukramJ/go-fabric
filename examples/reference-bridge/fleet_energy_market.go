@@ -312,6 +312,14 @@ func (d *demoEnergyTariff) shiftTariffTime(by time.Duration) {
 // ElectricalGridConditionsEventTriggers.cpp:116-136,
 // CommodityTariffEventTriggers.cpp:318-349). False for any other.
 func (d *demoEnergyTariff) testEventTrigger(trigger uint64) bool {
+	d.mu.Lock()
+	built := d.price != nil && d.grid != nil && d.tariff != nil
+	d.mu.Unlock()
+	if !built {
+		// Not built — withheld by --spec-level: no such device, so not
+		// handled, as demoDem answers unbuilt (R2-P6-err-2650).
+		return false
+	}
 	switch trigger & smokeTriggerMask {
 	case triggerPriceUpdate:
 		d.setPriceUpdate()

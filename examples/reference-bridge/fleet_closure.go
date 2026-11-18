@@ -280,6 +280,11 @@ const (
 // trigger (matter_testing.py _update_legacy_test_event_triggers); the
 // daemon has one closure, so the endpoint is masked off.
 func (g *demoGarage) testEventTrigger(trigger uint64) (handled bool) {
+	if g.server() == nil {
+		// Not built — withheld by --spec-level: no such device, so not
+		// handled, as demoDem answers unbuilt (R2-P6-err-2650).
+		return false
+	}
 	var patch ccldef.Patch
 	switch trigger &^ (0xFFFF << 32) {
 	case triggerClosureError:
