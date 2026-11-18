@@ -16,9 +16,6 @@ import (
 // worktrees) or an untracked file is no caller; a failing git grep is an
 // error, not "no mention" (R2-P6-test-2807).
 func TestMentioningFilesReadsTrackedFilesOnly(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git")
-	}
 	root := t.TempDir()
 	write := func(rel, body string) {
 		t.Helper()

@@ -757,9 +757,6 @@ func TestTestFuncsNameTheConstraint(t *testing.T) {
 // does not end in Test.ts fails the snapshot when it holds a top-level
 // describe, and passes when it holds only a helper (R2-P6-test-2811).
 func TestNoUnnamedTestsReadsTheBlobs(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git")
-	}
 	dir := t.TempDir()
 	write := func(name, body string) {
 		t.Helper()

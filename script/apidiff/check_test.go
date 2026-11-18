@@ -147,9 +147,6 @@ func TestUnannouncedNeedsThePackage(t *testing.T) {
 // commit as the root's release, the root's base is still the v* tag, and a
 // nested module finds its own (R2-P6-sup-2801, R2-P6-sup-2803).
 func TestLastTagSkipsNestedTags(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git")
-	}
 	dir := t.TempDir()
 	t.Chdir(dir)
 	for _, args := range [][]string{

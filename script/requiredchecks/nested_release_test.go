@@ -18,14 +18,6 @@ import (
 // "the environment", not 1 or a pass (N5-rwci-2; the mapping of
 // script/nested-release-check.sh's go mod download step).
 func TestNestedReleaseCheckUnreachableProxyIsExitTwo(t *testing.T) {
-	if testing.Short() {
-		t.Skip("runs go mod download")
-	}
-	for _, tool := range []string{"git", "go", "jq"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s not found: the script would exit 2 for that reason instead", tool)
-		}
-	}
 	bash := lookBash(t)
 	root, err := filepath.Abs(repoRoot)
 	if err != nil {

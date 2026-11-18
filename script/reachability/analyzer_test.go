@@ -17,9 +17,6 @@ import (
 // package-level var's initializer reads as reached (R2-P6-test-2805), and
 // an exported method no test calls is listed as unreached (R2-P6-test-2806).
 func TestAnalyzerSeedsInitializersAndListsMethods(t *testing.T) {
-	if testing.Short() {
-		t.Skip("loads and analyses a module")
-	}
 	out := t.TempDir()
 	invPath, sumPath := filepath.Join(out, "inventory.json"), filepath.Join(out, "summary.md")
 	if err := run(slog.New(slog.DiscardHandler), filepath.Join("testdata", "fixture"), invPath, sumPath); err != nil {

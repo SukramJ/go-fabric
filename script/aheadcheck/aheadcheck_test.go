@@ -383,9 +383,6 @@ func TestReadFailureIsExitTwo(t *testing.T) {
 // TestGitShowTellsAbsentFromUnreadable: a path the tree does not list is
 // errNoFile; a listed one is read.
 func TestGitShowTellsAbsentFromUnreadable(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git")
-	}
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "a.ts"), []byte("x\n"), 0o600); err != nil {
 		t.Fatal(err)
