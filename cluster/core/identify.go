@@ -185,24 +185,32 @@ func (i *Identify) hostHandler() contract.IdentifyHandler {
 // Close returns after its goroutine did — and no later write / command
 // starts a new one. Idempotent and safe for concurrent use.
 //
+// A countdown Close ends before it reached zero is reported to the host
+// as a stop: the [contract.IdentifyHandler] is called once with 0, on a
+// goroutine of its own, after any request's or countdown's call in
+// flight (the IdentifyTime queue, as the countdown's own stop is
+// ordered). IdentifyTime is not changed and nothing is reported. A Close
+// with no countdown running, and every later Close, calls nothing.
+//
 // Close does not wait for the host: a [contract.IdentifyHandler] call in
-// flight — a request's, or the stop the countdown reported — is still
-// running when Close returns, and returns into a server that is closed.
-// The countdown's goroutine is never inside the host's code, so a handler
-// that is slow, or that waits for a lock the closing goroutine holds,
-// cannot hold Close.
+// flight — a request's, the stop the countdown reported or the stop
+// Close reports — is still running when Close returns, and returns into
+// a server that is closed. The countdown's goroutine is never inside the
+// host's code, so a handler that is slow, or that waits for a lock the
+// closing goroutine holds, cannot hold Close.
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/identify/IdentifyServer.ts:116-119 at
 // db021da0 ([Symbol.asyncDispose] → #stopIdentifying, :100-106), which
 // stops the identify timer when the behavior — and with it the endpoint —
-// is destroyed. There it also clears isIdentifying and emits
-// stopIdentifying, which Close does not (F-db021da0-9,
-// notes/parity/matter_behaviour_findings.md).
+// is destroyed, and, only while the timer runs, emits stopIdentifying
+// without touching identifyTime (F-db021da0-9).
 func (i *Identify) Close() {
 	i.timerMu.Lock()
+	running := false
 	if !i.closed {
 		i.closed = true
+		running = i.timerActive
 		i.timerActive = false
 		if i.done != nil {
 			close(i.done)
@@ -210,6 +218,24 @@ func (i *Identify) Close() {
 	}
 	i.timerMu.Unlock()
 	i.countdown.Wait()
+	// The countdown's goroutine has returned: a tick that took
+	// IdentifyTime to zero has already told the host to stop.
+	if !running || i.identifyTime.Load() == 0 {
+		return
+	}
+	h := i.hostHandler()
+	if h == nil {
+		return
+	}
+	op := i.opQueue()
+	// Not counted in i.countdown: Close does not wait for the host. The
+	// context is not one Close ends: it would cancel the call that tells
+	// the host to stop.
+	go func() {
+		op <- struct{}{}
+		defer func() { <-op }()
+		_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the server is closed
+	}()
 }
 
 // Compile-time assertions.

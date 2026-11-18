@@ -38,7 +38,9 @@ import "context"
 // returns while a MatterIdentify is still running — a request's, or the
 // stop of a countdown that just ended, which is called from a goroutine of
 // its own — so a handler may take a lock that is held across the removal,
-// and may return into a server that is closed.
+// and may return into a server that is closed. A removal that ends a
+// running countdown reports it as a stop, MatterIdentify with 0, from a
+// goroutine of its own as well.
 type IdentifyHandler interface {
 	// MatterIdentify is the Identify command or an IdentifyTime write:
 	// identify for identifyTime seconds, 0 stops. It runs with the

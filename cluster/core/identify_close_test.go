@@ -7,6 +7,7 @@ import (
 	"context"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,8 +22,9 @@ import (
 // IdentifyTime when its handling of it returns.
 type gatedIdentify struct {
 	gate    uint16
-	entered chan struct{} // closed when the gated call is in the handler
+	entered chan struct{} // closed when the gated call is first in the handler
 	release chan struct{} // closed by the test to let it return
+	once    sync.Once
 
 	mu       sync.Mutex
 	returned []uint16
@@ -34,7 +36,7 @@ func newGatedIdentify(gate uint16) *gatedIdentify {
 
 func (h *gatedIdentify) MatterIdentify(_ context.Context, t uint16) error {
 	if t == h.gate {
-		close(h.entered)
+		h.once.Do(func() { close(h.entered) })
 		<-h.release
 	}
 	h.mu.Lock()
@@ -136,12 +138,16 @@ func TestIdentify_CloseDoesNotWaitForTheHostsHandler(t *testing.T) {
 			t.Fatal("the request did not return once its handler did")
 		}
 		// The tick that waited gave up with the Close: nothing counted
-		// the new time down, and the host was told nothing more.
+		// the new time down. The countdown Close ended is reported once
+		// as a stop, after the request's handler (F-db021da0-9).
 		if v, _ := id.MatterRead(0x0000); v != uint16(10) {
 			t.Errorf("IdentifyTime %v after the request, want 10", v)
 		}
-		if got := h.handled(); !slices.Equal(got, []uint16{5, 10}) {
-			t.Errorf("the host handled %v, want [5 10]", got)
+		for len(h.handled()) < 3 && ctx.Err() == nil {
+			clk.Yield()
+		}
+		if got := h.handled(); !slices.Equal(got, []uint16{5, 10, 0}) {
+			t.Errorf("the host handled %v, want [5 10 0]", got)
 		}
 	})
 
@@ -225,5 +231,75 @@ func TestIdentify_ARequestWaitsForTheCountdownsStop(t *testing.T) {
 	}
 	if v, _ := id.MatterRead(0x0000); v != uint16(7) {
 		t.Errorf("IdentifyTime %v after the request, want 7", v)
+	}
+}
+
+// identifyRecorder records every IdentifyTime its host handler is called
+// with.
+type identifyRecorder struct {
+	mu    sync.Mutex
+	calls []uint16
+}
+
+func (r *identifyRecorder) MatterIdentify(_ context.Context, t uint16) error {
+	r.mu.Lock()
+	r.calls = append(r.calls, t)
+	r.mu.Unlock()
+	return nil
+}
+
+func (*identifyRecorder) MatterTriggerEffect(context.Context, uint8, uint8) error { return nil }
+
+func (r *identifyRecorder) handled() []uint16 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.calls)
+}
+
+// TestIdentify_CloseReportsARunningCountdownsStop (F-db021da0-9): an
+// endpoint removed while it identifies tells the host to stop — its
+// handler hears 0 once — and leaves IdentifyTime and the version alone;
+// a Close with no countdown running, and a second Close, tell nothing.
+// Mirrors matter.js IdentifyServer.ts:116-119 → #stopIdentifying
+// (:100-106, only while the timer runs) at db021da0.
+func TestIdentify_CloseReportsARunningCountdownsStop(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	h := &identifyRecorder{}
+	id, clk := armedIdentify(t, h, 5)
+	var reported atomic.Bool
+	id.OnAttributeChange(func(contract.Change) { reported.Store(true) })
+	before := id.MatterDataVersion()
+	id.Close()
+	for len(h.handled()) < 2 && ctx.Err() == nil {
+		clk.Yield()
+	}
+	if got := h.handled(); !slices.Equal(got, []uint16{5, 0}) {
+		t.Fatalf("the host handled %v, want [5 0]: the removal's stop", got)
+	}
+	if v, _ := id.MatterRead(0x0000); v != uint16(5) {
+		t.Errorf("IdentifyTime %v after Close, want it unchanged (5)", v)
+	}
+	if id.MatterDataVersion() != before || reported.Load() {
+		t.Errorf("Close changed the version (%d → %d) or reported (%v)", before, id.MatterDataVersion(), reported.Load())
+	}
+	id.Close()
+	for range 20 {
+		clk.Yield()
+	}
+	if got := h.handled(); len(got) != 2 {
+		t.Errorf("a second Close told the host %v", got[2:])
+	}
+
+	idle := &identifyRecorder{}
+	quiet := core.NewIdentify()
+	quiet.SetHandler(idle)
+	quiet.Close()
+	for range 20 {
+		clk.Yield()
+	}
+	if got := idle.handled(); len(got) != 0 {
+		t.Errorf("a Close without a countdown told the host %v", got)
 	}
 }
