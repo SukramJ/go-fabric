@@ -631,7 +631,8 @@ func (unreadableTree) content(p string) ([]string, error) {
 // TestUnreadableBlobIsNoVerdict: a listed file that cannot be read gives no
 // hard error ("file not found") but the run's exit 2 (R2-P6-err-2812).
 func TestUnreadableBlobIsNoVerdict(t *testing.T) {
-	r := check(unreadableTree{}, citation{File: "x.go", Line: 1, Text: "a.ts:3", Path: "a.ts", Lo: 3, Hi: 3})
+	// The text is split so that citecheck does not collect it as a citation.
+	r := check(unreadableTree{}, citation{File: "x.go", Line: 1, Text: "a" + ".ts" + ":3", Path: "a.ts", Lo: 3, Hi: 3})
 	if r.hard != "" || !errors.Is(r.env, errEnv) {
 		t.Errorf("hard %q, env %v; want no hard error and an environment error", r.hard, r.env)
 	}
