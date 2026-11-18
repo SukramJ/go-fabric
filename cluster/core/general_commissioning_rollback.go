@@ -202,6 +202,11 @@ var errGencommArmedForAnotherFabric = errors.New("core: GeneralCommissioning: th
 // close named it (review II, R2-P2-comm-11); the deprecated
 // onFailSafeRolledBack, which names none, refuses it as before.
 func (g *GeneralCommissioning) settleArmLocked(ctx context.Context, sessFabric uint8, paseSession uint16) error {
+	// A closed server arms nothing: the node is stopping, and the
+	// fail-safe its stop expired is not armed again behind it.
+	if g.closed {
+		return errGencommClosed
+	}
 	paseCloses, removals := g.rollbackPaseCloses, g.rollbackFabricRemovals[sessFabric]
 	unnamedCloses := g.rollbackUnnamedPaseCloses
 	named := sessFabric == 0 && paseSession != 0

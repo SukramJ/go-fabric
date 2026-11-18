@@ -13,8 +13,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/groups"
 )
 
@@ -177,16 +175,8 @@ func (c Config) Validate() error {
 	}
 	// VendorName is served as every bridged endpoint's
 	// BridgedDeviceBasicInformation VendorName that states none of its
-	// own, uncut: held once here to the generated definition's constraint,
-	// the check checkBridgedInfo applies to an endpoint's own (review II,
-	// R2-P6-wire-2502, decision 201).
-	if c.VendorName != "" {
-		if err := spec.CheckWritten(bdbidef.Definition, 0, bdbidef.AttrVendorName, c.VendorName, nil); err != nil {
-			return fmt.Errorf("endpoint: Config.VendorName (BridgedDeviceBasicInformation VendorName, constraint %q): %w",
-				bdbidef.Definition.Attribute(bdbidef.AttrVendorName).Constraint.Text, err)
-		}
-	}
-	return nil
+	// own, uncut: held once here (review II, R2-P6-wire-2502, decision 201).
+	return checkBridgeVendorName(c.VendorName)
 }
 
 // Assembler turns snapshots of [Spec] values into a [Topology].
@@ -295,7 +285,7 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 	// countdown stops, and the registry stays bounded to the live
 	// topology. State of endpoints still present in `seen` is retained,
 	// keeping their version stable.
-	a.states.retain(seen)
+	a.states.retain(seen) //nolint:contextcheck // a removed endpoint's Identify tells its host to stop on a goroutine of its own, not bound by this assembly
 
 	sort.SliceStable(topology.Endpoints, func(i, j int) bool {
 		return topology.Endpoints[i].ID < topology.Endpoints[j].ID

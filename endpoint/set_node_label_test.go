@@ -42,7 +42,7 @@ func (*labelStore) LoadScenes(context.Context, SourceKey) ([]byte, error) { retu
 
 func (*labelStore) SaveScenes(context.Context, SourceKey, []byte) error { return nil }
 
-func (s *labelStore) stored() (string, int) {
+func (s *labelStore) stored() (last string, saves int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.last, s.saves

@@ -816,11 +816,6 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// session). It gates the fail-safe ownership rules below.
 	_, sessFabric := im.FabricFilterFromContext(ctx)
 	if req.ExpiryLengthSeconds != 0 {
-		// A closed server arms nothing: the node is stopping, and the
-		// fail-safe its stop expired is not armed again behind it.
-		if g.closed {
-			return nil, errGencommClosed
-		}
 		if err := g.settleArmLocked(ctx, sessFabric, 0); err != nil {
 			return nil, err
 		}

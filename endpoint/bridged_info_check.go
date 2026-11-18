@@ -46,6 +46,21 @@ func checkBridgedInfo(s *Spec, part bool) error {
 	return nil
 }
 
+// checkBridgeVendorName holds the bridge's own VendorName ([Config.VendorName])
+// to the BridgedDeviceBasicInformation VendorName constraint, the check
+// [checkBridgedInfo] applies to an endpoint's own: it is served, uncut, by
+// every bridged endpoint that states none. Empty is not served and passes.
+func checkBridgeVendorName(name string) error {
+	if name == "" {
+		return nil
+	}
+	if err := spec.CheckWritten(bdbidef.Definition, 0, bdbidef.AttrVendorName, name, nil); err != nil {
+		return fmt.Errorf("endpoint: Config.VendorName (BridgedDeviceBasicInformation VendorName, constraint %q): %w",
+			bdbidef.Definition.Attribute(bdbidef.AttrVendorName).Constraint.Text, err)
+	}
+	return nil
+}
+
 // servesBridgedInfo reports whether the endpoint s assembles to serves
 // BridgedDeviceBasicInformation: a bridged endpoint, not a part, with a
 // cluster surface of its own (ClusterServers mounts the server after the
