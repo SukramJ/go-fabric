@@ -116,6 +116,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 	}
 	admin.SetFabricCounter(fabrics)
 	window.SetFabricCounter(fabrics)
+	h.br.SetFabricCounter(fabrics)
 	h.fabricCount = fabrics
 
 	window.SetFailSafeChecker(h.root.GeneralCommissioning)

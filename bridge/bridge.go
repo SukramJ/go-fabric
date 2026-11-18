@@ -234,6 +234,9 @@
 //   - SetSubscriptionPersistence — on by default. Off on purpose, nothing
 //     is recorded or loaded and ReestablishFormerSubscriptions does
 //     nothing; controllers recover through their liveness timeout.
+//   - SetFabricCounter — silent. Without it the chunk waits are bounded
+//     per session only; with it each fabric is also held to its share
+//     once the waits reach half the dispatch budget.
 //
 // An ICD (Intermittently Connected Device) wires three more, all silent —
 // skipped, the node's operational record and MRP behave as a non-ICD's:
