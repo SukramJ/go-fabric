@@ -24,3 +24,9 @@ func Old() {}
 func Sinks() {}
 
 var msg = "a message (Gadget.ts:2)" + Odd // Widget.ts:1 trails
+
+// Parts: src/Gadget.ts at 0123abcd: :2, then :30 (`#tie`); after a citation, Widget.ts:1, :3 is not read.
+func Parts() {}
+
+// One (0123abcd, Widget.ts:2). Two: matter.js 4567cdef Widget.ts:3. Three (1000000, Widget.ts:1).
+func Forms() {}

@@ -64,6 +64,9 @@ func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation, err
 	for i := range results {
 		r := &results[i]
 		c := r.cite
+		if c.Bare {
+			continue // a bare part bound to its file is counted, not corrected
+		}
 		base := path.Base(c.Path)
 		tail := base + c.Text[len(c.Path):]
 		switch {

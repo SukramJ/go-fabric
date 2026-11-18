@@ -11,7 +11,13 @@
     {"line": 20, "text": "Widget.ts:2", "idents": ["run"], "attached": ["run"], "shas": ["0123abcd", "6170af84"]},
     {"line": 23, "text": "Widget.ts:1", "why": "reportStarted is the bare line part's"},
     {"line": 26, "text": "Gadget.ts:2", "why": "the message is the sentence"},
-    {"line": 26, "text": "Widget.ts:1"}
+    {"line": 26, "text": "Widget.ts:1"},
+    {"line": 28, "text": ":2", "path": "src/Gadget.ts", "bare": true, "shas": ["0123abcd"], "why": "a bare part bound to the file named before it without a line"},
+    {"line": 28, "text": ":30", "path": "src/Gadget.ts", "bare": true, "idents": ["#tie"], "attached": ["#tie"], "shas": ["0123abcd"], "why": "a part after a bound part continues its file"},
+    {"line": 28, "text": "Widget.ts:1", "shas": ["0123abcd"], "why": "the :3 after it follows a citation and is not bound"},
+    {"line": 31, "text": "Widget.ts:2", "shas": ["0123abcd"], "why": "a sha opening a parenthesis"},
+    {"line": 31, "text": "Widget.ts:3", "shas": ["4567cdef"], "why": "matter.js <sha>"},
+    {"line": 31, "text": "Widget.ts:1", "why": "a number in a parenthesis is no sha"}
   ],
   "results": {
     "basename": "3 Widget.ts:40-42",

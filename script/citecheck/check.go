@@ -362,6 +362,10 @@ type result struct {
 	// env is set when the cited file could not be read (errEnv): the run
 	// ends with exit 2 instead of a verdict.
 	env error
+	// commit is the full id of the matter.js commit the citation was
+	// checked at when that is its own `at <sha>` (the pin included);
+	// empty when it was checked at the pin for naming none.
+	commit string
 }
 
 // check checks one citation against t (concept v4 §A.2 step 3).

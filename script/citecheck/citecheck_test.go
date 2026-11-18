@@ -117,6 +117,51 @@ import (
 // 1466 is the icacValue field of the addNoc invoke; none is new.
 const citecheckDriftRatchet = 343
 
+// citecheckOffPinRatchet is the number of line citations checked at a
+// matter.js commit other than the pin: their sentence names that commit
+// (`at <sha>`, a sha opening a parenthesis, "matter.js <sha>"), so they are
+// measured there and not at the pin (R2-P6-test-3201, decision 123). The
+// committed summary.md carries the count and the rows per commit; exact in
+// both directions, as citecheckDriftRatchet: a new off-pin citation needs
+// its justification in the commit that raises it, and a citation re-read
+// and re-labelled at the pin lowers it in the same commit. The goal is 0.
+// File-only mentions, bare line parts and chip citations at a commit other
+// than the harness commit are counted in summary.md beside it, not held.
+//
+// 1216 at the first measurement, review II phase 6b wave 4, unit sec: 1327
+// with the forms the collector learnt in the same change ("(0ceb202d, …",
+// "matter.js 0ceb202d …"; 115 citations that read as the pin's before),
+// less the unit's own rows re-read and re-labelled at db021da0. The cite
+// unit counted 1211 at dd17ab06 in the old forms.
+const citecheckOffPinRatchet = 1216
+
+// offPinRowRE reads the off-pin row of summary.md.
+var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
+
+func TestCitecheckOffPinOnRatchet(t *testing.T) {
+	data, err := os.ReadFile("summary.md")
+	if err != nil {
+		t.Fatalf("read the committed summary.md: %v", err)
+	}
+	m := offPinRowRE.FindSubmatch(data)
+	if m == nil {
+		t.Fatal("summary.md carries no off-pin row (regenerate with make cite-report)")
+	}
+	n, _ := strconv.Atoi(string(m[1]))
+	if n != citecheckOffPinRatchet {
+		t.Errorf("summary.md counts %d line citations checked at a matter.js commit other than the pin, the ratchet is %d: a rise needs its justification in the commit, a drop lowers citecheckOffPinRatchet in the same commit", n, citecheckOffPinRatchet)
+	}
+	// The rows per commit add up to the count.
+	sum := 0
+	for _, row := range regexp.MustCompile("(?m)^\\| `([0-9a-f]+)` \\| (\\d+) \\| (\\d+) \\|$").FindAllSubmatch(data, -1) {
+		k, _ := strconv.Atoi(string(row[2]))
+		sum += k
+	}
+	if sum != n {
+		t.Errorf("the off-pin rows per commit add up to %d, the count is %d", sum, n)
+	}
+}
+
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()
 	data, err := os.ReadFile("drift.json")
@@ -225,7 +270,8 @@ func sampleCitations(t *testing.T) []citation {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return collectFile("sample.go", string(src))
+	cites, _ := collectFile("sample.go", string(src))
+	return cites
 }
 
 // expectation is testdata/expect.json: what sample.go.txt yields against
@@ -235,6 +281,8 @@ type expectation struct {
 	Citations []struct {
 		Line     int      `json:"line"`
 		Text     string   `json:"text"`
+		Path     string   `json:"path"` // compared when set
+		Bare     bool     `json:"bare"`
 		Idents   []string `json:"idents"`
 		Attached []string `json:"attached"`
 		Shas     []string `json:"shas"`
@@ -268,8 +316,9 @@ func TestCollect(t *testing.T) {
 	}
 	for i, w := range wants {
 		c := got[i]
-		if c.Line != w.Line || c.Text != w.Text || !slices.Equal(c.Idents, w.Idents) || !slices.Equal(c.Attached, w.Attached) || !slices.Equal(c.Shas, w.Shas) {
-			t.Errorf("citation %d = line %d %q idents %v attached %v shas %v, want %+v", i, c.Line, c.Text, c.Idents, c.Attached, c.Shas, w)
+		if c.Line != w.Line || c.Text != w.Text || c.Bare != w.Bare || w.Path != "" && c.Path != w.Path ||
+			!slices.Equal(c.Idents, w.Idents) || !slices.Equal(c.Attached, w.Attached) || !slices.Equal(c.Shas, w.Shas) {
+			t.Errorf("citation %d = line %d %q path %q bare %v idents %v attached %v shas %v, want %+v", i, c.Line, c.Text, c.Path, c.Bare, c.Idents, c.Attached, c.Shas, w)
 		}
 	}
 }
@@ -311,8 +360,13 @@ func TestCheckAndDerive(t *testing.T) {
 	}
 
 	sum := summarise("pin", results)
-	if sum.citations != 11 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 2 {
-		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 11, 1, 4, 2", sum.citations, sum.files, len(sum.hard), len(sum.drift))
+	if sum.citations != 15 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 2 {
+		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 15, 1, 4, 2", sum.citations, sum.files, len(sum.hard), len(sum.drift))
+	}
+	// The two bare parts are checked and counted on their own: never a
+	// citation, a hard error or a drift of the run.
+	if sum.bare != 2 || sum.bareHard != 0 {
+		t.Errorf("summary: %d bare parts, %d with a hard error; want 2, 0", sum.bare, sum.bareHard)
 	}
 	dir := t.TempDir()
 	if err := writeArtefacts(dir, sum); err != nil {
@@ -495,6 +549,102 @@ func TestCitecheckSecondTree(t *testing.T) {
 	wrongTree := module(fmt.Sprintf("package a\n\n// After matterjs-server at %s, packages/a/src/Bar"+ts+":3.\n", sha[:8]))
 	if code, _ := run(wrongTree, matter, server, t.TempDir(), ""); code != 1 {
 		t.Errorf("a matter.js path cited as matterjs-server's = %d, want 1 (not found in the second tree)", code)
+	}
+}
+
+// TestCitecheckOffPinCounts runs the tool over a module whose citations
+// name a matter.js commit other than the pin in each form decision 123
+// counts (R2-P6-test-3201, -3202): the line citation at the older commit
+// is the one off-pin row of summary.md, under its commit; one naming the
+// pin counts at the pin; the bare parts after a file named without a line
+// are checked at that commit and counted beside it — one beyond the end of
+// the file is no hard error of the run; and a chip citation at a commit
+// other than the Makefile's harness commit is counted under its commit.
+func TestCitecheckOffPinCounts(t *testing.T) {
+	// Spelt in pieces, as in TestCitecheckSecondTree.
+	const ts = ".t" + "s"
+	matter, old := gitInit(t, map[string]string{"packages/a/src/Bar" + ts: strings.Repeat("// line\n", 20)})
+	r := &gitRepo{dir: matter}
+	if err := os.WriteFile(filepath.Join(matter, "packages/a/src/Bar"+ts), []byte(strings.Repeat("// line\n", 21)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"add", "-A"},
+		{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "pin"},
+	} {
+		if _, err := r.git(args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := r.git("rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := strings.TrimSpace(string(out))
+	const harness = "6170af8461b10b1766044122ac83332c6d00ab20"
+
+	module := func(makefile bool) string {
+		root := t.TempDir()
+		files := map[string]string{
+			"parity/schema.json": fmt.Sprintf(`{"matter": {"sourceCommit": %q}}`, pin),
+			"a.go": "package a\n\n" +
+				"// At the pin: Bar" + ts + ":3.\n\n" +
+				"// Named: Bar" + ts + ":5 at " + pin[:8] + ".\n\n" +
+				"// Older: Bar" + ts + ":4 at " + old[:8] + ".\n\n" +
+				"// Parts: Bar" + ts + " at " + old[:8] + ": :6, :7 and :99.\n\n" +
+				"// chip at 645b267a: Foo.cpp:12. chip at 6170af84: Foo.cpp:13.\n",
+		}
+		if makefile {
+			files["Makefile"] = "CHIP_TEST_IMAGE_COMMIT ?= " + harness + "\n"
+		}
+		for name, body := range files {
+			p := filepath.Join(root, filepath.FromSlash(name))
+			if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return root
+	}
+	dir := t.TempDir()
+	if code, err := run(module(true), matter, filepath.Join(t.TempDir(), "none"), dir, ""); code != 0 {
+		t.Fatalf("run = %d, %v; want 0: a bare part beyond the file is no hard error", code, err)
+	}
+	sum, err := os.ReadFile(filepath.Join(dir, "summary.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"| Citations | 3 |",
+		"| Checked at their own `at <sha>`, the pin | 1 |",
+		"| " + offPinRow + " | 1 |",
+		"| `" + old[:8] + "` | 1 | 3 |",
+		"| A .ts file named without a line part | 1 |",
+		"| … whose sentence names another matter.js commit | 1 |",
+		"| A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 3 |",
+		"| … checked at another matter.js commit | 3 |",
+		"| … with a hard error at the commit it was checked at | 1 |",
+		"| A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 2 |",
+		"| … at a commit other than the harness commit `6170af84` (Makefile CHIP_TEST_IMAGE_COMMIT) | 1 |",
+		"| `645b267a` | 1 |",
+		"| **Hard errors** | 0 |",
+	} {
+		if !strings.Contains(string(sum), want) {
+			t.Errorf("summary.md lacks %q:\n%s", want, sum)
+		}
+	}
+	if m := offPinRowRE.FindSubmatch(sum); len(m) < 2 || string(m[1]) != "1" {
+		t.Errorf("offPinRowRE does not read the off-pin row of a written summary.md: %q", m)
+	}
+
+	dir = t.TempDir()
+	if code, err := run(module(false), matter, filepath.Join(t.TempDir(), "none"), dir, ""); code != 0 {
+		t.Fatalf("run without a Makefile = %d, %v", code, err)
+	}
+	if sum, _ := os.ReadFile(filepath.Join(dir, "summary.md")); !strings.Contains(string(sum), "not measured: the Makefile names no CHIP_TEST_IMAGE_COMMIT") {
+		t.Errorf("summary.md without a harness commit:\n%s", sum)
 	}
 }
 
