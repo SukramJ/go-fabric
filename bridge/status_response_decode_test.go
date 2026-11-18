@@ -24,9 +24,9 @@ import (
 // a peer answering an ongoing report with InvalidSubscription (0x7d)
 // ends the subscription — and that a Success answer does not. matter.js
 // throws on any non-Success StatusResponse after a DataReport
-// (InteractionMessenger.ts:183-196 throwIfErrorStatusMessage, reached
-// through waitForSuccess at :721) and ServerSubscription.ts:866-876
-// marks the subscription terminated and closes it. Without this the
+// (InteractionMessenger.ts:259-272 throwIfErrorStatusMessage, reached
+// through waitForSuccess at :844) and ServerSubscription.ts:938-950 at
+// db021da0 marks the subscription terminated and closes it. Without this the
 // engine keeps ticking a subscription the peer has forgotten, the
 // per-fabric quota slot stays occupied, and the peer's own reply keeps
 // the session's idle reaper from ever firing.
@@ -119,8 +119,8 @@ func buildWildcardReadRequestPayload(t *testing.T) []byte {
 // TestReadChunkLoopAbortsOnErrorStatusResponse pins that an error
 // StatusResponse answering a ReportData chunk aborts the interaction
 // instead of releasing the next chunk. matter.js's per-chunk
-// waitForSuccess (InteractionMessenger.ts:721) throws on any
-// non-Success status (:183-196) and the read is abandoned.
+// waitForSuccess (InteractionMessenger.ts:844 at db021da0) throws on any
+// non-Success status (:259-272) and the read is abandoned.
 func TestReadChunkLoopAbortsOnErrorStatusResponse(t *testing.T) {
 	t.Parallel()
 	const sessionID uint16 = 78

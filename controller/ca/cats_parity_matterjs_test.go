@@ -12,9 +12,10 @@ import (
 
 // TestGenerateNOCValidatesTheCATList mirrors matter.js
 // CaseAuthenticatedTag.validateNocTagList (datatype/CaseAuthenticatedTag.ts:96-105
-// at 862ad75f: at most three tags, identifier values unique) and the
+// at db021da0: at most three tags, identifier values unique) and the
 // constructor's version rule (:32-33: version 0 refused), which
-// kinds/Certificate.ts:989 applies when the NOC subject becomes ASN.1.
+// kinds/DistinguishedName.ts:491 (distinguishedNameToAsn1) applies when
+// the NOC subject becomes ASN.1.
 // A NOC the device would refuse at AddNOC (InvalidNOC) is never signed.
 func TestGenerateNOCValidatesTheCATList(t *testing.T) {
 	t.Parallel()

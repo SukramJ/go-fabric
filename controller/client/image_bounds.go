@@ -4,6 +4,7 @@
 package client
 
 import (
+	"fmt"
 	"log/slog"
 	"unsafe"
 
@@ -21,7 +22,9 @@ import (
 // own (review II, R2-P3-ctl-dev-02, owner decision 54; R2-P3-dr-ctl-02):
 // matter.js bounds neither what a peer's reports store nor their sum
 // (ClientStructure.ts:568-610, :1147-1193 at db021da0). The value is
-// chosen, sixteen times interaction.DefaultMaxReportBytesPerSession.
+// chosen (decision 59), sixteen times the 2 MiB report bound of then;
+// since decision 220 interaction.DefaultMaxReportBytesPerSession is
+// 16 MiB of charged memory, half of this quota.
 const DefaultMaxImageBytesPerNode = 32 << 20
 
 // What the image charges towards a node's quota beside a value's stored
@@ -74,7 +77,16 @@ func (s *structure) quota() int {
 // endpoint and cluster of it and each attribute's charge ([valueCharge]);
 // the node's own settings, record, ICD and onboarding entries are no
 // cluster of the image and do not count.
-func (s *structure) imageBytes() int {
+func (s *structure) imageBytes() int { return s.bytes }
+
+// checkImageTotal makes admit check the running total against the
+// structure's sum (recountImageBytes) and panic on a difference: the
+// package's tests set it, so each of them holds the total's invariant
+// (review II, N3-finimg-3). Off in production.
+var checkImageTotal = false
+
+// recountImageBytes is imageBytes summed from the structure.
+func (s *structure) recountImageBytes() int {
 	total := 0
 	for _, ep := range s.endpoints {
 		total += imageEndpointBytes
@@ -192,10 +204,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		}
 		return spec.Node{}, false
 	})
-	type place struct {
-		ep      uint16
-		cluster uint32
-	}
+	type place = imagePlace
 	type key struct {
 		place
 		attr uint32
@@ -224,6 +233,11 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		sizes[key{at, a.Path.Attribute}] = valueCharge(a.Value)
 	}
 	before := s.imageBytes()
+	if checkImageTotal {
+		if sum := s.recountImageBytes(); sum != before {
+			panic(fmt.Sprintf("client: the image's running total %d differs from its structure's %d", before, sum))
+		}
+	}
 	after := before
 	newEndpoints, newClusters := map[uint16]bool{}, map[place]bool{}
 	for k, size := range sizes {
@@ -239,6 +253,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		}
 		after += size
 	}
+	s.chargeDescriptorLists(kept, newEndpoints, newClusters)
 	after += len(newEndpoints)*imageEndpointBytes + len(newClusters)*imageClusterBytes
 	if quota := s.quota(); after > quota && after > before {
 		if !s.quotaLogged {
@@ -250,6 +265,56 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		return nil
 	}
 	return kept
+}
+
+// imagePlace is a cluster of an endpoint, as admit charges it.
+type imagePlace struct {
+	ep      uint16
+	cluster uint32
+}
+
+// chargeDescriptorLists adds to newEndpoints and newClusters what the
+// Descriptor lists of kept would create. synchronizeServerList creates a
+// cluster, with its cache, for every id a ServerList names,
+// synchronizePartsList an endpoint for every part a PartsList names; the
+// image charges them once they exist, so admit's projection charges them
+// now — what a reported list would create, not only what the report
+// carries values for (review II, R2-P6-bound-2351, owner decision 54).
+// The structure code that creates them stays as it is.
+func (s *structure) chargeDescriptorLists(kept []AttributeData, newEndpoints map[uint16]bool, newClusters map[imagePlace]bool) {
+	for i := range kept {
+		a := &kept[i]
+		if a.Path.Cluster != descriptor.ClusterID || !isList(a.Value) {
+			continue
+		}
+		ep := a.Path.Endpoint
+		switch a.Path.Attribute {
+		case descriptor.AttrServerList:
+			e := s.endpoints[ep]
+			if e == nil {
+				newEndpoints[ep] = true
+			}
+			for _, c := range a.Value.Children {
+				if !isUint(c) || c.El.Uint > 0xFFFF_FFFF {
+					continue
+				}
+				if at := (imagePlace{ep, uint32(c.El.Uint)}); e == nil || e.clusters[at.cluster] == nil {
+					newClusters[at] = true
+				}
+			}
+		case descriptor.AttrPartsList:
+			for _, c := range a.Value.Children {
+				// EndpointNumber.isValid, 0 to 0xFFFE, as synchronizePartsList;
+				// the root and the endpoint itself are no parts there.
+				if !isUint(c) || c.El.Uint > 0xFFFE || c.El.Uint == 0 || c.El.Uint == uint64(ep) {
+					continue
+				}
+				if part := uint16(c.El.Uint); s.endpoints[part] == nil {
+					newEndpoints[part] = true
+				}
+			}
+		}
+	}
 }
 
 // privateCluster is one of the node's own entries the store keeps on
@@ -335,9 +400,14 @@ func (s *structure) cutBackStored(stored []StoredEndpoint) []StoredEndpoint {
 		}
 		out = append(out, keep)
 	}
-	s.log.Warn("matter.controller.client.image_cut_at_load", slog.Int("bytes", total), slog.Int("trimmed_bytes", total-storedImageBytes(out)),
-		slog.Int("max_bytes", quota), slog.Int("dropped", dropped),
-		slog.String("reason", "the stored image exceeds the node's quota; what the node's structure does not name is dropped from the image and the store"))
+	// A cut that dropped nothing is no cut: the image loads above its
+	// quota as it is, and a report that would grow it is refused (and
+	// logged) as at any other time (review II, N3-finimg-1).
+	if dropped > 0 {
+		s.log.Warn("matter.controller.client.image_cut_at_load", slog.Int("bytes", total), slog.Int("trimmed_bytes", total-storedImageBytes(out)),
+			slog.Int("max_bytes", quota), slog.Int("dropped", dropped),
+			slog.String("reason", "the stored image exceeds the node's quota; what the node's structure does not name is dropped from the image and the store"))
+	}
 	return out
 }
 

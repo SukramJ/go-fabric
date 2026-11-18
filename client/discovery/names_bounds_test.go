@@ -168,3 +168,86 @@ func TestNames_StagedAddressGoesWhenACachedRecordWould(t *testing.T) {
 		t.Fatalf("%d staged addresses past their graced TTL, before the prune interval %v", staged, stagedIPPruneInterval)
 	}
 }
+
+// TestNames_CachedAddressesPerHostAreBounded: a host in the cache holds at
+// most maxCachedAddressesPerHost A/AAAA records, whatever a sender
+// announces for it; past it the address installed longest ago goes, as the
+// staging drops its oldest (review II, R2-P6-bound-2101).
+func TestNames_CachedAddressesPerHostAreBounded(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		perPacket int
+	}{
+		{name: "one packet", perPacket: 50},
+		{name: "one address a packet", perPacket: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			n, _, clk := testNames(t)
+			deliver(t, n, 0, []dns.RR{srvRR(instQ, "victim.local", 5540, 120, true)}, aaaaRR("victim.local", "fd00::1", 120, false))
+			last := ""
+			for p := range 50 / tc.perPacket {
+				clk.Advance(time.Millisecond)
+				var answers []dns.RR
+				for i := range tc.perPacket {
+					last = fmt.Sprintf("fd00::%x:%x", p+1, i+1)
+					answers = append(answers, aaaaRR("victim.local", last, 120, false))
+				}
+				deliver(t, n, 0, answers)
+			}
+			recs := n.Get("victim.local").Records()
+			if len(recs) > maxCachedAddressesPerHost {
+				t.Fatalf("victim.local holds %d addresses, want at most %d", len(recs), maxCachedAddressesPerHost)
+			}
+			var newest, first bool
+			for _, r := range recs {
+				newest = newest || r.IP.String() == last
+				first = first || r.IP.String() == "fd00::1"
+			}
+			if !newest || first {
+				t.Fatalf("records %v: want the newest %s kept and the first fd00::1 gone", recs, last)
+			}
+		})
+	}
+}
+
+// TestNames_FloodEvictsUnresolvedNamesFirst: past maxCachedRecords the
+// cache evicts the records of names no resolution observes before those
+// of names one does: a resolving service keeps its service and host
+// records through an overflow of other names, and without the resolution
+// the same overflow evicts them (U3-ctl-lan-1, owner decision 240).
+func TestNames_FloodEvictsUnresolvedNamesFirst(t *testing.T) {
+	t.Parallel()
+	for _, resolving := range []bool{true, false} {
+		t.Run(fmt.Sprintf("resolving=%v", resolving), func(t *testing.T) {
+			t.Parallel()
+			n, _, _ := testNames(t)
+			deliver(t, n, 0, []dns.RR{srvRR(opQ, "ctrl.local", 5540, 4500, false)}, aaaaRR("ctrl.local", "fd00::7", 4500, false))
+			if resolving {
+				s := n.Service(opCFID, opNode)
+				defer s.Close()
+			}
+			const perPacket = 50
+			inst := func(i int) string { return fmt.Sprintf("%016X._matterc._udp.local", i) }
+			host := func(i int) string { return fmt.Sprintf("h%d.local", i) }
+			for first := 0; first < maxCachedRecords+2*perPacket; first += perPacket {
+				var answers, extra []dns.RR
+				for i := first; i < first+perPacket; i++ {
+					answers = append(answers, srvRR(inst(i), host(i), 5540, 4500, false))
+					extra = append(extra, aaaaRR(host(i), fmt.Sprintf("fd00::%x", i+0x100), 4500, false))
+				}
+				deliver(t, n, 0, answers, extra...)
+			}
+			var cached int
+			onLoop(t, n, func() { cached = len(n.expiring) })
+			if cached > maxCachedRecords {
+				t.Fatalf("%d records cached, want at most %d", cached, maxCachedRecords)
+			}
+			kept := n.Has(opQ) && n.Get(opQ).IsDiscovered() && n.Has("ctrl.local") && n.Get("ctrl.local").IsDiscovered()
+			if kept != resolving {
+				t.Fatalf("the peer's records kept: %v, want %v", kept, resolving)
+			}
+		})
+	}
+}

@@ -13,6 +13,7 @@ package ca
 
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/asn1"
 	"errors"
@@ -80,7 +81,7 @@ const yearSeconds int64 = 365 * 24 * 60 * 60
 
 // matterDate is the certificate time of t moved by years. Mirrors matter.js
 // packages/protocol/src/certificate/kinds/definitions/asn.ts:18-22
-// (jsToMatterDate) at 0ceb202d: Unix seconds, floored, minus the Matter
+// (jsToMatterDate) at db021da0: Unix seconds, floored, minus the Matter
 // epoch offset, plus the years; the X.520 non-well-defined date (a zero
 // time here) encodes as 0. A result outside the 32-bit field is an error.
 func matterDate(t time.Time, years int64) (uint32, error) {
@@ -126,10 +127,13 @@ func serialBytes(id uint64) []byte {
 }
 
 // encodeCert writes the certificate TLV with sig as its signature. The
-// top-level structure is in schema order (operational.ts:123-153); the
-// DN lists and the extension list keep the order the caller gives
-// (TlvTaggedListPreservingOrder, :36, :110), which is the order of
-// matter.js's object literals in CertificateAuthority.ts.
+// top-level structure is in schema order (operational.ts:124-154); the
+// DN lists and the extension list keep the order the caller gives, which
+// is the order of matter.js's object literals in CertificateAuthority.ts:
+// the DN lists are a TlvDistinguishedName (operational.ts:111) and the
+// extension list a TlvTaggedListPreservingOrder (operational.ts:37); the
+// DN list's DistinguishedNameSchema keeps the order
+// (kinds/DistinguishedName.ts:613-630, :460-482 at db021da0).
 func encodeCert(f *certFields, sig []byte) ([]byte, error) {
 	e := tlv.NewEncoder()
 	e.StartStruct(tlv.AnonymousTag())
@@ -175,7 +179,12 @@ func encodeCert(f *certFields, sig []byte) ([]byte, error) {
 // X.509 DER form of the TBS certificate (secure/mattercert TBSToDER, the
 // bytes matter.js Certificate.sign hashes), ECDSA P-256 over SHA-256
 // through key.Sign (for an *ecdsa.PrivateKey that is ecdsa.SignASN1),
-// carried as the 64-byte r‖s.
+// carried as the 64-byte r‖s. The signature is verified under the key's
+// Public() — for a host's signer the key [New] checked against the issuing
+// certificate — before the certificate leaves the CA: a signer that signs
+// with another key or over another digest fails the issue instead of
+// yielding a certificate that verifies nowhere (review II,
+// R2-P6-err-1855).
 func signCert(f *certFields, key crypto.Signer, rand io.Reader) ([]byte, error) {
 	unsigned, err := encodeCert(f, make([]byte, 64))
 	if err != nil {
@@ -194,6 +203,9 @@ func signCert(f *certFields, key crypto.Signer, rand io.Reader) ([]byte, error) 
 	if err != nil {
 		return nil, fmt.Errorf("ca: sign: %w", err)
 	}
+	if pub, ok := key.Public().(*ecdsa.PublicKey); !ok || !ecdsa.VerifyASN1(pub, digest[:], asn) {
+		return nil, errSignatureDoesNotVerify
+	}
 	sig, err := rawSignature(asn)
 	if err != nil {
 		return nil, err
@@ -201,12 +213,20 @@ func signCert(f *certFields, key crypto.Signer, rand io.Reader) ([]byte, error) 
 	return encodeCert(f, sig)
 }
 
+// errSignatureDoesNotVerify is a signature the signing key's Public()
+// does not verify.
+var errSignatureDoesNotVerify = errors.New("ca: sign: the signer's signature does not verify")
+
 // rawSignature turns an ASN.1 ECDSA signature into the 64-byte r‖s form
 // Matter certificates carry.
 func rawSignature(asn []byte) ([]byte, error) {
 	var sig struct{ R, S *big.Int }
-	if _, err := asn1.Unmarshal(asn, &sig); err != nil {
+	rest, err := asn1.Unmarshal(asn, &sig)
+	if err != nil {
 		return nil, fmt.Errorf("ca: signature: %w", err)
+	}
+	if len(rest) != 0 {
+		return nil, errors.New("ca: signature: bytes after the ASN.1 sequence")
 	}
 	if sig.R.BitLen() > 256 || sig.S.BitLen() > 256 {
 		return nil, errors.New("ca: signature: component exceeds 32 bytes")

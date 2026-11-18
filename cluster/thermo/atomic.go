@@ -429,12 +429,12 @@ func (s *ThermostatServer) rollbackWrite(ctx context.Context, req tdef.AtomicReq
 // statuses. The state closes whatever the outcome.
 //
 // The unit runs in two passes, as chip's CommitWrite does
-// (ThermostatClusterAtomic.cpp:442-447 at 645b267a): every attribute's
-// precommit — the Presets validation and commit checks, chip's
-// PrecommitSchedules — and, only when all passed, every commit
-// ([ThermostatServer.commitAll], which undoes the committed attributes
-// when a later host port refuses). With Presets alone that is the one
-// validate-and-apply matter.js runs.
+// (ThermostatClusterAtomic.cpp:362-367 at 6170af84, :442-447 at
+// 645b267a): every attribute's precommit — the Presets validation and
+// commit checks, chip's PrecommitSchedules — and, only when all passed,
+// every commit ([ThermostatServer.commitAll], which undoes the committed
+// attributes when a later host port refuses). With Presets alone that is
+// the one validate-and-apply matter.js runs.
 func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicRequestRequest) (any, error) {
 	st, err := s.existingAtomicState(ctx, req)
 	if err != nil {
@@ -474,7 +474,7 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 // previous value is stored and handed to the port again — and its status
 // stands for every attribute. Mirrors matter.js
 // packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:314-326 at
-// 862ad75f: any failure rolls the one transaction back, and a failure
+// db021da0: any failure rolls the one transaction back, and a failure
 // while committing "cannot be traced to one attribute, so it stands for
 // each of them" (AtomicWriteHandlerTest.ts:491-517 "discards a valid
 // Presets write when the Schedules write fails"; W3-clua1-02). The

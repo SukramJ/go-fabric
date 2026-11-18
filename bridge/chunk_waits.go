@@ -6,6 +6,7 @@ package bridge
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -39,6 +40,18 @@ import (
 // nothing of sessions. A peer holds at most
 // operational.MaxSessionsPerPeer sessions, so at most that many times
 // the bound of the slots.
+//
+// Each fabric is held to a share as well: once the claims bridge-wide
+// reach [chunkWaitFabricThreshold] — half the listener's dispatch budget —
+// a fabric that holds more than the threshold divided by the fabrics the
+// node holds ([Bridge.SetFabricCounter]) is answered Busy for a further
+// claim, as the per-session bound answers. Below the threshold, and on a
+// node of one fabric, nothing changes; a node whose host wired no counter
+// keeps the per-session bound alone (review II, TM R3.7, decision 245). The rule is
+// this module's: matter.js bounds a session's outgoing exchanges only
+// (packages/protocol/src/protocol/ExchangeManager.ts:63 at db021da0);
+// connectedhomeip reserves read and subscription resources per fabric
+// (src/app/InteractionModelEngine.h:113-116, :674-687 at 6170af84).
 
 // maxChunkWaitsPerSession bounds the interactions of one session that
 // may wait for the peer's StatusResponse to a chunk at once — a
@@ -50,33 +63,59 @@ import (
 // (src/lib/core/CHIPConfig.h:922, :992 at 6170af84).
 const maxChunkWaitsPerSession = 4
 
-// chunkWaitClaims counts, per session, the interactions holding a chunk
-// wait claim.
+// chunkWaitFabricThreshold is the number of chunk wait claims bridge-wide
+// from which a fabric is held to its share: half of the ordered
+// listener's dispatch budget (transport/udp maxConcurrentDispatch, 1024),
+// so a fabric over its share leaves the other half to the rest. The
+// relation is held by the test that fills the budget.
+const chunkWaitFabricThreshold = 512
+
+// chunkWaitClaims counts the interactions holding a chunk wait claim, per
+// session and per fabric.
 type chunkWaitClaims struct {
-	mu sync.Mutex
-	n  map[uint16]int
+	mu       sync.Mutex
+	n        map[uint16]int
+	byFabric map[uint8]int
+	total    int
+	// fabrics counts the fabrics the node holds ([Bridge.SetFabricCounter]).
+	fabrics atomic.Pointer[func(context.Context) (int, error)]
 }
 
-// claim takes one of sessionID's [maxChunkWaitsPerSession] claims; false
-// when the session holds them all. A true claim is given back with
-// [chunkWaitClaims.release].
-func (c *chunkWaitClaims) claim(sessionID uint16) bool {
+// claim takes one of sessionID's [maxChunkWaitsPerSession] claims for
+// fabric; false when the session holds them all, or when share is set and
+// the fabric already holds more than share. A true claim is given back
+// with [chunkWaitClaims.release].
+func (c *chunkWaitClaims) claim(sessionID uint16, fabric uint8, share int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.n[sessionID] >= maxChunkWaitsPerSession {
 		return false
 	}
+	if share > 0 && c.total >= chunkWaitFabricThreshold && c.byFabric[fabric] > share {
+		return false
+	}
 	if c.n == nil {
-		c.n = map[uint16]int{}
+		c.n, c.byFabric = map[uint16]int{}, map[uint8]int{}
 	}
 	c.n[sessionID]++
+	c.byFabric[fabric]++
+	c.total++
 	return true
 }
 
 // release gives back a claim [chunkWaitClaims.claim] granted.
-func (c *chunkWaitClaims) release(sessionID uint16) {
+func (c *chunkWaitClaims) release(sessionID uint16, fabric uint8) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.n[sessionID] == 0 {
+		return
+	}
+	c.total--
+	if c.byFabric[fabric] <= 1 {
+		delete(c.byFabric, fabric)
+	} else {
+		c.byFabric[fabric]--
+	}
 	if c.n[sessionID] <= 1 {
 		delete(c.n, sessionID)
 		return
@@ -84,17 +123,66 @@ func (c *chunkWaitClaims) release(sessionID uint16) {
 	c.n[sessionID]--
 }
 
+// atThreshold reports whether the claims bridge-wide reach
+// [chunkWaitFabricThreshold].
+func (c *chunkWaitClaims) atThreshold() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.total >= chunkWaitFabricThreshold
+}
+
+// share is a fabric's share of the threshold — the threshold over the
+// fabrics the node holds — or 0, no share rule, without a counter, on a
+// counter error and on a node of at most one fabric.
+func (c *chunkWaitClaims) share(ctx context.Context) int {
+	fn := c.fabrics.Load()
+	if fn == nil {
+		return 0
+	}
+	n, err := (*fn)(ctx)
+	if err != nil || n <= 1 {
+		return 0
+	}
+	return chunkWaitFabricThreshold / n
+}
+
+// SetFabricCounter wires the count of the fabrics the node holds, which
+// sets each fabric's share of the chunk waits once they reach half the
+// dispatch budget (review II, TM R3.7, decision 245). It is asked only
+// then. Without it — nil clears it — the per-session bound is the only
+// one.
+func (b *Bridge) SetFabricCounter(fn func(context.Context) (int, error)) {
+	if fn == nil {
+		b.routing.chunkWaits.fabrics.Store(nil)
+		return
+	}
+	b.routing.chunkWaits.fabrics.Store(&fn)
+}
+
 // claimChunkWait takes one of sessionID's chunk wait claims when needed
 // is set. release gives it back and is a no-op when nothing was taken;
-// ok is false when the session holds every claim.
-func (b *Bridge) claimChunkWait(sessionID uint16, needed bool) (release func(), ok bool) {
+// ok is false when the session holds every claim, or its fabric more than
+// its share ([chunkWaitFabricThreshold]).
+func (b *Bridge) claimChunkWait(ctx context.Context, sessionID uint16, needed bool) (release func(), ok bool) {
 	if !needed {
 		return func() {}, true
 	}
-	if !b.routing.chunkWaits.claim(sessionID) {
+	var fabric uint8
+	b.mu.RLock()
+	sessions := b.sessions
+	b.mu.RUnlock()
+	if r, has := sessions.(SessionFabricResolver); has {
+		fabric, _ = r.FabricFor(sessionID)
+	}
+	share := 0
+	if b.routing.chunkWaits.atThreshold() {
+		share = b.routing.chunkWaits.share(ctx)
+	}
+	if !b.routing.chunkWaits.claim(sessionID, fabric, share) {
 		return nil, false
 	}
-	return func() { b.routing.chunkWaits.release(sessionID) }, true
+	var once sync.Once
+	return func() { once.Do(func() { b.routing.chunkWaits.release(sessionID, fabric) }) }, true
 }
 
 // endSessionChunkWaits disarms every StatusResponse wait of sessionID: a

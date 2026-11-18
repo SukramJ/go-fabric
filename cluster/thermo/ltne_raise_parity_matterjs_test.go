@@ -15,7 +15,7 @@ import (
 // LocalTemperature attribute stays null whatever the host reports and no
 // LocalTemperatureChange is emitted — matter.js
 // packages/node/src/behaviors/thermostat/ThermostatServer.ts:456-464,
-// :516-519 at 862ad75f (W3-clua1-03).
+// :516-519 at db021da0 (W3-clua1-03).
 func TestParityMatterJS_LocalTemperatureNotExposed(t *testing.T) {
 	t.Parallel()
 	srv, rec := tevtServer(t, featHeatTEVT|thermo.ThermostatFeatureLTNE)
@@ -38,7 +38,7 @@ func TestParityMatterJS_LocalTemperatureNotExposed(t *testing.T) {
 // TestParityMatterJS_SetpointRaiseLowerDoesNotWrap: the raise is computed
 // in a wide integer and cropped to the limit, as matter.js computes it in
 // numbers (ThermostatServer.ts:200, :222-224, cropValueRange :875-885 at
-// 862ad75f); an int16 sum used to wrap and land on the minimum
+// db021da0); an int16 sum used to wrap and land on the minimum
 // (W3-clua1-04).
 func TestParityMatterJS_SetpointRaiseLowerDoesNotWrap(t *testing.T) {
 	t.Parallel()

@@ -419,9 +419,14 @@
           "it": "logs a refusal the camera stated at info",
           "class": "js-runtime-only",
           "reason": "asserts the level on matter.js's Logger destination"
+        },
+        {
+          "it": "lets an abandoned deallocate drop a lease that was only reused since, not allocated again",
+          "class": "by-design",
+          "reason": "BD-matterjs-server-CameraStreamManagement (review II, R2-P6-conc-2210, decision 207): the give-back chain runs within the cleanup budget and is cut, not abandoned, so its late answer drops no lease; the camera's report that no longer names the stream does — controller/camera:TestSliceDDeviceCleanupBudgetParityMatterjsServer \"keeps a lease a cut deallocate left until the camera's report no longer names the stream\""
         }
       ],
-      "reason": "All 421 cases against the manager over a fake camera (manager*.go): the ladders, the sessions with their registry, the snapshots, the leases and the cleanup budget on the fake clock; the left rows are JavaScript-only mechanisms (Observable listener isolation, assertions on matter.js's Logger).",
+      "reason": "All 421 cases against the manager over a fake camera (manager*.go): the ladders, the sessions with their registry, the snapshots, the leases and the cleanup budget on the fake clock; the left rows are JavaScript-only mechanisms (Observable listener isolation, assertions on matter.js's Logger) and one by-design divergence of the cleanup budget.",
       "snapshotSha": "56f452c0535ca2bfc1d69af935636eb1dbc20aef"
     },
     {

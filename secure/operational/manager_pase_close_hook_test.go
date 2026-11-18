@@ -18,7 +18,7 @@ import (
 // and never for a CASE session. matter.js's DeviceAdvertiser keys the
 // same decision on `session.isPase` in its `sessions.deleted` observer
 // (packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162 at
-// 862ad75f).
+// db021da0).
 func TestSetOnPaseSessionClose(t *testing.T) {
 	t.Parallel()
 	secret := make([]byte, 16)

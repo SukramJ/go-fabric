@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -174,7 +175,10 @@ func (m *MemoryBlobs) Put(_ context.Context, name string, data []byte) error {
 	return nil
 }
 
-// Get implements [Blobs].
+// Get implements [Blobs]. The slice it returns is the stored file, not a
+// copy (an image is not doubled per read): the caller only reads it — a
+// write into it would change the file under every other reader (review
+// II, R2-P6-conc-1916).
 func (m *MemoryBlobs) Get(_ context.Context, name string) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -241,6 +245,70 @@ type Images struct {
 	// and not yet verified, which Find and Open do not offer meanwhile.
 	hiddenMu sync.Mutex
 	hidden   map[string]int
+
+	// names serialises the writers of one file name: DownloadUpdate and
+	// Store hold a name's lock from their first look at the stored file to
+	// their last write, so a second writer of that name neither reads a
+	// file the first is replacing nor removes the one the first verified
+	// (review II, R2-P6-conc-1901).
+	names nameLocks
+}
+
+// nameLocks is a lock per file name; an unused name holds no entry.
+type nameLocks struct {
+	mu    sync.Mutex
+	locks map[string]*nameLock
+	// waited, when set, is called when a caller finds its name locked and
+	// is about to wait. A test seam.
+	waited func(name string)
+}
+
+type nameLock struct {
+	held  chan struct{} // a slot of one
+	users int
+}
+
+// lock takes name's lock and returns its release, or an error wrapping
+// ErrOTA and ctx's error when ctx ends while another writer of the name
+// holds it.
+func (n *nameLocks) lock(ctx context.Context, name string) (func(), error) {
+	n.mu.Lock()
+	if n.locks == nil {
+		n.locks = map[string]*nameLock{}
+	}
+	l := n.locks[name]
+	if l == nil {
+		l = &nameLock{held: make(chan struct{}, 1)}
+		n.locks[name] = l
+	}
+	l.users++
+	waited := n.waited
+	n.mu.Unlock()
+	leave := func() {
+		n.mu.Lock()
+		l.users--
+		if l.users == 0 {
+			delete(n.locks, name)
+		}
+		n.mu.Unlock()
+	}
+	select {
+	case l.held <- struct{}{}:
+	default:
+		if waited != nil {
+			waited(name)
+		}
+		select {
+		case l.held <- struct{}{}:
+		case <-ctx.Done():
+			leave()
+			return nil, fmt.Errorf("%w: waiting for another writer of %s: %w", ErrOTA, name, ctx.Err())
+		}
+	}
+	return func() {
+		<-l.held
+		leave()
+	}, nil
 }
 
 // ImagesConfig configures [NewImages].
@@ -253,9 +321,9 @@ type ImagesConfig struct {
 	// found, and nothing is downloaded. Its MaxImageSize bounds every
 	// download of the store ([Images.DownloadUpdate],
 	// [Images.UpdateInfoFromURL]) at [dcl.DefaultMaxImageSize] when it
-	// sets none. UpdateInfoFromURL holds its image in memory, and so does
-	// DownloadUpdate until the image is verified unless Blobs is a
-	// [BlobStreamer].
+	// sets none. DownloadUpdate holds the image in memory until it is
+	// verified unless Blobs is a [BlobStreamer]; UpdateInfoFromURL reads
+	// the header only.
 	Ledger *dcl.OTAVersions
 	// Logger receives the store's lines; nil is slog.Default().
 	Logger *slog.Logger
@@ -378,23 +446,26 @@ func originOf(info *UpdateInfo) string {
 // recordOrigin records the provenance of the stored image name, stored
 // for info. A failed write is logged and the former record removed, so
 // that the image counts as unbound to a ledger checksum. The record is
-// also removed before an image is written (Store, downloadInto). A
-// record therefore names the bytes it was written for, unless a removal
-// fails as well — a store failure, logged — or the files are changed
-// outside the store.
+// also removed before an image is written (Store, downloadInto), and a
+// removal that fails there fails the write. A record therefore names the
+// bytes it was written for, unless the removal after a failed record
+// write fails as well — a store failure, logged — or the files are
+// changed outside the store.
 func (i *Images) recordOrigin(ctx context.Context, name string, info *UpdateInfo) {
 	if err := i.blobs.Put(ctx, name+originSuffix, []byte(originOf(info))); err != nil {
 		i.log.Warn("ota.images.origin_not_recorded", slog.String("file", name), slog.Any("err", err))
-		i.forgetOrigin(ctx, name)
+		_ = i.forgetOrigin(ctx, name) // logged; the record is gone or the store is failing
 	}
 }
 
-// forgetOrigin removes the provenance record of name; a failure other
-// than a missing record is logged.
-func (i *Images) forgetOrigin(ctx context.Context, name string) {
+// forgetOrigin removes the provenance record of name. A failure other
+// than a missing record is logged and returned (review II, 5b-dcl R9).
+func (i *Images) forgetOrigin(ctx context.Context, name string) error {
 	if err := i.blobs.Delete(ctx, name+originSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		i.log.Warn("ota.images.origin_not_removed", slog.String("file", name), slog.Any("err", err))
+		return fmt.Errorf("%w: remove the provenance record of %s: %w", ErrOTA, name, err)
 	}
+	return nil
 }
 
 // vouched reports whether the stored image name needs no admission: a
@@ -436,19 +507,45 @@ func fileName(vid, pid uint16, mode Mode, version uint32) string {
 // written under its vendor, product, mode and version, read back and
 // checked against its header (and against info's vendor, product and
 // version when given), the specification version recorded; a failed check
-// removes it.
+// removes it. Store and [Images.DownloadUpdate] of one file name run one
+// at a time. A provenance record that cannot be removed before the image
+// is written fails the call with [ErrOTA] and nothing is written (review
+// II, 5b-dcl R9).
 func (i *Images) Store(ctx context.Context, image []byte, mode Mode, info *UpdateInfo) (StoredImage, error) {
+	h, err := checkImage(image, info)
+	if err != nil {
+		return StoredImage{}, err
+	}
+	name := fileName(h.VendorID, h.ProductID, mode, h.SoftwareVersion)
+	unlock, err := i.names.lock(ctx, name)
+	if err != nil {
+		return StoredImage{}, err
+	}
+	defer unlock()
+	return i.store(ctx, name, image, info)
+}
+
+// checkImage is Store's check of a whole image before it is kept: the
+// file (storeValidation) and, when info is given, its header against
+// info's vendor, product and version.
+func checkImage(image []byte, info *UpdateInfo) (otaimage.Header, error) {
 	h, err := otaimage.ValidateFile(bytes.NewReader(image), storeValidation(info))
 	if err != nil {
-		return StoredImage{}, fmt.Errorf("%w: %w", ErrOTA, err)
+		return otaimage.Header{}, fmt.Errorf("%w: %w", ErrOTA, err)
 	}
 	if info != nil {
 		if err := verifyHeader(h, *info); err != nil {
-			return StoredImage{}, err
+			return otaimage.Header{}, err
 		}
 	}
-	name := fileName(h.VendorID, h.ProductID, mode, h.SoftwareVersion)
-	i.forgetOrigin(ctx, name)
+	return h, nil
+}
+
+// store is Store under name's lock, once the image is checked.
+func (i *Images) store(ctx context.Context, name string, image []byte, info *UpdateInfo) (StoredImage, error) {
+	if err := i.forgetOrigin(ctx, name); err != nil {
+		return StoredImage{}, err
+	}
 	if err := i.blobs.Put(ctx, name, image); err != nil {
 		return StoredImage{}, fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
 	}
@@ -492,7 +589,7 @@ func storeValidation(info *UpdateInfo) otaimage.FileOptions {
 // recordMeta records the specification version of the stored image name;
 // 0 removes the record. The record is optional, so a failure is logged and
 // fails nothing. Mirrors matter.js #recordMetadata
-// (DclOtaUpdateService.ts:468-491 at 862ad75f); an unset value is 0 here,
+// (DclOtaUpdateService.ts:468-491 at db021da0); an unset value is 0 here,
 // the one invalid value a uint32 can carry (isSpecificationVersion, :67-69).
 func (i *Images) recordMeta(ctx context.Context, name string, spec uint32) {
 	var err error
@@ -509,7 +606,7 @@ func (i *Images) recordMeta(ctx context.Context, name string, spec uint32) {
 // readMeta is the recorded specification version of the stored image
 // name, 0 when none is recorded. A record that cannot be read or holds no
 // valid version is removed, so it is reported once. Mirrors matter.js
-// #readMetadata (DclOtaUpdateService.ts:493-524 at 862ad75f).
+// #readMetadata (DclOtaUpdateService.ts:493-524 at db021da0).
 func (i *Images) readMeta(ctx context.Context, name string) uint32 {
 	m, err := i.blobs.Get(ctx, name+metaSuffix)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -612,7 +709,7 @@ func (i *Images) Find(ctx context.Context, opts FindOptions) []StoredImage {
 }
 
 // DeleteOptions select the stored images [Images.Delete] removes —
-// delete's options (DclOtaUpdateService.ts:1187-1194 at 862ad75f).
+// delete's options (DclOtaUpdateService.ts:1187-1194 at db021da0).
 type DeleteOptions struct {
 	// Filename names one stored image ("fff1.8000.prod.3"); the other
 	// fields are then not read.
@@ -820,7 +917,7 @@ func modeOf(source string) Mode {
 }
 
 // storedCheck is what the check of a stored image found —
-// #checkStoredImage's verdict (DclOtaUpdateService.ts:429-451 at 862ad75f).
+// #checkStoredImage's verdict (DclOtaUpdateService.ts:429-451 at db021da0).
 type storedCheck int
 
 const (
@@ -854,7 +951,7 @@ func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateI
 
 // DownloadUpdate makes info's image available in the store and returns
 // its filename — downloadUpdate (DclOtaUpdateService.ts:615-720 at
-// 862ad75f). A stored image that validates is used, unless force asks for
+// db021da0). A stored image that validates is used, unless force asks for
 // a new download, and the specification version info carries is recorded
 // for it; a stored image that fails validation is removed. Online a
 // stored image that cannot be read, or one force replaces, is removed
@@ -872,8 +969,17 @@ func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateI
 // with [ErrOTA] before anything else — nothing is downloaded, and the
 // stored image is kept but not reused. An image the host supplied itself
 // needs none.
+//
+// Calls for one file name, and [Images.Store] of it, run one at a time: a
+// second call waits for the first and then finds the image the first
+// stored (review II, R2-P6-conc-1901).
 func (i *Images) DownloadUpdate(ctx context.Context, info UpdateInfo, force bool) (string, error) {
 	name := fileName(info.VendorID, info.ProductID, modeOf(info.Source), info.SoftwareVersion)
+	unlock, err := i.names.lock(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
 	var unverified bool
 	var why string
 	switch {
@@ -957,7 +1063,12 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 	if _, err := dcl.VerifyImage(bytes.NewReader(buf.Bytes()), *info.ledger, i.log); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrOTA, err)
 	}
-	if _, err := i.Store(ctx, buf.Bytes(), mode, &info); err != nil {
+	// Store's checks, under the lock DownloadUpdate holds for name: the
+	// header matches info, so Store would pick the same name.
+	if _, err := checkImage(buf.Bytes(), &info); err != nil {
+		return "", err
+	}
+	if _, err := i.store(ctx, name, buf.Bytes(), &info); err != nil {
 		return "", err
 	}
 	return name, nil
@@ -973,7 +1084,9 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 // version info carries is recorded as Store records it.
 func (i *Images) downloadInto(ctx context.Context, s BlobStreamer, name string, info UpdateInfo) error {
 	defer i.hide(name)()
-	i.forgetOrigin(ctx, name)
+	if err := i.forgetOrigin(ctx, name); err != nil {
+		return err
+	}
 	w, err := s.CreateBlob(ctx, name)
 	if err != nil {
 		return fmt.Errorf("%w: store %s: %w", ErrOTA, name, err)
@@ -1016,9 +1129,45 @@ func (i *Images) verifyStored(ctx context.Context, s BlobStreamer, name string, 
 	return verifyHeader(h, info)
 }
 
+// headerPrefix is the OTA file's fixed prefix: file identifier, total
+// size, header size (otaimage.ReadHeader reads it first).
+const headerPrefix = 4 + 8 + 4
+
+// errHeaderRead ends a download once headerWriter holds the header.
+var errHeaderRead = errors.New("softwareupdate: the OTA header is read")
+
+// headerWriter keeps the first bytes of an OTA file up to the end of its
+// header — the prefix and the header size the prefix states — and then
+// refuses more with errHeaderRead, which ends the download. It keeps at
+// most the prefix and otaimage.MaxHeaderSize bytes; a header size above
+// that ends it after the prefix, which otaimage.ReadHeader refuses. A file
+// shorter than its header is kept whole.
+type headerWriter struct{ buf []byte }
+
+// done reports whether buf holds the header the prefix states.
+func (h *headerWriter) done() bool {
+	if len(h.buf) < headerPrefix {
+		return false
+	}
+	n := binary.LittleEndian.Uint32(h.buf[12:headerPrefix])
+	return n > otaimage.MaxHeaderSize || len(h.buf) >= headerPrefix+int(n)
+}
+
+func (h *headerWriter) Write(p []byte) (int, error) {
+	if h.done() {
+		return 0, errHeaderRead
+	}
+	take := min(len(p), headerPrefix+otaimage.MaxHeaderSize-len(h.buf))
+	h.buf = append(h.buf, p[:take]...)
+	if h.done() {
+		return take, errHeaderRead
+	}
+	return take, nil
+}
+
 // LocalImageOptions are the fields of a local image's [UpdateInfo] its
 // header may not carry — updateInfoFromStream's options
-// (DclOtaUpdateService.ts:841-863 at 862ad75f).
+// (DclOtaUpdateService.ts:841-863 at db021da0).
 type LocalImageOptions struct {
 	// MinApplicable is used when the header states none; nil is 0.
 	MinApplicable *uint32
@@ -1032,7 +1181,7 @@ type LocalImageOptions struct {
 
 // UpdateInfoFromImage reads the header of the OTA image r and returns its
 // update, of [SourceLocal], for [Images.Store] with [ModeLocal] — matter.js
-// updateInfoFromStream (DclOtaUpdateService.ts:841-901 at 862ad75f): the
+// updateInfoFromStream (DclOtaUpdateService.ts:841-901 at db021da0): the
 // header's ids, version and applicable range, opts where the header states
 // none.
 func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error) {
@@ -1063,10 +1212,13 @@ func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error
 	return u, nil
 }
 
-// UpdateInfoFromURL fetches the OTA image at the HTTP(S) URL fileURL and
-// returns its update, of [SourceLocal]; [Images.DownloadUpdate] then
-// downloads it from that URL into [ModeLocal] — matter.js
-// createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at 862ad75f).
+// UpdateInfoFromURL reads the header of the OTA image at the HTTP(S) URL
+// fileURL and returns its update, of [SourceLocal]; [Images.DownloadUpdate]
+// then downloads it from that URL into [ModeLocal] — matter.js
+// createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at db021da0).
+// The download ends once the header's bytes are in (at most
+// [otaimage.MaxHeaderSize] and the 16-byte prefix); the rest of the image
+// is not fetched.
 // Another scheme is refused (a local file is [UpdateInfoFromImage]'s), and
 // so is every URL offline, without a fetch. The host names the URL, so
 // both downloads take [dcl.OTAVersions.DownloadHostURL]: http and a
@@ -1080,11 +1232,13 @@ func (i *Images) UpdateInfoFromURL(ctx context.Context, fileURL string, opts Loc
 	if i.offline {
 		return UpdateInfo{}, fmt.Errorf("%w: cannot read OTA image from %s: the service is offline, use UpdateInfoFromImage instead", ErrOTA, fileURL)
 	}
-	var buf bytes.Buffer
-	if err := i.ledger.DownloadHostURL(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &buf); err != nil {
+	// Only the header is read: the download ends once its bytes are in
+	// (review II, R2-P6-bound-1903).
+	var head headerWriter
+	if err := i.ledger.DownloadHostURL(ctx, dcl.SoftwareVersion{OTAURL: fileURL}, &head); err != nil && !errors.Is(err, errHeaderRead) {
 		return UpdateInfo{}, fmt.Errorf("%w: failed to read OTA image from %s: %w", ErrOTA, fileURL, err)
 	}
-	u, err := UpdateInfoFromImage(&buf, opts)
+	u, err := UpdateInfoFromImage(bytes.NewReader(head.buf), opts)
 	if err != nil {
 		return UpdateInfo{}, fmt.Errorf("failed to read OTA image from %s: %w", fileURL, err)
 	}

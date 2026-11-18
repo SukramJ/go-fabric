@@ -136,6 +136,12 @@ func (g *generator) hullCommands() []hullCommand {
 					break
 				}
 			}
+			// A named response no payload answers fails the generation
+			// ([renderError]) rather than typing the handler as answering
+			// by status alone (R2-P6-par-2715).
+			if hc.response == "struct{}" {
+				panic(renderError{fmt.Errorf("command %s: response %q is no response payload of the cluster", cmd.Name, e.Response)})
+			}
 		}
 		out = append(out, hc)
 	}

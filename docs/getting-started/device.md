@@ -33,7 +33,7 @@ every port, what skipping it costs, and whether the failure is visible.
 `Node.Bridge()` gives you the bridge for a port the facade does not cover
 without leaving the facade.
 
-*Source: `node/doc.go:4-43`, `node/config.go:107-116`, `bridge/bridge.go:29-47`, `node/node.go` (`Node.Bridge`).*
+*Source: `node/doc.go` (package doc), `node/config.go` (`Config.Snapshotter`), `bridge/bridge.go` (package doc, Bring-up sequence), `node/node.go` (`Node.Bridge`).*
 
 ## The program
 
@@ -52,6 +52,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log/slog"
 	"os"
@@ -92,15 +93,24 @@ func run(ctx context.Context) error {
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
+// randomSalt is a SPAKE2+ salt drawn at random at each start, never a
+// constant every copy of this example shares (R2-P6-sec-2615): the salt
+// reaches a commissioner inside PASE only, so nothing needs it kept.
+func randomSalt() []byte {
+	salt := make([]byte, node.PBKDFSaltMax)
+	_, _ = rand.Read(salt) // crypto/rand.Read does not fail
+	return salt
+}
+
 // newNode builds the node on the SQLite file at path — the node opens it
 // (foreign keys on, a new file created 0600), applies the schemas and
 // closes it on Stop — and adds the light, unstarted.
 func newNode(ctx context.Context, path string, network node.Network) (*node.Node, error) {
 	n, err := node.New(ctx, node.Config{
 		Network: network,
-		Commissioning: node.Commissioning{ // change all four for anything real
+		Commissioning: node.Commissioning{ // change the passcode and discriminator for anything real
 			Passcode: 20202021, Discriminator: 3840,
-			PBKDFIterations: 1000, Salt: []byte("go-fabric-quickstart"),
+			PBKDFIterations: 1000, Salt: randomSalt(),
 		},
 		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001}, // CSA test vendor
 		BasicInformation: node.BasicInformation{
@@ -157,23 +167,40 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
 - the discriminator fits 12 bits;
 - the passcode is in range and not on the trivially-guessable list;
 - the PBKDF iteration count and salt length are what SPAKE2+ accepts;
-- `VendorID` and `ProductID` are set;
+- `VendorID` and `ProductID` are set, and `ProductDescription.DeviceType`,
+  when set, is a device type of the schema;
 - a store is given — `Store.Path`, `Store.DB`, or both `Store.Credentials`
   and `Store.Endpoints` (see below) — and not both `Store.Path` and `Store.DB`;
 - `Attestation.Provider` is not combined with `Files`, `Chain` or the CD,
   `Attestation.Files` is not combined with `Chain` or the CD, and
   `BlockCommissioningOnError` comes with `Files`;
 - `BootReason` is a BootReasonEnum value;
-- `Health.Interval` is not negative;
-- `SupportedFabrics` is at most 254;
-- `UniqueID` is at most 32 bytes;
+- `Health.Interval` and `Network.InterfaceCheck` are not below 1 s when
+  positive (`Health.Interval` not negative; a negative `InterfaceCheck` turns
+  the check off);
+- `Limits.SupportedFabrics` is at most 254, and a deprecated
+  `Config.SupportedFabrics` or `Config.MaxPathsPerInvoke` set beside its
+  `Limits` field equals it;
+- `Network` takes `GATT` or the deprecated `BLE`, not both;
+- the advertised device name (`ProductDescription.Name`, else
+  `BasicInformation.NodeLabel`) is at most 32 bytes, and `Network.MDNS`'s
+  settings are not combined with an own `Advertiser`;
+- `UniqueID` is at most 32 bytes, and every `BasicInformation` string
+  (VendorName, ProductName, ProductLabel, NodeLabel, SerialNumber,
+  HardwareVersionString, SoftwareVersionString) is inside its attribute's
+  constraint in the generated definition — a SerialNumber longer than 32
+  (UTF-16 code units) fails;
 - `LocationCapability` is a valid regulatory location (zero is IndoorOutdoor,
   matter.js's default), and `IndoorOnly` comes with no other value;
 - `Network.WiFi`, when set, has its `Driver`, its `Reporter` or both;
 - `Network.TCP.MaxInboundConnections` is not negative;
-- every name in `Network.MDNS.Interfaces` is non-empty and named once;
-- `OTA.Dir` is set when `OTA` is;
-- `TLS.CertificatePort` is set when `TLS` is;
+- every name in `Network.MDNS.Interfaces` is non-empty and named once, and
+  `Network.MDNS.HostName`, when set, is one DNS label of at most 40 bytes;
+- `OTA.Dir` is set when `OTA` is, and `OTA.HTTPSMaxImageSize`,
+  `HTTPSIdleTimeout` and `AnnouncedUpdateQueryDelay` are not negative;
+- `TLS.CertificatePort` is set when `TLS` is, and each `TLS` capacity is
+  inside its bound;
+- `EndpointState` is not combined with the deprecated `EndpointPersistence`;
 - `DeviceTypeValidation` is one of warn, strict and off;
 - every `Limits` field is inside its bound and the `Sessions` intervals
   are valid;
@@ -200,7 +227,7 @@ Defaults worth knowing:
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
 | `DeviceTypeValidation` | matter.js's warn mode |
-| `SupportedFabrics` | 5 (matter.js defaults to 254) |
+| `Limits.SupportedFabrics` | 5 (matter.js defaults to 254) |
 | `BootReason` | Unspecified, matter.js's default; a start into the version the node's own OTA requestor recorded as its update in progress reports SoftwareUpdateCompleted whatever this states |
 | `Commissioning.LocationCapability` | IndoorOutdoor, matter.js's default; `Commissioning.IndoorOnly` states Indoor |
 | `OTAProvider.GrantFabric` | with `OTAProvider` set: the provider's ACL entry is written into no fabric — the fabric's administrator grants the access, or the host returns true for the fabrics it opens the provider to. A grant only adds: an entry written while a grant stood, or by a version that wrote it into every fabric, stays when the grant goes, until the fabric's administrator writes the ACL without it |
@@ -219,7 +246,7 @@ Defaults worth knowing:
 | `TimeSynchronization` | mounted, UTCTime, Granularity and TimeSource of the node's UTC; `Off` leaves it off the root — the node then has no UTC, and `Aggregator.Add` and `Replace` refuse a Valve with TimeSync —, `Config` serves the TZ, NTPC, NTPS and TSC features it names, after connectedhomeip ([Time synchronization](#time-synchronization)) |
 | `TLS` | no TLS servers; set, TlsCertificateManagement and TlsClientManagement mount on endpoint 0 (`node.TLSConfig`: the `CertificatePort`, per-fabric maxima defaulting to chip's 5, the stores defaulting to the node's) and every camera's PushAvStreamTransport without its own TLS lookups validates against them ([Camera](../guides/camera.md#the-transport-model)) |
 
-*Source: `node/config.go:37-205`, `node/config.go:303-365`, `node/config.go:466-524`, `node/node.go` (`New`).*
+*Source: `node/config.go` (`Config`, `Commissioning`, `ProductDescription`, `BasicInformation`, `Config.Validate`), `node/node.go` (`New`).*
 
 ### The node's own name
 
@@ -442,6 +469,10 @@ Once a device is added, it has a lifecycle of its own:
 device's Reachable attribute and its ReachableChanged event),
 `Device.Rename(ctx, name)` changes the NodeLabel a controller sees, and
 `Device.EndpointNumber` returns the endpoint the node gave it.
+`SetReachable`, `Rename` and `Device.Update` return an error:
+`device.ErrNotBridged` on a part, whose node serves no reachability or
+label of its own, and from `Rename` the store's refusal to persist the
+label, which is then not served.
 `Node.Topology()` is what the node serves: the Aggregator's endpoint and
 every bridged device with its key, endpoint, device type, name and
 reachability. The [host's view](../guides/host-view.md) walks through a
@@ -450,7 +481,7 @@ controller sees it: every endpoint — the root and the Aggregator
 included — by number, with its parent and the PartsList, DeviceTypeList
 and ServerList its Descriptor serves.
 
-*Source: `node/aggregator.go:40-132`, `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`, `Endpoints`), `examples/reference-bridge/main.go:329-331`, `examples/reference-bridge/fleet_node.go` (`endpointByKey`).*
+*Source: `node/aggregator.go` (`Aggregator`), `device/lifecycle.go`, `node/` (`Topology`, `BridgeTopology`, `Endpoints`), `examples/reference-bridge/fleet_node.go` (`attachNodeProviders`, `endpointByKey`).*
 
 ## Commissioning
 
@@ -468,7 +499,7 @@ fail-safe armed over PASE expires, an open window is revoked), and
 controllers that are already paired keep working. A host calls it before `Start` when, for example, it cannot serve
 its configured attestation chain.
 
-*Source: `node/inspect.go` (`Node.SetupPayload`), `node/node.go` (`Node.Start`), `node/commissioning.go:424-452`, `node/node.go` (`Node.SetCommissioningBlocked`).*
+*Source: `node/inspect.go` (`Node.SetupPayload`), `node/node.go` (`Node.Start`), `node/commissioning.go` (`Node.OpenBasicWindow`), `node/node.go` (`Node.SetCommissioningBlocked`).*
 
 ## Time synchronization
 

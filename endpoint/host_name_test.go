@@ -23,7 +23,9 @@ func TestHostName(t *testing.T) {
 	if len(written) != 0 {
 		t.Errorf("a host name was handed to the persist hook: %v", written)
 	}
-	e.SetNodeLabel("written")
+	if err := e.SetNodeLabel("written"); err != nil {
+		t.Fatalf("SetNodeLabel: %v", err)
+	}
 	if e.SetHostName("later") || e.NodeLabel() != "written" {
 		t.Errorf("a host name won over a written label: %q", e.NodeLabel())
 	}

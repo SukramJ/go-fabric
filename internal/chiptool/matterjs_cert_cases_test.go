@@ -240,16 +240,16 @@ var matterJSCasesNotRun = map[string]gap{
 	// sends commands to the tv TH, which answers success.
 	"CHANNEL/5.8": notPorted(classNotSupported, "TC-CHANNEL-5.8.test.ts:24", "needs Channel's ElectronicGuide and RecordProgram "+
 		"features (GetProgramGuide, RecordProgram, CancelRecordProgram): the module serves them to a host port that implements "+
-		"ChannelGuide and ChannelRecorder (cluster/media/channel.go:42-51), the daemon's video player implements neither "+
+		"ChannelGuide and ChannelRecorder (`cluster/media/channel.go`: `ChannelGuide`, `ChannelRecorder`), the daemon's video player implements neither "+
 		"(CHANNEL.S.F02=0, CHANNEL.S.F03=0)"),
 
 	// Client cases of a device cluster: the DUT invokes the TH's server,
 	// read mirrored as TC-IDM-1.1's and TC-LVL-8.1's ports are.
 	"DGETH/3.2": notPorted(classNotSupported, "TC-DGETH-3.2.test.ts:19", "needs ResetCounts, which the module's "+
 		"EthernetNetworkDiagnostics does not offer, with neither PacketCounts nor ErrorCounts "+
-		"(cluster/core/ethernet_network_diagnostics.go:39-42; DGETH.S.C00.Rsp=0): a port would record its only step skipped"),
+		"(`EthernetNetworkDiagnosticsConfig.Attributes` in `cluster/core/ethernet_network_diagnostics.go`; DGETH.S.C00.Rsp=0): a port would record its only step skipped"),
 	"DGSW/3.2": notPorted(classNotSupported, "TC-DGSW-3.2.test.ts:19", "needs ResetWatermarks: the module serves the Watermarks "+
-		"feature to a host that supplies a WatermarkReporter (cluster/core/software_diagnostics.go:29-37), the reference daemon "+
+		"feature to a host that supplies a WatermarkReporter (`WatermarkReporter` in `cluster/core/software_diagnostics.go`), the reference daemon "+
 		"supplies none (DGSW.S.F00=0, DGSW.S.C00.Rsp=0)"),
 	"DGTHREAD/3.4": notPorted(classHarness, "TC-DGTHREAD-3.4.test.ts:27", "needs the daemon's Thread variant (`--otbr` against "+
 		"a live OTBR REST API, the DGTHREAD family's composition, run by otbr-virtual.yml), which the Go-TH leg does not start"),
@@ -281,8 +281,8 @@ func portableNow(at, how string) gap { return notPorted(classNotPortedYet, at, "
 func daDUT(at, args string) gap {
 	return notPorted(classHarness, at, "needs, with the Go controller as DUT, a daemon started from each of chip's "+
 		"credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, "+args+
-		"): the daemon reads one attestation chain from files (`--attestation-dir`, examples/reference-bridge/main.go:134) "+
-		"and serves a fixed product id (main.go:71, :503)")
+		"): the daemon reads one attestation chain from files (`--attestation-dir` in `examples/reference-bridge/main.go`) "+
+		"and serves a fixed product id (`testProductID`)")
 }
 
 // errorRecorder is a testing.TB whose Errorf records the message instead

@@ -158,14 +158,15 @@ func tree(n *client.Node) []string {
 
 // TestLiveClientNode: the client node over a commissioned node.Node — the
 // initial read of a newly commissioned node and the default subscription
-// (NetworkClient.ts:113-196 at 0ceb202d) install the tree the node's
-// Descriptors describe (ClientStructure.ts:851-1009); a toggle on the node
+// (NetworkClient.ts:131-238 at db021da0) install the tree the node's
+// Descriptors describe (ClientStructure.ts:987-1145); a toggle on the node
 // reaches the image through the subscription; the node restarted on its
 // database delivers again; a lost subscription is re-established with the
-// refreshed versions and event minimum (ClientNodeInteraction.ts:148-155);
-// the plug removed from the node is erased from the image (:971-1008); a
-// second client node on the store loads the tree without a read
-// (:183-232).
+// refreshed versions and event minimum (ClientNodeInteraction.ts:161-168,
+// SustainedSubscription.ts:379-384); the plug removed from the node is
+// erased from the image (ClientStructure.ts:1107-1144); a second client
+// node on the store loads the tree without a read (ClientStructure.ts:211-262,
+// loadCache).
 func TestLiveClientNode(t *testing.T) {
 	t.Parallel()
 	lv := newPairLive(t)

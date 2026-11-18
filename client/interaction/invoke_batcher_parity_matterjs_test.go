@@ -3,7 +3,7 @@
 
 package interaction_test
 
-// Ports of matter.js at 862ad75f, by meaning, of the cases about the
+// Ports of matter.js at db021da0, by meaning, of the cases about the
 // batcher of single commands (ClientInteraction.#invokeWithBatching,
 // packages/protocol/src/action/client/ClientInteraction.ts:744-1005):
 // packages/node/test/node/ClientInvokeTest.ts (the batcher, its bypasses,

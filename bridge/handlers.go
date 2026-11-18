@@ -643,6 +643,11 @@ type CaseAdapter struct {
 	// a Sigma3 and accepts none.
 	sigma3Digest   [32]byte
 	sigma3Accepted bool
+	// resumeInstalled is the session the last Sigma1 installed by
+	// resumption, until the router takes it for the Sigma2_Resume's
+	// retransmission entry ([CaseAdapter.takeResumeInstall]); zero for
+	// none.
+	resumeInstalled uint16
 	// onUnfinished and releasedStaked: see [CaseAdapter.SetOnUnfinished].
 	onUnfinished   func(sessionID uint16)
 	releasedStaked bool
@@ -778,7 +783,8 @@ func (a *PaseAdapter) responderSessionParamsLocked() *sessionparams.Parameters {
 // ([sessionparams.TransportTCPClient], [sessionparams.TransportTCPServer])
 // and, when it names TCP, MaxTCPMessageSize — matter.js's fallback of
 // 64000 bytes unless the host passes its own bound (SessionParameters.ts:58-63,
-// :152). A node without TCP states neither field.
+// :152). A node without TCP states the bitmap as 0 and no size, as matter.js
+// does ([sessionparams.Parameters.Encode]; review II, R2-P6-par-2905).
 func SessionParametersFor(transports uint16, maxTCPMessageSize uint32) sigma.SessionParameters {
 	p := DefaultSessionParameters()
 	p.SupportedTransports = transports
@@ -919,11 +925,16 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	}
 
 	if result.IsResume() {
-		// Sigma2_Resume fast path: session is live after this reply.
-		// Fire onEstablished now (before sending the reply) so the
-		// operational session is registered before the initiator's
-		// StatusReport Success arrives. Mirrors matter.js
-		// CaseServer.ts line 200-202 (session added before waitForSuccess).
+		// Sigma2_Resume fast path: the session is installed, the host told
+		// and the resumption record replaced before the reply is sent; the
+		// record is consumed at its acceptance, where the responder claims
+		// its id. matter.js sends Sigma2_Resume first, adds the session once
+		// the send is acknowledged and saves the record after the
+		// initiator's success report
+		// (packages/protocol/src/session/case/CaseServer.ts:196-201, :211,
+		// :216, :219 at db021da0). A session whose Sigma2_Resume is not
+		// acknowledged is closed ([Bridge.closeUnacknowledgedResume];
+		// review II, R2-P6-sec-3320).
 		out := sigma.MarshalSigma2Resume(*result.Sigma2Resume)
 
 		// Every resume that yields a session id the adapter has not
@@ -939,6 +950,12 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		a.establishedSessionID = sessionID
 		a.sigma3Accepted = false
 		a.mu.Unlock()
+		if !install || a.onEstablished == nil {
+			// No session is installed for this resume, so nobody replaces
+			// the record it presented: the claim goes back (review II,
+			// R2-P6-sec-3320, decision 243).
+			result.Claim.Release()
+		}
 		if install && a.onEstablished != nil {
 			// The callback's second argument is the PEER's session id
 			// (Sigma1.initiatorSessionID) — the id the initiator expects
@@ -964,6 +981,9 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 				}
 				return 0, nil, fmt.Errorf("bridge: CASE resume session pickup: %w", err)
 			}
+			a.mu.Lock()
+			a.resumeInstalled = sessionID
+			a.mu.Unlock()
 		}
 		a.sigma1BeganHandshake()
 		return mrp.SCOpcodeSigma2Resume, out, nil
@@ -990,6 +1010,34 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	a.mu.Unlock()
 	a.sigma1BeganHandshake()
 	return mrp.SCOpcodeSigma2, out, nil
+}
+
+// pendingOnFabric reports whether the adapter's handshake resolved
+// fabricIndex and has not established its session
+// ([Bridge.abortFabricHandshakes]).
+func (a *CaseAdapter) pendingOnFabric(fabricIndex uint8) bool {
+	r := a.snapshotResponder()
+	if r == nil {
+		return false
+	}
+	fi, _, ok := r.SessionIdentity()
+	if !ok || fi != fabricIndex {
+		return false
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return !a.established
+}
+
+// takeResumeInstall returns, once, the session the last Sigma1 installed by
+// resumption: the router ties it to the Sigma2_Resume's retransmission
+// entry ([Bridge.handleCase]).
+func (a *CaseAdapter) takeResumeInstall() (uint16, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	id := a.resumeInstalled
+	a.resumeInstalled = 0
+	return id, id != 0
 }
 
 // caseFailureProtocolCode maps a CASE handshake failure to the
@@ -1183,6 +1231,7 @@ type OperationalSessionLookup struct {
 	paseFor       func(sessionID uint16) (bool, bool)
 	intervalFor   func(sessionID uint16, now time.Time) (time.Duration, bool)
 	transportsFor func(sessionID uint16) (uint16, uint32, bool)
+	scheduleFor   func(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool)
 	markRx        func(sessionID uint16)
 	markTx        func(sessionID uint16)
 }
@@ -1203,7 +1252,8 @@ type SessionFabricResolver interface {
 // [SessionLookup] can implement so the outbound-reliable tracker can
 // size its retransmission backoff to the peer's advertised MRP
 // session parameters (active/idle interval selected by peer
-// activity — matter.js MRP.ts:129 retransmissionIntervalOf). Sessions
+// activity — matter.js MRP.ts:181 in retransmissionIntervalOf,
+// :162-190 at db021da0). Sessions
 // the resolver does not know (session 0 / PASE) return (_, false)
 // and the tracker falls back to the spec idle default.
 type SessionRetransmitIntervalResolver interface {
@@ -1355,6 +1405,42 @@ func (l *OperationalSessionLookup) TransportParametersFor(sessionID uint16) (tra
 		return 0, 0, false
 	}
 	return l.transportsFor(sessionID)
+}
+
+// SessionPeerScheduleResolver is an optional capability a [SessionLookup]
+// can implement so a wait for the peer's answer can be bounded by the
+// peer's whole MRP schedule: its idle and active intervals, its active
+// threshold and whether it is active now (typically
+// [operational.Entry.PeerMRPSchedule]). The bound of a chunk's
+// StatusResponse wait sums the peer's retransmissions on it, switching
+// from the active to the idle interval past the threshold, as matter.js's
+// maxResponseTimeOf does (review II, F-db021da0-13). Sessions the
+// resolver does not know answer ok false; the bound then sums one base
+// interval ([SessionRetransmitIntervalResolver]).
+type SessionPeerScheduleResolver interface {
+	PeerMRPSchedule(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool)
+}
+
+// WithPeerScheduleResolver wires the optional PeerMRPSchedule side of the
+// adapter ([SessionPeerScheduleResolver]). Pass a closure answering a known
+// session's schedule with ok true. Returns the receiver so callers can
+// chain.
+func (l *OperationalSessionLookup) WithPeerScheduleResolver(scheduleFor func(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool)) *OperationalSessionLookup {
+	if l == nil {
+		return nil
+	}
+	l.scheduleFor = scheduleFor
+	return l
+}
+
+// PeerMRPSchedule implements [SessionPeerScheduleResolver]. ok is false
+// when the adapter was built without a schedule closure or the session
+// is unknown.
+func (l *OperationalSessionLookup) PeerMRPSchedule(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool) {
+	if l == nil || l.scheduleFor == nil {
+		return 0, 0, 0, false, false
+	}
+	return l.scheduleFor(sessionID)
 }
 
 // RetransmitBaseInterval implements [SessionRetransmitIntervalResolver].

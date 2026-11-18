@@ -4,6 +4,9 @@
 package client
 
 import (
+	"context"
+	"net/netip"
+
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
@@ -160,7 +163,7 @@ func SetNewlyCommissioned(n *Node) {
 
 // PatchRemoveFabric makes r's decommissions call fn in place of their
 // RemoveFabric invoke — matter.js patchRemoveFabric
-// (DecommissionTest.ts:36-47 at 862ad75f), which replaces the peer's
+// (DecommissionTest.ts:48-58 at db021da0), which replaces the peer's
 // OperationalCredentialsClient.removeFabric. fn gets the fabric index the
 // decommission removes and the invoke it replaces, which it may call with
 // any index. The returned restore removes the patch.
@@ -178,7 +181,7 @@ func PatchRemoveFabric(r *Registry, fn func(fabricIndex uint8, invoke func(fabri
 // EmitLeave delivers a BasicInformation Leave event of fabricIndex to r as
 // n's subscription does (onEvent) and waits for the reaction it starts —
 // matter.js's leave.emit on the peer's BasicInformationClient events
-// (DecommissionTest.ts:231 at 862ad75f).
+// (DecommissionTest.ts:239 at db021da0).
 func EmitLeave(r *Registry, n *Node, fabricIndex uint8) {
 	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex})
 	r.work.Wait()
@@ -238,4 +241,33 @@ func ApplyAsked(n *Node, ep uint16, cluster uint32, v spec.Node) {
 	b := &report{}
 	b.attr(ep, cluster, 0, v, 1)
 	n.apply(askedFor(ep, cluster), &b.r, true)
+}
+
+// OnRegisterChecked sets the test seam Register calls once its checks
+// outside the ICD client's lock passed, before it starts the operation.
+func OnRegisterChecked(c *ICDClient, fn func()) {
+	c.mu.Lock()
+	c.registerChecked = fn
+	c.mu.Unlock()
+}
+
+// ICDRegistering reports a registration operation in flight.
+func ICDRegistering(c *ICDClient) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.op != nil && c.op.kind == icdRegistering
+}
+
+// CompleteOperation runs CompleteCommissioning's fabric operation on n, as
+// a second call that passed its check before the first's ForAddress does.
+func CompleteOperation(ctx context.Context, r *Registry, n *Node, o CompleteOptions) error {
+	addr, _ := n.PeerAddress()
+	return r.completeOperation(ctx, n, addr, o)
+}
+
+// AddRecordAddress adds a to n's record addresses, as a discovery would.
+func AddRecordAddress(n *Node, a netip.AddrPort) {
+	n.updateRecord(func(r *Record) {
+		r.Addresses = append(r.Addresses, NetworkAddress{IP: a.Addr(), Port: a.Port()})
+	})
 }

@@ -44,7 +44,7 @@ func sigLabels(sends [][]wpdef.ICECandidateStruct) [][]string {
 // sigService is a service that routes signals to the sessions it holds.
 func sigService() *Service {
 	s := &Service{sessions: map[sessionKey]*Session{}, m: newManager(&fakeIO{}, nil, nil)}
-	s.ps = &providerSessions{offers: map[providerKey]string{}}
+	s.ps = &providerSessions{offers: map[providerKey]*sentOffer{}}
 	return s
 }
 
@@ -54,7 +54,7 @@ func TestSignallingHoldParityMatterjsServer(t *testing.T) {
 	life := t.Context()
 	t.Run("holds an event of the started session only for its node, endpoint and id", func(t *testing.T) {
 		s := sigService()
-		sess := &Session{box: newMailbox(life)}
+		sess := &Session{box: newMailbox(life, nil)}
 		s.sessions[sessionKey{5, 1, 7}] = sess
 		var elsewhere []wrdef.WebRTCSessionStruct
 		s.cfg.Observer.Signal = func(sig Signal) { elsewhere = append(elsewhere, sig.Session) }
@@ -73,7 +73,7 @@ func TestSignallingHoldParityMatterjsServer(t *testing.T) {
 		// The signals delivered before the host reads are kept and come out
 		// in order; the queued candidates are the connection's.
 		s := sigService()
-		sess := &Session{box: newMailbox(life)}
+		sess := &Session{box: newMailbox(life, nil)}
 		s.sessions[sessionKey{5, 1, 7}] = sess
 		on := wrdef.WebRTCSessionStruct{Id: 7, PeerNodeId: 5, PeerEndpointId: 1}
 		s.onSignal(Signal{Kind: controller.CameraSignalAnswer, Session: on, SDP: "event-1"})

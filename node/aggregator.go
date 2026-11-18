@@ -71,7 +71,7 @@ var (
 // run has not added yet, or never will — keeps its number too: nothing is
 // collected because it is absent, as matter.js keeps every stored number
 // until its store is erased (packages/node/src/storage/server/
-// ServerEndpointStores.ts:33-45 load, :109-130 assignNumber at 862ad75f).
+// ServerEndpointStores.ts:33-45 load, :109-130 assignNumber at db021da0).
 // A host that knows a device is gone for good calls Forget.
 //
 // The set is partitioned for a host whose devices come from several
@@ -113,6 +113,9 @@ type Aggregator struct {
 	// reassemblies counts the successful reassemblies (tests; the
 	// aggregator.reassemblies metric counts beside it).
 	reassemblies atomic.Int64
+	// forgetMu serialises the record of the forgets in progress
+	// (markForget).
+	forgetMu sync.Mutex
 }
 
 // partition is one snapshot scope of the set: its endpoints in insertion
@@ -206,7 +209,7 @@ func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
 // next assembly first erases every endpoint number stored for scope name
 // and their reservations — matter.js erasing each endpoint's store
 // (packages/node/src/node/server/ServerEndpointInitializer.ts:59-65
-// eraseDescendant at 862ad75f) — and the name is then forgotten. A running node reassembles at once; before [Node.Start]
+// eraseDescendant at db021da0) — and the name is then forgotten. A running node reassembles at once; before [Node.Start]
 // the retirement rides on Start's assembly. The default partition is
 // refused ([ErrRetireDefault]), and so is a partition that still holds
 // endpoints ([ErrPartitionNotEmpty]): Remove them first, or in a
@@ -272,7 +275,7 @@ func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpo
 // no other device is given them. [Aggregator.Forget] frees them. It
 // mirrors matter.js closing an endpoint, which keeps its number
 // reservation (packages/node/src/node/server/ServerEndpointInitializer.ts:
-// 67-69 at 862ad75f) and hands it back to the endpoint that returns
+// 67-69 at db021da0) and hands it back to the endpoint that returns
 // (packages/node/src/storage/server/ServerEndpointStores.ts:117-123). It
 // acts on the default partition.
 func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {
@@ -381,20 +384,39 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	b := &Batch{a: p.a, scope: p.scope, ctx: ctx}
 	fnErr := fn(b)
 	// The reservations first, so the reassembly keeps a removed key's
-	// number and collects a forgotten one's.
-	resErr := p.a.applyReservations(ctx, b.ops)
+	// number — but a forgotten key's erasure last: the reassembly takes
+	// its endpoint off the wire and the device is unbound before what is
+	// stored under its keys is erased, so no write a controller or the
+	// host makes in between stores under an erased key again (review II,
+	// R2-P6-conc-2405, N-finp-3). A key forgotten and added again in the
+	// batch is held out of the first reassembly and served by a second
+	// one, after the erasure, so it starts as a new device would.
+	pre, erase, readded := splitErasures(b.ops)
+	resErr := p.a.applyReservations(ctx, pre)
 	p.a.mu.Lock()
 	started := p.a.started
 	p.a.mu.Unlock()
 	var err error
+	var restore func() bool
 	if b.changed && started {
+		restore = p.a.holdBack(b.scope, readded)
 		err = p.a.reassemble(ctx)
 	}
-	err = errors.Join(resErr, err)
 	// Unbound after the reassembly: no controller reaches them any more.
 	for _, d := range b.detach {
 		d()
 	}
+	resErr = errors.Join(resErr, p.a.applyReservations(ctx, erase))
+	// A key forgotten and added again in this batch is the new device's
+	// once served: an erasure that did not finish must not take it at the
+	// next New.
+	for _, k := range readded {
+		resErr = errors.Join(resErr, p.a.cancelForget(ctx, k))
+	}
+	if restore != nil && restore() {
+		err = errors.Join(err, p.a.reassemble(ctx))
+	}
+	err = errors.Join(resErr, err)
 	switch {
 	case fnErr == nil:
 		return err
@@ -412,7 +434,8 @@ func (b *Batch) Add(ep Endpoint) error {
 		return err
 	}
 	a := b.a
-	if err := a.n.checkSurface(b.ctx, ep); err != nil {
+	entries, err := a.n.checkSurface(ep)
+	if err != nil {
 		return err
 	}
 	if err := a.n.checkMatterTime(ep); err != nil {
@@ -422,6 +445,11 @@ func (b *Batch) Add(ep Endpoint) error {
 	defer a.mu.Unlock()
 	if p, _ := a.findLocked(key); p != nil {
 		return fmt.Errorf("%w: %s", ErrDuplicateKey, key)
+	}
+	// Withheld only once the set takes the key, and never for a key it
+	// serves (review II, R2-P6-store-2414).
+	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
+		return err
 	}
 	detach, err := a.attach(ep)
 	if err != nil {
@@ -452,7 +480,8 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 		return fmt.Errorf("%w: %s replaces %s", ErrKeyMismatch, newKey, key)
 	}
 	a := b.a
-	if err := a.n.checkSurface(b.ctx, ep); err != nil {
+	entries, err := a.n.checkSurface(ep)
+	if err != nil {
 		return err
 	}
 	if err := a.n.checkMatterTime(ep); err != nil {
@@ -466,6 +495,9 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	}
 	if part.eps[i] == ep {
 		return nil
+	}
+	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
+		return err
 	}
 	old := a.detach[newKey]
 	detach, err := a.attach(ep)
@@ -518,6 +550,22 @@ func (b *Batch) dropLocked(part *partition, i int, key string) {
 	}
 	a.detachSetLocked(key, nil)
 	b.changed = true
+}
+
+// servesLocked reports whether the set holds an endpoint, or a part of
+// one, under key; a.mu is held.
+func (a *Aggregator) servesLocked(key string) bool {
+	for _, p := range a.parts {
+		for _, ep := range p.eps {
+			entries := surfaceEntries(ep)
+			for i := range entries {
+				if entries[i].key == key {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // attach binds ep to the node when it is a device; the returned detach is
@@ -659,10 +707,22 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		specs := make([]endpoint.Spec, 0, len(p.eps)+1)
 		for _, ep := range p.eps {
 			spec := ep.Spec()
-			if label, _ := a.n.endpoints.LoadNodeLabel(ctx, spec.StableKey); label != "" {
+			// A store that fails a read fails the assembly: the default
+			// served in the stored value's place would be stored over it at
+			// the next write, a version read as 0 would go down (review II,
+			// R2-P6-store-2403). The topology before stays served.
+			label, err := a.n.endpoints.LoadNodeLabel(ctx, spec.StableKey)
+			if err != nil {
+				return nil, err
+			}
+			if label != "" {
 				spec.NodeLabel = label
 			}
-			spec.ConfigurationVersion = max(spec.ConfigurationVersion, a.n.persisted.configVersion(ctx, spec.StableKey))
+			version, err := a.n.persisted.configVersion(ctx, spec.StableKey)
+			if err != nil {
+				return nil, err
+			}
+			spec.ConfigurationVersion = max(spec.ConfigurationVersion, version)
 			specs = append(specs, spec)
 		}
 		// The OTA provider's endpoint is numbered in the default scope

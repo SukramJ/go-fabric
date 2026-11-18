@@ -7,7 +7,7 @@ import "github.com/SukramJ/go-fabric/im"
 
 // scope tells whether an endpoint and cluster are in scope of a read —
 // matter.js ReadScope (packages/protocol/src/action/client/ReadScope.ts:13-52
-// at 0ceb202d).
+// at db021da0).
 type scope struct {
 	// isRelevant: the read covers some of the cluster, so a version filter
 	// for it applies (ReadScope.ts:14-19, :40-43).

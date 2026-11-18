@@ -26,15 +26,16 @@ type FabricScope struct {
 }
 
 // FabricScopeDeclarer is the optional capability a [ClusterServer]
-// implements to state the fabric scope of its attributes for a cluster
-// the module's schema snapshot does not hold — a vendor cluster. The
-// dispatcher asks it for an attribute on a request; ok false declares the
-// attribute not fabric-scoped.
+// implements to state the fabric scope of its attributes the module's
+// schema snapshot does not hold: those of a vendor cluster, and the
+// manufacturer-specific attributes (a non-zero vendor prefix) a server
+// adds to a cluster of the snapshot. The dispatcher asks it for such an
+// attribute on a request; ok false declares the attribute not
+// fabric-scoped.
 //
-// For a cluster of the snapshot the snapshot's scope table is the whole
-// answer and the declarer is not asked: a server cannot narrow or drop the
-// scope the model states — nor declare one for a manufacturer-specific
-// attribute it adds to such a cluster, which is not scoped. The scope applies whatever the server returns,
+// For a standard attribute of a cluster of the snapshot the snapshot's
+// scope table is the whole answer and the declarer is not asked: a server
+// cannot add, narrow or drop the scope the model states. The scope applies whatever the server returns,
 // from [ClusterServer.MatterRead] or [FabricScopedReader.MatterReadFiltered];
 // a server returns every fabric's entries whole (a filtered
 // MatterReadFiltered the accessing fabric's alone) and leaves the scoping

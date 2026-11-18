@@ -28,7 +28,7 @@ func checks(fs []attestation.Finding) []string {
 // TestReferenceNodeChain: the chain and CD the reference node presents
 // (secure/attestation.BuildTestChain, BuildTestCertificationDeclaration)
 // validate against TestStore with the one finding DAV produces for them:
-// a test CD (DAV:413-418).
+// a test CD (DAV:521-526).
 func TestReferenceNodeChain(t *testing.T) {
 	t.Parallel()
 	chain, err := secattestation.BuildTestChain(0xFFF1, 0x8000)
@@ -82,7 +82,7 @@ func TestNoStore(t *testing.T) {
 	if _, err := attestation.Validate(f.ctx, f.data); err != nil {
 		t.Fatalf("untrusted PAA without a store: %v", err)
 	}
-	// authorized_paa_list cannot be checked without the PAA (DAV:519-525).
+	// authorized_paa_list cannot be checked without the PAA (DAV:627-633).
 	cd := defaultCD()
 	cd.authorizedPAAs = [][]byte{make([]byte, 20)}
 	f = newFixture(t, defaultSpec(), cd)
@@ -247,7 +247,7 @@ func TestHardFailures(t *testing.T) {
 }
 
 // TestStoreErrors: a trust-store fault is a plain error, not the peer's
-// failure (DAV:270, the revocation lookup).
+// failure (DAV:358, the revocation lookup).
 func TestStoreErrors(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, defaultSpec(), defaultCD())

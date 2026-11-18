@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -31,7 +32,7 @@ func (d *csrDevice) handle(req imRequest) (opcode uint8, payload []byte, ok bool
 		return 0, nil, false
 	}
 	path, fields, err := decodeInvoke(req.payload)
-	if err != nil || path.Command != cmdCSRRequest {
+	if err != nil || path.Command != opcredsdef.CmdCsrRequest {
 		return 0, nil, false
 	}
 	var sent []byte

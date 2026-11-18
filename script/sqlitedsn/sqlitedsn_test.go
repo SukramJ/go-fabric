@@ -36,7 +36,9 @@
 //
 // The exception is counted, not a rule: the `file:<path>` key reference of
 // controller/ca/keyfile (Signer.KeyRef, the --ca-key flag of the reference
-// controller) is a scheme of its own and no SQLite URI. [keyReferences]
+// controller) and the `--seal-key file:<path>` key reference of the
+// reference daemon and controller are schemes of their own and no SQLite
+// URI. [keyReferences]
 // lists the files that build it with the number of sites each holds; a
 // further site in one of them fails like a site anywhere else, and a
 // removed one fails until its count is lowered in the same commit.
@@ -60,12 +62,15 @@ import (
 // the guard is silently checking nothing.
 const minFiles = 2000
 
-// keyReferences are the files that build the keyfile signer's
-// `file:<path>` key reference, with the number of sites in each.
+// keyReferences are the files that build a `file:<path>` key reference
+// (the keyfile signer's, and the examples' --seal-key), with the number of
+// sites in each.
 var keyReferences = map[string]int{
-	"controller/ca/keyfile/keyfile.go":                1,
-	"controller/ca/keyfile/keyfile_test.go":           1,
-	"examples/reference-controller/cli/cakey_test.go": 3,
+	"controller/ca/keyfile/keyfile.go":                  1,
+	"controller/ca/keyfile/keyfile_test.go":             1,
+	"examples/reference-controller/cli/cakey_test.go":   3,
+	"examples/reference-bridge/sealkey_test.go":         3,
+	"examples/reference-controller/cli/sealkey_test.go": 5,
 }
 
 // skippedTop are the top-level directories the guard does not judge.

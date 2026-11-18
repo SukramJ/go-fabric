@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -393,7 +394,7 @@ func TestNetworkTypeAndThresholds(t *testing.T) {
 func TestThreadMatching(t *testing.T) {
 	one := mkThread(1, threadOpts{rloc16: ptr[uint16](1024), ext: 0xAABBCCDDEEFF0011})
 	m := newThreadMaps([]*Image{&one})
-	if m.byExt[0xAABBCCDDEEFF0011] != "1" || m.byRloc[1024] != "1" {
+	if m.byExt[0xAABBCCDDEEFF0011] != "1" || m.byRloc[rlocKey{xpan: extPan, network: true, rloc: 1024}] != "1" {
 		t.Errorf("maps = %+v", m)
 	}
 	a := mkThread(1, threadOpts{rloc16: ptr[uint16](1024), neighbours: []threaddiagdef.NeighborTableStruct{neighbour(0, 1025, 3, ptr[int8](-40), false)}})
@@ -514,5 +515,112 @@ func TestBuildBorderRouters(t *testing.T) {
 	bad.ExtAddress, bad.ExtPanID = "not hex", "short"
 	if n := byID(Build([]Image{node1}, []brdiscovery.Entry{bad}, at))[brUnkID]; n.Kind != KindThreadUnknown || n.NetworkName != "" {
 		t.Errorf("a malformed entry matched: %+v", n)
+	}
+}
+
+// TestBuildEscapesControlCharacters (review II, R2-P6-sec-2311): the
+// border router's names, which any LAN host publishing a _meshcop record
+// controls, reach the graph with their control characters and invalid
+// bytes escaped; printable names stay as they are.
+func TestBuildEscapesControlCharacters(t *testing.T) {
+	t.Parallel()
+	br := makeBr()
+	br.NetworkName, br.HostName, br.VendorName, br.ModelName = "Open\nThread", "Cui\x1bsine.local.", "Ap\xffple", "ee\x00ro"
+	topo := Build(fullMesh(), []brdiscovery.Entry{br}, time.UnixMilli(2000))
+	found := false
+	for _, n := range topo.Nodes {
+		for _, s := range []string{n.NetworkName, n.HostName, n.VendorName, n.ModelName} {
+			if strings.ContainsAny(s, "\n\x1b\x00") || strings.Contains(s, "\xff") {
+				t.Fatalf("node %s carries a control character or an invalid byte: %q", n.ID, s)
+			}
+		}
+		if n.HostName == `Cui\x1bsine` {
+			found = true
+			if n.NetworkName != `Open\nThread` || n.VendorName != `Ap\xffple` || n.ModelName != `ee\x00ro` {
+				t.Fatalf("the border router's names %q %q %q, want them escaped", n.NetworkName, n.VendorName, n.ModelName)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no node carries the border router's escaped host name")
+	}
+}
+
+// TestBuildCollidingClaimsResolveToNeither (review II, R2-P6-bound-2362,
+// owner decision 222): an extended address two nodes claim, and an RLOC16
+// two nodes claim, resolve to neither node. A neighbour entry naming the
+// claimed extended address shows as unknown_<ext>; the claimed RLOC16
+// names no node. Before, the later node's claim won, so a node could
+// redirect another node's edges to itself.
+func TestBuildCollidingClaimsResolveToNeither(t *testing.T) {
+	t.Parallel()
+	const shared = 0x0A0B0C0D0E0F1011
+	observer := mkThread(1, threadOpts{role: role(threaddiagdef.RoutingRoleLeader), rloc16: ptr[uint16](1024), ext: 0x1111111111111111, neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(shared, 0, 3, ptr[int8](-40), true),
+		neighbour(0x2222222222222222, 0x0C00, 3, ptr[int8](-40), true),
+	}})
+	genuine := mkThread(2, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0800), ext: shared})
+	claimant := mkThread(3, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: shared})
+	rlocClaimant := mkThread(4, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x4444444444444444})
+	topo := Build([]Image{observer, genuine, claimant, rlocClaimant}, nil, at)
+	for _, id := range []string{"2", "3", "4"} {
+		if _, ok := connection(topo, "1", id); ok {
+			t.Errorf("an edge 1-%s through a claim two nodes share", id)
+		}
+	}
+	for _, want := range []string{"unknown_" + hex16(shared), "unknown_" + hex16(0x2222222222222222)} {
+		if !slices.ContainsFunc(topo.Nodes, func(n Node) bool { return n.ID == want }) {
+			t.Errorf("no node %s for the neighbour whose claim collided", want)
+		}
+	}
+}
+
+// TestBuildRloc16ClaimsAreScopedByNetwork (review II, R2-P6-bound-2362,
+// owner decision 237): an RLOC16 is unique only within one Thread network,
+// so two nodes on two networks that hold the same one are both kept — each
+// observer reaches the node of its own network — while two on one network
+// resolve to neither.
+func TestBuildRloc16ClaimsAreScopedByNetwork(t *testing.T) {
+	t.Parallel()
+	const otherPan = 0x2222222222222222
+	onNet := func(img Image, xpan uint64) Image {
+		img.ThreadNetworkDiagnostics.ExtendedPanId = ptr(xpan)
+		return img
+	}
+	// Each observer lists a neighbour by RLOC16 0x0C00 only (no extended
+	// address it could match).
+	obsA := onNet(mkThread(1, threadOpts{role: role(threaddiagdef.RoutingRoleLeader), rloc16: ptr[uint16](0x0400), ext: 0x1111111111111111, neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(0x0909090909090909, 0x0C00, 3, ptr[int8](-40), true),
+	}}), extPan)
+	onA := onNet(mkThread(2, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x2222222222222222}), extPan)
+	obsB := onNet(mkThread(3, threadOpts{role: role(threaddiagdef.RoutingRoleLeader), rloc16: ptr[uint16](0x0400), ext: 0x3333333333333333, neighbours: []threaddiagdef.NeighborTableStruct{
+		neighbour(0x0909090909090909, 0x0C00, 3, ptr[int8](-40), true),
+	}}), otherPan)
+	onB := onNet(mkThread(4, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x4444444444444444}), otherPan)
+	topo, collisions := build([]Image{obsA, onA, obsB, onB}, nil, at)
+	if _, ok := connection(topo, "1", "2"); !ok {
+		t.Error("the observer on network A does not reach its RLOC16 neighbour")
+	}
+	if _, ok := connection(topo, "3", "4"); !ok {
+		t.Error("the observer on network B does not reach its RLOC16 neighbour")
+	}
+	for _, c := range collisions {
+		if c.kind == "rloc16" {
+			t.Errorf("an RLOC16 held on two networks counted as a collision: %+v", c)
+		}
+	}
+	// A third node on network A with the same RLOC16: neither on A.
+	twin := onNet(mkThread(5, threadOpts{role: role(threaddiagdef.RoutingRoleRouter), rloc16: ptr[uint16](0x0C00), ext: 0x5555555555555555}), extPan)
+	topo, collisions = build([]Image{obsA, onA, obsB, onB, twin}, nil, at)
+	for _, id := range []string{"2", "5"} {
+		if _, ok := connection(topo, "1", id); ok {
+			t.Errorf("an edge 1-%s through an RLOC16 two nodes of one network claim", id)
+		}
+	}
+	if _, ok := connection(topo, "3", "4"); !ok {
+		t.Error("the other network's RLOC16 lost its node")
+	}
+	if len(collisions) != 1 || collisions[0].kind != "rloc16" || len(collisions[0].nodes) != 2 {
+		t.Errorf("collisions %+v, want the one RLOC16 of network A", collisions)
 	}
 }

@@ -24,7 +24,7 @@ import "github.com/SukramJ/go-fabric/tlv"
 // (packages/types/src/tlv/TlvNumber.ts); the width of the constructor is
 // the Go type the value is held in, and the peer checks the attribute's
 // range. matter.js encodes a written value by the attribute's model
-// (packages/protocol/src/action/request/Write.ts:149-185 at 862ad75f,
+// (packages/protocol/src/action/request/Write.ts:149-185 at db021da0,
 // TlvOfModel(attribute)); a Go value carries its type, so the constructor
 // names it.
 //

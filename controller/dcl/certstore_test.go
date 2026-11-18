@@ -279,12 +279,14 @@ func TestCertificateStoreSelfHeal(t *testing.T) {
 	if p, ok := s2.PAA(pki.paa.skid()); !ok || len(p.DER) != 40 {
 		t.Fatal("the broken root vanished")
 	}
-	// A store whose data is not JSON fails to open.
+	// A store whose data is not JSON opens empty (R2-P6-store-1910).
 	bad := &MemoryStore{}
 	_ = bad.Save(context.Background(), []byte("{"))
-	if _, err := OpenCertificateStore(context.Background(), CertificateOptions{Store: bad}); err == nil {
-		t.Fatal("a corrupt store opened")
+	s3, err := OpenCertificateStore(context.Background(), CertificateOptions{Store: bad})
+	if err != nil || len(s3.Certificates()) != 0 {
+		t.Fatalf("a corrupt store: %v, want it read as empty", err)
 	}
+	s3.Close()
 }
 
 // TestCertificateStoreGitHub: the development-certificate fallback is off

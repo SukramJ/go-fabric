@@ -4,9 +4,9 @@
 package peer
 
 // The session-parameter TCP gate cases of matter.js
-// packages/node/test/node/ClientNodeTcpTest.ts:266-339 at 862ad75f, which
+// packages/node/test/node/ClientNodeTcpTest.ts:321-394 at db021da0, which
 // set a peer's reported parameters by hand: Peer.resolveTransports
-// (packages/protocol/src/peer/Peer.ts:359-410) on a harness peer whose
+// (packages/protocol/src/peer/Peer.ts:360-411) on a harness peer whose
 // descriptor and TXT record the test controls.
 
 import (
@@ -236,8 +236,8 @@ func tcpOwnershipPeer(t *testing.T) (*harness, *Peer, chan *harnessTCP) {
 
 // TestPeerConnectionSocketOwnershipParity is the TCP describe of matter.js
 // packages/protocol/test/peer/PeerConnectionSocketOwnershipTest.ts:90-127
-// at 862ad75f: a TCP attempt's channel is closed when the pairing fails or
-// is aborted (PeerConnection.ts:514-516, :640-650); the success case — the
+// at db021da0: a TCP attempt's channel is closed when the pairing fails or
+// is aborted (PeerConnection.ts:533-535, :662-672); the success case — the
 // session adopts the channel — is controller:TestLargeMessageReadOverTCP.
 func TestPeerConnectionSocketOwnershipParity(t *testing.T) {
 	t.Parallel()

@@ -673,7 +673,7 @@ func writeAny(b *bytes.Buffer, n Node) error {
 
 // PropertyName is the camelCase property name of a model name, the name
 // matter.js gives a field in its JavaScript form — camelize
-// (packages/general/src/util/identifier-case.ts:21 at 862ad75f) as
+// (packages/general/src/util/identifier-case.ts:21 at db021da0) as
 // [DecodeJSON] keys a struct: "OnOff" is "onOff", "PIROccupiedToUnoccupiedDelay"
 // "pirOccupiedToUnoccupiedDelay".
 func PropertyName(name string) string { return camel(name) }

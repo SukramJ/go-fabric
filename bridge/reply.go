@@ -201,7 +201,7 @@ func (b *Bridge) sendReplyOpts(
 	responsePayload []byte,
 	reliable bool,
 ) error {
-	return b.sendReplyTimed(src, requestHdr, requestProto, responseOpcode, responsePayload, reliable, nil)
+	return b.sendReplyTimed(src, requestHdr, requestProto, responseOpcode, responsePayload, reliable, nil, 0)
 }
 
 // sendHandshakeReplyReliable is [Bridge.sendReplyReliable] for a
@@ -217,12 +217,16 @@ func (b *Bridge) sendHandshakeReplyReliable(
 	responseOpcode uint8,
 	responsePayload []byte,
 	peer *handshakePeerTiming,
+	installed uint16,
 ) error {
-	return b.sendReplyTimed(src, requestHdr, requestProto, responseOpcode, responsePayload, true, peer)
+	return b.sendReplyTimed(src, requestHdr, requestProto, responseOpcode, responsePayload, true, peer, installed)
 }
 
 // sendReplyTimed is [Bridge.sendReplyOpts] with the handshake peer timing
 // a session-0 reply's retransmissions follow; nil keeps the idle default.
+// installed is the secure session a session-0 reply's handshake installed
+// before the peer acknowledged the reply, zero for none
+// ([outboundReliableTracker.trackUnsecuredInstalled]).
 func (b *Bridge) sendReplyTimed(
 	src net.Addr,
 	requestHdr *message.Header,
@@ -231,6 +235,7 @@ func (b *Bridge) sendReplyTimed(
 	responsePayload []byte,
 	reliable bool,
 	peer *handshakePeerTiming,
+	installed uint16,
 ) error {
 	if requestProto.ProtocolID == im.InteractionModelProtocolID {
 		b.load.imSent.Add(1)
@@ -290,7 +295,7 @@ func (b *Bridge) sendReplyTimed(
 		// Always: a full table gives up its oldest entry, never this reply
 		// ([unsecuredEntryLimit]).
 		if needsAck {
-			tracker.trackUnsecured(counter, handshakeKeyOf(requestHdr, requestProto.ExchangeID), datagram, src, b.clk().Now(), peer)
+			tracker.trackUnsecuredInstalled(counter, handshakeKeyOf(requestHdr, requestProto.ExchangeID), datagram, src, b.clk().Now(), peer, installed)
 		}
 		if err := b.sendRouted(listener, src, 0, datagram); err != nil {
 			if needsAck {

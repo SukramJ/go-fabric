@@ -171,6 +171,9 @@ type settings struct {
 	// (compose).
 	measured map[uint32]bool
 	cut      surfaceCut
+	// bindings are the self-held servers' subscriptions on host ports
+	// (defaultBuild.bind), the device's once New succeeds.
+	bindings []func() func()
 	// skipInitialCheck builds the device without New's refusal of an
 	// attribute matter.js requires a value of ([Type.RequiredInitial]
 	// measures them).
@@ -195,6 +198,11 @@ func newSettings() *settings {
 // declare collects one declaration. A cluster takes one generated
 // Declare; the kit's per-cluster options accumulate as before.
 func (s *settings) declare(d Declaration) error {
+	if rv := reflect.ValueOf(d); rv.Kind() == reflect.Pointer && rv.IsNil() {
+		// A typed nil *<cluster>def.Declare declares nothing; its value
+		// methods would panic (R2-P6-err-2507).
+		return fmt.Errorf("%w: a nil %T declares nothing", ErrConfiguration, d)
+	}
 	switch o := d.(type) {
 	case nil:
 		return nil
@@ -218,6 +226,11 @@ func (s *settings) declare(d Declaration) error {
 			}
 			if err := checkServedIDs(o.decl.Server); err != nil {
 				return fmt.Errorf("%w: HostServer for cluster 0x%08X: %w", ErrConfiguration, o.decl.Cluster, err)
+			}
+			// A cluster is declared once (R2-P6-err-2508): a second
+			// server for it would replace the first.
+			if _, dup := s.servers[o.decl.Cluster]; dup {
+				return fmt.Errorf("%w: cluster 0x%08X is declared twice", ErrConfiguration, o.decl.Cluster)
 			}
 		}
 		s.merge(o.decl, o.mount)
@@ -245,6 +258,18 @@ func (s *settings) declare(d Declaration) error {
 	}
 	if decl.Server != nil && hasPorts(decl.Ports) {
 		return fmt.Errorf("%w: cluster 0x%04X: a host port and a HostServer, the port is the kit's server's", ErrConfiguration, id)
+	}
+	if decl.Server != nil {
+		// The host's server serves the declared cluster, and holds to the
+		// IDs an undeclared HostServer is held to (R2-P6-err-2505): one
+		// of another cluster would be mounted under id and leave the
+		// declared cluster unserved.
+		if got := decl.Server.MatterClusterID(); got != id {
+			return fmt.Errorf("%w: cluster 0x%04X is declared with a HostServer of cluster 0x%04X", ErrConfiguration, id, got)
+		}
+		if err := checkServedIDs(decl.Server); err != nil {
+			return fmt.Errorf("%w: HostServer for cluster 0x%04X: %w", ErrConfiguration, id, err)
+		}
 	}
 	// An optional attribute the declaration gives a value is served, and
 	// an optional command it has a handler for accepted
@@ -344,7 +369,7 @@ func mountServer(srv contract.ClusterServer) Declaration {
 // hosting it does not come up, as matter.js fails an endpoint's
 // initialization with the ClusterImplementationError of
 // ValidatedElements (packages/node/src/behavior/cluster/
-// ValidatedElements.ts:190-222 at 862ad75f; ValidatedElementsTest.ts:655-668
+// ValidatedElements.ts:190-222 at db021da0; ValidatedElementsTest.ts:655-668
 // "fails endpoint initialization for a hosted cluster with an illegal ID").
 func checkServedIDs(srv contract.ClusterServer) error {
 	var errs []error

@@ -48,16 +48,16 @@ is stale.
 
 ## The levels
 
-| Level | matter.js tag | Commit | Method | Device types | Clusters | Features | Attributes | Commands | Events |
-| --- | --- | --- | --- | --: | --: | --: | --: | --: | --: |
-| `1.4` | `v0.13.0` | `e812bd077` | model | 71 | 119 | 269 | 1690 | 365 | 113 |
-| `1.4.1` | `v0.14.0` | `d87d1de44` | model | 71 | 119 | 269 | 1690 | 365 | 113 |
-| `1.4.2` | `v0.16.0` | `84dbb68cc` | model | 72 | 115 | 269 | 1657 | 370 | 113 |
-| `1.5.1` | `v0.17.0` | `33353a771` | model | 91 | 132 | 321 | 1872 | 431 | 124 |
-| `1.6.0` | `v0.17.9` | `2a7d4bfe7` | model | 91 | 135 | 347 | 1926 | 443 | 137 |
-| `1.6.1` | `v0.18.0` | `7e1f5d789` | model | 91 | 135 | 347 | 1926 | 443 | 137 |
+| Level | matter.js tag | Commit | Method | Device types | Clusters | Features | Attributes | Requests | Responses | Events |
+| --- | --- | --- | --- | --: | --: | --: | --: | --: | --: | --: |
+| `1.4` | `v0.13.0` | `e812bd077` | model | 71 | 119 | 269 | 1690 | 306 | 79 | 113 |
+| `1.4.1` | `v0.14.0` | `d87d1de44` | model | 71 | 119 | 269 | 1690 | 306 | 79 | 113 |
+| `1.4.2` | `v0.16.0` | `84dbb68cc` | model | 72 | 115 | 269 | 1657 | 310 | 80 | 113 |
+| `1.5.1` | `v0.17.0` | `33353a771` | model | 91 | 132 | 321 | 1872 | 352 | 95 | 124 |
+| `1.6.0` | `v0.17.9` | `2a7d4bfe7` | model | 91 | 135 | 347 | 1926 | 362 | 97 | 137 |
+| `1.6.1` | `v0.18.0` | `7e1f5d789` | model | 91 | 135 | 347 | 1926 | 362 | 97 | 137 |
 
-The last level is the pin's revision. Commands count each id once, request and response alike.
+The last level is the pin's revision. Requests and Responses count the command ids of each direction.
 
 ## What each level does not know
 
@@ -81,9 +81,9 @@ Kept, mandatory at the pin:
 | --- | --- |
 | BasicInformation `0x0028` | attribute `0x0018` |
 | GeneralDiagnostics `0x0033` | attribute `0x000A` |
-| OperationalCredentials `0x003E` | command `0x000C`, `0x000D`, `0x000E` |
+| OperationalCredentials `0x003E` | request command `0x000C`, `0x000D`; response command `0x000E` |
 | JointFabricDatastore `0x0752` | attribute `0x0009`, `0x000A`, `0x000B`, `0x000C`, `0x000D` |
-| JointFabricAdministrator `0x0753` | attribute `0x0000`; command `0x0005`, `0x0006`, `0x0007`, `0x0008` |
+| JointFabricAdministrator `0x0753` | attribute `0x0000`; request command `0x0005`, `0x0007`, `0x0008`; response command `0x0006` |
 
 ### Level 1.4.1
 
@@ -97,9 +97,9 @@ Kept, mandatory at the pin:
 | --- | --- |
 | BasicInformation `0x0028` | attribute `0x0018` |
 | GeneralDiagnostics `0x0033` | attribute `0x000A` |
-| OperationalCredentials `0x003E` | command `0x000C`, `0x000D`, `0x000E` |
+| OperationalCredentials `0x003E` | request command `0x000C`, `0x000D`; response command `0x000E` |
 | JointFabricDatastore `0x0752` | attribute `0x0009`, `0x000A`, `0x000B`, `0x000C`, `0x000D` |
-| JointFabricAdministrator `0x0753` | attribute `0x0000`; command `0x0005`, `0x0006`, `0x0007`, `0x0008` |
+| JointFabricAdministrator `0x0753` | attribute `0x0000`; request command `0x0005`, `0x0007`, `0x0008`; response command `0x0006` |
 
 ### Level 1.4.2
 

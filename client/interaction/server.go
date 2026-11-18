@@ -20,7 +20,7 @@ import (
 // ServerConfig is the Interaction Model server the client stack serves on
 // endpoints of its own — matter.js's one InteractionServer on a node that
 // is also a controller: the ClientSubscriptionHandler is installed into
-// it (Peers.ts:589-590, InteractionServer.ts:218-228 at 862ad75f) and its
+// it (Peers.ts:589-590, InteractionServer.ts:302-304 at db021da0) and its
 // onNewExchange hands a first ReportData to the client
 // handler and every other first message to the server
 // (InteractionServer.ts:240-249). The
@@ -204,8 +204,8 @@ func (s *server) dispatcher() im.Dispatcher {
 
 // requestContext is the context a served request runs under: the
 // session's fabric and subject, as the device-side bridge builds it
-// (bridge/receive_dispatch.go) — a client stack's sessions are CASE, so no
-// PASE mark; our node id on the session's fabric, so a path that names
+// (bridge/receive_dispatch.go) — only a CASE session reaches it
+// (HandleExchange refuses any other), so no PASE mark; our node id on the session's fabric, so a path that names
 // another node is answered as the device side answers it (UnsupportedNode
 // for a concrete path, nothing for a wildcard; review II,
 // R2-P3-ctl-dev-03; matter.js AttributeReadResponse.ts:160-162 and
@@ -293,9 +293,19 @@ func (s *server) awaitChunkStatus(ctx context.Context, x *exchange.Exchange) boo
 // db021da0) and the messenger answers it
 // (packages/protocol/src/interaction/InteractionMessenger.ts:457-459),
 // sending no status for a request that suppressed its response (:317-322).
+//
+// A chunked write (MoreChunkedMessages) is refused whole with FAILURE
+// before any of it is applied: this server answers one WriteRequest per
+// exchange and would apply the first chunk alone — an ACL replace would
+// leave the list at its first chunk. It fails closed until ADR 0032's
+// single session layer serves these sessions with the bridge's server
+// (review II, F-db021da0-51).
 func (s *server) write(ctx context.Context, x *exchange.Exchange, req im.WriteRequest, timed bool) im.StatusCode {
 	if req.TimedRequest != timed {
 		return im.StatusTimedRequestMismatch
+	}
+	if req.MoreChunkedMessages {
+		return im.StatusFailure
 	}
 	d := s.dispatcher()
 	if d == nil {

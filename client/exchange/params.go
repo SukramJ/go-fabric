@@ -12,18 +12,18 @@ import (
 
 // Fallbacks for session parameters a peer did not report. Mirrors matter.js
 // packages/protocol/src/session/SessionIntervals.ts:45-49 (the intervals)
-// and SessionParameters.ts:118-153 (the rest) at 0ceb202d.
+// and SessionParameters.ts:147-188 (the rest) at db021da0.
 const (
 	FallbackIdleInterval             uint32 = 500  // ms, SessionIntervals.ts:46
 	FallbackActiveInterval           uint32 = 300  // ms, SessionIntervals.ts:47
 	FallbackActiveThreshold          uint16 = 4000 // ms, SessionIntervals.ts:48
-	FallbackDataModelRevision        uint16 = 17   // SessionParameters.ts:125
-	FallbackInteractionModelRevision uint16 = 11   // SessionParameters.ts:131
-	FallbackMaxPathsPerInvoke        uint16 = 1    // SessionParameters.ts:145
+	FallbackDataModelRevision        uint16 = 17   // SessionParameters.ts:154
+	FallbackInteractionModelRevision uint16 = 11   // SessionParameters.ts:160
+	FallbackMaxPathsPerInvoke        uint16 = 1    // SessionParameters.ts:174
 )
 
 // Our own revisions, the ones matter.js SessionParameters.defaults
-// (SessionParameters.ts:158-164) takes from packages/model/src/common/Specification.ts.
+// (SessionParameters.ts:193-199) takes from packages/model/src/common/Specification.ts.
 const (
 	// localDataModelRevision is Specification.ts:115 DATA_MODEL_REVISION.
 	localDataModelRevision uint16 = 21
@@ -33,7 +33,7 @@ const (
 
 // DefaultLocalParameters is the session parameters a controller sends
 // when its host chose none: matter.js SessionParameters.defaults
-// (SessionParameters.ts:158-164), the fallbacks with this module's
+// (SessionParameters.ts:193-199), the fallbacks with this module's
 // data-model revision, interaction-model revision and specification
 // version.
 func DefaultLocalParameters() sessionparams.Parameters {
@@ -52,7 +52,7 @@ func DefaultLocalParameters() sessionparams.Parameters {
 // fallbacks overlaid by what the peer reported (nil reported nothing), with
 // TCP cleared for a peer below Matter 1.5, MaxTCPMessageSize only when TCP
 // remains, and a MaxPathsPerInvoke of 0 taking the fallback. Mirrors
-// matter.js SessionParameters.ts:42-81 (the SessionParameters factory).
+// matter.js SessionParameters.ts:48-91 (the SessionParameters factory).
 func PeerParameters(reported *sessionparams.Parameters) sessionparams.Parameters {
 	var r sessionparams.Parameters
 	if reported != nil {

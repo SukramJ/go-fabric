@@ -49,11 +49,11 @@ func initiate(t *testing.T, site *fabrictest.Site, u *fabrictest.Pair, nodeID ui
 
 // TestSplitCommissioningParity ports matter.js's SplitCommissioningTest
 // (packages/node/test/node/SplitCommissioningTest.ts at 862ad75f) onto
-// Registry.CompleteCommissioning (Peers.ts:236-359). matter.js runs the
-// two halves on two controllers that share a fabric; fabrictest gives each
-// controller its own CA and fabric, so the port runs both halves on one
-// controller — the commissioner's FinalizeCommissioning hands off, the
-// registry completes — which exercises the same completion.
+// Registry.CompleteCommissioning (Peers.ts:236-359 at db021da0). matter.js
+// runs the two halves on two controllers that share a fabric; fabrictest
+// gives each controller its own CA and fabric, so the port runs both
+// halves on one controller — the commissioner's FinalizeCommissioning
+// hands off, the registry completes — which exercises the same completion.
 func TestSplitCommissioningParity(t *testing.T) {
 	t.Parallel()
 
@@ -87,6 +87,17 @@ func TestSplitCommissioningParity(t *testing.T) {
 		})
 		if !errors.Is(err, client.ErrAlreadyCommissioned) || reg.Get(n.ID()) != n {
 			t.Fatalf("second completion: %v", err)
+		}
+		// A second call that passed that check before the first's
+		// ForAddress, and reaches the fabric operation after the first
+		// succeeded, is refused there and leaves the node (review II,
+		// R2-P6-fsm-2310). Before, it sent CommissioningComplete again and,
+		// with the fail-safe gone, deleted the node the first commissioned.
+		err = site.Run(parityCtx(t), func(ctx context.Context) error {
+			return client.CompleteOperation(ctx, reg, n, client.CompleteOptions{})
+		})
+		if !errors.Is(err, client.ErrAlreadyCommissioned) || reg.Get(n.ID()) != n || !n.IsCommissioned() {
+			t.Fatalf("a completion that passed the check before the first: %v; node kept %v", err, reg.Get(n.ID()) == n)
 		}
 	})
 

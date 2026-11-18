@@ -5,7 +5,7 @@
 // ESPHome Bluetooth proxies: examples/reference-controller's command line,
 // plus pair --bluetooth-proxy host[:port][,key] (repeatable) and
 // --bluetooth-proxy-discover with --bluetooth-proxy-key name=key
-// (repeatable).
+// (repeatable) and --bluetooth-proxy-allow-plaintext.
 package main
 
 import (
@@ -60,7 +60,7 @@ func proxies(flags cli.ProxyFlags, log *slog.Logger) (ble.Central, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts.Discover = &esphome.DiscoverOptions{Browser: names, Keys: keys}
+	opts.Discover = &esphome.DiscoverOptions{Browser: names, Keys: keys, AllowPlaintext: flags.AllowPlaintext}
 	c, err := esphome.NewCentral(ps, opts)
 	if err != nil {
 		_ = names.Close()

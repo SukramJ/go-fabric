@@ -430,7 +430,7 @@ func TestLockCommandFields(t *testing.T) {
 // TestDoorStateUnchangedIsNoChange: a repeated SetDoorState emits nothing
 // and counts nothing, as matter.js's doorState$Changed reactor does not
 // fire for an unchanged value (DoorLockServer.ts:179, :1345-1361;
-// Datasource.ts:823-825 at 862ad75f; W3-clua2-03).
+// Datasource.ts:823-825 at db021da0; W3-clua2-03).
 func TestDoorStateUnchangedIsNoChange(t *testing.T) {
 	t.Parallel()
 	srv, em := newLocal(t, nil)

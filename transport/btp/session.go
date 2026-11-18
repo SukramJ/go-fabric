@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // maximumSequenceNumber is the last sequence number before the wrap to 0
@@ -90,7 +91,7 @@ type outgoing struct {
 }
 
 // Session is one BTP session — matter.js BtpSessionHandler
-// (packages/protocol/src/ble/BtpSessionHandler.ts:31-715) at 0ceb202d. It
+// (packages/protocol/src/ble/BtpSessionHandler.ts:31-715) at db021da0. It
 // is safe for concurrent use.
 type Session struct {
 	role         Role
@@ -334,7 +335,7 @@ func (s *Session) OnStall(f func(replay [][]byte)) {
 
 // Stalled reports whether the session was suspended by its stall report.
 // matter.js suspends and emits in one synchronous step
-// (BtpSessionHandler.ts:657-658 at 862ad75f); here the observer runs
+// (BtpSessionHandler.ts:657-658 at db021da0); here the observer runs
 // after the lock is released, so a transport whose Send met the inactive
 // session in between asks this and waits for the renegotiation the
 // report starts.
@@ -371,6 +372,19 @@ func (s *Session) HandleIncoming(data []byte) error {
 	}
 	return err
 }
+
+// maxInboundMessage is the largest message a session reassembles: the
+// module's datagram bound, [udp.MaxDatagramSize], so a message over BLE is
+// held to the size of one over UDP (TM R5 5a.5). The declared length is
+// judged at the beginning segment; connectedhomeip bounds the reassembled
+// data instead, by its one reassembly buffer, and refuses at the segment
+// that overflows it, CHIP_ERROR_INBOUND_MESSAGE_TOO_BIG
+// (src/ble/BtpEngine.cpp:305, :312-314, :326-331 at 6170af84); matter.js
+// bounds it by the declared 16-bit length only
+// (packages/protocol/src/ble/BtpSessionHandler.ts:314, :322-330 at
+// db021da0). The controller's channel holds the same bound
+// (controller/ble Channel.deliver).
+const maxInboundMessage = udp.MaxDatagramSize
 
 func (s *Session) handleIncomingLocked(data []byte) error {
 	if len(data) > s.fragmentSize {
@@ -425,6 +439,9 @@ func (s *Session) handleIncomingLocked(data []byte) error {
 	case h.IsBeginningSegment:
 		if s.reassembling {
 			return protocolError("BTP message flow error! New beginning packet was received without previous message being completed.")
+		}
+		if n := int(*p.MessageLength); n > maxInboundMessage {
+			return protocolError(fmt.Sprintf("BTP message length %d exceeds the %d-byte inbound bound", n, maxInboundMessage))
 		}
 		s.reassembling, s.incomingLen, s.incoming = true, int(*p.MessageLength), p.SegmentPayload
 	case h.IsContinuingSegment || h.IsEndingSegment:

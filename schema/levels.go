@@ -50,8 +50,12 @@ type levelCluster struct {
 	revisions  [MaxLevels]uint16
 	features   map[uint8]LevelSet
 	attributes map[uint32]LevelSet
-	commands   map[uint32]LevelSet
-	events     map[uint32]LevelSet
+	// requestCommands and responseCommands are keyed by direction: one id
+	// can name a request at one level and a response at another
+	// (Thermostat 2 — review II R2-P6-par-2713, owner decision 227).
+	requestCommands  map[uint32]LevelSet
+	responseCommands map[uint32]LevelSet
+	events           map[uint32]LevelSet
 }
 
 // DeviceTypeLevels returns the levels the device type exists at; 0 for
@@ -84,13 +88,35 @@ func ClusterAttributeLevels(cluster, attr uint32) LevelSet {
 	return 0
 }
 
-// ClusterCommandLevels returns the levels the cluster's command id exists
-// at, a request or a response.
-func ClusterCommandLevels(cluster, cmd uint32) LevelSet {
+// ClusterRequestCommandLevels returns the levels the cluster's request
+// command id exists at — an accepted command; a response with the same id
+// is not counted.
+func ClusterRequestCommandLevels(cluster, cmd uint32) LevelSet {
 	if c := clusterLevels[cluster]; c != nil {
-		return c.commands[cmd]
+		return c.requestCommands[cmd]
 	}
 	return 0
+}
+
+// ClusterResponseCommandLevels returns the levels the cluster's response
+// command id exists at — a generated command; a request with the same id
+// is not counted.
+func ClusterResponseCommandLevels(cluster, cmd uint32) LevelSet {
+	if c := clusterLevels[cluster]; c != nil {
+		return c.responseCommands[cmd]
+	}
+	return 0
+}
+
+// ClusterCommandLevels returns the levels the cluster's command id exists
+// at, a request or a response.
+//
+// Deprecated: use [ClusterRequestCommandLevels] or
+// [ClusterResponseCommandLevels]: an id can name a request at one level and
+// a response at another, which the union cannot tell apart. Removable in
+// the next minor release.
+func ClusterCommandLevels(cluster, cmd uint32) LevelSet {
+	return ClusterRequestCommandLevels(cluster, cmd) | ClusterResponseCommandLevels(cluster, cmd)
 }
 
 // ClusterEventLevels returns the levels the cluster's event exists at.

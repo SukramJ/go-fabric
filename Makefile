@@ -225,17 +225,26 @@ reachability: ## regenerate script/reachability/inventory.json — which exporte
 	@# here would measure the wrong thing.
 	$(GO) run ./script/reachability
 
+# The regenerating guards read the working tree, untracked files included, and
+# compare with HEAD: an untracked .go file would make their verdict one about a
+# tree no commit holds (R2-P6-test-2824). On CI's clean checkout this passes.
+.PHONY: no-untracked-go
+no-untracked-go: ## fail when the tree holds an untracked .go file (the regenerating guards read it)
+	@u=$$(git ls-files --others --exclude-standard -- '*.go'); \
+	if [ -n "$$u" ]; then echo "untracked .go files — commit, remove or ignore them before a regenerating guard:"; echo "$$u"; exit 1; fi
+
 .PHONY: reachability-check
-reachability-check: reachability ## regenerate, then fail if the committed snapshot moved or is off its ratchet
-	@git diff --quiet -- script/reachability/inventory.json script/reachability/summary.md || { \
+reachability-check: no-untracked-go reachability ## regenerate, then fail if the committed snapshot moved or is off its ratchet
+	@git diff --quiet HEAD -- script/reachability/inventory.json script/reachability/summary.md || { \
 		echo ""; \
 		echo "The committed reachability snapshot is stale: regenerating it changed the file."; \
 		echo "Run 'make reachability', read the diff, and commit it with the change that moved"; \
 		echo "it — adjusting reachabilityUnreachedRatchet in the same commit if the count moved."; \
 		echo ""; \
-		git --no-pager diff --stat -- script/reachability/; \
+		git --no-pager diff --stat HEAD -- script/reachability/; \
 		exit 1; \
 	}
+	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
 
 .PHONY: surface
 surface: ## regenerate script/surfacecheck/surface.json and summary.md — what a controller sees of the reference daemon
@@ -245,17 +254,17 @@ surface: ## regenerate script/surfacecheck/surface.json and summary.md — what 
 	GO=$(GO) $(GO) run ./script/surfacecheck
 
 .PHONY: surface-check
-surface-check: surface ## regenerate, then fail if the committed surface snapshot moved
-	@git diff --quiet -- script/surfacecheck/surface.json script/surfacecheck/summary.md || { \
+surface-check: no-untracked-go surface ## regenerate, then fail if the committed surface snapshot moved
+	@git diff --quiet HEAD -- script/surfacecheck/surface.json script/surfacecheck/summary.md || { \
 		echo ""; \
 		echo "The committed surface snapshot is stale: regenerating it changed the file."; \
 		echo "Run 'make surface', read the diff — it is what a controller sees change — and"; \
 		echo "commit it with the change that moved it."; \
 		echo ""; \
-		git --no-pager diff --stat -- script/surfacecheck/; \
+		git --no-pager diff --stat HEAD -- script/surfacecheck/; \
 		exit 1; \
 	}
-	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
+	$(GO) test -count=1 -run TestCommittedSnapshot ./script/surfacecheck/
 
 .PHONY: testparity
 testparity: ## render notes/parity/matterjs_tests.md from the matter.js test register (no matter.js clone needed)
@@ -266,6 +275,21 @@ testparity-snapshot: ## refresh script/testparity/matterjs_tests.json from $(MAT
 	@# A pin lift's step: the diff names the matter.js test files added, removed
 	@# and changed; testparity-check then lists every mapping to re-check.
 	MATTERJS_DIR=$(MATTERJS_DIR) $(GO) run ./script/testparity -snapshot
+
+.PHONY: testparity-snapshot-check
+testparity-snapshot-check: no-untracked-go testparity-snapshot testparity-server ## regenerate both test snapshots from the pinned clones, then fail if either moved off the committed one
+	@# testparity-check holds the register to the committed snapshots and
+	@# checks only their commit and roots; this leg holds the snapshots to
+	@# the clones, so a test file a snapshot lost or never gained fails
+	@# (R2-P6-test-2809). ci-net and ci.yml's cite-check job run it.
+	@git diff --quiet HEAD -- script/testparity/matterjs_tests.json script/testparity/matterjsserver_tests.json || { \
+		echo ""; \
+		echo "A committed test snapshot is not what the pinned clone holds: regenerating it changed the file."; \
+		echo "Run 'make testparity-snapshot testparity-server', read the diff, and commit it."; \
+		echo ""; \
+		git --no-pager diff --stat HEAD -- script/testparity/; \
+		exit 1; \
+	}
 
 .PHONY: testparity-server
 testparity-server: ## refresh script/testparity/matterjsserver_tests.json from $(MATTERJS_SERVER_DIR) at the matterjs-server pin (exit 2 without the clone)
@@ -279,9 +303,14 @@ testparity-check: ## fail if the test register and the snapshot disagree, a Go t
 	$(GO) test -count=1 -run 'Testparity' ./script/testparity/
 
 .PHONY: ahead-check
-ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.md at the pin and at MATTERJS_REF (weekly: MATTERJS_REF=origin/main)
+ahead-check: ## check the Ahead-of-matter.js markers of notes/parity/by_design.md at the pin and at MATTERJS_REF (default the clone's HEAD; weekly: MATTERJS_REF=origin/main)
 	@# Built, not `go run`, for the same reason as cite-check: exit 2 (no clone,
 	@# the pin or the ref unresolvable) must not read as a finding.
+	@# The verdict depends on the clone (R2-P6-test-2813): by default it reads
+	@# the neighbour checkout's HEAD, with MATTERJS_REF=origin/main the ref as
+	@# of its last fetch. The weekly job (matterjs-pin.yml) reads origin/main
+	@# of a fresh clone; the line below names the ref's commit and date.
+	@git -C $(MATTERJS_DIR) log -1 --format='ahead-check: $(MATTERJS_REF) is %h of %cs' $(MATTERJS_REF) 2>/dev/null || true
 	@bin=$$(mktemp -d)/aheadcheck; $(GO) build -o $$bin ./script/aheadcheck || exit 1; \
 	$$bin -matterjs $(MATTERJS_DIR) -ref $(MATTERJS_REF); rc=$$?; rm -rf $$(dirname $$bin); \
 	if [ $$rc -eq 2 ]; then echo "ahead-check: no matter.js clone with the pin and $(MATTERJS_REF) at $(MATTERJS_DIR)"; fi; \
@@ -295,19 +324,19 @@ cite-report: ## regenerate script/citecheck/drift.json, summary.md and registers
 	$(GO) run ./script/citecheck -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR) -report
 
 .PHONY: cite-check
-cite-check: ## regenerate the citation artefacts, then fail on a hard error or when they moved off the committed ones
+cite-check: no-untracked-go ## regenerate the citation artefacts, then fail on a hard error or when they moved off the committed ones
 	@# Built, not `go run`: go run turns every non-zero exit into 1, and exit 2
 	@# (no clone, no pin) must not read as "hard errors".
 	@bin=$$(mktemp -d)/citecheck; $(GO) build -o $$bin ./script/citecheck || exit 1; \
 	$$bin -matterjs $(MATTERJS_DIR) -server $(MATTERJS_SERVER_DIR); rc=$$?; rm -rf $$(dirname $$bin); \
 	if [ $$rc -eq 2 ]; then echo "cite-check: no matter.js clone with the pin at $(MATTERJS_DIR), or no matterjs-server clone at $(MATTERJS_SERVER_DIR)"; exit 2; fi; \
-	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md script/citecheck/registers.json || { \
+	git diff --quiet HEAD -- script/citecheck/drift.json script/citecheck/summary.md script/citecheck/registers.json || { \
 		echo ""; \
 		echo "The committed citation artefacts are stale: regenerating them changed the files."; \
 		echo "Run 'make cite-report', read the diff, and commit it with the change that moved"; \
 		echo "it — adjusting citecheckDriftRatchet in the same commit if the drift count moved."; \
 		echo ""; \
-		git --no-pager diff --stat -- script/citecheck/; \
+		git --no-pager diff --stat HEAD -- script/citecheck/; \
 		exit 1; \
 	}; \
 	if [ $$rc -ne 0 ]; then echo "cite-check: hard errors (summary.md lists them)"; exit $$rc; fi
@@ -323,7 +352,10 @@ cite-check: ## regenerate the citation artefacts, then fail on a hard error or w
 # CHIP_CERT_BINS_IMAGE is only the host fallback: `make chiptool-extract`
 # copies chip-tool out of it for a run without Docker (arm64 hosts; the image
 # publishes arm64 manifests only). Bump it deliberately, like the image pin.
-CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc529f183b293b71f
+# Pinned by digest as well (R2-P5-sup-07): the tag names a commit but can be
+# pushed again; the digest is the index `docker buildx imagetools inspect`
+# printed for the tag on 2026-11-18.
+CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc529f183b293b71f@sha256:aa51b88d33e8a29304941eecd46eae5f6e4aa597627581c9d6b425895e8fb0ba
 CHIPTOOL_BIN_DIR     ?= bin
 
 # The CHIP test harness image the chip-tool suite runs by default: the
@@ -459,6 +491,11 @@ CHIPTOOL_CONTAINER_SUBNET  ?= fd00:6f66:6162:c7::/64
 CHIPTOOL_CONTAINER_RUN     ?= .
 CHIPTOOL_CONTAINER_SKIP    ?= ^(TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases)$$|^TestChipToolSuite$$/^groups$$|^TestGoCertificationCases$$/^CAMERA-GO$$
 GO_MOD_VERSION := $(shell sed -n 's/^go //p' go.mod)
+# The Go image of chiptool-container, by tag and digest (R2-P5-sup-07; the
+# index digest of golang:1.27.4 on 2026-11-18). The target refuses a GO_IMAGE
+# whose version is not go.mod's: a digest that outlived a go.mod bump would
+# build with the old Go under the new tag's name.
+GO_IMAGE ?= golang:1.27.4@sha256:205c7636d74e0ffbe3d007162df7d74f859f5a8c8322dfb9f907977686c126cf
 
 .PHONY: chiptool-container
 chiptool-container: ## the chip-tool suite's host fallback in one linux/arm64 container on a bridge network — the local loop where the harness image cannot use the host network (arm64 + Docker)
@@ -474,9 +511,12 @@ chiptool-container: ## the chip-tool suite's host fallback in one linux/arm64 co
 	@[ "$$(docker network inspect -f '{{.EnableIPv6}}' $(CHIPTOOL_CONTAINER_NETWORK))" = "true" ] || { \
 		echo "chiptool-container: the network $(CHIPTOOL_CONTAINER_NETWORK) exists without IPv6, which Matter needs; name another with CHIPTOOL_CONTAINER_NETWORK."; \
 		exit 1; }
+	@case "$(GO_IMAGE)" in golang:$(GO_MOD_VERSION)@sha256:*) ;; *) \
+		echo "chiptool-container: GO_IMAGE $(GO_IMAGE) is not golang:$(GO_MOD_VERSION)@sha256:… — move the pin with go.mod"; \
+		exit 1;; esac
 	docker build --platform linux/arm64 \
 		--build-arg CHIP_CERT_BINS_IMAGE=$(CHIP_CERT_BINS_IMAGE) \
-		--build-arg GO_IMAGE=golang:$(GO_MOD_VERSION) \
+		--build-arg GO_IMAGE=$(GO_IMAGE) \
 		-t $(CHIPTOOL_CONTAINER_IMAGE) internal/chiptool/container
 	docker run --rm --platform linux/arm64 --network $(CHIPTOOL_CONTAINER_NETWORK) \
 		-v "$(CURDIR)":/src \
@@ -556,6 +596,10 @@ tidy: ## tidy go.mod / go.sum
 
 .PHONY: generate-matter-schema
 generate-matter-schema: ## regenerate parity/schema.json, schema/ and the generated cluster definitions from a matter.js checkout
+	# packages/model is built at the checkout's HEAD first: the extractor
+	# imports the build output, which git ignores, so a stale build would
+	# yield a snapshot labelled with HEAD (review II S-12).
+	cd $(MATTERJS_DIR)/packages/model && npm run --silent build
 	# The extractor runs inside the matter.js tree so its bare @matter/model
 	# import resolves; the copy is removed again even when node fails.
 	cp script/extract-from-matter-js.ts $(MATTERJS_DIR)/.gofabric-extract.mts
@@ -693,7 +737,10 @@ ble-wifi-light-check: ## the examples/ble-wifi-light module: build (linux amd64,
 	cd $(BLEWIFI_DIR) && GOOS=linux GOARCH=arm GOARM=7 $(GO) build -o /dev/null .
 	cd $(BLEWIFI_DIR) && $(GO) vet ./...
 	cd $(BLEWIFI_DIR) && $(GO) test -count=1 ./...
-	cd $(BLEWIFI_DIR) && $(GOLANGCI_LINT) run --timeout=$(GOLANGCI_TIMEOUT) ./...
+	@# Linted for the platform it runs on (N6a-lint-1): off Linux,
+	@# wpasupplicant.New is the stub that always fails, and staticcheck
+	@# reads its error check as always true (SA4023).
+	cd $(BLEWIFI_DIR) && GOOS=linux $(GOLANGCI_LINT) run --timeout=$(GOLANGCI_TIMEOUT) ./...
 	cd $(BLEWIFI_DIR) && $(GO) mod tidy -diff
 	cd $(BLEWIFI_DIR) && $(GO) mod verify
 
@@ -711,21 +758,25 @@ nested-release-check: ## build each nested module against the go-fabric version 
 
 .PHONY: workflow-lint
 workflow-lint: ## actionlint and zizmor over .github/workflows (pinned: ACTIONLINT_VERSION, ZIZMOR_VERSION)
-	@# shellcheck and pyflakes inside actionlint are off: the run scripts'
-	@# shell style is a decision of its own, not this guard's.
-	$(ACTIONLINT) -shellcheck= -pyflakes=
+	@# shellcheck runs inside actionlint over every run script (N5-ci-9).
+	@# Without it on PATH actionlint skips the check silently, so the target
+	@# refuses to run; ubuntu-latest has it, `make setup` does not install
+	@# it. pyflakes is off: no step's shell is python.
+	@command -v shellcheck >/dev/null || { echo "workflow-lint: shellcheck is not on PATH; actionlint would skip the run scripts"; exit 1; }
+	$(ACTIONLINT) -pyflakes=
 	$(ZIZMOR) --offline .github/workflows
 
 # What ci.yml runs, as make targets: `make ci` the guards that need no
-# network beyond the module proxy, `make ci-net` the two that read a clone
-# at a pinned commit (matter.js and matterjs-server for cite-check, the
-# connectedhomeip data model for chipdm-check; MATTERJS_DIR,
+# network beyond the module proxy, `make ci-net` the three that read a clone
+# at a pinned commit (matter.js and matterjs-server for cite-check and
+# testparity-snapshot-check, the connectedhomeip data model for
+# chipdm-check; MATTERJS_DIR,
 # MATTERJS_SERVER_DIR and CHIP_ROOT name them, `make chiptool-setup`
 # makes the last). Not in either, each for a reason script/requiredchecks
 # records (TestMakeCIRunsWhatCIRuns): test-32bit needs a Linux host,
 # workflow-lint needs zizmor, which is no Go tool.
 .PHONY: ci
-ci: build build-32bit vet archcheck apidiff-check race lint cover-check bench-smoke reachability-check surface-check testparity-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs offline (ci-net: the two guards that read a pinned clone)
+ci: build build-32bit vet archcheck apidiff-check race lint cover-check bench-smoke reachability-check surface-check testparity-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs offline (ci-net: the guards that read a pinned clone)
 
 .PHONY: ci-net
-ci-net: cite-check chipdm-check ## the pipeline's two guards that read a clone at a pinned commit (matter.js, connectedhomeip's data model)
+ci-net: cite-check testparity-snapshot-check chipdm-check ## the pipeline's guards that read a clone at a pinned commit (matter.js and matterjs-server, connectedhomeip's data model)

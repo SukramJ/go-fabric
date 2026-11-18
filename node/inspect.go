@@ -85,11 +85,11 @@ type Occupancy = diag.Occupancy
 // session.
 //
 // matter.js exposes the same per-session facts on its sessions
-// (packages/protocol/src/session/NodeSession.ts:183 `subscriptions`,
-// :238 `fabric`, :250 `id`, :270 `peerNodeId`; the activity timestamps
+// (packages/protocol/src/session/NodeSession.ts:191 `subscriptions`,
+// :256 `fabric`, :268 `id`, :288 `peerNodeId`; the activity timestamps
 // `timestamp` and `activeTimestamp` of
-// packages/protocol/src/session/Session.ts:56, :65, :142-146 at
-// 862ad75f); the occupancy split is this module's
+// packages/protocol/src/session/Session.ts:57, :66, :143-147 at
+// db021da0); the occupancy split is this module's
 // (operational.SessionTableOccupancy).
 func (n *Node) SessionDiagnostics() SessionDiagnostics {
 	now := n.Clock().Now()

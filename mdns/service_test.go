@@ -682,7 +682,8 @@ func TestBuildCommissionableService_RotatingID_Empty_NoRI(t *testing.T) {
 
 // TestBuildCommissionableService_ICD_Emitted verifies that a non-nil ICD
 // pointer emits the `ICD` TXT key.
-// Mirrors matter.js MdnsAdvertisement.ts:191-193.
+// Mirrors matter.js MdnsAdvertisement.ts:210 at
+// db021da0.
 func TestBuildCommissionableService_ICD_Emitted(t *testing.T) {
 	t.Parallel()
 	cfg := commissionableCfg()

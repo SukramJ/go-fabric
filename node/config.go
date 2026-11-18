@@ -11,16 +11,20 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	basicdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/surface"
@@ -44,7 +48,8 @@ type Groups = groups.Manager
 // the subset the reference daemon uses; the rest is what the daemon's
 // bring-up needs beyond them (examples/reference-bridge/main.go:84-497 at b4ea1f96^).
 type Config struct {
-	// Network mirrors matter.js `network` (NetworkServer.ts:202-222).
+	// Network mirrors matter.js `network` (NetworkServer.ts:202-223 at
+	// db021da0).
 	Network Network
 	// Commissioning mirrors matter.js `commissioning`
 	// (CommissioningServer.ts:409-419 at db021da0). An uncommissioned
@@ -170,7 +175,7 @@ type Config struct {
 	// RootServers are mounted on the root endpoint after the root's own
 	// servers — a PowerSource on a battery node's root, say: matter.js's
 	// ServerNode.RootEndpoint.with(...) (ClientNodeTest.ts:3192-3205 at
-	// 862ad75f puts PowerSourceServer.with("Battery") there). A cluster
+	// db021da0 puts PowerSourceServer.with("Battery") there). A cluster
 	// the root already serves is refused.
 	RootServers []contract.ClusterServer
 	// specificationVersion is the SpecificationVersion the node reports,
@@ -273,7 +278,8 @@ type Config struct {
 }
 
 // Network is matter.js `network` for the keys the daemon uses
-// (NetworkServer.ts:202-222: port and listening address, ipv4, tcp).
+// (NetworkServer.ts:202-223 at db021da0: port and listening address,
+// ipv4, tcp).
 type Network struct {
 	// Listen is the UDP listen address; empty is ":5540".
 	Listen string
@@ -364,7 +370,7 @@ type TimeSynchronization struct {
 	// has no UTC clock: TimeSnapshot answers SystemTimeMs alone and
 	// PosixTimeMs null, as matter.js GeneralDiagnosticsServer.timeSnapshot
 	// does without a TimeSynchronizationBehavior
-	// (GeneralDiagnosticsServer.ts:168-182).
+	// (GeneralDiagnosticsServer.ts:235-251 at db021da0).
 	Off bool
 	// Config selects the features TZ, NTPC, NTPS and TSC after
 	// connectedhomeip ([TimeSynchronizationConfig]); nil serves UTCTime
@@ -458,8 +464,13 @@ type Commissioning struct {
 	// PBKDFIterations is the SPAKE2+ PBKDF2 iteration count, within
 	// [spake2.IterationsMin, spake2.IterationsMax].
 	PBKDFIterations uint32
-	// Salt is the SPAKE2+ salt, spake2.PBKDFMinSaltSize to
-	// spake2.PBKDFMaxSaltSize bytes.
+	// Salt is a SPAKE2+ salt, spake2.PBKDFMinSaltSize to
+	// spake2.PBKDFMaxSaltSize bytes, still validated by [Config.Validate].
+	// The node no longer answers a window with it: its own window and an
+	// administrator's basic window each draw a fresh 32-byte salt when
+	// they open, as matter.js does (review II, decision 251). A window the
+	// host opens with [Node.OpenBasicWindow] takes the salt of its
+	// [WindowCredentials].
 	Salt []byte
 	// LocationCapability is GeneralCommissioning's LocationCapability
 	// (Matter §11.10.5.3), the regulatory locations the node supports and
@@ -481,7 +492,7 @@ type Commissioning struct {
 	// WindowStatus BasicWindowOpen, where the enhanced command carries its
 	// own verifier. Off by default, as matter.js serves the feature only
 	// through AdministratorCommissioningServer.with("Basic")
-	// (AdministratorCommissioningServer.ts:55-57, :105-117 at 862ad75f);
+	// (AdministratorCommissioningServer.ts:55-61, :115-127 at db021da0);
 	// a host that turns it on offers the weaker method knowingly (the
 	// window's PASE runs against the fixed setup passcode).
 	BasicCommissioning bool
@@ -490,7 +501,7 @@ type Commissioning struct {
 	// SetTCAcknowledgements before CommissioningComplete succeeds, after
 	// connectedhomeip (register row
 	// BD-chip-GeneralCommissioning-TermsAndConditions; matter.js serves no
-	// terms, GeneralCommissioningServer.ts:31 at 862ad75f). nil leaves the
+	// terms, GeneralCommissioningServer.ts:31 at db021da0). nil leaves the
 	// feature off. The node keeps the acceptance in its store, reverts a
 	// tentative one with the fail-safe and resets it with the last fabric.
 	// The row is served behind [Config].Surface's Extensions (ADR 0030).
@@ -652,6 +663,49 @@ type BasicInformation struct {
 	SoftwareVersionString string
 }
 
+// basicInformationChecks holds a value to the generated BasicInformation
+// definition's type and constraint (spec.Instance.CheckValue): the
+// constraints are the schema's, never stated here.
+var basicInformationChecks = sync.OnceValues(func() (*spec.Instance, error) {
+	return spec.New(basicdef.Definition, spec.Options{})
+})
+
+// constraintErrors refuses each BasicInformation string beyond its
+// attribute's constraint in the generated definition (VendorName,
+// ProductName, ProductLabel, NodeLabel, SerialNumber and the two version
+// strings), naming the attribute and the constraint (review II,
+// R2-P6-api-2407, decision 201): served as it is, an over-long value is a
+// wrong answer to every controller. An empty string is the field's
+// default (NodeLabel the ProductName, a version string the server's
+// fallback) and is not checked here.
+func (b BasicInformation) constraintErrors() []error {
+	inst, err := basicInformationChecks()
+	if err != nil {
+		return []error{fmt.Errorf("node: the BasicInformation definition: %w", err)}
+	}
+	var errs []error
+	for _, f := range []struct {
+		attr  uint32
+		value string
+	}{
+		{basicdef.AttrVendorName, b.VendorName},
+		{basicdef.AttrProductName, b.ProductName},
+		{basicdef.AttrProductLabel, b.ProductLabel},
+		{basicdef.AttrNodeLabel, b.NodeLabel},
+		{basicdef.AttrSerialNumber, b.SerialNumber},
+		{basicdef.AttrHardwareVersionString, b.HardwareVersionString},
+		{basicdef.AttrSoftwareVersionString, b.SoftwareVersionString},
+	} {
+		if f.value == "" {
+			continue
+		}
+		if _, err := inst.CheckValue(f.attr, f.value, nil); err != nil {
+			errs = append(errs, fmt.Errorf("node: BasicInformation.%s (constraint %q): %w", basicdef.Definition.Attribute(f.attr).Name, basicdef.Definition.Attribute(f.attr).Constraint.Text, err))
+		}
+	}
+	return errs
+}
+
 // defaultNodeLabel sets an empty NodeLabel to the ProductName, before
 // anything reads it: the root serves it, the commissionable record
 // advertises it when ProductDescription.Name is empty, and the first
@@ -753,8 +807,8 @@ type Attestation struct {
 	// CertificationDeclaration. Mirrors matter.js
 	// OperationalCredentialsServer.State.certification, which takes an
 	// async provider (packages/protocol/src/certificate/
-	// DeviceCertification.ts:181, built on first use by
-	// OperationalCredentialsServer.ts:560-572).
+	// DeviceCertification.ts:185, built on first use by
+	// OperationalCredentialsServer.ts:560-572 at db021da0).
 	Provider func(ctx context.Context) (chain *AttestationChain, certificationDeclaration []byte, err error)
 }
 
@@ -890,7 +944,7 @@ func (c *Config) Validate() error {
 	// A mode that is none of warn, strict and off fails the node's
 	// construction. Mirrors matter.js
 	// packages/node/src/node/server/DeviceTypeConformanceService.ts:674-685
-	// at 862ad75f (modeOf: an unknown endpoint.validation value throws).
+	// at db021da0 (modeOf: an unknown endpoint.validation value throws).
 	switch c.DeviceTypeValidation {
 	case endpoint.DeviceTypeValidationWarn, endpoint.DeviceTypeValidationStrict, endpoint.DeviceTypeValidationOff:
 	default:
@@ -909,6 +963,7 @@ func (c *Config) Validate() error {
 	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
 		errs = append(errs, fmt.Errorf("node: BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
 	}
+	errs = append(errs, c.BasicInformation.constraintErrors()...)
 	errs = append(errs, c.limitsPairErrors()...)
 	errs = append(errs, c.advertisementErrors()...)
 	if c.Network.GATT != nil && c.Network.BLE != nil { //nolint:staticcheck // the deprecated port is still honoured
@@ -970,6 +1025,7 @@ func (c *Config) optionalErrors() []error {
 	if c.Health != nil && c.Health.Interval < 0 {
 		errs = append(errs, fmt.Errorf("node: Health.Interval %v is negative", c.Health.Interval))
 	}
+	errs = append(errs, c.boundErrors()...)
 	if n := c.Network.TCP.MaxInboundConnections; n < 0 {
 		errs = append(errs, fmt.Errorf("node: Network.TCP.MaxInboundConnections %d is negative", n))
 	}
@@ -987,6 +1043,9 @@ func (c *Config) optionalErrors() []error {
 	if c.TLS != nil && c.TLS.CertificatePort == nil {
 		errs = append(errs, errNoCertificatePort)
 	}
+	if c.TLS != nil {
+		errs = append(errs, c.TLS.capacityErrors()...)
+	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("node: OTA.Dir must be set"))
 	}
@@ -994,6 +1053,58 @@ func (c *Config) optionalErrors() []error {
 		if err := c.ICD.validate(); err != nil {
 			errs = append(errs, err)
 		}
+	}
+	return errs
+}
+
+// minPeriod is the shortest period Validate takes for the node's own
+// periodic work — the health probe, the interface check: a period below
+// it runs the work back to back for nothing a host can observe. A module
+// rule.
+const minPeriod = time.Second
+
+// maxHostLabel is the longest mDNS host-name override, one DNS label
+// before ".local": connectedhomeip's kHostNameMaxLength, 40 bytes
+// (src/lib/dnssd/Constants.h:32-36 at 6170af84), below RFC 1035's 63 for a
+// label (owner decision 229, review II R2-P6-api-2409).
+const maxHostLabel = 40
+
+// boundErrors refuses the Config values no other check bounds (review II,
+// R2-P6-api-2409): a probe or interface-check period below [minPeriod]
+// (a negative InterfaceCheck stays the documented "off"); a negative OTA
+// HTTPS limit or announced-update delay, which would read as the default
+// or as no wait; an advertised device type the schema does not define; an
+// mDNS host name that is not one DNS label; and EndpointState beside
+// EndpointPersistence, the older field the node would then ignore.
+func (c *Config) boundErrors() []error {
+	var errs []error
+	if c.Health != nil && c.Health.Interval > 0 && c.Health.Interval < minPeriod {
+		errs = append(errs, fmt.Errorf("node: Health.Interval %v is below %v", c.Health.Interval, minPeriod))
+	}
+	if d := c.Network.InterfaceCheck; d > 0 && d < minPeriod {
+		errs = append(errs, fmt.Errorf("node: Network.InterfaceCheck %v is below %v (negative turns the check off)", d, minPeriod))
+	}
+	if o := c.OTA; o != nil {
+		if o.HTTPSMaxImageSize < 0 {
+			errs = append(errs, fmt.Errorf("node: OTA.HTTPSMaxImageSize %d is negative", o.HTTPSMaxImageSize))
+		}
+		if o.HTTPSIdleTimeout < 0 {
+			errs = append(errs, fmt.Errorf("node: OTA.HTTPSIdleTimeout %v is negative", o.HTTPSIdleTimeout))
+		}
+		if d := o.AnnouncedUpdateQueryDelay; d != nil && *d < 0 {
+			errs = append(errs, fmt.Errorf("node: OTA.AnnouncedUpdateQueryDelay %v is negative", *d))
+		}
+	}
+	if dt := c.ProductDescription.DeviceType; dt != 0 {
+		if _, ok := schema.DeviceTypeRevision(schema.DeviceTypeID(dt)); !ok {
+			errs = append(errs, fmt.Errorf("node: ProductDescription.DeviceType 0x%04X is not a device type of the schema", dt))
+		}
+	}
+	if h := c.Network.MDNS.HostName; h != "" && (strings.ContainsAny(h, ". \t") || len(h) > maxHostLabel) {
+		errs = append(errs, fmt.Errorf("node: Network.MDNS.HostName %q is not one DNS label of at most %d bytes (without \".local\")", h, maxHostLabel))
+	}
+	if c.EndpointState != nil && c.EndpointPersistence != nil { //nolint:staticcheck // the deprecated field is still honoured
+		errs = append(errs, errors.New("node: EndpointState excludes the deprecated EndpointPersistence"))
 	}
 	return errs
 }

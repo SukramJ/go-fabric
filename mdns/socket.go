@@ -23,9 +23,11 @@ import (
 // The responder's sockets: one IPv4 and one IPv6 UDP socket on port 5353,
 // joined to 224.0.0.251 and ff02::fb on every multicast interface, with the
 // interface of each received packet reported so the answer goes out where
-// the query came in (matter.js answers per interface, MdnsServer.ts:187-197
-// at 862ad75f). The wildcard multicast bind coexists with the OS responder
-// (avahi, mDNSResponder) and with the module's own querier (query_conn.go).
+// the query came in (matter.js answers per interface, MdnsServer.ts:115 and
+// InterfaceResponder.ts:743-789 (#transmit, the send on its own interface
+// :751) at db021da0). The wildcard multicast bind coexists with the OS
+// responder (avahi, mDNSResponder) and with the
+// module's own querier (query_conn.go).
 
 var (
 	mdnsGroup4 = &net.UDPAddr{IP: net.IPv4(224, 0, 0, 251), Port: 5353}
@@ -291,7 +293,7 @@ func (s *sockets) link(ifIndex int) link {
 
 // linkOf is ifi as a [link]: the advertise policy's addresses, IPv4
 // dropped when no IPv4 socket bound (matter.js MdnsAdvertisement.ts:166-169
-// supportsIpv4 at 862ad75f), and the families of all its addresses.
+// supportsIpv4 at db021da0), and the families of all its addresses.
 func (s *sockets) linkOf(ifi net.Interface) link {
 	h := hostIfaceOf(ifi)
 	l := link{index: ifi.Index, name: ifi.Name, listed: true, nets: h.nets}

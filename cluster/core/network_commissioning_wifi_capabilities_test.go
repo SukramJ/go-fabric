@@ -171,3 +171,38 @@ func TestFailSafeExpiryDisconnectsAfterAFailedRejoin(t *testing.T) {
 		t.Errorf("after the failed rejoin the radio is on %q, want none", d.on())
 	}
 }
+
+// TestWiFiOnConnectedRunsAfterASuccessfulJoin (review II, R2-P6-api-2450):
+// the OnConnected hook runs once after a ConnectNetwork the driver
+// answers successfully, and not after one it refuses.
+func TestWiFiOnConnectedRunsAfterASuccessfulJoin(t *testing.T) {
+	t.Parallel()
+	var armed atomic.Bool
+	var joined atomic.Int32
+	d := newCapableDriver("home")
+	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{
+		Driver: d, IsFailSafeArmed: armed.Load, Clock: clocktest.New(time.Unix(1_700_000_000, 0)),
+		OnConnected: func(context.Context) { joined.Add(1) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	armed.Store(true)
+	for _, ssid := range []string{"home", "away"} {
+		if _, err := w.MatterInvoke(t.Context(), netcommdef.CmdAddOrUpdateWiFiNetwork, netcommdef.AddOrUpdateWiFiNetworkRequest{Ssid: []byte(ssid), Credentials: []byte("secret12")}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := w.MatterInvoke(t.Context(), netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("away")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := joined.Load(); got != 0 {
+		t.Fatalf("OnConnected ran %d times after a refused join, want 0", got)
+	}
+	if r, err := w.MatterInvoke(t.Context(), netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("home")}); err != nil || r.(netcommdef.ConnectNetworkResponse).NetworkingStatus != netcommdef.NetworkCommissioningStatusSuccess {
+		t.Fatalf("join of home: %+v %v", r, err)
+	}
+	if got := joined.Load(); got != 1 {
+		t.Errorf("OnConnected ran %d times after a successful join, want 1", got)
+	}
+}

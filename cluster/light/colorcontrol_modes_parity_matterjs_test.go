@@ -209,6 +209,16 @@ func TestRemainingTimeOnStops(t *testing.T) {
 			invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100})
 			invoke(t, srv, ccdef.CmdStopMoveStep, ccdef.StopMoveStepRequest{})
 		}, []uint64{100, 0}},
+		// R2-P6-fsm-1402: an immediate move ends the running transition as
+		// a cancel does, as connectedhomeip's level cluster
+		// (LevelControlCluster.cpp:351, :731-735, :701-706 at 6170af84: 0,
+		// reportable for a transition of 1 s or longer — 10 s here);
+		// matter.js's replace reports nothing.
+		{"an immediate move replaces a running one", allColorFeatures, func(t *testing.T, srv *light.ColorControlServer) {
+			t.Helper()
+			invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100})
+			invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300})
+		}, []uint64{100, 0}},
 		{"a mode switch reports only the new remaining time", allColorFeatures, func(t *testing.T, srv *light.ColorControlServer) {
 			t.Helper()
 			invoke(t, srv, ccdef.CmdMoveToHue, ccdef.MoveToHueRequest{Hue: 200, Direction: ccdef.DirectionUp, TransitionTime: 200})
@@ -455,6 +465,36 @@ func TestColorLoopSet(t *testing.T) {
 		synctest.Wait()
 		if read(t, srv, ccdef.AttrEnhancedCurrentHue) != 5000 {
 			t.Error("the hue moved after the loop stopped")
+		}
+	})
+}
+
+// TestColorLoopTimeZeroTurnsOnceASecond (R2-P6-fsm-1412): a loop started
+// with ColorLoopTime 0 moves the hue, one turn a second, as
+// connectedhomeip guards the zero ("loopTimeSec = (timeSec == 0) ? 1u :
+// timeSec", ColorControlCluster.cpp:913 at 6170af84); the attribute keeps
+// reading 0. matter.js divides by `colorLoopTime`
+// (ColorControlServer.ts:1208 at db021da0), with ColorLoopActive set
+// Active before it (:1156), over a hue that does not move — the
+// divergence this test pins.
+func TestColorLoopTimeZeroTurnsOnceASecond(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		srv := colorLight(t, allColorFeatures, true)
+		invoke(t, srv, ccdef.CmdColorLoopSet, ccdef.ColorLoopSetRequest{
+			UpdateFlags: ccdef.UpdateFlagsUpdateAction | ccdef.UpdateFlagsUpdateDirection | ccdef.UpdateFlagsUpdateTime | ccdef.UpdateFlagsUpdateStartHue,
+			Action:      ccdef.ColorLoopActionActivateFromColorLoopStartEnhancedHue,
+			Direction:   ccdef.ColorLoopDirectionIncrement, Time: 0, StartHue: 1000,
+		})
+		if read(t, srv, ccdef.AttrColorLoopActive) != 1 || read(t, srv, ccdef.AttrColorLoopTime) != 0 {
+			t.Fatal("ColorLoopSet with Time 0 did not start the loop with ColorLoopTime 0")
+		}
+		time.Sleep(500 * time.Millisecond)
+		synctest.Wait()
+		// About half a turn in half a second (the first step counts one
+		// step interval more, as every transition's): floor(65535/1) a
+		// second.
+		if h := read(t, srv, ccdef.AttrEnhancedCurrentHue); h < 1000+30000 || h > 1000+42000 {
+			t.Errorf("after 0.5 s the loop is at %d, want about half a turn past 1000", h)
 		}
 	})
 }

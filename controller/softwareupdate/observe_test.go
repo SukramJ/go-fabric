@@ -60,7 +60,7 @@ func observe(t *testing.T, m *Manager) *eventLog {
 
 // TestObserveAppliedUpdate: an update the provider reports Applying and
 // then Done is reported applying once — a retransmitted ApplyUpdateRequest
-// reports Applying again (SoftwareUpdateManager.ts:1312-1318 at 862ad75f)
+// reports Applying again (SoftwareUpdateManager.ts:1312-1318 at db021da0)
 // — and then done, both with the queued target.
 func TestObserveAppliedUpdate(t *testing.T) {
 	t.Parallel()

@@ -15,7 +15,7 @@ import (
 
 // GroupDataCounterKey is the matter_metadata key of the node-global Group
 // Encrypted Data Message Counter. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:192 at 0ceb202d
+// packages/protocol/src/session/SessionManager.ts:226 at db021da0
 // (GROUP_DATA_COUNTER_KEY).
 const GroupDataCounterKey = "groupDataCounter"
 

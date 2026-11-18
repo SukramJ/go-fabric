@@ -13,12 +13,12 @@ import (
 
 // ServiceTypeCommissioner is the commissioner discovery service label,
 // Matter §4.3.3: matter.js MATTER_COMMISSIONER_SERVICE_QNAME
-// (packages/protocol/src/mdns/MdnsConsts.ts:12 at 862ad75f).
+// (packages/protocol/src/mdns/MdnsConsts.ts:12 at db021da0).
 const ServiceTypeCommissioner = "_matterd._udp"
 
 // CommissionerServiceConfig drives [BuildCommissionerService]: matter.js's
 // ServiceDescription.Commissioner (packages/protocol/src/advertisement/
-// ServiceDescription.ts:94-110 at 862ad75f) — a ProductDescription whose
+// ServiceDescription.ts:94-110 at db021da0) — a ProductDescription whose
 // device type is optional — and the advertiser's omitPrivateDetails.
 type CommissionerServiceConfig struct {
 	// InstanceID is the instance label's 8 random bytes, rendered as 16
@@ -50,7 +50,7 @@ type CommissionerServiceConfig struct {
 // BuildCommissionerService is the `_matterd._udp` record a commissioner
 // advertises, Matter §4.3.3. It mirrors matter.js's
 // CommissionerMdnsAdvertisement (packages/protocol/src/advertisement/
-// mdns/CommissionerMdnsAdvertisement.ts at 862ad75f): the instance
+// mdns/CommissionerMdnsAdvertisement.ts at db021da0): the instance
 // `<id>._matterd._udp.local` (:24-30, MdnsConsts.ts:46), the `_V<vendor>`
 // subtype unless privacy masked (:41-45), the `_T<deviceType>` subtype when
 // a device type is given (:47-52), and the TXT keys DN, DT and — unless

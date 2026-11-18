@@ -34,7 +34,7 @@ read at the pin (`0ceb202d`, 2026-10-14) measured:
   mounts a generated definition with `Source`/`Sink` hooks and
   `Server.Handle(cmdID, handler)` for commands; an unhandled command
   answers UNSUPPORTED_COMMAND. It refuses a fabric-scoped attribute
-  (`cluster/spec/server.go:131-135`, `ErrFabricScoped`): Messages'
+  (`cluster/spec/server.go`, `ErrFabricScoped`): Messages'
   `Messages` attribute is `R F V`, so Messages needs a core-held server as
   Binding and EcosystemInformation have (`device/device.go` default
   factories). List- and struct-typed mandatory attributes have no

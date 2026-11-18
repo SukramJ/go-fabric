@@ -179,7 +179,7 @@ func TestSinkEchoInTheTimedOffTick(t *testing.T) {
 // through Set before it returns does not hide the change from the scene
 // invalidation — matter.js judges On and Off on this.state.onOff at
 // command start (packages/node/src/behaviors/on-off/OnOffServer.ts:98-100, :120-122 at
-// 862ad75f; W3-club2-01). A command that changes nothing still
+// db021da0; W3-club2-01). A command that changes nothing still
 // invalidates nothing.
 func TestSinkEchoInvalidatesScenes(t *testing.T) {
 	t.Parallel()

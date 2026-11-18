@@ -13,7 +13,7 @@ import (
 )
 
 // The node's settings — matter.js NetworkClient.State's persisted fields
-// (behavior/system/network/NetworkClient.ts:331-372 at 0ceb202d, all
+// (behavior/system/network/NetworkClient.ts:497-538 at db021da0, all
 // quality N) — are stored with the image, under a cluster id no cluster
 // has, on endpoint 0: the place of matter.js's "network" behaviour context
 // in ClientNodeStores.
@@ -27,7 +27,7 @@ const (
 	// settingCacheFabricFiltered is the cache's recorded fabric filter —
 	// ClientNodeStore's "fabricFiltered" key of its cache context
 	// (packages/node/src/storage/client/ClientNodeStore.ts:17, :88-97 at
-	// 862ad75f). It is written on its own ([Node.adoptFabricFilter]),
+	// db021da0). It is written on its own ([Node.adoptFabricFilter]),
 	// never with the other settings.
 	settingCacheFabricFiltered uint32 = 4
 )
@@ -242,6 +242,17 @@ func (o *SubscribeOptions) clone() *SubscribeOptions {
 	}
 	if o.Events != nil {
 		c.Events = slices.Clone(o.Events)
+	}
+	// The interval bounds are pointers: the copy gets its own, so a write
+	// through the caller's pointer changes neither the stored setting nor
+	// a clone handed out (review II, R2-P6-api-2356).
+	if o.MinIntervalFloor != nil {
+		v := *o.MinIntervalFloor
+		c.MinIntervalFloor = &v
+	}
+	if o.MaxIntervalCeiling != nil {
+		v := *o.MaxIntervalCeiling
+		c.MaxIntervalCeiling = &v
 	}
 	return &c
 }

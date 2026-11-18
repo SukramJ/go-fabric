@@ -134,7 +134,7 @@ func TestJointCommissioningOverTheWire(t *testing.T) {
 	c := site.AddController(fabrictest.ControllerOptions{FabricID: 0x0C})
 	var refused commissioner.TrustInfo
 	_, err = c.Commission(ctx, dev, fabrictest.CommissionOptions{Edit: func(o *commissioner.Options) {
-		o.JointFabric = &commissioner.JointFabricOptions{Consent: func(info commissioner.TrustInfo) bool { refused = info; return false }}
+		o.JointFabric = &commissioner.JointFabricOptions{TrustAnchors: jcm.SelfAnchored, Consent: func(_ context.Context, info commissioner.TrustInfo) (bool, error) { refused = info; return false, nil }}
 	}})
 	if !errors.Is(err, commissioner.ErrJointFabric) {
 		t.Fatalf("refused consent: %v, want ErrJointFabric", err)
@@ -155,9 +155,12 @@ func TestJointCommissioningOverTheWire(t *testing.T) {
 	pairA, err := a.Commission(ctx, dev, fabrictest.CommissionOptions{Edit: func(o *commissioner.Options) {
 		o.CATs = []uint32{adminCAT}
 		o.Progress = func(s commissioner.Step) { steps = append(steps, s) }
+		// The site's fabrics are self-minted: the test anchors the
+		// administrator's vendor id at its own root (jcm.SelfAnchored).
 		o.JointFabric = &commissioner.JointFabricOptions{
-			Consent:  func(commissioner.TrustInfo) bool { asked = true; return true },
-			Progress: func(s jcm.Stage, _ jcm.Result) { stages = append(stages, s) },
+			TrustAnchors: jcm.SelfAnchored,
+			Consent:      func(context.Context, commissioner.TrustInfo) (bool, error) { asked = true; return true, nil },
+			Progress:     func(s jcm.Stage, _ jcm.Result) { stages = append(stages, s) },
 		}
 	}})
 	if err != nil {

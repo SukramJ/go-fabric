@@ -92,7 +92,7 @@ type ICDUserActiveModeTrigger struct {
 }
 
 // ICDModeEvent is a transition of the device's idle/active mode
-// (matter.js IcdManagementServer.ts:813-820, Events).
+// (matter.js IcdManagementServer.ts:813-820 at db021da0, Events).
 type ICDModeEvent uint8
 
 // The three events.
@@ -320,8 +320,10 @@ func (i *ICD) OnModeChangeAsync(fn func(ICDModeEvent)) (unsubscribe func()) {
 	if fn == nil {
 		return func() {}
 	}
-	q := i.n.callbacks
-	return i.srv.OnModeEvent(func(e mattercore.ICDModeEvent) { q.Enqueue(func() { fn(ICDModeEvent(e)) }) })
+	// Through queued, which contains a panic as every queued host
+	// callback's (review II, R2-P6-err-2410).
+	n := i.n
+	return i.srv.OnModeEvent(func(e mattercore.ICDModeEvent) { n.queued("icd_mode_change", func() { fn(ICDModeEvent(e)) }) })
 }
 
 // startICD enters active mode once the node's fabrics are announced: the

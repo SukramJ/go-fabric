@@ -5,6 +5,9 @@
   superseded by [ADR 0031](./0031-ble-and-wifi-provisioning-on-the-device-side.md)
   (2026-11-11)
 - **Date**: 2026-10-16
+- **Supersedes**: decision 4 of
+  [ADR 0020 — the commissioner and controller role](./0020-commissioner-and-controller-role.md)
+  ("On-network only")
 - **Related**: [ADR 0020 — the commissioner and controller role](./0020-commissioner-and-controller-role.md),
   [concept v3](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v3-commissioner-in-the-field.md) §A.1,
   `docs/matterjs-comparison.md` (the BLE row and non-goal 2)

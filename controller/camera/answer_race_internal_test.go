@@ -132,7 +132,7 @@ func awaitSessionSignal(t *testing.T, sess *Session) Signal {
 func TestCameraAnswerAtEstablishing(t *testing.T) {
 	t.Run("an Answer served at the end of the establishing step reaches the session's signals", func(t *testing.T) {
 		f, port, r, rr := raceFixture(t)
-		sess := &Session{box: newMailbox(t.Context())}
+		sess := &Session{box: newMailbox(t.Context(), nil)}
 		var answerErr error
 		answered := false
 		rr.afterUpsert = func(s wrdef.WebRTCSessionStruct) {
@@ -204,7 +204,7 @@ func TestCameraAnswerAtArrival(t *testing.T) {
 	at := target{psCamera, psEndpoint}
 	t.Run("an Answer served between the response's arrival and newSession's result reaches the session's signals", func(t *testing.T) {
 		f, port, r, _ := raceFixture(t)
-		sess := &Session{box: newMailbox(t.Context())}
+		sess := &Session{box: newMailbox(t.Context(), nil)}
 		var answerErr error
 		f.held = func(any) error {
 			// newSession is held here: the response arrived, the invoke
@@ -305,7 +305,7 @@ func raceEnded(f *psFixture, id uint16) bool {
 // goes to Observer.Signal, never to a session, even one of that id.
 func TestCameraRefusalReachesTheObserver(t *testing.T) {
 	s := sigService()
-	sess := &Session{box: newMailbox(t.Context())}
+	sess := &Session{box: newMailbox(t.Context(), nil)}
 	s.sessions[sessionKey{psCamera, psEndpoint, 9}] = sess
 	var observed []Signal
 	s.cfg.Observer.Signal = func(sig Signal) { observed = append(observed, sig) }
@@ -367,7 +367,7 @@ func TestCameraArrivalOnTheFabric(t *testing.T) {
 	probe := &arrivalProbe{clientProviderNodes: clientProviderNodes{d.svc.io}}
 	ps := &providerSessions{
 		nodes: probe, requestor: requestor{d.c.CameraRequestor()}, fabricIndex: d.c.Fabric().FabricIndex,
-		log: slog.New(slog.DiscardHandler), cleanup: d.svc.m.cleanupContext, offers: map[providerKey]string{},
+		log: slog.New(slog.DiscardHandler), cleanup: d.svc.m.cleanupContext, offers: map[providerKey]*sentOffer{},
 	}
 	probe.ps = ps
 	usage := wpdef.StreamUsageLiveView

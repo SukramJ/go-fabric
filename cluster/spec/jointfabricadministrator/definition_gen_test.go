@@ -143,6 +143,7 @@ func TestTypedServer(t *testing.T) {
 	}
 	var _ AdministratorPort = d.AdministratorPort
 	var _ CommissionerReach = d.CommissionerReach
+	var _ TrustAnchors = d.TrustAnchors
 	// Every handler declared: each is installed, and refused by the
 	// empty definition's AcceptedCommandList.
 	all := d

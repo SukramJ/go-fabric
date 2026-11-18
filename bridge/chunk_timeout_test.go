@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/transport"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -113,5 +114,43 @@ func TestMaxScheduleTimeLeavesActiveOnlyPastTheThreshold(t *testing.T) {
 	}
 	if below := maxScheduleTime(idle, active, first-time.Nanosecond, true, 0); below <= at {
 		t.Errorf("a threshold the wait passes: %v, want more than %v (idle from the second send)", below, at)
+	}
+}
+
+// TestChunkStatusResponseTimeoutSumsThePeersSchedule (review II,
+// F-db021da0-13): with the session lookup stating the peer's whole MRP
+// schedule, the peer term is matter.js's maxResponseTimeOf over it — on
+// the active interval while the peer was active at the send and the wait
+// has not passed its active threshold, on the idle interval after — not
+// the one base interval the peer had at the send summed throughout.
+func TestChunkStatusResponseTimeoutSumsThePeersSchedule(t *testing.T) {
+	t.Parallel()
+	const (
+		idle      = 5 * time.Second
+		active    = 300 * time.Millisecond
+		threshold = time.Second
+	)
+	bound := func(withSchedule bool) time.Duration {
+		b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: "127.0.0.1:0"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lookup := NewOperationalSessionLookup(func(uint16) (*channel.Session, bool) { return nil, false }).
+			WithRetransmitIntervalResolver(func(uint16, time.Time) (time.Duration, bool) { return active, true })
+		if withSchedule {
+			lookup = lookup.WithPeerScheduleResolver(func(uint16) (time.Duration, time.Duration, time.Duration, bool, bool) {
+				return idle, active, threshold, true, true
+			})
+		}
+		b.AttachSessionLookup(lookup)
+		return b.chunkStatusResponseTimeout(nil, 1)
+	}
+	got, onBase := bound(true), bound(false)
+	want := maxScheduleTime(idle, active, threshold, true, 0) - maxScheduleTime(active, active, 0, false, 0)
+	if got-onBase != want {
+		t.Fatalf("the schedule moved the bound by %v, want %v (bound %v, on the base interval %v)", got-onBase, want, got, onBase)
+	}
+	if want <= 0 {
+		t.Fatalf("the test needs a schedule that reaches the idle interval (difference %v)", want)
 	}
 }

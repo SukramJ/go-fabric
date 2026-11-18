@@ -17,7 +17,7 @@ import (
 
 // The ClientInteraction.close and abandoned-subscribe cases of matter.js's
 // ClientInteractionSubscribeTest (packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts
-// at 862ad75f) on the scripted peer: Close (ClientInteraction.ts:264-297),
+// at db021da0) on the scripted peer: Close (ClientInteraction.ts:264-297),
 // the in-flight set it drains, and the abandoned establishment
 // (:1084-1097, InteractionMessenger.ts:1116-1137).
 

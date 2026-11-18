@@ -267,8 +267,6 @@ var variableKeySites = map[string][]string{
 		"basic_information.configuration_version", "bridged_configuration_version.<key>",
 		"basic_information.surface_digest", "bridged_surface_digest.<key>", "bridged_surface_digest.@<endpoint>",
 	},
-	// bridgedUserLabelKeyRoot + key
-	"node/user_labels.go:persisted.userLabel": {"bridged_user_label.<key>"},
 }
 
 // TestSettingsKeysDocumented: every settings key this module writes with a

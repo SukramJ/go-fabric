@@ -58,10 +58,10 @@ func TestForgetOwesTheReloadOfThatFabricOnly(t *testing.T) {
 	st.mu.Unlock()
 
 	m.ForgetFabric(1)
-	if msg, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, 1, true, []byte("x"))); err != nil || msg.Duplicate {
+	if msg, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, 1, true, imPayload([]byte("x")))); err != nil || msg.Duplicate {
 		t.Fatalf("a message of fabric 2 while the store fails after ForgetFabric(1): err %v", err)
 	}
-	if _, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, []byte("x"))); err == nil {
+	if _, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, imPayload([]byte("x")))); err == nil {
 		t.Fatal("fabric 1 decoded while its reload failed")
 	}
 	if err := m.Load(ctx); !errors.Is(err, errStoreDown) {
@@ -74,7 +74,7 @@ func TestForgetOwesTheReloadOfThatFabricOnly(t *testing.T) {
 	if err := m.Load(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if msg, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 2, true, []byte("x"))); err != nil || msg.Duplicate {
+	if msg, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 2, true, imPayload([]byte("x")))); err != nil || msg.Duplicate {
 		t.Fatalf("fabric 1 after the store recovered: err %v", err)
 	}
 }
@@ -87,7 +87,7 @@ func TestParkedWindowsSurviveASecondForget(t *testing.T) {
 	ctx := context.Background()
 	op, sid := opKeyOf(t, 0xA1)
 	m, st := newTestManager(t)
-	recorded := sealGroup(t, op, sid, 0x0101, 7, 100, true, []byte("toggle"))
+	recorded := sealGroup(t, op, sid, 0x0101, 7, 100, true, imPayload([]byte("toggle")))
 	if msg, err := m.Decode(ctx, recorded); err != nil || msg.Duplicate {
 		t.Fatalf("the first message: err %v", err)
 	}
@@ -122,7 +122,7 @@ func TestParkedWindowWinsOverAFreshOne(t *testing.T) {
 	m, _ := newTestManager(t)
 	recorded := make([][]byte, 3) // counters 100, 101, 102 of source 7
 	for i := range recorded {
-		recorded[i] = sealGroup(t, op, sid, 0x0101, 7, uint32(100+i), true, []byte("toggle"))
+		recorded[i] = sealGroup(t, op, sid, 0x0101, 7, uint32(100+i), true, imPayload([]byte("toggle")))
 		if msg, err := m.Decode(ctx, recorded[i]); err != nil || msg.Duplicate {
 			t.Fatalf("message %d: err %v", i, err)
 		}
@@ -141,7 +141,7 @@ func TestParkedWindowWinsOverAFreshOne(t *testing.T) {
 			t.Fatalf("the recorded datagram %d of source 7: err %v, want a duplicate (the parked window wins)", 100+i, err)
 		}
 	}
-	if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 7, 103, true, []byte("toggle"))); err != nil || msg.Duplicate {
+	if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 7, 103, true, imPayload([]byte("toggle")))); err != nil || msg.Duplicate {
 		t.Fatalf("source 7's next counter: err %v", err)
 	}
 	if window(m, op, 9).Accept(50) {
@@ -157,7 +157,7 @@ func TestParkedWindowsOfARemovedFabricAreDropped(t *testing.T) {
 	ctx := context.Background()
 	op, sid := opKeyOf(t, 0xA1)
 	m, st := newTestManager(t)
-	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 7, 100, true, []byte("toggle"))); err != nil {
+	if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 7, 100, true, imPayload([]byte("toggle")))); err != nil {
 		t.Fatal(err)
 	}
 	st.mu.Lock()
@@ -198,7 +198,7 @@ func TestOwedReloadIsPacedOnTheReceivePath(t *testing.T) {
 	flood := func(n int) {
 		for range n {
 			counter++
-			if _, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, counter, true, []byte("x"))); err != nil {
+			if _, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, counter, true, imPayload([]byte("x")))); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -237,7 +237,7 @@ func TestOwedReloadIsPacedOnTheReceivePath(t *testing.T) {
 	fake.Advance(time.Minute)
 	flood(1)
 	op1, sid1 := opKeyOf(t, 0xA1)
-	if _, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, []byte("x"))); err != nil {
+	if _, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, imPayload([]byte("x")))); err != nil {
 		t.Fatalf("fabric 1 after the store recovered: %v", err)
 	}
 }
@@ -286,7 +286,7 @@ func TestNewForgetStartsUnpaced(t *testing.T) {
 	st.mu.Unlock()
 	m.ForgetFabric(1)
 	for c := range uint32(3) { // paced attempts fail: a backoff is set
-		if _, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, c+1, true, []byte("x"))); err != nil {
+		if _, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, c+1, true, imPayload([]byte("x")))); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -297,10 +297,10 @@ func TestNewForgetStartsUnpaced(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.ForgetFabric(2)
-	if msg, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, 10, true, []byte("x"))); err != nil || msg.Duplicate {
+	if msg, err := m.Decode(ctx, sealGroup(t, op2, sid2, 0x0202, 9, 10, true, imPayload([]byte("x")))); err != nil || msg.Duplicate {
 		t.Fatalf("fabric 2 on the first receive after its forget: err %v (held back by an old backoff?)", err)
 	}
-	if msg, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, []byte("x"))); err != nil || msg.Duplicate {
+	if msg, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, imPayload([]byte("x")))); err != nil || msg.Duplicate {
 		t.Fatalf("fabric 1 after its Reload: err %v", err)
 	}
 }

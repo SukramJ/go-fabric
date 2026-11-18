@@ -14,8 +14,8 @@ import (
 )
 
 // The DER reading of a CRL as matter.js does it: its DerCodec
-// (packages/general/src/codec/DerCodec.ts at 0ceb202d) and
-// DclCertificateService.parseCrl (DclCertificateService.ts:1785-1998).
+// (packages/general/src/codec/DerCodec.ts at db021da0) and
+// DclCertificateService.parseCrl (DclCertificateService.ts:1900-2113).
 // crypto/x509's ParseRevocationList reads differently — it neither reports
 // an unknown critical extension nor an Issuing Distribution Point URI —
 // so the CRL is walked here node by node, as matter.js walks it.
@@ -112,13 +112,20 @@ func derDecodeRec(data []byte, depth int) (derNode, []byte, error) {
 		if len(rest) < ll {
 			return derNode{}, nil, errDERTruncated
 		}
-		length = 0
+		// Accumulated in 64 bits and compared with what is left before it
+		// becomes an int, so a 5- or 6-byte length cannot wrap on a 32-bit
+		// build (review II, R2-P6-wire-1917).
+		var long uint64
 		for _, b := range rest[:ll] {
-			length = length*0x100 + int(b)
+			long = long<<8 | uint64(b)
 		}
 		rest = rest[ll:]
+		if long > uint64(len(rest)) {
+			return derNode{}, nil, errDERTruncated
+		}
+		length = int(long) //nolint:gosec // at most len(rest), checked above
 	}
-	if length < 0 || len(rest) < length {
+	if len(rest) < length {
 		return derNode{}, nil, errDERTruncated
 	}
 	content, rest := rest[:length], rest[length:]

@@ -13,6 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -102,6 +103,18 @@ func withheldOr[T any](d *T, err error) (*T, error) {
 		return d, err
 	}
 	return nil, err
+}
+
+// nilEndpoint reports whether ep holds no device: a nil interface, or a
+// nil pointer of a device type inside it — what a constructor's
+// "return nil, err" and withheldOr's nil result turn into once they are
+// passed as a node.Endpoint (R2-P6-err-2617).
+func nilEndpoint(ep node.Endpoint) bool {
+	if ep == nil {
+		return true
+	}
+	v := reflect.ValueOf(ep)
+	return v.Kind() == reflect.Pointer && v.IsNil()
 }
 
 // addAll adds eps to the node's Aggregator and returns those it added. A

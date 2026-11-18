@@ -14,6 +14,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/SukramJ/go-fabric/internal/sealseam"
 )
 
 // Sealer seals the secrets a [Store] made by [NewSealed] keeps at rest.
@@ -685,23 +687,63 @@ func (s *Store) ScrubOwed(ctx context.Context) (bool, error) {
 // schema v10. There is no unseal: the way back to a clear database is a
 // restore or a factory reset. The rows of other modules' tables on the
 // same file (the controller's node registry, controller/client/sqlstore)
-// are not this store's and are not resealed.
+// are not this store's and are not resealed: a controller's database
+// moves with controller.Reseal, which reseals both stores in one
+// transaction, and a registry alone with sqlstore.Reseal.
+//
+// The one transaction is atomic only with a journal: under
+// journal_mode=OFF SQLite cannot roll it back, and a Reseal that fails
+// part-way can leave the file half-moved. journal_mode=OFF is not
+// supported (review II, R2-P6-doc-3007).
 func Reseal(ctx context.Context, db *sql.DB, old, next Sealer) error {
 	if old == nil || next == nil {
 		return errors.New("store: Reseal: nil Sealer")
 	}
-	if err := checkSealMarks(ctx, db, "Reseal"); err != nil {
-		return err
-	}
-	from, to := &Store{db: db, sealer: old}, &Store{db: db, sealer: next}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("store: Reseal: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := resealTx(ctx, tx, old, next); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: Reseal: commit: %w", err)
+	}
+	if err := Scrub(ctx, db); err != nil {
+		return fmt.Errorf("store: Reseal: the values are sealed under the new sealer: %w", err)
+	}
+	if err := dropScrubOwed(ctx, db); err != nil {
+		// The mark stays, so ScrubOwed still says owed and the next
+		// NewSealed scrubs again: the same state as an unfinished scrub.
+		return fmt.Errorf("store: Reseal: the values are sealed under the new sealer, the owed scrub stays marked: %w: %w", ErrScrubIncomplete, err)
+	}
+	return nil
+}
+
+func init() {
+	sealseam.StoreResealTx = func(ctx context.Context, tx *sql.Tx, old, next sealseam.Sealer) error {
+		return resealTx(ctx, tx, old, next)
+	}
+	sealseam.StoreDropScrubOwed = dropScrubOwed
+}
+
+// resealTx is [Reseal]'s transaction on tx, without the commit and the
+// scrub: the schema check, the write lock, the seal canary opened under old
+// (the key check), a clear secret row refused, every sealed value of
+// secretTables opened under old and sealed under next, the canary last, and
+// the owed scrub marked. controller.Reseal runs it beside the node
+// registry's in one transaction ([sealseam.StoreResealTx]).
+func resealTx(ctx context.Context, tx *sql.Tx, old, next Sealer) error {
+	// A write first, so the transaction holds the write lock before it
+	// reads, the schema check included (sealUnmarked's rule).
 	if _, err := tx.ExecContext(ctx, `UPDATE matter_metadata SET value = value WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
 		return fmt.Errorf("store: Reseal: %w", err)
 	}
+	if err := checkSealMarks(ctx, tx, "Reseal"); err != nil {
+		return err
+	}
+	from, to := &Store{sealer: old}, &Store{sealer: next}
 	stored, markSealed, marked, err := readCanary(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("store: Reseal: %w", err)
@@ -727,16 +769,13 @@ func Reseal(ctx context.Context, db *sql.DB, old, next Sealer) error {
 	if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO matter_metadata (key, value) VALUES (?, 1)`, metadataKeySealScrubOwed); err != nil {
 		return fmt.Errorf("store: Reseal: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("store: Reseal: commit: %w", err)
-	}
-	if err := Scrub(ctx, db); err != nil {
-		return fmt.Errorf("store: Reseal: the values are sealed under the new sealer: %w", err)
-	}
+	return nil
+}
+
+// dropScrubOwed deletes the mark of an owed scrub once a [Scrub] finished.
+func dropScrubOwed(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, `DELETE FROM matter_metadata WHERE key = ?`, metadataKeySealScrubOwed); err != nil {
-		// The mark stays, so ScrubOwed still says owed and the next
-		// NewSealed scrubs again: the same state as an unfinished scrub.
-		return fmt.Errorf("store: Reseal: the values are sealed under the new sealer, the owed scrub stays marked: %w: %w", ErrScrubIncomplete, err)
+		return fmt.Errorf("store: drop the owed scrub's mark: %w", err)
 	}
 	return nil
 }
@@ -823,7 +862,7 @@ func resealTable(ctx context.Context, tx *sql.Tx, from, to *Store, t secretColum
 
 // checkSealMarks is the schema check of [NewSealed] and [Reseal]: every
 // table of secretTables carries the seal mark of migration v10.
-func checkSealMarks(ctx context.Context, db *sql.DB, op string) error {
+func checkSealMarks(ctx context.Context, db sqlExecQuerier, op string) error {
 	for _, t := range secretTables {
 		var n int
 		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = 'sealed'`, t.table).Scan(&n); err != nil {

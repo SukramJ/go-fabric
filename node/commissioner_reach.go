@@ -142,12 +142,21 @@ func (r commissionerReach) ReadNOCs(ctx context.Context, p jointfabric.Commissio
 
 // SignVIDVerification sends SignVIDVerificationRequest to the commissioner
 // and returns its response with the attestation challenge of the session
-// it went over (VendorIdVerificationClient.cpp:127-187).
+// it went over (VendorIdVerificationClient.cpp:127-187). The invoke is
+// bound to one session, the peer's newest when it starts, and the
+// challenge is that session's: the peer's newest after the invoke may be
+// another one, whose challenge the commissioner did not sign (review II,
+// R2-P6-conc-2451).
 func (r commissionerReach) SignVIDVerification(ctx context.Context, p jointfabric.CommissionerPeer, fabricIndex uint8, clientChallenge []byte) (opcreds.SignVidVerificationResponse, []byte, error) {
-	ia, err := r.interaction(ctx, p)
+	pr, err := r.n.connectedPeer(ctx, p.FabricIndex, p.NodeID)
 	if err != nil {
 		return opcreds.SignVidVerificationResponse{}, nil, err
 	}
+	sess := pr.NewestSession()
+	if sess == nil {
+		return opcreds.SignVidVerificationResponse{}, nil, errors.New("node: the commissioner's session closed")
+	}
+	ia := interaction.Bind(interaction.SessionProvider(pr.Exchanges(), sess), interaction.Config{Logger: r.n.logger, Clock: r.n.cfg.Clock})
 	path := im.ConcreteCommandPath{Endpoint: 0, Cluster: opcreds.ClusterID, Command: opcreds.CmdSignVidVerificationRequest}
 	res, err := ia.Invoke(ctx, path, opcreds.SignVidVerificationRequestRequest{FabricIndex: fabricIndex, ClientChallenge: clientChallenge}, interaction.InvokeOptions{})
 	if err != nil {
@@ -159,10 +168,6 @@ func (r commissionerReach) SignVIDVerification(ctx context.Context, p jointfabri
 	resp, err := spec.DecodeStruct[opcreds.SignVidVerificationResponse](res.Fields)
 	if err != nil {
 		return opcreds.SignVidVerificationResponse{}, nil, err
-	}
-	sess := ia.Session()
-	if sess == nil {
-		return opcreds.SignVidVerificationResponse{}, nil, errors.New("node: the commissioner's session closed")
 	}
 	return resp, sess.AttestationChallenge(), nil
 }

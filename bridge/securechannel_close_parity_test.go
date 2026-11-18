@@ -15,7 +15,7 @@ package bridge
 //     handleInitialStatusReport — an inbound CloseSession closes the
 //     session ("Closed by peer"); any other initial StatusReport is
 //     ignored with a debug log.
-//   - packages/protocol/src/protocol/ExchangeManager.ts:693/:716-726 —
+//   - packages/protocol/src/protocol/ExchangeManager.ts:758/:781-787 —
 //     gracefulClose observer ships the report on a fresh exchange.
 //   - packages/node/src/behavior/system/network/ServerNetworkRuntime.ts
 //     :410-447 — shutdown closes sessions before transport teardown.
@@ -99,7 +99,7 @@ func closeSessionStatusReportBody() []byte {
 
 // TestAttachSessionRegistry_SelfWiresManagerHooks verifies the attach
 // call installs both reverse hooks on a registry that supports them —
-// the Go translation of matter.js ExchangeManager.ts:693 observing
+// the Go translation of matter.js ExchangeManager.ts:758 observing
 // session.gracefulClose at session-add time.
 func TestAttachSessionRegistry_SelfWiresManagerHooks(t *testing.T) {
 	t.Parallel()
@@ -642,7 +642,7 @@ func startedEventBridge(t *testing.T) (b *Bridge, adv *eventAdvertiser, op1, op2
 // broadcast events (mdns.Responder) the session-teardown trigger is
 // matter.js's "reconnect" event for the session's fabric's operational
 // service only — packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
-// at 862ad75f, advertisementForFabric(fabric).serviceDisconnected()
+// at db021da0, advertisementForFabric(fabric).serviceDisconnected()
 // (Advertiser.ts:69-75). Index 0 (no fabric) and a fabric without an
 // announced service reach nothing.
 func TestTriggerSessionReannounce_ReconnectEvent(t *testing.T) {
@@ -668,7 +668,7 @@ func TestTriggerSessionReannounce_ReconnectEvent(t *testing.T) {
 // that fabric's operational service — once per fabric and tick, however
 // many of its sessions retransmitted; a session without a resolvable
 // fabric starts none (packages/protocol/src/protocol/DeviceAdvertiser.ts:164-172
-// at 862ad75f).
+// at db021da0).
 func TestTickOutboundReliable_RetransmitEvent(t *testing.T) {
 	t.Parallel()
 	b, adv, op1, op2 := startedEventBridge(t)

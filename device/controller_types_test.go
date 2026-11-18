@@ -11,7 +11,7 @@ import (
 )
 
 // controllerParity is what one matter.js controller device file states
-// (packages/node/src/devices/<name>.ts at 0ceb202d): the type's identity,
+// (packages/node/src/devices/<name>.ts at db021da0): the type's identity,
 // its `server.mandatory` / `server.optional` blocks and its
 // `client.mandatory` / `client.optional` blocks, transcribed in order —
 // packages/node/src/devices/on-off-light-switch.ts:75-95 is the shape of all eleven.

@@ -95,6 +95,13 @@ func (m CertificateMetadata) kind() Kind {
 type storedCertificate struct {
 	CertificateMetadata
 	DER []byte `json:"der"`
+	// ProductionLedger marks a production entry whose bytes the production
+	// ledger answered (a root it lists, a CD signer it serves). A production
+	// entry without it — one a store wrote before review II R2-P6-sec-1902,
+	// whose promotion may have kept a test source's bytes — is fetched again
+	// at the next update that sees it listed; until then (an offline store)
+	// it keeps its stored bytes.
+	ProductionLedger bool `json:"productionLedger,omitempty"`
 }
 
 // storedIndex is the persisted trust store.
@@ -117,11 +124,14 @@ type CertificateStore struct {
 	github *githubClient
 
 	// mu guards closed, githubRateLimited, index and timer.
-	mu      sync.Mutex
-	index   map[string]storedCertificate
-	closed  bool
-	timer   exchange.Timer
-	fetchMu sync.Mutex // the in-flight update (#fetchPromise, :300)
+	mu     sync.Mutex
+	index  map[string]storedCertificate
+	closed bool
+	timer  exchange.Timer
+	// fetching holds the in-flight update (#fetchPromise, :300): a slot
+	// of one, taken by lockFetch, which a waiter leaves when its context
+	// ends (review II, R2-P6-bound-1911).
+	fetching chan struct{}
 	// githubRateLimited skips GitHub for the rest of one update (:297,
 	// :1165-1172).
 	githubRateLimited bool
@@ -148,11 +158,16 @@ var (
 // OpenCertificateStore loads the stored trust store, runs the first update
 // and starts the periodic one — the service's construction
 // (DclCertificateService.ts:332-352). A failed update is logged, not
-// returned (update :952-972); a store that cannot be read is an error.
+// returned (update :952-972); a store that cannot be read is an error, one
+// whose content does not parse is logged and read as empty. The first
+// update runs on ctx: it fetches up to maxRootsPerUpdate roots and
+// maxGitHubFilesPerUpdate files (1024 each), one request of at most
+// [DefaultTimeout] each, so a ctx with a deadline bounds the open
+// (U3-net-1).
 func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*CertificateStore, error) {
 	s := &CertificateStore{
 		opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{},
-		verifyCDSigner: attestation.VerifyCDSignerCertificate,
+		verifyCDSigner: attestation.VerifyCDSignerCertificate, fetching: make(chan struct{}, 1),
 	}
 	s.periodic, s.cancelPeriodic = context.WithCancel(context.Background())
 	if s.clock == nil {
@@ -226,14 +241,41 @@ func (s *CertificateStore) Close() {
 	if s.cancelPeriodic != nil {
 		s.cancelPeriodic()
 	}
-	s.awaitUpdate()
+	_ = s.awaitUpdate(context.Background())
 	s.revocations.close()
 }
 
-// awaitUpdate waits for a running update to settle (close :902-903).
-func (s *CertificateStore) awaitUpdate() {
-	s.fetchMu.Lock()
-	s.fetchMu.Unlock() //nolint:gocritic,staticcheck // an empty critical section: it only waits for a running update
+// lockFetch takes the update slot, or returns ctx's error when ctx ends
+// first; unlockFetch gives it back.
+func (s *CertificateStore) lockFetch(ctx context.Context) error {
+	select {
+	case s.fetching <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// tryLockFetch takes the update slot if it is free.
+func (s *CertificateStore) tryLockFetch() bool {
+	select {
+	case s.fetching <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *CertificateStore) unlockFetch() { <-s.fetching }
+
+// awaitUpdate waits for a running update to settle (close :902-903), or
+// for ctx to end.
+func (s *CertificateStore) awaitUpdate(ctx context.Context) error {
+	if err := s.lockFetch(ctx); err != nil {
+		return err
+	}
+	s.unlockFetch()
+	return nil
 }
 
 func (s *CertificateStore) isClosed() bool {
@@ -296,12 +338,12 @@ func (s *CertificateStore) PAA(skid []byte) (attestation.PAA, bool) {
 var considerAll = true
 
 // ErrCertificateNotFound is matter.js's MatterDclError "Certificate not
-// found" (DclCertificateService.ts:604-610 at 862ad75f): no certificate
+// found" (DclCertificateService.ts:612-618 at db021da0): no certificate
 // with that key identifier, or one the trust policy filters out.
 var ErrCertificateNotFound = errors.New("dcl: certificate not found")
 
 // GetCertificateOptions is DclCertificateService.GetCertificateOptions
-// (DclCertificateService.ts:2026-2032 at 862ad75f).
+// (DclCertificateService.ts:2123-2129 at db021da0).
 type GetCertificateOptions struct {
 	// ConsiderTestCertificates also returns test PAAs; nil is
 	// [CertificateStore.AcceptsTestCertificates].
@@ -385,7 +427,7 @@ func (s *CertificateStore) CertificateDER(ctx context.Context, skid string, o Ge
 }
 
 // GetOrFetchCertificateOptions is getOrFetchCertificate's options
-// (DclCertificateService.ts:749 at 862ad75f).
+// (DclCertificateService.ts:757 at db021da0).
 type GetOrFetchCertificateOptions struct {
 	GetCertificateOptions
 	// IsProduction asks the production ledger, false the test ledger; nil
@@ -406,13 +448,15 @@ func (s *CertificateStore) GetOrFetchCertificate(ctx context.Context, skid strin
 	if s.offline() {
 		return CertificateMetadata{}, false
 	}
-	if !s.fetchMu.TryLock() {
+	if !s.tryLockFetch() {
 		// An update is running: its outcome is the answer (:764-768 at
-		// 862ad75f).
-		s.awaitUpdate()
+		// 862ad75f), unless the caller's context ends first.
+		if s.awaitUpdate(ctx) != nil {
+			return CertificateMetadata{}, false
+		}
 		return s.Certificate(id, o.GetCertificateOptions)
 	}
-	defer s.fetchMu.Unlock()
+	defer s.unlockFetch()
 	isProduction := o.IsProduction == nil || *o.IsProduction
 	stored, err := s.fetchAndStoreRootCertificateBySkid(ctx, id, isProduction, false)
 	if err != nil {
@@ -459,8 +503,10 @@ func (s *CertificateStore) tryRefetchRootCertificate(ctx context.Context, id str
 	if s.offline() {
 		return nil, false
 	}
-	s.fetchMu.Lock()
-	defer s.fetchMu.Unlock()
+	if s.lockFetch(ctx) != nil {
+		return nil, false
+	}
+	defer s.unlockFetch()
 	stored, err := s.fetchAndStoreRootCertificateBySkid(ctx, id, isProduction, true)
 	if err != nil {
 		s.log.Warn("dcl.certificates.refetch_failed", slog.String("skid", id), slog.Any("err", err))
@@ -580,7 +626,7 @@ func (s *CertificateStore) putCDSigner(ctx context.Context, id string, der []byt
 	s.storeCertificate(id, der, CertificateMetadata{
 		Subject: c.x509.Subject.CommonName, SubjectKeyID: id, SerialNumber: hex.EncodeToString(serialContent(c.x509.SerialNumber)),
 		VID: vidOrZero(c), IsProduction: true, Kind: KindCDSigner,
-	})
+	}, true)
 	s.saveIndex(ctx)
 	s.log.Info("dcl.certificates.added", slog.String("kind", string(KindCDSigner)), slog.String("skid", id), slog.Bool("production", true))
 }
@@ -602,13 +648,19 @@ func (s *CertificateStore) AddCertificate(ctx context.Context, der []byte, kind 
 		}
 	}
 	id := hexUpper(c.x509.SubjectKeyId)
-	if _, ok := s.lookup(id); ok {
-		return false, nil
-	}
-	s.storeCertificate(id, der, CertificateMetadata{
+	// The look-up and the store under one lock: a certificate another
+	// writer stores in between makes this add report false, not true over
+	// a store that kept the other (review II, R2-P6-sec-1902).
+	s.mu.Lock()
+	_, exists := s.index[id]
+	added := !exists && s.storeCertificateLocked(id, der, CertificateMetadata{
 		Subject: c.x509.Subject.CommonName, SubjectKeyID: id, SerialNumber: hex.EncodeToString(serialContent(c.x509.SerialNumber)),
 		VID: vidOrZero(c), IsRoot: kind == KindPAA, IsProduction: production, Kind: kind,
-	})
+	}, false)
+	s.mu.Unlock()
+	if !added {
+		return false, nil
+	}
 	s.saveIndex(ctx)
 	s.log.Info("dcl.certificates.added", slog.String("kind", string(kind)), slog.String("skid", id), slog.Bool("production", production))
 	return true, nil
@@ -647,7 +699,11 @@ func (s *CertificateStore) loadIndex(ctx context.Context) error {
 	}
 	var idx storedIndex
 	if err := json.Unmarshal(data, &idx); err != nil {
-		return err
+		// A cache of ledger answers: read as empty, refetched (review II,
+		// R2-P6-store-1910).
+		s.log.Warn("dcl.certificates.store_unreadable", slog.Any("err", err),
+			slog.String("message", "The stored trust store does not parse; it is read as empty and refetched"))
+		return nil
 	}
 	valid, invalid := 0, 0
 	s.mu.Lock()
@@ -688,14 +744,31 @@ func (s *CertificateStore) saveIndex(ctx context.Context) {
 	}
 }
 
-// storeCertificate is #storeCertificate (:1328-1350): never downgrade a
-// production certificate to test, keep the first FetchedAt.
-func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata) {
+// storeCertificate is #storeCertificate (DclCertificateService.ts:1442 ff.
+// at db021da0): never downgrade a production certificate to test, keep
+// the first FetchedAt. A non-production source (the test ledger, GitHub, a
+// test AddCertificate) never replaces a production entry: the entry, its
+// DER included, stays as the production source stored it, so the bytes
+// [CertificateStore.PAA] reports as production are the production
+// ledger's — for a store written before this rule, once an update has
+// fetched the entry again (storedCertificate.ProductionLedger). matter.js
+// keeps the production flag and stores the new bytes under it
+// (DclCertificateService.ts:1449-1452, :1460 at db021da0); review II,
+// R2-P6-sec-1902, the Ahead-of-matter.js row of the promotion and of this
+// rule. fromLedger says the bytes are the production ledger's answer
+// (storedCertificate.ProductionLedger).
+func (s *CertificateStore) storeCertificate(id string, der []byte, m CertificateMetadata, fromLedger bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.storeCertificateLocked(id, der, m, fromLedger)
+}
+
+// storeCertificateLocked is storeCertificate under s.mu; it reports
+// whether it stored.
+func (s *CertificateStore) storeCertificateLocked(id string, der []byte, m CertificateMetadata, fromLedger bool) bool {
 	existing, ok := s.index[id]
 	if ok && existing.IsProduction && !m.IsProduction {
-		m.IsProduction = true
+		return false
 	}
 	if m.FetchedAt.IsZero() {
 		if ok && !existing.FetchedAt.IsZero() {
@@ -704,7 +777,8 @@ func (s *CertificateStore) storeCertificate(id string, der []byte, m Certificate
 			m.FetchedAt = s.clock.Now().UTC().Truncate(time.Millisecond)
 		}
 	}
-	s.index[id] = storedCertificate{CertificateMetadata: m, DER: bytes.Clone(der)}
+	s.index[id] = storedCertificate{CertificateMetadata: m, DER: bytes.Clone(der), ProductionLedger: fromLedger && m.IsProduction}
+	return true
 }
 
 // Update fetches the ledger's roots (and, with the options, the test
@@ -715,8 +789,11 @@ func (s *CertificateStore) Update(ctx context.Context, force bool) bool {
 	if s.isClosed() || s.offline() {
 		return true
 	}
-	s.fetchMu.Lock()
-	defer s.fetchMu.Unlock()
+	if err := s.lockFetch(ctx); err != nil {
+		s.log.Info("dcl.certificates.update_failed", slog.Any("err", err), slog.String("message", "Certificate update failed"))
+		return false
+	}
+	defer s.unlockFetch()
 	s.log.Debug("dcl.certificates.update", slog.Bool("force", force))
 	if err := s.fetchCertificates(ctx, force); err != nil {
 		s.log.Info("dcl.certificates.update_failed", slog.Any("err", err), slog.String("message", "Certificate update failed"))
@@ -766,6 +843,20 @@ func (s *CertificateStore) fetchCertificates(ctx context.Context, force bool) er
 	return nil
 }
 
+// maxRootsPerUpdate and maxGitHubFilesPerUpdate bound the roots of one
+// ledger and the .der files of one GitHub directory an update fetches,
+// one request each, while it holds the update slot: past them the rest
+// is not fetched, logged once (review II, R2-P6-bound-1911; an
+// Ahead-of-matter.js row: matter.js loops every listed root and file,
+// DclCertificateService.ts:1144-1147, :1304-1307, :1335-1338 at
+// db021da0). The value 1024 is this module's judgement, not a measured
+// figure: it is meant to sit well above both lists; the ledger's current
+// root count was not measured.
+const (
+	maxRootsPerUpdate       = 1024
+	maxGitHubFilesPerUpdate = 1024
+)
+
 // fetchDclCertificates is #fetchDclCertificates (:1026-1043).
 func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProduction, force bool) error {
 	client := s.clientFor(isProduction)
@@ -774,6 +865,11 @@ func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProductio
 		return err
 	}
 	s.log.Debug("dcl.certificates.roots", slog.Bool("production", isProduction), slog.Int("count", len(refs)))
+	if len(refs) > maxRootsPerUpdate {
+		s.log.Warn("dcl.certificates.too_many_roots", slog.Bool("production", isProduction), slog.Int("count", len(refs)),
+			slog.Int("max", maxRootsPerUpdate))
+		refs = refs[:maxRootsPerUpdate]
+	}
 	for _, ref := range refs {
 		if s.isClosed() {
 			return nil
@@ -792,17 +888,22 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 	if !force {
 		s.mu.Lock()
 		existing, ok := s.index[refID]
-		if ok {
-			// A test certificate found in the production ledger is upgraded
-			// (:1075-1082).
-			if isProduction && !existing.IsProduction {
-				existing.IsProduction = true
-				s.index[refID] = existing
-			}
-			s.mu.Unlock()
+		s.mu.Unlock()
+		// A stored test certificate the production ledger lists is upgraded
+		// (DclCertificateService.ts:1186-1192 at db021da0) by the production
+		// ledger's own record: it is fetched
+		// and stored below, its DER replacing the test source's, and the
+		// entry stays a test certificate when that fetch fails. matter.js
+		// sets the flag on the stored entry by key identifier alone and
+		// returns before the fetch (DclCertificateService.ts:1184-1188,
+		// :1199 at db021da0); this is ahead of it (review II,
+		// R2-P6-sec-1902).
+		// A production entry the production ledger did not answer the bytes
+		// of (one a store wrote before that rule) is fetched again too.
+		upgrade := isProduction && (!existing.IsProduction || !existing.ProductionLedger)
+		if ok && !upgrade {
 			return true
 		}
-		s.mu.Unlock()
 	}
 	certs, err := client.RootCertificateBySubject(ctx, ref)
 	if err != nil {
@@ -829,7 +930,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		s.storeCertificate(id, der, CertificateMetadata{
 			Subject: cert.Subject, SubjectAsText: cert.SubjectAsText, SubjectKeyID: id, SerialNumber: cert.SerialNumber,
 			VID: cert.VID, IsRoot: cert.IsRoot, IsProduction: isProduction, Kind: KindPAA,
-		})
+		}, isProduction)
 		stored = stored || id == refID
 	}
 	return stored
@@ -904,10 +1005,8 @@ func (s *CertificateStore) fetchGitHubCertificates(ctx context.Context, force bo
 		s.logGitHubFetchFailure(ctx, "Failed to fetch certificates from GitHub", err, KindPAA)
 		return
 	}
-	for _, name := range files {
-		if !strings.HasSuffix(name, ".der") || strings.HasPrefix(name, "dcld_mirror_") {
-			continue
-		}
+	paa := func(name string) bool { return !strings.HasPrefix(name, "dcld_mirror_") }
+	for _, name := range s.capGitHubFiles(files, s.github.cfg.CertPath, paa) {
 		if s.isClosed() {
 			return
 		}
@@ -930,15 +1029,34 @@ func (s *CertificateStore) fetchGitHubCdSignerCertificates(ctx context.Context, 
 		s.logGitHubFetchFailure(ctx, "Failed to fetch CD signer certificates from GitHub", err, KindCDSigner)
 		return
 	}
-	for _, name := range files {
-		if !strings.HasSuffix(name, ".der") {
-			continue
-		}
+	for _, name := range s.capGitHubFiles(files, s.github.cfg.CDSignerCertPath, nil) {
 		if s.isClosed() {
 			return
 		}
 		s.fetchGitHubCertificate(ctx, dir, name, KindCDSigner, force)
 	}
+}
+
+// capGitHubFiles is files' .der entries that keep accepts (nil: all), up
+// to maxGitHubFilesPerUpdate — the cap counts only files that would be
+// fetched; the rest is logged once and dropped.
+func (s *CertificateStore) capGitHubFiles(files []string, dir string, keep func(string) bool) []string {
+	der := make([]string, 0, min(len(files), maxGitHubFilesPerUpdate))
+	skipped := 0
+	for _, name := range files {
+		if !strings.HasSuffix(name, ".der") || (keep != nil && !keep(name)) {
+			continue
+		}
+		if len(der) == maxGitHubFilesPerUpdate {
+			skipped++
+			continue
+		}
+		der = append(der, name)
+	}
+	if skipped > 0 {
+		s.log.Warn("dcl.certificates.too_many_github_files", slog.String("path", dir), slog.Int("count", len(der)+skipped), slog.Int("max", maxGitHubFilesPerUpdate))
+	}
+	return der
 }
 
 // fetchGitHubCertificate is #fetchGitHubCertificate and
@@ -961,5 +1079,5 @@ func (s *CertificateStore) fetchGitHubCertificate(ctx context.Context, dir *gith
 	s.storeCertificate(id, der, CertificateMetadata{
 		Subject: strings.Replace(name, ".der", "", 1), SubjectKeyID: id, SerialNumber: hex.EncodeToString(serialContent(c.x509.SerialNumber)),
 		VID: vidOrZero(c), IsRoot: kind == KindPAA, IsProduction: false, Kind: kind,
-	})
+	}, false)
 }

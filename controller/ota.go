@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -80,7 +81,11 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 		Registry: c.reg, Images: images, FabricIndex: c.fabricIndex(), ProviderNodeID: c.fabric.RootNodeID, ProviderEndpoint: OTAProviderEndpoint,
 		VendorID: c.fabric.RootVendorID, Armer: c.armer,
 		SessionID: func(p softwareupdate.Peer) (uint16, bool) {
-			if pp := c.peers.Get(p); pp != nil {
+			peers := c.live.peers.Load()
+			if peers == nil {
+				return 0, false
+			}
+			if pp := peers.Get(p); pp != nil {
 				if s := pp.NewestSession(); s != nil {
 					return s.ID(), true
 				}
@@ -91,7 +96,7 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 		AnnounceAsDefaultProvider: o.AnnounceAsDefaultProvider, AnnouncementInterval: o.AnnouncementInterval,
 		MaxBDXBlockSize: o.MaxBDXBlockSize, BDXAdditionalMrpDelay: o.BDXAdditionalMrpDelay, ApplyDelay: o.ApplyDelay,
 		RequestConsent: o.RequestConsent, OnUpdateAvailable: o.OnUpdateAvailable, OnUpdateApplying: o.OnUpdateApplying,
-		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: o.OnUpdateFailed, OnStatus: c.traceOTAStatus(o.OnStatus),
+		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: c.otaFailed(o.OnUpdateFailed), OnStatus: c.traceOTAStatus(o.OnStatus),
 		ScriptQueryImage: o.ScriptQueryImage, ScriptApplyUpdate: o.ScriptApplyUpdate, OnProviderExchange: o.OnProviderExchange,
 		Clock: c.clock, Logger: c.log,
 	})
@@ -138,14 +143,36 @@ func (c *Controller) BDX() *bdx.Responder {
 	return st.bdx
 }
 
+// otaNodeDeleted hands the update manager's NodeDeleted for p to a
+// goroutine Close waits for until it reaches the host's callback
+// (otaHandoffs); nothing once Close began to close the manager.
+func (c *Controller) otaNodeDeleted(p softwareupdate.Peer) {
+	m := c.ota.Load()
+	if m == nil {
+		return
+	}
+	o := c.otaHandoffs.start(p)
+	if o == nil {
+		return
+	}
+	go func() {
+		defer c.otaHandoffs.done(p, o)
+		m.NodeDeleted(p)
+	}()
+}
+
 // armerContext is the reboot armer's view of the stack — matter.js's
 // SessionManager and ClientSubscriptions (RebootResubscribeArmer.ts:58-75
-// at 862ad75f).
+// at db021da0).
 func (c *Controller) armerContext() peer.RebootArmerContext {
 	return peer.RebootArmerContext{
 		Clock: c.clock, Logger: c.log,
 		ClosePeerSessionsBefore: func(p exchange.PeerAddress, t time.Time) {
-			if pp := c.peers.Get(p); pp != nil {
+			peers := c.live.peers.Load()
+			if peers == nil {
+				return
+			}
+			if pp := peers.Get(p); pp != nil {
 				for _, s := range pp.Sessions() {
 					if s.CreatedAt().Before(t) {
 						s.Close()
@@ -153,24 +180,42 @@ func (c *Controller) armerContext() peer.RebootArmerContext {
 				}
 			}
 		},
-		PeerLost:           func(p exchange.PeerAddress) { c.mgr.HandlePeerLoss(p, errRebootReturnTimeout, time.Time{}) },
-		CloseSubscriptions: func(p exchange.PeerAddress) { c.subs.CloseForPeer(p) },
+		// The armer's timers run on the clock's goroutines, which Close does
+		// not wait for: each reads the component it reaches from live and
+		// skips once Close cleared it (review II, R2-P6-conc-2305).
+		PeerLost: func(p exchange.PeerAddress) {
+			if mgr := c.live.mgr.Load(); mgr != nil {
+				mgr.HandlePeerLoss(p, errRebootReturnTimeout, time.Time{})
+			}
+		},
+		CloseSubscriptions: func(p exchange.PeerAddress) {
+			if subs := c.live.subs.Load(); subs != nil {
+				subs.CloseForPeer(p)
+			}
+		},
 	}
+}
+
+// initiated reports whether we initiated s's session, false once Close
+// cleared the peer set (review II, R2-P6-conc-2305).
+func (c *Controller) initiated(s *exchange.Session) bool {
+	peers := c.live.peers.Load()
+	return peers != nil && peers.Initiated(s)
 }
 
 // armerObserver sees the report sessions the reboot armer is fed — a test
 // seam (export_ota_test.go), as matter.js's OtaTest listens on
-// ClientSubscriptions.reportStarted (OtaTest.ts:919-921 at 862ad75f). It
+// ClientSubscriptions.reportStarted (OtaTest.ts:919-921 at db021da0). It
 // observes only; nil in production.
 type armerObserver struct {
 	ReportStarted func(s peer.ArmerSession)
 }
 
 // sessionAdded feeds a peer's new session to the armer
-// (RebootResubscribeArmer.ts:117-150 at 862ad75f).
+// (RebootResubscribeArmer.ts:117-150 at db021da0).
 func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 	if c.armer != nil && s.IsSecure() {
-		c.armer.SessionAdded(armerSession{s: s, initiator: c.peers.Initiated(s)})
+		c.armer.SessionAdded(armerSession{s: s, initiator: c.initiated(s)})
 	}
 }
 
@@ -178,7 +223,7 @@ func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 // (RebootResubscribeArmer.ts:68, :165-172).
 func (c *Controller) reportStarted(s *exchange.Session) {
 	if c.armer != nil {
-		as := armerSession{s: s, initiator: c.peers.Initiated(s)}
+		as := armerSession{s: s, initiator: c.initiated(s)}
 		if o := c.armerObs.Load(); o != nil && o.ReportStarted != nil {
 			o.ReportStarted(as)
 		}
@@ -217,16 +262,44 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 			}
 			return nil
 		}
+		// lastPeer is the node's address as the last hook saw it: Deleted
+		// runs once the registry no longer holds the node, so nodeOf is nil
+		// there.
+		var lastPeer atomic.Pointer[softwareupdate.Peer]
+		seen := func(n *client.Node) {
+			if p, ok := n.PeerAddress(); ok {
+				lastPeer.Store(&p)
+			}
+		}
 		h.Changed = func() {
 			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
+				seen(n)
 				m.NodeChanged(n)
 			}
 			if inner.Changed != nil {
 				inner.Changed()
 			}
 		}
+		// The manager forgets a node that left the registry at once — its
+		// consents and its queued update (review II, R2-P6-bound-1914,
+		// decision 219). Deleted can run inside the registry's fabric
+		// operation (Erase, a peer's leave), and NodeDeleted calls the
+		// host's OnUpdateFailed for a queued update: it runs on its own
+		// goroutine, after the hook returned, so a host callback that
+		// starts a fabric operation does not wait for the one running.
+		// Close waits for it, within its ctx, until it reaches the host's
+		// callback (otaHandoffs).
+		h.Deleted = func() {
+			if p := lastPeer.Load(); p != nil {
+				c.otaNodeDeleted(*p)
+			}
+			if inner.Deleted != nil {
+				inner.Deleted()
+			}
+		}
 		h.Event = func(endpoint uint16, cluster, event uint32, e client.EventData, value any) {
 			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
+				seen(n)
 				m.NodeEvent(n, endpoint, cluster, event, value)
 			}
 			if inner.Event != nil {
@@ -235,6 +308,7 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 		}
 		h.SubscriptionStatusChanged = func(active bool) {
 			if m, n := c.ota.Load(), nodeOf(); m != nil && n != nil {
+				seen(n)
 				m.NodeSubscription(n, active)
 			}
 			if inner.SubscriptionStatusChanged != nil {

@@ -34,6 +34,11 @@ var (
 	ErrReportsNotInstalled = errors.New("camera: Config.Reports is not installed on the controller's configuration")
 	// ErrClosed: the service was closed.
 	ErrClosed = errors.New("camera: the service is closed")
+	// ErrReportsInUse: Config.Reports is held by a Service that is not
+	// closed. The refusal also matches [ErrInvalidArgument] with
+	// errors.Is, as it did before this sentinel existed (review II,
+	// R2-P6-api-2208, decision 248).
+	ErrReportsInUse = errors.New("camera: Config.Reports is held by a camera Service that is not closed")
 )
 
 // Signal is one command a camera invoked on the controller's requestor:
@@ -175,8 +180,11 @@ type Service struct {
 // New starts a service over ctrl, attaching to its requestor
 // (ctrl.CameraRequestor) and its signals (ctrl.OnCameraSignal). It
 // refuses a controller without a requestor ([ErrNoRequestor]), without
-// outgoing TCP ([ErrTCPRequired]) and a Config whose Reports were not
-// installed ([ErrReportsNotInstalled]).
+// outgoing TCP ([ErrTCPRequired]), a Config whose Reports were not
+// installed ([ErrReportsNotInstalled]) and one whose Reports a Service
+// that is not closed holds ([ErrReportsInUse], which also matches
+// [ErrInvalidArgument]): the first would stop getting its reports (review
+// II, R2-P6-api-2208).
 func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service, error) {
 	switch {
 	case ctrl.CameraRequestor() == nil:
@@ -185,6 +193,8 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 		return nil, ErrTCPRequired
 	case cfg.Reports == nil || !cfg.Reports.installed():
 		return nil, ErrReportsNotInstalled
+	case !cfg.Reports.claim():
+		return nil, &argumentError{msg: "Config.Reports is held by a camera Service that is not closed; close that Service first, or give this one its own Reports", also: ErrReportsInUse}
 	}
 	log := cfg.Logger
 	if log == nil {
@@ -198,7 +208,7 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 	s.localNodeID = func() uint64 { return ctrl.Fabric().RootNodeID }
 	s.reported = s.reconcile
 	s.w = newSessionWatch(life, serviceWatch{s}, ctrl.Clock(), log)
-	s.ps = &providerSessions{nodes: clientProviderNodes{s.io}, requestor: requestor{ctrl.CameraRequestor()}, fabricIndex: ctrl.Fabric().FabricIndex, watch: s.w, log: log, cleanup: s.m.cleanupContext, offers: map[providerKey]string{}}
+	s.ps = &providerSessions{nodes: clientProviderNodes{s.io}, requestor: requestor{ctrl.CameraRequestor()}, fabricIndex: ctrl.Fabric().FabricIndex, watch: s.w, log: log, cleanup: s.m.cleanupContext, offers: map[providerKey]*sentOffer{}}
 	s.wire()
 	s.unsub = ctrl.OnCameraSignal(s.onSignal)
 	cfg.Reports.attach(s)
@@ -223,7 +233,12 @@ func (s *Service) wire() {
 }
 
 // Close ends every session this service holds, stops its sweeps and
-// detaches it from the controller. A raw provider command in flight is
+// detaches it from the controller. The sessions it ends are the ones
+// [Service.StartStream] opened and every other session of the
+// controller's requestor on this fabric — those a host opened through
+// [Provider.Send] — each with an EndSession (UserHangup) within one
+// cleanup budget, announced as [EndReleased] (review II, R2-P6-fsm-2202).
+// A raw provider command in flight is
 // waited for; an offer of one answered once Close began ends its session
 // instead of keeping it (review II, R2-P2-stop-03). The wait for those
 // commands is bounded by ctx: a Close whose ctx ends first returns ctx's
@@ -246,14 +261,20 @@ func (s *Service) Close(ctx context.Context) error {
 	s.closed = true
 	done := make(chan struct{})
 	s.closeDone = done
-	s.ps.close()
 	s.mu.Unlock()
+	// From here on no session is added to the requestor (ps.close) and no
+	// start registers (closeStarts), so the entries the registry does not
+	// name are the raw route's, every one of them (R2-P6-fsm-2202,
+	// R2-P6-conc-2201).
+	s.ps.close()
+	s.m.sessions.closeStarts()
+	raw := s.untrackedSessions()
 	if s.cfg.Reports != nil {
 		s.cfg.Reports.detach(s)
 	}
 	// The EndSessions need the camera connections, so the sessions end
 	// before the service lets go of the controller.
-	s.m.shutdown(ctx)
+	s.m.shutdown(ctx, func(ctx context.Context) { s.m.releaseUntracked(ctx, raw, s.ps.sendEndSession) })
 	go func() {
 		defer close(done)
 		s.ending.Wait()
@@ -270,6 +291,17 @@ func (s *Service) Close(ctx context.Context) error {
 		}
 		return ctx.Err()
 	}
+}
+
+// untrackedSessions are the requestor's sessions of this fabric the
+// registry does not name.
+func (s *Service) untrackedSessions() []sessionKey {
+	entries := s.ps.untracked(func(t target, id uint16) bool { return s.m.sessions.knows(t.nodeID, t.endpointID, id) })
+	out := make([]sessionKey, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, sessionKey{e.PeerNodeId, e.PeerEndpointId, e.Id})
+	}
+	return out
 }
 
 // finishClose is the teardown after the raw provider commands returned:
@@ -325,10 +357,14 @@ func targetOf(node *client.Node, endpoint uint16) (target, error) {
 	return target{nodeID: addr.NodeID, endpointID: endpoint}, nil
 }
 
-// Capabilities reads what the camera endpoint states and holds. Mirrors
+// Capabilities reads what the camera endpoint states and holds; after
+// Close it is [ErrClosed] (review II, R2-P6-api-2207). Mirrors
 // matterjs-server packages/ws-controller/src/camera/CameraStreamManager.ts:969-1034
 // at 0bd06f2.
 func (s *Service) Capabilities(ctx context.Context, node *client.Node, endpoint uint16) (*Capabilities, error) {
+	if s.isClosed() {
+		return nil, ErrClosed
+	}
 	t, err := targetOf(node, endpoint)
 	if err != nil {
 		return nil, err
@@ -338,10 +374,14 @@ func (s *Service) Capabilities(ctx context.Context, node *client.Node, endpoint 
 
 // ReleaseStream deallocates one stream, passing the camera's answer on;
 // a stream the camera still references is [ErrStreamInUse] (an
-// [*InUseError]). Mirrors matterjs-server
+// [*InUseError]). After Close it is [ErrClosed] and sends nothing (review
+// II, R2-P6-api-2207). Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2702-2736 at
 // 0bd06f2.
 func (s *Service) ReleaseStream(ctx context.Context, node *client.Node, endpoint uint16, kind StreamKind, id uint16) error {
+	if s.isClosed() {
+		return ErrClosed
+	}
 	t, err := targetOf(node, endpoint)
 	if err != nil {
 		return err
@@ -376,10 +416,15 @@ func (s *Service) StopSession(ctx context.Context, node *client.Node, endpoint, 
 // StopByKey stops the session owner started with key on the node and
 // endpoint; a start still running is cancelled (its StartStream fails)
 // and this answers once it gave up. false when the key names no session
-// of the owner, or the camera held none. Mirrors matterjs-server
+// of the owner, or the camera held none. After Close, which ended the
+// service's sessions, it is [ErrClosed] and sends nothing (review II,
+// R2-P6-api-2207). Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2213-2230 at
 // 0bd06f2.
 func (s *Service) StopByKey(ctx context.Context, node *client.Node, endpoint uint16, owner, key string) (bool, error) {
+	if s.isClosed() {
+		return false, ErrClosed
+	}
 	t, err := targetOf(node, endpoint)
 	if err != nil {
 		return false, err
@@ -389,9 +434,9 @@ func (s *Service) StopByKey(ctx context.Context, node *client.Node, endpoint uin
 
 // Release ends every session owner holds or is starting, as a host does
 // when the owner goes away; only EndSession lowers a stream's
-// ReferenceCount. After Close it stays callable: Close claimed every
-// session, so it finds none, or retries the EndSession of one whose end
-// failed at Close. Mirrors matterjs-server
+// ReferenceCount. After Close it stays callable — the one camera-acting
+// method that does: Close claimed every session, so it finds none, or
+// retries the EndSession of one whose end failed at Close. Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2327-2331 at
 // 0bd06f2.
 func (s *Service) Release(ctx context.Context, owner string) {
@@ -571,13 +616,16 @@ func (w serviceWatch) reported(nodeID uint64, endpointID uint16, present map[uin
 // an earlier report listed and this one does not ends as camera_restarted
 // after a StartUp, else camera_dropped. Mirrors matterjs-server
 // packages/ws-controller/src/camera/CameraStreamManager.ts:2283-2296 at
-// 0bd06f2.
+// 0bd06f2. The same report then applies to the raw route's requestor
+// entries (providerSessions.reconcileUntracked; review II,
+// R2-P6-store-2203).
 func (s *Service) reconcile(nodeID uint64, endpointID uint16, present map[uint16]bool, restarted bool) {
 	cause := endCameraDropped
 	if restarted {
 		cause = endCameraRestarted
 	}
 	s.m.sessions.reconcile(nodeID, endpointID, present, cause)
+	s.ps.reconcileUntracked(target{nodeID, endpointID}, present, func(t target, id uint16) bool { return s.m.sessions.knows(t.nodeID, t.endpointID, id) })
 }
 
 // reportCompleted is a report batch of the node applied: each provider

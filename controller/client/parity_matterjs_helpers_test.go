@@ -23,7 +23,7 @@ import (
 // its siblings at 862ad75f: matter.js MockSite (node/src/testing/mock-site.ts)
 // is fabrictest's Site, controller.peers the controller's client.Registry,
 // and a pair commissioned as MockSite.addCommissionedPair does it
-// (mock-site.ts:156, controller.peers.commission) is
+// (mock-site.ts:156 at db021da0, controller.peers.commission) is
 // fabrictest.Controller.CommissionNode.
 
 // parityCtx bounds one port on the wall clock.

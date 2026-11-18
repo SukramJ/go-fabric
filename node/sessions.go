@@ -17,10 +17,10 @@ import (
 // (SII, SAI, SAT): how long a peer waits before it retransmits to this
 // node. A zero field is the Matter default. Mirrors matter.js
 // SessionsBehavior.State.intervals (SessionsBehavior.ts:115-120 at
-// 862ad75f), which ServerNetworkRuntime.ts:357-363 hands the
+// db021da0), which ServerNetworkRuntime.ts:364-367 hands the
 // SessionManager's sessionParameters and DeviceAdvertiser.ts:361-364 the
 // operational advertisement; omitted values fall back to
-// SessionIntervals.defaults (SessionIntervals.ts:36-50).
+// SessionIntervals.defaults (SessionIntervals.ts:36-49).
 type SessionIntervals struct {
 	// Idle is SESSION_IDLE_INTERVAL; 0 is 500 ms.
 	Idle time.Duration
@@ -106,7 +106,8 @@ func (s *SessionIntervals) apply(p *sessionparams.Parameters) {
 // PASE and CASE peer (PBKDFParamResponse tag 5, Sigma2's
 // responderSessionParams): the intervals of [Config.Sessions], the node's
 // MaxPathsPerInvoke and its TCP roles. Mirrors matter.js
-// SessionManager.sessionParameters (SessionManager.ts:351-360).
+// SessionManager.sessionParameters (SessionManager.ts:391-400 at
+// db021da0; review II, R2-P6-doc-2906).
 func (n *Node) SessionParameters() SessionParameters {
 	return *n.sec.responderParams
 }

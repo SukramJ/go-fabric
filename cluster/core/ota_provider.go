@@ -205,7 +205,7 @@ type OTAProviderConfig struct {
 	// it cancelled — with the query's session: matter.js hands it to
 	// SoftwareUpdateManager.suppressNextStartUp, so the StartUp event that
 	// follows on that session is not taken for a failed apply
-	// (OtaSoftwareUpdateProviderServer.ts:221-224 at 862ad75f).
+	// (OtaSoftwareUpdateProviderServer.ts:221-224 at db021da0).
 	RebootQuery func(peer OTAPeer, sessionID uint16)
 	// TransferBlockSize, when set, caps the block size of one peer's
 	// transfer in place of BDXMaxBlockSize; 0 falls back to it. matter.js
@@ -507,7 +507,7 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 		}
 		p.removeInProgress(peer)
 		if fn := p.cfg.RebootQuery; fn != nil {
-			fn(peer, sessionID) // OtaSoftwareUpdateProviderServer.ts:221-224 at 862ad75f
+			fn(peer, sessionID) // OtaSoftwareUpdateProviderServer.ts:221-224 at db021da0
 		}
 		return provdef.QueryImageResponse{}, false
 	}
@@ -609,7 +609,7 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 	// requestor's current one, so 0 names no image provided and stands for
 	// the token's. Mirrors matter.js
 	// packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:417-430
-	// at 862ad75f (tokenVersion, the adjustment of newVersion 0).
+	// at db021da0 (tokenVersion, the adjustment of newVersion 0).
 	var tokenVersion *uint32
 	if details != nil && details.versionToApply != nil {
 		v := *details.versionToApply

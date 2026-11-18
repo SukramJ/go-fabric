@@ -131,3 +131,43 @@ func TestOpenRejects(t *testing.T) {
 		t.Fatal("empty passphrase accepted")
 	}
 }
+
+// TestCreateSyncsTheFileAndItsDirectory: Create returns only once the key
+// file and the directory entry that names it are on stable storage, so a
+// power loss after the CA record was rewritten without the private key
+// cannot leave the root key nowhere; a failed sync of either fails Create
+// and removes the file (review II, R2-P6-store-1856). The syncs are
+// observed through the package's seams; no test can hold an fsync itself.
+func TestCreateSyncsTheFileAndItsDirectory(t *testing.T) {
+	saveFile, saveDir := syncFile, syncDir
+	t.Cleanup(func() { syncFile, syncDir = saveFile, saveDir })
+	var synced []string
+	syncFile = func(f *os.File) error { synced = append(synced, "file="+filepath.Base(f.Name())); return nil }
+	syncDir = func(dir string) error { synced = append(synced, "dir="+filepath.Base(dir)); return nil }
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ca.key")
+	if _, err := create(path, []byte("secret"), nil, minIterations); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"file=ca.key", "dir=" + filepath.Base(dir)}; strings.Join(synced, ",") != strings.Join(want, ",") {
+		t.Fatalf("synced %v, want %v", synced, want)
+	}
+	boom := errors.New("sync failed")
+	for _, c := range []struct {
+		name string
+		set  func()
+	}{
+		{"the file", func() { syncFile = func(*os.File) error { return boom } }},
+		{"the directory", func() { syncDir = func(string) error { return boom } }},
+	} {
+		syncFile, syncDir = func(*os.File) error { return nil }, func(string) error { return nil }
+		c.set()
+		p := filepath.Join(dir, "fails.key")
+		if _, err := create(p, []byte("secret"), nil, minIterations); !errors.Is(err, boom) {
+			t.Fatalf("%s: Create = %v, want the sync error", c.name, err)
+		}
+		if _, err := os.Stat(p); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("%s: the file is left: %v", c.name, err)
+		}
+	}
+}

@@ -14,7 +14,11 @@ import (
 // BD-Matter-Attestation-ValidityAtDacNotBefore (notes/parity/by_design.md):
 // the attestation chain is judged at the DAC's notBefore, so a DAC past
 // its own notAfter and a PAI that has expired since the DAC was issued
-// pass — the current time is not part of the verdict.
+// pass — the current time is not part of the verdict when the Context
+// carries no clock. With one, a DAC past its notAfter is an error finding
+// (TestStricterDeviceChecksAreErrorFindings; review II, R2-P6-par-1805,
+// owner decision 193), which the commissioner, which sets its clock,
+// hands to its policy.
 //
 // matter.js's validator checks "Certificate validity at DAC's notBefore
 // timestamp": the DAC's notBefore against the PAI's and the PAA's

@@ -40,7 +40,7 @@ const (
 // ErrNoBasicWindow is [WindowOptions].Basic on a node whose
 // AdministratorCommissioning lacks the Basic (BC) feature — matter.js's
 // ImplementationError of openBasicCommissioningWindow
-// (CommissioningClient.ts:487-489 at 862ad75f).
+// (CommissioningClient.ts:487-489 at db021da0).
 var ErrNoBasicWindow = errors.New("client: the node does not support the basic commissioning method")
 
 // WindowOptions configure [Node.OpenCommissioningWindow]; the zero value
@@ -56,7 +56,7 @@ type WindowOptions struct {
 
 // CommissioningWindow is an open commissioning window — matter.js
 // CommissioningClient.EnhancedCommissioningWindow
-// (CommissioningClient.ts:820-833 at 862ad75f): the pairing codes, the
+// (CommissioningClient.ts:820-833 at db021da0): the pairing codes, the
 // passcode and long discriminator they encode, the node's vendor and
 // product id, and the window's timeout. A basic window carries the
 // timeout alone; the node's own code commissions it.
@@ -78,9 +78,9 @@ type CommissioningWindow struct {
 // OpenCommissioningWindow with a random discriminator and passcode and the
 // PAKE verifier derived from them over a random 32-byte salt at 1000
 // PBKDF2 iterations — CommissioningClient.openEnhancedCommissioningWindow
-// (CommissioningClient.ts:507-567 at 862ad75f) with PaseClient's
+// (CommissioningClient.ts:507-567 at db021da0) with PaseClient's
 // generateRandomDiscriminator, generateRandomPasscode and
-// generatePakePasscodeVerifier (PaseClient.ts:49-71). The codes it returns
+// generatePakePasscodeVerifier (PaseClient.ts:50-71). The codes it returns
 // are the manual code of the Standard flow and the QR code of version 0,
 // Standard flow, discovery on the IP network, with the vendor and product
 // id of the peer's BasicInformation.
@@ -176,7 +176,7 @@ func (n *Node) openBasicWindow(ctx context.Context, timeout uint16) (Commissioni
 // RevokeCommissioning (timed); open is false when the peer answered
 // WindowNotOpen (Failure with that cluster status), which is no error —
 // CommissioningClient.#revokeStaleCommissioningWindow
-// (CommissioningClient.ts:570-582 at 862ad75f).
+// (CommissioningClient.ts:570-582 at db021da0).
 func (n *Node) RevokeCommissioningWindow(ctx context.Context) (open bool, err error) {
 	_, err = n.Invoke(ctx, CommandAt(0, admincommdef.ClusterID, admincommdef.CmdRevokeCommissioning), nil, InvokeOptions{Timed: true})
 	var se *StatusError

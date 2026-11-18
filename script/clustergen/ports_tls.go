@@ -60,7 +60,5 @@ var tlsPorts = map[string]portSet{
 }
 
 func init() {
-	for name, ps := range tlsPorts {
-		ports[name] = ps
-	}
+	mergePorts(ports, tlsPorts, "ports_tls.go")
 }

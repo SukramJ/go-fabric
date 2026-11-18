@@ -162,7 +162,7 @@ func TestDnsCodecEncodeParityMatterJS(t *testing.T) {
 }
 
 // TestDnsCodecQNameParityMatterJS mirrors DnsCodecTest.ts:154-217 and
-// :310-326 (decode QName) at 862ad75f by meaning: names are read from a
+// :310-326 (decode QName) at db021da0 by meaning: names are read from a
 // message's question, a compressed name follows its pointer, and a name
 // cut short or pointing at itself fails the message.
 func TestDnsCodecQNameParityMatterJS(t *testing.T) {

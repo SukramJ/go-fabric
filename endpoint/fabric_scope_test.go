@@ -64,6 +64,8 @@ func TestReadOneAttachesTheScopeOnARequest(t *testing.T) {
 		{"standard cluster, host server", scopeServer{cluster: 0x0065, attr: 0x0000}, request, &im.FabricScope{Fabric: 3, Filtered: true, Fields: []uint32{2}}},
 		{"standard cluster, a declaration that drops it", declaringServer{scopeServer{0x0065, 0x0000, nil}}, request, &im.FabricScope{Fabric: 3, Filtered: true, Fields: []uint32{2}}},
 		{"standard cluster, a declaration that adds one", declaringServer{scopeServer{0x0006, 0x0000, &vendor}}, request, nil},
+		{"standard cluster, a manufacturer-specific attribute, declared", declaringServer{scopeServer{0x0006, 0xFFF10000, &vendor}}, request, &im.FabricScope{Fabric: 3, Filtered: true, Sensitive: true, Fields: []uint32{4}}},
+		{"standard cluster, a manufacturer-specific attribute, undeclared", scopeServer{cluster: 0x0006, attr: 0xFFF10000}, request, nil},
 		{"vendor cluster, declared", declaringServer{scopeServer{0xFFF1FC01, 0x0001, &vendor}}, request, &im.FabricScope{Fabric: 3, Filtered: true, Sensitive: true, Fields: []uint32{4}}},
 		{"vendor cluster, undeclared", scopeServer{cluster: 0xFFF1FC01, attr: 0x0001}, request, nil},
 		{"no request behind the read", scopeServer{cluster: 0x0065, attr: 0x0000}, context.Background(), nil},

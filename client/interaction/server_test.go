@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acdef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
 	"github.com/SukramJ/go-fabric/cluster/spec/groups"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -377,6 +378,32 @@ func TestServeWrite(t *testing.T) {
 	})
 }
 
+// TestServeChunkedWriteRefusedWhole: a chunked write — an ACL replace
+// sent in two chunks — is refused whole with FAILURE at its first chunk:
+// nothing of it reaches the dispatcher, so the list stays as it was rather
+// than at its first chunk. The server answers one WriteRequest per
+// exchange until ADR 0032's single session layer (review II,
+// F-db021da0-51).
+func TestServeChunkedWriteRefusedWhole(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, _, d := serverRig(t, 0)
+		acl := im.ConcreteAttributePath{Endpoint: 0, Cluster: acdef.ClusterID, Attribute: acdef.AttrAcl, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+		first := im.WriteRequest{MoreChunkedMessages: true, Writes: []im.AttributeWrite{
+			{Path: acl, Value: im.AttributeValue{Value: spec.List[acdef.AccessControlEntryStruct]{}}},
+		}}
+		s.push(t, 0x7238, im.OpcodeWriteRequest, encode(t, func(e *tlv.Encoder) { first.MarshalTLV(e, wire.AttributeValueWriter) }))
+		s.ackPushed(t, expectStatus(t, s, im.StatusFailure))
+		synctest.Wait()
+
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		if len(d.writes) != 0 {
+			t.Fatalf("%d writes of a refused chunked write reached the dispatcher, want none", len(d.writes))
+		}
+	})
+}
+
 // TestServeWriteEndedAtAnElement: a write whose element ends the
 // interaction — a path with a numeric ListIndex, INVALID_ACTION — is
 // answered with that status in a StatusResponse, the element before it
@@ -687,4 +714,40 @@ func TestServeReadGeneratesChunkByChunk(t *testing.T) {
 			t.Fatalf("%d reports from %d reads, want 6 from 6", reports, d.reads.Load())
 		}
 	})
+}
+
+// TestServeRefusesANonCASESession: a request a peer opens on a session
+// that is not CASE — a commissionee's PASE session carries no fabric — is
+// answered UnsupportedAccess before anything is dispatched, whatever the
+// dispatcher's ACL would say (review II, R2-P6-acl-2108).
+func TestServeRefusesANonCASESession(t *testing.T) {
+	t.Parallel()
+	for name, req := range map[string]struct {
+		opcode  uint8
+		payload func(t *testing.T) []byte
+	}{
+		"read":   {im.OpcodeReadRequest, func(t *testing.T) []byte { t.Helper(); return readRequest(t, 20) }},
+		"write":  {im.OpcodeWriteRequest, func(t *testing.T) []byte { t.Helper(); return writeRequest(t, false, false) }},
+		"invoke": {im.OpcodeInvokeRequest, func(t *testing.T) []byte { t.Helper(); return invokeRequest(t, false, false, 20) }},
+		"timed":  {im.OpcodeTimedRequest, func(t *testing.T) []byte { t.Helper(); return timedRequest(t, 1000) }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				s := newScriptedOn(t, nil, 0)
+				reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+				reg.Register(s.mgr)
+				t.Cleanup(func() { s.mgr.SetProtocolHandler(im.InteractionModelProtocolID, nil) })
+				d := &fakeDispatcher{sizes: map[uint32]int{20: 10}}
+				reg.Serve(interaction.ServerConfig{Dispatcher: d, Qualities: plainQualities{}})
+				s.push(t, 0x7301, req.opcode, req.payload(t))
+				expectStatus(t, s, im.StatusUnsupportedAccess)
+				d.mu.Lock()
+				defer d.mu.Unlock()
+				if len(d.writes)+len(d.timed) != 0 {
+					t.Fatalf("dispatched %d writes and %d invokes on a session without a fabric", len(d.writes), len(d.timed))
+				}
+			})
+		})
+	}
 }

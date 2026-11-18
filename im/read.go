@@ -87,12 +87,14 @@ type ReadRequest struct {
 // MarshalTLV encodes r at the top level (always anonymous tag) as a
 // client sends it. Mirrors matter.js
 // packages/types/src/protocol/messages/TlvReadRequest.ts:19-35 at
-// 0ceb202d with the request action/request/Read.ts:40-89 builds: the
+// db021da0 with the request action/request/Read.ts:40-89 builds: the
 // optional lists — AttributeRequests (0), EventRequests (1), EventFilters
-// (2) — only when they have members, IsFabricFiltered (3) always,
-// DataVersionFilters (4) only with members, and InteractionModelRevision
+// (2) — when the request has them, IsFabricFiltered (3) always,
+// DataVersionFilters (4) when it has them, and InteractionModelRevision
 // (0xFF) [MatterInteractionModelRevision]
-// (packages/model/src/common/Specification.ts:124), in field order.
+// (packages/model/src/common/Specification.ts:124), in field order. A list
+// without members is left out here; Read.ts:75-89 would send one its
+// caller passed as an empty array.
 func (r ReadRequest) MarshalTLV(enc *tlv.Encoder) {
 	enc.StartStruct(tlv.AnonymousTag())
 	marshalAttributePaths(enc, tagReadReqAttributeRequests, r.AttributeRequests)
@@ -228,7 +230,7 @@ func readPathArray(dec *tlv.Decoder) ([]ConcreteAttributePath, error) {
 			}
 			return paths, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeList {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeList {
 			return nil, fmt.Errorf("%w: AttributePathIB not list, got 0x%02X", ErrInvalidPath, el.Type)
 		}
 		// Re-construct the path from the already-opened list. We
@@ -1006,7 +1008,7 @@ func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath 
 // subject that passes the View pass, which comes first; the event's own
 // read privilege is checked for an event that exists. Mirrors matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-224 at
-// 862ad75f (#addConcrete, core spec §8.4.3.2); such a path used to be
+// db021da0 (#addConcrete, core spec §8.4.3.2); such a path used to be
 // answered with nothing.
 //
 // With this node's id stamped ([WithLocalNodeID]), a concrete path naming

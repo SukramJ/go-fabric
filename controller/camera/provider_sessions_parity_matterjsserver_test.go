@@ -234,7 +234,7 @@ func newPSFixture() *psFixture {
 		f.mu.Unlock()
 	}
 	s.w = newSessionWatch(context.Background(), serviceWatch{s}, clk, log)
-	s.ps = &providerSessions{nodes: f, requestor: f, fabricIndex: psFabric, watch: s.w, log: log, cleanup: s.m.cleanupContext, offers: map[providerKey]string{}}
+	s.ps = &providerSessions{nodes: f, requestor: f, fabricIndex: psFabric, watch: s.w, log: log, cleanup: s.m.cleanupContext, offers: map[providerKey]*sentOffer{}}
 	s.cfg.Observer.Signal = func(sig Signal) {
 		f.mu.Lock()
 		f.signals = append(f.signals, sig)

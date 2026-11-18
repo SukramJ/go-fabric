@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -30,7 +31,7 @@ import (
 type Peer = exchange.PeerAddress
 
 // Status is an update's status as the provider reports it — matter.js
-// OtaUpdateStatus (SoftwareUpdateManager.ts:105-114 at 862ad75f),
+// OtaUpdateStatus (SoftwareUpdateManager.ts:105-114 at db021da0),
 // cluster/core's OTAUpdateStatus.
 type Status = mattercore.OTAUpdateStatus
 
@@ -230,7 +231,7 @@ type Config struct {
 	// answer to the provider. OnProviderExchange is told each command the
 	// provider answered, with its answer. A test harness's seam: matter.js
 	// keeps all three in its cert harness (support/chip-testing/src/cert/
-	// InProcessControllerAdapter.ts:456-638 at 862ad75f).
+	// InProcessControllerAdapter.ts:610-792 at db021da0).
 	ScriptQueryImage   func(p Peer, req QueryImageRequest) (QueryImageScript, bool)
 	ScriptApplyUpdate  func(p Peer, req provdef.ApplyUpdateRequestRequest) (ApplyUpdateScript, bool)
 	OnProviderExchange func(x ProviderExchange)
@@ -292,6 +293,16 @@ type Manager struct {
 	announcements          *announcements
 	closed                 bool
 	work                   sync.WaitGroup
+	// life is the context of the update checks the timers run, cancelled
+	// by Close, which also waits for them (review II, R2-P6-conc-1907).
+	life     context.Context
+	stopLife context.CancelFunc
+	// check is the timers' update check; nil is checkForUpdates. A test
+	// seam.
+	check func(ctx context.Context) error
+	// query stands in for queryUpdates; nil is queryUpdates. A test seam:
+	// a product check that fails needs a commissioned node.
+	query func(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, bool, error)
 	// obs are the observers of [Manager.Observe], with their own lock.
 	obs observers
 	// bdxSession, when set, stands in for the BDX responder's session
@@ -304,7 +315,7 @@ type Manager struct {
 // bdxTransfer is what the manager reads of a node's running BDX transfer,
 // a *bdx.ServerSession: matter.js reads the session's transferredBytes
 // and dataLength (#isTransferring, queuedUpdates,
-// SoftwareUpdateManager.ts:293-336 at 862ad75f).
+// SoftwareUpdateManager.ts:293-336 at db021da0).
 type bdxTransfer interface {
 	Transferred() uint64
 	Negotiated() (bdx.Result, bool)
@@ -320,6 +331,7 @@ func New(cfg Config) (*Manager, error) {
 		suppress: true, known: map[Peer]SoftwareUpdateInfo{}, startUpSuppress: map[Peer]uint16{},
 		observed: map[Peer]uint32{}, applyDelays: map[Peer]time.Duration{},
 	}
+	m.life, m.stopLife = context.WithCancel(context.Background())
 	if m.rand == nil {
 		m.rand = rand.Float64
 	}
@@ -355,15 +367,26 @@ func (m *Manager) Start() {
 	if m.checkTimer != nil {
 		m.checkTimer.Stop()
 	}
-	m.checkTimer = m.clock.AfterFunc(delay, m.initializeUpdateCheck)
+	m.checkTimer = m.clock.AfterFunc(delay, func() { m.goWork(m.initializeUpdateCheck) })
 }
 
-// initializeUpdateCheck is #initializeUpdateCheck (:261-271).
+// initializeUpdateCheck is #initializeUpdateCheck (:261-271). It runs, as
+// every timer's check, on a goroutine Close cancels and waits for.
 func (m *Manager) initializeUpdateCheck() {
-	if err := m.CheckForUpdates(context.Background()); err != nil {
+	if err := m.runCheck(); err != nil {
 		m.log.Info("ota.manager.initial_check_failed", slog.Any("err", err))
 	}
 	m.scheduleCheck()
+}
+
+// runCheck is a timer's update check under the manager's life: the
+// failures of the products whose check failed (review II,
+// R2-P6-err-1912).
+func (m *Manager) runCheck() error {
+	if m.check != nil {
+		return m.check(m.life)
+	}
+	return m.checkForUpdates(m.life)
 }
 
 func (m *Manager) scheduleCheck() {
@@ -373,14 +396,20 @@ func (m *Manager) scheduleCheck() {
 		return
 	}
 	m.checkTimer = m.clock.AfterFunc(m.cfg.UpdateCheckInterval, func() {
-		_ = m.CheckForUpdates(context.Background())
-		m.scheduleCheck()
+		m.goWork(func() {
+			if err := m.runCheck(); err != nil {
+				m.log.Info("ota.manager.check_failed_products", slog.Any("err", err))
+			}
+			m.scheduleCheck()
+		})
 	})
 }
 
 // Close takes the manager offline — #nodeGoingOffline and the disposal
 // (:232-244, :1323-1329): no update work starts any more, the timers and
-// the announcements stop.
+// the announcements stop. A running update check a timer started is
+// cancelled — its download included — and waited for, so nothing is
+// stored after Close returns (review II, R2-P6-conc-1907).
 func (m *Manager) Close() {
 	m.mu.Lock()
 	m.suppress = true
@@ -393,6 +422,7 @@ func (m *Manager) Close() {
 	a := m.announcements
 	m.announcements = nil
 	m.mu.Unlock()
+	m.stopLife()
 	if a != nil {
 		a.close()
 	}
@@ -461,7 +491,7 @@ func (m *Manager) preparePeerForUpdate(n *client.Node) (prepared, bool) {
 // NodeChanged, NodeEvent and NodeSubscription are the node events the
 // manager observes a node through once it prepared it for an update —
 // softwareVersion$Changed, startUp and subscriptionStatusChanged
-// (SoftwareUpdateManager.ts:714-760 at 862ad75f). The controller feeds
+// (SoftwareUpdateManager.ts:714-760 at db021da0). The controller feeds
 // them from every node's hooks (client.RegistryConfig.HooksFor).
 
 // NodeChanged takes a change of the node's image.
@@ -492,11 +522,27 @@ func (m *Manager) NodeSubscription(n *client.Node, active bool) {
 }
 
 // SetProvider names the provider's node id and endpoint, once the
-// controller has built its provider (controller/ota.go openOTA).
+// controller has built its provider (controller/ota.go openOTA). It may
+// be called at any time; the announcements read the values it set under
+// the manager's lock (review II, R2-P6-conc-1913).
 func (m *Manager) SetProvider(nodeID uint64, endpoint uint16) {
 	m.mu.Lock()
 	m.cfg.ProviderNodeID, m.cfg.ProviderEndpoint = nodeID, endpoint
 	m.mu.Unlock()
+}
+
+// provider is the provider's node id and endpoint SetProvider set.
+func (m *Manager) provider() (nodeID uint64, endpoint uint16) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.cfg.ProviderNodeID, m.cfg.ProviderEndpoint
+}
+
+// bdxResponder is the BDX responder SetBDX set; nil for none.
+func (m *Manager) bdxResponder() *bdx.Responder {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.cfg.BDX
 }
 
 // QueryImageRequest is a requestor's QueryImage.
@@ -649,10 +695,11 @@ func (m *Manager) bdxSessionFor(p Peer) bdxTransfer {
 	if m.bdxSession != nil {
 		return m.bdxSession(p)
 	}
-	if m.cfg.BDX == nil {
+	r := m.bdxResponder()
+	if r == nil {
 		return nil
 	}
-	s := m.cfg.BDX.SessionFor(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota")
+	s := r.SessionFor(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota")
 	if s == nil {
 		return nil // no typed nil in the interface
 	}
@@ -825,12 +872,20 @@ func (m *Manager) storedCandidates(ctx context.Context, vid, pid uint16, version
 
 // CheckForUpdates checks every node for updates, stored images included,
 // and purges the stored images no node needs — checkForUpdates (:471-474).
+// A product whose check failed is logged and passed over, the others are
+// still checked and the purge still runs; the error joins the failures of
+// those products (errors.Join), as [Manager.QueryUpdates] returns them,
+// and is nil only when every product's check succeeded (review II,
+// R2-P6-err-1912).
 func (m *Manager) CheckForUpdates(ctx context.Context) error {
-	if _, err := m.QueryUpdates(ctx, nil, true); err != nil {
-		return err
-	}
+	return m.checkForUpdates(ctx)
+}
+
+// checkForUpdates is CheckForUpdates.
+func (m *Manager) checkForUpdates(ctx context.Context) error {
+	_, failed := m.queryUpdatesAndReport(ctx, nil, true)
 	m.cleanupObsoleteUpdates(ctx)
-	return nil
+	return failed
 }
 
 // cleanupObsoleteUpdates is #cleanupObsoleteUpdates (:483-556): a stored
@@ -883,9 +938,24 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 // QueryUpdates checks every node, or only, for updates over the ledgers
 // and — with includeStored — the stored images, and returns the nodes it
 // found one for — queryUpdates (:559-623). A check the manager ran (it
-// was not suppressed) ends with an [UpdateCheckFinished] event.
+// was not suppressed) ends with an [UpdateCheckFinished] event. A product
+// whose check failed is logged and passed over and the others are still
+// checked: the nodes returned are those of the products that succeeded,
+// and the error joins the failures (errors.Join; the event's Err is the
+// same error). It is nil only when every product's check succeeded, so a
+// caller that treats any error as fatal discards the updates found
+// besides (review II, R2-P6-err-1912).
 func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, error) {
-	out, ran, failed := m.queryUpdates(ctx, only, includeStored)
+	return m.queryUpdatesAndReport(ctx, only, includeStored)
+}
+
+// queryUpdatesAndReport is QueryUpdates.
+func (m *Manager) queryUpdatesAndReport(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, error) {
+	query := m.queryUpdates
+	if m.query != nil {
+		query = m.query
+	}
+	out, ran, failed := query(ctx, only, includeStored)
 	if ran {
 		ev := UpdateEvent{Kind: UpdateCheckFinished, Updates: slices.Clone(out), Err: failed}
 		if only != nil {
@@ -893,7 +963,7 @@ func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeSt
 		}
 		m.emit(ev)
 	}
-	return out, nil
+	return out, failed
 }
 
 // queryUpdates is QueryUpdates; ran is false when the manager was
@@ -907,7 +977,11 @@ func (m *Manager) queryUpdates(ctx context.Context, only *client.Node, includeSt
 	}
 	var order []string
 	groups := map[string]*group{}
-	for _, n := range m.cfg.Registry.Nodes() {
+	nodes := m.cfg.Registry.Nodes()
+	if only == nil {
+		m.forgetGone(nodes)
+	}
+	for _, n := range nodes {
 		if m.suppressed() {
 			return nil, false, nil
 		}
@@ -952,6 +1026,31 @@ func (m *Manager) queryUpdates(ctx context.Context, only *client.Node, includeSt
 		m.mu.Unlock()
 	}
 	return out, true, failed
+}
+
+// forgetGone drops what the manager keeps per node for every node that
+// is no longer one of nodes, the registry's, and has no queued update: the
+// version it observed, the apply delay, the update it found, a startUp to
+// suppress, its consents. A check of every node runs it, so what a node
+// that left the registry leaves behind lasts until the next check (review
+// II, R2-P6-bound-1914).
+func (m *Manager) forgetGone(nodes []*client.Node) {
+	keep := make(map[Peer]bool, len(nodes))
+	for _, n := range nodes {
+		if p, ok := n.PeerAddress(); ok {
+			keep[p] = true
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, e := range m.queue {
+		keep[e.peer] = true
+	}
+	maps.DeleteFunc(m.observed, func(p Peer, _ uint32) bool { return !keep[p] })
+	maps.DeleteFunc(m.applyDelays, func(p Peer, _ time.Duration) bool { return !keep[p] })
+	maps.DeleteFunc(m.known, func(p Peer, _ SoftwareUpdateInfo) bool { return !keep[p] })
+	maps.DeleteFunc(m.startUpSuppress, func(p Peer, _ uint16) bool { return !keep[p] })
+	m.consents = slices.DeleteFunc(m.consents, func(c consent) bool { return !keep[c.peer] })
 }
 
 func (m *Manager) suppressed() bool {
@@ -1176,8 +1275,8 @@ func (m *Manager) ForceUpdate(ctx context.Context, p Peer, t Target) error {
 			delete(m.startUpSuppress, p)
 		}
 		m.mu.Unlock()
-		if m.cfg.BDX != nil {
-			_ = m.cfg.BDX.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
+		if r := m.bdxResponder(); r != nil {
+			_ = r.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
 		}
 	}
 	added, err := m.AddUpdateConsent(ctx, p, t)
@@ -1210,8 +1309,8 @@ func (m *Manager) ForceUpdate(ctx context.Context, p Peer, t Target) error {
 // closed; an update not yet Applying or Done is dropped and reported
 // failed, the reboot arming lifted.
 func (m *Manager) cancelUpdate(p Peer) {
-	if m.cfg.BDX != nil {
-		_ = m.cfg.BDX.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
+	if r := m.bdxResponder(); r != nil {
+		_ = r.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
 	}
 	m.mu.Lock()
 	i := m.indexOfLocked(p)
@@ -1328,6 +1427,59 @@ func (m *Manager) RemoveConsent(p Peer, version uint32) {
 	m.cancelUpdate(p)
 }
 
+// NodeDeleted forgets the node at p at once, when it left the registry
+// (client.Hooks.Deleted): its consents (each reported as
+// [UpdateConsentChanged]), its queued update whatever its state (reported
+// as [UpdateFailed] with [ErrUpdateCancelled]), its BDX scope (a transfer
+// that runs is closed), its reboot arming, and what the manager observed
+// of it — the scope and the arming whether or not an update was queued. A later
+// node at the same address starts with nothing of it. A node the manager
+// never saw is no error. The next full check drops the same for a node
+// whose deletion was not reported (review II, R2-P6-bound-1914).
+func (m *Manager) NodeDeleted(p Peer) {
+	m.mu.Lock()
+	var removed []Target
+	m.consents = slices.DeleteFunc(m.consents, func(c consent) bool {
+		if c.peer != p {
+			return false
+		}
+		removed = append(removed, c.Target)
+		return true
+	})
+	var cancelled *Target
+	if i := m.indexOfLocked(p); i >= 0 {
+		t := m.queue[i].Target
+		cancelled = &t
+		m.queue = slices.Delete(m.queue, i, i+1)
+	}
+	delete(m.observed, p)
+	delete(m.applyDelays, p)
+	delete(m.known, p)
+	delete(m.startUpSuppress, p)
+	failed := m.cfg.OnUpdateFailed
+	m.mu.Unlock()
+	// The scope and the arming go whether or not an update is queued: the
+	// provider enables the scope and a status arms the peer on their own.
+	if r := m.bdxResponder(); r != nil {
+		_ = r.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
+	}
+	if m.cfg.Armer != nil {
+		m.cfg.Armer.Disarm(p)
+	}
+	for _, t := range removed {
+		m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t})
+	}
+	if cancelled == nil {
+		return
+	}
+	m.log.Info("ota.manager.node_deleted", slog.String("node", peerString(p)))
+	if failed != nil {
+		failed(p)
+	}
+	m.emit(UpdateEvent{Kind: UpdateFailed, Peer: p, Target: *cancelled, Err: ErrUpdateCancelled})
+	m.triggerQueuedUpdate()
+}
+
 // SuppressNextStartUp suppresses the node's next StartUp event on session
 // sessionID — suppressNextStartUp (:1239-1241), called by the provider for
 // a QueryImage it took for the node's restart.
@@ -1419,15 +1571,19 @@ func (m *Manager) progressLocked(p Peer, e *queueEntry, status Status, applyDela
 	if transferStarted {
 		e.transferStarted = true
 	}
+	// The arming happens under m.mu, with the entry it is for still queued:
+	// a NodeDeleted that removes the entry disarms after it, so a deleted
+	// peer is never left armed (review II, R2-P6-bound-1914). The armer runs
+	// no callback under its own lock.
+	if status == mattercore.OTAUpdateApplying && m.cfg.Armer != nil {
+		m.cfg.Armer.Arm(p, applyDelay)
+	}
 	m.mu.Unlock()
 	if transferStarted {
 		m.emit(UpdateEvent{Kind: UpdateTransferStarted, Peer: p, Target: target})
 	}
 	if status != mattercore.OTAUpdateApplying {
 		return
-	}
-	if m.cfg.Armer != nil {
-		m.cfg.Armer.Arm(p, applyDelay)
 	}
 	if !wasApplying {
 		if applying != nil {

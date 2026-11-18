@@ -149,7 +149,7 @@ func (n *Node) eraseStores(ctx context.Context) error {
 // DeriveUniqueID's shape — in the erased store, so the node that comes back
 // serves another one (persisted.uniqueID reads a stored pin first). matter.js
 // draws one when the erased state holds none (BasicInformationServer.ts:89-91,
-// createUniqueId :161-170 at 862ad75f), so its reset node serves a new
+// createUniqueId :161-170 at db021da0), so its reset node serves a new
 // UniqueID (testing/node-helpers.ts:164-165). With UniqueID rotation on the
 // pin is never read, and none is written.
 func (n *Node) pinFreshUniqueID(ctx context.Context, st store.Settings) error {
@@ -170,9 +170,9 @@ func (n *Node) pinFreshUniqueID(ctx context.Context, st store.Settings) error {
 // eraseEndpointRecords erases every endpoint record and restarts the
 // numbering at the first bridged number, so the node that comes back
 // numbers as a fresh install. Mirrors matter.js
-// packages/node/src/storage/server/ServerNodeStore.ts erase (:134-139),
+// packages/node/src/storage/server/ServerNodeStore.ts erase (:137-142),
 // which erases the endpoint stores, and ServerEndpointStores.ts erase
-// (:63-77): storage.clearAll(), a fresh holder map, #nextNumber = 1.
+// (:63-80 at db021da0): storage.clearAll(), a fresh holder map, #nextNumber = 1.
 func eraseEndpointRecords(ctx context.Context, s endpoint.Store) error {
 	if err := s.EraseEndpoints(ctx); err != nil {
 		return fmt.Errorf("node: factory reset: erase endpoints: %w", err)

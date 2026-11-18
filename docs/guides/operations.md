@@ -48,7 +48,8 @@ So the operator's rules are the persistence guide's
   upgrades (a volume, the add-on's data directory, the service's state
   directory);
 - protect it like a key: it holds the node's private operational keys
-  unencrypted. A file the node creates through `Store.Path` (or
+  unencrypted unless `Store.Sealer` is set ([sealing at
+  rest](../security.md#sealing-at-rest)). A file the node creates through `Store.Path` (or
   `store.OpenSQLite`) is created with mode `0600`, and
   SQLite gives its `-wal` and `-shm` files the same mode; an existing file
   keeps its mode, and a host that opens its own handle (`Store.DB`) sets the
@@ -127,7 +128,8 @@ bluetoothd. It needs the system-bus rights its central needs (the
 The reference daemon has no BLE flag: `examples/ble-wifi-light` is the
 example node with BLE and Wi-Fi.
 
-*Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `leaveBLE`),
+*Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `commissioningHost.withdrawBLE`),
+[`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`Node.leaveRadioWhenCommissioned`),
 [`bridge/ble.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `WithdrawBLE`, `StopBLE`, `advertiseBLE`),
 [`transport/btp/accept.go`](https://github.com/SukramJ/go-fabric/blob/main/transport/btp/accept.go) (`Accept`),
 [`ble/bluez/peripheral_linux.go`](https://github.com/SukramJ/go-fabric/blob/main/ble/bluez/peripheral_linux.go) (`NewPeripheral`).*
@@ -214,8 +216,13 @@ new driver. When the system-bus connection itself is lost, every later scan
 and join fails at once with UnknownError and the debug text "the driver's
 bus connection is gone" — the same signal to build a new driver. A scan or
 join also ends with its caller's context while it waits for the driver.
+The node hands the host's driver to the server unwrapped, so the server
+finds every optional port it implements — `contract.WiFiLinkWatcher` and
+`contract.WiFiDisconnector` included — and re-announces the node's DNS-SD
+records after each successful join through the server's `OnConnected`
+hook.
 
-*Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`reannouncingDriver`),
+*Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`wifiDriver`, `wifiConnected`),
 [`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
 [`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`, `CurrentNetwork`).*
 
@@ -355,7 +362,7 @@ failing. The zero value runs no probe.
 Every table a peer can fill has a fixed size; the [limits page](limits.md)
 lists them all. The three an operator meets first:
 
-- **Fabrics: 5** (`node.Config.SupportedFabrics`, up to 254). Each
+- **Fabrics: 5** (`node.Config.Limits.SupportedFabrics`, up to 254). Each
   controller ecosystem the node is paired with is one fabric; a sixth
   pairing is answered `TableFull`.
 - **PASE failures per commissioning window: 20**, then a lockout of

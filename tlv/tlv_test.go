@@ -657,8 +657,9 @@ func TestPutUTF8Bounded_OverflowMultibyteTrimsAtRuneBoundary(t *testing.T) {
 // --- PutUint*Bounded sentinel rejection ---
 // These tests mirror the signed-int sentinel tests above for the
 // unsigned side. See Matter §6.6.4.5 Table 26; matter.js
-// packages/types/src/tlv/TlvNullable.ts:28-31 (NullableSchema shrinks
-// max from baseTypeMax to baseTypeMax-1 for nullable unsigned types).
+// packages/types/src/tlv/TlvNullable.ts:37-44 at db021da0
+// (NullableSchema shrinks max from baseTypeMax to baseTypeMax-1 for
+// nullable unsigned types).
 
 // TestPutUint8Bounded_SentinelRejected verifies that 0xFF is rejected,
 // as it is the wire sentinel for nullable uint8 fields.
@@ -716,7 +717,7 @@ func TestPutUint16Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at 0ceb202d).
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-300 at db021da0).
 		if wire[0]&0x1F > byte(TypeUnsignedInt2) {
 			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt2 0x%02X", v, wire[0], TypeUnsignedInt2)
 		}
@@ -752,7 +753,7 @@ func TestPutUint32Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at 0ceb202d).
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-300 at db021da0).
 		if wire[0]&0x1F > byte(TypeUnsignedInt4) {
 			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt4 0x%02X", v, wire[0], TypeUnsignedInt4)
 		}
@@ -788,7 +789,7 @@ func TestPutUint64Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at 0ceb202d).
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-300 at db021da0).
 		if wire[0]&0x1F > byte(TypeUnsignedInt8) {
 			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt8 0x%02X", v, wire[0], TypeUnsignedInt8)
 		}

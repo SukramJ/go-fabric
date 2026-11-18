@@ -26,8 +26,8 @@ func FuzzDecode(f *testing.F) {
 	if err != nil {
 		f.Fatal(err)
 	}
-	f.Add(sealGroup(f, op, sid, 0x0101, 1, 1, true, []byte("seed")))
-	f.Add(sealGroup(f, op, sid, 0x0101, 1, 2, false, []byte("seed")))
+	f.Add(sealGroup(f, op, sid, 0x0101, 1, 1, true, imPayload([]byte("seed"))))
+	f.Add(sealGroup(f, op, sid, 0x0101, 1, 2, false, imPayload([]byte("seed"))))
 	f.Add([]byte{0x06, 0xEF, 0x5F, 0x81})
 	f.Add([]byte{})
 	f.Fuzz(func(t *testing.T, datagram []byte) {

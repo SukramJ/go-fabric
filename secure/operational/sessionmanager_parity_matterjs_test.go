@@ -182,7 +182,7 @@ func TestSessionManagerWallClockSteps(t *testing.T) {
 	// neither ages nor rejuvenates the peer. The observable is the MRP
 	// base interval (active 1000 ms, idle 5000 ms, threshold 4000 ms as
 	// the spec's default); matter.js reads session.isPeerActive
-	// (Session.ts:149-151 at 862ad75f).
+	// (Session.ts:150-152 at db021da0).
 	const activeMs, idleMs, thresholdMs = 1000, 5000, 4000
 	active, idle := activeMs*time.Millisecond, idleMs*time.Millisecond
 	open := func(t *testing.T, m *Manager, id uint16) *Entry {
@@ -192,7 +192,7 @@ func TestSessionManagerWallClockSteps(t *testing.T) {
 		return e
 	}
 	t.Run("keeps a peer heard from just now active across a forward step", func(t *testing.T) {
-		// SessionManagerTest.ts:825-832 at 862ad75f.
+		// SessionManagerTest.ts:826-833 at db021da0.
 		t.Parallel()
 		m := NewManager(newMinimalFakeStore())
 		clk := clocktest.New(time.UnixMilli(1_700_000_000_000))

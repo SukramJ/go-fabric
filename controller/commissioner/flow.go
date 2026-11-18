@@ -27,6 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	timesync "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/controller/attestation"
@@ -34,10 +35,10 @@ import (
 )
 
 // Timing of the flow. Mirrors matter.js
-// packages/protocol/src/peer/ControllerCommissioningFlow.ts:289
-// (DEFAULT_FAILSAFE_TIME = 1 min), :295 (CASE_RECONNECT_TIMEOUT = 5 min),
-// :298 (FAILSAFE_PROCESSING_MARGIN = 10 s) and :301
-// (FAILSAFE_MAX_SEND_TIME = 10 s) at 0ceb202d.
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:290
+// (DEFAULT_FAILSAFE_TIME = 1 min), :296 (CASE_RECONNECT_TIMEOUT = 5 min),
+// :299 (FAILSAFE_PROCESSING_MARGIN = 10 s) and :302
+// (FAILSAFE_MAX_SEND_TIME = 10 s) at db021da0.
 const (
 	DefaultFailSafeTime      = time.Minute
 	CASEReconnectTimeout     = 5 * time.Minute
@@ -544,12 +545,12 @@ func (f *flow) ensureGeneralCommissioningSuccess(what string, code gencomm.Commi
 func (f *flow) ensureOperationalCredentialsSuccess(what string, r nocResponse) error {
 	suffix := ""
 	if r.debugText != nil && *r.debugText != "" {
-		suffix += ", " + *r.debugText
+		suffix += ", " + deviceText(*r.debugText)
 	}
 	if r.fabricIndex != nil {
 		suffix += fmt.Sprintf(", fabricIndex: %d", *r.fabricIndex)
 	}
-	f.log.Debug("matter.controller.commissioning.operational_credentials_result", slog.String("context", what), slog.String("status", nocStatusNames[r.status]))
+	f.log.Debug("matter.controller.commissioning.operational_credentials_result", slog.String("context", what), slog.String("status", nocStatusName(r.status)))
 	if r.status == nocStatusOk {
 		return nil
 	}
@@ -561,7 +562,7 @@ func (f *flow) ensureOperationalCredentialsSuccess(what string, r nocResponse) e
 	case what == "updateFabricLabel" && r.status == nocStatusLabelConflict:
 		return newError(ErrFabricLabelConflict, fmt.Sprintf("Cannot set fabric label to %q because another fabric on this device already uses this name. Please adjust fabric labels to be unique.", f.fabric.CurrentLabel()), nil)
 	}
-	return newError(ErrCommissioning, fmt.Sprintf("Commission error for %q: %s (%d)%s", what, nocStatusNames[r.status], r.status, suffix), nil)
+	return newError(ErrCommissioning, fmt.Sprintf("Commission error for %q: %s (%d)%s", what, nocStatusName(r.status), r.status, suffix), nil)
 }
 
 // enumName is the matter.js enum lookup Enum[value].
@@ -588,8 +589,8 @@ func enumName(e *spec.Enum, v uint64) string {
 // PASE session armed (checkTerms, disarmAfterFailure).
 func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 	v, ok, err := f.readValues(ctx,
-		rootAttr(opCredsCluster, opCredsAttrSupportedFabrics),
-		rootAttr(opCredsCluster, opCredsAttrCommissionedFabrics),
+		rootAttr(opCredsCluster, opcredsdef.AttrSupportedFabrics),
+		rootAttr(opCredsCluster, opcredsdef.AttrCommissionedFabrics),
 		rootAttr(descriptor.ClusterID, descriptor.AttrPartsList),
 		rootAttr(descriptor.ClusterID, descriptor.AttrServerList),
 		rootAttr(basicinfo.ClusterID, basicinfo.AttrVendorId),
@@ -674,7 +675,10 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		case netcomm.AttrNetworks:
 			nets, err := decodeNetworks(a.Value)
 			if err != nil {
-				return 0, fmt.Errorf("%w: NetworkCommissioning Networks: %w", errUnexpectedResponse, err)
+				// A value whose shape does not decode is skipped and the
+				// read goes on (F-db021da0-15, reportedValue).
+				f.log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", "NetworkCommissioning Networks"), slog.Int("endpoint", int(a.Path.Endpoint)), slog.Any("err", err))
+				continue
 			}
 			d.networkStatus = append(d.networkStatus, networkStatus{endpoint: a.Path.Endpoint, networks: nets})
 		}
@@ -768,19 +772,34 @@ func (f *flow) armFailsafe(ctx context.Context, d time.Duration) (stepResult, er
 		if err != nil {
 			return 0, err
 		}
+		// By shape, a malformed value absent (F-db021da0-15, reportedValue).
+		def := gencomm.BasicCommissioningInfoDef
+		var fields map[uint32]any
+		if ok[0] {
+			fields, ok[0] = reportedStruct(f.log, "BasicCommissioningInfo", def, v[0])
+		}
 		if !ok[0] {
 			return 0, fmt.Errorf("%w: no BasicCommissioningInfo", errUnexpectedResponse)
 		}
 		var info gencomm.BasicCommissioningInfo
-		if err := info.DecodeTLV(v[0]); err != nil {
-			return 0, fmt.Errorf("%w: BasicCommissioningInfo: %w", errUnexpectedResponse, err)
+		var has bool
+		// A value without FailSafeExpiryLengthSeconds is refused: this
+		// module's rule — the flow cannot arm without it (F-db021da0-15).
+		if info.FailSafeExpiryLengthSeconds, has = fieldUint[uint16](def, fields, "FailSafeExpiryLengthSeconds"); !has {
+			return 0, fmt.Errorf("%w: no BasicCommissioningInfo FailSafeExpiryLengthSeconds", errUnexpectedResponse)
 		}
+		// A missing MaxCumulativeFailsafeSeconds leaves the commissioning
+		// expiry undefined (zero), as an unset field.
+		maxCumulative, hasMax := fieldUint[uint16](def, fields, "MaxCumulativeFailsafeSeconds")
+		info.MaxCumulativeFailsafeSeconds = maxCumulative
 		f.data.basicCommissioningInfo = &info
 		f.defaultFailSafe = time.Duration(info.FailSafeExpiryLengthSeconds) * time.Second
 		started := f.now()
-		f.mu.Lock()
-		f.commissioningExpiry = started.Add(time.Duration(info.MaxCumulativeFailsafeSeconds) * time.Second)
-		f.mu.Unlock()
+		if hasMax {
+			f.mu.Lock()
+			f.commissioningExpiry = started.Add(time.Duration(maxCumulative) * time.Second)
+			f.mu.Unlock()
+		}
 	}
 	maxExpiry := f.defaultFailSafe
 	if i := f.data.basicCommissioningInfo; i != nil {
@@ -1002,12 +1021,15 @@ func (f *flow) configureRegulatoryInformation(ctx context.Context) (stepResult, 
 	if err != nil {
 		return 0, err
 	}
+	var capability uint8
+	if ok[0] {
+		// By shape, a malformed value absent (F-db021da0-15, reportedValue).
+		var isNull bool
+		capability, isNull, ok[0] = reportedUint[uint8](f.log, "LocationCapability", 8, v[0])
+		ok[0] = ok[0] && !isNull
+	}
 	if !ok[0] {
 		return 0, fmt.Errorf("%w: no LocationCapability", errUnexpectedResponse)
-	}
-	capability, err := spec.DecodeUint[uint8](8)(v[0])
-	if err != nil {
-		return 0, fmt.Errorf("%w: LocationCapability: %w", errUnexpectedResponse, err)
 	}
 	location := gencomm.RegulatoryLocationTypeEnum(capability)
 	if location == gencomm.RegulatoryLocationTypeIndoorOutdoor {
@@ -1108,9 +1130,12 @@ func (f *flow) random(n int) ([]byte, error) {
 // policy decides (:1305-1319); the DAC key kept, parsed from the DAC when
 // the policy accepted a failed validation (:1321-1331).
 func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
+	// An earlier run's pair never outlives this run: a run that fails or
+	// withholds the pair leaves none (review II, R2-P6-fsm-1811).
+	f.attested = nil
 	chain := make([][]byte, 2)
-	for i, kind := range []uint8{certificateTypeDAC, certificateTypePAI} {
-		res, err := f.invoke(ctx, opCredsCluster, cmdCertificateChainRequest, certificateChainRequest(kind), true)
+	for i, kind := range []opcredsdef.CertificateChainTypeEnum{opcredsdef.CertificateChainTypeDacCertificate, opcredsdef.CertificateChainTypePaiCertificate} {
+		res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdCertificateChainRequest, opcredsdef.CertificateChainRequestRequest{CertificateType: kind}, true)
 		if err != nil {
 			return 0, err
 		}
@@ -1125,7 +1150,7 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := f.invoke(ctx, opCredsCluster, cmdAttestationRequest, octetsRequest(nonce), true)
+	res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdAttestationRequest, opcredsdef.AttestationRequestRequest{AttestationNonce: nonce}, true)
 	if err != nil {
 		return 0, err
 	}
@@ -1140,7 +1165,7 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	var findings []attestation.Finding
 	var baseErr error
 	result, err := attestation.Validate(
-		attestation.Context{Challenge: f.challenge, Store: f.c.ctx.Attestation},
+		attestation.Context{Challenge: f.challenge, Store: f.c.ctx.Attestation, Clock: f.c.ctx.Clock},
 		attestation.Data{
 			DAC: chain[0], PAI: chain[1], Elements: att.elements, Signature: att.signature, Nonce: nonce,
 			VendorID: f.data.vendorID, ProductID: f.data.productID,
@@ -1163,7 +1188,7 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		// (owner decision 119): a finding that a check could not run (no
 		// trust store, DclServiceUnavailable) or a LevelError one the
 		// policy accepts below leaves it unattested, with one log line.
-		if why, withheld := attestedPairWithheld(findings); withheld {
+		if why, withheld := attestedPairWithheld(result); withheld {
 			f.log.Info("matter.controller.commissioning.attested_identity_not_recorded", slog.String("reason", why))
 		} else {
 			f.attested = &[2]uint16{f.data.vendorID, f.data.productID}
@@ -1200,12 +1225,25 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 }
 
 // attestedPairWithheld reports why an attestation that returned no error
-// still records no attested pair: a check that did not run because no
-// trust store (DCL service) was available — the DAC chain, or the
-// Certification Declaration's authorized_paa_list
+// still records no attested pair: a chain that ends in a test root or a
+// declaration the test CD signer signed ([attestation.Result].TestPAA,
+// TestCDSigner; decision 119 extended by decision 192), a check that did
+// not run because no trust store (DCL service) was available — the DAC
+// chain, or the Certification Declaration's authorized_paa_list
 // ([attestation.DclServiceUnavailable]) — or an error finding
 // ([attestation.LevelError]), which a policy may accept.
-func attestedPairWithheld(findings []attestation.Finding) (string, bool) {
+func attestedPairWithheld(result attestation.Result) (string, bool) {
+	findings := result.Findings
+	// A test root or the test CD signer: trusted as such by a store that
+	// accepts test certificates, without a finding, and their keys are
+	// public — the pair is anyone's to claim (R2-P6-sec-1803, decision
+	// 214).
+	switch {
+	case result.TestPAA:
+		return "the attestation chain ends in a test root", true
+	case result.TestCDSigner:
+		return "the Certification Declaration is signed by the Matter test CD signer", true
+	}
 	for _, fd := range findings {
 		if fd.Check == attestation.DclServiceUnavailable {
 			return "the attestation chain was not verified: " + fd.Message, true
@@ -1244,7 +1282,7 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := f.invoke(ctx, opCredsCluster, cmdCSRRequest, octetsRequest(nonce), true)
+	res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdCsrRequest, opcredsdef.CsrRequestRequest{CsrNonce: nonce}, true)
 	if err != nil {
 		return 0, err
 	}
@@ -1278,17 +1316,15 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	if err != nil {
 		return 0, err
 	}
-	if _, err := f.invoke(ctx, opCredsCluster, cmdAddTrustedRootCertificate, octetsRequest(f.fabric.CA.RootCert()), true); err != nil {
+	if _, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdAddTrustedRootCertificate, opcredsdef.AddTrustedRootCertificateRequest{RootCaCertificate: f.fabric.CA.RootCert()}, true); err != nil {
 		return 0, err
 	}
 	noc, err := f.fabric.CA.GenerateNOC(operationalKey, f.fabric.FabricID, f.address.NodeID, f.opts.CATs)
 	if err != nil {
 		return 0, err
 	}
-	res, err = f.invoke(ctx, opCredsCluster, cmdAddNOC, addNOCRequest{
-		noc: noc, icac: f.fabric.CA.ICACCert(), ipk: f.fabric.IPK,
-		caseAdminSubject: f.fabric.RootNodeID, adminVendorID: f.fabric.RootVendorID,
-	}, true)
+	res, err = f.invoke(ctx, opCredsCluster, opcredsdef.CmdAddNoc,
+		addNOCRequest(noc, f.fabric.CA.ICACCert(), f.fabric.IPK, f.fabric.RootNodeID, f.fabric.RootVendorID), true)
 	if err != nil {
 		return 0, err
 	}
@@ -1412,7 +1448,7 @@ func (f *flow) updateFabricLabel(ctx context.Context) (stepResult, error) {
 		f.log.Error("matter.controller.commissioning.no_fabric_index")
 		return stepFailure, nil
 	}
-	res, err := f.invoke(ctx, opCredsCluster, cmdUpdateFabricLabel, updateFabricLabelRequest(f.fabric.CurrentLabel()), false)
+	res, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdUpdateFabricLabel, opcredsdef.UpdateFabricLabelRequest{Label: f.fabric.CurrentLabel()}, false)
 	if err == nil {
 		var nr nocResponse
 		err = response(res, "NocResponse", func(n spec.Node) (err error) {

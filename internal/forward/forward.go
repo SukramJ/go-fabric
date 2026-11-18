@@ -4,7 +4,7 @@
 // Package forward holds the switches of Matter behaviour implemented
 // ahead of a released specification revision — matter.js
 // Specification.ForwardFeature and isForwardFeatureEnabled
-// (packages/model/src/common/Specification.ts:78-105 at 862ad75f): off in
+// (packages/model/src/common/Specification.ts:78-105 at db021da0): off in
 // every release, with no supported configuration or API to change them;
 // matter.js's tests enable one feature through the MatterHooks harness
 // hook, this module's through [Enable], which only its own tests reach

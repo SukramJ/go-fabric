@@ -152,23 +152,90 @@ func (f *fakePeers) For(addr handshake.PeerAddress) (*peer.Peer, error) {
 	return p, nil
 }
 
+// Has reports whether For has handed out a peer for addr, as
+// client/peer.Set.Has does.
+func (f *fakePeers) Has(addr handshake.PeerAddress) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.peers[addr] != nil
+}
+
+// replace puts another peer at addr, or none (nil), as client/peer.Set
+// does once it closed the peer and a holder asks for the node again.
+func (f *fakePeers) replace(addr handshake.PeerAddress, p *peer.Peer) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if p == nil {
+		delete(f.peers, addr)
+		return
+	}
+	f.peers[addr] = p
+}
+
 // fakeLink is the peers' sessions and connection attempts.
 type fakeLink struct {
 	mu        sync.Mutex
 	sessions  map[*peer.Peer]bool
 	observers map[*peer.Peer][]*func()
 	connects  map[*peer.Peer]int
+	ctxs      map[*peer.Peer][]context.Context
+	releases  map[*peer.Peer]int
+	// block makes connect wait for its context to end, as a Connect call
+	// against an unreachable peer does, and then for held to close — a
+	// call slow to return; events records the returns of such calls and
+	// the releases, in order.
+	block  bool
+	held   chan struct{}
+	events []string
 }
 
 func newFakeLink() *fakeLink {
-	return &fakeLink{sessions: map[*peer.Peer]bool{}, observers: map[*peer.Peer][]*func(){}, connects: map[*peer.Peer]int{}}
+	return &fakeLink{sessions: map[*peer.Peer]bool{}, observers: map[*peer.Peer][]*func(){}, connects: map[*peer.Peer]int{}, ctxs: map[*peer.Peer][]context.Context{}, releases: map[*peer.Peer]int{}}
+}
+
+func (l *fakeLink) release(_ context.Context, p *peer.Peer) {
+	l.mu.Lock()
+	l.releases[p]++
+	l.events = append(l.events, "release")
+	l.mu.Unlock()
+}
+
+func (l *fakeLink) released(p *peer.Peer) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.releases[p]
 }
 
 func (l *fakeLink) connect(ctx context.Context, p *peer.Peer) error {
 	l.mu.Lock()
 	l.connects[p]++
+	l.ctxs[p] = append(l.ctxs[p], ctx)
+	block, held := l.block, l.held
 	l.mu.Unlock()
+	if block {
+		<-ctx.Done()
+		if held != nil {
+			<-held
+		}
+		l.mu.Lock()
+		l.events = append(l.events, "connect returned")
+		l.mu.Unlock()
+		return ctx.Err()
+	}
 	return nil
+}
+
+// connectsEnded reports whether every Connect call made for p has its
+// context ended (true when none was made).
+func (l *fakeLink) connectsEnded(p *peer.Peer) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, ctx := range l.ctxs[p] {
+		if ctx.Err() == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (l *fakeLink) hasSession(p *peer.Peer) bool {
@@ -323,11 +390,33 @@ func peerAddr(fabricIndex uint8, node uint64) handshake.PeerAddress {
 // waitFor polls cond for up to ten seconds.
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
+	waitUntil(t, "the condition", cond)
+}
+
+// waitUntil polls cond for up to ten seconds, naming what it waits for
+// when it gives up: the package's one wall-clock poll.
+func waitUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
-			t.Fatal("timed out")
+			t.Fatalf("timed out waiting for %s", what)
 		}
 		time.Sleep(time.Millisecond)
 	}
+}
+
+// receive waits for a value on ch under [waitUntil]'s bound.
+func receive[T any](t *testing.T, what string, ch <-chan T) T {
+	t.Helper()
+	var v T
+	waitUntil(t, what, func() bool {
+		select {
+		case v = <-ch:
+			return true
+		default:
+			return false
+		}
+	})
+	return v
 }

@@ -9,13 +9,15 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	"github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
-// networkCommissioningClusterID is NetworkCommissioning (0x0031), whose
-// presence on the root decides CustomNetworkConfig for a remote node.
-const networkCommissioningClusterID uint32 = 0x0031
+// networkCommissioningClusterID is NetworkCommissioning, whose presence on
+// the root decides CustomNetworkConfig for a remote node: the generated
+// definition's id (review II, R2-P6-par-2360).
+const networkCommissioningClusterID = networkcommissioning.ClusterID
 
 // ConformanceStatus is the verdict of a [ConformanceReport].
 type ConformanceStatus int
@@ -226,10 +228,19 @@ func rawIDList(n spec.Node) []uint32 {
 	if !isList(n) {
 		return nil
 	}
+	// A set, not a search of out: the list is the peer's, as long as the
+	// image quota admits, and this runs under the image's read lock that
+	// report application waits for (review II, R2-P6-bound-2358).
 	out := make([]uint32, 0, len(n.Children))
+	seen := make(map[uint32]struct{}, len(n.Children))
 	for _, e := range n.Children {
-		if isUint(e) && e.El.Uint <= 0xFFFF_FFFF && !slices.Contains(out, uint32(e.El.Uint)) {
-			out = append(out, uint32(e.El.Uint))
+		if !isUint(e) || e.El.Uint > 0xFFFF_FFFF {
+			continue
+		}
+		id := uint32(e.El.Uint)
+		if _, dup := seen[id]; !dup {
+			seen[id] = struct{}{}
+			out = append(out, id)
 		}
 	}
 	return out

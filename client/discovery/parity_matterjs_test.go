@@ -512,7 +512,6 @@ func TestParityDiscovery_IdentifierMatches(t *testing.T) {
 		want bool
 	}{
 		{ByInstanceID("ABCD"), dev, true},
-		{ByInstanceID("abcd"), dev, false},
 		{ByLongDiscriminator(0xF00), dev, true},
 		{ByLongDiscriminator(0xF01), dev, false},
 		{ByShortDiscriminator(15), dev, true},

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
@@ -41,13 +42,15 @@ import (
 //     ContentAppPlatform and PhysicalInputs: OnOff, MediaPlayback (AS, VS, TT, AT, AA),
 //     KeypadInput (NV, LK, NK), ContentLauncher (CS, UP), ApplicationLauncher
 //     (AP), MediaInput (NU), AudioOutput (NU), Channel (CL, LI),
-//     TargetNavigator, LowPower, WakeOnLan and Messages.
+//     TargetNavigator, LowPower and WakeOnLan, and Messages with
+//     --media-messages.
 //   - "app" is a ContentApp (tv-app endpoint 3, ma_contentapp,
 //     tv-app.matter's endpoint 3): ApplicationBasic, ApplicationLauncher
 //     (no AP), AccountLogin and KeypadInput — the test suite's app, catalog
 //     vendor 123 and application "exampleid" (AppTv.cpp
 //     ConvertToPlatformCatalogVendorApp and InstallContentApp: "Vendor1",
-//     version "Version1", setup PIN "34567890").
+//     version "Version1"). Its setup PIN is mediaAppSetupPIN, not the
+//     "34567890" chip's installed app carries (see mediaAppSetupPIN).
 //
 // Each cluster is declared (<cluster>def.Declare) with the manager as its
 // port and the manager's state as its Initial: the device kit mounts the
@@ -365,14 +368,26 @@ func (playerTransport) Rewind(_ context.Context, st *mpdef.State, _ mpdef.Rewind
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
-// SkipForward is HandleSkipForward (:245-257): up to the duration.
+// SkipForward is HandleSkipForward (:245-257): up to the duration. Unlike
+// that handler, whose uint64 add wraps (:249-250), the add saturates: a
+// delta that would overflow moves the position to the duration — or,
+// without one, to the largest position — never backward
+// (R2-P6-wire-2654).
 func (playerTransport) SkipForward(_ context.Context, st *mpdef.State, req mpdef.SkipForwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
-	next := positionOf(st) + req.DeltaPositionMilliseconds
+	next := saturatingAdd(positionOf(st), req.DeltaPositionMilliseconds)
 	if st.Duration != nil {
 		next = min(next, *st.Duration)
 	}
 	st.SampledPosition = position(next)
 	return tvResponse(mpdef.StatusSuccess), nil
+}
+
+// saturatingAdd is a+b, or math.MaxUint64 where the sum would wrap.
+func saturatingAdd(a, b uint64) uint64 {
+	if b > math.MaxUint64-a {
+		return math.MaxUint64
+	}
+	return a + b
 }
 
 // SkipBackward is HandleSkipBackward (:230-243): down to 0.

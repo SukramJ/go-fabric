@@ -16,8 +16,8 @@ import (
 
 // TestRegistryRecordFollowsDescriptorSave: the record follows every save
 // of the peer's descriptor, not only a new session — CommissioningClient
-// observes peer.updated (CommissioningClient.ts:711, #update :721-741 at
-// 0ceb202d), which Peer.#save emits (Peer.ts:575-579).
+// observes peer.updated (CommissioningClient.ts:743, #update :753-773 at
+// db021da0), which Peer.#save emits (Peer.ts:576-580).
 func TestRegistryRecordFollowsDescriptorSave(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -39,8 +39,8 @@ func TestRegistryRecordFollowsDescriptorSave(t *testing.T) {
 	})
 }
 
-// TestRemovalConfirmedByFabricRemoved: CommissioningClient.ts:405-417 at
-// 0ceb202d counts FabricRemovedError among the causes that confirm a
+// TestRemovalConfirmedByFabricRemoved: CommissioningClient.ts:437-449 at
+// db021da0 counts FabricRemovedError among the causes that confirm a
 // RemoveFabric without a response.
 func TestRemovalConfirmedByFabricRemoved(t *testing.T) {
 	t.Parallel()

@@ -175,10 +175,39 @@ func write(dir string, o *output) (changed bool, err error) {
 	if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, o.Source) { //nolint:gosec // a path below the output directory this tool writes
 		return false, nil
 	}
-	if err := os.WriteFile(path, o.Source, 0o644); err != nil { //nolint:gosec // generated source, world-readable like the rest of the tree
+	if err := writeAtomic(path, o.Source); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// writeAtomic replaces path with content through a temporary file beside
+// it and a rename, so an interrupted write leaves the old file or the new
+// one, never a truncated one (R2-P6-err-2709). The file keeps the mode of
+// the one it replaces, 0o644 for a new one.
+func writeAtomic(path string, content []byte) error {
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(content)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), mode)
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), path)
+	}
+	if err != nil {
+		_ = os.Remove(f.Name())
+	}
+	return err
 }
 
 // moduleRoot returns the directory holding this module's go.mod, found from

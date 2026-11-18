@@ -124,7 +124,7 @@ const (
 	// DefaultMaxIntervalCeilingSeconds is the publisher's ceiling: one
 	// hour. matter.js: MAX_INTERVAL_PUBLISHER_LIMIT = Hours.one
 	// (packages/node/src/node/server/ServerSubscription.ts:71 at
-	// 862ad75f); chip: kSubscriptionMaxIntervalPublisherLimit.
+	// db021da0); chip: kSubscriptionMaxIntervalPublisherLimit.
 	DefaultMaxIntervalCeilingSeconds = 3600
 	// DefaultTickInterval is the report sweeper's period.
 	DefaultTickInterval = 250 * time.Millisecond
@@ -294,7 +294,7 @@ func (m *Manager) SetOnSubscriptionClosed(fn func(subID uint32)) {
 // "reconnect" broadcast with it, as matter.js's subscriptionsChanged
 // observer does when the subscription isTerminated
 // (packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at
-// 862ad75f). Pass nil to detach.
+// db021da0). Pass nil to detach.
 func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32, fabricIndex uint8)) {
 	m.mu.Lock()
 	m.onTerminated = fn
@@ -305,8 +305,10 @@ func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32, fabricIndex 
 // session's set of subscriptions changed — a subscription added on it, or
 // one closed on it by any close path — with the session's id, outside the
 // manager's lock. matter.js's SessionManager raises subscriptionsChanged
-// for both (packages/node/src/behavior/system/sessions/
-// SessionsBehavior.ts:53, :75-93 at 862ad75f). Pass nil to detach.
+// for both (packages/protocol/src/session/SessionManager.ts:321-331 at
+// db021da0), which SessionsBehavior observes
+// (packages/node/src/behavior/system/sessions/SessionsBehavior.ts:54,
+// :75-93). Pass nil to detach.
 func (m *Manager) SetOnSessionSubscriptionsChanged(fn func(sessionID uint16)) {
 	m.mu.Lock()
 	m.onSessionChanged = fn
@@ -482,7 +484,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// MaxInterval stays >= MinIntervalFloor even when the floor exceeds
 	// the publisher limit (Matter §8.5.3.2). Mirrors matter.js
 	// packages/node/src/node/server/ServerSubscription.ts:324-343 at
-	// 862ad75f (Duration.max(minIntervalFloor, …) around the
+	// db021da0 (Duration.max(minIntervalFloor, …) around the
 	// MAX_INTERVAL_PUBLISHER_LIMIT cap) and chip ReadHandler.cpp, which
 	// accepts the requested MaxInterval; such a request was refused as
 	// inverted after the clamp.
@@ -1193,10 +1195,12 @@ func (m *Manager) snapshot() []*Subscription {
 // Info is one active subscription as [Manager.Snapshot]
 // lists it: a copy of the [Subscription]'s request and identity, which a
 // host reads without reaching the subscription itself (it cannot close
-// it). matter.js persists the same record per subscription in
-// SubscriptionsServer's state (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts:149-159
-// at 862ad75f: subscriptionId, peerAddress, minIntervalFloor,
-// maxIntervalCeiling, attributeRequests, eventRequests, sendInterval).
+// it). matter.js builds the same record per subscription in
+// SubscriptionsServer (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts:148-158
+// at db021da0: subscriptionId, peerAddress, minIntervalFloor,
+// maxIntervalCeiling, attributeRequests, eventRequests, sendInterval),
+// keeps it in internal.subscriptions (:161) and persists it through
+// SubscriptionStore.save (:212).
 type Info struct {
 	ID          uint32
 	FabricIndex uint8
@@ -1217,8 +1221,11 @@ type Info struct {
 
 // Snapshot lists every subscription the manager holds and has not seen
 // closed, by ID: a read-only view for a host's diagnostics. matter.js
-// keeps the list as SubscriptionsServer.state.subscriptions
-// (SubscriptionsServer.ts:345-354 at 862ad75f) and exposes no live one.
+// keeps the list in SubscriptionsServer's internal.subscriptions
+// (SubscriptionsServer.ts:161 at db021da0; State.subscriptions,
+// :384-390, is deprecated and no longer written) and exposes no live
+// list of these records — its live subscriptions are per session
+// (NodeSession.ts:191-193).
 func (m *Manager) Snapshot() []Info {
 	subs := m.snapshot()
 	out := make([]Info, 0, len(subs))

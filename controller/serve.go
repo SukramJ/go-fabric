@@ -31,7 +31,7 @@ import (
 //
 // matter.js's controller is a ServerNode with the ControllerBehavior: the
 // behavior and the peers on one node (ControllerBehavior.ts:43-50,
-// Peers.ts:109,:549-552,:574-579 at 862ad75f). matterjs-server composes its
+// Peers.ts:109,:549-552,:574-579 at db021da0). matterjs-server composes its
 // controller so, and adds the OTA provider and the camera controller with
 // its WebRtcTransportRequestor as endpoints
 // (packages/ws-controller/src/controller/ControllerNode.ts:33,:140-147 at
@@ -159,7 +159,7 @@ func (c *Controller) composeTree(cfg Config, log *slog.Logger) error {
 	rootDescriptor(root).SetPartsList(parts)
 	s.topology = &endpoint.Topology{Endpoints: append([]*endpoint.Endpoint{root}, endpoints...), VendorID: c.fabric.RootVendorID}
 	s.dispatcher = endpoint.NewTopologyDispatcher(s.topology)
-	s.dispatcher.SetACLLister(servedACL{c: c, s: s})
+	s.dispatcher.SetACLLister(servedACL{c: c, s: s, ota: c.otaProvider != nil})
 	c.subs.Serve(interaction.ServerConfig{Dispatcher: s.dispatcher, Qualities: servedQualities{}})
 	c.served = s
 	log.Info("controller.serve.endpoints", slog.Int("endpoints", len(s.topology.Endpoints)), slog.Bool("camera", cfg.Camera != nil), slog.Bool("ota", cfg.OTA != nil))
@@ -205,6 +205,11 @@ func rootDescriptor(root *endpoint.Endpoint) *mattercore.Descriptor {
 type servedACL struct {
 	c *Controller
 	s *served
+	// ota is whether the tree serves the OTA provider, fixed when the tree
+	// is built: ListACL runs on the receive path, which Close does not
+	// wait for, while Close clears c.otaProvider (review II,
+	// R2-P6-conc-2305).
+	ota bool
 }
 
 func (a servedACL) ListACL(_ context.Context, fabricIndex uint8) ([]store.ACLEntry, error) {
@@ -224,7 +229,7 @@ func (a servedACL) ListACL(_ context.Context, fabricIndex uint8) ([]store.ACLEnt
 	if a.s.requestor != nil {
 		operate(wrdef.ClusterID, CameraControllerEndpoint)
 	}
-	if a.c.otaProvider != nil {
+	if a.ota {
 		// The requestors of the fabric reach the provider as node/ lets
 		// them (node/ota_provider.go: Operate, CASE, no subject, the
 		// provider's endpoint and cluster).

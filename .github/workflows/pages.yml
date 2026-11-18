@@ -46,7 +46,9 @@ jobs:
           cache: pip
           cache-dependency-path: docs/requirements.txt
       - name: install
-        run: pip install -r docs/requirements.txt
+        # The hashed lock of docs/requirements.in (R2-P5-sup-07): every
+        # package of the set pinned, none installed without its hash.
+        run: pip install --require-hashes -r docs/requirements.txt
       - name: mkdocs build --strict
         run: mkdocs build --strict --site-dir _site
       - name: upload

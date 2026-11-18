@@ -138,10 +138,20 @@ func (p Parameters) EffectiveMaxTCPMessageSize() uint32 {
 }
 
 // Encode writes the structure as a sub-structure tagged outer: every
-// stated field at its spec width (PaseMessages.ts:28-58), tag 9 only when
-// the bitmap names TCP. matter.js itself encodes the minimal width and
+// stated field at its spec width (PaseMessages.ts:28-58), the
+// SUPPORTED_TRANSPORTS bitmap (tag 8) always — 0 for a node without TCP —
+// and tag 9 only when the bitmap names TCP. matter.js states the bitmap in
+// every session parameters it sends: SessionManager's getter keeps it and
+// drops only the TCP message size without a TCP role
+// (packages/protocol/src/session/SessionManager.ts:391-400 at db021da0),
+// ServerNetworkRuntime sets it whatever the role
+// (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:204-210),
+// and its encoder writes {tcpClient: false, tcpServer: false} as 0
+// (secure/sessionparams/testdata/session-params-fixtures.json, review II,
+// R2-P6-par-2905). A reader here cannot tell an absent bitmap from 0
+// ([DecodeFields]). matter.js itself encodes the minimal width and
 // its decoder checks only the element type (TlvNumber.ts:118-143 at
-// 0ceb202d), so either width is accepted on the wire; the fixed width
+// db021da0), so either width is accepted on the wire; the fixed width
 // keeps the fixtures stable.
 func (p Parameters) Encode(enc *tlv.Encoder, outer tlv.Tag) {
 	enc.StartStruct(outer)
@@ -166,9 +176,7 @@ func (p Parameters) Encode(enc *tlv.Encoder, outer tlv.Tag) {
 	if p.MaxPathsPerInvoke != 0 {
 		enc.PutUint16(tlv.ContextTag(7), p.MaxPathsPerInvoke)
 	}
-	if p.SupportedTransports != 0 {
-		enc.PutUint16(tlv.ContextTag(8), p.SupportedTransports)
-	}
+	enc.PutUint16(tlv.ContextTag(8), p.SupportedTransports)
 	if p.MaxTCPMessageSize != 0 && p.SupportsTCP() {
 		enc.PutUint32(tlv.ContextTag(9), p.MaxTCPMessageSize)
 	}

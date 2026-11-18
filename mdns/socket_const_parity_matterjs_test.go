@@ -6,7 +6,7 @@ package mdns
 import "testing"
 
 // TestMdnsSocketConstantsParityMatterJS mirrors
-// packages/general/test/net/dns-sd/MdnsSocketTest.ts:741-745 at 862ad75f
+// packages/general/test/net/dns-sd/MdnsSocketTest.ts:757-761 at db021da0
 // ("has correct mDNS broadcast addresses"): 224.0.0.251 and ff02::fb, port
 // 5353.
 func TestMdnsSocketConstantsParityMatterJS(t *testing.T) {

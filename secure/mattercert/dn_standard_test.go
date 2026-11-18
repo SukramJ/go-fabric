@@ -12,8 +12,8 @@ import (
 // standard X.520 DN tag is written with: a UTF8String for 1-15, an
 // IA5String for domainComponent (16), a PrintableString for 129-143, in
 // arrival order among the Matter attributes — matter.js
-// packages/protocol/src/certificate/kinds/Certificate.ts:895-964 and
-// packages/general/src/crypto/X520.ts:28-79 at 862ad75f.
+// packages/protocol/src/certificate/kinds/DistinguishedName.ts:489-583 and
+// packages/general/src/crypto/X520.ts:28-79 at db021da0.
 func TestBuildDNStandardAttributes(t *testing.T) {
 	dn := DistinguishedName{
 		MatterRCACID: 0xCACACACA00000001, HasRCACID: true,

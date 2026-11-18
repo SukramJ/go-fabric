@@ -7,10 +7,9 @@
 //
 // Three artefacts, one of them generated from the other two:
 //
-//   - matterjs_tests.json — the SNAPSHOT. Every *Test.ts under
-//     packages/general/test, packages/model/test, packages/node/test,
-//     packages/nodejs/test, packages/protocol/test,
-//     packages/thread-br-client/test and packages/types/test
+//   - matterjs_tests.json — the SNAPSHOT. Every *Test.ts under the trees
+//     [snapshotRoots] names (eight, packages/nodejs-ble/test among them;
+//     the snapshot's own "roots" field and the page repeat the list)
 //     of matter.js at the commit
 //     parity/schema.json names in matter.sourceCommit, with its line count,
 //     the SHA-1 of its blob and its top-level describe names. Written by
@@ -326,8 +325,11 @@ func buildSnapshot(matterjs, commit string, roots []string) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("git ls-tree: %w", err)
 	}
-	files, err := parseLsTree(out)
+	files, others, err := parseLsTree(out)
 	if err != nil {
+		return nil, err
+	}
+	if err := noUnnamedTests(matterjs, others); err != nil {
 		return nil, err
 	}
 	contents, err := catBlobs(matterjs, files)
@@ -341,10 +343,32 @@ func buildSnapshot(matterjs, commit string, roots []string) (*Snapshot, error) {
 	return &Snapshot{Commit: commit, Roots: append([]string(nil), roots...), Files: files}, nil
 }
 
+// noUnnamedTests fails when a .ts file under the roots that the snapshot
+// leaves out by its name (not *Test.ts) holds a top-level describe: a test
+// file the register would never see (R2-P6-test-2811). At the pin none
+// does — the one other .ts file that calls describe,
+// packages/node/test/behavior/state/validation/validation-test-utils.ts,
+// calls it inside a helper its *Test.ts callers run.
+func noUnnamedTests(matterjs string, others []SnapshotFile) error {
+	contents, err := catBlobs(matterjs, others)
+	if err != nil {
+		return err
+	}
+	var unnamed []string
+	for i, f := range others {
+		if len(topLevelDescribes(contents[i])) > 0 {
+			unnamed = append(unnamed, f.Path)
+		}
+	}
+	if len(unnamed) > 0 {
+		return fmt.Errorf("test files the snapshot does not read, their names not ending in Test.ts (widen parseLsTree's filter): %s", strings.Join(unnamed, ", "))
+	}
+	return nil
+}
+
 // parseLsTree keeps the *Test.ts blobs of `git ls-tree -r` output, sorted by
-// path.
-func parseLsTree(out []byte) ([]SnapshotFile, error) {
-	var files []SnapshotFile
+// path; the other .ts blobs are returned apart, for noUnnamedTests.
+func parseLsTree(out []byte) (files, others []SnapshotFile, err error) {
 	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
 		if line == "" {
 			continue
@@ -352,15 +376,18 @@ func parseLsTree(out []byte) ([]SnapshotFile, error) {
 		meta, p, ok := strings.Cut(line, "\t")
 		fields := strings.Fields(meta)
 		if !ok || len(fields) != 3 {
-			return nil, fmt.Errorf("git ls-tree: unexpected line %q", line)
+			return nil, nil, fmt.Errorf("git ls-tree: unexpected line %q", line)
 		}
-		if fields[1] != "blob" || !strings.HasSuffix(p, "Test.ts") {
-			continue
+		switch {
+		case fields[1] != "blob" || !strings.HasSuffix(p, ".ts"):
+		case strings.HasSuffix(p, "Test.ts"):
+			files = append(files, SnapshotFile{Path: p, SHA: fields[2], Describes: []string{}})
+		default:
+			others = append(others, SnapshotFile{Path: p, SHA: fields[2]})
 		}
-		files = append(files, SnapshotFile{Path: p, SHA: fields[2], Describes: []string{}})
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
-	return files, nil
+	return files, others, nil
 }
 
 // catBlobs reads every blob through one `git cat-file --batch`.

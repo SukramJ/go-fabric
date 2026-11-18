@@ -19,7 +19,7 @@ import (
 // matter.js (register row BD-chip-GeneralCommissioning-TermsAndConditions,
 // notes/parity/by_design.md): matter.js's GeneralCommissioningServer has
 // no terms-and-conditions logic (`class GeneralCommissioningServer`,
-// GeneralCommissioningServer.ts:31 at 862ad75f, 285 lines). The behaviour
+// GeneralCommissioningServer.ts:31 at db021da0, 285 lines). The behaviour
 // is connectedhomeip's, `src/app/clusters/general-commissioning-server/
 // GeneralCommissioningCluster.cpp` at 6170af84 with its
 // TermsAndConditionsProvider (`src/app/server/TermsAndConditionsProvider.h`,
@@ -243,7 +243,7 @@ func (g *GeneralCommissioning) persistTermsLocked(ctx context.Context, acc *term
 		v = strconv.FormatUint(uint64(acc.version), 10) + ":" + strconv.FormatUint(uint64(acc.acks), 10)
 	}
 	if err := g.tcSettings.SetSetting(ctx, store.SettingTermsAcceptance, v); err != nil {
-		return fmt.Errorf("core: GeneralCommissioning: persist the terms acceptance: %w", err)
+		return storeFailureErr{err: fmt.Errorf("core: GeneralCommissioning: persist the terms acceptance: %w", err)}
 	}
 	return nil
 }

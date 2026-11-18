@@ -90,10 +90,10 @@ type primingSource struct {
 
 	// matched counts the authorized results of attributes that exist
 	// (matter.js AttributeReadResponse.counts.existent,
-	// packages/protocol/src/action/server/AttributeReadResponse.ts:
-	// 125-131, the values and the version-filtered ones, read by
-	// ServerSubscription.ts:674, :707-711): a status (unsupported
-	// endpoint, cluster or attribute) does not count.
+	// packages/protocol/src/action/server/
+	// AttributeReadResponse.ts:125-131, the values and the version-filtered
+	// ones, read by ServerSubscription.ts:674, :707-711): a status
+	// (unsupported endpoint, cluster or attribute) does not count.
 	matched int
 	// reports counts the reports handed out.
 	reports int
@@ -737,8 +737,8 @@ func (b *Bridge) streamPrimingChunks( //nolint:gocognit // per-chunk ack synchro
 		//
 		// An error status or a missing answer aborts the Subscribe: the
 		// peer is not consuming the priming report, and matter.js's
-		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
-		// MessageExchange.ts:855-863).
+		// waitForSuccess throws in both cases (InteractionMessenger.ts:844,
+		// MessageExchange.ts:888-895 at db021da0).
 		if _, err := b.sendChunk(leg, i, body, chunk, chunkWaitHere); err != nil {
 			if errors.Is(err, errChunkAnswerUndecodable) {
 				// The peer's answer carried no status: the interaction

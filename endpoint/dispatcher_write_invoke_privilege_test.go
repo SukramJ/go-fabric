@@ -207,7 +207,7 @@ func TestTopologyDispatcher_MinWritePrivilege(t *testing.T) {
 		// precedes the existence checks, the write privilege applies to
 		// an attribute that exists (matter.js
 		// packages/protocol/src/action/server/AttributeWriteResponse.ts:200-241
-		// at 862ad75f; chip src/app/WriteHandler.cpp CheckWriteAllowed).
+		// at db021da0; chip src/app/WriteHandler.cpp CheckWriteAllowed).
 		{"unmounted cluster on a real endpoint needs View", 0, 0x9999, 0x0000, 1},
 		{"unmounted endpoint needs View", 42, accessControlID, accessControlACL, 1},
 		{"unmounted endpoint needs View for BridgedDeviceBasicInformation.NodeLabel", 42, 0x0039, 0x0005, 1},
@@ -261,7 +261,7 @@ func TestTopologyDispatcher_MinInvokePrivilege(t *testing.T) {
 		// resolves the model's limits for it, but the Operate pass and the
 		// existence checks come first, so the model's privilege is never
 		// reached (packages/protocol/src/action/server/CommandInvokeResponse.ts:241-278
-		// at 862ad75f).
+		// at db021da0).
 		{"unmounted endpoint needs Operate", 42, opCredsID, opCredsRemoveFab, 3},
 		{"unmounted endpoint needs Operate for Identify.Identify", 42, 0x0003, 0x00, 3},
 	}

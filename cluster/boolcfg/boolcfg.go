@@ -350,7 +350,7 @@ func (s *Server) hasAlarms() bool { return s.HasFeature("VIS") || s.HasFeature("
 // (.cpp:321-337). The definition's bound "max supportedSensitivityLevels -
 // 1" (chip .cpp:324) is computed by the generated checks against the
 // served SupportedSensitivityLevels (cluster/spec/bound_expr.go, matter.js
-// Constraint.ts:969-1096 at 862ad75f) and answers CONSTRAINT_ERROR before
+// Constraint.ts:969-1096 at db021da0) and answers CONSTRAINT_ERROR before
 // the sink runs.
 type sensitivitySink struct{ s *Server }
 

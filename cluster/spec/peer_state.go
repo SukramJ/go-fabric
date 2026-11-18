@@ -43,7 +43,7 @@ func (v AttributeValues) Value(attrID uint32) (Node, bool) {
 //
 // It is the decode matter.js applies to every reported attribute as it
 // arrives, by the attribute's schema, an unknown one as unknown
-// (packages/protocol/src/action/client/InputChunk.ts:291-302 at 862ad75f,
+// (packages/protocol/src/action/client/InputChunk.ts:291-302 at db021da0,
 // decodeAttributeGroup; globals by their cluster-independent schema,
 // :58-74).
 func DecodeAttribute(def *Cluster, attrID uint32, n Node) (any, error) {
@@ -94,7 +94,7 @@ func globalType(attrID uint32) (Type, bool) {
 //
 // matter.js types a peer's cluster with the same generated cluster
 // behavior a server uses (packages/node/src/node/client/PeerBehavior.ts:42-63
-// at 862ad75f, a "known" shape), its state filled from the decoded
+// at db021da0, a "known" shape), its state filled from the decoded
 // report values (InputChunk.ts:291-302, ReadResult.ts:49-55 value).
 // Each generated package calls it as <cluster>def.StateFrom.
 // fabric:reachable:reason="generic: every generated server_gen.go calls an instantiation of it, and RTA records the instantiation, not the generic declaration"

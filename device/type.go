@@ -193,7 +193,7 @@ func cloneRequirements(rs []ClusterRequirement) []ClusterRequirement {
 //
 // A client view resolves a remote endpoint's device type through it, as
 // matter.js's ClientStructure resolves it through the model
-// (packages/node/src/node/client/ClientStructure.ts:871,
+// (packages/node/src/node/client/ClientStructure.ts:1007 at db021da0,
 // this.#node.matter.deviceTypes(dt.deviceType)).
 func Lookup(id uint32) (*Type, bool) {
 	t, ok := typesByID[id]

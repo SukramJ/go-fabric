@@ -122,10 +122,43 @@ func (c *fakeUDP) drain() {
 }
 
 // fakeMDNS is an mdns.QueryConn the test feeds responses into.
-type fakeMDNS struct{ out chan mdns.QueryResponse }
+type fakeMDNS struct {
+	out chan mdns.QueryResponse
 
-func newFakeMDNS() *fakeMDNS                             { return &fakeMDNS{out: make(chan mdns.QueryResponse, 256)} }
-func (f *fakeMDNS) Send([]byte) error                    { return nil }
+	mu sync.Mutex
+	// gate, when set, holds every Send — and with it the discovery loop,
+	// which sends its queries — until it is closed; entered receives one
+	// value per held Send.
+	gate    chan struct{}
+	entered chan struct{}
+}
+
+func newFakeMDNS() *fakeMDNS { return &fakeMDNS{out: make(chan mdns.QueryResponse, 256)} }
+
+func (f *fakeMDNS) Send([]byte) error {
+	f.mu.Lock()
+	gate, entered := f.gate, f.entered
+	f.mu.Unlock()
+	if gate != nil {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-gate
+	}
+	return nil
+}
+
+// hold makes every later Send wait for the returned release; the channel
+// receives when a Send waits.
+func (f *fakeMDNS) hold() (entered <-chan struct{}, release func()) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.gate, f.entered = make(chan struct{}), make(chan struct{}, 1)
+	gate := f.gate
+	return f.entered, sync.OnceFunc(func() { close(gate) })
+}
+
 func (f *fakeMDNS) Responses() <-chan mdns.QueryResponse { return f.out }
 func (f *fakeMDNS) Close() error                         { return nil }
 

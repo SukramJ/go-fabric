@@ -5,10 +5,11 @@ package dcl
 
 // The X.509 side of the trust store: what matter.js Paa.fromAsn1,
 // Pai.fromAsn1 and Certificate.parseAsn1Certificate (packages/protocol/src/
-// certificate/kinds/AttestationCertificates.ts:23-50, Certificate.ts at
-// 0ceb202d) read of a trust-store, CRL signer or CD signer certificate,
-// on crypto/x509. The subject's ids, the P-256 key and the signature check
-// are controller/attestation's (MatterIDs, P256Key, VerifySignedBy).
+// certificate/kinds/AttestationCertificates.ts:83-89, :207-214
+// (parseAttestationCertificate :51-63), Certificate.ts at db021da0) read
+// of a trust-store, CRL signer or CD signer certificate, on crypto/x509.
+// The subject's ids, the P-256 key and the signature check are
+// controller/attestation's (MatterIDs, P256Key, VerifySignedBy).
 
 import (
 	"crypto/x509"

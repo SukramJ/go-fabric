@@ -141,7 +141,7 @@ type ServerConfig struct {
 	// one, and the command stays out of AcceptedCommandList (and its
 	// response out of GeneratedCommandList) until [Server.Handle]
 	// registers it — matter.js's non-strict validation
-	// (ValidatedElements.ts:106-108, :341-343, :361-368 at 0ceb202d). The
+	// (ValidatedElements.ts:106-108, :341-343, :361-368 at db021da0). The
 	// device layer's generated default server is such a stub.
 	Unimplemented bool
 }
@@ -269,7 +269,7 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	// A command the conformance requires is fatal at construction when it
 	// has no implementation. Mirrors matter.js
 	// packages/node/src/behavior/cluster/ValidatedElements.ts:331-333,357-370
-	// at 0ceb202d (requireCommand, #validateRequiredCommands: "Implementation
+	// at db021da0 (requireCommand, #validateRequiredCommands: "Implementation
 	// missing", fatal) — rather than advertising it in AcceptedCommandList
 	// and answering UNSUPPORTED_COMMAND at invoke.
 	for id, fn := range cfg.Handlers {
@@ -281,7 +281,7 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 	// Every mandatory command without a handler is named, not the first
 	// alone: matter.js records a fatal error per command and reports them
 	// together (ValidatedElements.ts:357-372 #validateRequiredCommands,
-	// report :154-180 at 862ad75f). An optional command the selection
+	// report :154-180 at db021da0). An optional command the selection
 	// names without a handler is refused too, unless the server is the
 	// generated behavior (Unimplemented): it would be left out of
 	// AcceptedCommandList, so the selection would have no effect and
@@ -900,7 +900,7 @@ func (s *Server) unimplementedLocked(cmdID uint32) bool { return s.handlers[cmdI
 // command left out of AcceptedCommandList, or under strict validation a
 // fatal ClusterImplementationError
 // (packages/node/src/behavior/cluster/ValidatedElements.ts:357-372 at
-// 862ad75f, #validateRequiredCommands). The device-type validator reports
+// db021da0, #validateRequiredCommands). The device-type validator reports
 // each as a violation of the endpoint (endpoint.ViolationUnimplemented).
 func (s *Server) UnimplementedMandatoryCommands() []uint32 {
 	s.mu.Lock()
@@ -924,7 +924,7 @@ func (s *Server) Accepts(cmdID uint32) bool {
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]: the
 // instance's accepted commands that have a handler
-// (ServerBehaviorBacking.ts:127-147 at 0ceb202d lists the implemented
+// (ServerBehaviorBacking.ts:119-135 at db021da0 lists the implemented
 // commands only).
 func (s *Server) MatterAcceptedCommands() []uint32 {
 	s.mu.Lock()

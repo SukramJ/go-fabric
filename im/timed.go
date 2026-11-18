@@ -131,9 +131,10 @@ type StatusResponse struct {
 
 // UnmarshalStatusResponseTLV parses a StatusResponseMessage TLV
 // payload. Mirrors matter.js TlvStatusResponse decoding in
-// packages/protocol/src/interaction/InteractionMessenger.ts:183-196
-// (throwIfErrorStatusMessage), which reads the status of every inbound
-// StatusResponse before deciding whether the exchange goes on.
+// packages/protocol/src/interaction/InteractionMessenger.ts:259-272 at
+// db021da0 (throwIfErrorStatusMessage), which reads the status of
+// every inbound StatusResponse before deciding whether the exchange
+// goes on.
 func UnmarshalStatusResponseTLV(dec *tlv.Decoder) (StatusResponse, error) {
 	var sr StatusResponse
 	open, err := dec.Next()

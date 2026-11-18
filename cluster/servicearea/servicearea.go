@@ -383,10 +383,25 @@ func (s *Server) checkAreas(areas []Area) error {
 		if nullMap {
 			return invalid("Areas must not have a null mapId when supportedMaps is defined")
 		}
+		// Each MapID names a SupportedMaps entry, as connectedhomeip
+		// requires ("mapID SHALL be the ID of an entry from the
+		// SupportedMaps attribute", ServiceAreaCluster.cpp:506-512 at
+		// 6170af84); matter.js judges null or not null only
+		// (ServiceAreaServer.ts:137-143 at db021da0; R2-P6-fsm-1593).
+		for _, a := range areas {
+			if !s.mapHeld(a.MapId.Value) {
+				return invalid("Area %d's MapID %d is not in the supported maps list", a.AreaId, a.MapId.Value)
+			}
+		}
 	} else if !nullMap || distinct > 1 {
 		return invalid("Areas must have a null mapId when supportedMaps is empty")
 	}
 	return nil
+}
+
+// mapHeld reports whether id is a SupportedMaps entry.
+func (s *Server) mapHeld(id uint32) bool {
+	return slices.ContainsFunc(s.maps, func(m Map) bool { return m.MapId == id })
 }
 
 // sameMap is matter.js's `otherArea.mapId !== mapId` negated: null equals
@@ -711,7 +726,17 @@ func (s *Server) SetSupportedAreas(areas []Area) error {
 }
 
 // SetSupportedMaps records the device's map list (MAPS); it is refused
-// when it breaks #assertSupportedMaps.
+// when it breaks #assertSupportedMaps. Every area on a map the new list no
+// longer holds is removed with it — and every area when the new list
+// empties a list that was not empty (an empty list set on an empty one
+// keeps the areas, as chip clears them only when the maps were not
+// already empty) — with what follows an area's removal (SelectedAreas, CurrentArea,
+// Progress), in one report, as connectedhomeip's ClearSupportedMaps and
+// RemoveSupportedMap take the areas along
+// (ServiceAreaCluster.cpp:944-947, :964-998 at 6170af84; chip has no
+// whole-list setter): every area keeps naming a SupportedMaps entry
+// (R2-P6-fsm-1593). The removed areas are lost without an error; a host
+// that moves to other maps sets the maps, then the areas.
 func (s *Server) SetSupportedMaps(maps []Map) error {
 	if !s.Serves(sa.AttrSupportedMaps) {
 		return fmt.Errorf("%w: SupportedMaps needs MAPS", ErrConfig)
@@ -721,9 +746,19 @@ func (s *Server) SetSupportedMaps(maps []Map) error {
 		s.mu.Unlock()
 		return err
 	}
+	var gone []uint32
+	for _, a := range s.areas {
+		if len(maps) == 0 && len(s.maps) > 0 || !a.MapId.Null && !slices.ContainsFunc(maps, func(m Map) bool { return m.MapId == a.MapId.Value }) {
+			gone = append(gone, a.AreaId)
+		}
+	}
+	changed := []uint32{sa.AttrSupportedMaps}
+	for _, id := range gone {
+		changed = append(changed, s.removeAreaLocked(id)...)
+	}
 	s.maps = slices.Clone(maps)
 	s.mu.Unlock()
-	s.changed(sa.AttrSupportedMaps)
+	s.report(changed)
 	return nil
 }
 
@@ -844,9 +879,12 @@ func (s *Server) report(changed []uint32) {
 	}
 }
 
-// RemoveSupportedMapsEntry removes a map and the first area that lies on
-// it — matter.js removeSupportedMapsEntry (:276-289), which finds one
-// affected area, not every one.
+// RemoveSupportedMapsEntry removes a map and every area that lies on it,
+// as connectedhomeip's RemoveSupportedMap collects every area on the
+// removed map (ServiceAreaCluster.cpp:970-995 at 6170af84), so no area
+// names a map that is gone (R2-P6-fsm-1593). matter.js removes the first
+// one only (removeSupportedMapsEntry, ServiceAreaServer.ts:276-289 at
+// db021da0).
 func (s *Server) RemoveSupportedMapsEntry(mapID uint32) {
 	s.mu.Lock()
 	idx := slices.IndexFunc(s.maps, func(m Map) bool { return m.MapId == mapID })
@@ -855,8 +893,14 @@ func (s *Server) RemoveSupportedMapsEntry(mapID uint32) {
 		return
 	}
 	var changed []uint32
-	if a := slices.IndexFunc(s.areas, func(a Area) bool { return !a.MapId.Null && a.MapId.Value == mapID }); a >= 0 {
-		changed = s.removeAreaLocked(s.areas[a].AreaId)
+	var onMap []uint32
+	for _, a := range s.areas {
+		if !a.MapId.Null && a.MapId.Value == mapID {
+			onMap = append(onMap, a.AreaId)
+		}
+	}
+	for _, id := range onMap {
+		changed = append(changed, s.removeAreaLocked(id)...)
 	}
 	s.maps = slices.Delete(slices.Clone(s.maps), idx, idx+1)
 	changed = append(changed, sa.AttrSupportedMaps)
@@ -872,5 +916,5 @@ var _ sa.Host = (*Server)(nil)
 // EstimatedEndTime throttle's deferred report ([cluster.Quieter.Stop]), the
 // one timer the server runs, so it does not report after the bridge let
 // the server go. matter.js stops a behaviour's timers on dispose
-// (SwitchServer.ts:379-384 at 862ad75f is the pattern; W3-club2-02).
+// (SwitchServer.ts:379-384 at db021da0 is the pattern; W3-club2-02).
 func (s *Server) MatterQuiesce() { s.quiet.Stop() }

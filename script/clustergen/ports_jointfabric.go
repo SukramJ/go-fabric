@@ -102,6 +102,23 @@ var jointFabricPorts = map[string]portSet{
 			"ReadNOCs(ctx context.Context, peer Peer) ([]operationalcredentials.NOCStruct, error)",
 			"SignVIDVerification(ctx context.Context, peer Peer, fabricIndex uint8, clientChallenge []byte) (resp operationalcredentials.SignVidVerificationResponse, attestationChallenge []byte, err error)",
 		},
+	}, {
+		name: "TrustAnchors",
+		doc: []string{
+			"TrustAnchors finds the globally trusted root of a vendor (the DCL's",
+			"Operational Trust Anchors) for the Vendor ID Verification of a",
+			"joint commissioning: the root of vendorID whose subject key id is",
+			"subjectKeyID. ctx is the verification's; an error, or no port, fails",
+			"the verification closed and the joint commissioning answers",
+			"VendorIDVerificationFailed (jointfabric.AdministratorConfig.TrustAnchors,",
+			"owner decisions 190 and 235). jcm.SelfAnchored, the commissioner's",
+			"own RCAC, verifies nothing about the vendor: a host that opts into",
+			"it, for tests or a self-minted fabric, implements this port by",
+			"calling it with the ctx it is given.",
+		},
+		methods: []string{
+			"LookupTrustAnchor(ctx context.Context, vendorID uint16, subjectKeyID []byte) (globallyTrustedRoot []byte, err error)",
+		},
 	}}, types: []string{
 		"// Peer is the commissioner a CommissionerReach reaches: the fabric",
 		"// index and the node id of the session that invoked",
@@ -114,7 +131,5 @@ var jointFabricPorts = map[string]portSet{
 }
 
 func init() {
-	for name, ps := range jointFabricPorts {
-		ports[name] = ps
-	}
+	mergePorts(ports, jointFabricPorts, "ports_jointfabric.go")
 }

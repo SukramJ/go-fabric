@@ -242,16 +242,26 @@ func negotiateReceiver(ctx context.Context, f *inboundFlow, modes []DriverMode, 
 	if err := checkDesignator(opts); err != nil {
 		return Result{}, err
 	}
-	tc, blockSize, _, err := determineAccept(f.m, modes, opts)
+	tc, blockSize, length, err := determineAccept(f.m, modes, opts)
 	if err != nil {
 		return Result{}, err
 	}
 	if err := f.m.SendSendAccept(ctx, SendAccept{TransferControl: tc, MaxBlockSize: blockSize}); err != nil {
 		return Result{}, err
 	}
+	// The Init's definite length is the length the transfer must meet: a
+	// block past it is refused before it reaches the sink, and BlockEof
+	// short of it fails — as the initiating Receive holds the Accept's
+	// (R2-P2-alloc-06; review II, R2-P6-bound-1908; an Ahead-of-matter.js
+	// row: matter.js's receiver-and-responder collects the accept
+	// parameters with no length, bdx-session-initiator.ts:105-111 at
+	// db021da0).
+	if length != nil {
+		f.setDataLength(*length)
+	}
 	mode := ReceiverDrive
 	if tc.SenderDrive {
 		mode = SenderDrive
 	}
-	return Result{Mode: mode, BlockSize: uint16(capBlockSizeToTransport(f.m, int(blockSize)))}, nil //nolint:gosec // capped above
+	return Result{Length: f.dataLength, Mode: mode, BlockSize: uint16(capBlockSizeToTransport(f.m, int(blockSize)))}, nil //nolint:gosec // capped above
 }

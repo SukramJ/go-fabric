@@ -4,11 +4,11 @@
 package groups
 
 // A port of matter.js packages/protocol/test/session/SessionManagerTest.ts
-// at 862ad75f, the reception-state cases of a key set's removal: matter.js
+// at db021da0, the reception-state cases of a key set's removal: matter.js
 // keys the replay window on the operational key
-// (packages/protocol/src/groups/MessagingState.ts:80-98) and forgets it when
+// (packages/protocol/src/groups/MessagingState.ts:80-90) and forgets it when
 // the last key set deriving that key goes
-// (packages/protocol/src/groups/FabricGroups.ts:185-219,
+// (packages/protocol/src/groups/FabricGroups.ts:190-225,
 // #forgetUnreferencedReceptionState). Review 2026-11 W2-sec-05.
 
 import (
@@ -31,7 +31,7 @@ func TestReceptionStateTeardownParity(t *testing.T) {
 	op, sid := opKeyOf(t, 0xA1)
 	duplicate := func(t *testing.T, m *Manager, counter uint32) bool {
 		t.Helper()
-		msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 2, counter, true, []byte("x")))
+		msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, 2, counter, true, imPayload([]byte("x"))))
 		if err != nil {
 			t.Fatal(err)
 		}

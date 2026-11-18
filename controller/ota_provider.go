@@ -25,7 +25,7 @@ import (
 // fabric as RootNodeID — matter.js's OtaSoftwareUpdateProviderServer on
 // the controller's ServerNode, whose announced providerNodeId is the
 // fabric's root node id and whose endpoint is one of the controller's own
-// (OtaAnnouncements.ts:47-58, :272-278 at 862ad75f). matterjs-server adds
+// (OtaAnnouncements.ts:47-58, :272-278 at db021da0). matterjs-server adds
 // that endpoint (packages/ws-controller/src/controller/ControllerNode.ts:140-141
 // at 0bd06f2). Until phase 37 the provider ran
 // on a second node of its own (`node/controllernode`, `OTAConfig.StartNode`);
@@ -274,6 +274,17 @@ func (c *Controller) retireOwnNode(ctx context.Context, st *store.Store, log *sl
 	}
 	if err := st.DeleteSettings(ctx, ownNodeKey); err != nil {
 		return err
+	}
+	// The record held the own node's passcode, discriminator and salt in
+	// clear — it is no sealed setting — and on a sealed database the
+	// opening scrub ran before this delete: scrub again, so its bytes do
+	// not stay in free pages until a later one (review II,
+	// R2-P6-store-2316). A scrub a reader blocks is logged; the passcode
+	// opens nothing once the node is gone.
+	if c.sealed {
+		if err := store.Scrub(ctx, c.db); err != nil {
+			log.Warn("controller.ota.own_node.scrub", slog.Any("err", err))
+		}
 	}
 	log.Info("controller.ota.own_node.retired", slog.String("node", fmt.Sprintf("%016X", rec.NodeID)))
 	return nil

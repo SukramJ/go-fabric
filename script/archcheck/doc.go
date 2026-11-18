@@ -32,7 +32,10 @@
 // file, so "cluster/spec/..." in model-and-protocol beats "cluster/..." in
 // servers, and the exact "cluster" (shared machinery, model-and-protocol)
 // beats the "cluster/..." pattern of the servers layer. Patterns that match nothing are not an error: a layer may name a
-// package that lives in another module (ble/bluez) or that is yet to come.
+// package that is yet to come. The nested modules (ble/bluez, ble/esphome,
+// wifi/wpasupplicant, examples/ble-wifi-light) are loaded from their own
+// directories and held to the same layers: they are released on their own,
+// and the root's ./... does not reach them.
 //
 // # Changing the rules
 //

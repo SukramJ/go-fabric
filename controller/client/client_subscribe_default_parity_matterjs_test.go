@@ -754,6 +754,10 @@ func TestClientSubscribeDefaultSubscriptionParity(t *testing.T) {
 		// underlying subscription on the controller, which the sustained
 		// subscription replaces.
 		old := s.ID()
+		// Lasted the retry schedule's first interval before the loss, so it
+		// is replaced at once, as matter.js replaces it (review II,
+		// R2-P6-fsm-2110: an earlier loss waits that interval).
+		fp.advance(t, 8*advanceStep) // 16 s
 		subs := fabrictestseam.Subscriptions(fp.pair.Controller)
 		subs.CloseForPeer(subs.Active()[0].Peer())
 		fp.eventually(t, "the subscription replaced", func() bool { return s.Active() && s.ID() != old })

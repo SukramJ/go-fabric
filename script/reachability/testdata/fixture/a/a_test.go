@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 SukramJ.
+
+package a_test
+
+import (
+	"testing"
+
+	"github.com/SukramJ/go-fabric/a"
+)
+
+func TestA(t *testing.T) {
+	a.Called()
+	var x a.T
+	x.Called()
+	use(nil)
+}
+
+func use(a.I) {}

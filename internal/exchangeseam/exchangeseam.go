@@ -4,8 +4,8 @@
 // Package exchangeseam carries the one-way seam through which a test
 // outside client/exchange stamps traffic on a client session: the activity
 // a message received from or sent to the peer records
-// (exchange.Session.notifyActivity, matter.js Session.ts:141-147 at
-// 862ad75f). The stamps decide which of a peer's sessions is the newest
+// (exchange.Session.notifyActivity, matter.js Session.ts:142-148 at
+// db021da0). The stamps decide which of a peer's sessions is the newest
 // and whether the peer counts active, and they are written by the wire
 // and by nothing else — a test of the peer set (client/peer) that stands
 // in for traffic it did not send has no other way to reach them.

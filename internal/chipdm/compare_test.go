@@ -444,7 +444,7 @@ func TestCompareRules(t *testing.T) {
 		}
 	}
 	for rule, n := range map[string]int{
-		"global-attribute": 1, "fabric-index": 2, "descriptor-required": 1, "composed-device-type": 1,
+		"global-attribute": 1, "fabric-index": 2, "descriptor-required": 1,
 		"superset-requirement": 1, "core-global": 1, "global-datatype": 2,
 		"scoped-global": 1, "type-alias": 1, "value-table-m": 1, "base-device-type": 1,
 	} {
@@ -456,8 +456,80 @@ func TestCompareRules(t *testing.T) {
 		t.Errorf("provisional = %v", res.Provisional)
 	}
 	if res.NotCompared["definitions outside the snapshot"] != 1 || res.NotCompared["cluster classification"] != 0 ||
-		res.NotCompared["members CHIP does not state"] != 1 || res.NotCompared["base device type"] != 0 {
+		res.NotCompared["members CHIP does not state"] != 1 || res.NotCompared["base device type"] != 0 ||
+		res.NotCompared["device type composition CHIP does not state"] != 1 {
 		t.Errorf("not compared = %v", res.NotCompared)
+	}
+}
+
+// TestCompareComposition: the device types a composed device type contains
+// are compared where CHIP lists them — every instance of the snapshot's,
+// the cluster requirements CHIP states, their conformance — and what the
+// snapshot states beyond CHIP is counted, not compared (R2-P6-test-2850).
+// A key the snapshot holds twice where one is meant is reported
+// (R2-P6-test-2818).
+func TestCompareComposition(t *testing.T) {
+	t.Parallel()
+	m := func(text string) *Conf {
+		c, err := ParseConformance(text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	epm := func(conf string, features ...string) *Requirement {
+		r := &Requirement{ID: 0x90, Name: "ElectricalPowerMeasurement", Side: "server", Conformance: m(conf)}
+		for _, f := range features {
+			r.Elements = append(r.Elements, &ElementRequirement{Element: "feature", Name: f, Conformance: m("M")})
+		}
+		return r
+	}
+	es := func(clusters ...*Requirement) *Requirement {
+		return &Requirement{ID: 0x510, Name: "ElectricalSensor", Side: "deviceType", Conformance: m("M"), Clusters: clusters}
+	}
+	ours := &Model{DeviceTypes: []*DeviceType{{ID: u32(0x18), Name: "BatteryStorage", Requirements: []*Requirement{
+		es(epm("M", "ALTC"), &Requirement{ID: 0x1d, Name: "Descriptor", Side: "server"}),
+		es(epm("O", "DIRC")),
+		{ID: 0x11, Name: "PowerSource", Side: "deviceType", Conformance: m("M")},
+		{ID: 0x3, Name: "Identify", Side: "server", Conformance: m("O")},
+		{ID: 0x3, Name: "Identify", Side: "server", Conformance: m("O")},
+	}}}}
+	chip := &Model{DeviceTypes: []*DeviceType{{ID: u32(0x18), Name: "Battery Storage", Requirements: []*Requirement{
+		{ID: 0x3, Name: "Identify", Side: "server", Conformance: m("O")},
+		{ID: 0x510, Name: "Electrical Sensor", Side: "deviceType", Clusters: []*Requirement{
+			{ID: 0x90, Name: "Electrical Power Measurement", Conformance: m("M")}, // CHIP states no side
+			{ID: 0x91, Name: "Electrical Energy Measurement", Conformance: m("M")},
+		}},
+	}}}}
+	res := Compare(ours, chip)
+	got := diffStrings(res)
+	want := []string{
+		`BatteryStorage.ElectricalSensor (deviceType).Electrical Energy Measurement composed requirement: chip "present", ours "absent"`,
+		`BatteryStorage.ElectricalSensor (deviceType).Electrical Energy Measurement composed requirement: chip "present", ours "absent"`,
+		`BatteryStorage.ElectricalSensor (deviceType).ElectricalPowerMeasurement (server) conformance: chip "m", ours "o"`,
+		`BatteryStorage.Identify (server) requirement: chip "once", ours "twice"`,
+	}
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("differences:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	// PowerSource (not listed by CHIP) and the two listed Electrical Sensor
+	// instances, whose conformance CHIP does not state; the first instance's
+	// Descriptor and its feature ALTC, the second's DIRC.
+	if n := res.NotCompared["device type composition CHIP does not state"]; n != 3 {
+		t.Errorf("composition not stated = %d, want 3", n)
+	}
+	if n := res.NotCompared["side of a composed requirement"]; n != 1 {
+		t.Errorf("sides not compared = %d, want 1 (the matched row, counted once)", n)
+	}
+	if n := res.NotCompared["composition requirements CHIP does not state"]; n != 3 {
+		t.Errorf("composition requirements not stated = %d, want 3", n)
+	}
+	// CHIP's matched row counted once for two instances; a listed
+	// contained type is no "requirement" compared, only its id.
+	if res.Compared["composed requirement"] != 1 || res.Compared["contained device type id"] != 2 || res.Compared["requirement"] != 1 {
+		t.Errorf("compared = %v", res.Compared)
 	}
 }
 
@@ -579,5 +651,47 @@ func TestComparerPanicsOnUnknownNames(t *testing.T) {
 			}()
 			f()
 		}()
+	}
+}
+
+// TestScopedGlobalIsAmbiguousWhenDefinedTwice: a CHIP global type that two
+// snapshot clusters define differently is reported, not compared with
+// whichever came first; the first is the one of the lower cluster id
+// (R2-P6-test-2854).
+func TestScopedGlobalIsAmbiguousWhenDefinedTwice(t *testing.T) {
+	t.Parallel()
+	enum := func(names ...string) *Element {
+		e := &Element{Name: "StatusCodeEnum", Kind: "enum8", Metatype: "enum"}
+		for i, n := range names {
+			e.Fields = append(e.Fields, &Element{ID: u32(uint32(i)), Name: n})
+		}
+		return e
+	}
+	chip := &Model{Globals: []*Element{enum("A")}}
+	twice := &Model{Clusters: []*Cluster{
+		{ID: u32(0x20), Name: "B", Datatypes: []*Element{enum("A", "B")}},
+		{ID: u32(0x10), Name: "A", Datatypes: []*Element{enum("A")}},
+	}}
+	// The clusters themselves are absent from this CHIP model; only the
+	// global datatype's line is the subject.
+	globals := func(m *Model) []string {
+		var out []string
+		for _, d := range diffStrings(Compare(m, chip)) {
+			if strings.Contains(d, "global datatype") {
+				out = append(out, d)
+			}
+		}
+		return out
+	}
+	got := globals(twice)
+	if len(got) != 1 || !strings.Contains(got[0], "defined differently by clusters 0x20") {
+		t.Errorf("differences %q, want the ambiguity naming 0x20", got)
+	}
+	once := &Model{Clusters: []*Cluster{
+		{ID: u32(0x20), Name: "B", Datatypes: []*Element{enum("A")}},
+		{ID: u32(0x10), Name: "A", Datatypes: []*Element{enum("A")}},
+	}}
+	if got := globals(once); len(got) != 0 {
+		t.Errorf("two equal definitions: %q", got)
 	}
 }

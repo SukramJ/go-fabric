@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/netip"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -33,7 +34,7 @@ import (
 // packages/protocol/src/peer/ControllerCommissioner.ts:123
 // (DEFAULT_CASE_CONNECTION_TIMEOUT = 255 s), :264 (the PASE budget,
 // 30 s), :603-604 (regulatory location Outdoor, country "XX") and :706
-// (a NoSharedTrustRoots retry after 15 s) at 0ceb202d.
+// (a NoSharedTrustRoots retry after 15 s) at db021da0.
 const (
 	DefaultCASEConnectionTimeout = 255 * time.Second
 	DefaultPASETimeout           = 30 * time.Second
@@ -78,7 +79,7 @@ type Context struct {
 	Resumption handshake.ResumptionStore
 	// Scanners are the scanners that may still hold a commissioned
 	// device's advertisement — matter.js's ScannerSet
-	// (ControllerCommissioner.ts:321-341 at 862ad75f); nil is none.
+	// (ControllerCommissioner.ts:321-341 at db021da0); nil is none.
 	Scanners []CommissionedScanner
 }
 
@@ -165,11 +166,12 @@ type Options struct {
 	// the commissioning after step 0.1 with a [*TermsRequiredError]
 	// (BD-Matter-Commissioner-TermsRequirementRead).
 	TermsAndConditions *TermsAndConditionsAcknowledgement
-	// OnAttestationFailure is the attestation policy (DAV:156). The zero
-	// value accepts every finding: a device whose attestation failed is
+	// OnAttestationFailure is the attestation policy
+	// (DeviceAttestationValidator.ts:244 at db021da0). The zero value
+	// accepts every finding: a device whose attestation failed is
 	// commissioned and the findings are logged, as matter.js's flow does
-	// without a callback (ControllerCommissioningFlow.ts:1352-1367 at
-	// 862ad75f); the controller facade sets attestation.Reject() by
+	// without a callback (ControllerCommissioningFlow.ts:1370-1385 at
+	// db021da0); the controller facade sets attestation.Reject() by
 	// default. notes/parity/by_design.md BD-Matter-AttestationPolicy-ZeroProceeds
 	// and BD-Matter-Controller-PairRejectsFailedAttestation.
 	OnAttestationFailure attestation.Policy
@@ -213,13 +215,17 @@ type Result struct {
 	// validated them — [attestation.Validate] returned no error, so the
 	// Certification Declaration's vendor_id is that VendorID and its
 	// product_id_array holds that ProductID — and the DAC chain was
-	// verified against the trust store and no error finding stands. Both
-	// nil otherwise, also when the OnAttestationFailure policy let
-	// commissioning go on: an error of Validate, a check that did not run
-	// for want of a trust store (attestation.DclServiceUnavailable), an
-	// accepted attestation.LevelError finding; the commissioning log names
-	// the reason (matter.controller.commissioning.attested_identity_not_recorded).
-	// client.Record keeps them (review II decisions 105 and 119).
+	// verified against the trust store, ends in a production root, the
+	// declaration is not the Matter test CD signer's and no error finding
+	// stands. Both nil otherwise, also when the OnAttestationFailure
+	// policy let commissioning go on: an error of Validate, a check that
+	// did not run for want of a trust store
+	// (attestation.DclServiceUnavailable), an accepted
+	// attestation.LevelError finding, a test root or the test CD signer
+	// (attestation.Result.TestPAA, TestCDSigner); the commissioning log
+	// names the reason
+	// (matter.controller.commissioning.attested_identity_not_recorded).
+	// client.Record keeps them (review II decisions 105, 119, 192, 214).
 	AttestedVendorID, AttestedProductID *uint16
 }
 
@@ -238,12 +244,19 @@ type PASEOptions struct {
 }
 
 // Commissioner commissions nodes onto a fabric — matter.js
-// ControllerCommissioner (ControllerCommissioner.ts:230-737) at 0ceb202d.
+// ControllerCommissioner (ControllerCommissioner.ts:230-737) at db021da0.
 // It is safe for concurrent use.
 type Commissioner struct {
 	ctx        Context
 	log        *slog.Logger
 	caseServer *handshake.CASEServer
+
+	// claimMu guards claimed: the addresses commissionings hold from
+	// determineAddress until commissionConnectedNode returns, so two
+	// concurrent commissionings never get one node id (review II,
+	// R2-P6-conc-1810).
+	claimMu sync.Mutex
+	claimed map[handshake.PeerAddress]bool
 }
 
 // New returns a commissioner over c.
@@ -309,6 +322,16 @@ func (c *Commissioner) Interaction(p *peer.Peer) *interaction.Interaction {
 // (:283-292); the connected node commissioned (:294-298); the PASE session
 // closed on every path, with a CommissioningTransitionError on success and
 // the error on failure (:299-307, #closePaseSession :313-319).
+//
+// ctx bounds the whole call. The flow's own bounds are the ones the
+// device states: each step's timeout, and the total by the device's
+// MaxCumulativeFailsafeSeconds (up to about 18 hours), so a device that
+// answers every step just inside its timeout keeps Commission running
+// that long unless ctx ends first; a caller that wants a shorter bound
+// gives ctx a deadline (review II, R2-P6-bound-1812).
+//
+// A node id the call determines is held until it returns: a concurrent
+// Commission with the same NodeID is [ErrNodeIDConflict].
 func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, error) {
 	if opts.Fabric == nil {
 		return Result{}, errors.New("commissioner: Options.Fabric is required")
@@ -537,12 +560,44 @@ func txtParameters(t discovery.TXTData) *sessionparams.Parameters {
 	return &p
 }
 
-// assertPeerAddress is #assertPeerAddress (:495-499).
+// assertPeerAddress is #assertPeerAddress (:495-499); an address another
+// commissioning holds is a conflict as well (R2-P6-conc-1810).
 func (c *Commissioner) assertPeerAddress(a handshake.PeerAddress) error {
+	c.claimMu.Lock()
+	defer c.claimMu.Unlock()
+	return c.assertPeerAddressLocked(a)
+}
+
+func (c *Commissioner) assertPeerAddressLocked(a handshake.PeerAddress) error {
 	if c.ctx.Peers.Has(a) {
 		return newError(ErrNodeIDConflict, fmt.Sprintf("Node ID %d is already commissioned and can not be reused", a.NodeID), nil)
 	}
+	if c.claimed[a] {
+		return newError(ErrNodeIDConflict, fmt.Sprintf("Node ID %d is being commissioned and can not be reused", a.NodeID), nil)
+	}
 	return nil
+}
+
+// claimAddress holds a for one commissioning, in one step with the check,
+// unless it is a peer or held already.
+func (c *Commissioner) claimAddress(a handshake.PeerAddress) error {
+	c.claimMu.Lock()
+	defer c.claimMu.Unlock()
+	if err := c.assertPeerAddressLocked(a); err != nil {
+		return err
+	}
+	if c.claimed == nil {
+		c.claimed = map[handshake.PeerAddress]bool{}
+	}
+	c.claimed[a] = true
+	return nil
+}
+
+// releaseAddress ends a commissioning's hold of a.
+func (c *Commissioner) releaseAddress(a handshake.PeerAddress) {
+	c.claimMu.Lock()
+	delete(c.claimed, a)
+	c.claimMu.Unlock()
 }
 
 // addressesToCandidates is #addressesToCandidates (:547-566): the distinct
@@ -585,7 +640,10 @@ func addressesToCandidates(addrs []*net.UDPAddr, dd *discovery.Device) []*candid
 }
 
 // determineAddress is #determineAddress (:569-582): the requested node id,
-// or a random operational node id no peer of the fabric has.
+// or a random operational node id no peer of the fabric has — claimed for
+// the caller, who releases it ([Commissioner.releaseAddress]) when its
+// commissioning returns; a second claim is ErrNodeIDConflict
+// (R2-P6-conc-1810).
 func (c *Commissioner) determineAddress(f *Fabric, nodeID uint64) (handshake.PeerAddress, error) {
 	for {
 		id := nodeID
@@ -599,7 +657,7 @@ func (c *Commissioner) determineAddress(f *Fabric, nodeID uint64) (handshake.Pee
 			}
 		}
 		addr := f.AddressOf(id)
-		if err := c.assertPeerAddress(addr); err != nil {
+		if err := c.claimAddress(addr); err != nil {
 			if nodeID != 0 {
 				return handshake.PeerAddress{}, err
 			}
@@ -630,6 +688,7 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 		c.disarmPASE(ctx, pase, opts.Channel)
 		return Result{}, err
 	}
+	defer c.releaseAddress(address)
 	c.log.Info("matter.controller.commissioning.start", slog.Uint64("node_id", address.NodeID), slog.Uint64("fabric_id", opts.Fabric.FabricID))
 	mgr := c.ctx.Exchanges
 	if opts.Channel != nil {
@@ -691,7 +750,7 @@ func (c *Commissioner) forgetCommissioned(opts Options) {
 // is logged and the other scanners are still told —
 // ControllerCommissioner.#forgetCommissionedDevice's catch
 // (packages/protocol/src/peer/ControllerCommissioner.ts:335-339 at
-// 862ad75f).
+// db021da0).
 func (c *Commissioner) forgetIn(s CommissionedScanner, addresses []string, identity *discovery.CommissionedIdentity) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -756,7 +815,7 @@ func (c *Commissioner) sessionInteraction(mgr *exchange.Manager, s *exchange.Ses
 // new fabric yet, so the attempt retries after 15 s instead of the peer's
 // default delay; any other error keeps that default. Mirrors matter.js
 // ControllerCommissioner.transitionToCase's handleError
-// (packages/protocol/src/peer/ControllerCommissioner.ts:701-708) at 862ad75f.
+// (packages/protocol/src/peer/ControllerCommissioner.ts:701-708) at db021da0.
 func (c *Commissioner) handleNoSharedTrustRoots(err error) (time.Duration, bool, error) {
 	var sr *exchange.StatusReportError
 	if errors.As(err, &sr) && sr.Report.ProtocolCode == mrp.SCStatusProtocolNoSharedTrustRoots {

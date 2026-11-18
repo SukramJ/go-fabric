@@ -59,7 +59,7 @@ type commandPathCtxKey struct{}
 //
 // Mirrors the location matter.js builds from the invoking endpoint for
 // `context.authorityAt(writeLevel, location)` (packages/node/src/behaviors/
-// thermostat/AtomicWriteHandler.ts:187-193 at 862ad75f).
+// thermostat/AtomicWriteHandler.ts:187-193 at db021da0).
 func WithCommandPath(ctx context.Context, path ConcreteCommandPath) context.Context {
 	return context.WithValue(ctx, commandPathCtxKey{}, path)
 }

@@ -21,7 +21,7 @@ is what it means.
 What stays public below the facade, and what going around it costs, is
 on [Advanced seams](advanced-seams.md).
 
-*Source: `bridge/bridge.go:38-47`.*
+*Source: `bridge/bridge.go` (package doc).*
 
 ## `contract/`: what a device and a server implement
 
@@ -83,7 +83,7 @@ in the module.
 | `WiFiDriver` | the host's Wi-Fi stack: `wifi/wpasupplicant.New` on Linux, the reference daemon's `--wifi-sim` in tests | scans and joins the network a commissioner provisions | NetworkCommissioning serves the Ethernet feature |
 | `WiFiInterfaceSwitcher` (optional on a `WiFiDriver`) | a host Wi-Fi stack that can switch its interface on and off | switches the interface a controller's write of `InterfaceEnabled` names; the attribute takes the value once the driver switched | `InterfaceEnabled` stays true: a write of false answers `INVALID_ACTION` |
 
-*Source: `contract/doc.go:4-18`, `contract/ble.go`, `contract/wifi.go`, `contract/matter.go:21-260`, `contract/matter.go:298-440`, `contract/matter.go:540-837`, `contract/switchevents.go:26`, `contract/switchevents.go:54`.*
+*Source: `contract/doc.go` (package doc), `contract/ble.go`, `contract/wifi.go`, `contract/matter.go` (`EndpointSource`, `ClusterServer`, `MeasurementMaterializer`, `RegisterMeasurementKind`, `MeasurementSource`, `ChangeNotifier`, `AttributeChangeNotifier`), `contract/switchevents.go` (`SwitchEventEmitter`, `SwitchPositionSink`).*
 
 ## `node.Config`: the facade's ports
 
@@ -124,7 +124,7 @@ Setting a cluster hook that the facade wires itself, such as
 OperationalCredentials `SetOnFabricRemoved`, replaces the facade's wiring.
 Use `Observers` instead.
 
-*Source: `node/config.go:37-205`, `node/config.go:221-281`, `node/config.go:367-415`, `node/client.go:29-51`, `node/ota_provider.go:25-39`, `node/commissioner_control.go:23-34`, `node/observers.go:4-71`, `node/persist.go:57-77`, `node/root.go:392-403`, `node/root.go:536-540`, `node/doc.go:49-64`, `bridge/bridge.go` (`Bridge.Stop`).*
+*Source: `node/config.go` (`Config`, `Network`, `Store`, `Attestation`, `OTAConfig`), `node/client.go` (`Client`), `node/ota_provider.go` (`OTAProviderConfig`), `node/commissioner_control.go` (`CommissionerControlConfig`), `node/observers.go` (`Observers`), `node/persist.go` (`EndpointPersistence`), `node/root.go` (`buildRootOptional`, `unknownEthernet`), `node/doc.go` (package doc), `bridge/bridge.go` (`Bridge.Stop`).*
 
 ## `controller.Config`: the controller's ports added in v0.13.0
 
@@ -140,7 +140,7 @@ Use `Observers` instead.
 | `Advertise`, `Advertiser` | the `_matterd._udp` commissioner record and the advertiser publishing it | no record; `mdns.NewResponder()` when `Advertise` is set |
 | `Diagnostics` (`diag.Diagnostics{Capacity}`) | the size of the diagnostic trace (`Controller.DiagnosticEvents`, `Controller.OnDiagnosticEvent`) | 256 events |
 | `Metrics` (`contract.Metrics`) | the named counters and gauges (`controller.Metric…`) | nothing recorded |
-| `MaxReportBytesPerSession` | the bound on the report chunks a session's interactions with a paired node (the commissioning steps' included) hold while the rest arrive (`interaction.ErrReportTooLarge` past it; [limits](limits.md)); negative is `controller.ErrConfiguration` | `interaction.DefaultMaxReportBytesPerSession` (2 MiB) |
+| `MaxReportBytesPerSession` | the bound on the report chunks a session's interactions with a paired node (the commissioning steps' included) hold while the rest arrive (`interaction.ErrReportTooLarge` past it; [limits](limits.md)); negative is `controller.ErrConfiguration` | `interaction.DefaultMaxReportBytesPerSession` (16 MiB) |
 | `MaxImageBytesPerNode` | the bound on what one paired node's reports leave in the controller's image of it and in `DB` — the image is charged its values' stored bytes and what each endpoint, cluster, attribute and TLV element holds in memory: a report that would raise the image above it is not applied, an image stored above it is cut back to what the node's structure names when it loads ([limits](limits.md)); negative is `controller.ErrConfiguration` | `client.DefaultMaxImageBytesPerNode` (32 MiB) |
 
 `controller/commissioner.Context.Scanners` (`CommissionedScanner`) are the
@@ -158,7 +158,7 @@ These are read once at `Start`, or feed a component `Start` builds.
 
 | Port | Failure mode | What a skip costs |
 | --- | --- | --- |
-| `AttachACLLister` | fails closed | every fabric-scoped request is denied with UnsupportedAccess. `endpoint.UnenforcedACL` is the explicit way to run without an ACL |
+| `AttachACLLister` | fails closed | every operational (CASE) request is denied with UnsupportedAccess. `endpoint.UnenforcedACL` is the explicit way to run without an ACL |
 | `AttachSessionLookup` | silent | every encrypted datagram is dropped. CASE completes and carries no traffic |
 | `AttachPaseHandlerProvider` (or `AttachPaseHandler`) | fails closed | commissioning cannot begin. Prefer the provider: the singleton serialises commissioners |
 | `AttachCaseHandlerProvider` (or `AttachCaseHandler`) | fails closed | no CASE. A singleton rejects the parallel CASE sessions Apple Home opens |
@@ -210,9 +210,12 @@ matter.js refuses only at construction. A misplaced singleton is refused in
 every mode, the first misplacing endpoint in tree order alone. A mandatory
 command a server leaves unimplemented is `endpoint.ViolationUnimplemented`:
 logged in warn and off, refused in strict. A mode that is none of the three
-fails `node.New`.
+fails `node.New`. A node that commissions over BLE (`node.Network.BLE`,
+`endpoint.Topology.CommissionsOverBLE`) does not hold the CustomNetworkConfig
+condition, so its RootNode requires NetworkCommissioning, as matter.js
+derives the condition (`ServerEndpointFacts.ts:135-144` at `db021da0`).
 
-*Source: the `bridge` package doc (`bridge/bridge.go`), `bridge/bridge.go` (`AttachCommissioningWindow`, `wireCommissioned`), `bridge/securechannel.go` (`AttachSessionRegistry`), `bridge/ackpump.go`.*
+*Source: the `bridge` package doc (`bridge/bridge.go`), `bridge/bridge.go` (`AttachCommissioningWindow`, `wireCommissioned`), `bridge/securechannel.go` (`AttachSessionRegistry`), `bridge/ackpump.go`, `endpoint/devicetype_validation.go` (`assembledNodeConditions`).*
 
 ### Capabilities the bridge looks for on what is attached
 
@@ -291,6 +294,7 @@ the kit server implements for host inputs: the switch's.
 | ServiceArea | `RemoveSupportedAreasEntry`, `RemoveSupportedMapsEntry` (with what names the area or map) |
 | SmokeCoAlarm | `Refresh` (for a `StateSource` that is no `contract.ChangeNotifier`) |
 | Switch | `contract.SwitchPositionSink` (`SetRawPosition`, `SetCurrentPosition`) and `contract.SwitchEventEmitter` (`FireInitialPress` …), `RawPosition`, `SetDebounceDelay`, `SetLongPressDelay`, `SetMultiPressDelay`, `ResetState` |
+| Thermostat | `SetMeasuredTemperature` (the host's measured temperature; LocalTemperatureCalibration applies before it is served as LocalTemperature), `SetOccupied` (OCC: the Occupancy attribute, and the setpoints in effect) |
 | ThreadBorderRouterManagement, ThreadNetworkDiagnostics | `Refresh` (the host schedules it) |
 | ThreadNetworkDirectory | `ReloadNetworks` |
 | TlsCertificateManagement | `RootCertificate`, `ClientCertificate`, `SetDependencyChecker` |
@@ -383,4 +387,4 @@ AcceptedCommandList. AccessControl, OperationalCredentials and
 GroupKeyManagement have a definition but no `Declare`: their servers are
 the hand-written `cluster/core` ones the node mounts.
 
-*Source: `cluster/levelcontrol/native.go:18-73`, `mdns/responder.go` (`TriggerReannounce`, `ServiceConnected`), `node/reannounce.go`, `cluster/onoff/server.go:55-73`, `cluster/thermo/thermostat_server.go:261-288`, `cluster/core/wifi_network_diagnostics.go:26-28`, `cluster/core/ota_software_update_requestor.go:180`, `cluster/core/ota_provider.go:96-138`, `cluster/core/commissioner_control.go:73-111`, `cluster/core/actions.go:63`, `cluster/core/diagnostic_logs.go:62-67`, `node/node.go` (`ringLogs`).*
+*Source: `cluster/levelcontrol/native.go` (`NativeRamp`, `NativeMover`, `NativeSwitcher`), `mdns/responder.go` (`TriggerReannounce`, `ServiceConnected`), `node/reannounce.go`, `cluster/onoff/server.go` (`Sink`), `cluster/thermo/thermostat_server.go` (`Sink`), `cluster/core/wifi_network_diagnostics.go` (`WiFiReporter`), `cluster/core/ota_software_update_requestor.go` (`OtaApplier`), `cluster/core/ota_provider.go` (`OTAImageSource`, `OTAConsent`, `OTAApplyPolicy`), `cluster/core/commissioner_control.go` (`CommissioningApprover`, `ReverseCommissioner`), `cluster/core/actions.go` (`ActionsHost`), `cluster/core/diagnostic_logs.go` (`LogProvider`), `node/node.go` (`ringLogs`).*

@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"runtime"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -135,9 +137,11 @@ type rootDeps struct {
 	groups     *groups.Manager
 	connector  mattercore.OtaProviderConnector
 	// wifiDriver is [Network].WiFi's Driver as the node hands it to the
-	// Wi-Fi NetworkCommissioning server (reannouncingDriver); nil mounts
-	// the Ethernet server.
+	// Wi-Fi NetworkCommissioning server, unwrapped; nil mounts the
+	// Ethernet server. onWiFiConnected runs after each successful join
+	// (Node.wifiConnected).
 	wifiDriver        contract.WiFiDriver
+	onWiFiConnected   func(ctx context.Context)
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
 	// onCommissioningComplete runs after the root's own
 	// CommissioningComplete handling (the host's observer).
@@ -294,7 +298,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	var netComm contract.ClusterServer
 	if drv := d.wifiDriver; drv != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{ //nolint:contextcheck // the constructor takes no context; it reads the store once
-			Driver: drv, FailSafe: generalCom.FailSafeFabric,
+			Driver: drv, OnConnected: d.onWiFiConnected, FailSafe: generalCom.FailSafeFabric,
 			// The committed network survives a restart, as chip's driver
 			// keeps it (NetworkCommissioningWiFiDriver.cpp:135-167);
 			// Node.Start reconnects to it.
@@ -350,7 +354,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if r.WiFiNetworkDiagnostics, err = buildWiFiDiagnostics(cfg.Network.WiFi); err != nil {
 		return nil, err
 	}
-	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels, cfg.Locales, r.WiFiNetworkDiagnostics)
+	optional, err := buildRootOptional(ctx, d.st, d.logger, cfg.FixedLabels, cfg.Locales, r.WiFiNetworkDiagnostics)
 	if err != nil {
 		return nil, fmt.Errorf("root labels and diagnostics: %w", err)
 	}
@@ -478,10 +482,10 @@ func attestationMaterialOf(cfg *Config, chain *attestation.Chain, cd []byte) (ma
 // TimeFormatLocalization (24-hour, Gregorian), UnitLocalization,
 // SoftwareDiagnostics (the Go heap), the host's WiFiNetworkDiagnostics when
 // it has one, and EthernetNetworkDiagnostics (every value null).
-func buildRootOptional(ctx context.Context, st store.Settings, fixed []fixedlabeldef.LabelStruct, locales []string,
+func buildRootOptional(ctx context.Context, st store.Settings, logger *slog.Logger, fixed []fixedlabeldef.LabelStruct, locales []string,
 	wifi *mattercore.WiFiNetworkDiagnostics,
 ) ([]contract.ClusterServer, error) {
-	fixedLabel, userLabel, err := buildLabels(ctx, st, rootUserLabelsKey, fixed)
+	fixedLabel, userLabel, err := buildLabels(ctx, st, logger, rootUserLabelsKey, fixed)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +510,7 @@ func buildRootOptional(ctx context.Context, st store.Settings, fixed []fixedlabe
 	if err != nil {
 		return nil, err
 	}
-	software, err := mattercore.NewSoftwareDiagnostics(mattercore.SoftwareDiagnosticsConfig{Heap: runtimeHeap{}})
+	software, err := mattercore.NewSoftwareDiagnostics(mattercore.SoftwareDiagnosticsConfig{Heap: newRuntimeHeap()})
 	if err != nil {
 		return nil, err
 	}
@@ -526,15 +530,25 @@ func buildRootOptional(ctx context.Context, st store.Settings, fixed []fixedlabe
 
 // buildLabels constructs one endpoint's FixedLabel and UserLabel, the
 // latter restored from and persisted under key (root_optional.go:93-127 at b4ea1f96^).
-func buildLabels(ctx context.Context, st store.Settings, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
+func buildLabels(ctx context.Context, st store.Settings, logger *slog.Logger, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
 	fixedLabel, err = mattercore.NewFixedLabel(fixed)
 	if err != nil {
 		return nil, nil, err
 	}
+	// A store that fails the read fails the build, and New with it: an
+	// empty list served in the stored one's place would be stored over
+	// it by a controller's read-modify-write (review II,
+	// R2-P6-store-2403). A value that does not decode is logged and
+	// served as none.
 	var labels []userlabeldef.LabelStruct
-	if v, ok, gerr := st.GetSetting(ctx, key); gerr == nil && ok {
-		if json.Unmarshal([]byte(v), &labels) != nil {
+	v, ok, err := st.GetSetting(ctx, key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("node: load %s: %w", key, err)
+	}
+	if ok {
+		if uerr := json.Unmarshal([]byte(v), &labels); uerr != nil {
 			labels = nil
+			logger.Warn("label.restore", slog.String("key", key), slog.Any("err", uerr))
 		}
 	}
 	userLabel, err = mattercore.NewUserLabel(mattercore.UserLabelConfig{
@@ -557,7 +571,7 @@ func buildLabels(ctx context.Context, st store.Settings, key string, fixed []fix
 // Descriptor, FixedLabel ("role" "aggregator"), UserLabel and the host's
 // extra servers (wiring.go:332-345 at b4ea1f96^). Identify counts down on clk, the
 // node's clock.
-func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
+func buildAggregatorClusters(ctx context.Context, st store.Settings, logger *slog.Logger, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
 		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(schema.DeviceTypeID(deviceTypeAggregator))}},
 		nil, nil, nil,
@@ -565,7 +579,7 @@ func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []con
 	if err != nil {
 		return nil, fmt.Errorf("aggregator descriptor: %w", err)
 	}
-	fixedLabel, userLabel, err := buildLabels(ctx, st, aggregatorUserLabelsKey, []fixedlabeldef.LabelStruct{
+	fixedLabel, userLabel, err := buildLabels(ctx, st, logger, aggregatorUserLabelsKey, []fixedlabeldef.LabelStruct{
 		{Label: "role", Value: "aggregator"},
 	})
 	if err != nil {
@@ -573,7 +587,13 @@ func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []con
 	}
 	identify := mattercore.NewIdentify()
 	identify.SetClock(clk)
-	servers := append([]contract.ClusterServer{identify, descriptor, fixedLabel, userLabel}, extra...)
+	// The host's servers, and the CommissionerControl the node mounts,
+	// under the root's rule: a cluster the Aggregator serves already is
+	// refused (review II, R2-P6-api-2408).
+	servers, err := withHostServers([]contract.ClusterServer{identify, descriptor, fixedLabel, userLabel}, extra, "Aggregator", "Config.AggregatorServers")
+	if err != nil {
+		return nil, err
+	}
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, nil
 }
@@ -581,10 +601,18 @@ func buildAggregatorClusters(ctx context.Context, st store.Settings, extra []con
 // withRootServers appends the host's own root servers ([Config].RootServers);
 // a cluster the root serves already is refused.
 func withRootServers(servers, extra []contract.ClusterServer) ([]contract.ClusterServer, error) {
+	return withHostServers(servers, extra, "root", "Config.RootServers")
+}
+
+// withHostServers appends a host's own servers of one endpoint (where),
+// configured in field; a cluster the endpoint serves already — its own
+// or an earlier one of extra — is refused: one endpoint serves one server
+// per cluster.
+func withHostServers(servers, extra []contract.ClusterServer, where, field string) ([]contract.ClusterServer, error) {
 	for _, srv := range extra {
 		id := srv.MatterClusterID()
 		if slices.ContainsFunc(servers, func(s contract.ClusterServer) bool { return s.MatterClusterID() == id }) {
-			return nil, fmt.Errorf("node: root: Config.RootServers names cluster 0x%04x, which the root serves already", id)
+			return nil, fmt.Errorf("node: %s: %s names cluster 0x%04x, which the %s serves already", where, field, id, where)
 		}
 		servers = append(servers, srv)
 	}
@@ -609,23 +637,50 @@ func clusterIDsOf(servers []contract.ClusterServer) func() []uint32 {
 	}
 }
 
-// runtimeHeap reports the Go heap (root_optional.go:129-144 at b4ea1f96^).
-type runtimeHeap struct{}
+// heapSampleAge is how long one reading of the Go heap answers the
+// SoftwareDiagnostics heap attributes: runtime.ReadMemStats stops the
+// world, and a peer that may read the root would otherwise stop it once
+// per attribute it reads, at its own request rate (review II,
+// R2-P6-bound-2453).
+const heapSampleAge = time.Second
 
-func (runtimeHeap) read() runtime.MemStats {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	return m
+// runtimeHeap reports the Go heap (root_optional.go:129-144 at b4ea1f96^),
+// from one reading per heapSampleAge.
+type runtimeHeap struct {
+	// readMemStats reads the heap (runtime.ReadMemStats); now is the
+	// sample's clock (clock.System).
+	readMemStats func(*runtime.MemStats)
+	now          func() time.Time
+	// mu guards at and m: the last reading and when it was taken.
+	mu sync.Mutex
+	at time.Time
+	m  runtime.MemStats
+}
+
+func newRuntimeHeap() *runtimeHeap {
+	return &runtimeHeap{readMemStats: runtime.ReadMemStats, now: clock.System{}.Now}
+}
+
+// read returns the last reading while it is younger than heapSampleAge,
+// else a new one.
+func (h *runtimeHeap) read() runtime.MemStats {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if now := h.now(); h.at.IsZero() || now.Sub(h.at) >= heapSampleAge || now.Before(h.at) {
+		h.readMemStats(&h.m)
+		h.at = now
+	}
+	return h.m
 }
 
 // CurrentHeapFree implements mattercore.HeapReporter.
-func (h runtimeHeap) CurrentHeapFree() (uint64, bool) {
+func (h *runtimeHeap) CurrentHeapFree() (uint64, bool) {
 	m := h.read()
 	return m.HeapSys - m.HeapReleased - m.HeapAlloc, true
 }
 
 // CurrentHeapUsed implements mattercore.HeapReporter.
-func (h runtimeHeap) CurrentHeapUsed() (uint64, bool) { return h.read().HeapAlloc, true }
+func (h *runtimeHeap) CurrentHeapUsed() (uint64, bool) { return h.read().HeapAlloc, true }
 
 // unknownEthernet is an Ethernet reporter that cannot tell anything: the
 // node binds every interface and knows no single link.

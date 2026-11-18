@@ -90,3 +90,84 @@ func TestSustainedHoldsWakefulnessFedAfterEstablishment(t *testing.T) {
 		r.wantActive(true)
 	})
 }
+
+// attemptsNow is the rig's attempt count once the loop has settled.
+func (r *icdRig) attemptsNow() int {
+	r.t.Helper()
+	settle()
+	a, _ := r.count()
+	return a
+}
+
+// TestSustainedRetryScheduleSpansEstablishments: a peer that grants the
+// subscription and drops it at once is re-subscribed on the retry
+// schedule, not at once each time: the schedule lives across
+// establishments and starts over only after a subscription that lasted
+// its current interval. matter.js starts a new schedule per establishment
+// loop (SustainedSubscription.ts:203 at db021da0); the rule is this
+// module's (review II, R2-P6-fsm-2110).
+func TestSustainedRetryScheduleSpansEstablishments(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newICDRig(t, nil)
+		r.start(nil, nil)
+		r.wantAttempts(1)
+		r.lose() // lasted nothing: wait the first interval
+		if n := r.attemptsNow(); n != 1 {
+			t.Fatalf("%d attempts at once after a subscription that lasted nothing, want 1", n)
+		}
+		r.advance(15 * time.Second)
+		r.wantAttempts(2)
+		r.lose() // the schedule continues: 30 s
+		r.advance(15 * time.Second)
+		if n := r.attemptsNow(); n != 2 {
+			t.Fatalf("%d attempts 15 s into the second interval, want 2", n)
+		}
+		r.advance(15 * time.Second)
+		r.wantAttempts(3)
+		// A subscription that lasted the current interval (60 s) resets the
+		// schedule and is replaced at once.
+		r.advance(time.Minute)
+		r.lose()
+		r.wantAttempts(4)
+		r.lose()
+		if n := r.attemptsNow(); n != 4 {
+			t.Fatalf("%d attempts at once after a reset schedule's first loss, want 4", n)
+		}
+		r.advance(15 * time.Second)
+		r.wantAttempts(5)
+	})
+}
+
+// TestSustainedRetryAfterAnOutageIsNotCarriedOver: the failed attempts of
+// an outage do not count against the subscription that ends it: one lost a
+// minute after it was established following an hour of failed attempts is
+// re-subscribed at once, as both references do — matter.js starts the
+// attempts' schedule per establishment (SustainedSubscription.ts:203 in the
+// loop of :139 at db021da0), connectedhomeip resets its retry count at
+// every SubscribeResponse (src/app/ReadClient.cpp:1139 at 6170af84)
+// (review II, R2-P6-fsm-2110, Fable F3).
+func TestSustainedRetryAfterAnOutageIsNotCarriedOver(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		const failures = 10 // 15 s doubling: the last waits the hour
+		r := newICDRig(t, func(n int) error {
+			if n <= failures {
+				return errTransient
+			}
+			return nil
+		})
+		r.start(nil, nil)
+		for i := 0; r.attemptsNow() <= failures; i++ {
+			if i > 2*failures {
+				t.Fatalf("%d attempts after %d hours", r.attemptsNow(), i)
+			}
+			r.advance(time.Hour)
+		}
+		r.wantAttempts(failures + 1)
+		r.wantActive(true)
+		r.advance(time.Minute)
+		r.lose()
+		r.wantAttempts(failures + 2)
+	})
+}

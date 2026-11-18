@@ -235,13 +235,23 @@ type Exchange struct {
 	firstTransmitAt time.Time
 	sendOpts        SendOptions
 	used            bool
-	closing         bool
-	closed          bool
-	closeCause      error
-	closeTimer      Timer
-	receivedCount   int
-	lastActive      time.Time
-	createdAt       time.Time
+	// sentOpcode is the opcode of the last message sent, not an
+	// acknowledgement; waitTimeout the timeout of the last wait for the
+	// peer's next message ([Exchange.Next]). A Sigma1 refused for the
+	// handshake this exchange runs reads both ([Manager.answerBusy]).
+	sentOpcode  uint8
+	waitTimeout time.Duration
+	// busyWait is, on the exchange of a refused Sigma1, the minimum wait
+	// time its Busy answer states ([Manager.sendBusy]); set before the
+	// answer runs.
+	busyWait      uint16
+	closing       bool
+	closed        bool
+	closeCause    error
+	closeTimer    Timer
+	receivedCount int
+	lastActive    time.Time
+	createdAt     time.Time
 	// queuedCounted are the queued messages counted as delivered work
 	// (Manager.inflight), held the ones the reader took and has not yet
 	// come back from: its next Next, Send, Close or Abort ends their
@@ -405,6 +415,14 @@ func (x *Exchange) considerClosed() bool {
 	return x.closed || (x.initiator && x.closing)
 }
 
+// ended reports whether the exchange is closing or closed: its handler is
+// done with it.
+func (x *Exchange) ended() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	return x.closing || x.closed
+}
+
 // ConsiderClosed reports whether the exchange counts as closed: closed,
 // or — for an exchange we initiated — closing. It is matter.js
 // MessageExchange.considerClosed (MessageExchange.ts:376-378), which a
@@ -439,25 +457,26 @@ func (x *Exchange) notifySentLocked() {
 
 // Send sends one message on the exchange and, when it travels reliably,
 // returns once the peer acknowledged it. Mirrors matter.js
-// MessageExchange.ts:605-820 (send, #send) at 0ceb202d:
+// MessageExchange.ts:635-858 (send, #send) at db021da0:
 //
-//   - a closed exchange refuses (:606-608);
+//   - a closed exchange refuses (:636-638);
 //   - the message asks for an acknowledgement unless SuppressAck
-//     (:660); a StatusReport travels on the Secure Channel protocol
-//     whatever the exchange's protocol (:662-665);
+//     (:692); a StatusReport travels on the Secure Channel protocol
+//     whatever the exchange's protocol (:696-697);
 //   - a send while the previous message is unacknowledged is an
-//     [ErrFlow] (:669-673);
+//     [ErrFlow] (:701-705);
 //   - the acknowledgement owed for the last received message rides
-//     along, and its standalone-ack timer stops (:679-686);
+//     along, and its standalone-ack timer stops (:711-718);
 //   - the message is retransmitted on the MRP schedule until
 //     acknowledged; after the last transmission and the final wait the
-//     send fails with a [*PeerUnresponsiveError] (:752-766, :879-966);
+//     send fails with a [*PeerUnresponsiveError] (:784-799, :934-1018);
 //   - a failure with nothing received on the exchange that shows the
-//     peer gone reports it to the manager's PeerLost hook (:613-638).
+//     peer gone reports it to the manager's PeerLost hook (:643-654,
+//     :661-668).
 //
 // A ctx already done sends nothing; a ctx done while waiting for the
 // acknowledgement stops the retransmissions and leaves the message
-// unacknowledged (:793-805). Both return ctx's error.
+// unacknowledged (:813-843). Both return ctx's error.
 func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts SendOptions) error {
 	x.mu.Lock()
 	x.releaseHeldLocked()
@@ -527,6 +546,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 		return nil, fmt.Errorf("%w: the previous message %d is not acknowledged yet", ErrFlow, x.sentToAck.counter)
 	}
 	x.used = true
+	x.sentOpcode = opcode
 	x.notifySentLocked()
 	proto := message.ProtocolHeader{
 		Initiator:  x.initiator,
@@ -927,10 +947,34 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 	x.enqueueLocked(msg)
 }
 
+// maxQueuedMessages is how many of the peer's messages an exchange holds
+// for a reader that has not taken them with [Exchange.Next]. Every
+// protocol the controller speaks alternates on an exchange — a message,
+// then the other side's answer — so a reader has one message in hand and
+// a peer that keeps to the protocol at most one beyond it; the number
+// leaves a slow reader room and bounds what a peer that ignores the
+// alternation makes the controller hold at this many times the message
+// size limit. Past it the exchange is aborted with [ErrFlow]: dropping
+// the message would leave its acknowledgement and the peer's view of the
+// exchange apart. The module's own bound, ahead of matter.js, whose
+// exchange queue has none (review II, R2-P6-bound-1807, U3-ctl-dev-1,
+// owner decision 45).
+const maxQueuedMessages = 16
+
 // enqueueLocked queues msg for [Exchange.Next] with x.mu held and releases
 // it: the queue notifier ([Exchange.SetQueueNotifier]) hears of msg first,
-// so it has run before Next can return msg.
+// so it has run before Next can return msg. A queue at
+// [maxQueuedMessages] takes no further message: the queue is dropped and
+// the exchange aborted with [ErrFlow], msg's acknowledgement sent.
 func (x *Exchange) enqueueLocked(msg *Message) {
+	if len(x.queue) >= maxQueuedMessages {
+		x.queue = nil
+		x.mu.Unlock()
+		x.m.log.Warn("matter.controller.exchange_queue_full", slog.Int("exchange_id", int(x.id)), slog.Int("queued", maxQueuedMessages),
+			slog.String("reason", "the peer sent more messages than the reader took"))
+		x.abort(fmt.Errorf("%w: %d messages wait for the reader", ErrFlow, maxQueuedMessages))
+		return
+	}
 	if onQueued := x.onQueued; onQueued != nil {
 		x.mu.Unlock()
 		onQueued(msg)
@@ -1014,6 +1058,7 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 	}
 	x.mu.Lock()
 	x.releaseHeldLocked()
+	x.waitTimeout = timeout
 	x.mu.Unlock()
 	for {
 		x.mu.Lock()

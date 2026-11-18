@@ -94,6 +94,9 @@ func loadFiles(files map[string][]byte, idsOnly bool) (*Model, error) {
 			l.uncompared("semantic namespaces", 1)
 			continue
 		default:
+			// An XML file elsewhere, or below a subdirectory of the
+			// three, is not read: counted, not dropped (R2-P6-test-2816).
+			l.uncompared("data model files not read", 1)
 			continue
 		}
 		if err := l.addFile(dir, name, files[name]); err != nil {
@@ -182,6 +185,9 @@ func readChipModel(root, commit, version string, load func(map[string][]byte) (*
 }
 
 // untar reads the regular files below prefix, keyed by their path below it.
+// Any other entry below prefix but a directory — a symlink, a device — is an
+// error: dropped, the files it stands for would be neither compared nor
+// counted (R2-P6-test-2816).
 func untar(data []byte, prefix string) (map[string][]byte, error) {
 	files := map[string][]byte{}
 	r := tar.NewReader(bytes.NewReader(data))
@@ -193,8 +199,11 @@ func untar(data []byte, prefix string) (map[string][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("chipdm: reading the archive: %w", err)
 		}
-		if h.Typeflag != tar.TypeReg || !strings.HasPrefix(h.Name, prefix) {
+		if !strings.HasPrefix(h.Name, prefix) || h.Typeflag == tar.TypeDir {
 			continue
+		}
+		if h.Typeflag != tar.TypeReg {
+			return nil, fmt.Errorf("chipdm: %s is not a regular file (type %q)", h.Name, h.Typeflag)
 		}
 		body, err := io.ReadAll(r)
 		if err != nil {

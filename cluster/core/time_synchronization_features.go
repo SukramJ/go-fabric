@@ -25,7 +25,7 @@ import (
 // The TimeSynchronization features TZ, NTPC, NTPS and TSC, served after
 // connectedhomeip: matter.js's TimeSynchronizationServer is the generated
 // behaviour with no command handlers (TimeSynchronizationServer.ts:14 at
-// 862ad75f), so chip's src/app/clusters/time-synchronization-server at
+// db021da0), so chip's src/app/clusters/time-synchronization-server at
 // 6170af84 is the authority — the attribute gating
 // (TimeSynchronizationCluster.cpp:186-248), the reads (:250-331), the
 // stored state (:333-353, TimeSyncDataProvider.h:58-75), the four command
@@ -108,7 +108,10 @@ const (
 	defaultNTPMaxLen     = 128
 )
 
-// The store keys (chip's TimeSyncDataProvider keys, TimeSyncDataProvider.cpp).
+// The store keys: the module's own names for the four values chip's
+// TimeSyncDataProvider persists (TimeSyncDataProvider.cpp; chip's keys are
+// g/ts/tts, g/ts/dntp, g/ts/tz and g/ts/dsto,
+// src/lib/support/DefaultStorageKeyAllocator.h:279-282 at 6170af84).
 const (
 	timeSyncKeyTrustedTimeSource = "timesync.trusted_time_source"
 	timeSyncKeyDefaultNTP        = "timesync.default_ntp"

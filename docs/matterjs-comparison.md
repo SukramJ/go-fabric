@@ -9,7 +9,7 @@ commissioner/controller, as an embeddable Go library.
 
 This page maps the two, so that "matter.js has X and we don't" is a decision on
 record rather than an open question. Everything here is measured against
-matter.js HEAD as checked out at `../matter.js`.
+matter.js at the snapshot's pin (`parity/schema.json` `matter.sourceCommit`).
 
 **Swept 2026-10-28** for milestone 6 (wave 27-C) at the pin `862ad75f`:
 every row was re-read. The rows that cite matter.js lines were re-read at

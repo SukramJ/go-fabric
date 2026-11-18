@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Command reference-bridge is a runnable Matter bridge assembled only from
-// go-fabric's public API.
+// Command reference-bridge is a runnable Matter bridge assembled from
+// go-fabric's public API — with one TESTING-ONLY exception, --ota-harness,
+// which reaches internal/nodeseam (applyOTAHarness).
 //
 // It bridges a hard-coded fleet of simulated devices — one per surface the
 // module serves: lights, a speaker, a fan, a smoke alarm, a pump, a washer,
@@ -27,11 +28,13 @@
 // health probe (node.Config.Health); it names none of mdns, secure/* or
 // bridge for them, and it lists its endpoints through the facade too
 // (Node.Topology for the banner's count of bridged devices, Node.Endpoints
-// for printTopology). Two things still reach below the facade (review
-// 2026-11 W5-ex-10): the thermostat's preset store
-// (store.NewThermostatPresetStore over Node.Store) and the charger's
+// for printTopology). Three things still reach below the facade (review
+// 2026-11 W5-ex-10, R2-P6-doc-2605): the thermostat's preset store
+// (store.NewThermostatPresetStore over Node.Store), the charger's
 // EnergyEvse with its host port (cluster/energy.NewEnergyEvse as the
-// Declare's HostServer).
+// Declare's HostServer), and, TESTING ONLY, --ota-harness's
+// internal/nodeseam.UseOTAHarness, which no host outside this module can
+// import.
 //
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
@@ -42,7 +45,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -95,7 +97,7 @@ type flags struct {
 	appPipe, enableKey, otaDir, dcl                string
 	attestationDir, metricsExpvar                  string
 	wifiSimSSIDs                                   string
-	otbr                                           string
+	otbr, sealKey                                  string
 	passcode, discriminator, customFlow            uint
 	iterations                                     int
 	advertise, osHostName, otaHarness, wifi        bool
@@ -105,7 +107,7 @@ type flags struct {
 	tlsSim, cameraSim, jointFabricSim              bool
 	camera                                         cameraOptions
 	icdIdleSeconds, icdActiveMillis                uint
-	thermostatSchedules                            bool
+	thermostatSchedules, metricsAnyAddress         bool
 	tcRequired                                     bool
 	dumpSurface                                    bool
 	extensions                                     string
@@ -116,18 +118,20 @@ type flags struct {
 func parseFlags() flags {
 	var f flags
 	flag.StringVar(&f.dbPath, "db", "reference-bridge.db", "SQLite file holding fabrics, credentials and endpoint numbers")
+	flag.StringVar(&f.sealKey, "seal-key", "", "seal the secrets of --db under a key outside it (node.Store.Sealer, AES-256-GCM): file:<path> holding 64 hex digits, created with a new random key when missing; every later start needs it; see sealkey.go")
 	flag.StringVar(&f.listen, "listen", ":5540", "UDP listen address for Matter traffic")
 	flag.StringVar(&f.tcp, "tcp", "true", "Matter TCP: true (accept and open connections), false, or incoming / outgoing comma-separated; incoming listens on the UDP port, both are advertised in the operational T key")
 	flag.StringVar(&f.label, "label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
-	flag.UintVar(&f.passcode, "passcode", 20202021, "Matter setup passcode (8 digits, not trivially guessable)")
+	f.passcode = 20202021
+	flag.Var(passcodeValue{&f.passcode}, "passcode", "Matter setup passcode (8 digits, not trivially guessable), or @file holding it; default $"+passcodeEnv+" when set — change it for anything real")
 	flag.UintVar(&f.discriminator, "discriminator", 3840, "12-bit commissioning discriminator")
 	flag.UintVar(&f.customFlow, "custom-flow", 0, "the commissioning flow the onboarding payload states: 0 Standard, 1 User-Intent, 2 Custom (node.Commissioning.Flow; flow 1 and 2 print the long manual code with vendor and product id). Under 1 an uncommissioned daemon opens no commissioning window by itself (node.Commissioning.WindowOnDemand): it is not commissionable until the app pipe's UserIntentCommissioningStart opens the window, the user action the flow stands for; see control.go")
 	flag.IntVar(&f.iterations, "pbkdf-iterations", 1000, "SPAKE2+ PBKDF2 iteration count")
-	flag.StringVar(&f.salt, "pbkdf-salt", "go-fabric-ref-salt", "SPAKE2+ salt (16-32 bytes; change it for anything real)")
+	flag.StringVar(&f.salt, "pbkdf-salt", "", "SPAKE2+ salt (16-32 bytes); default a random 32-byte salt drawn at each start")
 	flag.BoolVar(&f.advertise, "advertise", true, "publish the commissionable mDNS record (false = no discovery, direct address only)")
 	flag.StringVar(&f.logLevel, "log-level", "info", "debug, info, warn or error")
 	flag.StringVar(&f.appPipe, "app-pipe", "", "TESTING ONLY: named pipe of CHIP-style JSON test commands (button presses, sensor values, …); see control.go")
-	flag.StringVar(&f.enableKey, "enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger; see control.go")
+	flag.StringVar(&f.enableKey, "enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger, or @file holding it; see control.go")
 	flag.BoolVar(&f.osHostName, "mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
 	flag.StringVar(&f.otaDir, "ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
 	flag.BoolVar(&f.otaHarness, "ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
@@ -137,7 +141,8 @@ func parseFlags() flags {
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
 	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that knows the --wifi-sim-ssid networks, connects to one after a short delay and stays on the Ethernet address; see wifisim.go")
 	flag.StringVar(&f.wifiSimSSIDs, "wifi-sim-ssid", defaultWiFiSimSSIDs, "TESTING ONLY, with --wifi-sim: the networks the simulated driver finds and joins, comma-separated ssid:passphrase (an entry without a passphrase takes any); see wifisim.go")
-	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as /debug/vars, in expvar's JSON shape and without authentication — keep it on loopback; off when empty; see metrics.go")
+	flag.StringVar(&f.metricsExpvar, "metrics-expvar", "", "address (\"127.0.0.1:9090\") to serve the node's metrics on as /debug/vars, in expvar's JSON shape and without authentication — a non-loopback address is refused unless --metrics-expvar-any-address; off when empty; see metrics.go")
+	flag.BoolVar(&f.metricsAnyAddress, "metrics-expvar-any-address", false, "serve --metrics-expvar on an address that is not loopback (\":9090\", a LAN address), where anyone who reaches it reads the counters without authentication")
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
 	flag.BoolVar(&f.tcRequired, "tc-required", false, "TESTING ONLY: serve GeneralCommissioning's TermsAndConditions feature with version 1 and acknowledgement bit 1 required — what the CSA's CGEN cases expect as PIXIT.CGEN.TCRevision / RequiredTCAcknowledgements — and enable the extension "+termsAndConditionsRow+"; a commissioner then has to send SetTCAcknowledgements before CommissioningComplete (chip-tool pairing --tc-acknowledgements 1 --tc-acknowledgements-version 1); see surface.go")
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
@@ -159,6 +164,10 @@ func parseFlags() flags {
 	flag.BoolVar(&f.jointFabricSim, "jointfabric-sim", false, "TESTING ONLY: add a JointFabricAdministrator endpoint (Joint Fabric Datastore and Administrator) whose member-node synchronisation is simulated, and turn on the node's client stack for its commissioner reach, for the Joint Fabric certification families; see jointfabric.go")
 	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the assembled effective surface of the root, the Aggregator and every endpoint, the clusters the endpoint assembler mounts included, the surface policies' digest, the selected profiles, the effective level and its origin (explicit, profile <name> or pin) and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say on an in-memory store and assembled by starting the node on a loopback UDP port the system assigns, then stopping it: no mDNS record is published and the --db store is not opened; see surface.go")
 	flag.Parse()
+	if err := passcodeFromEnv(flag.CommandLine); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	return f
 }
 
@@ -238,16 +247,16 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 
 	// TestEventTrigger, armed by the test enable key (control.go).
 	if f.enableKey != "" {
-		key, err := hex.DecodeString(f.enableKey)
+		key, err := enableKeyBytes(f.enableKey)
 		if err != nil {
-			return fmt.Errorf("--enable-key: %w", err)
+			return err
 		}
 		if err := n.Root().GeneralDiagnostics.EnableTestEventTriggers(key, devices.testEventTrigger); err != nil {
 			return fmt.Errorf("--enable-key: %w", err)
 		}
 	}
 
-	if err := serveMetrics(ctx, f.metricsExpvar, logger); err != nil {
+	if err := serveMetrics(ctx, f.metricsExpvar, f.metricsAnyAddress, logger); err != nil {
 		return fmt.Errorf("--metrics-expvar: %w", err)
 	}
 	if err := n.Start(ctx); err != nil {
@@ -313,7 +322,7 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	// requestor once the node has built them.
 	applier := &otaApplier{
 		vendorID: testVendorID, productID: testProductID,
-		dir: otaDownloads, harness: f.otaHarness, logger: logger,
+		dir: otaDownloads, harness: f.otaHarness, logger: logger, life: ctx,
 	}
 	// Actions on the Aggregator (Aggregator: optional), over the demo
 	// scenes (fleet_node.go).
@@ -322,6 +331,9 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		return nil, nil, fmt.Errorf("aggregator actions: %w", err)
 	}
 	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, applier, actions, logger)
+	if err := applyOTAHarness(&cfg, applier); err != nil {
+		return nil, nil, err
+	}
 	cfg.Attestation = attestationConfig(f.attestationDir)
 	cfg.Surface = policies
 	// The listener's verdict every probe interval (node.Config.Health),
@@ -329,6 +341,9 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 	cfg.Health = &node.Health{Interval: node.DefaultProbeInterval}
 	applyTestWiFi(&cfg, f, devices)
 	applyMetrics(&cfg, f.metricsExpvar)
+	if err := applySealKey(&cfg, f, dump); err != nil {
+		return nil, nil, err
+	}
 	if dump != nil {
 		// The surface dump touches neither --db nor the network: it
 		// starts the node to assemble the topology (bridge.Bridge.Start
@@ -505,7 +520,7 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		Network: node.Network{Listen: f.listen, TCP: tcp, MDNS: mdnsConfig(f)},
 		Commissioning: node.Commissioning{
 			Passcode: passcode, Discriminator: discriminator,
-			PBKDFIterations: pbkdfIterations(f.iterations), Salt: []byte(f.salt),
+			PBKDFIterations: pbkdfIterations(f.iterations), Salt: pbkdfSalt(f.salt),
 			// The Basic feature (BC), as connectedhomeip's all-clusters app
 			// serves it: TC-CADMIN-1.4 and 1.11 exercise
 			// OpenBasicCommissioningWindow (phase 36).
@@ -546,11 +561,22 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		AggregatorServers: []contract.ClusterServer{actions},
 		Logger:            logger,
 	}
-	if applier.harness {
-		// TESTING ONLY: the image applied in place (ota.go).
-		nodeseam.UseOTAHarness(&cfg)
-	}
 	return cfg
+}
+
+// applyOTAHarness is --ota-harness (TESTING ONLY): the requestor applies
+// an image in place (ota.go), through internal/nodeseam — the daemon's
+// one reach below the public API (README). The seam refuses a
+// configuration without an OTA requestor; the flag then fails rather than
+// leaving harness mode silently off (R2-P6-doc-2605).
+func applyOTAHarness(cfg *node.Config, applier *otaApplier) error {
+	if !applier.harness {
+		return nil
+	}
+	if !nodeseam.UseOTAHarness(cfg) {
+		return errors.New("--ota-harness: the node configuration has no OTA requestor to put in harness mode")
+	}
+	return nil
 }
 
 // commissioningFlow is the --custom-flow value as the node's field;

@@ -12,7 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// matter.js TlvString.ts:57-69 at 862ad75f bounds a string that carries an
+// matter.js TlvString.ts:57-69 at db021da0 bounds a string that carries an
 // IS1 by its whole length before it slices at the IS1: a 40-byte NodeLabel
 // ("max 32") whose sixth byte is 0x1F is a ValidationOutOfBoundsError —
 // CONSTRAINT_ERROR — not the accepted "ABCDE". One that fits is accepted

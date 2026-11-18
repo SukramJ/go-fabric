@@ -6,7 +6,6 @@ package core
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -258,8 +257,15 @@ const (
 // SetTCAcknowledgements and the TC attributes stay out).
 var gencommInst = mustInstance(gencommdef.Definition, spec.Options{})
 
-// errGencommInvalidArg is returned for malformed command payloads.
-var errGencommInvalidArg = errors.New("core: GeneralCommissioning invalid argument")
+// errGencommInvalidArg is returned for a payload of the wrong Go type,
+// which answers INVALID_COMMAND — the one status of that class on the
+// security-path servers, [errOpcredsInvalidArg]'s ([invalidArgErr]; review
+// II, W6-test-17, R2-P6-err-3112).
+var errGencommInvalidArg error = invalidArgErr{msg: "core: GeneralCommissioning invalid argument"}
+
+// errGencommInvalidValue is returned for an attribute write's value of the
+// wrong Go type: INVALID_DATA_TYPE ([invalidValueErr]; owner decision 234).
+var errGencommInvalidValue error = invalidValueErr{msg: "core: GeneralCommissioning invalid value"}
 
 // GeneralCommissioningConfig drives [NewGeneralCommissioning].
 type GeneralCommissioningConfig struct {
@@ -271,7 +277,7 @@ type GeneralCommissioningConfig struct {
 	// go-fabric answers "true" — the bridge runs over Ethernet.
 	SupportsConcurrentConnection bool
 	// FailSafeMaxSeconds bounds how long an ArmFailSafe window stays
-	// active. Matter spec floor is 60 s; v1.1 defaults to 900 s
+	// active. Matter spec floor is 60 s; the module defaults to 900 s
 	// (15 min) to keep parity with the pairing-window default in
 	// the UI concept.
 	FailSafeMaxSeconds uint16
@@ -646,7 +652,7 @@ func (g *GeneralCommissioning) MatterWriteChanged(ctx context.Context, attrID ui
 	}
 	v, ok := value.(uint64)
 	if !ok {
-		return false, fmt.Errorf("%w: Breadcrumb expected uint64, got %T", errGencommInvalidArg, value)
+		return false, fmt.Errorf("%w: Breadcrumb expected uint64, got %T", errGencommInvalidValue, value)
 	}
 	g.mu.Lock()
 	changed := g.breadcrumb != v
@@ -910,7 +916,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	}
 	// ExpiryLengthSeconds is not bounded by FailSafeMaxSeconds: matter.js
 	// arms or extends with the value as sent
-	// (GeneralCommissioningServer.ts:89-106 at 862ad75f) and chip arms it
+	// (GeneralCommissioningServer.ts:89-106 at db021da0) and chip arms it
 	// as given (GeneralCommissioningCluster.cpp:439-441 at 6170af84,
 	// FailSafeContext.cpp:112-119); both end the window at the cumulative
 	// limit's own timer, as the clamp below does. The ValueOutsideRange
@@ -978,7 +984,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	unlocked = true
 	if armedHook != nil && !extending {
 		// Mirrors matter.js GeneralCommissioningServer.ts:90-100 at
-		// 862ad75f: an ArmFailSafe while armed extends the fail-safe
+		// db021da0: an ArmFailSafe while armed extends the fail-safe
 		// context, one while disarmed creates a new
 		// ServerNodeFailsafeContext (the hook runs only then), surfacing a
 		// fresh `rootCertSet` / `fabricIndex` set so multi-admin pairing
@@ -1026,8 +1032,13 @@ func (g *GeneralCommissioning) startFailSafeWatchLocked(ctx context.Context, fab
 // the PASE close — until it returns or ctx ends, which is the error; from
 // then on no deadline expires the fail-safe. The node calls it when it
 // stops, before its store goes (review II, R2-P2-stop-06): a rollback that
-// began before the stop no longer writes after it. What stays uncommitted
-// is rolled back by the next start. It may be called again after an error.
+// began before the stop no longer writes after it. The node expires an
+// armed fail-safe first ([GeneralCommissioning.ExpireFailSafe]; review II,
+// R2-P6-fsm-2411); Close itself rolls nothing back, and what a host that
+// calls it alone leaves uncommitted is rolled back by the next start. From
+// Close on no arm is taken — ArmFailSafe and the internal arms answer
+// FAILURE — so the node closes the server before it expires the fail-safe
+// at its stop. It may be called again after an error.
 func (g *GeneralCommissioning) Close(ctx context.Context) error {
 	g.mu.Lock()
 	g.closed = true
@@ -1402,6 +1413,10 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 		return nil
 	}
 	g.mu.Lock()
+	if g.closed {
+		g.mu.Unlock()
+		return errGencommClosed
+	}
 	// The settle and the fresh start release the lock around the hooks they
 	// run and hold it again on return, on a panic of a hook too; this guard
 	// frees it then, as handleArmFailSafe's does, while every return below

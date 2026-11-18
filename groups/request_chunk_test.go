@@ -27,8 +27,8 @@ func (l u8List) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // unicast write's list chunking in one message — REPLACE-ALL with the
 // empty list, then one append per element (matter.js
 // ClientGroupInteraction.write → ClientInteraction.write → Write(),
-// Write.ts:149-171 at 0ceb202d); AccessControl's ACL is not chunked
-// (:18-21, :151-156), nor a write with DisableListChunking.
+// Write.ts:155-177 at db021da0); AccessControl's ACL is not chunked
+// (:24-27, :157-162), nor a write with DisableListChunking.
 func TestSenderWriteListChunked(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

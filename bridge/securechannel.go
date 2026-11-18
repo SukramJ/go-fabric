@@ -1074,18 +1074,41 @@ func (b *Bridge) paseHandshakeOfAnother(key HandshakeKey) bool {
 // retransmitted until it is acknowledged or its retransmissions are spent
 // ([Bridge.sendHandshakeFailureReport], owner decision 173). The replies
 // of another initiator's handshake on the same exchange id stay.
+//
+// A reply that installed a secure session the peer has not acknowledged
+// yet — a Sigma2_Resume — ends with its handshake, so the session is
+// closed ([Bridge.closeUnacknowledgedResume]); [Bridge.replaceHandshakeReplies]
+// is the one caller that drops replies to send them again.
 func (b *Bridge) abandonHandshakeReplies(key HandshakeKey) {
+	for _, id := range b.dropHandshakeReplies(key) {
+		b.closeUnacknowledgedResume(id)
+	}
+}
+
+// replaceHandshakeReplies drops the replies of the handshake key names
+// because one is sent again in their place ([Bridge.handleSigma3OfCompleted]):
+// the handshake goes on and the peer has just spoken on its exchange, so a
+// session a reply installed stays.
+func (b *Bridge) replaceHandshakeReplies(key HandshakeKey) {
+	_ = b.dropHandshakeReplies(key)
+}
+
+// dropHandshakeReplies drops the replies of the handshake key names and
+// returns the sessions they installed unacknowledged.
+func (b *Bridge) dropHandshakeReplies(key HandshakeKey) []uint16 {
 	b.mu.RLock()
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
 	if tracker == nil {
-		return
+		return nil
 	}
-	if cleared := tracker.AbandonUnsecuredExchange(key); cleared > 0 {
+	cleared, installed := tracker.abandonUnsecuredExchange(key)
+	if cleared > 0 {
 		b.logger.Debug("matter.sc.handshake.abandon_replies",
 			slog.Int("exchange_id", int(key.ExchangeID)),
 			slog.Int("cleared", cleared))
 	}
+	return installed
 }
 
 // handshakeReplyUnacknowledged reports whether a message of the handshake
@@ -1387,7 +1410,7 @@ func (b *Bridge) handlePase(
 	// makes every non-standalone-ack reply reliable (MessageExchange.ts:602);
 	// the Sigma3/Pake3 piggyback ack (or a standalone ack) stops the
 	// retransmit via the universal inbound Ack path (receive.go).
-	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt)); err != nil {
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt), 0); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		return err
 	}
@@ -1481,12 +1504,53 @@ func (b *Bridge) handleCase(
 	// rebroadcast. matter.js makes every non-standalone-ack reply
 	// reliable (MessageExchange.ts:602); the Sigma3 piggyback ack stops
 	// the retransmit via the universal inbound Ack path (receive.go).
-	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt)); err != nil {
+	var installed uint16
+	if a, ok := handler.(*CaseAdapter); ok && respOpcode == mrp.SCOpcodeSigma2Resume {
+		installed, _ = a.takeResumeInstall()
+	}
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt), installed); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
+		if installed != 0 {
+			// matter.js closes the session when the Sigma2_Resume cannot
+			// be sent (CaseServer.ts:202-206 at db021da0).
+			b.closeUnacknowledgedResume(installed)
+		}
 		return err
 	}
 	b.dischargeOwedReplyAck(requestHdr, proto)
 	return nil
+}
+
+// closeUnacknowledgedResume closes the secure session a resumption installed
+// whose Sigma2_Resume the initiator did not acknowledge: its
+// retransmissions were spent, its time on the unsecured session ran out
+// ([tickOutboundReliable]), it could not be sent ([Bridge.handleCase]) or
+// its handshake was ended ([Bridge.abandonHandshakeReplies]). That is
+// matter.js's outcome: its send returns only once the message is
+// acknowledged (packages/protocol/src/protocol/MessageExchange.ts:822-830
+// at db021da0), a send that fails — its acknowledgement missing included —
+// closes the session (packages/protocol/src/session/case/CaseServer.ts:202-206),
+// and the session is added only after it (:211). The controller's CASE
+// responder closes such a session too (client/handshake). It is a liveness
+// rule, not a defence: an acknowledgement authenticates nothing. An entry
+// that lost its place in the retransmit table to a newer one
+// ([unsecuredEntryLimit]) closes nothing — its datagram went out, and the
+// peer's acknowledgement may still come; the session is left to the idle
+// reaper. Review II, R2-P6-sec-3320.
+func (b *Bridge) closeUnacknowledgedResume(sessionID uint16) {
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	b.logger.Info("matter.rx.sc.resume_unacknowledged",
+		slog.Int("session_id", int(sessionID)))
+	if reg == nil {
+		return
+	}
+	if err := reg.Close(sessionID); err != nil {
+		b.logger.Debug("matter.rx.sc.resume_unacknowledged.miss",
+			slog.Int("session_id", int(sessionID)),
+			slog.Any("err", err))
+	}
 }
 
 // sendHandshakeFailureReport ends the handshake on the request's exchange
@@ -1535,7 +1599,7 @@ func (b *Bridge) sendHandshakeFailureReport(
 		b.endHandshakeUnreported(key, "failure_report")
 		return nil
 	}
-	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body, peer); err != nil {
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body, peer, 0); err != nil {
 		return err
 	}
 	// The report carried the acknowledgement of the request.
@@ -1555,8 +1619,8 @@ type peerSessionParamsSource interface {
 // request received at rxAt: the intervals the handler kept from the
 // request (the spec defaults when it kept none or lacks the capability),
 // the peer counted active from rxAt. matter.js creates the responder's
-// unsecured session with the peer active (UnsecuredSession.ts:30
-// `setActiveTimestamp: !isInitiator`) and adopts the initiator's
+// unsecured session with the peer active (UnsecuredSession.ts:36 at
+// db021da0, `setActiveTimestamp: !isInitiator`) and adopts the initiator's
 // parameters before it replies (PaseServer.ts:153-156,
 // CaseServer.ts:120-123), so its PBKDFParamResponse, Pake2 and Sigma2
 // retransmit at the peer's active interval (MRP.ts:181).
@@ -1672,6 +1736,62 @@ func (b *Bridge) endHandshakeOfReplacedHandler(key HandshakeKey, hash [32]byte) 
 		b.releaseCASEHandshakeEverywhere(key)
 		b.abandonHandshakeReplies(key)
 	}
+}
+
+// abortFabricHandshakes ends every CASE handshake this node answers whose
+// responder resolved fabricIndex and that no Sigma3 completed yet: its
+// record goes, what it still retransmits is dropped, and a provider's
+// adapter leaves its provider and returns its staked id. A later Sigma3 of
+// it is acknowledged and not answered ([Bridge.dropHandshakeNotBegun]).
+// connectedhomeip aborts a pending establishment on the updated fabric
+// (src/protocols/secure_channel/CASESession.h:149-153,
+// CASESession.cpp:423-433 at 6170af84); matter.js has no listener that
+// ends a handshake in flight: FabricManager.ts:401 at db021da0 emits
+// `replaced`, and its listeners are OperationalCredentialsServer.ts:596
+// (the Fabrics attribute and the commissioning state) and
+// DeviceAdvertiser.ts:80 (the operational advertisement).
+// Returns how many it ended. Review II, R2-P6-sec-2412.
+func (b *Bridge) abortFabricHandshakes(fabricIndex uint8) int {
+	type pending struct {
+		key HandshakeKey
+		seq uint64
+	}
+	var candidates []pending
+	b.mu.RLock()
+	for key, rec := range b.sigma1Replied {
+		if rec.completed == nil {
+			candidates = append(candidates, pending{key, rec.seq})
+		}
+	}
+	b.mu.RUnlock()
+	ended := 0
+	for _, c := range candidates {
+		h, provided := b.resolveCaseHandlerOf(c.key)
+		a, ok := h.(*CaseAdapter)
+		if !ok || !a.pendingOnFabric(fabricIndex) {
+			continue
+		}
+		b.mu.Lock()
+		rec, held := b.sigma1Replied[c.key]
+		gone := held && rec.seq == c.seq && rec.completed == nil
+		if gone {
+			delete(b.sigma1Replied, c.key)
+		}
+		b.mu.Unlock()
+		if !gone {
+			continue
+		}
+		b.releaseCASEHandshakeEverywhere(c.key)
+		b.abandonHandshakeReplies(c.key)
+		if provided {
+			a.handshakeFailed()
+		}
+		ended++
+		b.logger.Info("matter.rx.sc.case_aborted_fabric_updated",
+			slog.Int("fabric_index", int(fabricIndex)),
+			slog.Int("exchange_id", int(c.key.ExchangeID)))
+	}
+	return ended
 }
 
 // holdCompletedRecord keeps the record of the completed handshake key from
@@ -2192,7 +2312,7 @@ func (b *Bridge) handleSigma3OfCompleted(src net.Addr, requestHdr *message.Heade
 	// acknowledgement; the record holds until the new one is tracked.
 	release := b.holdCompletedRecord(key)
 	defer release()
-	b.abandonHandshakeReplies(key)
+	b.replaceHandshakeReplies(key)
 	h := completedCaseHandler{params: done.params}
 	return b.handleCase(src, requestHdr, proto, payload, "sigma3", h.ProcessSigma3, h)
 }
@@ -2326,7 +2446,7 @@ type SessionRegistry interface {
 // [SessionRegistry] implements to receive the bridge's outbound
 // CloseSession sender. The operational manager fires it once per
 // session before zeroising the keys on graceful teardown — the Go
-// translation of matter.js ExchangeManager.ts:693 observing
+// translation of matter.js ExchangeManager.ts:758 (at db021da0) observing
 // session.gracefulClose and shipping the report via #sendCloseSession.
 type gracefulCloseNotifierSetter interface {
 	SetGracefulCloseNotifier(fn func(sessionID uint16, sess *channel.Session))
@@ -2337,7 +2457,7 @@ type gracefulCloseNotifierSetter interface {
 // broadcast-resume trigger, fired with the fabric index after a reap /
 // eviction leaves a (fabric, peer) pair with zero live sessions
 // (matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
-// at 862ad75f).
+// at db021da0).
 type reannounceTriggerSetter interface {
 	SetReannounceTrigger(fn func(fabricIndex uint8))
 }
@@ -2470,7 +2590,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 	// Deferred: the route goes after the session, and with the session's
 	// last route a TCP connection — matter.js closes the channel from
 	// #deleteSession, after the session left the table
-	// (ExchangeManager.ts:696-713).
+	// (ExchangeManager.ts:761-779 at db021da0).
 	defer b.unbindSessionRoute(requestHdr.SessionID)
 	// Every exchange the session carried dies with it, so any timed
 	// deadline it registered can never be consumed. [Bridge.SessionClosed]
@@ -2655,10 +2775,10 @@ type serviceRetransmitter interface {
 // a session teardown left a peer of that fabric with zero live sessions,
 // so the controller rediscovers the bridge and re-establishes CASE
 // instead of showing it unresponsive. Mirrors matter.js
-// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at 862ad75f
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at db021da0
 // (sessions.deleted → advertisementForFabric(fabric).serviceDisconnected(),
 // Advertiser.ts:69-75, which starts the "reconnect" broadcast event,
-// MdnsAdvertisement.ts:132-134; a running schedule is not reset,
+// MdnsAdvertisement.ts:133-135; a running schedule is not reset,
 // Advertisement.ts:78-91): an advertiser with ServiceDisconnected
 // (mdns.Responder) runs the broadcast schedule again for that fabric's
 // operational service only; an advertiser without the events re-publishes
@@ -2748,7 +2868,7 @@ func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 // a revoked window, a commissioner that gave up — finds a fresh round
 // instead of a record announced once at the window's open. Mirrors
 // matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:152-161 at
-// 862ad75f (sessions.deleted → session.isPase →
+// db021da0 (sessions.deleted → session.isPase →
 // #startCommissioningAdvertisement, which returns without a commissioning
 // service — after exitCommissioningMode — or while closing) and
 // FailsafeCommissioningTest.ts:106-196, :198-303: exactly one round in the

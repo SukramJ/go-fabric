@@ -281,7 +281,7 @@ func TestClosePeer_NotifiesAndResumesBroadcast(t *testing.T) {
 // that pair's fabric: matter.js runs the sessions.deleted check per
 // deleted session and resumes only the session's fabric's advertisement
 // (packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at
-// 862ad75f). Two fabrics losing their peer in one sweep fire twice, one
+// db021da0). Two fabrics losing their peer in one sweep fire twice, one
 // each; two sessions of one pair fire once.
 func TestReapIdle_ReannouncePerFabricPeerPair(t *testing.T) {
 	t.Parallel()

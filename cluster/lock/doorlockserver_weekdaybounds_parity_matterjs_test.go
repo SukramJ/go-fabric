@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/door-lock/DoorLockServerTest.ts
-// at 862ad75f: describe("week day window bounds") (:937-968) inside
+// at db021da0: describe("week day window bounds") (:937-968) inside
 // "schedule-restricted access" — LockSchedule.isAccessGranted on one
 // Monday schedule, called directly as matter.js calls it
 // ([lock.IsAccessGranted], LockSchedule.ts:129-167).

@@ -17,10 +17,10 @@ import (
 )
 
 // Subscription defaults. Mirrors matter.js
-// packages/protocol/src/action/client/ClientInteraction.ts:96
-// (SUBSCRIPTION_PROCESSING_TIME = 10 s), :149 (DEFAULT_MIN_INTERVAL_FLOOR =
-// 1 s) and :157 (SUBSCRIPTION_MAX_INTERVAL_PUBLISHER_LIMIT = 60 min) at
-// 0ceb202d.
+// packages/protocol/src/action/client/ClientInteraction.ts:101
+// (SUBSCRIPTION_PROCESSING_TIME = 10 s), :165 (DEFAULT_MIN_INTERVAL_FLOOR =
+// 1 s) and :173 (SUBSCRIPTION_MAX_INTERVAL_PUBLISHER_LIMIT = 60 min) at
+// db021da0.
 const (
 	SubscriptionProcessingTime            = 10 * time.Second
 	DefaultMinIntervalFloor               = time.Second
@@ -75,8 +75,8 @@ type SubscribeRequest struct {
 	// cancelled establishment is); a later report is left unanswered and
 	// the error logged; a sustained subscription logs it, warning once,
 	// and keeps running. Mirrors matter.js's subscribe, whose updated
-	// rejection fails the establishment (ClientSubscribeTest.ts:1275-1331
-	// at 862ad75f), and
+	// rejection fails the establishment (ClientSubscribeTest.ts:1276-1332
+	// at db021da0), and
 	// SustainedSubscription.#deliver
 	// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-352).
 	Updated func(r *Report) error
@@ -132,26 +132,33 @@ type SubscribeRequest struct {
 func Interval(d time.Duration) *time.Duration { return &d }
 
 // Subscribe subscribes on a fresh exchange. Mirrors matter.js
-// ClientInteraction.subscribe (ClientInteraction.ts:978-1123) at 0ceb202d:
+// ClientInteraction.subscribe
+// (packages/protocol/src/action/client/ClientInteraction.ts:1011-1170 at
+// db021da0; review II, R2-P6-doc-2906):
 //
 //   - a request without paths is refused, more paths than the provider's
-//     subscribePathsSupported only logged (:981-989);
-//   - the peer must have a peer address (:991-994);
+//     subscribePathsSupported only logged (:1014-1022);
+//   - the peer must have a peer address (:1024-1027);
 //   - ReplaceSubscriptions closes our subscriptions with the peer first
-//     (:996-1008);
+//     (:1029-1041);
 //   - the intervals default to 1 s and 60 min, the ceiling may not be below
-//     the floor (:1010-1021), and each is at most 65535 s (Subscribe.ts:46-60);
-//   - the attempt (:1023-1078): the request with the intervals in seconds,
-//     encoded to fit one message (InteractionMessenger.ts:1052-1055); the
-//     priming report's chunks read and acknowledged (:1048,
-//     InteractionMessenger.ts:938-972) and handed to Updated; the
-//     SubscribeResponse; the subscription registered by (peer, id), its
-//     liveness timeout its maximum interval plus twice the maximum peer
-//     response time for a 10 s processing time (:1054-1063).
+//     the floor (:1043-1054), and each is at most 65535 s (Subscribe.ts:46-60
+//     at 0ceb202d);
+//   - the attempt (:1056-1125): the request with the intervals in seconds
+//     (:1074-1081), encoded to fit one message (InteractionMessenger.ts:1052-1055
+//     at 0ceb202d); the priming report's chunks read and acknowledged
+//     (:1083, InteractionMessenger.ts:938-972 at 0ceb202d) and handed to
+//     Updated; the SubscribeResponse (:1086); an attempt that fails abandons
+//     the subscription, waiting for the peer's report unless the peer or
+//     the session ended the interaction (:1087-1098); the subscription
+//     registered by (peer, id), with the maximum peer response time for the
+//     subscription processing time (:1101-1110) — its liveness timeout the
+//     maximum interval plus twice that time, as at 0ceb202d (:1054-1063
+//     there).
 //
 // ctx bounds the establishment of a plain subscription. A sustained one
 // (Sustain) is returned at once and establishes itself on its own until
-// closed (:1092-1115).
+// closed (:1139-1162).
 func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscription, error) {
 	paths := len(req.Attributes) + len(req.Events)
 	if paths == 0 {
@@ -231,7 +238,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	// A failed establishment is abandoned, not dropped: the request may
 	// have reached the peer, which may hold the subscription and send its
 	// report — unless the peer or the session ended it (ClientInteraction.ts:1084-1097
-	// at 862ad75f).
+	// at db021da0).
 	fail := func(err error) (*Subscription, error) {
 		awaitReport := !errors.Is(err, exchange.ErrTransient) && !errors.Is(err, exchange.ErrNetwork) &&
 			!errors.Is(err, exchange.ErrRetransmissionLimit) && !errors.Is(err, exchange.ErrSessionClosed) && !isStatusError(err)
@@ -281,7 +288,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 
 // abandonSubscription ends an abandoned establishment on the peer —
 // InteractionMessenger.abandonSubscription (InteractionMessenger.ts:1116-1137
-// at 862ad75f) under the interaction's closing: a report whose status is
+// at db021da0) under the interaction's closing: a report whose status is
 // owed is answered INVALID_SUBSCRIPTION; otherwise, with awaitReport, the
 // next report is awaited and answered so. A failure is logged only.
 func (c *Interaction) abandonSubscription(m *messenger, awaitReport bool) {

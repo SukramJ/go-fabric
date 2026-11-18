@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -93,7 +92,7 @@ func serveAppPipe(ctx context.Context, f *fleet, path string, logger *slog.Logge
 	}
 	go func() {
 		for ctx.Err() == nil {
-			fh, err := os.OpenFile(path, os.O_RDONLY, 0) //nolint:gosec // the operator-chosen pipe path
+			fh, err := openFIFOReader(path)
 			if err != nil {
 				logger.Warn("apppipe.open", slog.Any("err", err))
 				return
@@ -110,35 +109,79 @@ func serveAppPipe(ctx context.Context, f *fleet, path string, logger *slog.Logge
 	return nil
 }
 
-// readPipe applies the commands of one writer.
+// maxPipeLine is the longest app-pipe line readPipe applies, in bytes; a
+// longer one is logged as apppipe.error and skipped, and the writer's next
+// lines are read on (R2-P6-err-2610).
+const maxPipeLine = 64 << 10
+
+// readPipe applies the commands of one writer, line by line. A read error
+// other than the writer's close ends the writer and is logged as
+// apppipe.error, the driver's only signal.
 func readPipe(f *fleet, r io.Reader, logger *slog.Logger) {
-	sc := bufio.NewScanner(r)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
-			continue
+	br := bufio.NewReader(r)
+	for {
+		line, n, err := readPipeLine(br)
+		switch {
+		case n > maxPipeLine:
+			logger.Warn("apppipe.error", slog.Int("bytes", n), slog.String("err", fmt.Sprintf("line longer than %d bytes, skipped", maxPipeLine)))
+		case line != "":
+			applyPipeLine(f, line, logger)
 		}
-		// The camera-app's commands carry fields of other types than the
-		// generic command's (a bool Value, a ZoneId that may be a list).
-		if name, ok := pipeCommandName(line); ok && isCameraPipeCommand(name) {
-			if err := f.applyCameraPipeCommand(line); err != nil {
-				logger.Warn("apppipe.error", slog.String("name", name), slog.Any("err", err))
-				continue
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				logger.Warn("apppipe.error", slog.Any("err", err))
 			}
-			logger.Info("apppipe.applied", slog.String("name", name))
-			continue
+			return
 		}
-		var cmd pipeCommand
-		if err := json.Unmarshal([]byte(line), &cmd); err != nil {
-			logger.Warn("apppipe.error", slog.String("line", line), slog.Any("err", err))
-			continue
-		}
-		if err := f.applyPipeCommand(cmd); err != nil {
-			logger.Warn("apppipe.error", slog.String("name", cmd.Name), slog.Any("err", err))
-			continue
-		}
-		logger.Info("apppipe.applied", slog.String("name", cmd.Name))
 	}
+}
+
+// readPipeLine reads one line: its text, trimmed, and its length in bytes.
+// A line longer than maxPipeLine is read through but not kept (its text
+// empty).
+func readPipeLine(br *bufio.Reader) (line string, n int, err error) {
+	var buf []byte
+	for {
+		var chunk []byte
+		chunk, err = br.ReadSlice('\n')
+		n += len(chunk)
+		if n <= maxPipeLine {
+			buf = append(buf, chunk...)
+		} else {
+			buf = nil
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		if n > maxPipeLine {
+			return "", n, err
+		}
+		return strings.TrimSpace(string(buf)), n, err
+	}
+}
+
+// applyPipeLine applies one command line.
+func applyPipeLine(f *fleet, line string, logger *slog.Logger) {
+	// The camera-app's commands carry fields of other types than the
+	// generic command's (a bool Value, a ZoneId that may be a list).
+	if name, ok := pipeCommandName(line); ok && isCameraPipeCommand(name) {
+		if err := f.applyCameraPipeCommand(line); err != nil {
+			logger.Warn("apppipe.error", slog.String("name", name), slog.Any("err", err))
+			return
+		}
+		logger.Info("apppipe.applied", slog.String("name", name))
+		return
+	}
+	var cmd pipeCommand
+	if err := json.Unmarshal([]byte(line), &cmd); err != nil {
+		logger.Warn("apppipe.error", slog.String("line", line), slog.Any("err", err))
+		return
+	}
+	if err := f.applyPipeCommand(cmd); err != nil {
+		logger.Warn("apppipe.error", slog.String("name", cmd.Name), slog.Any("err", err))
+		return
+	}
+	logger.Info("apppipe.applied", slog.String("name", cmd.Name))
 }
 
 // pipeCommandName is a command line's Name.

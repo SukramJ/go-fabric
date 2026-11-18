@@ -173,7 +173,10 @@ func (c Config) Validate() error {
 	if c.ProductID == 0 {
 		return errors.New("endpoint: Config.ProductID must be non-zero")
 	}
-	return nil
+	// VendorName is served as every bridged endpoint's
+	// BridgedDeviceBasicInformation VendorName that states none of its
+	// own, uncut: held once here (review II, R2-P6-wire-2502, decision 201).
+	return checkBridgeVendorName(c.VendorName)
 }
 
 // Assembler turns snapshots of [Spec] values into a [Topology].
@@ -282,7 +285,7 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 	// countdown stops, and the registry stays bounded to the live
 	// topology. State of endpoints still present in `seen` is retained,
 	// keeping their version stable.
-	a.states.retain(seen)
+	a.states.retain(seen) //nolint:contextcheck // a removed endpoint's Identify tells its host to stop on a goroutine of its own, not bound by this assembly
 
 	sort.SliceStable(topology.Endpoints, func(i, j int) bool {
 		return topology.Endpoints[i].ID < topology.Endpoints[j].ID
@@ -329,6 +332,9 @@ const deviceTypeAggregator = 0x000E
 // endpoint itself removed, for a full-family composer; endpoint.parts
 // otherwise; ascending either way).
 func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *Spec, parent uint16, part bool) ([]*Endpoint, error) {
+	if err := checkBridgedInfo(spec, part); err != nil {
+		return nil, err
+	}
 	ep, err := a.buildEndpoint(ctx, scope, spec)
 	if err != nil {
 		return nil, err

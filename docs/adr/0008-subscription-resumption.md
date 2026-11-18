@@ -5,6 +5,17 @@
   [ADR 0020](./0020-commissioner-and-controller-role.md); once its stage 1
   lands, the initiator here becomes the first user of `controller/`'s
   session client. The behaviour this ADR specifies does not change.
+  Note (2026-11-18, review II, R2-P6-doc-3076, -3077, -3313): the
+  `matter_persistent_subscriptions` API was removed in v0.3.0, not only
+  deprecated (`store/schema.sql`, the table's comment). Re-establishment
+  is exercised against chip-tool (`internal/chiptool/suite_test.go`, the
+  `subscription-restart` leg) and against the matter.js controller
+  (`internal/chiptool/matterjs_test.go`, `TestMatterJSController`).
+  matter.js too drops a removed fabric's subscription rows at removal,
+  not one restart later: the fabric's sessions close (`Fabric.ts:484-487`
+  at `db021da0`), their subscriptions end (`Session.ts:331-335`,
+  `NodeSession.ts:312-322`, `ServerSubscription.ts:768-770`, `:834`) and `SubscriptionsServer.ts:168-187`
+  drops the rows.
 - **Date**: 2026-10-04
 - **Related**:
   [ADR 0003 — Sigma resumption extraction](./0003-sigma-resume-extraction.md),

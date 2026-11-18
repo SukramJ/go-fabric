@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -126,7 +127,11 @@ func (t *gitTree) content(p string) ([]string, error) {
 	}
 	data, err := t.repo.batch.show(t.sha + ":" + p)
 	if err != nil {
-		return nil, err
+		// The path is in the tree's listing (resolve reads ls-tree), so a
+		// blob that cannot be read is the clone's failure — a lazy fetch
+		// of CI's blobless clone that did not complete — never "file not
+		// found" (R2-P6-err-2812).
+		return nil, fmt.Errorf("%w: %s at %s: %w", errEnv, p, t.sha, err)
 	}
 	lines := strings.Split(string(data), "\n")
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
@@ -142,6 +147,10 @@ type catFile struct {
 	cmd *exec.Cmd
 	in  io.WriteCloser
 	out *bufio.Reader
+	// dead is the error that left the pipe out of step with its requests:
+	// every later show returns it rather than reading another object's
+	// bytes as its own.
+	dead error
 }
 
 func newCatFile(dir string) (*catFile, error) {
@@ -161,6 +170,20 @@ func newCatFile(dir string) (*catFile, error) {
 }
 
 func (c *catFile) show(obj string) ([]byte, error) {
+	if c.dead != nil {
+		return nil, c.dead
+	}
+	data, err := c.read(obj)
+	if err != nil && !errors.Is(err, errMissing) {
+		c.dead = fmt.Errorf("git cat-file --batch is out of step since %s: %w", obj, err)
+	}
+	return data, err
+}
+
+// errMissing is cat-file's "<obj> missing": the pipe stays in step.
+var errMissing = errors.New("missing")
+
+func (c *catFile) read(obj string) ([]byte, error) {
 	if _, err := fmt.Fprintln(c.in, obj); err != nil {
 		return nil, err
 	}
@@ -170,7 +193,7 @@ func (c *catFile) show(obj string) ([]byte, error) {
 	}
 	fields := strings.Fields(header)
 	if len(fields) == 2 && fields[1] == "missing" {
-		return nil, fmt.Errorf("%s: missing", obj)
+		return nil, fmt.Errorf("%s: %w", obj, errMissing)
 	}
 	if len(fields) != 3 || fields[1] != "blob" {
 		return nil, fmt.Errorf("%s: unexpected cat-file header %q", obj, strings.TrimSpace(header))
@@ -277,6 +300,20 @@ func occurrences(lines []string, ident string, loose bool) []int {
 
 var identREs = map[string]*regexp.Regexp{}
 
+// lowerCamel returns the lines that name an upper-case ident in matter.js's
+// lower camel case — the field IcacValue as icacValue, the command AddNoc as
+// "addNoc" — as a whole word or, as a loose read, the tail of a longer one.
+// It only keeps a citation (check): a name the sentence spells in Go's form
+// and the cited file in matter.js's, next to the cited line, is the same name.
+// It never makes a citation drift-checked that was not, so a common word
+// ("Write" as write) elsewhere in the file cannot turn into drift.
+func lowerCamel(lines []string, ident string) []int {
+	if ident == "" || ident[0] < 'A' || ident[0] > 'Z' {
+		return nil
+	}
+	return occurrences(lines, strings.ToLower(ident[:1])+ident[1:], false)
+}
+
 func identRE(ident string, loose bool) *regexp.Regexp {
 	key := fmt.Sprint(loose, " ", ident)
 	if re, ok := identREs[key]; ok {
@@ -322,6 +359,13 @@ type result struct {
 	ident    string
 	occ      []int
 	attached bool
+	// env is set when the cited file could not be read (errEnv): the run
+	// ends with exit 2 instead of a verdict.
+	env error
+	// commit is the full id of the matter.js commit the citation was
+	// checked at when that is its own `at <sha>` (the pin included);
+	// empty when it was checked at the pin for naming none.
+	commit string
 }
 
 // check checks one citation against t (concept v4 §A.2 step 3).
@@ -340,6 +384,10 @@ func check(t tree, c citation) result {
 	}
 	r.resolved = resolved
 	lines, err := t.content(resolved)
+	if errors.Is(err, errEnv) {
+		r.env = err // the run cannot judge this citation: exit 2
+		return r
+	}
 	if err != nil {
 		r.hard = errNotFound
 		return r
@@ -371,11 +419,22 @@ func check(t tree, c citation) result {
 		return r
 	}
 	r.checked = true
-	for _, id := range found {
-		for _, l := range occ[id] {
+	near := func(o []int) bool {
+		for _, l := range o {
 			if l >= c.Lo-driftWindow && l <= c.Hi+driftWindow {
-				return r
+				return true
 			}
+		}
+		return false
+	}
+	for _, id := range found {
+		if near(occ[id]) {
+			return r
+		}
+	}
+	for _, id := range c.Idents {
+		if id != stem && near(lowerCamel(lines, id)) {
+			return r
 		}
 	}
 	r.drift = &driftEntry{

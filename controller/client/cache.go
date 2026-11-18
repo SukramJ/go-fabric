@@ -31,6 +31,9 @@ type cache struct {
 	// ([structure.imageBytes]).
 	sizes map[uint32]int
 	bytes int
+	// total is the image's running total this cache counts in, nil while
+	// it counts in none (structure.attachCache).
+	total *int
 	// version is the cluster's DataVersion; hasVersion false is
 	// Datasource.UNKNOWN_VERSION (DatasourceCache.ts:47-48).
 	version    uint32
@@ -96,7 +99,7 @@ func (c *cache) externalSet(values map[uint32]*spec.Node, version *uint32) {
 }
 
 // externalSetUnversioned is externalSet with the version set unknown —
-// #applyUpdates' UNKNOWN_VERSION (ClientStructure.ts:674-678 at 862ad75f).
+// #applyUpdates' UNKNOWN_VERSION (ClientStructure.ts:674-678 at db021da0).
 func (c *cache) externalSetUnversioned(values map[uint32]*spec.Node) {
 	if c.erased {
 		return
@@ -110,7 +113,7 @@ func (c *cache) externalSetUnversioned(values map[uint32]*spec.Node) {
 // flush in hand lands first — and returns the store's error. Mirrors
 // matter.js DatasourceCache.forgetVersion
 // (packages/node/src/storage/client/DatasourceCache.ts:318-332 at
-// 862ad75f). The caller holds the node's lock.
+// db021da0). The caller holds the node's lock.
 func (c *cache) forgetVersion() error {
 	if c.erased {
 		return nil
@@ -143,7 +146,7 @@ func (c *cache) discard() {
 }
 
 // erase disables the cache and erases its cluster from the store
-// (DatasourceCache.ts:219-222).
+// (DatasourceCache.ts:351-354 at db021da0).
 func (c *cache) erase() {
 	c.discard()
 	if err := c.p.store.EraseCluster(c.p.nodeID, c.ep, c.cluster); err != nil {
@@ -153,6 +156,9 @@ func (c *cache) erase() {
 
 // setSize records value k's charge; 0 forgets it.
 func (c *cache) setSize(k uint32, size int) {
+	if c.total != nil {
+		*c.total += size - c.sizes[k]
+	}
 	c.bytes += size - c.sizes[k]
 	if size == 0 {
 		delete(c.sizes, k)
@@ -375,11 +381,29 @@ func (p *persister) flush() {
 			failed = append(failed, j)
 		}
 	}
-	if len(failed) == 0 {
+	if len(jobs) == 0 {
 		return
 	}
 	p.image.Lock()
 	defer p.image.Unlock()
+	// The writes ran without the node's lock: a structural change applied
+	// meanwhile erased a cluster or an endpoint from the store under it,
+	// and a write above put the erased cluster's rows back. Each such
+	// cluster is erased again here, still under flushMu, so the next load
+	// finds no cluster the peer no longer has. A module rule (review II,
+	// R2-P6-store-2307; Fable fact note fable-6b-w2 G1): matter.js's flush
+	// tests the cache's erased mark at its entry only
+	// (packages/node/src/storage/client/DatasourceCache.ts:376 at
+	// db021da0). A stop between a write and this erase still leaves the
+	// rows.
+	for _, j := range jobs {
+		if !j.c.erased {
+			continue
+		}
+		if err := p.store.EraseCluster(p.nodeID, j.c.ep, j.c.cluster); err != nil {
+			p.log.Warn("matter.controller.client.store_erase_failed", slog.Int("endpoint", int(j.c.ep)), slog.Uint64("cluster", uint64(j.c.cluster)), slog.Any("err", err))
+		}
+	}
 	for _, j := range failed {
 		if j.c.erased {
 			continue

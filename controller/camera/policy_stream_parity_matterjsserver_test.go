@@ -92,7 +92,7 @@ func envelopeOf(t *testing.T, caps videoCapabilities, limits selectedVideoCodecL
 //nolint:funlen // one subtest per ported case
 func TestComputeVideoEnvelopeParityMatterjsServer(t *testing.T) {
 	caps := spCapabilities
-	area := func(r resolution) int { return r.pixels() }
+	area := func(r resolution) int { return int(r.pixels()) }
 	t.Run("narrows by the selected codec's own level cap, not by another codec's", func(t *testing.T) {
 		e := envelopeOf(t, caps(), limitsOf(offerH265Cap8160H264Cap3600, spH265), nil)
 		if a := area(e.maxResolution); a > 8160*256 || a <= 3600*256 {

@@ -25,7 +25,7 @@ func probeAsync(ctx context.Context, c *interaction.Interaction, opts interactio
 
 // TestProbe holds Interaction.Probe to matter.js ClientInteraction.probe
 // (packages/protocol/src/action/client/ClientInteraction.ts:352-412 at
-// 862ad75f): an empty, unfiltered read on the existing session, to the
+// db021da0): an empty, unfiltered read on the existing session, to the
 // override address when one is set, true once the reports are drained and
 // false on silence, a closed interaction or an ended ctx — the session's
 // own address and liveness untouched.

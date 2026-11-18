@@ -163,3 +163,57 @@ func TestOperational_ResolveOnAClosedCache(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// TestOperational_ResolveBoundsItsHostDiscoveries: one resolution runs at
+// most maxHostDiscoveries host discoveries at once, however many SRV
+// targets without addresses the service names; a target that waited
+// starts when a place frees (review II, U3-ctl-lan-1).
+func TestOperational_ResolveBoundsItsHostDiscoveries(t *testing.T) {
+	t.Parallel()
+	n, conn, clk := testNames(t)
+	targets := []string{"t0.local", "t1.local", "t2.local", "t3.local", "t4.local", "t5.local"}
+	srvs := make([]dns.RR, 0, 1+len(targets))
+	srvs = append(srvs, srvRR(opQ, "known.local", 5540, 120, false))
+	for _, tg := range targets {
+		srvs = append(srvs, srvRR(opQ, tg, 5540, 120, false))
+	}
+	deliver(t, n, 0, srvs, aRR("known.local", "192.0.2.1", 120, true))
+	s := n.Service(opCFID, opNode)
+	defer s.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { _, err := s.Resolve(ctx); done <- err }()
+	waitFor(t, func() bool { return asked(t, conn, opQ, TypeSRV) })
+	running := func(names ...string) (n0 int) {
+		onLoop(t, n, func() {
+			for _, nm := range names {
+				if _, ok := n.solicitor.discovering[n.get(nm)]; ok {
+					n0++
+				}
+			}
+		})
+		return n0
+	}
+	if got := running(targets...); got != maxHostDiscoveries {
+		t.Fatalf("%d host discoveries running for %d targets, want %d", got, len(targets), maxHostDiscoveries)
+	}
+	if got := running("t4.local", "t5.local"); got != 0 {
+		t.Fatalf("%d of the last two targets resolving, want both waiting (targets start in SRV order)", got)
+	}
+	if asked(t, conn, "known.local", TypeA) {
+		t.Fatal("a target with an address took a place")
+	}
+	// The service now names two targets only — the known host's address
+	// leaves with its SRV, which re-reads the targets: both resolve.
+	clk.advance(n, 2*time.Second)
+	deliver(t, n, 0, []dns.RR{srvRR(opQ, "t4.local", 5540, 120, true), srvRR(opQ, "t5.local", 5540, 120, true)})
+	clk.advance(n, time.Second)
+	waitFor(t, func() bool { return running("t4.local", "t5.local") == 2 })
+	if got := running(targets[:4]...); got != 0 {
+		t.Fatalf("%d discoveries left for targets no longer named", got)
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+}

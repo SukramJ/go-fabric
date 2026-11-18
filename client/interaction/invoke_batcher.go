@@ -17,7 +17,7 @@ import (
 
 // maxCommandRef is the highest command reference the batcher hands out
 // before it wraps to 1 — matter.js MAX_COMMAND_REF
-// (packages/protocol/src/action/client/ClientInteraction.ts:98 at 862ad75f).
+// (packages/protocol/src/action/client/ClientInteraction.ts:98 at db021da0).
 const maxCommandRef = 0xffff
 
 // pathsPerInvoker is a provider that knows the peer's MaxPathsPerInvoke —
@@ -119,7 +119,7 @@ func (p *pendingCommand) finish(res Result, answered bool, err error) {
 
 // invokeBatched queues one command for the batch of its lane and waits for
 // its answer — matter.js ClientInteraction.#invokeWithBatching
-// (ClientInteraction.ts:744-818 at 862ad75f):
+// (ClientInteraction.ts:744-818 at db021da0):
 //
 //   - a closed interaction refuses, and an already-aborted ctx fails
 //     before anything is queued (:745-751);

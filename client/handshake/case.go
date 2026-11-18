@@ -77,19 +77,19 @@ type CASEOptions struct {
 // CASE establishes a CASE session with node peerNodeID of fabric at addr,
 // on a fresh exchange over a new unsecured session of mgr, and returns
 // the secure session, registered with mgr, and whether it was resumed.
-// Mirrors matter.js packages/protocol/src/session/case/CaseClient.ts:54-382
-// (pair, #doPair) at 0ceb202d:
+// Mirrors matter.js packages/protocol/src/session/case/CaseClient.ts:54-385
+// (pair, #doPair) at db021da0:
 //
 //  1. a free session id; with a resumption record for (fabric, peer)
 //     Sigma1 offers resumption, otherwise it is the plain Sigma1, the
 //     destination id the fabric's for the peer and the random
-//     (:118-164) — secure/sigma's peer initiator builds both;
-//  2. Sigma2Resume (:168-233): refused without a record; the peer's
+//     (:119-165) — secure/sigma's peer initiator builds both;
+//  2. Sigma2Resume (:169-234): refused without a record; the peer's
 //     parameters are the unsecured session's overlaid by the record's
 //     and by the responder's; the resume MIC is checked; the session
 //     salt uses the old resumption id and the record takes the new one;
 //     Success is sent and a failure to send it only logged;
-//  3. Sigma2 (:234-367): the responder's parameters become the unsecured
+//  3. Sigma2 (:235-370): the responder's parameters become the unsecured
 //     session's timing; the NOC must name the expected node on our
 //     fabric and its chain verify (an ICAC's fabric must match the NOC's,
 //     mattercert's chain check, so the fabric's); Sigma3 and the Success
@@ -99,11 +99,11 @@ type CASEOptions struct {
 //     new record with the responder's resumption id and those CATs
 //     (:360-366);
 //  4. the record is saved after the session exists, a failure only
-//     logged (:369-381).
+//     logged (:372-384).
 //
 // On an error InvalidParam is sent unless ctx was cancelled, our last
 // message is unacknowledged, or the error is a network, transient or
-// retransmission-limit one (:83-99).
+// retransmission-limit one (:85-101).
 func CASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, fabric Fabric, peerNodeID uint64, opts CASEOptions) (*exchange.Session, bool, error) {
 	log := opts.Logger
 	if log == nil {

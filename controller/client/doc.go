@@ -46,11 +46,14 @@
 // a time, culls expired commissionable nodes and addresses, and reacts to
 // the peer's BasicInformation leave, shutDown and startUp. A node's
 // commissioning record ([Record]) is stored beside its settings.
-// controller/client/sqlstore is a durable [Store].
+// controller/client/sqlstore is a durable [Store]. Each node the registry
+// holds has an [ICDClient] ([Node.ICD]): the controller's Check-In
+// registration on an ICD peer, its receipt of the peer's Check-Ins, the
+// key refresh and the peer's wakefulness.
 //
 // # Not here
 //
-// Groups, ICD clients, split commissioning, matter.js's discovery runners
+// Groups, split commissioning, matter.js's discovery runners
 // (the host runs discovery.Scanner and hands the registry a device), TCP
 // and the transport preference, matter.js's remote API
 // (applyWireChanges), writes through the cache (RemoteWriter.ts) and

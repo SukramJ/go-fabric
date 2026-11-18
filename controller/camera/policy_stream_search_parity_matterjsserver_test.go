@@ -394,7 +394,7 @@ func TestVideoWindowSearchBudgetParityMatterjsServer(t *testing.T) {
 	// Not even 640x360 at 7 fps fits at first, so the budget cannot pick a
 	// window.
 	t.Run("after making room, asks a smaller size the budget now carries instead of making room again", func(t *testing.T) {
-		free, rooms := 1000000, 0
+		free, rooms := int64(1000000), 0
 		fits := func(w videoEnvelope) bool { return encodedPixelRate(w) <= free }
 		asked, _, _ := walk(t, searchPlan(), func(w videoEnvelope) cameraAnswer {
 			if fits(w) {
@@ -578,7 +578,7 @@ func TestVideoWindowSearchParityMatterjsServer(t *testing.T) {
 			switch {
 			case w.minFrameRate != w.maxFrameRate,
 				w.maxFrameRate < 20 || w.maxFrameRate > 50,
-				w.maxFrameRate*w.maxResolution.pixels() > 1920*1080*40,
+				int64(w.maxFrameRate)*w.maxResolution.pixels() > 1920*1080*40,
 				w.minBitRate != 3000000,
 				w.maxBitRate < 3000000 || w.maxBitRate > 6000000,
 				w.maxResolution.width < 1280 || w.maxResolution.width > 1920,

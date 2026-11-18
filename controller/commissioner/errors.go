@@ -6,6 +6,9 @@ package commissioner
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
@@ -14,7 +17,7 @@ import (
 
 // The classes of commissioning failure — matter.js CommissioningError
 // (packages/protocol/src/peer/CommissioningError.ts:14) and its subclasses
-// of ControllerCommissioningFlow.ts:223-254 at 0ceb202d. A
+// of ControllerCommissioningFlow.ts:224-255 at db021da0. A
 // [*CommissioningError] carries one as its Kind; errors.Is matches the
 // kind and, for every kind, [ErrCommissioning].
 var (
@@ -45,8 +48,8 @@ var (
 	// and the policy (Options.OnAttestationFailure) rejected them, or a
 	// chain the validator refused was not accepted — the two throws of
 	// matter.js's #deviceAttestation after #resolveAttestationFindings
-	// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1306-1315
-	// at 862ad75f). matter.js names no class of its own for it (the error
+	// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1320-1329
+	// at db021da0). matter.js names no class of its own for it (the error
 	// is a CommissioningError or the validator's DeviceAttestationError);
 	// errors.Is matches this sentinel besides the error matter.js throws,
 	// whose message the error keeps. A policy function's own error is
@@ -101,7 +104,7 @@ func (e *CommissioningError) Unwrap() []error {
 // refused: ArmFailSafe, SetRegulatoryConfig, SetTCAcknowledgements or
 // CommissioningComplete answered with an ErrorCode other than OK. It is
 // matter.js's CommissioningError of #ensureGeneralCommissioningSuccess
-// (ControllerCommissioningFlow.ts:712-719 at 0ceb202d), its message
+// (ControllerCommissioningFlow.ts:712-719 at db021da0), its message
 // unchanged, with the command and the code as data: errors.As finds it,
 // and it unwraps to that [*CommissioningError] of kind
 // [ErrCommissioning]. A device that requires terms and conditions answers
@@ -122,7 +125,7 @@ type GeneralCommissioningError struct {
 func (e *GeneralCommissioningError) message() string {
 	msg := fmt.Sprintf("Commission error for %q: %s (%d)", e.Command, enumName(gencomm.CommissioningErrorEnumDef, uint64(e.Code)), e.Code)
 	if e.DebugText != "" {
-		msg += ", " + e.DebugText
+		msg += ", " + deviceText(e.DebugText)
 	}
 	return msg
 }
@@ -238,4 +241,30 @@ func isCommissioningError(err error) bool {
 func isStatusError(err error) bool {
 	var se *interaction.StatusError
 	return errors.As(err, &se)
+}
+
+// maxDeviceText is the most of a device's string an error message carries,
+// in bytes: the NOC response's DebugText bound (wire.go), which the
+// generated decoders of the other responses do not all apply.
+const maxDeviceText = 128
+
+// deviceText is a string a device sent — a DebugText — made fit for an
+// error message the host may print anywhere: cut at [maxDeviceText]
+// bytes, and quoted with Go's escapes when it holds a control character
+// or is not valid UTF-8, so no raw byte of it reaches a terminal or a log
+// line. Plain printable text stays as it is, the message shape the parity
+// tests pin (review II, R2-P6-sec-1861).
+func deviceText(s string) string {
+	cut := len(s) > maxDeviceText
+	if cut {
+		s = s[:maxDeviceText]
+	}
+	plain := utf8.ValidString(s) && !strings.ContainsFunc(s, func(r rune) bool { return !strconv.IsPrint(r) })
+	if !plain {
+		s = strconv.Quote(s)
+	}
+	if cut {
+		s += "…"
+	}
+	return s
 }

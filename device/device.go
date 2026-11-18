@@ -85,8 +85,24 @@ type Device struct {
 	hosted map[uint32]bool
 	ports  map[uint32]any
 
+	// bindings are the subscriptions the device's servers hold on host
+	// ports (defaultBuild.bind), set once at New. life serialises start,
+	// stop and subscribe; running is whether the device runs on a node
+	// (its queue), subscribed whether the bindings are subscribed, and
+	// unbind undoes them.
+	bindings   []func() func()
+	life       sync.Mutex
+	running    bool
+	subscribed bool
+	unbind     []func()
+
+	// owner is the device d is a part of ([Device.AddPart]), nil for a
+	// device the host adds itself; written under composeMu.
+	owner atomic.Pointer[Device]
+
 	// mu guards parts, host and the host statements of opts (Name,
-	// DeviceAddress, ChannelAddress: Rename, Update).
+	// DeviceAddress, ChannelAddress: Rename, Update); parts change only
+	// under composeMu too.
 	mu    sync.Mutex
 	parts []*Device
 	host  deviceseam.Host
@@ -142,9 +158,16 @@ var assemblerMounted = map[uint32]string{
 // and returns the same error. A level is an operator's setting; the host
 // decides what to show.
 //
+// New reads the servers it built: the attributes a value is required of
+// (decision 17) and the ones that start at their select default are read
+// through each server's MatterRead. A kit server backed by a declared host
+// port (a valve's or a fan's state source, …) answers that read from the
+// port, so a port the host declares is called from New and must answer
+// then, without blocking (R2-P6-api-2517).
+//
 // Mirrors matter.js's construction of an Endpoint from its generated
 // MutableEndpoint type (packages/node/src/devices/dimmable-light.ts:103-116,
-// packages/node/src/endpoint/Endpoint.ts:596-637).
+// packages/node/src/endpoint/Endpoint.ts:596-637 at db021da0).
 func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: no device type", ErrConfiguration)
@@ -256,12 +279,34 @@ func buildDevice(t *Type, opts Options, s *settings) (*Device, error) {
 	}
 
 	d.ports = maps.Clone(s.ports)
+	d.bindings = s.bindings
 	if d.identify, err = newIdentifyHandlers(s); err != nil {
 		return nil, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	d.report.Effective = d.effective()
 	d.report.Decisions = append(d.report.Decisions, opts.Surface.ServerInternal(d.report.Effective.Endpoints[0], s.candidates)...)
+	d.subscribe() // the device is built: nothing after this refuses it
 	return d, nil
+}
+
+// withMandatedElements adds the attributes, commands and events the
+// device type's requirement mandates to opts.
+func withMandatedElements(r *ClusterRequirement, opts spec.Options) spec.Options {
+	for _, e := range r.Elements {
+		if e.Presence != PresenceMandatory {
+			continue
+		}
+		switch e.Element {
+		case schema.RequirementAttribute:
+			opts.Attributes = append(opts.Attributes, e.ID)
+		case schema.RequirementCommand:
+			opts.Commands = append(opts.Commands, e.ID)
+		case schema.RequirementEvent:
+			opts.Events = append(opts.Events, e.ID)
+		default:
+		}
+	}
+	return opts
 }
 
 // identifyClusterID is Identify (identify.element.ts, 0x0003).
@@ -402,20 +447,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		opts.Commands = append(opts.Commands, extra.Commands...)
 		opts.Events = append(opts.Events, extra.Events...)
 	}
-	for _, e := range r.Elements {
-		if e.Presence != PresenceMandatory {
-			continue
-		}
-		switch e.Element {
-		case schema.RequirementAttribute:
-			opts.Attributes = append(opts.Attributes, e.ID)
-		case schema.RequirementCommand:
-			opts.Commands = append(opts.Commands, e.ID)
-		case schema.RequirementEvent:
-			opts.Events = append(opts.Events, e.ID)
-		default:
-		}
-	}
+	opts = withMandatedElements(r, opts)
 	// Without the elements the surface policies removed (compose).
 	opts = s.cut.trim(r.ID, opts)
 	inst, err := spec.New(def, opts)
@@ -438,9 +470,11 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		// whole Initial (review II, R2-P5-apidev-10: the media and camera
 		// kit servers dropped it before).
 		heldInitial := maps.Clone(initial)
+		var bindings []func() func()
 		srv, err := factory(defaultBuild{
 			def: def, opts: opts, clock: s.clock, sibling: sibling, deviceType: uint16(t.ID), key: s.key, logger: s.logger,
 			ports: s.ports[r.ID], transitions: s.transitions[r.ID], initial: heldInitial,
+			bind: func(subscribe func() func()) { bindings = append(bindings, subscribe) },
 		})
 		if err == nil {
 			err = checkSelection(r.Name, srv, opts)
@@ -451,6 +485,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 		switch {
 		case err == nil:
 			fillSelectDefaults(def, srv)
+			s.bindings = append(s.bindings, bindings...)
 			return srv, nil
 		case !errors.Is(err, ErrSelectionNotServed):
 			return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
@@ -469,7 +504,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
-	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d). Its state
+	// (ValidatedElements.ts:341-343, :361-368 at db021da0). Its state
 	// starts where matter.js's does: the default server's initialize
 	// values, then SelectDefaultValue for what is still unset
 	// (defaults_fallback.go).
@@ -570,7 +605,7 @@ func powerSource(cfg *spec.ServerConfig, features uint32, self func() (uint16, b
 
 // powerSourceDefaults fills what matter.js's PowerSourceServer.initialize
 // sets when the state leaves it unset (packages/node/src/behaviors/power-source/PowerSourceServer.ts:37-62
-// at 862ad75f): Status Unspecified; Description "Mains power" with WIRED,
+// at db021da0): Status Unspecified; Description "Mains power" with WIRED,
 // else "Battery power" with BAT; with BAT, BatChargeLevel Ok and
 // BatReplaceability Unspecified; with WIRED, WiredCurrentType AC.
 func powerSourceDefaults(features uint32, initial map[uint32]any) {
@@ -602,8 +637,8 @@ func powerSourceDefaults(features uint32, initial map[uint32]any) {
 // endpoints a bridged device's power source feeds are its own, unless the
 // declaration's Initial names them. matter.js's PowerSourceServer sets no
 // EndpointList (packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63
-// at 862ad75f), and the model makes EndpointList mandatory
-// (power-source-cluster.element.ts:130 at 862ad75f), so the application
+// at db021da0), and the model makes EndpointList mandatory
+// (power-source-cluster.element.ts:130 at db021da0), so the application
 // fills it; the kit fills it as the measurement-projected server does
 // (cluster/measurement SetEndpoint).
 type ownEndpointList struct{ self func() (uint16, bool) }
@@ -724,13 +759,34 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // (its deviceType requirements, schema.DeviceTypeDefinitionOf, through its
 // base types), except under a BridgedNode, whose "Separate Endpoints"
 // pattern hosts any application device type on descendants
-// (packages/node/src/endpoints/bridged-node.ts:39-73).
+// (packages/node/src/endpoints/bridged-node.ts:39-73 at db021da0).
+//
+// A part of another device moves while it is bound to no running node:
+// it leaves its former owner's parts — and that owner's node, which has
+// not started — and is bound with d to d's node, or waits unbound until d
+// is added. The bookkeeping mirrors matter.js's owner setter, which
+// removes the endpoint from its former owner's container before it adds
+// it to the new one (packages/node/src/endpoint/Endpoint.ts:706-725 at
+// db021da0); matter.js completes that move only while the endpoint is not
+// initialised. A part bound to a running node is refused with
+// [ErrComposition] and stays with its former owner, nothing moved: matter.js
+// refuses the move of a live endpoint too — the add starts its
+// construction (Parts.ts:64-70), which an active one refuses
+// (packages/general/src/util/Construction.ts:284-287) — and Go keeps the
+// state clean where matter.js's owner setter leaves the endpoint without
+// an owner (packages/node/src/endpoint/Endpoint.ts:719-723; R2-P6-fsm-2501,
+// decision 225). The node counts as running from before its first
+// snapshot (deviceseam.Composing), so no move lands between that snapshot and the node's start. Every refusal comes
+// before the move, so a refused AddPart leaves p with its former owner, as
+// matter.js's parts.add checks before it adds (Parts.ts:45-59); nothing
+// after the move can fail, so p is never half-owned. A device a node holds
+// as a bridged device is the Aggregator's, which AddPart does not change:
+// it is refused with [ErrAddedElsewhere] (node.Aggregator.Remove it
+// first). A part already d's is left as it is. A callback on p's queue
+// must not move p: the move waits for p's queue to run what it holds.
 func (d *Device) AddPart(p *Device) error {
 	if p == nil {
 		return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
-	}
-	if p == d || p.contains(d) {
-		return fmt.Errorf("%w: %s: a part may not contain its owner", ErrComposition, d.typ.Name)
 	}
 	if p.bridgedPowerSource {
 		return fmt.Errorf("%w: %s: the part %s declares PowerSource, which BridgedNode allows on a bridged device under BridgedPowerSourceInfo; a part is no bridged node",
@@ -740,17 +796,51 @@ func (d *Device) AddPart(p *Device) error {
 		return fmt.Errorf("%w: %s (%s) states no component device type %s; its parts must be device types its requirements name",
 			ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
 	}
-	d.mu.Lock()
-	if slices.Contains(d.parts, p) {
-		d.mu.Unlock()
+	composeMu.Lock()
+	if p == d || p.contains(d) {
+		composeMu.Unlock()
+		return fmt.Errorf("%w: %s: a part may not contain its owner", ErrComposition, d.typ.Name)
+	}
+	former := p.owner.Load()
+	if former == d {
+		composeMu.Unlock()
 		return nil
 	}
+	if former == nil && p.hostOf() != nil {
+		composeMu.Unlock()
+		return fmt.Errorf("%w: %s is a bridged device of a node; remove it from the Aggregator before it becomes a part", ErrAddedElsewhere, p.opts.StableKey)
+	}
+	if h := p.hostOf(); h != nil && h.Running() {
+		composeMu.Unlock()
+		return fmt.Errorf("%w: %s is a part on a running node and does not move; move it before the node starts, or remove its owner first",
+			ErrComposition, p.opts.StableKey)
+	}
+	// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
+	if former != nil {
+		former.mu.Lock()
+		former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
+		former.mu.Unlock()
+	}
+	p.owner.Store(d)
+	d.mu.Lock()
 	d.parts = append(d.parts, p)
 	h := d.host
 	d.mu.Unlock()
-	// A part added to a device the node holds joins its lifecycle.
+	tree := p.treeLocked()
+	bound := p.hostOf() != nil
+	for _, x := range tree {
+		x.setHost(h)
+	}
+	composeMu.Unlock()
+	if bound {
+		for _, x := range tree {
+			x.stop()
+		}
+	}
 	if h != nil {
-		return p.attach(h)
+		for _, x := range tree {
+			x.start()
+		}
 	}
 	return nil
 }

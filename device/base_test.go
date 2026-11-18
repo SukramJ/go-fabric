@@ -18,7 +18,7 @@ import (
 
 // TestBaseOptionalServers: the Base device type's plain optional server
 // clusters are FixedLabel and UserLabel — matter.js
-// packages/model/src/standard/elements/base.element.ts:46-47 at 862ad75f —
+// packages/model/src/standard/elements/base.element.ts:46-47 at db021da0 —
 // read from the snapshot; Binding (:45, `Simple & Client`) is not among
 // them.
 func TestBaseOptionalServers(t *testing.T) {
@@ -103,7 +103,7 @@ func TestBaseOptionalConformsAndRefuses(t *testing.T) {
 // under the condition BridgedPowerSourceInfo are PowerSourceConfiguration
 // (`BridgedPowerSourceInfo, D`) and PowerSource (`BridgedPowerSourceInfo`) —
 // matter.js packages/model/src/standard/elements/bridged-node.element.ts:22-23
-// at 862ad75f — read from the generated type with their definitions, and
+// at db021da0 — read from the generated type with their definitions, and
 // the condition is the Base device type's (base.element.ts:40).
 func TestBridgedPowerSourceServers(t *testing.T) {
 	t.Parallel()

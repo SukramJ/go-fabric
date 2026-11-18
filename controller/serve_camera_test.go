@@ -41,7 +41,7 @@ func TestControllerServesTheCameraRequestor(t *testing.T) {
 	port := &testCameraPort{offered: make(chan wpdef.OfferArgs, 1)}
 	cam := newTestCamera(t, port)
 	// The SDP travels over TCP: a large-message command requires it
-	// (ClientInteraction.ts:1235 at 862ad75f), and a requestor refuses one
+	// (ClientInteraction.ts:1235 at db021da0), and a requestor refuses one
 	// on any other session (InvalidTransportType). matterjs-server runs its
 	// controller with TCP (ControllerNode.ts:113-114 at 0bd06f2). Both take
 	// both roles: the controller opens TCP for its ProvideOffer, the camera

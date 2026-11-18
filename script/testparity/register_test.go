@@ -13,10 +13,12 @@ package main
 import (
 	"bytes"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -241,11 +243,16 @@ const testparityLeftRatchet = 630
 // Wave W8 (#461): NetworkTopologyServiceTest.ts's five border-router cases
 // ported on thread/brdiscovery's registry, the file ported: 19 ported, 1
 // missing.
+// Review II 6b (R2-P6-conc-2210, decision 207): CameraStreamManagerTest.ts's
+// "lets an abandoned deallocate drop a lease that was only reused since"
+// left as by-design — the module cuts the give-back chain at the cleanup
+// budget instead of abandoning it (BD-matterjs-server-CameraStreamManagement):
+// 98 left.
 const (
 	serverPlannedRatchet = 0
 	serverPortedRatchet  = 19
 	serverMissingRatchet = 1
-	serverLeftRatchet    = 97
+	serverLeftRatchet    = 98
 )
 
 // moduleRoot is where the committed artefacts live, seen from this package.
@@ -323,7 +330,7 @@ func TestTestparityRegisterCoversSnapshot(t *testing.T) {
 }
 
 func TestTestparityGoReferencesResolve(t *testing.T) {
-	funcs := map[string]map[string]bool{} // package dir -> Test function names
+	funcs := map[string]map[string]string{} // package dir -> Test function names -> exclusion
 	for _, src := range sources {
 		_, reg := mustLoadSource(t, src)
 		for _, e := range reg.Entries {
@@ -332,8 +339,12 @@ func TestTestparityGoReferencesResolve(t *testing.T) {
 				if _, ok := funcs[dir]; !ok {
 					funcs[dir] = testFuncs(t, filepath.Join(moduleRoot, filepath.FromSlash(dir)))
 				}
-				if !funcs[dir][name] {
+				excluded, ok := funcs[dir][name]
+				switch {
+				case !ok:
 					t.Errorf("%s: %s — no func %s in %s/*_test.go", e.Path, ref, name, dir)
+				case excluded != "":
+					t.Errorf("%s: %s — %s is in %s, which go test on linux/amd64 without build tags does not build", e.Path, ref, name, excluded)
 				}
 			}
 		}
@@ -341,32 +352,59 @@ func TestTestparityGoReferencesResolve(t *testing.T) {
 }
 
 // testFuncs parses a package directory's _test.go files and returns its
-// top-level Test functions.
-func testFuncs(t *testing.T, dir string) map[string]bool {
+// top-level Test functions, each with "" when `go test` on CI builds its
+// file (linux/amd64, no build tags), else the file and the constraint that
+// leaves it out — a ported entry that names a test `make test` never runs
+// is no port (R2-P6-test-2810).
+func testFuncs(t *testing.T, dir string) map[string]string {
 	t.Helper()
-	names := map[string]bool{}
+	names := map[string]string{}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
 		t.Errorf("%s: %v", dir, err)
 		return names
 	}
+	ctx := build.Default
+	ctx.GOOS, ctx.GOARCH, ctx.BuildTags = "linux", "amd64", nil
 	fset := token.NewFileSet()
 	for _, ent := range ents {
 		if ent.IsDir() || !strings.HasSuffix(ent.Name(), "_test.go") {
 			continue
 		}
-		f, err := parser.ParseFile(fset, filepath.Join(dir, ent.Name()), nil, parser.SkipObjectResolution)
+		f, err := parser.ParseFile(fset, filepath.Join(dir, ent.Name()), nil, parser.SkipObjectResolution|parser.ParseComments)
 		if err != nil {
 			t.Errorf("%s: %v", ent.Name(), err)
 			continue
 		}
+		excluded := ""
+		if ok, err := ctx.MatchFile(dir, ent.Name()); err != nil {
+			t.Errorf("%s: %v", ent.Name(), err)
+		} else if !ok {
+			excluded = ent.Name() + " (" + constraint(f) + ")"
+		}
 		for _, d := range f.Decls {
 			if fn, ok := d.(*ast.FuncDecl); ok && fn.Recv == nil && strings.HasPrefix(fn.Name.Name, "Test") {
-				names[fn.Name.Name] = true
+				names[fn.Name.Name] = excluded
 			}
 		}
 	}
 	return names
+}
+
+// constraint is a file's //go:build line, or its name's GOOS/GOARCH suffix
+// when it has none.
+func constraint(f *ast.File) string {
+	for _, cg := range f.Comments {
+		if cg.Pos() > f.Package {
+			break
+		}
+		for _, c := range cg.List {
+			if strings.HasPrefix(c.Text, "//go:build ") {
+				return c.Text
+			}
+		}
+	}
+	return "its file name's GOOS/GOARCH suffix"
 }
 
 func TestTestparityPageIsCurrent(t *testing.T) {
@@ -564,14 +602,18 @@ func TestTestparitySnapshotParsing(t *testing.T) {
 		"100644 blob " + strings.Repeat("2", 40) + "\tpackages/node/test/b/helper.ts\n" +
 		"040000 tree " + strings.Repeat("3", 40) + "\tpackages/node/test/b\n" +
 		"100644 blob " + strings.Repeat("4", 40) + "\tpackages/node/test/a/ATest.ts\n"
-	files, err := parseLsTree([]byte(ls))
+	files, others, err := parseLsTree([]byte(ls))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(files) != 2 || files[0].Path != "packages/node/test/a/ATest.ts" || files[1].Path != "packages/node/test/b/ZTest.ts" {
 		t.Fatalf("parseLsTree = %+v", files)
 	}
-	if _, err := parseLsTree([]byte("garbage\n")); err == nil {
+	// The other .ts blob is handed to noUnnamedTests (R2-P6-test-2811).
+	if len(others) != 1 || others[0].Path != "packages/node/test/b/helper.ts" {
+		t.Fatalf("parseLsTree others = %+v", others)
+	}
+	if _, _, err := parseLsTree([]byte("garbage\n")); err == nil {
 		t.Error("parseLsTree accepted a malformed line")
 	}
 
@@ -683,4 +725,61 @@ func fixMeSkips(t *testing.T, root string) map[string]bool {
 		t.Fatal(err)
 	}
 	return out
+}
+
+// TestTestFuncsNameTheConstraint: a Test function in a file go test does not
+// build on CI — a //go:build ignore file, a _darwin file — is reported with
+// its constraint, so a register reference into it fails (R2-P6-test-2810).
+func TestTestFuncsNameTheConstraint(t *testing.T) {
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"a_test.go":        "package p\n\nimport \"testing\"\n\nfunc TestBuilt(t *testing.T) {}\n",
+		"b_test.go":        "//go:build ignore\n\npackage p\n\nimport \"testing\"\n\nfunc TestIgnored(t *testing.T) {}\n",
+		"c_darwin_test.go": "package p\n\nimport \"testing\"\n\nfunc TestDarwin(t *testing.T) {}\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := testFuncs(t, dir)
+	if got["TestBuilt"] != "" {
+		t.Errorf("TestBuilt excluded: %q", got["TestBuilt"])
+	}
+	if !strings.Contains(got["TestIgnored"], "//go:build ignore") {
+		t.Errorf("TestIgnored: %q, want the ignore constraint", got["TestIgnored"])
+	}
+	if !strings.Contains(got["TestDarwin"], "c_darwin_test.go") {
+		t.Errorf("TestDarwin: %q, want its file", got["TestDarwin"])
+	}
+}
+
+// TestNoUnnamedTestsReadsTheBlobs: a .ts file under the roots whose name
+// does not end in Test.ts fails the snapshot when it holds a top-level
+// describe, and passes when it holds only a helper (R2-P6-test-2811).
+func TestNoUnnamedTestsReadsTheBlobs(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("helper.ts", "export function suite() {\n    describe(\"x\", () => {});\n}\n")
+	write("spec.test.ts", "describe(\"y\", () => {});\n")
+	var ls []byte
+	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "a"}, {"ls-tree", "-r", "HEAD"}} {
+		out, err := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...).Output()
+		if err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+		ls = out
+	}
+	_, others, err := parseLsTree(ls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = noUnnamedTests(dir, others)
+	if err == nil || !strings.Contains(err.Error(), "spec.test.ts") || strings.Contains(err.Error(), "helper.ts") {
+		t.Errorf("noUnnamedTests = %v, want spec.test.ts alone", err)
+	}
 }

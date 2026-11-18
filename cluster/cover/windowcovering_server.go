@@ -594,12 +594,23 @@ func (s *WindowCoveringServer) MatterWrite(ctx context.Context, attrID uint32, v
 // write of [WindowCoveringServer.MatterWrite], changed when it moved Mode
 // or the ConfigStatus Mode drives — the attributes it notifies.
 func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	changed, err := s.MatterWriteCommit(ctx, attrID, value)
+	return len(changed) > 0, err
+}
+
+// MatterWriteCommit implements [contract.ChangeNamingWriter]: the write of
+// [WindowCoveringServer.MatterWrite], and the attributes it changed — Mode
+// when it moved and ConfigStatus when the Mode moved it; none for the Mode
+// in effect. Mirrors matter.js: a commit names a property only when its
+// value differs (packages/node/src/behavior/state/managed/Datasource.ts:1476-1481,
+// the list handed on at :1319, at db021da0; F-db021da0-57).
+func (s *WindowCoveringServer) MatterWriteCommit(ctx context.Context, attrID uint32, value any) ([]uint32, error) {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		if attrID == wcdef.AttrMode {
-			return false, windowCoveringConstraintErr{fmt.Sprintf("cover: Mode %v exceeds constraint max 15: %v", value, err)}
+			return nil, windowCoveringConstraintErr{fmt.Sprintf("cover: Mode %v exceeds constraint max 15: %v", value, err)}
 		}
-		return false, err
+		return nil, err
 	}
 	n, _ := v.(uint64) // a map8 ≤ 15 per ValidateWrite
 	mode := uint8(n)   //nolint:gosec // ≤ 15 per ValidateWrite
@@ -608,7 +619,7 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 		mode &^= calibration
 	}
 	if mode&calibration != 0 {
-		return false, windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
+		return nil, windowCoveringConstraintErr{"cover: Mode CalibrationMode: calibration not supported"}
 	}
 	// A write of the Mode in effect changes nothing and reaches no veto;
 	// the host's veto ([spec.WriteVeto.Check]) hears a change only.
@@ -616,12 +627,12 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 	held := s.wcMode == mode
 	s.mu.Unlock()
 	if held {
-		return false, nil
+		return nil, nil
 	}
 	// The veto hears the Mode the write stores — normalised, the value a
 	// read answers after it (R2-P6-api-1505).
 	if err := s.veto.Check(ctx, attrID, spec.Stored(wcdef.Definition.Attribute(attrID).Type, mode)); err != nil {
-		return false, err
+		return nil, err
 	}
 	s.mu.Lock()
 	before := s.configStatusLocked()
@@ -641,7 +652,7 @@ func (s *WindowCoveringServer) MatterWriteChanged(ctx context.Context, attrID ui
 		changed = append(changed, wcdef.AttrMode)
 	}
 	s.changes.NotifyFrom(contract.OriginControllerWrite, changed...)
-	return len(changed) > 0, nil
+	return changed, nil
 }
 
 // maintenanceErr answers a movement command in MaintenanceMode.

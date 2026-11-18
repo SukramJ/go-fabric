@@ -3,7 +3,7 @@
 
 // The icdLit routing case of matter.js
 // packages/node/test/node/client/ClientNodeInteractionIcdTest.ts:202-217 at
-// 862ad75f: a read of an await-mode LIT peer, held until the peer wakes,
+// db021da0: a read of an await-mode LIT peer, held until the peer wakes,
 // goes out through the unthrottled "icdLit" network profile
 // (ClientNodeInteraction.ts:78-81, :300-318). matter.js records the ids
 // NetworkProfiles.select is called with; Go counts the grants of the

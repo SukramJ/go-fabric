@@ -25,7 +25,8 @@ import (
 // TLV null is nil for every kind. It is the attribute-level counterpart of
 // matter.js TlvOfModel for the values the generated decoders do not cover:
 // matter.js decodes every reported attribute by its model as it arrives
-// (packages/protocol/src/action/client/InputChunk.ts:89-124 at 0ceb202d);
+// (packages/protocol/src/action/client/InputChunk.ts:299-303 at db021da0,
+// the schema of the attribute's model resolved at :105-124);
 // the controller keeps the node and decodes it here on access. A value of
 // the wrong shape is an error; constraints are not checked.
 func DecodeValue(t Type, n Node) (any, error) {
@@ -68,9 +69,9 @@ func DecodeValue(t Type, n Node) (any, error) {
 // value for an unsigned type, an unsigned one beyond int64 for a signed
 // type and every non-integer element stay as they are and are refused by
 // the strict decoder. Mirrors matter.js
-// packages/protocol/src/action/client/InputChunk.ts:42-48 at 862ad75f
+// packages/protocol/src/action/client/InputChunk.ts:42-48 at db021da0
 // (DATA_REPORT_DECODE_OPTIONS) and packages/types/src/tlv/TlvNumber.ts:124-141
-// at 862ad75f (decodeTlvInternalValue: an integer of the other signedness
+// at db021da0 (decodeTlvInternalValue: an integer of the other signedness
 // is read and checked against the schema's bounds). The server's decoders
 // (DecodeUintIn, DecodeIntIn) stay strict, as matter.js's default.
 func relaxedInteger(n Node, signed bool) Node {

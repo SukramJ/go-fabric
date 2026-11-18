@@ -102,7 +102,7 @@ type constraint struct {
 
 type feature struct {
 	Name      string `json:"name"`
-	Bit       uint   `json:"bit"`
+	Bit       *uint  `json:"bit"`
 	Effective struct {
 		Title       string       `json:"title"`
 		Conformance *conformance `json:"conformance"`
@@ -142,6 +142,14 @@ func parseSnapshot(raw []byte) (*snapshot, error) {
 		for _, a := range c.Attributes {
 			if a.Effective != nil && len(a.Effective.value.Fields) == 0 {
 				a.Effective.value.Fields = a.Effective.Fields
+			}
+		}
+		for _, f := range c.Features {
+			// Without a bit the feature would decode as bit 0
+			// (R2-P6-par-2714); one above 31 the generated Feature
+			// constant's uint32 cannot hold, which its compile refuses.
+			if f.Bit == nil {
+				return nil, fmt.Errorf("%s.%s: feature without a bit", c.Name, f.Name)
 			}
 		}
 		for _, list := range [][]*element{c.Attributes, c.Commands, c.Events} {

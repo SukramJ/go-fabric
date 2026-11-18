@@ -100,6 +100,8 @@ type central struct {
 	addresses  map[dbus.ObjectPath]string // device path → address
 	devices    map[string]dbus.ObjectPath // address → device path
 	conns      map[dbus.ObjectPath]*connection
+	// connecting holds the device paths a Connect is in progress for.
+	connecting map[dbus.ObjectPath]struct{}
 	notifying  map[dbus.ObjectPath]*connection // C2 path → its connection
 	watchers   map[dbus.ObjectPath]map[chan struct{}]struct{}
 }
@@ -116,7 +118,7 @@ func newCentral(b bus, adapter dbus.ObjectPath) (*central, error) {
 	c := &central{
 		bus: b, adapter: adapter, done: make(chan struct{}), dispatched: make(chan struct{}),
 		discovered: map[string][]byte{}, addresses: map[dbus.ObjectPath]string{}, devices: map[string]dbus.ObjectPath{},
-		conns: map[dbus.ObjectPath]*connection{}, notifying: map[dbus.ObjectPath]*connection{},
+		conns: map[dbus.ObjectPath]*connection{}, connecting: map[dbus.ObjectPath]struct{}{}, notifying: map[dbus.ObjectPath]*connection{},
 		watchers: map[dbus.ObjectPath]map[chan struct{}]struct{}{},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), objectsTimeout)
@@ -472,30 +474,57 @@ func (c *central) devicePath(address string) dbus.ObjectPath {
 // left is [ErrNoMatterService] and the connection is dropped.
 func (c *central) Connect(ctx context.Context, p ble.Peripheral) (ble.Connection, error) {
 	path := c.devicePath(p.Address)
+	// The path is reserved before the bus call, so a second Connect for
+	// the same peripheral is refused while the first one connects
+	// (review II, R2-P6-conc-2016).
 	c.mu.Lock()
 	closed := c.closed
-	open := c.conns[path]
+	_, connecting := c.connecting[path]
+	open := c.conns[path] != nil || connecting
+	if !closed && !open {
+		c.connecting[path] = struct{}{}
+	}
 	c.mu.Unlock()
 	if closed {
 		return nil, errors.New("bluez: central closed")
 	}
-	if open != nil {
+	if open {
 		return nil, fmt.Errorf("bluez: %s: a connection is already open", p.Address)
 	}
+	defer func() {
+		c.mu.Lock()
+		delete(c.connecting, path)
+		c.mu.Unlock()
+	}()
 	cctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	_, err := call(cctx, c.bus, path, ifaceDevice+".Connect")
 	cancel()
 	if err != nil && dbusName(err) != "org.bluez.Error.AlreadyConnected" {
+		// A Connect that ended without BlueZ's answer — the timeout, the
+		// caller's context, the bus daemon giving up — may still be
+		// carried out: the device is dropped as after a failed interview
+		// (review II, R2-P6-err-2017). A refusal BlueZ answered connected
+		// nothing.
+		if name := dbusName(err); name == "" || name == "org.freedesktop.DBus.Error.NoReply" {
+			c.disconnectDevice(ctx, path)
+		}
 		return nil, err
 	}
 	conn, err := c.interview(ctx, path)
 	if err != nil {
-		dctx, dcancel := context.WithTimeout(context.WithoutCancel(ctx), disconnectTimeout)
-		_, _ = call(dctx, c.bus, path, ifaceDevice+".Disconnect")
-		dcancel()
+		c.disconnectDevice(ctx, path)
 		return nil, err
 	}
 	return conn, nil
+}
+
+// disconnectDevice is Device1.Disconnect on a fresh context bounded by
+// disconnectTimeout, its error ignored: the teardown of a Connect that
+// did not produce a connection.
+func (c *central) disconnectDevice(ctx context.Context, path dbus.ObjectPath) {
+	dctx, dcancel := context.WithTimeout(context.WithoutCancel(ctx), disconnectTimeout)
+	defer dcancel()
+	_, _ = call(dctx, c.bus, path, ifaceDevice+".Disconnect")
 }
 
 // interview waits for the resolved GATT database and finds the Matter
@@ -827,11 +856,25 @@ func (k *connection) markGone() {
 	})
 }
 
-// enqueue hands a C2 value to the delivery goroutine, starting it.
+// maxC2Queue bounds the C2 values queued for a subscriber: a peripheral
+// keeps at most the receive window the session announced unacknowledged,
+// and no window is larger than btp.MaximumWindowSize, so a queue past it
+// is a peripheral that ignores the window (review II, R2-P6-bound-2005).
+const maxC2Queue = btp.MaximumWindowSize
+
+// enqueue hands a C2 value to the delivery goroutine, starting it. A
+// value past maxC2Queue ends the connection: notifications stop at once,
+// and BlueZ is asked to drop the link on a goroutine of its own, off the
+// signal loop that calls enqueue.
 func (k *connection) enqueue(v []byte) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	if k.on == nil || k.unsubscribe {
+		return
+	}
+	if len(k.queue) >= maxC2Queue {
+		k.on, k.queue, k.unsubscribe = nil, nil, true
+		go func() { _ = k.Disconnect() }()
 		return
 	}
 	k.queue = append(k.queue, append([]byte(nil), v...))

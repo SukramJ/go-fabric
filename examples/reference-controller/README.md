@@ -37,6 +37,7 @@ They go before or after the command.
 | `--node-listen <addr>` | `[::]:0` | Deprecated: accepted, without effect since v0.18.0, which retired the controller's second node — the group sender and the OTA provider use the controller's socket (`--listen`). The flag will be removed. |
 | `--timeout <duration>` | `60s` | How long a command waits for the network (a bare number is seconds). |
 | `--ca-key file:<path>` | unset | The CA root key in a passphrase-encrypted key file instead of the database; the passphrase comes from `GOFABRIC_KEY_PASSPHRASE`. A missing file is created: with the root key the database holds (which then leaves the database), or a new key for a new database. Every later run needs the flag. |
+| `--seal-key file:<path>` | unset | Seal the database's secrets at rest (`controller.Config.Sealer` with `store.NewAESGCMSealer`) under a 32-byte key kept in the named file as 64 hex digits. A missing file is created with a new random key, mode `0600`; a clear database is sealed on the way in. Every later run needs the flag and the same file — see [The database](#the-database). |
 
 A `<node>` argument is the node id, decimal or `0x` hex, or the registry's
 local id (`peer1`). A path is `<endpoint>/<Cluster>/<element>`: the cluster
@@ -256,8 +257,12 @@ key as the device's `api: encryption: key:` holds it) names an ESPHome
 Bluetooth proxy with `active: true`, and implies `--ble`.
 `--bluetooth-proxy-discover` finds the proxies over DNS-SD as well, and
 `--bluetooth-proxy-key name=key` (repeatable) gives a discovered device's key
-by its name or MAC; a device without one is used only when it answers
-plaintext. The host needs no adapter. A proxy serves one API subscriber, so the pairing takes it from Home
+by its name or MAC. A discovered device without a key is skipped (logged as
+`ble.esphome.proxy_skipped`): the plaintext API authenticates neither side,
+so any host announcing `_esphomelib._tcp` would carry the pairing.
+`--bluetooth-proxy-allow-plaintext` dials such a device anyway, over the
+plaintext API, with a warning per proxy. A proxy named with
+`--bluetooth-proxy` is used as given. The host needs no adapter. A proxy serves one API subscriber, so the pairing takes it from Home
 Assistant while it runs
 ([guide](../../docs/guides/ble-proxies.md)).
 
@@ -290,15 +295,23 @@ One SQLite file holds:
 | `matter_settings` `controller.ca` | The CA: root certificate, root key, certificate counter (JSON, matter.js `CertificateAuthority` field names). With `--ca-key` the root key is not here; `rootKeyRef` names the key file. |
 | `matter_settings` `controller.ca.fabric` | The fabric: fabric id, root node id, vendor id, IPK, fabric index, label, the controller's operational key and NOC (matter.js `Fabric.Config` names). |
 | `matter_settings` `controller.dcl.trust` | The DCL trust store, with `--dcl prod` or `testnet`. |
-| `matter_settings` `controller.group.<id>` | Each group `group create` made (key set, epoch key, members). |
+| `matter_settings` `controller.group.<id>` | Each group `group create` made (key set id, members, endpoints). The epoch key is not here: it is in the controller's key set (`matter_group_keys`). A record an earlier version wrote with an `epochKey` is rewritten without it by the next `bind --group` of that group. |
 | `matter_settings` `controller.self`, `controller.ownnode` | Only in a database from before v0.18.0: the record of the second node the tool ran then (passcode, discriminator, salt, node id). The first `group` or `ota` command removes it. |
 | `matter_client_values`, `matter_client_versions` | The client registry: every paired node's record and cached image (`controller/client/sqlstore`). |
 | `matter_group_keys`, `matter_group_key_map` | The key sets of the groups the controller sends to (`Controller.SetGroupKey`). |
+| `matter_resumption` | One CASE resumption record per node the tool had a session with: that session's shared secret, so a later run resumes instead of running full CASE (`controller.New`'s store). |
 | the other `matter_*` tables | In a database from before v0.18.0: the store of the second node the tool ran then (its fabric, keys, ACL). The migration removes that node's record and the registry's node, not these rows. |
 
-The file holds private keys: keep it as private as the devices it controls.
-CASE resumption records are kept in memory only, so the first command of a
-run makes a full CASE handshake.
+The file holds private keys and session secrets: keep it as private as the
+devices it controls. Without `--seal-key` they are in clear — the CA and
+its root key (unless `--ca-key`), the fabric's IPK and operational key, the
+group key sets and the resumption records — and the file's `0600` mode is
+all that protects them. With `--seal-key file:<path>` the controller seals
+each of them under the key in that file
+([`docs/security.md`, "Sealing at rest"](../../docs/security.md#sealing-at-rest));
+the certificates, ids and the nodes' cached attributes stay readable. Keep
+the key file off the database's disk and backup: a database sealed under it
+does not open without it.
 
 ## What leaves the host
 

@@ -220,6 +220,30 @@ func fields(b []byte, f func(field) error) error {
 	return nil
 }
 
+// shape names the wire types each field of a message may arrive in, by
+// field number: the types the message's own Marshal writes, and both
+// varint and bytes for a repeated scalar, which arrives unpacked or packed.
+type shape map[int]uint8
+
+const (
+	asVarint = 1 << wireVarint
+	asBytes  = 1 << wireBytes
+)
+
+// decode is fields for a message of shape s: a field the shape does not
+// name, or that arrives in a wire type the shape does not allow for it, is
+// skipped, as protobuf skips an unknown field — not taken as a zero value
+// or an empty entry (R2-P6-wire-2054). Every decoder goes through it
+// (TestDecodersGoThroughTheirShape).
+func decode(b []byte, s shape, f func(field) error) error {
+	return fields(b, func(fl field) error {
+		if s[fl.num]&(1<<fl.wt) == 0 {
+			return nil
+		}
+		return f(fl)
+	})
+}
+
 func (f field) u32() uint32 { return uint32(f.value) } //nolint:gosec // proto3 truncates a uint32 the same way
 
 func (f field) i32() int32 { return int32(f.value) } //nolint:gosec // proto3 int32 is the low 32 bits
@@ -273,7 +297,7 @@ func (m *HelloRequest) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *HelloRequest) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asBytes, 2: asVarint, 3: asVarint}, func(f field) error {
 		switch f.num {
 		case 1:
 			m.ClientInfo = string(f.data)
@@ -307,7 +331,7 @@ func (m *HelloResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *HelloResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint, 2: asVarint, 3: asBytes, 4: asBytes}, func(f field) error {
 		switch f.num {
 		case 1:
 			m.APIVersionMajor = f.u32()
@@ -367,7 +391,8 @@ func (m *DeviceInfoResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *DeviceInfoResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	s := shape{deviceInfoNameField: asBytes, deviceInfoMACField: asBytes, deviceInfoBluetoothProxyFeatureFlagsField: asVarint, deviceInfoBluetoothMACField: asBytes}
+	return decode(b, s, func(f field) error {
 		switch f.num {
 		case deviceInfoNameField:
 			m.Name = string(f.data)
@@ -401,11 +426,9 @@ func (m *DeviceCapabilitiesResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *DeviceCapabilitiesResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
-		if f.num != deviceCapabilitiesBluetoothProxyField || f.wt != wireBytes {
-			return nil
-		}
-		return fields(f.data, func(g field) error {
+	return decode(b, shape{deviceCapabilitiesBluetoothProxyField: asBytes}, func(f field) error {
+		s := shape{bluetoothProxyCapabilitiesFlagsField: asVarint, bluetoothProxyCapabilitiesMACField: asBytes}
+		return decode(f.data, s, func(g field) error {
 			switch g.num {
 			case bluetoothProxyCapabilitiesFlagsField:
 				m.BluetoothProxyFeatureFlags = g.u32()
@@ -436,7 +459,7 @@ func (m *SubscribeBluetoothLEAdvertisementsRequest) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *SubscribeBluetoothLEAdvertisementsRequest) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint}, func(f field) error {
 		if f.num == 1 {
 			m.Flags = f.u32()
 		}
@@ -479,12 +502,9 @@ func (m *BluetoothLERawAdvertisementsResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *BluetoothLERawAdvertisementsResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
-		if f.num != 1 || f.wt != wireBytes {
-			return nil
-		}
+	return decode(b, shape{1: asBytes}, func(f field) error {
 		var a RawAdvertisement
-		if err := fields(f.data, func(g field) error {
+		if err := decode(f.data, shape{1: asVarint, 2: asVarint, 3: asVarint, 4: asBytes}, func(g field) error {
 			switch g.num {
 			case 1:
 				a.Address = g.value
@@ -539,7 +559,7 @@ func (m *BluetoothLEAdvertisementResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *BluetoothLEAdvertisementResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint, 2: asBytes, 3: asVarint, 5: asBytes, 7: asVarint}, func(f field) error {
 		switch f.num {
 		case 1:
 			m.Address = f.value
@@ -549,7 +569,7 @@ func (m *BluetoothLEAdvertisementResponse) Unmarshal(b []byte) error {
 			m.RSSI = f.s32()
 		case 5:
 			var sd ServiceData
-			if err := fields(f.data, func(g field) error {
+			if err := decode(f.data, shape{1: asBytes, 3: asBytes}, func(g field) error {
 				switch g.num {
 				case 1:
 					sd.UUID = string(g.data)
@@ -591,7 +611,7 @@ func (m *BluetoothDeviceRequest) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *BluetoothDeviceRequest) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint, 2: asVarint, 3: asVarint, 4: asVarint}, func(f field) error {
 		switch f.num {
 		case 1:
 			m.Address = f.value
@@ -629,7 +649,7 @@ func (m *BluetoothDeviceConnectionResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *BluetoothDeviceConnectionResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint, 2: asVarint, 3: asVarint, 4: asVarint}, func(f field) error {
 		switch f.num {
 		case 1:
 			m.Address = f.value
@@ -667,7 +687,7 @@ func (m *BluetoothConnectionsFreeResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *BluetoothConnectionsFreeResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) (err error) {
+	return decode(b, shape{1: asVarint, 2: asVarint, 3: asVarint | asBytes}, func(f field) (err error) {
 		switch f.num {
 		case 1:
 			m.Free = f.u32()
@@ -763,7 +783,7 @@ func (s *GATTService) marshal() []byte {
 
 func (d *GATTDescriptor) unmarshal(b []byte) error {
 	n := 0
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint | asBytes, 2: asVarint, 3: asVarint}, func(f field) error {
 		switch f.num {
 		case 1:
 			return d.UUID.word(f, &n)
@@ -778,7 +798,7 @@ func (d *GATTDescriptor) unmarshal(b []byte) error {
 
 func (c *GATTCharacteristic) unmarshal(b []byte) error {
 	n := 0
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint | asBytes, 2: asVarint, 3: asVarint, 4: asBytes, 5: asVarint}, func(f field) error {
 		switch f.num {
 		case 1:
 			return c.UUID.word(f, &n)
@@ -801,7 +821,7 @@ func (c *GATTCharacteristic) unmarshal(b []byte) error {
 
 func (s *GATTService) unmarshal(b []byte) error {
 	n := 0
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint | asBytes, 2: asVarint, 3: asBytes, 4: asVarint}, func(f field) error {
 		switch f.num {
 		case 1:
 			return s.UUID.word(f, &n)
@@ -840,7 +860,7 @@ func (m *BluetoothGATTGetServicesResponse) Marshal() []byte {
 
 // Unmarshal decodes b.
 func (m *BluetoothGATTGetServicesResponse) Unmarshal(b []byte) error {
-	return fields(b, func(f field) error {
+	return decode(b, shape{1: asVarint, 2: asBytes}, func(f field) error {
 		switch f.num {
 		case 1:
 			m.Address = f.value
@@ -899,7 +919,14 @@ func (m *AddressHandle) Marshal() []byte {
 // Unmarshal decodes b as a message of type t.
 func (m *AddressHandle) Unmarshal(t uint16, b []byte) error {
 	m.MessageType = t
-	return fields(b, func(f field) error {
+	s := shape{1: asVarint, 2: asVarint, 3: asBytes}
+	switch t {
+	case TypeBluetoothGATTWriteRequest:
+		s[3], s[4] = asVarint, asBytes
+	case TypeBluetoothGATTNotifyRequest, TypeBluetoothGATTErrorResponse:
+		s[3] = asVarint
+	}
+	return decode(b, s, func(f field) error {
 		switch {
 		case f.num == 1:
 			m.Address = f.value
@@ -909,7 +936,7 @@ func (m *AddressHandle) Unmarshal(t uint16, b []byte) error {
 			m.Flag = f.boolean()
 		case f.num == 3 && t == TypeBluetoothGATTErrorResponse:
 			m.Error = f.i32()
-		case f.num == 3 && f.wt == wireBytes:
+		case f.num == 3:
 			m.Data = f.clone()
 		case f.num == 4 && t == TypeBluetoothGATTWriteRequest:
 			m.Data = f.clone()

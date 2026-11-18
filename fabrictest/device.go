@@ -146,7 +146,7 @@ func (s *Site) AddDevice(topo Topology) *Device {
 // until the test adds to it ([Device.Act]); a restart builds the node from
 // cfg again. matter.js's MockSite.addNode builds a plain ServerNode from the
 // test's own options in the site's environment (mock-site.ts:59-106 at
-// 862ad75f). A node that fails to build fails the test.
+// db021da0). A node that fails to build fails the test.
 func (s *Site) AddNode(cfg node.Config) *Device {
 	s.tb.Helper()
 	return s.addDevice(Topology{}, &cfg)
@@ -175,9 +175,9 @@ func (s *Site) addDevice(topo Topology, base *node.Config) *Device {
 	s.onClose(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 		defer cancel()
-		_ = d.Stop(ctx)
+		s.logTeardown(fmt.Sprintf("device %d: stop", d.index), d.Stop(ctx))
 		if db != nil {
-			_ = db.Close()
+			s.logTeardown(fmt.Sprintf("device %d: close the store", d.index), db.Close())
 		}
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
@@ -229,6 +229,19 @@ func (d *Device) startLocked(ctx context.Context) error {
 	// operational is the bridge's socket on the in-memory network, which
 	// the node's group messages leave through once it started.
 	var operational *udp.Listener
+	// A step that fails from here stops the node it built — its client
+	// socket among what node.New opened — and closes the bridge's socket,
+	// so the next Start finds the site's addresses free (R2-P6-err-2510).
+	started := false
+	defer func() {
+		if started {
+			return
+		}
+		_ = n.Stop(context.WithoutCancel(ctx))
+		if operational != nil {
+			_ = operational.Close()
+		}
+	}()
 	if nw := d.site.net; nw != nil {
 		addr := hostAddr(d.index)
 		if !bridgeseam.UseListener(n.Bridge(), func() (*udp.Listener, error) {
@@ -272,9 +285,9 @@ func (d *Device) startLocked(ctx context.Context) error {
 	}
 	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
 	if err != nil {
-		_ = n.Stop(ctx)
 		return fmt.Errorf("address: %w", err)
 	}
+	started = true
 	d.mu.Lock()
 	d.n, d.adv, d.addr, d.cfg, d.running = n, cfg.Advertiser, addr, cfg, true
 	d.mu.Unlock()
@@ -360,7 +373,7 @@ func (d *Device) siteClient(cfg *node.Config) {
 		if d.names == nil {
 			d.names = discovery.NewNames(newQueryConn(d.site), d.site.log)
 			names := d.names
-			d.site.onClose(func() { _ = names.Close() })
+			d.site.onClose(func() { d.site.logTeardown("close the DNS-SD cache", names.Close()) })
 		}
 		cfg.Client.Names = d.names
 		d.mu.Unlock()
@@ -387,7 +400,7 @@ func (d *Device) sitePeerClient(n *node.Node) {
 	if d.names == nil {
 		d.names = discovery.NewNames(newQueryConn(d.site), d.site.log)
 		names := d.names
-		d.site.onClose(func() { _ = names.Close() })
+		d.site.onClose(func() { d.site.logTeardown("close the DNS-SD cache", names.Close()) })
 	}
 	names := d.names
 	d.mu.Unlock()
@@ -521,13 +534,18 @@ func (d *Device) EndpointOf(key string) (uint16, bool) {
 // the local access matter.js's MockServerNode gives a test
 // (mock-server-node.ts): an attribute fn sets on a server is reported to
 // subscribers as a host's change is. Act does not
-// overlap Start, Stop or Restart, and returns fn's error.
+// overlap Start, Stop, Restart or FactoryReset, and returns fn's error; a
+// device that is not running is refused without fn (R2-P6-conc-2520).
+// fn must not call Start, Stop, Restart, FactoryReset, OpenWindow or Act
+// of the same device: each waits for Act to return.
 func (d *Device) Act(fn func(n *node.Node) error) error {
 	d.actMu.Lock()
 	defer d.actMu.Unlock()
-	n := d.Node()
-	if n == nil {
-		return errors.New("fabrictest: the device never started")
+	d.mu.Lock()
+	n, running := d.n, d.running
+	d.mu.Unlock()
+	if n == nil || !running {
+		return errors.New("fabrictest: the device is not running")
 	}
 	return fn(n)
 }

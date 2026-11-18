@@ -25,7 +25,7 @@ import (
 
 // Certificate ids. Mirrors matter.js
 // packages/protocol/src/certificate/CertificateAuthority.ts:52
-// (#rootCertId = 0) and :56 (#nextCertificateId = 1) at 0ceb202d.
+// (#rootCertId = 0) and :56 (#nextCertificateId = 1) at db021da0.
 const (
 	RootCertID         uint64 = 0
 	FirstCertificateID uint64 = 1
@@ -42,7 +42,13 @@ const (
 // ErrConfig is a stored CA that does not fit the configuration: its ICAC
 // presence differs from Config.IntermediateCA, or it has neither an ICAC
 // nor a root private key to sign with — matter.js ImplementationError
-// (CertificateAuthority.ts:367-373, :382-387).
+// (CertificateAuthority.ts:367-373, :382-387). It is also a stored record
+// [New] does not load and does not replace: one that is incomplete (the
+// root's key identifier or certificate missing, an ICAC with some but not
+// all of its parts), whose certificate counter would repeat a serial, or
+// whose stored root or ICAC key is not its certificate's, and one whose
+// JSON, keys or certificates do not parse (review II, R2-P6-store-1851–1853,
+// Fable read F4).
 var ErrConfig = errors.New("ca: stored credentials do not match the configuration")
 
 // ErrInvalidCATs is a CASE Authenticated Tag list GenerateNOC refuses to
@@ -264,7 +270,7 @@ type signer struct {
 }
 
 // CA is a fabric's certificate authority — matter.js CertificateAuthority
-// (CertificateAuthority.ts:50-437) at 0ceb202d. It is safe for concurrent
+// (CertificateAuthority.ts:50-437) at db021da0. It is safe for concurrent
 // use.
 type CA struct {
 	cfg Config
@@ -291,9 +297,12 @@ type CA struct {
 // New loads the CA cfg.Store holds, or creates one. Mirrors matter.js
 // CertificateAuthority.ts:149-184 (the construction): a valid stored root
 // (:336-346) is loaded (:357-389) and must agree with cfg.IntermediateCA
-// (:367-373); otherwise a P-256 root key, its SHA-1 key identifier
-// (:169-170), the RCAC (:225-249), the ICAC when configured (:251-285),
-// and the result is saved (:181-183).
+// (:367-373); with nothing stored, a P-256 root key, its SHA-1 key
+// identifier (:169-170), the RCAC (:225-249), the ICAC when configured
+// (:251-285), and the result is saved (:181-183). A stored record that is
+// not valid is [ErrConfig] and stays as it is — never replaced, as
+// matter.js replaces it; the module's own rule (review II,
+// R2-P6-store-1851, owner decision 191).
 func New(cfg Config) (*CA, error) {
 	cfg.Clock = clock.Or(cfg.Clock)
 	if cfg.Rand == nil {
@@ -306,7 +315,17 @@ func New(cfg Config) (*CA, error) {
 		if err != nil {
 			return nil, fmt.Errorf("ca: load: %w", err)
 		}
-		st, haveStored = s, ok && validStoredRoot(s)
+		if ok {
+			// A record the store holds is loaded or refused, never
+			// replaced: a new root saved over an incomplete record would
+			// destroy the key it still holds (review II, R2-P6-store-1851,
+			// owner decision 191; ahead of matter.js, whose constructor
+			// creates a new root when the stored one is not valid).
+			if err := checkStored(s); err != nil {
+				return nil, err
+			}
+			st, haveStored = s, true
+		}
 	}
 	if haveStored && cfg.DetectIntermediateCA {
 		// Mirrors matter.js packages/protocol/src/certificate/CertificateAuthority.ts:157-159
@@ -370,13 +389,34 @@ func New(cfg Config) (*CA, error) {
 
 // initVerifier builds the verifier over the root certificate, so a NOC's
 // authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:170-184 at 862ad75f).
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db021da0).
 func (c *CA) initVerifier() error {
 	v, err := mattercert.NewVerifierFromRCAC(c.rootCert, c.cfg.Clock)
 	if err != nil {
 		return fmt.Errorf("ca: root certificate: %w", err)
 	}
 	c.verifier = v
+	return nil
+}
+
+// checkStored refuses, with [ErrConfig], a stored record that is
+// incomplete — the root's key identifier or certificate missing, an ICAC
+// with some but not all of its parts — or whose certificate counter would
+// repeat a serial: below [FirstCertificateID], the root's, or not above
+// the stored ICAC's id (review II, R2-P6-store-1851, R2-P6-store-1852).
+func checkStored(s Stored) error {
+	if !validStoredRoot(s) {
+		return fmt.Errorf("%w: the stored CA is incomplete: its root key identifier or root certificate is missing", ErrConfig)
+	}
+	if s.ICAC != nil && !validStoredICAC(s) {
+		return fmt.Errorf("%w: the stored ICAC is incomplete: its key, key identifier or certificate is missing", ErrConfig)
+	}
+	if s.NextCertificateID < FirstCertificateID {
+		return fmt.Errorf("%w: the stored next certificate id %d is below %d", ErrConfig, s.NextCertificateID, FirstCertificateID)
+	}
+	if s.ICAC != nil && s.NextCertificateID <= s.ICAC.CertID {
+		return fmt.Errorf("%w: the stored next certificate id %d is not above the ICAC's id %d", ErrConfig, s.NextCertificateID, s.ICAC.CertID)
+	}
 	return nil
 }
 
@@ -421,7 +461,7 @@ func (c *CA) load(s Stored) error {
 	if s.RootKeyPair != nil && c.cfg.RootSigner == nil {
 		k, err := privateKey(s.RootKeyPair.PrivateKey)
 		if err != nil {
-			return fmt.Errorf("ca: stored root key: %w", err)
+			return fmt.Errorf("%w: stored root key: %w", ErrConfig, err)
 		}
 		c.rootKey = k
 	}
@@ -430,9 +470,14 @@ func (c *CA) load(s Stored) error {
 	c.nextID = s.NextCertificateID
 	root, err := mattercert.Decode(c.rootCert)
 	if err != nil {
-		return fmt.Errorf("ca: stored root certificate: %w", err)
+		return fmt.Errorf("%w: stored root certificate: %w", ErrConfig, err)
 	}
 	c.rootPub = root.PublicKey
+	if k, ok := c.rootKey.(*ecdsa.PrivateKey); ok && !bytes.Equal(publicKeyBytes(&k.PublicKey), c.rootPub) {
+		// A stored key that is not its certificate's would sign
+		// certificates that verify nowhere (R2-P6-store-1853 (a)).
+		return fmt.Errorf("%w: the stored root key is not the stored root certificate's", ErrConfig)
+	}
 	if c.cfg.RootSigner != nil {
 		if err := signerFor(c.cfg.RootSigner, c.rootPub, "root"); err != nil {
 			return err
@@ -451,7 +496,7 @@ func (c *CA) load(s Stored) error {
 		if c.cfg.ICACSigner != nil {
 			icac, err := mattercert.Decode(s.ICAC.CertBytes)
 			if err != nil {
-				return fmt.Errorf("ca: stored ICAC certificate: %w", err)
+				return fmt.Errorf("%w: stored ICAC certificate: %w", ErrConfig, err)
 			}
 			if err := signerFor(c.cfg.ICACSigner, icac.PublicKey, "ICAC"); err != nil {
 				return err
@@ -469,7 +514,15 @@ func (c *CA) load(s Stored) error {
 		}
 		k, err := privateKey(s.ICAC.KeyPair.PrivateKey)
 		if err != nil {
-			return fmt.Errorf("ca: stored ICAC key: %w", err)
+			return fmt.Errorf("%w: stored ICAC key: %w", ErrConfig, err)
+		}
+		icac, err := mattercert.Decode(s.ICAC.CertBytes)
+		if err != nil {
+			return fmt.Errorf("%w: stored ICAC certificate: %w", ErrConfig, err)
+		}
+		if !bytes.Equal(publicKeyBytes(&k.PublicKey), icac.PublicKey) {
+			// R2-P6-store-1853 (b).
+			return fmt.Errorf("%w: the stored ICAC key is not the stored ICAC certificate's", ErrConfig)
 		}
 		c.icac = &signer{
 			id: s.ICAC.CertID, tag: dnTagICACID, key: k,
@@ -625,10 +678,13 @@ func (c *CA) Verifier() *mattercert.Verifier { return c.verifier }
 // GenerateNOC issues a NOC for the subject key pub (65-byte uncompressed
 // P-256), on fabricID for nodeID with the CASE Authenticated Tags cats.
 // Mirrors matter.js CertificateAuthority.ts:287-320 (generateNoc) at
-// 0ceb202d: the next certificate id; issuer and signer the ICAC when there
+// db021da0: the next certificate id; issuer and signer the ICAC when there
 // is one, else the root (#getSigningParameters :411-429); subject
 // {fabricId, nodeId, caseAuthenticatedTags} in that order (the DN list
-// keeps the caller's order, kinds/definitions/operational.ts:109-110);
+// keeps the caller's order: kinds/definitions/operational.ts:111 makes it
+// a TlvDistinguishedName, whose DistinguishedNameSchema.encodeTlvInternal
+// and rdnsOfProperties keep it, kinds/DistinguishedName.ts:613-630,
+// :460-482);
 // validity −1 / +10 years; not a CA; keyUsage digitalSignature;
 // extendedKeyUsage [clientAuth, serverAuth]; SHA-1 of pub as the subject
 // key identifier and the signer's as the authority key identifier.
@@ -704,7 +760,7 @@ func KeyIdentifier(pub []byte) []byte {
 // "CompressedFabric" as info, 8 bytes. Mirrors matter.js
 // packages/types/src/datatype/GlobalFabricId.ts:11, :36-47
 // (GlobalFabricId.compute; DataWriter is big-endian by default,
-// general/src/util/DataWriter.ts:12-18) at 0ceb202d.
+// general/src/util/DataWriter.ts:12-19) at db021da0.
 func CompressedFabricID(rootPub []byte, fabricID uint64) ([8]byte, error) {
 	var id [8]byte
 	if len(rootPub) != 65 || rootPub[0] != 0x04 {

@@ -21,8 +21,8 @@ import (
 
 // Peer is a node on one of our fabrics: its descriptor, its sessions, its
 // operational DNS-SD service and the work that keeps a session to it. It
-// is matter.js Peer (packages/protocol/src/peer/Peer.ts:64-674 at
-// 0ceb202d) without the transport preference, the BasicInformation input
+// is matter.js Peer (packages/protocol/src/peer/Peer.ts:64-675 at
+// db021da0) without the transport preference, the BasicInformation input
 // and the client interaction (stages 3 and 4); of its physical
 // properties it takes the medium ([Peer.SetMedium]) its network profile
 // is selected by. It is safe for concurrent use.
@@ -131,7 +131,7 @@ func (p *Peer) busyRemaining() time.Duration {
 // properties its network profile is selected by — matter.js
 // Peer.physicalProperties, which the client node sets
 // (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
-// 862ad75f). nil removes it: the peer's medium is unknown.
+// db021da0). nil removes it: the peer's medium is unknown.
 func (p *Peer) SetMedium(fn func() Medium) {
 	if fn == nil {
 		p.mediumOf.Store(nil)
@@ -403,6 +403,11 @@ func (p *Peer) save() {
 // parameters replace the descriptor's when it reported any (:176-178),
 // and the session leaves the peer when it begins to close (:168-174).
 func (p *Peer) addSession(s *exchange.Session) {
+	// The discovered addresses are read before the lock: the read waits
+	// for the discovery loop, and the peer's lock held across it would
+	// hold every session read behind a busy loop (review II,
+	// R2-P6-conc-2112).
+	discovered := p.service.Addresses()
 	p.mu.Lock()
 	if p.closed || slices.Contains(p.sessions, s) {
 		p.mu.Unlock()
@@ -410,12 +415,13 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.sessions = append(p.sessions, s)
 	p.busyUntil = time.Time{}
-	p.followAddressLocked(s)
+	p.followAddressLocked(s, discovered)
 	// A later move of the session — a migration, or a new exchange the
 	// node opened from another address — carries the operational address
 	// with it: matter.js Peer.ts:161-163 observes
 	// MessageChannel.networkAddressChanged, which the socket swap of
-	// ExchangeManager.ts:425-431 emits (W4-ctlnet-02).
+	// ExchangeManager.ts:484-486 at db021da0 emits (W4-ctlnet-02;
+	// R2-P6-doc-2906).
 	s.OnAddressChanged(func(*net.UDPAddr) { p.followAddress(s) })
 	// Only a known medium pads the session's exchanges: the unknown
 	// fallback would inflate every exchange of a peer never characterised
@@ -464,12 +470,14 @@ func (p *Peer) addSession(s *exchange.Session) {
 // With the address it learns the proven host, ahead of matter.js
 // (learnHostLocked). matter.js follows the address only, at the same two
 // sites (Peer.ts:142-144 and :161-163 at db021da0).
-func (p *Peer) followAddressLocked(s *exchange.Session) {
+//
+// addrs are the service's discovered addresses, read by the caller before
+// it took the lock (addSession).
+func (p *Peer) followAddressLocked(s *exchange.Session, addrs []discovery.Address) {
 	a := s.Addr()
 	if a == nil {
 		return
 	}
-	addrs := p.service.Addresses()
 	if s.Transport() == exchange.TransportTCP {
 		if len(addrs) == 0 {
 			return
@@ -512,9 +520,10 @@ func (p *Peer) learnHost(discovered []discovery.Address) {
 // followAddress makes the session's address, after a migration, the
 // operational address (Peer.ts:161-163, MessageChannel.networkAddressChanged).
 func (p *Peer) followAddress(s *exchange.Session) {
+	discovered := p.service.Addresses()
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.followAddressLocked(s)
+	p.followAddressLocked(s, discovered)
 }
 
 // removeSession drops a closing session; the set's Disconnected hook runs
@@ -582,7 +591,7 @@ func (p *Peer) HasSession() bool { return p.NewestSession() != nil }
 func (p *Peer) NewestSession() *exchange.Session { return p.newestOn(nil) }
 
 // NewestSessionOn is [Peer.NewestSession] among the sessions over t —
-// Peer.newestSession(type) (Peer.ts:581-601 at 862ad75f).
+// Peer.newestSession(type) (Peer.ts:582-602 at db021da0).
 func (p *Peer) NewestSessionOn(t exchange.Transport) *exchange.Session { return p.newestOn(&t) }
 
 // SessionFor is the newest session over the first transport
@@ -624,7 +633,7 @@ func (p *Peer) newestOn(t *exchange.Transport) *exchange.Session {
 	// The order is the monotonic reading of the last message heard
 	// (exchange.Session.ActiveMonotonic), so a wall-clock step between
 	// two sessions' traffic does not reverse it — matter.js keeps
-	// activeTimestamp on Time.nowUs (Session.ts:141-151 at 862ad75f).
+	// activeTimestamp on Time.nowUs (Session.ts:142-152 at db021da0).
 	var found *exchange.Session
 	var at time.Duration
 	for _, s := range p.Sessions() {
@@ -689,7 +698,8 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 // unreachable (we removed our fabric from it, say), without the
 // CloseSession of a graceful close. Without a cause the sessions stay.
 // Mirrors matter.js Peer.disconnect (Peer.ts:504-527), whose
-// initiateForceClose marks each session lost (NodeSession.ts:349-352).
+// initiateForceClose marks each session lost (NodeSession.ts:379-381 at
+// db021da0; R2-P6-doc-2906).
 func (p *Peer) Disconnect(ctx context.Context, cause error) {
 	p.stopConnecting(ctx)
 	if cause != nil {

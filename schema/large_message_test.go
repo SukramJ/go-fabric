@@ -55,7 +55,8 @@ func TestCommandLargeMessageMatchesSnapshot(t *testing.T) {
 				Name      string `json:"name"`
 				Direction string `json:"direction"`
 				Effective *struct {
-					Quality struct {
+					Direction string `json:"direction"`
+					Quality   struct {
 						LargeMessage bool `json:"largeMessage"`
 					} `json:"quality"`
 				} `json:"effective"`
@@ -69,7 +70,20 @@ func TestCommandLargeMessageMatchesSnapshot(t *testing.T) {
 	for _, c := range snap.Clusters {
 		want := map[uint32]string{}
 		for _, m := range c.Commands {
-			if m.Direction == "request" && m.Effective != nil && m.Effective.Quality.LargeMessage {
+			// The effective direction, as the generator selects request
+			// commands (commandDirection): a derived cluster's override
+			// states none of its own (R2-P6-sec-2701).
+			dir := m.Direction
+			if m.Effective != nil && m.Effective.Direction != "" {
+				dir = m.Effective.Direction
+			}
+			if dir != "request" {
+				continue
+			}
+			if m.Effective == nil {
+				t.Fatalf("%s.%s: request command without an effective block", c.Name, m.Name)
+			}
+			if m.Effective.Quality.LargeMessage {
 				want[m.ID] = m.Name
 			}
 		}

@@ -79,11 +79,15 @@ const (
 // from the report's acknowledgement (notes/parity/by_design.md,
 // BD-Matter-Subscription-ReportWaitBound; review II, R2-P1-req2-12).
 //
-// The peer's schedule is summed on the base interval the session lookup
-// resolves for it now (the spec idle default when it resolves none) and
-// does not switch from the peer's active to its idle interval past the
-// peer's active threshold, as matter.js's formula does: the session port
-// names one base interval, not the peer's three parameters.
+// The peer's schedule is summed with matter.js's formula for a peer
+// (MRP.ts:101-102, :198-224 at db021da0): on the peer's idle interval,
+// active interval and active threshold, starting active or idle as the
+// peer is at the send, where the session lookup states them
+// ([SessionPeerScheduleResolver]; review II, F-db021da0-13); else on the
+// one base interval it resolves now (the spec idle default when it
+// resolves none). Not in either term: the per-transmission margin a
+// tracked send may carry (outboundReliableTracker.TrackWithMargin, the
+// OTA provider link's), which the backoff amplifies.
 //
 // Over a reliable connection (TCP, BLE) no retransmission runs: the bound
 // is max(30 s, the expected processing time) plus the response buffer,
@@ -100,11 +104,16 @@ func (b *Bridge) chunkStatusResponseTimeout(route net.Addr, sessionID uint16) ti
 	if r, ok := route.(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
 		return max(chunkStatusResponseReliable, chunkStatusResponseExpectedProcessing) + chunkStatusResponseBuffer
 	}
-	base := b.outboundBaseInterval(sessionID, b.clk().Now())
-	if base <= 0 {
-		base = mrp.SessionIdleIntervalDefault
+	var peer time.Duration
+	if idle, active, threshold, peerActive, ok := b.peerSchedule(sessionID); ok {
+		peer = maxScheduleTime(idle, active, threshold, peerActive, 0)
+	} else {
+		base := b.outboundBaseInterval(sessionID, b.clk().Now())
+		if base <= 0 {
+			base = mrp.SessionIdleIntervalDefault
+		}
+		peer = maxScheduleTime(base, base, 0, false, 0)
 	}
-	peer := maxScheduleTime(base, base, 0, false, 0)
 	local := b.cfg.SessionIntervals
 	if local.Idle <= 0 {
 		local.Idle = mrp.SessionIdleIntervalDefault
@@ -117,6 +126,20 @@ func (b *Bridge) chunkStatusResponseTimeout(route net.Addr, sessionID uint16) ti
 	}
 	own := maxScheduleTime(local.Idle, local.Active, local.ActiveThreshold, true, b.LocalFixedMRPBackoff())
 	return peer + own + chunkStatusResponseExpectedProcessing + chunkStatusResponseBuffer
+}
+
+// peerSchedule is the peer's MRP schedule the session lookup states for
+// sessionID ([SessionPeerScheduleResolver]); ok false when it states none.
+func (b *Bridge) peerSchedule(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool) {
+	b.mu.RLock()
+	sessions := b.sessions
+	b.mu.RUnlock()
+	r, has := sessions.(SessionPeerScheduleResolver)
+	if !has {
+		return 0, 0, 0, false, false
+	}
+	idle, active, threshold, peerActive, ok = r.PeerMRPSchedule(sessionID)
+	return idle, active, threshold, peerActive, ok && idle > 0 && active > 0
 }
 
 // maxScheduleTime is matter.js's maxResponseTimeOf (MRP.ts:198-224 at
@@ -205,7 +228,7 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// also starts its fabric's "reconnect" broadcast so the
 		// controller finds the bridge again: matter.js
 		// packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at
-		// 862ad75f (subscriptionsChanged: operational, isTerminated and a
+		// db021da0 (subscriptionsChanged: operational, isTerminated and a
 		// fabric → #advertiseFabric(session.fabric, "reconnect"), whose
 		// Advertiser.advertise starts the fabric's advertisement,
 		// Advertiser.ts:32-43, without resetting a running schedule,
@@ -1656,8 +1679,8 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // every change it carried, with no re-queue behind it. matter.js runs
 // ongoing updates through the same chunking messenger as the initial
 // report
-// (packages/protocol/src/interaction/InteractionMessenger.ts:347
-// sendDataReport).
+// (packages/protocol/src/interaction/InteractionMessenger.ts:470
+// sendDataReport at db021da0).
 //
 // Like [Bridge.streamInitialReportChunks] it waits for the peer's IM
 // StatusResponse to each chunk but the last before sending the next — the
@@ -2063,7 +2086,7 @@ func (b *Bridge) subscribeWith(
 	// answered Busy before anything is registered or torn down (review
 	// II, R2-P1-req2-01). matter.js has no such refusal; this module's
 	// own bound refuses side-effect free, and the controller retries.
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
+	release, claimed := b.claimChunkWait(ctx, requestHdr.SessionID, true)
 	if !claimed {
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
 	}
@@ -2119,7 +2142,7 @@ func (b *Bridge) subscribeWith(
 	// goes out after the priming report, instead of falling between the
 	// read and the admission unseen. matter.js attaches the subscription's
 	// change handlers before it reads the initial report
-	// (ServerSubscription.ts:731-739 sendInitialReport at 862ad75f) and
+	// (ServerSubscription.ts:731-739 sendInitialReport at db021da0) and
 	// clears the peer's other subscriptions before that
 	// (InteractionServer.ts:647-662); the re-establishment after a restart
 	// (subscription_reestablish.go) already admits first.
@@ -2275,8 +2298,8 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 // Apple Home flags bridged sensors as "not responding" once the
 // initial ReportData expires.
 //
-// Mirrors matter.js's reactor wiring (e.g. ThermostatServer.ts:451's
-// `reactTo(...measuredValue$Changed, handler)`) translated to Go:
+// Mirrors matter.js's reactor wiring (e.g. ThermostatServer.ts:480-483 at
+// db021da0, `reactTo(...measuredValue$Changed, handler)`) translated to Go:
 // the cluster server is a struct, not a behavior with attached
 // observables, so the source notifies and the bridge looks up the
 // reportable paths via [endpoint.ReportablePaths].
@@ -2681,9 +2704,14 @@ func (b *Bridge) reportServerChange(mgr *subscription.Manager, ep *endpointpkg.E
 	}
 	// A report view's mark waits for a write applied meanwhile, the
 	// write's own change included: the write's report marks it after the
-	// dispatcher's advance (Fable read 5b-write R3).
+	// dispatcher's advance (Fable read 5b-write R3). A write's own change
+	// told by a server without a report view waits the same way: matter.js
+	// advances the version before the commit's changes are handed on
+	// (packages/node/src/behavior/state/managed/Datasource.ts:1456-1457,
+	// :1319 at db021da0), so no report carries the written value under the
+	// version from before the write (review II, F-db021da0-59).
 	if change.Origin != contract.OriginControllerWrite && (b.invokeCommits.hold(ep.ID, clusterID, attrIDs) || b.holdWritten(mgr, ep, clusterID, attrIDs, !advance)) ||
-		change.Origin == contract.OriginControllerWrite && !advance && b.holdWritten(mgr, ep, clusterID, attrIDs, true) {
+		change.Origin == contract.OriginControllerWrite && b.holdWritten(mgr, ep, clusterID, attrIDs, true) {
 		if hook := b.onAttributeChange.Load(); hook != nil {
 			(*hook)(ep.ID, clusterID, change)
 		}
@@ -3445,7 +3473,7 @@ func (e *booleanStateEvents) check() {
 // server lists the event — the OccupancyEvent feature of its selection.
 // matter.js emits it on occupancy$Changed when that feature is set
 // (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:67-74,
-// :88-90 at 862ad75f); the projected server is rebuilt on every dispatch,
+// :88-90 at db021da0); the projected server is rebuilt on every dispatch,
 // so the change is observed here, where the host's notification arrives,
 // as for BooleanState's StateChange. The device kit's server
 // (sensing.Occupancy) emits the event itself and is no

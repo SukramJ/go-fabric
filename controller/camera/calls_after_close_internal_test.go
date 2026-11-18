@@ -13,20 +13,22 @@ import (
 	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
 )
 
-// TestCallsAfterCloseAreRefused (review II, R2-P1-cam-b-04): after Close
-// the calls that would act on the camera through the detached service —
-// Provider.Send, Provider.EndSession, Snapshot, StopSession — are refused
-// with ErrClosed and send nothing. Before, a raw ProvideOffer opened a
-// session and registered it with the requestor after Close, one nothing
-// would end, and StopSession sent an EndSession and announced its end to
-// the observer of the closed service. Release stays a no-op once Close
-// ended its owner's sessions.
+// TestCallsAfterCloseAreRefused (review II, R2-P1-cam-b-04,
+// R2-P6-api-2207): after Close every call that would act on the camera
+// through the detached service — Provider.Send, Provider.EndSession,
+// Snapshot, StopSession, Capabilities, ReleaseStream, StopByKey and a
+// Session's Stop, ProvideAnswer and ProvideICECandidates — is refused with
+// ErrClosed and sends nothing. Before, a raw ProvideOffer opened a session
+// and registered it with the requestor after Close, one nothing would end,
+// StopSession sent an EndSession and announced its end to the observer of
+// the closed service, and the six later ones still reached the camera.
+// Release stays a no-op once Close ended its owner's sessions.
 func TestCallsAfterCloseAreRefused(t *testing.T) {
 	t.Parallel()
 	x := newReuseFixture(t, 42, 43)
 	var ends []SessionEnd
 	x.s.cfg.Observer.SessionEnded = func(e SessionEnd) { ends = append(ends, e) }
-	x.start(t, "a")
+	sess := x.start(t, "a")
 	if err := x.s.Close(t.Context()); err != nil {
 		t.Fatalf("close: %v", err)
 	}
@@ -53,6 +55,24 @@ func TestCallsAfterCloseAreRefused(t *testing.T) {
 	}
 	if _, err := x.s.StopSession(t.Context(), node, tEndpoint, 42, "conn-2"); !errors.Is(err, ErrClosed) {
 		t.Errorf("StopSession after Close = %v, want ErrClosed", err)
+	}
+	if _, err := x.s.Capabilities(t.Context(), node, tEndpoint); !errors.Is(err, ErrClosed) {
+		t.Errorf("Capabilities after Close = %v, want ErrClosed", err)
+	}
+	if err := x.s.ReleaseStream(t.Context(), node, tEndpoint, StreamVideo, 1); !errors.Is(err, ErrClosed) {
+		t.Errorf("ReleaseStream after Close = %v, want ErrClosed", err)
+	}
+	if _, err := x.s.StopByKey(t.Context(), node, tEndpoint, "conn-1", "a"); !errors.Is(err, ErrClosed) {
+		t.Errorf("StopByKey after Close = %v, want ErrClosed", err)
+	}
+	if _, err := sess.Stop(t.Context()); !errors.Is(err, ErrClosed) {
+		t.Errorf("Session.Stop after Close = %v, want ErrClosed", err)
+	}
+	if err := sess.ProvideAnswer(t.Context(), psAnswer); !errors.Is(err, ErrClosed) {
+		t.Errorf("Session.ProvideAnswer after Close = %v, want ErrClosed", err)
+	}
+	if err := sess.ProvideICECandidates(t.Context(), []wpdef.ICECandidateStruct{{Candidate: "candidate:1 1 UDP 1 192.0.2.1 9 typ host"}}); !errors.Is(err, ErrClosed) {
+		t.Errorf("Session.ProvideICECandidates after Close = %v, want ErrClosed", err)
 	}
 	x.s.Release(t.Context(), "conn-1")
 	if got := io.recorded()[sentBefore:]; len(got) != 0 {

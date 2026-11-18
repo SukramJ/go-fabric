@@ -19,7 +19,7 @@ import (
 // matter.js reserves an endpoint number per endpoint store: "Each number
 // is reserved for one store. An installed endpoint keeps its number"
 // (packages/node/src/storage/server/ServerEndpointStores.ts:20-22 at
-// 862ad75f), a closed endpoint keeps its reservation
+// db021da0), a closed endpoint keeps its reservation
 // (packages/node/src/node/server/ServerEndpointInitializer.ts:67-69), an
 // endpoint that returns gets its stored number back
 // (ServerEndpointStores.ts:117-123), and only an erased store frees it
@@ -80,18 +80,17 @@ func (p persisted) reserve(ctx context.Context, tree []string) error {
 	return errors.Join(errs...)
 }
 
-// release drops the reservation key holds, under every key of its tree;
-// it returns the tree (nil without a reservation).
-func (p persisted) release(ctx context.Context, key string) ([]string, error) {
+// release drops the reservation key holds, under every key of its tree.
+func (p persisted) release(ctx context.Context, key string) error {
 	tree, err := p.reservedTree(ctx, key)
 	if err != nil || tree == nil {
-		return nil, err
+		return err
 	}
 	var errs []error
 	for _, k := range tree {
 		errs = append(errs, p.st.SetSetting(ctx, endpointReservedKeyRoot+k, ""))
 	}
-	return tree, errors.Join(errs...)
+	return errors.Join(errs...)
 }
 
 // reservationOp is one change a [Batch] makes to the reservations, applied
@@ -123,8 +122,9 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 		case opReserve:
 			errs = append(errs, p.reserve(ctx, op.tree))
 		case opRelease:
-			_, err := p.release(ctx, op.key)
-			errs = append(errs, err)
+			// A returning key is no longer forgotten: a forget left half
+			// done for it must not erase it at the next New.
+			errs = append(errs, p.release(ctx, op.key), a.cancelForget(ctx, op.key))
 		case opErase:
 			errs = append(errs, a.erase(ctx, op))
 		}
@@ -139,14 +139,140 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 // tree, the tree it had in the set, and the key itself. The nonvolatile
 // persister lets go of the servers it met at those keys and erases the
 // nonvolatile values and UserLabel lists stored for them.
+//
+// A Forget is several store writes. Before the first, the keys are
+// recorded as a forget in progress (forgetPendingKey); the record goes
+// once every write landed, and the next New finishes a forget that a
+// refused write or a crash left half done ([Aggregator.finishForgets]), so
+// a key's number never survives its values and reservation (review II,
+// R2-P6-store-2406). A store that refuses the record changes nothing.
 func (a *Aggregator) erase(ctx context.Context, op reservationOp) error {
-	tree, err := a.n.persisted.release(ctx, op.key)
-	keys := slices.Concat([]string{op.key}, op.tree, tree)
-	forgetErr := a.n.nonVolatile.forget(ctx, keys)
+	reserved, err := a.n.persisted.reservedTree(ctx, op.key)
 	if err != nil {
-		return errors.Join(err, forgetErr)
+		return err
 	}
-	return errors.Join(forgetErr, a.removeRecords(ctx, "", keys))
+	keys := slices.Compact(slices.Sorted(slices.Values(slices.Concat([]string{op.key}, op.tree, reserved))))
+	if err := a.markForget(ctx, keys, true); err != nil {
+		return err
+	}
+	return a.forgetKeys(ctx, keys)
+}
+
+// forgetKeys is erase's writes for keys, recorded as a forget in progress:
+// the reservations released, the values erased, the endpoint records
+// removed — and then the record of the forget. A refused release leaves
+// the records, as before, for the forget's next run.
+func (a *Aggregator) forgetKeys(ctx context.Context, keys []string) error {
+	var errs []error
+	for _, k := range keys {
+		if err := a.n.persisted.release(ctx, k); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	released := len(errs) == 0
+	errs = append(errs, a.n.nonVolatile.forget(ctx, keys))
+	if released {
+		errs = append(errs, a.removeRecords(ctx, "", keys))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	return a.markForget(ctx, keys, false)
+}
+
+// finishForgets runs again every forget a refused write or a crash left
+// half done (erase), at New, before the host adds anything.
+func (a *Aggregator) finishForgets(ctx context.Context) error {
+	pending, err := a.n.persisted.pendingForgets(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, keys := range pending {
+		errs = append(errs, a.forgetKeys(ctx, keys))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("node: finish a forget: %w", err)
+	}
+	return nil
+}
+
+// forgetPendingKey is the setting the forgets in progress are recorded
+// under: a JSON list of their key sets.
+const forgetPendingKey = "aggregator.forget_pending"
+
+// pendingForgets returns the key sets of the forgets in progress.
+func (p persisted) pendingForgets(ctx context.Context) ([][]string, error) {
+	v, ok, err := p.st.GetSetting(ctx, forgetPendingKey)
+	if err != nil {
+		return nil, fmt.Errorf("node: load %s: %w", forgetPendingKey, err)
+	}
+	if !ok || v == "" {
+		return nil, nil
+	}
+	var pending [][]string
+	if err := json.Unmarshal([]byte(v), &pending); err != nil {
+		return nil, fmt.Errorf("node: %s: %w", forgetPendingKey, err)
+	}
+	return pending, nil
+}
+
+// cancelForget drops key from every forget in progress (and a forget left
+// with no key): a key added again after a forget that did not finish is
+// the new device's, and the next New finishing that forget must not erase
+// it (review II, R2-P6-store-2406, coordinator decision on facade Q3).
+func (a *Aggregator) cancelForget(ctx context.Context, key string) error {
+	a.forgetMu.Lock()
+	defer a.forgetMu.Unlock()
+	pending, err := a.n.persisted.pendingForgets(ctx)
+	if err != nil || len(pending) == 0 {
+		return err
+	}
+	changed := false
+	kept := pending[:0]
+	for _, keys := range pending {
+		if i := slices.Index(keys, key); i >= 0 {
+			keys = slices.Delete(slices.Clone(keys), i, i+1)
+			changed = true
+		}
+		if len(keys) > 0 {
+			kept = append(kept, keys)
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return a.storeForgets(ctx, kept)
+}
+
+// storeForgets writes the forgets in progress; a.forgetMu is held.
+func (a *Aggregator) storeForgets(ctx context.Context, pending [][]string) error {
+	v := ""
+	if len(pending) > 0 {
+		b, err := json.Marshal(pending)
+		if err != nil {
+			return err
+		}
+		v = string(b)
+	}
+	return a.n.persisted.st.SetSetting(ctx, forgetPendingKey, v)
+}
+
+// markForget records keys as a forget in progress (on) or done (off); the
+// record is read and written under a.forgetMu.
+func (a *Aggregator) markForget(ctx context.Context, keys []string, on bool) error {
+	a.forgetMu.Lock()
+	defer a.forgetMu.Unlock()
+	p := a.n.persisted
+	pending, err := p.pendingForgets(ctx)
+	if err != nil {
+		return err
+	}
+	pending = slices.DeleteFunc(pending, func(k []string) bool { return slices.Equal(k, keys) })
+	if on {
+		pending = append(pending, keys)
+	}
+	return a.storeForgets(ctx, pending)
 }
 
 // removeRecords deletes the endpoint store's records of scope ("" is
@@ -185,7 +311,7 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 		if rec.Key == nil {
 			continue
 		}
-		if _, err := a.n.persisted.release(ctx, rec.Key.String()); err != nil {
+		if err := a.n.persisted.release(ctx, rec.Key.String()); err != nil {
 			errs = append(errs, err)
 		}
 		errs = append(errs, store.RemoveEndpoint(ctx, rec.Key))
@@ -203,7 +329,7 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 // nonvolatile attribute values the module holds and the UserLabel lists —
 // so the later Add starts from its declaration. It is the counterpart of [Aggregator.Remove], which keeps them —
 // matter.js's `delete()` beside `close()` (endpoint/Endpoint.ts:987-992,
-// :1024-1032 at 862ad75f; ServerEndpointInitializer.ts:59-65
+// :1024-1032 at db021da0; ServerEndpointInitializer.ts:59-65
 // eraseDescendant). A key no partition holds and nothing is stored for is
 // no error; a key another partition holds is [ErrUnknownKey]. A key the
 // specification level withheld loses its withheld record in
@@ -247,4 +373,91 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	}
 	b.ops = append(b.ops, op)
 	return nil
+}
+
+// splitErasures splits a batch's reservation ops into the ones applied
+// before its reassembly and the erasures of forgotten keys applied after
+// it ([Partition.Batch]); readded are the forgotten keys an Add of the
+// same batch brought back (an opRelease after the opErase).
+func splitErasures(ops []reservationOp) (pre, erase []reservationOp, readded []string) {
+	forgotten := map[string]bool{}
+	for _, op := range ops {
+		switch op.kind {
+		case opErase:
+			erase = append(erase, op)
+			forgotten[op.key] = true
+		case opRelease:
+			if forgotten[op.key] && !slices.Contains(readded, op.key) {
+				readded = append(readded, op.key)
+			}
+			pre = append(pre, op)
+		default:
+			pre = append(pre, op)
+		}
+	}
+	return pre, erase, readded
+}
+
+// heldEndpoint is an endpoint [Aggregator.holdBack] took out of its
+// partition: where it was and its device's detach.
+type heldEndpoint struct {
+	key    string
+	at     int
+	ep     Endpoint
+	detach func()
+}
+
+// holdBack takes the endpoints with keys out of scope's partition until
+// the returned restore puts them back where they were; restore reports
+// whether it put any back. A key another goroutine added meanwhile keeps
+// that endpoint, and the held one is unbound; on a stopped node nothing is
+// put back (its Stop unbound every device it held, the held ones among
+// them). nil restore for no key held.
+func (a *Aggregator) holdBack(scope string, keys []string) (restore func() bool) {
+	if len(keys) == 0 {
+		return nil
+	}
+	a.mu.Lock()
+	part := a.partLocked(scope)
+	var held []heldEndpoint
+	for _, k := range keys {
+		i := slices.IndexFunc(part.eps, func(ep Endpoint) bool {
+			ek, err := keyOf(ep.Spec())
+			return err == nil && ek == k
+		})
+		if i < 0 {
+			continue
+		}
+		held = append(held, heldEndpoint{key: k, at: i, ep: part.eps[i], detach: a.detach[k]})
+		part.eps = slices.Delete(part.eps, i, i+1)
+	}
+	a.mu.Unlock()
+	if len(held) == 0 {
+		return nil
+	}
+	return func() bool {
+		var unbind []func()
+		put := false
+		a.mu.Lock()
+		part := a.partLocked(scope)
+		for j := len(held) - 1; j >= 0; j-- {
+			h := held[j]
+			if a.closed {
+				continue
+			}
+			if p, _ := a.findLocked(h.key); p != nil {
+				unbind = append(unbind, h.detach)
+				continue
+			}
+			part.eps = slices.Insert(part.eps, min(h.at, len(part.eps)), h.ep)
+			put = true
+		}
+		a.mu.Unlock()
+		for _, d := range unbind {
+			if d != nil {
+				d()
+			}
+		}
+		return put
+	}
 }

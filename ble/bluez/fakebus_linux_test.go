@@ -48,6 +48,53 @@ type fakeBus struct {
 	// onDisconnect, when set, runs once inside the next Device1.Disconnect
 	// bluetoothd answers.
 	onDisconnect func()
+	// owner is the unique name that owns org.bluez: the sender of every
+	// call bluetoothd makes on the exported objects.
+	owner string
+	// held are calls (by method) that wait for their channel to close
+	// before bluetoothd carries them out.
+	held map[string]chan struct{}
+}
+
+// bluezSender is bluetoothd's unique name on the fake bus.
+const bluezSender = dbus.Sender(":1.7")
+
+// NameOwner implements bus: org.bluez is owned by bluetoothd.
+func (b *fakeBus) NameOwner(_ context.Context, name string) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if err, ok := b.errs["GetNameOwner"]; ok {
+		return "", err
+	}
+	if name != service {
+		return "", dbus.Error{Name: "org.freedesktop.DBus.Error.NameHasNoOwner"}
+	}
+	return b.owner, nil
+}
+
+// ownerSender is the sender of bluetoothd's calls: the owner of org.bluez.
+func (b *fakeBus) ownerSender() dbus.Sender {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return dbus.Sender(b.owner)
+}
+
+// hold makes the next calls of method wait until the returned release
+// runs; then bluetoothd carries them out.
+func (b *fakeBus) hold(method string) (release func()) {
+	ch := make(chan struct{})
+	b.mu.Lock()
+	b.held[method] = ch
+	b.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			b.mu.Lock()
+			delete(b.held, method)
+			b.mu.Unlock()
+			close(ch)
+		})
+	}
 }
 
 const testAdapter = dbus.ObjectPath("/org/bluez/hci0")
@@ -60,6 +107,8 @@ func newFakeBus() *fakeBus {
 		devices: map[dbus.ObjectPath]*fakeDevice{},
 		sigs:    make(chan *dbus.Signal, 4096),
 		exports: map[dbus.ObjectPath]map[string]map[string]any{},
+		owner:   string(bluezSender),
+		held:    map[string]chan struct{}{},
 	}
 	return b
 }
@@ -191,6 +240,7 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	if !ok {
 		err, ok = b.errs[method]
 	}
+	gate := b.held[method]
 	dev := b.devices[path]
 	if dev == nil {
 		for p, d := range b.devices {
@@ -200,6 +250,13 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 		}
 	}
 	b.mu.Unlock()
+	if gate != nil {
+		select {
+		case <-gate:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 	if ok {
 		if errors.Is(err, errHang) {
 			<-ctx.Done() // a call the daemon never answers
@@ -253,11 +310,11 @@ func (b *fakeBus) bluetoothd(path dbus.ObjectPath, method string, args []any) ([
 	switch method {
 	case ifaceGattManager + ".RegisterApplication":
 		root, _ := args[0].(dbus.ObjectPath)
-		get, ok := b.method(root, ifaceObjectMgr, "GetManagedObjects").(func() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error))
+		get, ok := b.method(root, ifaceObjectMgr, "GetManagedObjects").(func(dbus.Sender) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error))
 		if !ok {
 			return nil, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"no ObjectManager at " + string(root)}}
 		}
-		objs, derr := get()
+		objs, derr := get(b.ownerSender())
 		if derr != nil {
 			return nil, derr
 		}
@@ -270,11 +327,11 @@ func (b *fakeBus) bluetoothd(path dbus.ObjectPath, method string, args []any) ([
 		b.mu.Unlock()
 	case ifaceAdvertising + ".RegisterAdvertisement":
 		adv, _ := args[0].(dbus.ObjectPath)
-		getAll, ok := b.method(adv, ifaceProperties, "GetAll").(func(string) (map[string]dbus.Variant, *dbus.Error))
+		getAll, ok := b.method(adv, ifaceProperties, "GetAll").(func(dbus.Sender, string) (map[string]dbus.Variant, *dbus.Error))
 		if !ok {
 			return nil, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"no Properties at " + string(adv)}}
 		}
-		props, derr := getAll(ifaceAdvertise)
+		props, derr := getAll(b.ownerSender(), ifaceAdvertise)
 		if derr != nil {
 			return nil, derr
 		}
@@ -329,7 +386,7 @@ func (fc *fakeCentral) options(mtu uint16) map[string]dbus.Variant {
 	return map[string]dbus.Variant{"device": dbus.MakeVariant(fc.device), "mtu": dbus.MakeVariant(mtu), "link": dbus.MakeVariant("LE")}
 }
 
-type acquireFunc = func(map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error)
+type acquireFunc = func(dbus.Sender, map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error)
 
 // acquire calls the exported AcquireWrite (C1) or AcquireNotify (C2), as
 // bluetoothd does at the central's first write and at its subscription.
@@ -338,7 +395,7 @@ func (fc *fakeCentral) acquire(char dbus.ObjectPath, member string, mtu uint16) 
 	if !ok {
 		return nil, fmt.Errorf("%s not exported at %s", member, char)
 	}
-	fd, gotMTU, derr := f(fc.options(mtu))
+	fd, gotMTU, derr := f(bluezSender, fc.options(mtu))
 	if derr != nil {
 		return nil, derr
 	}

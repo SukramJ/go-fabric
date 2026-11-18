@@ -31,7 +31,7 @@ func TestAFabricThatFailsToLoadLeavesTheOthersServed(t *testing.T) {
 		t.Fatal(err)
 	}
 	op1, sid1 := opKeyOf(t, 0xA1)
-	if msg, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, []byte("x"))); err != nil || msg.Duplicate {
+	if msg, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, imPayload([]byte("x")))); err != nil || msg.Duplicate {
 		t.Fatalf("fabric 1's message while fabric 2 cannot load: err %v", err)
 	}
 	if err := m.Load(ctx); !errors.Is(err, errStoreDown) {

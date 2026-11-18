@@ -21,7 +21,7 @@ import (
 // icdCommands counts the RegisterClient and UnregisterClient commands the
 // device's ICDManagement server receives and refuses RegisterClient while
 // refuse is set — matter.js's CountingIcdServer and RefusingIcdServer
-// (IcdClientTest.ts:265-274, :298-312 at 862ad75f), installed through
+// (IcdClientTest.ts:265-274, :298-312 at db021da0), installed through
 // internal/coreseam.ObserveICDRegistrations.
 type icdCommands struct {
 	mu                             sync.Mutex

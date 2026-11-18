@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
@@ -26,11 +27,25 @@ import (
 // #emitReachableChange).
 
 // ErrAddedElsewhere is the refusal to add a device a node holds already to
-// another.
+// another, or to make it a part ([Device.AddPart]) while a node holds it
+// as a bridged device.
 var ErrAddedElsewhere = errors.New("device: the device is added to a node already")
+
+// ErrNotBridged is the refusal of [Device.SetReachable], [Device.Rename]
+// and [Device.Update] on a part ([Device.AddPart]): reachability, the
+// NodeLabel and the host's statements are the bridged device's
+// BridgedDeviceBasicInformation, which only the endpoint its node adds
+// under the Aggregator serves — a part serves none of its own
+// (R2-P6-api-2503).
+var ErrNotBridged = errors.New("device: a part has no BridgedDeviceBasicInformation of its own")
 
 func init() {
 	deviceseam.AheadRows = aheadRows
+	deviceseam.Composing = func(fn func()) {
+		composeMu.Lock()
+		defer composeMu.Unlock()
+		fn()
+	}
 	deviceseam.Attach = func(ep any, h deviceseam.Host) (func(), bool, error) {
 		owner, ok := ep.(interface{ base() *Device })
 		if !ok {
@@ -48,39 +63,137 @@ func init() {
 // which is how the node finds the device behind any of them.
 func (d *Device) base() *Device { return d }
 
-// attach binds d and its parts to h.
+// composeMu serialises every change of a device tree's structure — a
+// part's owner, a device's parts, the node a tree is bound to — so a check
+// and the change it guards are one step: no cycle forms between two
+// concurrent AddPart calls (R2-P6-conc-2521), and an attach sees the tree
+// it binds whole (R2-P6-fsm-2501). It is held only while the structure
+// changes, never while a host is called or a queue drains. Lock order:
+// composeMu before a device's mu.
+var composeMu sync.Mutex
+
+// attach binds d and its parts to h: all of them, or — when one is bound
+// to a node already — none, leaving every device as it was (R2-P6-fsm-2501:
+// a refused attach unbound the parts another node held). A part is bound
+// with its owner, never on its own.
 func (d *Device) attach(h deviceseam.Host) error {
-	d.mu.Lock()
-	if d.host != nil {
-		d.mu.Unlock()
-		return fmt.Errorf("%w: %s", ErrAddedElsewhere, d.opts.StableKey)
+	composeMu.Lock()
+	if o := d.owner.Load(); o != nil {
+		composeMu.Unlock()
+		return fmt.Errorf("%w: %s is a part of %s; a part is added with its owner", ErrComposition, d.opts.StableKey, o.opts.StableKey)
 	}
-	d.host = h
-	parts := d.parts
-	d.mu.Unlock()
-	d.clock.setNode(h.Clock())
-	d.queue.Start()
-	for _, p := range parts {
-		if err := p.attach(h); err != nil {
-			d.detach()
-			return err
+	tree := d.treeLocked()
+	for _, x := range tree {
+		if x.hostOf() != nil {
+			composeMu.Unlock()
+			return fmt.Errorf("%w: %s", ErrAddedElsewhere, x.opts.StableKey)
 		}
+	}
+	for _, x := range tree {
+		x.setHost(h)
+	}
+	composeMu.Unlock()
+	for _, x := range tree {
+		x.start()
 	}
 	return nil
 }
 
-// detach stops d's and its parts' queues, each once it ran what it holds,
-// and unbinds them.
+// detach unbinds d and the parts it holds now, then stops their queues —
+// each once it ran what it holds — and their subscriptions on host ports.
+// A part moved to another owner since ([Device.AddPart]) is no longer in
+// d's tree and is not touched.
 func (d *Device) detach() {
-	d.mu.Lock()
-	d.host = nil
-	parts := d.parts
-	d.mu.Unlock()
-	d.queue.Stop()
-	for _, p := range parts {
-		p.detach()
+	composeMu.Lock()
+	tree := d.treeLocked()
+	for _, x := range tree {
+		x.setHost(nil)
+	}
+	composeMu.Unlock()
+	for _, x := range tree {
+		x.stop()
 	}
 }
+
+// treeLocked is d and its descendants, d first; composeMu is held.
+func (d *Device) treeLocked() []*Device {
+	out := []*Device{d}
+	for _, p := range d.Parts() {
+		out = append(out, p.treeLocked()...)
+	}
+	return out
+}
+
+// setHost records the node d is bound to; nil unbinds it.
+func (d *Device) setHost(h deviceseam.Host) {
+	d.mu.Lock()
+	d.host = h
+	d.mu.Unlock()
+}
+
+// start runs d on the node it is bound to: the node's clock, the device's
+// queue and the subscriptions its servers hold on host ports
+// (defaultBuild.bind). A device bound again while it runs only takes the
+// new node's clock; one unbound meanwhile is not started.
+func (d *Device) start() {
+	d.life.Lock()
+	defer d.life.Unlock()
+	h := d.hostOf()
+	if h == nil {
+		return
+	}
+	d.clock.setNode(h.Clock())
+	if d.running {
+		return
+	}
+	d.running = true
+	d.queue.Start()
+	d.subscribeLocked()
+}
+
+// stop ends what start began, unless d is bound again meanwhile: the
+// subscriptions first, then the queue, which runs what it holds.
+func (d *Device) stop() {
+	d.life.Lock()
+	defer d.life.Unlock()
+	if !d.running || d.hostOf() != nil {
+		return
+	}
+	d.running = false
+	unbind := d.unbind
+	d.unbind, d.subscribed = nil, false
+	for _, u := range unbind {
+		if u != nil {
+			u()
+		}
+	}
+	d.queue.Stop()
+}
+
+// subscribe makes the subscriptions the device's servers hold on host
+// ports (defaultBuild.bind): New calls it once the device is built — a
+// refused device makes none — and start again for a device a detach
+// ended them for (R2-P6-store-2515).
+func (d *Device) subscribe() {
+	d.life.Lock()
+	defer d.life.Unlock()
+	d.subscribeLocked()
+}
+
+func (d *Device) subscribeLocked() {
+	if d.subscribed {
+		return
+	}
+	d.subscribed = true
+	unbind := make([]func(), 0, len(d.bindings))
+	for _, subscribe := range d.bindings {
+		unbind = append(unbind, subscribe())
+	}
+	d.unbind = unbind
+}
+
+// isPart reports whether d is a part of another device.
+func (d *Device) isPart() bool { return d.owner.Load() != nil }
 
 // hostOf returns the node the device is added to; nil before.
 func (d *Device) hostOf() deviceseam.Host {
@@ -117,16 +230,22 @@ func (d *Device) EndpointNumber() (uint16, bool) {
 // ReachableChanged event) returns. A call that finds another telling the
 // host leaves its notification to that one, in order and under that call's
 // ctx, and returns before the host heard it (review II, R2-P1-dr-rest-06).
-func (d *Device) SetReachable(ctx context.Context, reachable bool) {
+//
+// On a part ([Device.AddPart]) it returns [ErrNotBridged] and changes
+// nothing: a part serves no Reachable of its own (R2-P6-api-2503).
+func (d *Device) SetReachable(ctx context.Context, reachable bool) error {
+	if d.isPart() {
+		return fmt.Errorf("%w: SetReachable of %s", ErrNotBridged, d.opts.StableKey)
+	}
 	d.reachMu.Lock()
 	if d.reachable.Swap(reachable) == reachable {
 		d.reachMu.Unlock()
-		return
+		return nil
 	}
 	d.reachPending = append(d.reachPending, reachable)
 	if d.reachPublishing {
 		d.reachMu.Unlock()
-		return
+		return nil
 	}
 	d.reachPublishing = true
 	locked := true
@@ -148,6 +267,7 @@ func (d *Device) SetReachable(ctx context.Context, reachable bool) {
 		d.reachMu.Lock()
 		locked = true
 	}
+	return nil
 }
 
 // Reachable reports whether the device is reachable: what
@@ -164,17 +284,28 @@ func (d *Device) available() bool { return d.reachable.Load() }
 // label, which a later [Device.Update] of the host's name does not
 // replace. The Name of the device's [Options] becomes name, capped at the
 // NodeLabel maximum ([ComposeNodeLabel]). Before the device is added only
-// the name changes. Rename reports no error: when the node's store
-// refuses to save the label, the caller is not told.
-func (d *Device) Rename(ctx context.Context, name string) {
+// the name changes.
+//
+// The node stores the label before it serves it, as it stores a
+// controller's write: when its store refuses, Rename returns the refusal,
+// the label is not served and the device keeps its name — a label the
+// host believes saved is never lost on the next restart (R2-P5-apidev-16).
+// On a part ([Device.AddPart]) Rename returns [ErrNotBridged] and changes
+// nothing (R2-P6-api-2503).
+func (d *Device) Rename(ctx context.Context, name string) error {
+	if d.isPart() {
+		return fmt.Errorf("%w: Rename of %s", ErrNotBridged, d.opts.StableKey)
+	}
 	name = ComposeNodeLabel(name, "")
+	if h := d.hostOf(); h != nil {
+		if err := h.Rename(ctx, d.opts.StableKey, name); err != nil {
+			return fmt.Errorf("device: rename %s: %w", d.opts.StableKey, err)
+		}
+	}
 	d.mu.Lock()
 	d.opts.Name = name
-	h := d.host
 	d.mu.Unlock()
-	if h != nil {
-		h.Rename(ctx, d.opts.StableKey, name)
-	}
+	return nil
 }
 
 // HostStatement are the facts of a device's [Options] the host states and
@@ -206,30 +337,52 @@ type HostStatement struct {
 // [Device.SetReachable] keep working. Before the device is added only the
 // statements change.
 //
+// fn runs without a lock of the device, so it may ask the device anything
+// (R2-P6-conc-2504); only the statements fn changed are written back, so a
+// [Device.Rename] or another Update that lands while fn runs keeps what it
+// set unless fn changed the same statement. On a part ([Device.AddPart])
+// Update returns [ErrNotBridged], calls no fn and changes nothing
+// (R2-P6-api-2503).
+//
 // matter.js has no such split: every change of a persistent attribute is
-// stored, whoever made it (packages/node/src/behavior/state/managed/Datasource.ts:1427-1438
-// at 862ad75f; NodeLabel is nonvolatile, basic-information.element.ts:36-37),
+// stored, whoever made it (packages/node/src/behavior/state/managed/Datasource.ts:1442-1453
+// at db021da0; NodeLabel is nonvolatile, basic-information.element.ts:36-37),
 // and the stored value replaces the endpoint's configured state when the
 // node restarts (Datasource.ts:580-583). The host's statement is the
 // configured state here — changed without becoming the stored one.
-func (d *Device) Update(ctx context.Context, fn func(*HostStatement)) {
+func (d *Device) Update(ctx context.Context, fn func(*HostStatement)) error {
 	if fn == nil {
-		return
+		return nil
+	}
+	if d.isPart() {
+		return fmt.Errorf("%w: Update of %s", ErrNotBridged, d.opts.StableKey)
 	}
 	d.mu.Lock()
-	st := HostStatement{
+	was := HostStatement{
 		Name: d.opts.Name, DeviceAddress: d.opts.DeviceAddress,
 		ChannelAddress: d.opts.ChannelAddress,
 	}
+	d.mu.Unlock()
+	st := was
 	fn(&st)
 	st.Name = ComposeNodeLabel(st.Name, "")
-	renamed := st.Name != d.opts.Name
-	d.opts.Name, d.opts.DeviceAddress, d.opts.ChannelAddress = st.Name, st.DeviceAddress, st.ChannelAddress
+	renamed := st.Name != was.Name
+	d.mu.Lock()
+	if renamed {
+		d.opts.Name = st.Name
+	}
+	if st.DeviceAddress != was.DeviceAddress {
+		d.opts.DeviceAddress = st.DeviceAddress
+	}
+	if st.ChannelAddress != was.ChannelAddress {
+		d.opts.ChannelAddress = st.ChannelAddress
+	}
 	h := d.host
 	d.mu.Unlock()
 	if h != nil && renamed {
 		h.HostName(ctx, d.opts.StableKey, st.Name)
 	}
+	return nil
 }
 
 // ComposeNodeLabel is the NodeLabel of a bridged endpoint named base with

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"slices"
 	"sync"
@@ -173,8 +174,11 @@ func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 // does not share, so a flow that means one (a DiagnosticLogs transfer)
 // finds none. What the bridge's server adds beyond the gates is not on this
 // path: events are not reported in a read, a SubscribeRequest answers
-// InvalidAction, and a write or invoke reaches the bridge's subscriptions
-// through the servers' own change notifications only.
+// InvalidAction, a chunked write (MoreChunkedMessages) is refused whole
+// with FAILURE before any of it is applied until ADR 0032's single session
+// layer (client/interaction, F-db021da0-51, decision 242), and a write or
+// invoke reaches the bridge's subscriptions through the servers' own change
+// notifications only.
 func (n *Node) clientServerConfig() interaction.ServerConfig {
 	maxPaths := int(n.cfg.MaxPathsPerInvoke)
 	if maxPaths == 0 {
@@ -392,7 +396,11 @@ func invokingClientSession(ctx context.Context) *exchange.Session {
 // identity moved (Node.fabricUpdated); the peers stay and connect again under the new
 // one. Mirrors matter.js FailsafeContext.ts:167-170 (replaceFabric →
 // SessionManager.deleteResumptionRecordsForFabric) with the fabric's
-// sessions, which every role registers with it (NodeSession.ts:153-156).
+// sessions, which every role registers with it (NodeSession.ts:153-156);
+// the sessions are closed by the command itself, "close all sessions found
+// to the old fabric and just leave the one with this exchange open"
+// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:372-373
+// at db021da0; review II, R2-P6-doc-2910).
 func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8) {
 	invoking := invokingClientSession(ctx)
 	for _, cs := range n.clientStacks() {
@@ -402,8 +410,13 @@ func (n *Node) closeClientFabricSessions(ctx context.Context, fabricIndex uint8)
 				continue
 			}
 			// A handshake in flight ran under the old NOC: its connection
-			// process ends first, then its sessions and record go.
-			p.Disconnect(ctx, nil)
+			// process ends first, then its sessions and record go. The wait
+			// is not the command's context's: a teardown whose context has
+			// ended would otherwise walk the sessions before a handshake
+			// finishing in that instant adopts its own, which then outlives
+			// the update; the process's end is bounded by its own waits
+			// (dev6a R8).
+			p.Disconnect(context.WithoutCancel(ctx), nil)
 			for _, s := range cs.exchanges.SessionsFor(addr) {
 				// The UpdateNOC's own session closes once its response is
 				// out, as the bridge's invoking session does (review II,
@@ -497,8 +510,15 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		if err := n.attachMatterTime(t); err != nil {
 			return nil, err
 		}
-		n.persistBindings(ctx, t)
-		n.persistUserLabels(ctx, t)
+		// A store that fails a restore read fails the topology: a server
+		// is never served without its stored state, and the topology
+		// before stays served (review II, R2-P6-store-2403, -2404).
+		if err := n.persistBindings(ctx, t); err != nil {
+			return nil, err
+		}
+		if err := n.persistUserLabels(ctx, t); err != nil {
+			return nil, err
+		}
 		n.persistNonVolatile(ctx, t)
 		// What the servers restored for a fabric the table no longer
 		// holds goes before the topology is served (fabric_state.go).
@@ -545,8 +565,12 @@ func (n *Node) startBindings() {
 // the stored entries at start (BindingServer.ts:120-126). A server met
 // again in a reassembly is not restored again: its list is the newer (and
 // the stored one, since every change is saved). One that left the topology
-// is forgotten.
-func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) {
+// is forgotten. A restore that fails fails the topology, so the server is
+// never served without its Save hook (a write answering SUCCESS that is
+// not stored) and never restored over a list it served (review II,
+// R2-P6-store-2404); the servers restored before it are kept with the
+// ones the node met already.
+func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) error {
 	n.bindSync.persistMu.Lock()
 	defer n.bindSync.persistMu.Unlock()
 	current := map[*mattercore.Binding]bool{}
@@ -563,13 +587,18 @@ func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) {
 				key := bindingKey(ep)
 				if err := b.Persist(n.persisted.bindingConfig(context.WithoutCancel(ctx), key)); err != nil {
 					n.logger.Warn("binding.restore", slog.String("key", key), slog.Any("err", err))
-					continue
+					if n.bindSync.persisted == nil {
+						n.bindSync.persisted = map[*mattercore.Binding]bool{}
+					}
+					maps.Copy(n.bindSync.persisted, current)
+					return err
 				}
 			}
 			current[b] = true
 		}
 	}
 	n.bindSync.persisted = current
+	return nil
 }
 
 // bindingServers are the Binding servers of a topology by endpoint.

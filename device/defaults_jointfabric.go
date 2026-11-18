@@ -19,7 +19,8 @@ import (
 // each is the module's server once its declaration carries its port —
 // the Datastore its Sync (and, optionally, its Store under the device's
 // StableKey), the Administrator its AdministratorPort (and, optionally,
-// its CommissionerReach); without one the generated server stays. The
+// its CommissionerReach and TrustAnchors); without one the generated
+// server stays. The
 // Administrator takes the endpoint's kit Datastore as the anchor's.
 
 func init() {
@@ -41,15 +42,20 @@ func newJointFabricDatastoreServer(b defaultBuild) (contract.ClusterServer, erro
 
 // newJointFabricAdministratorServer is the module's
 // JointFabricAdministrator server ([jointfabric.NewAdministrator]) on the
-// declared AdministratorPort and CommissionerReach; Initial's
-// AdministratorFabricIndex is set on it.
+// declared AdministratorPort, CommissionerReach and TrustAnchors; Initial's
+// AdministratorFabricIndex is set on it. Without TrustAnchors the Vendor
+// ID Verification fails closed (owner decisions 190 and 235).
 func newJointFabricAdministratorServer(b defaultBuild) (contract.ClusterServer, error) {
 	d, _ := b.ports.(jfadef.Declare)
 	if d.AdministratorPort == nil {
 		return nil, notServed(fmt.Errorf("joint fabric administrator: %w", errNoPort))
 	}
 	ds, _ := b.sibling(dsdef.ClusterID).(*jointfabric.Datastore)
-	return jointfabric.NewAdministrator(jointfabric.AdministratorConfig{
+	cfg := jointfabric.AdministratorConfig{
 		Port: d.AdministratorPort, Reach: d.CommissionerReach, Datastore: ds,
-	})
+	}
+	if d.TrustAnchors != nil {
+		cfg.TrustAnchors = d.TrustAnchors.LookupTrustAnchor
+	}
+	return jointfabric.NewAdministrator(cfg)
 }

@@ -322,16 +322,36 @@ func TestRemoveFabricClosesSessionsWithCloseSession(t *testing.T) {
 	if err != nil || status != 0 {
 		t.Fatalf("RemoveFabric = %d, %v; want NOCResponse OK", status, err)
 	}
-	// The other session's CloseSession went out before the response.
-	short, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-	_, err = second.Read(short, attr(0, clusterBasicInformation, attrNodeLabel))
-	cancel()
-	if !errors.Is(err, bridgetest.ErrSessionClosed) {
-		t.Errorf("read on the fabric's other session after RemoveFabric = %v, want ErrSessionClosed (a CloseSession)", err)
+	// The other session's CloseSession went out before the response. The
+	// test waits until the commissioner has processed it — a read on the
+	// session answers ErrSessionClosed — rather than for a wall-clock
+	// window; a read that ends at its deadline is a CloseSession not
+	// processed yet (R2-P6-test-3105, N5-tflake-3).
+	closedBy := time.Now().Add(10 * time.Second)
+	for {
+		short, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+		_, err = second.Read(short, attr(0, clusterBasicInformation, attrNodeLabel))
+		cancel()
+		if errors.Is(err, bridgetest.ErrSessionClosed) {
+			break
+		}
+		if !errors.Is(err, context.DeadlineExceeded) || time.Now().After(closedBy) {
+			t.Fatalf("read on the fabric's other session after RemoveFabric = %v, want ErrSessionClosed (a CloseSession)", err)
+		}
 	}
-	// The invoking session: closed after its response, without a CloseSession.
-	time.Sleep(300 * time.Millisecond)
-	short, cancel = context.WithTimeout(ctx, 1500*time.Millisecond)
+	// The invoking session: closed after its response, without a
+	// CloseSession. The device closes it once the response's exchange
+	// ended; the test waits until the device holds no session of the
+	// removed fabric, then a read on it must go unanswered.
+	waitLive(t, "the device to close the removed fabric's sessions", func() bool {
+		for _, info := range n.Sessions().Sessions() {
+			if info.FabricIndex == fabricIndex {
+				return false
+			}
+		}
+		return true
+	})
+	short, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
 	_, err = s.Read(short, attr(0, clusterBasicInformation, attrNodeLabel))
 	cancel()
 	if !errors.Is(err, context.DeadlineExceeded) {

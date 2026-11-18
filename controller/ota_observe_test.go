@@ -50,7 +50,7 @@ func (u *updateEvents) has(k softwareupdate.UpdateEventKind) func() bool {
 
 // TestOTAObserveAppliedUpdate: the observer of a queued and applied
 // update — consent, announcement, the BDX download, apply, the applied
-// notification (OtaTest.ts:91 at 862ad75f) — sees the consent, the
+// notification (OtaTest.ts:91 at db021da0) — sees the consent, the
 // update queued (#queueUpdate, SoftwareUpdateManager.ts:892-920), its
 // transfer started (the provider's Downloading at the BDX session start,
 // OtaSoftwareUpdateProviderServer.ts:308-327), then the update applying

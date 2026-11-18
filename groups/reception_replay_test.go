@@ -53,7 +53,7 @@ func TestRecordedGroupMessageStaysADuplicate(t *testing.T) {
 			held := min(senders, maxGroupSendersPerKey)
 			recorded := make([][]byte, senders)
 			for s := range recorded {
-				recorded[s] = sealGroup(t, op, sid, 0x0101, uint64(s+1), 7, true, []byte("toggle"))
+				recorded[s] = sealGroup(t, op, sid, 0x0101, uint64(s+1), 7, true, imPayload([]byte("toggle")))
 				msg, err := m.Decode(ctx, recorded[s])
 				if s >= held {
 					if !errors.Is(err, errReceptionFull) {
@@ -97,7 +97,7 @@ func TestRecordedGroupMessageStaysADuplicate(t *testing.T) {
 			// A real sender is not lost among them: its next counter is new,
 			// and the one before stays refused.
 			for _, source := range []uint64{1, uint64(held)} {
-				next, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, source, 8, true, []byte("toggle")))
+				next, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, source, 8, true, imPayload([]byte("toggle"))))
 				if err != nil || next.Duplicate {
 					t.Fatalf("the next message of sender %d: err %v, duplicate %v", source, err, next != nil && next.Duplicate)
 				}
@@ -123,7 +123,7 @@ func TestReceptionStateOfOneKeyIsNotAnothers(t *testing.T) {
 		t.Fatal("precondition: the first counter under the other key was refused")
 	}
 	for source := uint64(1); source <= maxGroupSendersPerKey; source++ {
-		if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, source, 1, true, []byte("x"))); err != nil {
+		if _, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, source, 1, true, imPayload([]byte("x")))); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -160,7 +160,7 @@ func TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState(t *testing.T) {
 		m, _ := newTestManager(t)
 		// Without privacy the header is in the clear: flags, session id,
 		// security flags, counter (4), source node id (8) at offset 8.
-		genuine := sealGroup(t, op, sid, 0x0101, 1, 7, false, []byte("toggle"))
+		genuine := sealGroup(t, op, sid, 0x0101, 1, 7, false, imPayload([]byte("toggle")))
 		for source := uint64(2); source <= 1001; source++ {
 			forged := append([]byte(nil), genuine...)
 			binary.LittleEndian.PutUint64(forged[8:16], source)
@@ -183,7 +183,7 @@ func TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState(t *testing.T) {
 	t.Run("a changed counter, a changed payload, a changed tag", func(t *testing.T) {
 		t.Parallel()
 		m, _ := newTestManager(t)
-		genuine := sealGroup(t, op, sid, 0x0101, 1, 7, false, []byte("toggle"))
+		genuine := sealGroup(t, op, sid, 0x0101, 1, 7, false, imPayload([]byte("toggle")))
 		for name, at := range map[string]int{"counter": 4, "payload": len(genuine) - 17, "tag": len(genuine) - 1} {
 			forged := append([]byte(nil), genuine...)
 			forged[at] ^= 0x01
@@ -202,7 +202,7 @@ func TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState(t *testing.T) {
 		foreign, _ := opKeyOf(t, 0xEE)
 		for _, privacy := range []bool{false, true} {
 			for source := uint64(1); source <= 100; source++ {
-				if _, err := m.Decode(ctx, sealGroup(t, foreign, sid, 0x0101, source, 7, privacy, []byte("toggle"))); !errors.Is(err, ErrDecrypt) {
+				if _, err := m.Decode(ctx, sealGroup(t, foreign, sid, 0x0101, source, 7, privacy, imPayload([]byte("toggle")))); !errors.Is(err, ErrDecrypt) {
 					t.Fatalf("privacy %v, source %d: err = %v, want ErrDecrypt", privacy, source, err)
 				}
 			}
@@ -220,7 +220,7 @@ func TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState(t *testing.T) {
 			t.Fatal(err)
 		}
 		unmapped, unmappedSID := opKeyOf(t, 0xB2)
-		_, err := m.Decode(ctx, sealGroup(t, unmapped, unmappedSID, 0x0101, 1, 7, true, []byte("toggle")))
+		_, err := m.Decode(ctx, sealGroup(t, unmapped, unmappedSID, 0x0101, 1, 7, true, imPayload([]byte("toggle"))))
 		if !errors.Is(err, ErrNoKey) {
 			t.Fatalf("err = %v, want no key candidate", err)
 		}
@@ -235,7 +235,7 @@ func TestOnlyAnAuthenticatedGroupMessageCreatesReceptionState(t *testing.T) {
 	t.Run("a mapped key for a group it is not mapped to", func(t *testing.T) {
 		t.Parallel()
 		m, _ := newTestManager(t)
-		_, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0202, 1, 7, true, []byte("toggle")))
+		_, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0202, 1, 7, true, imPayload([]byte("toggle"))))
 		var rejected *DecodeError
 		if !errors.As(err, &rejected) || rejected.GroupFabricIndex != 1 || rejected.GroupID != 0x0202 {
 			t.Fatalf("err = %v (%+v), want a DecodeError naming group 0x0202 of fabric 1", err, rejected)

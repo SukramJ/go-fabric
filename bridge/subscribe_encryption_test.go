@@ -24,8 +24,8 @@ import (
 // payload equals the input.
 //
 // matter.js's `ServerSubscription.#sendUpdateMessage`
-// (ServerSubscription.ts:764) opens a fresh exchange for every ongoing
-// report; that pattern works against chip-tool but Apple Home's
+// (ServerSubscription.ts:893, :900 at db021da0) opens a fresh exchange for
+// every ongoing report; that pattern works against chip-tool but Apple Home's
 // MTRDevice times the subscription out 10 s after SubscribeResponse if
 // no further ReportData lands on the **original** Subscribe exchange
 // (empirically validated). We therefore stay on the

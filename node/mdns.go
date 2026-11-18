@@ -24,7 +24,8 @@ type MDNS struct {
 	// (mdns.Responder.HostName, without ".local"): a host name the OS
 	// responder owns and publishes the address records of. Empty is the
 	// name the advertiser derives from the interface's MAC, whose address
-	// records it publishes itself.
+	// records it publishes itself. At most 40 bytes, one DNS label
+	// ([Config.Validate]).
 	HostName string
 	// Interfaces, when non-empty, restricts the advertiser to the named
 	// host interfaces ("eth0", "br30"): it announces and answers on them

@@ -32,8 +32,8 @@ type RetrySchedule struct {
 // DefaultSustainRetries is the schedule a sustained subscription retries
 // on: 15 s, doubling, at most an hour, a quarter of jitter, no timeout.
 // Mirrors matter.js
-// packages/protocol/src/action/client/subscription/SustainedSubscription.ts:483-499
-// (SustainedSubscription.DefaultRetrySchedule) at 0ceb202d.
+// packages/protocol/src/action/client/subscription/SustainedSubscription.ts:614-630
+// (SustainedSubscription.DefaultRetrySchedule) at db021da0.
 var DefaultSustainRetries = RetrySchedule{
 	InitialInterval: 15 * time.Second,
 	BackoffFactor:   2,
@@ -50,7 +50,13 @@ type retries struct {
 	cfg  RetrySchedule
 	rand func() float64
 	base time.Duration
+	// establishedAt is, for the schedule of short-lived subscriptions,
+	// when the sustained subscription was last established (R2-P6-fsm-2110).
+	establishedAt time.Time
 }
+
+// reset starts the schedule over at its initial interval.
+func (r *retries) reset() { r.base = r.cfg.InitialInterval }
 
 func newRetries(cfg RetrySchedule, rand func() float64) *retries {
 	if cfg.InitialInterval == 0 {
@@ -60,6 +66,14 @@ func newRetries(cfg RetrySchedule, rand func() float64) *retries {
 		cfg.BackoffFactor = 2
 	}
 	return &retries{cfg: cfg, rand: rand, base: cfg.InitialInterval}
+}
+
+// current is the interval the next step waits, its jitter not counted.
+func (r *retries) current() time.Duration {
+	if r.cfg.MaximumInterval != 0 && r.base > r.cfg.MaximumInterval {
+		return r.cfg.MaximumInterval
+	}
+	return r.base
 }
 
 func (r *retries) next() time.Duration {
@@ -121,7 +135,7 @@ func (st *sustainedState) releaseHold() {
 // event; it never decreases. A plain subscription reports none. Mirrors
 // matter.js SustainedSubscription.maxEventNumber
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:105-114)
-// at 862ad75f.
+// at db021da0.
 func (s *Subscription) MaxEventNumber() (uint64, bool) {
 	if s.sustained == nil {
 		return 0, false
@@ -135,7 +149,7 @@ func (s *Subscription) MaxEventNumber() (uint64, bool) {
 // returned. Mirrors matter.js SustainedSubscription.#deliver and
 // #raiseMaxEventNumber
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-364)
-// at 862ad75f, the maxEventNumberChanged hook included: a failure of the
+// at db021da0, the maxEventNumberChanged hook included: a failure of the
 // consumer is the subscriber's own, logged by #logLocalFailure's rule
 // (:345-347), and the report's events still count (:348-350).
 func (st *sustainedState) deliver(r *Report, consumer func(*Report) error) error {
@@ -164,7 +178,7 @@ func (st *sustainedState) deliver(r *Report, consumer func(*Report) error) error
 // first as a warning, later ones at debug, since a peer can trigger one with
 // every report. Mirrors matter.js SustainedSubscription.#logLocalFailure
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:366-377)
-// at 862ad75f.
+// at db021da0.
 func (st *sustainedState) logLocalFailure(what string, err error) {
 	if st.log == nil {
 		return
@@ -181,7 +195,7 @@ func (st *sustainedState) logLocalFailure(what string, err error) {
 }
 
 // delivering is the consumer reached through deliver, nil without one
-// (SustainedSubscription.ts:120-121 at 862ad75f).
+// (SustainedSubscription.ts:120-121 at db021da0).
 func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report) error {
 	if consumer == nil {
 		return nil
@@ -193,7 +207,7 @@ func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report)
 // the request's filters kept until then. Mirrors matter.js
 // SustainedSubscription.#requestNewEvents
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:379-384)
-// at 862ad75f.
+// at db021da0.
 func (st *sustainedState) requestNewEvents(req SubscribeRequest) SubscribeRequest {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -262,7 +276,7 @@ func (s *Subscription) setActive(active bool) {
 const SITRetryInterval = 15 * time.Second
 
 // runSustained is SustainedSubscription.#run (SustainedSubscription.ts:116-337
-// at 862ad75f): the session is trusted at first; after a loss the
+// at db021da0): the session is trusted at first; after a loss the
 // provider's reachability is verified, a failed probe meaning a new
 // session anyway (:185-199); the attempts run on the retry schedule — the
 // bootstrap read hook first while it has not succeeded (:209-223), then
@@ -309,6 +323,23 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	// recreatePriority: a mode-flip recreate goes out on the priority
 	// connection (:133-135).
 	recreatePriority := false
+	// Two schedules. The attempts of one establishment follow matter.js:
+	// their schedule starts over with each establishment loop
+	// (SustainedSubscription.ts:203 inside the loop of :139 at db021da0;
+	// connectedhomeip resets its count at every SubscribeResponse,
+	// src/app/ReadClient.cpp:1139 at 6170af84). losses spans
+	// establishments and paces consecutive short-lived subscriptions only:
+	// one the peer drops before it lasted losses' current interval waits
+	// its next step before the re-subscribe, one that lasted it starts it
+	// over. "Short-lived" is measured against the current interval, not
+	// the first step: after several quick drops (the interval at, say,
+	// 16 min) a subscription that lasted 10 min and is then lost still
+	// waits 16 min and doubles the interval again. So a peer that grants
+	// and drops at once is not re-subscribed without a pause, and the
+	// failed attempts of an outage do not count against the subscription
+	// that ends it. Ahead of matter.js; the rule is this module's (review
+	// II, R2-P6-fsm-2110).
+	losses := newRetries(DefaultSustainRetries, c.rand)
 	for {
 		req, closed, deliberate := innerRequest(outer, updated)
 		// The attempt's network: a mode-flip recreate's goes out on the
@@ -341,6 +372,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 				// nil branch's "a wakefulness present now is the feed", and the recreate
 				// takes the hold.
 				held = established(outer, inner, wakefulness())
+				losses.establishedAt = c.clock.Now()
 				break
 			}
 			if ctx.Err() != nil {
@@ -373,12 +405,9 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		if ctx.Err() != nil {
 			return
 		}
-		if !flipped {
-			// A genuine loss: report not live so consumers re-establish. A
-			// deliberate recreate keeps active until it re-established or has
-			// to park (:289-293).
-			outer.setActive(false)
-			c.log.Info("matter.controller.interaction.sustain_replacing", slog.Uint64("node_id", outer.peer.NodeID))
+		if replace, ok := c.afterEstablishment(ctx, outer, losses, !flipped); !ok {
+			return
+		} else if replace {
 			continue
 		}
 		deliberate.Store(true)
@@ -387,6 +416,34 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			slog.String("reason", "ICD operating mode change"))
 		recreatePriority = true
 	}
+}
+
+// afterEstablishment applies the short-lived-subscription rule
+// (R2-P6-fsm-2110) when the subscription established at
+// losses.establishedAt ended: losses starts over when it lasted losses'
+// current interval. After a genuine loss (lost) the subscription is
+// reported not live (:289-293) and, when it did not last, losses' next
+// step is waited before the re-subscribe — but for a peer that requires
+// awaiting, which has no timed retry and which the gate parks for its
+// next wake. It reports whether the loop replaces the subscription (a
+// loss), and false for ok when ctx ended.
+func (c *Interaction) afterEstablishment(ctx context.Context, outer *Subscription, losses *retries, lost bool) (replace, ok bool) {
+	lasted := c.clock.Now().Sub(losses.establishedAt) >= losses.current()
+	if lasted {
+		losses.reset()
+	}
+	if !lost {
+		return false, true
+	}
+	outer.setActive(false)
+	c.log.Info("matter.controller.interaction.sustain_replacing", slog.Uint64("node_id", outer.peer.NodeID))
+	if lasted || requiresAwait(outer.wakefulness()) {
+		return true, true
+	}
+	retry := losses.next()
+	c.log.Info("matter.controller.interaction.sustain_retry",
+		slog.Uint64("node_id", outer.peer.NodeID), slog.Duration("retry", retry), slog.String("reason", "subscription lost early"))
+	return true, c.sleep(ctx, retry)
 }
 
 // wakefulness is the peer's ICD wakefulness, read live on every use so a
@@ -602,7 +659,7 @@ func (c *Interaction) nextWake(ctx context.Context, w *icd.PeerWakefulness) bool
 // bootstrap read while it has not succeeded and the request refreshed
 // after it (:187-204), then the subscription. Each refresh asks for the
 // events above the highest one delivered (SustainedSubscription.ts:125-126
-// at 862ad75f).
+// at db021da0).
 func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool) (*Subscription, error) {
 	if *needRefresh {
 		*req = st.requestNewEvents(refreshed(*req))

@@ -38,14 +38,15 @@ type InvokeOptions struct {
 	// NEEDS_TIMED_INTERACTION answer needs it.
 	TimedOff bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
-	// [DefaultTimedRequestTimeout] (:439).
+	// [DefaultTimedRequestTimeout] (:439). A negative one makes a timed
+	// invoke fail with [ErrMalformedRequest].
 	TimedTimeout time.Duration
 	// SuppressResponse asks the peer for no InvokeResponse: the send
 	// expects an acknowledgement only and Invoke returns the zero Result.
 	SuppressResponse bool
 	// BatchDuration is how long a single command waits for others to
-	// share its InvokeRequest — matter.js Invoke.Definition.batchDuration
-	// (packages/protocol/src/action/request/Invoke.ts:50 at 862ad75f);
+	// share its InvokeRequest — matter.js Invoke.batchDuration
+	// (packages/protocol/src/action/request/Invoke.ts:50 at db021da0);
 	// 0 is matter.js's default, Instant (ClientInteraction.ts:796): the
 	// commands invoked concurrently. A queued batch flushes at the
 	// earliest deadline of its commands. Only [Interaction.Invoke] batches.
@@ -56,7 +57,7 @@ type InvokeOptions struct {
 	// InteractionModelRevision is the InvokeRequest's
 	// InteractionModelRevision — matter.js Invoke.Definition
 	// .interactionModelRevision (packages/protocol/src/action/request/Invoke.ts:189
-	// at 862ad75f); 0 is this module's [im.MatterInteractionModelRevision].
+	// at db021da0); 0 is this module's [im.MatterInteractionModelRevision].
 	// Any other revision sends the command on its own, as the batch
 	// request carries the default (ClientInteraction.ts:196-198).
 	InteractionModelRevision uint8
@@ -99,25 +100,36 @@ type Result struct {
 	Status im.StatusCode
 	// ClusterStatus is the cluster-specific status, nil when absent.
 	ClusterStatus *uint8
+	// Path is the path of the entry that answered, as the peer stated it:
+	// for a response command its endpoint, cluster and response command
+	// id, for a status the command's endpoint, cluster and command id. The
+	// answer is matched to its command by position, or by CommandRef in a
+	// batch, never by this path, so a caller that must know the answer is
+	// the command's own compares it with the request's. connectedhomeip
+	// hands the response's path to its caller
+	// (src/app/CommandSender.cpp:509-513 at 6170af84), as matter.js copies
+	// it into its result (ClientInteraction.ts:574-578 at db021da0)
+	// (review II, R2-P6-wire-2153).
+	Path im.ConcreteCommandPath
 }
 
 // Invoke invokes one command on a fresh exchange and returns the peer's
 // answer; a status other than Success is a *StatusError. fields is the
 // request payload (a generated request's value), nil for an empty one.
 // Mirrors matter.js ClientInteraction.#invokeSingle
-// (ClientInteraction.ts:434-474) with InteractionClientMessenger
-// .sendInvokeCommand (interaction/InteractionMessenger.ts:1061-1108) at
-// 0ceb202d:
+// (ClientInteraction.ts:487-527) with InteractionClientMessenger
+// .sendInvokeCommand (interaction/InteractionMessenger.ts:1206-1253) at
+// db021da0:
 //
 //   - a timed invoke first sends a TimedRequest and waits for its Success
-//     StatusResponse (:438-440, InteractionMessenger.ts:1124-1136);
-//   - the single command goes without a commandRef (:457-464);
+//     StatusResponse (:491-493, InteractionMessenger.ts:1440-1452);
+//   - the single command goes without a commandRef (:510-517);
 //   - the processing time is ExpectedProcessingTime, else 30 s with the
-//     extended failsafe timeout, else the exchange's default (:466-474),
+//     extended failsafe timeout, else the exchange's default (:519-527),
 //     for the send's final wait and the wait for the response;
 //   - a chunked InvokeResponse is acknowledged with a StatusResponse
 //     Success after every chunk with more to come and its entries are
-//     accumulated (InteractionMessenger.ts:1082-1105);
+//     accumulated (InteractionMessenger.ts:1227-1250);
 //   - the first entry is the answer, as the flow's #invokeCommand reads it
 //     (ControllerCommissioningFlow.ts:506-530): a CommandStatusIB other
 //     than Success is a *StatusError.
@@ -168,7 +180,7 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 // stay as they were.
 //
 // Mirrors matter.js ClientInteraction.invoke (ClientInteraction.ts:716-719
-// at 862ad75f: "Copy instead of mutating the caller-owned request") with
+// at db021da0: "Copy instead of mutating the caller-owned request") with
 // inferLargeMessage (:111-127), which probes each command's schema for
 // effectiveQuality.largeMessage. matter.js skips a legacy command request,
 // which carries no model; here every command is named by its path, and a
@@ -214,7 +226,7 @@ func (o InvokeOptions) timedFor(invokes ...im.CommandInvocation) bool {
 // for a suppressed response. It is the exchange of [Interaction.Invoke]
 // and of each batch of [Interaction.InvokeBatch]: matter.js
 // ClientInteraction.#invokeSingle (ClientInteraction.ts:487-649 at
-// 862ad75f) up to the decoding of its entries.
+// db021da0) up to the decoding of its entries.
 func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandInvocation, opts InvokeOptions) ([]im.InvokeResponseEntry, error) {
 	m, ctx, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {
@@ -305,12 +317,12 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 		if err != nil {
 			return nil, err
 		}
-		if err := m.holdChunk(ctx, &held, msg.Payload); err != nil {
-			return nil, err
-		}
 		resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(msg.Payload), readFields)
 		if err != nil {
 			return nil, fmt.Errorf("%w: InvokeResponse: %w", ErrUnexpectedMessage, err)
+		}
+		if err := m.holdChunk(ctx, &held, invokeCharge(msg.Payload, &resp)); err != nil {
+			return nil, err
 		}
 		entries = append(entries, resp.Responses...)
 		if !resp.MoreChunkedMessages {
@@ -326,14 +338,14 @@ func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandIn
 // command and its fields, or the status and cluster status.
 func resultOf(e im.InvokeResponseEntry) Result {
 	if e.IsStatus {
-		res := Result{Status: e.Status.Status}
+		res := Result{Status: e.Status.Status, Path: e.Path}
 		if e.Status.HasClusterStatus {
 			cs := e.Status.ClusterStatus
 			res.ClusterStatus = &cs
 		}
 		return res
 	}
-	res := Result{Command: e.Path.Command, Status: im.StatusSuccess}
+	res := Result{Command: e.Path.Command, Status: im.StatusSuccess, Path: e.Path}
 	if n, ok := e.Response.(spec.Node); ok {
 		res.HasFields, res.Fields = true, n
 	}
@@ -352,7 +364,15 @@ func readFields(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any
 // InteractionClientMessenger.sendTimedRequest
 // (InteractionMessenger.ts:1440-1452, TlvTimedRequest: [0] timeout in
 // milliseconds, [255] InteractionModelRevision).
+//
+// A negative timeout is [ErrMalformedRequest] before anything is sent: the
+// TimedRequest's field is unsigned, and the conversion would wrap it to a
+// window of about a minute (review II, R2-P6-err-2154). Every timed write
+// and invoke comes through here.
 func (m *messenger) timed(ctx context.Context, timeout time.Duration) error {
+	if timeout < 0 {
+		return fmt.Errorf("%w: TimedTimeout %v is negative", ErrMalformedRequest, timeout)
+	}
 	enc := tlv.NewEncoder()
 	im.TimedRequest{TimeoutMs: uint16(min(timeout.Milliseconds(), 0xFFFF))}.MarshalTLV(enc) //nolint:gosec // bounded to uint16
 	req, err := enc.Bytes()

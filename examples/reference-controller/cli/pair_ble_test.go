@@ -85,8 +85,20 @@ func TestPairBluetoothProxyFlag(t *testing.T) {
 			got = flags
 			return nil, refused
 		}})
-	if !errors.Is(err, refused) || !got.Discover || len(got.Proxies) != 0 || strings.Join(got.Keys, " ") != "kitchen=K1 AA:BB:CC:DD:EE:FF=K2" {
+	if !errors.Is(err, refused) || !got.Discover || len(got.Proxies) != 0 || strings.Join(got.Keys, " ") != "kitchen=K1 AA:BB:CC:DD:EE:FF=K2" || got.AllowPlaintext {
 		t.Fatalf("discovery %+v: %v", got, err)
+	}
+	// Decision 196: plaintext proxies are opt-in, handed on as given.
+	err = Run([]string{"--db", db, "--listen", "127.0.0.1:0", "pair", "--bluetooth-proxy-discover", "--bluetooth-proxy-allow-plaintext", "--passcode", "20202021", "--discriminator", "3840", "--thread-dataset", "0e080000000000010000"}, strings.NewReader(""), &bytes.Buffer{},
+		Options{Proxies: func(flags ProxyFlags, _ *slog.Logger) (ble.Central, error) {
+			got = flags
+			return nil, refused
+		}})
+	if !errors.Is(err, refused) || !got.Discover || !got.AllowPlaintext {
+		t.Fatalf("allow plaintext %+v: %v", got, err)
+	}
+	if err := run([]string{"--db", db, "pair", "--bluetooth-proxy", "p.local", "--bluetooth-proxy-allow-plaintext", "--passcode", "20202021", "--discriminator", "3840", "--wifi-ssid", "lab"}, strings.NewReader(""), &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "--bluetooth-proxy-allow-plaintext needs --bluetooth-proxy-discover") {
+		t.Fatalf("allow plaintext without discovery: %v", err)
 	}
 	// A key without discovery is refused before anything opens.
 	if err := run([]string{"--db", db, "pair", "--bluetooth-proxy-key", "kitchen=K1", "--passcode", "20202021", "--discriminator", "3840", "--wifi-ssid", "lab"}, strings.NewReader(""), &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "--bluetooth-proxy-discover") {

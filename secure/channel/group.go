@@ -16,49 +16,51 @@ import (
 // The send half of a group session: the AEAD seal of a group message and
 // the privacy obfuscation of its header — the counterparts of the
 // candidate decrypt and deobfuscation groups.Manager.Decode runs. Mirrors
-// matter.js packages/protocol/src/session/GroupSession.ts:251-287 (encode)
-// and packages/protocol/src/codec/MessagePrivacy.ts:38-56 at 0ceb202d.
+// matter.js packages/protocol/src/session/GroupSession.ts:297-325 (encode)
+// and packages/protocol/src/codec/MessagePrivacy.ts:38-56 at db021da0.
 
 // ErrNotGroupHeader is returned by [EncryptGroup] for a header that is not
 // a group-session header carrying a destination group id. Mirrors the
-// UnexpectedDataError of GroupSession.ts:254-257 ("Group ID is required
-// for GroupSession encode").
+// UnexpectedDataError of GroupSession.ts:300-303 at db021da0 ("Group ID
+// and source node ID are required for GroupSession encode").
 var ErrNotGroupHeader = errors.New("channel: group encode needs a group-session header with a destination group id")
 
 // ErrSourceNodeMismatch is returned by [EncryptGroup] for a sender node id
 // the header's Source Node ID disagrees with: the nonce is the header's
-// (GroupSession.ts:268-269), so the two must name the same node.
+// (GroupSession.ts:308-309), so the two must name the same node.
 var ErrSourceNodeMismatch = errors.New("channel: group encode sender node id differs from the header's source node id")
 
 // privacyHeaderOffset is where the obfuscated header region starts: the
 // Message Flags byte, the Session ID and the Security Flags stay in the
-// clear (GroupSession.ts:278, :285 — `headerBytes.slice(4)` /
+// clear (GroupSession.ts:321, :323 — `headerBytes.slice(4)` /
 // `headerBytes.slice(0, 4)`).
 const privacyHeaderOffset = 4
 
 // EncryptGroup seals payload — the protocol header and the application
 // payload — under an operational group key and returns the packet header
 // bytes it authenticated and the ciphertext with its 16-byte MIC. Mirrors
-// matter.js GroupSession.encode (GroupSession.ts:251-267) line by line:
+// matter.js GroupSession.encode (GroupSession.ts:297-325 at db021da0) line
+// by line:
 //
-//   - :254-257 the header must name a destination group ([ErrNotGroupHeader]);
-//   - :259 headerBytes = MessageCodec.encodePacketHeader(packetHeader) —
+//   - :300-303 the header must name a destination group and a source node
+//     id ([ErrNotGroupHeader], [ErrSourceNodeMismatch]);
+//   - :305 headerBytes = MessageCodec.encodePacketHeader(packetHeader) —
 //     [message.Header.MarshalPacket], with its group constraint;
-//   - :260 securityFlags = headerBytes[3];
-//   - :261 nonce = Session.generateNonce(securityFlags, messageId,
-//     fabric.nodeId) — the 13-byte nonce of Matter §4.7.1.1 with the
-//     source node id; at 862ad75f the header's (below);
-//   - :262-267 ciphertext = crypto.encrypt(operationalGroupKey, payload,
+//   - :306 securityFlags = headerBytes[3];
+//   - :309 nonce = Session.generateNonce(securityFlags, messageId,
+//     header.sourceNodeId) — the 13-byte nonce of Matter §4.7.1.1 with the
+//     header's source node id (below);
+//   - :310 ciphertext = crypto.encrypt(operationalGroupKey, payload,
 //     nonce, headerBytes) — AES-CCM, the unobfuscated header bytes as AAD.
 //
 // The header is the one the caller built (sessionId already the group
-// session id, GroupSession.ts:252); EncryptGroup does not change it.
+// session id, GroupSession.ts:298); EncryptGroup does not change it.
 //
 // The nonce is built from header.SourceNodeID, the id receivers read back
 // and rebuild the nonce from. sourceNodeID names the sender's node id and
 // must agree with the header ([ErrSourceNodeMismatch]); a nonce from any
 // other id would seal a message no receiver can open. Mirrors matter.js
-// packages/protocol/src/session/GroupSession.ts:260-269 at 862ad75f
+// packages/protocol/src/session/GroupSession.ts:300-309 at db021da0
 // ("Receivers derive the nonce from the header, so the header's source
 // node ID is the only one used").
 func EncryptGroup(operationalKey []byte, sourceNodeID uint64, header message.Header, payload []byte) (headerBytes, ciphertext []byte, err error) {
@@ -87,16 +89,16 @@ func EncryptGroup(operationalKey []byte, sourceNodeID uint64, header message.Hea
 
 // ObfuscateGroupHeader applies the privacy enhancement to a sealed group
 // message's header and returns the header as it goes on the wire. Mirrors
-// matter.js GroupSession.encode (GroupSession.ts:276-286) line by line:
+// matter.js GroupSession.encode (GroupSession.ts:319-324) line by line:
 //
-//   - :276 mic = the last CRYPTO_AEAD_MIC_LENGTH_BYTES (16) of the
+//   - :319 mic = the last CRYPTO_AEAD_MIC_LENGTH_BYTES (16) of the
 //     ciphertext;
-//   - :277 privacyNonce = MessagePrivacy.buildNonce(header.sessionId, mic)
+//   - :320 privacyNonce = MessagePrivacy.buildNonce(header.sessionId, mic)
 //     — [PrivacyNonce];
-//   - :278 region = headerBytes.slice(4);
-//   - :279-284 obfuscated = MessagePrivacy.obfuscate(privacyKey, region,
+//   - :321 region = headerBytes.slice(4);
+//   - :322 obfuscated = MessagePrivacy.obfuscate(privacyKey, region,
 //     privacyNonce) — [Obfuscate];
-//   - :285 the wire header is headerBytes[0:4] followed by the obfuscated
+//   - :323 the wire header is headerBytes[0:4] followed by the obfuscated
 //     region.
 //
 // The input slices are not modified.

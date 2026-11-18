@@ -75,7 +75,7 @@ func TestGenDiag_ReadRebootCount(t *testing.T) {
 		t.Fatal("RebootCount: ok=false")
 	}
 	// Unseeded, RebootCount is 0, as matter.js starts an unset count
-	// (GeneralDiagnosticsServer.ts:102-106 at 862ad75f; W3-clucore-11).
+	// (GeneralDiagnosticsServer.ts:159-163 at db021da0; W3-clucore-11).
 	if v.(uint16) != 0 {
 		t.Fatalf("RebootCount = %v, want 0", v)
 	}

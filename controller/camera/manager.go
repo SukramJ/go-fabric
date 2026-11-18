@@ -260,14 +260,26 @@ func (s *allocationScope) returnUnlessSpent(give func(context.Context) error) (s
 	}
 }
 
-// settle runs what is due, newest first, and waits for it at most one
-// deviceCleanupBudget on the manager's clock. A chain the budget abandons
-// keeps running on a context detached from the request, as an abandoned
-// promise does, so a give-back the camera answers late still drops its
-// lease, unless the id was leased again since (dropLeaseIfCurrent). A
-// failed give-back is logged, and a stream left behind stays leased.
-// Mirrors matterjs-server packages/ws-controller/src/camera/CameraStreamManager.ts:380-398
-// at 0bd06f2.
+// settle runs what is due, newest first, on a context detached from the
+// request with one deviceCleanupBudget on the manager's clock as its
+// deadline, and returns once the chain has ended: a give-back the camera
+// does not answer is cut at the deadline, the ones after it start on the
+// ended context and send nothing, and nothing of the chain runs after
+// settle returned — outside the endpoint lock its caller holds. A failed
+// or cut give-back is logged, and a stream left behind stays leased; one
+// a cut give-back did deallocate is NotFound to a later release, which
+// drops its lease. Mirrors matterjs-server
+// packages/ws-controller/src/camera/CameraStreamManager.ts:380-398 at
+// 0bd06f2 in the order and the budget; matterjs-server abandons the chain
+// at the budget and lets it run on, since its invoke takes no abort signal
+// (packages/ws-controller/src/util/deviceCleanupBudget.ts:24-26) — Go's
+// client invoke returns at its context's deadline
+// (client/interaction/invoke_batcher.go, the ctx.Done case), so the chain
+// is bounded here, a divergence (review II, R2-P6-conc-2210, decision
+// 207). A cut invoke's exchange stops retransmitting once every command of
+// its exchange is abandoned; what it already sent can still reach the
+// camera after the lock is released, so the late-effect window is narrowed
+// to the command in flight, not closed.
 func (m *manager) settle(ctx context.Context, s *allocationScope, succeeded bool) {
 	s.mu.Lock()
 	returns := slices.Clone(s.returns)
@@ -281,22 +293,15 @@ func (m *manager) settle(ctx context.Context, s *allocationScope, succeeded bool
 	if len(due) == 0 {
 		return
 	}
-	detached := context.WithoutCancel(ctx)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for _, r := range due {
-			if err := r.give(detached); err != nil {
-				m.log.Warn("camera.cleanup.failed", slog.Any("err", err))
-			}
+	cctx, cancel := m.cleanupContext(ctx)
+	defer cancel()
+	for _, r := range due {
+		if err := r.give(cctx); err != nil {
+			m.log.Warn("camera.cleanup.failed", slog.Any("err", err))
 		}
-	}()
-	budget := m.clk.NewTimer(deviceCleanupBudget)
-	defer budget.Stop()
-	select {
-	case <-done:
-	case <-budget.C():
-		m.log.Warn("camera.cleanup.abandoned", slog.Duration("budget", deviceCleanupBudget))
+	}
+	if cctx.Err() != nil {
+		m.log.Warn("camera.cleanup.cut", slog.Duration("budget", deviceCleanupBudget))
 	}
 }
 
@@ -724,7 +729,8 @@ func exhausted(st *cameraState, allocated []OccupyingStream) *ExhaustedError {
 		e.MaxEncoders = &v
 	}
 	if st.maxEncodedPixelRate.set {
-		v := int(st.maxEncodedPixelRate.value)
+		// Saturated on a 32-bit build (review II, R2-P6-bound-2250).
+		v := floorInt(st.maxEncodedPixelRate.value)
 		e.MaxPixelRate = &v
 	}
 	return e

@@ -9,6 +9,10 @@
   [`../concept-v2-scope-extension.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v2-scope-extension.md)
   decision 0.1, phase 7). The non-goal it supersedes is retired; phase 7
   starts with stage 1.
+  Note (2026-11-18, review II, R2-P6-doc-3086): decision 4 ("On-network only")
+  is superseded by [ADR 0024](./0024-ble-commissioning-in-the-controller.md):
+  the commissioner commissions over BLE and provisions Wi-Fi or Thread
+  credentials (`controller/commissioner/commissioner.go`, `Channel`).
 - **Date**: 2026-10-13
 - **Related**:
   [ADR 0008 — subscription resumption (the narrow CASE initiator)](./0008-subscription-resumption.md),

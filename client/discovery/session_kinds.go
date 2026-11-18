@@ -17,7 +17,7 @@ import (
 
 // FindInstance finds one device and returns it — matter.js InstanceDiscovery
 // (packages/node/src/behavior/system/controller/discovery/InstanceDiscovery.ts:18-46
-// at 862ad75f): the first device found is the result and stops the
+// at db021da0): the first device found is the result and stops the
 // search (:25-32); once found, a later interruption is ignored (:37-39);
 // none found is [ErrDeviceNotDiscovered] (:41-45).
 func FindInstance(ctx context.Context, transports []Transport, opts SessionOptions) *Session[Candidate] {

@@ -52,6 +52,10 @@ Recovered panics are intentionally suppressed — the underlying bug
 is fixed at the source, but the receive loop survives the malformed
 input that exposed it.
 
+*Note, 2026-11-18:* `safeDispatch` is the UDP listener's
+(`transport/udp/listener.go`, `Listener.safeDispatch`), not the bridge's
+(review II, R2-P6-doc-3075).
+
 **Why this is non-obvious:** "panics indicate bugs, let them
 surface" is the standard Go advice. It does not apply when the
 parser receives untrusted wire bytes — a single bad datagram must
@@ -64,6 +68,13 @@ Matter §10.6.1.4 lists `DataVersion` as a required field of every
 Read response (not just subscriptions) and rejects entries missing
 the tag-0 element. `AttributeReport.DataVersion` defaults to 1 on
 the wire when the bridge has no per-cluster version tracking.
+
+*Note, 2026-11-18:* every cluster instance now carries its own DataVersion,
+and it goes out as it is, 0 included (`im/read.go`, review II decision 46);
+there is no default of 1. The check this section rests on is
+connectedhomeip's `ReadClient` (`src/app/ReadClient.cpp:858-859` at
+`6170af84`); chip-tool has no `ClusterStateCache` (review II,
+R2-P6-doc-3075, -3312).
 
 **Why this is non-obvious:** the spec narrative for DataVersion
 focuses on subscription-cache invalidation, easy to read as "only

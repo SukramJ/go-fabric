@@ -9,7 +9,7 @@ import (
 )
 
 // TestGroupSessionIDDerivationParityMatterJS mirrors
-// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:174-183 at 862ad75f
+// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:174-183 at db021da0
 // ("validate group session id derivation"): HKDF-SHA256 "GroupKeyHash"
 // over the operational group key a6f5…d960 with an empty salt, two bytes
 // read big-endian, is 0xB9F7 (SessionID).

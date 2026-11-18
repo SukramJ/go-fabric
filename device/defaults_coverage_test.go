@@ -189,7 +189,7 @@ func TestWindowCoveringDefaultTakesTheDeclaration(t *testing.T) {
 		t.Fatalf("with transitions: %v", err)
 	}
 	// Lift alone is served, as matter.js serves it (WindowCoveringServer.ts:123-141
-	// at 862ad75f); AbsolutePosition is not.
+	// at db021da0); AbsolutePosition is not.
 	b.opts.Features = 0x1
 	if _, err := selfHeldDefaults[wcdef.ClusterID](b); err != nil {
 		t.Errorf("Lift alone: %v", err)

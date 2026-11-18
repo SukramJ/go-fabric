@@ -75,8 +75,14 @@ func TestParityMatterJS_BridgedVendorNameComesFromTheHost(t *testing.T) {
 	if v, ok := read(t, base, spec("")); ok {
 		t.Errorf("VendorName with neither = %v, want the attribute not served", v)
 	}
+	// A VendorName beyond the constraint refuses the assembly rather than
+	// being served cut (R2-P6-wire-2502, decision 201).
+	a, err := endpoint.New(endpointtest.NewFakeStore(), base, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	long := strings.Repeat("v", 40)
-	if v, ok := read(t, base, spec(long)); !ok || v != long[:32] {
-		t.Errorf("a 40-byte VendorName read %v, want the 32-byte constraint applied", v)
+	if _, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{spec(long)}}}); err == nil || !strings.Contains(err.Error(), "VendorName") {
+		t.Errorf("a 40-character VendorName: %v, want the assembly refused naming VendorName", err)
 	}
 }

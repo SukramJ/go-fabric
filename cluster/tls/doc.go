@@ -10,7 +10,7 @@
 // TLSClientManagementCluster.cpp and their example delegates' tables);
 // matter.js's server for each is the generated behaviour
 // (TlsCertificateManagementServer.ts:14, TlsClientManagementServer.ts:14
-// at 862ad75f).
+// at db021da0).
 //
 // The module keeps the tables and their rules — the size bounds, the
 // per-fabric capacities, the node-wide ids, the duplicate and dependency

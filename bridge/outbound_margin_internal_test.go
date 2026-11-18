@@ -53,7 +53,7 @@ func TestOutboundTrackerMarginJoinsTheBaseInterval(t *testing.T) {
 // budget on the MRP schedule, not on consecutive pump ticks. matter.js
 // counts the retransmission before it sends and, on a send error that is
 // not a closed session, still arms the next one with the computed
-// backoff (MessageExchange.ts:905-906, :975-981 at 862ad75f).
+// backoff (MessageExchange.ts:941-942, :1008-1014 at db021da0).
 func TestOutboundTrackerFailedSendFollowsTheBackoffSchedule(t *testing.T) {
 	t.Parallel()
 	const base = 300 * time.Millisecond

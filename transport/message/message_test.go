@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -565,23 +566,98 @@ func TestProtocolHeaderWithSecuredExt(t *testing.T) {
 }
 
 // TestSessionOrderKey: the order key is the session id of a unicast secure
-// message; the unsecured session (id 0, the PASE / CASE handshakes), group
-// messages and a datagram too short for the header have none.
+// message and, for an unsecured message, the node id of the handshake's
+// initiator — its destination node id when it carries one, else its source
+// node id (review II, N3-coord-1); group messages, an unsecured message
+// without a node id and a datagram too short for its header have none.
 func TestSessionOrderKey(t *testing.T) {
 	t.Parallel()
+	unsecured := func(src, dst *uint64) []byte {
+		h := Header{SessionID: 0, MessageCounter: 7}
+		if src != nil {
+			h.HasSourceNodeID, h.SourceNodeID = true, *src
+		}
+		if dst != nil {
+			h.DestSize, h.DestNodeID = DestNodeID, *dst
+		}
+		return h.Marshal()
+	}
+	a, b := uint64(0x1122334455667788), uint64(0x0102030405060708)
+	keyOf := func(buf []byte) uint32 {
+		k, ok := SessionOrderKey(buf)
+		if !ok {
+			t.Fatalf("no key for % x", buf)
+		}
+		return k
+	}
 	for name, tc := range map[string]struct {
 		buf  []byte
 		key  uint32
 		want bool
 	}{
-		"unicast secure": {[]byte{0x00, 0x34, 0x12, 0x00}, 0x1234, true},
-		"unsecured":      {[]byte{0x00, 0x00, 0x00, 0x00}, 0, false},
-		"group":          {[]byte{0x00, 0x34, 0x12, 0x01}, 0, false},
-		"short":          {[]byte{0x00, 0x34}, 0, false},
+		"unicast secure":               {[]byte{0x00, 0x34, 0x12, 0x00}, 0x1234, true},
+		"unsecured, no node id":        {unsecured(nil, nil), 0, false},
+		"group":                        {[]byte{0x00, 0x34, 0x12, 0x01}, 0, false},
+		"short":                        {[]byte{0x00, 0x34}, 0, false},
+		"unsecured, short":             {unsecured(&a, nil)[:10], 0, false},
+		"unsecured, short destination": {unsecured(&a, &b)[:20], 0, false},
 	} {
 		key, ok := SessionOrderKey(tc.buf)
 		if ok != tc.want || (ok && key != tc.key) {
 			t.Errorf("%s: (%#x, %v), want (%#x, %v)", name, key, ok, tc.key, tc.want)
+		}
+	}
+	request, response := keyOf(unsecured(&a, nil)), keyOf(unsecured(nil, &a))
+	if request != response {
+		t.Errorf("an initiator's request (source %#x) and the response to it (destination %#x) key %#x and %#x; want one stream", a, a, request, response)
+	}
+	if request < 1<<16 {
+		t.Errorf("unsecured key %#x is in the session ids' range", request)
+	}
+	if other := keyOf(unsecured(&b, nil)); other == request {
+		t.Errorf("initiators %#x and %#x share key %#x", a, b, other)
+	}
+	if both := keyOf(unsecured(&b, &a)); both != request {
+		t.Errorf("a message naming both ids keys %#x, want the destination's %#x", both, request)
+	}
+}
+
+// TestUnmarshalHeaderEdges holds the decoder at the edges of its bounds
+// (R2-P5-tmut-18 rest): a zero-length message extension decodes to a nil
+// block, as a header built without one; a header built in memory with a
+// three-byte Raw takes its nonce byte from the typed fields; and a
+// truncated protocol header names the field it cut — the vendor id of a
+// V-flagged header two bytes short of it, the protocol id of a four-byte
+// header.
+func TestUnmarshalHeaderEdges(t *testing.T) {
+	t.Parallel()
+	// flags, session id 1, security flags with the extension bit, counter 1,
+	// then a zero-length extension block.
+	h, _, err := UnmarshalHeader([]byte{0x00, 0x01, 0x00, secFlagExtensions, 1, 0, 0, 0, 0x00, 0x00})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !h.HasExtension || h.MessageExtension != nil {
+		t.Errorf("zero-length extension: HasExtension %v, MessageExtension %#v; want true, nil", h.HasExtension, h.MessageExtension)
+	}
+
+	built := Header{SessionType: SessionGroup, Raw: []byte{0x00, 0x00, 0x00}}
+	if got, want := built.NonceSecurityFlags(), built.SecurityFlags(); got != want {
+		t.Errorf("NonceSecurityFlags with a three-byte Raw = %#x, want the typed %#x", got, want)
+	}
+
+	for _, tc := range []struct {
+		name string
+		buf  []byte
+		want string
+	}{
+		{"four bytes", []byte{0x00, 0x00, 0x01, 0x00}, "protocol id"},
+		{"V flag, six bytes", []byte{exchFlagVendor, 0x00, 0x01, 0x00, 0xF1, 0xFF}, "protocol id"},
+		{"V flag, five bytes", []byte{exchFlagVendor, 0x00, 0x01, 0x00, 0xF1}, "vendor id"},
+	} {
+		_, _, err := UnmarshalProtocolHeader(tc.buf)
+		if !errors.Is(err, ErrTruncated) || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v, want ErrTruncated naming the %s", tc.name, err, tc.want)
 		}
 	}
 }

@@ -422,16 +422,19 @@ var (
 
 // chip-tool prints three different success lines during a commissioning and
 // only the last of them means the flow finished. All three were read out of
-// the connectedhomeip tree AT THE PINNED COMMIT — the tag in the Makefile's
-// CHIP_CERT_BINS_IMAGE — not from a newer checkout and not from convention
-// (examples/chip-tool/commands/pairing/PairingCommand.cpp at
-// 6feac778f196483b6355d35fc529f183b293b71f):
+// the connectedhomeip tree AT THE PINNED COMMITS — not from a newer checkout
+// and not from convention — in examples/chip-tool/commands/pairing/
+// PairingCommand.cpp: at 6feac778f196483b6355d35fc529f183b293b71f, the tag in
+// the Makefile's CHIP_CERT_BINS_IMAGE (the host fallback), and at 6170af84,
+// the harness commit of the CHIP image the suite runs in
+// (CHIP_TEST_IMAGE_COMMIT):
 //
-//	:489  "Secure Pairing Success"
-//	:490  "CASE establishment successful"   — OnStatusUpdate
-//	:503  "Pairing Success"
-//	:504  "PASE establishment successful"   — OnPairingComplete
-//	:539  "Device commissioning completed with success" — OnCommissioningComplete
+//	6feac778 6170af84
+//	:489     :590      "Secure Pairing Success"
+//	:490     :591      "CASE establishment successful"   — OnStatusUpdate
+//	:503     :604      "Pairing Success"
+//	:504     :605      "PASE establishment successful"   — OnPairingComplete
+//	:539     :644      "Device commissioning completed with success" — OnCommissioningComplete
 //
 // The distinction is the whole point of this guard. "Pairing Success" is
 // printed when PASE alone has finished; a run that establishes PASE and then

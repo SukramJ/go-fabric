@@ -29,6 +29,25 @@ const (
 	disconnectTimeout = 5 * time.Second
 )
 
+// The bounds of what a proxy makes a connection hold, this module's own
+// (R2-P6-bound-2002, R2-P6-bound-2004).
+const (
+	// maxGATTAttributes bounds the services, characteristics and
+	// descriptors one services read collects. A commissionee's database
+	// has a few dozen; past the bound the read fails and the connection
+	// ends, where the reply frames would otherwise accumulate for as long
+	// as the read runs.
+	maxGATTAttributes = 1024
+	// maxQueuedIndications bounds the C2 indications waiting for the
+	// subscriber: the largest window a BTP session negotiates
+	// (btp.MaximumWindowSize), so a peripheral that keeps to its window
+	// never reaches it. Past it the connection ends.
+	maxQueuedIndications = btp.MaximumWindowSize
+)
+
+// errGATTDatabaseTooLarge is a services read past maxGATTAttributes.
+var errGATTDatabaseTooLarge = fmt.Errorf("esphome: the GATT database exceeds %d attributes", maxGATTAttributes)
+
 // Characteristic properties (Bluetooth Core, Vol 3, Part G, §3.3.1.1).
 const (
 	propNotify   = 0x10
@@ -58,7 +77,9 @@ type op struct {
 	handle   uint32
 	services bool
 	got      []wire.GATTService
-	done     chan reply
+	// attrs counts got's services, characteristics and descriptors.
+	attrs int
+	done  chan reply
 }
 
 // connection is a GATT connection to one peripheral through one proxy.
@@ -69,7 +90,9 @@ type connection struct {
 	log     *slog.Logger
 	clk     clock.Clock
 
-	// Set once by connect, read-only after.
+	// Set once by connect, read-only after; c2 is read under mu by the
+	// API reader as well, which is live before connect returns
+	// (R2-P6-conc-2007).
 	mtu                int
 	c1, c2, cccd, c3   uint32
 	c2Props            uint32
@@ -119,11 +142,18 @@ func (k *connection) onReply(typ uint16, m *wire.AddressHandle, svc *wire.Blueto
 	k.mu.Lock()
 	o := k.pending
 	var r *reply
+	overrun := false
 	switch {
 	case o == nil:
 	case typ == wire.TypeBluetoothGATTErrorResponse && (o.services || m.Handle == o.handle):
 		r = &reply{err: &GATTError{Op: o.name, Handle: m.Handle, Code: m.Error}}
 	case o.services && typ == wire.TypeBluetoothGATTGetServicesResponse:
+		o.attrs += countAttributes(svc.Services)
+		if o.attrs > maxGATTAttributes {
+			o.got, overrun = nil, true
+			r = &reply{err: errGATTDatabaseTooLarge}
+			break
+		}
 		o.got = append(o.got, svc.Services...)
 	case o.services && typ == wire.TypeBluetoothGATTGetServicesDoneResponse:
 		r = &reply{services: o.got}
@@ -137,6 +167,23 @@ func (k *connection) onReply(typ uint16, m *wire.AddressHandle, svc *wire.Blueto
 	if r != nil {
 		o.done <- *r
 	}
+	if overrun {
+		k.log.Info("ble.esphome.gatt_database_too_large", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.Int("max", maxGATTAttributes))
+		k.endLocally()
+	}
+}
+
+// countAttributes is the services, characteristics and descriptors of a
+// services frame.
+func countAttributes(ss []wire.GATTService) int {
+	n := len(ss)
+	for _, s := range ss {
+		n += len(s.Characteristics)
+		for _, c := range s.Characteristics {
+			n += len(c.Descriptors)
+		}
+	}
+	return n
 }
 
 // do runs one operation: m sent, its reply awaited for d. An operation that
@@ -204,6 +251,7 @@ func (k *connection) discover(ctx context.Context) error {
 		}
 		return shortWords(u.Short)
 	}
+	var c1, c2, c2Props, cccd, c3 uint32
 	for _, s := range r.services {
 		if words(s.UUID) != serviceWords {
 			continue
@@ -211,22 +259,27 @@ func (k *connection) discover(ctx context.Context) error {
 		for _, c := range s.Characteristics {
 			switch words(c.UUID) {
 			case c1Words:
-				k.c1 = c.Handle
+				c1 = c.Handle
 			case c2Words:
-				k.c2, k.c2Props = c.Handle, c.Properties
+				c2, c2Props = c.Handle, c.Properties
 				for _, d := range c.Descriptors {
 					if words(d.UUID) == cccdWords {
-						k.cccd = d.Handle
+						cccd = d.Handle
 					}
 				}
 			case c3Words:
-				k.c3 = c.Handle
+				c3 = c.Handle
 			}
 		}
 	}
-	if k.c1 == 0 || k.c2 == 0 || k.cccd == 0 {
+	if c1 == 0 || c2 == 0 || cccd == 0 {
 		return ErrNoMatterService
 	}
+	// The reader may be in onNotify now: the handles are published under
+	// the lock it reads c2 under.
+	k.mu.Lock()
+	k.c1, k.c2, k.c2Props, k.cccd, k.c3 = c1, c2, c2Props, cccd, c3
+	k.mu.Unlock()
 	return nil
 }
 
@@ -387,19 +440,28 @@ func (k *connection) markGone() {
 
 // onNotify is a BluetoothGATTNotifyDataResponse for the connection.
 func (k *connection) onNotify(handle uint32, data []byte) {
-	if handle != k.c2 {
+	k.mu.Lock()
+	if handle != k.c2 || k.on == nil {
+		k.mu.Unlock()
 		return
 	}
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	if k.on == nil {
+	if len(k.queue) >= maxQueuedIndications {
+		k.queue = nil
+		k.mu.Unlock()
+		k.log.Info("ble.esphome.indications_overrun", slog.String("proxy", k.p.name), slog.String("address", k.address), slog.Int("max", maxQueuedIndications))
+		k.endLocally()
 		return
 	}
 	k.queue = append(k.queue, data)
 	if !k.delivering {
 		k.delivering = true
-		go k.deliver()
+		// Counted in the central's run loops, so Close waits for a
+		// handler in flight (R2-P6-conc-2011). onNotify runs on the
+		// reader of a connection a run loop holds, so the count is not
+		// zero here.
+		k.p.c.wg.Go(k.deliver)
 	}
+	k.mu.Unlock()
 }
 
 // deliver hands the queued indications to the subscriber, in order, until

@@ -58,7 +58,7 @@ func FuzzDecoderNext(f *testing.F) {
 	f.Add([]byte{0x38})                         // end-of-container carrying a context tag-control
 	f.Add([]byte{0x16, 0x24, 0x01, 0x05, 0x18}) // context tag inside an array
 	// Implicit-profile tags, refused as malformed data before their tag
-	// bytes are read (TlvCodecTest.ts:59-75 at 862ad75f).
+	// bytes are read (TlvCodecTest.ts:59-75 at db021da0).
 	f.Add([]byte{0x84, 0x01, 0x00})                   // implicit profile tag, 2 octets
 	f.Add([]byte{0xA4, 0x01, 0x00, 0x00, 0x00})       // implicit profile tag, 4 octets
 	f.Add([]byte{0x15, 0x84, 0x01, 0x00, 0x2A, 0x18}) // inside a structure

@@ -43,7 +43,7 @@ const (
 	// ViolationUnimplemented: a command the conformance of a server
 	// cluster requires is the server's unimplemented stub — matter.js's
 	// "Throws unimplemented exception" of #validateRequiredCommands
-	// (ValidatedElements.ts:357-372 at 862ad75f), which matter.js logs, and
+	// (ValidatedElements.ts:357-372 at db021da0), which matter.js logs, and
 	// under strict validation refuses, when it constructs the behavior,
 	// not as a device-type violation. Its DeviceType names the cluster,
 	// its Requirement "<cluster>.<command>".
@@ -98,7 +98,7 @@ type DeviceTypeViolation struct {
 	// refuses it and reports it apart ([DeviceTypeVerdict].FreshAssertedAtRoot).
 	// Mirrors matter.js DeviceTypeViolation.assertedAtRoot
 	// (packages/model/src/logic/device-types/DeviceTypeViolation.ts:53-59
-	// at 862ad75f).
+	// at db021da0).
 	AssertedAtRoot bool
 }
 
@@ -386,7 +386,7 @@ type DeviceTypeVerdict struct {
 	// apart from Fresh: what matter.js logs at debug level as "does not
 	// meet requirements that device types of its node assert at the Root"
 	// and never refuses (DeviceTypeConformanceService.ts:401, :433-442 at
-	// 862ad75f).
+	// db021da0).
 	FreshAssertedAtRoot []DeviceTypeViolation
 }
 
@@ -440,7 +440,7 @@ func (v *DeviceTypeValidator) Mode() DeviceTypeValidationMode { return v.mode }
 // A violation flagged [DeviceTypeViolation].AssertedAtRoot is never
 // refused and is reported apart, in FreshAssertedAtRoot; once it binds it
 // is fresh again (DeviceTypeConformanceService.ts:401, :433-442, :479-494
-// at 862ad75f).
+// at db021da0).
 //
 // A refusal returns a *DeviceTypeConformanceError with the refused
 // endpoints' new violations and records nothing, so the next validation
@@ -503,7 +503,7 @@ func (v *DeviceTypeValidator) judge(all []DeviceTypeViolation, shape treeShape) 
 		// A mandatory command left unimplemented is reported whatever the
 		// mode: matter.js warns of it when it constructs the behavior,
 		// which the device-type validation mode does not switch off
-		// (ValidatedElements.ts:154-180 report, :357-372 at 862ad75f).
+		// (ValidatedElements.ts:154-180 report, :357-372 at db021da0).
 		var verdict DeviceTypeVerdict
 		reported := map[uint16]map[string]bool{}
 		for i := range all {
@@ -532,7 +532,7 @@ func (v *DeviceTypeValidator) judge(all []DeviceTypeViolation, shape treeShape) 
 		byEndpoint[viol.Endpoint][viol.Key()] = viol.AssertedAtRoot
 		// A violation that loses its Root-assertion flag now binds, so it
 		// is reported again (#judge, DeviceTypeConformanceService.ts:479-494
-		// at 862ad75f).
+		// at db021da0).
 		if flagged, ok := v.reported[viol.Endpoint][viol.Key()]; ok && (!flagged || viol.AssertedAtRoot) {
 			continue
 		}
@@ -570,7 +570,7 @@ func (v *DeviceTypeValidator) judge(all []DeviceTypeViolation, shape treeShape) 
 // endpoint in tree order that has one (of those within names, when within
 // is not nil): matter.js refuses that endpoint alone, before the behaviors
 // initialize and before the pass judges anything else
-// (DeviceTypeConformanceService.ts:371-382 #assertPlacement at 862ad75f,
+// (DeviceTypeConformanceService.ts:371-382 #assertPlacement at db021da0,
 // DeviceTypeConformance.misplacedSingletons' first entry).
 func firstMisplacing(vs []DeviceTypeViolation, within map[uint16]bool) []DeviceTypeViolation {
 	var out []DeviceTypeViolation

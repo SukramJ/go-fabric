@@ -567,7 +567,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		// Seeded by the daemon via [SetPersistedCounters]; 0 when
 		// persistence is not wired, as matter.js starts an unset
 		// RebootCount at 0 and counts the later boots
-		// (GeneralDiagnosticsServer.ts:102-106 at 862ad75f; W3-clucore-11).
+		// (GeneralDiagnosticsServer.ts:159-163 at db021da0; W3-clucore-11).
 		if g.persistedSeeded {
 			return g.rebootCount, true
 		}

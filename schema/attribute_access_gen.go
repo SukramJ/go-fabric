@@ -282,7 +282,7 @@ var attributeReadPrivileges = map[uint32]map[uint32]uint8{
 
 // changesOmittedAttributes lists every attribute whose matter.js quality
 // carries "C" (changesOmitted): a change to it is never reported to a
-// subscriber. Generated from the quality strings in parity/schema.json.
+// subscriber. Generated from the effective quality in parity/schema.json.
 var changesOmittedAttributes = map[uint32]map[uint32]struct{}{
 	0x001F: { // AccessControl
 		0x0007: {}, // AuxiliaryAcl "C"

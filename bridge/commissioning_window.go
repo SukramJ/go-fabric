@@ -328,7 +328,7 @@ func (w *CommissioningWindow) RequestedDurationSeconds() uint16 {
 // timeout is not clamped to 16 bits, so the node's own 48-hour window
 // reads as it runs. matter.js keeps the same three in the window's timer
 // (packages/protocol/src/protocol/DeviceCommissioner.ts:256-265 at
-// 862ad75f, `Time.getTimer("Commissioning timeout", timeout ?? …)`).
+// db021da0, `Time.getTimer("Commissioning timeout", timeout ?? …)`).
 func (w *CommissioningWindow) Timing() (openedAt, deadline time.Time, timeout time.Duration) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -1095,7 +1095,7 @@ func RandomDiscriminator() (uint16, error) {
 // from the §5.1.1.1.1 valid-passcode set: a candidate that fails
 // [setup.IsValidPasscode] — 0, the all-same-digit values 11111111..99999999,
 // 12345678 and 87654321, matter.js packages/types/src/schema/
-// PairingCodeSchema.ts:160-162 INVALID_PASSCODES at 862ad75f — is
+// PairingCodeSchema.ts:160-162 INVALID_PASSCODES at db021da0 — is
 // re-rolled, as matter.js PaseClient.generateRandomPasscode does
 // (packages/protocol/src/session/pase/PaseClient.ts:55-67). The rule is
 // that one function; this one only draws.
@@ -1131,12 +1131,13 @@ func RandomSalt() ([]byte, error) {
 // Commissioning window timeout constants.
 //
 //   - commissioningWindowMaxSec — standard upper bound for a commissioned
-//     bridge per Matter §11.19.8.1 (chip CommissioningWindowManager.cpp
-//     kMaxCommissioningTimeout = 900 s).
+//     bridge per Matter §11.19.8.1 (chip CommissioningWindowManager.cpp:318-330
+//     MaxCommissioningTimeout() at 6170af84: 15 × 60 s = 900 s).
 //   - commissioningWindowMaxSecUncommissioned — extended upper bound for an
 //     uncommissioned node (FabricCount == 0) per Matter §11.19.8.1 and chip
 //     CommissioningWindowManager.cpp::MaxCommissioningTimeout() which returns
-//     172 800 s (48 h) when the fabric table is empty.
+//     172 800 s (48 h) when the fabric table is empty and
+//     CHIP_DEVICE_CONFIG_EXT_ADVERTISING is set.
 const (
 	commissioningWindowMaxSec               = uint16(900)
 	commissioningWindowMaxSecUncommissioned = uint32(172800) // 48 h per Matter §11.19.8.1

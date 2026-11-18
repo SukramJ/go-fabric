@@ -18,7 +18,7 @@ func (panickingConnector) ConnectOtaProvider(context.Context, uint8, uint64) (Ot
 // TestOTARequestor_QueryRunningClearedOnPanic: a query that panics still
 // clears queryRunning, so the next timer queries again — matter.js clears
 // it in a finally block (OtaSoftwareUpdateRequestorServer.ts:576-581 at
-// 0ceb202d).
+// db021da0).
 func TestOTARequestor_QueryRunningClearedOnPanic(t *testing.T) {
 	t.Parallel()
 	h := newOtaHarness(t, func(c *OTARequestorConfig) { c.Connector = panickingConnector{} })

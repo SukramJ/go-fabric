@@ -44,7 +44,7 @@ var errServiceType = errors.New("discovery: browse: empty service type")
 // closes.
 //
 // matter.js browses no foreign service type: its DnssdNames
-// (packages/general/src/net/dns-sd/DnssdNames.ts at 862ad75f) is generic,
+// (packages/general/src/net/dns-sd/DnssdNames.ts at db021da0) is generic,
 // and MdnsService narrows it to Matter's types
 // (packages/protocol/src/mdns/MdnsService.ts:27, :90-94). Browse widens
 // the same cache for one type by an ingress filter, as the commissionable
@@ -105,13 +105,53 @@ func (b *browse) start() {
 	b.cancel, _ = b.n.solicitor.discover(&solicitation{name: b.ptr, types: []mdns.DNSType{TypePTR}}, nil)
 }
 
-// follow opens a view of every instance the type's PTR records name.
+// follow opens a view of every instance the type's PTR records name and
+// closes the view of every instance they no longer name — its PTR expired,
+// was withdrawn or evicted from the cache — with the SRV targets only it
+// asked for, so what a browse holds stays within what the cache holds
+// ([maxCachedRecords]) however many instances a sender names over the
+// browse (review II, R2-P6-bound-2151).
 func (b *browse) follow() {
+	named := make(map[string]bool)
 	for _, r := range b.ptr.records.values() {
 		if r.Type != TypePTR || !b.matches(&Record{Name: r.PTR}) {
 			continue
 		}
-		b.track(strings.TrimSuffix(r.PTR, "."))
+		qname := strings.TrimSuffix(r.PTR, ".")
+		named[strings.ToLower(qname)] = true
+		b.track(qname)
+	}
+	dropped := false
+	for _, key := range b.instances.snapshotKeys() {
+		if named[key] {
+			continue
+		}
+		in, _ := b.instances.get(key)
+		b.instances.del(key)
+		in.svc.name.off(in.obs)
+		in.svc.close()
+		dropped = true
+	}
+	if dropped {
+		b.pruneHosts()
+	}
+}
+
+// pruneHosts forgets the SRV targets no tracked instance names any more;
+// one named again is asked for again.
+func (b *browse) pruneHosts() {
+	targets := make(map[string]bool, len(b.hosts))
+	for _, in := range b.instances.values() {
+		for _, r := range in.svc.name.records.values() {
+			if r.Type == TypeSRV {
+				targets[strings.ToLower(strings.TrimSuffix(r.SRV.Target, "."))] = true
+			}
+		}
+	}
+	for host := range b.hosts {
+		if !targets[host] {
+			delete(b.hosts, host)
+		}
 	}
 }
 
@@ -122,7 +162,7 @@ func (b *browse) track(qname string) {
 	if b.instances.has(key) {
 		return
 	}
-	in := &browsed{svc: newService(b.n, qname)}
+	in := &browsed{svc: newService(b.n, qname, false)}
 	nm := in.svc.name
 	in.obs = &nameObserver{fn: func(c Changes) { b.resolveHosts(c.Name) }}
 	nm.on(in.obs)
@@ -146,7 +186,13 @@ func (b *browse) track(qname string) {
 }
 
 // resolveHosts asks once for the addresses of an SRV target that has none.
+// The targets asked for are pruned to those of the tracked instances when
+// they reach twice the cache's bound, so SRV records that come and go
+// under instances that stay do not grow them either.
 func (b *browse) resolveHosts(nm *Name) {
+	if len(b.hosts) >= 2*maxCachedRecords {
+		b.pruneHosts()
+	}
 	for _, r := range nm.records.values() {
 		if r.Type != TypeSRV {
 			continue

@@ -127,7 +127,7 @@ func part(t *testing.T, owner *Device, name string, conds []string, with ...Decl
 // (namespace 0x44, tag 0x06), ClosurePanelTag.Lift (0x45, 0x00) and
 // CommodityTariffCommodityTag.ElectricalEnergy (0x0D, 0x00), the ids of
 // packages/node/src/tags/{ClosureTag,ClosurePanelTag,
-// CommodityTariffCommodityTag}.ts at 862ad75f.
+// CommodityTariffCommodityTag}.ts at db021da0.
 var fixtureTags = map[string][]SemanticTag{
 	"Closure":                {closureDoorTag},
 	"ClosurePanel":           {{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x45, Tag: 0x00}},
@@ -245,7 +245,7 @@ var fixtures = map[string]fixture{
 	"OccupancySensor": {with: opts(feat(0x0406, occdef.FeaturePassiveInfrared))},
 	// The composites' components are parts (brief 27-B §4): matter.js
 	// counts a simple component only on an endpoint below the composite
-	// (DeviceTypeConformance.ts:596-613 at 862ad75f).
+	// (DeviceTypeConformance.ts:596-613 at db021da0).
 	"FloodlightCamera": {parts: func(t *testing.T, d *Device) {
 		t.Helper()
 		part(t, d, "OnOffLight", nil)

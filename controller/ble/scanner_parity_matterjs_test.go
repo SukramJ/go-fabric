@@ -860,6 +860,29 @@ func wantAddrs(t *testing.T, got []string, addrs ...string) {
 	}
 }
 
+// waitAddrs waits until the discovery's callback has offered len(addrs)
+// peripherals, then holds the offers to addrs. settle orders nothing
+// against the callback: FindContinuously registers its next waiter
+// (nextRound) before it runs the round's callbacks, so a read right after
+// settle can run before the callback (R2-P6-test-3103, N4-d4gate-2). A
+// positive read therefore waits on what it checks.
+func waitAddrs(t *testing.T, s *Scanner, got *collector, addrs ...string) {
+	t.Helper()
+	eventually(t, s, func() bool { return len(got.get()) >= len(addrs) }, "the discovery's offers")
+	wantAddrs(t, got.get(), addrs...)
+}
+
+// endAddrs closes the scanner, waits for the discovery res to return —
+// every callback of its rounds has run then — and holds the offers to
+// addrs: the read that also catches a callback still pending when an
+// earlier read ran (R2-P6-test-3103).
+func endAddrs(t *testing.T, s *Scanner, res <-chan findResult, got *collector, addrs ...string) {
+	t.Helper()
+	_ = s.Close(bg)
+	recv(t, res)
+	wantAddrs(t, got.get(), addrs...)
+}
+
 var bg = context.Background()
 
 // TestBleScannerDeduplicationAndAging covers the rest of
@@ -898,9 +921,7 @@ func TestBleScannerDeduplicationAndAging(t *testing.T) {
 		var got collector
 		res := goFindContinuously(bg, s, sd6, got.add, 0)
 		settle(t, s, 1)
-		wantAddrs(t, got.get())
-		_ = s.Close(bg)
-		recv(t, res)
+		endAddrs(t, s, res, &got)
 	})
 	t.Run("still resolves a stale peripheral for a channel open", func(t *testing.T) {
 		clock := newFakeClock()
@@ -923,8 +944,7 @@ func TestBleScannerDeduplicationAndAging(t *testing.T) {
 		res := goFindContinuously(bg, s, sd6, got.add, 0)
 		settle(t, s, 1)
 		c.discover(addrA, serviceDataA)
-		settle(t, s, 1)
-		wantAddrs(t, got.get(), addrA)
+		waitAddrs(t, s, &got, addrA)
 		clock.Advance(61 * time.Second)
 		want(t, s.Discovered(sd6))
 		_ = s.Close(bg)
@@ -1134,10 +1154,8 @@ func TestBleScannerReachabilityCases(t *testing.T) {
 		wantAddrs(t, got.get())
 		c.setReachable(addrA, true)
 		c.discover(addrA, serviceDataA)
-		settle(t, s, 1)
-		wantAddrs(t, got.get(), addrA)
-		_ = s.Close(bg)
-		recv(t, res)
+		waitAddrs(t, s, &got, addrA)
+		endAddrs(t, s, res, &got, addrA)
 	})
 	t.Run("hands a discovery a peripheral that became unreachable before the discovery started", func(t *testing.T) {
 		c := newProxy(newFakeClock())
@@ -1150,10 +1168,8 @@ func TestBleScannerReachabilityCases(t *testing.T) {
 		wantAddrs(t, got.get())
 		c.setReachable(addrA, true)
 		c.discover(addrA, serviceDataA)
-		settle(t, s, 1)
-		wantAddrs(t, got.get(), addrA)
-		_ = s.Close(bg)
-		recv(t, res)
+		waitAddrs(t, s, &got, addrA)
+		endAddrs(t, s, res, &got, addrA)
 	})
 	t.Run("offers a peripheral once however often it advertises", func(t *testing.T) {
 		c := newProxy(newFakeClock())
@@ -1162,12 +1178,10 @@ func TestBleScannerReachabilityCases(t *testing.T) {
 		res := goFindContinuously(bg, s, d1737, got.add, 0)
 		settle(t, s, 1)
 		c.discover(addrA, serviceDataA)
-		settle(t, s, 1)
+		waitAddrs(t, s, &got, addrA)
 		c.discover(addrA, serviceDataA)
 		settle(t, s, 1)
-		wantAddrs(t, got.get(), addrA)
-		_ = s.Close(bg)
-		recv(t, res)
+		endAddrs(t, s, res, &got, addrA)
 	})
 	t.Run("keeps offering peripherals for a client that states no reachability", func(t *testing.T) {
 		c := newListening(newFakeClock())
@@ -1426,10 +1440,10 @@ func TestBleScannerOverlapping(t *testing.T) {
 			t.Fatal("the scan stopped with a discovery still running")
 		}
 		c.discover(addrA, serviceDataA)
-		settle(t, s, 1)
-		wantAddrs(t, got.get(), addrA)
+		waitAddrs(t, s, &got, addrA)
 		s.Cancel(sd6)
 		recv(t, running)
+		wantAddrs(t, got.get(), addrA)
 		if c.isScanning() {
 			t.Fatal("still scanning")
 		}

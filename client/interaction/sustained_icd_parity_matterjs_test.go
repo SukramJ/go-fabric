@@ -293,6 +293,10 @@ func TestSustainedSubscriptionICD(t *testing.T) {
 				r.wantAttempts(1)
 				r.wantActive(true)
 				r.lose()
+				// Lost before it lasted the retry schedule's first interval:
+				// replaced after it, where matter.js replaces at once (review
+				// II, R2-P6-fsm-2110).
+				r.advance(15 * time.Second)
 				r.wantAttempts(2)
 				if r.prov.probeCount() != 1 {
 					t.Fatalf("%d probes", r.prov.probeCount())
@@ -552,6 +556,7 @@ func TestSustainedSubscriptionICD(t *testing.T) {
 				w.SetRequiresAwait(false)
 				r.wantAttempts(2)
 				r.lose()
+				r.advance(15 * time.Second) // R2-P6-fsm-2110, as above
 				r.wantAttempts(3)
 				if got := r.networks(); !slices.Equal(got, []bool{true, true, false}) {
 					t.Fatalf("priority %v", got)

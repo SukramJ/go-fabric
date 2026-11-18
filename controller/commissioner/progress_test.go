@@ -17,9 +17,9 @@ import (
 // TestFlowProgress: Options.Progress hears every step started and then
 // its result — Success and Stop as succeeded, Skipped as skipped, a
 // Failure without an error as failed (ControllerCommissioningFlow.ts:164-169
-// at 862ad75f) — a recoverable error as failed with the flow going on
-// (:432-437), and a terminating status error as failed with the
-// CommissioningError the flow returns (:438-462).
+// at db021da0) — a recoverable error as failed with the flow going on
+// (:431-436), and a terminating status error as failed with the
+// CommissioningError the flow returns (:437-461).
 func TestFlowProgress(t *testing.T) {
 	t.Parallel()
 	dev := &failsafeDevice{}

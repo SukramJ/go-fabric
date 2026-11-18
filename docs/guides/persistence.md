@@ -149,7 +149,7 @@ fabric is deleted (`FabricManager.ts:262-271`). go-fabric types the port by
 area instead of by key-value context, so a backend stores records, not
 opaque values.
 
-*Source: `store/port.go:8-45`, `store/port.go:53-258`, `store/memstore/memstore.go:4-28`, `endpoint/memstore/memstore.go:4-22`, `store/storetest/storetest.go:4-21`, `store/contract_test.go`, `groups/manager.go:36-44`, `fabrictest/site.go:69-75`, `node/config.go:367-381`.*
+*Source: `store/port.go` (`Port`, `Fabrics`, `Identity`, `ACL`, `GroupKeys`), `store/memstore/memstore.go` (package doc), `endpoint/memstore/memstore.go` (package doc), `store/storetest/storetest.go` (package doc), `store/contract_test.go`, `groups/manager.go` (`Store`), `fabrictest/site.go` (`StoreOnDisk`), `node/config.go` (`Store`).*
 
 ## Opening the database
 
@@ -175,7 +175,7 @@ handle you opened.
 `sqlitestore.Apply`) to the database on every boot. Both scripts are
 idempotent.
 
-*Source: `node/store_path.go`, `store/doc.go:8-36`, `node/node.go` (`openStores`).*
+*Source: `node/store_path.go`, `store/doc.go` (package doc), `node/node.go` (`openStores`).*
 
 ## The device database
 
@@ -211,7 +211,7 @@ idempotent.
 The stable key's string form is the primary key. If a host changes how its
 key renders, the row is orphaned and the source gets a new endpoint number.
 
-*Source: `store/schema.sql:25-412`, `store/migrations.go:43-67`, `store/migrations/v1.up.sql:4-6`, `store/metadata.go:15`, `store/settings.go:37-42`, `endpoint/sqlitestore/schema.sql:13-58`.*
+*Source: `store/schema.sql`, `store/migrations.go` (`migrationVersions`), `store/migrations/v1.up.sql`, `store/metadata.go` (`metadataKeyNextFabricIndex`), `store/settings.go` (`MetadataKeyEventNumber`), `endpoint/sqlitestore/schema.sql` (`matter_endpoints`, `matter_endpoint_allocation`).*
 
 ### Settings keys
 
@@ -235,6 +235,7 @@ delete it.
 | `bridged_configuration_version.<key>` | the facade | a bridged endpoint's ConfigurationVersion |
 | `scenes.<key>` | the facade | a bridged endpoint's scene table |
 | `binding.<key>`, `binding.@<endpoint>` | the facade | an endpoint's Binding list; `@` and the number for an endpoint without a stable key |
+| `aggregator.forget_pending` | the facade | the `Aggregator.Forget` batches whose erase is still owed, a JSON list of their key sets; the next `New` finishes them, and a key added again leaves the record |
 | `user_label.root`, `user_label.aggregator` | the facade | the UserLabel lists of the root and the Aggregator |
 | `bridged_user_label.<key>` | the facade | a bridged endpoint's UserLabel list, when its device declares the cluster; a controller's write is stored before it answers, and a refused store write answers FAILURE; a write the server refuses puts the stored list back, and when the store refuses that too, the list the server holds is written when the node stops. `Aggregator.Forget` erases it |
 | `nonvolatile.<key>.<cluster>.<attribute>`, `nonvolatile.@<endpoint>.<cluster>.<attribute>` | the facade | the value a nonvolatile attribute the module holds was last changed to, the cluster and attribute id in hex: every attribute whose generated definition carries the N quality and write access, not fabric-scoped and not kept under a key of its own above, of a server the module holds — the root's own, not one the host mounts there (`Config.RootServers`) (ActiveLocale, HourFormat, ActiveCalendarType, TemperatureUnit, NetworkCommissioning's InterfaceEnabled, …) and, on a bridged endpoint, one its `device.Device` built itself where no declared host port takes the attribute (`Device.HoldsAttribute`: StartUpOnOff, StartUpCurrentLevel, StartUpColorTemperatureMireds, WindowCovering's Mode, the Thermostat's limits, …). The value is the TLV of the value, hex. Every change is stored, whatever made it. A controller's write is stored before the server takes it: a refused store write answers FAILURE and the value is not in effect, a write the server refuses puts the stored value back, and the value the server holds after it applied the write (WindowCovering's Mode without CalibrationMode under MaintenanceMode, a companion setpoint the write moved) replaces it, so a restart serves what was served. Any other change — a command (SetpointRaiseLower), the host's `Set`, a companion the server moves — is stored after the server committed it, from the server's change notification; a store that refuses it is logged and the value is written again at the next change of the attribute and when the node stops. A crash between such a commit and its store write leaves the value stored before the change, which the restart serves. Only writes of the same attribute wait for one another (a host's `OnWrite` veto included). It is restored before the endpoint is served and overrides the declaration's `Initial`, once per server: a `Device` the host removes and adds again keeps what it holds and its stored values; one the host forgets (`Aggregator.Forget`) is let go, its later changes are not stored, and every value stored under its key and its parts' keys is erased, so a device added under the key afterwards starts from its declaration's `Initial`. A controller's write that reaches a server no longer in its key's place — a `Device` the host replaced or forgot, answering on the topology the write was resolved on — is not stored. Under the Aggregator a restored StartUp attribute is read back, not applied |
@@ -250,7 +251,7 @@ delete it.
 | `basic_information.surface_digest` | the facade | the root's effective surface digest, against which a surface change raises ConfigurationVersion; a change's digests are stored in one write with the ConfigurationVersions it raised, so a refused write stores neither and the next start announces the change again |
 | `bridged_surface_digest.<key>`, `bridged_surface_digest.@<endpoint>` | the facade | a bridged endpoint's (or an unkeyed endpoint's) effective surface digest |
 | `endpoint_number_reserved.<key>` | the facade | a removed endpoint's reservation: the stable keys of its tree, whose numbers stay held until `Forget` |
-| `timesync.trusted_time_source`, `timesync.default_ntp`, `timesync.time_zone`, `timesync.dst_offset` | `cluster/core` | TimeSynchronization's TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset, under connectedhomeip's key names; the offset of the node's UTC over its clock is not stored |
+| `timesync.trusted_time_source`, `timesync.default_ntp`, `timesync.time_zone`, `timesync.dst_offset` | `cluster/core` | TimeSynchronization's TrustedTimeSource, DefaultNTP, TimeZone and DSTOffset — the four values connectedhomeip persists (`TimeSyncDataProvider`), under the module's own keys; the offset of the node's UTC over its clock is not stored |
 | `general_commissioning.tc_acceptance` (`store.SettingTermsAcceptance`) | `cluster/core` | the committed terms-and-conditions acceptance (`<version>:<bits>`) of GeneralCommissioning's TC feature (`node.Commissioning.TermsAndConditions`); written at CommissioningComplete or by a SetTCAcknowledgements outside a fail-safe window, deleted with the last fabric, erased by the factory reset |
 | `netcomm.wifi.networks` | `cluster/core` | NetworkCommissioning's committed Wi-Fi networks, each with its SSID and its credentials, as JSON; written at CommissioningComplete on a Wi-Fi node (`node.Network.WiFi`), before the fabric is committed: a store that refuses it fails CommissioningComplete with nothing committed, and a fabric commit that fails after it writes the previous list back. The credentials are stored in clear, like the fabric's keys, unless the store seals them: whoever reads the database reads the Wi-Fi passphrase ([security model](../security.md#what-the-store-holds-in-clear)) |
 | `thermostat_user_interface_configuration.keypad_lockout` (`thermo.DefaultKeypadLockoutSetting`) | `cluster/thermo` | ThermostatUserInterfaceConfiguration's KeypadLockout, when the server is given `Settings`; `ThermostatUIConfig.SettingKey` names another key, which a second endpoint with the cluster needs |
@@ -284,7 +285,7 @@ A host may use the settings table for its own state, as the reference
 daemon does with `blind.position`. Pick a prefix that none of the keys
 above use.
 
-*Source: `store/settings.go:13-35`, `node/persist.go:24-38`, `node/nonvolatile.go`, `device/held.go`, `node/persist.go:57-77`, `node/persist.go:244-299`, `node/persist.go:317-326`, `node/root.go:42-43`, `store/ota.go:25`, `store/doorlock.go:13-24`, `store/icd.go`, `cluster/core/access_control.go:295-297`, `cluster/core/vid_verification.go:65-67`, `node/surface_stability.go:18-29`, `node/reserve.go:32-35`, `cluster/core/time_synchronization_features.go:90-95`, `cluster/core/network_commissioning_wifi.go:116-117`, `cluster/thermo/thermostatuserinterfaceconfiguration.go:100-102`, `cluster/tls/persist.go:25-29`, `cluster/jointfabric/datastore.go:180-182`, `examples/reference-bridge/persist.go:21-44`.*
+*Source: `store/settings.go` (`SettingNodeLabel`, `SettingLocation`, `SettingUniqueID`, `SettingTermsAcceptance`), `node/persist.go` (`rootConfigVersionKey`, `endpointLabelKeyRoot`, `endpointConfigVersionKey`, `scenesKeyRoot`, `bindingKeyRoot`, `rebootCountSetting`, `operationalTimeSetting`, `legacyOperationalHoursSetting`), `node/nonvolatile.go`, `device/held.go`, `node/persist.go` (`EndpointPersistence`, `countBoot`, `loadOperationalTime`, `storeOperationalTime`, `bindingKey`), `node/root.go` (`rootUserLabelsKey`, `aggregatorUserLabelsKey`), `node/user_labels.go` (`bridgedUserLabelKeyRoot`), `node/node.go` (`settingRotatingIDUniqueID`), `store/ota.go` (`otaRequestorStateKey`), `store/doorlock.go` (`SettingDoorLockCredentialKey`, `settingDoorLockSaved`), `store/icd.go`, `cluster/core/access_control.go` (`aclExtensionSettingKey`), `store/schema.go` (`vidSettingKey`), `cluster/core/operational_credentials_pending.go` (`pendingNOCSettingKey`, `pendingNOCUpdateSettingKey`), `node/surface_stability.go` (`rootSurfaceKey`, `endpointSurfaceKey`), `node/reserve.go` (`endpointReservedKeyRoot`, `forgetPendingKey`), `cluster/core/time_synchronization_features.go` (`timeSyncKeyTrustedTimeSource`, `timeSyncKeyDefaultNTP`, `timeSyncKeyTimeZone`, `timeSyncKeyDSTOffset`), `cluster/core/network_commissioning_wifi.go` (`wifiNetworksKey`), `cluster/thermo/thermostatuserinterfaceconfiguration.go` (`DefaultKeypadLockoutSetting`), `cluster/tls/persist.go` (`settingCertificates`, `settingEndpoints`), `cluster/jointfabric/datastore.go` (`settingPrefix`), `examples/reference-bridge/persist.go` (`blindPositionKey`).*
 
 `script/docscheck` (`TestSettingsKeysDocumented`) holds the table to the
 code: a `SetSetting` call that states its key as a constant fails the
@@ -305,7 +306,7 @@ build while the key is not in a table of this page.
 A restart does not re-identify the node: UniqueID is pinned, and fabrics
 and endpoint numbers are the same.
 
-*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql:286-292`, `node/security.go:372`, `node/security.go:483`, `bridge/bridge.go:85-94`, `node/config.go:347-360`.*
+*Source: `node/node.go` (`New`), `node/node.go` (`Node.Start`), `store/schema.sql` (`matter_server_subscriptions`), `node/security.go` (`wireSecurity`), `bridge/bridge.go` (`AttachSubscriptionStore`), `node/config.go` (`BasicInformation.UniqueID`).*
 
 ## The controller database
 
@@ -322,7 +323,7 @@ and `sqlstore.Apply`:
 | `matter_client_versions` | each stored cluster's DataVersion |
 | `matter_client_values`, cluster `0xFFFFFFFD` | each node's ICD Check-In registration: key, pending key, counter state, monitored subject, client type |
 | `matter_client_values`, cluster `0xFFFFFFFC` | a node's onboarding code, when kept (`Config.KeepOnboardingCodes`) or attached: the code, its source, the time, the checks it passed — a secret, like the keys above |
-| `matter_client_metadata` | the registry's marks: `sqlstore.seal_scrub_owed` while a sealing's scrub of the file has not finished (`sqlstore.NewSealed`) |
+| `matter_client_metadata` | the registry's marks: `sqlstore.seal_scrub_owed` while a sealing's scrub of the file has not finished (`sqlstore.NewSealed`, `Store.ScrubOwed`), and the seal canary `sqlstore.seal_canary`, its sealed value in `data` (v3) |
 
 The two `controller.ca` keys are `ca.SettingStore`'s default; another
 `Key` moves both. The controller keeps one CASE resumption record per node
@@ -331,7 +332,7 @@ running full CASE. With `controller.Config.Sealer` the CA, the fabric, the
 resumption records, the group key sets, the kept onboarding codes and the
 ICD keys are sealed ([security](../security.md#sealing-at-rest)).
 
-*Source: `controller/ca/persist.go:90-111`, `controller/client/sqlstore/sqlstore.go:4-44`, `controller/client/sqlstore/schema.sql:11-31`, `examples/reference-controller/cli/stack.go:34-44`, `examples/reference-controller/README.md` (The database), `node/client.go:115-120`.*
+*Source: `controller/ca/persist.go` (`SettingStore`, `DefaultSettingKey`), `controller/client/sqlstore/sqlstore.go` (`Store`, `New`), `controller/client/sqlstore/schema.sql` (`matter_client_values`, `matter_client_versions`, `matter_client_metadata`), `examples/reference-controller/cli/stack.go` (`dclTrustKey`, `selfKey`, `groupKeyPref`), `examples/reference-controller/README.md` (The database), `node/client.go` (`NewStoreResumption`).*
 
 ## Schema changes
 
@@ -344,7 +345,8 @@ Each schema ships three ways:
   release kept elsewhere (the VID settings into `matter_fabrics`). A host
   that runs `Migrations()` with its own tool calls `store.Upgrade` once
   after it, for the moves. `sqlstore.Apply` likewise runs
-  `sqlstore.Upgrade`, which adds v2's seal mark to `matter_client_values`.
+  `sqlstore.Upgrade`, which adds v2's seal mark to `matter_client_values`
+  and v3's `data` column, the seal canary's, to `matter_client_metadata`.
 - **`Migrations()`** returns the same schema as versioned steps (`v1`,
   `v2`, …), each with `Up` and `Down`, for a host that runs its own
   migration tool. A released step never changes. Pin
@@ -366,17 +368,16 @@ Each schema ships three ways:
 
 The schemas are independent and can be applied in either order.
 
-*Source: `store/schema.go:23-121`, `store/migrations.go:22-133`, `controller/client/sqlstore/sqlstore.go:11-16`, `controller/client/sqlstore/schema.go:31-125`, `endpoint/sqlitestore/sqlitestore.go:68-72`, `endpoint/sqlitestore/schema.sql:8-11`.*
+*Source: `store/schema.go` (`Schema`, `Apply`, `Upgrade`), `store/migrations.go` (`Migration`, `Migrations`, `SchemaFingerprint`), `controller/client/sqlstore/schema.go` (`Schema`, `Apply`, `Upgrade`, `Migrations`, `SchemaFingerprint`), `endpoint/sqlitestore/sqlitestore.go` (`Schema`, `Apply`), `endpoint/sqlitestore/schema.sql`.*
 
 ## Backup
 
 The module ships no backup tool. What a backup has to respect:
 
 - **The file holds private keys.** The node's operational keys and the
-  controller's CA key are stored unencrypted, unless the node's store
-  seals them (`store.NewSealed`, [sealing at
-  rest](../security.md#sealing-at-rest)); the controller's are never
-  sealed. The store's documentation leaves file-system protection to the
+  controller's CA key are stored unencrypted, unless the store seals
+  them (`store.NewSealed`; for a controller `controller.Config.Sealer`,
+  [sealing at rest](../security.md#sealing-at-rest)). The store's documentation leaves file-system protection to the
   operator. Protect the database and every copy of it like the keys — and,
   under a sealer, keep the sealing key out of the backup.
 - **Copy a consistent state.** Stop the node first, or use SQLite's own
@@ -386,5 +387,5 @@ The module ships no backup tool. What a backup has to respect:
   same fabrics, the same operational identity. Two running copies answer
   as one node under one identity.
 
-*Source: `store/doc.go:38-69`, `store/schema.sql:71-86`, `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
+*Source: `store/doc.go` (package doc, Secrets at rest), `store/schema.sql` (`matter_node_identities`), `store/seal.go` (`NewSealed`), `examples/reference-controller/README.md` (The database).*
 

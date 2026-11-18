@@ -102,7 +102,7 @@ func TestAckTrackerDueRemovesEntries(t *testing.T) {
 // as a standalone ack, and the new counter becomes the pending one — in
 // either counter order. Mirrors chip ReliableMessageContext.cpp:158-171 at
 // 6170af84 ("forcing tx of solitary ack") and matter.js
-// MessageExchange.ts:539-543 at 862ad75f (sendStandaloneAckForMessage for
+// MessageExchange.ts:555-559 at db021da0 (sendStandaloneAckForMessage for
 // the old one before taking the new one).
 func TestAckTrackerOweFlushesTheDisplacedObligation(t *testing.T) {
 	const delay = 50 * time.Millisecond

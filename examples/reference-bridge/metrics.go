@@ -34,8 +34,11 @@ func applyMetrics(cfg *node.Config, addr string) {
 // serveMetrics serves the node's metrics as /debug/vars on addr until ctx
 // ends ([metricsHandler]); a no-op for an empty addr. The listener is
 // opened before it returns, so a bad address fails the start. The endpoint
-// has no authentication: whoever reaches addr reads the counters.
-func serveMetrics(ctx context.Context, addr string, logger *slog.Logger) error {
+// has no authentication: whoever reaches addr reads the counters. So a
+// listener that is not on a loopback address — ":9090", a LAN address — is
+// refused unless anyAddress (--metrics-expvar-any-address) says the
+// operator means it (R2-P6-sec-2613).
+func serveMetrics(ctx context.Context, addr string, anyAddress bool, logger *slog.Logger) error {
 	if addr == "" {
 		return nil
 	}
@@ -43,6 +46,10 @@ func serveMetrics(ctx context.Context, addr string, logger *slog.Logger) error {
 	ln, err := lc.Listen(ctx, "tcp", addr)
 	if err != nil {
 		return err
+	}
+	if tcp, ok := ln.Addr().(*net.TCPAddr); !anyAddress && (!ok || !tcp.IP.IsLoopback()) {
+		_ = ln.Close()
+		return fmt.Errorf("%s listens on %s, not on a loopback address, and the endpoint has no authentication; pass --metrics-expvar-any-address to serve it there", addr, ln.Addr())
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/debug/vars", metricsHandler())

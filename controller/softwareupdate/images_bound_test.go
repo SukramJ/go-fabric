@@ -13,9 +13,10 @@ import (
 )
 
 // TestImagesHonourTheLedgersMaxImageSize (review II, R2-P0-bound-C01): both
-// of the store's downloads — a ledger update's (DownloadUpdate) and an
-// image's by URL (UpdateInfoFromURL), each held in memory until it is
-// verified — go through dcl.OTAVersions (Download, DownloadHostURL),
+// of the store's downloads — a ledger update's and an image's by URL
+// (DownloadUpdate of UpdateInfoFromURL's update; UpdateInfoFromURL itself
+// reads the header only), each held in memory until it is verified — go
+// through dcl.OTAVersions (Download, DownloadHostURL),
 // whose MaxImageSize bounds both, so the bound the host
 // sets on the ledger it hands in (ImagesConfig.Ledger, MaxImageSize) bounds
 // what the store buffers. A record that announces more is refused without
@@ -41,9 +42,15 @@ func TestImagesHonourTheLedgersMaxImageSize(t *testing.T) {
 	if names, _ := blobs.List(ctx); len(names) != 0 {
 		t.Fatalf("stored %v, want nothing", names)
 	}
-	_, err = bounded.UpdateInfoFromURL(ctx, url, LocalImageOptions{})
+	// UpdateInfoFromURL reads the header only (R2-P6-bound-1903); the
+	// download of its update is cut at the bound.
+	local, err := bounded.UpdateInfoFromURL(ctx, url, LocalImageOptions{})
+	if err != nil {
+		t.Fatalf("UpdateInfoFromURL: %v", err)
+	}
+	_, err = bounded.DownloadUpdate(ctx, local, false)
 	if !errors.Is(err, ErrOTA) || !errors.Is(err, dcl.ErrOTAImageTooLarge) {
-		t.Fatalf("UpdateInfoFromURL of a %d-byte image under a bound one byte smaller: %v, want ErrOTA wrapping dcl.ErrOTAImageTooLarge", len(img), err)
+		t.Fatalf("DownloadUpdate by URL of a %d-byte image under a bound one byte smaller: %v, want ErrOTA wrapping dcl.ErrOTAImageTooLarge", len(img), err)
 	}
 
 	// The same images at exactly the bound, and under the default one.

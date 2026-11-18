@@ -4,9 +4,10 @@
 package interaction_test
 
 // A port of matter.js packages/protocol/test/action/client/subscription/SustainedSubscriptionTest.ts
-// at 862ad75f: the maxEventNumberChanged cases of its "event numbers" and
-// "local processing failures" groups (SustainedSubscriptionTest.ts:1296-1477,
-// :1613-1638), on the rig of sustained_parity_matterjs_test.go.
+// at db021da0: the maxEventNumberChanged cases of its "event numbers" group
+// and the first case of "in maxEventNumberChanged" under its "when a report
+// fails" (SustainedSubscriptionTest.ts:1296-1477, :1613-1640), on the rig of
+// sustained_parity_matterjs_test.go.
 
 import (
 	"context"
@@ -99,6 +100,7 @@ func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 		states.wait(t, true)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60)
 		states.wait(t, true)
 		if n, ok := sub.MaxEventNumber(); !ok || n != 9 {
@@ -125,10 +127,11 @@ func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		first := ssEstablish(t, r.s, 1, 60, 9) // SustainedSubscriptionTest.ts:1361
+		first := ssEstablish(t, r.s, 1, 60, 9) // SustainedSubscriptionTest.ts:1376-1402
 		states.wait(t, true)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60, 5)
 		states.wait(t, true)
 		if n, ok := sub.MaxEventNumber(); !ok || n != 9 {
@@ -155,11 +158,12 @@ func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		first := ssEstablish(t, r.s, 1, 60, 5) // SustainedSubscriptionTest.ts:1423
+		first := ssEstablish(t, r.s, 1, 60, 5) // SustainedSubscriptionTest.ts:1420-1446
 		states.wait(t, true)
 		ssPushEvents(t, r, 0x7302, 1)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60)
 		states.wait(t, true)
 		if n, ok := sub.MaxEventNumber(); !ok || n != 5 {
@@ -232,7 +236,7 @@ func TestSustainedSubscriptionMaxEventNumberChanged(t *testing.T) {
 		}
 		ssEstablish(t, r.s, 1, 60)
 		states.wait(t, true)
-		ssPushEvents(t, r, 0x7304, 1, 4) // SustainedSubscriptionTest.ts:1625-1636
+		ssPushEvents(t, r, 0x7304, 1, 4) // SustainedSubscriptionTest.ts:1628-1640
 		if n, ok := sub.MaxEventNumber(); !ok || n != 4 {
 			t.Fatalf("max event number %d (%v), want 4", n, ok)
 		}

@@ -12,6 +12,14 @@
 // cluster's ClusterRevision (BasicInformation.ConfigurationVersion at
 // revision 6, concept v11 §C.9).
 //
+// Command ids are written by direction — requestCommands and
+// responseCommands, and the same split under mandatory — from each
+// command's effectiveDirection at the tag: an id can name a request at one
+// tag and a response at another (Thermostat 2: a request at v0.13.0, a
+// response at the pin), so a merged list would admit the other direction
+// at the level (review II R2-P6-par-2713, owner decision 227). A command
+// without a direction at the tag ends the run, naming it.
+//
 // Run inside a matter.js checkout at the tag (make generate-level TAG=…
 // copies it there, as generate-matter-schema does for the main extractor).
 import { ClusterModel, DeviceTypeModel, Matter, Specification } from "@matter/model";
@@ -26,13 +34,22 @@ function isMandatory(m: any, revision: number): boolean {
     return rev !== null && Number(rev[1]) <= revision;
 }
 
-let sourceCommit: string | undefined;
-let tag: string | undefined;
+// The provenance is required: a level without its tag and commit names a
+// release it cannot prove it was extracted from, so a failed git call ends
+// the run (review II S-11) instead of writing tag and sourceCommit
+// undefined.
+let sourceCommit: string;
+let tag: string;
 try {
     sourceCommit = execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
     tag = execSync("git describe --tags --exact-match HEAD", { encoding: "utf8" }).trim();
 } catch (e) {
     console.error("provenance:", (e as Error).message);
+    process.exit(1);
+}
+if (!sourceCommit || !tag) {
+    console.error(`provenance: commit ${JSON.stringify(sourceCommit)}, tag ${JSON.stringify(tag)}: both are required`);
+    process.exit(1);
 }
 
 const deviceTypes: any[] = [];
@@ -59,14 +76,31 @@ for (const c of Matter.clusters as ClusterModel[]) {
     const attributes = c.attributes as any[];
     const commands = c.commands as any[];
     const events = c.events as any[];
+    const directed = (d: string) =>
+        commands.filter(m => {
+            if (typeof m.id !== "number") return false;
+            const dir = m.effectiveDirection;
+            if (dir !== "request" && dir !== "response") {
+                throw new Error(`cluster ${c.id} command ${m.id} (${m.name}): direction ${JSON.stringify(dir)} at the tag`);
+            }
+            return dir === d;
+        });
+    const requests = directed("request");
+    const responses = directed("response");
     clusters.push({
         id: c.id,
         revision: c.revision,
         features,
         attributes: ids(attributes),
-        commands: ids(commands),
+        requestCommands: ids(requests),
+        responseCommands: ids(responses),
         events: ids(events),
-        mandatory: { attributes: mand(attributes), commands: mand(commands), events: mand(events) },
+        mandatory: {
+            attributes: mand(attributes),
+            requestCommands: mand(requests),
+            responseCommands: mand(responses),
+            events: mand(events),
+        },
     });
 }
 clusters.sort((a, b) => a.id - b.id);

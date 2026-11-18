@@ -101,7 +101,7 @@ func TestInvokeClientResponseRoundTrip(t *testing.T) {
 // the InteractionModelRevision, and the revision the request names — the
 // field order of matter.js TlvInvokeRequest
 // (packages/types/src/protocol/messages/TlvInvokeRequest.ts:17-31 at
-// 862ad75f) and TlvDelayReportData's two TlvFields. A request without a
+// db021da0) and TlvDelayReportData's two TlvFields. A request without a
 // revision carries [MatterInteractionModelRevision]; the decoder reads
 // back what the encoder wrote.
 func TestInvokeClientRequestOptionsParityMatterJS(t *testing.T) {

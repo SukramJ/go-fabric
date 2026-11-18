@@ -283,8 +283,8 @@ func TestRemoveFabricFromHost(t *testing.T) {
 // commissioned, and Node.Subscriptions counts the subscription riding on
 // that CASE session — a controller subscribes over CASE only, matter.js
 // ClientInteraction.subscribe refusing a peer without a peer address
-// (packages/protocol/src/action/client/ClientInteraction.ts:991-994 at
-// 0ceb202d).
+// (packages/protocol/src/action/client/ClientInteraction.ts:1024-1027 at
+// db021da0).
 func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	// Not parallel: its second connection (PASE closed, then Commission over
 	// a fresh discovery) lost the node under the package's parallel live
@@ -319,7 +319,7 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	}
 	pase.Close()
 	// The device accepts the next PBKDFParamRequest once the PASE session
-	// is gone (matter.js PaseServer.ts:76-86 at 862ad75f: no new PASE
+	// is gone (matter.js PaseServer.ts:76-86 at db021da0: no new PASE
 	// while one exists and is not closing). Its CloseSession and the
 	// commissioner's next request travel on separate handler goroutines
 	// here, where matter.js handles them in order on one thread; the test

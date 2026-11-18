@@ -116,8 +116,7 @@ kernel modules and stay weekly, outside that gate.
   mirrored: the reference daemon is the DUT, the module's own controller
   performs the TS file's controller actions, and the TS file's TH-side
   expectations are what the daemon has to satisfy. Each case cites its TS
-  file and the line of every step, as they stand at the snapshot's pin (the
-  two exceptions are named under the DUT role); a step's PICS is the TS's
+  file and the line of every step, as they stand at the snapshot's pin; a step's PICS is the TS's
   mirrored onto the server side (`ACT.C.C00.Tx` → `ACT.S.C00.Rsp`) and evaluated against the
   daemon's own PICS, and a step whose PICS is false is recorded skipped with
   the expression. One port holds a precondition looser than its TS file:
@@ -461,9 +460,9 @@ Harness image: `ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a
 | DA/1.12 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C00.Rsp & OPCREDS.S.C01.Tx & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | DA/1.13 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
 | DA/1.3 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.3.test.ts:101); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT commissioning the daemon twice, each AttestationNonce observable: matter.js reads it from its TH's log; the daemon logs none, and the controller's nonce reaches only controller/attestation's validation input (validate.go:40-41) |
-| DA/1.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.4.test.ts:458); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT, a daemon started from each of chip's credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, :279): the daemon reads one attestation chain from files (`--attestation-dir`, examples/reference-bridge/main.go:134) and serves a fixed product id (main.go:71, :503) |
+| DA/1.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.4.test.ts:458); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT, a daemon started from each of chip's credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, :279): the daemon reads one attestation chain from files (`--attestation-dir` in `examples/reference-bridge/main.go`) and serves a fixed product id (`testProductID`) |
 | DA/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DA/1.8 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.8.test.ts:200); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT, a daemon started from each of chip's credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, :105): the daemon reads one attestation chain from files (`--attestation-dir`, examples/reference-bridge/main.go:134) and serves a fixed product id (main.go:71, :503) |
+| DA/1.8 | (c) harness | matter.js automates it at the snapshot's pin (TC-DA-1.8.test.ts:200); the Go-TH leg does not run it, so the module is unmeasured here — needs, with the Go controller as DUT, a daemon started from each of chip's credentials/development/commissioner_dut vectors with the vector's product id (`--dac_provider`, `--product-id`, :105): the daemon reads one attestation chain from files (`--attestation-dir` in `examples/reference-bridge/main.go`) and serves a fixed product id (`testProductID`) |
 | DA/1.9 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT; controller role: matter.js drives chip's python script (prompt-driven-python-test.ts:41), the DUT answering its prompts — not ported (TC-DA-1.9.test.ts:32 TC_DA_1_9.py) |
 | DD/1.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/1.11 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -781,9 +780,9 @@ lists carry the same row under "Cases not run"; this table lists the others.
 
 | Case | Class | Reason |
 | --- | --- | --- |
-| CHANNEL/5.8 | (b) not supported | matter.js automates it at the snapshot's pin (TC-CHANNEL-5.8.test.ts:24); the Go-TH leg does not run it, so the module is unmeasured here — needs Channel's ElectronicGuide and RecordProgram features (GetProgramGuide, RecordProgram, CancelRecordProgram): the module serves them to a host port that implements ChannelGuide and ChannelRecorder (cluster/media/channel.go:42-51), the daemon's video player implements neither (CHANNEL.S.F02=0, CHANNEL.S.F03=0) |
-| DGETH/3.2 | (b) not supported | matter.js automates it at the snapshot's pin (TC-DGETH-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — needs ResetCounts, which the module's EthernetNetworkDiagnostics does not offer, with neither PacketCounts nor ErrorCounts (cluster/core/ethernet_network_diagnostics.go:39-42; DGETH.S.C00.Rsp=0): a port would record its only step skipped |
-| DGSW/3.2 | (b) not supported | matter.js automates it at the snapshot's pin (TC-DGSW-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — needs ResetWatermarks: the module serves the Watermarks feature to a host that supplies a WatermarkReporter (cluster/core/software_diagnostics.go:29-37), the reference daemon supplies none (DGSW.S.F00=0, DGSW.S.C00.Rsp=0) |
+| CHANNEL/5.8 | (b) not supported | matter.js automates it at the snapshot's pin (TC-CHANNEL-5.8.test.ts:24); the Go-TH leg does not run it, so the module is unmeasured here — needs Channel's ElectronicGuide and RecordProgram features (GetProgramGuide, RecordProgram, CancelRecordProgram): the module serves them to a host port that implements ChannelGuide and ChannelRecorder (`cluster/media/channel.go`: `ChannelGuide`, `ChannelRecorder`), the daemon's video player implements neither (CHANNEL.S.F02=0, CHANNEL.S.F03=0) |
+| DGETH/3.2 | (b) not supported | matter.js automates it at the snapshot's pin (TC-DGETH-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — needs ResetCounts, which the module's EthernetNetworkDiagnostics does not offer, with neither PacketCounts nor ErrorCounts (`EthernetNetworkDiagnosticsConfig.Attributes` in `cluster/core/ethernet_network_diagnostics.go`; DGETH.S.C00.Rsp=0): a port would record its only step skipped |
+| DGSW/3.2 | (b) not supported | matter.js automates it at the snapshot's pin (TC-DGSW-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — needs ResetWatermarks: the module serves the Watermarks feature to a host that supplies a WatermarkReporter (`WatermarkReporter` in `cluster/core/software_diagnostics.go`), the reference daemon supplies none (DGSW.S.F00=0, DGSW.S.C00.Rsp=0) |
 | DGTHREAD/3.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-DGTHREAD-3.4.test.ts:27); the Go-TH leg does not run it, so the module is unmeasured here — needs the daemon's Thread variant (`--otbr` against a live OTBR REST API, the DGTHREAD family's composition, run by otbr-virtual.yml), which the Go-TH leg does not start |
 
 ### Cases that pass with a recorded gap
@@ -874,9 +873,10 @@ image (`internal/chiptool/image`, built by `.github/workflows/chip-image.yml`).
 page: every prefix with three cases or more at the harness commit is a
 family row or a row of the table above.
 
-Some families run but have nothing the daemon can be tested on. The root's
-IcdManagement is not mounted (`node/root.go` buildRoot says why), so the
-ICDM cases are not applicable through the device's own PICS (`ICDM.S=0`).
+Some families run but have nothing the daemon can be tested on. The
+default daemon is no ICD, so its root mounts no IcdManagement (`node/root.go`
+buildRoot; the `--icd-lit` daemon above is the ICD variant), and the ICDM
+cases are not applicable through its own PICS (`ICDM.S=0`).
 The OTA Software Update Requestor is mounted since #49 (ADR 0019) and its
 automated SU cases run, against a daemon in harness mode: the suite starts
 every daemon with `--ota-harness` (TESTING ONLY, `internal/chiptool/bridge_test.go`
@@ -888,13 +888,15 @@ SoftwareVersion and the VersionApplied event pass on. Without the flag the
 applier keeps the old version running and the requestor reports a failed
 update after the next restart; a product's applier and its restart into the
 new image are the product's, and these cases do not test them. The image lists
-the DLOG case, the BIND cases and the SU YAML cases as manual, so the
-status block records them as class (c); on substance BIND tests the binding
-client (`BIND.C`, a controller-side role, (d) — proven in-repo since wave 21), and the SU provider cases an
-OTA provider (b — built in wave 23, ADR 0021; the cases stay manual YAML, the
-in-repo proof is the module's requestor downloading from the module's
-provider; the DLOG case stays manual at the pinned image although the
-server now transfers over BDX). BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019) as the
+the DLOG case, the BIND cases and the SU YAML cases as manual. The status
+block records BIND/2.2 and DLOG/2.1 as class (c); BIND/2.1, BIND/2.3 and the
+SU cases run in the Go-TH leg with the module's controller as TH (the table
+above). On substance BIND tests the binding client (`BIND.C`, a
+controller-side role, proven in-repo since wave 21), and the SU provider
+cases an OTA provider (built in wave 23, ADR 0021; the in-repo proof is the
+module's requestor downloading from the module's provider); the DLOG case
+stays manual at the pinned image although the server now transfers over
+BDX. BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019) as the
 receiving side; the sending side came with ADR 0021 in `v0.4.0`, and a
 RetrieveLogsRequest that asks for BDX with a `TransferFileDesignator` is
 now served over BDX as chip does (`BD-chip-DiagLogs-BDX`).

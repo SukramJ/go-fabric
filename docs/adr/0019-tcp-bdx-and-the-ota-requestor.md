@@ -34,10 +34,10 @@ HEAD and the harness pin 6170af84:
 - TCP is Matter's large-payload path: `SessionParameters` carries
   `supportedTransports` (tag 8) and `maxTcpMessageSize` (tag 9, default
   64000; `PaseMessages.ts:28-58`), the mDNS `T` key advertises TCP client
-  and server support (`DeviceAdvertiser.ts:376`, `ServerNetworkRuntime.ts:337`),
-  frames carry a 4-byte little-endian length (`TcpChannel.ts:37-41`), and
+  and server support (`DeviceAdvertiser.ts:376`, `ServerNetworkRuntime.ts:345` at `db021da0`),
+  frames carry a 4-byte little-endian length (`TcpChannel.ts:34-35` at `db021da0`), and
   a dropped connection evicts every session bound to it
-  (`ExchangeManager.ts:633-660`, "mimics CHIP SDK").
+  (`ExchangeManager.ts:695-737` at `db021da0`, "mimics CHIP SDK").
 
 ## Decision
 

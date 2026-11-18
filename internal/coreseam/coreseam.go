@@ -6,11 +6,11 @@
 // SpecificationVersion a BasicInformation server reports — a test stands
 // in for a node of an older release with it, as matter.js's IcdClientTest
 // sets basicInformation.specificationVersion (IcdClientTest.ts:567-582 at
-// 862ad75f); a release node always reports the release the module
+// db021da0); a release node always reports the release the module
 // implements — and a hook on an ICDManagement server's RegisterClient and
 // UnregisterClient commands, which counts or refuses them as matter.js's
 // CountingIcdServer and RefusingIcdServer do (IcdClientTest.ts:265-274,
-// :298-312 at 862ad75f). Unset, a server serves as it always does.
+// :298-312 at db021da0). Unset, a server serves as it always does.
 //
 // Direction of the edge: package cluster/core installs the hook from its
 // init; package node calls it when internal/nodeseam.UseSpecificationVersion

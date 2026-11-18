@@ -93,9 +93,12 @@ type AdministratorConfig struct {
 	// AnnounceJointFabricAdministrator fails.
 	Reach CommissionerReach
 	// TrustAnchors finds the globally trusted root of a vendor (the DCL's
-	// Operational Trust Anchors). nil is connectedhomeip's placeholder,
-	// the commissioner's own RCAC (JCMCommissionee.cpp:71-81, "temporarily
-	// return the already known remote admin trusted root certificate").
+	// Operational Trust Anchors). nil fails the Vendor ID Verification
+	// closed: a joint commissioning answers VendorIDVerificationFailed.
+	// jcm.SelfAnchored, the commissioner's own RCAC, is connectedhomeip's
+	// placeholder (JCMCommissionee.cpp:71-81 at 6170af84) and verifies
+	// nothing about the vendor — an explicit opt-in for tests and
+	// self-minted fabrics (review II, R2-P6-sec-1850, owner decision 190).
 	TrustAnchors jcm.TrustAnchorLookup
 	// Datastore is the endpoint's JointFabricDatastore: when a fabric
 	// whose NOC carries the administrator and anchor CATs completes

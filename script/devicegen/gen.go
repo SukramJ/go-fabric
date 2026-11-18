@@ -97,7 +97,7 @@ type typeModel struct {
 // cluster requirement but the Descriptor (VideoDoorbell, FloodlightCamera;
 // matter.js generates their files with no behaviours of their own,
 // packages/node/src/devices/video-doorbell.ts:28-33,
-// packages/node/src/devices/floodlight-camera.ts:31-36 at 862ad75f).
+// packages/node/src/devices/floodlight-camera.ts:31-36 at db021da0).
 // matter.js places a component on an endpoint below the composite (DeviceTypeConformance.ts:596-613: only a
 // utility device type counts on the composing endpoint itself), and its
 // StandardDeviceTypeCorpusTest pins the missing components as "component
@@ -181,7 +181,11 @@ func (g *generator) side(dt *deviceType, side string) ([]*clusterReq, error) {
 	}
 	baseMandated := map[uint32]bool{}
 	if side == "server" {
-		for _, b := range g.missingBaseServers(dt) {
+		missing, err := g.missingBaseServers(dt)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", dt.Name, err)
+		}
+		for _, b := range missing {
 			id := *b.ID
 			baseMandated[id] = true
 			if !slices.ContainsFunc(reqs, func(r *requirement) bool { return r.ID != nil && *r.ID == id }) {
@@ -241,7 +245,7 @@ func (g *generator) clusterOf(r *requirement) *cluster {
 // parts or stated conditions, the Descriptor left out. The structural
 // conditions are matter.js's ownStructuralConditionsOf
 // (packages/model/src/logic/device-types/ConditionAssertions.ts:567-604).
-func (g *generator) missingBaseServers(dt *deviceType) []*requirement {
+func (g *generator) missingBaseServers(dt *deviceType) ([]*requirement, error) {
 	conds := map[string]bool{}
 	switch dt.Classification {
 	case "node":
@@ -281,12 +285,16 @@ func (g *generator) missingBaseServers(dt *deviceType) []*requirement {
 			if r.Element != "serverCluster" || r.ID == nil || *r.ID == descriptorClusterID {
 				continue
 			}
-			if mandatedUnder(r.Conformance.root(), conds) {
+			m, err := mandatedUnder(r.Conformance.root(), conds)
+			if err != nil {
+				return nil, fmt.Errorf("the Base device type %s, requirement %s: %w", b.Name, r.Name, err)
+			}
+			if m {
 				out = append(out, r)
 			}
 		}
 	}
-	return out
+	return out, nil
 }
 
 // specialized mirrors ClusterRequirements.isSpecialized
@@ -336,8 +344,9 @@ func (g *generator) ingestFeature(dt *deviceType, cr *clusterReq, n *requirement
 
 // ingestElement mirrors ClusterRequirements.ingestElement
 // (ClusterRequirements.ts:137-208): Mandate → optional:false, Relax →
-// optional:true, the stated default copied, a constraint value → min = max
-// = value and default ??= value, else min / max — numeric only.
+// optional:true, the stated default copied, a numeric constraint value →
+// min = max = value and default ??= value, else min / max — numeric only
+// (requirementBound).
 func (g *generator) ingestElement(dt *deviceType, cr *clusterReq, n *requirement) error {
 	e := cr.def.element(n.Element, n.Name)
 	if e == nil {
@@ -361,17 +370,33 @@ func (g *generator) ingestElement(dt *deviceType, cr *clusterReq, n *requirement
 		er.hasDefault, er.def = true, v
 	}
 	if c := n.Constraint; c != nil {
-		if v, ok := numeric(c.Value); ok {
+		// Mirrors matter.js ClusterRequirements.ingestElement
+		// (support/codegen/src/endpoints/ClusterRequirements.ts:169-187 at
+		// db021da0; Fable, verify-6b-B R2-P6-par-2708): only a numeric
+		// value is taken, and min / max are tried when the value gives
+		// none — MeterReferencePoint's TariffUnit "kWh | kVAh" is such a
+		// non-numeric value at the pin. Other forms are refused here
+		// (requirementBound) where matter.js reads them: a boolean
+		// numericValue takes as 1 / 0 (FieldValue.ts:219-221), and a
+		// string, null or a unit without a scaled type it reads as
+		// nothing and then tries min / max (Fable fable-read-6b-gen);
+		// none occurs at the pin.
+		where := fmt.Sprintf("%s %s.%s: constraint %q", dt.Name, cr.def.Name, n.Name, c.Text)
+		v, ok, err := requirementBound(c.Value)
+		if err != nil {
+			return fmt.Errorf("%s: value %w", where, err)
+		}
+		if ok {
 			er.hasMin, er.min, er.hasMax, er.max = true, v, true, v
 			if !er.hasDefault {
 				er.hasDefault, er.def = true, v
 			}
-		} else if len(c.Value) == 0 {
-			if v, ok := numeric(c.Min); ok {
-				er.hasMin, er.min = true, v
+		} else {
+			if er.min, er.hasMin, err = requirementBound(c.Min); err != nil {
+				return fmt.Errorf("%s: min %w", where, err)
 			}
-			if v, ok := numeric(c.Max); ok {
-				er.hasMax, er.max = true, v
+			if er.max, er.hasMax, err = requirementBound(c.Max); err != nil {
+				return fmt.Errorf("%s: max %w", where, err)
 			}
 		}
 	}
@@ -380,6 +405,27 @@ func (g *generator) ingestElement(dt *deviceType, cr *clusterReq, n *requirement
 	}
 	cr.elements = append(cr.elements, er)
 	return nil
+}
+
+// requirementBound reads one value of a requirement's constraint: a number
+// is taken (ok), an absent value and a reference state none, and any
+// other form — a unit, an expression, a string — fails rather than
+// stating nothing: the generator does not render it (wizard-6b §2 gen Q1,
+// R2-P6-par-2708).
+func requirementBound(raw json.RawMessage) (v float64, ok bool, err error) {
+	if len(raw) == 0 {
+		return 0, false, nil
+	}
+	if v, ok := numeric(raw); ok {
+		return v, true, nil
+	}
+	var fv struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(raw, &fv) == nil && fv.Type == "reference" {
+		return 0, false, nil
+	}
+	return 0, false, fmt.Errorf("%s: a form the generator does not render", raw)
 }
 
 // numeric is matter.js FieldValue.numericValue for a JSON value: a number.
@@ -645,7 +691,7 @@ func (g *generator) writeRequirement(w *bytes.Buffer, cr *clusterReq, server boo
 		var mask uint32
 		names := make([]string, 0, len(cr.features))
 		for _, f := range cr.features {
-			mask |= 1 << f.Bit
+			mask |= 1 << *f.Bit // at most 31 (snapshot.check)
 			names = append(names, f.Name)
 		}
 		fmt.Fprintf(w, "\t\t\tFeatures: 0x%X, FeatureNames: []string{%s},\n", mask, quoteList(names))

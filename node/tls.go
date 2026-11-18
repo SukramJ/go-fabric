@@ -28,7 +28,7 @@ type TLSConfig struct {
 	// CertificatePort is the node's TLS key store; required.
 	CertificatePort tls.CertificatePort
 	// MaxRootCertificates and MaxClientCertificates are the per-fabric
-	// capacities, at least 5; 0 is chip's 5
+	// capacities, 5 to 254; 0 is chip's 5
 	// (CHIP_CONFIG_TLS_MAX_ROOT_PER_FABRIC_CERTS_TABLE_SIZE,
 	// CHIP_CONFIG_TLS_MAX_CLIENT_CERTS_PER_FABRIC_TABLE_SIZE,
 	// src/lib/core/CHIPConfig.h:2043, :2052).
@@ -41,6 +41,31 @@ type TLSConfig struct {
 	// node's store.
 	CertificateStore tls.Store
 	EndpointStore    tls.Store
+}
+
+// The capacities the cluster/tls servers take, each tlsMinCapacity to
+// tlsMaxCapacity (cluster/tls NewCertificateManagement and
+// NewClientManagement refuse the rest).
+// TestTLSConfigBoundsAgreeWithTheCluster holds these to the servers.
+const (
+	tlsMinCapacity = 5
+	tlsMaxCapacity = 254
+)
+
+// capacityErrors refuses a capacity the cluster/tls constructors would
+// refuse at New, so Validate reports it as [ErrInvalidConfig] (review II,
+// R2-P6-api-2452); 0 is the default and valid.
+func (t *TLSConfig) capacityErrors() []error {
+	var errs []error
+	for _, f := range []struct {
+		name string
+		v    uint8
+	}{{"MaxRootCertificates", t.MaxRootCertificates}, {"MaxClientCertificates", t.MaxClientCertificates}, {"MaxProvisioned", t.MaxProvisioned}} {
+		if f.v != 0 && (f.v < tlsMinCapacity || f.v > tlsMaxCapacity) {
+			errs = append(errs, fmt.Errorf("node: TLS.%s %d is outside %d to %d", f.name, f.v, tlsMinCapacity, tlsMaxCapacity))
+		}
+	}
+	return errs
 }
 
 // errNoCertificatePort reports a TLSConfig without its CertificatePort.

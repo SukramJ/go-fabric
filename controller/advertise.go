@@ -15,9 +15,9 @@ import (
 // (`_matterd._udp`, Matter §4.3.3), so a device that offers
 // commissioner discovery (user-directed commissioning) finds it: matter.js's
 // ServiceDescription.Commissioner (packages/protocol/src/advertisement/
-// ServiceDescription.ts:94-110 at 862ad75f), broadcast by its
+// ServiceDescription.ts:93-109 at db021da0), broadcast by its
 // CommissionerMdnsAdvertisement (packages/protocol/src/advertisement/mdns/
-// CommissionerMdnsAdvertisement.ts:20-71). matter.js advertises it only
+// CommissionerMdnsAdvertisement.ts:21-76). matter.js advertises it only
 // when the program asks; so does [Config].Advertise.
 type Advertise struct {
 	// Name is the DN TXT key (the device name a device shows); "" omits it.

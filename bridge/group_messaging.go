@@ -304,6 +304,10 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 		})
 		return nil
 	}
+	// groups.Manager.Decode returns only a message whose protocol header
+	// parses (an unparsable one fails its candidate, review II,
+	// F-db021da0-35); the check stays for a GroupMessaging port of
+	// another make.
 	proto, _, err := message.UnmarshalProtocolHeader(msg.Payload)
 	if err != nil {
 		return fmt.Errorf("group message: %w", err)

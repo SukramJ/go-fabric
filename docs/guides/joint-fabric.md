@@ -125,8 +125,16 @@ reported. chip reports only NodeList.
 
 The global trust anchors of a vendor come from the DCL.
 `AdministratorConfig.TrustAnchors` and `JointFabricOptions.TrustAnchors`
-take that lookup. Without one, both roles use chip's placeholder: the
-other side's own RCAC.
+take that lookup. Without one, both sides fail the Vendor ID
+Verification (`VENDOR_ID_VERIFICATION_FAILED`, cause
+`jcm.ErrNoTrustAnchor`): the commissioner does not ask for consent, and
+the administrator answers an `AnnounceJointFabricAdministrator` with
+`FAILURE`. `jcm.SelfAnchored` is the explicit opt-in to chip's
+placeholder, the other side's own RCAC, for tests and examples. The
+device kit's administrator (`device.NewJointFabricAdministrator`) takes
+the lookup through its declaration's `TrustAnchors` port
+(`jointfabricadministrator.Declare.TrustAnchors`); without one it fails the
+verification.
 
 ## The commissioner side
 
@@ -135,7 +143,10 @@ res, err := com.Commission(ctx, commissioner.Options{
 	Fabric: jointFabric, Passcode: code, Addresses: addrs,
 	CATs: []uint32{0xFFFF_0001}, // the administrator CAT for the joining administrator
 	JointFabric: &commissioner.JointFabricOptions{
-		Consent: func(info commissioner.TrustInfo) bool { return askTheUser(info) },
+		TrustAnchors: dclTrustAnchors, // the vendor's root from the DCL
+		Consent: func(ctx context.Context, info commissioner.TrustInfo) (bool, error) {
+			return askTheUser(ctx, info)
+		},
 	},
 })
 ```
@@ -147,7 +158,10 @@ step reads the device's AdministratorFabricIndex and its Fabrics, NOCs
 and TrustedRootCertificates over the commissioning session. It then
 verifies the administrator's endpoint, fabric and administrator CAT, and
 verifies the vendor id: the device signs `SignVIDVerificationRequest`
-over the session's attestation challenge. Last, it asks `Consent`. The
+over the session's attestation challenge. Last, it asks `Consent`, which
+may take as long as the user needs: the flow keeps the fail-safe armed
+while it waits (up to the device's cumulative fail-safe limit), and when
+`ctx` ends the step fails at once; an error of `Consent` fails the step. The
 step fails with `ErrJointFabric` and a `jcm.Failure` that names the stage
 and chip's result, for example `USER_DENIED_CONSENT`. A device whose
 administrator fabric has no ICAC, or that carries a VID Verification

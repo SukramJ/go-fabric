@@ -1036,3 +1036,23 @@ func TestBtpSessionKeepsOfferedSegmentSize(t *testing.T) {
 	}
 	_ = f.s.Close()
 }
+
+// TestBtpSessionRefusesAMessageAboveTheDatagramBound (TM R5 5a.5): a
+// beginning segment that declares a message above udp.MaxDatagramSize ends
+// the session before anything is reassembled; one at the bound is taken.
+func TestBtpSessionRefusesAMessageAboveTheDatagramBound(t *testing.T) {
+	at := newMMH(t)
+	at.write = func([]byte) error { return nil }
+	if err := at.s.HandleIncoming(mustEncode(t, Packet{
+		Header:  Header{HasAckNumber: true, IsBeginningSegment: true},
+		Payload: Payload{AckNumber: u8(0), SequenceNumber: 0, MessageLength: u16(maxInboundMessage), SegmentPayload: unhex(t, "0102")},
+	})); err != nil {
+		t.Fatalf("a message of %d bytes: %v", maxInboundMessage, err)
+	}
+
+	over := newMMH(t)
+	over.expectDisconnectOn(t, mustEncode(t, Packet{
+		Header:  Header{HasAckNumber: true, IsBeginningSegment: true},
+		Payload: Payload{AckNumber: u8(0), SequenceNumber: 0, MessageLength: u16(maxInboundMessage + 1), SegmentPayload: unhex(t, "0102")},
+	}))
+}

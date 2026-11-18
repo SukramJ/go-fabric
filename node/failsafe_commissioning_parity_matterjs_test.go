@@ -24,7 +24,7 @@
 // closed PASE session starts a new announcement round of the record
 // (node commissioningHost.reannounceAfterPaseClose, as matter.js's
 // DeviceAdvertiser does on `sessions.deleted` for a session with `isPase`,
-// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162 at 862ad75f),
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162 at db021da0),
 // exactly once in the AddNOC case — the CASE session's close announces
 // nothing (FailsafeCommissioningTest.ts:290-300). The third
 // (the device's initial ACL creation failing during AddNOC) wraps the

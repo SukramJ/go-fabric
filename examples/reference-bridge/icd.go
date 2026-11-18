@@ -15,7 +15,7 @@ import (
 
 // --icd-lit (TESTING ONLY) makes the daemon a Long Idle Time ICD after
 // matter.js's lit-icd test app (support/chip-testing/src/IcdTestInstance.ts
-// at 862ad75f), for the ICD client certification cases the Go controller
+// at db021da0), for the ICD client certification cases the Go controller
 // runs as the DUT (TC-ICDM-6.1, TC-ICDB-1.3): the root serves ICD
 // Management with CheckInProtocolSupport, UserActiveModeTrigger,
 // LongIdleTimeSupport and DynamicSitLitSupport (:67-72), the app's

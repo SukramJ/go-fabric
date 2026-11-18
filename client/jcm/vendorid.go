@@ -80,6 +80,25 @@ type Signer interface {
 // (VendorIdVerificationClient.h:66-67).
 type TrustAnchorLookup func(ctx context.Context, vendorID uint16, subjectKeyID []byte) (globallyTrustedRoot []byte, err error)
 
+// SelfAnchored is a [TrustAnchorLookup] that answers with the
+// administrator's own RCAC — the root the device under commissioning
+// named itself — so step 12b checks the NOC chain against that root a
+// second time and the device vouches for its own vendor id. It verifies
+// nothing about the vendor: an explicit opt-in for tests and the example
+// controller, never a default (review II, R2-P6-sec-1850, owner decision
+// 190). It works inside [VerifyVendorID] and [Verify], which carry the
+// administrator's RCAC to it in their context; anywhere else it finds no
+// anchor ([ErrNoTrustAnchor]).
+func SelfAnchored(ctx context.Context, _ uint16, _ []byte) ([]byte, error) {
+	if rcac, ok := ctx.Value(adminRCACKey{}).([]byte); ok && len(rcac) > 0 {
+		return rcac, nil
+	}
+	return nil, ErrNoTrustAnchor
+}
+
+// adminRCACKey carries the administrator's RCAC to [SelfAnchored].
+type adminRCACKey struct{}
+
 // VerifyVendorID runs the Vendor ID Verification procedure on info's
 // administrator fabric: a random 32-byte client challenge, the peer's
 // SignVIDVerificationResponse, then [Verify]. random nil is crypto/rand.
@@ -116,6 +135,8 @@ func VerifyVendorID(ctx context.Context, signer Signer, info *Info, lookup Trust
 // (step 12a, which chip does not support, :103-104) the to-be-signed
 // message carries it, and [verifyStatement] checks it.
 func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallenge []byte, resp opcreds.SignVidVerificationResponse, lookup TrustAnchorLookup) error {
+	// The administrator's RCAC travels to SelfAnchored in the context.
+	ctx = context.WithValue(ctx, adminRCACKey{}, info.AdminRCAC)
 	rcac, err := mattercert.Decode(info.AdminRCAC) // :64-66
 	if err != nil {
 		return fmt.Errorf("jcm: RCAC: %w", err)

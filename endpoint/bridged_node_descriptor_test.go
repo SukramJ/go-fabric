@@ -19,7 +19,7 @@ import (
 // the host did not state (decision 143).
 // matter.js: every attribute of the bridged basic information cluster but
 // Reachable is optional (BridgedDeviceBasicInformationServer.ts:20 at
-// 862ad75f). Before
+// db021da0). Before
 // 2026-10-30 the constructor refused the empty label and the materialiser
 // returned the inner clusters only, with no Descriptor (S4 report, observed).
 func TestBridgedEndpointWithoutNameServesDescriptor(t *testing.T) {

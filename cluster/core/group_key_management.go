@@ -46,8 +46,10 @@ type GroupKeyManagement struct {
 	// never leave a mixture of both lists (matter.js holds the datasource
 	// across a write's change and the commit's comparison,
 	// packages/node/src/behavior/state/managed/Datasource.ts:1345-1350 and
-	// :1446-1457 at db021da0). It is taken before mu, never under it, and
-	// the store is called under it.
+	// :1446-1457 at db021da0). Groupcast's binding changes take it too
+	// (setGroupKeyMapping, removeGroupKeyMapping; review II,
+	// F-db021da0-42). It is taken before mu, never under it, and the store
+	// is called under it.
 	writeMu sync.Mutex
 	// keySetMu makes a key set's budget check and its store one step —
 	// KeySetWrite's and Groupcast's key creation alike — so concurrent
@@ -128,7 +130,15 @@ const (
 )
 
 // Errors.
-var errGroupKeyMgmtInvalidArg = errors.New("core: GroupKeyManagement invalid argument")
+// errGroupKeyMgmtInvalidArg is returned for a payload of the wrong Go type
+// and answers INVALID_COMMAND ([invalidArgErr]; review II, W6-test-17,
+// R2-P6-err-3112).
+var errGroupKeyMgmtInvalidArg error = invalidArgErr{msg: "core: GroupKeyManagement invalid argument"}
+
+// errGroupKeyMgmtInvalidValue is returned for an attribute write's value of
+// the wrong Go type: INVALID_DATA_TYPE ([invalidValueErr]; owner decision
+// 234).
+var errGroupKeyMgmtInvalidValue error = invalidValueErr{msg: "core: GroupKeyManagement invalid value"}
 
 // groupKeyNotFoundErr is the typed [im.StatusCodeError] returned when a
 // KeySetRead / KeySetRemove targets a group key set that does not exist on
@@ -788,7 +798,7 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	}
 	list, ok := value.([]GroupKeyMapStruct)
 	if !ok {
-		return false, fmt.Errorf("%w: GroupKeyMap write expected []GroupKeyMapStruct, got %T", errGroupKeyMgmtInvalidArg, value)
+		return false, fmt.Errorf("%w: GroupKeyMap write expected []GroupKeyMapStruct, got %T", errGroupKeyMgmtInvalidValue, value)
 	}
 	fabric, err := g.writeFabric(ctx)
 	if err != nil {
@@ -1065,7 +1075,7 @@ func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fie
 		// A fabric-scoped operation without an accessing fabric is
 		// UNSUPPORTED_ACCESS, matter.js's AccessDeniedError
 		// (packages/protocol/src/interaction/FabricAccessControl.ts:59-63 at
-		// 862ad75f); the dispatcher's ACL gate refuses such a request
+		// db021da0); the dispatcher's ACL gate refuses such a request
 		// before the server sees it (endpoint/dispatcher.go CheckACL), so
 		// this is the server's own answer on a direct call.
 		return nil, spec.Errorf(im.StatusUnsupportedAccess, "core: GroupKeyManagement command without active fabric")
@@ -1445,7 +1455,21 @@ func (g *GroupKeyManagement) checkGroupKeyMapping(ctx context.Context, fabric ui
 // replacing an earlier binding, and brings the operational key map along.
 // Mirrors matter.js GroupcastServer #setGroupKeyMapping /
 // #syncOperationalKeyMap.
+//
+// It writes the GroupKeyMap under writeMu, as a controller's write of the
+// attribute does: matter.js's Groupcast helpers assign the GroupKeyMap
+// state (packages/node/src/behaviors/groupcast/GroupcastServer.ts:777-793
+// at db021da0), and a managed write adds that state's datasource to its
+// transaction as a resource
+// (packages/node/src/behavior/state/managed/Datasource.ts:1345-1350), the
+// same resource a controller's write of the attribute takes: one writer
+// of the map at a time, whichever cluster the write comes through. The
+// check is repeated under the lock, where it binds; the caller's earlier
+// one only answers before anything moved (review II, F-db021da0-42).
+// Lock order: Groupcast.cmdMu, then writeMu.
 func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint8, groupID, keySetID uint16) error {
+	g.writeMu.Lock()
+	defer g.writeMu.Unlock()
 	if err := g.checkGroupKeyMapping(ctx, fabric, groupID, keySetID); err != nil {
 		return err
 	}
@@ -1458,8 +1482,11 @@ func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint
 }
 
 // removeGroupKeyMapping drops the fabric's binding of groupID. Mirrors
-// matter.js GroupcastServer #removeGroupKeyMappings.
+// matter.js GroupcastServer #removeGroupKeyMappings. Under writeMu, as
+// [GroupKeyManagement.setGroupKeyMapping] (review II, F-db021da0-42).
 func (g *GroupKeyManagement) removeGroupKeyMapping(ctx context.Context, fabric uint8, groupID uint16) error {
+	g.writeMu.Lock()
+	defer g.writeMu.Unlock()
 	if err := g.store.RemoveGroupKeyMapping(ctx, fabric, groupID); err != nil {
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}

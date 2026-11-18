@@ -17,27 +17,27 @@ import (
 
 // MaxOperationalCertDERBytes caps a Matter operational certificate in its
 // X.509 DER form — §6.1.3; matter.js MAX_DER_CERTIFICATE_SIZE
-// (packages/protocol/src/certificate/kinds/common.ts:13 at 862ad75f),
+// (packages/protocol/src/certificate/kinds/common.ts:13 at db021da0),
 // checked before a DER certificate is parsed
-// (Certificate.ts:617-622 parseAsn1Certificate).
+// (Certificate.ts:672-677 parseAsn1Certificate).
 const MaxOperationalCertDERBytes = 600
 
 // DecodeDER parses an X.509 DER operational certificate (RCAC, ICAC or
 // NOC, as a PKI outside Matter issues them) into the [Certificate] its
-// Matter TLV form carries — Rcac/Icac/Noc.fromAsn1 at 862ad75f
-// (Certificate.ts:612-770 parseAsn1Certificate): the DER is refused over
-// 600 bytes before parsing, the signature algorithm must be the same
-// inside and outside the TBSCertificate (RFC 5280 §4.1.1.2), the DN
-// attributes come back in their arrival order with the Matter ids parsed
-// from their hex strings (by the stricter rule of the db021da0 pin, see
-// derMatterAttribute; the rest of this path is cited at 862ad75f and not
-// yet re-read at db021da0), a recognised extension (basicConstraints,
-// keyUsage, extendedKeyUsage, subjectKeyIdentifier,
-// authorityKeyIdentifier) without its value OCTET STRING is refused and an
-// extension of any other OID is not read — whatever its value holds.
-// The TBSCertificate bytes are kept on Certificate.TBSDER, which
-// [TBSToDER] then returns unchanged (asUnsignedDer, Certificate.ts:196-199),
-// and Certificate.Raw is the TLV form ([Encode]).
+// Matter TLV form carries — Rcac/Icac/Noc.fromAsn1 (Certificate.ts:667-837
+// parseAsn1Certificate at db021da0): the DER is refused over 600 bytes
+// before parsing (:672-677), the signature algorithm must be the same
+// inside and outside the TBSCertificate (RFC 5280 §4.1.1.2, :717-720), the
+// DN attributes come back in their arrival order with the Matter ids
+// parsed from their hex strings (parseSubjectOrIssuer :302-382,
+// parseMatterRdnHex :242-249; see derMatterAttribute), a recognised
+// extension (basicConstraints, keyUsage, extendedKeyUsage,
+// subjectKeyIdentifier, authorityKeyIdentifier) without its value OCTET
+// STRING is refused (:488-490) and an extension of any other OID is not
+// read (:484-485) — whatever its value holds. The TBSCertificate bytes are
+// kept on Certificate.TBSDER, which [TBSToDER] then returns unchanged
+// (asUnsignedDer, Certificate.ts:187-194), and Certificate.Raw is the TLV
+// form ([Encode]).
 func DecodeDER(der []byte) (*Certificate, error) {
 	if len(der) > MaxOperationalCertDERBytes {
 		return nil, fmt.Errorf("%w: DER certificate of %d bytes exceeds the %d byte limit", ErrMalformed, len(der), MaxOperationalCertDERBytes)
@@ -60,7 +60,10 @@ func DecodeDER(der []byte) (*Certificate, error) {
 	}
 	idx := 0
 	if fields[idx].Class == asn1.ClassContextSpecific && fields[idx].Tag == 0 {
-		idx++ // version [0]
+		if err := derVersion(fields[idx]); err != nil {
+			return nil, err
+		}
+		idx++
 	}
 	c.SerialNumber = append([]byte(nil), fields[idx].Bytes...)
 	idx++
@@ -119,8 +122,23 @@ func DecodeDER(der []byte) (*Certificate, error) {
 	return c, nil
 }
 
+// derVersion checks the TBSCertificate's version [0]: its first element an
+// INTEGER with content; the value itself is not refused. Mirrors matter.js
+// packages/protocol/src/certificate/kinds/Certificate.ts:698-706 and
+// derUnsignedInteger (:399-406) at db021da0 (review II, R2-P6-par-3208).
+func derVersion(field asn1.RawValue) error {
+	version, err := derChildren(field.Bytes)
+	if err != nil || len(version) == 0 || version[0].Class != asn1.ClassUniversal || version[0].Tag != asn1.TagInteger || version[0].IsCompound {
+		return fmt.Errorf("%w: invalid certificate version structure", ErrMalformed)
+	}
+	if len(version[0].Bytes) == 0 {
+		return fmt.Errorf("%w: certificate version is an INTEGER without content", ErrMalformed)
+	}
+	return nil
+}
+
 // EncodeDER is c as a signed X.509 DER certificate — asSignedDer
-// (Certificate.ts:183-191 at 862ad75f): the TBSCertificate rebuilt from
+// (Certificate.ts:174-182 at db021da0): the TBSCertificate rebuilt from
 // the fields ([TBSToDER] without a kept TBSDER), the ecdsa-with-SHA256
 // algorithm and the signature as a DER ECDSA-Sig-Value; refused over 600
 // bytes.

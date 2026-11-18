@@ -53,7 +53,7 @@ A host names none of the packages below for these:
 | ClosureControl's host state | `closurecontroldef.Server.Set(Patch{MainState, CurrentErrorList, OverallCurrentState})`: the typed Set reaches the server's own setters (MainState Error with a list raises OperationalError, Disengaged the EngageStateChanged event); `closure.ControlServer`'s `SetCurrentPosition`, `SetMainState`, `SetErrorList` and `ReportError` stay its server methods on `cluster/wire` types |
 | The EV charger | the kit's `energy.EvseServer` is the EnergyEvse default: a state machine whose hardware inputs (`SetHardwareState`, `SetFault`, the hardware limits, `ReportRFID`, `DiagnosticsComplete`) and `Close` are `energyevsedef.Server.Host()`, the attributes it computes refused by `Set`; a charger with an `EvseHost` is `cluster/energy.NewEnergyEvse` mounted with `energyevsedef.Declare{HostServer: …}` (seam), and `Host()` reaches it too, since it is the kit's type |
 | A kit server's own methods | `<cluster>def.Server.Host()`: the methods of the kit's server that `Set`, `Get` and the typed handlers do not reach, as the cluster's `Host` interface ([Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)); nil over a server that does not implement it |
-| ContentAppObserver (seam) | `cluster/media.NewContentAppObserver` through `device.HostServer`: no device type serves the cluster (matter.js's ContentApp lists it as a client, `ObserverClient`), so it has no declaration |
+| ContentAppObserver (seam) | CastingVideoClient serves it optionally, as matter.js's `casting-video-client.ts` lists it, through the generated `contentappobserverdef.Declare`; `cluster/media.NewContentAppObserver` through `device.HostServer` is the seam for the hand-written server (matter.js's ContentApp lists the cluster as a client, `ObserverClient`) |
 | Lower-layer types on `Node` (seams) | `Node.SessionParameters()` (`node.SessionParameters`), `Node.OTAProvider()` (`node.OTAProviderServer`), `Node.BDX()` (`node.BDXResponder`), `Node.CommissionerControl()` (`node.CommissionerControlServer`), `ClientConfig.Names` (`node.DiscoveryNames`): the lower packages' types under names the facade owns, for a host that drives the provider's transfers, the commissioner control or its own DNS-SD cache |
 | Window errors | `node.ErrAdministratorWindowOpen`, `ErrCommissioningBlocked`, `ErrCommissioningWindowAlreadyOpen`, `ErrCommissioningWindowNotConfigured` (the bridge's values, for `errors.Is`) |
 
@@ -163,12 +163,17 @@ clients), and version 8 added columns: to `matter_fabrics` the row's commit
 state (`pending`), its VID verification statement and VVSC and the values a
 pending UpdateNOC replaced, to `matter_node_identities` the NOC, ICAC and
 private key a pending UpdateNOC replaced, and to
-`matter_server_subscriptions` the save order (`save_seq`). `store.Store`
-reads and writes fabrics on a version 8 database only; a host that runs
-`store.Migrations()` with its own tool runs `v8` and then calls
-`store.Upgrade` once, which moves the per-fabric VID settings keys into
-their fabric's columns. `store/migrations/v5.up.sql` to `v8.up.sql` hold
-the statements.
+`matter_server_subscriptions` the save order (`save_seq`). Version 9
+added `matter_resumption`'s session parameters and the table
+`matter_owed_fabric_events`, version 10 the seal mark of every table that
+holds a secret and the DoorLock records' source, and version 11
+`matter_group_key_map`'s `position` and `matter_resumption`'s
+`write_seq`. `store.Store` reads and writes on a database at the last
+version only (v11); a host that runs `store.Migrations()` with its own
+tool runs every step, through `v11`, and then calls `store.Upgrade` once,
+which moves the per-fabric VID settings keys into their fabric's columns.
+`store/migrations/v5.up.sql` to `v11.up.sql` hold the statements; the
+tables per version are in [Persistence](persistence.md#tables-of-store-the-matter_-schema).
 
 **Costs.** The node writes the same tables. A host that writes a fabric,
 an ACL row or a group key directly bypasses the fan-out the node runs for
@@ -176,7 +181,7 @@ the command that writes it (the CASE identity, the operational record,
 the sessions and subscriptions, the group routing). Read; write only
 settings of the host's own.
 
-*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `store/migrations/` (`v5.up.sql`, `v6.up.sql`, `v7.up.sql`), `examples/reference-bridge/persist.go`.*
+*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `store/migrations/` (`v5.up.sql` … `v11.up.sql`), `store/migrations.go` (`migrationVersions`), `examples/reference-bridge/persist.go`.*
 
 ## `mdns`
 
@@ -235,7 +240,7 @@ and sessions into its own hands. Reading them is a facade route,
 seam, for a host that needs what the diagnostics leave out. Closing is
 the node's.
 
-*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/root.go` (`checkProduct`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go:77`.*
+*Source: `node/attestation.go`, `node/config.go` (`Attestation.Chain`), `node/root.go` (`checkProduct`), `node/node.go` (`Sessions`, `Subscriptions`), `node/facade.go` (the re-exports), `secure/setup/setup.go` (`MaxDiscriminator`, `IsValidSetupPIN`), `secure/spake2/spake2.go` (`IterationsMin`, `IterationsMax`), `secure/spake2/wire.go` (`PBKDFMinSaltSize`, `PBKDFMaxSaltSize`), `secure/attestation/files.go` (`LoadChainFiles`).*
 
 ## `groups`
 
@@ -283,7 +288,7 @@ on the facade: `Node.DiagnosticEvents`, `Node.OnDiagnosticEvent` and
 
 **Costs.** None beyond the type: the ring is the node's.
 
-*Source: `node/facade.go`, `node/diagnostics.go`, `node/node.go` (`diagRing`, `ringLogs`), `diagevent/ring.go:58`.*
+*Source: `node/facade.go`, `node/diagnostics.go`, `node/node.go` (`diagRing`, `ringLogs`), `diagevent/ring.go` (`Event`).*
 
 ## `controller/softwareupdate`
 
@@ -306,9 +311,11 @@ node's attestation validated when it was commissioned
 (`client.Record.AttestedVendorID`/`AttestedProductID`) is logged as one
 Warn line, `ota.manager.attested_identity_mismatch`, and answered as any
 other query: nothing is refused on it. The ids are kept only when the
-attestation verified the DAC chain against the trust store and no error
-finding stands; a node commissioned before the record kept them, without a
-trust store, or with a failed attestation or an error finding the policy
+attestation verified the DAC chain against the trust store up to a
+production root, the Certification Declaration is not signed by the Matter
+test CD signer and no error finding stands; a node commissioned before the
+record kept them, without a trust store, under a test root or a test-signed
+declaration, or with a failed attestation or an error finding the policy
 accepted, is not judged.
 
 **Storage.** `ImagesConfig.Blobs` keeps the image files. A backend whose
@@ -329,7 +336,8 @@ port of matterjs-server's `NetworkTopologyService`: `topology.Build`, a
 pure function over one `topology.Image` per node (the root endpoint's
 NetworkCommissioning, GeneralDiagnostics, ThreadNetworkDiagnostics and
 WiFiNetworkDiagnostics, read by `topology.ImageOf`), and `topology.Service`,
-which keeps it current — a 2 s debounce after a node's change, a 60 s
+which keeps it current — a 2 s debounce after a node's change (a burst
+of changes rebuilds at the latest five debounces after its first), a 60 s
 periodic rebuild, `Refresh` re-reading the diagnostics of every online
 Thread and Wi-Fi node (four at a time, 30 s at most, concurrent callers
 sharing one run) — and calls `OnChanged` observers only when the graph
@@ -367,8 +375,15 @@ svc.OnChanged(func(t topology.Topology) { /* push it */ })
 
 **Costs.** A node's change hook says that a report applied, not which
 cluster: every report schedules a debounced rebuild (matterjs-server
-filters to the four network clusters); the hash keeps an unchanged graph
-from the observers. The route-table edges of matterjs-server are not
+filters to the four network clusters), so a burst is bounded at five
+debounces, or a node that reports every second would hold every rebuild
+off until the periodic one; the hash keeps an unchanged graph from the
+observers. An extended address two nodes claim, or an RLOC16 two nodes
+of one Thread network claim (an RLOC16 is unique only within a network,
+so it is keyed by the extended PAN id), resolves to neither
+(matterjs-server keeps the later claim): a neighbour naming it shows as
+`unknown_<EXTADDR>`, and with `topology.Config.Logger` set the service
+logs each such claim once (`matter.controller.topology.claim_collision`). The route-table edges of matterjs-server are not
 built.
 
 **Further sources.** Nodes the controller has not commissioned join the

@@ -171,9 +171,11 @@ func (b *Bridge) waitBDXResponders(ctx context.Context) bool {
 // open — an OTA requestor's ReceiveInit, say, for the provider's image.
 // Without one the bridge refuses them as it refuses any protocol it has no
 // handler for: the message is acknowledged when it asks for it and dropped
-// with [ErrUnknownProtocol], matter.js ExchangeManager.ts:441-455 for a
-// protocol without a handler (the acknowledgement for a message that
-// requires one, MessageFlowError "Unsupported protocol" otherwise). nil
+// with [ErrUnknownProtocol], matter.js ExchangeManager.ts:496-517 at
+// db021da0 for a protocol without a handler (a message that requires an
+// acknowledgement is acknowledged and its exchange closed, :496-507; any
+// other is logged as "message for an unsupported protocol" and dropped,
+// :509-516). nil
 // detaches it. Attach before or after Start.
 func (b *Bridge) AttachBDXResponder(r BDXResponder) {
 	b.bdx.mu.Lock()

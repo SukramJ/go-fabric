@@ -29,7 +29,7 @@
 // constants from Matter Core Spec §3.10.1 (which references the
 // SPAKE2+ test-vector points published with RFC 9383).
 //
-// Limitations of this v1.1 implementation:
+// Notes on this implementation:
 //
 //   - The high-level flow uses [crypto/elliptic.P256] arithmetic
 //     (deprecated in newer Go releases for ECDSA, but still the

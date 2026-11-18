@@ -99,13 +99,15 @@ func opstateServer(build func(opstate.Config) (*opstate.Server, error), port fun
 		if v, ok := consume8(b.initial, opdef.AttrOperationalState); ok {
 			cfg.State = opstate.State(v)
 		}
-		if v, ok := b.initial[opdef.AttrPhaseList]; ok {
+		// A value of another shape stays for the definition's check to
+		// refuse (R2-P6-err-2506).
+		if v, ok := b.initial[opdef.AttrPhaseList].([]string); ok {
 			delete(b.initial, opdef.AttrPhaseList)
-			cfg.Phases, _ = v.([]string)
+			cfg.Phases = v
 		}
 		if v, ok := consume8(b.initial, opdef.AttrCurrentPhase); ok {
 			cfg.CurrentPhase = &v
-		} else {
+		} else if v, has := b.initial[opdef.AttrCurrentPhase]; has && v == nil {
 			delete(b.initial, opdef.AttrCurrentPhase) // null
 		}
 		return build(cfg)

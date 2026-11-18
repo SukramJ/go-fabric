@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -228,9 +229,18 @@ type ICDClient struct {
 	// emitted once commitMu is released (IcdClient.ts:100-101: announced
 	// after commit, so a listener sees the stored registration).
 	announce []func()
-	ctx      context.Context
-	cancel   context.CancelFunc
-	work     sync.WaitGroup
+	// closed is set by close before it cancels and waits: an operation or
+	// an automatic registration starts only while it is unset, and adds to
+	// work under mu, so close's Wait never races an Add and no work
+	// outlives close (review II, R2-P6-conc-2308).
+	closed bool
+	// registerChecked is a test seam (export_test.go): Register calls it
+	// once its checks outside mu passed, before it starts the operation.
+	// Nil in production.
+	registerChecked func()
+	ctx             context.Context
+	cancel          context.CancelFunc
+	work            sync.WaitGroup
 }
 
 type icdObserver struct {
@@ -474,14 +484,16 @@ func (n *Node) icdImage() icdImage {
 	}
 	// IcdClient.ts:768-783: the peer's timings, the schedule's defaults for
 	// what the image lacks.
-	if v, ok := uintOf(ic, icddef.AttrActiveModeThreshold); ok {
-		out.timings.ActiveModeThreshold = time.Duration(v) * time.Millisecond //nolint:gosec // a uint16 attribute
+	// A value beyond the attribute's type is absent (uintWithin, review II,
+	// R2-P6-bound-2352): the schedule's default stands.
+	if v, ok := uintWithin(ic, icddef.AttrActiveModeThreshold, math.MaxUint16); ok {
+		out.timings.ActiveModeThreshold = time.Duration(v) * time.Millisecond //nolint:gosec // uintWithin bounds it to the attribute's uint16
 	}
-	if v, ok := uintOf(ic, icddef.AttrActiveModeDuration); ok {
-		out.timings.ActiveModeDuration = time.Duration(v) * time.Millisecond //nolint:gosec // a uint32 attribute
+	if v, ok := uintWithin(ic, icddef.AttrActiveModeDuration, math.MaxUint32); ok {
+		out.timings.ActiveModeDuration = time.Duration(v) * time.Millisecond //nolint:gosec // uintWithin bounds it to the attribute's uint32
 	}
-	if v, ok := uintOf(ic, icddef.AttrIdleModeDuration); ok {
-		out.timings.IdleModeDuration = time.Duration(v) * time.Second //nolint:gosec // a uint32 attribute
+	if v, ok := uintWithin(ic, icddef.AttrIdleModeDuration, math.MaxUint32); ok {
+		out.timings.IdleModeDuration = time.Duration(v) * time.Second //nolint:gosec // uintWithin bounds it to the attribute's uint32
 	}
 	return out
 }
@@ -514,6 +526,9 @@ func (c *ICDClient) mayStartLocked(kind icdOpKind) bool {
 // startLocked starts an operation of kind, abandoning the one in flight it
 // may take over (IcdClient.ts:312-331). The caller holds mu.
 func (c *ICDClient) startLocked(kind icdOpKind, opts *ICDRegisterOptions, body func(op *icdOperation) error) (*icdOperation, error) {
+	if c.closed {
+		return nil, fmt.Errorf("%w: ICD client is closed", ErrICDAbandoned)
+	}
 	if cur := c.op; cur != nil {
 		if !c.mayStartLocked(kind) {
 			return nil, fmt.Errorf("%w: ICD client cannot start %v while %v is in progress", ErrICDOperation, kind, cur.kind)
@@ -583,7 +598,7 @@ func (c *ICDClient) flushAnnouncements() {
 // stored registration (IcdClient.ts:444-456). The caller holds commitMu.
 // The registration in memory takes reg either way; a store error is logged
 // and returned — a commit that fails in its second phase, whose state
-// stays committed in memory (IcdClientTest.ts:806-824 at 862ad75f).
+// stays committed in memory (IcdClientTest.ts:806-824 at db021da0).
 func (c *ICDClient) persist(reg *ICDRegistration) error {
 	var before bool
 	c.mu.Lock()
@@ -654,24 +669,63 @@ func (n *Node) saveICD(values map[uint32][]byte) error {
 // IcdClient.ts:499-592 (register, #registerOnPeer; Core §9.16.7.1).
 func (c *ICDClient) Register(ctx context.Context, opts ICDRegisterOptions) error {
 	c.mu.Lock()
-	if cur := c.op; cur != nil && cur.kind == icdRegistering {
-		same := c.sameOptions(cur.opts, &opts)
+	join, err := c.admitRegisterLocked(&opts)
+	checked := c.registerChecked
+	c.mu.Unlock()
+	if join != nil {
+		return join.wait(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	if err := c.registerPreconditions(); err != nil {
+		return err
+	}
+	if checked != nil {
+		checked()
+	}
+	// The checks above ran without mu: a registration may have started, or
+	// finished, meanwhile — the automatic one, or another call's. Admit
+	// again under mu before starting, so such a call joins it or is
+	// refused as the doc says (review II, R2-P6-fsm-2355).
+	c.mu.Lock()
+	if join, err = c.admitRegisterLocked(&opts); join != nil || err != nil {
 		c.mu.Unlock()
-		if !same {
-			return fmt.Errorf("%w: an ICD client registration with other options is in progress", ErrICDOperation)
+		if join != nil {
+			return join.wait(ctx)
 		}
-		return cur.wait(ctx)
+		return err
+	}
+	op, err := c.startLocked(icdRegistering, &opts, func(op *icdOperation) error { return c.registerOnPeer(op, opts) })
+	c.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	return op.wait(ctx)
+}
+
+// admitRegisterLocked decides Register's admission under mu: the running
+// registration with the same options to join, or the refusal; neither
+// when a registration may start. The caller holds mu.
+func (c *ICDClient) admitRegisterLocked(opts *ICDRegisterOptions) (*icdOperation, error) {
+	if cur := c.op; cur != nil && cur.kind == icdRegistering {
+		if !c.sameOptions(cur.opts, opts) {
+			return nil, fmt.Errorf("%w: an ICD client registration with other options is in progress", ErrICDOperation)
+		}
+		return cur, nil
 	}
 	if !c.mayStartLocked(icdRegistering) {
-		kind := c.op.kind
-		c.mu.Unlock()
-		return fmt.Errorf("%w: ICD client cannot register while %v is in progress", ErrICDOperation, kind)
+		return nil, fmt.Errorf("%w: ICD client cannot register while %v is in progress", ErrICDOperation, c.op.kind)
 	}
 	if c.reg != nil {
-		c.mu.Unlock()
-		return fmt.Errorf("%w: ICD client is already registered; unregister first or let key refresh re-key in place", ErrICDOperation)
+		return nil, fmt.Errorf("%w: ICD client is already registered; unregister first or let key refresh re-key in place", ErrICDOperation)
 	}
-	c.mu.Unlock()
+	return nil, nil
+}
+
+// registerPreconditions are Register's checks of the node, run without
+// mu (IcdClient.ts:499-592).
+func (c *ICDClient) registerPreconditions() error {
 	if !c.n.SubscriptionActive() {
 		return fmt.Errorf("%w: ICD registration requires an active subscription so the peer operating mode is not stale", ErrICDOperation)
 	}
@@ -681,13 +735,7 @@ func (c *ICDClient) Register(ctx context.Context, opts ICDRegisterOptions) error
 	if img := c.n.icdImage(); img.features&icddef.FeatureCheckInProtocolSupport == 0 {
 		return fmt.Errorf("%w: ICD registration refused: peer does not support the Check-In Protocol (CIP)", ErrICDOperation)
 	}
-	c.mu.Lock()
-	op, err := c.startLocked(icdRegistering, &opts, func(op *icdOperation) error { return c.registerOnPeer(op, opts) })
-	c.mu.Unlock()
-	if err != nil {
-		return err
-	}
-	return op.wait(ctx)
+	return nil
 }
 
 // resolveOptions applies the defaults (IcdClient.ts:541-549).
@@ -1038,8 +1086,11 @@ func (c *ICDClient) onCheckIn(in icd.ReceivedCheckIn) {
 	c.mu.Lock()
 	reg := c.reg
 	fed := c.fed
+	closed := c.closed
 	c.mu.Unlock()
-	if reg == nil || fed == nil {
+	// A closed client takes no Check-In: it starts nothing (review II,
+	// R2-P6-store-2354, R2-P6-conc-2308).
+	if closed || reg == nil || fed == nil {
 		c.commitMu.Unlock()
 		return
 	}
@@ -1124,7 +1175,7 @@ func (c *ICDClient) offerKey(op *icdOperation) error {
 		entry.PendingKey = key
 		// A pending key the store refused is not offered: the refresh
 		// fails, the key stays pending in memory and the next Check-In
-		// retries (IcdClient.ts:882-901, :860-869 at 862ad75f; the commit
+		// retries (IcdClient.ts:882-901, :860-869 at db021da0; the commit
 		// that persists it rejects).
 		if err := c.persist(&ICDRegistration{
 			Key: entry.Key, PendingKey: key, CounterStart: entry.CounterStart, LastOffset: entry.LastOffset,
@@ -1215,9 +1266,13 @@ func (c *ICDClient) ensureLITRegistration() {
 		c.mu.Unlock()
 		return
 	}
+	if c.closed {
+		c.mu.Unlock()
+		return
+	}
 	c.autoRegistering = true
-	c.mu.Unlock()
 	c.work.Add(1)
+	c.mu.Unlock()
 	go func() {
 		defer c.work.Done()
 		c.autoRegister()
@@ -1318,11 +1373,17 @@ func (c *ICDClient) onDecommissioned() {
 	if c.op != nil {
 		c.op.cancel()
 	}
+	c.mu.Unlock()
+	// The state lock first, then the registration and the fed peer, the
+	// lock order of onCheckIn: a commit already past its ownership check
+	// stores and feeds under commitMu, so what it fed is read here and
+	// removed below (review II, R2-P6-conc-2353).
+	c.commitMu.Lock()
+	c.mu.Lock()
 	reg := c.reg
 	fed := c.fed
 	c.fed = nil
 	c.mu.Unlock()
-	c.commitMu.Lock()
 	if reg != nil {
 		_ = c.persist(nil)
 	}
@@ -1339,9 +1400,52 @@ func (c *ICDClient) onDecommissioned() {
 	}
 }
 
+// onDeleted is onDecommissioned for a node the registry deletes without
+// a decommission (Forget, Erase, the cull): the operation is abandoned,
+// the receive path dropped, the peer removed from the fabric's ICD table
+// and the registration cleared in memory — the store is the registry's to
+// erase, so nothing is written and nothing announced. Close at shutdown
+// keeps the stored registration (close). A module rule (review II,
+// R2-P6-store-2354; Fable fact note fable-6b-w2 G1): matter.js removes
+// the peer on decommission only
+// (packages/node/src/behavior/system/icd/IcdClient.ts:104, :426-437 at
+// db021da0), and its dispose removes nothing (:930-934).
+func (c *ICDClient) onDeleted() {
+	c.mu.Lock()
+	// Closed at once: until close runs inside the node's Close — after its
+	// stop, which can wait — no operation may start and feed the table
+	// again (an automatic registration, a host's Register).
+	c.closed = true
+	if c.op != nil {
+		c.op.cancel()
+	}
+	c.mu.Unlock()
+	c.commitMu.Lock()
+	c.mu.Lock()
+	fed := c.fed
+	c.fed = nil
+	c.reg = nil
+	c.lastCheckInAt = time.Time{}
+	c.available = false
+	c.mu.Unlock()
+	c.unwatchAll()
+	c.commitMu.Unlock()
+	if fed != nil {
+		if t := c.env.table(fed.FabricIndex); t != nil {
+			t.RemovePeer(fed.NodeID)
+		}
+	}
+	if p := c.n.peer(); p != nil {
+		p.SetICDAwait(nil)
+	}
+}
+
 // close abandons the operations and waits for them; the stored
 // registration stays (IcdClient.ts:138-140, :930-934).
 func (c *ICDClient) close() {
+	c.mu.Lock()
+	c.closed = true
+	c.mu.Unlock()
 	c.cancel()
 	c.work.Wait()
 	c.unwatchAll()

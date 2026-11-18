@@ -12,10 +12,10 @@ import (
 // TestPeersCommissionedParity ports matter.js's PeersCommissionedTest
 // (packages/node/test/node/client/PeersCommissionedTest.ts at 862ad75f):
 // Commissioned holds the commissioned node and an operational node a peer
-// address created, never a group node (Peers.ts:410-413). The Go registry
-// holds no commissionable discoveries — client/discovery reports them
-// without registering a node — so that third exclusion has nothing to
-// exclude here.
+// address created, never a group node (Peers.ts:410-413 at db021da0). The
+// Go registry holds no commissionable discoveries — client/discovery
+// reports them without registering a node — so that third exclusion has
+// nothing to exclude here.
 func TestPeersCommissionedParity(t *testing.T) {
 	t.Parallel()
 	cp := newClientPair(t, clientPairOptions{})

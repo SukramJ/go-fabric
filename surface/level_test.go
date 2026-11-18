@@ -269,3 +269,45 @@ func TestReportLevelJSON(t *testing.T) {
 		t.Error("Clone drops the level")
 	}
 }
+
+// TestServerInternalKeysACommandByDirection: Thermostat command 2 is a
+// request at 1.4–1.4.2 and a response (AddThermostatSuggestionResponse)
+// from 1.6.0 (parity/levels, measured). An endpoint that generates the
+// response gets a server-internal decision at 1.4: the response is
+// absent there. With the merged table of before owner decision 227 the
+// id read as present at 1.4 and the response went undecided
+// (R2-P6-par-2713).
+func TestServerInternalKeysACommandByDirection(t *testing.T) {
+	t.Parallel()
+	const thermostat, cmd2 = 0x0201, 0x02
+	if got := schema.ClusterRequestCommandLevels(thermostat, cmd2); got != set("1.4", "1.4.1", "1.4.2") {
+		t.Errorf("request 2's levels = %v", got.Levels())
+	}
+	if got := schema.ClusterResponseCommandLevels(thermostat, cmd2); got != set("1.6.0", "1.6.1") {
+		t.Errorf("response 2's levels = %v", got.Levels())
+	}
+	//nolint:staticcheck // SA1019: the deprecated union is the table of before decision 227
+	if got := schema.ClusterCommandLevels(thermostat, cmd2); got != set("1.4", "1.4.1", "1.4.2", "1.6.0", "1.6.1") {
+		t.Errorf("the union's levels = %v", got.Levels())
+	}
+	generates := surface.Endpoint{Key: "t", Clusters: []surface.Cluster{{ID: thermostat, Generated: []uint32{cmd2}}}}
+	got := (surface.Policies{Level: "1.4"}).ServerInternal(generates, nil)
+	var cmds []surface.Decision
+	for _, d := range got {
+		if d.Kind == surface.KindCommand {
+			cmds = append(cmds, d)
+		}
+	}
+	if len(cmds) != 1 || cmds[0].ID != cmd2 || cmds[0].Levels != set("1.6.0", "1.6.1") {
+		t.Errorf("generated 2 at 1.4: command decisions %+v, want one for 2 with the response's levels", cmds)
+	}
+	accepts := surface.Endpoint{Key: "t", Clusters: []surface.Cluster{{ID: thermostat, Accepted: []uint32{cmd2}}}}
+	for _, d := range (surface.Policies{Level: "1.4"}).ServerInternal(accepts, nil) {
+		if d.Kind == surface.KindCommand {
+			t.Errorf("accepted 2 at 1.4 (a request there): decision %+v", d)
+		}
+	}
+	if got := surface.ElementLevels(surface.Element{Kind: surface.KindCommand, Cluster: thermostat, ID: cmd2}); got != set("1.4", "1.4.1", "1.4.2") {
+		t.Errorf("a command element's levels = %v, want the request's", got.Levels())
+	}
+}

@@ -25,7 +25,7 @@ type AttributeValue struct {
 // before applying each write that carries a DataVersion field.
 //
 // Mirrors matter.js packages/protocol/src/action/server/AttributeWriteResponse.ts:254-257
-// at 862ad75f (a write whose DataVersion differs from the cluster's answers
+// at db021da0 (a write whose DataVersion differs from the cluster's answers
 // DataVersionMismatch before the write is dispatched), and chip
 // src/app/WriteHandler.cpp AttributeAccessInterface DataVersion verification.
 type DataVersionReader interface {

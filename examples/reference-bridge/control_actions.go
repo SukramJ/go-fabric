@@ -33,13 +33,9 @@ var errWrongSoilEndpoint = errors.New("not the soil sensor's endpoint")
 // limits. Here the sensor takes the value and the SoilMeasurement server
 // holds it to the limits on the next read.
 //
-// control.go's applyPipeCommand does not dispatch it yet: the owner adds
-//
-//	case "SetSimulatedSoilMoisture":
-//		return f.setSimulatedSoilMoisture(cmd.EndpointID, cmd.SoilMoistureValue)
-//
-// with a SoilMoistureValue *uint8 field (JSON "SoilMoistureValue") on
-// pipeCommand.
+// control.go's applyPipeCommand dispatches it as the app-pipe command
+// SetSimulatedSoilMoisture, with pipeCommand's SoilMoistureValue (JSON
+// "SoilMoistureValue").
 func (f *fleet) setSimulatedSoilMoisture(endpointID uint16, value *uint8) error {
 	if f.endpointOf != nil {
 		if id, ok := f.endpointOf(soilKey); !ok || id != endpointID {

@@ -212,33 +212,44 @@ func modeOptionsOf(v any) []modebase.ModeOption {
 }
 
 // consume8 is [consume] for an attribute of one octet: a value above 255
-// is none (the definition's check refuses it later).
+// is not taken.
 func consume8(initial map[uint32]any, attrID uint32) (uint8, bool) {
-	v, ok := consume(initial, attrID)
-	if !ok || v > math.MaxUint8 {
-		return 0, false
-	}
-	return uint8(v), true
+	v, ok := consumeMax(initial, attrID, math.MaxUint8)
+	return uint8(v), ok //nolint:gosec // consumeMax held it to 255
 }
 
 // consume removes attrID from initial and returns its value as an
 // unsigned integer: a typed value of the declaration's Patch, or the
 // uint64 of a device-type default.
 func consume(initial map[uint32]any, attrID uint32) (uint64, bool) {
+	return consumeMax(initial, attrID, math.MaxUint64)
+}
+
+// consumeMax is [consume] for a value at most limit. A value it does not
+// take — another kind, a negative one, one above limit — stays in initial,
+// so the definition's check (applyInitial, spec SetAttributes) refuses it
+// rather than the device dropping it unseen (R2-P6-err-2506).
+func consumeMax(initial map[uint32]any, attrID uint32, limit uint64) (uint64, bool) {
 	v, ok := initial[attrID]
 	if !ok {
 		return 0, false
 	}
-	delete(initial, attrID)
+	var u uint64
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return rv.Uint(), true
+		u = rv.Uint()
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if rv.Int() >= 0 {
-			return uint64(rv.Int()), true //nolint:gosec // not negative
+		if rv.Int() < 0 {
+			return 0, false
 		}
+		u = uint64(rv.Int()) //nolint:gosec // not negative
 	default:
+		return 0, false
 	}
-	return 0, false
+	if u > limit {
+		return 0, false
+	}
+	delete(initial, attrID)
+	return u, true
 }

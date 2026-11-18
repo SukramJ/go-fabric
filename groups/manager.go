@@ -880,8 +880,8 @@ func (m *Manager) HasKeyMapping(ctx context.Context, fabricIndex uint8, groupID 
 }
 
 // HasUsableKey reports whether the fabric maps the group to a key set it
-// holds — matter.js BindingManager #holdsGroupKey (BindingManager.ts:482-490
-// at 0ceb202d): the GroupKeyMap entry alone is not a key.
+// holds — matter.js BindingManager #holdsGroupKey (BindingManager.ts:466-474
+// at db021da0): the GroupKeyMap entry alone is not a key.
 func (m *Manager) HasUsableKey(ctx context.Context, fabricIndex uint8, groupID uint16) (bool, error) {
 	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {

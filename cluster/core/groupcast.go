@@ -59,7 +59,7 @@ const (
 	// groupcastLeaveMaxEndpoints is LeaveGroup.Endpoints' "1 to 20".
 	groupcastLeaveMaxEndpoints = 20
 	// groupcastJoinMaxEndpoints is JoinGroup.Endpoints' "desc" constraint
-	// (groupcast.element.ts:66 at 0ceb202d), which matter.js does not model;
+	// (groupcast.element.ts:66 at db021da0), which matter.js does not model;
 	// chip enforces kMaxCommandEndpoints, 20 (GroupcastCluster.cpp:428-440
 	// at the harness pin: more than 20 is ConstraintError before the key
 	// set is looked up — TC-GC-2.2 step 12).

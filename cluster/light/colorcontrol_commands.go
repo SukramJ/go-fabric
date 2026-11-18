@@ -729,7 +729,13 @@ func (s *ColorControlServer) stopColorLoop(ctx context.Context) error {
 
 // startColorLoopLogic is matter.js startColorLoopLogic: the enhanced hue
 // starts at startHue and moves without end, one turn per ColorLoopTime
-// seconds, in the loop's direction.
+// seconds, in the loop's direction. A ColorLoopTime of 0 turns once a
+// second, as connectedhomeip guards it ("loopTimeSec = (timeSec == 0) ?
+// 1u : timeSec", ColorControlCluster.cpp:913 at 6170af84); the attribute
+// keeps reading 0. matter.js divides by `colorLoopTime`
+// (ColorControlServer.ts:1208 at db021da0), an infinite rate the engine
+// takes as immediate and, without a target, drops — ColorLoopActive set
+// Active beforehand (:1156) over nothing (R2-P6-fsm-1412).
 func (s *ColorControlServer) startColorLoopLogic(ctx context.Context, startHue uint16) error {
 	if err := s.update(ctx, func(st *colorState) { st.enhancedHue = startHue }); err != nil {
 		return err
@@ -739,7 +745,7 @@ func (s *ColorControlServer) startColorLoopLogic(ctx context.Context, startHue u
 	if st.loopDirection == uint8(ccdef.ColorLoopDirectionDecrement) {
 		mode = ccdef.MoveModeDown
 	}
-	return s.moveHueLogic(mode, math.Floor(maxEnhancedHueValue/float64(st.loopTime)), true)
+	return s.moveHueLogic(mode, math.Floor(maxEnhancedHueValue/float64(max(st.loopTime, 1))), true)
 }
 
 // stopMoveStep is matter.js stopMoveStep and stopMoveStepLogic: every

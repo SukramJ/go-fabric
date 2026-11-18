@@ -414,10 +414,50 @@ func (m *manager) stopAll(ctx context.Context) {
 // just before Close would otherwise open a session nothing ends — and
 // stopAll ends the rest (review II, R2-P1-cam-b-04). stopAll itself keeps
 // the manager usable, as a ported case starts again after it
-// (manager_slice_d_parity_matterjsserver_test.go).
-func (m *manager) shutdown(ctx context.Context) {
+// (manager_slice_d_parity_matterjsserver_test.go). untracked, when not
+// nil, runs alongside stopAll: it ends the sessions the registry does not
+// hold.
+func (m *manager) shutdown(ctx context.Context, untracked func(ctx context.Context)) {
 	m.sessions.closeStarts()
+	if untracked == nil {
+		m.stopAll(ctx)
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		untracked(ctx)
+	}()
 	m.stopAll(ctx)
+	<-done
+}
+
+// releaseUntracked ends, concurrently and within one cleanup budget, the
+// sessions the registry does not hold: each through the registry's stop,
+// so the end is announced as a release, with send's EndSession.
+func (m *manager) releaseUntracked(ctx context.Context, sessions []sessionKey, send func(t target, id uint16) func(context.Context) error) {
+	if len(sessions) == 0 {
+		return
+	}
+	cctx, cancel := m.cleanupContext(ctx)
+	defer cancel()
+	done := make(chan struct{}, len(sessions))
+	for _, k := range sessions {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			t := target{k.nodeID, k.endpointID}
+			if _, err := m.sessions.stop(cctx, k.nodeID, k.endpointID, k.sessionID, sessionEnd{cause: endReleased}, send(t, k.sessionID)); err != nil {
+				m.log.Warn("camera.session.release_failed", slog.Int("webrtc_session_id", int(k.sessionID)), slog.Uint64("node_id", k.nodeID), slog.Any("err", err))
+			}
+		}()
+	}
+	for range sessions {
+		select {
+		case <-done:
+		case <-cctx.Done():
+			return
+		}
+	}
 }
 
 // releaseSessions ends every session in scope, including ones still being

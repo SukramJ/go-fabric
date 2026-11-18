@@ -65,7 +65,7 @@ func DecodeDoorLockRequest(payload []byte) (DoorLockRequest, error) {
 			return nil
 		}
 		// PINCode is an octet string of any length (door-lock-cluster.element.ts:231
-		// at 862ad75f states no constraint); another type is refused.
+		// at db021da0 states no constraint); another type is refused.
 		if el.Type != tlv.TypeOctetStr1 && el.Type != tlv.TypeOctetStr2 && el.Type != tlv.TypeOctetStr4 && el.Type != tlv.TypeOctetStr8 {
 			return fieldTypeError(el, ErrDoorLockMalformed, "an octet string")
 		}

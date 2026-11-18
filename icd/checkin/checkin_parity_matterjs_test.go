@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/protocol/test/icd/CheckInMessageTest.ts at
-// 862ad75f: the nonce, the encoding and the decoding of a Check-In payload
+// db021da0: the nonce, the encoding and the decoding of a Check-In payload
 // against the CHIP SDK's three test vectors (CheckIn_Message_test_vectors.h,
 // CheckInMessageTest.ts:12-38), the tampering and short-payload refusals,
 // the ICD round trip, and the counter validation with its uint32 wrap and

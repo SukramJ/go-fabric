@@ -5,6 +5,7 @@ package main
 
 import (
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,8 +27,12 @@ type citation struct {
 	Line int
 	// Text is the citation as written ("DescriptorServer.ts:227-254").
 	Text string
-	// Path is the cited path as written, without the line part.
+	// Path is the cited path as written, without the line part — for a
+	// citation by an alias ([citeAliases]) the path the alias stands for.
 	Path string
+	// Alias is the abbreviation the citation names its file by ("DAV"),
+	// empty for a citation that names the path.
+	Alias string
 	// Lo and Hi are the cited lines (Hi == Lo for a single line).
 	Lo, Hi int
 	// Sha is the commit the citation is checked at, set by run; empty for
@@ -40,6 +45,13 @@ type citation struct {
 	// citation is then checked against MATTERJS_SERVER_DIR at the
 	// sentence's `at <sha>`, never against matter.js (brief M9-module §1).
 	Server bool
+	// Bare is set for a bare line part (":441-443") that the sentence
+	// binds to the .ts file it names last before it without a line part
+	// ("<file> at <sha>: :441-443, :481-488"): Path is that file's, Text
+	// the part as written. It is checked like any citation but counted on its own and
+	// kept out of drift.json, the hard errors and the off-pin ratchet
+	// (R2-P6-test-3202, decision 123: printed, not ratcheted).
+	Bare bool
 	// Idents are the names of the sentence nearer to this citation than
 	// to any other reference of the sentence, nearest first; the stems of
 	// the files the sentence cites are not among them. Attached are those
@@ -53,6 +65,32 @@ type citation struct {
 // citeRE matches a cited TypeScript path and its line or line range.
 var citeRE = regexp.MustCompile(`((?:[A-Za-z0-9_.@-]+/)*[A-Za-z0-9_.@-]*[A-Za-z0-9_@-]\.ts):(\d+)(?:[-–](\d+))?`)
 
+// citeAliases are the abbreviations the Go code cites a matter.js file by,
+// with the path each stands for: `<alias>:<line>[-<line>]` is a citation
+// of that file, checked like one written with the path — at the pin, or at
+// the commit its sentence names. An alias is defined where it is used: the
+// package doc of controller/attestation binds DAV to
+// DeviceAttestationValidator.ts (review II, phase 6b, the wave-4 boundary
+// read).
+var citeAliases = map[string]string{
+	"DAV": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
+}
+
+// aliasRE matches an alias citation; its groups are those of citeRE (the
+// alias, the line, the end of the range), so the two are read alike.
+var aliasRE = regexp.MustCompile(`\b(` + strings.Join(slices.Sorted(maps.Keys(citeAliases)), "|") + `):(\d+)(?:[-–](\d+))?`)
+
+// citeMatches returns the citations of text, those by path and those by an
+// alias, in text order.
+func citeMatches(text string) [][]int {
+	out := citeRE.FindAllStringSubmatchIndex(text, -1)
+	if aliases := aliasRE.FindAllStringSubmatchIndex(text, -1); len(aliases) > 0 {
+		out = append(out, aliases...)
+		sort.Slice(out, func(a, b int) bool { return out[a][0] < out[b][0] })
+	}
+	return out
+}
+
 // The other references a sentence may carry: a bare line part (":108-112",
 // whose file the reader takes from the context, so it is not checked) and
 // a citation of a file in another language ("foo.go:12"). Neither is
@@ -63,13 +101,85 @@ var (
 	otherCiteRE = regexp.MustCompile(`[A-Za-z0-9_-]\.(?:go|cpp|h|py|yaml|json|md|js|mts):\d+(?:[-–]\d+)?`)
 )
 
+// The references a sentence names without a line part. tsPathRE is a .ts
+// path as citeRE spells it; a match followed by ":<digit>" is a citation
+// and one followed by a word byte (".tsx") no path, so the caller drops
+// both. otherFileRE is a file of another language named without a line
+// (a chip source, a Go file): a bare part after it is that file's, not a
+// .ts file's. A ".js" name is not among them: "matter.js"
+// names the project far more often than a file.
+var (
+	tsPathRE    = regexp.MustCompile(`(?:[A-Za-z0-9_.@-]+/)*[A-Za-z0-9_.@-]*[A-Za-z0-9_@-]\.ts`)
+	otherFileRE = regexp.MustCompile(`[A-Za-z0-9_-]\.(?:go|cpp|h|hpp|cc|py|yaml|xml|zap|json|md|mts)\b`)
+)
+
+// The chip citations the summary counts (decision 123): a file of a chip
+// language, with or without a line part, in a sentence that names chip or
+// connectedhomeip. The forms are the cite unit's (review II, phase 6b).
+var (
+	chipWordRE = regexp.MustCompile(`(?i)\b(chip|connectedhomeip)\b`)
+	chipFileRE = regexp.MustCompile(`(?:[A-Za-z0-9_.@-]+/)*[A-Za-z0-9_@-]+\.(?:cpp|h|hpp|cc|c|mm|py|yaml|gni|gn|zapt|zap|xml|java|kt|sh|txt|json|matter|ipp)(?::\d+(?:[-–]\d+)?)?`)
+)
+
 // serverName routes a citation to the second tree: a sentence that names
 // it cites matterjs-server (github.com/matter-js/matterjs-server), whose
 // packages/ layout a matter.js path could otherwise collide with.
 const serverName = "matterjs-server"
 
-// shaRE matches an `at <sha>` or an `at` followed by a backticked sha.
-var shaRE = regexp.MustCompile("\\bat\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)")
+// shaRE matches the forms in which a sentence names a commit: `at <sha>`
+// (or `at` before a backticked sha), a sha opening a parenthesis
+// ("(0ceb202d, packages/…)"), "matter.js <sha>" (R2-P6-test-3202 (b)), a
+// sha closing a parenthesis after a comma or semicolon ("(packages/…/,
+// 0ceb202d)"), "pin <sha>" and "HEAD <sha>" (Fable's wave-4 read, F3). Each
+// alternative has one group, the sha.
+var shaRE = regexp.MustCompile("\\bat\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)" +
+	"|\\(`?([0-9a-f]{7,40})`?[,;)]" +
+	"|\\bmatter\\.js\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)" +
+	"|[,;]\\s*`?([0-9a-f]{7,40})`?\\)" +
+	"|\\bpin\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)" +
+	"|\\bHEAD\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)")
+
+// shaSpans returns the span of the sha of every shaRE match in text. Every
+// form but `at <sha>` takes a sha only when it has a letter: those forms
+// frame plain numbers too ("(1000000)", ", 1000000)", "pin 12345678"), and
+// git would resolve a number that happens to abbreviate a commit. A sha of
+// digits only is still read in the `at <sha>` form.
+func shaSpans(text string) [][2]int {
+	var out [][2]int
+	for _, m := range shaRE.FindAllStringSubmatchIndex(text, -1) {
+		for g := 1; g < len(m)/2; g++ {
+			if m[2*g] < 0 {
+				continue
+			}
+			if g > 1 && strings.Trim(text[m[2*g]:m[2*g+1]], "0123456789") == "" {
+				break
+			}
+			out = append(out, [2]int{m[2*g], m[2*g+1]})
+			break
+		}
+	}
+	return out
+}
+
+// mention is a reference the summary counts but the checker does not
+// check line by line: a .ts path named without a line, a bare line part
+// bound to no .ts file, or a chip citation (decision 123).
+type mention struct {
+	File string
+	Line int
+	Kind string
+	Text string
+	// Shas are the sentence's commits, nearest first, as a citation's.
+	Shas   []string
+	Server bool
+}
+
+// Mention kinds.
+const (
+	mentionFileOnly = "file-only"
+	mentionBare     = "bare"
+	mentionChip     = "chip"
+)
 
 // Identifier forms the drift check reads in a sentence: a `#name`, a
 // backticked name, and a CamelCase word (upper with two humps or more, or
@@ -238,33 +348,123 @@ func gap(a0, a1, b0, b1 int) int {
 	return 0
 }
 
-// span is one reference of a sentence before its names are assigned; a
-// sink (a bare line part, another language's citation) is not emitted.
+// span is one reference of a sentence before its names are assigned; only
+// a spanCite one is emitted as a citation, every kind takes the names
+// nearest to it.
 type span struct {
 	start, end int // in the sentence
-	sink       bool
+	kind       int
+	unbound    bool // a bare part after a .ts citation or after no file
 	c          citation
 }
 
-// collectFile returns the citations in one Go file's source.
-func collectFile(file, src string) []citation {
+// collectFile returns the citations in one Go file's source and the
+// references the summary counts beside them.
+func collectFile(file, src string) ([]citation, []mention) {
 	var out []citation
+	var ments []mention
 	for _, seg := range segments(src) {
-		matches := citeRE.FindAllStringSubmatchIndex(seg.text, -1)
-		for i := 0; i < len(matches); {
-			s, e := sentenceBounds(seg.text, matches[i][0], matches[i][1])
-			if seg.code {
-				if ls, le, ok := literalBounds(seg.text, matches[i][0], matches[i][1]); ok {
-					s, e = ls, le
-				}
-			}
+		matches := citeMatches(seg.text)
+		paths := filesWithoutLine(seg.text)
+		// The sentences hold a citation or a .ts file named without a line.
+		anchors := make([][2]int, 0, len(matches)+len(paths))
+		for _, m := range matches {
+			anchors = append(anchors, [2]int{m[0], m[1]})
+		}
+		anchors = append(anchors, paths...)
+		sort.Slice(anchors, func(a, b int) bool { return anchors[a][0] < anchors[b][0] })
+		for i := 0; i < len(anchors); {
+			s, e := sentenceAt(seg, anchors[i][0], anchors[i][1])
 			j := i
-			for j < len(matches) && matches[j][0] < e {
+			for j < len(anchors) && anchors[j][0] < e {
 				j++
 			}
-			out = append(out, collectSentence(file, seg, s, e, matches[i:j])...)
+			var ms [][]int
+			for _, m := range matches {
+				if m[0] >= anchors[i][0] && m[0] < e {
+					ms = append(ms, m)
+				}
+			}
+			var ps [][2]int
+			for _, p := range paths {
+				if p[0] >= anchors[i][0] && p[0] < e {
+					ps = append(ps, p)
+				}
+			}
+			c, m := collectSentence(file, seg, s, e, ms, ps)
+			out = append(out, c...)
+			ments = append(ments, m...)
 			i = j
 		}
+		ments = append(ments, chipMentions(file, seg)...)
+	}
+	return out, ments
+}
+
+// sentenceAt is the sentence of seg around [lo, hi): on a line of code the
+// string literal that holds it, else the sentence of the text.
+func sentenceAt(seg segment, lo, hi int) (start, end int) {
+	s, e := sentenceBounds(seg.text, lo, hi)
+	if seg.code {
+		if ls, le, ok := literalBounds(seg.text, lo, hi); ok {
+			s, e = ls, le
+		}
+	}
+	return s, e
+}
+
+// filesWithoutLine returns the spans of the .ts paths text names without
+// a line part.
+func filesWithoutLine(text string) [][2]int {
+	var out [][2]int
+	for _, m := range tsPathRE.FindAllStringIndex(text, -1) {
+		after := text[m[1]:]
+		if after != "" && isWordByte(after[0]) {
+			continue // ".tsx", or the path runs on
+		}
+		if len(after) > 1 && after[0] == ':' && after[1] >= '0' && after[1] <= '9' {
+			continue // a citation
+		}
+		out = append(out, [2]int{m[0], m[1]})
+	}
+	return out
+}
+
+// chipMentions returns the chip citations of seg: a file of a chip
+// language, with or without a line part, in a sentence that names chip or
+// connectedhomeip (and not matterjs-server).
+func chipMentions(file string, seg segment) []mention {
+	var out []mention
+	for _, m := range chipFileRE.FindAllStringIndex(seg.text, -1) {
+		if m[0] > 0 && (isWordByte(seg.text[m[0]-1]) || seg.text[m[0]-1] == '.') {
+			continue
+		}
+		if m[1] < len(seg.text) && isWordByte(seg.text[m[1]]) {
+			continue // a name such as "Server.commitAll", not a file
+		}
+		s, e := sentenceAt(seg, m[0], m[1])
+		sentence := seg.text[s:e]
+		if !chipWordRE.MatchString(sentence) || strings.Contains(sentence, serverName) {
+			continue
+		}
+		out = append(out, mention{
+			File: file, Line: seg.lines[m[1]-1], Kind: mentionChip, Text: seg.text[m[0]:m[1]],
+			Shas: nearestShas(sentence, m[0]-s, m[1]-s),
+		})
+	}
+	return out
+}
+
+// nearestShas returns the commits sentence names, nearest to [lo, hi)
+// first.
+func nearestShas(sentence string, lo, hi int) []string {
+	spans := shaSpans(sentence)
+	sort.SliceStable(spans, func(a, b int) bool {
+		return gap(spans[a][0], spans[a][1], lo, hi) < gap(spans[b][0], spans[b][1], lo, hi)
+	})
+	out := make([]string, 0, len(spans))
+	for _, sp := range spans {
+		out = append(out, sentence[sp[0]:sp[1]])
 	}
 	return out
 }
@@ -341,12 +541,23 @@ func attached(text string, inner []int, parent map[int]int, n0, n1, c0, c1 int) 
 	return false
 }
 
+// Span kinds of a sentence.
+const (
+	spanCite  = iota // a citation: emitted
+	spanBare         // a bare line part
+	spanPath         // a .ts file named without a line
+	spanOther        // another language's citation or file
+)
+
 // collectSentence builds the citations of the sentence text[s:e], whose
-// citations are matches: each with the names nearer to it than to any
-// other reference of the sentence.
-func collectSentence(file string, seg segment, s, e int, matches [][]int) []citation {
+// citations are matches and whose .ts files named without a line are
+// paths: each with the names nearer to it than to any other reference of
+// the sentence. A bare line part whose nearest reference before it is
+// such a file is bound to it ([citation.Bare]); the other bare parts and
+// the files are returned as mentions.
+func collectSentence(file string, seg segment, s, e int, matches [][]int, paths [][2]int) ([]citation, []mention) {
 	sentence := seg.text[s:e]
-	spans := make([]span, 0, len(matches))
+	spans := make([]span, 0, len(matches)+len(paths))
 	stems := map[string]bool{}
 	for _, m := range matches {
 		lo, _ := strconv.Atoi(seg.text[m[4]:m[5]])
@@ -354,47 +565,45 @@ func collectSentence(file string, seg segment, s, e int, matches [][]int) []cita
 		if m[6] >= 0 {
 			hi, _ = strconv.Atoi(seg.text[m[6]:m[7]])
 		}
-		p := seg.text[m[2]:m[3]]
+		p, alias := seg.text[m[2]:m[3]], ""
+		if full, ok := citeAliases[p]; ok {
+			p, alias = full, p
+		}
 		stems[strings.TrimSuffix(path.Base(p), ".ts")] = true
 		spans = append(spans, span{start: m[0] - s, end: m[1] - s, c: citation{
-			File: file, Line: seg.lines[m[1]-1], Text: seg.text[m[0]:m[1]], Path: p, Lo: lo, Hi: hi,
+			File: file, Line: seg.lines[m[1]-1], Text: seg.text[m[0]:m[1]], Path: p, Alias: alias, Lo: lo, Hi: hi,
+		}})
+	}
+	for _, p := range paths {
+		text := seg.text[p[0]:p[1]]
+		stems[strings.TrimSuffix(path.Base(text), ".ts")] = true
+		spans = append(spans, span{start: p[0] - s, end: p[1] - s, kind: spanPath, c: citation{
+			File: file, Line: seg.lines[p[1]-1], Text: text, Path: text,
 		}})
 	}
 	for _, m := range bareLineRE.FindAllStringSubmatchIndex(sentence, -1) {
-		spans = append(spans, span{start: m[2], end: m[3], sink: true})
+		spans = append(spans, span{start: m[2], end: m[3], kind: spanBare})
 	}
 	for _, m := range otherCiteRE.FindAllStringIndex(sentence, -1) {
-		spans = append(spans, span{start: m[0], end: m[1], sink: true})
+		spans = append(spans, span{start: m[0], end: m[1], kind: spanOther})
 	}
-	blank := make([][2]int, 0, len(spans))
-	for i := range spans {
-		blank = append(blank, [2]int{spans[i].start, spans[i].end})
-	}
-	type owned struct {
-		name     string
-		dist     int
-		attached bool
-	}
-	inner, parent := parenGroups(sentence)
-	own := make([][]owned, len(spans))
-	for _, h := range names(sentence, blank) {
-		if stems[h.name] {
-			continue // a file the sentence cites, named as such
-		}
-		best, bestGap := -1, 0
-		for k := range spans {
-			if g := gap(h.pos, h.end, spans[k].start, spans[k].end); best < 0 || g < bestGap {
-				best, bestGap = k, g
-			}
-		}
-		sp := &spans[best]
-		own[best] = append(own[best], owned{h.name, bestGap, attached(sentence, inner, parent, h.pos, h.end, sp.start, sp.end)})
-	}
-	shas := shaRE.FindAllStringSubmatchIndex(sentence, -1)
+	bindBareParts(file, seg, s, sentence, spans)
+	own := assignNames(sentence, spans, stems)
+	server := strings.Contains(sentence, serverName)
 	out := make([]citation, 0, len(spans))
+	at := make([]int, 0, len(spans)) // each citation's place in the sentence
+	var ments []mention
 	for k := range spans {
 		sp := &spans[k]
-		if sp.sink {
+		shas := nearestShas(sentence, sp.start, sp.end)
+		switch {
+		case sp.kind == spanPath:
+			ments = append(ments, mention{File: file, Line: sp.c.Line, Kind: mentionFileOnly, Text: sp.c.Text, Shas: shas, Server: server})
+			continue
+		case sp.kind == spanBare && sp.unbound:
+			ments = append(ments, mention{File: file, Line: seg.lines[s+sp.end-1], Kind: mentionBare, Text: sentence[sp.start:sp.end], Shas: shas, Server: server})
+			continue
+		case sp.kind != spanCite:
 			continue
 		}
 		c := sp.c
@@ -409,25 +618,122 @@ func collectSentence(file string, seg segment, s, e int, matches [][]int) []cita
 				c.Attached = append(c.Attached, o.name)
 			}
 		}
-		ordered := append([][]int(nil), shas...)
-		sort.SliceStable(ordered, func(a, b int) bool {
-			return gap(ordered[a][2], ordered[a][3], sp.start, sp.end) < gap(ordered[b][2], ordered[b][3], sp.start, sp.end)
-		})
-		for _, sm := range ordered {
-			c.Shas = append(c.Shas, sentence[sm[2]:sm[3]])
-		}
-		c.Server = strings.Contains(sentence, serverName)
+		c.Shas = shas
+		c.Server = server
 		out = append(out, c)
+		at = append(at, sp.start)
 	}
-	sort.SliceStable(out, func(a, b int) bool { return out[a].Line < out[b].Line })
-	return out
+	order := make([]int, len(out))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		x, y := order[a], order[b]
+		if out[x].Line != out[y].Line {
+			return out[x].Line < out[y].Line
+		}
+		return at[x] < at[y]
+	})
+	sorted := make([]citation, len(out))
+	for i, k := range order {
+		sorted[i] = out[k]
+	}
+	return sorted, ments
+}
+
+// owned is a name of a sentence assigned to one of its spans.
+type owned struct {
+	name     string
+	dist     int
+	attached bool
+}
+
+// assignNames gives every name of sentence to the span nearest it, leaving
+// out the stems of the files the sentence cites: own[k] are span k's.
+func assignNames(sentence string, spans []span, stems map[string]bool) [][]owned {
+	blank := make([][2]int, 0, len(spans))
+	for i := range spans {
+		blank = append(blank, [2]int{spans[i].start, spans[i].end})
+	}
+	inner, parent := parenGroups(sentence)
+	own := make([][]owned, len(spans))
+	for _, h := range names(sentence, blank) {
+		if stems[h.name] {
+			continue // a file the sentence cites, named as such
+		}
+		best, bestGap := -1, 0
+		for k := range spans {
+			if g := gap(h.pos, h.end, spans[k].start, spans[k].end); best < 0 || g < bestGap {
+				best, bestGap = k, g
+			}
+		}
+		if best < 0 {
+			continue
+		}
+		sp := &spans[best]
+		own[best] = append(own[best], owned{h.name, bestGap, attached(sentence, inner, parent, h.pos, h.end, sp.start, sp.end)})
+	}
+	return own
+}
+
+// bindBareParts binds each bare part of spans to the reference nearest
+// before it in sentence (seg.text[s:]), when that is a .ts file named
+// without a line or a part already bound: the part becomes a citation of
+// that file ([citation.Bare]). Another language's file named without a line
+// (no span of its own: it never took names) ends the run. A part after a
+// .ts citation, or after no file at all, is marked unbound.
+func bindBareParts(file string, seg segment, s int, sentence string, spans []span) {
+	others := otherFileRE.FindAllStringIndex(sentence, -1)
+	for k := range spans {
+		b := &spans[k]
+		if b.kind != spanBare {
+			continue
+		}
+		prev, prevEnd := -1, -1
+		for q := range spans {
+			if sp := &spans[q]; sp.kind != spanBare && sp.end <= b.start && sp.end > prevEnd {
+				prev, prevEnd = q, sp.end
+			}
+		}
+		for _, o := range others {
+			if o[1] <= b.start && o[1] > prevEnd {
+				prev, prevEnd = -1, o[1]
+			}
+		}
+		// A part after a part already bound continues its file.
+		bindable := prev >= 0 && (spans[prev].kind == spanPath || spans[prev].c.Bare)
+		if !bindable {
+			if prev >= 0 && spans[prev].kind == spanCite || prevEnd < 0 {
+				b.unbound = true // after a .ts citation, or after no file at all
+			}
+			continue
+		}
+		lo, hi := lineRange(sentence[b.start+1 : b.end])
+		b.kind = spanCite
+		b.c = citation{
+			File: file, Line: seg.lines[s+b.end-1], Text: sentence[b.start:b.end],
+			Path: spans[prev].c.Path, Lo: lo, Hi: hi, Bare: true,
+		}
+	}
+}
+
+// lineRange parses "12" or "12-14" (or an en dash).
+func lineRange(part string) (lo, hi int) {
+	a, b, ok := strings.Cut(strings.ReplaceAll(part, "–", "-"), "-")
+	lo, _ = strconv.Atoi(a)
+	hi = lo
+	if ok {
+		hi, _ = strconv.Atoi(b)
+	}
+	return lo, hi
 }
 
 // collect walks root for *.go files — skipping every directory whose name
 // starts with "." (.git, .claude and its worktrees) and vendor — and
-// returns their citations in file order.
-func collect(root string) ([]citation, error) {
+// returns their citations and mentions in file order.
+func collect(root string) ([]citation, []mention, error) {
 	var out []citation
+	var ments []mention
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -450,8 +756,10 @@ func collect(root string) ([]citation, error) {
 		if err != nil {
 			return err
 		}
-		out = append(out, collectFile(filepath.ToSlash(rel), string(src))...)
+		c, m := collectFile(filepath.ToSlash(rel), string(src))
+		out = append(out, c...)
+		ments = append(ments, m...)
 		return nil
 	})
-	return out, err
+	return out, ments, err
 }

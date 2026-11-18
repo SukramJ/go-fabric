@@ -23,7 +23,7 @@ type PAA struct {
 	// Production is false for a test or development root.
 	Production bool
 	// FetchedAt is when the store obtained the root; the zero time is
-	// unknown and skips the PaaTrustStoreTimeMismatch check (DAV:253-266).
+	// unknown and skips the PaaTrustStoreTimeMismatch check (DAV:341-354).
 	FetchedAt time.Time
 }
 
@@ -36,7 +36,7 @@ type PAAStore interface {
 	// PAA returns the root whose subject key identifier is skid.
 	PAA(skid []byte) (PAA, bool)
 	// AcceptsTestCertificates reports whether a test root is trusted as
-	// one; when false a test root is an error finding (DAV:243-251).
+	// one; when false a test root is an error finding (DAV:331-339).
 	AcceptsTestCertificates() bool
 	// CDSigner returns the public key of the Certification Declaration
 	// signer whose subject key identifier is skid. [Validate] asks only
@@ -51,7 +51,7 @@ type PAAStore interface {
 
 // Revocations is the optional revocation check of a [PAAStore] —
 // matter.js DclCertificateService.isRevoked(authorityKeyId, serialNumber,
-// issuerDnHex) (DAV:342-363). A store without it reports nothing revoked.
+// issuerDnHex) (DAV:430-451). A store without it reports nothing revoked.
 type Revocations interface {
 	// IsRevoked reports whether the certificate with serial (the DER
 	// INTEGER content) issued under akid by the issuer whose DER DN is

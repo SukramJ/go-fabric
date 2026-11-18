@@ -14,7 +14,7 @@ import (
 )
 
 // ReadRequest is a read through the node — matter.js ClientRead
-// (packages/protocol/src/action/client/ClientRead.ts:12 at 0ceb202d): the
+// (packages/protocol/src/action/client/ClientRead.ts:15 at db021da0): the
 // paths and filters it sends ([ReadPaths], embedded as ReadRequest, its
 // fields promoted) and IncludeKnownVersions.
 type ReadRequest struct {
@@ -27,7 +27,7 @@ type ReadRequest struct {
 // SubscribeRequest is a subscription through the node — matter.js
 // ClientSubscribe with ClientNodeInteraction's includeKnownVersions
 // (packages/node/src/node/client/ClientNodeInteraction.ts:111-124 at
-// 862ad75f): what it sends ([SubscribePaths], embedded, its fields
+// db021da0): what it sends ([SubscribePaths], embedded, its fields
 // promoted) and IncludeKnownVersions.
 type SubscribeRequest struct {
 	interaction.SubscribeRequest
@@ -63,7 +63,7 @@ func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Rep
 		r.DataVersionFilters = n.s.withKnownVersions(sc, r.DataVersionFilters, true)
 	}
 	// The read records versions only while its epoch stays current
-	// (ClientStructure.ts:335-341 at 862ad75f).
+	// (ClientStructure.ts:335-341 at db021da0).
 	in := n.s.epoch
 	n.mu.RUnlock()
 	ia, err := n.interaction()
@@ -89,8 +89,8 @@ func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Rep
 // The routing is applied to the caller's copy, so a reused request never
 // caches it across a SIT⇄LIT flip. Mirrors matter.js
 // ClientNodeInteraction.#awaitModeIcdRouting
-// (packages/node/src/node/client/ClientNodeInteraction.ts:300-318 at
-// 862ad75f), applied at :78-81 (read) and :188-191 (write). An invoke
+// (packages/node/src/node/client/ClientNodeInteraction.ts:321-324 at
+// db021da0), applied at :81-84 (read) and :189-192 (write). An invoke
 // takes routeInvoke instead.
 func (n *Node) routeICD(r *interaction.ClientRequest) {
 	if n.icd == nil || r.Network != "" {
@@ -120,24 +120,24 @@ func (n *Node) noteICDActive() {
 }
 
 // Subscribe subscribes through the node — ClientNodeInteraction.subscribe
-// (ClientNodeInteraction.ts:125-169 at 0ceb202d): the cached versions go
-// along as filters (:128, no changes-omitted refresh), as for a read none
-// for a cluster the caller filters and none with the other fabric filter
-// than the cache's ([structure.withKnownVersions]); the interval bounds
-// are the node's for the request's (:129-133); each report is applied to
-// the image before req.Updated sees it (:139-146), its store writes and
-// hooks on the node's job queue, off the report's exchange
-// (ClientStructure.ts:417-439); a sustained
-// subscription's re-subscriptions send the versions then current and the
+// (ClientNodeInteraction.ts:119-182 at db021da0): the cached versions go
+// along as filters (:123-124, :136, no changes-omitted refresh), as for a
+// read none for a cluster the caller filters and none with the other
+// fabric filter than the cache's ([structure.withKnownVersions]); the
+// interval bounds are the node's for the request's (:137-141); each
+// report is applied to the image before req.Updated sees it (:147-159),
+// its store writes and hooks on the node's job queue, off the report's
+// exchange (ClientStructure.ts:417-439); a sustained subscription's
+// re-subscriptions send the versions then current (:161-168) and the
 // event minimum past the highest event it delivered itself, the
-// request's own event filters until then (:148-155, :162-168).
+// request's own event filters until then (SustainedSubscription.ts:379-384).
 //
 // A sustained subscription's re-subscription starts from the caller's own
 // filters, runs the caller's RefreshRequest on them, then injects the
 // versions, and its reports are applied by the scope of the request that
 // produced them. Mirrors matter.js
-// packages/node/src/node/client/ClientNodeInteraction.ts:119-181 at
-// 862ad75f (callerRefresh :125, sent :129-132, refreshRequest :162-168).
+// packages/node/src/node/client/ClientNodeInteraction.ts:119-182 at
+// db021da0 (callerRefresh :125, sent :129-132, refreshRequest :162-168).
 // With IncludeKnownVersions no version goes along, in the first request
 // nor in a re-subscription's (withKnownVersions, :123-124).
 //
@@ -164,7 +164,7 @@ func (n *Node) subscribe(ctx context.Context, sr SubscribeRequest, emitEvents fu
 	}
 	// sentMu guards sent and sentIn, the scope and the cache epoch the next
 	// report is applied by, which a re-subscription's RefreshRequest
-	// replaces (ClientNodeInteraction.ts:128-132, :162-168 at 862ad75f).
+	// replaces (ClientNodeInteraction.ts:128-132, :162-168 at db021da0).
 	var sentMu sync.Mutex
 	sent := newScope(req.Attributes, req.NoFabricFilter)
 	r := req
@@ -265,9 +265,9 @@ func (n *Node) Write(ctx context.Context, writes []WriteRequest, opts WriteOptio
 // icdLit routing a read or write takes. Mirrors matter.js
 // ClientNodeInteraction.invoke
 // (packages/node/src/node/client/ClientNodeInteraction.ts:213-216 at
-// 862ad75f: `if (request.network === undefined) request = { ...request,
+// db021da0: `if (request.network === undefined) request = { ...request,
 // network: "unlimited" }`), where #awaitModeIcdRouting is applied to read
-// (:78-81) and write (:188-191) only. A caller that named a network keeps
+// (:81-84) and write (:189-192) only. A caller that named a network keeps
 // it. Applied to the caller's copy.
 func routeInvoke(r *interaction.ClientRequest) {
 	if r.Network == "" {
@@ -299,7 +299,7 @@ func (n *Node) Invoke(ctx context.Context, path CommandPath, fields spec.Encodab
 // go in batches of the peer's [Node.MaxPathsPerInvoke], each batch on an
 // exchange of its own, in parallel — matter.js ClientInteraction.invoke
 // with #invokeWithSplitting (packages/protocol/src/action/client/ClientInteraction.ts:654-737
-// at 862ad75f) behind ClientNodeInteraction.invoke
+// at db021da0) behind ClientNodeInteraction.invoke
 // (packages/node/src/node/client/ClientNodeInteraction.ts). A batch's
 // exchange failure is the error; the Results of the other batches stand.
 func (n *Node) InvokeBatch(ctx context.Context, cmds []CommandRequest, opts InvokeOptions) ([]Result, error) {
@@ -322,7 +322,7 @@ func (n *Node) InvokeBatch(ctx context.Context, cmds []CommandRequest, opts Invo
 // InvokeRequest: the MaxPathsPerInvoke of its session parameters, 1 when
 // it reported none or the node has no peer — matter.js
 // PeerExchangeProvider.maxPathsPerInvoke (packages/protocol/src/peer/PeerExchangeProvider.ts:30-32
-// at 862ad75f) and ClientInteraction's fallback of 1 (ClientInteraction.ts:721).
+// at db021da0) and ClientInteraction's fallback of 1 (ClientInteraction.ts:721).
 func (n *Node) MaxPathsPerInvoke() int {
 	p := n.peer()
 	if p == nil {

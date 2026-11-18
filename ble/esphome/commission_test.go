@@ -47,7 +47,7 @@ var modes = []struct {
 // front of the peripherals, which it has seen once, so a Dial without a
 // scan finds them as bletest's central does. With discover the proxy is
 // not given but advertised on an in-memory DNS-SD network, its key given
-// by its name.
+// by its name; a keyless one admitted by AllowPlaintext.
 func newCentral(t *testing.T, key string, discover bool, ps ...*bletest.Peripheral) ble.Central {
 	t.Helper()
 	f := fake(t, esphometest.Options{Key: key, Name: "commission-proxy"}, ps...)
@@ -56,7 +56,7 @@ func newCentral(t *testing.T, key string, discover bool, ps ...*bletest.Peripher
 		mdnsNet := esphometest.NewNetwork()
 		mdnsNet.Advertise(f)
 		c = central(t, esphome.Options{Discover: &esphome.DiscoverOptions{
-			Browser: names(t, mdnsNet), Keys: esphome.Keys{"commission-proxy": key}, Timeout: browseWindow,
+			Browser: names(t, mdnsNet), Keys: esphome.Keys{"commission-proxy": key}, AllowPlaintext: key == "", Timeout: browseWindow,
 		}})
 	} else {
 		c = central(t, esphome.Options{}, esphome.Proxy{Addr: f.Addr(), Key: key})

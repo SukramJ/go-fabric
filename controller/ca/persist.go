@@ -14,9 +14,9 @@ import (
 // the CA that roots it: enough to rebuild the same operational identity on
 // the next start, so every node it commissioned still trusts it.
 //
-// It is matter.js Fabric.Config (packages/protocol/src/fabric/Fabric.ts:666-685
-// at 0ceb202d), which FabricManager persists as a list under "fabrics" with
-// "nextFabricIndex" beside it (packages/protocol/src/fabric/FabricManager.ts:66-71),
+// It is matter.js Fabric.Config (packages/protocol/src/fabric/Fabric.ts:714-733
+// at db021da0), which FabricManager persists as a list under "fabrics" with
+// "nextFabricIndex" beside it (packages/protocol/src/fabric/FabricManager.ts:68-73),
 // narrowed to one fabric per store. Kept: fabricIndex, fabricId, rootNodeId
 // (which is the controller's nodeId on its own fabric), rootVendorId,
 // identityProtectionKey, label, keyPair and operationalCert, and the derived
@@ -164,7 +164,9 @@ func (s SettingStore) load(key string, into any) (bool, error) {
 		return false, err
 	}
 	if err := json.Unmarshal([]byte(v), into); err != nil {
-		return false, fmt.Errorf("ca: setting %q: %w", key, err)
+		// A record that does not parse is refused, never replaced (Fable
+		// read F4).
+		return false, fmt.Errorf("%w: setting %q: %w", ErrConfig, key, err)
 	}
 	return true, nil
 }
@@ -195,8 +197,15 @@ func (s SettingStore) Load() (Stored, bool, error) {
 		RootKeyPair:       j.RootKeyPair,
 		RootKeyRef:        j.RootKeyRef,
 	}
-	if j.ICACCertID != nil && j.ICACKeyPair != nil {
+	anyICAC := j.ICACCertID != nil || j.ICACKeyPair != nil || len(j.ICACKeyIdentifier) > 0 || len(j.ICACCertBytes) > 0 || j.ICACKeyRef != ""
+	switch {
+	case j.ICACCertID != nil && j.ICACKeyPair != nil:
 		st.ICAC = &StoredICAC{CertID: *j.ICACCertID, KeyPair: *j.ICACKeyPair, KeyIdentifier: j.ICACKeyIdentifier, CertBytes: j.ICACCertBytes, KeyRef: j.ICACKeyRef}
+	case anyICAC:
+		// Some ICAC fields without the id or the key pair: not a CA
+		// without an ICAC, whose next save would drop the fields still
+		// there (review II, R2-P6-store-1851).
+		return Stored{}, false, fmt.Errorf("%w: the stored ICAC is incomplete: icacCertId or icacKeyPair is missing", ErrConfig)
 	}
 	return st, true, nil
 }

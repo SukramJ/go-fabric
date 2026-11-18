@@ -12,12 +12,12 @@ import (
 )
 
 // Announcements, the broadcast schedule and goodbyes. matter.js claims the
-// names without probing first (MdnsAdvertisement.ts:179-180 at 862ad75f),
+// names without probing first (MdnsAdvertisement.ts:179-180 at db021da0),
 // and chip does not probe either; the responder announces at once.
 
 // broadcastEvent is what started a broadcast run, matter.js
 // Advertiser.BroadcastEvent (packages/protocol/src/advertisement/
-// Advertiser.ts:93 at 862ad75f).
+// Advertiser.ts:93 at db021da0).
 type broadcastEvent int
 
 const (
@@ -45,7 +45,7 @@ type broadcastSchedule struct {
 
 // defaultBroadcastSchedule is matter.js MdnsAdvertiser.DefaultBroadcastSchedule
 // (packages/protocol/src/advertisement/mdns/MdnsAdvertiser.ts:213-232 at
-// 862ad75f): 1 s, doubling, at most 90 s apart, 25 % jitter, for the
+// db021da0): 1 s, doubling, at most 90 s apart, 25 % jitter, for the
 // maximum commissioning timeout of two days
 // (packages/types/src/commissioning/CommissioningConstants.ts:11). Its
 // broadcastAfterConnection is Instant: an operational connection ends the
@@ -59,7 +59,7 @@ var defaultBroadcastSchedule = broadcastSchedule{
 }
 
 // scheduleFor is matter.js MdnsAdvertiser #scheduleFor (MdnsAdvertiser.ts:129-149
-// at 862ad75f) over its built-in list: the retransmit schedule for a
+// at db021da0) over its built-in list: the retransmit schedule for a
 // retransmission — the default merged with maximumCount 1 (:109-119,
 // RetrySchedule.Configuration) — and the default for every other event.
 func scheduleFor(event broadcastEvent) broadcastSchedule {
@@ -71,7 +71,7 @@ func scheduleFor(event broadcastEvent) broadcastSchedule {
 }
 
 // retrySchedule yields the intervals of a schedule, matter.js RetrySchedule
-// (packages/general/src/net/RetrySchedule.ts:28-60 at 862ad75f).
+// (packages/general/src/net/RetrySchedule.ts:28-60 at db021da0).
 type retrySchedule struct {
 	cfg      broadcastSchedule
 	count    int
@@ -120,7 +120,7 @@ func (s *retrySchedule) next() (time.Duration, bool) {
 }
 
 // broadcastRun is one running schedule of a service — matter.js
-// MdnsAdvertisement.run (MdnsAdvertisement.ts:64-80 at 862ad75f) over its
+// MdnsAdvertisement.run (MdnsAdvertisement.ts:65-81 at db021da0) over its
 // activity.
 type broadcastRun struct {
 	sched *retrySchedule
@@ -132,7 +132,7 @@ type broadcastRun struct {
 
 // startLocked begins a broadcast run of e for event, unless one runs:
 // matter.js Advertisement.start (packages/protocol/src/advertisement/
-// Advertisement.ts:78-91 at 862ad75f) does not reset a running schedule.
+// Advertisement.ts:78-91 at db021da0) does not reset a running schedule.
 // The first broadcast goes out now. Caller holds r.mu.
 func (r *Responder) startLocked(e *entry, event broadcastEvent) {
 	if r.closed || e.run != nil {

@@ -62,7 +62,9 @@ func (v AttributeValue) JSON() (json.RawMessage, error) {
 // attribute the node does not serve is a [contract.StatusError] with the
 // status a controller's read receives
 // (UNSUPPORTED_ENDPOINT, UNSUPPORTED_CLUSTER, UNSUPPORTED_ATTRIBUTE);
-// before [Node.Start] it is [ErrNotStarted].
+// before [Node.Start] it is [ErrNotStarted]. After [Node.Stop] it reads
+// the topology the node served last, from servers no controller reaches
+// any more (review II, R2-P6-doc-2454).
 func (n *Node) ReadAttribute(ctx context.Context, endpoint uint16, cluster, attribute uint32) (AttributeValue, error) {
 	results, err := n.readServed(ctx, im.ConcreteAttributePath{
 		Endpoint: endpoint, Cluster: cluster, Attribute: attribute,
@@ -87,7 +89,8 @@ func (n *Node) ReadAttribute(ctx context.Context, endpoint uint16, cluster, attr
 // which a controller's wildcard read leaves out (it answers a status for a
 // fully concrete path only). An endpoint or cluster the node does not
 // serve is a [contract.StatusError]; before [Node.Start] it is
-// [ErrNotStarted].
+// [ErrNotStarted]. After [Node.Stop] it reads the topology the node served
+// last, as ReadAttribute does.
 func (n *Node) ReadCluster(ctx context.Context, endpoint uint16, cluster uint32) ([]AttributeValue, error) {
 	results, err := n.readServed(ctx, im.ConcreteAttributePath{
 		Endpoint: endpoint, Cluster: cluster, HasEndpoint: true, HasCluster: true,

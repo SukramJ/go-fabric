@@ -17,7 +17,8 @@ import (
 // cluster's own commands for a host that allocates its streams itself, or
 // re-offers a live session. A session it opens is registered with the
 // controller's requestor, so the camera's signals arrive, on
-// [Observer].Signal, since no [Session] holds it.
+// [Observer].Signal, since no [Session] holds it; the service's Close
+// ends it.
 type Provider struct {
 	s *Service
 	t target

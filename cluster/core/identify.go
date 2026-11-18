@@ -165,7 +165,7 @@ type identifyHandlerRef struct{ h contract.IdentifyHandler }
 // refuses the command. nil removes it. Mirrors matter.js's application
 // override of IdentifyServer.identify and triggerEffect
 // (packages/node/src/behaviors/identify/IdentifyServer.ts:129-135 at
-// 862ad75f).
+// db021da0).
 func (i *Identify) SetHandler(h contract.IdentifyHandler) {
 	if h == nil {
 		i.handler.Store(nil)
@@ -185,24 +185,32 @@ func (i *Identify) hostHandler() contract.IdentifyHandler {
 // Close returns after its goroutine did — and no later write / command
 // starts a new one. Idempotent and safe for concurrent use.
 //
+// A countdown Close ends before it reached zero is reported to the host
+// as a stop: the [contract.IdentifyHandler] is called once with 0, on a
+// goroutine of its own, after any request's or countdown's call in
+// flight (the IdentifyTime queue, as the countdown's own stop is
+// ordered). IdentifyTime is not changed and nothing is reported. A Close
+// with no countdown running, and every later Close, calls nothing.
+//
 // Close does not wait for the host: a [contract.IdentifyHandler] call in
-// flight — a request's, or the stop the countdown reported — is still
-// running when Close returns, and returns into a server that is closed.
-// The countdown's goroutine is never inside the host's code, so a handler
-// that is slow, or that waits for a lock the closing goroutine holds,
-// cannot hold Close.
+// flight — a request's, the stop the countdown reported or the stop
+// Close reports — is still running when Close returns, and returns into
+// a server that is closed. The countdown's goroutine is never inside the
+// host's code, so a handler that is slow, or that waits for a lock the
+// closing goroutine holds, cannot hold Close.
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/identify/IdentifyServer.ts:116-119 at
 // db021da0 ([Symbol.asyncDispose] → #stopIdentifying, :100-106), which
 // stops the identify timer when the behavior — and with it the endpoint —
-// is destroyed. There it also clears isIdentifying and emits
-// stopIdentifying, which Close does not (F-db021da0-9,
-// notes/parity/matter_behaviour_findings.md).
+// is destroyed, and, only while the timer runs, clears isIdentifying and
+// emits stopIdentifying without touching identifyTime (F-db021da0-9).
 func (i *Identify) Close() {
 	i.timerMu.Lock()
+	running := false
 	if !i.closed {
 		i.closed = true
+		running = i.timerActive
 		i.timerActive = false
 		if i.done != nil {
 			close(i.done)
@@ -210,6 +218,24 @@ func (i *Identify) Close() {
 	}
 	i.timerMu.Unlock()
 	i.countdown.Wait()
+	// The countdown's goroutine has returned: a tick that took
+	// IdentifyTime to zero has already told the host to stop.
+	if !running || i.identifyTime.Load() == 0 {
+		return
+	}
+	h := i.hostHandler()
+	if h == nil {
+		return
+	}
+	op := i.opQueue()
+	// Not counted in i.countdown: Close does not wait for the host. The
+	// context is not one Close ends: it would cancel the call that tells
+	// the host to stop.
+	go func() {
+		op <- struct{}{}
+		defer func() { <-op }()
+		_ = h.MatterIdentify(context.Background(), 0) //nolint:errcheck // nothing to refuse: the server is closed
+	}()
 }
 
 // Compile-time assertions.
@@ -268,7 +294,7 @@ func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 // units of seconds, and SHALL be writable." — clients drive Identify
 // either via the command or by setting the attribute directly, and the
 // host's handler sees both: matter.js reacts to identifyTime$Changed
-// whichever wrote it (IdentifyServer.ts:57-58 at 862ad75f), so the write
+// whichever wrote it (IdentifyServer.ts:57-58 at db021da0), so the write
 // runs the handler as the Identify command does and a refusal refuses the
 // write with its status.
 func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) error {
@@ -293,7 +319,7 @@ func (i *Identify) MatterWriteChanged(ctx context.Context, attrID uint32, value 
 		return false, fmt.Errorf("core: Identify.IdentifyTime: %w", err)
 	}
 	// Mirrors matter.js packages/node/src/behaviors/identify/
-	// IdentifyServer.ts:57-58, :108-114 at 862ad75f: the attribute and the
+	// IdentifyServer.ts:57-58, :108-114 at db021da0: the attribute and the
 	// command reach one reactor (#identifyTimeChangedHandler).
 	changed, err := i.setIdentifyTime(ctx, t)
 	if err != nil {
@@ -483,7 +509,7 @@ func (i *Identify) tick(done <-chan struct{}) (over, zero bool) {
 	// The countdown reached zero: the edge advances the DataVersion and
 	// is reported by the caller (W3-clucore-05), and the host is told to
 	// stop, as matter.js's tick drives the reactor to #stopIdentifying
-	// (IdentifyServer.ts:100-114, :121-127 at 862ad75f); 0 is the
+	// (IdentifyServer.ts:100-114, :121-127 at db021da0); 0 is the
 	// contract's "stops".
 	i.dataVersion.Bump()
 	h := i.hostHandler()
@@ -569,13 +595,13 @@ func coerceUint16(v any) (uint16, error) {
 	}
 	// A value of another type is a datatype mismatch: InvalidAction, as
 	// matter.js's ValidationDatatypeMismatchError answers it
-	// (packages/types/src/common/ValidationError.ts:35-38 at 862ad75f).
+	// (packages/types/src/common/ValidationError.ts:35-38 at db021da0).
 	return 0, spec.Errorf(im.StatusInvalidAction, "core: unsupported IdentifyTime type %T", v)
 }
 
 // boundUint16 refuses a value above the uint16 range with ConstraintError
 // instead of masking it into a different, valid IdentifyTime. Mirrors
-// matter.js packages/types/src/tlv/TlvNumber.ts:151-155 at 862ad75f
+// matter.js packages/types/src/tlv/TlvNumber.ts:151-155 at db021da0
 // (ValidationOutOfBoundsError, a ValidationError = ConstraintError;
 // W3-clucore-04).
 func boundUint16(x uint64) (uint16, error) {

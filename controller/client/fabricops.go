@@ -21,8 +21,8 @@ import (
 // Fabric operations: commission and decommission through the registry.
 
 // Peer-loss causes of the registry — matter.js PeerLeftError and
-// PeerShutdownError (protocol/src/peer/PeerCommunicationError.ts:80-84,
-// :62-66 at 0ceb202d), which client/peer and client/exchange do
+// PeerShutdownError (protocol/src/peer/PeerCommunicationError.ts:90-94,
+// :72-76 at db021da0), which client/peer and client/exchange do
 // not declare.
 var (
 	// ErrPeerLeft: the peer left the fabric — the cause its sessions are
@@ -34,9 +34,9 @@ var (
 	ErrPeerShutdown error = peerShutdownError{}
 	// ErrFabricRemoved: this node is no longer a member of the session's
 	// fabric — matter.js FabricRemovedError
-	// (protocol/src/peer/PeerCommunicationError.ts:86-93 at 0ceb202d), the
+	// (protocol/src/peer/PeerCommunicationError.ts:96-103 at db021da0), the
 	// cause Fabric.delete force-closes the fabric's sessions with
-	// (protocol/src/fabric/Fabric.ts:461-465). A host that drops its fabric
+	// (protocol/src/fabric/Fabric.ts:484-488). A host that drops its fabric
 	// closes the peers' sessions with it (peer.Peer.Disconnect); a
 	// RemoveFabric that fails with it counts as delivered.
 	ErrFabricRemoved = errors.New("client: this node is no longer a member of the fabric")
@@ -119,7 +119,7 @@ type CommissionOptions struct {
 	// nil is the node's record; CASEConnectionTiming nil is the tighter
 	// timing matter.js applies after a commissioning
 	// (defaultCaseConnectionTiming, CommissioningClient.ts:798-811 at
-	// 862ad75f).
+	// db021da0).
 	commissioner.Options
 	// AutoSubscribe nil or true subscribes the node — "unless disabled
 	// explicitly" (CommissioningClient.ts:310-311).
@@ -172,7 +172,7 @@ var defaultCASEConnectionTiming = Timing{
 // the start's error. It is never skipped: every commission that succeeds
 // starts the node, and one that fails earlier reports nothing after its
 // failed step, as matter.js reports nothing after a failure
-// (ControllerCommissioningFlow.ts:438-462 at 862ad75f).
+// (ControllerCommissioningFlow.ts:437-465 at db021da0).
 func (r *Registry) Commission(ctx context.Context, n *Node, o CommissionOptions) error {
 	return r.runFabricOperation(n, opCommission, func() error { return r.commission(ctx, n, o) })
 }
@@ -193,7 +193,7 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	}
 	// A node found over BLE is located by its commissioning channel. In
 	// matter.js its addresses hold the peripheral as a NetworkAddress of
-	// type "ble" (CommissioningClient.ts:910-945 at 862ad75f), which passes
+	// type "ble" (CommissioningClient.ts:910-945 at db021da0), which passes
 	// the check above (:254-257); a Record's NetworkAddress is IP only, so the
 	// channel stands for it.
 	if len(opts.Addresses) == 0 && opts.Channel == nil {
@@ -210,6 +210,21 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	if err != nil {
 		return err
 	}
+	// The device carries our fabric now: the record takes its address
+	// before the peer is looked up, so a lookup that fails leaves a node
+	// that can still be reached and decommissioned. Mirrors matter.js
+	// CommissioningClient.commission, which sets peerAddress and
+	// commissionedAt (packages/node/src/behavior/system/commissioning/
+	// CommissioningClient.ts:324-326 at db021da0) before PeerSet.for
+	// (:330) (review II, R2-P6-err-2318).
+	now := r.clock.Now()
+	n.updateRecord(func(rec *Record) {
+		a := res.Address
+		rec.PeerAddress = &a
+		rec.CommissionedAt = now
+		rec.FabricIndexOnPeer = res.FabricIndexOnPeer
+		rec.AttestedVendorID, rec.AttestedProductID = res.AttestedVendorID, res.AttestedProductID
+	})
 	p := r.cfg.Peers.Get(res.Address)
 	if p == nil {
 		//nolint:contextcheck // the peer's service resolves under the DNS-SD cache's context
@@ -217,16 +232,8 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 			return err
 		}
 	}
-	now := r.clock.Now()
 	d := p.Descriptor()
-	n.updateRecord(func(rec *Record) {
-		a := res.Address
-		rec.PeerAddress = &a
-		rec.CommissionedAt = now
-		rec.FabricIndexOnPeer = res.FabricIndexOnPeer
-		rec.AttestedVendorID, rec.AttestedProductID = res.AttestedVendorID, res.AttestedProductID
-		rec.applyPeer(d)
-	})
+	n.updateRecord(func(rec *Record) { rec.applyPeer(d) })
 	r.bindPeer(n, p)
 	n.mu.Lock()
 	n.settings.defaultSubscription = o.DefaultSubscription.clone()
@@ -311,7 +318,7 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 	current := currentFabricIndex(oc)
 	if oc == nil || (rec.FabricIndexOnPeer == 0 && current == 0) {
 		// The read has the cache's fabric filter (CommissioningClient.ts:391-392
-		// at 862ad75f).
+		// at db021da0).
 		n.mu.RLock()
 		noFilter := !n.s.cacheFabricFiltered()
 		n.mu.RUnlock()
@@ -405,7 +412,7 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, erro
 // removalConfirmedBy reports whether an error of RemoveFabric means the
 // command was delivered: matter.js causedBy(PeerMessageMissingError,
 // PeerLeftError, FabricRemovedError, PeerInitiatedCloseError)
-// (CommissioningClient.ts:437-440 at 862ad75f). PeerMessageMissingError and
+// (CommissioningClient.ts:437-440 at db021da0). PeerMessageMissingError and
 // PeerInitiatedCloseError are client/exchange's
 // [*exchange.PeerMessageMissingError] and [*exchange.PeerInitiatedCloseError];
 // PeerLeftError is [ErrPeerLeft]; FabricRemovedError is [ErrFabricRemoved].

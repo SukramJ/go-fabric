@@ -33,12 +33,16 @@ const (
 // is commissioned in parallel and the first to establish PASE wins
 // (discovery.CommissioningRace, matter.js CommissioningDiscovery over
 // ParallelPaseDiscovery, packages/node/src/behavior/system/controller/
-// discovery/CommissioningDiscovery.ts:23-91 at 862ad75f, which
-// CommissioningController.commissionNode runs, CommissioningController.ts:462-500).
+// discovery/CommissioningDiscovery.ts:23-91 at db021da0, which
+// CommissioningController.commissionNode runs, CommissioningController.ts:465-503).
 // The transports are matter.js's selection (Discovery.ts:272-273): the IP
 // network always, BLE where a QR code's capabilities name it or the code
 // names none (a manual code).
 func (c *Controller) pairDiscovered(ctx context.Context, st stack, pc PairingCode, identity discovery.Identity, opts PairOptions, searchTimeout time.Duration) (*client.Node, error) {
+	// The race reports from each transport's search and each attempt's
+	// goroutine: the host's hook runs one call at a time (review II,
+	// R2-P6-doc-2313).
+	opts.Progress = serialProgress(opts.Progress)
 	r := &pairRace{progress: opts.Progress}
 	var transports []discovery.Transport
 	if st.names != nil {
@@ -102,6 +106,8 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Regi
 		}
 		defer func() { _ = ch.Close() }()
 		channel = ch
+		// The peripheral answered once it accepted the connection:
+		// ble.Dial marks the attempt (N3-rwrace-2).
 	}
 	n, err := reg.ForDevice(actx, dev, "")
 	if err != nil {
@@ -120,6 +126,19 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Regi
 		return nodeID, true
 	}
 	return n, reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)})
+}
+
+// serialProgress is progress called one report at a time; nil stays nil.
+func serialProgress(progress func(PairingStep)) func(PairingStep) {
+	if progress == nil {
+		return nil
+	}
+	var mu sync.Mutex
+	return func(st PairingStep) {
+		mu.Lock()
+		defer mu.Unlock()
+		progress(st)
+	}
 }
 
 // bothContexts is a context that ends with a or b.

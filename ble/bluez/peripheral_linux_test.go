@@ -111,14 +111,14 @@ func TestPeripheralRegistersApplication(t *testing.T) {
 			}
 		}
 	}
-	read, ok := b.method(p.charPath(3), ifaceGattChar, "ReadValue").(func(map[string]dbus.Variant) ([]byte, *dbus.Error))
+	read, ok := b.method(p.charPath(3), ifaceGattChar, "ReadValue").(func(dbus.Sender, map[string]dbus.Variant) ([]byte, *dbus.Error))
 	if !ok {
 		t.Fatal("C3 ReadValue not exported")
 	}
-	if v, derr := read(map[string]dbus.Variant{"offset": dbus.MakeVariant(uint16(1))}); derr != nil || !bytes.Equal(v, []byte{0x30}) {
+	if v, derr := read(bluezSender, map[string]dbus.Variant{"offset": dbus.MakeVariant(uint16(1))}); derr != nil || !bytes.Equal(v, []byte{0x30}) {
 		t.Fatalf("C3 read at 1: %x, %v", v, derr)
 	}
-	if _, derr := read(map[string]dbus.Variant{"offset": dbus.MakeVariant(uint16(3))}); derr == nil {
+	if _, derr := read(bluezSender, map[string]dbus.Variant{"offset": dbus.MakeVariant(uint16(3))}); derr == nil {
 		t.Fatal("C3 read beyond its value succeeded")
 	}
 	if err := p.Serve(context.Background(), nil, func(contract.BLEConnection) {}); !errors.Is(err, ErrServing) {
@@ -292,11 +292,11 @@ func TestPeripheralConnectionEvents(t *testing.T) {
 	if v, err := fc.indication(); err != nil || string(v) != "ind2" {
 		t.Fatalf("indication %q, %v", v, err)
 	}
-	confirm, ok := b.method(p.charPath(2), ifaceGattChar, "Confirm").(func() *dbus.Error)
+	confirm, ok := b.method(p.charPath(2), ifaceGattChar, "Confirm").(func(dbus.Sender) *dbus.Error)
 	if !ok {
 		t.Fatal("Confirm not exported")
 	}
-	if derr := confirm(); derr != nil {
+	if derr := confirm(bluezSender); derr != nil {
 		t.Fatal(derr)
 	}
 	if err := <-errc; err != nil {
@@ -520,11 +520,11 @@ func TestPeripheralConfirmAfterRefusedCentral(t *testing.T) {
 	if _, err := fc.indication(); err != nil {
 		t.Fatal(err)
 	}
-	confirm, ok := b.method(p.charPath(2), ifaceGattChar, "Confirm").(func() *dbus.Error)
+	confirm, ok := b.method(p.charPath(2), ifaceGattChar, "Confirm").(func(dbus.Sender) *dbus.Error)
 	if !ok {
 		t.Fatal("Confirm not exported")
 	}
-	if derr := confirm(); derr != nil {
+	if derr := confirm(bluezSender); derr != nil {
 		t.Fatal(derr)
 	}
 	if err := <-errc; err != nil {
@@ -566,11 +566,11 @@ func TestPeripheralRefusesCentralWhileDropping(t *testing.T) {
 // reads it, through the characteristic's Properties.Get.
 func acquiredFlag(t *testing.T, b *fakeBus, p *peripheral, n int, name string) bool {
 	t.Helper()
-	get, ok := b.method(p.charPath(n), methodProps, "Get").(func(string, string) (dbus.Variant, *dbus.Error))
+	get, ok := b.method(p.charPath(n), methodProps, "Get").(func(dbus.Sender, string, string) (dbus.Variant, *dbus.Error))
 	if !ok {
 		t.Fatal("Properties.Get not exported")
 	}
-	v, derr := get(ifaceGattChar, name)
+	v, derr := get(bluezSender, ifaceGattChar, name)
 	if derr != nil {
 		t.Fatalf("%s: %v", name, derr)
 	}
@@ -880,10 +880,329 @@ func TestPeripheralCentralGoneBeforeItsAcquire(t *testing.T) {
 			return false
 		}
 	})
+	// markGone closes Disconnected before it forgets the connection, so
+	// the forgetting is waited for, not read once.
+	waitUntil(t, "the gone central's connection to be forgotten", func() bool {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return len(p.conns) == 0
+	})
+}
+
+// TestPeripheralFailedUnregisterKeepsTheRegistration: an
+// UnregisterAdvertisement or UnregisterApplication that fails keeps the
+// registration, its objects and the owed unregister; the next Advertise,
+// StopAdvertising or Serve retries it before anything else (review II,
+// R2-P6-err-2012).
+func TestPeripheralFailedUnregisterKeepsTheRegistration(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	ctx := context.Background()
+	data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: data}); err != nil {
+		t.Fatal(err)
+	}
+	unregAdv := ifaceAdvertising + ".UnregisterAdvertisement"
+	b.failWith(unregAdv, dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"})
+	if err := p.StopAdvertising(ctx); err == nil {
+		t.Fatal("StopAdvertising with a failed unregister succeeded")
+	}
+	if _, adv := b.registered(); adv == nil || !b.exported(p.advPath()) {
+		t.Fatalf("after the failed unregister: held by BlueZ %v, exported %v", adv != nil, b.exported(p.advPath()))
+	}
+	// The retry fails again: Advertise reports it and changes nothing.
+	ext := btp.EncodeAdvertisementData(3840, 0, 0, false, true)
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: ext}); err == nil {
+		t.Fatal("Advertise over an owed unregister that failed again succeeded")
+	}
+	if !b.exported(p.advPath()) {
+		t.Fatal("the advertisement was unexported while BlueZ may hold it")
+	}
+	// The retry succeeds: the old registration is released, a fresh one made.
+	b.mu.Lock()
+	delete(b.errs, unregAdv)
+	b.mu.Unlock()
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: ext}); err != nil {
+		t.Fatal(err)
+	}
+	_, adv := b.registered()
+	if sd := adv["ServiceData"].Value().(map[string]dbus.Variant)["fff6"].Value().([]byte); !bytes.Equal(sd, ext[7:]) {
+		t.Fatalf("advertisement %v", adv)
+	}
+	var seq []string
+	for _, c := range b.called() {
+		if strings.HasSuffix(c, "Advertisement") {
+			seq = append(seq, c[strings.LastIndex(c, ".")+1:])
+		}
+	}
+	want := []string{"RegisterAdvertisement", "UnregisterAdvertisement", "UnregisterAdvertisement", "UnregisterAdvertisement", "RegisterAdvertisement"}
+	if !slices.Equal(seq, want) {
+		t.Fatalf("calls %q, want %q", seq, want)
+	}
+	if err := p.StopAdvertising(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, adv := b.registered(); adv != nil || b.exported(p.advPath()) {
+		t.Fatal("the advertisement is still registered or exported")
+	}
+
+	// The application: Serve's unregister fails, the objects stay.
+	unregApp := ifaceGattManager + ".UnregisterApplication"
+	b.failWith(unregApp, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"busy"}})
+	s := serve(t, p, nil, func(contract.BLEConnection) {})
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	s.cancel()
+	<-s.done
+	if s.err == nil {
+		t.Fatal("Serve with a failed unregister returned nil")
+	}
+	if !b.exported(p.root) {
+		t.Fatal("the application was unexported while BlueZ may hold it")
+	}
+	b.mu.Lock()
+	delete(b.errs, unregApp)
+	b.mu.Unlock()
+	before := len(b.called())
+	s = serve(t, p, nil, func(contract.BLEConnection) {})
+	waitUntil(t, "the second registration", func() bool {
+		for _, c := range b.called()[before:] {
+			if strings.HasSuffix(c, ".RegisterApplication") {
+				return true
+			}
+		}
+		return false
+	})
+	var app []string
+	for _, c := range b.called()[before:] {
+		if strings.Contains(c, "Application") {
+			app = append(app, c[strings.LastIndex(c, ".")+1:])
+		}
+	}
+	if !slices.Equal(app, []string{"UnregisterApplication", "RegisterApplication"}) {
+		t.Fatalf("calls %q, want the owed unregister before the registration", app)
+	}
+	s.cancel()
+	<-s.done
+	if s.err != nil || b.exported(p.root) {
+		t.Fatalf("Serve: %v, exported %v", s.err, b.exported(p.root))
+	}
+}
+
+// TestPeripheralStopDuringAdvertise: a StopAdvertising while the first
+// Advertise's registration is in flight is not overtaken by it — nothing
+// is registered after both returned (review II, R2-P6-conc-2013).
+func TestPeripheralStopDuringAdvertise(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	release := b.hold(ifaceAdvertising + ".RegisterAdvertisement")
+	defer release()
+	data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+	advErr := make(chan error, 1)
+	go func() { advErr <- p.Advertise(context.Background(), contract.BLEAdvertisement{Data: data}) }()
+	waitUntil(t, "the registration in flight", func() bool {
+		return slices.Contains(b.called(), string(testAdapter)+" "+ifaceAdvertising+".RegisterAdvertisement")
+	})
+	stopErr := make(chan error, 1)
+	go func() { stopErr <- p.StopAdvertising(context.Background()) }()
+	time.Sleep(20 * time.Millisecond) // the stop runs into the registration
+	release()
+	if err := <-advErr; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-stopErr; err != nil {
+		t.Fatal(err)
+	}
 	p.mu.Lock()
-	left := len(p.conns)
+	registered := p.registered
 	p.mu.Unlock()
-	if left != 0 {
-		t.Fatalf("%d connections left after the central was gone", left)
+	if _, adv := b.registered(); adv != nil || registered || b.exported(p.advPath()) {
+		t.Fatalf("after the stop: held by BlueZ %v, registered %v, exported %v", adv != nil, registered, b.exported(p.advPath()))
+	}
+}
+
+// TestPeripheralServesBluetoothdOnly: the exported methods answer the
+// owner of org.bluez only; another caller is refused with NotPermitted and
+// creates no connection, completes no indication and drops no
+// advertisement (review II, R2-P6-sec-2014).
+func TestPeripheralServesBluetoothdOnly(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	a := &acceptedConn{}
+	serve(t, p, []byte{0x15}, a.accept)
+	waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+	data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+	if err := p.Advertise(context.Background(), contract.BLEAdvertisement{Data: data}); err != nil {
+		t.Fatal(err)
+	}
+	const intruder = dbus.Sender(":1.99")
+	notPermitted := func(what string, derr *dbus.Error) {
+		t.Helper()
+		if derr == nil || derr.Name != errNotPermitted {
+			t.Fatalf("%s from another sender: %v, want %s", what, derr, errNotPermitted)
+		}
+	}
+	opts := map[string]dbus.Variant{"device": dbus.MakeVariant(devPath("AA:BB:CC:DD:EE:42")), "mtu": dbus.MakeVariant(uint16(100))}
+	for _, m := range []struct {
+		char   int
+		member string
+	}{{1, "AcquireWrite"}, {2, "AcquireNotify"}} {
+		f, ok := b.method(p.charPath(m.char), ifaceGattChar, m.member).(acquireFunc)
+		if !ok {
+			t.Fatalf("%s not exported with a sender", m.member)
+		}
+		_, _, derr := f(intruder, opts)
+		notPermitted(m.member, derr)
+	}
+	read, ok := b.method(p.charPath(3), ifaceGattChar, "ReadValue").(func(dbus.Sender, map[string]dbus.Variant) ([]byte, *dbus.Error))
+	if !ok {
+		t.Fatal("ReadValue not exported with a sender")
+	}
+	_, derr := read(intruder, map[string]dbus.Variant{})
+	notPermitted("ReadValue", derr)
+	get, ok := b.method(p.charPath(3), methodProps, "Get").(func(dbus.Sender, string, string) (dbus.Variant, *dbus.Error))
+	if !ok {
+		t.Fatal("Properties.Get not exported with a sender")
+	}
+	_, derr = get(intruder, ifaceGattChar, "Value")
+	notPermitted("Properties.Get", derr)
+	getAll, ok := b.method(p.charPath(3), methodProps, "GetAll").(func(dbus.Sender, string) (map[string]dbus.Variant, *dbus.Error))
+	if !ok {
+		t.Fatal("Properties.GetAll not exported with a sender")
+	}
+	_, derr = getAll(intruder, ifaceGattChar)
+	notPermitted("Properties.GetAll", derr)
+	managed, ok := b.method(p.root, ifaceObjectMgr, "GetManagedObjects").(func(dbus.Sender) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error))
+	if !ok {
+		t.Fatal("GetManagedObjects not exported with a sender")
+	}
+	_, derr = managed(intruder)
+	notPermitted("GetManagedObjects", derr)
+	if v, derr := get(bluezSender, ifaceGattChar, "Value"); derr != nil || !bytes.Equal(v.Value().([]byte), []byte{0x15}) {
+		t.Fatalf("C3's Value for bluetoothd: %v, %v", v, derr)
+	}
+	release, ok := b.method(p.advPath(), ifaceAdvertise, "Release").(func(dbus.Sender) *dbus.Error)
+	if !ok {
+		t.Fatal("Release not exported with a sender")
+	}
+	notPermitted("Release", release(intruder))
+	p.mu.Lock()
+	conns, registered := len(p.conns), p.registered
+	p.mu.Unlock()
+	a.mu.Lock()
+	accepted := len(a.conns)
+	a.mu.Unlock()
+	if conns != 0 || accepted != 0 || !registered || !b.exported(p.advPath()) {
+		t.Fatalf("after the refused calls: %d connections, %d accepted, registered %v", conns, accepted, registered)
+	}
+
+	// Confirm from another sender does not complete the indication.
+	fc := b.connectCentral("AA:BB:CC:DD:EE:43")
+	if err := fc.acquireWrite(p.charPath(1), 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := fc.writeC1([]byte("hs")); err != nil {
+		t.Fatal(err)
+	}
+	if err := fc.acquireNotify(p.charPath(2), 100); err != nil {
+		t.Fatal(err)
+	}
+	c := a.conn(t)
+	errc := make(chan error, 1)
+	go func() { errc <- c.Indicate(context.Background(), []byte("ind")) }()
+	if _, err := fc.indication(); err != nil {
+		t.Fatal(err)
+	}
+	confirm, ok := b.method(p.charPath(2), ifaceGattChar, "Confirm").(func(dbus.Sender) *dbus.Error)
+	if !ok {
+		t.Fatal("Confirm not exported with a sender")
+	}
+	notPermitted("Confirm", confirm(intruder))
+	select {
+	case err := <-errc:
+		t.Fatalf("another sender's Confirm completed the indication: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	if derr := confirm(bluezSender); derr != nil {
+		t.Fatal(derr)
+	}
+	if err := <-errc; err != nil {
+		t.Fatal(err)
+	}
+
+	// bluetoothd restarted under a new unique name: followed.
+	b.mu.Lock()
+	b.owner = ":1.8"
+	b.mu.Unlock()
+	if _, derr := read(":1.8", map[string]dbus.Variant{}); derr != nil {
+		t.Fatalf("ReadValue from the new owner: %v", derr)
+	}
+	_, derr = read(bluezSender, map[string]dbus.Variant{})
+	notPermitted("ReadValue from the old owner", derr)
+}
+
+// TestPeripheralLateConfirmationOfAnAbandonedIndication: the confirmation
+// of an indication whose Indicate gave up is counted against it, not taken
+// for the next indication's (review II, R2-P6-fsm-2015).
+func TestPeripheralLateConfirmationOfAnAbandonedIndication(t *testing.T) {
+	for _, via := range []string{"socket", "Confirm"} {
+		t.Run(via, func(t *testing.T) {
+			p, b := newTestPeripheral(t)
+			a := &acceptedConn{}
+			serve(t, p, nil, a.accept)
+			waitUntil(t, "the registration", func() bool { app, _ := b.registered(); return app != nil })
+			fc := b.connectCentral("AA:BB:CC:DD:EE:44")
+			if err := fc.acquireWrite(p.charPath(1), 100); err != nil {
+				t.Fatal(err)
+			}
+			if err := fc.writeC1([]byte("hs")); err != nil {
+				t.Fatal(err)
+			}
+			if err := fc.acquireNotify(p.charPath(2), 100); err != nil {
+				t.Fatal(err)
+			}
+			c := a.conn(t)
+			confirm := func() {
+				t.Helper()
+				if via == "socket" {
+					if err := fc.confirm(); err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+				f, ok := b.method(p.charPath(2), ifaceGattChar, "Confirm").(func(dbus.Sender) *dbus.Error)
+				if !ok {
+					t.Fatal("Confirm not exported")
+				}
+				if derr := f(bluezSender); derr != nil {
+					t.Fatal(derr)
+				}
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			errc := make(chan error, 1)
+			go func() { errc <- c.Indicate(ctx, []byte("first")) }()
+			if v, err := fc.indication(); err != nil || string(v) != "first" {
+				t.Fatalf("indication %q, %v", v, err)
+			}
+			cancel()
+			if err := <-errc; !errors.Is(err, context.Canceled) {
+				t.Fatalf("the abandoned Indicate: %v", err)
+			}
+			go func() { errc <- c.Indicate(context.Background(), []byte("second")) }()
+			if v, err := fc.indication(); err != nil || string(v) != "second" {
+				t.Fatalf("indication %q, %v", v, err)
+			}
+			confirm() // the first indication's, late
+			select {
+			case err := <-errc:
+				t.Fatalf("the first indication's confirmation completed the second: %v", err)
+			case <-time.After(50 * time.Millisecond):
+			}
+			confirm()
+			select {
+			case err := <-errc:
+				if err != nil {
+					t.Fatal(err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("the second indication's own confirmation did not complete it")
+			}
+		})
 	}
 }

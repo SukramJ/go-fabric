@@ -15,7 +15,7 @@ import "context"
 //
 // matter.js's IdentifyServer runs the application's override of identify
 // and triggerEffect (packages/node/src/behaviors/identify/IdentifyServer.ts:129-135
-// at 862ad75f) and emits startIdentifying, stopIdentifying and
+// at db021da0) and emits startIdentifying, stopIdentifying and
 // effectTriggered (:91-105, :133-135); here the assembler's server keeps
 // the IdentifyTime countdown and the host's handler runs first.
 //
@@ -38,7 +38,9 @@ import "context"
 // returns while a MatterIdentify is still running — a request's, or the
 // stop of a countdown that just ended, which is called from a goroutine of
 // its own — so a handler may take a lock that is held across the removal,
-// and may return into a server that is closed.
+// and may return into a server that is closed. A removal that ends a
+// running countdown reports it as a stop, MatterIdentify with 0, from a
+// goroutine of its own as well.
 type IdentifyHandler interface {
 	// MatterIdentify is the Identify command or an IdentifyTime write:
 	// identify for identifyTime seconds, 0 stops. It runs with the

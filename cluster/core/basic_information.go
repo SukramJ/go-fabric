@@ -889,10 +889,10 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 // checkLabelWrite holds a NodeLabel or Location write to the attribute's
 // constraint — NodeLabel "max 32", Location "2"
 // (packages/model/src/standard/elements/basic-information.element.ts:36,
-// :40 at 862ad75f) — and refuses a violation with CONSTRAINT_ERROR, as
+// :40 at db021da0) — and refuses a violation with CONSTRAINT_ERROR, as
 // matter.js's string-length validator does. Mirrors matter.js
-// packages/node/src/behavior/state/validation/constraint.ts:199-211 at
-// 862ad75f (ConstraintError, "String length of … is not within bounds");
+// packages/node/src/behavior/state/validation/constraint.ts:200-211 at
+// db021da0 (ConstraintError, "String length of … is not within bounds");
 // the refusal used to surface as FAILURE. A value that is no string — the
 // bridge's stand-in for a string its schema refused, one too long before
 // its IS1 among them — is CONSTRAINT_ERROR as well, the definition's
@@ -990,16 +990,35 @@ func (b *BasicInformation) OtaNodeInformation() OtaNodeInformation {
 
 // SetSoftwareVersion sets SoftwareVersion and SoftwareVersionString to the
 // release the node now runs — after an applied OTA update. The string is
-// held to its "1 to 64" (basic-information.element.ts).
+// held to its "1 to 64" (basic-information.element.ts). Each attribute
+// whose value differs is reported to the server's change listeners with
+// the host's origin, and the DataVersion advances once when one does; the
+// values held change nothing. Mirrors matter.js: a change of the state is
+// broadcast whoever makes it (ServerBehaviorBacking.ts:163-168, suppressed
+// only for changesOmitted and quieter, :230-243; SoftwareVersion is
+// neither, basic-information.element.ts:51-52), and a value equal to the
+// held one advances nothing and names nothing (Datasource.ts:1456-1457,
+// :1476-1481 at db021da0; N-flake-1).
 func (b *BasicInformation) SetSoftwareVersion(version uint32, versionString string) error {
 	if versionString == "" || len(versionString) > 64 {
 		return fmt.Errorf("core: SoftwareVersionString must be 1 to 64 bytes (got %d)", len(versionString))
 	}
+	var changed []uint32
 	b.mu.Lock()
-	b.softwareVersion = version
-	b.softwareString = versionString
+	if b.softwareVersion != version {
+		b.softwareVersion = version
+		changed = append(changed, basicInfoAttrSoftwareVersion)
+	}
+	if b.softwareString != versionString {
+		b.softwareString = versionString
+		changed = append(changed, basicInfoAttrSoftwareVersionStr)
+	}
 	b.mu.Unlock()
+	if len(changed) == 0 {
+		return nil
+	}
 	b.dataVersion.Bump()
+	b.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	return nil
 }
 

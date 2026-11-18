@@ -33,6 +33,28 @@ var _ deviceseam.Host = nodeHost{}
 // Clock implements [deviceseam.Host].
 func (h nodeHost) Clock() clock.Clock { return h.n.cfg.Clock }
 
+// Running implements [deviceseam.Host]: the node serves its devices —
+// from before the bridge's start takes its snapshot until a failed start
+// clears it (markDevicesLive). A stopped node has unbound its devices
+// (Node.Stop), so a bound device's node is either not started yet or
+// running.
+func (h nodeHost) Running() bool { return h.n.devicesLive.Load() }
+
+// markDevicesLive sets what [nodeHost.Running] answers, under
+// deviceseam.Composing: an AddPart that moves a part of this node either
+// completed before the flip — the bridge's first snapshot reads the
+// moved tree — or sees the node running and is refused (R2-P6-fsm-2501,
+// decision 225). Start sets it before the bridge's start and clears it
+// when that fails.
+func (n *Node) markDevicesLive(live bool) {
+	flip := func() { n.devicesLive.Store(live) }
+	if deviceseam.Composing == nil {
+		flip()
+		return
+	}
+	deviceseam.Composing(flip)
+}
+
 // EndpointNumber implements [deviceseam.Host].
 func (h nodeHost) EndpointNumber(key endpoint.SourceKey) (uint16, bool) {
 	if ep := h.n.assembled(key); ep != nil {
@@ -48,16 +70,39 @@ func (h nodeHost) NotifyReachable(_ context.Context, key endpoint.SourceKey, rea
 	}
 }
 
-// Rename implements [deviceseam.Host]: the assembled endpoint's NodeLabel,
-// or, before the node assembled it, the persisted label the assembly
-// restores (Aggregator.snapshot).
-func (h nodeHost) Rename(ctx context.Context, key endpoint.SourceKey, name string) {
+// Rename implements [deviceseam.Host]: the label is stored first, as a
+// controller's write of it is, and a refused store serves nothing and is
+// returned to the host (R2-P5-apidev-16). An assembled endpoint stores
+// and serves it in one locked step (bridge.Bridge.NotifyEndpointNodeLabel
+// → endpoint.Endpoint.SetNodeLabel, the node's EndpointState as its
+// Persistence) and reports it to the subscriptions — one store write per
+// rename (decision 226). Before the node assembled the endpoint the label
+// is only stored, and the assembly restores it (Aggregator.snapshot); an
+// assembly that lands between that store and the second look serves it
+// through the bridge as well.
+func (h nodeHost) Rename(ctx context.Context, key endpoint.SourceKey, name string) error {
 	if ep := h.n.assembled(key); ep != nil {
-		h.n.br.NotifyEndpointNodeLabel(ep.ID, name) //nolint:contextcheck // the host's rename outlives the call; the endpoint's save is not bound by it
-		return
+		return h.renameAssembled(ctx, key, ep.ID, name)
 	}
-	// The host's rename: a refused save is the persistence's to log.
-	_ = h.n.endpoints.SaveNodeLabel(ctx, key, name)
+	if err := h.n.endpoints.SaveNodeLabel(ctx, key, name); err != nil {
+		return err
+	}
+	if ep := h.n.assembled(key); ep != nil {
+		return h.renameAssembled(ctx, key, ep.ID, name)
+	}
+	return nil
+}
+
+// renameAssembled is Rename's route for an assembled endpoint. An endpoint
+// the bridge no longer serves (a reassembly dropped it between the look
+// and the call) has its label stored directly, so the next assembly
+// restores it.
+func (h nodeHost) renameAssembled(ctx context.Context, key endpoint.SourceKey, id uint16, name string) error {
+	found, err := h.n.br.NotifyEndpointNodeLabel(id, name) //nolint:contextcheck // the host's rename outlives the call; the endpoint's save is not bound by it
+	if err != nil || found {
+		return err
+	}
+	return h.n.endpoints.SaveNodeLabel(ctx, key, name)
 }
 
 // HostName implements [deviceseam.Host]: the host's current name of the
@@ -208,7 +253,7 @@ func (n *Node) Topology() BridgeTopology {
 // the same from the endpoint's behaviors — DescriptorServer's serverList
 // is the endpoint's supported cluster behaviors
 // (packages/node/src/behaviors/descriptor/DescriptorServer.ts:275
-// #serverList at 862ad75f).
+// #serverList at db021da0).
 func mountedClusters(ep *endpoint.Endpoint) []ClusterInfo {
 	servers := endpoint.ClusterServers(ep)
 	out := make([]ClusterInfo, 0, len(servers))

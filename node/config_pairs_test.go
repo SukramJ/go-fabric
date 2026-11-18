@@ -41,10 +41,12 @@ func TestConfigRefusesPairsOneOfWhichWouldBeDropped(t *testing.T) {
 		{"ProductDescription.Name of 32 bytes", func(c *node.Config) { c.ProductDescription.Name = strings.Repeat("n", 32) }, false},
 		{"ProductDescription.Name of 33 bytes", func(c *node.Config) { c.ProductDescription.Name = strings.Repeat("n", 33) }, true},
 		{"NodeLabel standing in, 33 bytes", func(c *node.Config) { c.BasicInformation.NodeLabel = strings.Repeat("l", 33) }, true},
+		// The NodeLabel's own constraint refuses it behind a Name too
+		// (review II, R2-P6-api-2407).
 		{"a long NodeLabel behind a Name", func(c *node.Config) {
 			c.ProductDescription.Name = "short"
 			c.BasicInformation.NodeLabel = strings.Repeat("l", 33)
-		}, false},
+		}, true},
 	} {
 		cfg := base()
 		tc.edit(&cfg)

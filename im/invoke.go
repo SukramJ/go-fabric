@@ -75,7 +75,7 @@ type InvokeRequest struct {
 	// (BD-Matter-DelayReportData).
 	DelayReportData *DelayReportData
 	// InteractionModelRevision is the request's InteractionModelRevision
-	// (tag 0xFF, TlvInvokeRequest.ts:30 at 862ad75f):
+	// (tag 0xFF, TlvInvokeRequest.ts:30 at db021da0):
 	// [MarshalInvokeRequestTLV] writes it, 0 writing
 	// [MatterInteractionModelRevision]; [UnmarshalInvokeRequestTLV] fills
 	// it, 0 when the field is absent. The server acts on neither.
@@ -302,7 +302,7 @@ func readCommandData(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]Comm
 			}
 			return out, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeStructure {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: CommandDataIB not struct", ErrInvalidInvokeRequest)
 		}
 		inv, err := readCommandInvocation(dec, fieldsReader)
@@ -391,8 +391,8 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 	// another type cannot decode against any command's schema and
 	// is the command's INVALID_COMMAND, the rest of the batch
 	// unaffected. Mirrors matter.js
-	// packages/protocol/src/action/server/CommandInvokeResponse.ts:551-562
-	// at 862ad75f (#decodeWithSchema: InvalidCommandError); the
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:555-563
+	// at db021da0 (#decodeWithSchema: InvalidCommandError); the
 	// reader read past it and the request failed as a whole.
 	if notStruct, err := skipNonStructFields(dec, el); notStruct || err != nil {
 		if err != nil {
@@ -697,10 +697,12 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// the cluster, accepts the command and on which the session may
 		// invoke it; an endpoint it may not is skipped, not reported.
 		// Mirrors matter.js
-		// packages/protocol/src/action/server/CommandInvokeResponse.ts:131-170
-		// (#processWildcard) and :337-412 (#processEndpointForWildcard,
-		// #wildcardTargetOf: the command's privilege, its fabric scope,
-		// its timed quality) at 862ad75f. It answered UNSUPPORTED_ENDPOINT.
+		// packages/protocol/src/action/server/CommandInvokeResponse.ts:131-173
+		// (#processWildcard), :330-361 (#processEndpointForWildcard) and
+		// :367-398 (#wildcardTargetOf: the command's privilege :380, its
+		// Large Message quality :384-386, its fabric scope :388-390, its
+		// timed quality :392-394) at db021da0. It answered
+		// UNSUPPORTED_ENDPOINT.
 		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint {
 			if !inv.DecodeStatus.IsSuccess() {
 				ir.Responses = append(ir.Responses, undecodedWildcardEntries(ctx, wild, g, inv)...)
@@ -769,9 +771,9 @@ func undecodedWildcardEntries(ctx context.Context, wild AuthorizingInvoker, g *i
 // fabric scope, timed quality), and every endpoint a wildcard path expands to. A path that
 // fails a check contributes nothing, and nothing runs. It is matter.js's
 // dispatch-endpoint set, collected in CommandInvokeResponse's validation
-// pass and handed to its dispatch hook before any command runs
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165
-// and :297 at 862ad75f), the endpoints a DelayReportData defers.
+// pass (packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165
+// and :298 at db021da0) and handed to its dispatch hook before any command
+// runs (:101-103), the endpoints a DelayReportData defers.
 func DispatchEndpoints(ctx context.Context, d Dispatcher, req InvokeRequest) map[uint16]bool {
 	g := newInvokeGate(ctx, d)
 	out := map[uint16]bool{}
@@ -966,7 +968,7 @@ func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32
 // result: its response, or its status. A cluster-specific status goes out
 // under an outer FAILURE whatever the handler named — Matter §7.10.7,
 // matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:448-451
-// at 862ad75f (#addStatus); it went out under the handler's status.
+// at db021da0 (#addStatus); it went out under the handler's status.
 func resultEntry(inv CommandInvocation, res InvokeResult) InvokeResponseEntry {
 	ent := InvokeResponseEntry{
 		Path:          res.Path,

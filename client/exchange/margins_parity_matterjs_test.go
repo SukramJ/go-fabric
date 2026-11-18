@@ -187,7 +187,8 @@ func TestMessageExchangeMRPBackoffMargin(t *testing.T) {
 	})
 	// W4-ctlnet-01: from transmission ~52 on mrp.BackoffDuration saturates;
 	// the pads added after it must not wrap the wait negative. matter.js
-	// grows to Infinity and caps (MRP.ts:182-190, MessageExchange.ts:1242-1250).
+	// grows to Infinity and caps (MRP.ts:182-189, MessageExchange.ts:1288-1296
+	// at db021da0).
 	t.Run("caps a saturated backoff plus initialRetransmissionTime instead of wrapping", func(t *testing.T) {
 		t.Parallel()
 		x := marginExchange(t, 0, nil, nil, false, mrp.SecureChannelProtocolID)

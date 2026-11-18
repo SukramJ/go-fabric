@@ -531,8 +531,8 @@ func TestTickOutboundReliable_NilListener(t *testing.T) {
 // [mrp.DefaultStandaloneAckDelay] (not 0) so the negative control is
 // meaningful: a zero-delay fixture would make every obligation immediately
 // due regardless of expediting, masking a regression of the underlying fix.
-// Mirrors matter.js MessageExchange.ts:428-433 (duplicate + requiresAck →
-// sendStandaloneAckForMessage immediately).
+// Mirrors matter.js MessageExchange.ts:501-511 at db021da0 (duplicate +
+// requiresAck → sendStandaloneAckForMessage immediately).
 func TestAckPump_ExpediteDuplicateAck(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)

@@ -435,7 +435,7 @@ func (r *forgetRecorder) ForgetCommissioned(addresses []string, identity *discov
 // the device by its identity — D and VP of its discovery data — and no
 // BLE address, the device having been reached over UDP; a failed
 // commissioning forgets nothing (ControllerCommissioner.ts:321-341,
-// :721-723 at 862ad75f).
+// :721-723 at db021da0).
 func TestCommissionForgetsTheDevice(t *testing.T) {
 	t.Parallel()
 	_, addr := startNode(t, nil, "127.0.0.1:0")

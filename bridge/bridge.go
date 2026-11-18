@@ -70,7 +70,7 @@
 //     first dispatcher carries it; a later call replaces the lister on
 //     the running dispatcher at once (the one port of this group that
 //     does). Without one, TopologyDispatcher.CheckACL denies every
-//     fabric-scoped request with UnsupportedAccess: a bridge that pairs
+//     operational (CASE) request with UnsupportedAccess: a bridge that pairs
 //     normally and then answers nothing. A deployment that
 //     means to run unguarded passes [endpoint.UnenforcedACL] — the
 //     explicit spelling of the same effect.
@@ -234,6 +234,9 @@
 //   - SetSubscriptionPersistence — on by default. Off on purpose, nothing
 //     is recorded or loaded and ReestablishFormerSubscriptions does
 //     nothing; controllers recover through their liveness timeout.
+//   - SetFabricCounter — silent. Without it the chunk waits are bounded
+//     per session only; with it each fabric is also held to its share
+//     once the waits reach half the dispatch budget.
 //
 // An ICD (Intermittently Connected Device) wires three more, all silent —
 // skipped, the node's operational record and MRP behave as a non-ICD's:
@@ -463,7 +466,7 @@ type Bridge struct {
 	// operational `_matter._tcp` service [Bridge.AnnounceFabric] published
 	// for it, so the broadcast events reach the session's fabric only
 	// (matter.js packages/protocol/src/advertisement/Advertiser.ts:69-75 at
-	// 862ad75f, advertisementForFabric). Guarded by mu.
+	// db021da0, advertisementForFabric). Guarded by mu.
 	operationalByFabric map[uint8]string
 
 	// rootClusters carry the cluster servers the daemon attached to
@@ -1878,20 +1881,20 @@ func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8
 // [SessionRegistry] that can close by fabric (the operational manager
 // does).
 //
-// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:423-432
-// `leave(currentExchange)` (OperationalCredentialsServer.ts:425
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:447-457 at
+// db021da0 `leave(currentExchange)` (OperationalCredentialsServer.ts:425
 // `fabric.leave(this.context.exchange)`): each session of the fabric runs
 // `initiateClose` — a session without active exchanges closes at once and
-// its close emits gracefulClose (NodeSession.ts:384-393), which the
+// its close emits gracefulClose (NodeSession.ts:367-377, :414-425), which the
 // ExchangeManager answers with a CloseSession on a fresh exchange
-// (ExchangeManager.ts:693, :716-726 #sendCloseSession); the session of the
+// (ExchangeManager.ts:758, :781-787 #sendCloseSession); the session of the
 // current exchange defers its close until that exchange ends
-// (NodeSession.ts:337-347, Session.ts:292-308). `delete` → `#closeSessions`
-// (Fabric.ts:440-465) then force-closes what is left with the current
-// exchange: `NodeSession.initiateForceClose` marks the session peer-lost
-// (NodeSession.ts:349-352), so the deferred close of the invoking session
-// emits no gracefulClose — it closes after its exchange without a
-// CloseSession.
+// (NodeSession.ts:372-375, :384-392; Session.ts:315-317). `delete` →
+// `#closeSessions` (Fabric.ts:464-488) then force-closes what is left with
+// the current exchange: `NodeSession.initiateForceClose` marks the
+// session peer-lost (NodeSession.ts:379-382), so the deferred close of the
+// invoking session emits no gracefulClose — it closes after its exchange
+// without a CloseSession.
 func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
 	b.emitFabricRemoved(ctx, fabricIndex)
 	b.mu.RLock()
@@ -1918,14 +1921,15 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 // one session (operational.Manager.CloseFabricExcept); without one it
 // does nothing.
 //
-// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:408-415
-// `replaced(currentExchange)` (OperationalCredentialsServer.ts:373): each
-// session of the fabric runs `initiateClose`, whose close emits
-// gracefulClose and so a CloseSession (NodeSession.ts:384-393,
-// ExchangeManager.ts:693, :716-726), before `initiateForceClose`. The
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:432-439 at
+// db021da0 `replaced(currentExchange)` (OperationalCredentialsServer.ts:373):
+// each session of the fabric runs `initiateClose`, whose close emits
+// gracefulClose and so a CloseSession (NodeSession.ts:367-377, :414-425;
+// ExchangeManager.ts:758, :781-787), before `initiateForceClose`. The
 // invoking session is kept open here, where matter.js closes it after its
 // exchange without a CloseSession (the force close marks it peer-lost,
-// NodeSession.ts:349-352); keeping it is the existing rule of
+// NodeSession.ts:379-382, and spares the invoking exchange,
+// Session.ts:336-340); keeping it is the existing rule of
 // operational.Manager.CloseFabricExcept, which this does not change.
 func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID uint16) {
 	b.mu.RLock()
@@ -1944,12 +1948,23 @@ func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID ui
 // closed at once ([Bridge.CloseFabricSessionsExcept]), and the session
 // that carried UpdateNOC — named by ctx — is closed after its response,
 // without a CloseSession. Mirrors matter.js Fabric.replaced
-// (Fabric.ts:408-415): every session of the fabric runs
+// (Fabric.ts:432-439): every session of the fabric runs
 // initiateForceClose, the invoking one included, which closes once its
 // exchange ends and, marked peer-lost, sends nothing
-// (NodeSession.ts:349-352). The controller reconnects with CASE under the
-// new NOC.
+// (NodeSession.ts:379-382, :419-425). The controller reconnects with
+// CASE under the new NOC.
+//
+// A CASE handshake on fabricIndex that has not finished is aborted first,
+// one this node answers ([Bridge.abortFabricHandshakes]) and one it opened
+// ([Bridge.abortFabricInitiations]): it would complete under the replaced
+// NOC. connectedhomeip aborts a pending establishment on the updated
+// fabric in either role (src/protocols/secure_channel/CASESession.h:149-153,
+// CASESession.cpp:423-433 at 6170af84); matter.js has no listener that
+// ends a handshake in flight (review II, R2-P6-sec-2412, owner decision
+// 233).
 func (b *Bridge) CloseFabricSessionsAfterUpdate(ctx context.Context, fabricIndex uint8) {
+	b.abortFabricHandshakes(fabricIndex)
+	b.abortFabricInitiations(fabricIndex)
 	invoking := mattercore.InvokeSessionIDFromContext(ctx)
 	b.CloseFabricSessionsExcept(fabricIndex, invoking)
 	if invoking == 0 {
@@ -2798,9 +2813,9 @@ func (b *Bridge) LocalAddr() string {
 // assigns an ephemeral port, and advertising the 5540 default instead
 // points every commissioner's SRV lookup at a port nothing listens on.
 // Mirrors matter.js packages/node/src/behavior/system/network/
-// ServerNetworkRuntime.ts:234 (`addTransports` writes the bound
-// `ipv6Interface.port` into `network.operationalPort`) which
-// ServerNetworkRuntime.ts:89 then reads when it constructs the
+// ServerNetworkRuntime.ts:243 at db021da0 (`addTransports` writes the
+// bound `ipv6Interface.port` into `network.operationalPort`) which
+// ServerNetworkRuntime.ts:90 then reads when it constructs the
 // MdnsAdvertiser.
 func (b *Bridge) effectiveUDPPort() int {
 	b.mu.RLock()
@@ -2933,7 +2948,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, fabricIndex uint8, compress
 		// HostName empty → the advertiser's MAC-derived default (mdns defaultHostName) so the
 		// SRV target resolves via macOS Bonjour / Linux avahi A/AAAA.
 		HostName: "",
-		// T key: matter.js ServerNetworkRuntime.ts:334-338 sets
+		// T key: matter.js ServerNetworkRuntime.ts:345 at db021da0 sets
 		// supportedTransports {tcpClient: outgoing, tcpServer: incoming}
 		// for the operational advertisement only (MdnsAdvertisement.ts:205-206).
 		TCPClient: b.cfg.TCP.Outgoing,
@@ -2978,7 +2993,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, fabricIndex uint8, compress
 // advertiser re-announces what it still holds, so the stale
 // <compressedID>-<nodeID> instance keeps answering until its TTL and
 // commissioners resolve an identity that no longer exists. Mirrors
-// matter.js DeviceAdvertiser.ts:76-86 (close the fabric's
+// matter.js DeviceAdvertiser.ts:80-107, :109-112 at db021da0 (close the fabric's
 // advertisements on update/delete before re-advertising). fabricIndex
 // is the fabric the identity belonged to: the bridge forgets the
 // instance it recorded for it, so no broadcast event reaches it again.
@@ -3038,9 +3053,9 @@ func (b *Bridge) forgetOperationalInstance(fabricIndex uint8, instance string) {
 // instance name of fabricIndex's operational service. Index 0 (a session
 // without a fabric) and an index with no announced service report false,
 // and the event does nothing — matter.js
-// packages/protocol/src/protocol/DeviceAdvertiser.ts:164-179 at 862ad75f
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:164-179 at db021da0
 // returns when the session has no fabric, and
-// packages/protocol/src/advertisement/Advertiser.ts:69-75 at 862ad75f
+// packages/protocol/src/advertisement/Advertiser.ts:69-75 at db021da0
 // (advertisementForFabric) finds no advertisement for a fabric that has
 // none.
 func (b *Bridge) operationalInstanceFor(fabricIndex uint8) (string, bool) {
@@ -3079,12 +3094,16 @@ type CommissioningAdvertisement struct {
 	PairingInstruction string
 	InstanceID         [8]byte
 
-	// RotatingID is the optional Matter §5.4.2.4 "Rotating Device
-	// Identifier" — 36 uppercase-hex characters when present, empty
-	// to suppress the `RI` TXT key. Callers compute it via
-	// [mdns.GenerateRotatingID] from a persisted UniqueID +
-	// LifetimeCounter pair; the bridge merely forwards the precomputed
-	// value into the mDNS service config.
+	// RotatingID is the optional Rotating Device Identifier, as
+	// connectedhomeip generates it (generateRotatingDeviceIdAsBinary,
+	// src/setup_payload/AdditionalDataPayloadGenerator.cpp:81 at
+	// 6170af84; matter.js advertises no RI key,
+	// packages/protocol/src/advertisement/mdns/CommissionableMdnsAdvertisement.ts:85-92
+	// at db021da0) — 36 uppercase-hex characters when present, empty to
+	// suppress the `RI` TXT key. Callers compute it via
+	// [mdns.GenerateRotatingID] from a persisted UniqueID + LifetimeCounter
+	// pair; the bridge merely forwards the precomputed value into the mDNS
+	// service config.
 	RotatingID string
 }
 

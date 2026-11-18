@@ -291,3 +291,21 @@ func TestICACCommandsNeedTheAccessingFabricsFailSafe(t *testing.T) {
 		t.Errorf("AddICAC under fabric 5's fail-safe = %v, want FailsafeRequired", err)
 	}
 }
+
+// TestAnnounceWithoutTrustAnchorsFailsClosed: an administrator built
+// without a trust anchor lookup fails the announcing commissioner's Vendor
+// ID Verification — the announcement answers FAILURE and no fabric is
+// marked verified — where it used to take the commissioner's own RCAC as
+// the vendor's anchor, connectedhomeip's placeholder
+// (JCMCommissionee.cpp:71-81 at 6170af84). jcm.SelfAnchored is the
+// explicit opt-in (review II, R2-P6-sec-1850, owner decision 190).
+func TestAnnounceWithoutTrustAnchorsFailsClosed(t *testing.T) {
+	fx := adminFixtureOf(t, AdministratorConfig{}, false)
+	ctx := caseCtx(t.Context(), 3)
+	if _, err := fx.a.MatterInvoke(ctx, AdministratorCmdAnnounce, announce(1)); statusOf(err) != im.StatusFailure {
+		t.Fatalf("announce without trust anchors: %v, want FAILURE", err)
+	}
+	if got := fx.a.VIDVerifiedFabric(); got != 0 {
+		t.Fatalf("VID verified for fabric %d without trust anchors", got)
+	}
+}

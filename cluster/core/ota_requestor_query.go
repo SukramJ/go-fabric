@@ -142,7 +142,7 @@ func (r *OTASoftwareUpdateRequestor) performUpdateQuery(ctx context.Context) {
 // ends — a panic included, which would otherwise leave the flag set and
 // every later timer skipping. Mirrors `try { await this.#queryForUpdate() }
 // finally { this.internal.queryRunning = false }`
-// (OtaSoftwareUpdateRequestorServer.ts:576-581 at 0ceb202d). It returns
+// (OtaSoftwareUpdateRequestorServer.ts:576-581 at db021da0). It returns
 // the update the query prepared, if any.
 func (r *OTASoftwareUpdateRequestor) runUpdateQuery(ctx context.Context) (pending *pendingApply) {
 	defer func() {
@@ -519,7 +519,7 @@ func (e *otaDownloadError) Error() string {
 func (e *otaDownloadError) Unwrap() error { return e.cause }
 
 // handleDownload mirrors matter.js #handleDownload
-// (OtaSoftwareUpdateRequestorServer.ts:1072-1115 at 862ad75f): a bdx:// or
+// (OtaSoftwareUpdateRequestorServer.ts:1072-1115 at db021da0): a bdx:// or
 // https:// URI whose protocol the requestor announces moves to
 // Downloading and is fetched, any other URI — http:// among them — is
 // refused (:1106); the file is then validated against the offered version
@@ -614,7 +614,7 @@ func (t *otaIdleTimer) halt() {
 }
 
 // handleHTTPSDownload mirrors matter.js #handleHttpsDownload
-// (OtaSoftwareUpdateRequestorServer.ts:1008-1062 at 862ad75f): a GET of the
+// (OtaSoftwareUpdateRequestorServer.ts:1008-1062 at db021da0): a GET of the
 // URI; a status outside 2xx is an OtaDownloadError carrying it
 // (:1010-1012); the body streams into the download location with progress
 // from Content-Length (:1013-1049); a failure while streaming is an

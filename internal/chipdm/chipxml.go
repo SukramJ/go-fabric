@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -579,7 +580,91 @@ func loadDeviceType(root *xmlNode, filename string) (*DeviceType, error) {
 			}
 		}
 	}
+	if err := loadComposition(dt, root); err != nil {
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+	for _, c := range root.Children {
+		switch c.tag() {
+		case "revisionHistory", "classification", "clusters", "conditions", "conditionRequirements", "composedDeviceTypes":
+		default:
+			// An element this loader does not read would be neither
+			// compared nor counted (R2-P6-test-2850).
+			return nil, fmt.Errorf("%s: <deviceType> child <%s> is not read", filename, c.tag())
+		}
+	}
 	return dt, nil
+}
+
+// loadComposition reads <composedDeviceTypes> (R2-P6-test-2850): each
+// <deviceType deviceTypeId deviceTypeName> is a requirement of side
+// "deviceType" whose Clusters are its <clusterRequirements>; CHIP states no
+// conformance or constraint of the contained type itself. A <cluster>
+// directly below <composedDeviceTypes> restates one of the device type's own
+// <clusters> requirements and must equal it; anything else fails the load.
+func loadComposition(dt *DeviceType, root *xmlNode) error {
+	own := dt.Requirements
+	for _, block := range root.children("composedDeviceTypes") {
+		for _, n := range block.Children {
+			switch n.tag() {
+			case "cluster":
+				req, err := loadClusterRequirement(n)
+				if err != nil {
+					return fmt.Errorf("composed device types: %w", err)
+				}
+				if !slices.ContainsFunc(own, func(o *Requirement) bool { return reflect.DeepEqual(o, req) }) {
+					return fmt.Errorf("composed device types: <cluster id=%#x side=%s> is none of the device type's own cluster requirements", req.ID, req.Side)
+				}
+			case "deviceType":
+				req, err := loadContainedDeviceType(n)
+				if err != nil {
+					return fmt.Errorf("composed device types: %w", err)
+				}
+				dt.Requirements = append(dt.Requirements, req)
+			default:
+				return fmt.Errorf("composed device types: <%s> is not read", n.tag())
+			}
+		}
+	}
+	return nil
+}
+
+// loadContainedDeviceType reads one <deviceType> of <composedDeviceTypes>.
+func loadContainedDeviceType(n *xmlNode) (*Requirement, error) {
+	name := n.str("deviceTypeName")
+	if name == "" {
+		return nil, errors.New("<deviceType> has no deviceTypeName")
+	}
+	id, err := n.num("deviceTypeId")
+	if err != nil {
+		return nil, err
+	}
+	if id == nil {
+		return nil, fmt.Errorf("<deviceType deviceTypeName=%q> has no deviceTypeId", name)
+	}
+	req := &Requirement{ID: *id, Name: name, Side: "deviceType"}
+	for _, c := range n.Children {
+		if c.tag() != "clusterRequirements" {
+			return nil, fmt.Errorf("contained device type %s: <%s> is not read", name, c.tag())
+		}
+		for _, cl := range c.Children {
+			if cl.tag() != "cluster" {
+				return nil, fmt.Errorf("contained device type %s: <%s> is not read", name, cl.tag())
+			}
+			r, err := loadClusterRequirement(cl)
+			if err != nil {
+				return nil, fmt.Errorf("contained device type %s: %w", name, err)
+			}
+			// A cluster requirement of a contained device type states no
+			// side (all 14 at 6170af84, data_model/1.6.1). Its side is
+			// left empty, not supplied: the comparison keys these rows on
+			// the cluster id and does not compare a side.
+			if _, stated := cl.attr("side"); !stated {
+				r.Side = ""
+			}
+			req.Clusters = append(req.Clusters, r)
+		}
+	}
+	return req, nil
 }
 
 // loadConditionRequirement reads one <conditionRequirement> of the device
@@ -658,9 +743,17 @@ func loadClusterRequirement(n *xmlNode) (*Requirement, error) {
 	if id == nil {
 		return nil, fmt.Errorf("cluster requirement %s has no id", name)
 	}
-	side := "server"
-	if n.str("side") == "client" {
-		side = "client"
+	// A cluster requirement of <clusters> states its side; any value but
+	// server or client is an error, not a server (R2-P6-test-2852). One
+	// that states none is read as server here; loadContainedDeviceType
+	// takes that back for a contained type's rows, which state none.
+	side := n.str("side")
+	switch side {
+	case "", "server":
+		side = "server"
+	case "client":
+	default:
+		return nil, fmt.Errorf("cluster requirement %s: side %q", name, side)
 	}
 	conf, err := translateConformance(n)
 	if err != nil {
@@ -998,11 +1091,11 @@ func (c *constraintAST) atom() string {
 // notation; "" when CHIP states none.
 func translateConstraint(n *xmlNode) (string, error) {
 	defs := n.children("constraint")
-	var entryDef *xmlNode
+	var entryDefs []*xmlNode
 	if entry := n.child("entry"); entry != nil {
-		entryDef = entry.child("constraint")
+		entryDefs = entry.children("constraint") // every one, as the element's own (R2-P6-test-2852)
 	}
-	if len(defs) == 0 && entryDef == nil {
+	if len(defs) == 0 && len(entryDefs) == 0 {
 		return "", nil
 	}
 	ast := &constraintAST{}
@@ -1013,12 +1106,16 @@ func translateConstraint(n *xmlNode) (string, error) {
 		}
 		ast = combineConstraint(ast, part)
 	}
-	if entryDef != nil {
-		entry, err := constraintPart(entryDef)
+	for i, d := range entryDefs {
+		part, err := constraintPart(d)
 		if err != nil {
 			return "", err
 		}
-		ast.entry = entry
+		if i == 0 {
+			ast.entry = part
+			continue
+		}
+		ast.entry = combineConstraint(ast.entry, part)
 	}
 	return ast.serialize(), nil
 }
@@ -1232,11 +1329,19 @@ func nestedBound(n *xmlNode) (string, error) {
 
 var privileges = map[string]string{"view": "V", "operate": "O", "manage": "M", "admin": "A"}
 
+// accessAttrs are the attributes of <access> translateAccess reads.
+var accessAttrs = []string{"read", "write", "fabricSensitive", "fabricScoped", "readPrivilege", "writePrivilege", "invokePrivilege", "timed"}
+
 // translateAccess returns nil when CHIP states no access.
 func translateAccess(n *xmlNode) (*Access, error) {
 	def := n.child("access")
 	if def == nil {
 		return nil, nil
+	}
+	for _, a := range def.Attrs {
+		if a.Name.Space == "" && !slices.Contains(accessAttrs, a.Name.Local) {
+			return nil, fmt.Errorf("unsupported access %q", a.Name.Local) // R2-P6-test-2852
+		}
 	}
 	read, err := def.boolean("read")
 	if err != nil {
@@ -1317,12 +1422,26 @@ var qualities = []struct{ attr, flag string }{
 
 var persistence = map[string]string{"nonVolatile": "nonvolatile", "fixed": "fixed"}
 
+// qualityNotTranslated is the one <quality> attribute the loader knows and
+// does not translate: "reportable", which the older data models the level
+// cross-check reads state (data_model/1.4) and 1.6.1 does not; the
+// comparison normalizes the snapshot's P quality (quality-reportable).
+const qualityNotTranslated = "reportable"
+
 // translateQuality returns nil when CHIP states no quality, and the sorted
 // flags otherwise (an empty, non-nil set when it states only false flags).
 func translateQuality(n *xmlNode) ([]string, error) {
 	def := n.child("quality")
 	if def == nil {
 		return nil, nil
+	}
+	// An attribute outside the table would read as "not stated" on both
+	// sides once the snapshot lacks it too (R2-P6-test-2852).
+	for _, a := range def.Attrs {
+		if a.Name.Space == "" && a.Name.Local != "persistence" && a.Name.Local != qualityNotTranslated &&
+			!slices.ContainsFunc(qualities, func(q struct{ attr, flag string }) bool { return q.attr == a.Name.Local }) {
+			return nil, fmt.Errorf("unsupported quality %q", a.Name.Local)
+		}
 	}
 	out := []string{}
 	for _, q := range qualities {

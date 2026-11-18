@@ -5,6 +5,7 @@ package fan_test
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 
@@ -80,6 +81,80 @@ func TestFanWriteVerdictIsTheWrittenValueAgainstTheHeldOne(t *testing.T) {
 			if changed, err := srv.MatterWriteChanged(ctx, tc.attr, tc.written); err != nil || !changed || host.calls != 1 || srv.MatterDataVersion() != v0+1 {
 				t.Errorf("%v over the held %v: changed %v, %v, setter calls %d, DataVersion %d → %d; want changed, one call, one advance",
 					tc.written, tc.held, changed, err, host.calls, v0, srv.MatterDataVersion())
+			}
+		})
+	}
+}
+
+// TestFanWriteCommitNamesTheSiblings (F-db021da0-57): a write names the
+// attributes it changed — the written one, and each sibling the coupling
+// rules hand the host whose value differs from the held one — and advances
+// the version once; the held value names nothing. Mirrors matter.js: a
+// commit names a property only when its value differs and advances once
+// (Datasource.ts:1476-1481, :1456-1457, :1319 at db021da0).
+func TestFanWriteCommitNamesTheSiblings(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name    string
+		held    fandef.State
+		attr    uint32
+		written any
+		want    []uint32
+	}{
+		{
+			"FanMode Off moves both settings",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrFanMode, uint64(fan.FanModeOff),
+			[]uint32{fan.AttrFanMode, fan.AttrPercentSetting, fan.AttrSpeedSetting},
+		},
+		{
+			"PercentSetting moves SpeedSetting",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrPercentSetting, uint64(60),
+			[]uint32{fan.AttrPercentSetting, fan.AttrSpeedSetting},
+		},
+		{
+			"a sibling already there is not named",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(6)},
+			fan.AttrPercentSetting, uint64(60),
+			[]uint32{fan.AttrPercentSetting},
+		},
+		{
+			"SpeedSetting 0 moves FanMode and PercentSetting",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrSpeedSetting, uint64(0),
+			[]uint32{fan.AttrSpeedSetting, fan.AttrFanMode, fan.AttrPercentSetting},
+		},
+		{
+			"the held value",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrPercentSetting, uint64(40), nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv, err := fan.NewServer(fan.Config{
+				Source: &laterFan{st: tc.held}, Features: allFeatures, Sequence: fan.SequenceOffLowMedHighAuto, SpeedMax: 10,
+				RockSupport: fan.RockLeftRight | fan.RockUpDown, WindSupport: fan.WindNatural,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			v0 := srv.MatterDataVersion()
+			got, err := srv.MatterWriteCommit(ctx, tc.attr, tc.written)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("named %v, want %v", got, tc.want)
+			}
+			advance := uint32(0)
+			if len(tc.want) > 0 {
+				advance = 1
+			}
+			if srv.MatterDataVersion() != v0+advance {
+				t.Errorf("version %d → %d, want +%d", v0, srv.MatterDataVersion(), advance)
 			}
 		})
 	}

@@ -127,7 +127,8 @@ type nvKey struct {
 	attrID uint32
 	// label: a bridged LabelList, kept in persistUserLabels' form;
 	// labelSrv: the UserLabel server whose list an owed label key is
-	// written from when the node stops (a rollback the store refused).
+	// written from when the node stops (a change or a rollback the store
+	// refused).
 	label    bool
 	labelSrv contract.ClusterServer
 }
@@ -251,8 +252,17 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	}
 	prev, had, err := st.GetSetting(ctx, key)
 	// A value the store holds already is not written again: the write
-	// changes nothing stored (review II, R2-P5-write-04).
+	// changes nothing stored (review II, R2-P5-write-04). Nor is one the
+	// server holds under a key never stored: a write of the held value
+	// changes nothing, which matter.js neither notes nor stores
+	// (Datasource.ts:1446-1452, :1476-1481 at db021da0; F-db021da0-47) —
+	// a restart serves the same value from the declaration.
 	wrote := !had || prev != stored
+	if err == nil && !had && !k.label {
+		if held, ok := v.heldForm(k); ok && held == stored {
+			wrote = false
+		}
+	}
 	if err == nil && wrote {
 		err = st.SetSetting(ctx, key, stored)
 	}
@@ -306,6 +316,25 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	}, nil
 }
 
+// heldForm is the stored form (hex of its TLV) of the value k's server
+// holds; false without a server, for an attribute it serves no value of,
+// and for a value the codec does not take (logged).
+func (v *nonVolatile) heldForm(k *nvKey) (string, bool) {
+	if k.srv == nil {
+		return "", false
+	}
+	val, ok := k.srv.MatterRead(k.attrID)
+	if !ok {
+		return "", false
+	}
+	b, err := bridge.AttributeValueTLV(val)
+	if err != nil {
+		v.n.logger.Debug("nonvolatile.persist", slog.Uint64("attribute", uint64(k.attrID)), slog.Any("err", err))
+		return "", false
+	}
+	return hex.EncodeToString(b), true
+}
+
 // storeHeld stores the value k's server holds under key when the store
 // does not hold it already; a store that refuses it is logged and the key
 // owed (written again at the next change and when the node stops). The
@@ -316,20 +345,10 @@ func (v *nonVolatile) storeHeld(ctx context.Context, k *nvKey, key string) {
 		v.storeLabel(ctx, k, key)
 		return
 	}
-	if k.srv == nil {
-		return
-	}
-	val, ok := k.srv.MatterRead(k.attrID)
+	held, ok := v.heldForm(k)
 	if !ok {
 		return
 	}
-	b, err := bridge.AttributeValueTLV(val)
-	if err != nil {
-		// A form the codec does not take: what is stored stays.
-		v.n.logger.Debug("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
-		return
-	}
-	held := hex.EncodeToString(b)
 	if k.known && !k.owed && held == k.stored {
 		return
 	}
@@ -341,12 +360,29 @@ func (v *nonVolatile) storeHeld(ctx context.Context, k *nvKey, key string) {
 	k.stored, k.known, k.owed = held, true, false
 }
 
-// storeLabel writes an owed label key from the list its UserLabel server
-// holds, as persistUserLabels stores each change of it, while the node
-// keeps that server's list; one it let go of (the endpoint left the
-// topology) takes its debt with it, and the server in its place stores
-// its own list. Only a refused rollback owes a label key; persistUserLabels
-// writes the list again at its next change. The caller holds k.store.
+// labelChanged stores the list a bridged UserLabel server holds after a
+// change of it (persistUserLabels' subscription) under key, under the
+// key's store lock as every other nonvolatile key's change: a host's
+// change and a controller's write of the list are stored one after the
+// other, each as the list the server holds then, so the older list is
+// never stored last; a refused store owes the key, written again at the
+// next change and when the node stops (review II, R2-P6-store-2416). A
+// server the node let go of meanwhile (a forgotten or replaced endpoint)
+// stores nothing.
+func (v *nonVolatile) labelChanged(ctx context.Context, key string, srv contract.ClusterServer) {
+	k := v.keyState(key)
+	k.store.Lock()
+	defer k.store.Unlock()
+	k.labelSrv = srv
+	v.storeLabel(ctx, k, key)
+}
+
+// storeLabel writes a label key from the list its UserLabel server holds
+// (k.labelSrv), while the node keeps that server's list; one it let go of
+// (the endpoint left the topology) takes its debt with it, and the server
+// in its place stores its own list. A refused store owes the key: a
+// change ([nonVolatile.labelChanged]) or a refused rollback. The caller
+// holds k.store.
 func (v *nonVolatile) storeLabel(ctx context.Context, k *nvKey, key string) {
 	srv := k.labelSrv
 	if srv == nil {

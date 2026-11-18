@@ -137,8 +137,8 @@ func uintList(v bridgetest.TLV) []uint64 {
 // holds a subscription over the CASE session that reports an Aggregator
 // change (the subscription manager, Reassemble). The subscription rides
 // CASE because a controller subscribes only to a commissioned peer
-// (matter.js packages/protocol/src/action/client/ClientInteraction.ts:991-994
-// at 0ceb202d).
+// (matter.js packages/protocol/src/action/client/ClientInteraction.ts:1024-1027
+// at db021da0).
 func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 	t.Parallel()
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
@@ -561,7 +561,7 @@ func TestOTARequestorMounted(t *testing.T) {
 // running node's set keeps its number, however many assemblies run
 // without it, as matter.js keeps every stored number until the store is
 // erased (packages/node/src/storage/server/ServerEndpointStores.ts:33-45
-// load, :109-130 assignNumber at 862ad75f). It replaces TestMarkComplete:
+// load, :109-130 assignNumber at db021da0). It replaces TestMarkComplete:
 // v0.13.0 removed Aggregator.MarkComplete and the collection it enabled.
 func TestStoredNumbersSurviveAbsence(t *testing.T) {
 	t.Parallel()
@@ -736,7 +736,7 @@ func TestAggregatorConcurrentAdds(t *testing.T) {
 
 // TestStartFailureLeavesTheNodeStartable: a Start that fails — its UDP
 // port held by another socket — leaves the node startable, as matter.js's
-// Node.start does (packages/node/src/node/Node.ts:113-128 at 862ad75f:
+// Node.start does (packages/node/src/node/Node.ts:113-128 at db021da0:
 // the target state back to "offline", the error rethrown): the store New
 // opened stays usable, the Aggregator takes a device, and once the port
 // is free the second Start succeeds; an explicit Stop then makes a later

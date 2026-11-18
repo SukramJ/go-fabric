@@ -10,7 +10,7 @@ import (
 
 // maxPendingJobs is the bound past which the report consumer waits for
 // the node's jobs to drain — matter.js MAX_PENDING_JOBS
-// (packages/node/src/node/client/ClientStructure.ts:57 at 862ad75f,
+// (packages/node/src/node/client/ClientStructure.ts:57 at db021da0,
 // applied at :469-471).
 const maxPendingJobs = 100
 

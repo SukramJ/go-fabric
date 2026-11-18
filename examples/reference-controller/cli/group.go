@@ -32,13 +32,22 @@ import (
 const epochStartTime0 = 1_110_000
 
 // groupRecord is what the database keeps of a group "group create" made.
+// It carries no key: the epoch key lives once, in the controller's own key
+// set (Controller.SetGroupKey, table matter_group_keys), which
+// Config.Sealer seals; a copy here, under a setting key the sealed store
+// does not seal, would keep the secret in clear beside it
+// (R2-P6-store-2603). groupEpochKey reads it from there.
 type groupRecord struct {
 	GroupID   uint16   `json:"groupId"`
 	KeySetID  uint16   `json:"keySetId"`
-	EpochKey  string   `json:"epochKey"`
 	Nodes     []uint64 `json:"nodes"`
 	Endpoints []uint16 `json:"endpoints"`
 }
+
+// legacyEpochKeyField is the field a record written before
+// R2-P6-store-2603 carried the epoch key in; loadGroup rewrites such a
+// record without it.
+const legacyEpochKeyField = "epochKey"
 
 func groupKey(id uint16) string { return groupKeyPref + strconv.Itoa(int(id)) }
 
@@ -51,8 +60,38 @@ func loadGroup(ctx context.Context, s *stack, id uint16) (groupRecord, error) {
 	if !ok {
 		return g, fmt.Errorf("group %d: create it first (group create)", id)
 	}
-	err = json.Unmarshal([]byte(v), &g)
-	return g, err
+	if err := json.Unmarshal([]byte(v), &g); err != nil {
+		return g, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(v), &fields); err != nil {
+		return g, err
+	}
+	if _, legacy := fields[legacyEpochKeyField]; legacy {
+		if err := saveGroup(ctx, s, g); err != nil {
+			return g, fmt.Errorf("group %d: drop the record's key copy: %w", id, err)
+		}
+	}
+	return g, nil
+}
+
+// saveGroup writes g's record.
+func saveGroup(ctx context.Context, s *stack, g groupRecord) error {
+	b, err := json.Marshal(g)
+	if err != nil {
+		return err
+	}
+	return s.settings.SetSetting(ctx, groupKey(g.GroupID), string(b))
+}
+
+// groupEpochKey is the epoch key of g's key set, read from the
+// controller's own key set, the one copy (R2-P6-store-2603).
+func groupEpochKey(ctx context.Context, s *stack, g groupRecord) ([]byte, error) {
+	ks, err := s.settings.GetGroupKeySet(ctx, s.fabric.FabricIndex, g.KeySetID)
+	if err != nil {
+		return nil, fmt.Errorf("group %d key set %d: %w", g.GroupID, g.KeySetID, err)
+	}
+	return ks.EpochKey0, nil
 }
 
 // keySetWrite is GroupKeyManagement KeySetWrite (§11.2.7.1) of one epoch
@@ -172,7 +211,6 @@ func cmdGroupCreate(e *env, args []string) error {
 	} else if key, err = hex.DecodeString(strings.TrimPrefix(keyArg, "hex:")); err != nil || len(key) != 16 {
 		return errors.New("--key: want 16 bytes in hex or random")
 	}
-	g.EpochKey = hex.EncodeToString(key)
 	if g.Nodes, err = parseList[uint64](nodesArg, 64); err != nil {
 		return err
 	}
@@ -213,11 +251,7 @@ func cmdGroupCreate(e *env, args []string) error {
 		}, g.GroupID); err != nil {
 			return fmt.Errorf("the controller's key set: %w", err)
 		}
-		b, err := json.Marshal(g)
-		if err != nil {
-			return err
-		}
-		if err := s.settings.SetSetting(ctx, groupKey(g.GroupID), string(b)); err != nil {
+		if err := saveGroup(ctx, s, g); err != nil {
 			return err
 		}
 		e.printf("group %d created with key set %d\n", g.GroupID, g.KeySetID)
@@ -302,6 +336,27 @@ func servesGroupcast(ctx context.Context, n *client.Node) (bool, error) {
 // wire form chip stores (src/app/server/AclStorage.cpp:162-171 converts
 // the internal 0xFFFFFFFFFFFF0000|group node id to GroupIdFromNodeId) and
 // the one cluster/core's AccessControl accepts (0x0001..0xFFFF).
+// addGroupOK judges an AddGroup answer: an AddGroupResponse whose Status
+// (context tag 0) is Success, for the group asked — decoded by tag
+// (groupsdef.AddGroupResponse.DecodeTLV), not by the members' position
+// (R2-P6-wire-2609); TestGroupMessaging.yaml:145-150 expects Status 0.
+func addGroupOK(res interaction.Result, groupID uint16) error {
+	if !res.HasFields || res.Command != groupsdef.CmdAddGroupResponse {
+		return fmt.Errorf("no AddGroupResponse (status %s, command 0x%02X)", res.Status, res.Command)
+	}
+	var rsp groupsdef.AddGroupResponse
+	if err := rsp.DecodeTLV(res.Fields); err != nil {
+		return fmt.Errorf("AddGroupResponse: %w", err)
+	}
+	if rsp.Status != groupsdef.Status(im.StatusSuccess) {
+		return fmt.Errorf("status %s", im.StatusCode(rsp.Status))
+	}
+	if rsp.GroupId != groupID {
+		return fmt.Errorf("AddGroupResponse for group %d, want %d", rsp.GroupId, groupID)
+	}
+	return nil
+}
+
 func legacyJoin(ctx context.Context, n *client.Node, g groupRecord) error {
 	gid := uint64(g.GroupID)
 	if err := appendEntry(ctx, n, listPath(0, gkmdef.ClusterID),
@@ -316,9 +371,8 @@ func legacyJoin(ctx context.Context, n *client.Node, g groupRecord) error {
 		if err != nil {
 			return fmt.Errorf("AddGroup on endpoint %d: %w", ep, err)
 		}
-		// AddGroupResponse: Status 0 (TestGroupMessaging.yaml:145-150).
-		if len(res.Fields.Children) == 0 || res.Fields.Children[0].El.Uint != 0 {
-			return fmt.Errorf("AddGroup on endpoint %d: status %s", ep, valueJSON(nil, res.Fields))
+		if err := addGroupOK(res, g.GroupID); err != nil {
+			return fmt.Errorf("AddGroup on endpoint %d: %w", ep, err)
 		}
 		targets = append(targets, acldef.AccessControlTargetStruct{
 			Cluster: spec.NullOf[uint32](), Endpoint: spec.ValueOf(ep), DeviceType: spec.NullOf[uint32](),

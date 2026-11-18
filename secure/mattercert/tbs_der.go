@@ -128,15 +128,15 @@ type rdnAttribute struct {
 // localityName, stateOrProvinceName, organizationName,
 // organizationalUnitName, title, name, givenName, initials,
 // generationQualifier, dnQualifier, pseudonym. Mirrors matter.js
-// packages/general/src/crypto/X520.ts:46-76 at 862ad75f.
+// packages/general/src/crypto/X520.ts:46-75 at db021da0.
 var x520AttributeTypes = [...]int{3, 4, 5, 6, 7, 8, 10, 11, 12, 41, 42, 43, 44, 46, 65}
 
 // standardDNAttribute maps a standard X.520 DN TLV tag to its OID and its
 // ASN.1 string tag: 1-15 are 2.5.4.n as UTF8String, 16 is domainComponent
 // as IA5String, 129-143 are the attributes 1-15 as PrintableString; ok is
 // false for any other tag. Mirrors matter.js
-// packages/protocol/src/certificate/kinds/Certificate.ts:895-964 at
-// 862ad75f (astOfDistinguishedName with the X520 encoders,
+// packages/protocol/src/certificate/kinds/DistinguishedName.ts:489-583 at
+// db021da0 (distinguishedNameToAsn1 and rdnToAsn1 with the X520 encoders,
 // packages/general/src/crypto/X520.ts:28-79).
 func standardDNAttribute(tag uint8) (oid asn1.ObjectIdentifier, asn1Tag int, ok bool) {
 	switch {
@@ -159,8 +159,9 @@ func standardDNAttribute(tag uint8) (oid asn1.ObjectIdentifier, asn1Tag int, ok 
 // case-authenticated-tags are uppercase hex (8 chars). The standard
 // X.520 attributes go out in their arrival position with their own string
 // type ([standardDNAttribute]) — matter.js
-// packages/protocol/src/certificate/kinds/Certificate.ts:895-964 at
-// 862ad75f (astOfDistinguishedName); they used to be left out, which
+// packages/protocol/src/certificate/kinds/DistinguishedName.ts:489-583 at
+// db021da0 (distinguishedNameToAsn1, the arrival order by encodedRdnsOf,
+// :494); they used to be left out, which
 // failed every chain whose DNs carry them (Google's roots).
 func buildDN(dn DistinguishedName) []asn1.RawValue {
 	var rdns []asn1.RawValue

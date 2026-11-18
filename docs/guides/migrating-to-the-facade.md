@@ -323,7 +323,7 @@ changes are the rows marked *changed*.
 | `device.NewRootNode` | none: the root endpoint is the node's (`Node.Root`); `device.RootNodeType` stays for `device.Lookup` |
 | *changed:* the `*device.Type` of `<Name>Type()`, `device.Lookup`, `device.Types`, `Device.Type` was the registry's own value | each is a copy, and `device.New` copies the `Type` it is given: compare types by `ID`, not by pointer |
 | a composite (FloodlightCamera, VideoDoorbell) or a composed device only in code | `device.Spec.Parts`: `FromSpec` builds the parts; a composite missing a mandatory component is refused with the constructor's `ErrComposition` |
-| *breaking:* a device whose kit server lists an attribute without a value — 21 types built bare: AirPurifier, AirQualitySensor, BasicVideoPlayer, Camera, CastingVideoPlayer, Chime, ContentApp, Dishwasher, EnergyEvse, ExtractorHood, Fan, Intercom, JointFabricAdministrator, LaundryDryer, LaundryWasher, ModeSelect, NetworkInfrastructureManager, RoboticVacuumCleaner, SoilSensor, ThreadBorderRouter, WaterHeater; the composites FloodlightCamera and VideoDoorbell through their Camera; and with a feature selection AudioDoorbell, Closure, ClosurePanel, DeviceEnergyManagement, ElectricalMeter, ElectricalSensor, MicrowaveOven, Pump, SecondaryNetworkInterface, PowerSource (Rechargeable, Replaceable) | `device.New` refuses it with `ErrConfiguration` naming the cluster, the attribute and the `<cluster>def.Declare{Initial: <cluster>def.Patch{<Field>: …}}` that states it, as matter.js refuses the server at initialisation (decision 17; the decision named 19 types — the measured set is larger). `(*device.Type).RequiredInitial()` lists them before a build |
+| *breaking:* a device whose kit server lists an attribute without a value — 21 types built bare: AirPurifier, AirQualitySensor, BasicVideoPlayer, Camera, CastingVideoPlayer, Chime, ContentApp, Dishwasher, EnergyEvse, ExtractorHood, Fan, Intercom, JointFabricAdministrator, LaundryDryer, LaundryWasher, ModeSelect, NetworkInfrastructureManager, RoboticVacuumCleaner, SoilSensor, ThreadBorderRouter, WaterHeater; the composites FloodlightCamera and VideoDoorbell through their Camera; and with a feature selection AudioDoorbell, Closure, ClosurePanel, DeviceEnergyManagement, ElectricalMeter, ElectricalSensor, MicrowaveOven, Pump, SecondaryNetworkInterface, PowerSource (Rechargeable, Replaceable) | `device.New` refuses it with `ErrConfiguration` naming the cluster, the attribute and the `<cluster>def.Declare{Initial: <cluster>def.Patch{<Field>: …}}` that states it, as matter.js refuses the server at initialisation (decision 17, confirmed as built by decision 203: 21 types built bare, 36 attributes; `TestRequiredInitialSetIsPinned` holds the count). `(*device.Type).RequiredInitial()` lists them before a build |
 | `ThermostatServer.SetLocalTemperature` for a sensor's reading | `SetMeasuredTemperature`, which applies `LocalTemperatureCalibration`; `SetLocalTemperature` stays the uncalibrated setter |
 | `im.FabricFilterFromContext` / `im.LookupFabricFilter` in a host's server | `contract.AccessingFabric(ctx)` |
 | a host switch source's `WireMatterSwitchHandler` / `WireMatterSwitchPositions` matched by name | `contract.SwitchGestureSource`, `contract.SwitchPositionSource` |
@@ -451,6 +451,35 @@ changes are the rows marked *changed*.
 | *changed:* a `contract.DataVersionTracker` whose 0 meant "no version" | 0 is an ordinary version, and `Bump` wraps to it |
 | `bridgetest.EstablishSubscriptionTarget(b, subID, target)` in a test | subscribe through a commissioned `bridgetest.Session` (`Session.Subscribe`): the real SubscribeRequest sets the route and anchors the peer's counter window |
 | `bridge.ErrAckWaitTimeout` compared from a host | nothing: no function returns it |
+
+## Changed after v0.22.2: the controller, the client stack and the radio kits
+
+Review II, phase 6b, first wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release; the behaviour
+changes are the rows marked *changed* or *breaking*.
+
+| Before | Now |
+| --- | --- |
+| *breaking:* `JointFabricOptions.Consent: func(info commissioner.TrustInfo) bool { … }` | `func(_ context.Context, info commissioner.TrustInfo) (bool, error) { return …, nil }`: the context is Commission's and ends the wait; an error fails the step |
+| *changed:* `sqlstore.New` on a registry a `sqlstore.NewSealed` has marked | refuses to write a secret value (`store.ErrNoSealer`): open it with `NewSealed` and its sealer; `sqlstore.Reseal` / `controller.Reseal` rotate the key |
+| `peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report |
+
+## Changed after v0.22.2: the node, the device and the controller
+
+Review II, phase 6b, second wave. Every deprecated identifier keeps its
+behaviour until it is removed in the next minor release; the behaviour
+changes are the rows marked *changed* or *breaking*.
+
+| Before | Now |
+| --- | --- |
+| *breaking:* `dev.SetReachable(ctx, ok)`, `dev.Rename(ctx, name)`, `dev.Update(ctx, fn)` as statements | each returns `error`: `device.ErrNotBridged` on a part (call it on the bridged device that owns the part), and from `Rename` the store's refusal — the label was not served and the device keeps its name; retry or report it |
+| *changed:* `node.New` with a `BasicInformation` string beyond its attribute's constraint, such as a `SerialNumber` longer than 32 (counted in UTF-16 code units: 32 characters of ASCII) | refused with `node.ErrInvalidConfig`, naming the attribute and its constraint: shorten the value before it reaches the `Config` |
+| *changed:* `node.Config.Network.MDNS.HostName` over 40 bytes, or holding a dot, a space or a tab | refused with `node.ErrInvalidConfig`: one DNS label of at most 40 bytes, without `.local` |
+| *changed:* the other values `node.Config.Validate` now bounds — `Health.Interval` or `Network.InterfaceCheck` below 1 s, a negative `OTA.HTTPSMaxImageSize`, `HTTPSIdleTimeout` or `AnnouncedUpdateQueryDelay`, a `ProductDescription.DeviceType` the schema does not define, `EndpointState` beside `EndpointPersistence`, a `TLS` capacity outside 5–254 | refused with `node.ErrInvalidConfig`: set a value in range, or drop `EndpointPersistence` |
+| `cluster/lock.StateSource` named in a type switch or by reflection | it is the generated `cluster/spec/doorlock.StateSource` (an alias); an implementation of its methods compiles unchanged |
+| *changed:* `client.Node.PingAddress(ctx, addr)` with an address that is not one of the node's record addresses | refused with `client.ErrConfig`, nothing sent: pass one of `n.Record().Addresses` |
+| `topology.Config{…}` without a logger | optional `Logger`: the service logs, once each, a Thread address two nodes claim (`matter.controller.topology.claim_collision`); nil logs nothing |
+| `schema.ClusterCommandLevels(c, id)` | `schema.ClusterRequestCommandLevels(c, id)` for an accepted command, `schema.ClusterResponseCommandLevels(c, id)` for a generated one |
 
 ## Changed after v0.18.0: the exchange receive notifier
 
@@ -772,4 +801,4 @@ endpoints (or `Topology.Snapshotter` for its own assembler, and
 controller reading and writing them over CASE —
 [Testing in process](testing-in-process.md).
 
-*Source: `node/facade.go`, `node/health.go`, `node/credentials.go`, `node/attestation.go`, `node/mdns.go`, `node/observers.go`, `node/node.go`, `fabrictest/device.go:47-77`, `fabrictest/site.go:121`, `fabrictest/controller.go:496`.*
+*Source: `node/facade.go`, `node/health.go`, `node/credentials.go`, `node/attestation.go`, `node/mdns.go`, `node/observers.go`, `node/node.go`, `fabrictest/device.go` (`Topology`), `fabrictest/site.go` (`NewSite`), `fabrictest/controller.go` (`Site.CommissionedPair`).*

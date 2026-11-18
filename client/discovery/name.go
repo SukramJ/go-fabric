@@ -227,6 +227,10 @@ type Changes struct {
 // alive; fn may be nil (matter.js's null observer).
 type nameObserver struct {
 	fn func(Changes)
+	// resolution marks the observer of a resolution a caller runs — an
+	// operational [Service] ([NewService]) — whose name's records the
+	// cache evicts last ([Names.evictOverflow]).
+	resolution bool
 }
 
 type pendingChange struct {
@@ -295,24 +299,39 @@ func (n *Name) isDiscovered() bool { return n.records.len() > 0 }
 
 func (n *Name) isObserved() bool { return len(n.observers) > 0 }
 
+// isResolved reports whether a resolution observes the name.
+func (n *Name) isResolved() bool {
+	return slices.ContainsFunc(n.observers, func(o *nameObserver) bool { return o.resolution })
+}
+
 func (n *Name) on(o *nameObserver) {
 	if !slices.Contains(n.observers, o) {
+		was := n.isResolved()
 		n.observers = append(n.observers, o)
+		if o.resolution && !was {
+			n.names.reclassify(n)
+		}
 	}
 }
 
 // off removes an observer and deletes the name if nothing keeps it.
 // Mirrors matter.js 0ceb202d DnssdName.ts:58-61.
 func (n *Name) off(o *nameObserver) {
+	was := n.isResolved()
 	n.observers = slices.DeleteFunc(n.observers, func(x *nameObserver) bool { return x == o })
+	if was && !n.isResolved() {
+		n.names.reclassify(n)
+	}
 	n.deleteIfUnused()
 }
 
 // parameters builds the TXT parameters: newest TXT record first, entries in
 // wire order, an empty entry or an entry with an empty key skipped, split
-// at the first "=", the first occurrence of a key winning, a key without
-// "=" having an empty value. Mirrors matter.js 0ceb202d
-// packages/general/src/net/dns-sd/DnssdName.ts:76-112.
+// at the first "=", a key without "=" having an empty value, and the first
+// occurrence of a key winning whatever its case. Mirrors matter.js
+// packages/general/src/net/dns-sd/DnssdName.ts:76-107 (the entries) and
+// DnssdParameters.ts:27-34 (first wins, the key folded) at db021da0
+// (review II, R2-P6-doc-2906).
 func (n *Name) parameters() Parameters {
 	if n.params != nil {
 		return n.params
@@ -378,6 +397,8 @@ func (n *Name) installRecord(rec *Record, sourceIntf string, at time.Time) bool 
 
 	if old, ok := n.records.get(key); ok {
 		n.names.unregisterForExpiration(old)
+	} else if rec.Type == TypeA || rec.Type == TypeAAAA {
+		n.boundAddresses()
 	}
 
 	// Retire only once the record is kept; the copy it replaces is
@@ -418,6 +439,35 @@ func (n *Name) installRecord(rec *Record, sourceIntf string, at time.Time) bool 
 
 	n.notify(false, key, &installed)
 	return true
+}
+
+// boundAddresses makes room for one more A/AAAA record: while the name
+// holds [maxCachedAddressesPerHost] of them, the one installed or refreshed
+// longest ago is deleted, as the staging drops its oldest
+// ([Names.stageAddresses]). Called only for an address not yet installed,
+// so the record being refreshed is never the one that goes.
+func (n *Name) boundAddresses() {
+	for {
+		var oldest *Record
+		count := 0
+		for _, r := range n.records.values() {
+			if r.Type != TypeA && r.Type != TypeAAAA {
+				continue
+			}
+			count++
+			if oldest == nil || r.InstalledAt.Before(oldest.InstalledAt) {
+				oldest = r
+			}
+		}
+		if count < maxCachedAddressesPerHost {
+			return
+		}
+		before := n.records.len()
+		n.deleteRecord(oldest)
+		if n.records.len() == before {
+			return
+		}
+	}
 }
 
 // installedFor returns the record installed under rec's key.

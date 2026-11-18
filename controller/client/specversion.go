@@ -9,7 +9,7 @@ import "fmt"
 // four component bytes, most significant first: 0x01040200 is version
 // 1.4.2, Reserved 0 — the layout matter.js documents for the attribute
 // (packages/types/src/clusters/basic-information.d.ts:168-200 at
-// 862ad75f; Specification.SPECIFICATION_VERSION 0x01060100 is 1.6.1,
+// db021da0; Specification.SPECIFICATION_VERSION 0x01060100 is 1.6.1,
 // packages/model/src/common/Specification.ts:110). Compare versions by
 // [SpecVersion.Uint32], over all 32 bits, as the specification says.
 type SpecVersion struct {

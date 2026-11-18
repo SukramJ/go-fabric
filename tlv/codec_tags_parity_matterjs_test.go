@@ -10,7 +10,7 @@ import (
 )
 
 // TestTlvCodecTagsParityMatterJS mirrors
-// packages/types/test/tlv/TlvCodecTest.ts:23-75 at 862ad75f: the tag
+// packages/types/test/tlv/TlvCodecTest.ts:23-75 at db021da0: the tag
 // encodings of Core Appendix A.12 (vendor 0xFFF1, profile 0xDEED) read and
 // written, a structure member under a 4-octet fully qualified tag, and an
 // implicit-profile tag — 2 or 4 octets, alone or inside a structure —
@@ -100,7 +100,7 @@ func TestTlvCodecTagsParityMatterJS(t *testing.T) {
 }
 
 // TestTlvStringByteSizeParityMatterJS mirrors
-// packages/types/test/tlv/TlvStringTest.ts:73-83 at 862ad75f: "test"
+// packages/types/test/tlv/TlvStringTest.ts:73-83 at db021da0: "test"
 // encodes in 6 bytes, "testè" (è is two UTF-8 bytes) in 8.
 func TestTlvStringByteSizeParityMatterJS(t *testing.T) {
 	t.Parallel()

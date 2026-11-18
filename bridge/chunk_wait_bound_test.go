@@ -305,7 +305,7 @@ func TestChunkWaitsBoundTheBatchInvoke(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	for range maxChunkWaitsPerSession {
-		if !b.routing.chunkWaits.claim(paseTestSessionID) {
+		if !b.routing.chunkWaits.claim(paseTestSessionID, 0, 0) {
 			t.Fatal("a claim below the bound was refused")
 		}
 	}
@@ -354,7 +354,7 @@ func TestChunkWaitsBoundTheBatchInvoke(t *testing.T) {
 	if n := claims(); n != maxChunkWaitsPerSession {
 		t.Errorf("claims after the single invoke = %d, want %d", n, maxChunkWaitsPerSession)
 	}
-	b.routing.chunkWaits.release(paseTestSessionID)
+	b.routing.chunkWaits.release(paseTestSessionID, 0)
 	if op := invoke(0x3502, encodeInvokeRequestWithRefs(t, on, off)); op != im.OpcodeInvokeResponse {
 		t.Errorf("a batch invoke below the bound answered with opcode %#x, want InvokeResponse", op)
 	}

@@ -6,6 +6,7 @@ package device
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"reflect"
 	"slices"
@@ -344,8 +345,16 @@ func newCommodityTariffServer(b defaultBuild) (contract.ClusterServer, error) {
 	if err != nil {
 		return nil, notServed(err)
 	}
-	if n, ok := d.TimeSource.(contract.ChangeNotifier); ok {
-		n.OnMatterValueChanged(func() { _ = srv.SyncTime() }) // the device's lifetime: the source is the device's
+	if n, ok := d.TimeSource.(contract.ChangeNotifier); ok && b.bind != nil {
+		// Not for a refused or a removed device (R2-P6-store-2515).
+		logger := b.logger
+		b.bind(func() func() {
+			return n.OnMatterValueChanged(func() {
+				if err := srv.SyncTime(); err != nil && logger != nil {
+					logger.Warn("device.tariff.sync", slog.Any("err", err))
+				}
+			})
+		})
 	}
 	return srv, nil
 }

@@ -11,8 +11,8 @@ import (
 
 // TestMemoryResumptionStore_DeleteForgetsThePeer: DeleteResumptionRecord
 // removes a peer's record and reports whether there was one (matter.js
-// SessionManager.deleteResumptionRecord, session/SessionManager.ts:468-480
-// at 0ceb202d); the record handed out is a copy.
+// SessionManager.deleteResumptionRecord, session/SessionManager.ts:519-531
+// at db021da0); the record handed out is a copy.
 func TestMemoryResumptionStore_DeleteForgetsThePeer(t *testing.T) {
 	t.Parallel()
 	store := &handshake.MemoryResumptionStore{}

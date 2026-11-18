@@ -691,8 +691,13 @@ func (d *demoDem) current() *dem.ForecastStruct {
 }
 
 // setCapability is SetTestEventTrigger_PowerAdjustment and _ClearForecast
-// (DEMTestEventTriggers.cpp:137-177).
+// (DEMTestEventTriggers.cpp:137-177). A device without the PowerAdjustment
+// feature serves no PowerAdjustmentCapability and keeps none, as conform
+// holds the forecast to the features (R2-P6-err-2655).
 func (d *demoDem) setCapability(minPower, maxPower int64, minDuration, maxDuration uint32) {
+	if d.features&dem.FeaturePowerAdjustment == 0 {
+		return
+	}
 	c := &dem.PowerAdjustCapabilityStruct{
 		PowerAdjustCapability: spec.ValueOf([]dem.PowerAdjustStruct{{MinPower: minPower, MaxPower: maxPower, MinDuration: minDuration, MaxDuration: maxDuration}}),
 		Cause:                 dem.PowerAdjustReasonNoAdjustment,

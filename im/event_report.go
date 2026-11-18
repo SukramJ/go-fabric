@@ -187,7 +187,7 @@ func readEventPathArray(dec *tlv.Decoder) ([]ConcreteEventPath, error) {
 			}
 			return paths, nil
 		}
-		if !el.IsContainer || el.Type != tlv.TypeList {
+		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeList {
 			return nil, fmt.Errorf("%w: EventPathIB not list, got 0x%02X", ErrInvalidPath, el.Type)
 		}
 		p, err := readEventPathFields(dec)
@@ -262,14 +262,15 @@ func (rep EventReport) marshal(enc *tlv.Encoder, valueWriter EventDataWriter) {
 		enc.StartStruct(tlv.ContextTag(tagEventReportData))
 		// IsUrgent is a SubscribeRequest path qualifier; it MUST NOT appear in
 		// an EventDataIB path. Mirrors matter.js
-		// packages/protocol/src/interaction/AttributeDataEncoder.ts:131 (#3988,
-		// Matter §8.9.3.4), which deletes isUrgent before encoding the data path.
+		// packages/protocol/src/interaction/AttributeDataEncoder.ts:137 at
+		// db021da0 (#3988, Matter §8.9.3.4), which deletes isUrgent before
+		// encoding the data path.
 		dataPath := rep.Path
 		dataPath.IsUrgent = false
 		dataPath.MarshalTLV(enc, tlv.ContextTag(tagEventDataPath))
 		// EventNumber and EpochTimestamp at the smallest fitting width.
 		// Mirrors matter.js packages/types/src/protocol/types/TlvEventData.ts:20,22
-		// at 0ceb202d (TlvEventNumber / TlvPosixMs, both TlvUInt64, whose
+		// at db021da0 (TlvEventNumber / TlvPosixMs, both TlvUInt64, whose
 		// length follows the value — TlvNumber.ts:295-299); chip reads the
 		// two through TLVReader::Get(uint64_t&), which takes any unsigned
 		// width (src/app/MessageDef/EventDataIB.cpp:169-177,

@@ -42,6 +42,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 // Format is the file format's version.
@@ -59,6 +60,23 @@ const Iterations = 600_000
 const (
 	minIterations = 100_000
 	maxIterations = 10_000_000
+)
+
+// syncFile and syncDir put a written key file and its directory entry on
+// stable storage; tests replace them to observe and fail the syncs.
+var (
+	syncFile = func(f *os.File) error { return f.Sync() }
+	syncDir  = func(dir string) error {
+		d, err := os.Open(dir) //nolint:gosec // G304: the directory of the operator's key file
+		if err != nil {
+			return err
+		}
+		if err := d.Sync(); err != nil {
+			_ = d.Close()
+			return err
+		}
+		return d.Close()
+	}
 )
 
 // ErrDecrypt is a file that does not open: a wrong passphrase or a
@@ -161,7 +179,8 @@ func Open(path string, passphrase []byte) (*Signer, error) {
 
 // Create writes key to a new file at path (mode 0600; an existing file is
 // an error) under passphrase and returns its signer. A nil key generates
-// one.
+// one. It returns once the file and its directory entry are synced to
+// stable storage; a failed sync fails Create and removes the file.
 func Create(path string, passphrase []byte, key *ecdsa.PrivateKey) (*Signer, error) {
 	return create(path, passphrase, key, Iterations)
 }
@@ -215,7 +234,20 @@ func create(path string, passphrase []byte, key *ecdsa.PrivateKey, iterations in
 		_ = os.Remove(path)
 		return nil, err
 	}
+	// The file and the directory entry that names it reach stable storage
+	// before Create returns: the documented move rewrites the CA record
+	// without the private key next, and a power loss in between must not
+	// leave the root key nowhere (review II, R2-P6-store-1856).
+	if err := syncFile(out); err != nil {
+		_ = out.Close()
+		_ = os.Remove(path)
+		return nil, err
+	}
 	if err := out.Close(); err != nil {
+		_ = os.Remove(path)
+		return nil, err
+	}
+	if err := syncDir(filepath.Dir(path)); err != nil {
 		_ = os.Remove(path)
 		return nil, err
 	}

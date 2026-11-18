@@ -3,11 +3,11 @@
 
 package bdx_test
 
-// A port of matter.js packages/protocol/test/bdx/BdxTest.ts at 862ad75f:
+// A port of matter.js packages/protocol/test/bdx/BdxTest.ts at db021da0:
 // whole transfers between an initiator (Send / Receive, matter.js
 // BdxClient.asSender / asReceiver) and a [bdx.Responder] serving the "ota"
 // scope (BdxProtocol.onNewExchange), every message both sides sent
-// recorded before an optional manipulation, as bdx-helpers.ts:85-204
+// recorded before an optional manipulation, as bdx-helpers.ts:85-207
 // (bdxTransfer) does. The matter.js PersistedFileDesignator of the client
 // is the Data / Sink of the Go initiator; its transferFileDesignator is
 // TransferFileDesignator.
@@ -610,14 +610,14 @@ func TestBdxSuccessfulTransfers(t *testing.T) {
 // Result are values, so an observer altering its copy cannot reach the
 // session's.
 func TestBdxPerBlockDebugLogging(t *testing.T) {
-	const blockSize, tailSize = 500, 116 // BdxTest.ts:1307-1308
+	const blockSize, tailSize = 500, 116 // BdxTest.ts:1330-1331
 
 	t.Run("a responder reports what it received and granted, and an observer cannot alter either", func(t *testing.T) {
 		var responder *bdx.ServerSession
 		var announced bdx.Init
 		runBdxTransfer(t, bdxCase{
 			sender: true, data: bdxRandom(2*blockSize + tailSize), maxBlockSize: blockSize,
-			// Announced before it negotiates (BdxTest.ts:1374-1379).
+			// Announced before it negotiates (BdxTest.ts:1396-1400).
 			observe: func(s *bdx.ServerSession) {
 				responder = s
 				announced = s.Init()
@@ -636,7 +636,7 @@ func TestBdxPerBlockDebugLogging(t *testing.T) {
 			t.Fatalf("the session's Init changed with the observer's copy: %+v", in)
 		}
 
-		// Result carries no file designator (BdxTest.ts:1388).
+		// Result carries no file designator (BdxTest.ts:1414).
 		negotiated, ok := responder.Negotiated()
 		if !ok || negotiated.Mode != bdx.SenderDrive || negotiated.BlockSize != blockSize || negotiated.StartOffset != 0 {
 			t.Fatalf("negotiated %+v (%v)", negotiated, ok)

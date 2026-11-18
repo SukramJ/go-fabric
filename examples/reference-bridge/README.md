@@ -1,7 +1,9 @@
 # reference-bridge
 
-A runnable Matter bridge built **only from `go-fabric`'s public API** — no
-`internal/`, no `_test.go` helper, no fork. It bridges a hard-coded fleet of
+A runnable Matter bridge built **from `go-fabric`'s public API** — no
+`_test.go` helper, no fork, and no `internal/` but one TESTING-ONLY flag:
+`--ota-harness` reaches `internal/nodeseam` to apply an OTA image in place,
+which a host outside this module cannot import. It bridges a hard-coded fleet of
 simulated devices — one per surface the module serves — advertises itself
 over mDNS, accepts a commissioner over PASE and serves the operational CASE
 session that follows. It is also the device the chip-tool suite
@@ -75,6 +77,13 @@ Startup prints the pairing information on stdout:
   --------------------------------------------------------------
 ```
 
+`20202021` and `3840` are the test defaults every copy shares; change them
+for anything real. `--passcode` takes the number, `@file` holding it, or —
+when the flag is not given — `$GOFABRIC_PASSCODE`, so the passcode need not
+be on the command line, where `ps` and the shell history show it
+(`--enable-key` takes `@file` the same way). The SPAKE2+ salt is drawn at
+random at each start unless `--pbkdf-salt` names one.
+
 ## The fleet
 
 | Endpoint | Device type | Backed by |
@@ -145,7 +154,10 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   announcement, as matter.js's cert requestor does. Without it the daemon
   validates a downloaded image and keeps it under `<ota-dir>/applied/`,
   still running the old version; `--ota-dir` (default `ota` beside `--db`)
-  is where downloads land.
+  is where downloads land. The validation is the image format's — digest,
+  size, version, vendor and product — not the image's authenticity: a
+  product verifies its vendor's signature over the payload before it
+  installs an image, which this example does not (`ota.go`, `ApplyUpdate`).
 
 - `--wifi` (TESTING ONLY) serves WiFiNetworkDiagnostics on the root from a
   simulated Wi-Fi link (`wifi.go`): fixed values (a locally administered
@@ -369,6 +381,18 @@ names the SQLite file (`--db`), and the node does the rest.
 - **CASE resumption records** persist too, so a controller that reconnects
   after a restart resumes in one round trip; CASE sessions themselves stay
   volatile — Matter treats them so.
+- **Sealing at rest is opt-in: `--seal-key file:<path>`.** Without it the
+  file's `0600` mode is all that protects the keys in it. With it the node
+  opens the file sealed (`node.Store.Sealer` with `store.NewAESGCMSealer`,
+  [`docs/security.md`, "Sealing at rest"](../../docs/security.md#sealing-at-rest)):
+  the operational keys, the resumption secrets, the group keys and the
+  other secrets of the store's list are sealed under a 32-byte key kept in
+  the named file as 64 hex digits — created with a new random key, mode
+  `0600`, when missing; a clear database is sealed on the way in. Keep the
+  key file off the database's disk or backup; every later start needs it,
+  and a database sealed under it does not open without it. The
+  `--tls-sim` and `--jointfabric-sim` test keys are daemon settings the
+  seal does not cover (`tls.go`, `jointfabric.go`).
 
 Delete `reference-bridge.db` to factory-reset.
 

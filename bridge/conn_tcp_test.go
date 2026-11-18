@@ -218,7 +218,7 @@ func TestTCPRequestRepliedOnSameConnWithoutMRP(t *testing.T) {
 
 // TestTCPConnectionDropEvictsBoundSessions: when the connection closes,
 // every session bound to it is closed without a farewell, as matter.js
-// ExchangeManager.ts:655-670 #onConnectionDisconnect does.
+// ExchangeManager.ts:715-731 #onConnectionDisconnect does (at db021da0).
 func TestTCPConnectionDropEvictsBoundSessions(t *testing.T) {
 	h := newTCPHarness(t)
 	conn, replies := h.dial()
@@ -246,8 +246,8 @@ func TestTCPConnectionDropEvictsBoundSessions(t *testing.T) {
 // TestTCPConnClosedWhenLastSessionGoes: a connection whose sessions all
 // closed the other way round — here through the registry's close hook,
 // as the reaper or a fabric removal closes them — is closed when its
-// last session goes, and not before (matter.js ExchangeManager.ts:674-681
-// #closeTcpChannelIfLastSession, scheduled from :696-713).
+// last session goes, and not before (matter.js ExchangeManager.ts:739-746
+// #closeTcpChannelIfLastSession, scheduled from :761-779 at db021da0).
 func TestTCPConnClosedWhenLastSessionGoes(t *testing.T) {
 	h := newTCPHarness(t)
 	conn, replies := h.dial()
@@ -340,9 +340,9 @@ func TestTCPInboundCloseSessionClosesConn(t *testing.T) {
 }
 
 // TestTCPListenerSharesUDPPortAndAdvertisesT: the TCP listener binds
-// the UDP socket's port (ServerNetworkRuntime.ts:203-214) and the
-// operational record carries T=6 for client+server (Advertiser.h:63-64
-// bits, ServerNetworkRuntime.ts:334-338).
+// the UDP socket's port (ServerNetworkRuntime.ts:211-218, listeningPort
+// :216) and the operational record carries T=6 for client+server
+// (Advertiser.h:63-64 bits, ServerNetworkRuntime.ts:345 at db021da0).
 func TestTCPListenerSharesUDPPortAndAdvertisesT(t *testing.T) {
 	h := newTCPHarness(t)
 	h.bridge.mu.RLock()
@@ -409,7 +409,8 @@ func TestReceiveOverReliableServesUnsecuredDropsGroup(t *testing.T) {
 }
 
 // TestBindSessionRouteNeverSwitchesTransport: matter.js replaces a
-// session's channel only UDP-for-UDP (MessageChannel.ts:140-148); a
+// session's channel only UDP-for-UDP (MessageChannel.ts:155-164 at
+// db021da0); a
 // reused session id binds afresh.
 func TestBindSessionRouteNeverSwitchesTransport(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)

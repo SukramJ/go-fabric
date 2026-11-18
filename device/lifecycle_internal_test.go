@@ -34,9 +34,17 @@ type fakeHost struct {
 	names     []string
 	// hostNames record the host statements of the name.
 	hostNames []string
+	// running is what Running answers.
+	running bool
 }
 
 func (h *fakeHost) Clock() clock.Clock { return h.clk }
+
+func (h *fakeHost) Running() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.running
+}
 
 func (h *fakeHost) EndpointNumber(key endpoint.SourceKey) (uint16, bool) {
 	h.mu.Lock()
@@ -51,10 +59,11 @@ func (h *fakeHost) NotifyReachable(_ context.Context, _ endpoint.SourceKey, reac
 	h.mu.Unlock()
 }
 
-func (h *fakeHost) Rename(_ context.Context, _ endpoint.SourceKey, name string) {
+func (h *fakeHost) Rename(_ context.Context, _ endpoint.SourceKey, name string) error {
 	h.mu.Lock()
 	h.names = append(h.names, name)
 	h.mu.Unlock()
+	return nil
 }
 
 func (h *fakeHost) HostName(_ context.Context, _ endpoint.SourceKey, name string) {

@@ -476,7 +476,12 @@ func TestSliceDDeviceCleanupBudgetParityMatterjsServer(t *testing.T) {
 			t.Fatalf("allocated video = %+v, want stream 9 allocated by this server", caps.Allocated.Video)
 		}
 	})
-	t.Run("lets an abandoned deallocate drop a lease that was only reused since, not allocated again", func(t *testing.T) {
+	// Go's own case in the place of matterjs-server's "lets an abandoned
+	// deallocate drop a lease that was only reused since, not allocated
+	// again" (CameraStreamManagerTest.ts:8151 at 0bd06f2), which the test
+	// register keeps as a by-design left row: there the abandoned
+	// give-back's late answer drops the lease.
+	t.Run("keeps a lease a cut deallocate left until the camera's report no longer names the stream", func(t *testing.T) {
 		ctx := t.Context()
 		entered, answer := sliceDNewGate(), sliceDNewGate()
 		t.Cleanup(answer.open)
@@ -506,16 +511,26 @@ func TestSliceDDeviceCleanupBudgetParityMatterjsServer(t *testing.T) {
 		if reused.provenance == ProvenanceAllocated {
 			t.Fatal("provenance = allocated, want a reuse")
 		}
+		// Divergence (review II, R2-P6-conc-2210, decision 207): the
+		// give-back was cut at the budget, not abandoned, so its late answer
+		// reaches no one and the lease stays while the camera still
+		// reports the stream; the camera's report that the stream is gone
+		// drops it (reconcileLeases: the camera named it, then stopped
+		// naming it).
 		answer.open()
-		// Only the give-back can drop the lease: the camera still reports
-		// the stream.
-		sliceDEventually(t, func() bool { return !m.ownsStream(tTarget, StreamVideo, 9) })
+		if !m.ownsStream(tTarget, StreamVideo, 9) {
+			t.Fatal("the cut give-back dropped the lease")
+		}
+		io.setState(fixtureState())
 		caps, err := m.capabilities(ctx, tTarget)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(caps.Allocated.Video) != 1 || caps.Allocated.Video[0].AllocatedByUs {
-			t.Fatalf("allocated video = %+v, want stream 9 not allocated by this server", caps.Allocated.Video)
+		if m.ownsStream(tTarget, StreamVideo, 9) {
+			t.Fatal("the lease of a stream the camera no longer reports stayed")
+		}
+		if len(caps.Allocated.Video) != 0 {
+			t.Fatalf("allocated video = %+v, want none", caps.Allocated.Video)
 		}
 	})
 	t.Run("fails a request rather than waiting for a give-back the camera never answers", func(t *testing.T) {

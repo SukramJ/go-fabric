@@ -252,7 +252,7 @@ func NewDigest(digestType uint8) hash.Hash {
 // MaxHeaderSize is the largest header TLV ReadHeader accepts — chip's
 // kMaxHeaderSize (src/lib/core/OTAImageHeader.cpp:53 at 6170af84, checked
 // at :128 "Safety check against malicious headers"). matter.js has no cap
-// (OtaImageReader.ts:157-191 at 862ad75f); an ahead-of-matter.js row in
+// (OtaImageReader.ts:157-191 at db021da0); an ahead-of-matter.js row in
 // notes/parity/by_design.md (W4-ctlint-07).
 const MaxHeaderSize = 1024
 
@@ -286,7 +286,7 @@ func ReadHeader(r io.Reader) (Header, Prefix, []byte, error) {
 	// The header is collected as it arrives, never allocated at the size
 	// the prefix claims: matter.js #processHeader appends each chunk until
 	// remainingBytesCount reaches headerSize
-	// (packages/protocol/src/ota/OtaImageReader.ts:157-191 at 862ad75f), so
+	// (packages/protocol/src/ota/OtaImageReader.ts:157-191 at db021da0), so
 	// a prefix claiming 4 GiB costs what the stream delivers.
 	headerTLV, err := io.ReadAll(io.LimitReader(r, int64(p.HeaderSize)))
 	if err != nil {

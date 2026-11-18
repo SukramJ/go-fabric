@@ -18,12 +18,14 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	"github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/cluster/spec/powersource"
+	"github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // Properties are a node's physical properties — matter.js
 // PhysicalDeviceProperties (packages/protocol/src/peer/PhysicalDeviceProperties.ts:32-61
-// at 0ceb202d) as NodePhysicalProperties computes them from the image
+// at db021da0) as NodePhysicalProperties computes them from the image
 // (packages/node/src/node/NodePhysicalProperties.ts:30-194). A pointer
 // field is nil while unknown.
 type Properties struct {
@@ -50,7 +52,7 @@ type Properties struct {
 
 // Medium is the part of the properties a peer's network profile is
 // selected by (client/peer.NetworkProfiles.ForPeer, NetworkProfile.ts:184-221
-// at 862ad75f).
+// at db021da0).
 func (p Properties) Medium() peer.Medium {
 	m := peer.Medium{
 		SupportsThread: p.SupportsThread, SupportsWifi: p.SupportsWifi, SupportsEthernet: p.SupportsEthernet,
@@ -63,22 +65,19 @@ func (p Properties) Medium() peer.Medium {
 	return m
 }
 
-// Cluster and attribute ids the properties read. ThreadNetworkDiagnostics
-// and WiFiNetworkDiagnostics have no generated definition; their ids are
-// matter.js's (model/src/standard/elements/thread-network-diagnostics.element.ts:20,
-// :31-38, :288 and wi-fi-network-diagnostics.element.ts:20, :28 at
-// 0ceb202d), the clusters "ThreadNetworkDiagnostics" (0x0035) and
-// "WiFiNetworkDiagnostics" (0x0036) of parity/schema.json.
+// Cluster and attribute ids the properties read: the generated
+// definitions' (ADR 0013), so a regeneration carries them (review II,
+// R2-P6-par-2360).
 const (
-	threadDiagnostics            uint32 = 0x0035
-	threadAttrChannel            uint32 = 0x0000
-	threadAttrRoutingRole        uint32 = 0x0001
-	threadAttrNetworkName        uint32 = 0x0002
-	threadAttrPanID              uint32 = 0x0003
-	threadAttrExtendedPanID      uint32 = 0x0004
-	threadRoutingSleepyEndDevice        = 2
-	wifiDiagnostics              uint32 = 0x0036
-	wifiAttrBssid                uint32 = 0x0000
+	threadDiagnostics            = threadnetworkdiagnostics.ClusterID
+	threadAttrChannel            = threadnetworkdiagnostics.AttrChannel
+	threadAttrRoutingRole        = threadnetworkdiagnostics.AttrRoutingRole
+	threadAttrNetworkName        = threadnetworkdiagnostics.AttrNetworkName
+	threadAttrPanID              = threadnetworkdiagnostics.AttrPanId
+	threadAttrExtendedPanID      = threadnetworkdiagnostics.AttrExtendedPanId
+	threadRoutingSleepyEndDevice = uint64(threadnetworkdiagnostics.RoutingRoleSleepyEndDevice)
+	wifiDiagnostics              = wifinetworkdiagnostics.ClusterID
+	wifiAttrBssid                = wifinetworkdiagnostics.AttrBssid
 
 	aggregatorDeviceType    uint32 = 0x000E
 	genericSwitchDeviceType uint32 = 0x000F
@@ -112,8 +111,8 @@ func (s *structure) computeProperties() Properties {
 		if mode, ok := uintOf(icd, icdmanagement.AttrOperatingMode); ok {
 			p.LongIdleTimeOperating = lits && mode == uint64(icdmanagement.OperatingModeLit)
 		}
-		if idle, ok := uintOf(icd, icdmanagement.AttrIdleModeDuration); ok {
-			d := time.Duration(idle) * time.Second //nolint:gosec // a uint32 attribute
+		if idle, ok := uintWithin(icd, icdmanagement.AttrIdleModeDuration, math.MaxUint32); ok {
+			d := time.Duration(idle) * time.Second //nolint:gosec // uintWithin bounds it to the attribute's uint32
 			p.IdleModeDuration = &d
 		}
 	}
@@ -285,6 +284,19 @@ func uintOf(c *Cluster, attr uint32) (uint64, bool) {
 		return 0, false
 	}
 	return v.El.Uint, true
+}
+
+// uintWithin is uintOf for an attribute of an unsigned type no wider than
+// limit: a value beyond its type is absent. The ICD timings are multiplied
+// into a time.Duration, and a peer's value wider than the attribute's type
+// would overflow it — a negative idle window, a subscription ceiling of 0
+// (review II, R2-P6-bound-2352).
+func uintWithin(c *Cluster, attr uint32, limit uint64) (uint64, bool) {
+	v, ok := uintOf(c, attr)
+	if !ok || v > limit {
+		return 0, false
+	}
+	return v, true
 }
 
 // idListInOrder is a list's numeric entries in list order.

@@ -510,26 +510,65 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 // db021da0, #noteIfChanged); its FanControlServer adds no behaviour to a
 // write (packages/node/src/behaviors/fan-control/FanControlServer.ts:13-19).
 func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
-	var stored bool
-	var err error
+	changed, err := s.MatterWriteCommit(ctx, attrID, value)
+	return len(changed) > 0, err
+}
+
+// MatterWriteCommit implements [contract.ChangeNamingWriter]: the write of
+// [Server.MatterWriteChanged], and the attributes it changed — the written
+// one when it reached the host, and each sibling the coupling rules hand
+// the host with it (PercentSetting, SpeedSetting, FanMode) whose value
+// differs from the one the host's state held before the write; none for
+// the held value. The version advances once for the whole list. Mirrors
+// matter.js: a commit names a property only when its value differs and
+// advances once (packages/node/src/behavior/state/managed/Datasource.ts:1476-1481,
+// :1456-1457, the list handed on at :1319, at db021da0); the sibling
+// movement itself is connectedhomeip's (percentSettings, speedSettings;
+// F-db021da0-57).
+func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any) ([]uint32, error) {
+	before := s.src.FanState()
+	var (
+		set    settings
+		stored bool
+		err    error
+	)
 	if attrID == AttrFanMode {
-		stored, err = s.writeFanMode(ctx, value)
+		set, stored, err = s.writeFanMode(ctx, value)
 	} else {
-		stored, err = s.writeChecked(ctx, attrID, value)
+		set, stored, err = s.writeChecked(ctx, attrID, value)
 	}
 	if err != nil || !stored {
-		return false, err
+		return nil, err
 	}
+	changed := []uint32{attrID}
+	name := func(id uint32, moved bool) {
+		if moved && id != attrID {
+			changed = append(changed, id)
+		}
+	}
+	name(AttrFanMode, set.FanMode != nil && *set.FanMode != before.FanMode)
+	name(AttrPercentSetting, set.PercentSetting != nil && !set.PercentSetting.equals(before.PercentSetting))
+	name(AttrSpeedSetting, set.SpeedSetting != nil && !set.SpeedSetting.equals(before.SpeedSetting))
 	s.tracker().Bump()
-	return true, nil
+	return changed, nil
+}
+
+// equals reports whether the resolved setting is the held value (nil for
+// null).
+func (v *setting) equals(held *uint8) bool {
+	if v.Null || held == nil {
+		return v.Null == (held == nil)
+	}
+	return v.Value == *held
 }
 
 // writeChecked applies a write the definition has checked; stored reports
-// whether it reached the host — a value equal to the held one does not.
-func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (stored bool, err error) {
+// whether it reached the host — a value equal to the held one does not —
+// and set what a PercentSetting or SpeedSetting write handed it.
+func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (set settings, stored bool, err error) {
 	v, err := s.inst.ValidateWrite(attrID, value, s.peer)
 	if err != nil {
-		return false, err
+		return settings{}, false, err
 	}
 	// The host's veto hears a change only: each case below compares with
 	// the held value first ([spec.WriteVeto.Check]).
@@ -540,43 +579,47 @@ func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) (st
 	switch attrID {
 	case AttrPercentSetting:
 		if !isNum {
-			return false, nil // null: "the attribute value shall NOT change" (resource :86-87)
+			return settings{}, false, nil // null: "the attribute value shall NOT change" (resource :86-87)
 		}
 		if held := s.src.FanState().PercentSetting; held != nil && uint64(*held) == n {
-			return false, nil
+			return settings{}, false, nil
 		}
 		if err := veto(); err != nil {
-			return false, err
+			return settings{}, false, err
 		}
-		return true, s.apply(ctx, "PercentSetting write", s.percentSettings(uint8(n))) //nolint:gosec // ≤ 100 per ValidateWrite
+		set = s.percentSettings(uint8(n)) //nolint:gosec // ≤ 100 per ValidateWrite
+		return set, true, s.apply(ctx, "PercentSetting write", set)
 	case AttrSpeedSetting:
 		if !isNum {
-			return false, nil // null, as PercentSetting
+			return settings{}, false, nil // null, as PercentSetting
 		}
 		if held := s.src.FanState().SpeedSetting; held != nil && uint64(*held) == n {
-			return false, nil
+			return settings{}, false, nil
 		}
 		if err := veto(); err != nil {
-			return false, err
+			return settings{}, false, err
 		}
-		return true, s.apply(ctx, "SpeedSetting write", s.speedSettings(uint8(n))) //nolint:gosec // ≤ SpeedMax per ValidateWrite
+		set = s.speedSettings(uint8(n)) //nolint:gosec // ≤ SpeedMax per ValidateWrite
+		return set, true, s.apply(ctx, "SpeedSetting write", set)
 	case AttrRockSetting:
-		return s.writeRockSetting(ctx, RockBitmap(n), veto) //nolint:gosec // a map8 per ValidateWrite
+		stored, err = s.writeRockSetting(ctx, RockBitmap(n), veto) //nolint:gosec // a map8 per ValidateWrite
+		return settings{}, stored, err
 	case AttrWindSetting:
-		return s.writeWindSetting(ctx, WindBitmap(n), veto) //nolint:gosec // a map8 per ValidateWrite
+		stored, err = s.writeWindSetting(ctx, WindBitmap(n), veto) //nolint:gosec // a map8 per ValidateWrite
+		return settings{}, stored, err
 	default: // AttrAirflowDirection, the last writable attribute
 		dir := AirflowDirection(n) //nolint:gosec // an enum8 per ValidateWrite
 		if s.src.FanState().AirflowDirection == dir {
-			return false, nil
+			return settings{}, false, nil
 		}
 		if err := veto(); err != nil {
-			return false, err
+			return settings{}, false, err
 		}
 		setter, _ := s.src.(airflowSetter) // guaranteed by NewServer
 		if err := setter.SetAirflowDirection(ctx, dir); err != nil {
-			return false, fmt.Errorf("fan: AirflowDirection write: %w", err)
+			return settings{}, false, fmt.Errorf("fan: AirflowDirection write: %w", err)
 		}
-		return true, nil
+		return settings{}, true, nil
 	}
 }
 
@@ -699,19 +742,21 @@ func (s *Server) apply(ctx context.Context, what string, set settings) error {
 }
 
 // writeFanMode applies a FanMode write; stored reports whether it reached
-// the host — the FanMode the host holds, written again, does not.
-func (s *Server) writeFanMode(ctx context.Context, value any) (stored bool, err error) {
+// the host — the FanMode the host holds, written again, does not — and
+// set what it handed the host.
+func (s *Server) writeFanMode(ctx context.Context, value any) (set settings, stored bool, err error) {
 	m, err := s.resolveFanMode(value)
 	if err != nil {
-		return false, err
+		return settings{}, false, err
 	}
 	if s.src.FanState().FanMode == m {
-		return false, nil
+		return settings{}, false, nil
 	}
 	if err := s.veto.Check(ctx, AttrFanMode, spec.Stored(fandef.Definition.Attribute(AttrFanMode).Type, m)); err != nil {
-		return false, err
+		return settings{}, false, err
 	}
-	return true, s.apply(ctx, "FanMode write", s.fanModeSettings(m))
+	set = s.fanModeSettings(m)
+	return set, true, s.apply(ctx, "FanMode write", set)
 }
 
 // writeRockSetting: "Each bit shall only be set to 1, if the

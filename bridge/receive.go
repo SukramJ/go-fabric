@@ -217,7 +217,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// carries the piggyback grace window, behind which a duplicate
 	// ack must not hide (the peer would retransmit again meanwhile).
 	// Expedite it to due-now, flush the pump, drop processing.
-	// Mirrors matter.js MessageExchange.ts:428-433 (duplicate +
+	// Mirrors matter.js MessageExchange.ts:501-511 at db021da0 (duplicate +
 	// requiresAck → sendStandaloneAckForMessage without delay).
 	if duplicate {
 		b.expediteDuplicateAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
@@ -273,9 +273,9 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// vendor-specific protocol the bridge does not implement — even if its
 	// low 16-bit protocol id collides with IM/SC. matter.js keys dispatch on
 	// the full 32-bit id (vendorId*0x10000 + protocolId,
-	// MessageCodec.ts:377), so a vendor-qualified protocol never routes into
-	// the common handlers; reject it before the switch rather than feeding a
-	// forged frame into the PASE/IM machinery.
+	// MessageCodec.ts:466-467 at db021da0), so a vendor-qualified protocol
+	// never routes into the common handlers; reject it before the switch
+	// rather than feeding a forged frame into the PASE/IM machinery.
 	if proto.HasVendorID && proto.VendorID != 0 {
 		err := fmt.Errorf("%w: vendor=0x%04X protocol=0x%04X", ErrUnknownProtocol, proto.VendorID, proto.ProtocolID)
 		b.logger.Debug("matter.rx.vendor_protocol",
@@ -660,8 +660,9 @@ func (b *Bridge) decryptIfNeeded(hdr *message.Header, body []byte) (plaintext []
 	// and authenticated — MRP retransmits (duplicate=true) included —
 	// refreshes the session's Rx activity so the idle reaper never
 	// evicts a session whose peer is demonstrably alive. Mirrors
-	// matter.js packages/protocol/src/protocol/MessageExchange.ts:429,
-	// where #notifyActivity(true) fires before the duplicate branch.
+	// matter.js packages/protocol/src/protocol/ExchangeManager.ts:362-364 at
+	// db021da0, where session.notifyActivity(true) runs after the duplicate
+	// check, for a duplicate too.
 	b.notifySessionActivity(hdr.SessionID, true)
 	return plain, duplicate, nil
 }
@@ -935,18 +936,22 @@ func (b *Bridge) NotifyEndpointReachable(endpointID uint16, reachable bool) bool
 
 // NotifyEndpointNodeLabel sets the BridgedDeviceBasicInformation NodeLabel
 // of the bridged endpoint with id endpointID to label — the host's rename,
-// stored and persisted as a controller's write is
+// stored before it is served as a controller's write is
 // (endpoint.Endpoint.SetNodeLabel) — bumps the cluster's DataVersion and
 // marks the attribute dirty, so a subscribed controller reads the new
-// name. It reports false when no bridged endpoint has the id.
-func (b *Bridge) NotifyEndpointNodeLabel(endpointID uint16, label string) bool {
+// name. It reports false when no bridged endpoint has the id; a refused
+// store serves nothing, reports nothing and is returned
+// (R2-P5-apidev-16, decision 226).
+func (b *Bridge) NotifyEndpointNodeLabel(endpointID uint16, label string) (bool, error) {
 	ep := b.bridgedEndpoint(endpointID)
 	if ep == nil {
-		return false
+		return false, nil
 	}
-	ep.SetNodeLabel(label)
+	if err := ep.SetNodeLabel(label); err != nil {
+		return true, err
+	}
 	b.nodeLabelChanged(ep)
-	return true
+	return true, nil
 }
 
 // NotifyEndpointHostName gives the bridged endpoint with id endpointID the

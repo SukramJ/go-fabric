@@ -3,7 +3,10 @@
 
 package main
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // The declaration (concept v6 A.3 step 2, brief BU): server_gen.go ends
 // with Declare, the one form in which a host states a cluster of a device —
@@ -84,7 +87,8 @@ var modeChanger = portSet{ports: []portDecl{{
 		"ModeChanger moves the device to a supported mode other than the",
 		"current one: status 0 (Success) makes newMode the CurrentMode, any",
 		"other ModeChangeStatus is the response's with text for the user; an",
-		"error answers FAILURE. The kit's ModeBase server runs on it",
+		"error answers its status, FAILURE without one. The kit's ModeBase",
+		"server runs on it",
 		"(cluster/modebase).",
 	},
 	methods: []string{"ChangeToMode(ctx context.Context, newMode uint8) (status uint8, text string, err error)"},
@@ -100,7 +104,8 @@ var ports = map[string]portSet{
 		doc: []string{
 			"Sink switches the device: the kit's OnOff server calls it before it",
 			"stores a change of OnOff a command makes, and an error leaves the",
-			"state and answers FAILURE (cluster/onoff Sink).",
+			"state and answers its status, FAILURE without one (cluster/onoff",
+			"Sink).",
 		},
 		methods: []string{"SetOnOff(ctx context.Context, on bool) error"},
 	}}},
@@ -255,15 +260,32 @@ var ports = map[string]portSet{
 	}}},
 	"DoorLock": {ports: []portDecl{{
 		name: "StateSource",
+		// The one declaration of the port: cluster/lock aliases it
+		// (R2-P6-api-2751, owner decision 224), so this doc carries the
+		// whole contract.
 		doc: []string{
 			"StateSource is the lock's actuator: it reports whether the bolt is",
-			"jammed and locked, and LockInvoke runs a LockDoor or UnlockDoor",
-			"(cmdID) the kit's DoorLock server admitted (cluster/lock",
-			"StateSource). The server reads LockState from it at every read and",
-			"stores none: IsJammed true is NotFullyLocked, IsLocked's observed",
-			"false (the lock's state is not known) is a null LockState, else",
-			"locked is Locked or Unlocked; after LockInvoke the next read asks",
-			"IsLocked again. Without one the server keeps its own lock state.",
+			"jammed and locked, and LockInvoke runs a lock operation the kit's",
+			"DoorLock server admitted (cluster/lock StateSource). The server",
+			"reads LockState from it at every read and stores none: IsJammed",
+			"true is NotFullyLocked, IsLocked's observed false (the lock's state",
+			"is not known) is a null LockState, else locked is Locked or",
+			"Unlocked; after LockInvoke the next read asks IsLocked again.",
+			"Without one the server keeps its own lock state.",
+			"",
+			"cmdID is [CmdLockDoor], [CmdUnlockDoor] or [CmdUnboltDoor];",
+			"UnlockWithTimeout and an auto-relock arrive as UnlockDoor and",
+			"LockDoor. LockInvoke is not called for a request without an",
+			"accessing fabric or one the authorization refuses, and a source",
+			"that also implements cluster/lock's LockOperationHandler is called",
+			"through HandleLockOperation instead. A returned error fails the",
+			"command: the server emits LockOperationError (the reason a",
+			"cluster/lock LockOperationFailedError names, Unspecified",
+			"otherwise), and the error answers its status, FAILURE without one.",
+			"The implementation owns the southbound urgency of the write it",
+			"performs: the cluster contract carries no priority, so a host",
+			"whose command queue ranks by urgency names the value it wants",
+			"inside LockInvoke.",
 		},
 		methods: []string{
 			"IsJammed() bool",
@@ -306,8 +328,8 @@ var ports = map[string]portSet{
 				"Sink applies a SystemMode write, a setpoint change (a write or",
 				"a SetpointRaiseLower) with the companions that move with it,",
 				"and a TemperatureSetpointHold write, each one the kit's",
-				"Thermostat server admitted; an error answers FAILURE and",
-				"stores nothing (cluster/thermo Sink).",
+				"Thermostat server admitted; an error answers its status,",
+				"FAILURE without one, and stores nothing (cluster/thermo Sink).",
 			},
 			methods: []string{
 				"SetSystemMode(ctx context.Context, mode uint8) error",
@@ -360,9 +382,10 @@ var ports = map[string]portSet{
 			"one and RemoveNetwork drops one; LoadPreferred returns the saved",
 			"PreferredExtendedPanID (ok false when none was saved) and",
 			"SavePreferred stores it (nil or empty for null). An error answers",
-			"the command or write FAILURE and changes nothing. Without one the",
-			"kit's server keeps both in memory (cluster/netinfra",
-			"ThreadNetworkStore).",
+			"the command or write with its status, FAILURE without one",
+			"(RESOURCE_EXHAUSTED for a SaveNetwork refused with",
+			"netinfra.ErrStoreFull), and changes nothing. Without one the kit's",
+			"server keeps both in memory (cluster/netinfra ThreadNetworkStore).",
 		},
 		methods: []string{
 			"Capacity() uint8",
@@ -555,4 +578,34 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	}
 	w.p("\treturn errors.Join(errs...)")
 	w.p("}")
+}
+
+// mergePorts adds the port sets of table (declared in file) into dst; a
+// cluster dst already holds is a panic at start — two tables naming one
+// cluster would otherwise leave the later file's entry silently
+// (R2-P6-err-2716).
+func mergePorts(dst, table map[string]portSet, file string) {
+	for name, ps := range table {
+		if _, dup := dst[name]; dup {
+			panic(fmt.Sprintf("clustergen: %s declares the ports of %s, which another table already declares", file, name))
+		}
+		dst[name] = ps
+	}
+}
+
+// addPorts adds one cluster's port set to dst, refusing a cluster dst
+// already holds as mergePorts does.
+func addPorts(dst map[string]portSet, name string, ps portSet) {
+	mergePorts(dst, map[string]portSet{name: ps}, "an init")
+}
+
+// mergeHosts adds the host declarations of table (declared in file) into
+// dst, refusing a cluster dst already holds as mergePorts does.
+func mergeHosts(dst, table map[string]hostDecl, file string) {
+	for name, h := range table {
+		if _, dup := dst[name]; dup {
+			panic(fmt.Sprintf("clustergen: %s declares the host of %s, which another table already declares", file, name))
+		}
+		dst[name] = h
+	}
 }

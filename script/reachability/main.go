@@ -24,13 +24,26 @@
 // supposed to detect.
 //
 // So the root set here is the module's TEST entry points: every Test*, Benchmark*,
-// Fuzz* and Example* function in a test package. The question that answers is
+// Fuzz* and Example* function in a test package, and the package initializer of
+// every test package that holds one — a test binary runs it before any test, and
+// through it the initializer of every package it links, so code reached from a
+// package-level var's initializer or an init function is measured, not exempted
+// (R2-P6-test-2805). The question that answers is
 //
 //	which exported API does no test reach?
 //
 // which is the meaningful one for a module whose entire purpose is to be consumed
 // from outside: untested exported surface is exactly the surface a host consumer
 // can break without this module noticing.
+//
+// The population is every exported package-level identifier and every exported
+// method of an exported defined type (listed as "Type.Method"; R2-P6-test-2806):
+// a host calls methods at least as often as functions. A method of an interface
+// type is a declaration, not code, and is not listed; nor is a method promoted
+// from an embedded type, which is listed on the type that declares it. A
+// method counts as reached when a test's call path calls it or takes its value
+// ([calledFrom]); RTA's own verdict would count every exported method of a type
+// that reaches an interface value, since reflection might call it.
 //
 // "Reached" means referenced from a test's call graph, not tested: one test
 // that merely names an identifier — passes a sentinel to errors.Is, takes a
@@ -86,7 +99,11 @@
 // A small set of identifiers is whitelisted automatically: declarations in
 // _test.go files, identifiers whose name begins with mock/fake/stub/dummy, and
 // type aliases (every use of an alias resolves to the aliased type, so RTA can
-// never observe the alias itself as reachable). Nothing else. The reference
+// never observe the alias itself as reachable). Nothing else. Every annotation
+// and the name-pattern rule are held on an exact ratchet per class
+// (TestReachabilityWhitelistOnItsRatchet, R2-P6-test-2804): an annotation takes an
+// identifier out of the unreached count, so adding one is a decision the commit
+// that raises the ratchet states. The reference
 // daemon carries a long list of path-keyed auto-whitelist rules for its
 // reflectively mounted REST handlers and registry-dispatched device profiles;
 // none of those constructs exist here, and a rule that can never fire is dead
@@ -141,7 +158,7 @@ type UnreachableEntry struct {
 	Identifier string `json:"identifier"`
 	File       string `json:"file"`
 	Line       int    `json:"line"`
-	Kind       string `json:"kind"` // "func", "type", "var", "unknown"
+	Kind       string `json:"kind"` // "func", "method", "type", "var", "unknown"
 }
 
 // PackageSummary aggregates the unreachable counts of one package.
@@ -164,6 +181,7 @@ type Summary struct {
 type Inventory struct {
 	RootSet      string             `json:"root_set"`
 	EntryPoints  int                `json:"entry_points"`
+	Initializers int                `json:"initializers"`
 	EntryPkgs    []string           `json:"entry_packages"`
 	Summary      Summary            `json:"summary"`
 	ByPackage    []PackageSummary   `json:"by_package"`
@@ -190,6 +208,7 @@ const (
 // rootSetDescription is copied into the inventory so a reader of the JSON alone
 // knows what the numbers were measured against.
 const rootSetDescription = "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package " +
+	"and the package initializer of each such package " +
 	"(this module is a library; its example programs are one host's composition, not a production root set)"
 
 // errNoProductionRoots is returned for -production-only. It is an error rather
@@ -248,7 +267,9 @@ func run(logger *slog.Logger, repoRoot, outPath, summaryPath string) error {
 	logger.Info("SSA built", "packages", len(ssaPkgs))
 
 	entryFuncs, entryPkgs := collectTestRoots(prog, ssaPkgs)
-	logger.Info("entry points collected", "count", len(entryFuncs), "tested_packages", len(entryPkgs))
+	inits := collectInitializers(entryFuncs)
+	logger.Info("entry points collected", "count", len(entryFuncs), "tested_packages", len(entryPkgs),
+		"initializers", len(inits))
 	if len(entryFuncs) == 0 {
 		// A silent empty root set is the one failure mode this port exists to
 		// avoid: RTA over no roots reaches nothing, so every exported
@@ -259,10 +280,11 @@ func run(logger *slog.Logger, repoRoot, outPath, summaryPath string) error {
 	}
 
 	logger.Info("running RTA")
-	rtaResult := rta.Analyze(entryFuncs, true)
+	rtaResult := rta.Analyze(append(append([]*ssa.Function(nil), entryFuncs...), inits...), true)
 	logger.Info("RTA complete")
 
 	reachableFuncs := unifyReachableVariants(rtaResult, ssaPkgs)
+	called := calledFrom(rtaResult, append(append([]*ssa.Function(nil), entryFuncs...), inits...))
 	refs := buildReferenceIndex(reachableFuncs)
 	logger.Info("reachable code indexed",
 		"functions", len(reachableFuncs), "named_types", len(refs.namedTypes), "globals", len(refs.globals))
@@ -271,9 +293,10 @@ func run(logger *slog.Logger, repoRoot, outPath, summaryPath string) error {
 	collectWhitelisted(pkgs, absRoot, whitelisted, logger)
 	logger.Info("annotation whitelist loaded", "entries", len(whitelisted))
 
-	inv := classify(prog, ssaPkgs, absRoot, reachableFuncs, refs, whitelisted)
+	inv := classify(prog, ssaPkgs, absRoot, reachableFuncs, called, refs, whitelisted)
 	inv.RootSet = rootSetDescription
 	inv.EntryPoints = len(entryFuncs)
+	inv.Initializers = len(inits)
 	inv.EntryPkgs = entryPkgs
 
 	if err := writeInventory(absRoot, outPath, inv); err != nil {
@@ -393,6 +416,79 @@ func isTestRootName(name string) bool {
 		strings.HasPrefix(name, "Example")
 }
 
+// calledFrom is the set of functions a call path from the roots calls or takes
+// the value of, keyed by RelString so that every SSA package variant of one
+// function shares the verdict (and a generic function's instance reaches its
+// origin). It walks RTA's call graph — static, interface and dynamic call edges
+// — and adds every function an operand of a reached function names (a method
+// value's bound wrapper, a function value).
+//
+// It is what a method's verdict rests on (R2-P6-test-2806), not RTA's Reachable:
+// RTA counts every exported method of every runtime type as reachable, since
+// reflection may call it (golang.org/x/tools/go/callgraph/rta, rta.go:30-32), so
+// a method would read as reached once its type reached an interface value —
+// a test that only prints a value would reach every exported method of its type.
+func calledFrom(res *rta.Result, roots []*ssa.Function) map[string]bool {
+	seen := make(map[*ssa.Function]bool)
+	queue := append([]*ssa.Function(nil), roots...)
+	for len(queue) > 0 {
+		fn := queue[len(queue)-1]
+		queue = queue[:len(queue)-1]
+		if fn == nil || seen[fn] {
+			continue
+		}
+		seen[fn] = true
+		if n := res.CallGraph.Nodes[fn]; n != nil {
+			for _, e := range n.Out {
+				queue = append(queue, e.Callee.Func)
+			}
+		}
+		for _, b := range fn.Blocks {
+			for _, instr := range b.Instrs {
+				for _, op := range instr.Operands(nil) {
+					if op == nil || *op == nil {
+						continue
+					}
+					if g, ok := (*op).(*ssa.Function); ok {
+						queue = append(queue, g)
+					}
+				}
+			}
+		}
+		queue = append(queue, fn.AnonFuncs...)
+	}
+	called := make(map[string]bool, len(seen))
+	for fn := range seen {
+		called[fn.RelString(nil)] = true
+		if o := fn.Origin(); o != nil {
+			called[o.RelString(nil)] = true
+		}
+	}
+	return called
+}
+
+// collectInitializers returns the package initializer of every SSA package that
+// holds a test root: `go test` runs it before the first test, and SSA's
+// synthesized init calls the initializer of every package it imports, so RTA
+// follows it into each package-level var initializer and init function the test
+// binary runs (R2-P6-test-2805). Seeding the init of every loaded package instead
+// would count code no test binary links as reached.
+func collectInitializers(roots []*ssa.Function) []*ssa.Function {
+	seen := make(map[*ssa.Package]bool)
+	var inits []*ssa.Function
+	for _, fn := range roots {
+		p := fn.Pkg
+		if p == nil || seen[p] {
+			continue
+		}
+		seen[p] = true
+		if init := p.Func("init"); init != nil {
+			inits = append(inits, init)
+		}
+	}
+	return inits
+}
+
 // unifyReachableVariants folds RTA's per-object answer across the SSA package
 // variants go/packages produces.
 //
@@ -455,6 +551,7 @@ func classify(
 	ssaPkgs []*ssa.Package,
 	absRoot string,
 	reachableFuncs map[*ssa.Function]bool,
+	called map[string]bool,
 	refs *referenceIndex,
 	whitelisted map[identKey]WhitelistEntry,
 ) Inventory {
@@ -476,6 +573,13 @@ func classify(
 		for name, member := range p.Members {
 			if !ast.IsExported(name) {
 				continue
+			}
+			for _, m := range exportedMethods(member) {
+				mname := name + "." + m.Name()
+				fn := prog.FuncValue(m)
+				reached := fn != nil && called[fn.RelString(nil)]
+				disagreements += classifyOne(classes, &order, &totalExported, whitelisted,
+					identKey{pkg: relPkg, name: mname}, prog.Fset.Position(m.Pos()), absRoot, "method", nil, reached)
 			}
 			key := identKey{pkg: relPkg, name: name}
 			cls := classes[key]
@@ -527,6 +631,90 @@ func classify(
 	}
 
 	return foldClasses(order, classes, totalExported, disagreements)
+}
+
+// exportedMethods returns the exported methods an exported defined type
+// declares, on the value or the pointer receiver: none for an alias (its
+// methods are the aliased type's, listed there), an interface (a method set
+// declaration, no code) or a non-type member. A method promoted from an
+// embedded type is not declared here and is listed on the type that declares it.
+func exportedMethods(member ssa.Member) []*types.Func {
+	t, ok := member.(*ssa.Type)
+	if !ok {
+		return nil
+	}
+	tn, ok := t.Object().(*types.TypeName)
+	if !ok || tn.IsAlias() {
+		return nil
+	}
+	named, ok := tn.Type().(*types.Named)
+	if !ok || types.IsInterface(named) {
+		return nil
+	}
+	var out []*types.Func
+	for m := range named.Methods() {
+		if m.Exported() {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// classifyOne folds one variant's verdict on an exported method into its
+// identifier's class, with the precedence classify applies to members:
+// whitelisted (by the declaring file, the name pattern or an annotation keyed
+// "Type.Method"), then reachable in any variant, then unreachable. It returns
+// the disagreements it saw.
+func classifyOne(
+	classes map[identKey]*identClass,
+	order *[]identKey,
+	totalExported *int,
+	whitelisted map[identKey]WhitelistEntry,
+	key identKey,
+	pos token.Position,
+	absRoot, kind string,
+	member ssa.Member,
+	reached bool,
+) int {
+	cls := classes[key]
+	if cls == nil {
+		cls = &identClass{}
+		classes[key] = cls
+		*order = append(*order, key)
+		*totalExported++
+	}
+	relFile := strings.TrimPrefix(pos.Filename, absRoot+string(filepath.Separator))
+	if reason, ok := autoWhitelist(member, relFile, key.name); ok {
+		if cls.whitelisted == nil {
+			cls.whitelisted = &WhitelistEntry{
+				Package: key.pkg, Identifier: key.name,
+				Reason: string(reason), File: relFile, Line: pos.Line,
+			}
+		}
+		return 0
+	}
+	if entry, ok := whitelisted[key]; ok {
+		if cls.whitelisted == nil {
+			e := entry
+			cls.whitelisted = &e
+		}
+		return 0
+	}
+	switch {
+	case reached:
+		cls.reachable = true
+		if cls.unreachable != nil {
+			return 1
+		}
+	case cls.reachable:
+		return 1
+	case cls.unreachable == nil:
+		cls.unreachable = &UnreachableEntry{
+			Package: key.pkg, Identifier: key.name,
+			File: relFile, Line: pos.Line, Kind: kind,
+		}
+	}
+	return 0
 }
 
 // foldClasses turns the per-identifier verdicts into the inventory document,
@@ -592,7 +780,7 @@ func autoWhitelist(member ssa.Member, relFile, identifier string) (autoWhitelist
 	// A type alias re-exports another type under a local name. Every use
 	// resolves to the aliased type, so RTA can never observe the alias itself
 	// as reachable — listing them would be pure noise.
-	if t, isType := member.(*ssa.Type); isType {
+	if t, isType := member.(*ssa.Type); isType && t != nil {
 		if tn, isName := t.Object().(*types.TypeName); isName && tn.IsAlias() {
 			return autoWhitelistTypeAlias, true
 		}
@@ -794,7 +982,7 @@ func buildPackageSummary(items []UnreachableEntry) []PackageSummary {
 			m[item.Package] = ps
 		}
 		switch item.Kind {
-		case "func":
+		case "func", "method":
 			ps.UnreachableFuncs++
 		case "type":
 			ps.UnreachableTypes++
@@ -863,12 +1051,12 @@ func writeInventory(absRoot, outPath string, inv Inventory) error {
 	if err != nil {
 		return fmt.Errorf("create output file: %w", err)
 	}
-	defer func() { _ = f.Close() }()
-
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(inv); err != nil {
-		return fmt.Errorf("encode inventory: %w", err)
+	// A failed close is a failed write (R2-P6-err-2855): the file may be
+	// truncated, and the run must not exit 0 over it.
+	if err := errors.Join(enc.Encode(inv), f.Close()); err != nil {
+		return fmt.Errorf("write inventory: %w", err)
 	}
 	fmt.Printf("inventory.json written: %s\n", absOut)
 	return nil
@@ -878,6 +1066,7 @@ func writeInventory(absRoot, outPath string, inv Inventory) error {
 func printReport(inv Inventory) {
 	fmt.Printf("  root_set:       %s\n", inv.RootSet)
 	fmt.Printf("  entry_points:   %d\n", inv.EntryPoints)
+	fmt.Printf("  initializers:   %d\n", inv.Initializers)
 	fmt.Printf("  total_exported: %d\n", inv.Summary.TotalExported)
 	fmt.Printf("  reachable:      %d\n", inv.Summary.Reachable)
 	fmt.Printf("  whitelisted:    %d\n", inv.Summary.Whitelisted)
@@ -902,7 +1091,7 @@ func printReport(inv Inventory) {
 const summaryTemplate = `# Exported-API reachability summary
 
 Root set: {{.RootSet}}
-Entry points: {{.EntryPoints}} across {{len .EntryPkgs}} test packages.
+Entry points: {{.EntryPoints}} across {{len .EntryPkgs}} test packages, and {{.Initializers}} package initializers.
 
 ## Overview
 
@@ -921,7 +1110,7 @@ Entry points: {{.EntryPoints}} across {{len .EntryPkgs}} test packages.
 | {{.Package}} | {{.UnreachableFuncs}} | {{.UnreachableTypes}} | {{.UnreachableOther}} |
 {{- end}}
 
-## First 50 unreached functions
+## First 50 unreached functions and methods
 
 | Package | Identifier | File | Line |
 |---|---|---|---|
@@ -943,6 +1132,7 @@ func writeSummaryMD(path string, inv Inventory) error {
 	type templateData struct {
 		RootSet       string
 		EntryPoints   int
+		Initializers  int
 		EntryPkgs     []string
 		Summary       Summary
 		Top20Packages []PackageSummary
@@ -956,7 +1146,7 @@ func writeSummaryMD(path string, inv Inventory) error {
 	}
 	var funcs []UnreachableEntry
 	for _, item := range inv.Unreachable {
-		if item.Kind != "func" {
+		if item.Kind != "func" && item.Kind != "method" {
 			continue
 		}
 		funcs = append(funcs, item)
@@ -976,14 +1166,13 @@ func writeSummaryMD(path string, inv Inventory) error {
 	if err != nil {
 		return fmt.Errorf("create summary file: %w", err)
 	}
-	defer func() { _ = f.Close() }()
-
-	return tmpl.Execute(f, templateData{
+	// Close's error is the write's (R2-P6-err-2855), as in writeInventory.
+	return errors.Join(tmpl.Execute(f, templateData{
 		RootSet:     inv.RootSet,
-		EntryPoints: inv.EntryPoints, EntryPkgs: inv.EntryPkgs,
+		EntryPoints: inv.EntryPoints, Initializers: inv.Initializers, EntryPkgs: inv.EntryPkgs,
 		Summary: inv.Summary, Top20Packages: top20,
 		Top50Funcs: funcs, ByPackage: inv.ByPackage,
-	})
+	}), f.Close())
 }
 
 // isTestPkg reports whether an SSA package is one of go/packages' test variants.
@@ -1048,9 +1237,23 @@ func recordWhitelistDecl(
 	}
 	switch d := decl.(type) {
 	case *ast.FuncDecl:
-		if d.Name != nil {
-			add(d.Name.Name, fset.Position(d.Pos()).Line)
+		if d.Name == nil {
+			return
 		}
+		// A method is keyed "Type.Method", as classify lists it; keyed
+		// by its bare name it would whitelist a function of that name.
+		if d.Recv != nil && len(d.Recv.List) > 0 {
+			recv := receiverTypeName(d.Recv.List[0].Type)
+			if recv == "" || !ast.IsExported(recv) || !ast.IsExported(d.Name.Name) {
+				return
+			}
+			out[identKey{pkg: relPkg, name: recv + "." + d.Name.Name}] = WhitelistEntry{
+				Package: relPkg, Identifier: recv + "." + d.Name.Name, Reason: reason,
+				File: relFile, Line: fset.Position(d.Pos()).Line,
+			}
+			return
+		}
+		add(d.Name.Name, fset.Position(d.Pos()).Line)
 	case *ast.GenDecl:
 		for _, spec := range d.Specs {
 			switch s := spec.(type) {
@@ -1061,6 +1264,27 @@ func recordWhitelistDecl(
 					add(name.Name, fset.Position(s.Pos()).Line)
 				}
 			}
+		}
+	}
+}
+
+// receiverTypeName is the type name of a method's receiver expression: T, *T,
+// T[P] and *T[P, Q] all name T.
+func receiverTypeName(expr ast.Expr) string {
+	for {
+		switch e := expr.(type) {
+		case *ast.StarExpr:
+			expr = e.X
+		case *ast.ParenExpr:
+			expr = e.X
+		case *ast.IndexExpr:
+			expr = e.X
+		case *ast.IndexListExpr:
+			expr = e.X
+		case *ast.Ident:
+			return e.Name
+		default:
+			return ""
 		}
 	}
 }

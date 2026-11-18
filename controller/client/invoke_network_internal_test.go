@@ -12,7 +12,7 @@ import (
 
 // TestRouteInvoke pins the network a command goes out on: "unlimited" when
 // the caller named none — matter.js ClientNodeInteraction.invoke
-// (ClientNodeInteraction.ts:213-216 at 862ad75f), which never applies the
+// (ClientNodeInteraction.ts:213-216 at db021da0), which never applies the
 // await-mode ICD routing of a read or write to an invoke — and the
 // caller's own otherwise.
 func TestRouteInvoke(t *testing.T) {

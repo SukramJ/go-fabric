@@ -369,7 +369,7 @@ const certificatesNOCCATASN1 = "308201cea003020102020101300a06082a8648ce3d040302
 
 // TestCertificatesRecodeParityMatterJS ports "recode root certificate",
 // "recode intermediate certificate" and "recode operational certificate"
-// (CertificatesTest.ts:57-72 at 862ad75f): Rcac/Icac/Noc.fromTlv(…).asSignedTlv()
+// (CertificatesTest.ts:58-73 at db021da0): Rcac/Icac/Noc.fromTlv(…).asSignedTlv()
 // reproduces the fixture TLV of every certificate set — here Decode then
 // [Encode], the DN attributes and the extensions in their arrival order.
 func TestCertificatesRecodeParityMatterJS(t *testing.T) {
@@ -397,11 +397,12 @@ func TestCertificatesRecodeParityMatterJS(t *testing.T) {
 // TestCertificatesRootFabricIDParityMatterJS ports the three "verify
 // operational certificate via ICAC and ROOT with fabricId in root
 // matching / in all matching / in root not matching" cases
-// (CertificatesTest.ts:412-419, :430-449 at 862ad75f; matter.js Noc.ts:116-125):
-// a root that carries a matter-fabric-id binds the NOC to it, and a root
-// whose fabric id differs refuses the chain with "FabricId in NoC
-// certificate does not match the fabricId in the parent certificate".
-// matter.js edits the decoded root's and ICAC's subject in place; the Go
+// (CertificatesTest.ts:438-448, :462-488 at db021da0; matter.js
+// Noc.ts:119-128): a root that carries a matter-fabric-id binds the NOC to
+// it, and a root whose fabric id differs refuses the chain with "FabricId
+// in NoC certificate does not match the fabricId in the parent
+// certificate". matter.js builds new Rcac and Icac objects with the
+// subject changed (CertificatesTest.ts:442-446); the Go
 // verifier takes the root as a decoded certificate
 // ([NewVerifierFromCertificate]) and still verifies the ICAC's signature,
 // so only the root's subject is edited here — the ICAC's own fabric id,

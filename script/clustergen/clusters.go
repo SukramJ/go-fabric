@@ -5,9 +5,8 @@ package main
 
 // committed lists the clusters whose generated definitions and servers
 // are committed under cluster/spec/: each is the definition a server in
-// this module is built on, one the client role reads typed, or one the
-// generated server serves as matter.js's stub behaviour does (the last
-// two groups). With definitionOnly it names every snapshot cluster
+// this module is built on, or one the client role reads typed (the
+// controller/client group). With definitionOnly it names every snapshot cluster
 // (TestEverySnapshotClusterIsCommitted). A server's
 // cluster joins when its server does; the migration list in
 // docs/adr/0013-generated-cluster-definitions.md says which servers are

@@ -47,7 +47,7 @@ func seedPartitions(t *testing.T, path string) (idA, idB uint16) {
 // whenever they return — nothing is collected because a key was absent
 // from an assembly (matter.js keeps every stored number,
 // packages/node/src/storage/server/ServerEndpointStores.ts:33-45 at
-// 862ad75f). It replaces #229's completeness test with v0.13.0.
+// db021da0). It replaces #229's completeness test with v0.13.0.
 func TestPartitionsKeepTheirStoredNumbers(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

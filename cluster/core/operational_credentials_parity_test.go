@@ -714,7 +714,7 @@ func TestParityOpcreds_UpdateNOCFailSafeFabricAndRoot(t *testing.T) {
 // leaving hook runs while the store still holds the fabric, before the
 // removed hook, and not for an index the store does not hold — matter.js
 // Fabric.leave: the leaving event, the flush, then delete
-// (packages/protocol/src/fabric/Fabric.ts:447-457 at 862ad75f).
+// (packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0).
 func TestParityFabricLeave_OpcredsLeavingHookRunsBeforeTheRowsGo(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

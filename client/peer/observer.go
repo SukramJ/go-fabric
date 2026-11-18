@@ -10,9 +10,9 @@ import (
 )
 
 // Observer receives one peer's signals — what matter.js's node layer
-// observes on a Peer directly (NetworkClient.ts:81-83 at 0ceb202d): its
-// session set's added and deleted events (Peer.ts:68, :258-260, a
-// BasicSet) and establishmentUnresponsive (Peer.ts:90-92, :197-204). Each
+// observes on a Peer directly (NetworkClient.ts:85-87 at db021da0): its
+// session set's added and deleted events (Peer.ts:68, :259-261, a
+// BasicSet) and establishmentUnresponsive (Peer.ts:90-92, :197-205). Each
 // field is optional; the set-wide [Context] hooks stay as they are.
 type Observer struct {
 	// SessionAdded is called when the peer takes a session.
@@ -23,9 +23,9 @@ type Observer struct {
 	// attempt retransmitted past the MRP budget.
 	EstablishmentUnresponsive func()
 	// Updated is called after the peer's descriptor was saved — matter.js
-	// Peer.updated, emitted by #save (Peer.ts:190-195, :575-579 at
-	// 0ceb202d), which CommissioningClient observes per node
-	// (CommissioningClient.ts:711).
+	// Peer.updated, emitted by #save (Peer.ts:190-195, :576-580 at
+	// db021da0), which CommissioningClient observes per node
+	// (CommissioningClient.ts:743).
 	Updated func()
 	// ReachabilityVerified is called once at the end of an address
 	// monitor run that probed the peer ([Peer.VerifyReachability], the

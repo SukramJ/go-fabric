@@ -111,45 +111,139 @@ func TestControllerRecoversFromASilentRestart(t *testing.T) {
 			t.Fatalf("the next read ran on %v, want a new CASE session of the controller's", s)
 		}
 	})
+	// The subscription's two recovery paths, each ordered against the
+	// device's persistence of the subscription, which it records after
+	// the SubscribeResponse (bridge/subscription_persistence.go): without
+	// that order the case took one path or the other by timing
+	// (R2-P6-test-3101, F-db021da0-58, N5b-guard-1).
 	t.Run("subscription", func(t *testing.T) {
 		t.Parallel()
-		site, p, pl, ep := pairWithPlug(t, fabrictest.Options{})
-		ctx := testContext(t)
-		pr := fabrictestseam.Peer(p)
-		old := pr.NewestSession()
-		reports := make(chan *interaction.Report, 64)
-		sub, err := fabrictest.Subscribe(ctx, p, interaction.SubscribeRequest{
-			Attributes: []im.ConcreteAttributePath{onOffPath(ep)}, MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(time.Minute),
-			Updated: func(r *interaction.Report) error { reports <- r; return nil },
-			Sustain: true,
-		})
-		if err != nil {
-			t.Fatalf("Subscribe: %v", err)
-		}
-		defer sub.Close()
-		restartSilently(ctx, t, site, p)
-		if err := p.Device.Act(func(*node.Node) error { pl.srv.Set(true); return nil }); err != nil {
-			t.Fatal(err)
-		}
-		var on bool
-		if err := site.Eventually(ctx, "OnOff true reported after the restart", func() bool {
-			for {
-				select {
-				case r := <-reports:
-					v, ok := r.Value(ep, onoff.ClusterID, onoff.AttrOnOff)
-					on = on || (ok && v.El.Bool)
-				default:
-					return on
-				}
+		// Nothing persisted at the restart: the device has no former
+		// subscription to re-establish, the controller notices the loss
+		// itself, drops the old session and subscribes again on a new
+		// session it opens.
+		t.Run("controller recovers", func(t *testing.T) {
+			t.Parallel()
+			sp := subscribedPair(t)
+			site, p, pl, ep, old, reports := sp.site, sp.p, sp.pl, sp.ep, sp.old, sp.reports
+			ctx := testContext(t)
+			waitPersistedSubscription(ctx, t, site, p)
+			if err := p.Device.Act(func(n *node.Node) error {
+				return n.Store().ClearServerSubscriptions(ctx)
+			}); err != nil {
+				t.Fatal(err)
 			}
-		}); err != nil {
-			t.Fatal(err)
-		}
-		if !old.IsPeerLost() {
-			t.Fatal("the session the device lost was not dropped")
-		}
-		if s := pr.NewestSession(); s == nil || s == old {
-			t.Fatalf("the subscription reported on %v, want a new session", s)
-		}
+			restartSilently(ctx, t, site, p)
+			waitOnReported(ctx, t, site, p, pl, ep, reports)
+			if !old.IsPeerLost() {
+				t.Fatal("the session the device lost was not dropped")
+			}
+			pr := fabrictestseam.Peer(p)
+			s := pr.NewestSession()
+			if s == nil || s == old {
+				t.Fatalf("the subscription reported on %v, want a new session", s)
+			}
+			if !fabrictestseam.Peers(p.Controller).Initiated(s) {
+				t.Fatal("the new session is not the controller's: the device re-established a subscription it did not persist")
+			}
+		})
+		// The subscription persisted before the restart: the restarted
+		// device re-establishes it (node.go ReestablishFormerSubscriptions)
+		// on a session the device opens, and the report arrives there. The
+		// session from before the restart stays: a session the peer
+		// establishes does not end the controller's older ones
+		// (R2-P6-par-3102, owner decision 239).
+		t.Run("device resumes", func(t *testing.T) {
+			t.Parallel()
+			sp := subscribedPair(t)
+			site, p, pl, ep, old, reports := sp.site, sp.p, sp.pl, sp.ep, sp.old, sp.reports
+			ctx := testContext(t)
+			waitPersistedSubscription(ctx, t, site, p)
+			restartSilently(ctx, t, site, p)
+			waitOnReported(ctx, t, site, p, pl, ep, reports)
+			pr := fabrictestseam.Peer(p)
+			s := pr.NewestSession()
+			if s == nil || s == old {
+				t.Fatalf("the subscription reported on %v, want a new session", s)
+			}
+			if fabrictestseam.Peers(p.Controller).Initiated(s) {
+				t.Fatal("the new session is the controller's, want the one the restarted device opened to re-establish its subscription")
+			}
+			if old.IsPeerLost() || old.IsClosed() {
+				t.Fatalf("the session from before the restart: lost %v, closed %v; want it kept", old.IsPeerLost(), old.IsClosed())
+			}
+		})
 	})
+}
+
+// subscribed is a commissioned pair whose controller holds a sustained
+// subscription to the plug's OnOff, with the session it was made on and
+// the channel its reports arrive on.
+type subscribed struct {
+	site    *fabrictest.Site
+	p       *fabrictest.Pair
+	pl      *plug
+	ep      uint16
+	old     *exchange.Session
+	reports chan *interaction.Report
+}
+
+func subscribedPair(t *testing.T) subscribed {
+	t.Helper()
+	site, p, pl, ep := pairWithPlug(t, fabrictest.Options{})
+	ctx := testContext(t)
+	old := fabrictestseam.Peer(p).NewestSession()
+	if old == nil {
+		t.Fatal("no session after commissioning")
+	}
+	reports := make(chan *interaction.Report, 64)
+	sub, err := fabrictest.Subscribe(ctx, p, interaction.SubscribeRequest{
+		Attributes: []im.ConcreteAttributePath{onOffPath(ep)}, MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(time.Minute),
+		Updated: func(r *interaction.Report) error { reports <- r; return nil },
+		Sustain: true,
+	})
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	t.Cleanup(sub.Close)
+	return subscribed{site: site, p: p, pl: pl, ep: ep, old: old, reports: reports}
+}
+
+// waitPersistedSubscription waits until the device has stored the
+// subscription for re-establishment.
+func waitPersistedSubscription(ctx context.Context, t *testing.T, site *fabrictest.Site, p *fabrictest.Pair) {
+	t.Helper()
+	if err := site.Eventually(ctx, "the device to persist the subscription", func() bool {
+		persisted := false
+		_ = p.Device.Act(func(n *node.Node) error {
+			rows, err := n.Store().LoadServerSubscriptions(ctx)
+			persisted = err == nil && len(rows) > 0
+			return nil
+		})
+		return persisted
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// waitOnReported sets the plug on and waits until a report carried it.
+func waitOnReported(ctx context.Context, t *testing.T, site *fabrictest.Site, p *fabrictest.Pair, pl *plug, ep uint16, reports chan *interaction.Report) {
+	t.Helper()
+	if err := p.Device.Act(func(*node.Node) error { pl.srv.Set(true); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	var on bool
+	if err := site.Eventually(ctx, "OnOff true reported after the restart", func() bool {
+		for {
+			select {
+			case r := <-reports:
+				v, ok := r.Value(ep, onoff.ClusterID, onoff.AttrOnOff)
+				on = on || (ok && v.El.Bool)
+			default:
+				return on
+			}
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
 }

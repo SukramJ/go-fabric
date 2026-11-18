@@ -12,7 +12,7 @@ import (
 )
 
 // TestRequestValidationOverTheWire holds the bridge's DoorLock request
-// decoding to matter.js DoorLockServer.ts:1491-1521 at 862ad75f: a
+// decoding to matter.js DoorLockServer.ts:1491-1521 at db021da0: a
 // request the schema refuses answers INVALID_COMMAND for the commands
 // matter.js remaps, and the Get…Schedule commands answer an index out of
 // range in their response (TC-DRLK-2.7 step 5, TC-DRLK-2.8 step 6c).

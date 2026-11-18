@@ -180,7 +180,7 @@ func nullToNonNullableScalar(def *spec.Cluster, a *spec.Attribute) error {
 // first IS1 when the string as it arrived exceeds the attribute's maximum
 // length: matter.js decodes a write with the attribute's TlvString, which
 // checks `value.length > maxLength` before it slices at the IS1
-// (packages/types/src/tlv/TlvString.ts:57-69 at 862ad75f) and answers the
+// (packages/types/src/tlv/TlvString.ts:57-69 at db021da0) and answers the
 // ValidationOutOfBoundsError CONSTRAINT_ERROR. The value is an
 // [undecodedValue], which the server's write check answers
 // CONSTRAINT_ERROR. Attributes of a cluster no registered definition

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -133,6 +134,14 @@ type Driver struct {
 	// calls counts the scans and joins in flight: Close lets them finish
 	// (a failed join removes its network) before it releases the bus.
 	calls sync.WaitGroup
+	// owed (mu) are networks whose RemoveNetwork failed — a failed join's
+	// own, the one before a successful join — removed by sweep before the
+	// next join and at Close while wpa_supplicant still lists them; joined
+	// (mu) is the network of the last join that ended in Success, the one
+	// a later Success leaves behind even when its CurrentNetwork read
+	// fails (review II, R2-P6-store-2021).
+	owed   map[dbus.ObjectPath]struct{}
+	joined dbus.ObjectPath
 
 	closed    chan struct{}
 	closeOnce sync.Once
@@ -219,6 +228,7 @@ func newDriver(ctx context.Context, b bus, opts Options) (*Driver, error) {
 		bus: b, scanTimeout: opts.ScanTimeout, connectTimeout: opts.ConnectTimeout, log: opts.Logger,
 		register: make(chan *attempt), armScan: make(chan *scanWaiter),
 		closed: make(chan struct{}), loopDone: make(chan struct{}),
+		owed: map[dbus.ObjectPath]struct{}{},
 	}
 	ifname := opts.Interface
 	if ifname == "" {
@@ -249,6 +259,9 @@ func newDriver(ctx context.Context, b bus, opts Options) (*Driver, error) {
 		}
 	}
 	d.iface = path
+	if err := b.Watch(ctx, path); err != nil {
+		return nil, err
+	}
 	if _, err := b.Call(ctx, path, ifaceInterface+".AutoScan", ""); err != nil {
 		d.log.Warn("wpasupplicant: failed to stop auto scan", slog.Any("err", err))
 	}
@@ -614,6 +627,7 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 	ctx, cancel := context.WithTimeout(ctx, d.connectTimeout)
 	defer cancel()
 
+	d.sweep(ctx)
 	ssidAttr := slog.String("ssid", fmt.Sprintf("%q", ssid))
 	network, prev, debugText := d.addNetwork(ctx, ssid, credentials, ssidAttr)
 	if debugText != "" {
@@ -639,7 +653,60 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 		return status, debugText, errorValue
 	}
 	d.removePrevious(ctx, prev)
+	d.mu.Lock()
+	joined := d.joined
+	d.joined = network
+	d.mu.Unlock()
+	if joined != "" && joined != prev && joined != network {
+		// The CurrentNetwork read failed, or another client selected a
+		// network meanwhile: the earlier join's network goes as well.
+		d.removePrevious(ctx, joined)
+	}
 	return status, debugText, errorValue
+}
+
+// owe records a network whose RemoveNetwork failed, for sweep.
+func (d *Driver) owe(network dbus.ObjectPath) {
+	d.mu.Lock()
+	d.owed[network] = struct{}{}
+	d.mu.Unlock()
+}
+
+// sweep removes the networks owed (a RemoveNetwork that failed) that
+// wpa_supplicant still lists in the interface's Networks; one it no longer
+// lists is forgotten, one whose removal fails again stays owed. It runs
+// before a join and at Close, on a context of its own bounded by
+// removeTimeout; a failed read of Networks leaves everything owed.
+func (d *Driver) sweep(ctx context.Context) {
+	d.mu.Lock()
+	owed := make([]dbus.ObjectPath, 0, len(d.owed))
+	for n := range d.owed {
+		owed = append(owed, n)
+	}
+	d.mu.Unlock()
+	if len(owed) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
+	defer cancel()
+	v, err := d.property(ctx, "Networks")
+	if err != nil {
+		d.log.Warn("wpasupplicant: failed to read the networks to remove", slog.String("reason", errName(err)))
+		return
+	}
+	listed, _ := v.Value().([]dbus.ObjectPath)
+	for _, n := range owed {
+		if slices.Contains(listed, n) {
+			if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", n); err != nil {
+				d.log.Warn("wpasupplicant: failed to remove a network left behind", slog.String("path", string(n)), slog.String("reason", errName(err)))
+				continue
+			}
+			d.log.Debug("wpasupplicant: removed a network left behind", slog.String("path", string(n)))
+		}
+		d.mu.Lock()
+		delete(d.owed, n)
+		d.mu.Unlock()
+	}
 }
 
 // listen starts the join's attempt: from here on the interface's State
@@ -693,6 +760,7 @@ func (d *Driver) removeAdded(ctx context.Context, network dbus.ObjectPath) {
 	defer cancel()
 	if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", network); err != nil {
 		d.log.Warn("wpasupplicant: failed to remove the network of a failed join", slog.String("path", string(network)), slog.String("reason", errName(err)))
+		d.owe(network)
 		return
 	}
 	d.log.Debug("wpasupplicant: removed the network of a failed join", slog.String("path", string(network)))
@@ -728,6 +796,7 @@ func (d *Driver) removePrevious(ctx context.Context, prev dbus.ObjectPath) {
 	defer cancel()
 	if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", prev); err != nil {
 		d.log.Warn("wpasupplicant: failed to remove the network of before the join", slog.String("path", string(prev)), slog.String("reason", errName(err)))
+		d.owe(prev)
 		return
 	}
 	d.log.Debug("wpasupplicant: removed network", slog.String("path", string(prev)))
@@ -765,6 +834,12 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 		d.log.Warn("wpasupplicant: failed to add network", ssidAttr, slog.String("reason", errName(err)))
 		return "", "", "add network: " + errName(err)
 	}
+	// A path wpa_supplicant hands out now is this join's network, not one
+	// owed from before: a removal that failed by its answer may have been
+	// carried out, and the path numbered anew (review II, R2-P6-store-2021).
+	d.mu.Lock()
+	delete(d.owed, network)
+	d.mu.Unlock()
 	d.log.Info("wpasupplicant: added network", ssidAttr, slog.String("path", string(network)))
 	return network, prev, ""
 }
@@ -782,6 +857,10 @@ func (d *Driver) await(ctx context.Context, a *attempt, network dbus.ObjectPath,
 				return statusUnknown, "the connect did not complete in time", 0
 			case <-d.closed:
 				return statusUnknown, "the driver is closed", 0
+			case <-d.loopDone:
+				// The bus connection is gone: no State change will come
+				// (review II, R2-P6-fsm-2019).
+				return statusUnknown, debugBusGone, 0
 			case <-a.more:
 			}
 			continue
@@ -937,8 +1016,10 @@ func (d *Driver) Close() error {
 		d.mu.Lock()
 		close(d.closed)
 		d.mu.Unlock()
-		// A join ended by Close removes its network over the bus first.
+		// A join ended by Close removes its network over the bus first,
+		// and the networks still owed go with it.
 		d.calls.Wait()
+		d.sweep(context.Background())
 		d.closeErr = d.bus.Close()
 		<-d.loopDone
 	})

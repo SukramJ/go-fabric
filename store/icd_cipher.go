@@ -21,7 +21,7 @@ import (
 // DoorLock credentials' scheme ([SettingDoorLockCredentialKey],
 // cluster/lock NewCredentialCipher: AES-128-GCM, a random nonce ahead of
 // the sealed data). matter.js keeps the ICD keys as nonvolatile behaviour
-// state in clear (IcdManagementServer.ts:787-791 at 862ad75f); the store
+// state in clear (IcdManagementServer.ts:787-791 at db021da0); the store
 // seals them (ADR 0029). In memory, [ICDRegistration].Key stays clear.
 const SettingICDKey = "icd_management.key" //nolint:gosec // the name of a settings key, not a credential
 

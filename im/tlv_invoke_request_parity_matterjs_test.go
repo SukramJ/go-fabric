@@ -11,7 +11,7 @@ import (
 )
 
 // TestTlvInvokeRequestParityMatterJS mirrors
-// packages/types/test/protocol/TlvInvokeRequestTest.ts:37-84 at 862ad75f
+// packages/types/test/protocol/TlvInvokeRequestTest.ts:37-84 at db021da0
 // on the decode side: an InvokeRequest's DelayReportData in context tag 3
 // decodes with its two uint16 fields, a request without it decodes to none,
 // a missing field reads as 0, and a DelayReportData that is not a structure

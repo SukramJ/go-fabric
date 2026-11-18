@@ -21,7 +21,7 @@ import (
 // The responder's tests run it over a fake transport and the fake clock —
 // matter.js's MdnsServerTest drives MdnsServer through a simulated
 // UdpMulticastServer under MockTime (packages/protocol/test/mdns/
-// MdnsServerTest.ts:42-79 at 862ad75f). No socket, no sleep.
+// MdnsServerTest.ts:50-102 at db021da0). No socket, no sleep.
 
 // sentPacket is one packet the responder sent.
 type sentPacket struct {

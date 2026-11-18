@@ -334,8 +334,8 @@ An update needs a known zone (`NOT_FOUND`), not the manufacturer's
 without a trigger (`NOT_FOUND`, `CONSTRAINT_ERROR`, `INVALID_IN_STATE`).
 
 **A trigger** has an InitialDuration of at least 1, an
-AugmentationDuration of at most and a MaxDuration of at least the
-initial one (`CONSTRAINT_ERROR`). It carries a Sensitivity exactly with
+AugmentationDuration of at most the initial one and a MaxDuration of at
+least it (`CONSTRAINT_ERROR`). It carries a Sensitivity exactly with
 PerZoneSensitivity (`INVALID_COMMAND`), 1 to SensitivityMax
 (`CONSTRAINT_ERROR`). Its zone must exist (`NOT_FOUND`) and, when it is a
 2D zone, be a Motion zone (`CONSTRAINT_ERROR`). A new trigger goes to

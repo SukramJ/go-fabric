@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/controller/ca"
@@ -34,7 +33,8 @@ type FabricConfig struct {
 	// IPK is the 16-byte identity protection key (the epoch key AddNOC
 	// carries); nil draws one from Rand.
 	IPK []byte
-	// Label is the fabric label UpdateFabricLabel sets.
+	// Label is the fabric label UpdateFabricLabel sets: at most
+	// [MaxLabelLength] bytes, else [ErrLabel].
 	Label string
 	// FabricIndex is our index of the fabric; 0 is 1.
 	FabricIndex uint8
@@ -55,8 +55,10 @@ type FabricConfig struct {
 	// crypto.Signer whose private key the store never sees (a key file,
 	// an HSM, a KMS); CASE signs Sigma3 through it. The NOC is issued for
 	// its public key; the stored record holds the NOC, the public key and
-	// a KeyRef ([ca.KeyRefOf]), no private key, and a stored NOC for
-	// another key is replaced by a new one. matter.js has no such seam
+	// a KeyRef ([ca.KeyRefOf]), no private key. A stored NOC for another
+	// key is refused with [ca.ErrConfig] (with [ErrFabricMismatch]) and the
+	// record kept; a stored private key of the signer's key leaves the
+	// record. matter.js has no such seam
 	// (Fabric.ts:50-76 keeps #keyPair).
 	OperationalSigner crypto.Signer
 }
@@ -69,11 +71,15 @@ var ErrFabricMismatch = errors.New("commissioner: stored fabric does not match")
 // Fabric is our side of a fabric the commissioner commissions into:
 // [handshake.Fabric] (our operational identity, the root public key, the
 // verifier) and what the flow needs of matter.js Fabric
-// (packages/protocol/src/fabric/Fabric.ts:60-73 at 0ceb202d): the fabric
-// id, the root node id (caseAdminSubject, ControllerCommissioningFlow.ts:1451),
-// the root vendor id (adminVendorId, :1450, Fabric.ts:256), the identity
-// protection key (:1449), the label (:1494, Fabric.ts:188) and the fabric
-// index (Fabric.ts:522).
+// (packages/protocol/src/fabric/Fabric.ts:61-74 at db021da0): the fabric
+// id, the root node id (caseAdminSubject, ControllerCommissioningFlow.ts:1469),
+// the root vendor id (adminVendorId, :1468, Fabric.ts:257), the identity
+// protection key (:1467), the label (:1512, Fabric.ts:189) and the fabric
+// index (Fabric.ts:545).
+//
+// A Fabric must not be copied after first use: it holds the label's
+// locks. The zero value is usable for [Fabric.SetLabel] and
+// [Fabric.CurrentLabel] (review II, R2-P6-conc-1858).
 type Fabric struct {
 	handshake.Fabric
 	FabricID     uint64
@@ -89,57 +95,78 @@ type Fabric struct {
 	CA *ca.CA
 
 	keyRef string // set: Identity.Signer is FabricConfig.OperationalSigner
-	// labelMu guards Label against SetLabel; store is FabricConfig.Store,
-	// where SetLabel saves.
-	labelMu *sync.RWMutex
-	store   ca.FabricStore
+	// labelMu guards Label against SetLabel; setLabelMu serialises
+	// SetLabel across its save, so CurrentLabel never waits for the store
+	// (review II, R2-P6-conc-1858). store is FabricConfig.Store, where
+	// SetLabel saves.
+	labelMu    sync.RWMutex
+	setLabelMu sync.Mutex
+	store      ca.FabricStore
 }
 
-// MaxLabelLength is the longest fabric label, in characters — matter.js
-// Fabric.setLabel's 32 (packages/protocol/src/fabric/Fabric.ts:193-196 at
-// 862ad75f).
+// MaxLabelLength is the longest fabric label, in bytes of its UTF-8
+// encoding — the bound a device enforces, connectedhomeip's
+// kFabricLabelMaxLengthInBytes (src/credentials/FabricTable.h:48 at
+// 6170af84) and this module's device side. matter.js's Fabric.setLabel
+// counts UTF-16 code units against the same 32
+// (packages/protocol/src/fabric/Fabric.ts:193-196 at db021da0); a label
+// within 32 bytes is within both. The module's choice (review II,
+// R2-P6-par-1854, decision 155).
 const MaxLabelLength = 32
 
-// ErrLabel is a fabric label [Fabric.SetLabel] refuses.
-var ErrLabel = errors.New("commissioner: fabric label must be at most 32 characters long")
+// ErrLabel is a fabric label longer than [MaxLabelLength] bytes: refused
+// by [NewFabric], [FabricAuthority.CreateFabric] and [Fabric.SetLabel],
+// and in a stored record.
+var ErrLabel = errors.New("commissioner: fabric label must be at most 32 bytes long")
+
+// validLabel is the one check of a fabric label, at creation, at load and
+// in SetLabel.
+func validLabel(label string) error {
+	if len(label) > MaxLabelLength {
+		return ErrLabel
+	}
+	return nil
+}
 
 // CurrentLabel is the fabric's label: the one it was built with, or the
 // one [Fabric.SetLabel] set last.
 func (f *Fabric) CurrentLabel() string {
-	if f.labelMu == nil {
-		return f.Label
-	}
 	f.labelMu.RLock()
 	defer f.labelMu.RUnlock()
 	return f.Label
 }
 
 // SetLabel sets the fabric's label and saves the fabric record when it
-// changed — matter.js Fabric.setLabel (Fabric.ts:193-201 at 862ad75f): a
-// label longer than 32 characters is [ErrLabel], an unchanged one is
-// nothing, a changed one is persisted. The commissioner gives the new
+// changed — after matter.js Fabric.setLabel (Fabric.ts:193-201 at
+// db021da0), which bounds the label at 32 UTF-16 code units and sets it
+// before it persists; here the bound is [MaxLabelLength] bytes and a
+// changed label is persisted before it takes effect (the module's own
+// rule, decision 155): a longer one is [ErrLabel], an unchanged one is
+// nothing. The
+// commissioner gives the new
 // label to the nodes it commissions from then on; a client.Registry
 // reconciles it to the nodes commissioned before (Registry.SetFabricLabel).
 func (f *Fabric) SetLabel(label string) error {
-	if utf8.RuneCountInString(label) > MaxLabelLength {
-		return ErrLabel
+	if err := validLabel(label); err != nil {
+		return err
 	}
-	if f.labelMu == nil {
-		f.labelMu = &sync.RWMutex{}
-	}
-	f.labelMu.Lock()
-	defer f.labelMu.Unlock()
-	if f.Label == label {
+	// setLabelMu, not labelMu, is held across the save: CurrentLabel —
+	// which the flow reads at step 98.1 — never waits for the store.
+	f.setLabelMu.Lock()
+	defer f.setLabelMu.Unlock()
+	if f.CurrentLabel() == label {
 		return nil
 	}
-	old := f.Label
-	f.Label = label
 	if f.store != nil {
-		if err := f.store.SaveFabric(fabricRecord(f, f.CA)); err != nil {
-			f.Label = old
+		rec := fabricRecord(f, f.CA)
+		rec.Label = label
+		if err := f.store.SaveFabric(rec); err != nil {
 			return fmt.Errorf("commissioner: save fabric: %w", err)
 		}
 	}
+	f.labelMu.Lock()
+	f.Label = label
+	f.labelMu.Unlock()
 	return nil
 }
 
@@ -160,6 +187,9 @@ func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 func newFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	if c == nil {
 		return nil, errors.New("commissioner: NewFabric needs a CA")
+	}
+	if err := validLabel(cfg.Label); err != nil {
+		return nil, err
 	}
 	if cfg.Store != nil {
 		rec, ok, err := cfg.Store.LoadFabric()
@@ -249,11 +279,22 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 	if rec.FabricID == 0 || !isOperationalNodeID(rec.RootNodeID) || len(rec.IPK) != 16 {
 		return nil, fmt.Errorf("%w: stored record is incomplete", ErrFabricMismatch)
 	}
+	if err := validLabel(rec.Label); err != nil {
+		return nil, fmt.Errorf("%w: stored label of %d bytes: %w", ErrFabricMismatch, len(rec.Label), err)
+	}
 	if rec.FabricIndex == 0 {
 		rec.FabricIndex = 1
 	}
 	cfg.FabricID, cfg.RootNodeID, cfg.VendorID = rec.FabricID, rec.RootNodeID, rec.RootVendorID
 	cfg.Label, cfg.FabricIndex = rec.Label, rec.FabricIndex
+	// A stored operational key is never dropped (decision 191, Fable read
+	// F3): a record with a key pair but no NOC, or a NOC but no key pair,
+	// is refused instead of a new identity saved over it. A record that
+	// keeps neither gets one minted below.
+	hasKey := rec.KeyPair != nil && (len(rec.KeyPair.PrivateKey) > 0 || len(rec.KeyPair.PublicKey) > 0)
+	if hasNOC := len(rec.NOC) > 0; hasKey != hasNOC {
+		return nil, fmt.Errorf("%w: %w: the stored fabric holds its operational key pair or its NOC without the other", ErrFabricMismatch, ca.ErrConfig)
+	}
 	if cfg.OperationalSigner != nil {
 		return loadSignerFabric(c, cfg, rec)
 	}
@@ -278,13 +319,44 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 	if err != nil {
 		return nil, fmt.Errorf("%w: operational key: %w", ErrFabricMismatch, err)
 	}
+	if err := checkStoredNOC(c, rec, &key.PublicKey); err != nil {
+		return nil, err
+	}
 	return buildFabric(c, cfg, rec.IPK, key, rec.NOC)
 }
 
+// checkStoredNOC holds a stored NOC to the record it is stored in: it
+// verifies under the CA (with the CA's ICAC), it is for the stored key,
+// and it names the record's node and fabric. A NOC that does not would
+// fail at the first CASE or AddNOC with an error that names nothing
+// (review II, R2-P6-store-1853 (c)).
+func checkStoredNOC(c *ca.CA, rec ca.FabricRecord, key *ecdsa.PublicKey) error {
+	nocKey, err := c.Verifier().VerifyAndExtractPubKey(rec.NOC, c.ICACCert())
+	if err != nil {
+		return fmt.Errorf("%w: the stored NOC does not verify under the CA: %w", ErrFabricMismatch, err)
+	}
+	if !nocKey.Equal(key) {
+		return fmt.Errorf("%w: the stored NOC is not for the stored operational key", ErrFabricMismatch)
+	}
+	noc, err := mattercert.Decode(rec.NOC)
+	if err != nil {
+		return fmt.Errorf("%w: the stored NOC: %w", ErrFabricMismatch, err)
+	}
+	if noc.Subject.MatterNodeID != rec.RootNodeID || noc.Subject.MatterFabricID != rec.FabricID {
+		return fmt.Errorf("%w: the stored NOC names node 0x%016X on fabric 0x%016X, the record node 0x%016X on fabric 0x%016X",
+			ErrFabricMismatch, noc.Subject.MatterNodeID, noc.Subject.MatterFabricID, rec.RootNodeID, rec.FabricID)
+	}
+	return nil
+}
+
 // loadSignerFabric is loadFabric with an operational signer: the stored
-// NOC is kept when it is for the signer's key, otherwise a new NOC is
-// minted under the stored ids; a record that still holds a private key
-// or another NOC is saved again.
+// NOC is kept when it is for the signer's key, and a stored NOC for
+// another key — or one that does not decode — is refused with
+// ca.ErrConfig, the record left as it is (decision 191, Fable read F3):
+// the signer is held to the stored certificate as the CA holds its
+// signers (ca.Config.RootSigner). A record without a NOC gets one minted
+// under the stored ids; a record that still holds the private key the
+// signer now keeps is saved again without it.
 func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error) {
 	pub, err := ca.P256PublicKey(cfg.OperationalSigner)
 	if err != nil {
@@ -293,9 +365,14 @@ func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric,
 	store := cfg.Store
 	keep := false
 	if len(rec.NOC) > 0 {
-		if noc, err := mattercert.Decode(rec.NOC); err == nil && bytes.Equal(noc.PublicKey, pub) {
-			keep = true
+		noc, err := mattercert.Decode(rec.NOC)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w: the stored NOC: %w", ErrFabricMismatch, ca.ErrConfig, err)
 		}
+		if !bytes.Equal(noc.PublicKey, pub) {
+			return nil, fmt.Errorf("%w: %w: the operational signer's key is not the stored NOC's", ErrFabricMismatch, ca.ErrConfig)
+		}
+		keep = true
 	}
 	var f *Fabric
 	if keep {
@@ -370,7 +447,6 @@ func buildFabric(c *ca.CA, cfg FabricConfig, ipk []byte, key *ecdsa.PrivateKey, 
 			Verifier:      c.Verifier(),
 		},
 		keyRef:       keyRef,
-		labelMu:      &sync.RWMutex{},
 		FabricID:     cfg.FabricID,
 		RootNodeID:   cfg.RootNodeID,
 		RootVendorID: cfg.VendorID,
@@ -408,7 +484,7 @@ const (
 )
 
 // Operational node id range — matter.js packages/types/src/datatype/
-// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at 0ceb202d.
+// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at db021da0.
 const (
 	operationalNodeMin uint64 = 0x0000_0000_0000_0001
 	operationalNodeMax uint64 = 0xFFFF_FFEF_FFFF_FFFF

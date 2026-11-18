@@ -81,7 +81,7 @@ func sinkStatus(t *testing.T, err error) im.StatusCode {
 // TestSinkRefusalKeepsTheStoredSetpoint: a refused occupied-setpoint write
 // answers FAILURE and stores nothing — matter.js refuses in
 // occupied*Setpoint$Changing, before the state changes
-// (ThermostatServer.ts:594-601 at 0ceb202d).
+// (ThermostatServer.ts:594-601 at db021da0).
 func TestSinkRefusalKeepsTheStoredSetpoint(t *testing.T) {
 	t.Parallel()
 	sink := &recordingThermoSink{err: errors.New("radio timeout")}
@@ -177,7 +177,7 @@ func TestSinkNotCalledForLimitsOrRefusedWrites(t *testing.T) {
 // TestSetpointRaiseLowerGoesThroughTheSink: Both on a HEAT+COOL thermostat
 // is one Sink call — the cooling setpoint as the primary, the heating
 // setpoint its companion (matter.js ThermostatServer.ts:219-220 at
-// 0ceb202d assigns cooling first); a single-mode command is one call with
+// db021da0 assigns cooling first); a single-mode command is one call with
 // no companions; a refusal stores neither.
 func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 	t.Parallel()

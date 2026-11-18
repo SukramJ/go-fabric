@@ -19,7 +19,7 @@ import (
 // answered CONSTRAINT_ERROR: matter.js's ConformanceError,
 // EnumValueConformanceError and UnknownEnumValueError all carry
 // Status.ConstraintError (packages/protocol/src/action/errors.ts:99-123 at
-// 862ad75f).
+// db021da0).
 var (
 	// ErrConformance: a field the conformance requires is absent, one it
 	// does not allow is present, or a choice group holds too few or too
@@ -36,7 +36,7 @@ var (
 
 // The node codes of matter.js's conformance compiler
 // (packages/node/src/behavior/state/validation/conformance-util.ts:21-39
-// at 862ad75f).
+// at db021da0).
 type confCode uint8
 
 const (
@@ -145,7 +145,7 @@ type confLocation struct {
 // sets ([Instance.CheckValue], [Instance.CheckSet], a [Server]'s initial
 // values) is held to it, a controller's write ([Instance.ValidateWrite])
 // is not — matter.js enforces it only where no remote subject authored
-// the value (state/validation/ValueValidator.ts:284-305 at 862ad75f, hasLocalActor).
+// the value (state/validation/ValueValidator.ts:284-305 at db021da0, hasLocalActor).
 //
 // written marks a controller's written value ([CheckWritten]): the
 // FabricIndex field of its structs is the accessing fabric's, assigned
@@ -233,7 +233,7 @@ type confCompiler struct {
 	nameRef func(name string) confNode
 	// unreadable records a static comparison with an operand that is not
 	// a value ("LT > 4"), which matter.js's compiler refuses to compile
-	// (conformance-util.ts:183-196 at 862ad75f, performComparison's
+	// (conformance-util.ts:183-196 at db021da0, performComparison's
 	// assertValue throws SchemaImplementationError); the field
 	// conformance reads it as nonconformant, a bit's is left unjudged
 	// ([Instance.checkBitConformance]).
@@ -750,7 +750,7 @@ func (i *Instance) fieldValidator(where string, s *Struct, f *Field, enums bool)
 }
 
 // withEnumMembers is addEnumMemberValidation (conformance-compiler.ts:763-868
-// at 862ad75f): a value must be a member's id or lie in a range member,
+// at db021da0): a value must be a member's id or lie in a range member,
 // and that member's conformance must allow it.
 func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main fieldValidator) fieldValidator {
 	e := f.Type.Enum
@@ -825,7 +825,7 @@ func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main
 // its conformance with the struct as the record, then the choice groups'
 // counts (createStructValidator,
 // packages/node/src/behavior/state/validation/ValueValidator.ts:392-467 at
-// 862ad75f).
+// db021da0).
 func (i *Instance) checkFieldConformance(where string, s *Struct, rv reflect.Value, scope nameScope) error {
 	loc := &confLocation{siblings: rv, fields: s, choices: map[string]*confChoice{}, scope: scope}
 	for fi := range s.Fields {
@@ -870,7 +870,7 @@ func (i *Instance) checkFieldConformance(where string, s *Struct, rv reflect.Val
 // packages/node/src/behavior/state/validation/ValueValidator.ts:392-467
 // (createStructValidator) over conformance.ts:19-55
 // (createConformanceValidator) and conformance-compiler.ts:87-220
-// (astToFunction), :763-868 (addEnumMemberValidation) at 862ad75f.
+// (astToFunction), :763-868 (addEnumMemberValidation) at db021da0.
 func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error {
 	a := i.def.Attribute(attrID)
 	if a == nil || value == nil {
@@ -889,7 +889,7 @@ func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error
 // present. Mirrors matter.js
 // packages/node/src/node/integration/ProtocolService.ts:601-626
 // (validateCommandPayload), :681-684 (outerResolve: the request by the
-// request command's name) and :733-740 at 862ad75f (a response validation
+// request command's name) and :733-740 at db021da0 (a response validation
 // error is a FailureError).
 //
 // The fields' types, constraints and enum values, and the structs nested

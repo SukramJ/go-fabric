@@ -27,7 +27,7 @@ func subscribeOn(t *testing.T, m *subscription.Manager, fabricIndex uint8, peerN
 }
 
 // TestSubscriptionTerminated_StartsTheFabricsReconnect pins matter.js
-// packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at 862ad75f:
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at db021da0:
 // a subscription that ends for good (isTerminated) starts the "reconnect"
 // broadcast of its session's fabric — the peer's error status
 // (closeSubscriptionByExchange) and the ack pump's abandonment of the

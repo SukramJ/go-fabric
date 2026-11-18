@@ -281,7 +281,7 @@ func TestEndpointNumberConflictParityMatterJS(t *testing.T) {
 	})
 
 	t.Run("keeps a closed endpoint's number for its return", func(t *testing.T) {
-		// ServerEndpointStores.ts:20-22 at 862ad75f: "Each number is
+		// ServerEndpointStores.ts:20-22 at db021da0: "Each number is
 		// reserved for one store"; a closed endpoint keeps it
 		// (ServerEndpointInitializer.ts:67-69), and load keeps every
 		// stored number (ServerEndpointStores.ts:33-45). The assembler

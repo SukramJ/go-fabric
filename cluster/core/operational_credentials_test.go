@@ -329,7 +329,7 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 
 	// An IPK of the wrong length is CONSTRAINT_ERROR at the IM level, as
 	// matter.js's schema ("octstr, M, 16", operational-credentials.element.ts:98
-	// at 862ad75f) refuses it before addNoc runs; chip answers
+	// at db021da0) refuses it before addNoc runs; chip answers
 	// INVALID_COMMAND (OperationalCredentialsCluster.cpp:469 at 6170af84).
 	// The server used to answer in-band InvalidNOC (W3-clusec-07).
 	_, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
@@ -1364,13 +1364,16 @@ func TestOpcreds_SetFailSafeNoOp(t *testing.T) {
 }
 
 // TestOpcreds_UpdateFabricLabelInvalidArgType verifies that UpdateFabricLabel
-// (0x09) with a wrong fields type returns an error.
+// (0x09) with a wrong fields type answers INVALID_COMMAND, the status of
+// that class on every security-path server (review II, W6-test-17,
+// R2-P6-err-3112).
 func TestOpcreds_UpdateFabricLabelInvalidArgType(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	_, err := oc.MatterInvoke(context.Background(), 0x09, "wrong-type")
-	if err == nil {
-		t.Fatal("expected error for invalid UpdateFabricLabelRequest type, got nil")
+	var sce im.StatusCodeError
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
+		t.Fatalf("a wrong UpdateFabricLabelRequest type: %v, want INVALID_COMMAND", err)
 	}
 }
 

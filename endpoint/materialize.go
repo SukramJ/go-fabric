@@ -211,7 +211,10 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		productLabel = *stated.ProductLabel
 	}
 	if stated.VendorName != nil {
-		vendorName = truncateLabel(*stated.VendorName)
+		// Served as stated, as every stated value is: device.New refuses
+		// one beyond the attribute's constraint rather than the assembler
+		// cutting it (R2-P6-wire-2502, decision 201).
+		vendorName = *stated.VendorName
 	}
 	if stated.VendorId != nil {
 		vendorID = *stated.VendorId
@@ -242,6 +245,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		NodeLabelStated:      stated.NodeLabel != nil,
 		SaveNodeLabel:        ep.nodeLabelSaver(),
 		OnNodeLabelWrite:     ep.nodeLabelWriter(),
+		HoldNodeLabel:        ep.holdNodeLabel,
 		ConfigurationVersion: ep.ConfigurationVersion(),
 		UniqueID:             uniqueIDFor(ep.SourceKey),
 		// Reachable mirrors the underlying CCU device's live availability
@@ -616,12 +620,15 @@ func applyStatedBridgedInfo(cfg *mattercore.BridgedConfig, st bdbidef.Patch) {
 	}
 }
 
+// bridgedVendorName is the VendorName a bridged endpoint serves: the
+// spec's, else the bridge's — as stated, never cut; the assembly refused
+// one beyond the attribute's constraint (checkBridgedInfo; R2-P6-wire-2502,
+// decision 201).
 func bridgedVendorName(ep *Endpoint) string {
-	name := ep.VendorName
-	if name == "" {
-		name = ep.BridgeVendorName
+	if ep.VendorName != "" {
+		return ep.VendorName
 	}
-	return truncateLabel(name)
+	return ep.BridgeVendorName
 }
 
 // identifyClusterID is the Identify cluster (identify.element.ts, 0x0003).

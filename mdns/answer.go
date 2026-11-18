@@ -51,7 +51,7 @@ import (
 const (
 	// maxMessageSize is the largest message the responder sends,
 	// matter.js MAX_MDNS_MESSAGE_SIZE (packages/general/src/codec/
-	// DnsCodec.ts:26 at 862ad75f): the IPv6 minimum MTU less the IPv6 and
+	// DnsCodec.ts:26 at db021da0): the IPv6 minimum MTU less the IPv6 and
 	// UDP headers.
 	maxMessageSize = 1232
 	// dnsHeaderSize is the fixed DNS header.
@@ -319,7 +319,7 @@ func onLink(ip net.IP, nets []*net.IPNet) bool {
 }
 
 // truncatedKey is matter.js's `${transactionId}-${sourceIntf}-${sourceIp}`
-// (MdnsServer.ts:471 at 862ad75f).
+// (MdnsServer.ts:514 at db021da0).
 func truncatedKey(msg *dns.Msg, ifIndex int, src *net.UDPAddr) string {
 	s := ""
 	if src != nil {
@@ -328,8 +328,8 @@ func truncatedKey(msg *dns.Msg, ifIndex int, src *net.UDPAddr) string {
 	return strconv.Itoa(int(msg.Id)) + "-" + strconv.Itoa(ifIndex) + "-" + s
 }
 
-// prepareLocked is matter.js #prepareMessage (MdnsServer.ts:463-503 at
-// 862ad75f): only queries are handled; a truncated query is held for
+// prepareLocked is matter.js #prepareMessage (MdnsServer.ts:506-546 at
+// db021da0): only queries are handled; a truncated query is held for
 // 400–500 ms (RFC 6762 §7.2) and merged with its continuation packets; nil
 // when there is nothing to answer yet. Caller holds r.mu.
 //
@@ -385,7 +385,7 @@ func (r *Responder) prepareLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) *
 }
 
 // processTruncated answers a truncated query whose wait ran out
-// (#processTruncatedQuery, MdnsServer.ts:446-458 at 862ad75f).
+// (#processTruncatedQuery, MdnsServer.ts:489-501 at db021da0).
 func (r *Responder) processTruncated(key string, ifIndex int, src *net.UDPAddr) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -496,8 +496,8 @@ func (r *Responder) answerNextLocked(query *dns.Msg, ifIndex int, src *net.UDPAd
 	}
 }
 
-// queryRecords is matter.js #queryRecords (MdnsServer.ts:377-387 at
-// 862ad75f): the records whose name matches the question's
+// queryRecords is matter.js queryRecords (InterfaceResponder.ts:924-932 at
+// db021da0): the records whose name matches the question's
 // case-insensitively (RFC 6762 §16) and whose type is the question's, or
 // any type for ANY.
 func queryRecords(q dns.Question, all []dns.RR) []dns.RR {
@@ -512,8 +512,8 @@ func queryRecords(q dns.Question, all []dns.RR) []dns.RR {
 }
 
 // knownTo reports whether a known answer of the query carries rr (RFC 6762
-// §7.1, matter.js #suppressedByKnownAnswer, MdnsServer.ts:366-375 at
-// 862ad75f): same type, class (the cache-flush bit is framing), name and
+// §7.1, matter.js InterfaceResponder.ts:334-337, recordKeyOf :1001-1016 at
+// db021da0): same type, class (the cache-flush bit is framing), name and
 // value, with more than half of rr's TTL left.
 func knownTo(known []dns.RR, rr dns.RR) bool {
 	hdr := rr.Header()
@@ -578,8 +578,9 @@ func newResponse(id uint16) *dns.Msg {
 }
 
 // splitResponse packs answers and additionals into responses of at most
-// [maxMessageSize] bytes, as matter.js MdnsSocket.send does
-// (packages/general/src/net/dns-sd/MdnsSocket.ts:131-201 at 862ad75f):
+// [maxMessageSize] bytes, as the answer splitting of matter.js
+// MdnsSocket.send does
+// (packages/general/src/net/dns-sd/MdnsSocket.ts:155-228 at db021da0):
 // answers fill a packet and spill into the next with no additionals; the
 // additionals follow the last answers and spill into packets of their own.
 // The size is counted uncompressed, as matter.js encodes records one by one.

@@ -23,7 +23,7 @@ func (d *statusDispatcher) Read(_ context.Context, p ConcreteAttributePath) []Re
 
 // TestReachesWriteGates: a write's DataVersion is judged on an attribute
 // the node serves and writes, and left to the dispatcher's own answer
-// otherwise (matter.js AttributeWriteResponse.ts:221-257 at 862ad75f).
+// otherwise (matter.js AttributeWriteResponse.ts:221-257 at db021da0).
 func TestReachesWriteGates(t *testing.T) {
 	t.Parallel()
 	const basicInformation = 0x0028
@@ -53,7 +53,7 @@ func TestReachesWriteGates(t *testing.T) {
 }
 
 // TestWriteTransactionRelease: Release ends every hold of an abandoned
-// chunked write (InteractionServer.ts:469 at 862ad75f).
+// chunked write (InteractionServer.ts:469 at db021da0).
 func TestWriteTransactionRelease(t *testing.T) {
 	t.Parallel()
 	holds := &WriteHolds{}
@@ -76,7 +76,7 @@ func TestWriteTransactionRelease(t *testing.T) {
 
 // TestWriteRequestSuppressResponseType: a SuppressResponse that is not a
 // boolean fails the decode, and the request is answered
-// (SuppressResponseTest.ts:399-403 at 862ad75f, UNREADABLE_SUPPRESS_RESPONSE).
+// (SuppressResponseTest.ts:399-403 at db021da0, UNREADABLE_SUPPRESS_RESPONSE).
 func TestWriteRequestSuppressResponseType(t *testing.T) {
 	t.Parallel()
 	enc := tlv.NewEncoder()
@@ -93,7 +93,7 @@ func TestWriteRequestSuppressResponseType(t *testing.T) {
 }
 
 // TestWriteRequestDecodeRefusals: the WriteRequest decoder refuses what
-// TlvWriteRequest.ts:16-24 at 862ad75f does not describe — a top level that
+// TlvWriteRequest.ts:16-24 at db021da0 does not describe — a top level that
 // is no struct, a WriteRequests that is no array, an AttributeDataIB that
 // is no struct, a message cut short — and skips a field it does not know.
 func TestWriteRequestDecodeRefusals(t *testing.T) {

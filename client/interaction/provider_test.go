@@ -192,7 +192,7 @@ func TestMaximumPeerResponseTimeCarriesLocalPad(t *testing.T) {
 // the network of an exchange whose request names none, on the direct path
 // as on the batched one, and a request's own network wins — matter.js
 // `request.network ?? this.#network` (ClientInteraction.ts:1250 at
-// 862ad75f).
+// db021da0).
 func TestConfigNetworkIsTheExchangeDefault(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

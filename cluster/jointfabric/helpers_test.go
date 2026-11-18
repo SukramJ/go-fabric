@@ -239,12 +239,24 @@ type adminFixture struct {
 
 func newAdminFixture(t *testing.T, cfg AdministratorConfig) *adminFixture {
 	t.Helper()
+	return adminFixtureOf(t, cfg, true)
+}
+
+// adminFixtureOf is [newAdminFixture]; anchored false leaves a nil
+// TrustAnchors nil.
+func adminFixtureOf(t *testing.T, cfg AdministratorConfig, anchored bool) *adminFixture {
+	t.Helper()
 	fx := &adminFixture{f: newJFFabric(t, 3, adminCAT), window: &fakeWindow{}}
 	if cfg.Port == nil {
 		cfg.Port = &fakePort{csr: fx.f.csr(t)}
 	}
 	if cfg.Reach == nil {
 		cfg.Reach = &fakeReach{f: fx.f, adminIndex: 3}
+	}
+	if cfg.TrustAnchors == nil && anchored {
+		// The fixture's fabric is self-minted: its vendor id is anchored
+		// at its own root, an explicit opt-in (owner decision 190).
+		cfg.TrustAnchors = jcm.SelfAnchored
 	}
 	a, err := NewAdministrator(cfg)
 	if err != nil {

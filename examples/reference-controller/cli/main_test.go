@@ -414,8 +414,43 @@ func TestReferenceController(t *testing.T) {
 	if out := tl.run("bind", nid, strconv.Itoa(int(h.swEP)), "--to", fmt.Sprintf("%s/%d/OnOff", nid, h.plugEP)); !strings.Contains(out, "bound node 17185") {
 		t.Fatalf("bind:\n%s", out)
 	}
+	// R2-P6-store-2603: the group record keeps no copy of the epoch key —
+	// the controller's key set is the one copy. A record of the earlier
+	// shape (with "epochKey") is rewritten without it by the bind, which
+	// reads the key from the key set.
+	groupRecordOf := func() string {
+		t.Helper()
+		db, err := store.OpenSQLite(tl.db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+		v, ok, err := store.New(db).GetSetting(context.Background(), groupKey(257))
+		if err != nil || !ok {
+			t.Fatalf("group record: ok=%v err=%v", ok, err)
+		}
+		return v
+	}
+	const epochHex = "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
+	if rec := groupRecordOf(); strings.Contains(rec, epochHex) || strings.Contains(rec, legacyEpochKeyField) {
+		t.Fatalf("the group record carries the epoch key: %s", rec)
+	}
+	func() {
+		db, err := store.OpenSQLite(tl.db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+		legacy := strings.Replace(groupRecordOf(), "{", `{"epochKey":"`+epochHex+`",`, 1)
+		if err := store.New(db).SetSetting(context.Background(), groupKey(257), legacy); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	if out := tl.run("bind", nid, strconv.Itoa(int(h.swEP)), "--group", "257"); !strings.Contains(out, "to group 257") {
 		t.Fatalf("bind --group:\n%s", out)
+	}
+	if rec := groupRecordOf(); strings.Contains(rec, epochHex) {
+		t.Fatalf("the bind left the legacy key copy: %s", rec)
 	}
 	entries := h.sw.Binding().Host().Entries()
 	if len(entries) != 2 || entries[0].Node == nil || *entries[0].Node != harnessNodeID || entries[0].Endpoint == nil || *entries[0].Endpoint != h.plugEP || entries[1].Group == nil || *entries[1].Group != 257 {

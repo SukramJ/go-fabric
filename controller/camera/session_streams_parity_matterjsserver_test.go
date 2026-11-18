@@ -258,7 +258,7 @@ func (f *ssFixture) remove(wrdef.SessionKey) {}
 func newSSFixture() *ssFixture {
 	f := &ssFixture{revision: 2, known: true, clk: clocktest.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))}
 	m := newManager(&fakeIO{}, f.clk, nil)
-	f.ps = &providerSessions{nodes: f, requestor: f, fabricIndex: 1, log: slog.New(slog.DiscardHandler), cleanup: m.cleanupContext, offers: map[providerKey]string{}}
+	f.ps = &providerSessions{nodes: f, requestor: f, fabricIndex: 1, log: slog.New(slog.DiscardHandler), cleanup: m.cleanupContext, offers: map[providerKey]*sentOffer{}}
 	return f
 }
 

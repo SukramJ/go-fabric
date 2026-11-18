@@ -337,10 +337,10 @@ func TestDispatch_UnknownProtocolID(t *testing.T) {
 // with ErrUnknownProtocol even when its low 16-bit ProtocolID collides
 // with SecureChannel (0x0000) — a vendor-specific protocol must never
 // route into the Common-vendor PASE/IM handlers just because the low bits
-// match. Mirrors matter.js MessageCodec.ts:377, which keys dispatch on
-// the full 32-bit (vendorId*0x10000 + protocolId) identifier. Also
-// confirms the PASE handler that a naive ProtocolID-only switch would
-// have invoked never sees the forged frame.
+// match. Mirrors matter.js MessageCodec.ts:466-467 at db021da0, which
+// keys dispatch on the full 32-bit (vendorId*0x10000 + protocolId)
+// identifier. Also confirms the PASE handler that a naive ProtocolID-only
+// switch would have invoked never sees the forged frame.
 func TestDispatch_VendorQualifiedProtocolCollisionRejected(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)

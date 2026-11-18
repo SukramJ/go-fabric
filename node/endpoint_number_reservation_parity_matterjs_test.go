@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// A port of matter.js's endpoint-number reservation tests at 862ad75f:
+// A port of matter.js's endpoint-number reservation tests at db021da0:
 // packages/node/test/endpoints/BridgeTest.ts:231-269 ("closing and
 // re-adding dynamic endpoints during runtime"), :271-341 ("with multiple
 // dynamic endpoints close and re-add during runtime"), :343-425 ("with

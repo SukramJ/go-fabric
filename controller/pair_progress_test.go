@@ -41,7 +41,7 @@ func (l *progressLog) lines() []string {
 
 // TestPairProgress: a paired device reports each step started, then
 // succeeded or skipped, in execution order under matter.js's step names
-// (ControllerCommissioningFlow.ts:536-656 at 862ad75f) — the discovery
+// (ControllerCommissioningFlow.ts:536-656 at db021da0) — the discovery
 // and PASE first, the module's own 2.1 and 2.2. An IP device has no
 // network steps (:596-626); this device's regulatory configuration is
 // skipped (:1185-1188), time synchronisation always is (:1200-1211), and

@@ -45,8 +45,8 @@ type emission struct {
 // (ClientStructure.ts:1634-1649).
 type pendingChange struct{ erase, install, rebuild bool }
 
-// structure is matter.js ClientStructure (node/client/ClientStructure.ts:115-1564
-// at 0ceb202d): the endpoints and clusters the peer's reports describe. Its
+// structure is matter.js ClientStructure (node/client/ClientStructure.ts:123-1773
+// at db021da0): the endpoints and clusters the peer's reports describe. Its
 // state is guarded by the node's lock; every method expects it held.
 type structure struct {
 	// mu is the owning Node's lock (Node.mu); it guards every field of the
@@ -57,6 +57,12 @@ type structure struct {
 
 	endpoints map[uint16]*Endpoint
 	root      *Endpoint
+	// bytes is the image's charge ([structure.imageBytes]) kept as a
+	// running total: each endpoint of endpoints, each of their clusters and
+	// each attached cache's values (cache.total points here). admit reads
+	// it on every report, which summed every cluster before (review II,
+	// N3-finimg-3).
+	bytes int
 
 	// pendingOrder and pending are #pendingChanges, a Map in insertion order.
 	pendingOrder []*Endpoint
@@ -72,7 +78,7 @@ type structure struct {
 	// recordedFabricFiltered is the fabric filter the cache records, nil
 	// before one is recorded — ClientNodeStore.cacheFabricFiltered
 	// (packages/node/src/storage/client/ClientNodeStore.ts:80-97 at
-	// 862ad75f); [structure.cacheFabricFiltered] reads it.
+	// db021da0); [structure.cacheFabricFiltered] reads it.
 	recordedFabricFiltered *bool
 	// epoch is the epoch an interaction starting now belongs to
 	// (ClientStructure.ts:128, :335-341).
@@ -105,11 +111,12 @@ func newStructure(mu *sync.RWMutex, log *slog.Logger, p *persister) *structure {
 	s.root = newEndpoint(mu, 0)
 	s.root.deviceType, s.root.classification, s.root.name, s.root.installed = rootNodeDeviceType, "node", "RootNode", true
 	s.endpoints[0] = s.root
+	s.bytes = imageEndpointBytes
 	return s
 }
 
 // epoch is ClientStructure.Epoch (ClientStructure.ts:1776-1782 at
-// 862ad75f): an interaction records the data versions it reports only if
+// db021da0): an interaction records the data versions it reports only if
 // its epoch is still the current one and trusted when its data is
 // applied; a change of the cache's fabric filter starts a new one, and
 // while the versions are forgotten the epoch is not trusted. Not
@@ -120,7 +127,7 @@ type epoch struct{ trusted bool }
 // takes data from: only they update cached values and data versions, and
 // only they get versions injected. Fabric filtered until a filter is
 // recorded. Mirrors matter.js ClientStructure.cacheFabricFiltered
-// (packages/node/src/node/client/ClientStructure.ts:326-333 at 862ad75f).
+// (packages/node/src/node/client/ClientStructure.ts:326-333 at db021da0).
 func (s *structure) cacheFabricFiltered() bool {
 	return s.recordedFabricFiltered == nil || *s.recordedFabricFiltered
 }
@@ -161,7 +168,9 @@ func (s *structure) loadCache(stored []StoredEndpoint) error {
 				values[id] = n
 			}
 			c := s.clusterFor(ep, sc.ID)
+			s.detachCache(c)
 			c.cache = newCache(s.p, se.Number, sc.ID, values, sc.Version)
+			s.attachCache(ep, c)
 			s.checkUnlistedSeedValues(c)
 			s.synchronizeCluster(ep, c, nil)
 		}
@@ -207,8 +216,8 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 
 // withKnownVersions is the version filters a read or subscription sends —
 // the caller's own, kept as given and first, then the injected ones.
-// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-323
-// (injectVersionFilters at 862ad75f): a request with the other fabric
+// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-324
+// (injectVersionFilters at db021da0): a request with the other fabric
 // filter than the cache's, or one sent while the epoch is not trusted,
 // gets none injected (:288), and a cluster the caller filters gets no
 // injected filter (:293-295, :312), so the peer sees exactly the
@@ -745,6 +754,7 @@ func (s *structure) endpointFor(number uint16) *Endpoint {
 	}
 	ep := newEndpoint(s.mu, number)
 	s.endpoints[number] = ep
+	s.bytes += imageEndpointBytes
 	return ep
 }
 
@@ -755,7 +765,30 @@ func (s *structure) clusterFor(ep *Endpoint, id uint32) *Cluster {
 	}
 	c := newCluster(s.mu, id, newCache(s.p, ep.number, id, nil, nil))
 	ep.clusters[id] = c
+	if s.endpoints[ep.number] == ep {
+		s.bytes += imageClusterBytes
+		s.attachCache(ep, c)
+	}
 	return c
+}
+
+// attachCache counts c's cache in the image's running total while ep is
+// the structure's endpoint of its number; its values' changes follow.
+func (s *structure) attachCache(ep *Endpoint, c *Cluster) {
+	if s.endpoints[ep.number] != ep || c.cache.total != nil {
+		return
+	}
+	c.cache.total = &s.bytes
+	s.bytes += c.cache.bytes
+}
+
+// detachCache takes c's cache out of the image's running total.
+func (s *structure) detachCache(c *Cluster) {
+	if c.cache.total != &s.bytes {
+		return
+	}
+	s.bytes -= c.cache.bytes
+	c.cache.total = nil
 }
 
 // ownerOf is #ownerOf (:1111-1125): the pending owner, else the owner; the
@@ -788,6 +821,10 @@ func (s *structure) eraseOnce(ep *Endpoint, seen map[*Endpoint]bool) {
 	}
 	if s.endpoints[ep.number] == ep {
 		delete(s.endpoints, ep.number)
+		s.bytes -= imageEndpointBytes + len(ep.clusters)*imageClusterBytes
+		for _, c := range ep.clusters {
+			s.detachCache(c)
+		}
 	}
 	s.deleteClaims(ep)
 	delete(s.partsListOf, ep)
@@ -821,6 +858,10 @@ func (s *structure) rebuild(ep *Endpoint) {
 		c := ep.clusters[id]
 		if c.pendingDelete {
 			delete(ep.clusters, id)
+			if s.endpoints[ep.number] == ep {
+				s.bytes -= imageClusterBytes
+				s.detachCache(c)
+			}
 			if c.current == nil {
 				continue
 			}
@@ -916,7 +957,7 @@ func (s *structure) resolvePartClaims() {
 				continue
 			}
 			// The warning for the other claimants comes after the root's
-			// check of the part (ClientStructure.ts:1455-1471 at 862ad75f).
+			// check of the part (ClientStructure.ts:1455-1471 at db021da0).
 			if len(contenders) > 0 {
 				others := make([]int, 0, len(contenders))
 				for _, o := range contenders {
@@ -966,13 +1007,13 @@ func (s *structure) isOnTheNode(ep *Endpoint) bool {
 
 // ownerFor is the claimant that owns a part, with the claimants that
 // conflict with that choice, nil while that cannot be told. Mirrors
-// matter.js packages/node/src/node/client/ClientStructure.ts:1509-1551
-// (#ownerFor at 862ad75f): a claimant the root does not name owns nothing
+// matter.js packages/node/src/node/client/ClientStructure.ts:1509-1550
+// (#ownerFor at db021da0): a claimant the root does not name owns nothing
 // (:1513-1518), one whose composition is unknown makes the part wait
 // (:1520-1525); an ordinary claimant is closer to the part than any
-// full-family one (:1530-1533); among the candidates the closest wins
+// full-family one (:1530-1532); among the candidates the closest wins
 // ([structure.closestClaimant]); a full-family owner waits until every
-// endpoint it names has reported its own parts (:1539-1541). The
+// endpoint it names has reported its own parts (:1538-1540). The
 // contenders are the other ordinary claimants, or the full-family ones
 // that do not name the owner (:1543-1548).
 func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders []*Endpoint) {
@@ -1022,8 +1063,8 @@ func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders
 // name: the one naming the fewest of the other claimants, then the one
 // with the shorter PartsList, then the one with the lower endpoint number
 // — the choice depends on the lists, not on the order they arrived in.
-// Mirrors matter.js ClientStructure.ts:1553-1578 (#closestClaimant at
-// 862ad75f).
+// Mirrors matter.js ClientStructure.ts:1559-1580 (#closestClaimant at
+// db021da0).
 func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint {
 	rank := func(c *Endpoint) [3]int {
 		parts := s.partsListOf[c]
@@ -1046,8 +1087,8 @@ func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint
 
 // partsAccountedFor: every endpoint ep names has reported a PartsList of
 // its own; an endpoint the root no longer names reports nothing more and
-// is not waited for. Mirrors matter.js ClientStructure.ts:1580-1599
-// (#partsAccountedFor at 862ad75f).
+// is not waited for. Mirrors matter.js ClientStructure.ts:1587-1601
+// (#partsAccountedFor at db021da0).
 func (s *structure) partsAccountedFor(ep *Endpoint) bool {
 	rootParts, rootReported := s.partsListOf[s.endpoints[0]]
 	for partNo := range s.partsListOf[ep] {

@@ -111,6 +111,10 @@ func TestRegisterRules(t *testing.T) {
 		{"repeated id", "`Profile` is the profile id (`a`, `a`)\n\n" + tableHead, "repeat one"},
 		{"no table", header + "## Register\n\nNone.\n", "no register table"},
 		{"no column", header + "## Register\n\n| Profile | Element |\n| --- | --- |\n", "no \"effect\" column"},
+		// A row after the table ended, before the next heading, is no row
+		// the generator drops silently (R2-P6-err-2711).
+		{"row after a blank line", header + tableHead + "| alpha | level | level 1.4 | Reproduced | s | r |\n\n| beta | level | level 1.4 | Reproduced | s | r |\n", "line 12: a table row after the register table ended"},
+		{"row after a paragraph", header + tableHead + "| alpha | level | level 1.4 | Reproduced | s | r |\nA note.\n| beta | level | level 1.4 | Reproduced | s | r |\n\n## Next\n", "line 12: a table row after the register table ended"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			_, err := parseRegister(c.doc)

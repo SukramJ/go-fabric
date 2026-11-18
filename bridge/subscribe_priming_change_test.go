@@ -49,7 +49,7 @@ func changingPath() im.ConcreteAttributePath {
 // SubscribeResponse. matter.js attaches the subscription's change
 // handlers before it reads the initial report
 // (packages/node/src/node/server/ServerSubscription.ts:731-739 at
-// 862ad75f); a bridge that read first and admitted after lost the change
+// db021da0); a bridge that read first and admitted after lost the change
 // (the controller-side CI flake "flips requiresAwait when a registered
 // DSLS peer switches SIT→LIT at runtime": the device's OperatingMode
 // flipped inside the recreated subscription's priming read).

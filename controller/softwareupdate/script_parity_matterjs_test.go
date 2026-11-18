@@ -14,8 +14,8 @@ import (
 
 // The scripted provider (script.go) against matter.js's cert harness
 // provider, RecordingOtaProviderServer
-// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:456-638 at
-// 862ad75f): which answers state the script directly, which run the
+// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:610-792 at
+// db021da0): which answers state the script directly, which run the
 // provider's own path with the script laid over it, and that every answer
 // is recorded.
 

@@ -99,7 +99,7 @@ func expectWritten(t *testing.T, statuses interaction.WriteStatuses, got, want [
 // TestClientChunkedWriteParity ports matter.js's ClientChunkedWriteTest
 // (packages/node/test/node/ClientChunkedWriteTest.ts at 862ad75f) on
 // fabrictest: the write chunking of sendWriteCommand
-// (InteractionMessenger.ts:1269-1450) against the module's device.
+// (InteractionMessenger.ts:1269-1450 at db021da0) against the module's device.
 func TestClientChunkedWriteParity(t *testing.T) {
 	t.Parallel()
 

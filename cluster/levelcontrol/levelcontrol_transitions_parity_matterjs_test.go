@@ -361,6 +361,38 @@ func TestRemainingTimeReportAdvancesTheDataVersion(t *testing.T) {
 	})
 }
 
+// TestImmediateMoveEndsTheRunningTransition (R2-P6-fsm-1402): a
+// MoveToLevel with no transition time that replaces a running transition
+// ends it as a cancel does — RemainingTime reported 0 — as connectedhomeip
+// stops the running transition before any new one and sets RemainingTime
+// to 0, reportable when the stopped transition was 1 s or longer
+// (LevelControlCluster.cpp:351, :731-735, :701-706 at 6170af84; 60 s here);
+// matter.js's replace reports nothing (Transitions.ts:124, :263-284 at
+// db021da0).
+func TestImmediateMoveEndsTheRunningTransition(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := newDevice(10, true)
+		srv := engineServer(d, nil)
+		r := observe(t, srv)
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 200, TransitionTime: u16(600)}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		if remaining(t, srv) == 0 {
+			t.Fatal("no transition runs")
+		}
+		_, before := r.snapshot()
+		if err := invoke(t, srv, levelcontrol.CmdMoveToLevel, wire.MoveToLevelRequest{Level: 100, TransitionTime: u16(0)}); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		_, times := r.snapshot()
+		if remaining(t, srv) != 0 || len(times) == len(before) {
+			t.Errorf("RemainingTime %d after the immediate move, reports %v → %v; want 0 and a report of it", remaining(t, srv), before, times)
+		}
+	})
+}
+
 // TestMoveAndStop is TC-LVL-4.1 / TC-LVL-6.1 (Test_TC_LVL_4_1.yaml,
 // Test_TC_LVL_6_1.yaml): Move up at 5/s from 50 reads ~100 after 10 s; a
 // Stop after 5 s leaves it at 64-86 and RemainingTime at 0; Rate 0 is

@@ -15,7 +15,7 @@ import (
 // manager's socket: a TCP connection (a *transport/tcp.Conn satisfies it).
 // matter.js binds every session to a channel — the UDP socket's address or
 // a TcpChannel (packages/protocol/src/transport/tcp/TcpChannel.ts:43 at
-// 862ad75f); here a session without one sends on the manager's [Conn].
+// db021da0); here a session without one sends on the manager's [Conn].
 type Channel interface {
 	// Send sends one framed message.
 	Send(msg []byte) error
@@ -181,8 +181,8 @@ func (s *Session) Transport() Transport {
 
 // Channel is the connection a TCP session is bound to, nil for a session
 // over UDP or BLE — matter.js Session.channel's transportChannel
-// (packages/protocol/src/session/Session.ts:349, MessageChannel.ts:130 at
-// 862ad75f). Closing it severs the connection under the session without
+// (packages/protocol/src/session/Session.ts:361, MessageChannel.ts:145 at
+// db021da0). Closing it severs the connection under the session without
 // telling the peer anything, as matter.js's cert controller does to drop a
 // TCP session (support/chip-testing/src/cert/
 // InProcessControllerAdapter.ts:1707-1735, severTransportConnection); the

@@ -11,7 +11,7 @@ import (
 )
 
 // TestServerNodeOrphanedFabricDataParityMatterJS ports matter.js
-// packages/node/test/node/ServerNodeTest.ts:1640-1679 at 862ad75f
+// packages/node/test/node/ServerNodeTest.ts:1640-1679 at db021da0
 // ("sanitizes orphaned fabric-scoped data at startup"): matter.js persists
 // an ACL entry of a fabric that does not exist and strips it when the node
 // starts (limitNodeDataToAllowedFabrics, ServerEnvironment.ts:187-195). The

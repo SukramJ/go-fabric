@@ -17,7 +17,7 @@ import (
 
 // The write-chunking cases of matter.js's InteractionClientMessengerTest
 // "writes" group (packages/protocol/test/interaction/InteractionClientMessengerTest.ts:593-801
-// at 862ad75f) through Interaction.Write against the scripted peer:
+// at db021da0) through Interaction.Write against the scripted peer:
 // sendWriteCommand and #chunkWriteRequest (InteractionMessenger.ts:1269-1450).
 
 // chunkedWrite is one WriteRequest message the peer received.

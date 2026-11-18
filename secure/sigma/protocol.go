@@ -159,6 +159,27 @@ type ResumptionStore interface {
 	GetByID(resumptionID []byte) (*ResumptionRecord, error)
 }
 
+// resumptionClaimer is the optional capability of a [ResumptionStore] to
+// hand a resumption id to one resume at a time: ClaimResumptionID claims
+// id for the resume about to be accepted, false when another resume holds
+// it; release gives it back when this one does not take place. A claim
+// that is not released ends with the record the resume replaces — the
+// store's owner drops it (review II, R2-P6-sec-3320, owner decision 231).
+type resumptionClaimer interface {
+	ClaimResumptionID(id []byte) (release func(), ok bool)
+}
+
+// resolutionCommitter is the optional capability of an [IdentityResolver]
+// to learn when the Sigma1 its last resolution served is accepted: the
+// responder calls CommitResolution at its commit point, once that Sigma1
+// can no longer be refused, so a resolution made for a Sigma1 the
+// responder then refuses — a bad ephemeral key, no session id — never
+// stands for the handshake in progress (review II, decision 244). It runs
+// under the responder's lock and must not call back into it.
+type resolutionCommitter interface {
+	CommitResolution()
+}
+
 // Sigma1ProcessResult is the discriminated union returned by
 // [Responder.ProcessSigma1WithResume]. Callers check IsResume to
 // decide which opcode to send.
@@ -170,6 +191,29 @@ type Sigma1ProcessResult struct {
 	// ResumeKeys holds the derived session keys after a Sigma2_Resume.
 	// Populated only when Sigma2Resume != nil.
 	ResumeKeys SessionKeys
+	// Claim, set on a resume whose [ResumptionStore] claims the presented
+	// resumption id, is that claim. A caller that installs no session for
+	// the resume — it re-announces a session the caller holds already —
+	// releases it ([ResumeClaim.Release]), so the record may resume again;
+	// a caller that installs one leaves the claim to the store's owner,
+	// who ends it with the record the resume replaces (review II,
+	// R2-P6-sec-3320, decision 243). nil on a full handshake and on a
+	// store that claims nothing.
+	Claim *ResumeClaim
+}
+
+// ResumeClaim is the responder's claim of a resumption id
+// ([Sigma1ProcessResult.Claim]).
+type ResumeClaim struct{ release func() }
+
+// Release gives the claim back; a nil claim, and every release after the
+// first, does nothing.
+func (c *ResumeClaim) Release() {
+	if c == nil || c.release == nil {
+		return
+	}
+	c.release()
+	c.release = nil
 }
 
 // IsResume reports whether the result requires a Sigma2_Resume reply.
@@ -450,6 +494,14 @@ func (r *Responder) SetSessionIDRenewer(fn func(previous uint16) (uint16, bool))
 	r.mu.Unlock()
 }
 
+// commitResolutionLocked tells the resolver, when it can be told, that the
+// Sigma1 its last resolution served is accepted. Caller holds r.mu.
+func (r *Responder) commitResolutionLocked() {
+	if c, ok := r.identityResolver.(resolutionCommitter); ok {
+		c.CommitResolution()
+	}
+}
+
 // errNoSessionID fails the handshake of a responder that has no local
 // session id and whose renewer supplied none.
 var errNoSessionID = errors.New("sigma: no local session id for the handshake")
@@ -689,6 +741,26 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	copy(keys.R2IKey[:], finalMat[SessionKeySize:2*SessionKeySize])
 	copy(keys.AttestationChallenge[:], finalMat[2*SessionKeySize:3*SessionKeySize])
 
+	// The record goes to one resume: a store that can claims its id now,
+	// and a Sigma1 whose id another resume holds falls through to Full
+	// Sigma, as a miss does (review II, R2-P6-sec-3320).
+	release := func() {}
+	var claim *ResumeClaim
+	if c, ok := r.resumptionStore.(resumptionClaimer); ok {
+		var claimed bool
+		if release, claimed = c.ClaimResumptionID(sigma1.ResumptionID); !claimed {
+			return Sigma1ProcessResult{}, false, nil
+		}
+		// Looked up again under the claim: a resume that held the id
+		// and gave it back once its record was replaced leaves no record
+		// under it.
+		if again, err := r.resumptionStore.GetByID(sigma1.ResumptionID); err != nil || again == nil {
+			release()
+			return Sigma1ProcessResult{}, false, nil //nolint:nilerr // a record gone under the claim is a miss
+		}
+		claim = &ResumeClaim{release: release}
+	}
+
 	// The resumption is accepted: its session takes its id now, the last
 	// step that can refuse it. A resume that lands on a responder which
 	// already completed a handshake is a second session on this
@@ -699,9 +771,11 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
 	sessionID, err := r.nextSessionIDLocked(r.idPending || r.state == responderStateFinished)
 	if err != nil {
+		release()
 		return Sigma1ProcessResult{}, false, err
 	}
 	r.sessionID, r.idPending = sessionID, false
+	r.commitResolutionLocked()
 	r.identity, r.verifier = identity, verifier
 	r.peerSessionParams = sigma1.InitiatorSessionParams
 	r.sigma3Digest = nil
@@ -750,6 +824,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	return Sigma1ProcessResult{
 		Sigma2Resume: &s2r,
 		ResumeKeys:   keys,
+		Claim:        claim,
 	}, true, nil
 }
 
@@ -982,6 +1057,7 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 	if err != nil {
 		return Sigma2{}, err
 	}
+	r.commitResolutionLocked()
 
 	// Commit. The previous handshake's shared secret and session keys
 	// end here ([zero]); whoever needed them took a copy when it

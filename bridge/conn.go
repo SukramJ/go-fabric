@@ -209,10 +209,10 @@ func sendVia(listener *udp.Listener, dst net.Addr, datagram []byte) error {
 // never moved
 // between transports or connections: matter.js replaces a session's
 // channel only when both the old and the new one are UDP
-// (MessageChannel.ts:140-148), so a session first seen on a TCP
+// (MessageChannel.ts:155-164 at db021da0), so a session first seen on a TCP
 // connection stays bound to it, and one first seen over UDP stays on
 // UDP. The binding is what the connection's drop evicts
-// (ExchangeManager.ts:638-650 #sessionsOnChannel).
+// (ExchangeManager.ts:699-713 #sessionsOnChannel at db021da0).
 //
 // "The same session" is the session object, not the id: an id is
 // reused once its session is gone, and the new session binds afresh
@@ -564,8 +564,10 @@ func (b *Bridge) purgeSessionState(sessionID uint16) {
 	b.mu.RLock()
 	outbound, tracker := b.outboundReliable, b.ackTracker
 	b.mu.RUnlock()
-	// Nothing it sent is retransmitted on the closed session's keys.
+	// Nothing it sent is retransmitted on the closed session's keys, and
+	// no handshake reply still names it as the session it installed.
 	outbound.DropSession(sessionID)
+	outbound.forgetInstalled(sessionID)
 	b.dropSessionReplyRoutes(tracker, sessionID)
 }
 
@@ -604,8 +606,8 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 		// An unsecured (PASE / CASE handshake) message is served on the
 		// connection like any other: matter.js creates the unsecured
 		// session for an inbound message from whatever channel carried it
-		// (ExchangeManager.ts:242-265 `createUnsecuredSession({ channel,
-		// initiatorNodeId })`), and its secure-channel servers never ask
+		// (ExchangeManager.ts:325-328 at db021da0 `createUnsecuredSession({
+		// channel, initiatorNodeId })`), and its secure-channel servers never ask
 		// which transport they run on. Replies go back on the connection
 		// (sendVia) without MRP (routeUsesMRP). The handshake holds the
 		// connection open while it runs (holdHandshake, settleHandshake),

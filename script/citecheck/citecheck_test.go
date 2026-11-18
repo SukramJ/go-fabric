@@ -11,7 +11,9 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -98,7 +100,86 @@ import (
 // groups/decode.go was rewritten with net's groups fixes, and the two of
 // schema/fabric_scoped.go went with the hand-written tables the generated
 // fabric-scope tables replaced.
-const citecheckDriftRatchet = 372
+//
+// 374 after review II, phase 6b wave 1, two rows new and none gone. The
+// rewritten addNOCRequest sentence of controller/commissioner/wire.go
+// names AddNoc, which its cited line does not carry at the pin: that line
+// is the addTrustedRootCertificate invoke, the addNoc invoke eleven lines
+// below it (an off-pin citation, open for its re-cite). The cap comment of
+// controller/dcl/certstore.go names GitHub for its second range; its
+// first, the root loop, holds. The lines are in the raising commit.
+//
+// 343 after review II, phase 6b wave 3: a citation whose sentence spells a
+// name in Go's form (AddNoc, IcacValue, OnOff) is kept when the cited file
+// spells it in matter.js's lower camel case ("addNoc", icacValue, onOff)
+// next to the cited line (lowerCamel). 31 rows go, among them
+// controller/commissioner/wire.go's re-cited AddNoc sentence, whose line
+// 1466 is the icacValue field of the addNoc invoke; none is new.
+//
+// 340 after review II, phase 6b wave 4, unit sec: a .ts file a sentence
+// names without a line now takes the names nearest to it, as a bare part or
+// another language's citation does (R2-P6-test-3202), so a name given for
+// it no longer drifts the citation beside it. Three rows go —
+// bridge/bridge.go (CloseSession, beside Session.ts),
+// bridge/subscribe_dispatch.go (AttributeReadResponse, its own file named
+// with its lines broken off) and cluster/levelcontrol/native.go
+// (targetValue, beside Transitions.ts); none is new. Rows whose sentence
+// now names its commit carry it in "at".
+//
+// 305 after the Fable wave-4 read applied (review II, phase 6b): the rows
+// it corrected go, two heuristic rows come (client/interaction/server.go,
+// cluster/spec/decode_value.go: a name the sentence gives for another
+// part); none is a moved citation.
+const citecheckDriftRatchet = 304
+
+// citecheckOffPinRatchet is the number of line citations checked at a
+// matter.js commit other than the pin: their sentence names that commit
+// (`at <sha>`, a sha opening or closing a parenthesis, "matter.js <sha>",
+// "pin <sha>", "HEAD <sha>"), so they are
+// measured there and not at the pin (R2-P6-test-3201, decision 123). The
+// committed summary.md carries the count and the rows per commit; exact in
+// both directions, as citecheckDriftRatchet: a new off-pin citation needs
+// its justification in the commit that raises it, and a citation re-read
+// and re-labelled at the pin lowers it in the same commit. The goal is 0.
+// File-only mentions, bare line parts and chip citations at a commit other
+// than the harness commit are counted in summary.md beside it, not held.
+//
+// 1216 at the first measurement, review II phase 6b wave 4, unit sec: 1327
+// with the forms the collector learnt in the same change ("(0ceb202d, …",
+// "matter.js 0ceb202d …"; 115 citations that read as the pin's before),
+// less the unit's own rows re-read and re-labelled at db021da0. The cite
+// unit counted 1211 at dd17ab06 in the old forms. 151 after the five
+// wave-4 units; 122 after the Fable wave-4 read applied, with the forms
+// of F3 (a sha closing a parenthesis after a comma, "pin <sha>",
+// "HEAD <sha>") counted.
+const citecheckOffPinRatchet = 122
+
+// offPinRowRE reads the off-pin row of summary.md.
+var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
+
+func TestCitecheckOffPinOnRatchet(t *testing.T) {
+	data, err := os.ReadFile("summary.md")
+	if err != nil {
+		t.Fatalf("read the committed summary.md: %v", err)
+	}
+	m := offPinRowRE.FindSubmatch(data)
+	if m == nil {
+		t.Fatal("summary.md carries no off-pin row (regenerate with make cite-report)")
+	}
+	n, _ := strconv.Atoi(string(m[1]))
+	if n != citecheckOffPinRatchet {
+		t.Errorf("summary.md counts %d line citations checked at a matter.js commit other than the pin, the ratchet is %d: a rise needs its justification in the commit, a drop lowers citecheckOffPinRatchet in the same commit", n, citecheckOffPinRatchet)
+	}
+	// The rows per commit add up to the count.
+	sum := 0
+	for _, row := range regexp.MustCompile("(?m)^\\| `([0-9a-f]+)` \\| (\\d+) \\| (\\d+) \\|$").FindAllSubmatch(data, -1) {
+		k, _ := strconv.Atoi(string(row[2]))
+		sum += k
+	}
+	if sum != n {
+		t.Errorf("the off-pin rows per commit add up to %d, the count is %d", sum, n)
+	}
+}
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()
@@ -199,6 +280,7 @@ func sampleTree() fakeTree {
 		"packages/other/lib/Gadget.ts": file(5, nil),
 		"packages/a/index.ts":          file(3, nil),
 		"packages/b/index.ts":          file(3, nil),
+		"packages/protocol/src/certificate/DeviceAttestationValidator.ts": file(40, map[int]string{30: "function idHex() {}"}),
 	}
 }
 
@@ -208,7 +290,8 @@ func sampleCitations(t *testing.T) []citation {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return collectFile("sample.go", string(src))
+	cites, _ := collectFile("sample.go", string(src))
+	return cites
 }
 
 // expectation is testdata/expect.json: what sample.go.txt yields against
@@ -218,6 +301,8 @@ type expectation struct {
 	Citations []struct {
 		Line     int      `json:"line"`
 		Text     string   `json:"text"`
+		Path     string   `json:"path"` // compared when set
+		Bare     bool     `json:"bare"`
 		Idents   []string `json:"idents"`
 		Attached []string `json:"attached"`
 		Shas     []string `json:"shas"`
@@ -251,8 +336,9 @@ func TestCollect(t *testing.T) {
 	}
 	for i, w := range wants {
 		c := got[i]
-		if c.Line != w.Line || c.Text != w.Text || !slices.Equal(c.Idents, w.Idents) || !slices.Equal(c.Attached, w.Attached) || !slices.Equal(c.Shas, w.Shas) {
-			t.Errorf("citation %d = line %d %q idents %v attached %v shas %v, want %+v", i, c.Line, c.Text, c.Idents, c.Attached, c.Shas, w)
+		if c.Line != w.Line || c.Text != w.Text || c.Bare != w.Bare || w.Path != "" && c.Path != w.Path ||
+			!slices.Equal(c.Idents, w.Idents) || !slices.Equal(c.Attached, w.Attached) || !slices.Equal(c.Shas, w.Shas) {
+			t.Errorf("citation %d = line %d %q path %q bare %v idents %v attached %v shas %v, want %+v", i, c.Line, c.Text, c.Path, c.Bare, c.Idents, c.Attached, c.Shas, w)
 		}
 	}
 }
@@ -292,21 +378,34 @@ func TestCheckAndDerive(t *testing.T) {
 	if r := by("unnamed"); r.checked || r.hard != "" {
 		t.Errorf("a citation without names is checked hard only: %+v", r)
 	}
+	// An alias resolves to the file it stands for, and its fix keeps the
+	// alias (expect.json, "fixes").
+	if r := by("alias"); r.rule != ruleExact || r.drift == nil || r.drift.Nearest != 30 || !r.attached {
+		t.Errorf("alias: %+v, want an exact path with attached drift to 30", r)
+	}
 
 	sum := summarise("pin", results)
-	if sum.citations != 11 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 2 {
-		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 11, 1, 4, 2", sum.citations, sum.files, len(sum.hard), len(sum.drift))
+	if sum.citations != 21 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 3 {
+		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 21, 1, 4, 3", sum.citations, sum.files, len(sum.hard), len(sum.drift))
+	}
+	// The two bare parts are checked and counted on their own: never a
+	// citation, a hard error or a drift of the run.
+	if sum.bare != 2 || sum.bareHard != 0 {
+		t.Errorf("summary: %d bare parts, %d with a hard error; want 2, 0", sum.bare, sum.bareHard)
 	}
 	dir := t.TempDir()
 	if err := writeArtefacts(dir, sum); err != nil {
 		t.Fatal(err)
 	}
 	md, _ := os.ReadFile(filepath.Join(dir, "summary.md"))
-	if !strings.Contains(string(md), "| **Drift** | 2 |") || !strings.Contains(string(md), "## Hard errors") {
+	if !strings.Contains(string(md), "| **Drift** | 3 |") || !strings.Contains(string(md), "## Hard errors") {
 		t.Errorf("summary.md:\n%s", md)
 	}
 
-	fixes, owner := derive(tr, results)
+	fixes, owner, err := derive(tr, results)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(fixes) != len(e.Fixes) {
 		t.Errorf("fixes = %+v, want %v", fixes, e.Fixes)
 	}
@@ -358,6 +457,20 @@ func TestOccurrencesLooseAndStrict(t *testing.T) {
 	}
 	if got := occurrences(lines, "#tie", false); !slices.Equal(got, []int{3}) {
 		t.Errorf("#tie = %v", got)
+	}
+	// Go's exported name is matter.js's lower-camel one: lowerCamel finds
+	// "addNoc" and icacValue for AddNoc and IcacValue
+	// (controller/commissioner/wire.go's citation of the addNoc invoke);
+	// occurrences, which decides whether a citation is drift-checked, does not.
+	invoke := []string{`command: "addNoc",`, "icacValue: this.ca.icacCert,", "readdNocx"}
+	if got := lowerCamel(invoke, "AddNoc"); !slices.Equal(got, []int{1}) {
+		t.Errorf("lowerCamel AddNoc = %v, want the invoke", got)
+	}
+	if got := lowerCamel(invoke, "IcacValue"); !slices.Equal(got, []int{2}) {
+		t.Errorf("lowerCamel IcacValue = %v", got)
+	}
+	if got := occurrences(invoke, "AddNoc", true); len(got) != 0 {
+		t.Errorf("loose AddNoc = %v, want none", got)
 	}
 }
 
@@ -464,6 +577,102 @@ func TestCitecheckSecondTree(t *testing.T) {
 	}
 }
 
+// TestCitecheckOffPinCounts runs the tool over a module whose citations
+// name a matter.js commit other than the pin in each form decision 123
+// counts (R2-P6-test-3201, -3202): the line citation at the older commit
+// is the one off-pin row of summary.md, under its commit; one naming the
+// pin counts at the pin; the bare parts after a file named without a line
+// are checked at that commit and counted beside it — one beyond the end of
+// the file is no hard error of the run; and a chip citation at a commit
+// other than the Makefile's harness commit is counted under its commit.
+func TestCitecheckOffPinCounts(t *testing.T) {
+	// Spelt in pieces, as in TestCitecheckSecondTree.
+	const ts = ".t" + "s"
+	matter, old := gitInit(t, map[string]string{"packages/a/src/Bar" + ts: strings.Repeat("// line\n", 20)})
+	r := &gitRepo{dir: matter}
+	if err := os.WriteFile(filepath.Join(matter, "packages/a/src/Bar"+ts), []byte(strings.Repeat("// line\n", 21)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"add", "-A"},
+		{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "pin"},
+	} {
+		if _, err := r.git(args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := r.git("rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := strings.TrimSpace(string(out))
+	const harness = "6170af8461b10b1766044122ac83332c6d00ab20"
+
+	module := func(makefile bool) string {
+		root := t.TempDir()
+		files := map[string]string{
+			"parity/schema.json": fmt.Sprintf(`{"matter": {"sourceCommit": %q}}`, pin),
+			"a.go": "package a\n\n" +
+				"// At the pin: Bar" + ts + ":3.\n\n" +
+				"// Named: Bar" + ts + ":5 at " + pin[:8] + ".\n\n" +
+				"// Older: Bar" + ts + ":4 at " + old[:8] + ".\n\n" +
+				"// Parts: Bar" + ts + " at " + old[:8] + ": :6, :7 and :99.\n\n" +
+				"// chip at 645b267a: Foo.cpp:12. chip at 6170af84: Foo.cpp:13.\n",
+		}
+		if makefile {
+			files["Makefile"] = "CHIP_TEST_IMAGE_COMMIT ?= " + harness + "\n"
+		}
+		for name, body := range files {
+			p := filepath.Join(root, filepath.FromSlash(name))
+			if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return root
+	}
+	dir := t.TempDir()
+	if code, err := run(module(true), matter, filepath.Join(t.TempDir(), "none"), dir, ""); code != 0 {
+		t.Fatalf("run = %d, %v; want 0: a bare part beyond the file is no hard error", code, err)
+	}
+	sum, err := os.ReadFile(filepath.Join(dir, "summary.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"| Citations | 3 |",
+		"| Checked at their own `at <sha>`, the pin | 1 |",
+		"| " + offPinRow + " | 1 |",
+		"| `" + old[:8] + "` | 1 | 3 |",
+		"| A .ts file named without a line part | 1 |",
+		"| … whose sentence names another matter.js commit | 1 |",
+		"| A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 3 |",
+		"| … checked at another matter.js commit | 3 |",
+		"| … with a hard error at the commit it was checked at | 1 |",
+		"| A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 2 |",
+		"| … at a commit other than the harness commit `6170af84` (Makefile CHIP_TEST_IMAGE_COMMIT) | 1 |",
+		"| `645b267a` | 1 |",
+		"| **Hard errors** | 0 |",
+	} {
+		if !strings.Contains(string(sum), want) {
+			t.Errorf("summary.md lacks %q:\n%s", want, sum)
+		}
+	}
+	if m := offPinRowRE.FindSubmatch(sum); len(m) < 2 || string(m[1]) != "1" {
+		t.Errorf("offPinRowRE does not read the off-pin row of a written summary.md: %q", m)
+	}
+
+	dir = t.TempDir()
+	if code, err := run(module(false), matter, filepath.Join(t.TempDir(), "none"), dir, ""); code != 0 {
+		t.Fatalf("run without a Makefile = %d, %v", code, err)
+	}
+	if sum, _ := os.ReadFile(filepath.Join(dir, "summary.md")); !strings.Contains(string(sum), "not measured: the Makefile names no CHIP_TEST_IMAGE_COMMIT") {
+		t.Errorf("summary.md without a harness commit:\n%s", sum)
+	}
+}
+
 // citecheckRegisterRatchet is the number of citations in the parity
 // registers (notes/parity/*.md) that do not resolve: the cited file is not
 // in the tree at the commit the sentence is checked at, or lacks the cited
@@ -481,7 +690,12 @@ func TestCitecheckSecondTree(t *testing.T) {
 // with the phase's re-read of the register (13 left there, 3 in the
 // findings register; 7 "file not found", 5 "ambiguous", 3 "line beyond end
 // of file" and 1 "no matterjs-server commit").
-const citecheckRegisterRatchet = 16
+//
+// 15 after review II, phase 6b wave 4, unit sec: the collector reads a sha
+// opening a parenthesis, so by_design.md's controller-diagnostics row
+// ("matterjs-server (`0bd06f2`)") names its matterjs-server commit and its
+// WebSocketControllerHandler citation resolves.
+const citecheckRegisterRatchet = 15
 
 func TestCitecheckRegistersOnRatchet(t *testing.T) {
 	data, err := os.ReadFile("registers.json")
@@ -584,3 +798,45 @@ func TestCitecheckRegisters(t *testing.T) {
 		t.Errorf("the register's citations are counted in summary.md:\n%s", sum)
 	}
 }
+
+// unreadableTree lists a.ts but cannot read it: a lazy blob fetch failed.
+type unreadableTree struct{}
+
+func (unreadableTree) files() []string { return []string{"packages/x/src/a.ts"} }
+
+func (unreadableTree) content(p string) ([]string, error) {
+	return nil, fmt.Errorf("%w: %s: fetch failed", errEnv, p)
+}
+
+// TestUnreadableBlobIsNoVerdict: a listed file that cannot be read gives no
+// hard error ("file not found") but the run's exit 2 (R2-P6-err-2812).
+func TestUnreadableBlobIsNoVerdict(t *testing.T) {
+	// The text is split so that citecheck does not collect it as a citation.
+	r := check(unreadableTree{}, citation{File: "x.go", Line: 1, Text: "a" + ".ts" + ":3", Path: "a.ts", Lo: 3, Hi: 3})
+	if r.hard != "" || !errors.Is(r.env, errEnv) {
+		t.Errorf("hard %q, env %v; want no hard error and an environment error", r.hard, r.env)
+	}
+}
+
+// TestCatFileOutOfStepStaysDead: after a read that left the batch pipe out
+// of step, every later read fails with that error instead of taking the
+// next object's bytes as its own; "missing" keeps the pipe in step
+// (R2-P6-err-2812).
+func TestCatFileOutOfStepStaysDead(t *testing.T) {
+	c := &catFile{in: nopWriteCloser{}, out: bufio.NewReader(strings.NewReader(
+		"a missing\nb blob 10\nsho"))} // the stream ends inside b: a failed fetch
+	if _, err := c.show("a"); !errors.Is(err, errMissing) || c.dead != nil {
+		t.Fatalf("missing: %v, dead %v", err, c.dead)
+	}
+	if _, err := c.show("b"); err == nil || c.dead == nil {
+		t.Fatalf("short read: %v, dead %v", err, c.dead)
+	}
+	if data, err := c.show("c"); err == nil {
+		t.Errorf("read after the pipe went out of step: %q", data)
+	}
+}
+
+type nopWriteCloser struct{}
+
+func (nopWriteCloser) Write(p []byte) (int, error) { return len(p), nil }
+func (nopWriteCloser) Close() error                { return nil }

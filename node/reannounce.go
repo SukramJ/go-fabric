@@ -28,7 +28,7 @@ func (n *Node) TriggerReannounce(ctx context.Context) {
 // operationalConnected ends the operational broadcast of the fabric a CASE
 // session opened on: matter.js's DeviceAdvertiser notifies the fabric's
 // advertisement of the new session (DeviceAdvertiser.ts:114-129 at
-// 862ad75f), whose DefaultBroadcastSchedule stops at the first connection
+// db021da0), whose DefaultBroadcastSchedule stops at the first connection
 // (broadcastAfterConnection Instant, MdnsAdvertiser.ts:230-231). The
 // service keeps answering queries. A no-op on an advertiser without
 // ServiceConnected (mdns.Noop, a custom Advertiser).

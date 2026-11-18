@@ -17,7 +17,7 @@ func noop(context.Context, any) (any, error) { return nil, nil }
 
 // TestNewServer_MandatoryCommandWithoutHandler: a command the
 // conformance requires and the configuration gives no handler is fatal at
-// construction — matter.js ValidatedElements.ts:357-370 at 0ceb202d
+// construction — matter.js ValidatedElements.ts:357-370 at db021da0
 // ("Implementation missing").
 func TestNewServer_MandatoryCommandWithoutHandler(t *testing.T) {
 	t.Parallel()
@@ -42,7 +42,7 @@ func TestNewServer_MandatoryCommandWithoutHandler(t *testing.T) {
 // Behavior.unimplemented under non-strict validation — the server
 // constructs, the commands stay out of AcceptedCommandList and their
 // responses out of GeneratedCommandList (ValidatedElements.ts:341-343,
-// :361-368; ServerBehaviorBacking.ts:127-148 at 0ceb202d) until a handler
+// :361-368; ServerBehaviorBacking.ts:119-136 at db021da0) until a handler
 // is registered.
 func TestNewServer_UnimplementedStub(t *testing.T) {
 	t.Parallel()

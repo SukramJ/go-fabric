@@ -16,8 +16,8 @@ import (
 )
 
 // UnsecuredSessionID is the session id of the unsecured session. Mirrors
-// matter.js packages/protocol/src/session/UnsecuredSession.ts:18
-// (UNICAST_UNSECURE_SESSION_ID) at 0ceb202d.
+// matter.js packages/protocol/src/codec/MessageCodec.ts:32
+// (UNICAST_UNSECURE_SESSION_ID) at db021da0.
 const UnsecuredSessionID uint16 = 0
 
 // Session is one session of the controller with a peer: the unsecured
@@ -75,7 +75,7 @@ type Session struct {
 	// activeMono is activeTimestamp on the clock's monotonic reading
 	// (clock.MonotonicOf): what the active threshold and the newest-session
 	// order are judged on, so a wall-clock step cannot flip them — matter.js
-	// keeps the stamps on Time.nowUs (Session.ts:141-151 at 862ad75f).
+	// keeps the stamps on Time.nowUs (Session.ts:142-152 at db021da0).
 	activeMono time.Duration
 	exchanges  map[*Exchange]struct{}
 	// handshakes counts the exchanges in exchanges a Sigma1 opened on an
@@ -108,7 +108,7 @@ func (s *Session) Addr() *net.UDPAddr {
 //
 // A session bound to a TCP connection stays on it: its address names the
 // connection (matter.js probes and migrates UDP sessions only,
-// PeerAddressMonitor.ts:138-139 at 862ad75f).
+// PeerAddressMonitor.ts:138-139 at db021da0).
 //
 // A move to a different address notifies the observer OnAddressChanged
 // installed — matter.js MessageChannel's networkAddressChanged, which the
@@ -266,7 +266,7 @@ func (s *Session) Resumed() bool { return s.resumed }
 
 // CreatedAt is when the session was established — matter.js
 // Session.createdAt, the cutoff SessionManager.#handlePeerLoss compares
-// (SessionManager.ts:690-692 at 0ceb202d).
+// (SessionManager.ts:740-742 at db021da0).
 func (s *Session) CreatedAt() time.Time { return s.createdAt }
 
 // IsPeerActive reports whether the peer sent a message within its active
@@ -335,7 +335,7 @@ func (s *Session) ActiveMonotonic() (time.Duration, bool) {
 // A resolver that returns nil, or none, pads nothing. Mirrors matter.js
 // Session.peerMrpMarginsResolver, which the peer sets on each of its
 // sessions to its network profile's margins once its medium is known
-// (packages/protocol/src/peer/Peer.ts:184-186 at 862ad75f).
+// (packages/protocol/src/peer/Peer.ts:184-186 at db021da0).
 func (s *Session) SetPeerMargins(fn func() *Margins) {
 	if fn == nil {
 		s.peerMargins.Store(nil)
@@ -489,24 +489,58 @@ func (s *Session) closeIfDeferred() {
 	}
 }
 
-func (s *Session) addExchange(x *Exchange) {
+// addExchange adds x unless the session is closed: a close that took its
+// snapshot of the exchanges to abort before x arrived would never abort
+// it (review II, R2-P6-conc-1809). The check and the add are one step
+// under s.mu, the lock closeWith sets closed under.
+func (s *Session) addExchange(x *Exchange) bool {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return false
+	}
 	s.exchanges[x] = struct{}{}
-	s.mu.Unlock()
+	return true
 }
 
 // addHandshake adds x, the exchange a Sigma1 opened, unless the session
-// holds [maxInboundUnsecuredHandshakes] such exchanges already — in one
-// step, so two Sigma1 received at once cannot both pass.
+// holds [maxInboundUnsecuredHandshakes] such exchanges already or is
+// closed — in one step, so two Sigma1 received at once cannot both pass.
 func (s *Session) addHandshake(x *Exchange) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.handshakes >= maxInboundUnsecuredHandshakes {
+	if s.closed || s.handshakes >= maxInboundUnsecuredHandshakes {
 		return false
 	}
 	x.handshake = true
 	s.handshakes++
 	s.exchanges[x] = struct{}{}
+	return true
+}
+
+// heldHandshake is the exchange a Sigma1 opened that the session holds,
+// nil for none ([Session.addHandshake]).
+func (s *Session) heldHandshake() *Exchange {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for x := range s.exchanges {
+		if x.handshake {
+			return x
+		}
+	}
+	return nil
+}
+
+// releaseHandshakeOf gives up the handshake place x holds, x staying with
+// the session as an ordinary exchange; false when x holds none.
+func (s *Session) releaseHandshakeOf(x *Exchange) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, held := s.exchanges[x]; !held || !x.handshake {
+		return false
+	}
+	x.handshake = false
+	s.handshakes--
 	return true
 }
 

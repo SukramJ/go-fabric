@@ -398,7 +398,8 @@ func (s *Server) Host() Host {
 
 // DemManager is the device's energy management behind the kit's
 // server: the hooks run after the server's checks; an error
-// answers FAILURE and changes nothing (cluster/energy).
+// answers its status, FAILURE without one, and changes nothing
+// (cluster/energy).
 type DemManager interface {
 	// ApproxEnergyDuringSession is PowerAdjustEnd's EnergyUse, in mWh.
 	ApproxEnergyDuringSession() int64

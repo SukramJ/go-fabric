@@ -10,6 +10,16 @@
   [Host ports](../guides/ports.md) has the current rule, and
   `endpoint/devicetype_validation.go` (`DeviceTypeValidationStrict`) is the
   authority.
+  Note (2026-11-18, review II, R2-P6-doc-3082, -3302, -3316): since
+  [ADR 0031](./0031-ble-and-wifi-provisioning-on-the-device-side.md)
+  CustomNetworkConfig holds only for a node that does not commission over
+  BLE (`endpoint/devicetype_validation.go`, `assembledNodeConditions`;
+  `Topology.CommissionsOverBLE`), as matter.js derives it
+  (`ServerEndpointFacts.ts:135-144` at `db021da0`): a BLE node's RootNode
+  requires NetworkCommissioning. Of Ip, Udp and IPv6, a requirement at the
+  pin does name Ip and IPv6 (`network-infrastructure-manager.element.ts:22`,
+  `:24`); what holds is that no requirement's conformance depends on one,
+  and matter.js derives none (`ConditionAssertions.ts:358-363`).
 - **Date**: 2026-10-06
 - **Related**:
   [ADR 0011 — certifiability is a goal](./0011-certifiability-is-a-goal.md),

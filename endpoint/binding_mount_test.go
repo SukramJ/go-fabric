@@ -175,7 +175,7 @@ func bindingViolations(topo *Topology, ep *Endpoint) []DeviceTypeViolation {
 // TestBindingMountParityMatterJS ports the "a missing Binding server"
 // cases of matter.js
 // packages/node/test/endpoint/validation/DeviceTypeConformanceTest.ts at
-// 862ad75f that TestDeclaredClientMountsBinding does not hold: the
+// db021da0 that TestDeclaredClientMountsBinding does not hold: the
 // assembler mounts the Binding server Base mandates as matter.js's
 // DeviceTypeConformanceService #addBaseServers injects it
 // (DeviceTypeConformanceService.ts:361-369, baseServerOf :670-672), judged

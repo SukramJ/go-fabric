@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -644,5 +645,38 @@ func TestNonVolatileWriteOfTheStoredValueStoresNothing(t *testing.T) {
 	}
 	if v, ok, err := st.GetSetting(t.Context(), st.key); err != nil || !ok || v != nvStoredTLV(t, int64(2100)) {
 		t.Errorf("stored %q (found %v, %v); want 2100's TLV", v, ok, err)
+	}
+}
+
+// TestNonVolatileWriteOfTheHeldValueStoresNothing (F-db021da0-47): a
+// controller's write of the value the server holds, under a key the store
+// never held, stores nothing — matter.js notes and stores no unchanged
+// field (Datasource.ts:1446-1452, :1476-1481 at db021da0); a write that
+// changes the value is stored.
+func TestNonVolatileWriteOfTheHeldValueStoresNothing(t *testing.T) {
+	t.Parallel()
+	st := &writeCountingStore{Port: memstore.New(), key: "nonvolatile.thermo.0201.0012"}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	path := attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	held, err := strconv.ParseInt(dispatchRead(t, n, path), 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := dispatchWrite(t, n, path, held); s != im.StatusSuccess {
+		t.Fatalf("write of the held %d: %v", held, s)
+	}
+	if w := st.writes.Load(); w != 0 {
+		t.Errorf("the store took %d writes for a write of the held value; want none", w)
+	}
+	if _, ok, err := st.GetSetting(t.Context(), st.key); err != nil || ok {
+		t.Errorf("the key is stored (found %v, %v); want it absent", ok, err)
+	}
+	if s := dispatchWrite(t, n, path, held+100); s != im.StatusSuccess {
+		t.Fatalf("write of %d: %v", held+100, s)
+	}
+	if v, ok, err := st.GetSetting(t.Context(), st.key); err != nil || !ok || v != nvStoredTLV(t, held+100) {
+		t.Errorf("stored %q (found %v, %v); want %d's TLV", v, ok, err, held+100)
 	}
 }

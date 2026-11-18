@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
@@ -177,5 +178,31 @@ func TestSpecLevelFlag(t *testing.T) {
 	}
 	if !strings.Contains(levelList(), "1.6.1") {
 		t.Error(levelList())
+	}
+}
+
+// TestNilEndpointSeesATypedNil holds R2-P6-err-2617: a constructor's nil
+// device, passed on as a node.Endpoint with surface.ErrWithheld, is a
+// typed nil that "!= nil" takes for a device; the fleet's add asks
+// nilEndpoint, which sees it, and keeps a real device.
+func TestNilEndpointSeesATypedNil(t *testing.T) {
+	t.Parallel()
+	typedNil := func() (node.Endpoint, error) {
+		var d *device.TemperatureSensor
+		return withheldOr(d, surface.ErrWithheld)
+	}
+	ep, err := typedNil()
+	if ep == nil || !errors.Is(err, surface.ErrWithheld) {
+		t.Fatalf("precondition: want a typed nil with ErrWithheld, got %v %v", ep, err)
+	}
+	if !nilEndpoint(ep) || !nilEndpoint(nil) {
+		t.Fatal("nilEndpoint took a typed nil or a nil interface for a device")
+	}
+	sensor, err := device.NewTemperatureSensor(bridged("t", "t"), temperatureDeclaration(thermometerCelsius))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nilEndpoint(sensor) {
+		t.Fatal("nilEndpoint took a device for nil")
 	}
 }

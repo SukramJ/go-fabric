@@ -34,7 +34,7 @@ const DefaultSettle = 10 * time.Millisecond
 // site logs it): work that waits on the clock while counted would
 // otherwise stall the site. matter.js MockTime abandons a host operation
 // after MAX_HOST_ASYNC_MS (packages/testing/src/mocks/time.ts:63-70 and
-// :169-180 at 862ad75f), measured on the host's clock for the same
+// :169-180 at db021da0), measured on the host's clock for the same
 // reason: counted in turns it would shrink when the machine is loaded.
 // A node.build (inflight.NodeBuild) holds the clock without a budget: it
 // waits on no clock, so it cannot stall the site, and it can take longer.
@@ -74,7 +74,11 @@ type Options struct {
 	// Loopback runs the site's hosts on real UDP sockets on the loopback
 	// address ([::1], an ephemeral port each) instead of the in-memory
 	// network, for a test that needs sockets. The site still answers its
-	// controllers' DNS-SD queries from what the devices publish.
+	// controllers' DNS-SD queries from what the devices publish. On a fake
+	// clock a loopback site runs alone among the process's loopback sites:
+	// [NewSite] waits while a test outside its own tree (the test, its
+	// parents and subtests) holds an open one, as the site's quiet check
+	// cannot tell another loopback site's work from its own.
 	Loopback bool
 	// Settle is the quiet period of [Site.Settle]; 0 is [DefaultSettle].
 	Settle time.Duration
@@ -176,6 +180,8 @@ func NewSite(tb testing.TB, opts Options) *Site {
 	}
 	if !opts.Loopback {
 		s.net = newNetwork(s.clk, opts.Net)
+	} else if s.fake != nil {
+		holdLoopbackSlot(tb)
 	}
 	s.dir = tb.TempDir()
 	s.inSyscall.Store(goroutinesInSyscall())
@@ -236,6 +242,16 @@ func (s *Site) index() int {
 	return i
 }
 
+// logTeardown reports err of what the site closes — a node's stop, a
+// store's or a socket's close — through the test's log, so a host that
+// fails to stop is seen in the test's output; it does not fail the test
+// (R2-P6-test-2519).
+func (s *Site) logTeardown(what string, err error) {
+	if err != nil {
+		s.tb.Logf("fabrictest: %s: %v", what, err)
+	}
+}
+
 // onClose runs fn when the site closes, the last registered first.
 func (s *Site) onClose(fn func()) {
 	s.mu.Lock()
@@ -290,7 +306,7 @@ func (s *Site) Settle(ctx context.Context) error { return s.quiet(ctx, nil, s.wa
 // [Site.Fake]().Advance while the stack may be working: the clock would
 // move under a host still handling a message. It is matter.js's mock
 // clock `advance(ms)`, awaited (packages/testing/src/mocks/time.ts:638-663
-// at 862ad75f), between two waits for the task queue to drain. Without a
+// at db021da0), between two waits for the task queue to drain. Without a
 // fake clock it fails.
 func (s *Site) Step(ctx context.Context, d time.Duration) error {
 	if s.fake == nil {
@@ -667,10 +683,14 @@ func (s *Site) pending() int {
 // ([Site.Settle]) it advances the clock to its next deadline, so a timer
 // fn waits on — a standalone acknowledgement, a retransmission, a
 // report's interval — fires. It returns fn's error, or ctx's when ctx ends
-// first. With a clock that is not a [clocktest.Fake] it only runs fn.
+// first — or, for a ctx without a deadline, [ErrWaited] once [Options].Wait
+// has passed on the wall clock, as [Site.Eventually] (R2-P6-test-2511).
+// fn's context ends when Run returns, so an fn Run gave up on sees its
+// context end. With a clock that is not a [clocktest.Fake] it only runs
+// fn.
 //
 // This is MockTime.resolve (packages/testing/src/mocks/time.ts:537-622 at
-// 862ad75f), under which the matter.js site commissions (mock-site.ts:156):
+// db021da0), under which the matter.js site commissions (mock-site.ts:156):
 // time moves only while nothing else can — no host operation pending
 // (:603, withholdVirtualTime) — read in Go as "no datagram in the
 // network, no counted work on a host, no goroutine working" ([Site.Settle]).
@@ -678,6 +698,9 @@ func (s *Site) Run(ctx context.Context, fn func(ctx context.Context) error) erro
 	if s.fake == nil {
 		return fn(ctx)
 	}
+	until := s.waitUntil(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	finished := make(chan struct{})
 	var result error
 	go func() {
@@ -685,7 +708,7 @@ func (s *Site) Run(ctx context.Context, fn func(ctx context.Context) error) erro
 		result = fn(ctx)
 	}()
 	for {
-		if err := s.quiet(ctx, finished, time.Time{}); err != nil {
+		if err := s.quiet(ctx, finished, until); err != nil {
 			return err
 		}
 		select {

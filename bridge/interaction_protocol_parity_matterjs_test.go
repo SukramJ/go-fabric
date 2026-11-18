@@ -181,8 +181,8 @@ func invokeResponses(t *testing.T, payload []byte) []tlvNode {
 func TestInteractionProtocolBridgeParityMatterJS(t *testing.T) {
 	t.Parallel()
 
-	// InteractionProtocolTest.ts:2126-2138: a CommandDataIB without
-	// CommandFields runs the command.
+	// InteractionProtocolTest.ts:2135-2147 at db021da0: a CommandDataIB
+	// without CommandFields runs the command.
 	t.Run("invoke command with no args", func(t *testing.T) {
 		t.Parallel()
 		h, srv, ep := newScriptedHarness(t)
@@ -284,8 +284,8 @@ func TestInteractionProtocolBridgeParityMatterJS(t *testing.T) {
 }
 
 // TestChunkedWriteAcrossMessagesParityMatterJS ports matter.js
-// packages/node/test/endpoint/server/InteractionProtocolTest.ts:1481-1603
-// at 862ad75f ("write chunked array values across multiple messages"): the
+// packages/node/test/endpoint/server/InteractionProtocolTest.ts:1490-1612
+// at db021da0 ("write chunked array values across multiple messages"): the
 // REPLACE-ALL of an empty ACL in the first WriteRequest (MoreChunkedMessages)
 // and two appends (ListIndex null) in the second, on one exchange, are
 // answered by one WriteResponse each — one status, then two — and leave

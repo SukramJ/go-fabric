@@ -35,9 +35,9 @@ const (
 // reliable way to tell which ecosystem a given fabric represents.
 //
 // The ids are the ones the CSA Distributed Compliance Ledger carries.
-// Two entries here were wrong until 0.60.0 and had been shipped: 0x1037
-// is NXP Semiconductors rather than Aqara, and 0x125D is Tuya rather
-// than Home Assistant. A wrong id costs twice — the real ecosystem's
+// Two entries here were once wrong and had been shipped: 0x1037 is NXP
+// Semiconductors rather than Aqara, and 0x125D is Tuya rather than Home
+// Assistant. A wrong id costs twice — the real ecosystem's
 // fabric falls through to unknown and is never warned about, and a
 // fabric belonging to whoever owns the id is labelled as an ecosystem it
 // has nothing to do with.

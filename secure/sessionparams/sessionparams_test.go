@@ -59,8 +59,8 @@ func TestEncodeShapeMatchesTlvSessionParameters(t *testing.T) {
 }
 
 // TestMaxTCPMessageSizeOnlyWithTCP: tag 9 is written only when the
-// bitmap names TCP (SessionParameters.ts:58-63), and an unstated field is
-// omitted.
+// bitmap names TCP (SessionParameters.ts:58-63), and an unstated field
+// other than the bitmap is omitted.
 func TestMaxTCPMessageSizeOnlyWithTCP(t *testing.T) {
 	t.Parallel()
 	encode := func(p sessionparams.Parameters) []byte {
@@ -80,7 +80,8 @@ func TestMaxTCPMessageSizeOnlyWithTCP(t *testing.T) {
 	if !bytes.Contains(withTCP, []byte{0x26, 0x09, 0xDC, 0x05, 0x00, 0x00}) {
 		t.Fatalf("tag 9 missing with TCP: % X", withTCP)
 	}
-	if got := encode(sessionparams.Parameters{}); !bytes.Equal(got, []byte{0x35, 0x05, 0x18}) {
+	// The bitmap is stated always, 0 without TCP (R2-P6-par-2905).
+	if got := encode(sessionparams.Parameters{}); !bytes.Equal(got, []byte{0x35, 0x05, 0x25, 0x08, 0x00, 0x00, 0x18}) {
 		t.Fatalf("empty structure = % X", got)
 	}
 	if !(sessionparams.Parameters{}).IsEmpty() || (sessionparams.Parameters{MaxPathsPerInvoke: 1}).IsEmpty() {

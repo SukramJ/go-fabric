@@ -14,7 +14,7 @@ import (
 // The chunking of a write into WriteRequest messages — matter.js
 // InteractionClientMessenger.#chunkWriteRequest and sendWriteCommand
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1269-1450 at
-// 862ad75f, Matter 1.6.1 § 10.6.4.3.1, § 10.7.6.2).
+// db021da0, Matter 1.6.1 § 10.6.4.3.1, § 10.7.6.2).
 
 // writeValue encodes an AttributeDataIB's Data.
 func writeValue(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
@@ -54,7 +54,10 @@ func responseSize(statuses ...im.AttributeStatus) int {
 }
 
 // maxStatusSizeOf is the largest AttributeStatusIB a peer answers path
-// with (InteractionMessenger.ts:102-106).
+// with (InteractionMessenger.ts:102-106). The budget it makes holds for a
+// concrete path only: a write to a wildcard endpoint is answered with one
+// status per matched endpoint, a number the client does not know (review
+// II, R2-P6-par-2156).
 func maxStatusSizeOf(path im.ConcreteAttributePath) int {
 	worst := im.AttributeStatus{Path: path, Status: im.StatusIB{Status: im.StatusFailure, ClusterStatus: uint8(im.StatusFailure), HasClusterStatus: true}}
 	return responseSize(worst) - responseSize()

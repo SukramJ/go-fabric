@@ -87,3 +87,46 @@ func TestAppPipeExistingIsMadePrivate(t *testing.T) {
 		}
 	})
 }
+
+// TestAppPipeReaderChecksWhatItOpened holds R2-P6-sec-2614: the reader
+// opens the path once, without following a symbolic link, and reads from
+// the descriptor it checked — a pipe swapped for a link or a regular file
+// after makeFIFO is refused, and a regular file at the path keeps its mode.
+func TestAppPipeReaderChecksWhatItOpened(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.fifo")
+	if err := makeFIFO(path); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(dir, "other.fifo")
+	if err := syscall.Mkfifo(other, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, path); err != nil {
+		t.Fatal(err)
+	}
+	if fh, err := openFIFOReader(path); err == nil {
+		_ = fh.Close()
+		t.Fatal("the reader followed a symbolic link swapped in for the pipe")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if fh, err := openFIFOReader(path); err == nil {
+		_ = fh.Close()
+		t.Fatal("the reader took a regular file swapped in for the pipe")
+	}
+	if err := makeFIFO(path); err == nil {
+		t.Fatal("makeFIFO took a regular file")
+	}
+	if st, err := os.Stat(path); err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("the regular file's mode changed: %v %v", st.Mode(), err)
+	}
+}

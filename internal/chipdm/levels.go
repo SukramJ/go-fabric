@@ -27,14 +27,19 @@ type LevelIDs struct {
 	Clusters map[uint32]*LevelCluster
 }
 
-// LevelCluster are a cluster's member ids: features by bit, commands
-// request and response alike.
+// LevelCluster are a cluster's member ids: features by bit, commands by
+// direction — a request and a response may share an id (Groups 0-3,
+// Scenes Management 0-1), so one direction missing at a level would not
+// show in a merged set (R2-P6-test-2853).
 type LevelCluster struct {
-	Features, Attributes, Commands, Events map[uint32]bool
+	Features, Attributes, Requests, Responses, Events map[uint32]bool
 }
 
 func newLevelCluster() *LevelCluster {
-	return &LevelCluster{Features: map[uint32]bool{}, Attributes: map[uint32]bool{}, Commands: map[uint32]bool{}, Events: map[uint32]bool{}}
+	return &LevelCluster{
+		Features: map[uint32]bool{}, Attributes: map[uint32]bool{},
+		Requests: map[uint32]bool{}, Responses: map[uint32]bool{}, Events: map[uint32]bool{},
+	}
 }
 
 // isGlobalAttribute: the global attributes (0xFFF8–0xFFFD) are compared
@@ -59,8 +64,11 @@ func LevelIDsOfFile(f leveltable.File) LevelIDs {
 				lc.Attributes[id] = true
 			}
 		}
-		for _, id := range c.Commands {
-			lc.Commands[id] = true
+		for _, id := range c.RequestCommands {
+			lc.Requests[id] = true
+		}
+		for _, id := range c.ResponseCommands {
+			lc.Responses[id] = true
 		}
 		for _, id := range c.Events {
 			lc.Events[id] = true
@@ -101,8 +109,12 @@ func LevelIDsOfModel(m *Model) LevelIDs {
 			}
 		}
 		for _, e := range eff.commands {
-			if e.ID != nil {
-				lc.Commands[*e.ID] = true
+			switch {
+			case e.ID == nil:
+			case e.Direction == "response":
+				lc.Responses[*e.ID] = true
+			default: // "" is a request, as the comparison keys it
+				lc.Requests[*e.ID] = true
 			}
 		}
 		for _, e := range eff.events {
@@ -128,7 +140,7 @@ const (
 // CompareLevel compares the presence of every id of ours (the level file)
 // and chip (data_model/<level>), both ways. A difference's path is
 // "<LevelSegment>.deviceType.0x<id>", "<…>.cluster.0x<id>" or
-// "<…>.cluster.0x<id>.<feature|attribute|command|event>.<bit or 0x id>";
+// "<…>.cluster.0x<id>.<feature|attribute|request|response|event>.<bit or 0x id>";
 // its property "presence", its values "present" or "absent". Members are
 // compared only on clusters both sides state.
 func CompareLevel(level string, ours, chip LevelIDs) []Difference {
@@ -171,7 +183,8 @@ func CompareLevel(level string, ours, chip LevelIDs) []Difference {
 		}{
 			{"feature", o.Features, c.Features, "%d"},
 			{"attribute", o.Attributes, c.Attributes, "0x%04x"},
-			{"command", o.Commands, c.Commands, "0x%02x"},
+			{"request", o.Requests, c.Requests, "0x%02x"},
+			{"response", o.Responses, c.Responses, "0x%02x"},
 			{"event", o.Events, c.Events, "0x%02x"},
 		} {
 			for _, x := range unionIDs(m.ours, m.chp) {

@@ -262,7 +262,7 @@ the fabric under `controller.ca.fabric`.
 The database therefore holds the fabric's private keys. Anyone with the
 file controls every node paired to it.
 
-*Source: `controller/ca/doc.go:4-17`, `controller/commissioner/fabric.go:23-69`, `controller/commissioner/fabricauthority.go`, `controller/ca/persist.go:94-115`, `examples/reference-controller/README.md` (The database).*
+*Source: `controller/ca/doc.go` (package doc), `controller/commissioner/fabric.go` (`FabricConfig`), `controller/commissioner/fabricauthority.go`, `controller/ca/persist.go` (`SettingStore`, `DefaultSettingKey`), `examples/reference-controller/README.md` (The database).*
 
 ## Pairing
 
@@ -436,7 +436,7 @@ module never pulls its D-Bus dependency; the reference controller's BLE
 build is its `cmd/reference-controller` (`pair --ble`, rights and BlueZ
 version in the reference controller's README).
 
-*Source: `examples/reference-controller/cli/pair.go:37-189`, `examples/reference-controller/cli/pair.go:214-246`, `ble/bluez/doc.go:4-30`, `controller/client/fabricops.go:108-157`, `controller/client/fabricops.go:224-232`, `controller/commissioner/commissioner.go:85-123`, `controller/commissioner/doc.go:4-19`, `controller/commissioner/progress.go`, `controller/client/registry.go:177-192`, `controller/commissioner/reconnect_probe.go`, `client/peer/hint.go`.*
+*Source: `examples/reference-controller/cli/pair.go` (`parseCode`, `networkOptions`, `cmdPair`), `ble/bluez/doc.go` (package doc), `controller/client/fabricops.go` (`CommissionOptions`, `Registry.Commission`, `Registry.Decommission`), `controller/commissioner/commissioner.go` (`Options`), `controller/commissioner/doc.go` (package doc), `controller/commissioner/progress.go`, `controller/client/registry.go` (`Registry.allocateIDLocked`), `controller/commissioner/reconnect_probe.go`, `client/peer/hint.go`.*
 
 ## Attestation and the DCL
 
@@ -522,7 +522,7 @@ A rejection matches `commissioner.ErrAttestationRejected` through
 `errors.Is`, besides `commissioner.ErrCommissioning`, so a host tells a
 refused device from a network failure.
 
-*Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/profile.go`, `controller/attestation/cdsigners.go`, `controller/attestation/validate.go`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:192-274`.*
+*Source: `controller/attestation/doc.go` (package doc), `controller/attestation/store.go` (`TestStore`), `controller/attestation/profile.go`, `controller/attestation/cdsigners.go`, `controller/attestation/validate.go`, `controller/attestation/policy.go` (`Policy`), `controller/commissioner/commissioner.go` (`Context.Attestation`), `controller/dcl/doc.go` (package doc), `examples/reference-controller/cli/stack.go` (`openSnapshot`, `openTrust`, `attestationPolicy`).*
 
 ## The registry and the device view
 
@@ -559,7 +559,7 @@ report (`Report.Values(endpoint, cluster)`).
 The image is persisted with `controller/client/sqlstore`, so a later run
 starts from what the last one saw.
 
-*Source: `controller/client/doc.go:19-50`, `controller/client/registry.go:24-192`, `controller/client/registry.go:345-371`, `controller/client/endpoint.go:56-148`, `controller/client/cluster.go:207-348`, `examples/reference-controller/cli/pair.go:191-212`.*
+*Source: `controller/client/doc.go` (package doc, The data model), `controller/client/registry.go` (`RegistryConfig`, `NewRegistry`, `Registry.Start`), `controller/client/endpoint.go` (`Endpoint`), `controller/client/cluster.go` (`Cluster`, `Cluster.Decoded`, `Cluster.Value`), `examples/reference-controller/cli/pair.go` (`printDevice`).*
 
 ## Read, write, invoke, subscribe
 
@@ -599,7 +599,7 @@ doc comment names the fields a host sets.
   while the peer primes it is answered `INVALID_SUBSCRIPTION`, so the
   device keeps none for it.
 
-*Source: `controller/client/surface.go`, `controller/client/interact.go:15-122`, `cluster/spec/value.go`, `client/interaction/subscribe.go:44-90`, `client/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
+*Source: `controller/client/surface.go`, `controller/client/interact.go` (`ReadRequest`, `Node.Read`, `Node.Subscribe`), `cluster/spec/value.go`, `client/interaction/subscribe.go` (`SubscribeRequest`), `client/interaction/handler.go` (`Subscriptions.handleReport`), `examples/reference-controller/cli/interact.go` (`cmdSubscribe`).*
 
 ## More of the facade
 
@@ -868,8 +868,10 @@ software-update manager: `Controller.SoftwareUpdates()` is a
 `softwareupdate.Manager` — `AddUpdateConsent` queues a node's update and
 announces the provider to it, `ForceUpdate` announces at once,
 `RemoveConsent` cancels, `QueryUpdates` and `CheckForUpdates` look for
-updates in the `softwareupdate.Images` store and the DCL ledgers,
-`QueuedUpdates` shows the queue. The provider is the controller itself: the
+updates in the `softwareupdate.Images` store and the DCL ledgers (a product
+whose check fails is passed over; its failure joins the returned error,
+which is nil only when every product's check succeeded, while the updates
+found for the others are still returned), `QueuedUpdates` shows the queue. The provider is the controller itself: the
 OTA provider server sits at `controller.OTAProviderEndpoint` of the
 controller's own endpoint tree, served as RootNodeID over the sessions the
 controller holds (matter.js's provider on the controller's node), and the
@@ -906,8 +908,9 @@ _, err = c.SoftwareUpdates().AddUpdateConsent(ctx, peer, softwareupdate.Target{
 A store without a ledger offers stored images only. `ImagesConfig.Ledger`
 (a `dcl.OTAVersions` with a `dcl.Client` for the production ledger, the
 test-net ledger or both) turns the ledger lookups and the downloads on:
-`DownloadUpdate` fetches the image a ledger record names and
-`UpdateInfoFromURL` one a URL names, each into memory, verified before it
+`DownloadUpdate` fetches the image a ledger record names, or the one a URL
+names after `UpdateInfoFromURL` has read its header (only the header: that
+download ends once the header is in), into memory, verified before it
 is stored — unless the store's `Blobs` type itself implements
 `softwareupdate.BlobStreamer` (`MemoryBlobs` does not): `DownloadUpdate` then
 writes the image into the backend as it arrives, verifies it by reading it

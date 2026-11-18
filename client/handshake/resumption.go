@@ -47,9 +47,9 @@ type ResumptionStore interface {
 	FindResumptionRecord(peer PeerAddress) (ResumptionRecord, bool)
 	// FindByResumptionID returns the record whose resumption id is id, if
 	// any — matter.js SessionManager.findResumptionRecordById
-	// (session/SessionManager.ts:841-849 at 0ceb202d), which scans every
-	// record; the CASE responder looks a resuming Sigma1 up with it
-	// (CaseServer.ts:113-116).
+	// (session/SessionManager.ts:880-886 at db021da0), a lookup in
+	// #resumptionRecordsById (:882); the CASE responder looks a resuming
+	// Sigma1 up with it (CaseServer.ts:113-116).
 	FindByResumptionID(id []byte) (ResumptionRecord, bool)
 	// SaveResumptionRecord stores rec, replacing the peer's earlier one.
 	SaveResumptionRecord(rec ResumptionRecord) error

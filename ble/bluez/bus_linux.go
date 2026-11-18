@@ -56,6 +56,9 @@ type bus interface {
 	// Emit sends the signal name (interface.member) from this process's
 	// object at path.
 	Emit(path dbus.ObjectPath, name string, values ...any) error
+	// NameOwner is the unique name that owns the bus name name
+	// (org.freedesktop.DBus.GetNameOwner).
+	NameOwner(ctx context.Context, name string) (string, error)
 	// Close releases the bus.
 	Close() error
 }
@@ -128,6 +131,14 @@ func (b *systemBus) Export(path dbus.ObjectPath, iface string, methods map[strin
 
 func (b *systemBus) Emit(path dbus.ObjectPath, name string, values ...any) error {
 	return b.conn.Emit(path, name, values...)
+}
+
+func (b *systemBus) NameOwner(ctx context.Context, name string) (string, error) {
+	var owner string
+	if err := b.conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, name).Store(&owner); err != nil {
+		return "", wrap("org.freedesktop.DBus.GetNameOwner", "", err)
+	}
+	return owner, nil
 }
 
 func (b *systemBus) Close() error {

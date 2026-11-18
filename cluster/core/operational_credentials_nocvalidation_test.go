@@ -237,9 +237,9 @@ func TestUpdateNOC_DifferentFabricIDRejectedAsInvalidNOC(t *testing.T) {
 // updates the fabric row's NodeID via [store.Store.UpdateFabricNodeID]
 // and (b) fires onFabricWithdraw with the OLD (CompressedID, NodeID) so
 // the stale mDNS operational instance is retracted. Mirrors matter.js
-// Fabric.ts:548 (nodeId lifted from the new NOC) + DeviceAdvertiser.ts:
-// 65-76 (close the fabric's advertisement when nodeId changed, then
-// re-advertise).
+// Fabric.ts:602-605, :636 (nodeId lifted from the new NOC) +
+// DeviceAdvertiser.ts:80-107 at db021da0 (close the fabric's advertisement
+// when nodeId changed, then re-advertise).
 func TestUpdateNOC_NewNodeIDUpdatesStoreAndFiresWithdraw(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -312,7 +312,7 @@ func TestUpdateNOC_NewNodeIDUpdatesStoreAndFiresWithdraw(t *testing.T) {
 // TestRemoveFabric_WithdrawsTheRemovedFabricOnly verifies that
 // RemoveFabric fires onFabricWithdraw once, with the removed fabric's
 // (CompressedID, NodeID), and republishes nothing else. Mirrors matter.js
-// DeviceAdvertiser.ts:109-111 at 862ad75f (fabrics.events.deleting →
+// DeviceAdvertiser.ts:109-111 at db021da0 (fabrics.events.deleting →
 // Advertisement.cancelAll of that fabric's operational advertisements;
 // no reannounce of the remaining set — review 2026-11 W6-reg-08 retired
 // the OnMDNSReannounce hook that did one).

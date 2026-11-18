@@ -203,11 +203,12 @@ type demoValve struct {
 	closesAt    time.Time
 	defaultOpen *uint32
 	// closer fires at closesAt; replaced by every Open, stopped by Close.
-	closer *time.Timer
+	closer latestTimer
 	// target is the position the head is travelling to; nil when it is not
-	// moving. arrive fires when it gets there.
+	// moving. arrive fires when it gets there; a stale arrival of an
+	// earlier travel does nothing (latestTimer).
 	target *valvedef.ValveStateEnum
-	arrive *time.Timer
+	arrive latestTimer
 	// level is the head's level in percent, levelTarget the level it
 	// travels to (nil once there); defaultLevel is DefaultOpenLevel.
 	level        uint8
@@ -234,24 +235,21 @@ func (v *demoValve) travelLocked(to valvedef.ValveStateEnum) {
 		v.levelTarget = nil
 		return
 	}
-	if v.arrive != nil {
-		v.arrive.Stop()
-	}
 	v.target = &to
 	v.state = valvedef.ValveStateTransitioning
-	v.arrive = time.AfterFunc(valveTravel, v.arrived)
+	v.arrive.armLocked(valveTravel, v.arrived)
 }
 
-// arrived completes the head's travel.
-func (v *demoValve) arrived() {
+// arrived completes the head's travel armed as gen; an earlier travel's
+// arrival that fired before the re-arm stopped it does nothing.
+func (v *demoValve) arrived(gen uint64) {
 	v.mu.Lock()
-	if v.target == nil {
+	if !v.arrive.takeLocked(gen) || v.target == nil {
 		v.mu.Unlock()
 		return
 	}
 	v.state = *v.target
 	v.target = nil
-	v.arrive = nil
 	if v.levelTarget != nil {
 		v.level = *v.levelTarget
 		v.levelTarget = nil
@@ -269,10 +267,7 @@ func (v *demoValve) openingLocked() bool {
 
 // stopTravelLocked abandons a travel in progress. Caller holds v.mu.
 func (v *demoValve) stopTravelLocked() {
-	if v.arrive != nil {
-		v.arrive.Stop()
-		v.arrive = nil
-	}
+	v.arrive.stopLocked()
 	v.target = nil
 	v.levelTarget = nil
 }
@@ -441,14 +436,11 @@ func (v *demoValve) Open(_ context.Context, req valvedef.OpenRequest) error {
 	}
 	v.travelLocked(valvedef.ValveStateOpen)
 	v.openFor = copyUint32(duration)
-	if v.closer != nil {
-		v.closer.Stop()
-		v.closer = nil
-	}
+	v.closer.stopLocked()
 	if duration != nil {
 		d := time.Duration(*duration) * time.Second
 		v.closesAt = time.Now().Add(d)
-		v.closer = time.AfterFunc(d, v.timedClose)
+		v.closer.armLocked(d, v.timedClose)
 	} else {
 		v.closesAt = time.Time{}
 	}
@@ -458,11 +450,15 @@ func (v *demoValve) Open(_ context.Context, req valvedef.OpenRequest) error {
 	return nil
 }
 
-// timedClose is the valve's own timer ending a timed opening.
-func (v *demoValve) timedClose() {
+// timedClose is the valve's own timer ending a timed opening armed as
+// gen; a stale one does nothing.
+func (v *demoValve) timedClose(gen uint64) {
 	v.mu.Lock()
+	if !v.closer.takeLocked(gen) {
+		v.mu.Unlock()
+		return
+	}
 	v.expireLocked(time.Now())
-	v.closer = nil
 	v.mu.Unlock()
 	slog.Info("valve.timed_close", slog.String("device", v.name))
 	v.notify()
@@ -471,10 +467,7 @@ func (v *demoValve) timedClose() {
 // Close implements [valvedef.StateSource].
 func (v *demoValve) Close(context.Context) error {
 	v.mu.Lock()
-	if v.closer != nil {
-		v.closer.Stop()
-		v.closer = nil
-	}
+	v.closer.stopLocked()
 	if v.levelTarget != nil || v.level != 0 {
 		v.levelTarget = new(uint8(0))
 	}
@@ -490,9 +483,10 @@ func (v *demoValve) Close(context.Context) error {
 // reportFromDevice applies a position the valve reported by itself — the
 // manual lever on the head, or its own local timer — as opposed to one a
 // Matter command asked for. A real host drives this from its southbound
-// event stream; this example has no southbound bus, so the only caller is
-// the fleet's own test, where it stands for a change that starts at the
-// device rather than at a controller.
+// event stream; this example has no southbound bus, so its callers are
+// the app pipe's SetValveState command (control.go) and the fleet's own
+// test, where it stands for a change that starts at the device rather than
+// at a controller.
 func (v *demoValve) reportFromDevice(state valvedef.ValveStateEnum) {
 	v.mu.Lock()
 	v.stopTravelLocked()
@@ -625,7 +619,8 @@ func (s *demoSelector) ChangeToMode(_ context.Context, newMode uint8) error {
 
 // reportFromDevice applies a position someone turned the knob to by hand.
 // Like [demoValve.reportFromDevice] it stands in for the southbound event a
-// real host would forward, and the fleet's test is its caller. An unknown
+// real host would forward; the app pipe's SetSelectorMode command
+// (control.go) and the fleet's test are its callers. An unknown
 // mode is refused rather than stored: the device cannot be in a position its
 // own mode list does not have.
 func (s *demoSelector) reportFromDevice(mode uint8) error {
@@ -1256,7 +1251,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 		errs []error
 	)
 	add := func(ep node.Endpoint, err error) {
-		if errors.Is(err, surface.ErrWithheld) && ep != nil {
+		// A constructor's nil device arrives as a typed nil (*T)(nil)
+		// inside the interface, which "ep != nil" takes for a device
+		// (R2-P6-err-2617): nilEndpoint looks inside.
+		if errors.Is(err, surface.ErrWithheld) && !nilEndpoint(ep) {
 			// Withheld by --spec-level: the node records it at Add
 			// (addAll, surface.go).
 			out = append(out, ep)
@@ -1264,6 +1262,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 		}
 		if err != nil {
 			errs = append(errs, err)
+			return
+		}
+		if nilEndpoint(ep) {
+			errs = append(errs, errors.New("a device constructor returned no device and no error"))
 			return
 		}
 		out = append(out, ep)

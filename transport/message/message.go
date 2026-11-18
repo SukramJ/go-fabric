@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 )
 
 // Message Flags bit layout (Core Spec §4.4.1.1).
@@ -124,7 +125,7 @@ var (
 
 	// ErrUnicastGroupDestination is returned for a unicast session type
 	// whose DSIZ names a destination group id. Mirrors matter.js
-	// packages/protocol/src/codec/MessageCodec.ts:223-225
+	// packages/protocol/src/codec/MessageCodec.ts:231-233 at db021da0
 	// ("Unicast session cannot have destination group
 	// id.") and chip src/transport/raw/MessageHeader.cpp:209-212
 	// (kDestinationGroupIdPresent outside a group session).
@@ -285,12 +286,23 @@ func (h Header) AAD() []byte {
 }
 
 // SessionOrderKey is the order key of a datagram for transport/udp's
-// ServeOrdered: the session id of a unicast secure message, read from the
-// unencrypted header without decoding it. The unsecured session (id 0, the
-// PASE and CASE handshakes) and group messages have none, and a datagram
-// too short for the header has none. A node and a controller both key
-// their receive path by it, so the messages of one session are handled in
-// arrival order.
+// ServeOrdered: the messages of one session are handled in arrival order. A
+// unicast secure message is keyed by its session id, read from the
+// unencrypted header without decoding it. An unsecured message (session id
+// 0, the PASE and CASE handshakes) is keyed by the node id of the
+// handshake's initiator — its destination node id when it has one (a
+// response carries the initiator's ephemeral id there), else its source node
+// id — which is the unit of matter.js's unsecured session
+// (packages/protocol/src/protocol/ExchangeManager.ts:306-312 at db021da0,
+// `packet.header.destNodeId ?? packet.header.sourceNodeId`), so the
+// unsecured counter window of one initiator ([mrp.Window], keyed by the
+// same peer) sees its counters in arrival order, as in both references
+// (review II, N3-coord-1). The two key spaces do not meet: a session id is
+// below 1<<16, an unsecured key at or above it; two initiators whose ids
+// fold to one key share a queue, which orders more than needed and loses
+// nothing. Group messages, an unsecured message that names no node id and a
+// datagram too short for its header have no key and are handled
+// concurrently. A node and a controller both key their receive path by it.
 func SessionOrderKey(datagram []byte) (uint32, bool) {
 	if len(datagram) < 4 {
 		return 0, false
@@ -299,10 +311,44 @@ func SessionOrderKey(datagram []byte) (uint32, bool) {
 		return 0, false
 	}
 	sid := binary.LittleEndian.Uint16(datagram[1:3])
-	if sid == 0 {
+	if sid != 0 {
+		return uint32(sid), true
+	}
+	id, ok := unsecuredInitiatorID(datagram)
+	if !ok {
 		return 0, false
 	}
-	return uint32(sid), true
+	fold := binary.LittleEndian.Uint32(id[:4]) ^ binary.LittleEndian.Uint32(id[4:])
+	return unsecuredOrderKeyBase + fold%(math.MaxUint32-unsecuredOrderKeyBase+1), true
+}
+
+// unsecuredOrderKeyBase is the lowest order key of an unsecured message,
+// above every session id ([SessionOrderKey]).
+const unsecuredOrderKeyBase = 1 << 16
+
+// unsecuredInitiatorID is the initiator's node id of an unsecured message,
+// its eight wire bytes: its destination node id when it has a 64-bit one,
+// else its source node id ([SessionOrderKey]).
+func unsecuredInitiatorID(datagram []byte) (id []byte, ok bool) {
+	const fixed = 1 + 2 + 1 + 4
+	flags := datagram[0]
+	off := fixed
+	var src []byte
+	hasSrc := flags&msgFlagSourcePres != 0
+	if hasSrc {
+		if len(datagram) < off+8 {
+			return nil, false
+		}
+		src = datagram[off : off+8]
+		off += 8
+	}
+	if DestSize(flags&msgFlagDSizMask) == DestNodeID {
+		if len(datagram) < off+8 {
+			return nil, false
+		}
+		return datagram[off : off+8], true
+	}
+	return src, hasSrc
 }
 
 // UnmarshalHeader decodes a Matter message header. Returns the

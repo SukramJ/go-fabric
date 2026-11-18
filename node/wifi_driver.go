@@ -5,64 +5,34 @@ package node
 
 import (
 	"context"
-	"errors"
 
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
-// reannouncingDriver is the host's Wi-Fi driver as the node hands it to
-// the Wi-Fi NetworkCommissioning server: a successful ConnectNetwork
-// command re-announces the node's DNS-SD records at once instead of
+// wifiConnected re-announces the node's DNS-SD records after a successful
+// join of the Wi-Fi NetworkCommissioning server's driver
+// (mattercore.WiFiNetworkCommissioningConfig.OnConnected) instead of
 // waiting for the responder's interface check. The rejoin at [Node.Start]
-// goes through it too; it runs before the start sequence publishes the
+// runs it too; that rejoin runs before the start sequence publishes the
 // fabrics' operational records (startLocked), so there the trigger finds
-// nothing published yet and the records go out right after it. Mirrors matter.js
+// nothing published yet and the records go out right after it. Mirrors
+// matter.js
 // examples/device-onoff-advanced/src/cluster/DummyWifiNetworkCommissioningServer.ts:132-133
 // at db021da0 ("Announce operational in IP network",
-// `this.env.get(DeviceAdvertiser).restartAdvertisement()` after its connect). The
-// cluster's own handling of the result does not change.
-type reannouncingDriver struct {
-	contract.WiFiDriver
-	n *Node
+// `this.env.get(DeviceAdvertiser).restartAdvertisement()` after its
+// connect).
+func (n *Node) wifiConnected(ctx context.Context) {
+	n.TriggerReannounce(ctx)
 }
 
-// ConnectNetwork joins through the host's driver and re-announces on
-// Success.
-func (d reannouncingDriver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (status uint8, debugText string, errorValue int32) {
-	status, debugText, errorValue = d.WiFiDriver.ConnectNetwork(ctx, ssid, credentials)
-	if netcommdef.NetworkCommissioningStatusEnum(status) == netcommdef.NetworkCommissioningStatusSuccess {
-		d.n.TriggerReannounce(ctx)
-	}
-	return status, debugText, errorValue
-}
-
-// CurrentNetwork forwards to the host's driver when it is a
-// [contract.WiFiLinkReporter], so the cluster asks it where the radio is
-// after a failed join; without one the network is not known.
-func (d reannouncingDriver) CurrentNetwork(ctx context.Context) (ssid []byte, known bool) {
-	if r, ok := d.WiFiDriver.(contract.WiFiLinkReporter); ok {
-		return r.CurrentNetwork(ctx)
-	}
-	return nil, false
-}
-
-// SetInterfaceEnabled forwards to the host's driver when it is a
-// [contract.WiFiInterfaceSwitcher], so a write of InterfaceEnabled
-// switches the interface; without one it answers errors.ErrUnsupported,
-// the cluster's INVALID_ACTION for a write of false.
-func (d reannouncingDriver) SetInterfaceEnabled(ctx context.Context, enabled bool) error {
-	if s, ok := d.WiFiDriver.(contract.WiFiInterfaceSwitcher); ok {
-		return s.SetInterfaceEnabled(ctx, enabled)
-	}
-	return errors.ErrUnsupported
-}
-
-// wifiDriver is [Network].WiFi's Driver wrapped for the cluster, nil
+// wifiDriver is [Network].WiFi's Driver as the node hands it to the Wi-Fi
+// NetworkCommissioning server: the host's own, unwrapped, so the server
+// finds every optional port the driver has — the link watch and the
+// disconnect a wrapper hid before (review II, R2-P6-api-2450); nil
 // without one.
 func (n *Node) wifiDriver() contract.WiFiDriver {
 	if w := n.cfg.Network.WiFi; w != nil && w.Driver != nil {
-		return reannouncingDriver{WiFiDriver: w.Driver, n: n}
+		return w.Driver
 	}
 	return nil
 }

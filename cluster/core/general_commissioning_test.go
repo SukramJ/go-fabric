@@ -228,9 +228,11 @@ func TestGencomm_WriteBreadcrumbValid(t *testing.T) {
 func TestGencomm_WriteBreadcrumbWrongType(t *testing.T) {
 	t.Parallel()
 	gc := defaultGencomm(t)
+	// A written value of the wrong Go type answers INVALID_DATA_TYPE for
+	// the path (owner decision 234; review II, W6-test-17, R2-P6-err-3112).
 	err := gc.MatterWrite(context.Background(), 0x0000, "not-a-uint64")
-	if spec.StatusOf(err) != im.StatusFailure {
-		t.Fatalf("Breadcrumb of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
+	if spec.StatusOf(err) != im.StatusInvalidDataType {
+		t.Fatalf("Breadcrumb of the wrong type: status %v (%v), want %v", spec.StatusOf(err), err, im.StatusInvalidDataType)
 	}
 }
 
@@ -286,7 +288,7 @@ func TestGencomm_ArmFailSafe_Arms(t *testing.T) {
 // TestGencomm_ArmFailSafe_AboveMax_ArmsToTheCumulativeLimit: an
 // ExpiryLengthSeconds above FailSafeMaxSeconds arms, as matter.js arms or
 // extends with the value as sent (GeneralCommissioningServer.ts:89-106 at
-// 862ad75f) and chip arms it as given (GeneralCommissioningCluster.cpp:439-441
+// db021da0) and chip arms it as given (GeneralCommissioningCluster.cpp:439-441
 // at 6170af84); the cumulative limit's own timer ends the window
 // (FailsafeTimer.ts:33-35, FailSafeContext.cpp:112-119). The server used to
 // answer ValueOutsideRange (W3-clusec-05).

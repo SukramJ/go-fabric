@@ -40,15 +40,23 @@ func (cp *clientPair) ping(t *testing.T, n *client.Node, addr netip.AddrPort) (t
 // the session's address, the record's addresses or the peer's liveness
 // (matter.js ClientInteraction.probe with addressOverride,
 // packages/protocol/src/action/client/ClientInteraction.ts:352-412 at
-// 862ad75f).
+// db021da0).
 func TestPingAddress(t *testing.T) {
 	t.Parallel()
 	cp := newClientPair(t, clientPairOptions{rootOnly: true})
 	n := cp.node
 	device := cp.pair.Device.Addr().AddrPort()
-	// The device's host, a port nobody listens on.
+	// The device's host, a port nobody listens on — in the record, as a
+	// stale address would be.
 	silent := netip.AddrPortFrom(device.Addr(), device.Port()+1)
+	client.AddRecordAddress(n, silent)
 	before := slices.Clone(n.Record().Addresses)
+	// An address not in the record is refused before anything is sent
+	// (review II, R2-P6-sec-2361, owner decision 236).
+	stranger := netip.AddrPortFrom(device.Addr(), device.Port()+2)
+	if _, err := cp.ping(t, n, stranger); !errors.Is(err, client.ErrConfig) {
+		t.Fatalf("ping of an address outside the record: %v, want ErrConfig", err)
+	}
 
 	if _, err := cp.ping(t, n, device); err != nil {
 		t.Fatalf("ping of the device's address: %v", err)
@@ -100,7 +108,7 @@ func TestPingAddressRefusals(t *testing.T) {
 
 // TestDecommissionProbeParity ports DecommissionTest "probe resolves false
 // on a destroyed node instead of throwing"
-// (packages/node/test/node/DecommissionTest.ts:301-320 at 862ad75f): the
+// (packages/node/test/node/DecommissionTest.ts:309-328 at db021da0): the
 // decommission completes with RemoveFabric's answer missing, and a late
 // ping of the removed node fails instead of panicking — matter.js's false
 // is the Go error.

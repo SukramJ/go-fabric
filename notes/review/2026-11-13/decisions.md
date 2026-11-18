@@ -280,3 +280,174 @@ options taken were the recommended ones.
 | --- | --- | --- |
 | 183 | TC-PAVST-2.8 step 4: a FindTransport (quality L) sent over a UDP session meets the large-message gate (INVALID_TRANSPORT_TYPE, as matter.js); connectedhomeip carries the same gate, inert for its code-driven clusters through a generator gap, so the case expects NOT_FOUND | **The gate stays**, one rule as matter.js; the case's step is recorded as a divergence (`by_design`, the certifiability page, the harness's record of the case) and reported upstream |
 | 184 | R2-P6-bound-1312 put again: connectedhomeip caps its recursive `TLV::Utilities::Iterate` at 10 levels, not its reader | **No depth cap**, as decided; the register's wording corrected |
+
+Wizard round 1 of 6b (2026-11-17), from the coordinator's phase plan for 6b;
+every option taken was the recommended one.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 185 | Completion of a full read in 6b (6a left 25–57 % of a unit unread on the first pass) | **A completion stage inside each review workflow**: after each code unit's review a script reads its unread-range table and a completion agent reads exactly the unread slices; up to 13 (review A) and 14 (review B) agents a workflow, the owner's word under decision 20 |
+| 186 | 6b's budget (≈ 34 M calibrated on 6a, range 28–40, against ≈ 22 M planned; the overrun is the fix side) | **Decision 122 holds for 6b** (everything confirmed is fixed); a checkpoint after the verify with measured counts — a fix side estimated above 20 M goes to the owner before the fix waves |
+| 187 | When the matter.js pin is lifted (the weekly marker check red since 2026-11-16: nine markers absent at matter.js origin/main `8addfb15`) | **After phase 7**, as its own pin-lift pull request with the nine register rows reconciled; phases 6 and 7 stay one convergence run at `db021da0`; the weekly job stays red until then by design |
+
+Wizard round 2 of 6b (2026-11-17), after the review's verify; the briefs and
+options were written by Fable, step n is decision 188 + n. 207 and 209 depart
+from the recommended option, the others take it.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 188 | Step 0, the fix scope (the checkpoint of 186; fix side ≈ 27 M, range 22–34) | **Everything confirmed** (decision 122), in four waves |
+| 189 | Peer-opened exchanges on an unsecured session this node opened (R2-P6-sec-1801, -bound-1802) | **Refuse**: Sigma1, PBKDFParamRequest and Check-In open an exchange only on an inbound unsecured session; an *Ahead of matter.js* row |
+| 190 | Joint commissioning without `TrustAnchors` (R2-P6-sec-1850) | **Fail closed** (VENDOR_ID_VERIFICATION_FAILED); a self-anchored lookup is a named host opt-in; `### Changed` |
+| 191 | A stored CA or fabric record a constructor would replace (R2-P6-store-1851 … -1853, R2-P6-api-1859) | **Never replace**: `ErrConfig`; `CreateFabric` errors on a held fabric; an *Ahead* row |
+| 192 | What "attested" means (R2-P6-sec-1803, decision 105's rule) | **The pair is withheld under test trust** (a production PAA and a CD signer that is not a test one), no rule at QueryImage |
+| 193 | connectedhomeip's stricter attestation checks (R2-P6-par-1804, -1805) | **Error findings under the policy**, the pair withheld; two *Ahead* rows; `Context` gets a clock |
+| 194 | The controller registry's seal mark (R2-P6-store-2304, N6a-seal-1) | **Its own sealed canary**, sqlstore schema v3, in the shape of decision 130 |
+| 195 | Reseal for a controller database (R2-P6-store-2302) | **`controller.Reseal(ctx, db, old, next)`**: one transaction, both canaries last, one scrub; `sqlstore.Reseal` exported beside it |
+| 196 | The radio kits' defaults towards the LAN (R2-P6-sec-2001, -2028) | **Both strict**: ESPHome keyed unless `DiscoverOptions.AllowPlaintext`; the OTBR default client refuses redirects |
+| 197 | `OperationalDataset.Redact` (R2-P6-sec-2022) | **The copy carries no `Raw`**; a `by_design` row |
+| 198 | R2-P6-sec-3320, the device's resumption record and its resumed session | **Keep the single-use record and record it**; close the installed session when its establishment does not finish; correct the two comments; trace the give-up path first |
+| 199 | N3-coord-1, the unsecured messages of one handshake initiator | **An order key for session 0 by the initiator's node id**, where both references apply the counter check in arrival order |
+| 200 | The device lifecycle methods' result (R2-P5-apidev-16, R2-P6-api-2503) | **`Rename`, `Update` and `SetReachable` return `error`**, in place, `### Changed`; the four hosts grepped for `.Update(` first |
+| 201 | A configuration string beyond its constraint (R2-P6-api-2407, -wire-2502) | **Refuse it in `node.Config.Validate` and `device.New`**; the assembler's VendorName truncation follows |
+| 202 | Additive API the fixes need (R2-P6-bound-1908, -api-2450, -par-3209, -api-2312, -par-3351) | **All five** |
+| 203 | Decision 17's refusal set (N5b-afacade-1) | **Confirmed as built**: 21 types, 36 rows; a test pins the count |
+| 204 | A part that already has an owner (R2-P6-fsm-2501) | **Move it, as matter.js** (`Endpoint.ts:706-725`); refined by 225 |
+| 205 | A Sigma1 refused for the one-handshake bound (R2-P6-par-2902) | **Busy with a minimum wait, as connectedhomeip** (`CASEServer.cpp:85-122`); the chip-tool suite before the pull request |
+| 206 | The status after a refused store write (R2-P6-par-2903) | **Keep the per-path FAILURE**, its scope recorded in `BD-Matter-NonVolatileWrite-StoredBeforeApplied` — a divergence by choice, the consistent reading of the order of authority |
+| 207 | The 23 rows that are the reference's own behaviour ("mirrors") | **Fix every one ahead of the reference**, 23 *Ahead of matter.js* rows. Not the recommended option |
+| 208 | The 575 `same` citations nobody read (decision 13) | **Read each in the fix**, a reference read of the doubtful ones and a sample, then relabel; the ratchet to the tool's count |
+| 209 | The 6a rows still open at the head (≈ 45) | **All now**, a reference read for each. Not the recommended option |
+
+Coordinator's reservations (the owner decides, the reasons are on record): 207
+— an *Ahead* row is a standing duty at every pin lift (a marker re-read,
+reconciliation when matter.js catches up); 20 of the 23 rows are behaviour the
+reference has and none of the unbounded-growth class (decision 45).
+Implementing them needs, per row, the authority the behaviour then follows, a
+reference fact note per row before the code, and 23 markers in the register;
+where a row turns out to be one consistent rule shared by both references with
+no defect, the fix unit brings it back as a question. 209 — those files are
+6a's cut and were not reviewed at this head in 6b; each fix therefore gets a
+read of its surroundings, and the held-back rows stay held until their fix
+merges (decisions 25, 126).
+
+Wizard round 3 of 6b (2026-11-17), on the decision-207 rows a reference fact
+note returned as a question or an interop risk; every option taken was the
+recommended one.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 210 | R2-P6-wire-2153, an invoke response's path not matched | **The response path into `Result`** (additive; both references hand it to the caller, connectedhomeip `CommandSender.cpp:509-513`); no discard rule (interop risk); a gap behind the references, not an *Ahead* row |
+| 211 | R2-P6-fsm-2109, the granted MaxInterval unchecked | **Register only**: not performable, the missing input is the peer's IdleModeDuration; connectedhomeip leaves it unchecked too (`ReadClient.cpp:1122`) |
+| 212 | R2-P6-par-2156, the status budget of a wildcard-endpoint write chunk | **Register only**: not performable, the missing input is the device's endpoint count; connectedhomeip budgets none (`WriteClient.cpp:183-204`) |
+| 213 | R2-P6-err-2106, the doc of `ErrNotConnectable`'s class | **The doc corrected**, the behaviour matter.js's, no *Ahead* row |
+
+Wizard round 4 of 6b (2026-11-17), on the first fix wave's questions. 216
+departs from the recommended option, the others take it.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 214 | R2-P6-sec-1803, the test-trust facts of decision 192 | **Two additive bools `attestation.Result.TestPAA` and `.TestCDSigner`**, set by `Validate`; the findings list unchanged |
+| 215 | R2-P6-fsm-1860, joint-commissioning consent without a context | **`Consent func(ctx, TrustInfo) (bool, error)` in place**: the fail-safe extended before the call, the context ends the wait; `### Changed` (no host uses it) |
+| 216 | R2-P6-doc-1857 (b), the signature length at decode | **A reference read of both references first**; the decoder then follows them. Not the recommended option |
+| 217 | R2-P6-err-1912, `QueryUpdates` and `CheckForUpdates` always nil | **Return the per-product failures** (`errors.Join`); `### Changed` |
+| 218 | 5b-dcl R8, a host outside ASCII handed to a proxy | **One rule for every proxy hand-over**: no proxy is handed a host outside ASCII |
+| 219 | R2-P6-bound-1914, the OTA manager forgets a removed node late | **An additive Manager method**, wired to `client.Hooks.Deleted` by the `ctl` unit in wave 2 |
+| 220 | R2-P6-bound-2102 follow-up: `DefaultMaxReportBytesPerSession` now counts memory | **16 MiB** (≈ 120 000 scalar attributes; was 2 MiB of payload, ≈ 80 000); `### Changed` |
+| 221 | R2-P6-bound-2104, how far the binding manager releases a peer it created | **Disconnect only**; the peer stays in the set, nothing another holder may use is closed |
+
+Coordinator, no owner step (the order of authority): R2-P6-doc-1857 (b) —
+matter.js models it (no length at decode, judged downstream), so the hand
+decoder stays and its 64-byte cap is lifted; the generated types are not used
+for the two signatures.
+
+Wizard during 6b's second fix wave (2026-11-17/18); every option taken was the
+recommended one. 225 refines 204 and 237 refines 222 after reference reads.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 222 | R2-P6-bound-2362, two nodes claim one extended address or RLOC16 in the topology | **A collision resolves to neither node and is logged once**, no new cap; a divergence paragraph from matterjs-server `0bd06f22` in `BD-matterjs-server-NetworkTopology` |
+| 223 | R2-P6-bound-2357, the set of warned unknown events | **256 per node**, a named constant, one "further unknown events are not logged" line; an *Ahead* row |
+| 224 | R2-P6-api-2751, `cluster/lock` declares `StateSource` a second time by hand | **An alias of the generated type**, `### Changed` (one declaration, as every kit port; no host imports `cluster/lock`) |
+| 225 | R2-P6-fsm-2501 again, after a reference read: matter.js moves an endpoint whose construction has started onto an owner whose parts are ready only by throwing, which leaves it without an owner (`Parts.ts:64-70`, `Construction.ts:284-287`, `Endpoint.ts:706-725`) | **Refuse the move of a part bound to a running node** (a clean refusal, the part stays with its owner); before start it moves, as matter.js; the two Aggregator refusals stay; `BD-Matter-Device-PartBoundWithItsOwner` with the liveness qualification |
+| 226 | R2-P5-apidev-16 rest: the second label write in `Endpoint.SetNodeLabel` is dropped and unlocked | **`SetNodeLabel(label) error`, locked, the bridge route returns it**; `### Changed`; unit `fx-open` in wave 3 |
+| 227 | R2-P6-par-2713 (replaces the gen unit's second question — its basis "no id differs by direction" is false: Thermostat command 2 is a response at the pin and a request at v0.13.0, measured by a real level-generation run) | **The level extractor writes request and response ids separately; the six levels re-extracted** (an own commit, its diff read) |
+| 228 | R2-P6-sec-2401, the limit half: the node's own Operate entry at a full per-fabric ACL | **As matter.js** (it appends, `AccessControlServer.ts:154-156` before `:178-181`), the consequence in the findings register; headroom is a later, separate decision |
+| 229 | R2-P6-api-2409, the bound of the mDNS host-name override | **40 bytes, as connectedhomeip** (`src/lib/dnssd/Constants.h:32-36`) |
+| 230 | N4-coresys-1, BootReason SoftwareUpdateCompleted on a start into the recorded version | **An *Ahead* row**, marker `OtaSoftwareUpdateRequestorServer.ts:153-155`, source connectedhomeip `ESP32/DiagnosticDataProviderImpl.cpp:192-201` |
+| 231 | R2-P6-sec-3320, the rest: the record was single-use only from the upsert (1 to 6 of 16 concurrent copies resumed, measured) | **The responder claims the resumption id at lookup**, so the record is single-use from acceptance |
+| 232 | R2-P6-sec-3320: an initiator's failure StatusReport on Sigma2_Resume | **Keep the installed session, as matter.js** (`CaseServer.ts:211`, `:216`; connectedhomeip discards it, `CASESession.cpp:2583-2593`); the report is not authenticated |
+| 233 | R2-P6-sec-2412, the initiator role | **Abort in both roles, as connectedhomeip** (`CASESession.cpp:476`, `:529`, `:423-433`), after a reference read of matter.js's CaseClient |
+| 234 | R2-P6-err-3112 / W6-test-17, a value of the wrong Go type on an attribute write | **INVALID_DATA_TYPE per path** (matter.js's validation, `action/errors.ts:55-57`); commands keep INVALID_COMMAND |
+| 235 | Decision 190 on the device side: `device.NewJointFabricAdministrator` cannot take a trust-anchor lookup | **An additive port field in the generator** (`script/clustergen/ports_jointfabric.go`); unit `fx-open` in wave 3 |
+| 236 | R2-P6-sec-2361, `controller.PingAddress` pings any address | **Refuse an address that is not in the node's record** (`ErrConfig`), `### Changed`; both hosts that use it pass `Record().Addresses` |
+| 237 | R2-P6-bound-2362 again (an RLOC16 is unique only within one Thread network, matterjs-server `topology-utils.ts:422-451`) | **An RLOC16 collision counts per ExtendedPanId**; extended addresses are global |
+
+Coordinator, no owner step: R2-P6-bound-2203, -2210 and -2362 get no *Ahead of
+matter.js* row (the marker check reads matter.js markers only) — divergence
+paragraphs in the `BD-matterjs-server-*` entries instead. Step 17's wording
+carries connectedhomeip's 16-bit cap and the watchdog condition.
+
+Coordinator, no owner step (the ctl unit's first-round questions):
+R2-P6-bound-2362's "logged once" → an optional `topology.Config.Logger`
+(additive, the module's `Config.Logger` pattern), implied by 222;
+R2-P6-err-2307's residual (a cluster replaced under the same id during a
+flush) → closed by marking the replacement dirty (122), later revoked when a
+reference read measured the residual not real; N3-rwrace-2's BLE-connect half
+→ `fx-open`.
+
+Wizard during 6b's third fix wave (2026-11-18); the fact notes behind it were
+written by Fable. 243 departs from the recommended option, the others take it.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 238 | R2-P6-sec-2616 (a decision-207 row, doc only) | **The doc sentence** on `ApplyUpdate` and in the README's OTA part, citing matter.js `OtaSoftwareUpdateRequestorServer.ts:1121`; no ledger-checksum behaviour |
+| 239 | R2-P6-par-3102 (a decision-207 row, a label) | **No code**; the 3101 (b) case asserts that the old session is neither lost nor closed and that `NewestSession` is the device's; one register sentence (`SessionManager.ts:703-708`) |
+| 240 | U3-ctl-lan-1, the eviction half | **Evict the records of names no resolution observes first** (a second order list); a per-name bound is a later decision |
+| 241 | The exported additions of F-db021da0-13, -43 and -57 | **All three allowed**: an optional peer-schedule interface, an `OperationalSessionLookup` method and an `operational.Entry` accessor; a `mattercore.BridgedConfig` field; `MatterWriteCommit` on the cover and fan servers; `### Added` each |
+| 242 | F-db021da0-51 | **Split**: a chunked write on a client-stack session is refused whole (fails closed) until ADR 0032's session layer — unit `fxo-ctl`; the rest stays with ADR 0032 |
+| 243 | R2-P6-sec-3320 (the dev6a unit's R7): the responder's claim is not released when the session is not installed | **An exported field on `sigma.Sigma1ProcessResult`**, which `CaseAdapter.ProcessSigma1` calls when the session is not installed; `### Added`. Not the recommended option |
+| 244 | `handshakeStake.resolved` on a refused Sigma1 | **Commit only at acceptance**: an optional capability on the resolver (an unexported interface), which sigma calls at its commit points; no exported move |
+| 245 | TM R3.7, the chunk waits a fabric holds | **A new exported bridge setter for the fabric count**, wired by `node`; each fabric's share of the chunk waits applies from half the dispatch budget |
+| 246 | F-db021da0-55 | **Export a MEI helper from `cluster/spec`**, used by the dispatcher; `### Added` |
+| 247 | R2-P3-rr-ctl-02 (held back, decision 25) | **Decided, no code**; the decision's text is held back with the row (decision 25) |
+| 248 | `camera.ErrReportsInUse` | **An additive sentinel that also matches `ErrInvalidArgument`** (`errors.Is`); `### Added` |
+| 249 | R2-P6-doc-3084, ADR 0026's principle 7 | **Two findings-register rows** (the OTA requestor's image, the DCL snapshot fetch), fixed in phase 7; a dated note in the ADR points to them |
+
+Coordinator's reservation: 243 — the owner chose the precise fix over
+recording; it adds one exported field to `secure/sigma` for a cost of one
+extra full CASE per occurrence. No objection on architecture: it is the
+precise cut, and the field is documented as the responder's own claim release.
+
+Coordinator, no owner step: R2-P6-test-3110 → recorded as covered by the
+`client/exchange` rollover tests (no production seam for one test).
+F-db021da0-20's three kinds (a non-member enum, a member outside the field's
+list, an undefined bitmap bit) → follow matter.js after a reference item on
+`spec.CheckRequest`. R2-P6-fsm-1593's `SetSupportedMaps` and a failed identity
+reload → reference items first. R2-P6-wire-2654 → a clause in the example's
+existing entry, no new *Ahead* row. The random-per-start salt, the node's
+per-window salt and three response-command differences of the guards unit →
+reference items. F-db021da0-43 lands as the field 241 allows.
+
+At the end of 6b's third fix wave and during the fourth (2026-11-18); every
+option taken was the recommended one.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 250 | A failed identity reload after UpdateNOC keeps answering CASE with the old identity | **Withdraw**: the error arm forgets the identity and withdraws the old instance; the stored fabric stays (connectedhomeip deletes it, `FabricTable.cpp:2064-2070`, not followed) |
+| 251 | One `Commissioning.Salt` for every basic window | **As matter.js, a fresh salt per window** (`DeviceCommissioner.ts:130-137`, `:214`); a new row for `node/`; `### Changed` |
+| 252 | The guard on SQLite DSNs: the examples' `--seal-key file:<path>` sites (8) | **Extend `keyReferences`** with exact counts (the reference bridge's tests 3, the reference controller's 5), the guard's counted mechanism, as for `--ca-key` |
+| 253 | CLAUDE.md:26 | **`make ci-net` names its three guards** |
+| 254 | Wave 3's fixture run: the helper branch was never pushed | **The coordinator pushes the helper branch and dispatches `chiptool.yml` with `update_fixtures`** (run 44252157107: all green, the artifacts byte-identical, no fixture commit) |
+| 255 | The citation sample: the ctl unit's relabels 3 of 10 off (the others 0 of 31) | **A reference read of all 86 of ctl's reason-for-behaviour citations** (70 read, 23 corrected, boundaries only) |
+| 256 | The verify's "confirmed" ranges were overlap-checked (7 of 12 off at ctl) | **A boundary read of the 111 verify-sourced citations of the cli, sec, node and clu units** (cli 10 of 39, sec 5 of 25, node 5 of 18, clu 1 of 9 off) |
+| 257 | `DAV:n` short citations at `0ceb202d` under a `db021da0` label | **Re-measured in 6b, and the citation check learns the DAV alias** (46 sites in seven files and a package doc) |
+
+Coordinator, no owner step (the reference items of wave 3): F-db021da0-20 is a
+test fix only (`spec.CheckRequest` already refuses the three kinds; the
+skipped test asserted the decoder). R2-P6-fsm-1593's `SetSupportedMaps` drops
+the areas of a removed map, as connectedhomeip; the refusal goes. The three
+response-command differences are classified by the guards unit. Two items need
+nothing beyond register lines. The class (ii) reason texts are reworded;
+"go-fabric serves no Descriptor TagList" is false at `b5ffb4c9`, so a new
+findings row.

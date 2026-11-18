@@ -17,8 +17,8 @@ import (
 // The Basic feature (BC): served only behind the switch of
 // wire.AdministratorCommissioningConfig. matter.js serves it only through
 // AdministratorCommissioningServer.with("Basic")
-// (AdministratorCommissioningServer.ts:55-57 at 862ad75f). With it,
-// OpenBasicCommissioningWindow (:105-117) opens the controller's window as
+// (AdministratorCommissioningServer.ts:59-61 at db021da0). With it,
+// OpenBasicCommissioningWindow (:115-127) opens the controller's window as
 // a basic one with the command's timeout and the admin fabric, and without
 // a PAKE verifier (DeviceCommissioner.allowBasicCommissioning builds the
 // PASE server from the node's own passcode, DeviceCommissioner.ts:130-137).

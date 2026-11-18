@@ -82,7 +82,10 @@ func (l boundedLimits) of(d videoRetryDimension) int {
 // so no fixed count reaches them. Mirrors matterjs-server
 // packages/ws-controller/src/camera/videoWindowSearch.ts:42-54 at 0bd06f2.
 func bitRateSteps(plan *videoPlan, resolutionSteps int) int {
-	floor := planBitRateFloor(plan, retryResolution(plan, resolutionSteps))
+	// A floor below 0 would hold the halving at 0 forever; the camera's
+	// rates are saturated, never negative, so 0 is only the guard (review
+	// II, R2-P6-bound-2250).
+	floor := max(planBitRateFloor(plan, retryResolution(plan, resolutionSteps)), 0)
 	steps := 0
 	for rate := plan.envelope.maxBitRate; rate > floor; rate = max(floor, rate/2) {
 		steps++

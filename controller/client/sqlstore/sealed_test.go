@@ -219,6 +219,19 @@ var errRefused = errors.New("sealer refused")
 func (refusingSealer) Seal([]byte, []byte) ([]byte, error) { return nil, errRefused }
 func (refusingSealer) Open([]byte, []byte) ([]byte, error) { return nil, errRefused }
 
+// switchSealer is a sealer whose Seal fails while refuse is set.
+type switchSealer struct {
+	store.Sealer
+	refuse bool
+}
+
+func (s *switchSealer) Seal(plain, aad []byte) ([]byte, error) {
+	if s.refuse {
+		return nil, errRefused
+	}
+	return s.Sealer.Seal(plain, aad)
+}
+
 // TestSealedStoreErrors: NewSealed refuses a nil sealer and a database it
 // cannot read; a Seal that fails leaves the clear values as they were on
 // the way in and fails a Save of a secret value with nothing written;
@@ -249,10 +262,13 @@ func TestSealedStoreErrors(t *testing.T) {
 	if err := s.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
 		t.Fatal(err)
 	}
-	failing, err := sqlstore.NewSealed(ctx, openTestDB(t), refusingSealer{})
+	// A Seal that fails once the store is open (NewSealed seals the canary).
+	down := &switchSealer{Sealer: sealerOf(t, 7)}
+	failing, err := sqlstore.NewSealed(ctx, openTestDB(t), down)
 	if err != nil {
 		t.Fatal(err)
 	}
+	down.refuse = true
 	if err := failing.Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X"), 1: {4}}, nil); !errors.Is(err, errRefused) {
 		t.Errorf("Save whose Seal fails: %v, want the sealer's error", err)
 	}
@@ -277,12 +293,10 @@ func TestSealedStoreErrors(t *testing.T) {
 	}
 
 	// A write of the sealing the database refuses leaves the code clear and
-	// owes no scrub; a marker the database will not delete after the scrub
-	// fails NewSealed, and the marker stays for the next one.
+	// owes no scrub.
 	for _, c := range []struct{ name, trigger string }{
 		{"the sealed value", `CREATE TRIGGER refuse BEFORE UPDATE ON matter_client_values BEGIN SELECT RAISE(ABORT, 'refused'); END`},
 		{"the owed-scrub mark", `CREATE TRIGGER refuse BEFORE INSERT ON matter_client_metadata BEGIN SELECT RAISE(ABORT, 'refused'); END`},
-		{"the mark's deletion", `CREATE TRIGGER refuse BEFORE DELETE ON matter_client_metadata BEGIN SELECT RAISE(ABORT, 'refused'); END`},
 	} {
 		refusing := openTestDB(t)
 		if err := sqlstore.New(refusing).Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
@@ -295,6 +309,21 @@ func TestSealedStoreErrors(t *testing.T) {
 			t.Errorf("%s refused: NewSealed succeeded", c.name)
 		}
 	}
+	// A mark the database will not delete after the scrub keeps the scrub
+	// owed for the next NewSealed, as an unfinished scrub does, and opens
+	// the store (decision 132).
+	kept := openTestDB(t)
+	if err := sqlstore.New(kept).Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:X")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := kept.ExecContext(ctx, `CREATE TRIGGER refuse BEFORE DELETE ON matter_client_metadata BEGIN SELECT RAISE(ABORT, 'refused'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if s, err := sqlstore.NewSealed(ctx, kept, sealerOf(t, 7)); err != nil {
+		t.Errorf("the mark's deletion refused: NewSealed = %v, want the store", err)
+	} else if owed, err := s.ScrubOwed(ctx); err != nil || !owed {
+		t.Errorf("the mark's deletion refused: ScrubOwed = %v, %v; want true", owed, err)
+	}
 
 	if err := sqlstore.Upgrade(ctx, openEmptyDB(t)); err != nil {
 		t.Errorf("Upgrade of a database without the tables: %v", err)
@@ -306,6 +335,9 @@ func TestSealedStoreErrors(t *testing.T) {
 	}
 	if _, err := sqlstore.NewSealed(ctx, closed, sealerOf(t, 7)); err == nil {
 		t.Error("NewSealed on a closed database")
+	}
+	if _, err := sqlstore.New(closed).ScrubOwed(ctx); err == nil {
+		t.Error("ScrubOwed on a closed database")
 	}
 }
 
@@ -350,13 +382,14 @@ func fileHolds(t *testing.T, path string, plain []byte) bool {
 	return false
 }
 
-// TestNewSealedScrubsAScrubItOwes: the scrub a sealing owes is recorded
-// with the sealing and run by every NewSealed until it finished, as
-// store.NewSealed does for the device's store. A process that ends after
-// the sealing committed and before the scrub leaves the clear code in the
-// file; the next NewSealed scrubs it. A scrub a reader blocks is
-// store.ErrScrubIncomplete, and the next NewSealed, the reader gone,
-// scrubs.
+// TestNewSealedScrubsAScrubItOwes (R2-P6-store-2303, decision 132): the
+// scrub a sealing owes is recorded with the sealing and run by every
+// NewSealed until it finished, as store.NewSealed does for the device's
+// store. A process that ends after the sealing committed and before the
+// scrub leaves the clear code in the file; the next NewSealed scrubs it.
+// A scrub a reader blocks does not fail NewSealed: the store opens sealed
+// and strict, ScrubOwed says the scrub is owed, and the next NewSealed,
+// the reader gone, scrubs.
 func TestNewSealedScrubsAScrubItOwes(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -416,12 +449,26 @@ func TestNewSealedScrubsAScrubItOwes(t *testing.T) {
 		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM matter_client_values`).Scan(&rows); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7)); !errors.Is(err, store.ErrScrubIncomplete) {
-			t.Fatalf("NewSealed while a reader held the -wal: %v, want store.ErrScrubIncomplete", err)
+		s, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7))
+		if err != nil || s == nil {
+			t.Fatalf("NewSealed while a reader held the -wal = %v, %v; want the sealed store and no error (decision 132)", s, err)
+		}
+		if owed, err := s.ScrubOwed(ctx); err != nil || !owed {
+			t.Errorf("ScrubOwed with the reader there = %v, %v; want true", owed, err)
+		}
+		if got := value(t, s, onboardingCluster, 0); !bytes.Equal(got, code) {
+			t.Errorf("the code under the owed scrub reads %q", got)
+		}
+		if err := sqlstore.New(db).Save("n", 0, onboardingCluster, map[uint32][]byte{0: []byte("MT:CLEAR")}, nil); !errors.Is(err, store.ErrNoSealer) {
+			t.Errorf("a clear code written while the scrub is owed = %v, want store.ErrNoSealer", err)
 		}
 		_ = tx.Rollback()
-		if _, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7)); err != nil {
+		again, err := sqlstore.NewSealed(ctx, db, sealerOf(t, 7))
+		if err != nil {
 			t.Fatalf("NewSealed with the reader gone: %v", err)
+		}
+		if owed, err := again.ScrubOwed(ctx); err != nil || owed {
+			t.Errorf("ScrubOwed after the next NewSealed = %v, %v; want false", owed, err)
 		}
 		if fileHolds(t, path, code) {
 			t.Error("the clear code is still in the file after the second NewSealed: the owed scrub was not run")

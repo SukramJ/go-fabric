@@ -34,8 +34,8 @@ type FabricRecord struct {
 	RootPublicKey []byte
 	// RootCert is the full Matter Certificate TLV envelope received via
 	// AddTrustedRootCertificate (Matter §11.18.7.12). Mirrors matter.js
-	// `Fabric.rootCert` (Fabric.ts:68); served verbatim as each entry
-	// of OperationalCredentials.TrustedRootCertificates
+	// `Fabric.rootCert` (Fabric.ts:70 at db021da0); served verbatim as
+	// each entry of OperationalCredentials.TrustedRootCertificates
 	// (matter.js OperationalCredentialsServer.ts:470-472). Apple Home
 	// validates every entry as a Matter Certificate TLV and silently
 	// drops the entire ReportData stream on schema mismatch.
@@ -161,8 +161,8 @@ func (p FabricPending) String() string {
 // no free slot exists.
 //
 // Index allocation follows the matter.js FabricManager #nextFabricIndex
-// monotonic-counter strategy (FabricManager.ts:163-164,186-188): a persisted
-// counter advances after each successful AddFabric so
+// monotonic-counter strategy (FabricManager.ts:178-179, :194-199 at
+// db021da0): a persisted counter advances after each successful AddFabric so
 // a freshly-removed index is not immediately reused — Apple Home caches
 // fabric metadata by fabricIndex and may conflate old and new entries on
 // rapid re-use. Falls back to the lowest-free-slot scan when the
@@ -333,9 +333,9 @@ WHERE fabric_index = ?`, vendorID, fabricIndex)
 // UpdateNOC installs a NOC that may carry a new NodeID for the same
 // fabric; the stored row must follow so destinationID resolution and
 // the operational mDNS instance name (<compressedID>-<nodeID>) match
-// the new certificate. Mirrors matter.js Fabric.ts:548 lifting nodeId
-// from the new NOC into the rebuilt fabric. Returns
-// [ErrFabricNotFound] when no row exists.
+// the new certificate. Mirrors matter.js Fabric.ts:579-596, :629-637
+// at db021da0 lifting nodeId from the new NOC into the rebuilt
+// fabric. Returns [ErrFabricNotFound] when no row exists.
 func (s *Store) UpdateFabricNodeID(ctx context.Context, fabricIndex uint8, nodeID uint64) error {
 	res, err := s.db.ExecContext(ctx, `
 UPDATE matter_fabrics SET node_id = ?, updated_at = CURRENT_TIMESTAMP
@@ -816,8 +816,8 @@ func (s *Store) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 // from matter_metadata and verifies the candidate is actually free. If the
 // counter points at an occupied slot it advances until it finds a free one.
 // Returns [ErrFabricExhausted] when all 254 slots are taken.
-// Mirrors matter.js FabricManager.ts:163-164 — allocate from #nextFabricIndex
-// then bump.
+// Mirrors matter.js FabricManager.ts:178-179 at db021da0 — allocate from
+// #nextFabricIndex then bump.
 func nextFabricIndexFromCounter(ctx context.Context, tx *sql.Tx) (uint8, error) {
 	candidate, err := getNextFabricIndexFromMetadata(ctx, tx)
 	if err != nil {

@@ -117,16 +117,16 @@ var floors = []packageFloor{
 		pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 92, spread: 3.3,
 		why: "measures 92.6 or 95.9 (review 2026-11 W6): the virtual central's teardown closes sessions and drops connections on fire-and-forget goroutines (bletest.go drop, UnsubscribeC2, the pipe loop's stop arm), and whether they run before the test binary exits is scheduling, which no clock drives. The floor is the whole percent below the lowest measurement",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 88},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ca/keyfile", min: 73},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client/sqlstore", min: 89},
-	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
-		min: 57,
-		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9; review II 5b (the blob streamer and the attested-identity line): 57.9. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
+		min: 63,
+		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9; review II 5b (the blob streamer and the attested-identity line): 57.9; review II 6b dcl (writers per name, header read, the manager's life): 63.1. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/controller/topology", min: 95},
@@ -169,7 +169,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 93},
 	// Brief BG: measured 86.9; the uncovered part is the error paths of a
 	// host that fails to build or listen, which fail the test through tb.
-	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 88},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
 		min: 90,
@@ -179,13 +179,13 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 80},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/host-view",
-		min: 31,
-		why: "brief CM §6: measured 34.8 once MarkComplete went (brief BU: 36.2); review 2026-11 W5: 32.7, run's new SetupPayload error path stops the node, and run binds the network, which a unit test does not; brief M9-module: 31.4, run's log loop indexes the devices now that BridgedDevice is too large to copy per iteration — one more statement in run. The tests drive the declared devices over the wire and on a node",
+		min: 35,
+		why: "review II 6b wave 3: measured 35.2. brief CM §6: measured 34.8 once MarkComplete went (brief BU: 36.2); review 2026-11 W5: 32.7, run's new SetupPayload error path stops the node, and run binds the network, which a unit test does not; brief M9-module: 31.4, run's log loop indexes the devices now that BridgedDevice is too large to copy per iteration — one more statement in run. The tests drive the declared devices over the wire and on a node",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",
-		min: 78,
-		why: "review 2026-11 W6-test-13: measured 75.1. The reference daemon is the DUT of every chip-tool case, which runs the built binary; its own tests (fleet_test.go and the control tests) drive the fleet through mounted endpoints, and this floor holds what they reach. Phase 34 measured 67.7 with the camera simulation (camera.go) and the joint-fabric administrator (jointfabric.go) reached only by the app-camera and app-jointfabric families; camera_sim_test.go and jointfabric_test.go drive both after chip's camera-app and jf-admin-app at 6170af84: measured 78.4",
+		min: 81,
+		why: "review II 6b wave 3: measured 81.8 with the block-26 tests. review 2026-11 W6-test-13: measured 75.1. The reference daemon is the DUT of every chip-tool case, which runs the built binary; its own tests (fleet_test.go and the control tests) drive the fleet through mounted endpoints, and this floor holds what they reach. Phase 34 measured 67.7 with the camera simulation (camera.go) and the joint-fabric administrator (jointfabric.go) reached only by the app-camera and app-jointfabric families; camera_sim_test.go and jointfabric_test.go drive both after chip's camera-app and jf-admin-app at 6170af84: measured 78.4",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-controller",
@@ -201,8 +201,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/examples/quickstart-controller", min: 38, why: "brief BV-a: the stack moved into controller.New (covered in controller); what remains is main and use, which need a paired node; phase 32: the Updated callback's return nil is one more statement of use (38.9)"},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/quickstart-device",
-		min: 28,
-		why: "brief AW: measured 24.4. The test drives newNode, the program's substance; main and run bind :5540 and the mDNS groups, which a unit test does not",
+		min: 35,
+		why: "review II 6b wave 3: measured 35.5. brief AW: measured 24.4. The test drives newNode, the program's substance; main and run bind :5540 and the mDNS groups, which a unit test does not",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/icd", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/icd/checkin", min: 94},
@@ -266,6 +266,12 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: a function variable node installs from its init, so the package holds no statement a test could execute",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
+	{
+		pkg:          "github.com/SukramJ/go-fabric/internal/sealseam",
+		min:          0,
+		unmeasurable: true,
+		why:          "declaration-only seam: an interface and function variables store and controller/client/sqlstore install from their init, so the package holds no statement a test could execute",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/sessionseam", min: 0, unmeasurable: true, why: "function variables only: secure/operational installs them, node and the module's test fixtures call them (review II, decisions 159, 160)"},
 	{
 		pkg:          "github.com/SukramJ/go-fabric/internal/surfaceseam",
@@ -293,12 +299,12 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/script/aheadcheck", min: 93, why: "the parser, the check and run against a fixture git repository built in the test; main (flags, the exit) is exercised by make ahead-check"},
 	{pkg: "github.com/SukramJ/go-fabric/script/archcheck", min: 0, unmeasurable: true, why: "doc and test only, no statements to cover"},
-	{pkg: "github.com/SukramJ/go-fabric/script/apidiff", min: 39, why: "the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
+	{pkg: "github.com/SukramJ/go-fabric/script/apidiff", min: 45, why: "review II 6b wave 3: measured 45.8 with the base, heading and nested-module checks tested; the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
-		min: 85,
-		why: "the collector, resolver, checker, summary and the derived corrections run against testdata and an in-memory tree, and since brief M9-module the git plumbing and run against two temporary repositories (TestCitecheckSecondTree); main needs the clones, which make cite-check and its CI job provide",
+		min: 88,
+		why: "the collector, resolver, checker, summary and the derived corrections run against testdata and an in-memory tree, and since brief M9-module the git plumbing and run against two temporary repositories (TestCitecheckSecondTree); since review II 6b wave 4 (R2-P6-test-3201) the off-pin counts run end to end against a two-commit repository (TestCitecheckOffPinCounts), measured 88.5; main needs the clones, which make cite-check and its CI job provide",
 	},
 	// This tool. Its parser and comparison are covered; main() — flag
 	// parsing, file opening, printing, the exit codes — is not, because
@@ -314,7 +320,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/script/testquality", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/requiredchecks", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "github.com/SukramJ/go-fabric/script/sqlitedsn", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
-	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 40, why: "the dump parser, the writer and the table half of run are tested (measured 41.0); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
+	{pkg: "github.com/SukramJ/go-fabric/script/levelgen", min: 59, why: "the dump parser, the writer, the table half of run and measureInternal's deadline are tested (measured 59.7); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
 	{pkg: "github.com/SukramJ/go-fabric/script/levelgen/leveltable", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/script/profilegen", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/surfacecheck", min: 54, why: "the summary and the committed snapshot are tested (measured 50.9); run, which builds and runs the reference daemon, is exercised by make surface-check"},
@@ -325,13 +331,13 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/testparity",
-		min: 70,
-		why: "the register guard and the snapshot parsers are covered; writeSnapshot and main, which shell out to git against a matter.js clone, are not, because the guard must run without one",
+		min: 76,
+		why: "review II 6b wave 3: measured 76.4 with the snapshot check. the register guard and the snapshot parsers are covered; writeSnapshot and main, which shell out to git against a matter.js clone, are not, because the guard must run without one",
 	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/reachability",
-		min: 0,
-		why: "the analyzer's own tests read the committed inventory rather than running the analysis, so none of its statements execute under go test",
+		min: 70,
+		why: "review II 6b wave 3: measured 70.4 — the analyzer's tests now run the analysis (initializers seeded, methods in the population, R2-P6-test-2804..2807), no longer only the committed inventory",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure", min: 0, unmeasurable: true, why: "package doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
@@ -379,7 +385,7 @@ var floors = []packageFloor{
 	// Brief S1: measured 98.4 and 91.7.
 	{pkg: "github.com/SukramJ/go-fabric/surface", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/surface/surfacetest", min: 94},
-	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
+	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 94, why: "review II 6b wave 3: measured 94.1"},
 	{pkg: "github.com/SukramJ/go-fabric/transport", min: 0, unmeasurable: true, why: "the Conn interface only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/transport/message", min: 100},

@@ -28,7 +28,7 @@
 //
 // Run from the module root:
 //
-//	go run ./script/reachability/whitelist_audit.go
+//	go run ./script/reachability/whitelist_audit.go ./script/reachability/mentions.go
 package main
 
 import (
@@ -37,7 +37,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -91,7 +90,12 @@ func main() {
 		case item.Offset != strictOffset:
 			c.Status = "INERT"
 		default:
-			c.Callers = findCallers(root, item)
+			callers, err := findCallers(root, item)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "whitelist_audit: %v\n", err)
+				os.Exit(1)
+			}
+			c.Callers = callers
 			c.Status = "PRODUCTIVE"
 			if len(c.Callers) == 0 {
 				c.Status = "MASKED"
@@ -140,7 +144,7 @@ func collectAnnotations(root string) ([]annotatedItem, error) {
 			return nil //nolint:nilerr // an unreadable entry is skipped, not fatal
 		}
 		if d.IsDir() {
-			if name := d.Name(); name == ".git" || name == "vendor" || name == "node_modules" {
+			if path != root && skipWalkDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -232,28 +236,13 @@ func findAnnotation(f *ast.File, fset *token.FileSet, decl ast.Decl) (reason str
 	return reason, declLine - best, true
 }
 
-// findCallers text-searches the module for mentions of the identifier outside
-// its declaring file. Test files count: the analyzer's root set is the tests,
-// so a test mention is exactly the kind of reach an annotation would be
-// redundant against.
-func findCallers(root string, item annotatedItem) []string {
-	cmd := exec.Command("grep", "-rln", "--include=*.go", "-w", item.Identifier, ".") //nolint:gosec // G204: identifier comes from the module's own source
-	cmd.Dir = root
-	out, _ := cmd.Output()
-
-	declFile := filepath.Clean(item.File)
-	var callers []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
-		clean := filepath.Clean(strings.TrimPrefix(line, "./"))
-		if clean == declFile || strings.HasPrefix(clean, "script"+string(filepath.Separator)) {
-			continue
-		}
-		callers = append(callers, clean)
-	}
-	return callers
+// findCallers lists the tracked files outside its declaring file and script/
+// that name the identifier (mentioningFiles, mentions.go: git grep, so a
+// worktree copy under .claude/ is no caller). Test files count: the analyzer's
+// root set is the tests, so a test mention is exactly the kind of reach an
+// annotation would be redundant against.
+func findCallers(root string, item annotatedItem) ([]string, error) {
+	return mentioningFiles(root, item.Identifier, item.File)
 }
 
 // writeReport renders the audit as markdown.

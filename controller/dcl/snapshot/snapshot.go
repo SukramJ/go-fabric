@@ -8,8 +8,8 @@
 // review step like the schema refresh, never automatic. It is the seed of
 // matter.js's DclCertificateService (options.seed.paaRoots and
 // options.seed.cdSigners, consumed by #consumeCertSeed,
-// packages/protocol/src/dcl/DclCertificateService.ts:336-340, :1352-1422
-// at 0ceb202d; the manifest's fields are SeedTypes.ts SeedSource and
+// packages/protocol/src/dcl/DclCertificateService.ts:344-348, :1466-1536
+// at db021da0; the manifest's fields are SeedTypes.ts SeedSource and
 // CertSeedEntry), as a [attestation.PAAStore] of its own that
 // attestation.Trust layers with the online dcl.CertificateStore.
 //

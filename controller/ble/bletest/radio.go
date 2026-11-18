@@ -48,6 +48,11 @@ type Radio struct {
 	accept     func(contract.BLEConnection)
 	c3         []byte
 	links      []*radioLink
+	// acceptMu serialises the node's accept, as contract.GATTService.Serve
+	// promises ("calls of accept do not overlap"), and orders it against
+	// the end of Serve: no accept runs once Serve dropped its links
+	// (review II, R2-P6-conc-2051). Taken before mu, never under it.
+	acceptMu sync.Mutex
 }
 
 var (
@@ -152,11 +157,13 @@ func (r *Radio) serve(ctx context.Context, c3 []byte, accept func(contract.BLECo
 	r.serving, r.accept, r.c3 = true, accept, bytes.Clone(c3)
 	r.mu.Unlock()
 	<-ctx.Done()
+	r.acceptMu.Lock() // an accept in flight completes first
 	r.mu.Lock()
 	r.serving, r.accept, r.c3 = false, nil, nil
 	links := r.links
 	r.links = nil
 	r.mu.Unlock()
+	r.acceptMu.Unlock()
 	for _, l := range links {
 		l.drop()
 	}
@@ -220,8 +227,10 @@ func matterServiceData(data []byte) ([]byte, bool) {
 
 // connect opens a connection to the radio for a central: the node's
 // accept runs before the central holds it, so the node's handlers see
-// every event.
+// every event, one connect's accept at a time and none after Serve ended.
 func (r *Radio) connect() (ble.Connection, error) {
+	r.acceptMu.Lock()
+	defer r.acceptMu.Unlock()
 	r.mu.Lock()
 	if !r.serving {
 		r.mu.Unlock()

@@ -166,12 +166,17 @@ var iceServerLimits = func() iceLimits {
 // refusal as matterjs-server words it.
 type argumentError struct {
 	msg string
+	// also is a further sentinel the refusal matches (nil: none).
+	also error
 }
 
 func (e *argumentError) Error() string { return e.msg }
 
-// Is makes every refusal of an argument [ErrInvalidArgument].
-func (e *argumentError) Is(target error) bool { return target == ErrInvalidArgument }
+// Is makes every refusal of an argument [ErrInvalidArgument], and one with
+// a further sentinel that one too.
+func (e *argumentError) Is(target error) bool {
+	return target == ErrInvalidArgument || (e.also != nil && target == e.also)
+}
 
 // ErrInvalidArgument is matterjs-server's error 8: a caller's argument the
 // controller refuses before anything reaches a camera. Every such refusal

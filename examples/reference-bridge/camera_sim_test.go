@@ -960,3 +960,62 @@ func TestCameraSimAppPipeRefusals(t *testing.T) {
 		t.Fatal("SetOnOff is a camera command")
 	}
 }
+
+// TestCameraSimStaleRecordingEndLeavesTheNewRecording holds
+// R2-P6-conc-2607 on the push transport: the end of a manual recording
+// that fires after a second ManuallyTriggerTransport re-armed it ends
+// nothing; the re-armed end does.
+func TestCameraSimStaleRecordingEndLeavesTheNewRecording(t *testing.T) {
+	t.Parallel()
+	c, _, rec := simCamera(t, cameraOptions{}, func(c *demoCamera) { c.restored.Push = simConnections() })
+	port := camPushPort{c}
+	ctx := context.Background()
+	if err := port.SetTransportStatus(ctx, []uint16{3}, padef.TransportStatusActive); err != nil {
+		t.Fatal(err)
+	}
+	var ends heldTimers
+	c.mu.Lock()
+	c.transports[3].stop.after = ends.after
+	c.mu.Unlock()
+	reason := padef.TriggerActivationReasonUserInitiated
+	for range 2 {
+		if err := port.ManuallyTriggerTransport(ctx, 3, reason, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wantPush(t, rec, padef.EventPushTransportBegin, 3, 1)
+	ends.fire(t, 0)
+	rec.none(t)
+	ends.fire(t, 1)
+	wantPush(t, rec, padef.EventPushTransportEnd, 3, 1)
+}
+
+// TestCameraSimPushEventsKeepTheirOrder holds R2-P6-conc-2608: a
+// transport set Active and Inactive back to back, many times, reports
+// each Begin before its End. (The events' CMAF session number is the
+// port's at emission, which runs after the transitions here; the order is
+// what this asserts.)
+func TestCameraSimPushEventsKeepTheirOrder(t *testing.T) {
+	t.Parallel()
+	c, _, rec := simCamera(t, cameraOptions{}, func(c *demoCamera) { c.restored.Push = simConnections() })
+	port := camPushPort{c}
+	ctx := context.Background()
+	const rounds = 24 // the recorder buffers 64 events
+	for range rounds {
+		if err := port.SetTransportStatus(ctx, []uint16{1}, padef.TransportStatusActive); err != nil {
+			t.Fatal(err)
+		}
+		if err := port.SetTransportStatus(ctx, []uint16{1}, padef.TransportStatusInactive); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range 2 * rounds {
+		want := padef.EventPushTransportBegin
+		if i%2 == 1 {
+			want = padef.EventPushTransportEnd
+		}
+		if e := rec.next(t); e.cluster != padef.ClusterID || e.event != want {
+			t.Fatalf("event %d: 0x%02X of cluster 0x%04X, want 0x%02X", i, e.event, e.cluster, want)
+		}
+	}
+}

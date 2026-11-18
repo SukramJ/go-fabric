@@ -24,7 +24,7 @@ var ErrPairingCode = errors.New("controller: pairing code")
 // PairingCode is a decoded onboarding payload: a QR code ("MT:…") or a
 // manual pairing code (11 or 21 digits) — matter.js's QrCodeData and
 // ManualPairingData (packages/types/src/schema/PairingCodeSchema.ts:106-116,
-// :409-421 at 862ad75f).
+// :409-421 at db021da0).
 type PairingCode struct {
 	// Manual is true for a manual pairing code, false for a QR code.
 	Manual bool
@@ -54,7 +54,7 @@ type PairingCode struct {
 // pairing code (11 or 21 digits; other characters are ignored), with
 // matter.js's validation: QrPairingCodeCodec.decode and
 // ManualPairingCodeCodec.decode (PairingCodeSchema.ts:330-345, :461-493 at
-// 862ad75f), each validating the passcode and the vendor and product
+// db021da0), each validating the passcode and the vendor and product
 // identity. A code it refuses is [ErrPairingCode].
 func ParsePairingCode(code string) (PairingCode, error) {
 	code = strings.TrimSpace(code)
@@ -81,7 +81,7 @@ func ParsePairingCode(code string) (PairingCode, error) {
 // Identifier is the DNS-SD (or BLE) selector of the device the code names:
 // its long discriminator for a QR code, its short one for a manual code —
 // the identifier matter.js's commissionNode discovers by
-// (CommissioningController.ts:462-500 at 862ad75f).
+// (CommissioningController.ts:465-503 at db021da0).
 func (p PairingCode) Identifier() discovery.Identifier {
 	if p.Manual {
 		return discovery.ByShortDiscriminator(uint8(p.Discriminator)) //nolint:gosec // a manual code's 4-bit discriminator
@@ -91,7 +91,7 @@ func (p PairingCode) Identifier() discovery.Identifier {
 
 // DefaultDiscoveryTimeout bounds [Controller.Discover] when its timeout is
 // 0 — matter.js discoverCommissionableDevices' Minutes(15)
-// (CommissioningController.ts:906-910 at 862ad75f).
+// (CommissioningController.ts:918-922 at db021da0).
 const DefaultDiscoveryTimeout = 15 * time.Minute
 
 // Discover searches DNS-SD for the commissionable devices id selects
@@ -99,8 +99,8 @@ const DefaultDiscoveryTimeout = 15 * time.Minute
 // [DefaultDiscoveryTimeout]) or ctx ends, and returns every device found,
 // each once, in the order they answered — matter.js
 // CommissioningController.discoverCommissionableDevices
-// (CommissioningController.ts:906-919, runDiscoverCommissionableDevices
-// :84-116 at 862ad75f; a ContinuousDiscovery, Peers.discover,
+// (CommissioningController.ts:918-931, runDiscoverCommissionableDevices
+// :84-116 at db021da0; a ContinuousDiscovery, Peers.discover,
 // packages/node/src/node/client/Peers.ts:204-206). The end of the
 // search's time or of ctx is no error; a closed controller is.
 func (c *Controller) Discover(ctx context.Context, id discovery.Identifier, timeout time.Duration) ([]client.Device, error) {
@@ -114,9 +114,9 @@ type DiscoverOptions struct {
 	// Peers.locate, whose InstanceDiscovery takes the first node found as
 	// its result and stops (packages/node/src/node/client/Peers.ts:189-194,
 	// packages/node/src/behavior/system/controller/discovery/
-	// InstanceDiscovery.ts:25-31 at 862ad75f), as commissionNode's
+	// InstanceDiscovery.ts:25-31 at db021da0), as commissionNode's
 	// discovery by identifier stops at the first device
-	// (CommissioningController.ts:462-500). None before timeout is an
+	// (CommissioningController.ts:465-503). None before timeout is an
 	// empty result, as for a full search.
 	First bool
 }

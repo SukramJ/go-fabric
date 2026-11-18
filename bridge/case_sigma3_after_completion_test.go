@@ -27,6 +27,9 @@ const (
 	// responder announces.
 	completedCaseExchange  = uint16(0x0202)
 	completedCaseSessionID = uint16(0x2001)
+	// completedCaseFabricIndex is the fabric the responder's identity is
+	// on.
+	completedCaseFabricIndex = uint8(3)
 	// completedCaseInitiator is the initiator's ephemeral node id.
 	completedCaseInitiator = uint64(0xC0DE)
 )
@@ -78,6 +81,7 @@ func beginCASE(t *testing.T, r *unsecuredRig, clk clock.Clock, viaProvider bool)
 	rootPub := elliptic.Marshal(elliptic.P256(), root.X, root.Y) //nolint:staticcheck // the uncompressed point the CASE destination id hashes
 	ipk := newCaseTestIPK(t)
 	ours := newCaseTestIdentity(t, 0xBBBB, 1, ipk)
+	ours.FabricIndex = completedCaseFabricIndex
 	sessions := new(atomic.Int32)
 	newAdapter := func() *CaseAdapter {
 		responder := sigma.NewResponder(ours, caseTestVerifier{}, completedCaseSessionID)

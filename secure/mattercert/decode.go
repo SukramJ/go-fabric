@@ -41,8 +41,8 @@ const (
 	// The standard X.520 attributes (Core § 6.5.6.1): tags 1-16 carry them
 	// as UTF8String — domainComponent (16) as IA5String — and tags 129-143
 	// carry the attributes 1-15 as PrintableString. Mirrors matter.js
-	// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
-	// at 862ad75f (TlvGenericMatterSubjectOrIssuerTaggedList).
+	// packages/protocol/src/certificate/kinds/definitions/operational.ts:71-112
+	// at db021da0 (TlvGenericMatterSubjectOrIssuerTaggedList).
 	dnTagStandardFirst  uint8 = 1
 	dnTagStandardLast   uint8 = 16
 	dnTagPrintableFirst uint8 = 129
@@ -77,9 +77,9 @@ var (
 	// NOC's matter-node-id lies outside the operational node ID range
 	// 0x0000_0000_0000_0001 .. 0xFFFF_FFEF_FFFF_FFFF. AddNOC and UpdateNOC
 	// answer it with NOCResponse InvalidNodeOpId instead of InvalidNOC.
-	// Mirrors matter.js 0ceb202d
+	// Mirrors matter.js
 	// packages/protocol/src/certificate/kinds/Noc.ts:20 (OperationalNodeIdError
-	// extends CertificateError) thrown at :83-85.
+	// extends CertificateError) thrown at :86-88, at db021da0.
 	ErrNonOperationalNodeID = errors.New("mattercert: NOC node id is not an operational node id")
 	// ErrUnsupportedAlgorithm is returned for non-ECDSA signatures or
 	// non-P-256 keys.
@@ -215,8 +215,8 @@ type DistinguishedName struct {
 // DNAttribute is one standard X.520 attribute of a [DistinguishedName] as
 // the TLV carried it: Tag is the context tag (1-16 a UTF8String, 129-143 a
 // PrintableString), Value the string. Mirrors matter.js
-// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
-// at 862ad75f.
+// packages/protocol/src/certificate/kinds/definitions/operational.ts:71-112
+// at db021da0.
 type DNAttribute struct {
 	Tag   uint8
 	Value string
@@ -332,9 +332,11 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			// re-encodes the Subject so) is malformed. Mirrors chip
 			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
 			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
-			// TlvObject.ts:205-207 at 862ad75f (the DN schema is a
-			// TlvTaggedListPreservingOrder, operational.ts:69-110; another
-			// type is UnexpectedDataError).
+			// DistinguishedName.ts:636-638 at db021da0 (the DN schema is
+			// TlvDistinguishedName, operational.ts:111, a
+			// DistinguishedNameSchema with its own codec,
+			// DistinguishedName.ts:613-666; another type is
+			// UnexpectedDataError).
 			return fmt.Errorf("%w: issuer is not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
 		}
 		dn, err := decodeDN(d)
@@ -360,9 +362,11 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			// re-encodes the Subject so) is malformed. Mirrors chip
 			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
 			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
-			// TlvObject.ts:205-207 at 862ad75f (the DN schema is a
-			// TlvTaggedListPreservingOrder, operational.ts:69-110; another
-			// type is UnexpectedDataError).
+			// DistinguishedName.ts:636-638 at db021da0 (the DN schema is
+			// TlvDistinguishedName, operational.ts:111, a
+			// DistinguishedNameSchema with its own codec,
+			// DistinguishedName.ts:613-666; another type is
+			// UnexpectedDataError).
 			return fmt.Errorf("%w: subject is not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
 		}
 		dn, err := decodeDN(d)
@@ -485,9 +489,9 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 			if isStandardDNTag(tag) {
 				// A standard X.520 attribute, kept with its place in the
 				// order for the TBS DER. Mirrors matter.js
-				// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
-				// at 862ad75f (TlvString fields of a
-				// TlvTaggedListPreservingOrder); they used to be skipped, so
+				// packages/protocol/src/certificate/kinds/definitions/operational.ts:71-112
+				// at db021da0 (TlvString fields, :74-109, of a
+				// TlvDistinguishedName, :111); they used to be skipped, so
 				// a chain whose DNs carry them failed to verify.
 				if el.Type < tlv.TypeUTF8Str1 || el.Type > tlv.TypeUTF8Str8 {
 					return dn, fmt.Errorf("%w: dn attribute %d is not a UTF-8 string", ErrMalformed, tag)

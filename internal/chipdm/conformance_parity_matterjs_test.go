@@ -6,7 +6,7 @@ package chipdm
 import "testing"
 
 // TestConformanceTextParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:18-100 at 862ad75f
+// packages/model/test/aspects/ConformanceTest.ts:18-100 at db021da0
 // (TEST_DEFINITIONS and TEST_DEFINITIONS2, "parses" and "serializes"):
 // every conformance text matter.js parses, parsed by the module's
 // conformance parser (the one the CHIP data model cross-check reads chip's
@@ -49,7 +49,7 @@ func TestConformanceTextParityMatterJS(t *testing.T) {
 }
 
 // TestConformanceInvalidParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:106-155 at 862ad75f: a
+// packages/model/test/aspects/ConformanceTest.ts:106-155 at db021da0: a
 // text that is not conformance, a range-form choice, mixed choice
 // modifiers and partial optionality are refused.
 func TestConformanceInvalidParityMatterJS(t *testing.T) {
@@ -62,7 +62,7 @@ func TestConformanceInvalidParityMatterJS(t *testing.T) {
 }
 
 // TestConformanceRevisionParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:676-698 at 862ad75f:
+// packages/model/test/aspects/ConformanceTest.ts:676-698 at db021da0:
 // "Rev >= vN" is one revision node, "[Rev >= vN]" an optional group of it,
 // "Rev >= vN, [Rev >= vM]" a list, each serialized with its "v".
 func TestConformanceRevisionParityMatterJS(t *testing.T) {
@@ -76,7 +76,7 @@ func TestConformanceRevisionParityMatterJS(t *testing.T) {
 }
 
 // TestConformancePrecedenceParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:339-398 at 862ad75f
+// packages/model/test/aspects/ConformanceTest.ts:339-398 at db021da0
 // (describe "operator precedence") and :180-182 ("Z.Foo" a qualified
 // name): == binds tighter than |, a comparison tighter than ==, and a
 // range check is the & of two comparisons.
@@ -103,5 +103,19 @@ func TestConformancePrecedenceParityMatterJS(t *testing.T) {
 	}
 	if c := shape("Z.Foo"); c.Op != opDot {
 		t.Errorf("parses \"Z.Foo\" as a qualified name: op %s", c.Op)
+	}
+}
+
+// TestConformanceSecondOrIsRefused: matter.js reads the first " or " as "|"
+// (Conformance.ts:554 at db021da0) and that one only; the module's parser
+// does the same, and a second "or" is an error instead of a name that makes
+// the text an otherwise list (R2-P6-test-2851, a module rule).
+func TestConformanceSecondOrIsRefused(t *testing.T) {
+	t.Parallel()
+	if c, err := ParseConformance("A or B"); err != nil || c.String() != "A | B" {
+		t.Errorf("ParseConformance(%q) = %v, %v; want A | B", "A or B", c, err)
+	}
+	if c, err := ParseConformance("A or B or C"); err == nil {
+		t.Errorf("ParseConformance(%q) = %q, want an error", "A or B or C", c.String())
 	}
 }

@@ -12,7 +12,7 @@ import (
 
 // A freshly-opened Entry counts its peer active from creation: matter.js
 // sets the active timestamp of every secure session when it is created
-// (NodeSession.ts:120 at 862ad75f, "We always set the active timestamp for
+// (NodeSession.ts:121 at db021da0, "We always set the active timestamp for
 // Secure sessions") and chip initialises mLastPeerActivityTime to now
 // (SecureSession.h:349 at 6170af84). Without advertised hints the base is
 // the spec SESSION_ACTIVE_INTERVAL default (300ms) within the active

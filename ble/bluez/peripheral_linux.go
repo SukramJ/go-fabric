@@ -49,6 +49,7 @@ const (
 	errFailed         = "org.bluez.Error.Failed"
 	errNotPermitted   = "org.bluez.Error.NotPermitted"
 	errInvalidOffset  = "org.bluez.Error.InvalidOffset"
+	errDoesNotExist   = "org.bluez.Error.DoesNotExist"
 	dbusErrInvalid    = "org.freedesktop.DBus.Error.InvalidArgs"
 	deviceNamePrefix  = "MATTER-"
 	appearanceUnknown = 0xffff
@@ -97,9 +98,17 @@ type peripheral struct {
 	// closed is set by Close.
 	closed bool
 	// adv is the advertisement's properties; registered whether BlueZ
-	// holds it.
+	// holds it. advOwed is an UnregisterAdvertisement that failed: the
+	// registration and its objects are kept, and the unregister is
+	// retried by the next Advertise or StopAdvertising (review II,
+	// R2-P6-err-2012).
 	adv        map[string]dbus.Variant
 	registered bool
+	advOwed    bool
+	// appOwed is an UnregisterApplication that failed at the end of a
+	// Serve: the application stays exported, and the next Serve retries
+	// the unregister before it registers (R2-P6-err-2012).
+	appOwed bool
 	// serving is set while Serve runs; accept and c3 are its arguments.
 	serving bool
 	accept  func(contract.BLEConnection)
@@ -115,6 +124,13 @@ type peripheral struct {
 	// field set and the PropertiesChanged sent under it, so the signals
 	// follow one another in the order of the states they report.
 	acquiredMu sync.Mutex
+	// advMu serialises Advertise and StopAdvertising, each of which reads
+	// the registration, calls BlueZ and records the result (review II,
+	// R2-P6-conc-2013). Taken before mu.
+	advMu sync.Mutex
+	// bluezOwner is the unique bus name that owns org.bluez as last read:
+	// the one caller the exported methods serve (fromBluez).
+	bluezOwner string
 }
 
 var _ contract.BLEPeripheral = (*peripheral)(nil) //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
@@ -281,12 +297,25 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 		"MinInterval":  dbus.MakeVariant(ms),
 		"MaxInterval":  dbus.MakeVariant(ms),
 	}
+	p.advMu.Lock()
+	defer p.advMu.Unlock()
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()
 		return errPeripheralClosed
 	}
-	registered := p.registered
+	registered, owed := p.registered, p.advOwed
+	p.mu.Unlock()
+	if owed {
+		// A StopAdvertising whose unregister failed: BlueZ may hold the
+		// registration or may have dropped it, so it is released before
+		// a fresh one rather than changed in place.
+		if err := p.unregisterAdvertisement(ctx); err != nil {
+			return err
+		}
+		registered = false
+	}
+	p.mu.Lock()
 	p.adv = props
 	p.mu.Unlock()
 	if registered {
@@ -296,6 +325,7 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 		}
 		return nil
 	}
+	//nolint:contextcheck // the exported handlers run on the bus's goroutines, outside the caller's context; fromBluez bounds its own call
 	if err := p.exportAdvertisement(); err != nil {
 		return err
 	}
@@ -314,20 +344,41 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 // LEAdvertisingManager1.UnregisterAdvertisement (chip
 // BluezAdvertisement.cpp:294-318).
 func (p *peripheral) StopAdvertising(ctx context.Context) error {
+	p.advMu.Lock()
+	defer p.advMu.Unlock()
 	p.mu.Lock()
 	registered := p.registered
-	p.registered = false
-	p.adv = nil
+	if !registered {
+		p.adv = nil
+	}
 	p.mu.Unlock()
 	if !registered {
 		return nil
 	}
+	return p.unregisterAdvertisement(ctx)
+}
+
+// unregisterAdvertisement is LEAdvertisingManager1.UnregisterAdvertisement;
+// the caller holds advMu. Answered — or DoesNotExist, released by BlueZ
+// meanwhile — the advertisement is forgotten and unexported. Any other
+// failure (a timeout, NoReply, a bus error) leaves BlueZ's side unknown:
+// the registration, its properties and its objects are kept, so the
+// advertisement BlueZ may still send stays the one this process answers
+// for, and the unregister is owed to the next Advertise or
+// StopAdvertising (review II, R2-P6-err-2012).
+func (p *peripheral) unregisterAdvertisement(ctx context.Context) error {
 	_, err := call(ctx, p.bus, p.adapter, ifaceAdvertising+".UnregisterAdvertisement", p.advPath())
-	p.unexportAdvertisement()
-	if dbusName(err) == "org.bluez.Error.DoesNotExist" {
-		return nil // released by BlueZ meanwhile
+	if err != nil && dbusName(err) != errDoesNotExist {
+		p.mu.Lock()
+		p.advOwed = p.registered // Release may have come meanwhile
+		p.mu.Unlock()
+		return err
 	}
-	return err
+	p.mu.Lock()
+	p.registered, p.advOwed, p.adv = false, false, nil
+	p.mu.Unlock()
+	p.unexportAdvertisement()
+	return nil
 }
 
 // releaseUnanswered undoes a Register call that failed without BlueZ's
@@ -367,11 +418,49 @@ func (p *peripheral) unexportAdvertisement() {
 
 // release is LEAdvertisement1.Release: BlueZ dropped the advertisement
 // (chip BluezAdvertisement.cpp:92-101).
-func (p *peripheral) release() *dbus.Error {
+func (p *peripheral) release(sender dbus.Sender) *dbus.Error {
+	if derr := p.fromBluez(sender); derr != nil {
+		return derr
+	}
 	p.mu.Lock()
-	p.registered = false
+	p.registered, p.advOwed = false, false
 	p.mu.Unlock()
 	p.unexportAdvertisement()
+	return nil
+}
+
+// fromBluez admits a call on an exported method only from the owner of
+// org.bluez: the methods create connections, sockets and goroutines
+// (AcquireWrite, AcquireNotify), complete indications (Confirm), drop the
+// advertisement (Release) and hand out C3 and the objects' properties
+// (ReadValue, Properties.Get and GetAll, GetManagedObjects), and whoever
+// else the system bus lets call this connection's objects is not
+// bluetoothd (review II, R2-P6-sec-2014). bluetoothd reads the objects
+// through the getters when it registers the application and the
+// advertisement, from the connection that owns org.bluez. The owner is read with GetNameOwner and kept; a caller
+// that is not the kept one has the owner read again, so a bluetoothd that
+// restarted under a new unique name is followed. Any other caller, and
+// every caller while the owner cannot be read, is refused with
+// NotPermitted.
+func (p *peripheral) fromBluez(sender dbus.Sender) *dbus.Error {
+	p.mu.Lock()
+	owner := p.bluezOwner
+	p.mu.Unlock()
+	if sender != "" && string(sender) == owner {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	owner, err := p.bus.NameOwner(ctx, service)
+	if err != nil {
+		return dbus.NewError(errNotPermitted, []any{"the owner of " + service + " is unknown"})
+	}
+	p.mu.Lock()
+	p.bluezOwner = owner
+	p.mu.Unlock()
+	if sender == "" || string(sender) != owner {
+		return dbus.NewError(errNotPermitted, []any{"only " + service + " may call"})
+	}
 	return nil
 }
 
@@ -425,6 +514,15 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 		p.serving, p.accept, p.c3 = false, nil, nil
 		p.mu.Unlock()
 	}()
+	p.mu.Lock()
+	owed := p.appOwed
+	p.mu.Unlock()
+	if owed {
+		if err := p.unregisterApplication(ctx); err != nil {
+			return err
+		}
+	}
+	//nolint:contextcheck // the exported handlers run on the bus's goroutines, outside Serve's context; fromBluez bounds its own call
 	if err := p.exportApplication(); err != nil {
 		p.unexportApplication()
 		return err
@@ -446,17 +544,32 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 	p.serving = false
 	p.mu.Unlock()
 	p.dropAll(true) //nolint:contextcheck // Serve's context has ended; each disconnect runs on a fresh bounded one
-	unregCtx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	return p.unregisterApplication(context.WithoutCancel(ctx))
+}
+
+// unregisterApplication is GattManager1.UnregisterApplication on a context
+// bounded by peripheralTimeout; the caller is the one running Serve.
+// Answered — or DoesNotExist, or the bus going away with the application —
+// the application is unexported. Any other failure keeps it exported and
+// the unregister owed to the next Serve, as unregisterAdvertisement keeps
+// the advertisement (review II, R2-P6-err-2012): no central reaches it
+// meanwhile, since connFor accepts only while Serve runs.
+func (p *peripheral) unregisterApplication(ctx context.Context) error {
+	unregCtx, cancel := context.WithTimeout(ctx, peripheralTimeout)
 	defer cancel()
-	//nolint:contextcheck // Serve's context has ended; the unregistration runs on a fresh bounded one
-	if _, err := call(unregCtx, p.bus, p.adapter, ifaceGattManager+".UnregisterApplication", p.root); err != nil {
+	if _, err := call(unregCtx, p.bus, p.adapter, ifaceGattManager+".UnregisterApplication", p.root); err != nil && dbusName(err) != errDoesNotExist {
 		select {
 		case <-p.done: // the bus is going away with the application
 		default:
-			p.unexportApplication()
+			p.mu.Lock()
+			p.appOwed = true
+			p.mu.Unlock()
 			return err
 		}
 	}
+	p.mu.Lock()
+	p.appOwed = false
+	p.mu.Unlock()
 	p.unexportApplication()
 	return nil
 }
@@ -519,14 +632,20 @@ func (p *peripheral) propertiesOf(path dbus.ObjectPath) map[string]any {
 		return props, ok
 	}
 	return map[string]any{
-		"Get": func(iface, name string) (dbus.Variant, *dbus.Error) {
+		"Get": func(sender dbus.Sender, iface, name string) (dbus.Variant, *dbus.Error) {
+			if derr := p.fromBluez(sender); derr != nil {
+				return dbus.Variant{}, derr
+			}
 			props, ok := lookup(iface)
 			if v, has := props[name]; ok && has {
 				return v, nil
 			}
 			return dbus.Variant{}, dbus.NewError(dbusErrInvalid, []any{"no property " + iface + "." + name})
 		},
-		"GetAll": func(iface string) (map[string]dbus.Variant, *dbus.Error) {
+		"GetAll": func(sender dbus.Sender, iface string) (map[string]dbus.Variant, *dbus.Error) {
+			if derr := p.fromBluez(sender); derr != nil {
+				return nil, derr
+			}
 			props, ok := lookup(iface)
 			if !ok {
 				return map[string]dbus.Variant{}, nil
@@ -544,7 +663,10 @@ func (p *peripheral) exportApplication() error {
 	}
 	exports := make([]export, 0, 8)
 	exports = append(exports, []export{
-		{p.root, ifaceObjectMgr, map[string]any{"GetManagedObjects": func() (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error) {
+		{p.root, ifaceObjectMgr, map[string]any{"GetManagedObjects": func(sender dbus.Sender) (map[dbus.ObjectPath]map[string]map[string]dbus.Variant, *dbus.Error) {
+			if derr := p.fromBluez(sender); derr != nil {
+				return nil, derr
+			}
 			return p.objects(), nil
 		}}},
 		{p.charPath(1), ifaceGattChar, map[string]any{"AcquireWrite": p.acquireWrite}},
@@ -573,7 +695,10 @@ func (p *peripheral) unexportApplication() {
 // readC3 is C3's ReadValue: the additional data from the requested
 // offset; an offset beyond it is refused (matter.js
 // BlenoBleServer.ts:344-350, RESULT_INVALID_OFFSET :106-109).
-func (p *peripheral) readC3(options map[string]dbus.Variant) ([]byte, *dbus.Error) {
+func (p *peripheral) readC3(sender dbus.Sender, options map[string]dbus.Variant) ([]byte, *dbus.Error) {
+	if derr := p.fromBluez(sender); derr != nil {
+		return nil, derr
+	}
 	p.mu.Lock()
 	c3 := bytes.Clone(p.c3)
 	p.mu.Unlock()
@@ -680,7 +805,10 @@ func (p *peripheral) refreshAcquired(n int) {
 
 // acquireWrite is C1's AcquireWrite: a socket pair whose writes are C1's
 // (chip BluezCharacteristicAcquireWrite, BluezEndpoint.cpp:97-136).
-func (p *peripheral) acquireWrite(options map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error) {
+func (p *peripheral) acquireWrite(sender dbus.Sender, options map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error) {
+	if derr := p.fromBluez(sender); derr != nil {
+		return 0, 0, derr
+	}
 	device, mtu, derr := deviceOf(options)
 	if derr != nil {
 		return 0, 0, derr
@@ -707,7 +835,10 @@ func (p *peripheral) acquireWrite(options map[string]dbus.Variant) (dbus.UnixFD,
 // indications, refused while one is acquired (chip
 // BluezCharacteristicAcquireNotify, BluezEndpoint.cpp:147-196); the
 // subscription it is reaches the connection (:192).
-func (p *peripheral) acquireNotify(options map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error) {
+func (p *peripheral) acquireNotify(sender dbus.Sender, options map[string]dbus.Variant) (dbus.UnixFD, uint16, *dbus.Error) {
+	if derr := p.fromBluez(sender); derr != nil {
+		return 0, 0, derr
+	}
 	device, mtu, derr := deviceOf(options)
 	if derr != nil {
 		return 0, 0, derr
@@ -739,7 +870,10 @@ func (p *peripheral) acquireNotify(options map[string]dbus.Variant) (dbus.UnixFD
 // :398-401). It completes the indication of the live connection that waits
 // for one: the bridge serves one central at a time, so a refused second
 // central, gone already, cannot take the served one's confirmation.
-func (p *peripheral) confirm() *dbus.Error {
+func (p *peripheral) confirm(sender dbus.Sender) *dbus.Error {
+	if derr := p.fromBluez(sender); derr != nil {
+		return derr
+	}
 	p.mu.Lock()
 	conns := make([]*pconn, 0, len(p.conns))
 	for _, c := range p.conns {
@@ -747,7 +881,7 @@ func (p *peripheral) confirm() *dbus.Error {
 	}
 	p.mu.Unlock()
 	for _, c := range conns {
-		if !c.isGone() && c.waiting() {
+		if !c.isGone() && c.owes() {
 			c.confirmed()
 			return nil
 		}
@@ -768,20 +902,28 @@ type pconn struct {
 	once   sync.Once
 
 	// mu guards every field below.
-	mu       sync.Mutex
-	onWrite  func([]byte)
-	onSub    func(int)
-	onUnsub  func()
-	mtu      uint16
-	write    *os.File
-	notify   *os.File
-	writes   int
-	heldSub  bool
-	heldMTU  int
-	pending  chan struct{}
-	queued   []func()
-	started  bool
-	indicate sync.Mutex
+	mu      sync.Mutex
+	onWrite func([]byte)
+	onSub   func(int)
+	onUnsub func()
+	mtu     uint16
+	write   *os.File
+	notify  *os.File
+	writes  int
+	heldSub bool
+	heldMTU int
+	// sent and acked count the indications written to the current C2
+	// socket and the confirmations received for them. ATT has one
+	// indication outstanding at a time and confirms in order, so the
+	// n-th confirmation is the n-th indication's — also when the Indicate
+	// that sent it gave up (review II, R2-P6-fsm-2015). pending is the
+	// waiting Indicate's channel, closed by confirmation pendingSeq.
+	sent, acked uint64
+	pending     chan struct{}
+	pendingSeq  uint64
+	queued      []func()
+	started     bool
+	indicate    sync.Mutex
 	// order makes counting a C1 write and posting it one step, so a
 	// subscription bluetoothd reports meanwhile is posted after it, never
 	// between the count and the post. Taken before mu.
@@ -945,15 +1087,24 @@ func (c *pconn) setNotify(f *os.File, mtu uint16) bool {
 				c.confirmed()
 			}
 		}
+		// No confirmation comes for what the closed socket carried: what
+		// is owed is written off and a waiting indication woken, in the
+		// step that ends the subscription, so a later subscription's
+		// indication is not.
+		var waiting chan struct{}
 		c.mu.Lock()
 		if c.notify == f {
 			c.notify = nil
 			c.heldSub = false
+			c.acked = c.sent
+			waiting, c.pending = c.pending, nil
 		}
 		c.mu.Unlock()
+		if waiting != nil {
+			close(waiting)
+		}
 		_ = f.Close()
 		c.p.refreshAcquired(2)
-		c.confirmed() // an indication waiting on the closed socket
 		if !c.isGone() {
 			c.post(c.deliverUnsubscribe)
 		}
@@ -994,22 +1145,44 @@ func (c *pconn) deliverUnsubscribe() {
 	}
 }
 
-// waiting reports whether an indication waits for its confirmation.
-func (c *pconn) waiting() bool {
+// owes reports whether an indication sent has no confirmation yet — also
+// one whose Indicate gave up waiting.
+func (c *pconn) owes() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.pending != nil
+	return c.acked < c.sent
 }
 
-// confirmed completes the indication that waits for its confirmation.
+// confirmed counts one confirmation against the indications sent and
+// completes the Indicate that waits for that one; a confirmation with
+// nothing owed is dropped.
 func (c *pconn) confirmed() {
 	c.mu.Lock()
-	ch := c.pending
-	c.pending = nil
+	if c.acked >= c.sent {
+		c.mu.Unlock()
+		return
+	}
+	c.acked++
+	var ch chan struct{}
+	if c.pending != nil && c.acked == c.pendingSeq {
+		ch, c.pending = c.pending, nil
+	}
 	c.mu.Unlock()
 	if ch != nil {
 		close(ch)
 	}
+}
+
+// abandon is an Indicate that returns without its confirmation: its
+// channel is no longer the waiting one, while the count keeps the
+// indication owed, so its confirmation, when it comes, is not taken for
+// the next one's.
+func (c *pconn) abandon(done chan struct{}) {
+	c.mu.Lock()
+	if c.pending == done {
+		c.pending = nil
+	}
+	c.mu.Unlock()
 }
 
 // Remote implements contract.BLEConnection: the device's address, from
@@ -1041,17 +1214,29 @@ func (c *pconn) Indicate(ctx context.Context, value []byte) error {
 		return fmt.Errorf("bluez: indicate on %s: %w", c.device, btp.ErrDisconnected)
 	}
 	done := make(chan struct{})
-	c.pending = done
+	c.sent++
+	seq := c.sent
+	c.pending, c.pendingSeq = done, seq
 	c.mu.Unlock()
 	if _, err := f.Write(value); err != nil {
-		c.confirmed()
+		// Not sent: nothing is owed for it.
+		c.mu.Lock()
+		if c.pending == done {
+			c.pending = nil
+		}
+		if c.sent == seq && c.acked < seq {
+			c.sent--
+		}
+		c.mu.Unlock()
 		return fmt.Errorf("bluez: indicate on %s: %w", c.device, err)
 	}
 	select {
 	case <-done:
 	case <-c.gone:
+		c.abandon(done)
 		return fmt.Errorf("bluez: indicate on %s: %w", c.device, btp.ErrDisconnected)
 	case <-ctx.Done():
+		c.abandon(done)
 		return ctx.Err()
 	}
 	c.mu.Lock()

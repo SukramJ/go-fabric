@@ -91,7 +91,7 @@ type Manager struct {
 	// resumes the commissionable advertisement there instead,
 	// DeviceAdvertiser.ts:152-161). Mirrors matter.js
 	// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at
-	// 862ad75f (sessions.deleted, per deleted session: skip when
+	// db021da0 (sessions.deleted, per deleted session: skip when
 	// `fabric.hasSessionForPeer(...)`, Fabric.ts:414-420, otherwise
 	// `advertisementForFabric(fabric).serviceDisconnected()` for that
 	// fabric only, Advertiser.ts:69-75). Not
@@ -200,7 +200,7 @@ func (m *Manager) hasSessionForPeer(fabricIndex uint8, peerNodeID uint64) bool {
 // table, so a same-peer replacement session installed by a CASE
 // re-establishment naturally suppresses the trigger. Mirrors
 // matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
-// at 862ad75f, which runs the check per deleted session.
+// at db021da0, which runs the check per deleted session.
 func (m *Manager) fireReannounceIfPeerGone(victims []*Entry) {
 	m.mu.RLock()
 	hook := m.onReannounce
@@ -259,7 +259,7 @@ func (m *Manager) SetOnSessionClose(fn func(sessionID uint16)) {
 // session here. The node resumes its commissionable advertisement on it,
 // as matter.js's DeviceAdvertiser does on `sessions.deleted` for a
 // session with `isPase` (packages/protocol/src/protocol/DeviceAdvertiser.ts:131-162
-// at 862ad75f). Passing nil clears any prior hook; the callback fires
+// at db021da0). Passing nil clears any prior hook; the callback fires
 // outside the manager's lock.
 func (m *Manager) SetOnPaseSessionClose(fn func(sessionID uint16)) {
 	m.mu.Lock()
@@ -419,8 +419,8 @@ type Entry struct {
 	// the per-peer LRU eviction — so a wall-clock step neither ages nor
 	// rejuvenates a session. The wall times above are what the stamps
 	// read as, for [SessionInfo]. matter.js keeps its timestamps on
-	// Time.nowUs, the monotonic reading (Session.ts:141-151 at 862ad75f),
-	// and exposes them through the wall-clock offset (:154-162).
+	// Time.nowUs, the monotonic reading (Session.ts:142-152 at db021da0),
+	// and exposes them through the wall-clock offset (:155-163).
 	lastActivityMono, lastPeerActivityMono, createdAtMono time.Duration
 	// clock is the manager's clock when the entry opened; nil (an entry
 	// built outside a manager) is clock.System.
@@ -488,36 +488,49 @@ func (e *Entry) PeerTransportParameters() (transports uint16, maxTCPMessageSize 
 // (re)transmission to this peer: the peer's active interval when it
 // sent a message within its active threshold, its idle interval
 // otherwise. Fields the peer never advertised fall back to the spec
-// defaults. Mirrors matter.js MRP.ts:129-135 retransmissionIntervalOf
-// ("baseInterval = isPeerActive ? activeInterval : idleInterval",
-// re-evaluated per transmission) and chip GetMRPBaseTimeout.
+// defaults. Mirrors the selection of matter.js MRP.ts:162-190
+// retransmissionIntervalOf at db021da0 (:181 "baseInterval = (isPeerActive
+// ? activeInterval : idleInterval) + additionalDelay", re-evaluated per
+// transmission; the additionalDelay term is the caller's, see the tracker's
+// margin in bridge/outbound_reliable.go) and chip GetMRPBaseTimeout.
 func (e *Entry) RetransmitBaseInterval(_ time.Time) time.Duration {
+	idle, active, _, peerActive := e.PeerMRPSchedule()
+	if peerActive {
+		return active
+	}
+	return idle
+}
+
+// PeerMRPSchedule returns the peer's MRP schedule as a sender judges it
+// now: its idle and active intervals and its active threshold, each the
+// spec default where the peer advertised none, and whether the peer is
+// active — it sent a message within its active threshold.
+// [Entry.RetransmitBaseInterval] picks one interval of it; a bound on a
+// wait for the peer's answer sums the whole schedule (review II,
+// F-db021da0-13).
+func (e *Entry) PeerMRPSchedule() (idle, active, threshold time.Duration, peerActive bool) {
 	// The peer-active decision is an interval, judged on the clock's
 	// monotonic reading so a wall-clock step cannot flip it (matter.js
-	// Session.ts:149-151 on Time.nowUs); the caller's wall reading is
-	// accepted for the signature's sake and not consulted.
+	// Session.ts:149-151 on Time.nowUs).
 	e.mu.Lock()
 	lastPeer, lastPeerMono := e.lastPeerActivity, e.lastPeerActivityMono
 	idleMs, activeMs, thresholdMs := e.peerIdleIntervalMs, e.peerActiveIntervalMs, e.peerActiveThresholdMs
 	e.mu.Unlock()
 	nowMono := clock.MonotonicOf(e.clock)
 
-	idle := mrp.SessionIdleIntervalDefault
+	idle = mrp.SessionIdleIntervalDefault
 	if idleMs != 0 {
 		idle = time.Duration(idleMs) * time.Millisecond
 	}
-	active := mrp.SessionActiveIntervalDefault
+	active = mrp.SessionActiveIntervalDefault
 	if activeMs != 0 {
 		active = time.Duration(activeMs) * time.Millisecond
 	}
-	threshold := mrp.SessionActiveThresholdDefault
+	threshold = mrp.SessionActiveThresholdDefault
 	if thresholdMs != 0 {
 		threshold = time.Duration(thresholdMs) * time.Millisecond
 	}
-	if !lastPeer.IsZero() && nowMono-lastPeerMono < threshold {
-		return active
-	}
-	return idle
+	return idle, active, threshold, !lastPeer.IsZero() && nowMono-lastPeerMono < threshold
 }
 
 // MarkActiveTx updates the entry's activity timestamp after a
@@ -1559,11 +1572,11 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 // sessions a peer held when an exchange on one of them ran out of MRP
 // retransmissions. No CloseSession goes on the wire: the peer is
 // lost, so matter.js marks the session peer-lost and force-closes it
-// (NodeSession.ts:325-328 handlePeerLoss → initiateForceClose), and
+// (NodeSession.ts:341-344 handlePeerLoss → initiateForceClose), and
 // the session manager applies that to every session of the peer
-// created before the reporting exchange (SessionManager.ts:677-695
-// #handlePeerLoss, the `asOf` check at :688). A zero asOf closes them
-// all. Returns the number of sessions closed.
+// created before the reporting exchange (SessionManager.ts:727-746
+// #handlePeerLoss, the `asOf` check at :740, at db021da0). A zero asOf
+// closes them all. Returns the number of sessions closed.
 //
 // asOf is compared with the session's wall-clock creation time: on
 // [clock.System] both carry Go's monotonic reading and a wall-clock step
@@ -1571,8 +1584,8 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 // comparison follows the step. A caller that holds the clock's monotonic
 // reading of the moment the loss was observed uses
 // [Manager.ClosePeerLostSince], the form matter.js's `asOf` has
-// (Time.nowUs, SessionManager.ts:630-642 handlePeerShutdown and :645-647
-// handlePeerLoss at 862ad75f).
+// (Time.nowUs, SessionManager.ts:674-681 handlePeerShutdown and :686-688
+// handlePeerLoss at db021da0).
 func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.Time) int {
 	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
 		return !asOf.IsZero() && !entry.CreatedAt().Before(asOf)
@@ -1584,8 +1597,8 @@ func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.
 // every live session of the peer created before sinceMono is force-closed,
 // one created at or after it is kept — matter.js keeps "sessions created
 // at or after this instant", its asOf being Time.nowUs, the monotonic
-// reading (SessionManager.ts:623-642 handlePeerShutdown, :688
-// #handlePeerLoss at 862ad75f), so a wall-clock step between the session's
+// reading (SessionManager.ts:667-686 handlePeerShutdown, :740
+// #handlePeerLoss at db021da0), so a wall-clock step between the session's
 // creation and the loss neither spares nor condemns it. Returns the number
 // of sessions closed.
 func (m *Manager) ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int {

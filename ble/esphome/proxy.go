@@ -147,6 +147,11 @@ func (p *proxy) dial(ctx context.Context) (*apiConn, error) {
 // answers; a permanent refusal ends the attempt, since every address is
 // the same device.
 func dialFirst(ctx context.Context, addrs []string, psk []byte, o *Options) (*apiConn, string, error) {
+	if len(addrs) == 0 {
+		// errors.Join of nothing is nil: without this a caller took a nil
+		// connection for an answer (R2-P6-err-2006).
+		return nil, "", errNoAddress
+	}
 	var errs []error
 	for _, addr := range addrs {
 		a, err := dialChecked(ctx, addr, psk, o)
@@ -189,6 +194,11 @@ func dialChecked(ctx context.Context, addr string, psk []byte, o *Options) (*api
 // changed — the proxy moved, or took a further address — a reconnect
 // backoff is cut short and setAddrs reports true.
 func (p *proxy) setAddrs(addrs []string) bool {
+	if len(addrs) == 0 {
+		// candidates drops an instance without an address; the proxy
+		// keeps the ones it has.
+		return false
+	}
 	p.mu.Lock()
 	was, now := slices.Sorted(slices.Values(p.addrs)), slices.Sorted(slices.Values(addrs))
 	changed := !slices.Equal(was, now)
@@ -233,7 +243,12 @@ func (p *proxy) wakeUp() {
 }
 
 // run keeps the proxy connected until the central closes: first is the
-// connection NewCentral opened, nil when that failed.
+// connection NewCentral opened, nil when that failed. The reconnect wait
+// doubles after every loss and every failed dial up to maxBackoff; only a
+// connection that held for SilenceTimeout starts it afresh, so a proxy
+// that answers the hello and drops the connection is not redialled — a
+// Noise handshake and a browse each time — every second
+// (R2-P6-fsm-2008).
 func (p *proxy) run(first *apiConn) {
 	defer p.c.wg.Done()
 	backoff := initialBackoff
@@ -257,13 +272,17 @@ func (p *proxy) run(first *apiConn) {
 				continue
 			}
 		}
-		backoff = initialBackoff
+		since := p.c.clk.Now()
 		cause := p.attach(a)
 		p.detach(a, cause)
 		a = nil
+		if p.c.clk.Now().Sub(since) >= p.c.opts.SilenceTimeout {
+			backoff = initialBackoff
+		}
 		if !p.sleep(backoff) {
 			return
 		}
+		backoff = min(2*backoff, maxBackoff)
 	}
 }
 
@@ -301,7 +320,9 @@ func (p *proxy) sleep(d time.Duration) bool {
 
 // attach runs one API connection until it ends and returns its cause: the
 // subscription when the central needs it, the reader, the watch for a
-// subscription another client took.
+// subscription another client took. It returns once the connection's
+// goroutines have, so the central's Close, which waits for the run loop,
+// waits for every handle call as well.
 func (p *proxy) attach(a *apiConn) error {
 	a.handle = p.handle
 	p.mu.Lock()
@@ -309,7 +330,8 @@ func (p *proxy) attach(a *apiConn) error {
 	p.mu.Unlock()
 	p.c.log.Info("ble.esphome.proxy_connected", slog.String("proxy", p.name), slog.String("device", a.name),
 		slog.Bool("encrypted", p.psk != nil), slog.Uint64("feature_flags", uint64(a.flags)))
-	go a.run()
+	a.start()
+	defer a.wait()
 	if p.c.isScanning() {
 		p.subscribe()
 	}

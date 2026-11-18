@@ -81,7 +81,7 @@ func (e *chunkRejectedError) Is(target error) bool { return target == errChunkRe
 func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	// Decode the carried status: the peer's answer is only a go-ahead
 	// when it is Success. matter.js reads it on every inbound
-	// StatusResponse (InteractionMessenger.ts:183-196
+	// StatusResponse (InteractionMessenger.ts:259-272 at db021da0,
 	// throwIfErrorStatusMessage) and throws on anything else; an
 	// undecodable one is treated as Failure so the waiting interaction
 	// stops rather than carries on blind.
@@ -140,8 +140,8 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// initiated (the peer speaks as the responder), is the last message of
 	// a report exchange: nothing of ours follows to piggyback its ack on,
 	// so the exchange closes and the ack goes out now. Mirrors matter.js
-	// packages/protocol/src/protocol/MessageExchange.ts:1117-1124 at
-	// 862ad75f (close sends the standalone ack of the last received
+	// packages/protocol/src/protocol/MessageExchange.ts:1150-1159 at
+	// db021da0 (close sends the standalone ack of the last received
 	// message at once, not after STANDALONE_ACK_TIMEOUT). Left to the ack
 	// pump's cadence, the peer's MRP layer holds the exchange open for the
 	// grace window and retransmits past it.
@@ -333,7 +333,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// session's [maxChunkWaitsPerSession] claims; beyond them it is
 	// answered Busy (review II, R2-P1-req2-01). Its first chunk tells: only
 	// the last chunk suppresses the answer.
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, readWaitsForChunks([]im.ReportData{chunk}))
+	release, claimed := b.claimChunkWait(ctx, requestHdr.SessionID, readWaitsForChunks([]im.ReportData{chunk}))
 	if !claimed {
 		return b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_chunk_waits", im.StatusBusy)
 	}
@@ -670,11 +670,11 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	}
 	// Reliable: a lost WriteResponse leaves the controller waiting and
 	// retrying the whole write. matter.js ships every non-standalone-ack
-	// reply on an MRP session reliably (MessageExchange.ts:602
-	// `requiresAck ?? (session.usesMrp && !isStandaloneAck)`); the ACK
-	// pump retransmits until the peer acks. The response is a pure
-	// outcome report, so it meets sendReplyReliable's idempotency
-	// contract.
+	// reply on an MRP session reliably (MessageExchange.ts:692 at db021da0
+	// `requiresAck = !this.#sendOptions.suppressAck && this.session.usesMrp
+	// && !isStandaloneAck`); the ACK pump retransmits until the peer acks.
+	// The response is a pure outcome report, so it meets
+	// sendReplyReliable's idempotency contract.
 	if err := b.sendReplyReliable(src, requestHdr, proto, im.OpcodeWriteResponse, body); err != nil {
 		debugReplyError(b.logger, "send_write", src, err)
 		return err
@@ -762,7 +762,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// waiting for the peer's StatusResponse: a batch takes one of the
 	// session's [maxChunkWaitsPerSession] claims before any command runs,
 	// and beyond them is answered Busy (review II, R2-P1-req2-01).
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, len(req.Invokes) > 1)
+	release, claimed := b.claimChunkWait(ctx, requestHdr.SessionID, len(req.Invokes) > 1)
 	if !claimed {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "invoke_chunk_waits", im.StatusBusy)
 	}
@@ -1520,7 +1520,7 @@ func (b *Bridge) sessionAttestationChallenge(sessionID uint16) ([]byte, bool) {
 // expands to ([im.DispatchEndpoints]); a command that fails its checks
 // defers nothing (matter.js CommandInvokeResponse's dispatch endpoints,
 // packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165,
-// :297 at 862ad75f). matter.js gates this behind its "delay-report-data"
+// :297 at db021da0). matter.js gates this behind its "delay-report-data"
 // forward feature, which its own CHIP test support switches on
 // (TC-IDM-1.5); the module acts on it always (BD-Matter-DelayReportData).
 func (b *Bridge) deferReportsFor(ctx context.Context, dispatcher im.Dispatcher, req im.InvokeRequest) {

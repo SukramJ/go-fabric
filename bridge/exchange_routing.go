@@ -25,9 +25,13 @@ const timedSweepInterval = time.Minute
 // that was registered by another session. Without the session
 // dimension a rogue or replaying peer could craft a Write/Invoke
 // with a matching exchangeID from a different session and pass the
-// timed gate. Mirrors chip CASESession.cpp / chip WriteHandler.cpp
-// which always validate against the session context before checking
-// the timed gate.
+// timed gate. Mirrors connectedhomeip, where the deadline is state of
+// the TimedHandler that is the delegate of the one exchange the
+// TimedRequest arrived on (src/app/InteractionModelEngine.cpp:967-979,
+// src/app/TimedHandler.cpp:61-72, :137-138 at 6170af84), and a message
+// reaches an exchange only when its session matches as well as its
+// exchange id (src/messaging/ExchangeMgr.cpp:296,
+// src/messaging/ExchangeContext.cpp:364-374).
 type timedKey struct {
 	sessionID  uint16
 	exchangeID uint16

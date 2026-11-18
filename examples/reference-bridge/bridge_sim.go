@@ -269,12 +269,13 @@ func (s *demoBridgeSim) rename() error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var errs []error
 	for i, l := range []*bridgeSimLight{s.light1, s.light2} {
 		if l.added {
-			l.dev.Rename(context.Background(), bridgeSimRenames[i])
+			errs = append(errs, l.dev.Rename(context.Background(), bridgeSimRenames[i]))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // add is #addLight2 (:246-252): the second light under the Aggregator, a

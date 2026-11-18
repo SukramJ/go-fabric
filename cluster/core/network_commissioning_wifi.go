@@ -52,7 +52,9 @@ type WiFiNetworkCommissioning struct {
 	// ([WiFiNetworkCommissioning.OnAttributeChange]).
 	changes cluster.AttributeChanges
 
-	driver        contract.WiFiDriver
+	driver contract.WiFiDriver
+	// onConnected is WiFiNetworkCommissioningConfig.OnConnected.
+	onConnected   func(ctx context.Context)
 	failSafe      func() (fabricIndex uint8, armed bool)
 	failSafeArmed func() bool
 	setBreadcrumb func(uint64)
@@ -160,6 +162,15 @@ type WiFiNetworkCommissioningConfig struct {
 	// Clock is the clock the rejoin of the committed network backs off
 	// on; nil is [clock.System].
 	Clock clock.Clock
+	// OnConnected, when set, runs after each join Driver reports
+	// successful — a ConnectNetwork command's and the rejoin of the
+	// committed network at Start — on the joining goroutine, without the
+	// server's lock, before the result is recorded. The node re-announces
+	// its DNS-SD records from it. The server asks Driver itself for its
+	// optional ports (contract.WiFiLinkWatcher, WiFiDisconnector,
+	// WiFiLinkReporter, WiFiInterfaceSwitcher), so a host's driver goes
+	// in unwrapped and keeps every one of them (review II, R2-P6-api-2450).
+	OnConnected func(ctx context.Context)
 }
 
 // wifiNetworksKey is the setting the committed networks are stored under.
@@ -201,7 +212,7 @@ func NewWiFiNetworkCommissioning(cfg WiFiNetworkCommissioningConfig) (*WiFiNetwo
 		return nil, errors.New("core: Wi-Fi NetworkCommissioning needs a driver")
 	}
 	w := &WiFiNetworkCommissioning{
-		driver: cfg.Driver, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
+		driver: cfg.Driver, onConnected: cfg.OnConnected, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
 		maxNetworks: cfg.MaxNetworks, scanMax: cfg.ScanMaxTimeSeconds, connectMax: cfg.ConnectMaxTimeSeconds,
 		store: cfg.Store, logger: cfg.Logger, clk: clock.Or(cfg.Clock), interfaceEnabled: true,
 		life: context.Background(),
@@ -363,7 +374,8 @@ const (
 // CommissioningComplete starts when the link is on no committed network.
 // An attempt waits while a fail-safe is armed or a command runs, and holds
 // the driver alone while it runs, the first at Start included: a command
-// answers Busy then, and a fail-safe expiry does not release it. chip
+// cancels it and runs once it ended ([WiFiNetworkCommissioning.MatterInvoke]),
+// and a fail-safe expiry does not release it. chip
 // leaves the reconnect to wpa_supplicant, which holds the network it
 // saved (CommitConfig, :1118-1135 of
 // ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp); this
@@ -504,6 +516,13 @@ func (w *WiFiNetworkCommissioning) disconnect() {
 	w.changes.Notify(netcommAttrNetworks)
 }
 
+// connected runs the OnConnected hook after a successful join.
+func (w *WiFiNetworkCommissioning) connected(ctx context.Context) {
+	if w.onConnected != nil {
+		w.onConnected(ctx)
+	}
+}
+
 // joinCommitted joins target, bounded by ConnectMaxTimeSeconds, and
 // records the result as Start does; it reports whether the join
 // succeeded. After a failed join the link is where the driver reports the
@@ -516,6 +535,9 @@ func (w *WiFiNetworkCommissioning) joinCommitted(ctx context.Context, target wif
 	code, _, errValue := w.driver.ConnectNetwork(jctx, target.ssid, target.credentials)
 	status := netcommdef.NetworkCommissioningStatusEnum(code)
 	ok := statusOK(status)
+	if ok {
+		w.connected(ctx)
+	}
 	var link []byte
 	if ok {
 		link = bytes.Clone(target.ssid)
@@ -892,20 +914,61 @@ func (w *WiFiNetworkCommissioning) switchInterface(ctx context.Context, v bool) 
 	if held == v {
 		return false, nil
 	}
-	err = errors.ErrUnsupported
-	if sw, ok := w.driver.(contract.WiFiInterfaceSwitcher); ok {
-		err = sw.SetInterfaceEnabled(ctx, v)
-	}
-	switch {
-	case errors.Is(err, errors.ErrUnsupported):
-		return false, netcommStatus(im.StatusInvalidAction, "core: InterfaceEnabled %t: the Wi-Fi driver cannot switch its interface: %v", v, err)
-	case err != nil:
-		return false, fmt.Errorf("core: InterfaceEnabled %t: the Wi-Fi driver did not switch its interface: %w", v, err)
+	if err := w.driverSwitch(ctx, v); err != nil {
+		return false, err
 	}
 	w.mu.Lock()
 	changed = w.setInterfaceEnabledLocked(v)
 	w.mu.Unlock()
 	return changed, nil
+}
+
+// driverSwitch has the driver switch its interface to v: InvalidAction
+// for a driver without the switch, the driver's error otherwise.
+func (w *WiFiNetworkCommissioning) driverSwitch(ctx context.Context, v bool) error {
+	err := errors.ErrUnsupported
+	if sw, ok := w.driver.(contract.WiFiInterfaceSwitcher); ok {
+		err = sw.SetInterfaceEnabled(ctx, v)
+	}
+	switch {
+	case errors.Is(err, errors.ErrUnsupported):
+		return netcommStatus(im.StatusInvalidAction, "core: InterfaceEnabled %t: the Wi-Fi driver cannot switch its interface: %v", v, err)
+	case err != nil:
+		return fmt.Errorf("core: InterfaceEnabled %t: the Wi-Fi driver did not switch its interface: %w", v, err)
+	}
+	return nil
+}
+
+// enableForConnect switches a disabled interface on for ConnectNetwork,
+// whatever the network id, before the join — as connectedhomeip's Thread
+// driver resets InterfaceEnabled to its default true at the start of its
+// ConnectNetwork, the one chip driver that models the switch
+// (src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp:205-213
+// at 6170af84; N4-d4wifi-1); matter.js has no server logic here
+// (NetworkCommissioningServer.ts:18 at db021da0). The DataVersion advances
+// with the attribute; the rejoin of the committed network is not started,
+// the command's own join being the join. A driver that does not switch on
+// fails the command, as a write of true does (judgement: chip's driver
+// returns without an answer there, :212).
+func (w *WiFiNetworkCommissioning) enableForConnect(ctx context.Context) error {
+	w.switchMu.Lock()
+	defer w.switchMu.Unlock()
+	w.mu.Lock()
+	on := w.interfaceEnabled
+	w.mu.Unlock()
+	if on {
+		return nil
+	}
+	if err := w.driverSwitch(ctx, true); err != nil {
+		return err
+	}
+	w.mu.Lock()
+	if !w.interfaceEnabled {
+		w.interfaceEnabled = true
+		w.dataVersion.Bump()
+	}
+	w.mu.Unlock()
+	return nil
 }
 
 // netcommStatusError is a command refused with an IM status.
@@ -1263,6 +1326,9 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	if !w.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
+	if err := w.enableForConnect(ctx); err != nil {
+		return nil, err
+	}
 	w.mu.Lock()
 	window := w.expiries
 	i := w.indexLocked(req.NetworkId)
@@ -1287,6 +1353,8 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		status = netcommdef.NetworkCommissioningStatusEnum(code)
 		if !statusOK(status) {
 			link = w.linkAfterFailure(ctx)
+		} else {
+			w.connected(ctx)
 		}
 	}
 	w.mu.Lock()

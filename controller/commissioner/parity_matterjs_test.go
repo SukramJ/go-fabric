@@ -19,8 +19,8 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// TestParityConstants: matter.js packages/protocol/src/peer/ at 0ceb202d —
-// ControllerCommissioningFlow.ts:289-301, ControllerCommissioner.ts:123,
+// TestParityConstants: matter.js packages/protocol/src/peer/ at db021da0 —
+// ControllerCommissioningFlow.ts:290-302, ControllerCommissioner.ts:123,
 // :264, :603-604, :706 and CommissioningConnection.ts:35.
 func TestParityConstants(t *testing.T) {
 	t.Parallel()
@@ -181,7 +181,7 @@ func TestParityOperationalCredentialsResults(t *testing.T) {
 func TestParityAddNOCFields(t *testing.T) {
 	t.Parallel()
 	e := tlv.NewEncoder()
-	addNOCRequest{noc: []byte{1}, ipk: make([]byte, 16), caseAdminSubject: 112233, adminVendorID: 0xFFF1}.EncodeTLV(e, tlv.AnonymousTag())
+	addNOCRequest([]byte{1}, nil, make([]byte, 16), 112233, 0xFFF1).EncodeTLV(e, tlv.AnonymousTag())
 	b, _ := e.Bytes()
 	n, err := spec.ReadElement(tlv.NewDecoder(b))
 	if err != nil {

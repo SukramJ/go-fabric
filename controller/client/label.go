@@ -17,8 +17,8 @@ import (
 const nocStatusLabelConflict uint8 = 10
 
 // latchLabel sets the node's once-per-start latch of the fabric-label
-// reconciliation; false when it was set already (NetworkClient.ts:269-273
-// at 0ceb202d).
+// reconciliation; false when it was set already (NetworkClient.ts:429-433
+// at db021da0).
 func (n *Node) latchLabel() bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -70,8 +70,8 @@ func (e *nocStatusError) Unwrap() error {
 
 // pushLabel is the reconciliation's work for n: nothing to do is nil; an
 // UpdateFabricLabel that fails is the error — a LabelConflict status
-// commissioner.ErrFabricLabelConflict (CommissioningController.ts:972-976
-// at 862ad75f, FabricLabelConflictError), another one a *nocStatusError.
+// commissioner.ErrFabricLabelConflict (CommissioningController.ts:984-988
+// at db021da0, FabricLabelConflictError), another one a *nocStatusError.
 func (r *Registry) pushLabel(ctx context.Context, n *Node) error {
 	addr, ok := n.PeerAddress()
 	oc := n.opCreds()
@@ -116,11 +116,11 @@ func (r *Registry) pushLabel(ctx context.Context, n *Node) error {
 // every commissioned node that is connected; a node that is not gets it at
 // its next start, when the reconciliation runs again on its first
 // SubscriptionAlive — matter.js CommissioningController.updateFabricLabel
-// (packages/matter.js/src/CommissioningController.ts:986-1033 at
-// 862ad75f): the fabric's setLabel (MatterController.ts:796-798), then
-// validateAndUpdateFabricLabel for each connected node (:941-980), an
+// (packages/matter.js/src/CommissioningController.ts:998-1045 at
+// db021da0): the fabric's setLabel (MatterController.ts:797-799), then
+// validateAndUpdateFabricLabel for each connected node (:953-992), an
 // offline node updated on its next connection. matter.js returns after
-// the first connected node it updated (:996-998); every connected node
+// the first connected node it updated (:1008-1010); every connected node
 // gets the label here. A label longer than 32 characters is
 // commissioner.ErrLabel; the error of each node it could not update is
 // joined into the returned error, a refusal of the name

@@ -1079,8 +1079,8 @@ type SetpointChange struct {
 // Sink applies a SystemMode write, a setpoint change (a write or
 // a SetpointRaiseLower) with the companions that move with it,
 // and a TemperatureSetpointHold write, each one the kit's
-// Thermostat server admitted; an error answers FAILURE and
-// stores nothing (cluster/thermo Sink).
+// Thermostat server admitted; an error answers its status,
+// FAILURE without one, and stores nothing (cluster/thermo Sink).
 type Sink interface {
 	SetSystemMode(ctx context.Context, mode uint8) error
 	SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error

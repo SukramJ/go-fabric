@@ -75,8 +75,9 @@ type outboundReliableTracker struct {
 	rtt mrpRTTWindow
 	// baseIntervalFor resolves the peer-appropriate MRP base interval
 	// for the session (peer-advertised active/idle interval selected
-	// by peer activity — matter.js MRP.ts:129). nil, or a session the
-	// resolver does not know, falls back to the spec idle default.
+	// by peer activity — matter.js MRP.ts:181 at db021da0). nil, or a
+	// session the resolver does not know, falls back to the spec idle
+	// default.
 	// Set once at construction; read without the mutex.
 	baseIntervalFor func(sessionID uint16, now time.Time) time.Duration
 	// clock stamps sentWall for the round-trip diagnostic.
@@ -146,6 +147,10 @@ type outboundEntry struct {
 	// activity instead of the session resolver, which knows no unsecured
 	// session ([outboundReliableTracker.trackUnsecured]).
 	peer *handshakePeerTiming
+	// installed is the secure session the reply's handshake installed
+	// before the peer acknowledged the reply, zero for none
+	// ([outboundReliableTracker.trackUnsecuredInstalled]).
+	installed uint16
 	// sentWall is the tracker's clock reading when the datagram first
 	// left, used only to report the peer's round-trip in diagnostics. It is
 	// deliberately NOT the injected `now` the retransmit schedule runs on:
@@ -188,14 +193,15 @@ func (t *outboundReliableTracker) baseInterval(sessionID uint16, now time.Time) 
 //
 // Mirrors matter.js: the responder's UnsecuredSession is created with
 // `setActiveTimestamp: !isInitiator` (packages/protocol/src/session/
-// UnsecuredSession.ts:30, "When we are the initiator we assume the node
+// UnsecuredSession.ts:36, "When we are the initiator we assume the node
 // is in idle mode" — the responder counts its peer active), its timing
 // parameters are replaced by the initiator's (PaseServer.ts:153-156,
 // CaseServer.ts:120-123 `session.timingParameters =
-// initiatorSessionParams`; Session.ts:108-121 stores them), every
-// received message refreshes the active timestamp (Session.ts:141-147
+// initiatorSessionParams`; Session.ts:261-266 stores them), every
+// received message refreshes the active timestamp (Session.ts:142-148
 // notifyActivity) and retransmissionIntervalOf picks activeInterval while
-// the peer is active (MRP.ts:181, isPeerActive: Session.ts:149-151).
+// the peer is active (MRP.ts:181, isPeerActive: Session.ts:150-152 at
+// db021da0).
 type handshakePeerTiming struct {
 	idle, active, threshold time.Duration
 	// activeAt is when the request this reply answers was received.
@@ -291,7 +297,7 @@ var errExchangeAwaitsAck = errors.New("bridge: outbound retransmit: the exchange
 // TrackWithMargin is [outboundReliableTracker.Track] with margin added to
 // the base interval of every (re)transmission before the backoff
 // amplifies it: matter.js MessageExchange #sendAdditionalDelay
-// (MessageExchange.ts:1219-1222 at 862ad75f) passed as
+// (MessageExchange.ts:1259-1262 at db021da0) passed as
 // retransmissionIntervalOf's additionalDelay (MRP.ts, `baseInterval =
 // (isPeerActive ? activeInterval : idleInterval) + additionalDelay`).
 func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
@@ -307,7 +313,40 @@ func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exc
 // ([unsecuredEntryLimit]) and the tracker reports it through its evicted
 // hook.
 func (t *outboundReliableTracker) trackUnsecured(counter uint32, key HandshakeKey, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming) {
+	t.trackUnsecuredInstalled(counter, key, datagram, dest, now, peer, 0)
+}
+
+// trackUnsecuredInstalled is [outboundReliableTracker.trackUnsecured] for a
+// reply whose handshake installed the secure session installed before the
+// peer acknowledged the reply (a Sigma2_Resume): [Tick] reports it with the
+// entry's give-up, and the bridge closes it
+// ([Bridge.closeUnacknowledgedResume]). Zero is none.
+func (t *outboundReliableTracker) trackUnsecuredInstalled(counter uint32, key HandshakeKey, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming, installed uint16) {
 	_ = t.track(counter, 0, key.ExchangeID, key.InitiatorNodeID, datagram, dest, now, 0, peer, exchangeRoleUnnamed)
+	if installed == 0 {
+		return
+	}
+	t.mu.Lock()
+	if e := t.pending[outboundKey{0, counter}]; e != nil {
+		e.installed = installed
+	}
+	t.mu.Unlock()
+}
+
+// forgetInstalled drops sessionID from every unsecured entry that names it
+// as installed: the session closed, and its id may be given to another
+// before the entry is given up ([Bridge.purgeSessionState]).
+func (t *outboundReliableTracker) forgetInstalled(sessionID uint16) {
+	if t == nil || sessionID == 0 {
+		return
+	}
+	t.mu.Lock()
+	for _, e := range t.pending {
+		if e.installed == sessionID {
+			e.installed = 0
+		}
+	}
+	t.mu.Unlock()
 }
 
 // unsecuredEntryLimit is how many reliable messages the unsecured session
@@ -467,9 +506,9 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
-	// formula at transmission 0 — matter.js MRP.ts:129 evaluates the
-	// peer-appropriate base interval for every transmission including
-	// the first.
+	// formula at transmission 0 — matter.js MRP.ts:181 (at db021da0)
+	// evaluates the peer-appropriate base interval for every
+	// transmission including the first.
 	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 	key := outboundKey{sessionID, counter}
 	var (
@@ -613,17 +652,29 @@ func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
 // exchanges in its own unsecured session, ExchangeManager.ts:308-312 and
 // :401 at db021da0).
 func (t *outboundReliableTracker) AbandonUnsecuredExchange(hk HandshakeKey) int {
+	cleared, _ := t.abandonUnsecuredExchange(hk)
+	return cleared
+}
+
+// abandonUnsecuredExchange is [outboundReliableTracker.AbandonUnsecuredExchange]
+// that also returns the secure sessions the dropped entries' handshake
+// installed before the peer acknowledged them
+// ([outboundReliableTracker.trackUnsecuredInstalled]).
+func (t *outboundReliableTracker) abandonUnsecuredExchange(hk HandshakeKey) (cleared int, installed []uint16) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	cleared := 0
 	for _, key := range slices.Clone(t.unsecured) {
-		if e := t.pending[key]; e.exchangeID != hk.ExchangeID || e.initiator != hk.InitiatorNodeID {
+		e := t.pending[key]
+		if e.exchangeID != hk.ExchangeID || e.initiator != hk.InitiatorNodeID {
 			continue
+		}
+		if e.installed != 0 {
+			installed = append(installed, e.installed)
 		}
 		t.dropLocked(key)
 		cleared++
 	}
-	return cleared
+	return cleared, installed
 }
 
 // DropSession drops every entry of the secure session sessionID — the
@@ -632,7 +683,7 @@ func (t *outboundReliableTracker) AbandonUnsecuredExchange(hk HandshakeKey) int 
 // belong to handshakes, which end on their own clock. matter.js stops
 // retransmitting when the send fails with SessionClosedError
 // (MessageExchange.ts:1008-1014 at db021da0, the lines
-// [outboundReliableTracker.Tick] cites at 862ad75f); review II,
+// [outboundReliableTracker.Tick] cites); review II,
 // R2-P2-sess-06.
 func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
 	if t == nil || sessionID == 0 {
@@ -752,6 +803,10 @@ type outboundTickResult struct {
 	Initiator uint64
 	Counter   uint32
 	Err       error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
+	// Installed is, for an unsecured entry given up or expired, the secure
+	// session its handshake installed before the peer acknowledged it
+	// ([outboundReliableTracker.trackUnsecuredInstalled]); zero for none.
+	Installed uint16
 }
 
 // Tick walks every entry whose nextSendAt has elapsed: re-sends via
@@ -767,7 +822,7 @@ type outboundTickResult struct {
 // error is surfaced via the result slice and counts as the transmission:
 // the entry keeps the backoff the sweep scheduled, so a failing socket
 // spends the retry budget on the MRP schedule, not at the pump's cadence.
-// Mirrors matter.js MessageExchange.ts:905-906 and :975-981 at 862ad75f
+// Mirrors matter.js MessageExchange.ts:941-942 and :1008-1014 at db021da0
 // (#retransmitMessage counts the retransmission before it sends, and a
 // failed send that is not SessionClosedError still runs
 // #initializeResubmission with the computed backoff).
@@ -793,7 +848,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// is dropped, due or not: [unsecuredEntryLifetime].
 		if key.sessionID == 0 && now.Sub(p.trackedAt) >= unsecuredEntryLifetime {
 			t.dropLocked(key)
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: errUnsecuredEntryExpired})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: errUnsecuredEntryExpired, Installed: p.installed})
 			continue
 		}
 		if now.Before(p.nextSendAt) {
@@ -804,7 +859,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 			if key.sessionID != 0 {
 				t.abandoned[key] = now.Add(now.Sub(p.trackedAt))
 			}
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached, Installed: p.installed})
 			continue
 		}
 		p.retries++

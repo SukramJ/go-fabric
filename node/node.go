@@ -209,7 +209,11 @@ type Node struct {
 	// never waits for it (ADR 0026 P6).
 	lifecycle chan struct{}
 	started   atomic.Bool
-	stopped   bool
+	// devicesLive is what the devices' host answers as Running
+	// (node/lifecycle.go markDevicesLive): set before the bridge's start
+	// takes its snapshot, cleared when that start fails.
+	devicesLive atomic.Bool
+	stopped     bool
 	// stopBegun: a Stop took the node's own parts down; stopped is set
 	// only once the bridge stopped too, so a Stop whose bridge stop gave
 	// up is resumed by the next one (review II, R2-P1-dr-req-01).
@@ -390,21 +394,22 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	n.caseIDs = newCaseIdentities(n.logger, n.groups)
 	n.caseIDs.clock = n.cfg.Clock
+	n.caseIDs.resumptions = n.st
 	// A KeySetWrite or KeySetRemove reloads the fabric's group state; the
 	// CASE identity follows key set 0 (matter.js Fabric.destinationIdsFor
 	// reads the fabric's KeySets, which GroupKeyManagementServer.keySetWrite
 	// replaced in place).
 	n.groups.OnGroupcastChanged(n.caseIDs.refreshIPK)
-	if err := n.buildLevelledRoot(ctx, rootDeps{
+	if err := n.buildRestoredRoot(ctx, rootDeps{
 		cfg: &n.cfg, logger: n.logger, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: peerPath{n},
 		wifiDriver:              n.wifiDriver(),
+		onWiFiConnected:         n.wifiConnected,
 		onFabricInstalled:       n.observedFabricInstalled,
 		onCommissioningComplete: n.commissioningCompleted,
 		onFailSafeExpired:       n.failSafeExpired,
 	}); err != nil {
 		return nil, err
 	}
-	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
 	n.bootReason = n.root.bootReason
 	n.setNetworkInterfaceRules()
 	// DiagnosticLogs hands logs over BDX on the requesting session
@@ -419,7 +424,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	if n.commissionerControl != nil {
 		aggExtra = append(slices.Clone(aggExtra), n.commissionerControl)
 	}
-	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, aggExtra, n.cfg.Clock)
+	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, n.logger, aggExtra, n.cfg.Clock)
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
 	}
@@ -433,7 +438,8 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{ //nolint:contextcheck // the handshake hooks run per session, for the node's lifetime, not New's call
-		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations), life: n.life,
+		passcode: cm.Passcode, iterations: int(cm.PBKDFIterations), life: n.life,
+		salts: &windowSalt{passcode: cm.Passcode, iterations: int(cm.PBKDFIterations)},
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger, &n.sessionEvents)
 	n.sessionEvents.n = n
 	n.wireICD()
@@ -445,7 +451,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
-		baseline: n.sec.pase, advert: advert, observers: n.observerList,
+		baseline: n.sec.pase, salts: n.sec.salts, advert: advert, observers: n.observerList,
 		deviceType:      &commissionableDeviceType{topology: n.br.Topology},
 		responderParams: n.sec.responderParams, life: n.life,
 		ble: cfg.Network.hasBLE(), clk: clock.Or(n.cfg.Clock),
@@ -582,6 +588,30 @@ func openCredentials(ctx context.Context, sc Store) (*store.Store, error) {
 		return nil, fmt.Errorf("node: open the sealed store: %w", err)
 	}
 	return st, nil
+}
+
+// buildRestoredRoot builds the root (buildLevelledRoot) and restores what
+// the store keeps for it (restoreStored).
+func (n *Node) buildRestoredRoot(ctx context.Context, d rootDeps) error {
+	if err := n.buildLevelledRoot(ctx, d); err != nil {
+		return err
+	}
+	return n.restoreStored(ctx)
+}
+
+// restoreStored is New's restore of what the store keeps for the node
+// itself: the root's NodeLabel, Location and ConfigurationVersion
+// (restoreRoot), and the forgets a refused write or a crash left half
+// done, finished before the host adds anything (review II,
+// R2-P6-store-2406).
+func (n *Node) restoreStored(ctx context.Context) error {
+	if err := n.persisted.restoreRoot(ctx, n.root.BasicInformation); err != nil {
+		return err
+	}
+	if n.agg != nil {
+		return n.agg.finishForgets(ctx)
+	}
+	return nil
 }
 
 // abandon releases what a New that failed had begun: the node's
@@ -788,7 +818,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
 	// The removed fabric's fabric-sensitive events leave the log
-	// (FabricScopedDataHandler.ts:114-170 at 862ad75f).
+	// (FabricScopedDataHandler.ts:114-170 at db021da0).
 	if log := n.br.EventLog(); log != nil {
 		log.DropFabric(fabricIndex)
 	}
@@ -921,19 +951,47 @@ func (n *Node) goKeeper(fn func()) bool {
 // sessions and records towards the fabric's peers
 // ([Node.closeClientFabricSessions]). Mirrors matter.js
 // packages/protocol/src/common/FailsafeContext.ts:167-170 (replaceFabric →
-// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537).
+// SessionManager.deleteResumptionRecordsForFabric, SessionManager.ts:537);
+// the sessions close by the command itself,
+// `await timedOp.associatedFabric.replaced(this.context.exchange)`
+// (packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:372-373
+// at db021da0; review II, R2-P6-doc-2910).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	loadErr := n.caseIDs.load(ctx, n.st, fabricIndex)
+	if loadErr != nil {
+		// The identity the store holds could not be read: the one in
+		// memory is not the committed one any more (the replaced NOC, or
+		// after a rolled-back update the new one), so it answers no
+		// Sigma1 and is no longer advertised until a later load succeeds
+		// — the next update, a rollback or the next start.
+		// connectedhomeip deletes the fabric when the commit of its
+		// pending data fails in storage, on an update as well
+		// (FabricTable.cpp:2064-2070 at 6170af84); the stored fabric is
+		// kept here, a failed read being one a later read may serve
+		// (judgement; fix-fxo-node Q3, Fable D3).
+		if c, nd, ok := n.caseIDs.forget(fabricIndex); ok {
+			n.br.WithdrawFabric(ctx, fabricIndex, c, nd)
+		}
+	}
 	// The identity moved first: a handshake from here on runs under the
-	// new NOC, and the sweep below takes every record, session and
-	// handshake in flight made under the old one (review II, Fable P-3).
+	// new NOC, a handshake in flight that began under the old one admits
+	// no session (caseIdentities.admitSessionAt, handshakeStake.of; review
+	// II, R2-P6-sec-2412), and the sweep below takes every record and
+	// session made under the old one (review II, Fable P-3); the bridge's
+	// CloseFabricSessionsAfterUpdate is where a pending handshake of the
+	// fabric is aborted.
 	if err := n.st.RemoveResumptionsByFabric(ctx, fabricIndex); err != nil {
 		n.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 	}
 	n.closeClientFabricSessions(ctx, fabricIndex)
 	if loadErr != nil {
+		// The new identity could not be read; what the update replaced is
+		// gone all the same: the fabric's pending handshakes are aborted
+		// and its sessions end, as on a reload that succeeds. Nothing is
+		// announced under an identity the node does not hold.
 		n.logger.Warn("case.identity.reload_failed", slog.Any("err", loadErr))
+		n.br.CloseFabricSessionsAfterUpdate(ctx, fabricIndex)
 		return
 	}
 	if newCompressed, newNode, ok := n.caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {
@@ -1212,13 +1270,14 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // previous run installed, the re-establishment of their subscriptions,
 // the OTA requestor, their operational records, and the node's own
 // commissioning window when no fabric exists. Start is idempotent, as
-// matter.js Node.start (Node.ts:114-132); after Stop it is [ErrStopped].
+// matter.js Node.start (Node.ts:114-130); after Stop it is [ErrStopped].
 //
 // The node counts as started once Start completed. A Start that fails
 // leaves the node startable, as matter.js's Node.start does — it sets the
-// target state back to "offline" and rethrows (Node.ts:113-128): the node
-// is not started, a later Start runs the whole start path again, and
-// what New opened (the store file of Store.Path) stays open until Stop.
+// target state back to "offline" and rethrows (Node.ts:124-126 at
+// db021da0): the node is not started, a later Start runs the whole start
+// path again, and what New opened (the store file of Store.Path) stays
+// open until Stop.
 // Every step that can fail — the DataModelTest check, the PartsList
 // providers, the bridge's start (topology, sockets) — runs before
 // anything is started, and the bridge's start undoes its own partial
@@ -1264,20 +1323,30 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// The DataModelTest feature against the node's MaxPathsPerInvoke, before
 	// anything goes online. Mirrors matter.js
 	// packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts
-	// #online (:352) → #assertDataModelTest (:125-143): without the feature a
-	// MaxPathsPerInvoke above one fails the node's start, with it a limit of
-	// one is logged.
+	// #online (:414-415) → #assertDataModelTest (:186-204 at db021da0):
+	// without the feature a MaxPathsPerInvoke above one fails the node's
+	// start, with it a limit of one is logged.
 	if err := n.checkDataModelTest(); err != nil {
 		return err
 	}
 	// The root's and the Aggregator's live PartsList are the bridge's own
 	// (bridge.Bridge.Start installs both providers).
 	// The fabric hooks the store owes run before anything is served
-	// (R2-P2-comm-03, R2-P5-port-18).
+	// (R2-P2-comm-03, R2-P5-port-18), and the callback queue runs before
+	// them: a delivery acknowledges the event in the store, so an
+	// ObserveAsync hook handed to a queue not yet running would never
+	// hear it (review II, R2-P6-err-2402). A failed bridge start stops
+	// the queue again, after the owed callbacks ran.
+	n.callbacks.Start()
 	n.deliverOwedFabricEvents(ctx)
 	// The bridge's start is the last step that can fail; it leaves
 	// nothing bound or published when it does (bridge.Bridge.Start).
+	// The devices count as served before the bridge's snapshot, so no
+	// part moves between that snapshot and Start's end (decision 225).
+	n.markDevicesLive(true)
 	if err := n.br.Start(ctx); err != nil {
+		n.markDevicesLive(false)
+		n.callbacks.Stop()
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
 	// The goroutines New leaves unstarted (ADR 0026 principle 5): the
@@ -1289,7 +1358,6 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// The assembled surface against the one a previous run persisted: a
 	// change raises the ConfigurationVersions (surface_stability.go).
 	n.announceSurface(ctx)
-	n.callbacks.Start()
 	if n.agg != nil {
 		n.agg.setStarted()
 	}
@@ -1387,7 +1455,10 @@ func (n *Node) startLocked(ctx context.Context) error {
 }
 
 // Stop takes the node offline and releases what New and Start began, in
-// the daemon's shutdown order (main.go:430-450 at b4ea1f96^): the OTA requestor, the
+// the daemon's shutdown order (main.go:430-450 at b4ea1f96^): an armed
+// fail-safe expired and rolled back (a fabric an unfinished commissioning
+// added goes, and [Observers].OnFabricRemoved runs before Stop returns),
+// the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the session
 // table's idle reaper, the subscription engine, the re-announce loop, the health probe, the
@@ -1484,6 +1555,22 @@ func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	n.keeperMu.Lock()
 	n.stopping = true
 	n.keeperMu.Unlock()
+	// An armed fail-safe expires now, with the rollback its timeout runs:
+	// a fabric an unfinished commissioning added goes, and the host hears
+	// OnFabricRemoved before Stop returns, instead of at the next start
+	// on this store — or never, when none follows. Mirrors matter.js
+	// packages/protocol/src/protocol/DeviceCommissioner.ts:326-340 at
+	// db021da0 (close closes the fail-safe context), which the node's stop
+	// reaches (packages/node/src/behavior/system/network/
+	// ServerNetworkRuntime.ts:446, `await env.close(DeviceCommissioner)`),
+	// and packages/protocol/src/common/FailsafeContext.ts:194-203 (a close
+	// with the fail-safe armed rolls back). No reopen follows: stopping
+	// is set (review II, R2-P6-fsm-2411). The server is closed first, so no
+	// arm — an administrator's over CASE above all — takes the fail-safe
+	// again between the expiry and the store's close (facade residual 2a);
+	// a Close that ctx ends is Close's error again in stopLocked.
+	_ = n.root.GeneralCommissioning.Close(ctx)
+	n.root.GeneralCommissioning.ExpireFailSafe(context.WithoutCancel(ctx))
 	if n.root.OTARequestor != nil {
 		n.root.OTARequestor.Stop()
 	}

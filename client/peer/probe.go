@@ -18,7 +18,7 @@ import (
 
 // probeMaxRetransmissions caps a liveness probe's transmissions — matter.js
 // PROBE_MAX_RETRANSMISSIONS (packages/protocol/src/peer/PeerAddressMonitor.ts:26-27
-// at 0ceb202d).
+// at db021da0).
 const probeMaxRetransmissions = 2
 
 // Tags of ReportDataMessage the probe reads (Matter §10.7.3).
@@ -43,9 +43,9 @@ const (
 //
 // With a network profile the probe takes a slot of it, released when the
 // exchange closes, and pads the exchange with margin — the probe network
-// PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at 862ad75f)
+// PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at db021da0)
 // and the medium margin PeerExchangeProvider.initiateExchange applies
-// (PeerExchangeProvider.ts:87-92, :136-141).
+// (PeerExchangeProvider.ts:87-92, :133-138).
 //
 // Its log record matter.controller.peer.probe names the probed address in
 // target — override, else the session's — beside the caller's address, so

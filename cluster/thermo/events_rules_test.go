@@ -134,7 +134,7 @@ func TestEventsOfCommandsAndHostSets(t *testing.T) {
 	}
 	got = rec.take()
 	// SystemMode Heat sets ThermostatRunningMode Heat (matter.js
-	// ThermostatServer.ts:1194-1206 at 862ad75f; W3-clua1-01), so
+	// ThermostatServer.ts:1194-1206 at db021da0; W3-clua1-01), so
 	// RunningModeChange follows in chip's attribute order.
 	wantIDs(t, got, tdef.EventSystemModeChange, tdef.EventLocalTemperatureChange, tdef.EventRunningModeChange)
 	if got[0].endpoint != 3 {

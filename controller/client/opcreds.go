@@ -3,16 +3,14 @@
 
 package client
 
-// The OperationalCredentials surface the registry uses. ADR 0013
-// generates no definition for the cluster (a named cluster), so its ids
-// and payloads are written here from the matter.js model at 0ceb202d as
-// parity/schema.json carries it: OperationalCredentials, cluster 62
-// (0x003E) — attribute 1 Fabrics (a list of FabricDescriptorStruct: 1
-// RootPublicKey octstr, 2 VendorId, 3 FabricId, 4 NodeId, 5 Label, 6
-// VidVerificationStatement, 254 FabricIndex), attribute 5
-// CurrentFabricIndex; command 8 NocResponse (0 StatusCode, 1 FabricIndex,
-// 2 DebugText), 9 UpdateFabricLabel (0 Label), 10 RemoveFabric (0
-// FabricIndex); NodeOperationalCertStatusEnum 0 Ok.
+// The OperationalCredentials surface the registry uses. Its ids are the
+// generated definition's (cluster/spec/operationalcredentials, ADR 0013),
+// so a regeneration carries them (review II, R2-P6-par-2360); the payloads
+// the registry decodes are written here: the Fabrics list's
+// FabricDescriptorStruct (1 RootPublicKey octstr, 2 VendorId, 3 FabricId,
+// 4 NodeId, 5 Label, 6 VidVerificationStatement, 254 FabricIndex),
+// NocResponse (0 StatusCode, 1 FabricIndex, 2 DebugText),
+// UpdateFabricLabel (0 Label) and RemoveFabric (0 FabricIndex).
 // controller/commissioner/wire.go writes the same shapes for the flow.
 
 import (
@@ -21,18 +19,19 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// OperationalCredentials ids (parity/schema.json, OperationalCredentials).
+// OperationalCredentials ids, the generated definition's.
 const (
-	opCredsCluster                uint32 = 0x003E
-	opCredsAttrFabrics            uint32 = 0x0001
-	opCredsAttrCurrentFabricIndex uint32 = 0x0005
-	opCredsCmdNOCResponse         uint32 = 0x08
-	opCredsCmdUpdateFabricLabel   uint32 = 0x09
-	opCredsCmdRemoveFabric        uint32 = 0x0A
-	nocStatusOk                   uint8  = 0
+	opCredsCluster                = operationalcredentials.ClusterID
+	opCredsAttrFabrics            = operationalcredentials.AttrFabrics
+	opCredsAttrCurrentFabricIndex = operationalcredentials.AttrCurrentFabricIndex
+	opCredsCmdNOCResponse         = operationalcredentials.CmdNocResponse
+	opCredsCmdUpdateFabricLabel   = operationalcredentials.CmdUpdateFabricLabel
+	opCredsCmdRemoveFabric        = operationalcredentials.CmdRemoveFabric
+	nocStatusOk                   = uint8(operationalcredentials.NodeOperationalCertStatusOk)
 )
 
 // fabricDescriptor is one FabricDescriptorStruct of the peer's Fabrics.
@@ -75,7 +74,7 @@ func (n *Node) opCreds() *Cluster {
 // Mirrors matter.js CommissioningClient.#backfillFabricIndexOnPeer and its
 // currentFabricIndex$Changed reaction
 // (packages/node/src/behavior/system/commissioning/CommissioningClient.ts:605-630
-// at 862ad75f).
+// at db021da0).
 func (n *Node) backfillFabricIndexOnPeer() {
 	n.mu.RLock()
 	missing := n.record.PeerAddress != nil && n.record.FabricIndexOnPeer == 0 && !n.erased

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/inflight"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -846,6 +847,49 @@ func TestDefaultsAndAccessors(t *testing.T) {
 		}
 		if _, err := m.NewSecureSession(SecureSessionConfig{ID: 8, Addr: peerAddr}); err == nil {
 			t.Fatal("a session without keys was accepted")
+		}
+	})
+}
+
+// TestExchangeQueueIsBounded: an exchange whose reader does not call Next
+// queues at most [maxQueuedMessages] of the peer's messages; the next one
+// is acknowledged and aborts the exchange with a flow error — dropping it
+// would desynchronise the acknowledgements — and the delivered-work count
+// returns to zero. The module's own bound, ahead of matter.js, whose
+// queue has none (review II, R2-P6-bound-1807, U3-ctl-dev-1).
+func TestExchangeQueueIsBounded(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		m, conn, _ := newTestManager(t, Config{})
+		s, p := newSecurePair(t, m, 0x0303, false)
+		x, _ := m.Initiate(s, im.InteractionModelProtocolID, Options{})
+		done := sendAsync(x, im.OpcodeReadRequest, []byte{7}, SendOptions{})
+		out := p.decode(t, conn.nextOn(t, x).bytes)
+		reply := message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: out.hdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: x.ID(), ProtocolID: im.InteractionModelProtocolID}
+		m.HandleDatagram(p.send(t, 0x0303, reply, []byte{8}), peerAddr)
+		if err := waitErr(t, done); err != nil {
+			t.Fatal(err)
+		}
+		more := message.ProtocolHeader{NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: x.ID(), ProtocolID: im.InteractionModelProtocolID}
+		for range maxQueuedMessages - 1 {
+			m.HandleDatagram(p.send(t, 0x0303, more, []byte{9}), peerAddr)
+		}
+		synctest.Wait()
+		if x.considerClosed() {
+			t.Fatalf("closed at %d queued messages", maxQueuedMessages)
+		}
+		m.HandleDatagram(p.send(t, 0x0303, more, []byte{10}), peerAddr)
+		synctest.Wait()
+		select {
+		case <-x.Done():
+		default:
+			t.Fatalf("still open past %d queued messages", maxQueuedMessages)
+		}
+		if _, err := x.Next(context.Background(), ReceiveOptions{}); !errors.Is(err, ErrFlow) {
+			t.Fatalf("Next after the overflow: %v, want a flow error", err)
+		}
+		if n := m.inflight.Snapshot()[inflight.ExchangeDelivered]; n != 0 {
+			t.Fatalf("%d delivered messages still counted", n)
 		}
 	})
 }

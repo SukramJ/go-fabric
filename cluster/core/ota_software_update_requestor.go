@@ -411,7 +411,7 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 		cfg.TransferProtocols = []DownloadProtocol{DownloadProtocolBDXSynchronous}
 	} else if !slices.Contains(cfg.TransferProtocols, DownloadProtocolBDXSynchronous) {
 		// matter.js's query carries BDX synchronous by default
-		// (OtaSoftwareUpdateRequestorServer.ts:1367-1372 at 862ad75f).
+		// (OtaSoftwareUpdateRequestorServer.ts:1367-1372 at db021da0).
 		return nil, errors.New("core: OTA requestor TransferProtocols must include DownloadProtocolBDXSynchronous")
 	} else {
 		cfg.TransferProtocols = slices.Clone(cfg.TransferProtocols)
@@ -681,7 +681,7 @@ func (r *OTASoftwareUpdateRequestor) MatterInvoke(ctx context.Context, cmdID uin
 	// after the query because the announcement's state change
 	// (#addActiveOtaProvider) waits for the transaction the running query
 	// holds (OtaSoftwareUpdateRequestorServer.ts:376-420, :568-582 at
-	// 862ad75f; OtaTest.ts "handles an announcement only after a running
+	// db021da0; OtaTest.ts "handles an announcement only after a running
 	// query, so no second query overlaps it"); the Go requestor answers the
 	// command at once and defers the handling, rather than holding the
 	// answer for as long as a query runs.

@@ -14,7 +14,7 @@ import (
 // traffic class: bulk transfer sustains many round trips over one path,
 // so it may need a margin different from normal messaging. Mirrors
 // matter.js MRP.Margins (packages/protocol/src/protocol/MRP.ts:12-19 at
-// 862ad75f); a network profile precomputes them (client/peer
+// db021da0); a network profile precomputes them (client/peer
 // NetworkProfile.Margins).
 type Margins struct {
 	Messaging time.Duration
@@ -36,7 +36,7 @@ func MarginFor(m *Margins, protocol uint16) (time.Duration, bool) {
 
 // Pad is the sender-side addition to the MRP backoff — matter.js
 // MRP.RetryDelayInputs' additionalDelay and fixedBackoff
-// (packages/protocol/src/protocol/MRP.ts:122-140 at 862ad75f).
+// (packages/protocol/src/protocol/MRP.ts:122-140 at db021da0).
 type Pad struct {
 	// Additional joins the base interval, so the exponential backoff
 	// amplifies it: a network profile's margin.
@@ -65,9 +65,9 @@ func RetransmissionIntervalPadded(n int, p Intervals, peerActive bool, rand01 fl
 // it — the fixed backoff here, InitialRetransmissionTime in backoffLocked —
 // would wrap that to a negative wait the timer fires at once. JavaScript
 // numbers grow to Infinity instead and the cap then applies: mirrors
-// matter.js MRP.ts:182-190 (backoff += fixedBackoff) and
-// MessageExchange.ts:1242-1250 (+ initialRetransmissionTime, then
-// Duration.min with the cap).
+// matter.js MRP.ts:188 (backoff += fixedBackoff) and
+// MessageExchange.ts:1288-1296 at db021da0 (+ initialRetransmissionTime,
+// then Duration.min with the cap).
 func satAdd(a, b time.Duration) time.Duration {
 	if b > 0 && a > math.MaxInt64-b {
 		return math.MaxInt64

@@ -44,8 +44,8 @@ type paseEntry struct {
 	// expireTimer is the per-exchange 60 s hard-timeout timer started at
 	// Resolve-time. Fires Forget(key) when the PASE exchange does
 	// not complete within 60 s per Matter §4.13.1.7.
-	// Mirrors matter.js packages/protocol/src/session/pase/PaseServer.ts:37
-	// `PASE_PAIRING_TIMEOUT = Seconds(60)`.
+	// Mirrors matter.js packages/protocol/src/session/pase/PaseServer.ts:33
+	// `PASE_PAIRING_TIMEOUT = Seconds(60)` at db021da0.
 	expireTimer clock.Timer
 }
 

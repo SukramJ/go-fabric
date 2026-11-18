@@ -4,8 +4,11 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -46,6 +49,23 @@ func TestGenerateRejects(t *testing.T) {
 		// admits every value (R2-P0-par-B05).
 		{"unknown bound node", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"max sqrt(4)","max":{"type":"sqrt","args":[4]}}}}],"commands":[],"events":[]}`, `unknown bound node type "sqrt"`},
 		{"unknown bound node in a struct field", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"S","type":"struct","metatype":"object","primitive":"struct","fields":[{"id":0,"name":"F","type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"min ?","min":{"type":"-","lhs":1}}}]}]}`, `without both operands`},
+		// A form the generator does not render is refused, not dropped
+		// (wizard-6b §2 gen Q1): a stated default it cannot carry
+		// (R2-P6-par-2703), a privilege letter (R2-P6-acl-2704), an event
+		// priority (R2-P6-par-2705), a non-reference "in"
+		// (R2-P6-par-2706), a named response no payload answers
+		// (R2-P6-par-2715), a feature without a bit (R2-P6-par-2714).
+		{"struct default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"struct","metatype":"object","fields":[],"default":{"type":"properties","properties":{"a":1}}}}],"commands":[],"events":[]}`, `default {"type":"properties"`},
+		{"none default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"none"}}}],"commands":[],"events":[]}`, `default {"type":"none"}`},
+		{"unscaled unit default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"int16","metatype":"integer","primitive":"int16","default":{"type":"celsius","value":26}}}],"commands":[],"events":[]}`, `default {"type":"celsius"`},
+		{"unknown default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"x"}}}],"commands":[],"events":[]}`, `default {"type":"x"}`},
+		{"unknown default in a struct field", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"S","type":"struct","metatype":"object","primitive":"struct","fields":[{"id":0,"name":"F","type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"x"}}]}]}`, `default {"type":"x"}`},
+		{"unknown privilege", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"bool","metatype":"boolean","access":{"rw":"R","readPriv":"R"}}}],"commands":[],"events":[]}`, `privilege "R"`},
+		{"unknown write privilege", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"bool","metatype":"boolean","access":{"rw":"RW","readPriv":"V","writePriv":"X"}}}],"commands":[],"events":[]}`, `privilege "X"`},
+		{"unknown priority", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[{"id":0,"name":"E","effective":{"priority":"warning","fields":[]}}]}`, `priority "warning"`},
+		{"no priority", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[{"id":0,"name":"E","effective":{"fields":[]}}]}`, `priority ""`},
+		{"non-reference in", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","constraint":{"text":"in [1, 2]","in":[1,2]}}}],"commands":[],"events":[]}`, `constraint "in [1, 2]": in [1,2]`},
+		{"unanswered response", `{"id":1,"name":"A","attributes":[],"commands":[{"id":0,"name":"C","effective":{"direction":"request","response":"CResponse","fields":[]}}],"events":[]}`, `response "CResponse"`},
 		{"bad named enum", `{"id":1,"name":"A","attributes":[{"id":0,"name":"Feature","effective":{"type":"Feature","metatype":"enum","primitive":"uint8"}}],"commands":[],"events":[],"datatypes":[]}`, ""},
 	}
 	for _, tc := range cases {
@@ -186,5 +206,98 @@ func TestParseSnapshot(t *testing.T) {
 	}
 	if _, err := write(filepath.Join(dir, "definition_gen.go"), &output{Package: "p"}); err == nil {
 		t.Error("write below a file succeeded")
+	}
+}
+
+// TestEmitWritesNothingWhenAClusterFails: a run whose second cluster fails
+// to generate leaves the output directory untouched — the first cluster's
+// package is not written either (R2-P6-err-2709).
+func TestEmitWritesNothingWhenAClusterFails(t *testing.T) {
+	t.Parallel()
+	s, err := parseSnapshot([]byte(`{"matter":{"revision":"1.6.1","sourceCommit":"0123456789"},"clusters":[
+		{"id":1,"name":"A","attributes":[],"commands":[],"events":[]},
+		{"id":2,"name":"B","attributes":[{"id":0,"name":"X","effective":{"type":"t","metatype":"weird"}}],"commands":[],"events":[]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := emit(io.Discard, dir, s, []string{"A", "B"}); err == nil || !strings.Contains(err.Error(), "unsupported metatype") {
+		t.Fatalf("emit = %v, want B's refusal", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("the output directory holds %d entries after a failed run (first %s)", len(entries), entries[0].Name())
+	}
+}
+
+// TestSnapshotRefusesAFeatureWithoutABit: a feature without a bit would
+// decode as bit 0 and render as the Feature constant 1 << 0; the snapshot
+// is refused instead (R2-P6-par-2714, as devicegen and the schema
+// generator refuse it).
+func TestSnapshotRefusesAFeatureWithoutABit(t *testing.T) {
+	t.Parallel()
+	_, err := parseSnapshot([]byte(`{"clusters":[{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"features":[{"name":"F","effective":{"title":"T"}}]}]}`))
+	if err == nil || !strings.Contains(err.Error(), "A.F") {
+		t.Errorf("parseSnapshot = %v, want a refusal naming A.F", err)
+	}
+}
+
+// TestTableMergeRefusesADuplicate: a cluster named in two port or host
+// tables is a panic at start, not the later file's entry winning
+// silently (R2-P6-err-2716). The init functions merge through these
+// helpers, so the committed tables are held by every test run.
+func TestTableMergeRefusesADuplicate(t *testing.T) {
+	t.Parallel()
+	refused := func(name string, f func()) {
+		t.Helper()
+		defer func() {
+			if r := recover(); r == nil || !strings.Contains(fmt.Sprint(r), "Twice") {
+				t.Errorf("%s: recovered %v, want a panic naming Twice", name, r)
+			}
+		}()
+		f()
+	}
+	refused("ports", func() {
+		mergePorts(map[string]portSet{"Twice": {}}, map[string]portSet{"Twice": {}}, "test")
+	})
+	refused("hosts", func() {
+		mergeHosts(map[string]hostDecl{"Twice": {}}, map[string]hostDecl{"Twice": {}}, "test")
+	})
+	refused("a port set added twice", func() {
+		addPorts(map[string]portSet{"Twice": {}}, "Twice", portSet{})
+	})
+	dst := map[string]portSet{"A": {}}
+	mergePorts(dst, map[string]portSet{"B": {}}, "test")
+	if _, ok := dst["B"]; !ok || len(dst) != 2 {
+		t.Errorf("merge of distinct keys: %v", dst)
+	}
+}
+
+// TestPortDocsStateTheStatusRule: a kit server answers the status a port's
+// error carries — a contract.StatusError or an im.StatusCodeError, through
+// the dispatcher's classifyError — and FAILURE only for an error without
+// one (docs/guides/ports.md). A generated port doc that says an error
+// "answers FAILURE" without naming that rule tells a host a specific
+// status cannot be answered; the doc states the rule as the camera ports
+// do: "an error answers its status, FAILURE without one"
+// (R2-P6-doc-2750). "answers" and "FAILURE" may stand apart ("answers the
+// command or write FAILURE", the ThreadNetworkStore doc the first form of
+// the check missed); the Oven port states the rule as "an error wrapping
+// an IM status answers it".
+// answersFailure finds a sentence that says an error answers FAILURE.
+var answersFailure = regexp.MustCompile(`answers[^.]*FAILURE`)
+
+func TestPortDocsStateTheStatusRule(t *testing.T) {
+	t.Parallel()
+	for cluster, ps := range ports {
+		for _, p := range ps.ports {
+			text := strings.Join(strings.Fields(strings.Join(p.doc, " ")), " ")
+			if answersFailure.MatchString(text) && !strings.Contains(text, "its status") && !strings.Contains(text, "wrapping an IM status") {
+				t.Errorf("%s %s: the doc says an error answers FAILURE without the status rule:\n%s", cluster, p.name, text)
+			}
+		}
 	}
 }

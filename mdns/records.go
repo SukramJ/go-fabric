@@ -15,7 +15,7 @@ import (
 const (
 	// recordTTL is the TTL of every record the responder publishes, in
 	// seconds: matter.js builds each one with DEFAULT_MDNS_TTL (matter.js
-	// packages/general/src/codec/DnsCodec.ts:20 at 862ad75f) — PTR, SRV,
+	// packages/general/src/codec/DnsCodec.ts:20 at db021da0) — PTR, SRV,
 	// TXT, A and AAAA alike, the TXT record included where chip keeps 4500 s
 	// (concept v12 §D.2: matter.js before chip). A node that vanishes without
 	// its goodbyes leaves a commissioner's cache within two minutes.
@@ -78,12 +78,12 @@ func namesOf(svc Service, host string) serviceNames {
 // interface — what an announcement carries and what a query is answered
 // from. Mirrors matter.js
 // packages/protocol/src/advertisement/mdns/MdnsAdvertisement.ts:154-184
-// (#recordsFor) at 862ad75f: the PTR records, the SRV record (priority 0,
+// (#recordsFor) at db021da0: the PTR records, the SRV record (priority 0,
 // weight 0, the port, the host as target), the TXT record and one A or
 // AAAA record per address of the interface, IPv6 before IPv4 and then in
 // selection-preference order (:166-177). The unique types — SRV, TXT, A,
 // AAAA — carry the cache-flush bit, the shared PTRs do not (:181-183,
-// DnsCodec.ts:198-208 isUnique). Every record carries [recordTTL].
+// DnsCodec.ts:198-207 isUnique). Every record carries [recordTTL].
 //
 // The PTR records follow OperationalMdnsAdvertisement.ts:33-41,
 // CommissionableMdnsAdvertisement.ts:43-71 and
@@ -117,7 +117,8 @@ func recordSet(svc Service, names serviceNames, txt []string, addrs []net.IP) []
 	out = append(out, &dns.SRV{Hdr: unique(names.instance, dns.TypeSRV), Priority: 0, Weight: 0, Port: svc.Port, Target: names.host})
 	if len(txt) == 0 {
 		// RFC 6763 §6.1: an empty TXT record is a single zero byte
-		// (matter.js MdnsTest.ts:782-783 expects [""]).
+		// (matter.js DnsCodec.ts:477-483 encodeTxtRecord and
+		// DnsCodecTest.ts:347 at db021da0).
 		txt = []string{""}
 	}
 	out = append(out, &dns.TXT{Hdr: unique(names.instance, dns.TypeTXT), Txt: txt})
@@ -126,7 +127,7 @@ func recordSet(svc Service, names serviceNames, txt []string, addrs []net.IP) []
 
 // addressRecords are the A/AAAA records of host for addrs: IPv6 first,
 // then IPv4, stably sorted by [SelectionPreference]
-// (MdnsAdvertisement.ts:166-177 at 862ad75f), each with the cache-flush bit.
+// (MdnsAdvertisement.ts:166-177 at db021da0), each with the cache-flush bit.
 func addressRecords(host string, addrs []net.IP) []dns.RR {
 	v6 := make([]netip.Addr, 0, len(addrs))
 	var v4 []netip.Addr

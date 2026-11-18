@@ -45,7 +45,8 @@ type Options struct {
 	// Proxies opens the BLE central over ESPHome Bluetooth proxies
 	// (--bluetooth-proxy host[:port][,key], repeatable;
 	// --bluetooth-proxy-discover with --bluetooth-proxy-key name=key,
-	// repeatable) for pair; nil is a build without them.
+	// repeatable, and --bluetooth-proxy-allow-plaintext) for pair; nil is
+	// a build without them.
 	Proxies func(flags ProxyFlags, log *slog.Logger) (ble.Central, error)
 }
 
@@ -59,6 +60,12 @@ type ProxyFlags struct {
 	// Keys are the --bluetooth-proxy-key specs, name=key, the keys of
 	// discovered proxies by name or MAC.
 	Keys []string
+	// AllowPlaintext is --bluetooth-proxy-allow-plaintext: a discovered
+	// proxy without a key in Keys is dialled over the plaintext API
+	// (esphome.DiscoverOptions.AllowPlaintext). Off by default: such a
+	// proxy is skipped, since the plaintext API authenticates neither side
+	// (decision 196).
+	AllowPlaintext bool
 }
 
 // set reports whether a proxy flag is given.
@@ -69,6 +76,9 @@ func (f ProxyFlags) set() bool { return len(f.Proxies) > 0 || f.Discover }
 func (f ProxyFlags) check(e *env) (bool, error) {
 	if len(f.Keys) > 0 && !f.Discover {
 		return false, errors.New("--bluetooth-proxy-key needs --bluetooth-proxy-discover")
+	}
+	if f.AllowPlaintext && !f.Discover {
+		return false, errors.New("--bluetooth-proxy-allow-plaintext needs --bluetooth-proxy-discover")
 	}
 	if !f.set() {
 		return false, nil
@@ -92,6 +102,7 @@ type globalOptions struct {
 	nodeListen  string
 	timeout     durationFlag
 	caKey       string
+	sealKey     string
 	trust       string
 	trustDir    string
 }
@@ -117,6 +128,7 @@ func (o *globalOptions) register(fs *flag.FlagSet) {
 	fs.StringVar(&o.nodeListen, "node-listen", o.nodeListen, "deprecated: no effect since v0.18.0, which retired the controller's second node (the group sender and the OTA provider use --listen); will be removed")
 	fs.Var(&o.timeout, "timeout", "how long a command waits for the network (default 60s)")
 	fs.StringVar(&o.caKey, "ca-key", o.caKey, "the CA root key outside the database: file:<path> (passphrase from "+passphraseEnv+")")
+	fs.StringVar(&o.sealKey, "seal-key", o.sealKey, "seal the database's secrets under a key outside it: file:<path>, 64 hex digits (a missing file is created with a new key); every later run needs it")
 }
 
 // command is one subcommand: its usage line and its function.
@@ -132,7 +144,7 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
-		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX] [--ble [--ble-adapter hci0 | --bluetooth-proxy host[:port][,key] … | --bluetooth-proxy-discover [--bluetooth-proxy-key name=key …]]]", cmdPair},
+		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX] [--ble [--ble-adapter hci0 | --bluetooth-proxy host[:port][,key] … | --bluetooth-proxy-discover [--bluetooth-proxy-key name=key …] [--bluetooth-proxy-allow-plaintext]]]", cmdPair},
 		"discover":  {"discover [--code <MT:… | 11 or 21 digits> | --discriminator N] [--first]", cmdDiscover},
 		"unpair":    {"unpair <node>", cmdUnpair},
 		"nodes":     {"nodes", cmdNodes},

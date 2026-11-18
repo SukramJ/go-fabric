@@ -109,8 +109,8 @@ func isIPv4Listen(addr string) bool {
 
 // openStack builds the controller over the database: the trust set
 // --trust, --trust-dir and --dcl name, the CA root key --ca-key names, the
-// socket --listen names, then controller.New, which creates or loads the
-// fabric and builds the rest. The nodes stay stopped (ManualStart): each
+// sealer --seal-key names, the socket --listen names, then controller.New,
+// which creates or loads the fabric and builds the rest. The nodes stay stopped (ManualStart): each
 // command connects the node it acts on.
 func openStack(e *env) (_ *stack, err error) {
 	s := &stack{e: e}
@@ -122,7 +122,18 @@ func openStack(e *env) (_ *stack, err error) {
 	if s.db, err = openDB(e.ctx, e.opts.db); err != nil {
 		return nil, err
 	}
-	s.settings = store.New(s.db)
+	// --seal-key: the controller and this tool's own settings store seal
+	// with the same sealer — every store of a sealed database needs it
+	// (store.NewSealed).
+	sealer, err := openSealKey(e.opts.sealKey)
+	if err != nil {
+		return nil, err
+	}
+	if sealer == nil {
+		s.settings = store.New(s.db)
+	} else if s.settings, err = store.NewSealed(e.ctx, s.db, sealer); err != nil {
+		return nil, fmt.Errorf("--seal-key: %w", err)
+	}
 	if s.policy, err = attestationPolicy(e); err != nil {
 		return nil, err
 	}
@@ -157,7 +168,7 @@ func openStack(e *env) (_ *stack, err error) {
 	}
 	cfg := controller.Config{
 		DB: s.db, Attestation: attestation.Trust(mode, snap, online), Listener: l,
-		VendorID: fabricVendorID, Label: fabricLabel, CAKey: rootSigner,
+		VendorID: fabricVendorID, Label: fabricLabel, CAKey: rootSigner, Sealer: sealer,
 		Logger: e.log, Node: client.Config{Logger: e.log}, ManualStart: true, Names: openNames,
 	}
 	if e.ownNode {

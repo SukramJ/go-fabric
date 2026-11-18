@@ -271,8 +271,8 @@ func (s *Server) Host() Host {
 
 // Selector decides a SelectAreas request whose areas are all
 // supported (areas without duplicates): a non-Success status is
-// answered as is and changes nothing, an error answers FAILURE
-// (cluster/servicearea).
+// answered as is and changes nothing, an error answers its status,
+// FAILURE without one (cluster/servicearea).
 type Selector interface {
 	SelectAreas(ctx context.Context, areas []uint32) (SelectAreasStatus, string, error)
 }

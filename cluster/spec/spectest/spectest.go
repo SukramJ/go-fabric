@@ -358,7 +358,7 @@ func checkServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 		}
 		// An accepted command has an implementation: matter.js lists the
 		// implemented commands only (ValidatedElements.ts:341-343,
-		// ServerBehaviorBacking.ts:130-147 at 0ceb202d). Checked where the
+		// ServerBehaviorBacking.ts:122-135 at db021da0). Checked where the
 		// server can say so ([spec.Server.Handles]).
 		if h, ok := srv.(interface{ Handles(cmdID uint32) bool }); ok {
 			for _, id := range accepted {

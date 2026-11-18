@@ -101,7 +101,10 @@ func collectRegisterFile(file, src string) []citation {
 			for j < len(matches) && matches[j][0] < e {
 				j++
 			}
-			out = append(out, collectSentence(file, seg, s, e, matches[i:j])...)
+			// A register's bare parts and files named without a line are
+			// not read: its citations are checked hard only.
+			c, _ := collectSentence(file, seg, s, e, matches[i:j], nil)
+			out = append(out, c...)
 			i = j
 		}
 	}

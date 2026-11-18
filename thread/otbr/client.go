@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -37,8 +38,12 @@ type Config struct {
 	Port int
 	// Timeout bounds each request; 0 is [DefaultTimeout].
 	Timeout time.Duration
-	// HTTPClient sends the requests; http.DefaultClient's transport when
-	// nil.
+	// HTTPClient sends the requests. Nil is a client on
+	// http.DefaultClient's transport that follows no redirect: a 3xx
+	// answer is a status error, so neither a GET nor the dataset PUT —
+	// the network key in its body — is sent where the border router's
+	// answer points (review II, R2-P6-sec-2028). A host that needs
+	// redirects followed passes its own client, which is used as given.
 	HTTPClient *http.Client
 	// Clock stamps a [Probe]'s Capability.ProbedAt; the system clock when
 	// nil.
@@ -75,10 +80,14 @@ func NewClient(cfg Config) (*Client, error) {
 		c.timeout = DefaultTimeout
 	}
 	if c.http == nil {
-		c.http = &http.Client{}
+		c.http = &http.Client{CheckRedirect: refuseRedirect}
 	}
 	return c, nil
 }
+
+// refuseRedirect is the default client's CheckRedirect: the redirect's
+// own answer is returned, not followed.
+func refuseRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 // BaseURL is "http://host:port" (OtbrRestClient.ts:171-173).
 func (c *Client) BaseURL() string { return c.baseURL }
@@ -145,8 +154,10 @@ func (c *Client) do(ctx context.Context, method, path, accept, contentType strin
 }
 
 // maxResponseBody bounds a border router's answer; the REST API's largest,
-// the dataset and the diagnostics, are a few KiB.
-const maxResponseBody = 16 << 20
+// the dataset and the diagnostics, are a few KiB. A JSON body decodes into
+// a tree many times its size and NormalizeKeys copies it once more, so the
+// bound is 1 MiB, not more (review II, R2-P6-bound-2023).
+const maxResponseBody = 1 << 20
 
 // statusError is a non-2xx answer (OtbrRestClient.ts:762-766).
 func statusError(method, path string, status int) *Error {
@@ -313,10 +324,18 @@ func (c *Client) Node(ctx context.Context) (NodeInfo, error) {
 	}
 	info.Rloc16 = rloc16
 	for _, key := range []string{"numOfRouter", "routerCount"} { // OtbrRestClient.ts:200
-		if n, ok := asNumber(body[key]); ok {
-			info.NumOfRouter = int(n)
-			break
+		v, isNumber := body[key].(json.Number)
+		if !isNumber {
+			continue
 		}
+		// A count of routers: an integer within a byte, as Rloc16 is
+		// checked for its range (review II, R2-P6-wire-2024).
+		n, ok := asUint(v, maxNumOfRouter)
+		if !ok {
+			return NodeInfo{}, protocolError("%s: invalid field %s", where, key)
+		}
+		info.NumOfRouter = int(n) //nolint:gosec // G115: bounded by asUint
+		break
 	}
 	return info, nil
 }
@@ -437,11 +456,30 @@ func (c *Client) Rloc16(ctx context.Context) (uint16, error) {
 	return uint16(n), nil
 }
 
-// NumOfRouter fetches /node/num-of-router (OtbrRestClient.ts:305-310).
+// NumOfRouter fetches /node/num-of-router (OtbrRestClient.ts:305-310): an
+// integer within a byte, else [CodeProtocol] (review II, R2-P6-wire-2024).
 func (c *Client) NumOfRouter(ctx context.Context) (int, error) {
-	n, err := c.jsonNumber(ctx, "/node/num-of-router")
-	return int(n), err
+	body, _, err := c.fetchJSON(ctx, "/node/num-of-router")
+	if err != nil {
+		return 0, err
+	}
+	if _, ok := asNumber(body); !ok {
+		return 0, protocolError("GET /node/num-of-router did not return a number")
+	}
+	n, ok := asUint(body, maxNumOfRouter)
+	if !ok {
+		return 0, protocolError("GET /node/num-of-router out of range")
+	}
+	return int(n), nil //nolint:gosec // G115: bounded by asUint
 }
+
+// maxNumOfRouter bounds a router count the border router reports. The
+// bound is the module's own: a count of a Thread network's routers that is
+// not an integer within a byte is a border router's error, as an
+// out-of-range RLOC16 is. matter.js takes any finite number (review II,
+// R2-P6-wire-2024; notes/parity/by_design.md
+// BD-Matter-OTBR-RouterCountRangeChecked).
+const maxNumOfRouter = math.MaxUint8
 
 // hexEndpoint is a JSON string of n hex bytes at path.
 func (c *Client) hexEndpoint(ctx context.Context, path string, n int) ([]byte, error) {

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/basic-information/BasicInformationValidatorsTest.ts
-// at 862ad75f: the VendorID/ProductID identity check of
+// at db021da0: the VendorID/ProductID identity check of
 // validateBasicInfoAttributes (basic-information-validators.ts:29-38).
 //
 // matter.js calls the validator directly; BasicInformationServer.ts:118 and

@@ -18,7 +18,7 @@ import (
 // ModeSelect, whose server needs the host's mode port — is matter.js's
 // generated behavior, whose commands are Behavior.unimplemented: non-strict
 // validation drops them from AcceptedCommandList (ValidatedElements.ts:341-343,
-// :361-368; ServerBehaviorBacking.ts:127-148 at 0ceb202d). A handler the
+// :361-368; ServerBehaviorBacking.ts:119-136 at db021da0). A handler the
 // host registers lists the command again.
 func TestDefaultServerCommandsUnimplementedUntilHandled(t *testing.T) {
 	t.Parallel()

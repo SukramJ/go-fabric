@@ -315,7 +315,7 @@ func TestMessageCodecDecodeRefusesCrossFieldShapes(t *testing.T) {
 }
 
 // The reserved DSIZ 0b11 is never encoded: every decoder discards it
-// (matter.js MessageCodec.ts:210-213 at 862ad75f, chip
+// (matter.js MessageCodec.ts:218-221 at db021da0, chip
 // MessageHeader.cpp:192-195 at 6170af84), and matter.js derives its flags
 // from the fields present, so it cannot build one.
 func TestMessageCodecEncodeRefusesTheReservedDestSize(t *testing.T) {

@@ -20,7 +20,9 @@
 //
 // A join keeps the network that was current until it has ended: a join
 // that fails removes the network it added and selects the one it was on
-// again, a join that succeeds removes the one it was on.
+// again, a join that succeeds removes the one it was on. A removal that
+// fails is retried before the next join and at Close while wpa_supplicant
+// still lists the network.
 //
 // What it does not do, on purpose: it saves nothing into wpa_supplicant's
 // configuration (the node's store holds the committed network and the

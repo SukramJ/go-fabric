@@ -129,7 +129,7 @@ func TestPutUTF8WithMax_ZeroMaxSkipsValidation(t *testing.T) {
 // PutUTF8Bounded with maxBytes ≤ 0 imposes no bound, as PutUTF8WithMax: a
 // negative maximum from a host's BoundedString must not panic the encoder
 // (it sliced b[:maxBytes]). matter.js refuses a negative maxLength at
-// schema construction (TlvString.ts:46 at 862ad75f), never per encode.
+// schema construction (TlvString.ts:45 at db021da0), never per encode.
 func TestPutUTF8Bounded_NonPositiveMaxIsUnbounded(t *testing.T) {
 	t.Parallel()
 	for _, maxBytes := range []int{-1, 0} {
@@ -152,7 +152,7 @@ func TestPutUTF8Bounded_NonPositiveMaxIsUnbounded(t *testing.T) {
 
 // A character string is never emitted ill-formed: each ill-formed byte
 // sequence becomes U+FFFD, as matter.js's TextEncoder-based
-// Bytes.fromString (Bytes.ts:125-131 at 862ad75f) can produce nothing
+// Bytes.fromString (Bytes.ts:125-131 at db021da0) can produce nothing
 // else; each maximal subpart becomes one U+FFFD, as the decoder reads
 // them. The bounded writers trim the sanitised string, so an input that
 // is ill-formed from its first byte no longer trims to "".

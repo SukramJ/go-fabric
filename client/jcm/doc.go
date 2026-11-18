@@ -9,7 +9,7 @@
 // Verification procedure each performs on the other's administrator
 // fabric. It is the port of connectedhomeip's src/credentials/jcm
 // (TrustVerification.{h,cpp}, VendorIdVerificationClient.{h,cpp}) at
-// 6170af84; matter.js has no Joint Fabric logic at its pin 862ad75f
+// 6170af84; matter.js has no Joint Fabric logic at 862ad75f
 // (JointFabricAdministratorServer.ts:14 is the empty subclass).
 //
 // The roles bring their own stages: controller/commissioner (the JCM

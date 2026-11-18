@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -149,17 +150,20 @@ func TestMicrowaveModeStartsInTheDeclaredMode(t *testing.T) {
 	}
 }
 
-// tariffTime is a TimeSource that is also a ChangeNotifier.
+// tariffTime is a TimeSource that is also a ChangeNotifier; active counts
+// the subscriptions not yet undone.
 type tariffTime struct {
-	now time.Time
-	cb  func()
+	now    time.Time
+	cb     func()
+	active atomic.Int32
 }
 
 func (t *tariffTime) Now() time.Time { return t.now }
 
 func (t *tariffTime) OnMatterValueChanged(cb func()) func() {
 	t.cb = cb
-	return func() {}
+	t.active.Add(1)
+	return func() { t.active.Add(-1) }
 }
 
 // TestCommodityTariffRunsOnTheDeclaredTimeSource: the source's time is the
@@ -169,13 +173,19 @@ func TestCommodityTariffRunsOnTheDeclaredTimeSource(t *testing.T) {
 	t.Parallel()
 
 	src := &tariffTime{now: time.Unix(1_700_000_000, 0)}
+	var bound []func() func()
 	srv, err := selfHeldDefaults[ctdef.ClusterID](defaultBuild{
 		sibling: noSiblings, clock: &deviceClock{}, opts: spec.Options{Features: uint32(ctdef.FeaturePricing)},
 		ports: ctdef.Declare{TimeSource: src},
+		bind:  func(subscribe func() func()) { bound = append(bound, subscribe) },
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(bound) != 1 || src.cb != nil {
+		t.Fatalf("bindings %d, subscribed before the attach %v; want one binding, no subscription yet", len(bound), src.cb != nil)
+	}
+	bound[0]()
 	if srv == nil || src.cb == nil {
 		t.Fatalf("server %v, the source's notifier subscribed %v", srv, src.cb != nil)
 	}
@@ -339,9 +349,11 @@ func TestLevelControlPortCouplesTheColorTemperature(t *testing.T) {
 	}
 }
 
-// TestAPartThatCannotBeBoundStopsTheOwner: an owner whose part is already
-// bound to another node is not bound either.
-func TestAPartThatCannotBeBoundStopsTheOwner(t *testing.T) {
+// TestAPartIsNotBoundOnItsOwn: a part is bound with its owner, never by
+// itself — the setup in which an owner's refused attach once unbound a part
+// another node held (R2-P6-fsm-2501) cannot arise — and the owner then
+// binds with it.
+func TestAPartIsNotBoundOnItsOwn(t *testing.T) {
 	t.Parallel()
 
 	owner, err := NewBridgedNode(testOptions("owner"))
@@ -356,17 +368,20 @@ func TestAPartThatCannotBeBoundStopsTheOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := &fakeHost{clk: &deviceClock{}, numbers: map[string]uint16{}}
-	detach, _, err := deviceseam.Attach(part, first)
+	if _, _, err := deviceseam.Attach(part, first); !errors.Is(err, ErrComposition) {
+		t.Errorf("binding a part on its own: %v, want ErrComposition", err)
+	}
+	if part.hostOf() != nil {
+		t.Error("the refused part is bound")
+	}
+	second := &fakeHost{clk: &deviceClock{}, numbers: map[string]uint16{}}
+	detach, _, err := deviceseam.Attach(owner, second)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("binding the owner: %v", err)
 	}
 	defer detach()
-	second := &fakeHost{clk: &deviceClock{}, numbers: map[string]uint16{}}
-	if _, _, err := deviceseam.Attach(owner, second); !errors.Is(err, ErrAddedElsewhere) {
-		t.Errorf("binding an owner whose part is bound elsewhere: %v, want ErrAddedElsewhere", err)
-	}
-	if owner.host != nil {
-		t.Error("the owner is still bound after its part refused")
+	if part.hostOf() == nil {
+		t.Error("the part is not bound with its owner")
 	}
 }
 

@@ -29,14 +29,14 @@ func TestReceptionStateIsBoundedPerKey(t *testing.T) {
 	m.logger = slog.New(slog.NewTextHandler(&logged, nil))
 	first := make([][]byte, maxGroupSendersPerKey)
 	for s := range first {
-		first[s] = sealGroup(t, op, sid, 0x0101, uint64(s+1), 7, true, []byte("toggle"))
+		first[s] = sealGroup(t, op, sid, 0x0101, uint64(s+1), 7, true, imPayload([]byte("toggle")))
 		if msg, err := m.Decode(ctx, first[s]); err != nil || msg.Duplicate {
 			t.Fatalf("sender %d of %d: err %v", s+1, maxGroupSendersPerKey, err)
 		}
 	}
 	beyond := uint64(maxGroupSendersPerKey + 1)
 	for counter := uint32(1); counter <= 3; counter++ {
-		if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, beyond, counter, true, []byte("toggle"))); err == nil {
+		if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, beyond, counter, true, imPayload([]byte("toggle")))); err == nil {
 			t.Fatalf("sender %d beyond the bound was taken (duplicate %v)", beyond, msg.Duplicate)
 		}
 	}
@@ -52,7 +52,7 @@ func TestReceptionStateIsBoundedPerKey(t *testing.T) {
 		if msg, err := m.Decode(ctx, first[s]); err != nil || !msg.Duplicate {
 			t.Fatalf("the replay of held sender %d: err %v, want a duplicate", s+1, err)
 		}
-		if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, uint64(s+1), 8, true, []byte("toggle"))); err != nil || msg.Duplicate {
+		if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, uint64(s+1), 8, true, imPayload([]byte("toggle")))); err != nil || msg.Duplicate {
 			t.Fatalf("the next message of held sender %d: err %v", s+1, err)
 		}
 	}
@@ -65,7 +65,7 @@ func TestReceptionStateIsBoundedPerKey(t *testing.T) {
 	m.receptionMu.Lock()
 	delete(m.reception, hex.EncodeToString(op))
 	m.receptionMu.Unlock()
-	if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, beyond, 4, true, []byte("toggle"))); err != nil || msg.Duplicate {
+	if msg, err := m.Decode(ctx, sealGroup(t, op, sid, 0x0101, beyond, 4, true, imPayload([]byte("toggle")))); err != nil || msg.Duplicate {
 		t.Fatalf("sender %d after the key's state was dropped: err %v", beyond, err)
 	}
 }

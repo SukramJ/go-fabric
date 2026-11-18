@@ -17,8 +17,7 @@
 // Left out of matter.js's registry: the addresses and ports of a border
 // router, the MeshCoP TXT fields beyond the five above (tv, sv, rv, the
 // border-agent id, the state bitmap, the active timestamp, the partition
-// id, the domain name), the instance-observer cap (the cache bounds what
-// it admits) and the start/stop lifecycle (a [Registry] runs from [New]
+// id, the domain name) and the start/stop lifecycle (a [Registry] runs from [New]
 // to [Registry.Close]). The registry joins no Thread network and speaks
 // no MeshCoP; thread/otbr stays the border router's REST client.
 package brdiscovery
@@ -48,6 +47,16 @@ const StaleRetention = 24 * time.Hour
 // packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:23
 // (REGISTRY_MAX_ENTRIES) and :565-610 (#evictOldest) at db021da0.
 const maxEntries = 256
+
+// maxInstances caps the instances the registry watches, with the
+// tombstones of evicted ones; a new instance past it evicts the instance
+// without a valid xa seen first, else the oldest entry with its instances,
+// until one is free (review II, R2-P6-bound-2026). Without it every
+// instance name a LAN announces — also one that never carries a valid xa
+// and so never becomes an entry — is kept until its last record goes.
+//
+// Mirrors matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:24-27 (INSTANCE_OBSERVER_CAP), :225-233 (the eviction loop) and :241-267 (#evictOldestPendingInstance) at db021da0; the tombstones and their bound are the module's own.
+const maxInstances = 512
 
 // The service suffixes the registry watches. Mirrors matter.js
 // packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:34-37 at
@@ -90,7 +99,9 @@ const (
 	// EventAdded: a border router entered the registry.
 	EventAdded EventKind = iota + 1
 	// EventUpdated: an instance of a known border router was installed or
-	// changed — fired on every such change, whether a field moved or not.
+	// changed — fired on every such change, whether a field moved or not;
+	// the updates of one entry that arrive while an observer is called
+	// are delivered as one, with the latest entry.
 	EventUpdated
 	// EventRemoved: the entry was pruned (stale past [StaleRetention]) or
 	// evicted.
@@ -124,7 +135,8 @@ type Registry struct {
 	entries   map[string]*record // by ExtAddress
 	order     []string           // ExtAddress in insertion order
 	instances map[string]*instance
-	evicted   map[string]bool // instance qnames (lower) ignored until gone
+	evicted   map[string]uint64 // instance qnames (lower) ignored until gone → when tombstoned (seq)
+	seq       uint64            // orders instances and tombstones
 	observers map[int]func(Event)
 	nextObs   int
 	pending   []Event
@@ -142,6 +154,7 @@ type record struct {
 type instance struct {
 	source string
 	xa     string // the entry it contributed to, "" before one
+	seen   uint64 // when it was first watched (Registry.seq)
 }
 
 // watcher is what the registry needs of a DNS-SD cache: *discovery.Names.
@@ -166,7 +179,7 @@ func newRegistry(w watcher, cfg Config) *Registry {
 	r := &Registry{
 		clk: clock.Or(cfg.Clock), log: cfg.Logger,
 		entries: map[string]*record{}, instances: map[string]*instance{},
-		evicted: map[string]bool{}, observers: map[int]func(Event){},
+		evicted: map[string]uint64{}, observers: map[int]func(Event){},
 	}
 	if r.log == nil {
 		r.log = slog.Default()
@@ -264,11 +277,29 @@ func (r *Registry) OnChange(fn func(Event)) (unsubscribe func()) {
 	}
 }
 
-// emitLocked queues an event for delivery.
+// emitLocked queues an event for delivery. An update of an entry whose
+// last queued event is its Added or Updated replaces that event's entry
+// instead of queueing another: while one delivery runs, every other
+// observation only queues, and each observation of a known instance is
+// an update, so without it the queue grows with the observations rather
+// than with the entries (review II, R2-P6-bound-2027).
 func (r *Registry) emitLocked(kind EventKind, rec *record) {
-	if len(r.observers) > 0 {
-		r.pending = append(r.pending, Event{Kind: kind, Entry: rec.Entry})
+	if len(r.observers) == 0 {
+		return
 	}
+	if kind == EventUpdated {
+		for i := len(r.pending) - 1; i >= 0; i-- {
+			if r.pending[i].Entry.ExtAddress != rec.ExtAddress {
+				continue
+			}
+			if r.pending[i].Kind != EventRemoved {
+				r.pending[i].Entry = rec.Entry
+				return
+			}
+			break
+		}
+	}
+	r.pending = append(r.pending, Event{Kind: kind, Entry: rec.Entry})
 }
 
 // deliver hands the queued events to the observers, one at a time; a
@@ -353,7 +384,7 @@ func (r *Registry) observeLocked(st discovery.NameState) {
 		r.goneLocked(key, source)
 		return
 	}
-	if r.evicted[key] {
+	if _, gone := r.evicted[key]; gone {
 		return
 	}
 	inst, known := r.instances[key]
@@ -361,7 +392,13 @@ func (r *Registry) observeLocked(st discovery.NameState) {
 		// A newly discovered instance. Mirrors matter.js
 		// BorderRouterRegistry.ts:204-240 (#onDiscovered).
 		r.pruneLocked()
-		inst = &instance{source: source}
+		for len(r.instances) >= maxInstances {
+			if !r.evictOldestPendingLocked() && !r.evictOldestLocked() {
+				break
+			}
+		}
+		r.seq++
+		inst = &instance{source: source, seen: r.seq}
 		r.instances[key] = inst
 	}
 	r.upsertLocked(st, inst)
@@ -451,7 +488,7 @@ func (r *Registry) upsertLocked(st discovery.NameState, inst *instance) {
 // matter.js packages/thread-br-client/src/discovery/BorderRouterRegistry.ts:565-610
 // (#evictOldest) at db021da0, where the evicted entry's instance observers
 // are released.
-func (r *Registry) evictOldestLocked() {
+func (r *Registry) evictOldestLocked() bool {
 	var stale, live string
 	var staleSeen, liveSeen time.Time
 	for _, xa := range r.order {
@@ -469,14 +506,51 @@ func (r *Registry) evictOldestLocked() {
 		victim = live
 	}
 	if victim == "" {
-		return
+		return false
 	}
 	r.removeLocked(victim)
 	for key, inst := range r.instances {
 		if inst.xa == victim {
 			delete(r.instances, key)
-			r.evicted[key] = true
+			r.tombstoneLocked(key)
 		}
+	}
+	return true
+}
+
+// evictOldestPendingLocked stops watching the instance without a valid xa
+// that was watched first; false when every instance has one. A later
+// observation of it is a new instance (review II, R2-P6-bound-2026).
+func (r *Registry) evictOldestPendingLocked() bool {
+	var oldest string
+	var seen uint64
+	for key, inst := range r.instances {
+		if inst.xa == "" && (oldest == "" || inst.seen < seen) {
+			oldest, seen = key, inst.seen
+		}
+	}
+	if oldest == "" {
+		return false
+	}
+	delete(r.instances, oldest)
+	return true
+}
+
+// tombstoneLocked ignores the instance key until its last record goes; the
+// tombstones are bounded by maxInstances, the oldest dropped first — a
+// dropped one's next observation is a new instance.
+func (r *Registry) tombstoneLocked(key string) {
+	r.seq++
+	r.evicted[key] = r.seq
+	for len(r.evicted) > maxInstances {
+		var oldest string
+		var at uint64
+		for k, s := range r.evicted {
+			if oldest == "" || s < at {
+				oldest, at = k, s
+			}
+		}
+		delete(r.evicted, oldest)
 	}
 }
 

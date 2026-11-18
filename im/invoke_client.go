@@ -19,7 +19,7 @@ import (
 // MarshalInvokeRequestTLV encodes req as an InvokeRequestMessage, each
 // command's fields through fieldsWriter, in matter.js TlvInvokeRequest's
 // field order (packages/types/src/protocol/messages/TlvInvokeRequest.ts:17-31
-// at 862ad75f): the DelayReportData (tag 3) when req carries one, both its
+// at db021da0): the DelayReportData (tag 3) when req carries one, both its
 // fields written (TlvDelayReportData.ts, TlvField with a decode fallback
 // only), then req's InteractionModelRevision — this module's
 // [MatterInteractionModelRevision] when 0. fieldsWriter is required: it
@@ -119,7 +119,7 @@ func readInvokeResponseIBs(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 		if ib.IsEndContainer {
 			return out, nil
 		}
-		if !ib.IsContainer || ib.Type != tlv.TypeStructure {
+		if taggedArrayElement(ib) || !ib.IsContainer || ib.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: InvokeResponseIB not struct", ErrInvalidInvokeRequest)
 		}
 		ent, err := readInvokeResponseIB(dec, fieldsReader)

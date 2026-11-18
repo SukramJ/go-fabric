@@ -36,6 +36,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -92,7 +93,7 @@ const DefaultVendorID uint16 = 0xFFF1
 // device that was found — that has the commissioner's own budgets
 // (commissioner.DefaultPASETimeout, commissioner.DefaultCASEConnectionTimeout
 // and the fail-safe), as matter.js's has: its commissionNode sets no
-// overall deadline (CommissioningController.ts:462-500 at 862ad75f), only
+// overall deadline (CommissioningController.ts:465-511 at db021da0), only
 // the discovery's timeout (CommissioningDiscovery.ts:40-45).
 const DefaultPairTimeout = time.Minute
 
@@ -115,7 +116,7 @@ type Config struct {
 	// advertisement, say: matter.js's ScannerSet, which the commissioner
 	// walks after the commissioning steps succeeded
 	// (packages/protocol/src/peer/ControllerCommissioner.ts:321-341,
-	// :721-723 at 862ad75f). nil is none.
+	// :721-723 at db021da0). nil is none.
 	Scanners []commissioner.CommissionedScanner
 	// Listen is the UDP address to listen on; "" is "[::]:0".
 	Listen string
@@ -133,12 +134,12 @@ type Config struct {
 	// id ("peer1", …) in place of Node.Hooks, so a host tells its nodes'
 	// reports, events and subscription signals apart
 	// (client.RegistryConfig.HooksFor) — matter.js gives each paired node
-	// its own events (packages/matter.js/src/device/PairedNode.ts:276-282
-	// at 862ad75f, attributeChanged and eventTriggered among them).
+	// its own events (packages/matter.js/src/device/PairedNode.ts:277-290
+	// at db021da0, attributeChanged and eventTriggered among them).
 	HooksFor func(id string) client.Hooks
 	// ManualStart leaves the commissioned nodes stopped when New returns;
 	// false starts each, as matter.js's start connects them unless
-	// autoConnect is false (CommissioningController.ts:864-866). A
+	// autoConnect is false (CommissioningController.ts:878-880 at db021da0). A
 	// program that only pairs, or reads once, sets it.
 	ManualStart bool
 	// KeepOnboardingCodes keeps the QR or manual pairing code of every
@@ -164,13 +165,18 @@ type Config struct {
 	// nodes' attribute values — stays readable. A database written without
 	// a sealer is sealed on the way in and its file scrubbed, as a node's
 	// store is (store.NewSealed): each store records the scrub it owes with
-	// its sealing, and a scrub that did not finish (store.ErrScrubIncomplete
-	// from New, or a process that ended first) is run by the next New. The
-	// key must live outside the database
-	// (docs/security.md, "Sealing at rest"). Every later New needs the
-	// same sealer: under another key New fails with an error that wraps
-	// store.ErrUnseal (the stores open one sealed value first); without
-	// one, New fails reading the sealed CA with store.ErrNoSealer.
+	// its sealing; a scrub that did not finish (a reader holding the -wal,
+	// a full disk, or a process that ended first) does not fail New — both
+	// stores open sealed, the scrub stays owed (store.Store.ScrubOwed,
+	// sqlstore.Store.ScrubOwed; New logs it once) and the next New runs it.
+	// To rotate the key, [Reseal] moves both stores in one transaction
+	// while no controller is open on the database. The key must live
+	// outside the database (docs/security.md, "Sealing at rest"). Every
+	// later New needs the same sealer: under another key New fails with an
+	// error that wraps store.ErrUnseal (the stores open one sealed value
+	// first); without one, New fails reading the sealed CA with
+	// store.ErrNoSealer. The node registry carries its own seal canary
+	// (sqlstore.NewSealed).
 	Sealer store.Sealer
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test
 	// passes one over its own socket.
@@ -194,7 +200,7 @@ type Config struct {
 	// from the database. nil keeps the root key in the database.
 	// matter.js has no such seam: its CertificateAuthority keeps the key
 	// pair in its storage (packages/protocol/src/certificate/
-	// CertificateAuthority.ts:53, :169 at 862ad75f).
+	// CertificateAuthority.ts:53, :169 at db021da0).
 	CAKey crypto.Signer
 	// Advertise, when set, publishes our commissioner record
 	// (`_matterd._udp`) on the controller's UDP port until Close
@@ -205,7 +211,7 @@ type Config struct {
 	// throttles and MRP margins the peers' connections and exchanges use
 	// (client/peer NetworkProfiles; matter.js NetworkServer.State.profiles,
 	// packages/node/src/behavior/system/network/NetworkServer.ts:162-183,
-	// :248 at 862ad75f). nil keeps the defaults.
+	// :254 at db021da0). nil keeps the defaults.
 	Networks *peer.ProfilesConfig
 	// OwnNetworkProfile is the profile of our own network, whose margin
 	// pads every exchange's sends: matter.js ownNetworkProfileId
@@ -219,7 +225,7 @@ type Config struct {
 	// Sessions sets the session intervals the controller reports in its
 	// handshakes (PBKDFParamRequest / Sigma1 SessionParameters) —
 	// matter.js's sessions.intervals fed into the SessionManager
-	// (ServerNetworkRuntime.ts:354-362 at 862ad75f), the controller-side
+	// (ServerNetworkRuntime.ts:362-367 at db021da0), the controller-side
 	// counterpart of node.Config.Sessions. nil is the Matter defaults
 	// (500 ms / 300 ms / 4000 ms); an interval outside whole milliseconds
 	// from 0 to the field's bound is [ErrConfiguration].
@@ -227,8 +233,8 @@ type Config struct {
 	// TransportPreference is the transport each peer prefers for its
 	// connections: exchange.TransportTCP is a soft hint — a connection
 	// falls back to UDP when the peer does not serve TCP — and needs
-	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:219-222,
-	// NetworkClient.ts:73-79 at 862ad75f).
+	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:225-228,
+	// NetworkClient.ts:73-79 at db021da0).
 	TransportPreference exchange.Transport
 	// PeerTiming sets the connection timing of the controller's peer set,
 	// every parameter [client.Timing] names: the connection timeout, the
@@ -267,12 +273,15 @@ type Config struct {
 	// ([Controller.DiagnosticEvents]); the zero value keeps
 	// diag.DefaultDiagnosticsCapacity events.
 	Diagnostics diag.Diagnostics
-	// MaxReportBytesPerSession bounds the report chunks (message payload
-	// bytes) the interactions of one session hold while the rest of their
-	// chunks arrive — reads, subscription reports and invoke responses of
-	// the paired nodes together: the chunk that would pass it is answered
-	// ResourceExhausted and the call returns interaction.ErrReportTooLarge.
-	// 0 is interaction.DefaultMaxReportBytesPerSession (2 MiB); a negative
+	// MaxReportBytesPerSession bounds the report chunks the interactions of
+	// one session hold while the rest of their chunks arrive, each charged
+	// its message payload, its entries and its decoded elements (the
+	// memory they hold, interaction.DefaultMaxReportBytesPerSession) —
+	// reads, subscription reports and invoke responses of the paired nodes
+	// together: the chunk that would pass it is answered ResourceExhausted
+	// and the call returns interaction.ErrReportTooLarge. 0 is
+	// interaction.DefaultMaxReportBytesPerSession (16 MiB, about 70 000
+	// scalar attributes of a wildcard read); a negative
 	// bound is [ErrConfiguration]. It holds for every interaction with a
 	// paired node, the reads a pairing makes once the node is commissioned
 	// included; the commissioning steps themselves, over PASE and the CASE
@@ -310,6 +319,9 @@ type Config struct {
 // Close.
 type Controller struct {
 	db *sql.DB
+	// sealed is whether Config.Sealer seals db (ota_provider.go
+	// retireOwnNode scrubs after the delete it makes).
+	sealed bool
 	// st is the controller's store on db, sealed with Config.Sealer when
 	// one is set: every read and write of the store tables goes through it.
 	st *store.Store
@@ -359,13 +371,20 @@ type Controller struct {
 	dcl        DCLConfig
 	vendorMu   sync.Mutex
 	vendorInfo *dcl.VendorInfoService
+	// vendorBuilding is closed when the build of vendorInfo in flight
+	// ends; nil while none runs. The build runs without vendorMu, so
+	// Close does not wait for the ledger (review II, R2-P6-err-2317).
+	vendorBuilding chan struct{}
 
 	// The OTA push (ota.go): the update manager and the reboot armer;
 	// registry is reg for the node hooks, which run while New builds it.
-	ota      atomic.Pointer[softwareupdate.Manager]
-	registry atomic.Pointer[client.Registry]
-	armer    *peer.RebootResubscribeArmer
-	armerObs atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
+	ota atomic.Pointer[softwareupdate.Manager]
+	// otaHandoffs are the update manager's NodeDeleted calls the node
+	// hooks handed off (ota_handoff.go).
+	otaHandoffs otaHandoffs
+	registry    atomic.Pointer[client.Registry]
+	armer       *peer.RebootResubscribeArmer
+	armerObs    atomic.Pointer[armerObserver] // a test seam, nil in production (ota.go)
 	// groups is the controller's group sender (groups.go).
 	groups *groups.Manager
 	// otaProvider is the OTA provider on the controller's identity
@@ -379,6 +398,18 @@ type Controller struct {
 	diagRing *diagevent.Ring
 	metrics  contract.Metrics
 	peerSet  atomic.Pointer[peer.Set]
+	// live holds the components the background callbacks reach — the
+	// reboot armer's timers, the peer set's and the subscriptions'
+	// session hooks, the update manager's session lookup. Those run on
+	// goroutines Close does not wait for, so they read these instead of
+	// the fields Close clears: each is set once its component exists and
+	// cleared when Close begins its teardown (clearLive), and a callback
+	// that finds nil does nothing (review II, R2-P6-conc-2305).
+	live struct {
+		mgr   atomic.Pointer[exchange.Manager]
+		peers atomic.Pointer[peer.Set]
+		subs  atomic.Pointer[interaction.Subscriptions]
+	}
 	// closeMu is the controller's one closed gate: Close sets closed
 	// under it first, and every public method reads closed — and the
 	// fields Close clears (reg, peers, com, names, adv, groups,
@@ -396,7 +427,8 @@ type Controller struct {
 }
 
 // checkRequired refuses a configuration without its required fields or
-// with a negative report, image or inbound TCP bound.
+// with a negative report, image or inbound TCP bound, or a TCP message
+// bound its roles cannot use.
 func checkRequired(cfg *Config) error {
 	switch {
 	case cfg.DB == nil:
@@ -409,6 +441,8 @@ func checkRequired(cfg *Config) error {
 		return fmt.Errorf("%w: MaxImageBytesPerNode %d is negative", ErrConfiguration, cfg.MaxImageBytesPerNode)
 	case cfg.TCP.MaxInboundConnections < 0:
 		return fmt.Errorf("%w: TCP.MaxInboundConnections %d is negative", ErrConfiguration, cfg.TCP.MaxInboundConnections)
+	case !cfg.TCP.validMessageSize():
+		return fmt.Errorf("%w: TCP.MaxMessageSize of %d is not a whole number from %d to %d", ErrConfiguration, cfg.TCP.MaxMessageSize, exchange.MaxUDPMessageSize, uint64(math.MaxUint32))
 	}
 	return nil
 }
@@ -445,7 +479,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 		openNames = discovery.Open
 	}
 	clk := clock.Or(cfg.Clock)
-	c := &Controller{db: cfg.DB, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP, metrics: cfg.Metrics, diagRing: newTrace(cfg.Diagnostics, clk), keepCodes: cfg.KeepOnboardingCodes}
+	c := &Controller{db: cfg.DB, sealed: cfg.Sealer != nil, log: log, clock: clk, stop: func() {}, dcl: cfg.DCL, tcp: cfg.TCP, metrics: cfg.Metrics, diagRing: newTrace(cfg.Diagnostics, clk), keepCodes: cfg.KeepOnboardingCodes}
 	defer func() {
 		if err != nil {
 			_ = c.Close(context.WithoutCancel(ctx))
@@ -454,7 +488,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if err := errors.Join(store.Apply(ctx, cfg.DB), sqlstore.Apply(ctx, cfg.DB)); err != nil {
 		return nil, err
 	}
-	if c.st, c.nodeStore, err = openStores(ctx, cfg); err != nil {
+	if c.st, c.nodeStore, err = openStores(ctx, cfg, log); err != nil {
 		return nil, err
 	}
 	keep := ca.SettingStore{Settings: c.st} // "controller.ca" and "controller.ca.fabric"
@@ -471,7 +505,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	// The operational key is rotated on every start, as matter.js's
 	// controller does for the fabric it keeps itself (FabricAuthority
 	// defaultFabric with rotateNoc, packages/matter.js/src/MatterController.ts:402-415
-	// at 862ad75f).
+	// at db021da0).
 	if c.fabric, err = commissioner.NewFabricAuthority(authority, log).DefaultFabric(fcfg, true); err != nil {
 		return nil, err
 	}
@@ -502,7 +536,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	if cfg.TCP.Outgoing {
 		pctx.DialTCP = c.dialTCP()
 	}
-	if c.peers, err = peer.NewSet(pctx); err != nil {
+	if err := c.openPeers(pctx); err != nil {
 		return nil, err
 	}
 	if cfg.OTA != nil {
@@ -510,7 +544,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	}
 	// The registry carries the report bound to every node interaction
 	// bound to it (commissioner.Interaction).
-	c.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{
+	c.openSubscriptions(interaction.SubscriptionsConfig{
 		Logger: log, Clock: clk, ReportStarted: c.reportStarted, MaxReportBytesPerSession: cfg.MaxReportBytesPerSession,
 	})
 	//nolint:contextcheck // the constructors take no context; the peers they adopt resolve on their own
@@ -593,11 +627,50 @@ func (c *Controller) serveAndStart(ctx context.Context, cfg Config, log *slog.Lo
 	return c.retireOwnNode(ctx, c.st, c.log)
 }
 
+// openPeers builds the peer set and publishes it to the background
+// callbacks (live).
+func (c *Controller) openPeers(pctx peer.Context) (err error) {
+	if c.peers, err = peer.NewSet(pctx); err != nil {
+		return err
+	}
+	c.live.peers.Store(c.peers)
+	return nil
+}
+
+// openSubscriptions builds the client subscriptions and publishes them to
+// the background callbacks (live).
+func (c *Controller) openSubscriptions(cfg interaction.SubscriptionsConfig) {
+	c.subs = interaction.NewSubscriptions(cfg)
+	c.live.subs.Store(c.subs)
+}
+
+// clearLive takes the components out of the background callbacks' reach
+// before Close closes them: a callback that runs later does nothing.
+func (c *Controller) clearLive() {
+	c.live.subs.Store(nil)
+	c.live.peers.Store(nil)
+	c.live.mgr.Store(nil)
+}
+
+// closeOTA stops the update manager once the NodeDeleted calls the node
+// hooks handed off reached the host's callback or returned, within ctx,
+// and refuses further ones (otaHandoffs).
+func (c *Controller) closeOTA(ctx context.Context) {
+	m := c.ota.Swap(nil)
+	if m == nil {
+		return
+	}
+	c.otaHandoffs.close(ctx)
+	m.Close()
+}
+
 // openStores builds the controller's store and node registry on cfg.DB,
 // sealed with cfg.Sealer when one is set — store.NewSealed, then
 // sqlstore.NewSealed, the schemas applied — as node's openCredentials
-// opens a node's credential store (node/node.go).
-func openStores(ctx context.Context, cfg Config) (st *store.Store, nodes *sqlstore.Store, err error) {
+// opens a node's credential store (node/node.go). A sealing whose scrub
+// did not finish opens both (decision 132) and is said once, as node says
+// it (node/node.go, matter.store.seal_scrub_owed).
+func openStores(ctx context.Context, cfg Config, log *slog.Logger) (st *store.Store, nodes *sqlstore.Store, err error) {
 	if cfg.Sealer == nil {
 		return store.New(cfg.DB), sqlstore.New(cfg.DB), nil
 	}
@@ -606,6 +679,16 @@ func openStores(ctx context.Context, cfg Config) (st *store.Store, nodes *sqlsto
 	}
 	if nodes, err = sqlstore.NewSealed(ctx, cfg.DB, cfg.Sealer); err != nil {
 		return nil, nil, fmt.Errorf("controller: open the sealed node registry: %w", err)
+	}
+	// The rows are sealed; the old bytes may remain in the file until a
+	// later open scrubs them (review II, fx-csql F2, decision 132).
+	for _, owed := range []func(context.Context) (bool, error){st.ScrubOwed, nodes.ScrubOwed} {
+		if o, err := owed(ctx); err != nil || o {
+			log.Warn("matter.store.seal_scrub_owed",
+				slog.String("detail", "the sealed values' former bytes may remain in the database file until a later start scrubs it"),
+				slog.Any("err", err))
+			break
+		}
 	}
 	return st, nodes, nil
 }
@@ -675,6 +758,7 @@ func (c *Controller) openNetwork(ctx context.Context, listen string, l *udp.List
 		_ = l.Close()
 		return err
 	}
+	c.live.mgr.Store(c.mgr)
 	serveCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	served := make(chan struct{})
 	handle := c.mgr.HandleDatagram // bound here: Close clears c.mgr while Serve runs
@@ -734,14 +818,13 @@ func (c *Controller) Close(ctx context.Context) error {
 		_ = c.subs.BlockNewActivity(ctx)
 	}
 	c.unwatchAllICD()
+	c.clearLive()
 	if c.stopDiscover != nil {
 		c.stopDiscover()
 		c.stopDiscover = nil
 	}
 	c.closeVendorInfo()
-	if m := c.ota.Swap(nil); m != nil {
-		m.Close()
-	}
+	c.closeOTA(ctx)
 	if c.groups != nil {
 		c.groups.SetTransport(nil)
 		c.groups = nil
@@ -964,7 +1047,7 @@ func (c *Controller) Fabric() *commissioner.Fabric { return c.fabric }
 // registry (its own node on a known address, say) adds it here
 // (peer.Set.AddKnownPeer) and reaches it with
 // Commissioner().Interaction. A seam of the role — matter.js's node
-// peers (packages/node/src/node/client/Peers.ts:93 at 862ad75f).
+// peers (packages/node/src/node/client/Peers.ts:93 at db021da0).
 // Nil once Close has begun.
 func (c *Controller) Peers() *peer.Set {
 	st, _ := c.open()
@@ -1016,8 +1099,8 @@ type PairOptions struct {
 	// supplies the passcode; its discriminator is not checked. Mirrors
 	// matter.js MatterController.commission, which commissions a
 	// discovery's knownAddress through Peers.forDescriptor({addresses})
-	// without a scan (packages/matter.js/src/MatterController.ts:539-566 at
-	// 862ad75f; the option is CommissioningController.ts:289). Address
+	// without a scan (packages/matter.js/src/MatterController.ts:539-565 at
+	// db021da0; the option is CommissioningController.ts:292). Address
 	// and BLE together are [ErrConfiguration].
 	Address *net.UDPAddr
 	// WiFi and Thread are the operational network the commissioning
@@ -1036,12 +1119,13 @@ type PairOptions struct {
 	// the terms and pairs again with the acknowledgement. nil acknowledges
 	// nothing, as a device without terms needs.
 	TermsAndConditions *commissioner.TermsAndConditionsAcknowledgement
-	// Progress, when set, is called on Pair's goroutine as each step of
-	// the pairing starts and ends ([PairingStep]): the search for the
-	// device (skipped with Address), PASE, the commissioning steps under
-	// matter.js's names, then the node's start, "Subscribe" 21.1. A
-	// failed step is the last report. Pair waits for it, so it must not
-	// block.
+	// Progress, when set, is called as each step of the pairing starts
+	// and ends ([PairingStep]): the search for the device (skipped with
+	// Address), PASE, the commissioning steps under matter.js's names,
+	// then the node's start, "Subscribe" 21.1. A failed step is the last
+	// report. It runs on the pairing's goroutines — Pair's, and in a
+	// discovery race each transport's search and each attempt — one call
+	// at a time. Pair waits for it, so it must not block.
 	// It is the commissioner's Options.Progress, which Edit may replace.
 	Progress func(PairingStep)
 	// Edit adjusts the commissioner's options last (a seam).
@@ -1055,7 +1139,7 @@ type PairOptions struct {
 // PairingStep is one report of [PairOptions].Progress: the step's
 // number, sub-step and name — matter.js's step names verbatim
 // (packages/protocol/src/peer/ControllerCommissioningFlow.ts:536-656 at
-// 862ad75f), so a UI can show them, "Discovery" 2.1 and "PASE" 2.2,
+// db021da0), so a UI can show them, "Discovery" 2.1 and "PASE" 2.2,
 // this module's names for the steps before matter.js's flow, and
 // "Subscribe" 21.1, its name for the node's start after it (the initial
 // read and the default subscription) — its
@@ -1086,9 +1170,9 @@ const (
 // timeout. With [PairOptions].BLE the device is found over BLE and
 // commissioned over BTP; with [PairOptions].Address it is dialled at that
 // address without discovery. Mirrors CommissioningController.commissionNode
-// (CommissioningController.ts:462-500 at 862ad75f), whose discovery takes
+// (CommissioningController.ts:465-511 at db021da0), whose discovery takes
 // BLE when the options name a BLE capability (discoveryCapabilities,
-// :280-283).
+// :283-286).
 //
 // The pairing enters the diagnostic trace ([Controller.DiagnosticEvents]):
 // its start and each failed step (a warning: one discovery transport of a
@@ -1197,7 +1281,7 @@ func (c *Controller) pairOptions(passcode uint32, channel commissioner.Channel, 
 // Peers.forDescriptor does for a descriptor of addresses only
 // (RemoteDescriptor.is matches nothing on an absent identifier,
 // packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts:37-50
-// at 862ad75f) — and what [PairOptions].Address pairs. An address without
+// at db021da0) — and what [PairOptions].Address pairs. An address without
 // an IP or a port is [ErrConfiguration].
 func DeviceAt(addr *net.UDPAddr) (client.Device, error) {
 	if addr == nil {

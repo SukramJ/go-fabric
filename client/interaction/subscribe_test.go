@@ -231,3 +231,39 @@ func TestSubscribeRefused(t *testing.T) {
 		}
 	})
 }
+
+// TestSubscriptionDisplacedByTheSameIDCloses: a peer that grants a second
+// subscription the id of one still registered displaces the first; the
+// first is closed — its Closed runs, a sustained one re-establishes —
+// instead of being left outside the liveness timer, where no report and no
+// timeout would reach it. connectedhomeip's subscription that loses its id
+// still ends at its own liveness timeout (src/app/ReadClient.cpp:976-993
+// at 6170af84); matter.js replaces the entry silently
+// (ClientSubscriptions.ts:140 at db021da0) (review II, R2-P6-fsm-2105).
+func TestSubscriptionDisplacedByTheSameIDCloses(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, reg, c, _ := handlerRig(t)
+		closed := make(chan struct{}, 2)
+		req := interaction.SubscribeRequest{
+			Attributes: []im.ConcreteAttributePath{onOff},
+			Updated:    func(*interaction.Report) error { return nil },
+			Closed:     func() { closed <- struct{}{} },
+		}
+		first := subscribed(t, s, c, req, 5)
+		second := subscribed(t, s, c, req, 5)
+		select {
+		case <-first.Done():
+		case <-time.After(time.Second):
+			t.Fatal("the displaced subscription was not closed")
+		}
+		select {
+		case <-second.Done():
+			t.Fatal("the subscription that took the id was closed")
+		default:
+		}
+		if got := reg.GetPeer(first.Peer(), 5); got != second {
+			t.Fatalf("the registry holds %p under the id, want the second subscription %p", got, second)
+		}
+	})
+}

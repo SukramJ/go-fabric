@@ -366,13 +366,25 @@ func snapshotDeviceType(sd *snapDeviceType) (*DeviceType, error) {
 		if err != nil {
 			return nil, fmt.Errorf("device type %s: requirement %s: %w", sd.Name, r.Name, err)
 		}
-		req := &Requirement{ID: r.ID, Name: r.Name, Side: side, Conformance: conf}
-		if eff := effectiveClusterRequirement(sd, r.Element, r.ID); eff != nil {
+		effs := effectiveRequirements(sd, r.Element, r.ID)
+		if len(effs) == 0 {
+			dt.Requirements = append(dt.Requirements, &Requirement{ID: r.ID, Name: r.Name, Side: side, Conformance: conf})
+			continue
+		}
+		// A cluster has one effective requirement; a contained device
+		// type one per instance the effective layer states (Battery
+		// Storage: two Electrical Sensors, one with ALTC, one with DIRC),
+		// each read, none dropped.
+		if side != "deviceType" {
+			effs = effs[:1]
+		}
+		for _, eff := range effs {
+			req := &Requirement{ID: r.ID, Name: r.Name, Side: side, Conformance: conf}
 			if err := withElements(req, eff); err != nil {
 				return nil, fmt.Errorf("device type %s: requirement %s: %w", sd.Name, r.Name, err)
 			}
+			dt.Requirements = append(dt.Requirements, req)
 		}
-		dt.Requirements = append(dt.Requirements, req)
 	}
 	if err := withConditions(dt, sd); err != nil {
 		return nil, err
@@ -416,25 +428,31 @@ func snapshotBaseDeviceType(sd *snapDeviceType) (*DeviceType, error) {
 	return dt, nil
 }
 
-// effectiveClusterRequirement finds the effective-layer counterpart of a raw
-// cluster requirement: the device type's own requirement of the cluster on
-// that side. A requirement the raw layer inherits from a base device type
-// without restating it has none — matter.js's validation reads only a
-// device type's own requirements (DeviceTypeModel.requirements).
-func effectiveClusterRequirement(sd *snapDeviceType, element string, id uint32) *snapDTRequirement {
+// effectiveRequirements finds the effective-layer counterparts of a raw
+// cluster or device type requirement: the device type's own requirements of
+// the element on that side, in order. A requirement the raw layer inherits
+// from a base device type without restating it has none — matter.js's
+// validation reads only a device type's own requirements
+// (DeviceTypeModel.requirements).
+func effectiveRequirements(sd *snapDeviceType, element string, id uint32) []*snapDTRequirement {
 	if sd.Effective == nil {
 		return nil
 	}
+	var out []*snapDTRequirement
 	for _, r := range sd.Effective.Requirements {
 		if r.Element == element && r.ID != nil && *r.ID == id {
-			return r
+			out = append(out, r)
 		}
 	}
-	return nil
+	return out
 }
 
 // withElements carries a cluster requirement's quality and its feature,
-// attribute, command and event requirements over from the effective layer.
+// attribute, command and event requirements over from the effective layer;
+// for a device type requirement (a composed device type's contained type),
+// the cluster requirements it states, each with its own (R2-P6-test-2850).
+// A nested requirement of another element is an error: dropped, it would
+// be neither compared nor counted.
 func withElements(req *Requirement, eff *snapDTRequirement) error {
 	if eff.Quality != nil {
 		req.Quality = []string{}
@@ -446,10 +464,15 @@ func withElements(req *Requirement, eff *snapDTRequirement) error {
 		slices.Sort(req.Quality)
 	}
 	for _, n := range eff.Requirements {
-		switch n.Element {
-		case "feature", "attribute", "command", "event":
-		default:
+		switch {
+		case req.Side == "deviceType" && (n.Element == "serverCluster" || n.Element == "clientCluster"):
+			if err := withCluster(req, n); err != nil {
+				return err
+			}
 			continue
+		case req.Side != "deviceType" && (n.Element == "feature" || n.Element == "attribute" || n.Element == "command" || n.Element == "event"):
+		default:
+			return fmt.Errorf("%s requirement %s: a requirement of element %q below it is not read", req.Side, n.Name, n.Element)
 		}
 		conf, err := snapshotConf(n.Conformance)
 		if err != nil {
@@ -464,6 +487,31 @@ func withElements(req *Requirement, eff *snapDTRequirement) error {
 		}
 		req.Elements = append(req.Elements, er)
 	}
+	return nil
+}
+
+// withCluster adds a cluster requirement a contained device type states.
+func withCluster(req *Requirement, n *snapDTRequirement) error {
+	side := "server"
+	if n.Element == "clientCluster" {
+		side = "client"
+	}
+	id := n.ID
+	if id == nil && n.Referent != nil {
+		id = n.Referent.ID
+	}
+	if id == nil {
+		return fmt.Errorf("cluster requirement %s of %s has no id", n.Name, req.Name)
+	}
+	conf, err := snapshotConf(n.Conformance)
+	if err != nil {
+		return fmt.Errorf("cluster requirement %s of %s: %w", n.Name, req.Name, err)
+	}
+	cl := &Requirement{ID: *id, Name: n.Name, Side: side, Conformance: conf}
+	if err := withElements(cl, n); err != nil {
+		return fmt.Errorf("cluster requirement %s of %s: %w", n.Name, req.Name, err)
+	}
+	req.Clusters = append(req.Clusters, cl)
 	return nil
 }
 

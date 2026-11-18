@@ -106,8 +106,14 @@ proxies, err := esphome.Discover(ctx, esphome.Options{
 ```
 
 Keys are per device, by name or by MAC (any spelling; a name matches first).
-A device without a key is used only when it answers plaintext; one that
-advertises `api_encryption` without a key in `Keys` is not dialled at all.
+A device without a key in `Keys` is not dialled: the plaintext API
+authenticates neither side, so any host on the LAN that announces
+`_esphomelib._tcp` and reports the proxy feature flags would otherwise carry
+the commissioning's BLE stream. `DiscoverOptions.AllowPlaintext` admits
+keyless devices on a LAN you trust; each plaintext proxy is then used only
+when it answers plaintext and is logged as the warning
+`ble.esphome.proxy_plaintext`. A proxy given to `NewCentral` by address is
+used as given, with or without a key.
 Every device left out — no key, a wrong key, no `bluetooth_proxy: active:
 true`, unreachable — is logged on `Options.Logger` as
 `ble.esphome.proxy_skipped` with the reason; `Options.Clock` paces the
@@ -128,8 +134,9 @@ lease — is followed by its name after the loss (`ble.esphome.proxy_moved`),
 and one no longer advertised leaves once it has no connection
 (`ble.esphome.proxy_removed`). A proxy given in the list stays regardless,
 and a device advertised at its address is that proxy, not a second one. A
-device refused for good (a wrong key, no active connections) is dialled
-again only when its `config_hash` changes. `NewCentral` fails when no proxy,
+device refused for good (a wrong key, no key while `AllowPlaintext` is off,
+no active connections) is dialled again only when its `config_hash`
+changes. `NewCentral` fails when no proxy,
 given or discovered, answers.
 
 The one-subscriber rule is unchanged: a discovered proxy is taken from Home

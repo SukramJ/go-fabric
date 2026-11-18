@@ -11,8 +11,8 @@ import (
 )
 
 // TestParityConstants: matter.js
-// packages/protocol/src/action/client/ClientInteraction.ts:159-160 at
-// 0ceb202d.
+// packages/protocol/src/action/client/ClientInteraction.ts:175-176 at
+// db021da0.
 func TestParityConstants(t *testing.T) {
 	t.Parallel()
 	if interaction.DefaultTimedRequestTimeout != 10*time.Second {

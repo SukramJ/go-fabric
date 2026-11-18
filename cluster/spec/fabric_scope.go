@@ -14,8 +14,9 @@ var _ contract.FabricScopeDeclarer = (*Instance)(nil)
 // write-only attribute, one the definition does not hold and one without
 // a fabric flag declare nothing.
 //
-// The dispatcher asks it only for a cluster the module's schema snapshot
-// does not hold — a vendor definition; for a standard cluster the
+// The dispatcher asks it for a cluster the module's schema snapshot does
+// not hold and for a manufacturer-specific attribute ([VendorPrefix]) on
+// one it does; for a standard attribute of a standard cluster the
 // snapshot's table is the answer, and a definition generated from the
 // snapshot states the same scope.
 func (i *Instance) MatterFabricScope(attrID uint32) (contract.FabricScope, bool) {

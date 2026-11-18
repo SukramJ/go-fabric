@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/basic-information/CapabilityMinimaTest.ts
-// at 862ad75f: the four Matter 1.6 CapabilityMinima fields
+// at db021da0: the four Matter 1.6 CapabilityMinima fields
 // BasicInformationServer.initialize seeds (BasicInformationServer.ts:26-30,
 // :73-83). "seeds the four 1.6 fields with the advertised defaults" is
 // TestCapabilityMinimaRev6Defaults (basic_information_test.go).

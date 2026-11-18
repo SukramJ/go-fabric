@@ -47,6 +47,10 @@ type otaApplier struct {
 	logger              *slog.Logger
 	// clock paces restartedWhenIdle's wait for Idle; nil is clock.System.
 	clock clock.Clock
+	// life is the daemon's lifetime (compose's ctx, which ends before the
+	// node stops): restartedWhenIdle gives up with it rather than emit on
+	// a stopped node (R2-P6-conc-2612). Nil is a lifetime without end.
+	life context.Context
 }
 
 var _ node.OTAApplier = (*otaApplier)(nil)
@@ -54,7 +58,7 @@ var _ node.OTAApplier = (*otaApplier)(nil)
 // RequestUserConsent implements [node.OTAApplier]. The daemon has no
 // user to ask; it declares CanConsent only in harness mode, where it
 // consents as the matter.js cert requestor does
-// (OtaRequestorTestInstance.ts:166-168).
+// (OtaRequestorTestInstance.ts:166-168 at db021da0).
 func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, error) {
 	return a.harness, nil
 }
@@ -65,6 +69,15 @@ func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, 
 // field applies to every vendor or product, OtaImageHeader.ts:26-41) —
 // then it is moved out of the download location, as an applied or
 // abandoned file must be (OtaSoftwareUpdateRequestorServer.ts:153-159).
+//
+// These checks are the image format's, not the image's authenticity:
+// nothing here verifies who made it. matter.js's requestor says the same
+// of its default validation — "The method SHALL be overridden to add
+// additional checks like validating the signature of the file."
+// (packages/node/src/behaviors/ota-software-update-requestor/
+// OtaSoftwareUpdateRequestorServer.ts:1121 at db021da0). A product
+// verifies its vendor's signature over the payload before it installs the
+// image (R2-P6-sec-2616).
 func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32, file string) error {
 	header, err := a.verify(newSoftwareVersion, file)
 	if err != nil {
@@ -73,6 +86,8 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	}
 	appliedDir := filepath.Join(a.dir, "applied")
 	if err := os.MkdirAll(appliedDir, 0o750); err != nil {
+		// Out of the download location on this path too (R2-P6-err-2611).
+		_ = os.Remove(file)
 		return err
 	}
 	kept := filepath.Join(appliedDir, fmt.Sprintf("ota-%04x-%04x-v%d.ota", a.vendorID, a.productID, newSoftwareVersion))
@@ -83,7 +98,7 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	if !a.harness {
 		a.logger.Info("ota.image_stored",
 			slog.Uint64("version", uint64(newSoftwareVersion)), slog.String("path", kept),
-			slog.String("hint", "install it and restart; this example does not flash itself"))
+			slog.String("hint", "verify its vendor signature, install it and restart; this example does neither"))
 		return nil
 	}
 	// A device that flashes its image stays in Applying until it reboots;
@@ -101,8 +116,16 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	a.logger.Info("ota.applied_in_place", slog.Uint64("version", uint64(newSoftwareVersion)))
 	// The requestor returns to Idle once this returns; the start-up path
 	// runs after that, as a restart would.
-	go a.restartedWhenIdle(context.WithoutCancel(ctx))
+	go a.restartedWhenIdle(a.lifetime()) //nolint:contextcheck // the restart outlives the apply request and ends with the daemon (R2-P6-conc-2612)
 	return nil
+}
+
+// lifetime is life, or a context without end.
+func (a *otaApplier) lifetime() context.Context {
+	if a.life != nil {
+		return a.life
+	}
+	return context.Background()
 }
 
 // otaHarnessApplyHold is how long the in-place apply of --ota-harness stays
@@ -156,8 +179,9 @@ func (a *otaApplier) verify(version uint32, file string) (node.OTAImageHeader, e
 // StartUp with the version now running — the event a node emits on every
 // start (node.Node.Start), which the matter.js cert requestor's restart
 // into its applied image emits too and TC-SU-2.5 waits for
-// (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at 862ad75f) —
-// then the requestor's own.
+// (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at db021da0) —
+// then the requestor's own. It gives up, emitting nothing, once ctx — the
+// daemon's lifetime — ends.
 func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 	r := a.requestor()
 	if r == nil {
@@ -170,6 +194,12 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 			break
 		}
 		clock.Sleep(clk, 10*time.Millisecond, ctx.Done())
+		if ctx.Err() != nil {
+			return
+		}
+	}
+	if ctx.Err() != nil {
+		return
 	}
 	if a.basicInfo != nil {
 		a.basicInfo.EmitStartUp()

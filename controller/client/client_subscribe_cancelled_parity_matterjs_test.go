@@ -19,8 +19,8 @@ import (
 const abandonedTerminated = "matter.controller.interaction.abandoned_terminated"
 
 // TestClientSubscribeCancelledParity ports ClientSubscribeTest's describe
-// "cancelled while being established" (packages/node/test/node/ClientSubscribeTest.ts:1116-1330
-// at 862ad75f): a subscription the caller gives up on while the peer
+// "cancelled while being established" (packages/node/test/node/ClientSubscribeTest.ts:1116-1333
+// at db021da0): a subscription the caller gives up on while the peer
 // primes it is abandoned (ClientInteraction.ts:1084-1097) and its priming
 // report answered INVALID_SUBSCRIPTION (InteractionMessenger.ts:1116-1137),
 // so the device keeps no subscription for it. matter.js reads the device's

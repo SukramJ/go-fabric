@@ -68,6 +68,12 @@ before relying on it) and emits per level one JSON:
                 "mandatory": {"attributes": [...], "commands": [...], "events": [...]}}] }
 ```
 
+> Superseded (review II, R2-P6-par-2713, owner decision 227): a level file
+> lists `requestCommands` and `responseCommands` apart instead of one
+> `commands` list, and `leveltable.Load` refuses a merged file; Thermostat
+> command 2, a request at 1.4–1.4.2 and a response from 1.6.0, was the case
+> the merge lost.
+
 Ids only, no text, no datatypes. `mandatory` is what the cluster's own
 conformance makes unconditionally mandatory at that revision (conformance
 `M`) — carried so the exception list in part 5 can be computed without
@@ -119,7 +125,7 @@ func DeviceTypeLevels(id DeviceTypeID) LevelSet
 func ClusterLevels(id uint32) LevelSet
 func ClusterFeatureLevels(cluster uint32, bit uint8) LevelSet
 func ClusterAttributeLevels(cluster, attr uint32) LevelSet
-func ClusterCommandLevels(cluster, cmd uint32) LevelSet
+func ClusterCommandLevels(cluster, cmd uint32) LevelSet   // deprecated since owner decision 227: ClusterRequestCommandLevels, ClusterResponseCommandLevels
 func ClusterEventLevels(cluster, ev uint32) LevelSet
 func ClusterRevisionAt(cluster uint32, l Level) (uint16, bool)
 const LevelsSnapshotSHA256 = "…"     // over the sorted level files

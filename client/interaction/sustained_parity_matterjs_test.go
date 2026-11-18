@@ -14,6 +14,7 @@ package interaction_test
 
 import (
 	"context"
+	"runtime"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -42,6 +43,23 @@ func ssNewRig(t *testing.T) *ssRig {
 	t.Cleanup(func() { s.mgr.SetProtocolHandler(im.InteractionModelProtocolID, nil) })
 	c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg, Clock: s.clock, Rand: func() float64 { return 0 }})
 	return &ssRig{s: s, reg: reg, c: c}
+}
+
+// ssEarlyLossWait advances past the retry schedule's first interval: a
+// subscription lost before it lasted that interval is replaced after it,
+// where matter.js replaces it at once (review II, R2-P6-fsm-2110).
+// It polls for the armed timer rather than settling a synctest bubble, so
+// it serves the cases that run outside one as well.
+func ssEarlyLossWait(t *testing.T, r *ssRig) {
+	t.Helper()
+	const step = 15 * time.Second
+	for i := 0; !slices.Contains(r.s.clock.pending(), step); i++ {
+		if i > 10_000_000 {
+			t.Fatalf("no retry timer of %v armed (pending %v)", step, r.s.clock.pending())
+		}
+		runtime.Gosched()
+	}
+	r.s.clock.Advance(step)
 }
 
 // ssStates records the ActiveChanged emissions.
@@ -260,6 +278,7 @@ func TestSustainedSubscriptionEventNumbers(t *testing.T) {
 		states.wait(t, true)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60)
 		states.wait(t, true)
 		want := []im.EventMinimumNumber{{EventMin: 7}}
@@ -351,6 +370,7 @@ func TestSustainedSubscriptionEventNumbers(t *testing.T) {
 		states.wait(t, true)
 		r.reg.CloseForPeer(sub.Peer())
 		states.wait(t, false)
+		ssEarlyLossWait(t, r)
 		second := ssEstablish(t, r.s, 2, 60)
 		states.wait(t, true)
 		if len(first) != 0 || !slices.Equal(second, []im.EventMinimumNumber{{EventMin: 6}}) {

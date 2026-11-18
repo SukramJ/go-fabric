@@ -58,7 +58,8 @@ func encodeFrame(msg []byte, maxPayloadSize int) ([]byte, error) {
 
 // assembler reassembles the messages of one connection from the byte
 // chunks the socket delivers. The Go translation of TcpChannel.ts's
-// #handleData (:202-220) and #extractMessages (:248-298).
+// #handleData (:195-206) and #extractMessages (:233-283) at
+// db021da0.
 type assembler struct {
 	maxPayloadSize int
 	buf            []byte

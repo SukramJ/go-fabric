@@ -14,14 +14,27 @@
 //
 // # What it checks
 //
-//  1. Collect. A citation is `<path>.ts:<line>[-<line>]`. A full-line
-//     comment paragraph is read as one text (a path broken after a '/' is
-//     rejoined), every other line on its own; the citation's sentence ends
-//     at a '.', '!' or '?' before white space. An `at <sha>` (or an `at`
-//     before a backticked sha) in the sentence checks the citation at that
-//     commit instead of the pin — the one nearest the citation that is a
-//     matter.js commit, since a sentence may name the chip harness commit
-//     as well; a sentence naming none is checked at the pin.
+//  1. Collect. A citation is `<path>.ts:<line>[-<line>]`, or
+//     `<alias>:<line>[-<line>]` for a file the Go code names by an
+//     abbreviation its package defines (citeAliases: DAV is
+//     DeviceAttestationValidator.ts), checked as the file it stands for. A
+//     full-line comment paragraph is read as one text (a path broken after a
+//     '/' is rejoined), every other line on its own; the citation's sentence
+//     ends at a '.', '!' or '?' before white space. A commit the sentence
+//     names checks the citation at that commit instead of the pin — the one
+//     nearest the citation that is a matter.js commit, since a sentence may
+//     name the chip harness commit as well; a sentence naming none is
+//     checked at the pin. A sentence names a commit as `at <sha>` (or `at`
+//     before a backticked sha), as a sha opening a parenthesis, as
+//     "matter.js <sha>" (R2-P6-test-3202), as a sha closing a parenthesis
+//     after a comma or semicolon, as "pin <sha>" or as "HEAD <sha>" (F3 of
+//     the wave-4 read) — every form but `at <sha>` only with a letter in the
+//     sha, since they frame plain numbers too: a sha abbreviated to digits
+//     only is skipped there, and the citation is checked at the pin unless
+//     the sentence names another commit. A bare line part (":12-14") whose
+//     nearest reference before it is a .ts file named without a line, or a
+//     part already bound, is bound to that file and checked as its citation;
+//     it is counted on its own (below).
 //  2. Resolve. A packages/… path exactly; a partial path as a unique suffix
 //     of the tree; a bare file name as a unique basename of the tree
 //     (`git ls-tree -r --name-only <sha> -- examples packages support`:
@@ -40,6 +53,18 @@
 //     cited file nearest the cited one where the name stands, and how often
 //     it stands there); the counts to summary.md. citecheck_test.go holds
 //     len(drift.json) at citecheckDriftRatchet, exactly, in both directions.
+//  5. Off the pin. The line citations checked at a matter.js commit other
+//     than the pin are counted per commit in summary.md, and
+//     citecheckOffPinRatchet holds their number, exactly, in both
+//     directions (R2-P6-test-3201, decision 123): each is a citation that
+//     still has to be re-read at the pin. Beside it summary.md counts, and
+//     no ratchet holds, the .ts files named without a line (and those whose
+//     sentence names another matter.js commit), the bound bare parts (with
+//     their commits and hard errors, which are not hard errors of the run),
+//     the bare parts after a citation or after no file, which are not read,
+//     and the chip citations — a chip source in a sentence naming chip or
+//     connectedhomeip — whose nearest non-matter.js commit is not the
+//     Makefile's CHIP_TEST_IMAGE_COMMIT.
 //
 // All git access is plumbing on MATTERJS_DIR (default ../matter.js):
 // rev-parse, ls-tree and one cat-file --batch. The working tree is never
@@ -103,6 +128,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -218,29 +244,22 @@ func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 						return nil, err
 					}
 				}
-				r := result{cite: c, hard: errNoServerCommit}
-				for _, sha := range c.Shas {
-					if own, err := server.at(sha); err == nil {
-						c.Sha = sha
-						r = check(own, c)
-						break
-					}
+				r := checkServer(server, c)
+				if r.env != nil {
+					return nil, r.env
 				}
 				results = append(results, r)
 				continue
 			}
-			t := pinTree
-			for _, sha := range c.Shas {
-				if own, err := repo.at(sha); err == nil {
-					c.Sha, t = sha, own
-					break
-				}
+			r := checkAt(repo, pinTree, c)
+			if r.env != nil {
+				return nil, r.env
 			}
-			results = append(results, check(t, c))
+			results = append(results, r)
 		}
 		return results, nil
 	}
-	cites, err := collect(root)
+	cites, ments, err := collect(root)
 	if err != nil {
 		return 2, err
 	}
@@ -249,6 +268,16 @@ func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 		return 2, err
 	}
 	sum := summarise(pin, results)
+	commits := map[string]string{} // sha as written → full matter.js commit, "" for none
+	matterCommit := func(sha string) string {
+		full, ok := commits[sha]
+		if !ok {
+			full, _ = repo.commit(sha)
+			commits[sha] = full
+		}
+		return full
+	}
+	sum.counted = countMentions(ments, matterCommit, pin, readHarness(root))
 	if err := writeArtefacts(outDir, sum); err != nil {
 		return 2, err
 	}
@@ -271,29 +300,158 @@ func run(root, matterDir, serverDir, outDir, fixFile string) (int, error) {
 	return 0, nil
 }
 
+// checkServer checks a matterjs-server citation at the first of its own
+// commits the clone has; without one it is errNoServerCommit.
+func checkServer(server *gitRepo, c citation) result {
+	for _, sha := range c.Shas {
+		if own, err := server.at(sha); err == nil {
+			c.Sha = sha
+			return check(own, c)
+		}
+	}
+	return result{cite: c, hard: errNoServerCommit}
+}
+
+// checkAt checks a matter.js citation at the first of its own commits the
+// clone has, else at the pin.
+func checkAt(repo *gitRepo, pinTree tree, c citation) result {
+	for _, sha := range c.Shas {
+		if own, err := repo.at(sha); err == nil {
+			c.Sha = sha
+			r := check(own, c)
+			r.commit = own.sha
+			return r
+		}
+	}
+	return check(pinTree, c)
+}
+
+// harnessRE is the Makefile's harness CHIP commit, the commit the chip-tool
+// suite and the CSA cases run at.
+var harnessRE = regexp.MustCompile(`(?m)^CHIP_TEST_IMAGE_COMMIT\s*\??=\s*([0-9a-f]{7,40})\s*$`)
+
+// readHarness returns the harness CHIP commit the module's Makefile names,
+// or "" when it names none (the chip count is then not measured).
+func readHarness(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, "Makefile")) //nolint:gosec // G304: fixed path under the module root
+	if err != nil {
+		return ""
+	}
+	if m := harnessRE.FindSubmatch(data); m != nil {
+		return string(m[1])
+	}
+	return ""
+}
+
+// counted are the references the summary prints but no ratchet holds
+// (decision 123): the .ts files named without a line, the bare line parts
+// and the chip citations.
+type counted struct {
+	fileOnly, fileOnlyOff int
+	bareUnbound           int
+	harness               string // "" when the Makefile names none
+	chip, chipNamed       int
+	chipOff               map[string]int // commit as written → chip citations
+}
+
+// countMentions counts ments. matterCommit resolves a sha to its full
+// matter.js commit ("" when it is none); a file mention is off the pin
+// when its nearest such commit is not pin. A chip citation's commit is
+// the nearest sha of its sentence that is no matter.js commit, off the
+// harness when it is not a prefix of harness.
+func countMentions(ments []mention, matterCommit func(string) string, pin, harness string) counted {
+	n := counted{harness: harness, chipOff: map[string]int{}}
+	for _, m := range ments {
+		switch m.Kind {
+		case mentionFileOnly:
+			if m.Server {
+				continue
+			}
+			n.fileOnly++
+			for _, sha := range m.Shas {
+				if full := matterCommit(sha); full != "" {
+					if full != pin {
+						n.fileOnlyOff++
+					}
+					break
+				}
+			}
+		case mentionBare:
+			if !m.Server {
+				n.bareUnbound++
+			}
+		case mentionChip:
+			n.chip++
+			for _, sha := range m.Shas {
+				if matterCommit(sha) != "" {
+					continue
+				}
+				n.chipNamed++
+				if harness != "" && !strings.HasPrefix(harness, sha) {
+					n.chipOff[sha]++
+				}
+				break
+			}
+		}
+	}
+	return n
+}
+
 type summary struct {
-	pin                      string
-	citations, files, ownSha int
-	server                   int // checked against matterjs-server
-	byRule                   map[string]int
-	driftChecked, hardOnly   int
-	drift                    []driftEntry
-	hard                     []string
-	hardByKind               map[string]int
+	pin                    string
+	citations, files       int
+	ownShaPin              int            // checked at their own `at <sha>`, which is the pin
+	offPin                 map[string]int // full commit → line citations checked there (citecheckOffPinRatchet)
+	server                 int            // checked against matterjs-server
+	byRule                 map[string]int
+	driftChecked, hardOnly int
+	drift                  []driftEntry
+	hard                   []string
+	hardByKind             map[string]int
+	// The bare line parts bound to a .ts file named without a line:
+	// checked, counted, outside the citations, drift and hard errors.
+	bare, bareHard int
+	bareOff        map[string]int // full commit → bound bare parts checked there
+	counted        counted
+}
+
+// offPinCount is the number of line citations checked at a matter.js
+// commit other than the pin.
+func (s *summary) offPinCount() int {
+	n := 0
+	for _, v := range s.offPin {
+		n += v
+	}
+	return n
 }
 
 func summarise(pin string, results []result) summary {
-	s := summary{pin: pin, byRule: map[string]int{}, hardByKind: map[string]int{}}
+	s := summary{pin: pin, byRule: map[string]int{}, hardByKind: map[string]int{}, offPin: map[string]int{}, bareOff: map[string]int{}}
 	files := map[string]bool{}
 	for i := range results {
 		r := &results[i]
+		if r.cite.Bare {
+			if r.cite.Server {
+				continue
+			}
+			s.bare++
+			if r.hard != "" {
+				s.bareHard++
+			}
+			if r.commit != "" && r.commit != pin {
+				s.bareOff[r.commit]++
+			}
+			continue
+		}
 		s.citations++
 		files[r.cite.File] = true
 		switch {
 		case r.cite.Server:
 			s.server++
+		case r.commit != "" && r.commit != pin:
+			s.offPin[r.commit]++
 		case r.cite.Sha != "":
-			s.ownSha++
+			s.ownShaPin++
 		}
 		if r.hard != "" {
 			s.hardByKind[r.hard]++
@@ -358,12 +516,15 @@ func writeArtefacts(dir string, s summary) error {
 	row("Resolved: exact path from a tree root (packages/, support/, examples/)", s.byRule[ruleExact])
 	row("Resolved: unique suffix", s.byRule[ruleSuffix])
 	row("Resolved: unique basename", s.byRule[ruleBasename])
-	row("Checked at their own `at <sha>`", s.ownSha)
+	row("Checked at their own `at <sha>`, the pin", s.ownShaPin)
+	row(offPinRow, s.offPinCount())
 	row("Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>`", s.server)
 	row("Drift-checked (the sentence names a name the file contains)", s.driftChecked)
 	row("Hard-checked only", s.hardOnly)
 	row("**Hard errors**", len(s.hard))
 	row("**Drift**", len(s.drift))
+	writeOffPin(&b, s)
+	writeCounted(&b, s)
 	if len(s.hard) > 0 {
 		kinds := make([]string, 0, len(s.hardByKind))
 		for k := range s.hardByKind {
@@ -380,4 +541,80 @@ func writeArtefacts(dir string, s summary) error {
 		}
 	}
 	return os.WriteFile(filepath.Join(dir, "summary.md"), []byte(b.String()), 0o644) //nolint:gosec // G306: a committed artefact
+}
+
+// offPinRow is the summary row citecheckOffPinRatchet holds.
+const offPinRow = "**Checked at another matter.js commit** (their own `at <sha>`, not the pin)"
+
+// short is a commit id cut to eight characters.
+func short(sha string) string {
+	if len(sha) > 8 {
+		return sha[:8]
+	}
+	return sha
+}
+
+// sortedKeys returns m's keys, sorted.
+func sortedKeys(m map[string]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// writeOffPin writes the line citations checked off the pin, by commit
+// (R2-P6-test-3201): the rows citecheckOffPinRatchet counts.
+func writeOffPin(b *strings.Builder, s summary) {
+	fmt.Fprintf(b, "\n## Off the pin, by commit\n\n")
+	fmt.Fprintf(b, "Line citations whose sentence names a matter.js commit other than the pin are checked at that commit; their count is held by `citecheckOffPinRatchet`, exactly. The bound bare parts are counted beside them, not ratcheted.\n\n")
+	fmt.Fprintf(b, "| Commit | Line citations | Bare parts bound to a file |\n|---|---|---|\n")
+	all := map[string]int{}
+	for k, v := range s.offPin {
+		all[k] += v
+	}
+	for k := range s.bareOff {
+		all[k] += 0
+	}
+	for _, k := range sortedKeys(all) {
+		fmt.Fprintf(b, "| `%s` | %d | %d |\n", short(k), s.offPin[k], s.bareOff[k])
+	}
+}
+
+// writeCounted writes the references counted and printed, not ratcheted
+// (decision 123): .ts files named without a line, bare line parts, chip
+// citations.
+func writeCounted(b *strings.Builder, s summary) {
+	n := s.counted
+	bareOff := 0
+	for _, v := range s.bareOff {
+		bareOff += v
+	}
+	fmt.Fprintf(b, "\n## Counted, not ratcheted\n\n| Reference | Count |\n|---|---|\n")
+	row := func(k string, v int) { fmt.Fprintf(b, "| %s | %d |\n", k, v) }
+	row("A .ts file named without a line part", n.fileOnly)
+	row("… whose sentence names another matter.js commit", n.fileOnlyOff)
+	row("A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run)", s.bare)
+	row("… checked at another matter.js commit", bareOff)
+	row("… with a hard error at the commit it was checked at", s.bareHard)
+	row("A bare line part after a .ts citation or after no file (not checked)", n.bareUnbound)
+	row("A chip citation (a chip source in a sentence naming chip or connectedhomeip)", n.chip)
+	row("… naming a commit that is no matter.js commit", n.chipNamed)
+	if n.harness == "" {
+		fmt.Fprintf(b, "| … at a commit other than the harness commit | not measured: the Makefile names no CHIP_TEST_IMAGE_COMMIT |\n")
+		return
+	}
+	off := 0
+	for _, v := range n.chipOff {
+		off += v
+	}
+	row(fmt.Sprintf("… at a commit other than the harness commit %#q (Makefile CHIP_TEST_IMAGE_COMMIT)", short(n.harness)), off)
+	if off == 0 {
+		return
+	}
+	fmt.Fprintf(b, "\n| chip commit | chip citations |\n|---|---|\n")
+	for _, k := range sortedKeys(n.chipOff) {
+		fmt.Fprintf(b, "| `%s` | %d |\n", k, n.chipOff[k])
+	}
 }

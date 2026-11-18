@@ -25,10 +25,10 @@ import (
 // event has already happened, so an observer returns nothing.
 //
 // The name follows matter.js, whose node events are Observables that
-// observers attach to (packages/protocol/src/fabric/FabricManager.ts:
-// 41-48 `#events`); a failing observer is logged and the remaining
-// observers still run (FabricManager.ts:404-410 `unhandled`, "Log
-// unhandled errors but do not abort deletion").
+// observers attach to (packages/protocol/src/fabric/
+// FabricManager.ts:44-51 `#events`); a failing observer is logged and the
+// remaining observers still run (FabricManager.ts:405-411 `unhandled` at
+// db021da0, "Log unhandled errors but do not abort deletion").
 //
 // They follow the node's one callback rule (ADR 0025 principle 8):
 // [Config].Observers and [Node.Observe] run on the goroutine of the event
@@ -39,7 +39,7 @@ type Observers struct {
 	// OnFabricAdded runs after an AddNOC installed a fabric and the
 	// facade rebuilt the fabric's CASE identity and announced its
 	// operational record. Mirrors matter.js FabricManager `events.added`
-	// (FabricManager.ts:209).
+	// (FabricManager.ts:216 at db021da0; review II, R2-P6-doc-2906).
 	OnFabricAdded func(FabricInfo)
 	// OnFabricRemoved runs after RemoveFabric (or the fail-safe rollback
 	// of an AddNOC) deleted a fabric and the facade's cleanup ran — for a
@@ -51,7 +51,8 @@ type Observers struct {
 	// the last fabric the node's own window reopens afterwards, once the
 	// node is idle — no fail-safe armed and no session left (matter.js
 	// #resetWhenIdle); OnWindowTransition reports that. Mirrors
-	// matter.js FabricManager `events.deleted` (FabricManager.ts:253).
+	// matter.js FabricManager `events.deleted` (FabricManager.ts:272 at
+	// db021da0).
 	// The removal a fail-safe rollback owes is kept in the store until it
 	// ran (store.OwedFabricEvent), so it reaches the host at least once:
 	// after a crash between the rollback and this hook — or in the
@@ -67,9 +68,10 @@ type Observers struct {
 	// fabric's other sessions, and after an UpdateFabricLabel or a
 	// SetVIDVerificationStatement changed a fabric under the same
 	// identity (nothing for the facade to move). Mirrors matter.js
-	// FabricManager `events.replaced` (FabricManager.ts:236-246, :377),
+	// FabricManager `events.replaced` (FabricManager.ts:236-249, :401),
 	// which a fabric's persist emits too, and CommissioningServer's
-	// fabricsChanged(index, "updated") (CommissioningServer.ts:118-141).
+	// fabricsChanged(index, "updated") (CommissioningServer.ts:118-141 at
+	// db021da0).
 	// The revert a fail-safe rollback of an UpdateNOC owes is delivered at
 	// least once, as OnFabricRemoved's removal is: a host may hear it
 	// twice after a crash.
@@ -102,11 +104,11 @@ type Observers struct {
 	// controller's subscription — with the session as [Node.SessionDiagnostics]
 	// lists it. A PASE session is not reported. Mirrors matter.js
 	// SessionsBehavior's `opened` event (packages/node/src/behavior/system/
-	// sessions/SessionsBehavior.ts:57-64, declared at :124).
+	// sessions/SessionsBehavior.ts:57-64, declared at :124, at db021da0).
 	OnSessionOpened func(SessionInfo)
 	// OnSessionClosed runs after a session OnSessionOpened reported closed,
 	// with its last state. Mirrors SessionsBehavior's `closed` event
-	// (SessionsBehavior.ts:66-73, :125).
+	// (SessionsBehavior.ts:66-73, :125 at db021da0).
 	OnSessionClosed func(SessionInfo)
 	// OnSubscriptionsChanged runs after a subscription was added to or
 	// closed on a session OnSessionOpened reported, with the session and
@@ -136,9 +138,9 @@ type Observers struct {
 	// priority, path, time and payload. It runs on the emitter's
 	// goroutine. matter.js emits each event on its endpoint's behavior and
 	// broadcasts the occurrence node-wide through the
-	// ChangeNotificationService (packages/node/src/behavior/Events.ts:219,
-	// packages/node/src/node/integration/ChangeNotificationService.ts:71-87
-	// at 862ad75f) — this hook is that broadcast for a host.
+	// ChangeNotificationService (packages/node/src/behavior/Events.ts:221,
+	// packages/node/src/node/integration/ChangeNotificationService.ts:97-113
+	// at db021da0) — this hook is that broadcast for a host.
 	OnEvent func(Event)
 }
 
@@ -188,7 +190,7 @@ func fabricInfoOf(rec store.FabricRecord) FabricInfo {
 // at any time. matter.js keeps the same state in DeviceCommissioner's
 // window — its status, byAdministrator and its timer
 // (packages/protocol/src/protocol/DeviceCommissioner.ts:344-350,
-// :236-266 #openWindow at 862ad75f) — and the advertised discriminator
+// :236-266 #openWindow at db021da0) — and the advertised discriminator
 // (`discriminator ?? commissioningConfig.discriminator`, :252).
 type WindowSnapshot struct {
 	// Open reports whether a window is open, whoever opened it.
@@ -232,7 +234,7 @@ const (
 	// ([Config].Commissioning): the one an uncommissioned node opens, or
 	// one the host opened through CommissioningWindow().OpenOwnWindow —
 	// matter.js's window with byAdministrator false
-	// (DeviceCommissioner.ts:236-266 at 862ad75f).
+	// (DeviceCommissioner.ts:236-266 at db021da0).
 	WindowOwn
 	// WindowBasic is the node's own window [Node.OpenBasicWindow] opened
 	// with the host's credentials (a host extension; see there).
@@ -325,7 +327,7 @@ func (n *Node) eventEmitted(rec im.EventRecord) {
 //
 // matter.js's node events are Observables a handler attaches to and
 // detaches from at any time (packages/general/src/util/Observable.ts:55
-// `on`, :70 `off` at 862ad75f — the FabricManager events of
+// `on`, :70 `off` at db021da0 — the FabricManager events of
 // packages/protocol/src/fabric/FabricManager.ts:41-48 among them);
 // Config.Observers is the attach at construction, Observe the attach later.
 func (n *Node) Observe(o Observers) (unsubscribe func()) {

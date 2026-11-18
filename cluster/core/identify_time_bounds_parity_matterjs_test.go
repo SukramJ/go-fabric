@@ -21,7 +21,7 @@ import (
 // attribute as it was, where it used to be masked into another valid
 // value; a value of another type is INVALID_ACTION — matter.js
 // packages/types/src/tlv/TlvNumber.ts:145-156 and
-// packages/types/src/common/ValidationError.ts:35-38 at 862ad75f
+// packages/types/src/common/ValidationError.ts:35-38 at db021da0
 // (W3-clucore-04).
 func TestParityMatterJS_IdentifyTimeBounds(t *testing.T) {
 	t.Parallel()
@@ -84,7 +84,7 @@ func TestParityMatterJS_IdentifyCommandTimeBounds(t *testing.T) {
 
 // TestParityMatterJS_IdentifyCountdownZeroReported: the countdown reaching
 // zero is reported once and advances the DataVersion, the per-second ticks
-// are not — matter.js IdentifyServer.ts:41-47 at 862ad75f (the quiet
+// are not — matter.js IdentifyServer.ts:41-47 at db021da0 (the quiet
 // event emits at once for a change to 0; W3-clucore-05).
 func TestParityMatterJS_IdentifyCountdownZeroReported(t *testing.T) {
 	t.Parallel()

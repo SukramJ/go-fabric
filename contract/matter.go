@@ -309,11 +309,13 @@ const (
 // MinReadPrivilege); a server's answer can only raise it, never lower it.
 //
 // Example: AccessControl (0x001F) attributes ACL (0x0000) and Extension
-// (0x0001) require Administer (5) per Matter §9.10.5.3. Mirrors chip
-// src/app/clusters/access-control-server/access-control-server.cpp which
-// checks ADMINISTER privilege for those two attribute reads, and
-// matter.js packages/model/src/standard/elements/access-control.element.ts
-// (acl + extension access: "administer").
+// (0x0001) require Administer (5) per Matter §9.10.5.3. The data model
+// states it for both: matter.js
+// packages/model/src/standard/elements/access-control.element.ts:31, :35
+// at db021da0 (`access: "RW F A"`), and connectedhomeip carries it as
+// attribute metadata, Administer for read and write
+// (zzz_generated/app-common/clusters/AccessControl/Metadata.h:25-27,
+// :30-32 at 6170af84; review II, R2-P6-doc-2901).
 type ClusterAttributeReadPrivilege interface {
 	// MinReadPrivilege returns the minimum Matter privilege level
 	// required to read the given attribute. Return 1 (View) when the
@@ -380,8 +382,8 @@ type ClusterCommandInvokePrivilege interface {
 // resolved server before it falls back to the module's generated table
 // (schema.IsTimedInvoke); a command it reports true for, invoked outside a
 // timed interaction, answers NEEDS_TIMED_INTERACTION. Mirrors matter.js
-// packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295
-// (`limits.timed && !this.session.timed`), which reads the flag from the
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295 at
+// db021da0 (`limits.timed && !this.session.timed`), which reads the flag from the
 // command's model for every cluster.
 type TimedCommander interface {
 	// IsTimedCommand reports whether the request command cmdID may only be
@@ -473,8 +475,6 @@ type MeasurementMaterializer func(src any, mc MeasurementContext) []ClusterServe
 // host binds to. A second thing a materialiser needs is then a new
 // field, source-compatible with every materialiser already written
 // against this type — where a second parameter would break all of them.
-// Before v0.1.0 that difference is nothing; after it, it is a
-// deprecation cycle.
 type MeasurementContext struct {
 	// EndpointID is the id of the endpoint the returned cluster servers
 	// are mounted on. It is the same value the assembler stamps onto
@@ -941,8 +941,8 @@ type ConcentrationReadingsSource interface {
 //
 // Mirrors matter.js's reactor-style observation of
 // `events.<attr>$Changed` (see matter.js
-// packages/node/src/behaviors/thermostat/ThermostatServer.ts:451 for
-// the canonical `reactTo(...measuredValue$Changed, handler)` pattern).
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:480-483 at
+// db021da0 for the canonical `reactTo(...measuredValue$Changed, handler)` pattern).
 // Without this push path the Subscribe engine emits only empty
 // heartbeats and Apple Home shows bridged sensors as "not responding"
 // shortly after the initial ReportData expires.
@@ -971,7 +971,8 @@ type ChangeNotifier interface {
 // and therefore knows exactly which of its attributes moved. It reports
 // every change at once, whoever made it, as the matter.js Datasource
 // queues a notification for each committed change
-// (packages/node/src/behavior/state/managed/Datasource.ts:1473-1476):
+// (packages/node/src/behavior/state/managed/Datasource.ts:1487-1492 at
+// db021da0; review II, R2-P6-doc-2906):
 // the host's OnChanged is subscribed here. The bridge subscribes to it at
 // reassembly for every bridged endpoint — to [AttributeReportNotifier]
 // instead when the server implements that — and on a fire it advances
@@ -1109,27 +1110,24 @@ type EventReceiver interface {
 	SetMatterEventEmitter(emitter EventEmitter)
 }
 
-// EligibilityState classifies a model source as
-// mappable / partially mappable / unmappable for the operator-facing
-// allowlist UI. Stored on the source itself (rich model, dumb bridge)
-// so the UI does not have to maintain a parallel classification table.
+// EligibilityState classifies a model source as mappable, partially
+// mappable or unmappable to Matter. The classification is the host's,
+// stored on the source itself (rich model, dumb bridge); this module
+// reads none of it, and how a host acts on it or presents it is the
+// host's (review II, R2-P6-doc-2455).
 type EligibilityState uint8
 
-// EligibilityState values. Stable string forms in
-// `(EligibilityState).String()` mirror the JSON tokens the
-// REST API uses (`mappable`, `partially_mappable`, `unmappable`).
+// EligibilityState values; `(EligibilityState).String()` returns a
+// stable token for each (`mappable`, `partially_mappable`, `unmappable`).
 const (
-	// EligibilityUnmappable means no Matter cluster covers the
-	// source. UI shows ⛔; the allowlist toggle is permanently disabled.
+	// EligibilityUnmappable means no Matter cluster covers the source.
 	EligibilityUnmappable EligibilityState = iota
 	// EligibilityMappable means the source has a complete Matter
-	// projection. UI toggle is active; the assembler bridges the source
-	// when the operator enables it.
+	// projection.
 	EligibilityMappable
-	// EligibilityPartial means a partial projection exists —
-	// some clusters map, some features stay with the host's own
-	// interfaces (e.g. siren tones, light effect playlists). UI shows ⚠
-	// with the reason; the toggle remains active.
+	// EligibilityPartial means a partial projection exists — some
+	// clusters map, some features stay with the host's own interfaces
+	// (e.g. siren tones, light effect playlists).
 	EligibilityPartial
 )
 

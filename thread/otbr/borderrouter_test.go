@@ -6,11 +6,14 @@ package otbr
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -267,5 +270,142 @@ func TestResponseBodyBounded(t *testing.T) {
 	}
 	if _, err := c.Node(context.Background()); err == nil {
 		t.Fatal("an answer over maxResponseBody was read")
+	}
+}
+
+// TestResponseBodyBoundIsOneMiB: an answer over 1 MiB fails as a transport
+// failure before any decode — a JSON body decodes into a tree many times
+// its size (review II, R2-P6-bound-2023).
+func TestResponseBodyBoundIsOneMiB(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"State":"`))
+		_, _ = w.Write(bytes.Repeat([]byte("x"), 2<<20))
+		_, _ = w.Write([]byte(`"}`))
+	}))
+	t.Cleanup(srv.Close)
+	u, _ := url.Parse(srv.URL)
+	port, _ := strconv.Atoi(u.Port())
+	c, err := NewClient(Config{Host: u.Hostname(), Port: port, Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Node(context.Background())
+	expectCode(t, err, CodeUnreachable)
+}
+
+// TestNumOfRouterIsAByteCount: a router count that is no integer within a
+// byte is a protocol error, in /node and /node/num-of-router alike, as
+// Rloc16 is range-checked (review II, R2-P6-wire-2024).
+func TestNumOfRouterIsAByteCount(t *testing.T) {
+	t.Parallel()
+	for _, bad := range []any{1e300, 2.5, 256, -1} {
+		s := newStub().on("GET", "/node", 200, camelWith(t, "routerCount", bad))
+		_, err := s.client(t).Node(context.Background())
+		expectCode(t, err, CodeProtocol)
+		body, _ := json.Marshal(bad)
+		s = newStub().on("GET", "/node/num-of-router", 200, string(body))
+		_, err = s.client(t).NumOfRouter(context.Background())
+		expectCode(t, err, CodeProtocol)
+	}
+	s := newStub().on("GET", "/node", 200, camelWith(t, "routerCount", 255)).on("GET", "/node/num-of-router", 200, "3")
+	if node, err := s.client(t).Node(context.Background()); err != nil || node.NumOfRouter != 255 {
+		t.Errorf("node %+v, %v", node, err)
+	}
+	if n, err := s.client(t).NumOfRouter(context.Background()); err != nil || n != 3 {
+		t.Errorf("num-of-router %d, %v", n, err)
+	}
+}
+
+// TestFailedActivationReenablesTheInterface: an activation that disabled
+// the Thread interface of a border router with a dataset and then failed
+// enables it again, its error joined (review II, R2-P6-err-2025).
+func TestFailedActivationReenablesTheInterface(t *testing.T) {
+	t.Parallel()
+	for _, fail := range []string{"/node/dataset/active", "/node/state enable"} {
+		t.Run(fail, func(t *testing.T) {
+			t.Parallel()
+			br, srv := newBR(t, otbrtest.Options{Active: fakeDataset(t)})
+			other := bytes.Clone(fakeDataset(t))
+			other[len(other)-1] ^= 0xff
+			if fail == "/node/dataset/active" {
+				srv.Fail("PUT", "/node/dataset/active", 409)
+			}
+			ctx := context.Background()
+			if fail == "/node/state enable" {
+				// The enable is refused once, the re-enable answered.
+				hc := br.Client().http
+				orig := hc.Transport
+				if orig == nil {
+					orig = http.DefaultTransport
+				}
+				refused := false
+				hc.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+					if r.Method == http.MethodPut && r.URL.Path == "/node/state" && !refused {
+						b, _ := r.GetBody()
+						if body, _ := io.ReadAll(b); string(body) == `"enable"` {
+							refused = true
+							return respond(500, ""), nil
+						}
+					}
+					return orig.RoundTrip(r)
+				})
+			}
+			if err := br.SetActiveDataset(ctx, other); err == nil {
+				t.Fatal("the failed activation succeeded")
+			}
+			reqs := srv.Requests()
+			last := reqs[len(reqs)-1]
+			if last.Method != http.MethodPut || last.Path != "/node/state" || last.Body != `"enable"` {
+				t.Fatalf("last request %+v, want the interface enabled again", last)
+			}
+			if srv.State() == "disabled" {
+				t.Fatal("the border router is left disabled")
+			}
+		})
+	}
+}
+
+// TestDefaultClientRefusesRedirects: the default client does not follow a
+// redirect — neither a GET nor the dataset PUT reaches where the answer
+// points — while a host's own client is used as given (review II,
+// R2-P6-sec-2028, decision 196).
+func TestDefaultClientRefusesRedirects(t *testing.T) {
+	t.Parallel()
+	var elsewhere atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		elsewhere.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(target.Close)
+	br := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(br.Close)
+	u, _ := url.Parse(br.URL)
+	port, _ := strconv.Atoi(u.Port())
+	c, err := NewClient(Config{Host: u.Hostname(), Port: port, Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	_, err = c.Node(ctx)
+	if e := expectCode(t, err, CodeProtocol); e.HTTPStatus != http.StatusTemporaryRedirect {
+		t.Errorf("status %d, want the redirect's own", e.HTTPStatus)
+	}
+	if err := c.setDataset(ctx, false, fakeDataset(t)); err == nil {
+		t.Error("a redirected dataset PUT succeeded")
+	}
+	if n := elsewhere.Load(); n != 0 {
+		t.Fatalf("%d requests followed the redirect", n)
+	}
+	own, err := NewClient(Config{Host: u.Hostname(), Port: port, Timeout: 5 * time.Second, HTTPClient: &http.Client{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = own.Node(ctx)
+	if elsewhere.Load() == 0 {
+		t.Fatal("the host's own client was not used as given")
 	}
 }

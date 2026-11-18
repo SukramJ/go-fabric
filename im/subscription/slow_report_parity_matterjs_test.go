@@ -301,7 +301,7 @@ func TestSlowReportParityMatterJS(t *testing.T) {
 }
 
 // TestSessionShutdownParityMatterJS ports ServerSubscriptionTest.ts:247-263
-// at 862ad75f ("keeps a subscription that joins a session closing for
+// at db021da0 ("keeps a subscription that joins a session closing for
 // shutdown"): a subscription closed with its session for shutdown is not
 // terminated, and one that joins the session afterwards is not terminated
 // by the session's later close — Go never terminates on a session close

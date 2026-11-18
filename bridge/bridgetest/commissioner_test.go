@@ -272,7 +272,7 @@ func TestCommissionerAcceptsReestablishment(t *testing.T) {
 
 // TestPASESession: a PASE session reads over the commissioning window, a
 // subscription on it is refused — matter.js's client subscribes only to a
-// peer with a peer address (ClientInteraction.ts:991-994 at 0ceb202d) —
+// peer with a peer address (ClientInteraction.ts:1024-1027 at db021da0) —
 // and a closed one answers ErrSessionClosed.
 func TestPASESession(t *testing.T) {
 	t.Parallel()

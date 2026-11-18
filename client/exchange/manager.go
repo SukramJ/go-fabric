@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	mrand "math/rand/v2"
 	"net"
 	"slices"
@@ -26,15 +27,15 @@ import (
 
 // MaxConcurrentExchangesPerSession is the number of open exchanges one
 // secure session keeps; opening one more closes the least recently active
-// one. Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:54
+// one. Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:63
 // (MAXIMUM_CONCURRENT_OUTGOING_EXCHANGES_PER_SESSION = 30) and the
-// eviction of :494-531 at 0ceb202d; the unsecured session is exempt
-// (:511-514).
+// eviction of :551-566, :578-596 at db021da0; the unsecured session is
+// exempt (:579-582).
 const MaxConcurrentExchangesPerSession = 30
 
 // initiatedExchangeFlag sets an initiated exchange's table index apart
 // from a received exchange with the same id — matter.js
-// ExchangeManager.ts:147 (`exchangeId | 0x10000`) and :333-335.
+// ExchangeManager.ts:172 (`exchangeId | 0x10000`) and :400 at db021da0.
 const initiatedExchangeFlag uint32 = 0x10000
 
 // sessionIDUpperBound is the largest local session id; ids cycle through
@@ -98,7 +99,7 @@ type Config struct {
 	// sender-side axis every exchange's backoff takes the larger of it and
 	// the peer's margin for — matter.js SessionManager.localAdditionalMrpDelay,
 	// set from the node's own network profile ("fast" by default, so 0;
-	// ServerNetworkRuntime.ts:405-406, NetworkServer.ts:242 at 862ad75f).
+	// ServerNetworkRuntime.ts:409-410, NetworkServer.ts:248 at db021da0).
 	LocalAdditionalMrpDelay time.Duration
 	// LocalFixedMrpBackoff is the flat pad added after every exchange's
 	// backoff, not amplified by it — matter.js
@@ -255,7 +256,7 @@ func (m *Manager) Reliable() bool { return m.reliable }
 // x acknowledges any message, and not returned by [Exchange.Next], which
 // waits for the message after it. It is matter.js
 // ProtocolHandler.onNewExchange (packages/protocol/src/protocol/ProtocolHandler.ts:22-23
-// at 0ceb202d). It runs on a goroutine of its own, one per exchange, so
+// at db021da0). It runs on a goroutine of its own, one per exchange, so
 // the receive path never waits for it; the exchange is closed when it
 // returns, if the handler did not close it.
 type ProtocolHandler func(x *Exchange, first *Message)
@@ -729,25 +730,36 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 	x := newExchange(m, s, id, protocol, true, opts)
 	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
-	s.addExchange(x)
+	// In the table first, then on the session: a close between the two
+	// either aborts x (it is on the session, abort removes it from the
+	// table) or refuses it here (R2-P6-conc-1809).
+	if !s.addExchange(x) {
+		m.unregister(x)
+		return nil, ErrSessionClosed
+	}
 	m.cleanupSessionExchanges(s)
 	return x, nil
 }
 
-// removeExchange drops x from the table if the index still maps to it.
-func (m *Manager) removeExchange(x *Exchange) {
+// unregister drops x, which never reached its session, from the table.
+func (m *Manager) unregister(x *Exchange) {
 	m.mu.Lock()
 	if key := (exchangeKey{x.session, x.index}); m.exchanges[key] == x {
 		delete(m.exchanges, key)
 	}
 	m.mu.Unlock()
+}
+
+// removeExchange drops x from the table if the index still maps to it.
+func (m *Manager) removeExchange(x *Exchange) {
+	m.unregister(x)
 	x.session.deleteExchange(x)
 	x.session.closeIfDeferred()
 }
 
 // cleanupSessionExchanges closes the least recently active exchange of s
 // once it has more than [MaxConcurrentExchangesPerSession] open ones —
-// matter.js ExchangeManager.ts:510-531.
+// matter.js ExchangeManager.ts:578-596 at db021da0.
 func (m *Manager) cleanupSessionExchanges(s *Session) {
 	if s.secure == nil {
 		return
@@ -964,7 +976,8 @@ const (
 	inboundUnsecuredLifetime = 60 * time.Second
 	// maxInboundUnsecuredHandshakes is how many exchanges a Sigma1 opened
 	// an inbound unsecured session holds at once; a further Sigma1 on a
-	// new exchange is acknowledged and dropped while they are open, so the
+	// new exchange starts no handler while they are open — it is answered
+	// Busy ([Manager.answerBusy]; review II, R2-P6-par-2902) — so the
 	// session bound bounds the CASE handlers too (review II,
 	// R2-P2-dr-ctl-04). One, because a session carries one handshake: the
 	// CASE responder closes the session when its handshake ends
@@ -974,11 +987,11 @@ const (
 	// inboundUnsecuredAckWaitLimit bounds, are not counted. The rule is
 	// the device side's for a second PASE handshake while one is in
 	// progress (bridge/securechannel.go:456-464, matter.js
-	// PaseServer.ts:80-86 as cited there): the new attempt is ignored, the
-	// running one kept. A device whose Sigma1 opens a second exchange on
-	// its source's session, while its earlier handshake still runs, sees
-	// the acknowledgement and no Sigma2; its retry after that handshake
-	// ended (its session lives inboundUnsecuredLifetime at most) is served.
+	// PaseServer.ts:80-86 as cited there): the running attempt is kept. A
+	// device whose Sigma1 opens a second exchange on its source's session,
+	// while its earlier handshake still runs, is answered Busy with the
+	// time to wait; its retry after that handshake ended (its session lives
+	// inboundUnsecuredLifetime at most) is served.
 	maxInboundUnsecuredHandshakes = 1
 )
 
@@ -1061,6 +1074,10 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 			return
 		}
 		x := m.accept(s, msg)
+		if x == nil {
+			// The session closed since the check above.
+			return
+		}
 		s.adoptSource(src)
 		x.onMessageReceived(msg, false)
 		m.handleSecureChannel(x, msg)
@@ -1095,9 +1112,18 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 // Check-In (:149-151); on a secure session the installed
 // handler of any protocol but the Secure Channel, whose secure-session
 // handler is built in.
+//
+// An unsecured session this node opened takes none of the three: only a
+// session a peer's initiating message opened ([Session.IsInbound]) does.
+// A Sigma1, PBKDFParamRequest or Check-In naming the ephemeral node id of
+// a handshake this node runs is acknowledged and dropped — no legitimate
+// peer opens an exchange there, and such a session is outside every
+// bound of the inbound sessions. The module's own rule, ahead of
+// matter.js, which looks the session up by the node id alone (review II,
+// R2-P6-sec-1801, R2-P6-bound-1802, owner decision 189).
 func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 	if msg.ProtocolID == mrp.SecureChannelProtocolID {
-		if s.secure != nil {
+		if s.secure != nil || !s.inbound {
 			return nil
 		}
 		switch msg.Opcode {
@@ -1131,14 +1157,33 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 // starts no handler and closes the exchange.
 func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 	x := m.accept(s, msg)
+	if x == nil && s.IsClosed() {
+		// The session closed since route's check: nothing to answer on.
+		return
+	}
+	var running *Exchange
 	if x == nil {
 		// An inbound unsecured session holds its one handshake
-		// ([maxInboundUnsecuredHandshakes]): acknowledged, then dropped.
+		// ([maxInboundUnsecuredHandshakes]). One whose handler is done
+		// with its exchange no longer runs: its place goes to this
+		// Sigma1, as connectedhomeip counts only a handshake in progress
+		// as busy (src/protocols/secure_channel/CASEServer.cpp:85 at
+		// 6170af84, a finished one is back in kInitialized). chip's
+		// watchdog (:92-93) has no counterpart here: the module runs no
+		// background work helper a handshake could be stuck on.
+		if running = s.heldHandshake(); running != nil && running.ended() && s.releaseHandshakeOf(running) {
+			x = m.accept(s, msg)
+		}
+	}
+	if x == nil && s.IsClosed() {
+		return
+	}
+	if x == nil {
+		// The running handshake continues; this Sigma1 is answered Busy
+		// with a minimum wait time ([Manager.answerBusy]).
 		m.log.Warn("matter.controller.unsecured_handshake_refused", slog.Uint64("node_id", s.nodeID), slog.Int("exchange_id", int(msg.ExchangeID)),
 			slog.String("reason", "the session of an unauthenticated peer holds a handshake already"))
-		if msg.RequiresAck {
-			m.sendAck(s, msg, 0)
-		}
+		m.answerBusy(s, msg, running)
 		return
 	}
 	x.onMessageReceived(msg, false)
@@ -1152,6 +1197,94 @@ func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 		}
 	}) {
 		x.Close()
+	}
+}
+
+// Secure Channel status codes of a Busy answer: matter.js
+// GeneralStatusCode.Busy (packages/types/src/protocol/definitions/general.ts:33
+// at db021da0) and SecureChannelStatusCode.Busy
+// (packages/types/src/protocol/definitions/secure-channel.ts:65-79), the
+// codes client/peer reads.
+const (
+	generalStatusBusy       uint16 = 8
+	secureChannelStatusBusy uint16 = 4
+)
+
+// busyDefaultWait is the minimum wait time of a Busy answer while the
+// running handshake has not sent its Sigma2 — connectedhomeip's
+// (src/protocols/secure_channel/CASEServer.cpp:116-120 at 6170af84).
+const busyDefaultWait = 5000 * time.Millisecond
+
+// busyWait is the minimum wait time a Sigma1 refused for running is told:
+// while running has sent its Sigma2 and waits for Sigma3, the time it
+// waits; else [busyDefaultWait]. Sent as 16-bit milliseconds, a wait at or
+// above the maximum as the maximum. Mirrors connectedhomeip
+// src/protocols/secure_channel/CASEServer.cpp:99-121 at 6170af84, where the
+// wait in kSentSigma2 is the responder's Sigma2 response timeout
+// (CASESession.cpp:2645-2649) and the cast to Milliseconds16 is clamped
+// (:105-114).
+func busyWait(running *Exchange) uint16 {
+	wait := busyDefaultWait
+	if running != nil {
+		running.mu.Lock()
+		if running.sentOpcode == mrp.SCOpcodeSigma2 && running.waitTimeout > 0 {
+			wait = running.waitTimeout
+		}
+		running.mu.Unlock()
+	}
+	if ms := wait.Milliseconds(); ms < math.MaxUint16 {
+		return uint16(ms) //nolint:gosec // below MaxUint16, checked
+	}
+	return math.MaxUint16
+}
+
+// answerBusy answers msg, a Sigma1 on s refused for the handshake running
+// holds, with a StatusReport Busy whose protocol data is the minimum wait
+// time ([busyWait]), sent reliably on an exchange of its own that the
+// handshake bound does not count; the running handshake continues.
+// connectedhomeip answers a Sigma1 that meets a running handshake so
+// (src/protocols/secure_channel/CASEServer.cpp:85-122,
+// StatusReport.cpp:112-130 at 6170af84); matter.js's CASE server has no
+// such bound (packages/protocol/src/session/case/CaseServer.ts:61-64 at
+// db021da0). The report waits for its acknowledgement in one of the
+// [inboundUnsecuredAckWaitLimit] places, so sixteen refused Sigma1 end the
+// wait of an earlier message on an inbound unsecured session — which then
+// loses only its retransmissions (review II, R2-P6-par-2902).
+func (m *Manager) answerBusy(s *Session, msg *Message, running *Exchange) {
+	x := m.acceptAs(s, msg, false)
+	if x == nil {
+		return
+	}
+	x.onMessageReceived(msg, false)
+	x.takeFirst(msg)
+	wait := busyWait(running)
+	x.mu.Lock()
+	x.busyWait = wait
+	x.mu.Unlock()
+	// Run as dispatch runs a handler: the exchange closes after it, and
+	// the session with it when nothing else holds it.
+	var h ProtocolHandler = m.sendBusy
+	if !m.goWork(func() {
+		h(x, msg)
+		x.Close()
+		<-x.Done()
+		m.releaseInbound(s)
+	}) {
+		x.Close()
+	}
+}
+
+// sendBusy sends the Busy StatusReport of [Manager.answerBusy] on x, the
+// refused Sigma1's exchange, with the minimum wait time answerBusy set.
+func (m *Manager) sendBusy(x *Exchange, _ *Message) {
+	x.mu.Lock()
+	wait := x.busyWait
+	x.mu.Unlock()
+	var data [2]byte
+	binary.LittleEndian.PutUint16(data[:], wait)
+	report := StatusReport{GeneralCode: generalStatusBusy, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: secureChannelStatusBusy, ProtocolData: data[:]}
+	if err := x.Send(context.Background(), mrp.SCOpcodeStatusReport, report.Encode(), SendOptions{}); err != nil {
+		m.log.Debug("matter.controller.busy_answer_failed", slog.Int("exchange_id", int(x.id)), slog.Any("err", err))
 	}
 }
 
@@ -1326,18 +1459,29 @@ func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, 
 // MessageExchange.fromInitialMessage and #addExchange
 // (ExchangeManager.ts:478-489, :551-566 at db021da0). A Sigma1 on an inbound
 // unsecured session that holds [maxInboundUnsecuredHandshakes] handshakes
-// already registers none and returns nil.
-func (m *Manager) accept(s *Session, msg *Message) *Exchange {
+// already registers none and returns nil, as does a closed session
+// (R2-P6-conc-1809): the exchange enters the table first and the session
+// second, so a close in between either aborts it or refuses it.
+func (m *Manager) accept(s *Session, msg *Message) *Exchange { return m.acceptAs(s, msg, true) }
+
+// acceptAs is [Manager.accept]; a Sigma1 takes a handshake place only when
+// countHandshake is set ([Manager.answerBusy] answers one on an exchange
+// the bound does not count).
+func (m *Manager) acceptAs(s *Session, msg *Message, countHandshake bool) *Exchange {
 	x := newExchange(m, s, msg.ExchangeID, msg.ProtocolID, false, Options{})
-	handshake := s.inbound && s.secure == nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Opcode == mrp.SCOpcodeSigma1
-	if handshake && !s.addHandshake(x) {
-		return nil
-	}
+	handshake := countHandshake && s.inbound && s.secure == nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Opcode == mrp.SCOpcodeSigma1
 	m.mu.Lock()
 	m.exchanges[exchangeKey{s, x.index}] = x
 	m.mu.Unlock()
-	if !handshake {
-		s.addExchange(x)
+	var added bool
+	if handshake {
+		added = s.addHandshake(x)
+	} else {
+		added = s.addExchange(x)
+	}
+	if !added {
+		m.unregister(x)
+		return nil
 	}
 	m.cleanupSessionExchanges(s)
 	return x
@@ -1346,13 +1490,13 @@ func (m *Manager) accept(s *Session, msg *Message) *Exchange {
 // handleSecureChannel is the Secure Channel handler of a controller for an
 // exchange the peer opened on a secure session. Mirrors matter.js
 // packages/protocol/src/securechannel/SecureChannelProtocol.ts:30-88
-// (StatusReportOnlySecureChannelProtocol) at 0ceb202d: an initial
+// (StatusReportOnlySecureChannelProtocol) at db021da0: an initial
 // StatusReport Success / CloseSession means the peer closed the session —
-// NodeSession.handlePeerClose (NodeSession.ts:305-309), the session lost
+// NodeSession.handlePeerClose (NodeSession.ts:335-339), the session lost
 // with a [PeerInitiatedCloseError] — and the exchange that carried it
 // closes, acknowledging it; any other initial StatusReport is ignored
 // (:69-77); a standalone ack ends there, unacknowledged as every
-// standalone ack (:43-45, MessageExchange.ts:519-522);
+// standalone ack (:43-45, MessageExchange.ts:549-552);
 // any other message is refused as unexpected (:46-49). Every branch closes
 // the exchange, so an ack the message asked for goes out.
 func (m *Manager) handleSecureChannel(x *Exchange, msg *Message) {

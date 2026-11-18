@@ -13,7 +13,7 @@ import (
 )
 
 // The registry's reactions to a peer's BasicInformation events —
-// node/client/Peers.ts:714-893 at 0ceb202d. They hang on each node's
+// node/client/Peers.ts:742-932 at db021da0. They hang on each node's
 // Event hook (D6 of brief AL): matter.js registers them once per node when
 // the BasicInformation client is installed (:719-729); the Go hook exists
 // from the node's creation, so that guard has nothing to guard. Like

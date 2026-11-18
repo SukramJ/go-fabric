@@ -29,6 +29,7 @@ package servicearea_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
@@ -127,38 +128,47 @@ func TestParityMatterJS_ServiceAreaServerTest(t *testing.T) {
 	})
 
 	t.Run("correctly validate supportedAreas", func(t *testing.T) {
-		// Area 2 lies on map 3, which supportedMaps does not list:
-		// #assertSupportedAreas does not check map membership
-		// (ServiceAreaServer.ts:94-147).
-		err := createNode(t, servicearea.Config{
-			Features:      mapsAndSelectWhileRunning,
-			SupportedMaps: twoFloors,
-			SupportedAreas: []servicearea.Area{
+		// matter.js's case puts area 2 on map 3, which supportedMaps does
+		// not list, and accepts it: #assertSupportedAreas does not check
+		// map membership (ServiceAreaServer.ts:94-147). This module
+		// follows connectedhomeip there and refuses it ("mapID SHALL be
+		// the ID of an entry from the SupportedMaps attribute",
+		// ServiceAreaCluster.cpp:506-512 at 6170af84; R2-P6-fsm-1593, a
+		// divergence): the case runs with area 2 on map 1, and the
+		// map-3 form is refused.
+		areas := func(kitchenMap uint32) []servicearea.Area {
+			return []servicearea.Area{
 				locatedArea(1, 1, "Living", 0, tagLivingRoom),
-				locatedArea(2, 3, "Kitchen", 0, tagKitchen),
+				locatedArea(2, kitchenMap, "Kitchen", 0, tagKitchen),
 				locatedArea(3, 2, "Bedroom", 1, tagBedroom),
 				locatedArea(4, 2, "Bathroom", 1, tagBathroom),
-			},
-		})
-		if err != nil {
+			}
+		}
+		if err := createNode(t, servicearea.Config{Features: mapsAndSelectWhileRunning, SupportedMaps: twoFloors, SupportedAreas: areas(1)}); err != nil {
 			t.Fatal(err)
+		}
+		err := createNode(t, servicearea.Config{Features: mapsAndSelectWhileRunning, SupportedMaps: twoFloors, SupportedAreas: areas(3)})
+		if !errors.Is(err, servicearea.ErrInvalidState) {
+			t.Fatalf("an area on a map supportedMaps does not list: %v, want ErrInvalidState", err)
 		}
 	})
 
 	t.Run("rejects with invalid supportedAreas", func(t *testing.T) {
-		// Areas 3 and 4 share map 2 and an equal AreaInfo.
+		// Areas 3 and 4 share map 2 and an equal AreaInfo. (matter.js's
+		// case has area 2 on map 3; on map 1 here, so the refusal is the
+		// equal AreaInfo's, not R2-P6-fsm-1593's map membership.)
 		err := createNode(t, servicearea.Config{
 			Features:      mapsAndSelectWhileRunning,
 			SupportedMaps: twoFloors,
 			SupportedAreas: []servicearea.Area{
 				locatedArea(1, 1, "Living", 0, tagLivingRoom),
-				locatedArea(2, 3, "Kitchen", 0, tagKitchen),
+				locatedArea(2, 1, "Kitchen", 0, tagKitchen),
 				locatedArea(3, 2, "Bedroom", 1, tagBedroom),
 				locatedArea(4, 2, "Bedroom", 1, tagBedroom),
 			},
 		})
-		if !errors.Is(err, servicearea.ErrInvalidState) {
-			t.Fatalf("createNode: %v, want ErrInvalidState", err)
+		if !errors.Is(err, servicearea.ErrInvalidState) || !strings.Contains(err.Error(), "unique AreaInfo") {
+			t.Fatalf("createNode: %v, want ErrInvalidState for the equal AreaInfo", err)
 		}
 	})
 }

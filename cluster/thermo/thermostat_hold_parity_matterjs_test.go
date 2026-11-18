@@ -3,7 +3,7 @@
 
 // TemperatureSetpointHold, TemperatureSetpointHoldDuration and
 // ThermostatRunningState, the optional attributes a week-program
-// thermostat serves (issue #273, brief CO PR 1). matter.js at 862ad75f
+// thermostat serves (issue #273, brief CO PR 1). matter.js at db021da0
 // serves them as plain state: #setupThermostatLogic initialises
 // temperatureSetpointHoldDuration to null when temperatureSetpointHold is
 // present (packages/node/src/behaviors/thermostat/ThermostatServer.ts:365-369),

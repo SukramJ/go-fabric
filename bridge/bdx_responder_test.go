@@ -88,7 +88,7 @@ func (l *bdxPeerLog) next(t *testing.T) bdx.Message {
 // the following sender on the same exchange — ReceiveAccept, a Block per
 // BlockQuery, the last as BlockEof — the way matter.js's ExchangeManager
 // hands a new exchange to BdxProtocol.onNewExchange
-// (ExchangeManager.ts:407-440, BdxProtocol.ts:110-173).
+// (ExchangeManager.ts:462-495 at db021da0, BdxProtocol.ts:110-173).
 func TestBDXResponder_RoutesReceiveInit(t *testing.T) {
 	t.Parallel()
 	image := bytes.Repeat([]byte{0xA5, 0x5A, 0x01}, 700) // 2100 bytes

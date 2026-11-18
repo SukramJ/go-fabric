@@ -442,10 +442,23 @@ func atomFromJSON(raw json.RawMessage) (string, error) {
 // trailing ".a", ".a2+" or ".a-" is a choice, "Rev >= vN" is revision
 // conformance, and the binary operators bind by matter.js's precedence
 // (comparisons, then equality, then "&", then "|" and "^").
+//
+// "or" is "|" once: matter.js rewrites the first " or " only
+// (Conformance.ts:554 at db021da0, a string pattern), and the parser does the
+// same. A further "or" is left as a word, which this parser lexes as a name;
+// white space separating the terms (Conformance.ts:598-615), the text would
+// parse as an otherwise list nobody wrote. It is an error instead
+// (R2-P6-test-2851, a module rule — the guard fails closed where matter.js
+// rewrites nothing and parses on).
 func ParseConformance(text string) (*Conf, error) {
 	p := &confParser{}
 	if err := p.lex(strings.Replace(text, " or ", " | ", 1)); err != nil {
 		return nil, err
+	}
+	for _, tok := range p.toks {
+		if tok.kind == "word" && tok.text == "or" {
+			return nil, fmt.Errorf("conformance %q: a second \"or\" (only the first reads as \"|\")", text)
+		}
 	}
 	var terms []*Conf
 	for !p.done() {
@@ -648,7 +661,7 @@ func (p *confParser) choice(expr *Conf) (*Conf, error) {
 	}
 	// At most one modifier, and no bare number after it: "a2+-" and the
 	// range form "a2-4" are not the grammar of § 7.3.14. Mirrors matter.js
-	// packages/model/src/aspects/Conformance.ts:741-753 at 862ad75f
+	// packages/model/src/aspects/Conformance.ts:741-753 at db021da0
 	// (INVALID_CHOICE).
 	if p.at("+") || p.at("-") {
 		return nil, fmt.Errorf("conformance: choice %q may have at most one \"+\" or \"-\" modifier", c.String())

@@ -428,7 +428,7 @@ func (r *Responder) TriggerReannounce(context.Context) {
 // ServiceConnected tells the responder that a client connection to the
 // service is established: its broadcast run ends, as matter.js's
 // DefaultBroadcastSchedule has broadcastAfterConnection Instant
-// (MdnsAdvertisement.ts:117-130, MdnsAdvertiser.ts:230-231 at 862ad75f).
+// (MdnsAdvertisement.ts:118-131, MdnsAdvertiser.ts:230-231 at db021da0).
 // The service keeps answering queries. The node calls it for a fabric's
 // operational service when a CASE session opens (DeviceAdvertiser.ts:114-129).
 func (r *Responder) ServiceConnected(instanceName, serviceType string) {
@@ -442,7 +442,7 @@ func (r *Responder) ServiceConnected(instanceName, serviceType string) {
 // ServiceDisconnected tells the responder that no client connection to the
 // service is left: the broadcast schedule runs again unless it runs
 // already — matter.js serviceDisconnected starts the "reconnect" event
-// (MdnsAdvertisement.ts:132-134, DeviceAdvertiser.ts:131-150 at 862ad75f).
+// (MdnsAdvertisement.ts:133-135, DeviceAdvertiser.ts:131-150 at db021da0).
 func (r *Responder) ServiceDisconnected(instanceName, serviceType string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -454,7 +454,7 @@ func (r *Responder) ServiceDisconnected(instanceName, serviceType string) {
 // ServiceRetransmission tells the responder that a message to a client of
 // the service was retransmitted: one broadcast, unless a run is under way —
 // matter.js's "retransmit" event and its RetransmissionBroadcastSchedule
-// (DeviceAdvertiser.ts:164-172, MdnsAdvertiser.ts:234-242 at 862ad75f).
+// (DeviceAdvertiser.ts:164-172, MdnsAdvertiser.ts:234-242 at db021da0).
 func (r *Responder) ServiceRetransmission(instanceName, serviceType string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

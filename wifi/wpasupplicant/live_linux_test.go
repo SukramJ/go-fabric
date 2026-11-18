@@ -21,6 +21,10 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 )
 
+// currentNetworkWait bounds the wait for the network a failed join selected
+// again to be the interface's CurrentNetwork (review II, R2-P6-test-2018).
+const currentNetworkWait = 10 * time.Second
+
 // The live test runs the driver against a real wpa_supplicant over the
 // system bus — the ble-virtual job's Wi-Fi variant starts one on a
 // mac80211_hwsim radio with hostapd's access points
@@ -126,12 +130,41 @@ func TestLiveWPASupplicant(t *testing.T) {
 			t.Fatalf("Networks: %v", err)
 		}
 		networks, _ := v.Value().([]dbus.ObjectPath)
-		// The join removed the network current before it (connectedhomeip
-		// src/platform/Linux/ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp:861-877
-		// at 6170af84) and the failed one removes its own (removeAdded):
-		// none is left.
-		if len(networks) != 0 {
-			t.Errorf("wpa_supplicant still lists %v after the failed join", networks)
+		// The driver keeps the network current before a join until the
+		// join has ended; the failed join removes the network it added
+		// (removeAdded) and selects the kept one again (restore) — a
+		// deliberate departure from connectedhomeip, which removes the
+		// current network before it adds the new one
+		// (src/platform/Linux/ConnectivityManagerImpl_NetworkManagementWpaSupplicant.cpp:861-877
+		// at 6170af84), recorded as BD-chip-WpaSupplicantDriver in
+		// notes/parity/by_design.md (review II, R2-P3-net-01). Left: the
+		// raw-PSK join's network, current again (review II,
+		// R2-P6-test-2018).
+		if len(networks) != 1 {
+			t.Fatalf("wpa_supplicant lists %v after the failed join, want the network of the join before it", networks)
+		}
+		// restore only selects the kept network; when wpa_supplicant sets
+		// CurrentNetwork for it is its own, so the check polls within a
+		// bound instead of reading once.
+		var cur dbus.ObjectPath
+		var got []byte
+		var known bool
+		deadline := time.Now().Add(currentNetworkWait)
+		for {
+			if cv, err := d.property(ctx, "CurrentNetwork"); err == nil {
+				cur, _ = cv.Value().(dbus.ObjectPath)
+			}
+			got, known = d.CurrentNetwork(ctx)
+			if (cur == networks[0] && known && string(got) == ssid) || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		if cur != networks[0] {
+			t.Errorf("CurrentNetwork %s %v after the failed join, want %s selected again", cur, currentNetworkWait, networks[0])
+		}
+		if !known || string(got) != ssid {
+			t.Errorf("CurrentNetwork reports %q (known %v) %v after the failed join, want %q", got, known, currentNetworkWait, ssid)
 		}
 	})
 	t.Run("open network", func(t *testing.T) {

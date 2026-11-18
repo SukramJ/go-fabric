@@ -21,7 +21,8 @@ import (
 
 // defaultRequest is the default subscription — every attribute, every
 // event urgent, fabric-filtered, replacing our other subscriptions —
-// narrowed by the stored options (NetworkClient.ts:121-128 at 0ceb202d).
+// narrowed by the stored options (the options branch of
+// NetworkClient.#defaultSubscribe, NetworkClient.ts:265-271 at db021da0).
 // The caller holds the lock.
 func (n *Node) defaultRequest() SubscribePaths {
 	r := SubscribePaths{
@@ -46,8 +47,8 @@ func (n *Node) defaultRequest() SubscribePaths {
 // endDefaultSubscription ends the default subscription and reports it not
 // subscribed if it was reported subscribed. Mirrors matter.js
 // NetworkClient.#endDefaultSubscription
-// (packages/node/src/behavior/system/network/NetworkClient.ts:238-251 at
-// 862ad75f).
+// (packages/node/src/behavior/system/network/NetworkClient.ts:243-252 at
+// db021da0).
 func (n *Node) endDefaultSubscription() {
 	n.mu.Lock()
 	s, wasActive := n.sub, n.subReported
@@ -63,7 +64,7 @@ func (n *Node) endDefaultSubscription() {
 
 // syncAutoSubscribe is NetworkClient.#syncAutoSubscribe with the node's
 // autoSubscribe, serialised with the other reactions (subSync, the
-// subscriptionChanges queue, NetworkClient.ts:113-115 at 862ad75f).
+// subscriptionChanges queue, NetworkClient.ts:114-116 at db021da0).
 func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	n.subSync.Lock()
 	defer n.subSync.Unlock()
@@ -71,13 +72,13 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 }
 
 // syncAutoSubscribeLocked is NetworkClient.#syncAutoSubscribe
-// (NetworkClient.ts:130-236 at 862ad75f): a newly commissioned node reads
-// the default subscription's paths once (:142-151, unless NoInitialRead);
+// (NetworkClient.ts:131-238 at db021da0): a newly commissioned node reads
+// the default subscription's paths once (:143-153, unless NoInitialRead);
 // then, when a subscription is desired and none is held, the default
 // subscription is established, sustained, with the event minimum past the
 // highest event seen and a bootstrap read unless the initial read ran
-// (:163-200); when none is desired the held one ends (:153-160). desire
-// overrides the node's autoSubscribe (desiredState, :130). The caller
+// (:164-206); when none is desired the held one ends (:159-162). desire
+// overrides the node's autoSubscribe (desiredState, :131). The caller
 // holds subSync.
 func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error {
 	n.mu.Lock()
@@ -86,17 +87,32 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 		desired = *desire && !n.settings.disabled
 	}
 	newly := n.newlyCommissioned
-	n.newlyCommissioned = false
+	if n.cfg.NoInitialRead {
+		n.newlyCommissioned = false
+	}
 	req := n.defaultRequest()
 	held := n.subOwner != nil
 	n.mu.Unlock()
 	didRead := false
 	if newly && !n.cfg.NoInitialRead {
 		// The newly-commissioned read emits its events and raises the
-		// cursor (NetworkClient.ts:303-308, emitEvents: true).
+		// cursor (NetworkClient.ts:303-308, emitEvents: true). The flag is
+		// cleared once the read succeeded: a read that failed is made
+		// again, as that read, by the next sync (SetAutoSubscribe,
+		// SetDefaultSubscription, or Stop and Start). A failed read applied
+		// nothing, so its events and cursor are not ahead. While the flag
+		// stands a sync toward off reads first too, so it fails as long as
+		// the peer does not answer; Stop, then the change, is the way out. A module rule (review II, R2-P6-err-2363; Fable
+		// fact note fable-6b-w2 G1): matter.js clears the flag before its
+		// read (packages/node/src/behavior/system/network/
+		// NetworkClient.ts:147-150 at db021da0). The caller holds subSync,
+		// so no other sync runs meanwhile.
 		if _, err := n.read(ctx, ReadRequest{ReadRequest: ReadPaths{Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter}}, true); err != nil {
 			return err
 		}
+		n.mu.Lock()
+		n.newlyCommissioned = false
+		n.mu.Unlock()
 		didRead = true
 	}
 	if desired == held {
@@ -116,9 +132,9 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 // ([Node.adoptDefaultFabricFilter]) and, when the node is started and
 // keeps a default subscription, the new one is established — matter.js
 // NetworkClient.#handleDefaultSubscriptionChange
-// (packages/node/src/behavior/system/network/NetworkClient.ts:117-128 at
-// 862ad75f), a reaction to the defaultSubscription state that runs one at
-// a time with Start and [Node.SetAutoSubscribe] (:113-115, :88-97). An
+// (packages/node/src/behavior/system/network/NetworkClient.ts:118-129 at
+// db021da0), a reaction to the defaultSubscription state that runs one at
+// a time with Start and [Node.SetAutoSubscribe] (:114-116, :93-98). An
 // unchanged request is nothing.
 //
 // The adoption waits, within ctx, for the node's queued report jobs —
@@ -205,8 +221,8 @@ func sameSubscribeOptions(a, b *SubscribeOptions) bool {
 // filter, it takes no data from that subscription until the switch
 // succeeds at the next start or the next change of the default
 // subscription. Mirrors matter.js NetworkClient.#adoptFabricFilter
-// (packages/node/src/behavior/system/network/NetworkClient.ts:273-298 at
-// 862ad75f): a record that failed while the filter is already the cache's
+// (packages/node/src/behavior/system/network/NetworkClient.ts:274-298 at
+// db021da0): a record that failed while the filter is already the cache's
 // is a warning, a failed switch an error. The caller holds subSync.
 //
 // Its error is ctx's and nothing else: ctx ended while the node's report
@@ -246,7 +262,7 @@ func (n *Node) adoptDefaultFabricFilter(ctx context.Context) error {
 // before it records no data version. A failed store write is returned and
 // the old record stays — written last, so the next attempt forgets the
 // versions again. Mirrors matter.js ClientStructure.adoptFabricFilter
-// (packages/node/src/node/client/ClientStructure.ts:343-390 at 862ad75f).
+// (packages/node/src/node/client/ClientStructure.ts:343-390 at db021da0).
 //
 // The drain it starts with ends with ctx, and it is the adoption's first
 // step: when ctx ends while jobs are still queued (a hook that blocks),
@@ -302,7 +318,7 @@ func (n *Node) adoptFabricFilterDrained(filtered bool) error {
 
 // recordCacheFabricFilteredLocked records the cache's fabric filter in the
 // store — ClientNodeStore.recordCacheFabricFiltered
-// (packages/node/src/storage/client/ClientNodeStore.ts:88-97 at 862ad75f),
+// (packages/node/src/storage/client/ClientNodeStore.ts:88-97 at db021da0),
 // under the settings' place. The caller holds n.mu.
 func (n *Node) recordCacheFabricFilteredLocked(filtered bool) error {
 	if n.erased {
@@ -344,7 +360,7 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 	var sub *Subscription
 	// The callbacks act only while this is the node's default
 	// subscription, so a replaced or ended one never acts for its
-	// successor (NetworkClient.ts:162-166, :176-200, :216-232 at 862ad75f).
+	// successor (NetworkClient.ts:164-167, :179-205, :212-236 at db021da0).
 	alive := func() {
 		n.mu.RLock()
 		current := n.subOwner == owner
@@ -706,8 +722,19 @@ func (n *Node) deliverEvent(e *EventData) {
 	n.mu.Unlock()
 }
 
+// maxUnknownWarned bounds the unknown clusters and events a node logs:
+// the set of those already logged holds at most this many, then one line
+// says further ones of the node are not logged and nothing more is
+// recorded. A module rule (review II, R2-P6-bound-2357, owner decision
+// 223; Fable fact note fable-6b-w2 G1): matter.js's set has no bound
+// (packages/node/src/node/client/ClientEventEmitter.ts:38, :145-147,
+// :155-157 at db021da0), and a peer that reports events under ever new
+// ids grew it for the node's life, charged to no quota. Event handling
+// is not touched, only the logging.
+const maxUnknownWarned = 256
+
 // noteUnknown logs an unknown cluster, or an unknown event of a cluster,
-// once (ClientEventEmitter.ts:138-156).
+// once (ClientEventEmitter.ts:138-156), up to maxUnknownWarned of them.
 func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 	key := [2]uint64{uint64(cluster), 1 << 32}
 	if isEvent {
@@ -715,8 +742,22 @@ func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 	}
 	n.mu.Lock()
 	seen := n.warned[key]
-	n.warned[key] = true
+	full := !seen && len(n.warned) >= maxUnknownWarned
+	if !seen && !full {
+		n.warned[key] = true
+	}
+	first := full && !n.warnedFull
+	if full {
+		n.warnedFull = true
+	}
 	n.mu.Unlock()
+	if full {
+		if first {
+			n.log.Info("matter.controller.client.unknown_not_logged", slog.Int("max", maxUnknownWarned),
+				slog.String("reason", "the node reported more unknown clusters and events than are logged; further unknown events of the node are not logged"))
+		}
+		return
+	}
 	if seen {
 		return
 	}
@@ -728,14 +769,14 @@ func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 }
 
 // evaluateSeeded marks the node seeded once its structure is known.
-// Mirrors matter.js packages/node/src/node/client/Peers.ts:760-797
-// (#evaluateSeeded at 862ad75f): BasicInformation is present and every
+// Mirrors matter.js packages/node/src/node/client/Peers.ts:760-798
+// (#evaluateSeeded at db021da0): BasicInformation is present and every
 // endpoint the root's reported PartsList names (the valid endpoint
 // numbers) is installed — an empty PartsList is a node of its root only;
 // a node whose PartsList was not reported needs an endpoint beyond the
 // root. A root-only node whose reported DeviceTypeList names nothing but
 // Root Node is logged as offering no function beyond node management
-// (:786-796).
+// (:787-797).
 func (n *Node) evaluateSeeded() {
 	n.mu.Lock()
 	if n.seeded || n.s.root == nil || readyCluster(n.s.root, basicinformation.ClusterID) == nil {

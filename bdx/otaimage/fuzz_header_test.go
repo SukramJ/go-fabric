@@ -84,7 +84,7 @@ func hugeHeaderPrefix() []byte {
 // header and ends there is "OTA file ended unexpectedly". The reader
 // collects only the bytes that arrive, as matter.js OtaImageReader
 // #processHeader does (packages/protocol/src/ota/OtaImageReader.ts:157-189
-// at 862ad75f). It never allocates the claimed size up front. FuzzReadHeader
+// at db021da0). It never allocates the claimed size up front. FuzzReadHeader
 // found the up-front allocation.
 func TestReadHeaderClaimedSizeIsNotAllocated(t *testing.T) {
 	var before, after runtime.MemStats

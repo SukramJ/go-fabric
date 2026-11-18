@@ -40,29 +40,36 @@ func TestOrderedServeKeepsASessionsDatagramsInOrder(t *testing.T) {
 	}()
 	t.Cleanup(func() { cancel(); <-served; _ = l.Close() })
 
+	// The burst is spread over enough exchanges that none holds more
+	// than maxQueuedMessages unread (R2-P6-bound-1807); the order is
+	// checked over the session's whole burst.
 	const burst = 200
+	const spread = burst/maxQueuedMessages + 1
 	var mu sync.Mutex
 	var counters []uint32
 	all := make(chan struct{})
-	x, err := m.Initiate(s, im.InteractionModelProtocolID, Options{OnReceive: func(msg *Message, _ bool) {
+	onReceive := func(msg *Message, _ bool) {
 		mu.Lock()
 		defer mu.Unlock()
 		counters = append(counters, msg.Counter)
 		if len(counters) == burst {
 			close(all)
 		}
-	}})
-	if err != nil {
-		t.Fatal(err)
+	}
+	xs := make([]*Exchange, spread)
+	for i := range xs {
+		if xs[i], err = m.Initiate(s, im.InteractionModelProtocolID, Options{OnReceive: onReceive}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	peer, err := net.DialUDP("udp4", nil, l.LocalAddr())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer peer.Close()
-	for range burst {
+	for i := range burst {
 		hdr := message.Header{SessionID: s.ID()}
-		proto := message.ProtocolHeader{Opcode: im.OpcodeReportData, ExchangeID: x.ID(), ProtocolID: im.InteractionModelProtocolID}
+		proto := message.ProtocolHeader{Opcode: im.OpcodeReportData, ExchangeID: xs[i%spread].ID(), ProtocolID: im.InteractionModelProtocolID}
 		sealed, err := p.ch.Encrypt(&hdr, hdr.SecurityFlags(), append(proto.Marshal(), 0x15, 0x18))
 		if err != nil {
 			t.Fatal(err)

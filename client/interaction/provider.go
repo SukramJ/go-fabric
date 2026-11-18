@@ -17,7 +17,7 @@ import (
 // Path floors of the base exchange provider: the CapabilityMinima
 // minimums a peer that reports none is assumed to support. Mirrors
 // matter.js packages/protocol/src/protocol/ExchangeProvider.ts:85-90 at
-// 0ceb202d.
+// db021da0.
 const (
 	DefaultReadPathsSupported      = 9
 	DefaultSubscribePathsSupported = 3
@@ -45,7 +45,7 @@ type ExchangeOptions struct {
 	// connection it starts) takes a slot of; "" is the peer's medium
 	// profile — matter.js ClientRequest.network
 	// (packages/protocol/src/action/client/ClientRequest.ts:14-24 at
-	// 862ad75f), "unlimited" disabling the throttle, "icdLit" the priority
+	// db021da0), "unlimited" disabling the throttle, "icdLit" the priority
 	// network of an await-mode LIT ICD (SustainedSubscription.ts:133-149).
 	Network string
 	// AdditionalMrpDelay, when set, overrides the peer-medium MRP margin of
@@ -62,7 +62,7 @@ type ExchangeOptions struct {
 
 // ClientRequest is what every interaction request carries for its
 // exchange — matter.js ClientRequest (action/client/ClientRequest.ts:13-87
-// at 862ad75f): the network profile, the MRP margin override and the
+// at db021da0): the network profile, the MRP margin override and the
 // address override. It is embedded in [ReadRequest], [SubscribeRequest],
 // [WriteOptions] and [InvokeOptions].
 type ClientRequest struct {

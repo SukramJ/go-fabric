@@ -26,7 +26,9 @@
 // A proxy is an ESP32 with `bluetooth_proxy: active: true` (connections need
 // it; the feature flag ACTIVE_CONNECTIONS, without which [NewCentral] refuses
 // the proxy) and, normally, an API key (`api: encryption: key:`), which
-// [Proxy.Key] carries. Without a key the API is plaintext.
+// [Proxy.Key] carries. Without a key the API is plaintext: it authenticates
+// neither the proxy nor this central, so a proxy given without a key is
+// trusted because the host named it.
 //
 // # One subscriber per proxy
 //
@@ -56,6 +58,15 @@
 // current ([DiscoverOptions]). Whether a device is a proxy is not in its TXT
 // record (esphome/components/mdns/mdns_component.cpp:133-242): it is in the
 // feature flags the device reports once connected.
+//
+// Discovery dials only the devices it has a key for. Anyone on the LAN can
+// announce `_esphomelib._tcp`, and a plaintext device that reports the two
+// feature flags would join the set and carry the connections the central
+// picks it for — the strongest signal, a number the proxy reports itself.
+// PASE keeps such a party out of the commissioning session, not off its
+// BLE stream. [DiscoverOptions.AllowPlaintext] admits keyless devices for a
+// LAN the host trusts; each one used is then logged as the warning
+// ble.esphome.proxy_plaintext.
 package esphome
 
 import (
@@ -75,7 +86,11 @@ var (
 	ErrRequiresEncryption = wire.ErrRequiresEncryption
 	// ErrPlaintextDevice is a proxy without an API key, reached with one.
 	ErrPlaintextDevice = wire.ErrPlaintextDevice
-	// ErrNoProxies is NewCentral without a proxy.
+	// ErrNoProxies is NewCentral without a proxy: none given and no
+	// Options.Discover, or — wrapped, "none answered and none was
+	// discovered over DNS-SD" — no proxy answering once the given ones
+	// were dialled without a failure and the first browse ran. A given
+	// proxy that failed makes NewCentral return that failure instead.
 	ErrNoProxies = errors.New("esphome: no Bluetooth proxy configured")
 	// ErrNoActiveConnections is a proxy that forwards advertisements only:
 	// its feature flags lack ACTIVE_CONNECTIONS (aioesphomeapi/model.py:140),

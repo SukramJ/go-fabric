@@ -20,8 +20,8 @@ import (
 // standalone ack, not left to the ack pump's grace window. matter.js
 // closes the exchange after it and MessageExchange.close sends the
 // standalone ack of the last received message immediately
-// (packages/protocol/src/protocol/MessageExchange.ts:1117-1124 at
-// 862ad75f). The tracker here is attached after Start, so no pump runs:
+// (packages/protocol/src/protocol/MessageExchange.ts:1150-1157 at
+// db021da0). The tracker here is attached after Start, so no pump runs:
 // before the fix the ack never left, and a controller's StatusResponse
 // waited on it until the controller's MRP gave up or its teardown bound
 // ran out.

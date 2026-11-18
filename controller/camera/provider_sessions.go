@@ -245,7 +245,7 @@ type providerSessions struct {
 	cleanup func(context.Context) (context.Context, context.CancelFunc)
 
 	mu     sync.Mutex
-	offers map[providerKey]string
+	offers map[providerKey]*sentOffer
 	// owners is the identity of the session each key's offer and
 	// requestor entry were recorded for, guarded by mu; recordMu orders
 	// that recording against an end applied by identity, so a late end
@@ -253,14 +253,23 @@ type providerSessions struct {
 	// (review II, R2-P1-cam-b-02).
 	owners   map[providerKey]*lifecycle
 	recordMu sync.Mutex
-	// closed, guarded by mu: the Service's Close began; a new session
-	// answered from now on is ended, not registered (review II,
-	// R2-P2-stop-03).
+	// listed, guarded by mu: the requestor entries the registry does not
+	// name that a CurrentSessions report has listed (reconcileUntracked).
+	listed map[providerKey]bool
+	// closed, guarded by mu and set under recordMu too: the Service's
+	// Close began; a new session answered from now on is ended, not
+	// registered (review II, R2-P2-stop-03). Every requestor upsert
+	// checks it under recordMu, so once close returned no entry is added
+	// and Close's end of the untracked entries sees every one added
+	// before (review II, R2-P6-conc-2201).
 	closed bool
 }
 
-// close refuses every session answered from now on.
+// close refuses every session answered from now on; it returns once no
+// requestor upsert is in progress.
 func (p *providerSessions) close() {
+	p.recordMu.Lock()
+	defer p.recordMu.Unlock()
 	p.mu.Lock()
 	p.closed = true
 	p.mu.Unlock()
@@ -276,18 +285,36 @@ func (p *providerSessions) key(t target, id uint16) providerKey {
 	return providerKey{id: id, fabricIndex: p.fabricIndex, peerNodeID: t.nodeID, peerEP: t.endpointID}
 }
 
+// sentOffer is one recorded send of an offer; its address tells two sends
+// of the same SDP apart.
+type sentOffer struct{ sdp string }
+
 // offerSent records the SDP sent for the session, so the camera's answer
-// can be narrowed to it; the returned function withdraws it.
+// can be narrowed to it; the returned function withdraws this send: while
+// it is still the record, the offer it replaced comes back, or the key
+// goes when it replaced none (review II, R2-P6-wire-2204). Mirrors
+// matterjs-server packages/ws-controller/src/controller/WebRtcCallbackBridge.ts:125-135
+// at 0bd06f2.
 func (p *providerSessions) offerSent(k providerKey, sdp string) func() {
+	sent := &sentOffer{sdp: sdp}
 	p.mu.Lock()
-	p.offers[k] = sdp
+	if p.offers == nil {
+		p.offers = map[providerKey]*sentOffer{}
+	}
+	replaced := p.offers[k]
+	p.offers[k] = sent
 	p.mu.Unlock()
 	return func() {
 		p.mu.Lock()
-		if p.offers[k] == sdp {
-			delete(p.offers, k)
+		defer p.mu.Unlock()
+		if p.offers[k] != sent {
+			return
 		}
-		p.mu.Unlock()
+		if replaced == nil {
+			delete(p.offers, k)
+		} else {
+			p.offers[k] = replaced
+		}
 	}
 }
 
@@ -295,8 +322,11 @@ func (p *providerSessions) offerSent(k providerKey, sdp string) func() {
 func (p *providerSessions) offerOf(k providerKey) (string, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	sdp, ok := p.offers[k]
-	return sdp, ok
+	sent, ok := p.offers[k]
+	if !ok {
+		return "", false
+	}
+	return sent.sdp, true
 }
 
 // sessionEnded drops the recorded offer of a session that ended.
@@ -304,6 +334,7 @@ func (p *providerSessions) sessionEnded(k providerKey) {
 	p.mu.Lock()
 	delete(p.offers, k)
 	delete(p.owners, k)
+	delete(p.listed, k)
 	p.mu.Unlock()
 }
 
@@ -608,8 +639,18 @@ func (a *arrivedSession) learn(resp any) {
 	}
 	a.p.recordMu.Lock()
 	defer a.p.recordMu.Unlock()
+	if a.p.isClosed() {
+		// Close began after the check above: the session is ended, as
+		// one answered after it (review II, R2-P6-conc-2201).
+		a.refused = true
+		return
+	}
 	k := a.p.key(a.t, id)
 	a.p.own(k, life)
+	// A new session under the id starts unlisted: a mark an older session
+	// under it left would let a report built before this offer remove it
+	// (review II, R2-P6-store-2203). A re-offer keeps the mark.
+	a.p.unlist(k)
 	if po, ok := a.fields.(wpdef.ProvideOfferRequest); ok {
 		a.withdraw = a.p.offerSent(k, po.Sdp)
 	}
@@ -679,6 +720,11 @@ func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.P
 		withdraw()
 		return nil, stackError("ProvideOffer did not return a WebRTCSessionID for node 0x%016X", t.nodeID)
 	}
+	// The closed check and the upsert are one step against Close
+	// (recordMu): an entry added before Close began is one Close ends
+	// (review II, R2-P6-conc-2201).
+	p.recordMu.Lock()
+	defer p.recordMu.Unlock()
 	if p.isClosed() {
 		// Answered once the service's Close began, as newSession's arrival
 		// refuses: the requestor gains no entry nothing would remove. A
@@ -696,6 +742,81 @@ func (p *providerSessions) reOffer(ctx context.Context, t target, fields wpdef.P
 		withdraw()
 	}
 	return resp, nil
+}
+
+// untracked are the requestor's entries of this fabric that tracked does
+// not name: the sessions a host opened through the raw route (review II,
+// R2-P6-fsm-2202).
+func (p *providerSessions) untracked(tracked func(t target, id uint16) bool) []wrdef.WebRTCSessionStruct {
+	var out []wrdef.WebRTCSessionStruct
+	for _, s := range p.requestor.sessions() {
+		if s.FabricIndex == p.fabricIndex && !tracked(target{s.PeerNodeId, s.PeerEndpointId}, s.Id) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// unlist clears the listed mark of a key.
+func (p *providerSessions) unlist(k providerKey) {
+	p.mu.Lock()
+	delete(p.listed, k)
+	p.mu.Unlock()
+}
+
+// reconcileUntracked applies one CurrentSessions report of an endpoint
+// (present: the ids it lists for this controller) to the requestor's
+// entries of this fabric on that endpoint the registry does not name — the
+// raw route's — as the registry applies a report to its own sessions
+// (sessionRegistry.reconcile): an entry the report lists is marked listed,
+// and one an earlier report listed and this one does not is dropped, its
+// records with it, as a vanished session's are. A report built before the
+// offer does not list the session, so only a listed entry can go. The
+// camera dropped the session without an End (a restart); kept, the entry
+// would count as held for the sweep and the requestor would accept
+// signals for a dead id. matterjs-server at 0bd06f2 keeps it: it applies
+// a report to registry lives only
+// (packages/ws-controller/src/camera/sessionRegistry.ts:414-432), and a
+// report takes a requestor entry away only through the registry's
+// sessionVanished
+// (packages/ws-controller/src/controller/MatterController.ts:581-584) —
+// a divergence, the module's rule (review II, R2-P6-store-2203, decision
+// 207).
+func (p *providerSessions) reconcileUntracked(t target, present map[uint16]bool, tracked func(t target, id uint16) bool) {
+	for _, s := range p.requestor.sessions() {
+		if s.FabricIndex != p.fabricIndex || s.PeerNodeId != t.nodeID || s.PeerEndpointId != t.endpointID || tracked(t, s.Id) {
+			continue
+		}
+		k := p.key(t, s.Id)
+		p.mu.Lock()
+		listed := p.listed[k]
+		if present[s.Id] && !listed {
+			if p.listed == nil {
+				p.listed = map[providerKey]bool{}
+			}
+			p.listed[k] = true
+		}
+		p.mu.Unlock()
+		if present[s.Id] || !listed {
+			continue
+		}
+		p.log.Info("camera.session.dropped_by_report", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("webrtc_session_id", int(s.Id)))
+		// A session the registry took the id for since is its own
+		// (ownedByOther); a raw entry has no owner.
+		p.removeTrackedOf(t, s.Id, nil)
+	}
+}
+
+// sendEndSession ends a session with UserHangup through the provider
+// route and drops its records once the camera ended it or knew none
+// (invokeEndSession).
+func (p *providerSessions) sendEndSession(t target, id uint16) func(context.Context) error {
+	return func(ctx context.Context) error {
+		return invokeEndSession(ctx, func(ctx context.Context) error {
+			_, err := p.nodes.invokeProvider(ctx, t, callEndSession, wpdef.EndSessionRequest{WebRtcSessionId: id, Reason: endReasonUserHangup})
+			return err
+		}, func(bool) { p.removeTracked(t, id) })
+	}
 }
 
 // removeTracked drops a session this controller ended from the requestor

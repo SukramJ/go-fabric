@@ -6,7 +6,7 @@
 // src/app/clusters/thermostat-server/tests/TestThermostatClusterSchedules.cpp
 // at 645b267a (the harness image's CHIP commit 6170af84 has no schedules
 // server). matter.js does not implement the feature
-// (ThermostatServer.ts:82 at 862ad75f), so chip is the behavioural
+// (ThermostatServer.ts:82 at db021da0), so chip is the behavioural
 // authority (CLAUDE.md workflow step 5). chip's fixture (:37-98) is a
 // HEAT+MSCH thermostat with NumberOfSchedules 2, NumberOfScheduleTransitions
 // 4, NumberOfScheduleTransitionPerDay 2 and one schedule type, Heat, of two

@@ -156,8 +156,10 @@ block below.
 | attribute | 1116 |
 | cluster | 135 |
 | command | 457 |
+| composed requirement | 14 |
 | condition | 46 |
 | conditionRequirement | 57 |
+| contained device type id | 7 |
 | datatype | 548 |
 | deviceType | 92 |
 | element requirement | 153 |
@@ -166,7 +168,7 @@ block below.
 | field | 3927 |
 | global datatype | 19 |
 | requirement | 470 |
-| **total** | **7504** |
+| **total** | **7525** |
 
 ### Differences by class
 
@@ -174,7 +176,7 @@ block below.
 | --- | ---: |
 | (i) matter.js right or deliberate | 113 |
 | (ii) CHIP right, snapshot wrong | 2 |
-| (iii) representation, normalized in code | 539 |
+| (iii) representation, normalized in code | 483 |
 | (iv) excused by the harness | 2 |
 | unexplained | 0 |
 
@@ -183,7 +185,6 @@ block below.
 | Rule | Applied | What it normalizes |
 | --- | ---: | --- |
 | `base-device-type` | 6 | CHIP names the Base device type "Base Device Type", matter.js "Base"; a condition requirement asserting one of its conditions names it so. |
-| `composed-device-type` | 56 | CHIP models the device types a composed device type contains outside its cluster requirements. |
 | `core-global` | 3 | The Interaction Model status codes, event priority and semantic namespace ids are global types of the Core specification that CHIP's data model XML does not restate. |
 | `datatype-fabric` | 21 | matter.js marks a fabric-scoped struct by its FabricIndex field, CHIP on the struct. |
 | `descriptor-required` | 91 | Every device type requires Descriptor; CHIP's device-type files do not restate it. |
@@ -210,11 +211,15 @@ What CHIP states and the snapshot does not carry, counted in CHIP's model.
 | --- | ---: | --- |
 | cluster provisional status | 3 | The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below. |
 | command quality | 0 | Commands CHIP gives a quality the snapshot records none for; the snapshot records the effective command quality (largeMessage, L) since brief CP. |
+| composition requirements CHIP does not state | 28 | A cluster requirement, or a feature, attribute, command or event requirement below one, that the snapshot states for a contained device type CHIP lists and CHIP's `clusterRequirements` do not. |
+| data model files not read | 0 | An XML file outside clusters/, device_types/, globals/ and namespaces/, or below a subdirectory of one: the loader does not read it. |
 | definitions outside the snapshot | 5 | CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit. |
+| device type composition CHIP does not state | 58 | A device type the snapshot requires a composed device type to contain that CHIP's `composedDeviceTypes` does not list, and each instance of one it lists. CHIP lists a contained device type with the cluster requirements stated for it and states no conformance or constraint of the contained type itself: for a contained type CHIP lists, only its id is compared. |
 | event quality | 0 | Events CHIP gives a quality the snapshot records none for; the snapshot records the effective event quality since brief CP. |
 | global commands | 2 | AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands). |
 | members CHIP does not state | 4 | A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with. |
 | semantic namespaces | 28 | The snapshot carries no semantic namespaces. |
+| side of a composed requirement | 14 | CHIP states no side for the cluster requirements of a contained device type; the comparison matches them on the cluster id and does not compare the side. |
 
 ### Provisional clusters
 
@@ -297,13 +302,13 @@ CHIP marks these cluster ids provisional. A certification run rejects a provisio
 ### (ii) CHIP is right, the snapshot is wrong
 
 - **GroupKeyManagement.GroupKeySetStruct.GroupKeyMulticastPolicy** (conformance): CHIP `d`, snapshot `o` — 1 difference(s).
-  - Why: Matter 1.6.1 deprecates the field (matter.js's own 1.6.1 scrape states D); a matter.js override written when the specification said "P, M" forces O for every revision.
+  - Why: matter.js's 1.6.1 scrape and CHIP's data model state D; a matter.js override, by its own comment written when the specification said "P, M", forces O for every revision.
   - Source: matter.js support/models/src/local/GroupKeyManagementOverrides.ts; support/models/src/v1.6.1/spec.ts GroupKeySetStruct.
-  - Impact: No certification case reads the field. go-fabric's KeySetReadResponse reports field 8 as matter.js's GroupKeyManagementServer does while its model defines the field, which a D field still is, so the behaviour stays; CHIP's server omits it. Finding recorded; upstream candidate (gate the override until 1.6.1).
+  - Impact: No certification case names the field (grep). go-fabric's KeySetReadResponse reports field 8 as matter.js's GroupKeyManagementServer does while its model defines the field, which a D field still is, so the behaviour stays; CHIP's group-key-mgmt-server does not name the field (grep). Finding recorded; upstream candidate (gate the override until 1.6.1).
 - **semtag.Label** (conformance): CHIP `mfgcode!=null,o`, snapshot `o` — 1 difference(s).
-  - Why: The specification makes Label mandatory when MfgCode is not null; matter.js relaxes it to O ("TODO we do not support MfgCode != null").
+  - Why: CHIP's data model makes Label mandatory when MfgCode is not null; matter.js relaxes it to O ("TODO we do not support MfgCode != null").
   - Source: matter.js support/models/src/local/semtag.ts.
-  - Impact: go-fabric serves no Descriptor TagList (cluster/core/descriptor.go) and ModeSelect's SemanticTagStruct is a different struct, so nothing depends on it. Finding recorded; known upstream TODO.
+  - Impact: Behaviour depends on it where a host enables the Descriptor TagList (cluster/core/descriptor.go EnableTagList, AddTags; off by default): neither refuses a tag with a manufacturer code and no label, which CHIP's data model makes non-conformant. Finding recorded; known upstream TODO.
 
 ### (iv) the harness excuses it
 

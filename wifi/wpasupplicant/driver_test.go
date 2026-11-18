@@ -1195,3 +1195,199 @@ func TestCurrentNetworkReportsTheNetworkTheRadioIsOn(t *testing.T) {
 		})
 	}
 }
+
+// TestAJoinEndsWhenTheBusConnectionDrops: a join that waits for the
+// interface's State when the bus connection is lost ends at once with
+// debugBusGone, not at its timeout (review II, R2-P6-fsm-2019).
+func TestAJoinEndsWhenTheBusConnectionDrops(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	b.onSelect = func(b *fakeBus, n int) { b.setStateLocked("associating") }
+	d, _ := startDriver(t, b, Options{ConnectTimeout: time.Hour})
+	type result struct {
+		status uint8
+		debug  string
+	}
+	res := make(chan result, 1)
+	go func() {
+		status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential))
+		res <- result{status, debug}
+	}()
+	<-b.selected
+	b.mu.Lock()
+	close(b.sigs)
+	b.mu.Unlock()
+	select {
+	case r := <-res:
+		if r.status != statusUnknown || r.debug != debugBusGone {
+			t.Fatalf("join = %d %q, want UnknownError %q", r.status, r.debug, debugBusGone)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the join still waits after the bus connection dropped")
+	}
+}
+
+// TestTheDriverWatchesItsInterfaceOnly: the driver subscribes to its
+// interface object's ScanDone and Interface PropertiesChanged once the
+// interface is known, before any call on it — not to the service's whole
+// namespace (review II, R2-P6-bound-2020).
+func TestTheDriverWatchesItsInterfaceOnly(t *testing.T) {
+	t.Parallel()
+	b := newFakeBus()
+	startDriver(t, b, Options{})
+	b.mu.Lock()
+	watched, at := slices.Clone(b.watched), slices.Clone(b.watchedAt)
+	b.mu.Unlock()
+	if !slices.Equal(watched, []dbus.ObjectPath{fakeIface}) || !slices.Equal(at, []int{1}) {
+		t.Fatalf("watched %v after %v calls, want %s right after GetInterface", watched, at, fakeIface)
+	}
+	want := []string{
+		"type='signal',sender='fi.w1.wpa_supplicant1',interface='fi.w1.wpa_supplicant1.Interface',member='ScanDone',path='" + string(fakeIface) + "'",
+		"type='signal',sender='fi.w1.wpa_supplicant1',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged',path='" + string(fakeIface) + "',arg0='fi.w1.wpa_supplicant1.Interface'",
+	}
+	if got := watchRules(fakeIface); !slices.Equal(got, want) {
+		t.Fatalf("rules\n%q\nwant\n%q", got, want)
+	}
+	for _, rule := range watchRules(fakeIface) {
+		if strings.Contains(rule, "path_namespace") {
+			t.Fatalf("a namespace rule: %s", rule)
+		}
+	}
+}
+
+// TestNetworksLeftBehindAreRemoved: a network whose RemoveNetwork failed —
+// after a failed join, or the one before a successful join — is removed
+// before the next join and at Close while wpa_supplicant still lists it;
+// and a successful join removes the earlier join's network also when it
+// cannot read the CurrentNetwork (review II, R2-P6-store-2021).
+func TestNetworksLeftBehindAreRemoved(t *testing.T) {
+	t.Parallel()
+	removes := func(b *fakeBus) []dbus.ObjectPath {
+		var out []dbus.ObjectPath
+		for _, c := range b.callsCopy() {
+			if c.method == ifaceInterface+".RemoveNetwork" {
+				out = append(out, c.args[0].(dbus.ObjectPath))
+			}
+		}
+		return out
+	}
+	failJoin := func(b *fakeBus, n int) {
+		b.setStateLocked("associating")
+		b.setStateLocked(stateDisconnected)
+	}
+
+	t.Run("before the next join", func(t *testing.T) {
+		t.Parallel()
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.onSelect = failJoin
+		b.fail[ifaceInterface+".RemoveNetwork"] = dbus.Error{Name: "fi.w1.wpa_supplicant1.UnknownError"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status == statusSuccess {
+			t.Fatal("the join succeeded")
+		}
+		b.mu.Lock()
+		delete(b.fail, ifaceInterface+".RemoveNetwork")
+		b.onSelect = nil
+		b.mu.Unlock()
+		before := len(b.callsCopy())
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q", status, debug)
+		}
+		var seq []string
+		for _, c := range b.callsCopy()[before:] {
+			if c.method == ifaceInterface+".RemoveNetwork" || c.method == ifaceInterface+".AddNetwork" {
+				seq = append(seq, c.method[strings.LastIndex(c.method, ".")+1:])
+			}
+		}
+		if len(seq) == 0 || seq[0] != "RemoveNetwork" {
+			t.Fatalf("the second join's calls %v, want the network left behind removed before AddNetwork", seq)
+		}
+	})
+
+	t.Run("at Close", func(t *testing.T) {
+		t.Parallel()
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.onSelect = failJoin
+		b.fail[ifaceInterface+".RemoveNetwork"] = dbus.Error{Name: "fi.w1.wpa_supplicant1.UnknownError"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status == statusSuccess {
+			t.Fatal("the join succeeded")
+		}
+		b.mu.Lock()
+		delete(b.fail, ifaceInterface+".RemoveNetwork")
+		b.mu.Unlock()
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if n, afterClose := b.removed(); n != 2 || afterClose {
+			t.Fatalf("%d removals of the failed join's network (after the bus closed: %v), want the failed one and Close's", n, afterClose)
+		}
+		b.mu.Lock()
+		listed, _ := b.props["Networks"].Value().([]dbus.ObjectPath)
+		b.mu.Unlock()
+		if len(listed) != 0 {
+			t.Fatalf("wpa_supplicant still lists %v after Close", listed)
+		}
+	})
+
+	t.Run("a path handed out again is not owed", func(t *testing.T) {
+		t.Parallel()
+		const reused = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/3")
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.nextNetworks = []dbus.ObjectPath{reused, reused}
+		b.onSelect = failJoin
+		b.fail[ifaceInterface+".RemoveNetwork"] = dbus.Error{Name: "fi.w1.wpa_supplicant1.UnknownError"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status == statusSuccess {
+			t.Fatal("the join succeeded")
+		}
+		// The failed removal was carried out after all, and the next
+		// sweep cannot read Networks: the path stays owed.
+		b.mu.Lock()
+		delete(b.fail, ifaceInterface+".RemoveNetwork")
+		b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
+		delete(b.props, "Networks")
+		b.onSelect = nil
+		b.mu.Unlock()
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q", status, debug)
+		}
+		// wpa_supplicant numbered the joined network with the same path.
+		b.mu.Lock()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{reused})
+		b.mu.Unlock()
+		before := len(b.callsCopy())
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range b.callsCopy()[before:] {
+			if c.method == ifaceInterface+".RemoveNetwork" {
+				t.Fatalf("Close removed %v, the joined network", c.args[0])
+			}
+		}
+	})
+
+	t.Run("the CurrentNetwork unreadable", func(t *testing.T) {
+		t.Parallel()
+		const first = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/1")
+		const second = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/2")
+		b := newFakeBus()
+		b.nextNetworks = []dbus.ObjectPath{first, second}
+		d, _ := startDriver(t, b, Options{})
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("one"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("first join = %d %q", status, debug)
+		}
+		b.mu.Lock()
+		delete(b.props, "CurrentNetwork") // the read fails
+		b.mu.Unlock()
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("two"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("second join = %d %q", status, debug)
+		}
+		if got := removes(b); !slices.Equal(got, []dbus.ObjectPath{first}) {
+			t.Fatalf("RemoveNetwork %v, want the first join's network", got)
+		}
+	})
+}

@@ -38,14 +38,17 @@ const garageTravel = 2 * time.Second
 type demoGarage struct {
 	name string
 
-	mu     sync.Mutex
-	travel *time.Timer
+	mu sync.Mutex
+	// travel is the running action (a travel or a settle), calibration
+	// the calibration run; a stale callback of either does nothing
+	// (latestTimer).
+	travel latestTimer
 	ctl    *ccldef.Server
 	// latchTo and speedTo are what the running action leaves the drive
-	// with; calibration is the calibration run.
+	// with.
 	latchTo     *bool
 	speedTo     *ccldef.ThreeLevelAutoEnum
-	calibration *time.Timer
+	calibration latestTimer
 }
 
 var (
@@ -74,7 +77,7 @@ func newDemoGarage(name string) *demoGarage { return &demoGarage{name: name} }
 func (g *demoGarage) device(opts device.Options) (*device.Closure, error) {
 	closed, stopped := ccldef.CurrentPositionFullyClosed, ccldef.MainStateStopped
 	// The Descriptor's TagList, which matter.js's Closure device enables
-	// (packages/node/src/devices/closure.ts:91 at 862ad75f): Closure
+	// (packages/node/src/devices/closure.ts:91 at db021da0): Closure
 	// namespace (0x44), GarageDoor (0x05). The device kit leaves it off
 	// unless a host opts in (BD-Matter-ClosureWithoutTagList).
 	opts.Tags = []device.SemanticTag{{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x44, Tag: 0x05}}
@@ -138,12 +141,10 @@ var arrivalOf = map[ccldef.TargetPositionEnum]ccldef.CurrentPositionEnum{
 func (g *demoGarage) MoveTo(_ context.Context, target ccldef.TargetPositionEnum) error {
 	arrival := arrivalOf[target]
 	g.mu.Lock()
-	if g.travel != nil {
-		g.travel.Stop()
-	}
-	g.travel = time.AfterFunc(garageTravel, func() {
-		g.finish(&arrival)
-		slog.Info("garage.arrived", slog.String("device", g.name), slog.Int("position", int(arrival)))
+	g.travel.armLocked(garageTravel, func(gen uint64) {
+		if g.finish(gen, &arrival) {
+			slog.Info("garage.arrived", slog.String("device", g.name), slog.Int("position", int(arrival)))
+		}
 	})
 	g.mu.Unlock()
 	slog.Info("garage.move", slog.String("device", g.name), slog.Int("target", int(target)))
@@ -182,18 +183,22 @@ func (g *demoGarage) SetSpeed(_ context.Context, speed ccldef.ThreeLevelAutoEnum
 // settleLocked arms the short action of a latch or speed change unless a
 // travel runs, which carries it out on arrival. Caller holds g.mu.
 func (g *demoGarage) settleLocked() {
-	if g.travel != nil {
+	if g.travel.armedLocked() {
 		return
 	}
-	g.travel = time.AfterFunc(garageSettle, func() { g.finish(nil) })
+	g.travel.armLocked(garageSettle, func(gen uint64) { g.finish(gen, nil) })
 }
 
-// finish ends the running action: the drive reports where it is — at
-// arrival, otherwise where it was — with the latch and speed the action
-// left it with, and Stopped.
-func (g *demoGarage) finish(arrival *ccldef.CurrentPositionEnum) {
+// finish ends the running action armed as gen: the drive reports where it
+// is — at arrival, otherwise where it was — with the latch and speed the
+// action left it with, and Stopped. A stale action (one a newer MoveTo or
+// a Stop replaced) reports nothing; finish then returns false.
+func (g *demoGarage) finish(gen uint64, arrival *ccldef.CurrentPositionEnum) bool {
 	g.mu.Lock()
-	g.travel = nil
+	if !g.travel.takeLocked(gen) {
+		g.mu.Unlock()
+		return false
+	}
 	latch, speed := g.latchTo, g.speedTo
 	g.latchTo, g.speedTo = nil, nil
 	g.mu.Unlock()
@@ -215,6 +220,7 @@ func (g *demoGarage) finish(arrival *ccldef.CurrentPositionEnum) {
 	if err := srv.Set(ccldef.Patch{OverallCurrentState: current, MainState: &stopped}); err != nil {
 		slog.Warn("garage.report", slog.String("device", g.name), slog.Any("err", err))
 	}
+	return true
 }
 
 // Calibrate implements [ccldef.Calibrator]: a calibration run that ends,
@@ -222,13 +228,13 @@ func (g *demoGarage) finish(arrival *ccldef.CurrentPositionEnum) {
 // returns.
 func (g *demoGarage) Calibrate(context.Context) error {
 	g.mu.Lock()
-	if g.calibration != nil {
-		g.calibration.Stop()
-	}
-	g.calibration = time.AfterFunc(garageCalibration, func() {
+	g.calibration.armLocked(garageCalibration, func(gen uint64) {
 		g.mu.Lock()
-		g.calibration = nil
+		current := g.calibration.takeLocked(gen)
 		g.mu.Unlock()
+		if !current {
+			return
+		}
 		stopped := ccldef.MainStateStopped
 		if err := g.server().Set(ccldef.Patch{MainState: &stopped}); err != nil {
 			slog.Warn("garage.calibrated", slog.String("device", g.name), slog.Any("err", err))
@@ -244,16 +250,10 @@ func (g *demoGarage) Calibrate(context.Context) error {
 // the position is no longer one of them; a calibration run is abandoned.
 func (g *demoGarage) Stop(context.Context) error {
 	g.mu.Lock()
-	moving := g.travel != nil
-	if moving {
-		g.travel.Stop()
-		g.travel = nil
-	}
+	moving := g.travel.armedLocked()
+	g.travel.stopLocked()
 	g.latchTo, g.speedTo = nil, nil
-	if g.calibration != nil {
-		g.calibration.Stop()
-		g.calibration = nil
-	}
+	g.calibration.stopLocked()
 	g.mu.Unlock()
 	if moving {
 		partial := ccldef.CurrentPositionPartiallyOpened
@@ -280,6 +280,11 @@ const (
 // trigger (matter_testing.py _update_legacy_test_event_triggers); the
 // daemon has one closure, so the endpoint is masked off.
 func (g *demoGarage) testEventTrigger(trigger uint64) (handled bool) {
+	if g.server() == nil {
+		// Not built — withheld by --spec-level: no such device, so not
+		// handled, as demoDem answers unbuilt (R2-P6-err-2650).
+		return false
+	}
 	var patch ccldef.Patch
 	switch trigger &^ (0xFFFF << 32) {
 	case triggerClosureError:
@@ -334,9 +339,11 @@ const (
 type demoPanel struct {
 	name string
 
-	mu     sync.Mutex
-	srv    *cdim.Server
-	motion *time.Timer
+	mu  sync.Mutex
+	srv *cdim.Server
+	// motion is the next motion tick; a stale tick of a chain a newer
+	// start replaced does nothing (latestTimer).
+	motion latestTimer
 	stepBy uint16
 }
 
@@ -351,7 +358,7 @@ func (p *demoPanel) device(opts device.Options) (*device.ClosurePanel, error) {
 	axis, overflow := cdim.RotationAxisCenteredVertical, cdim.OverflowTopInside
 	latching := cdim.LatchControlModesRemoteLatching | cdim.LatchControlModesRemoteUnlatching
 	// The Descriptor's TagList, which matter.js's ClosurePanel device
-	// enables (packages/node/src/devices/closure-panel.ts:59 at 862ad75f):
+	// enables (packages/node/src/devices/closure-panel.ts:59 at db021da0):
 	// ClosurePanel namespace (0x45), Rotate (0x03).
 	opts.Tags = []device.SemanticTag{{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x45, Tag: 0x03}}
 	d, err := device.NewClosurePanel(opts, cdim.Declare{
@@ -407,11 +414,8 @@ func (p *demoPanel) Step(_ context.Context, direction cdim.StepDirectionEnum, st
 func (p *demoPanel) start(stepBy uint16) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.motion != nil {
-		p.motion.Stop()
-	}
 	p.stepBy = stepBy
-	p.motion = time.AfterFunc(panelTick, p.tick)
+	p.motion.armLocked(panelTick, p.tick)
 }
 
 // setCurrent records the panel's current state.
@@ -423,10 +427,14 @@ func (p *demoPanel) setCurrent(srv *cdim.Server, cur *cdim.DimensionStateStruct)
 
 // tick is one motion step: unlatch when the target unlatches, move toward
 // the target position, and at the target latch when asked and take the
-// target's fields as current.
-func (p *demoPanel) tick() {
+// target's fields as current. A stale tick (gen not the pending arming)
+// does nothing, so one chain of ticks runs at a time.
+func (p *demoPanel) tick(gen uint64) {
 	p.mu.Lock()
-	p.motion = nil
+	if !p.motion.takeLocked(gen) {
+		p.mu.Unlock()
+		return
+	}
 	stepBy, srv := p.stepBy, p.srv
 	p.mu.Unlock()
 	st := srv.Get()
@@ -443,7 +451,10 @@ func (p *demoPanel) tick() {
 		p.setCurrent(srv, cur)
 		if next != tgt.Position.Value {
 			p.mu.Lock()
-			p.motion = time.AfterFunc(panelTick, p.tick)
+			// A start since this tick armed its own chain: that one goes on.
+			if !p.motion.armedLocked() {
+				p.motion.armLocked(panelTick, p.tick)
+			}
 			p.mu.Unlock()
 			return
 		}

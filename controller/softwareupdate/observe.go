@@ -15,11 +15,11 @@ type UpdateEventKind uint8
 // The kinds of an [UpdateEvent]. Available, Applying, Done and Failed are
 // matter.js's SoftwareUpdateManager events updateAvailable, updateApplying,
 // updateDone and updateFailed (packages/node/src/behavior/system/
-// software-update/SoftwareUpdateManager.ts:1420-1438 at 862ad75f), emitted
+// software-update/SoftwareUpdateManager.ts:1420-1438 at db021da0), emitted
 // where matter.js emits them (:886; :1317; :829, :1279; :878, :1123).
 // ConsentChanged, CheckFinished, Queued and TransferStarted are this
 // module's own: matter.js emits nothing when a consent is added or
-// removed, when a check ends, when #queueUpdate queues an entry (:892-920)
+// removed, when a check ends, when #queueUpdate queues an entry (:892-921)
 // or when onOtaStatusChange first sees Downloading (:1253-1321). One
 // update reports Queued, TransferStarted, Applying, then Done or Failed.
 const (
@@ -85,7 +85,7 @@ func (k UpdateEventKind) String() string {
 
 // ErrNotApplied is the Err of an [UpdateFailed] whose node came back from
 // its restart below the target version (#failAppliedUpdate,
-// SoftwareUpdateManager.ts:875-880 at 862ad75f).
+// SoftwareUpdateManager.ts:875-880 at db021da0).
 var ErrNotApplied = errors.New("softwareupdate: the node did not apply the update")
 
 // ErrUpdateCancelled is the Err of an [UpdateFailed] whose update was

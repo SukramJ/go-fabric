@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -155,5 +157,88 @@ func TestRadio(t *testing.T) {
 	}
 	if _, ok := r.Advertising(); ok {
 		t.Fatal("still advertising")
+	}
+}
+
+// TestRadioAcceptsOneAtATime: centrals that connect at once reach the
+// node's accept one at a time, as contract.GATTService.Serve promises; and
+// Serve does not return while an accept runs, nor accepts once it
+// returned (review II, R2-P6-conc-2051).
+func TestRadioAcceptsOneAtATime(t *testing.T) {
+	t.Parallel()
+	per := &bletest.Peripheral{Address: "AA:BB:CC:00:00:51"}
+	r := per.Radio()
+	c := bletest.NewCentral(per)
+	svc, err := r.RegisterService(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var in, overlaps atomic.Int32
+	var hold atomic.Bool
+	entered, release := make(chan struct{}, 1), make(chan struct{})
+	serveDone := make(chan struct{})
+	go func() {
+		defer close(serveDone)
+		_ = svc.Serve(ctx, func(contract.BLEConnection) {
+			if in.Add(1) > 1 {
+				overlaps.Add(1)
+			}
+			if hold.Load() {
+				entered <- struct{}{}
+				<-release
+			} else {
+				for range 100 { // the other connects' chance to enter now
+					runtime.Gosched()
+				}
+			}
+			in.Add(-1)
+		})
+	}()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer waitCancel()
+	for {
+		if s, _ := r.Serving(); s {
+			break
+		}
+		select {
+		case <-waitCtx.Done():
+			t.Fatal("not serving")
+		default:
+			runtime.Gosched()
+		}
+	}
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Go(func() {
+			if _, err := c.Connect(context.Background(), ble.Peripheral{Address: per.Address}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if n := overlaps.Load(); n > 0 {
+		t.Fatalf("accept ran concurrently: %d overlapping calls", n)
+	}
+
+	// Serve's end waits for the accept in flight.
+	hold.Store(true)
+	wg.Go(func() { _, _ = c.Connect(context.Background(), ble.Peripheral{Address: per.Address}) })
+	<-entered
+	cancel()
+	for range 100 { // Serve's chance to see ctx end and return early
+		runtime.Gosched()
+	}
+	select {
+	case <-serveDone:
+		t.Fatal("Serve returned while an accept ran")
+	default:
+	}
+	close(release)
+	wg.Wait()
+	<-serveDone
+	if _, err := c.Connect(context.Background(), ble.Peripheral{Address: per.Address}); !errors.Is(err, bletest.ErrNoService) {
+		t.Fatalf("Connect after Serve returned: %v, want ErrNoService", err)
 	}
 }

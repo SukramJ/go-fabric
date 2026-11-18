@@ -14,7 +14,7 @@ import (
 
 // ProbeOptions configure [Interaction.Probe] — matter.js
 // ClientProbeOptions (packages/protocol/src/action/client/ClientInteraction.ts:1370-1385
-// at 862ad75f). The abort is the ctx Probe takes.
+// at db021da0). The abort is the ctx Probe takes.
 type ProbeOptions struct {
 	// Network names the network profile whose throttle the probe takes a
 	// slot of; "" is the interaction's [Config].Network, then the peer's
@@ -38,7 +38,7 @@ type ProbeOptions struct {
 // Probe checks that the peer answers on an existing session with an empty
 // read and reports whether it did. Mirrors matter.js ClientInteraction.probe
 // (packages/protocol/src/action/client/ClientInteraction.ts:352-412 at
-// 862ad75f): a closed interaction probes nothing (:361-363); the exchange
+// db021da0): a closed interaction probes nothing (:361-363); the exchange
 // requires an existing session — never a new connection — and goes to
 // opts.AddressOverride when set (:369-374), a provider without a session
 // failing the probe (:375-378); the read has no paths and no fabric filter

@@ -23,7 +23,7 @@ type batchResult struct {
 // in one InvokeRequest numbered by CommandRef; the answers are matched by
 // it whatever their order, a response for no command of the batch is
 // dropped, and a command without an answer is NoCommandResponse
-// (ClientInteraction.ts:510-517, :616-646 at 862ad75f).
+// (ClientInteraction.ts:510-517, :616-646 at db021da0).
 func TestInvokeBatchOneExchange(t *testing.T) {
 	t.Parallel()
 	s := newScripted(t)

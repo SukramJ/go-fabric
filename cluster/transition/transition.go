@@ -236,7 +236,7 @@ func (e *Engine) Start(t Transition) error { return e.StartAll(t) }
 // does, the targets of the immediate ones applied in a single Apply.
 // matter.js starts a command's transitions inside the command's
 // transaction (moveToColorLogic starts currentX then currentY,
-// ColorControlServer.ts:797-813 at 0ceb202d), so an immediate transition's
+// ColorControlServer.ts:797-813 at db021da0), so an immediate transition's
 // values reach the state in one commit and a hook on the committed state
 // sees both at once; a step of a gradual transition applies every
 // property's value together anyway (Transitions.ts:537-574). Apply's error
@@ -258,10 +258,35 @@ func (e *Engine) StartAll(ts ...Transition) error {
 
 // startLocked is one transition of [StartAll]: it registers a gradual
 // transition and returns the change of an immediate one for the caller
-// to apply. The caller holds op.
+// to apply. A running transition of the name that the command ends
+// without starting a gradual one — already at the target, immediate, an
+// unknown value, no distance, at the bound — ends as a cancel does:
+// Settled for the name and RemainingTime by cancel's rule. Follows
+// connectedhomeip, which stops the running transition before any new one
+// and sets RemainingTime to 0, reportable when the stopped transition was
+// 1 s or longer (LevelControlCluster.cpp:351, :731-735, :701-706 at
+// 6170af84) — cancel's rule reports 0 where something was reported, the
+// same effect; matter.js's replace stops it silently
+// (Transitions.ts:124, :263-284 at db021da0; R2-P6-fsm-1402). A replace by
+// a gradual transition reports its own RemainingTime. The caller holds op.
 func (e *Engine) startLocked(t Transition) (Change, bool) {
-	e.stopLocked(t.Name)
+	previous := e.RemainingTime()
+	replaced := e.stopLocked(t.Name)
+	c, ok := e.beginLocked(t)
+	if replaced {
+		e.mu.Lock()
+		_, gradual := e.states[t.Name]
+		e.mu.Unlock()
+		if !gradual {
+			e.endedLocked([]string{t.Name}, previous)
+		}
+	}
+	return c, ok
+}
 
+// beginLocked is startLocked after the name's running transition was
+// stopped. The caller holds op.
+func (e *Engine) beginLocked(t Transition) (Change, bool) {
 	current, known := e.cfg.Read(t.Name)
 	if t.TargetFrom != nil && known && !t.NoTarget {
 		t.Target = t.TargetFrom(current)
@@ -413,12 +438,13 @@ func (e *Engine) StopAll() {
 	e.mu.Unlock()
 }
 
-// stopLocked is stop(name). The caller holds op.
-func (e *Engine) stopLocked(name string) {
+// stopLocked is stop(name); it reports whether a transition of name was
+// running. The caller holds op.
+func (e *Engine) stopLocked(name string) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if _, ok := e.states[name]; !ok {
-		return
+		return false
 	}
 	delete(e.states, name)
 	for i, n := range e.order {
@@ -430,6 +456,7 @@ func (e *Engine) stopLocked(name string) {
 	if len(e.states) == 0 {
 		e.disarmLocked()
 	}
+	return true
 }
 
 // Finish ends the transition of name as completed (matter.js
@@ -501,6 +528,15 @@ func (e *Engine) cancelLocked(names []string) {
 			e.stopLocked(name)
 		}
 	}
+	e.endedLocked(names, previous)
+}
+
+// endedLocked is the tail of cancel for names, which have just been
+// stopped; previous is RemainingTime before they were: Settled for each,
+// then RemainingTime — the remaining transitions' from the command while
+// any runs, else 0, reported where something was reported before. The
+// caller holds op.
+func (e *Engine) endedLocked(names []string, previous int) {
 	if e.cfg.Settled != nil {
 		for _, name := range names {
 			e.cfg.Settled(name)
@@ -676,10 +712,18 @@ func (e *Engine) step(now time.Time) {
 	}
 	if len(changes) > 0 {
 		if err := e.cfg.Apply(changes); err != nil {
-			e.mu.Lock()
-			e.order, e.states = nil, map[string]*state{}
-			e.disarmLocked()
-			e.mu.Unlock()
+			// A refused step ends every transition, as matter.js's step
+			// `.catch` calls `stop` on a step error (Transitions.ts:594-600
+			// at db021da0). It ends them as a cancel does — Settled per
+			// name, RemainingTime 0 reported where something was — so no
+			// subscriber keeps a RemainingTime above 0 for a transition
+			// that no longer runs (R2-P6-err-1415, ahead of matter.js, whose
+			// `stop` reports nothing, Transitions.ts:263-284 at db021da0;
+			// the rule is the one connectedhomeip quotes and implements,
+			// "When it changes to 0." (LevelControlCluster.cpp:688-691,
+			// :706 at 6170af84)).
+			// No retry: the transitions stay ended.
+			e.cancelLocked(nil)
 			return
 		}
 	}

@@ -16,9 +16,11 @@
 //     generated definitions, media/ the media and content clusters, …)
 //   - endpoint/      endpoint topology assembler and device-type validation
 //   - im/            Interaction Model
-//   - controller/    the commissioner/controller role: discovery, PASE/CASE
-//     client, attestation (DCL opt-in), CA, client interaction, the client
-//     node model and registry
+//   - client/        the client machinery both roles use: discovery,
+//     exchanges, the PASE/CASE initiator, the client interaction, the peer
+//     set, Joint Fabric trust verification
+//   - controller/    the commissioner/controller role: commissioning flow,
+//     attestation (DCL opt-in), CA, the client node model and registry
 //   - binding/, groups/  bindings and group messaging (send and receive)
 //   - bdx/           Bulk Data Exchange (OTA images, diagnostic logs)
 //   - commissioning/ on-network discovery, attestation, fabric join

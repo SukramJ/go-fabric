@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // The LIT ICD part of the port of matter.js
-// packages/node/test/node/ServerSubscriptionTest.ts at 862ad75f (:157-183):
+// packages/node/test/node/ServerSubscriptionTest.ts at db021da0 (:157-183):
 // a LIT-capable ICD publisher grants its IdleModeDuration as the
 // subscription's MaxInterval, above or below the ceiling the controller
 // requests (ServerSubscription.ts:302-312). The device is a fabrictest node

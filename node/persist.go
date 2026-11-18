@@ -203,24 +203,33 @@ func keyString(key device.SourceKey) (string, bool) {
 	return key.String(), true
 }
 
-func (p persisted) loadUint32(ctx context.Context, key string) uint32 {
+// loadUint32 reads the version stored under key, 0 for none. The store's
+// error is returned: a version read as 0 after a failed read would be
+// served lower and stored lower at the next raise, against "a version
+// never decreases" (review II, R2-P6-store-2403). A value that does not
+// decode is logged and read as none.
+func (p persisted) loadUint32(ctx context.Context, key string) (uint32, error) {
 	v, ok, err := p.st.GetSetting(ctx, key)
-	if err != nil || !ok {
-		return 0
+	if err != nil {
+		return 0, fmt.Errorf("node: load %s: %w", key, err)
+	}
+	if !ok {
+		return 0, nil
 	}
 	n, err := strconv.ParseUint(v, 10, 32)
 	if err != nil {
-		return 0
+		p.logger.Warn("config_version.restore", slog.String("key", key), slog.Any("err", err))
+		return 0, nil
 	}
-	return uint32(n)
+	return uint32(n), nil
 }
 
 // configVersion returns the ConfigurationVersion persisted for a bridged
-// endpoint, 0 for none.
-func (p persisted) configVersion(ctx context.Context, key device.SourceKey) uint32 {
+// endpoint, 0 for none, and the store's error (loadUint32).
+func (p persisted) configVersion(ctx context.Context, key device.SourceKey) (uint32, error) {
 	k, ok := keyString(key)
 	if !ok {
-		return 0
+		return 0, nil
 	}
 	return p.loadUint32(ctx, endpointConfigVersionKey+k)
 }
@@ -283,15 +292,30 @@ func (p persisted) LoadNodeLabel(ctx context.Context, key device.SourceKey) (str
 }
 
 // restoreRoot applies the persisted root NodeLabel, Location and
-// ConfigurationVersion and wires their persistence.
-func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformation) {
-	if v, ok, err := p.st.GetSetting(ctx, rootNodeLabelKey); err == nil && ok {
+// ConfigurationVersion and wires their persistence. A store that fails a
+// read fails it, and New with it, as countBoot's does: the default served
+// in the stored value's place would be stored over it at the next write
+// — one write stores both labels — and a version read as 0 would go down
+// (review II, R2-P6-store-2403).
+func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformation) error {
+	v, ok, err := p.st.GetSetting(ctx, rootNodeLabelKey)
+	if err != nil {
+		return fmt.Errorf("node: load %s: %w", rootNodeLabelKey, err)
+	}
+	if ok {
 		_ = b.RestoreNodeLabel(v)
 	}
-	if v, ok, err := p.st.GetSetting(ctx, rootLocationKey); err == nil && ok {
+	if v, ok, err = p.st.GetSetting(ctx, rootLocationKey); err != nil {
+		return fmt.Errorf("node: load %s: %w", rootLocationKey, err)
+	}
+	if ok {
 		_ = b.RestoreLocation(v)
 	}
-	b.RestoreConfigurationVersion(p.loadUint32(ctx, rootConfigVersionKey))
+	version, err := p.loadUint32(ctx, rootConfigVersionKey)
+	if err != nil {
+		return err
+	}
+	b.RestoreConfigurationVersion(version)
 	// A store failure fails the write (mattercore.BasicInformation
 	// SetOnPersistentWrite): the host's SetNodeLabel returns it, a
 	// controller's write answers FAILURE. The write uses New's context
@@ -306,6 +330,7 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 		}
 		return err
 	})
+	return nil
 }
 
 // LoadScenes implements [EndpointState] (endpoint.Persistence): the table

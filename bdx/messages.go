@@ -6,6 +6,7 @@ package bdx
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 )
 
 // ProtocolID is the BDX protocol id on the wire (Common vendor).
@@ -158,8 +159,16 @@ func decodeRangeControl(b byte) rangeControl {
 // Mirrors matter.js BdxInitMessagesSchema.ts:59-104 (BdxInit). matter.js
 // decides between 32- and 64-bit range fields by the JavaScript type of the
 // value (`typeof startOffset === "bigint"`); the Go form carries that choice
-// as WideRange. A MaxLength of 0 means an indefinite length, as in
-// matter.js, and is not put on the wire.
+// as WideRange, and a value above 2³²−1 takes the 64-bit form whatever
+// WideRange says — chosen by value, as connectedhomeip chooses it
+// (src/protocols/bdx/BdxMessages.cpp:47-48, :53 at 6170af84), so nothing is
+// truncated (review II, R2-P6-wire-1909; an Ahead-of-matter.js row: matter.js
+// takes the wide form by type — BdxInitMessagesSchema.ts:115 for the Init,
+// BdxAcceptMessagesSchema.ts:110 for the ReceiveAccept, at db021da0 — and
+// writes a number above 2³²−1 through DataView.setUint32,
+// DataWriter.ts:33-35, which wraps it modulo 2³²). A
+// MaxLength of 0 means an indefinite length, as in matter.js, and is not
+// put on the wire.
 type Init struct {
 	TransferControl TransferControl
 	MaxBlockSize    uint16
@@ -168,7 +177,8 @@ type Init struct {
 	// MaxLength is the optional definite length (DEFLEN); nil or 0 is
 	// indefinite.
 	MaxLength *uint64
-	// WideRange writes StartOffset and MaxLength as 64-bit values.
+	// WideRange writes StartOffset and MaxLength as 64-bit values; Encode
+	// sets it for a value above 2³²−1.
 	WideRange      bool
 	FileDesignator []byte
 	// MetaData is the optional trailing TLV metadata.
@@ -202,14 +212,16 @@ func (m Init) Encode() ([]byte, error) {
 		return nil, err
 	}
 	definite := m.MaxLength != nil && *m.MaxLength != 0
-	rc := rangeControl{startOffset: m.StartOffset != nil, definiteLength: definite, wideRange: m.WideRange}
+	// One flag for both fields, as BdxMessages.cpp:53 sets it.
+	wide := m.WideRange || (m.StartOffset != nil && *m.StartOffset > math.MaxUint32) || (definite && *m.MaxLength > math.MaxUint32)
+	rc := rangeControl{startOffset: m.StartOffset != nil, definiteLength: definite, wideRange: wide}
 	out := []byte{m.TransferControl.encode(), rc.encode()}
 	out = binary.LittleEndian.AppendUint16(out, m.MaxBlockSize)
 	if m.StartOffset != nil {
-		out = appendRange(out, *m.StartOffset, m.WideRange)
+		out = appendRange(out, *m.StartOffset, wide)
 	}
 	if definite {
-		out = appendRange(out, *m.MaxLength, m.WideRange)
+		out = appendRange(out, *m.MaxLength, wide)
 	}
 	out = binary.LittleEndian.AppendUint16(out, uint16(len(m.FileDesignator))) //nolint:gosec // Validate bounds it to 0xFFFF
 	out = append(out, m.FileDesignator...)
@@ -306,7 +318,10 @@ type ReceiveAccept struct {
 	MaxBlockSize    uint16
 	// Length is the optional definite length; nil or 0 is indefinite.
 	Length *uint64
-	// WideRange writes Length as a 64-bit value.
+	// WideRange writes Length as a 64-bit value; Encode sets it for a
+	// Length above 2³²−1, as connectedhomeip does
+	// (src/protocols/bdx/BdxMessages.cpp:302, :307 at 6170af84; review II,
+	// R2-P6-wire-1909).
 	WideRange bool
 	MetaData  []byte
 }
@@ -317,11 +332,12 @@ func (m ReceiveAccept) Encode() ([]byte, error) {
 		return nil, err
 	}
 	definite := m.Length != nil && *m.Length != 0
-	rc := rangeControl{definiteLength: definite, wideRange: m.WideRange}
+	wide := m.WideRange || (definite && *m.Length > math.MaxUint32)
+	rc := rangeControl{definiteLength: definite, wideRange: wide}
 	out := []byte{m.TransferControl.encode(), rc.encode()}
 	out = binary.LittleEndian.AppendUint16(out, m.MaxBlockSize)
 	if definite {
-		out = appendRange(out, *m.Length, m.WideRange)
+		out = appendRange(out, *m.Length, wide)
 	}
 	return append(out, m.MetaData...), nil
 }
@@ -436,6 +452,8 @@ func Decode(t MessageType, payload []byte) (any, error) {
 	return nil, fmt.Errorf("bdx: can not decode unknown BDX message type: %d", uint8(t))
 }
 
+// appendRange writes a range field; its callers pass wide for a value
+// above 2³²−1 and set the range control's flag with it.
 func appendRange(out []byte, v uint64, wide bool) []byte {
 	if wide {
 		return binary.LittleEndian.AppendUint64(out, v)

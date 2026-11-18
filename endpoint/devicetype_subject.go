@@ -107,7 +107,7 @@ func (tree DeviceTypeTree) Validate() []DeviceTypeViolation {
 // [ValidateDeviceTypes] leaves it out and [DeviceTypeValidator] adds it:
 // matter.js's #validateRequiredCommands
 // (packages/node/src/behavior/cluster/ValidatedElements.ts:357-372 at
-// 862ad75f), which warns "Throws unimplemented exception" and, under
+// db021da0), which warns "Throws unimplemented exception" and, under
 // strict validation, refuses the behavior (ClusterImplementationError,
 // :26-37; strict set at ServerBehaviorBacking.ts:100-102).
 func unimplementedOf(s DeviceTypeSubject) []DeviceTypeViolation {

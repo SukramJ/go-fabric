@@ -20,7 +20,7 @@ import (
 // keeps the generated server. No device type at the pin lists the cluster
 // as a server: matter.js has it only as the thermostat's client
 // (AmbientContextSensingClient, packages/node/src/devices/thermostat.ts:133-138
-// at 862ad75f). A host mounts it on another type as the declaration's
+// at db021da0). A host mounts it on another type as the declaration's
 // HostServer (acsdef.Declare{HostServer: srv} with
 // [sensing.NewAmbientContext]), the route for a cluster a type does not
 // list ([HostServer]).
@@ -40,10 +40,11 @@ func newAmbientContextServer(b defaultBuild) (contract.ClusterServer, error) {
 		ServeObjectCount: slices.Contains(b.opts.Attributes, acsdef.AttrObjectCount),
 		Clock:            b.clock,
 	}
+	selection := cfg
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := sensing.NewAmbientContext(cfg)
 	if err != nil {
-		return nil, notServed(err)
+		return nil, sensingError(err, func() error { _, err := sensing.NewAmbientContext(selection); return err })
 	}
 	return srv, nil
 }
@@ -53,7 +54,7 @@ func newAmbientContextServer(b defaultBuild) (contract.ClusterServer, error) {
 // sensor type from the detector features, OccupancyChanged on every
 // Occupancy change with OccupancyEvent
 // (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:22-90
-// at 862ad75f) — and, when the declaration serves HoldTime, chip's hold
+// at db021da0) — and, when the declaration serves HoldTime, chip's hold
 // timer on the device's clock. HoldTime and HoldTimeLimits start from
 // Initial; it needs no port, so it is the default wherever a device type
 // lists the cluster (OccupancySensor).
@@ -63,10 +64,24 @@ func newOccupancyServer(b defaultBuild) (contract.ClusterServer, error) {
 		Attributes: slices.Clone(b.opts.Attributes), Events: slices.Clone(b.opts.Events),
 		Clock: b.clock,
 	}
+	selection := cfg
 	configFrom(&cfg, b.def, b.initial)
 	srv, err := sensing.NewOccupancy(cfg)
 	if err != nil {
-		return nil, notServed(err)
+		return nil, sensingError(err, func() error { _, err := sensing.NewOccupancy(selection); return err })
 	}
 	return srv, nil
+}
+
+// sensingError classifies a sensing constructor's refusal err: the
+// selection alone refused (selectionOnly builds the server with the
+// selection and none of the Initial values) is the self-held server
+// declining the selection ([ErrSelectionNotServed]); otherwise a value of
+// the host's Initial is refused, which New reports as [ErrConfiguration]
+// (R2-P6-err-2516).
+func sensingError(err error, selectionOnly func() error) error {
+	if selectionOnly() != nil {
+		return notServed(err)
+	}
+	return err
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -67,6 +68,26 @@ func controllerOnClientSession(t *testing.T) (p *fabrictest.Pair, ctlAddr handsh
 	if n := len(p.Device.Node().Sessions().Sessions()); n != 0 {
 		t.Fatalf("the device still holds %d server-stack sessions", n)
 	}
+	// The device's server-stack sessions are gone on its side; the
+	// controller learns it from their CloseSession. Wait until the
+	// controller's peer holds no open session but those the device's
+	// client stack opened, so no command below can pick a session the
+	// device already closed (R2-P6-test-3106, N6a-flake-3; a hardening,
+	// the stale window was not seen in 120 probe runs).
+	waitLive(t, "the controller to drop the device's closed server-stack sessions", func() bool {
+		opened := map[uint16]bool{}
+		if dp := p.Device.Node().Peers().Get(ctlAddr); dp != nil {
+			for _, s := range dp.Sessions() {
+				opened[s.ID()] = true
+			}
+		}
+		for _, s := range fabrictestseam.Peer(p).Sessions() {
+			if !s.IsClosed() && !opened[s.PeerSessionID()] {
+				return false
+			}
+		}
+		return len(opened) > 0
+	})
 	return p, ctlAddr
 }
 

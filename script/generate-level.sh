@@ -35,8 +35,15 @@ if [ -e "$wt" ]; then
 	exit 2
 fi
 
+tmp="$out/.level-$tag.json.tmp"
 git -C "$matterjs" worktree add --quiet --detach "$wt" "$tag"
-cleanup() { git -C "$matterjs" worktree remove --force "$wt" || true; }
+# The exit trap removes the worktree and the extract's temporary files in
+# out/: a refusal after the extract (the tag check below, under set -e)
+# must not leave a .tmp in the tracked parity/levels (R2-P6-sup-2710).
+cleanup() {
+	rm -f "$tmp" "$tmp.err"
+	git -C "$matterjs" worktree remove --force "$wt" || true
+}
 trap cleanup EXIT
 
 (cd "$wt" && npm ci --ignore-scripts --no-audit --no-fund --loglevel=error)
@@ -50,7 +57,6 @@ if [ ! -f "$wt/packages/model/dist/esm/index.js" ]; then
 fi
 
 cp "$here/extract-levels-from-matter-js.ts" "$wt/.gofabric-levels.mts"
-tmp="$out/.level-$tag.json.tmp"
 # A node that cannot strip TypeScript types itself gets the extractor
 # transpiled by the tag's own esbuild first (as generate-matter-schema does).
 if (cd "$wt" && node .gofabric-levels.mts >"$tmp" 2>"$tmp.err"); then

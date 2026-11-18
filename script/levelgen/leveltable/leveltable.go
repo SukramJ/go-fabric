@@ -40,19 +40,24 @@ type DeviceType struct {
 }
 
 // Cluster is a cluster of a level: its revision, its features by bit and
-// the ids of its attributes, commands (request and response alike) and
-// events, and those its own conformance makes mandatory ("M").
+// the ids of its attributes, request commands, response commands and
+// events, and those its own conformance makes mandatory ("M"). A command
+// id is keyed by its direction: one id can name a request at one level
+// and a response at another (Thermostat 2), so the two lists are never
+// merged (review II R2-P6-par-2713, owner decision 227).
 type Cluster struct {
-	ID         uint32    `json:"id"`
-	Revision   uint16    `json:"revision"`
-	Features   []Feature `json:"features"`
-	Attributes []uint32  `json:"attributes"`
-	Commands   []uint32  `json:"commands"`
-	Events     []uint32  `json:"events"`
-	Mandatory  struct {
-		Attributes []uint32 `json:"attributes"`
-		Commands   []uint32 `json:"commands"`
-		Events     []uint32 `json:"events"`
+	ID               uint32    `json:"id"`
+	Revision         uint16    `json:"revision"`
+	Features         []Feature `json:"features"`
+	Attributes       []uint32  `json:"attributes"`
+	RequestCommands  []uint32  `json:"requestCommands"`
+	ResponseCommands []uint32  `json:"responseCommands"`
+	Events           []uint32  `json:"events"`
+	Mandatory        struct {
+		Attributes       []uint32 `json:"attributes"`
+		RequestCommands  []uint32 `json:"requestCommands"`
+		ResponseCommands []uint32 `json:"responseCommands"`
+		Events           []uint32 `json:"events"`
 	} `json:"mandatory"`
 }
 
@@ -81,6 +86,9 @@ func Load(dir string) ([]File, error) {
 		if err := json.Unmarshal(b, &f); err != nil {
 			return nil, fmt.Errorf("%s: %w", n, err)
 		}
+		if err := checkDirected(b); err != nil {
+			return nil, fmt.Errorf("%s: %w", n, err)
+		}
 		f.Name, f.raw = filepath.Base(n), b
 		if want := f.Matter.Revision + ".json"; f.Name != want {
 			return nil, fmt.Errorf("%s: carries revision %q, so its name must be %s", n, f.Matter.Revision, want)
@@ -98,6 +106,30 @@ func Load(dir string) ([]File, error) {
 	}
 	slices.SortFunc(out, func(a, b File) int { return CompareLevels(a.Matter.Revision, b.Matter.Revision) })
 	return out, nil
+}
+
+// checkDirected refuses a level file in the format before owner decision
+// 227: a cluster's "commands" list, request and response ids merged, which
+// the reader would otherwise read as no commands at all.
+func checkDirected(b []byte) error {
+	var probe struct {
+		Clusters []struct {
+			ID        uint32          `json:"id"`
+			Commands  json.RawMessage `json:"commands"`
+			Mandatory struct {
+				Commands json.RawMessage `json:"commands"`
+			} `json:"mandatory"`
+		} `json:"clusters"`
+	}
+	if err := json.Unmarshal(b, &probe); err != nil {
+		return err
+	}
+	for _, c := range probe.Clusters {
+		if c.Commands != nil || c.Mandatory.Commands != nil {
+			return fmt.Errorf("cluster 0x%04X lists \"commands\" without their direction: re-extract the level (make generate-level)", c.ID)
+		}
+	}
+	return nil
 }
 
 // ParseLevel splits a level id ("1.4.2") into its numbers.
@@ -147,11 +179,14 @@ type Pin struct {
 	DeviceTypeNames, ClusterNames map[uint32]string
 }
 
-// PinCluster is a cluster of the pin.
+// PinCluster is a cluster of the pin: its command ids by their effective
+// direction.
 type PinCluster struct {
-	ID                           uint32
-	Features                     []uint8
-	Attributes, Commands, Events []uint32
+	ID                                uint32
+	Features                          []uint8
+	Attributes                        []uint32
+	RequestCommands, ResponseCommands []uint32
+	Events                            []uint32
 }
 
 // LoadPin reads parity/schema.json's ids.
@@ -172,13 +207,19 @@ func LoadPin(path string) (Pin, error) {
 			ID       uint32 `json:"id"`
 			Name     string `json:"name"`
 			Features []struct {
-				Bit *uint8 `json:"bit"`
+				Name string `json:"name"`
+				Bit  *uint8 `json:"bit"`
 			} `json:"features"`
 			Attributes []struct {
 				ID uint32 `json:"id"`
 			} `json:"attributes"`
 			Commands []struct {
-				ID uint32 `json:"id"`
+				ID        uint32 `json:"id"`
+				Name      string `json:"name"`
+				Direction string `json:"direction"`
+				Effective *struct {
+					Direction string `json:"direction"`
+				} `json:"effective"`
 			} `json:"commands"`
 			Events []struct {
 				ID uint32 `json:"id"`
@@ -197,15 +238,34 @@ func LoadPin(path string) (Pin, error) {
 		p.ClusterNames[c.ID] = c.Name
 		pc := PinCluster{ID: c.ID}
 		for _, f := range c.Features {
-			if f.Bit != nil {
-				pc.Features = append(pc.Features, *f.Bit)
+			// A feature without a usable bit is refused, not skipped: the
+			// check against the last level would miss it (R2-P6-par-2714).
+			if f.Bit == nil {
+				return Pin{}, fmt.Errorf("%s: %s.%s: feature without a bit", path, c.Name, f.Name)
 			}
+			if *f.Bit > 31 {
+				return Pin{}, fmt.Errorf("%s: %s.%s: feature bit %d outside the 32-bit FeatureMap", path, c.Name, f.Name, *f.Bit)
+			}
+			pc.Features = append(pc.Features, *f.Bit)
 		}
 		for _, a := range c.Attributes {
 			pc.Attributes = append(pc.Attributes, a.ID)
 		}
 		for _, x := range c.Commands {
-			pc.Commands = append(pc.Commands, x.ID)
+			// The effective direction, the raw one when the effective
+			// layer states none (generate_matter_schema's commandDirection).
+			dir := x.Direction
+			if x.Effective != nil && x.Effective.Direction != "" {
+				dir = x.Effective.Direction
+			}
+			switch dir {
+			case "request":
+				pc.RequestCommands = append(pc.RequestCommands, x.ID)
+			case "response":
+				pc.ResponseCommands = append(pc.ResponseCommands, x.ID)
+			default:
+				return Pin{}, fmt.Errorf("%s: %s.%s: command direction %q", path, c.Name, x.Name, dir)
+			}
 		}
 		for _, e := range c.Events {
 			pc.Events = append(pc.Events, e.ID)
@@ -236,7 +296,8 @@ func CheckPin(files []File, pin Pin) error {
 	for i := range last.Clusters {
 		cls[last.Clusters[i].ID] = &last.Clusters[i]
 	}
-	for _, pc := range pin.Clusters {
+	for pi := range pin.Clusters {
+		pc := &pin.Clusters[pi]
 		c := cls[pc.ID]
 		if c == nil {
 			missing = append(missing, fmt.Sprintf("cluster 0x%04X", pc.ID))
@@ -250,7 +311,12 @@ func CheckPin(files []File, pin Pin) error {
 		for _, k := range []struct {
 			kind      string
 			pin, have []uint32
-		}{{"attribute", pc.Attributes, c.Attributes}, {"command", pc.Commands, c.Commands}, {"event", pc.Events, c.Events}} {
+		}{
+			{"attribute", pc.Attributes, c.Attributes},
+			{"request command", pc.RequestCommands, c.RequestCommands},
+			{"response command", pc.ResponseCommands, c.ResponseCommands},
+			{"event", pc.Events, c.Events},
+		} {
 			for _, id := range k.pin {
 				if !slices.Contains(k.have, id) {
 					missing = append(missing, fmt.Sprintf("%s 0x%04X of cluster 0x%04X", k.kind, id, pc.ID))
@@ -291,10 +357,10 @@ package schema
 
 	dts := map[uint32]set{}
 	type cl struct {
-		levels                       set
-		revisions                    []uint16
-		features                     map[uint8]set
-		attributes, commands, events map[uint32]set
+		levels                                  set
+		revisions                               []uint16
+		features                                map[uint8]set
+		attributes, requests, responses, events map[uint32]set
 	}
 	cls := map[uint32]*cl{}
 	for i := range files {
@@ -309,7 +375,7 @@ package schema
 			if x == nil {
 				x = &cl{
 					revisions: make([]uint16, len(files)), features: map[uint8]set{},
-					attributes: map[uint32]set{}, commands: map[uint32]set{}, events: map[uint32]set{},
+					attributes: map[uint32]set{}, requests: map[uint32]set{}, responses: map[uint32]set{}, events: map[uint32]set{},
 				}
 				cls[c.ID] = x
 			}
@@ -318,15 +384,10 @@ package schema
 			for _, ft := range c.Features {
 				x.features[ft.Bit] |= bit
 			}
-			for _, id := range c.Attributes {
-				x.attributes[id] |= bit
-			}
-			for _, id := range c.Commands {
-				x.commands[id] |= bit
-			}
-			for _, id := range c.Events {
-				x.events[id] |= bit
-			}
+			mark(x.attributes, c.Attributes, bit)
+			mark(x.requests, c.RequestCommands, bit)
+			mark(x.responses, c.ResponseCommands, bit)
+			mark(x.events, c.Events, bit)
 		}
 	}
 	b.WriteString("// deviceTypeLevels are the levels each device type exists at.\n")
@@ -337,7 +398,7 @@ package schema
 	b.WriteString("}\n\n")
 	b.WriteString("// clusterLevels are each cluster's levels, its ClusterRevision per level\n")
 	b.WriteString("// (0 where absent) and the levels of its features (by bit), attributes,\n")
-	b.WriteString("// commands and events (by id).\n")
+	b.WriteString("// request commands, response commands and events (by id).\n")
 	b.WriteString("var clusterLevels = map[uint32]*levelCluster{\n")
 	for _, id := range sortedKeys(cls) {
 		x := cls[id]
@@ -351,12 +412,20 @@ package schema
 		b.WriteString("},\n")
 		writeSetMap(&b, "features", x.features, "%d")
 		writeSetMap(&b, "attributes", x.attributes, "0x%04X")
-		writeSetMap(&b, "commands", x.commands, "0x%02X")
+		writeSetMap(&b, "requestCommands", x.requests, "0x%02X")
+		writeSetMap(&b, "responseCommands", x.responses, "0x%02X")
 		writeSetMap(&b, "events", x.events, "0x%02X")
 		b.WriteString("\t},\n")
 	}
 	b.WriteString("}\n")
 	return formatSource(b.Bytes())
+}
+
+// mark adds bit to the set of every id.
+func mark(m map[uint32]set, ids []uint32, bit set) {
+	for _, id := range ids {
+		m[id] |= bit
+	}
 }
 
 func writeSetMap[K ~uint8 | ~uint32](b *bytes.Buffer, field string, m map[K]set, idFmt string) {

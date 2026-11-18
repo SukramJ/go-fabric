@@ -21,7 +21,7 @@ import (
 //
 // matter.js's application overrides IdentifyServer's identify and
 // triggerEffect (packages/node/src/behaviors/identify/IdentifyServer.ts:129-135
-// at 862ad75f).
+// at db021da0).
 
 var _ contract.IdentifyHandler = (*Device)(nil)
 
@@ -33,7 +33,7 @@ func (s *settings) declareIdentify(d Declaration, decl spec.ClusterDeclaration) 
 	case identifydef.Declare:
 		onWrite = o.OnWrite != nil
 	case *identifydef.Declare:
-		onWrite = o != nil && o.OnWrite != nil
+		onWrite = o.OnWrite != nil // a typed nil is refused before (declare)
 	}
 	if onWrite || decl.Server != nil || decl.HasFeatures || len(decl.Initial) > 0 || hasPorts(decl.Ports) ||
 		len(decl.Elements.Attributes)+len(decl.Elements.Events) > 0 {

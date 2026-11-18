@@ -16,7 +16,7 @@ import (
 // cluster/spec.
 
 // TestConformanceApplicabilityParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:701-805 at 862ad75f
+// packages/model/test/aspects/ConformanceTest.ts:701-805 at db021da0
 // (describe "applicability", features AA and BB defined) and :807-827
 // (describe "provisionality", isMandatory).
 func TestConformanceApplicabilityParityMatterJS(t *testing.T) {
@@ -110,7 +110,7 @@ func TestConformanceApplicabilityParityMatterJS(t *testing.T) {
 }
 
 // TestAccessParityMatterJS mirrors
-// packages/model/test/aspects/AccessTest.ts:63-84 at 862ad75f (describe
+// packages/model/test/aspects/AccessTest.ts:63-84 at db021da0 (describe
 // "readable" and "writable"): R makes an element readable and W
 // writable, whatever fabric and privilege flags stand beside them.
 func TestAccessParityMatterJS(t *testing.T) {
@@ -136,7 +136,7 @@ func TestAccessParityMatterJS(t *testing.T) {
 }
 
 // TestConstraintValuesParityMatterJS mirrors the value tests of
-// packages/model/test/aspects/ConstraintTest.ts:23-87 at 862ad75f
+// packages/model/test/aspects/ConstraintTest.ts:23-87 at db021da0
 // ("accepts"/"rejects" over "0", "4", "-4", "min 4", "max 4" and
 // "4 to 44"), judged by a definition's CheckValue. The bigint value tests
 // beyond 2^53 are a findings-register row (float64 bounds).
@@ -185,7 +185,7 @@ func TestConstraintValuesParityMatterJS(t *testing.T) {
 
 // TestRequirementApplicabilityParityMatterJS mirrors
 // packages/model/test/logic/RequirementApplicabilityTest.ts:10-46 at
-// 862ad75f: a requirement's conformance judged by the names that hold
+// db021da0: a requirement's conformance judged by the names that hold
 // (Sit) among the names known (Sit, Lit, Cooler); a name not known is
 // left conditional.
 func TestRequirementApplicabilityParityMatterJS(t *testing.T) {
@@ -219,7 +219,7 @@ func TestRequirementApplicabilityParityMatterJS(t *testing.T) {
 }
 
 // TestEffectiveAccessParityMatterJS mirrors
-// packages/model/test/logic/EffectiveAccessTest.ts:33-53 at 862ad75f on
+// packages/model/test/logic/EffectiveAccessTest.ts:33-53 at db021da0 on
 // the access matter.js computes: the extractor writes each element's
 // effective access into parity/schema.json and script/clustergen into the
 // definition, and cluster/spec reads it. An attribute stating only "A" is

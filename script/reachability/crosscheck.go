@@ -4,7 +4,7 @@
 //go:build ignore
 
 // crosscheck reads the inventory produced by script/reachability and re-checks
-// every unreached FUNCTION with a plain text search, to separate genuine
+// every unreached function and method with a plain text search, to separate genuine
 // findings from RTA artefacts.
 //
 // The direction is inverted relative to the reference daemon's crosscheck, and
@@ -27,14 +27,13 @@
 //
 // Run from the module root:
 //
-//	go run ./script/reachability/crosscheck.go
+//	go run ./script/reachability/crosscheck.go ./script/reachability/mentions.go
 package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -85,14 +84,19 @@ func main() {
 	// over those would just restate the same evidence in a weaker form.
 	var candidates []entry
 	for _, e := range inv.Unreachable {
-		if e.Kind == "func" {
+		if e.Kind == "func" || e.Kind == "method" {
 			candidates = append(candidates, e)
 		}
 	}
 
 	out := result{TotalCandidates: len(candidates)}
 	for _, c := range candidates {
-		if hasAnyMention(root, c) {
+		mentioned, err := hasAnyMention(root, c)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "crosscheck: %v\n", err)
+			os.Exit(1)
+		}
+		if mentioned {
 			out.FalsePositives++
 			out.Refuted = append(out.Refuted, c)
 			continue
@@ -113,7 +117,7 @@ func main() {
 	}
 
 	fmt.Printf("Cross-check complete:\n")
-	fmt.Printf("  candidates (funcs): %d\n", out.TotalCandidates)
+	fmt.Printf("  candidates (funcs and methods): %d\n", out.TotalCandidates)
 	fmt.Printf("  refuted by a text mention elsewhere: %d\n", out.FalsePositives)
 	fmt.Printf("  no mention anywhere in the module:   %d\n", out.Genuine)
 	for _, e := range out.GenuineEntries {
@@ -122,25 +126,19 @@ func main() {
 	fmt.Printf("Output: %s\n", outPath)
 }
 
-// hasAnyMention reports whether any Go file in the module other than the one
-// declaring e names the identifier. Test files count — see the file comment.
-// script/ is excluded: this analyzer's own source quotes identifier names in
-// its documentation, and a tool refuting its own findings is worthless.
-func hasAnyMention(root string, e entry) bool {
-	cmd := exec.Command("grep", "-rln", "--include=*.go", "-w", e.Identifier, ".") //nolint:gosec // G204: identifier comes from the tool's own inventory
-	cmd.Dir = root
-	out, _ := cmd.Output()
-
-	declFile := filepath.Clean(e.File)
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
-		clean := filepath.Clean(strings.TrimPrefix(line, "./"))
-		if clean == declFile || strings.HasPrefix(clean, "script"+string(filepath.Separator)) {
-			continue
-		}
-		return true
+// hasAnyMention reports whether any tracked Go file in the module other than
+// the one declaring e names the identifier (mentioningFiles, mentions.go: git
+// grep, so a worktree copy under .claude/ is no mention). Test files count —
+// see the file comment. script/ is excluded: this analyzer's own source quotes
+// identifier names in its documentation, and a tool refuting its own findings
+// is worthless.
+//
+// A method ("Type.Method") is searched by its name: a call spells x.Method.
+func hasAnyMention(root string, e entry) (bool, error) {
+	name := e.Identifier
+	if i := strings.LastIndex(name, "."); i >= 0 {
+		name = name[i+1:]
 	}
-	return false
+	files, err := mentioningFiles(root, name, e.File)
+	return len(files) > 0, err
 }

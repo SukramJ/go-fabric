@@ -48,6 +48,7 @@ type commissioningHost struct {
 	root     *RootClusters
 	logger   *slog.Logger
 	baseline *bridge.PerExchangePaseProvider // the configured-passcode provider
+	salts    *windowSalt                     // the baseline's salt, drawn per window open
 	// responderParams is what the window's PASE adapters advertise
 	// (security.go responderSessionParams).
 	responderParams *sessionparams.Parameters
@@ -116,6 +117,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 	}
 	admin.SetFabricCounter(fabrics)
 	window.SetFabricCounter(fabrics)
+	h.br.SetFabricCounter(fabrics)
 	h.fabricCount = fabrics
 
 	window.SetFailSafeChecker(h.root.GeneralCommissioning)
@@ -176,6 +178,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// the transition OpenBasicWindow's own open fires, the basic
 		// window's acceptor (installed, so attachPase leaves it) and its
 		// discriminator.
+		h.renewSalt(window)
 		h.attachPase(h.baseline)
 		adv := h.advertisement()
 		if basic != nil {
@@ -215,8 +218,9 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// commissionable record under the configured discriminator, CM=1
 		// — matter.js allowBasicCommissioning builds the PASE server from
 		// the node's own passcode (DeviceCommissioner.ts:130-137 at
-		// 862ad75f) and #open advertises the configured discriminator
+		// db021da0) and #open advertises the configured discriminator
 		// (:236-256), the status BasicWindowOpen.
+		h.renewSalt(window)
 		h.attachPase(h.baseline)
 		if live {
 			h.announce(ctx, h.withRotatingID(ctx, h.advertisement()), "commissioning.basic_window.announce")
@@ -230,6 +234,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (matter.js #closeWindow: removePaseCommissioner,
 		// exitCommissioningMode).
 		h.attachPase(nil)
+		h.salts.end()
 		if live {
 			h.br.WithdrawCommissioning(ctx)
 			h.withdrawBLE(ctx)
@@ -283,13 +288,20 @@ func (h *commissioningHost) endBasic(b *basicWindow) {
 // advertised CM=1 under discriminator (see [Node.OpenBasicWindow]).
 func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierContext, iterations uint32, salt []byte, discriminator uint16, timeout time.Duration) error {
 	window := h.br.CommissioningWindow()
-	if window.IsOpen() && !window.IsOwnWindow() {
-		// Checked before the install, which would replace the
-		// administrator's acceptor.
-		return bridge.ErrAdministratorWindowOpen
+	// Checked under the install's lock, in the install, which would
+	// replace the administrator's acceptor: an administrator's window
+	// opens before its verifier is installed under the same lock, so
+	// one that opens after this check installs its acceptor after this
+	// one, and the basic window's open then fails without detaching it
+	// (review II, R2-P6-conc-2413).
+	adminOpen := func() error {
+		if window.IsOpen() && !window.IsOwnWindow() {
+			return bridge.ErrAdministratorWindowOpen
+		}
+		return nil
 	}
 	//nolint:contextcheck // the provider outlives this call; the adapters it builds carry no ctx of their own (as InstallVerifier's)
-	restore, err := h.installVerifierContext(vc, iterations, salt)
+	restore, err := h.installVerifierContext(vc, iterations, salt, adminOpen)
 	if err != nil {
 		return err
 	}
@@ -437,6 +449,19 @@ func (h *commissioningHost) snapshot(window *bridge.CommissioningWindow) WindowS
 	return snap
 }
 
+// renewSalt gives the window open now a fresh PBKDF salt for the
+// configured passcode, once per open ([windowSalt]; decision 251). A
+// failed draw keeps the previous salt and is logged.
+func (h *commissioningHost) renewSalt(window *bridge.CommissioningWindow) {
+	if h.salts == nil {
+		return
+	}
+	openedAt, _, _ := window.Timing()
+	if err := h.salts.renew(openedAt); err != nil {
+		h.logger.Warn("commissioning.salt", slog.Any("err", err))
+	}
+}
+
 // attachPase makes p the bridge's PASE acceptor (nil: none) unless an
 // administrator's verifier window has its own installed.
 func (h *commissioningHost) attachPase(p *bridge.PerExchangePaseProvider) {
@@ -484,7 +509,7 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 	if err != nil {
 		return nil, fmt.Errorf("PAKE passcode verifier: %w", err)
 	}
-	return h.installVerifierContext(vc, iterations, salt)
+	return h.installVerifierContext(vc, iterations, salt, nil)
 }
 
 // installVerifierContext makes a PASE acceptor over vc the bridge's until
@@ -492,12 +517,18 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 // (InstallVerifier) and [Node.OpenBasicWindow]'s credentials take. Once
 // stop ran it installs nothing and returns [ErrStopped]: a window opened
 // while the node stops has no acceptor and starts no reaper (review II,
-// R2-P2-stop-02).
-func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte) (restore func(), err error) {
+// R2-P2-stop-02). refuse, when set, runs under the install's lock first,
+// and its error installs nothing.
+func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte, refuse func() error) (restore func(), err error) {
 	h.installMu.Lock()
 	defer h.installMu.Unlock()
 	if h.stopped {
 		return nil, ErrStopped
+	}
+	if refuse != nil {
+		if err := refuse(); err != nil {
+			return nil, err
+		}
 	}
 	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
 		adapter, err := buildPaseAdapterFromContext(h.life, h.sessions, h.root, vc, salt, int(iterations), h.responderParams)
