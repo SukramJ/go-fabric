@@ -65,9 +65,9 @@ func RetransmissionIntervalPadded(n int, p Intervals, peerActive bool, rand01 fl
 // it — the fixed backoff here, InitialRetransmissionTime in backoffLocked —
 // would wrap that to a negative wait the timer fires at once. JavaScript
 // numbers grow to Infinity instead and the cap then applies: mirrors
-// matter.js MRP.ts:182-190 (backoff += fixedBackoff) and
-// MessageExchange.ts:1242-1250 (+ initialRetransmissionTime, then
-// Duration.min with the cap).
+// matter.js MRP.ts:188 (backoff += fixedBackoff) and
+// MessageExchange.ts:1288-1296 at db021da0 (+ initialRetransmissionTime,
+// then Duration.min with the cap).
 func satAdd(a, b time.Duration) time.Duration {
 	if b > 0 && a > math.MaxInt64-b {
 		return math.MaxInt64
