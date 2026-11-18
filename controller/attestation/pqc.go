@@ -18,10 +18,11 @@ import (
 // signature, the DAC key stays EC P-256 — matter.js's "pqc-phase-1"
 // forward feature (packages/model/src/common/Specification.ts:93 at
 // 862ad75f) over packages/general/src/crypto/MlDsa.ts and
-// packages/protocol/src/certificate/kinds/ (AttestationCertificates.ts:15-80,
-// CertificateSignature.ts). The keys, signatures and their RFC 9881
-// encodings are the standard library's (crypto/mldsa, crypto/x509 of Go
-// 1.27), which parse and verify them as matter.js's MlDsa namespace does.
+// packages/protocol/src/certificate/kinds/ (AttestationCertificates.ts:14-63
+// at db021da0, CertificateSignature.ts). The keys, signatures and their
+// RFC 9881 encodings are the standard library's (crypto/mldsa, crypto/x509
+// of Go 1.27), which parse and verify them as matter.js's MlDsa namespace
+// does.
 // Like matter.js, the module keeps the feature off: an ML-DSA attestation
 // certificate is refused with [ErrMLDSAAttestationDisabled] unless
 // internal/forward switches PQCPhase1 on, which only the module's tests do.

@@ -24,6 +24,6 @@
 // certificates and a KeyRef, no private key; without a signer the store
 // keeps the key as matter.js does. commissioner.FabricConfig.OperationalSigner
 // is the same seam for the controller's operational key. matter.js has no
-// such seam (packages/protocol/src/fabric/Fabric.ts:50-76 at 0ceb202d
+// such seam (packages/protocol/src/fabric/Fabric.ts:51-77 at db021da0
 // keeps #keyPair).
 package ca

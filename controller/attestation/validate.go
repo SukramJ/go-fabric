@@ -72,8 +72,8 @@ type Result struct {
 }
 
 // Validate validates the device's attestation. Mirrors matter.js
-// packages/protocol/src/certificate/DeviceAttestationValidator.ts:170-537
-// (validate) at 0ceb202d, check for check and in its order; each step
+// packages/protocol/src/certificate/DeviceAttestationValidator.ts:258-645
+// (validate) at db021da0, check for check and in its order; each step
 // cites the DAV lines it ports. A hard failure is an [*Error]; any other
 // error is the trust store's (a stored PAA that does not parse, a
 // revocation lookup that fails), which the commissioner reports as a

@@ -34,10 +34,10 @@ func Reject() Policy { f := false; return Policy{OnFailure: &f} }
 
 // Resolve applies the policy to findings — matter.js
 // ControllerCommissioningFlow.#resolveAttestationFindings
-// (ControllerCommissioningFlow.ts:1341-1368 at 0ceb202d): the function form
-// decides alone (:1344-1350); otherwise each finding is logged — a warning
+// (ControllerCommissioningFlow.ts:1359-1386 at db021da0): the function form
+// decides alone (:1362-1368); otherwise each finding is logged — a warning
 // under the undefined policy, info under true and false — and the
-// commissioning proceeds unless the policy is false (:1352-1367). err is
+// commissioning proceeds unless the policy is false (:1370-1385). err is
 // the function's own error, to be returned verbatim.
 func (p Policy) Resolve(findings []Finding, log *slog.Logger) (proceed bool, reason string, err error) {
 	if log == nil {

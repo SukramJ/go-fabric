@@ -36,13 +36,13 @@ var ErrChannelClosed = fmt.Errorf("ble: commissioning channel closed: %w", btp.E
 // ATTMTUSettleTimeout is how long [Dial] waits for a pending ATT_MTU
 // exchange before it sizes the BTP segment without it — matter.js
 // ATT_MTU_SETTLE_TIMEOUT (packages/nodejs-ble/src/NobleBleChannel.ts:40-41
-// at 862ad75f).
+// at db021da0).
 const ATTMTUSettleTimeout = 2 * time.Second
 
 // DisconnectTimeout bounds each C2 unsubscribe: a GATT stack can leave
 // the operation pending when the peripheral vanished without a disconnect
 // event — matter.js BLE_DISCONNECT_TIMEOUT
-// (packages/nodejs-ble/src/NobleBleChannel.ts:38 at 862ad75f) and its
+// (packages/nodejs-ble/src/NobleBleChannel.ts:38 at db021da0) and its
 // unsubscribeC2 (:573-588), which runs the unsubscribe under it (:579).
 const DisconnectTimeout = 5 * time.Second
 
@@ -62,17 +62,17 @@ type DialOptions struct {
 // Channel is a BTP session to one peripheral as a commissioning channel:
 // the exchange manager whose one carrier is the session, reliable, so no
 // MRP runs — matter.js NobleBleChannel
-// (packages/nodejs-ble/src/NobleBleChannel.ts:670-1022 at 862ad75f) under
+// (packages/nodejs-ble/src/NobleBleChannel.ts:670-1022 at db021da0) under
 // the ExchangeManager it feeds. It satisfies commissioner.Channel.
 //
 // The session behind the channel is replaceable: a peripheral that
 // completes the handshake and then answers no BTP packet before the
 // acknowledgement timeout is given a fresh session at the minimum segment
 // size, once, with the unacknowledged messages replayed — matter.js's
-// renegotiation (NobleBleChannel.ts:864-918 at 862ad75f), an interop
+// renegotiation (NobleBleChannel.ts:864-918 at db021da0), an interop
 // workaround its session documents as having no basis in the
 // specification (packages/protocol/src/ble/BtpSessionHandler.ts:67-84 at
-// 862ad75f). Every [Channel.Send] waits for a renegotiation in flight; a
+// db021da0). Every [Channel.Send] waits for a renegotiation in flight; a
 // renegotiation that fails closes the channel. See
 // BD-Matter-BTP-RenegotiationAfterStall.
 type Channel struct {
@@ -87,7 +87,7 @@ type Channel struct {
 	gattCtx context.Context
 	// life ends when the channel closes or is lost; the renegotiation
 	// handshake runs under it (NobleBleChannel.ts:728 #lifetime at
-	// 862ad75f) and a Send parked on a renegotiation wakes on it.
+	// db021da0) and a Send parked on a renegotiation wakes on it.
 	life *lifetime
 
 	// mu guards session, btpConn, c2, swapped, renegotiation, closing and
@@ -100,7 +100,7 @@ type Channel struct {
 	// swapped is closed when session is replaced, so watch re-reads it.
 	swapped chan struct{}
 	// renegotiation is nil until a renegotiation starts and closed when it
-	// ended, whichever way (NobleBleChannel.ts:868-870 at 862ad75f: "it
+	// ended, whichever way (NobleBleChannel.ts:868-870 at db021da0: "it
 	// must exist before the first step runs, settle once the channel
 	// ends").
 	renegotiation chan struct{}
@@ -110,7 +110,7 @@ type Channel struct {
 	stallReported chan struct{}
 	closing       bool
 	// lost is the session closed or the connection gone
-	// (NobleBleChannel.ts:830-834, :932-934 at 862ad75f).
+	// (NobleBleChannel.ts:830-834, :932-934 at db021da0).
 	lost bool
 
 	// released is the GATT connection given up: C2 unsubscribed and the
@@ -130,7 +130,7 @@ type lifetime struct {
 
 // handshakeState routes C2 data: to the handshake until the response
 // arrived, to the session afterwards (NobleBleChannel.ts:609-620,
-// :837-847 at 862ad75f); detached, it drops everything (:850-855
+// :837-847 at db021da0); detached, it drops everything (:850-855
 // #detachDataHandler). Each handshake has its own.
 type handshakeState struct {
 	// mu guards session and detached.
@@ -247,7 +247,7 @@ func Dial(ctx context.Context, central Central, p Peripheral, opts DialOptions) 
 }
 
 // segmentSizeFor sizes the BTP segment from the connection's ATT_MTU —
-// matter.js attMtuOf (NobleBleChannel.ts:526-567 at 862ad75f) and create
+// matter.js attMtuOf (NobleBleChannel.ts:526-567 at db021da0) and create
 // (:679-690): an unknown MTU on a connection that reports its exchange
 // ([MTUExchange]) is awaited for [ATTMTUSettleTimeout]; the exchange
 // landing, the timeout or the connection going settles it, and the
@@ -284,7 +284,7 @@ func segmentSizeFor(ctx context.Context, conn Connection, clk exchange.Clock, lo
 }
 
 // unsubscribeC2 is matter.js unsubscribeC2
-// (packages/nodejs-ble/src/NobleBleChannel.ts:573-588 at 862ad75f): the
+// (packages/nodejs-ble/src/NobleBleChannel.ts:573-588 at db021da0): the
 // unsubscribe under [DisconnectTimeout] on the clock, so a peripheral that
 // vanished without a disconnect event cannot hold the caller.
 func unsubscribeC2(ctx context.Context, conn Connection, c exchange.Clock) error {
@@ -350,7 +350,7 @@ func handshake(ctx context.Context, conn Connection, h *handshakeState, segment 
 }
 
 // adoptSession installs a freshly handshaken BTP session — matter.js
-// #adoptSession (NobleBleChannel.ts:770-848 at 862ad75f): the central's
+// #adoptSession (NobleBleChannel.ts:770-848 at db021da0): the central's
 // session on C1 and C2, its stall observed, swapped in under the lock so
 // Send and watch see it. A channel lost meanwhile leaves the session
 // suspended, "so nothing else would stop its timers" (:818-826). The
@@ -376,7 +376,7 @@ func (c *Channel) adoptSession(handshakeResponse []byte, segment int) (*btp.Sess
 		return nil, err
 	}
 	// Mirrors matter.js packages/nodejs-ble/src/NobleBleChannel.ts:835 at
-	// 862ad75f: session.stalledAfterHandshake.once(#startRenegotiation).
+	// db021da0: session.stalledAfterHandshake.once(#startRenegotiation).
 	session.OnStall(c.startRenegotiation)
 	c.mu.Lock()
 	if !c.usableLocked() {
@@ -409,7 +409,7 @@ func (c *Channel) releaseGATT(unsubscribe bool) error {
 }
 
 // startRenegotiation mirrors matter.js
-// packages/nodejs-ble/src/NobleBleChannel.ts:864-889 at 862ad75f
+// packages/nodejs-ble/src/NobleBleChannel.ts:864-889 at db021da0
 // (#startRenegotiation): at most once per channel — a session already at
 // the minimum segment size never reports the stall — and every Send waits
 // for it. A failure closes the channel unless the channel is closing
@@ -449,13 +449,13 @@ func (c *Channel) startRenegotiation(replay [][]byte) {
 }
 
 // renegotiate mirrors matter.js
-// packages/nodejs-ble/src/NobleBleChannel.ts:891-918 at 862ad75f
+// packages/nodejs-ble/src/NobleBleChannel.ts:891-918 at db021da0
 // (#renegotiate): the C2 handler detached — the stalled session is
 // suspended already — and C2 unsubscribed, which closes the peripheral's
 // BTP session (§4.19.4.10) and leaves the BLE connection; a failure there
 // may leave the peer holding the old session, so no new handshake is
 // attempted. The unsubscribe runs under [DisconnectTimeout] (:579 at
-// 862ad75f), the handshake's write and subscribe under its
+// db021da0), the handshake's write and subscribe under its
 // btp.ConnRspTimeout attempt, so a peripheral that vanished without a
 // disconnect event fails the renegotiation within the bound and the
 // channel closes. Then the handshake at btp.MinimumATTMTU under the
@@ -587,11 +587,11 @@ func (c *Channel) deliver(msg []byte) error {
 // in flight — the replay goes first — as matter.js's send awaits it before
 // it takes the session: "A renegotiation replaces the session, so sending
 // into the outgoing one would be rejected as inactive"
-// (NobleBleChannel.ts:944-953 at 862ad75f). It returns [ErrChannelClosed]
+// (NobleBleChannel.ts:944-953 at db021da0). It returns [ErrChannelClosed]
 // when the channel is lost meanwhile, the error matter.js's test asserts
 // for a send parked on a failed renegotiation: "BtpFlowError from the
 // suspended session would not read as channel loss downstream"
-// (packages/nodejs-ble/test/NobleBleChannelTest.ts:772 at 862ad75f).
+// (packages/nodejs-ble/test/NobleBleChannelTest.ts:772 at db021da0).
 func (c *Channel) Send(_ *net.UDPAddr, payload []byte) error {
 	for {
 		// The renegotiation and the session are read in one critical
@@ -660,7 +660,7 @@ func (c *Channel) ClosedCause() error { return ErrChannelClosed }
 
 // Close closes the exchange manager and the BTP session, which
 // unsubscribes C2 and disconnects — matter.js close
-// (NobleBleChannel.ts:1004-1021 at 862ad75f). A renegotiation in flight
+// (NobleBleChannel.ts:1004-1021 at db021da0). A renegotiation in flight
 // is abandoned, its parked sends released, the C2 handler detached so
 // data that still arrives is dropped (:1010 #detachDataHandler), and the
 // connection a suspended session no longer owns is dropped here.

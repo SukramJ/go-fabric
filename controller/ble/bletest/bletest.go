@@ -15,7 +15,7 @@
 // request arrives on C1, and the session — with its handshake response —
 // starts when the central subscribes to C2. A peripheral can also play
 // the stalled peer matter.js's channel tests model
-// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-346 at 862ad75f,
+// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-346 at db021da0,
 // handshakeOnlyMatterService): it completes the handshake at the offered
 // segment size and then answers no BTP packet — see [Peripheral.Stall]
 // and [Faults].
@@ -178,7 +178,7 @@ type Peripheral struct {
 	// then answer no BTP packet of that session, each one handed to the
 	// receiver instead, the connection kept — the stalled peripherals
 	// matter.js's renegotiation workaround targets
-	// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-212 at 862ad75f).
+	// (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-212 at db021da0).
 	Stall func(offeredSegmentSize int) (withhold func(packet []byte))
 	// Faults are the GATT failures every connection shows.
 	Faults Faults
@@ -198,7 +198,7 @@ type Peripheral struct {
 
 // Faults are GATT failures a peripheral or its platform shows, after the
 // fakes of matter.js's channel tests
-// (packages/nodejs-ble/test/NobleBleChannelTest.ts:212-346 at 862ad75f).
+// (packages/nodejs-ble/test/NobleBleChannelTest.ts:212-346 at db021da0).
 // Writes are counted per connection, from 1.
 type Faults struct {
 	// UnsubscribeC2 is the error every UnsubscribeC2 returns, the
@@ -564,7 +564,7 @@ func (c *connection) SubscribeC2(_ context.Context, on func([]byte)) error {
 // UnsubscribeC2 implements ble.Connection: the peripheral's BTP session
 // ends (§4.19.4.10) and the GATT server takes a new handshake, as
 // matter.js's server closes on the unsubscribe (BlenoBleServer.ts:81-84 at
-// 862ad75f). A served session's end drops the connection, as that server's
+// db021da0). A served session's end drops the connection, as that server's
 // close does; a stalled session's end leaves it, as the fake peer of
 // NobleBleChannelTest.ts does.
 func (c *connection) UnsubscribeC2(ctx context.Context) error {

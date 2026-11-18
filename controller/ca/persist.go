@@ -14,9 +14,9 @@ import (
 // the CA that roots it: enough to rebuild the same operational identity on
 // the next start, so every node it commissioned still trusts it.
 //
-// It is matter.js Fabric.Config (packages/protocol/src/fabric/Fabric.ts:666-685
-// at 0ceb202d), which FabricManager persists as a list under "fabrics" with
-// "nextFabricIndex" beside it (packages/protocol/src/fabric/FabricManager.ts:66-71),
+// It is matter.js Fabric.Config (packages/protocol/src/fabric/Fabric.ts:714-733
+// at db021da0), which FabricManager persists as a list under "fabrics" with
+// "nextFabricIndex" beside it (packages/protocol/src/fabric/FabricManager.ts:68-73),
 // narrowed to one fabric per store. Kept: fabricIndex, fabricId, rootNodeId
 // (which is the controller's nodeId on its own fabric), rootVendorId,
 // identityProtectionKey, label, keyPair and operationalCert, and the derived

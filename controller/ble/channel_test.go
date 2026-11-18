@@ -174,7 +174,7 @@ func TestChannelClosesWhenPeripheralDrops(t *testing.T) {
 
 // TestRenegotiationBoundsItsGATTCalls covers the bounds matter.js puts on
 // the renegotiation's GATT calls (packages/nodejs-ble/src/NobleBleChannel.ts:579,
-// :602-606 at 862ad75f): a peripheral that vanished without a disconnect
+// :602-606 at db021da0): a peripheral that vanished without a disconnect
 // event leaves the unsubscribe or the handshake write pending, and the
 // renegotiation fails within the bound, closing the channel.
 func TestRenegotiationBoundsItsGATTCalls(t *testing.T) {
@@ -278,7 +278,7 @@ func (c *answeringConnCentral) Connect(context.Context, ble.Peripheral) (ble.Con
 
 // TestCloseDetachesTheC2Handler: data on C2 after Close reaches no
 // session — matter.js's close detaches the handler
-// (packages/nodejs-ble/src/NobleBleChannel.ts:1010 at 862ad75f).
+// (packages/nodejs-ble/src/NobleBleChannel.ts:1010 at db021da0).
 func TestCloseDetachesTheC2Handler(t *testing.T) {
 	conn := &answering{silent: silent{gone: make(chan struct{})}}
 	rec := &recorder{}

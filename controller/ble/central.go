@@ -54,7 +54,7 @@ type ListeningClock interface {
 // MTUExchange is a [Connection] whose platform reports the ATT_MTU
 // exchange after the connection opens — noble leaves the MTU unknown
 // until its "mtu" event (matter.js NobleBleChannel.ts:520-526 at
-// 862ad75f). ATTMTUExchanged is closed once the exchange landed and
+// db021da0). ATTMTUExchanged is closed once the exchange landed and
 // [Connection.ATTMTU] reports it; [Dial] waits for it up to
 // [ATTMTUSettleTimeout] instead of sizing the BTP segment at the minimum.
 // A Connection without it that reports 0 gets the minimum at once.

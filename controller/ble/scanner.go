@@ -24,7 +24,7 @@ import (
 // Timing of the scanner. Mirrors matter.js
 // packages/protocol/src/common/BleScanner.ts:92-115 (STALE_ENTRY_AGE,
 // RECORD_MAX_AGE) and the default discovery timeout of
-// findCommissionableDevices (:543-546) at 0ceb202d.
+// findCommissionableDevices (:543-546) at db021da0.
 const (
 	// StaleEntryAge is the silence after which a record is dropped once
 	// its service data arrives from another address, and after which it
@@ -123,7 +123,7 @@ type ScannerOptions struct {
 }
 
 // Scanner finds commissionable devices by their BLE advertisements —
-// matter.js BleScanner (packages/protocol/src/common/BleScanner.ts:124-674) at 0ceb202d. One radio
+// matter.js BleScanner (packages/protocol/src/common/BleScanner.ts:124-674) at db021da0. One radio
 // serves every discovery: the scan starts with the first and stops with
 // the last. It is safe for concurrent use.
 type Scanner struct {

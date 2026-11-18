@@ -25,7 +25,7 @@ import (
 
 // Certificate ids. Mirrors matter.js
 // packages/protocol/src/certificate/CertificateAuthority.ts:52
-// (#rootCertId = 0) and :56 (#nextCertificateId = 1) at 0ceb202d.
+// (#rootCertId = 0) and :56 (#nextCertificateId = 1) at db021da0.
 const (
 	RootCertID         uint64 = 0
 	FirstCertificateID uint64 = 1
@@ -270,7 +270,7 @@ type signer struct {
 }
 
 // CA is a fabric's certificate authority — matter.js CertificateAuthority
-// (CertificateAuthority.ts:50-437) at 0ceb202d. It is safe for concurrent
+// (CertificateAuthority.ts:50-437) at db021da0. It is safe for concurrent
 // use.
 type CA struct {
 	cfg Config
@@ -389,7 +389,7 @@ func New(cfg Config) (*CA, error) {
 
 // initVerifier builds the verifier over the root certificate, so a NOC's
 // authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:170-184 at 862ad75f).
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db021da0).
 func (c *CA) initVerifier() error {
 	v, err := mattercert.NewVerifierFromRCAC(c.rootCert, c.cfg.Clock)
 	if err != nil {
@@ -760,7 +760,7 @@ func KeyIdentifier(pub []byte) []byte {
 // "CompressedFabric" as info, 8 bytes. Mirrors matter.js
 // packages/types/src/datatype/GlobalFabricId.ts:11, :36-47
 // (GlobalFabricId.compute; DataWriter is big-endian by default,
-// general/src/util/DataWriter.ts:12-18) at 0ceb202d.
+// general/src/util/DataWriter.ts:12-18) at db021da0.
 func CompressedFabricID(rootPub []byte, fabricID uint64) ([8]byte, error) {
 	var id [8]byte
 	if len(rootPub) != 65 || rootPub[0] != 0x04 {
