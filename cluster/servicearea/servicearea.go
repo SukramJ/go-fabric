@@ -383,10 +383,25 @@ func (s *Server) checkAreas(areas []Area) error {
 		if nullMap {
 			return invalid("Areas must not have a null mapId when supportedMaps is defined")
 		}
+		// Each MapID names a SupportedMaps entry, as connectedhomeip
+		// requires ("mapID SHALL be the ID of an entry from the
+		// SupportedMaps attribute", ServiceAreaCluster.cpp:506-512 at
+		// 6170af84); matter.js judges null or not null only
+		// (ServiceAreaServer.ts:137-143 at db021da0; R2-P6-fsm-1593).
+		for _, a := range areas {
+			if !s.mapHeld(a.MapId.Value) {
+				return invalid("Area %d's MapID %d is not in the supported maps list", a.AreaId, a.MapId.Value)
+			}
+		}
 	} else if !nullMap || distinct > 1 {
 		return invalid("Areas must have a null mapId when supportedMaps is empty")
 	}
 	return nil
+}
+
+// mapHeld reports whether id is a SupportedMaps entry.
+func (s *Server) mapHeld(id uint32) bool {
+	return slices.ContainsFunc(s.maps, func(m Map) bool { return m.MapId == id })
 }
 
 // sameMap is matter.js's `otherArea.mapId !== mapId` negated: null equals
@@ -711,7 +726,9 @@ func (s *Server) SetSupportedAreas(areas []Area) error {
 }
 
 // SetSupportedMaps records the device's map list (MAPS); it is refused
-// when it breaks #assertSupportedMaps.
+// when it breaks #assertSupportedMaps, and when a held area names a map
+// the new list does not hold (R2-P6-fsm-1593: every area's MapID names a
+// SupportedMaps entry) — change the areas first.
 func (s *Server) SetSupportedMaps(maps []Map) error {
 	if !s.Serves(sa.AttrSupportedMaps) {
 		return fmt.Errorf("%w: SupportedMaps needs MAPS", ErrConfig)
@@ -720,6 +737,12 @@ func (s *Server) SetSupportedMaps(maps []Map) error {
 	if err := s.checkMaps(maps); err != nil {
 		s.mu.Unlock()
 		return err
+	}
+	for _, a := range s.areas {
+		if !a.MapId.Null && !slices.ContainsFunc(maps, func(m Map) bool { return m.MapId == a.MapId.Value }) {
+			s.mu.Unlock()
+			return invalid("Area %d's MapID %d is not in the new supported maps list", a.AreaId, a.MapId.Value)
+		}
 	}
 	s.maps = slices.Clone(maps)
 	s.mu.Unlock()
@@ -844,9 +867,12 @@ func (s *Server) report(changed []uint32) {
 	}
 }
 
-// RemoveSupportedMapsEntry removes a map and the first area that lies on
-// it — matter.js removeSupportedMapsEntry (:276-289), which finds one
-// affected area, not every one.
+// RemoveSupportedMapsEntry removes a map and every area that lies on it,
+// as connectedhomeip's RemoveSupportedMap collects every area on the
+// removed map (ServiceAreaCluster.cpp:970-992 at 6170af84), so no area
+// names a map that is gone (R2-P6-fsm-1593). matter.js removes the first
+// one only (removeSupportedMapsEntry, ServiceAreaServer.ts:276-289 at
+// db021da0).
 func (s *Server) RemoveSupportedMapsEntry(mapID uint32) {
 	s.mu.Lock()
 	idx := slices.IndexFunc(s.maps, func(m Map) bool { return m.MapId == mapID })
@@ -855,8 +881,14 @@ func (s *Server) RemoveSupportedMapsEntry(mapID uint32) {
 		return
 	}
 	var changed []uint32
-	if a := slices.IndexFunc(s.areas, func(a Area) bool { return !a.MapId.Null && a.MapId.Value == mapID }); a >= 0 {
-		changed = s.removeAreaLocked(s.areas[a].AreaId)
+	var onMap []uint32
+	for _, a := range s.areas {
+		if !a.MapId.Null && a.MapId.Value == mapID {
+			onMap = append(onMap, a.AreaId)
+		}
+	}
+	for _, id := range onMap {
+		changed = append(changed, s.removeAreaLocked(id)...)
 	}
 	s.maps = slices.Delete(slices.Clone(s.maps), idx, idx+1)
 	changed = append(changed, sa.AttrSupportedMaps)
