@@ -37,7 +37,7 @@ func (fx caseFabricFixture) updateIdentity(sessions *operational.Manager) {
 func TestCASEResponderRefusesASessionAcrossAnUpdate(t *testing.T) {
 	t.Parallel()
 	fx := newCaseFabricFixture(t)
-	st := testStore(t)
+	st := fabricStore(t, fx) // holds fabric 1: a record of it could be stored
 	sessions := operational.NewManager(st)
 	adapter, err := buildCaseAdapter(sessions, fx.ids, nil, slog.New(slog.DiscardHandler), nil)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestCASEResponderRefusesASessionAcrossAnUpdate(t *testing.T) {
 func TestCASEInitiatorRefusesASessionAcrossAnUpdate(t *testing.T) {
 	t.Parallel()
 	fx := newCaseFabricFixture(t)
-	st := testStore(t)
+	st := fabricStore(t, fx) // holds fabric 1: a record of it could be stored
 	sessions := operational.NewManager(st)
 	provider := caseInitiatorProvider(st, sessions, fx.ids, slog.New(slog.DiscardHandler), nil)
 	init, err := provider(context.Background(), 1, fx.peer.NodeID)
