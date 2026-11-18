@@ -26,7 +26,7 @@ import (
 // controller.
 //
 // matter.js keeps a controller's fabric and nodes in the StorageService
-// of the controller's Environment (packages/matter.js/src/CommissioningController.ts:341-352
+// of the controller's Environment (packages/matter.js/src/CommissioningController.ts:341-353
 // at db021da0); the Go controller keeps them in the SQL database the host
 // owns, so the opener is a convenience over database/sql with no matter.js
 // counterpart of its own.
