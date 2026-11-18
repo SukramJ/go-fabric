@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -93,7 +92,7 @@ func serveAppPipe(ctx context.Context, f *fleet, path string, logger *slog.Logge
 	}
 	go func() {
 		for ctx.Err() == nil {
-			fh, err := os.OpenFile(path, os.O_RDONLY, 0) //nolint:gosec // the operator-chosen pipe path
+			fh, err := openFIFOReader(path)
 			if err != nil {
 				logger.Warn("apppipe.open", slog.Any("err", err))
 				return
