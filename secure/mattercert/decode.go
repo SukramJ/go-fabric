@@ -332,9 +332,11 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			// re-encodes the Subject so) is malformed. Mirrors chip
 			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
 			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
-			// TlvObject.ts:205-207 at 862ad75f (the DN schema is a
-			// TlvTaggedListPreservingOrder, operational.ts:69-110; another
-			// type is UnexpectedDataError).
+			// DistinguishedName.ts:636-638 at db021da0 (the DN schema is
+			// TlvDistinguishedName, operational.ts:111, a
+			// DistinguishedNameSchema with its own codec,
+			// DistinguishedName.ts:613-666; another type is
+			// UnexpectedDataError).
 			return fmt.Errorf("%w: issuer is not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
 		}
 		dn, err := decodeDN(d)
@@ -360,9 +362,11 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			// re-encodes the Subject so) is malformed. Mirrors chip
 			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
 			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
-			// TlvObject.ts:205-207 at 862ad75f (the DN schema is a
-			// TlvTaggedListPreservingOrder, operational.ts:69-110; another
-			// type is UnexpectedDataError).
+			// DistinguishedName.ts:636-638 at db021da0 (the DN schema is
+			// TlvDistinguishedName, operational.ts:111, a
+			// DistinguishedNameSchema with its own codec,
+			// DistinguishedName.ts:613-666; another type is
+			// UnexpectedDataError).
 			return fmt.Errorf("%w: subject is not a TLV list (type 0x%02X)", ErrMalformed, el.Type)
 		}
 		dn, err := decodeDN(d)
@@ -485,9 +489,9 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 			if isStandardDNTag(tag) {
 				// A standard X.520 attribute, kept with its place in the
 				// order for the TBS DER. Mirrors matter.js
-				// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
-				// at 862ad75f (TlvString fields of a
-				// TlvTaggedListPreservingOrder); they used to be skipped, so
+				// packages/protocol/src/certificate/kinds/definitions/operational.ts:71-111
+				// at db021da0 (TlvString fields, :74-109, of a
+				// TlvDistinguishedName, :111); they used to be skipped, so
 				// a chain whose DNs carry them failed to verify.
 				if el.Type < tlv.TypeUTF8Str1 || el.Type > tlv.TypeUTF8Str8 {
 					return dn, fmt.Errorf("%w: dn attribute %d is not a UTF-8 string", ErrMalformed, tag)

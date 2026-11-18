@@ -15,11 +15,11 @@ import (
 // ([DistinguishedName].Order, [CertificateExtensions].Order; the canonical
 // order when a caller built c without one). A certificate that came
 // through Decode encodes to the bytes it was decoded from. Mirrors
-// matter.js packages/protocol/src/certificate/kinds/Noc.ts:52-54
+// matter.js packages/protocol/src/certificate/kinds/Noc.ts:58-60
 // asSignedTlv (Rcac.ts, Icac.ts alike) over the schema of
-// packages/protocol/src/certificate/kinds/definitions/operational.ts:123-153
-// at 862ad75f, whose DN lists and extension list are
-// TlvTaggedListPreservingOrder (:36, :110).
+// packages/protocol/src/certificate/kinds/definitions/operational.ts:124-154
+// at db021da0, whose extension list is a TlvTaggedListPreservingOrder
+// (:37) and whose DN lists are a TlvDistinguishedName (:111).
 func Encode(c *Certificate) ([]byte, error) {
 	if c == nil {
 		return nil, fmt.Errorf("%w: nil certificate", ErrMalformed)
