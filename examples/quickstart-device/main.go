@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log/slog"
 	"os"
@@ -51,15 +52,24 @@ func run(ctx context.Context) error {
 	return n.Run(ctx) // Start, wait for ctx, Stop
 }
 
+// randomSalt is a SPAKE2+ salt drawn at random at each start, never a
+// constant every copy of this example shares (R2-P6-sec-2615): the salt
+// reaches a commissioner inside PASE only, so nothing needs it kept.
+func randomSalt() []byte {
+	salt := make([]byte, node.PBKDFSaltMax)
+	_, _ = rand.Read(salt) // crypto/rand.Read does not fail
+	return salt
+}
+
 // newNode builds the node on the SQLite file at path — the node opens it
 // (foreign keys on, a new file created 0600), applies the schemas and
 // closes it on Stop — and adds the light, unstarted.
 func newNode(ctx context.Context, path string, network node.Network) (*node.Node, error) {
 	n, err := node.New(ctx, node.Config{
 		Network: network,
-		Commissioning: node.Commissioning{ // change all four for anything real
+		Commissioning: node.Commissioning{ // change the passcode and discriminator for anything real
 			Passcode: 20202021, Discriminator: 3840,
-			PBKDFIterations: 1000, Salt: []byte("go-fabric-quickstart"),
+			PBKDFIterations: 1000, Salt: randomSalt(),
 		},
 		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001}, // CSA test vendor
 		BasicInformation: node.BasicInformation{

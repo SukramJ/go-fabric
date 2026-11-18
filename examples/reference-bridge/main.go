@@ -45,7 +45,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -123,15 +122,16 @@ func parseFlags() flags {
 	flag.StringVar(&f.listen, "listen", ":5540", "UDP listen address for Matter traffic")
 	flag.StringVar(&f.tcp, "tcp", "true", "Matter TCP: true (accept and open connections), false, or incoming / outgoing comma-separated; incoming listens on the UDP port, both are advertised in the operational T key")
 	flag.StringVar(&f.label, "label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
-	flag.UintVar(&f.passcode, "passcode", 20202021, "Matter setup passcode (8 digits, not trivially guessable)")
+	f.passcode = 20202021
+	flag.Var(passcodeValue{&f.passcode}, "passcode", "Matter setup passcode (8 digits, not trivially guessable), or @file holding it; default $"+passcodeEnv+" when set — change it for anything real")
 	flag.UintVar(&f.discriminator, "discriminator", 3840, "12-bit commissioning discriminator")
 	flag.UintVar(&f.customFlow, "custom-flow", 0, "the commissioning flow the onboarding payload states: 0 Standard, 1 User-Intent, 2 Custom (node.Commissioning.Flow; flow 1 and 2 print the long manual code with vendor and product id). Under 1 an uncommissioned daemon opens no commissioning window by itself (node.Commissioning.WindowOnDemand): it is not commissionable until the app pipe's UserIntentCommissioningStart opens the window, the user action the flow stands for; see control.go")
 	flag.IntVar(&f.iterations, "pbkdf-iterations", 1000, "SPAKE2+ PBKDF2 iteration count")
-	flag.StringVar(&f.salt, "pbkdf-salt", "go-fabric-ref-salt", "SPAKE2+ salt (16-32 bytes; change it for anything real)")
+	flag.StringVar(&f.salt, "pbkdf-salt", "", "SPAKE2+ salt (16-32 bytes); default a random 32-byte salt drawn at each start")
 	flag.BoolVar(&f.advertise, "advertise", true, "publish the commissionable mDNS record (false = no discovery, direct address only)")
 	flag.StringVar(&f.logLevel, "log-level", "info", "debug, info, warn or error")
 	flag.StringVar(&f.appPipe, "app-pipe", "", "TESTING ONLY: named pipe of CHIP-style JSON test commands (button presses, sensor values, …); see control.go")
-	flag.StringVar(&f.enableKey, "enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger; see control.go")
+	flag.StringVar(&f.enableKey, "enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger, or @file holding it; see control.go")
 	flag.BoolVar(&f.osHostName, "mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
 	flag.StringVar(&f.otaDir, "ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
 	flag.BoolVar(&f.otaHarness, "ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
@@ -164,6 +164,10 @@ func parseFlags() flags {
 	flag.BoolVar(&f.jointFabricSim, "jointfabric-sim", false, "TESTING ONLY: add a JointFabricAdministrator endpoint (Joint Fabric Datastore and Administrator) whose member-node synchronisation is simulated, and turn on the node's client stack for its commissioner reach, for the Joint Fabric certification families; see jointfabric.go")
 	flag.BoolVar(&f.dumpSurface, "dump-surface", false, "print the node's served surface — the assembled effective surface of the root, the Aggregator and every endpoint, the clusters the endpoint assembler mounts included, the surface policies' digest, the selected profiles, the effective level and its origin (explicit, profile <name> or pin) and every decision (package surface) — as JSON on stdout and exit, composed as the other flags say on an in-memory store and assembled by starting the node on a loopback UDP port the system assigns, then stopping it: no mDNS record is published and the --db store is not opened; see surface.go")
 	flag.Parse()
+	if err := passcodeFromEnv(flag.CommandLine); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	return f
 }
 
@@ -243,9 +247,9 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 
 	// TestEventTrigger, armed by the test enable key (control.go).
 	if f.enableKey != "" {
-		key, err := hex.DecodeString(f.enableKey)
+		key, err := enableKeyBytes(f.enableKey)
 		if err != nil {
-			return fmt.Errorf("--enable-key: %w", err)
+			return err
 		}
 		if err := n.Root().GeneralDiagnostics.EnableTestEventTriggers(key, devices.testEventTrigger); err != nil {
 			return fmt.Errorf("--enable-key: %w", err)
@@ -516,7 +520,7 @@ func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp node.TCPConf
 		Network: node.Network{Listen: f.listen, TCP: tcp, MDNS: mdnsConfig(f)},
 		Commissioning: node.Commissioning{
 			Passcode: passcode, Discriminator: discriminator,
-			PBKDFIterations: pbkdfIterations(f.iterations), Salt: []byte(f.salt),
+			PBKDFIterations: pbkdfIterations(f.iterations), Salt: pbkdfSalt(f.salt),
 			// The Basic feature (BC), as connectedhomeip's all-clusters app
 			// serves it: TC-CADMIN-1.4 and 1.11 exercise
 			// OpenBasicCommissioningWindow (phase 36).

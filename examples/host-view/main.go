@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -78,13 +79,22 @@ func newNode(ctx context.Context, cfg node.Config, b *bridge) (*node.Node, error
 	return n, nil
 }
 
+// randomSalt is a SPAKE2+ salt drawn at random at each start, never a
+// constant every copy of this example shares (R2-P6-sec-2615): the salt
+// reaches a commissioner inside PASE only, so nothing needs it kept.
+func randomSalt() []byte {
+	salt := make([]byte, node.PBKDFSaltMax)
+	_, _ = rand.Read(salt) // crypto/rand.Read does not fail
+	return salt
+}
+
 // config is the node's identity and its SQLite file; change the
 // commissioning values for anything real.
 func config(path string) node.Config {
 	return node.Config{
 		Commissioning: node.Commissioning{
 			Passcode: 20202021, Discriminator: 3840,
-			PBKDFIterations: 1000, Salt: []byte("go-fabric-host-view"),
+			PBKDFIterations: 1000, Salt: randomSalt(),
 		},
 		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8002}, // CSA test vendor
 		BasicInformation: node.BasicInformation{

@@ -19,6 +19,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
@@ -142,7 +143,7 @@ func newNode(ctx context.Context, o options, network node.Network, radio contrac
 		Network: network,
 		Commissioning: node.Commissioning{
 			Passcode: uint32(o.passcode), Discriminator: uint16(o.discriminator), //nolint:gosec // parseFlags bounds both
-			PBKDFIterations: 1000, Salt: []byte("go-fabric-ble-wifi-light"),
+			PBKDFIterations: 1000, Salt: randomSalt(),
 		},
 		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001}, // CSA test vendor
 		BasicInformation: node.BasicInformation{
@@ -168,4 +169,13 @@ func newNode(ctx context.Context, o options, network node.Network, radio contrac
 		return nil, err
 	}
 	return n, nil
+}
+
+// randomSalt is a SPAKE2+ salt drawn at random at each start, never a
+// constant every copy of this example shares (R2-P6-sec-2615): the salt
+// reaches a commissioner inside PASE only, so nothing needs it kept.
+func randomSalt() []byte {
+	salt := make([]byte, node.PBKDFSaltMax)
+	_, _ = rand.Read(salt) // crypto/rand.Read does not fail
+	return salt
 }

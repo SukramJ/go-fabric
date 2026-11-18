@@ -77,6 +77,13 @@ Startup prints the pairing information on stdout:
   --------------------------------------------------------------
 ```
 
+`20202021` and `3840` are the test defaults every copy shares; change them
+for anything real. `--passcode` takes the number, `@file` holding it, or —
+when the flag is not given — `$GOFABRIC_PASSCODE`, so the passcode need not
+be on the command line, where `ps` and the shell history show it
+(`--enable-key` takes `@file` the same way). The SPAKE2+ salt is drawn at
+random at each start unless `--pbkdf-salt` names one.
+
 ## The fleet
 
 | Endpoint | Device type | Backed by |
