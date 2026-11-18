@@ -71,13 +71,13 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 }
 
 // syncAutoSubscribeLocked is NetworkClient.#syncAutoSubscribe
-// (NetworkClient.ts:130-236 at 862ad75f): a newly commissioned node reads
-// the default subscription's paths once (:142-151, unless NoInitialRead);
+// (NetworkClient.ts:131-237 at db021da0): a newly commissioned node reads
+// the default subscription's paths once (:143-152, unless NoInitialRead);
 // then, when a subscription is desired and none is held, the default
 // subscription is established, sustained, with the event minimum past the
 // highest event seen and a bootstrap read unless the initial read ran
-// (:163-200); when none is desired the held one ends (:153-160). desire
-// overrides the node's autoSubscribe (desiredState, :130). The caller
+// (:164-201); when none is desired the held one ends (:154-161). desire
+// overrides the node's autoSubscribe (desiredState, :131). The caller
 // holds subSync.
 func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error {
 	n.mu.Lock()
@@ -131,9 +131,9 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 // ([Node.adoptDefaultFabricFilter]) and, when the node is started and
 // keeps a default subscription, the new one is established — matter.js
 // NetworkClient.#handleDefaultSubscriptionChange
-// (packages/node/src/behavior/system/network/NetworkClient.ts:117-128 at
-// 862ad75f), a reaction to the defaultSubscription state that runs one at
-// a time with Start and [Node.SetAutoSubscribe] (:113-115, :88-97). An
+// (packages/node/src/behavior/system/network/NetworkClient.ts:118-129 at
+// db021da0), a reaction to the defaultSubscription state that runs one at
+// a time with Start and [Node.SetAutoSubscribe] (:114-116, :89-98). An
 // unchanged request is nothing.
 //
 // The adoption waits, within ctx, for the node's queued report jobs —
@@ -359,7 +359,7 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 	var sub *Subscription
 	// The callbacks act only while this is the node's default
 	// subscription, so a replaced or ended one never acts for its
-	// successor (NetworkClient.ts:162-166, :176-200, :216-232 at 862ad75f).
+	// successor (NetworkClient.ts:163-167, :177-201, :217-233 at db021da0).
 	alive := func() {
 		n.mu.RLock()
 		current := n.subOwner == owner

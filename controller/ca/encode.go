@@ -128,9 +128,12 @@ func serialBytes(id uint64) []byte {
 
 // encodeCert writes the certificate TLV with sig as its signature. The
 // top-level structure is in schema order (operational.ts:123-153); the
-// DN lists and the extension list keep the order the caller gives
-// (TlvTaggedListPreservingOrder, :36, :110), which is the order of
-// matter.js's object literals in CertificateAuthority.ts.
+// DN lists and the extension list keep the order the caller gives, which
+// is the order of matter.js's object literals in CertificateAuthority.ts:
+// the DN lists are a TlvDistinguishedName (operational.ts:111) and the
+// extension list a TlvTaggedListPreservingOrder (operational.ts:37); the
+// DN list's DistinguishedNameSchema keeps the order
+// (kinds/DistinguishedName.ts:613-630, :460-482 at db021da0).
 func encodeCert(f *certFields, sig []byte) ([]byte, error) {
 	e := tlv.NewEncoder()
 	e.StartStruct(tlv.AnonymousTag())

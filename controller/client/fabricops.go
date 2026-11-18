@@ -21,8 +21,8 @@ import (
 // Fabric operations: commission and decommission through the registry.
 
 // Peer-loss causes of the registry — matter.js PeerLeftError and
-// PeerShutdownError (protocol/src/peer/PeerCommunicationError.ts:80-84,
-// :62-66 at 0ceb202d), which client/peer and client/exchange do
+// PeerShutdownError (protocol/src/peer/PeerCommunicationError.ts:90-94,
+// :72-76 at db021da0), which client/peer and client/exchange do
 // not declare.
 var (
 	// ErrPeerLeft: the peer left the fabric — the cause its sessions are
