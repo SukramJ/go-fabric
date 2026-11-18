@@ -660,8 +660,9 @@ func (b *Bridge) decryptIfNeeded(hdr *message.Header, body []byte) (plaintext []
 	// and authenticated — MRP retransmits (duplicate=true) included —
 	// refreshes the session's Rx activity so the idle reaper never
 	// evicts a session whose peer is demonstrably alive. Mirrors
-	// matter.js packages/protocol/src/protocol/MessageExchange.ts:429,
-	// where #notifyActivity(true) fires before the duplicate branch.
+	// matter.js packages/protocol/src/protocol/ExchangeManager.ts:362-364 at
+	// db021da0, where session.notifyActivity(true) runs after the duplicate
+	// check, for a duplicate too.
 	b.notifySessionActivity(hdr.SessionID, true)
 	return plain, duplicate, nil
 }

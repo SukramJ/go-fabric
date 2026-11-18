@@ -75,8 +75,9 @@ type outboundReliableTracker struct {
 	rtt mrpRTTWindow
 	// baseIntervalFor resolves the peer-appropriate MRP base interval
 	// for the session (peer-advertised active/idle interval selected
-	// by peer activity — matter.js MRP.ts:129). nil, or a session the
-	// resolver does not know, falls back to the spec idle default.
+	// by peer activity — matter.js MRP.ts:181 at db021da0). nil, or a
+	// session the resolver does not know, falls back to the spec idle
+	// default.
 	// Set once at construction; read without the mutex.
 	baseIntervalFor func(sessionID uint16, now time.Time) time.Duration
 	// clock stamps sentWall for the round-trip diagnostic.
@@ -192,14 +193,14 @@ func (t *outboundReliableTracker) baseInterval(sessionID uint16, now time.Time) 
 //
 // Mirrors matter.js: the responder's UnsecuredSession is created with
 // `setActiveTimestamp: !isInitiator` (packages/protocol/src/session/
-// UnsecuredSession.ts:30, "When we are the initiator we assume the node
+// UnsecuredSession.ts:36, "When we are the initiator we assume the node
 // is in idle mode" — the responder counts its peer active), its timing
 // parameters are replaced by the initiator's (PaseServer.ts:153-156,
 // CaseServer.ts:120-123 `session.timingParameters =
 // initiatorSessionParams`; Session.ts:108-121 stores them), every
-// received message refreshes the active timestamp (Session.ts:141-147
+// received message refreshes the active timestamp (Session.ts:142-148
 // notifyActivity) and retransmissionIntervalOf picks activeInterval while
-// the peer is active (MRP.ts:181, isPeerActive: Session.ts:149-151).
+// the peer is active (MRP.ts:181, isPeerActive: Session.ts:150-152).
 type handshakePeerTiming struct {
 	idle, active, threshold time.Duration
 	// activeAt is when the request this reply answers was received.
@@ -504,9 +505,9 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
-	// formula at transmission 0 — matter.js MRP.ts:129 evaluates the
-	// peer-appropriate base interval for every transmission including
-	// the first.
+	// formula at transmission 0 — matter.js MRP.ts:181 (at db021da0)
+	// evaluates the peer-appropriate base interval for every
+	// transmission including the first.
 	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 	key := outboundKey{sessionID, counter}
 	var (

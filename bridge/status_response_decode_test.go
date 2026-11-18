@@ -24,7 +24,7 @@ import (
 // a peer answering an ongoing report with InvalidSubscription (0x7d)
 // ends the subscription — and that a Success answer does not. matter.js
 // throws on any non-Success StatusResponse after a DataReport
-// (InteractionMessenger.ts:183-196 throwIfErrorStatusMessage, reached
+// (InteractionMessenger.ts:259-272 throwIfErrorStatusMessage, reached
 // through waitForSuccess at :721) and ServerSubscription.ts:866-876
 // marks the subscription terminated and closes it. Without this the
 // engine keeps ticking a subscription the peer has forgotten, the

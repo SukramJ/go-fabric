@@ -209,7 +209,7 @@ func sendVia(listener *udp.Listener, dst net.Addr, datagram []byte) error {
 // never moved
 // between transports or connections: matter.js replaces a session's
 // channel only when both the old and the new one are UDP
-// (MessageChannel.ts:140-148), so a session first seen on a TCP
+// (MessageChannel.ts:155-164 at db021da0), so a session first seen on a TCP
 // connection stays bound to it, and one first seen over UDP stays on
 // UDP. The binding is what the connection's drop evicts
 // (ExchangeManager.ts:638-650 #sessionsOnChannel).

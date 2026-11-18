@@ -1619,8 +1619,8 @@ type peerSessionParamsSource interface {
 // request received at rxAt: the intervals the handler kept from the
 // request (the spec defaults when it kept none or lacks the capability),
 // the peer counted active from rxAt. matter.js creates the responder's
-// unsecured session with the peer active (UnsecuredSession.ts:30
-// `setActiveTimestamp: !isInitiator`) and adopts the initiator's
+// unsecured session with the peer active (UnsecuredSession.ts:36 at
+// db021da0, `setActiveTimestamp: !isInitiator`) and adopts the initiator's
 // parameters before it replies (PaseServer.ts:153-156,
 // CaseServer.ts:120-123), so its PBKDFParamResponse, Pake2 and Sigma2
 // retransmit at the peer's active interval (MRP.ts:181).
@@ -2439,7 +2439,7 @@ type SessionRegistry interface {
 // [SessionRegistry] implements to receive the bridge's outbound
 // CloseSession sender. The operational manager fires it once per
 // session before zeroising the keys on graceful teardown — the Go
-// translation of matter.js ExchangeManager.ts:693 observing
+// translation of matter.js ExchangeManager.ts:758 (at db021da0) observing
 // session.gracefulClose and shipping the report via #sendCloseSession.
 type gracefulCloseNotifierSetter interface {
 	SetGracefulCloseNotifier(fn func(sessionID uint16, sess *channel.Session))

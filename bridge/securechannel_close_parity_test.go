@@ -15,7 +15,7 @@ package bridge
 //     handleInitialStatusReport — an inbound CloseSession closes the
 //     session ("Closed by peer"); any other initial StatusReport is
 //     ignored with a debug log.
-//   - packages/protocol/src/protocol/ExchangeManager.ts:693/:716-726 —
+//   - packages/protocol/src/protocol/ExchangeManager.ts:758/:781-787 —
 //     gracefulClose observer ships the report on a fresh exchange.
 //   - packages/node/src/behavior/system/network/ServerNetworkRuntime.ts
 //     :410-447 — shutdown closes sessions before transport teardown.
@@ -99,7 +99,7 @@ func closeSessionStatusReportBody() []byte {
 
 // TestAttachSessionRegistry_SelfWiresManagerHooks verifies the attach
 // call installs both reverse hooks on a registry that supports them —
-// the Go translation of matter.js ExchangeManager.ts:693 observing
+// the Go translation of matter.js ExchangeManager.ts:758 observing
 // session.gracefulClose at session-add time.
 func TestAttachSessionRegistry_SelfWiresManagerHooks(t *testing.T) {
 	t.Parallel()

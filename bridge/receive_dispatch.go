@@ -81,7 +81,7 @@ func (e *chunkRejectedError) Is(target error) bool { return target == errChunkRe
 func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	// Decode the carried status: the peer's answer is only a go-ahead
 	// when it is Success. matter.js reads it on every inbound
-	// StatusResponse (InteractionMessenger.ts:183-196
+	// StatusResponse (InteractionMessenger.ts:259-272 at db021da0,
 	// throwIfErrorStatusMessage) and throws on anything else; an
 	// undecodable one is treated as Failure so the waiting interaction
 	// stops rather than carries on blind.

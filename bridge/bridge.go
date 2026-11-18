@@ -1885,14 +1885,14 @@ func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8
 // `leave(currentExchange)` (OperationalCredentialsServer.ts:425
 // `fabric.leave(this.context.exchange)`): each session of the fabric runs
 // `initiateClose` — a session without active exchanges closes at once and
-// its close emits gracefulClose (NodeSession.ts:384-393), which the
+// its close emits gracefulClose (NodeSession.ts:367-377, :414-425), which the
 // ExchangeManager answers with a CloseSession on a fresh exchange
-// (ExchangeManager.ts:693, :716-726 #sendCloseSession); the session of the
+// (ExchangeManager.ts:758, :781-787 #sendCloseSession); the session of the
 // current exchange defers its close until that exchange ends
 // (NodeSession.ts:337-347, Session.ts:292-308). `delete` → `#closeSessions`
 // (Fabric.ts:440-465) then force-closes what is left with the current
 // exchange: `NodeSession.initiateForceClose` marks the session peer-lost
-// (NodeSession.ts:349-352), so the deferred close of the invoking session
+// (NodeSession.ts:379-382), so the deferred close of the invoking session
 // emits no gracefulClose — it closes after its exchange without a
 // CloseSession.
 func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
@@ -2812,9 +2812,9 @@ func (b *Bridge) LocalAddr() string {
 // assigns an ephemeral port, and advertising the 5540 default instead
 // points every commissioner's SRV lookup at a port nothing listens on.
 // Mirrors matter.js packages/node/src/behavior/system/network/
-// ServerNetworkRuntime.ts:234 (`addTransports` writes the bound
-// `ipv6Interface.port` into `network.operationalPort`) which
-// ServerNetworkRuntime.ts:89 then reads when it constructs the
+// ServerNetworkRuntime.ts:243 at db021da0 (`addTransports` writes the
+// bound `ipv6Interface.port` into `network.operationalPort`) which
+// ServerNetworkRuntime.ts:90 then reads when it constructs the
 // MdnsAdvertiser.
 func (b *Bridge) effectiveUDPPort() int {
 	b.mu.RLock()
@@ -2947,7 +2947,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, fabricIndex uint8, compress
 		// HostName empty → the advertiser's MAC-derived default (mdns defaultHostName) so the
 		// SRV target resolves via macOS Bonjour / Linux avahi A/AAAA.
 		HostName: "",
-		// T key: matter.js ServerNetworkRuntime.ts:334-338 sets
+		// T key: matter.js ServerNetworkRuntime.ts:345 at db021da0 sets
 		// supportedTransports {tcpClient: outgoing, tcpServer: incoming}
 		// for the operational advertisement only (MdnsAdvertisement.ts:205-206).
 		TCPClient: b.cfg.TCP.Outgoing,
