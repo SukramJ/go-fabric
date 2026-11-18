@@ -19,7 +19,7 @@ type UpdateEventKind uint8
 // where matter.js emits them (:886; :1317; :829, :1279; :878, :1123).
 // ConsentChanged, CheckFinished, Queued and TransferStarted are this
 // module's own: matter.js emits nothing when a consent is added or
-// removed, when a check ends, when #queueUpdate queues an entry (:892-920)
+// removed, when a check ends, when #queueUpdate queues an entry (:892-921)
 // or when onOtaStatusChange first sees Downloading (:1253-1321). One
 // update reports Queued, TransferStarted, Applying, then Done or Failed.
 const (

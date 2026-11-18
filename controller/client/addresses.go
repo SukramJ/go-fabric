@@ -143,12 +143,12 @@ func (r *Registry) cull(ctx context.Context) error {
 }
 
 // ForDevice is the node of a device the scanner found, created when the
-// registry has none — Peers.forDescriptor (Peers.ts:358-377). A node
-// matches by the device's instance id (Factory.find :942-952,
+// registry has none — Peers.forDescriptor (Peers.ts:371-390). A node
+// matches by the device's instance id (Factory.find :981-991,
 // RemoteDescriptor.is RemoteDescriptor.ts:37-50); a match under decommission is waited for
-// and the search repeated (:360-368); a match is refreshed from the device
-// (:369-375, the record's applyDevice); otherwise a new node is created
-// with id, or an allocated one when id is "" (:376; the id is the local
+// and the search repeated (:374-381); a match is refreshed from the device
+// (:382-388, the record's applyDevice); otherwise a new node is created
+// with id, or an allocated one when id is "" (:389; the id is the local
 // id a newly discovered node takes, matter.js Discovery.InstanceOptions.id,
 // packages/node/src/behavior/system/controller/discovery/Discovery.ts:269,
 // :355-357, :505-513 at db021da0 — a found node keeps its own; an id

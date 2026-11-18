@@ -172,7 +172,7 @@ var defaultCASEConnectionTiming = Timing{
 // the start's error. It is never skipped: every commission that succeeds
 // starts the node, and one that fails earlier reports nothing after its
 // failed step, as matter.js reports nothing after a failure
-// (ControllerCommissioningFlow.ts:437-461 at db021da0).
+// (ControllerCommissioningFlow.ts:437-465 at db021da0).
 func (r *Registry) Commission(ctx context.Context, n *Node, o CommissionOptions) error {
 	return r.runFabricOperation(n, opCommission, func() error { return r.commission(ctx, n, o) })
 }

@@ -47,7 +47,7 @@ func (n *Node) defaultRequest() SubscribePaths {
 // endDefaultSubscription ends the default subscription and reports it not
 // subscribed if it was reported subscribed. Mirrors matter.js
 // NetworkClient.#endDefaultSubscription
-// (packages/node/src/behavior/system/network/NetworkClient.ts:239-252 at
+// (packages/node/src/behavior/system/network/NetworkClient.ts:243-252 at
 // db021da0).
 func (n *Node) endDefaultSubscription() {
 	n.mu.Lock()
@@ -221,7 +221,7 @@ func sameSubscribeOptions(a, b *SubscribeOptions) bool {
 // filter, it takes no data from that subscription until the switch
 // succeeds at the next start or the next change of the default
 // subscription. Mirrors matter.js NetworkClient.#adoptFabricFilter
-// (packages/node/src/behavior/system/network/NetworkClient.ts:274-299 at
+// (packages/node/src/behavior/system/network/NetworkClient.ts:274-298 at
 // db021da0): a record that failed while the filter is already the cache's
 // is a warning, a failed switch an error. The caller holds subSync.
 //

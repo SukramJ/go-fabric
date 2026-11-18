@@ -760,7 +760,7 @@ func KeyIdentifier(pub []byte) []byte {
 // "CompressedFabric" as info, 8 bytes. Mirrors matter.js
 // packages/types/src/datatype/GlobalFabricId.ts:11, :36-47
 // (GlobalFabricId.compute; DataWriter is big-endian by default,
-// general/src/util/DataWriter.ts:12-18) at db021da0.
+// general/src/util/DataWriter.ts:12-19) at db021da0.
 func CompressedFabricID(rootPub []byte, fabricID uint64) ([8]byte, error) {
 	var id [8]byte
 	if len(rootPub) != 65 || rootPub[0] != 0x04 {

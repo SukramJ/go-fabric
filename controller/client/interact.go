@@ -136,7 +136,7 @@ func (n *Node) noteICDActive() {
 // filters, runs the caller's RefreshRequest on them, then injects the
 // versions, and its reports are applied by the scope of the request that
 // produced them. Mirrors matter.js
-// packages/node/src/node/client/ClientNodeInteraction.ts:119-181 at
+// packages/node/src/node/client/ClientNodeInteraction.ts:119-182 at
 // db021da0 (callerRefresh :125, sent :129-132, refreshRequest :162-168).
 // With IncludeKnownVersions no version goes along, in the first request
 // nor in a re-subscription's (withKnownVersions, :123-124).
@@ -267,7 +267,7 @@ func (n *Node) Write(ctx context.Context, writes []WriteRequest, opts WriteOptio
 // (packages/node/src/node/client/ClientNodeInteraction.ts:213-216 at
 // db021da0: `if (request.network === undefined) request = { ...request,
 // network: "unlimited" }`), where #awaitModeIcdRouting is applied to read
-// (:78-81) and write (:188-191) only. A caller that named a network keeps
+// (:81-84) and write (:189-192) only. A caller that named a network keeps
 // it. Applied to the caller's copy.
 func routeInvoke(r *interaction.ClientRequest) {
 	if r.Network == "" {

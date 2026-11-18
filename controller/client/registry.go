@@ -110,8 +110,8 @@ const idPrefix = "peer"
 // finds that node by its commissionable instance and is refused with
 // [ErrAlreadyCommissioned] until the node is erased — as matter.js at
 // db021da0: a leave event without an active subscription is ignored
-// (Peers.ts:855-862), Peers.forDescriptor hands out the node the
-// descriptor matches (Peers.ts:371-389; its `find` is Peers.ts:981-991,
+// (Peers.ts:856-863), Peers.forDescriptor hands out the node the
+// descriptor matches (Peers.ts:371-390; its `find` is Peers.ts:981-991,
 // the ClientNodeFactory implementation),
 // and CommissioningClient.commission refuses a node with a peer address
 // (CommissioningClient.ts:204-209).

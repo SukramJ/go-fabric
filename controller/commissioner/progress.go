@@ -36,7 +36,7 @@ func (p StepPhase) String() string {
 // Step is one report of commissioning progress ([Options].Progress).
 //
 // Number, Sub and Name are matter.js's CommissioningStep stepNumber,
-// subStepNumber and name verbatim (ControllerCommissioningFlow.ts:184-199,
+// subStepNumber and name verbatim (ControllerCommissioningFlow.ts:185-200,
 // the list :536-656 at db021da0) — "GetInitialData" 0.1,
 // "GeneralCommissioning.ArmFailsafe" 7.1, …, "Reconnect" 18.1 (which
 // includes the operational CASE connection, step 19, :628),
@@ -48,7 +48,7 @@ func (p StepPhase) String() string {
 // device over DNS-SD or BLE) and [StepPASE] 2.2 (the PASE session over
 // the commissioning channel), numbered after the "step 2 (device
 // discovery and commissioning channel establishment)" executeCommissioning
-// names (:444-446). Reports arrive in execution order, so 2.x precedes 0.1.
+// names (:444-445). Reports arrive in execution order, so 2.x precedes 0.1.
 // matter.js names no step for what runs after the flow either; the
 // module reports the node's start as [StepSubscribe] 21.1, its own
 // number after the flow's 20.1 (the initial read and the default
@@ -57,13 +57,13 @@ func (p StepPhase) String() string {
 // flow's last step — 98.1 here, as this port does not run matter.js's
 // 99.1 AdditionalLogic.AddDefaultOtaProvider. It has no Skipped case:
 // every successful commissioning starts the node, and a failed step is
-// the last report (:438-462).
+// the last report (:437-462).
 //
 // Err is the error of a Failed step: the step's own, or that of the
-// failsafe bookkeeping after it (:397-424). A recoverable failure
-// (RecoverableCommissioningError, :432-437) is reported Failed and the
+// failsafe bookkeeping after it (:398-424). A recoverable failure
+// (RecoverableCommissioningError, :431-436) is reported Failed and the
 // flow goes on; a step whose result is Failure without an error — 98.1
-// without a fabric index (:1480-1485) — is Failed with a nil Err.
+// without a fabric index (:1497-1503) — is Failed with a nil Err.
 type Step struct {
 	Number uint8
 	Sub    uint8

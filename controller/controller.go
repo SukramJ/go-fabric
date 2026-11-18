@@ -93,7 +93,7 @@ const DefaultVendorID uint16 = 0xFFF1
 // device that was found — that has the commissioner's own budgets
 // (commissioner.DefaultPASETimeout, commissioner.DefaultCASEConnectionTimeout
 // and the fail-safe), as matter.js's has: its commissionNode sets no
-// overall deadline (CommissioningController.ts:465-503 at db021da0), only
+// overall deadline (CommissioningController.ts:465-511 at db021da0), only
 // the discovery's timeout (CommissioningDiscovery.ts:40-45).
 const DefaultPairTimeout = time.Minute
 
@@ -134,7 +134,7 @@ type Config struct {
 	// id ("peer1", …) in place of Node.Hooks, so a host tells its nodes'
 	// reports, events and subscription signals apart
 	// (client.RegistryConfig.HooksFor) — matter.js gives each paired node
-	// its own events (packages/matter.js/src/device/PairedNode.ts:277-283
+	// its own events (packages/matter.js/src/device/PairedNode.ts:277-290
 	// at db021da0, attributeChanged and eventTriggered among them).
 	HooksFor func(id string) client.Hooks
 	// ManualStart leaves the commissioned nodes stopped when New returns;
@@ -1099,7 +1099,7 @@ type PairOptions struct {
 	// supplies the passcode; its discriminator is not checked. Mirrors
 	// matter.js MatterController.commission, which commissions a
 	// discovery's knownAddress through Peers.forDescriptor({addresses})
-	// without a scan (packages/matter.js/src/MatterController.ts:539-566 at
+	// without a scan (packages/matter.js/src/MatterController.ts:539-565 at
 	// db021da0; the option is CommissioningController.ts:292). Address
 	// and BLE together are [ErrConfiguration].
 	Address *net.UDPAddr
@@ -1170,7 +1170,7 @@ const (
 // timeout. With [PairOptions].BLE the device is found over BLE and
 // commissioned over BTP; with [PairOptions].Address it is dialled at that
 // address without discovery. Mirrors CommissioningController.commissionNode
-// (CommissioningController.ts:465-503 at db021da0), whose discovery takes
+// (CommissioningController.ts:465-511 at db021da0), whose discovery takes
 // BLE when the options name a BLE capability (discoveryCapabilities,
 // :283-286).
 //

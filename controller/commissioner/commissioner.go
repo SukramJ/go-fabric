@@ -169,7 +169,7 @@ type Options struct {
 	// OnAttestationFailure is the attestation policy (DAV:156). The zero
 	// value accepts every finding: a device whose attestation failed is
 	// commissioned and the findings are logged, as matter.js's flow does
-	// without a callback (ControllerCommissioningFlow.ts:1369-1384 at
+	// without a callback (ControllerCommissioningFlow.ts:1370-1385 at
 	// db021da0); the controller facade sets attestation.Reject() by
 	// default. notes/parity/by_design.md BD-Matter-AttestationPolicy-ZeroProceeds
 	// and BD-Matter-Controller-PairRejectsFailedAttestation.

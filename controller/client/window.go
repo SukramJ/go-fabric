@@ -80,7 +80,7 @@ type CommissioningWindow struct {
 // PBKDF2 iterations — CommissioningClient.openEnhancedCommissioningWindow
 // (CommissioningClient.ts:507-567 at db021da0) with PaseClient's
 // generateRandomDiscriminator, generateRandomPasscode and
-// generatePakePasscodeVerifier (PaseClient.ts:49-71). The codes it returns
+// generatePakePasscodeVerifier (PaseClient.ts:50-71). The codes it returns
 // are the manual code of the Standard flow and the QR code of version 0,
 // Standard flow, discovery on the IP network, with the vendor and product
 // id of the peer's BasicInformation.

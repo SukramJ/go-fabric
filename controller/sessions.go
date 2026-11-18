@@ -13,8 +13,8 @@ import (
 // SessionIntervals are the controller's own session intervals, reported
 // to every peer in its handshakes ([Config].Sessions). The same shape as
 // node.SessionIntervals; matter.js keeps one SessionIntervals for both
-// roles (SessionIntervals.ts:45-50 at db021da0, the defaults; the active
-// threshold is bounded by the uint16 it is encoded as, SessionManager.ts:59-68).
+// roles (SessionIntervals.ts:45-49 at db021da0, the defaults; the active
+// threshold is bounded by the uint16 it is encoded as, SessionManager.ts:58-68).
 type SessionIntervals struct {
 	// Idle is SESSION_IDLE_INTERVAL; 0 is 500 ms.
 	Idle time.Duration

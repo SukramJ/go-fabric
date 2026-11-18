@@ -216,7 +216,7 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 
 // withKnownVersions is the version filters a read or subscription sends —
 // the caller's own, kept as given and first, then the injected ones.
-// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-323
+// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-324
 // (injectVersionFilters at db021da0): a request with the other fabric
 // filter than the cache's, or one sent while the epoch is not trusted,
 // gets none injected (:288), and a cluster the caller filters gets no
@@ -1063,7 +1063,7 @@ func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders
 // name: the one naming the fewest of the other claimants, then the one
 // with the shorter PartsList, then the one with the lower endpoint number
 // — the choice depends on the lists, not on the order they arrived in.
-// Mirrors matter.js ClientStructure.ts:1553-1578 (#closestClaimant at
+// Mirrors matter.js ClientStructure.ts:1559-1580 (#closestClaimant at
 // db021da0).
 func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint {
 	rank := func(c *Endpoint) [3]int {
@@ -1087,7 +1087,7 @@ func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint
 
 // partsAccountedFor: every endpoint ep names has reported a PartsList of
 // its own; an endpoint the root no longer names reports nothing more and
-// is not waited for. Mirrors matter.js ClientStructure.ts:1580-1599
+// is not waited for. Mirrors matter.js ClientStructure.ts:1587-1601
 // (#partsAccountedFor at db021da0).
 func (s *structure) partsAccountedFor(ep *Endpoint) bool {
 	rootParts, rootReported := s.partsListOf[s.endpoints[0]]
