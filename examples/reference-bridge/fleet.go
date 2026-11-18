@@ -1251,7 +1251,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 		errs []error
 	)
 	add := func(ep node.Endpoint, err error) {
-		if errors.Is(err, surface.ErrWithheld) && ep != nil {
+		// A constructor's nil device arrives as a typed nil (*T)(nil)
+		// inside the interface, which "ep != nil" takes for a device
+		// (R2-P6-err-2617): nilEndpoint looks inside.
+		if errors.Is(err, surface.ErrWithheld) && !nilEndpoint(ep) {
 			// Withheld by --spec-level: the node records it at Add
 			// (addAll, surface.go).
 			out = append(out, ep)
@@ -1259,6 +1262,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 		}
 		if err != nil {
 			errs = append(errs, err)
+			return
+		}
+		if nilEndpoint(ep) {
+			errs = append(errs, errors.New("a device constructor returned no device and no error"))
 			return
 		}
 		out = append(out, ep)
