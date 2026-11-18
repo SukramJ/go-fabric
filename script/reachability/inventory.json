@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9995,
+  "entry_points": 9998,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27713,
-    "reachable": 20834,
-    "whitelisted": 6856,
+    "total_exported": 27717,
+    "reachable": 20836,
+    "whitelisted": 6858,
     "unreachable": 23
   },
   "by_package": [
@@ -11827,7 +11827,7 @@
       "identifier": "ReachableChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/bridged_device_basic_information.go",
-      "line": 144
+      "line": 145
     },
     {
       "package": "cluster/core",
@@ -35221,7 +35221,14 @@
       "identifier": "TestNodeLabelServedIsStoredLast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/set_node_label_test.go",
-      "line": 79
+      "line": 136
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestNodeLabelWritesOnTwoServerInstances",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/set_node_label_test.go",
+      "line": 110
     },
     {
       "package": "endpoint",
@@ -35599,7 +35606,7 @@
       "identifier": "TestSetNodeLabelReturnsTheStoresRefusal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/set_node_label_test.go",
-      "line": 54
+      "line": 58
     },
     {
       "package": "endpoint",
@@ -41591,7 +41598,7 @@
       "identifier": "FabricUpdated",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
-      "line": 85
+      "line": 91
     },
     {
       "package": "node",
@@ -41634,6 +41641,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
       "line": 42
+    },
+    {
+      "package": "node",
+      "identifier": "HasCASEIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 84
     },
     {
       "package": "node",
