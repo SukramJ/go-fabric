@@ -5,6 +5,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -24,8 +25,10 @@ func TestClosedGeneralCommissioningArmsNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, c := range map[string]context.Context{"CASE": im.WithFabricFilter(ctx, false, 2), "PASE": ctx} {
-		if _, err := gc.MatterInvoke(c, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err == nil {
-			t.Errorf("ArmFailSafe over %s armed a closed server", name)
+		// FAILURE: the error names no other status (this module's rule
+		// for a stopping node; no reference read for it).
+		if _, err := gc.MatterInvoke(c, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err == nil || errors.As(err, new(im.StatusCodeError)) {
+			t.Errorf("ArmFailSafe over %s on a closed server: %v, want FAILURE", name, err)
 		}
 	}
 	if err := gc.ArmFailSafeFor(ctx, 60, 0); err == nil {
