@@ -467,6 +467,35 @@ func TestColorLoopSet(t *testing.T) {
 	})
 }
 
+// TestColorLoopTimeZeroTurnsOnceASecond (R2-P6-fsm-1412): a loop started
+// with ColorLoopTime 0 moves the hue, one turn a second, as
+// connectedhomeip guards the zero ("loopTimeSec = (timeSec == 0) ? 1u :
+// timeSec", ColorControlCluster.cpp:913 at 6170af84); the attribute keeps
+// reading 0. matter.js divides by it (ColorControlServer.ts:1201-1210 at
+// db021da0), and the loop then sets ColorLoopActive over a hue that does
+// not move — the divergence this test pins.
+func TestColorLoopTimeZeroTurnsOnceASecond(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		srv := colorLight(t, allColorFeatures, true)
+		invoke(t, srv, ccdef.CmdColorLoopSet, ccdef.ColorLoopSetRequest{
+			UpdateFlags: ccdef.UpdateFlagsUpdateAction | ccdef.UpdateFlagsUpdateDirection | ccdef.UpdateFlagsUpdateTime | ccdef.UpdateFlagsUpdateStartHue,
+			Action:      ccdef.ColorLoopActionActivateFromColorLoopStartEnhancedHue,
+			Direction:   ccdef.ColorLoopDirectionIncrement, Time: 0, StartHue: 1000,
+		})
+		if read(t, srv, ccdef.AttrColorLoopActive) != 1 || read(t, srv, ccdef.AttrColorLoopTime) != 0 {
+			t.Fatal("ColorLoopSet with Time 0 did not start the loop with ColorLoopTime 0")
+		}
+		time.Sleep(500 * time.Millisecond)
+		synctest.Wait()
+		// About half a turn in half a second (the first step counts one
+		// step interval more, as every transition's): floor(65535/1) a
+		// second.
+		if h := read(t, srv, ccdef.AttrEnhancedCurrentHue); h < 1000+30000 || h > 1000+42000 {
+			t.Errorf("after 0.5 s the loop is at %d, want about half a turn past 1000", h)
+		}
+	})
+}
+
 // TestColorModeSwitchConverts: a command of another mode converts the
 // current colour into the new mode's attributes by matter.js's conversions
 // (switchColorMode), and stops what moved in the old mode.
