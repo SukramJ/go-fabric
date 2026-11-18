@@ -56,8 +56,8 @@ Prerequisites:
   new release finds fixed or justified in the same commit.
 
 `make help` lists the targets; `make ci` runs what the pipeline runs
-offline, `make ci-net` the two guards that read a clone at a pinned commit
-(`cite-check`, `chipdm-check`). `TestMakeCIRunsWhatCIRuns`
+offline, `make ci-net` the three guards that read a clone at a pinned commit
+(`cite-check`, `testparity-snapshot-check`, `chipdm-check`). `TestMakeCIRunsWhatCIRuns`
 (`script/requiredchecks`) holds both to `ci.yml`; `test-32bit` (a Linux host)
 and `workflow-lint` (zizmor) stay outside them.
 
