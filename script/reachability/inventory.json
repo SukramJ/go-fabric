@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9998,
+  "entry_points": 10014,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27717,
-    "reachable": 20836,
-    "whitelisted": 6858,
+    "total_exported": 27724,
+    "reachable": 20837,
+    "whitelisted": 6864,
     "unreachable": 23
   },
   "by_package": [
@@ -393,7 +393,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3272,
+      "line": 3276,
       "kind": "method"
     },
     {
@@ -624,6 +624,13 @@
     },
     {
       "package": "binding",
+      "identifier": "TestNextPeriodConnectsAfterTheRelease",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/release_test.go",
+      "line": 208
+    },
+    {
+      "package": "binding",
       "identifier": "TestParkedAgainWithoutObserver",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "binding/manager_test.go",
@@ -642,6 +649,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "binding/release_test.go",
       "line": 145
+    },
+    {
+      "package": "binding",
+      "identifier": "TestRecordOfAClosedPeerIsDropped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/release_test.go",
+      "line": 244
     },
     {
       "package": "binding",
@@ -8660,6 +8674,13 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestNames_FloodEvictsUnresolvedNamesFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/names_bounds_test.go",
+      "line": 220
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestNames_InterfaceNameOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/names_test.go",
@@ -8762,6 +8783,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/omap_test.go",
       "line": 14
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestOperational_ResolveBoundsItsHostDiscoveries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/operational_test.go",
+      "line": 171
     },
     {
       "package": "client/discovery",
@@ -28228,7 +28256,7 @@
       "identifier": "CommissionedIdentity",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/ble/scanner.go",
-      "line": 709
+      "line": 710
     },
     {
       "package": "controller/ble",
@@ -28508,7 +28536,7 @@
       "identifier": "Signal",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/camera/service.go",
-      "line": 43
+      "line": 48
     },
     {
       "package": "controller/camera",
@@ -28837,7 +28865,7 @@
       "identifier": "TestNewRefusesReportsInUse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/reports_internal_test.go",
-      "line": 94
+      "line": 95
     },
     {
       "package": "controller/camera",
@@ -30990,6 +31018,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestArmFailsafeTakesBasicCommissioningInfoByShape",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reported_parity_matterjs_test.go",
+      "line": 181
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestAttestationSignatureOfAnyLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/signature_length_test.go",
@@ -31189,49 +31224,49 @@
       "identifier": "TestConsentAwaitsAReArmInFlight",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 192
+      "line": 204
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentEndsWhenTheFailSafeCannotBeKept",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 152
+      "line": 164
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentEndsWithTheContext",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 92
+      "line": 105
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentErrorFailsTheStage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 115
+      "line": 128
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentKeepsAShortFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 128
+      "line": 141
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentOnBLE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 232
+      "line": 244
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConsentOutlivesTheFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_consent_test.go",
-      "line": 58
+      "line": 72
     },
     {
       "package": "controller/commissioner",
@@ -31718,6 +31753,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestReportedValueDecodedByShapeParityMatterjs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/reported_parity_matterjs_test.go",
+      "line": 31
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestResolveThreadNetworkName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
@@ -31840,7 +31882,7 @@
       "identifier": "TrustInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/commissioner/jcm.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "controller/dcl",
