@@ -758,9 +758,12 @@ nested-release-check: ## build each nested module against the go-fabric version 
 
 .PHONY: workflow-lint
 workflow-lint: ## actionlint and zizmor over .github/workflows (pinned: ACTIONLINT_VERSION, ZIZMOR_VERSION)
-	@# shellcheck and pyflakes inside actionlint are off: the run scripts'
-	@# shell style is a decision of its own, not this guard's.
-	$(ACTIONLINT) -shellcheck= -pyflakes=
+	@# shellcheck runs inside actionlint over every run script (N5-ci-9).
+	@# Without it on PATH actionlint skips the check silently, so the target
+	@# refuses to run; ubuntu-latest has it, `make setup` does not install
+	@# it. pyflakes is off: no step's shell is python.
+	@command -v shellcheck >/dev/null || { echo "workflow-lint: shellcheck is not on PATH; actionlint would skip the run scripts"; exit 1; }
+	$(ACTIONLINT) -pyflakes=
 	$(ZIZMOR) --offline .github/workflows
 
 # What ci.yml runs, as make targets: `make ci` the guards that need no

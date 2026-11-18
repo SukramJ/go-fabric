@@ -323,9 +323,11 @@ jobs:
       - name: read the CHIP pins
         id: pins
         run: |
-          echo "commit=$(sed -n 's/^CHIP_TEST_IMAGE_COMMIT *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
-          echo "version=$(sed -n 's/^CHIP_DATA_MODEL_VERSION *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
-          echo "levels=$(sed -n 's/^CHIP_LEVEL_DATA_MODELS *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
+          {
+            echo "commit=$(sed -n 's/^CHIP_TEST_IMAGE_COMMIT *?= *//p' Makefile)"
+            echo "version=$(sed -n 's/^CHIP_DATA_MODEL_VERSION *?= *//p' Makefile)"
+            echo "levels=$(sed -n 's/^CHIP_LEVEL_DATA_MODELS *?= *//p' Makefile)"
+          } >> "$GITHUB_OUTPUT"
       - name: cache the CHIP data model checkout
         id: chip-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

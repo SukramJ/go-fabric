@@ -174,7 +174,7 @@ jobs:
             --title "${GITHUB_REF_NAME}" \
             --notes-file RELEASE_NOTES.md \
             --verify-tag \
-            ${PRERELEASE}
+            ${PRERELEASE:+"$PRERELEASE"}
 
       # proxy.golang.org fetches a version the first time somebody asks for
       # it. Asking here turns that into part of the release rather than a
