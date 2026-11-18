@@ -69,6 +69,15 @@ func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, 
 // field applies to every vendor or product, OtaImageHeader.ts:26-41) —
 // then it is moved out of the download location, as an applied or
 // abandoned file must be (OtaSoftwareUpdateRequestorServer.ts:153-159).
+//
+// These checks are the image format's, not the image's authenticity:
+// nothing here verifies who made it. matter.js's requestor says the same
+// of its default validation — "The method SHALL be overridden to add
+// additional checks like validating the signature of the file."
+// (packages/node/src/behaviors/ota-software-update-requestor/
+// OtaSoftwareUpdateRequestorServer.ts:1121 at db021da0). A product
+// verifies its vendor's signature over the payload before it installs the
+// image (R2-P6-sec-2616).
 func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32, file string) error {
 	header, err := a.verify(newSoftwareVersion, file)
 	if err != nil {
@@ -89,7 +98,7 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	if !a.harness {
 		a.logger.Info("ota.image_stored",
 			slog.Uint64("version", uint64(newSoftwareVersion)), slog.String("path", kept),
-			slog.String("hint", "install it and restart; this example does not flash itself"))
+			slog.String("hint", "verify its vendor signature, install it and restart; this example does neither"))
 		return nil
 	}
 	// A device that flashes its image stays in Applying until it reboots;

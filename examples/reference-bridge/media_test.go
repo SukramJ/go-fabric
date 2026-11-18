@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"math"
 	"path/filepath"
 	"testing"
 
@@ -292,5 +293,34 @@ func TestMediaPlatformMovesTheAppStatus(t *testing.T) {
 	invokeMounted(t, app, launcherdef.ClusterID, launcherdef.CmdStopApp, launcherdef.StopAppRequest{})
 	if status() != uint8(basicdef.ApplicationStatusStopped) {
 		t.Errorf("Status after the app's StopApp %v", status())
+	}
+}
+
+// TestSkipForwardSaturates holds R2-P6-wire-2654: a delta whose sum with
+// the position would wrap moves the position to the duration — or,
+// without one, to the largest position — never backward; a sum that does
+// not wrap is unchanged.
+func TestSkipForwardSaturates(t *testing.T) {
+	t.Parallel()
+	duration := uint64(80_000)
+	for _, tc := range []struct {
+		name     string
+		duration *uint64
+		delta    uint64
+		want     uint64
+	}{
+		{"near 2^64 with a duration", &duration, math.MaxUint64, duration},
+		{"2^64 - pos with a duration", &duration, math.MaxUint64 - 4_999, duration},
+		{"near 2^64 without a duration", nil, math.MaxUint64, math.MaxUint64},
+		{"in range", &duration, 10_000, 15_000},
+		{"past the end", &duration, 100_000, duration},
+	} {
+		st := &mpdef.State{Duration: tc.duration, SampledPosition: position(5_000)}
+		if _, err := (playerTransport{}).SkipForward(context.Background(), st, mpdef.SkipForwardRequest{DeltaPositionMilliseconds: tc.delta}); err != nil {
+			t.Fatal(err)
+		}
+		if got := positionOf(st); got != tc.want {
+			t.Errorf("%s: position %d, want %d", tc.name, got, tc.want)
+		}
 	}
 }

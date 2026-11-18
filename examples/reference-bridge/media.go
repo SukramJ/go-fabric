@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
@@ -367,14 +368,26 @@ func (playerTransport) Rewind(_ context.Context, st *mpdef.State, _ mpdef.Rewind
 	return tvResponse(mpdef.StatusSuccess), nil
 }
 
-// SkipForward is HandleSkipForward (:245-257): up to the duration.
+// SkipForward is HandleSkipForward (:245-257): up to the duration. Unlike
+// that handler, whose uint64 add wraps (:249-250), the add saturates: a
+// delta that would overflow moves the position to the duration — or,
+// without one, to the largest position — never backward
+// (R2-P6-wire-2654).
 func (playerTransport) SkipForward(_ context.Context, st *mpdef.State, req mpdef.SkipForwardRequest) (mpdef.PlaybackResponse, error) { //nolint:unparam // the mediaplayback port signature
-	next := positionOf(st) + req.DeltaPositionMilliseconds
+	next := saturatingAdd(positionOf(st), req.DeltaPositionMilliseconds)
 	if st.Duration != nil {
 		next = min(next, *st.Duration)
 	}
 	st.SampledPosition = position(next)
 	return tvResponse(mpdef.StatusSuccess), nil
+}
+
+// saturatingAdd is a+b, or math.MaxUint64 where the sum would wrap.
+func saturatingAdd(a, b uint64) uint64 {
+	if b > math.MaxUint64-a {
+		return math.MaxUint64
+	}
+	return a + b
 }
 
 // SkipBackward is HandleSkipBackward (:230-243): down to 0.

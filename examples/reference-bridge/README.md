@@ -154,7 +154,10 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   announcement, as matter.js's cert requestor does. Without it the daemon
   validates a downloaded image and keeps it under `<ota-dir>/applied/`,
   still running the old version; `--ota-dir` (default `ota` beside `--db`)
-  is where downloads land.
+  is where downloads land. The validation is the image format's — digest,
+  size, version, vendor and product — not the image's authenticity: a
+  product verifies its vendor's signature over the payload before it
+  installs an image, which this example does not (`ota.go`, `ApplyUpdate`).
 
 - `--wifi` (TESTING ONLY) serves WiFiNetworkDiagnostics on the root from a
   simulated Wi-Fi link (`wifi.go`): fixed values (a locally administered
