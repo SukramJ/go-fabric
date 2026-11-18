@@ -1105,8 +1105,11 @@ func (l resumptionLookup) ClaimResumptionID(id []byte) (release func(), ok bool)
 
 // resumeClaims are the resumption ids a resume holds
 // ([resumptionLookup.ClaimResumptionID]). The zero value is ready. An id
-// stays held only while its resume runs, or when the record it presented
-// could not be replaced; so the set is bounded by the store's records.
+// stays held while its resume runs. An id whose record could not be
+// replaced (the persist failed) stays held for the life of the process,
+// also after a later handshake replaced that peer's record: the set is
+// bounded by those resumes, each one authenticated (a valid resume MIC
+// over a record the store held), not by the store's records.
 type resumeClaims struct {
 	mu   sync.Mutex
 	held map[string]struct{}
