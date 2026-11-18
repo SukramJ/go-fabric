@@ -237,9 +237,9 @@ func TestUpdateNOC_DifferentFabricIDRejectedAsInvalidNOC(t *testing.T) {
 // updates the fabric row's NodeID via [store.Store.UpdateFabricNodeID]
 // and (b) fires onFabricWithdraw with the OLD (CompressedID, NodeID) so
 // the stale mDNS operational instance is retracted. Mirrors matter.js
-// Fabric.ts:548 (nodeId lifted from the new NOC) + DeviceAdvertiser.ts:
-// 65-76 (close the fabric's advertisement when nodeId changed, then
-// re-advertise).
+// Fabric.ts:602-605, :636 (nodeId lifted from the new NOC) +
+// DeviceAdvertiser.ts:80-107 at db021da0 (close the fabric's advertisement
+// when nodeId changed, then re-advertise).
 func TestUpdateNOC_NewNodeIDUpdatesStoreAndFiresWithdraw(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

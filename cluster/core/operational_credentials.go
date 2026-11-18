@@ -2753,8 +2753,8 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// <compressedID>-<oldNodeID> record must be withdrawn explicitly — a
 	// republish alone leaves it answering until TTL. Mirrors matter.js
 	// Fabric.ts:602-605, :636 (nodeId lifted from the new NOC) +
-	// DeviceAdvertiser.ts:96-107 (close the fabric's advertisement when
-	// nodeId changed, then re-advertise).
+	// DeviceAdvertiser.ts:80-107 at db021da0 (close the fabric's
+	// advertisement when nodeId changed, then re-advertise).
 	if noc.Subject.MatterNodeID != fab.NodeID {
 		o.mu.RLock()
 		withdraw := o.onFabricWithdraw
