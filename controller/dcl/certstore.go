@@ -159,7 +159,11 @@ var (
 // and starts the periodic one — the service's construction
 // (DclCertificateService.ts:332-352). A failed update is logged, not
 // returned (update :952-972); a store that cannot be read is an error, one
-// whose content does not parse is logged and read as empty.
+// whose content does not parse is logged and read as empty. The first
+// update runs on ctx: it fetches up to maxRootsPerUpdate roots and
+// maxGitHubFilesPerUpdate files (1024 each), one request of at most
+// [DefaultTimeout] each, so a ctx with a deadline bounds the open
+// (U3-net-1).
 func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*CertificateStore, error) {
 	s := &CertificateStore{
 		opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{},
