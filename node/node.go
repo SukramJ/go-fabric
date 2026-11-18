@@ -437,7 +437,8 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// --- sessions, PASE, CASE (main.go:323-328 at b4ea1f96^) -------------------------
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.br, n.st, n.root, n.caseIDs, paseParams{ //nolint:contextcheck // the handshake hooks run per session, for the node's lifetime, not New's call
-		passcode: cm.Passcode, salt: cm.Salt, iterations: int(cm.PBKDFIterations), life: n.life,
+		passcode: cm.Passcode, iterations: int(cm.PBKDFIterations), life: n.life,
+		salts: &windowSalt{passcode: cm.Passcode, iterations: int(cm.PBKDFIterations)},
 	}, responderSessionParams(cfg.Network.TCP, cfg.MaxPathsPerInvoke, cfg.Sessions), cfg.Limits, n.logger, &n.sessionEvents)
 	n.sessionEvents.n = n
 	n.wireICD()
@@ -449,7 +450,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
-		baseline: n.sec.pase, advert: advert, observers: n.observerList,
+		baseline: n.sec.pase, salts: n.sec.salts, advert: advert, observers: n.observerList,
 		deviceType:      &commissionableDeviceType{topology: n.br.Topology},
 		responderParams: n.sec.responderParams, life: n.life,
 		ble: cfg.Network.hasBLE(), clk: clock.Or(n.cfg.Clock),

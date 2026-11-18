@@ -475,6 +475,7 @@ type security struct {
 	sessions *operational.Manager
 	subs     *subscription.Manager
 	pase     *bridge.PerExchangePaseProvider
+	salts    *windowSalt
 	casep    *bridge.PerExchangeCaseProvider
 	// responderParams is what every PASE and CASE responder advertises.
 	responderParams *sessionparams.Parameters
@@ -654,7 +655,7 @@ func wireSecurity(
 	br.AttachOperationalResolver(operationalResolver(logger, br.Clock()))
 	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger, events.opened))
 
-	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider, responderParams: responderParams}
+	return &security{sessions: sessions, subs: subs, pase: paseProvider, salts: pase.salts, casep: caseProvider, responderParams: responderParams}
 }
 
 // start runs the subscription engine and the session, PASE and CASE
@@ -756,8 +757,9 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 // needs it.
 type paseParams struct {
 	passcode   uint32
-	salt       []byte
 	iterations int
+	// salts is the salt of the basic window open now ([windowSalt]).
+	salts *windowSalt
 	// life is the node's lifetime: the fail-safe a PASE session arms
 	// lives under it, so Stop ends its watcher.
 	life context.Context
@@ -771,11 +773,90 @@ func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseP
 	if !setup.IsValidSetupPIN(p.passcode) {
 		return nil, errSetupPIN
 	}
-	vc, err := spake2.NewVerifierContext(p.passcode, p.salt, p.iterations)
+	salt, vc, err := p.salts.current()
 	if err != nil {
-		return nil, fmt.Errorf("spake2 verifier context: %w", err)
+		return nil, err
 	}
-	return buildPaseAdapterFromContext(p.life, sessions, root, vc, p.salt, p.iterations, responderParams)
+	return buildPaseAdapterFromContext(p.life, sessions, root, vc, salt, p.iterations, responderParams)
+}
+
+// windowSalt is the PBKDF salt of the node's basic commissioning window
+// — its own window and an administrator's basic window, both answered
+// with the configured passcode — with the verifier context built from it.
+// A fresh 32-byte salt is drawn per window open, as matter.js draws one
+// for the PASE server of every window it opens
+// (packages/protocol/src/protocol/DeviceCommissioner.ts:129-136, :214 at
+// db021da0); nothing stores it, a commissioner learns it from the
+// PBKDFParamResponse of the window it uses (review II, decision 251).
+// connectedhomeip answers every basic window with the provisioned salt
+// (src/app/server/CommissioningWindowManager.cpp:300-303 at 6170af84);
+// the node follows matter.js.
+type windowSalt struct {
+	passcode   uint32
+	iterations int
+
+	mu       sync.Mutex
+	openedAt time.Time
+	salt     []byte
+	vc       *spake2.VerifierContext
+	// ended: the window the salt was drawn for is no longer open.
+	ended bool
+}
+
+// renew draws the salt of the window opened at openedAt, unless it was
+// drawn for that open already: the same open instant and no close since.
+func (w *windowSalt) renew(openedAt time.Time) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.salt != nil && !w.ended && w.openedAt.Equal(openedAt) {
+		return nil
+	}
+	return w.drawLocked(openedAt)
+}
+
+// end marks the window the salt was drawn for as no longer open, so the
+// next open draws a fresh one even at the same instant.
+func (w *windowSalt) end() {
+	if w == nil {
+		return
+	}
+	w.mu.Lock()
+	w.ended = true
+	w.mu.Unlock()
+}
+
+// current is the salt of the window open now and its verifier context;
+// the first call before any window drew one draws it.
+func (w *windowSalt) current() ([]byte, *spake2.VerifierContext, error) {
+	if w == nil {
+		return nil, nil, errors.New("node: no PBKDF salt source")
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.salt == nil {
+		if err := w.drawLocked(time.Time{}); err != nil {
+			return nil, nil, err
+		}
+	}
+	if w.vc == nil {
+		// Derived on the first exchange of the window, in the exchange's
+		// handling, not in the window's transition.
+		vc, err := spake2.NewVerifierContext(w.passcode, w.salt, w.iterations)
+		if err != nil {
+			return nil, nil, fmt.Errorf("spake2 verifier context: %w", err)
+		}
+		w.vc = vc
+	}
+	return w.salt, w.vc, nil
+}
+
+func (w *windowSalt) drawLocked(openedAt time.Time) error {
+	salt, err := bridge.RandomSalt()
+	if err != nil {
+		return err
+	}
+	w.openedAt, w.salt, w.vc, w.ended = openedAt, salt, nil, false
+	return nil
 }
 
 // buildPaseAdapterFromContext is the passcode-independent half of

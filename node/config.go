@@ -462,8 +462,13 @@ type Commissioning struct {
 	// PBKDFIterations is the SPAKE2+ PBKDF2 iteration count, within
 	// [spake2.IterationsMin, spake2.IterationsMax].
 	PBKDFIterations uint32
-	// Salt is the SPAKE2+ salt, spake2.PBKDFMinSaltSize to
-	// spake2.PBKDFMaxSaltSize bytes.
+	// Salt is a SPAKE2+ salt, spake2.PBKDFMinSaltSize to
+	// spake2.PBKDFMaxSaltSize bytes, still validated by [Config.Validate].
+	// The node no longer answers a window with it: its own window and an
+	// administrator's basic window each draw a fresh 32-byte salt when
+	// they open, as matter.js does (review II, decision 251). A window the
+	// host opens with [Node.OpenBasicWindow] takes the salt of its
+	// [WindowCredentials].
 	Salt []byte
 	// LocationCapability is GeneralCommissioning's LocationCapability
 	// (Matter §11.10.5.3), the regulatory locations the node supports and

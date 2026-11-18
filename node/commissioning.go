@@ -48,6 +48,7 @@ type commissioningHost struct {
 	root     *RootClusters
 	logger   *slog.Logger
 	baseline *bridge.PerExchangePaseProvider // the configured-passcode provider
+	salts    *windowSalt                     // the baseline's salt, drawn per window open
 	// responderParams is what the window's PASE adapters advertise
 	// (security.go responderSessionParams).
 	responderParams *sessionparams.Parameters
@@ -177,6 +178,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// the transition OpenBasicWindow's own open fires, the basic
 		// window's acceptor (installed, so attachPase leaves it) and its
 		// discriminator.
+		h.renewSalt(window)
 		h.attachPase(h.baseline)
 		adv := h.advertisement()
 		if basic != nil {
@@ -218,6 +220,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// the node's own passcode (DeviceCommissioner.ts:130-137 at
 		// 862ad75f) and #open advertises the configured discriminator
 		// (:236-256), the status BasicWindowOpen.
+		h.renewSalt(window)
 		h.attachPase(h.baseline)
 		if live {
 			h.announce(ctx, h.withRotatingID(ctx, h.advertisement()), "commissioning.basic_window.announce")
@@ -231,6 +234,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// (matter.js #closeWindow: removePaseCommissioner,
 		// exitCommissioningMode).
 		h.attachPase(nil)
+		h.salts.end()
 		if live {
 			h.br.WithdrawCommissioning(ctx)
 			h.withdrawBLE(ctx)
@@ -443,6 +447,19 @@ func (h *commissioningHost) snapshot(window *bridge.CommissioningWindow) WindowS
 	snap.CommissioningMode, snap.Discriminator = h.announcedMode, h.announcedDiscriminator
 	h.announcedMu.Unlock()
 	return snap
+}
+
+// renewSalt gives the window open now a fresh PBKDF salt for the
+// configured passcode, once per open ([windowSalt]; decision 251). A
+// failed draw keeps the previous salt and is logged.
+func (h *commissioningHost) renewSalt(window *bridge.CommissioningWindow) {
+	if h.salts == nil {
+		return
+	}
+	openedAt, _, _ := window.Timing()
+	if err := h.salts.renew(openedAt); err != nil {
+		h.logger.Warn("commissioning.salt", slog.Any("err", err))
+	}
 }
 
 // attachPase makes p the bridge's PASE acceptor (nil: none) unless an
