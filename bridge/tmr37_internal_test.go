@@ -54,11 +54,11 @@ func TestTMR37Claims(t *testing.T) {
 	}
 }
 
-// TestTMR37 (review II, TM R3.7, decision 245).
+// TestTMR37 (review II, TM R3.7, decision 245). Every read is answered
+// once, at once: a read that took a claim with its first chunk, one
+// refused with Busy. The test waits for every answer, not for a time.
 func TestTMR37(t *testing.T) {
-	if testing.Short() {
-		t.Skip("starts 1024 reads")
-	}
+	t.Parallel()
 	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
 	b.chunkStatusResponseTimeoutOverride = time.Minute
 	b.SetFabricCounter(func(context.Context) (int, error) { return 2, nil })
@@ -87,13 +87,38 @@ func TestTMR37(t *testing.T) {
 			sendToBridge(t, b, p, wildcardRead(t, p, uint16(0x5000+i)))
 		}
 	}
-	deadline := time.Now().Add(60 * time.Second)
-	for b.routing.chunkWaits.heldTotal() < chunkWaitFabricThreshold && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond) //nolint:forbidigo // polls the parked count
+	// One answer per read, told apart by exchange: a retransmitted first
+	// chunk names an exchange already seen.
+	var parked, busy int
+	for _, p := range others {
+		seen := map[uint16]bool{}
+		for len(seen) < maxChunkWaitsPerSession {
+			proto, body, answered := readOneIMDatagram(t, p.conn, p.sess, 10*time.Second)
+			if !answered {
+				t.Fatalf("session %#x: %d of its %d reads answered", p.id, len(seen), maxChunkWaitsPerSession)
+			}
+			if seen[proto.ExchangeID] {
+				continue
+			}
+			seen[proto.ExchangeID] = true
+			switch proto.Opcode {
+			case im.OpcodeReportData:
+				parked++
+			case im.OpcodeStatusResponse:
+				if got := decodeStatusResponsePayload(t, body); got != im.StatusBusy {
+					t.Fatalf("session %#x: a refused read was answered %v, want Busy", p.id, got)
+				}
+				busy++
+			default:
+				t.Fatalf("session %#x: unexpected opcode %#x", p.id, proto.Opcode)
+			}
+		}
 	}
-	time.Sleep(500 * time.Millisecond) //nolint:forbidigo // lets the refused reads settle
-	if got := b.routing.chunkWaits.heldTotal(); got > chunkWaitFabricThreshold {
-		t.Fatalf("one fabric holds %d chunk waits, want at most %d", got, chunkWaitFabricThreshold)
+	if got := b.routing.chunkWaits.heldTotal(); got != parked || got > chunkWaitFabricThreshold {
+		t.Fatalf("one fabric holds %d chunk waits (%d reads parked, %d refused), want at most %d", got, parked, busy, chunkWaitFabricThreshold)
+	}
+	if busy == 0 {
+		t.Fatal("no read was refused: the share was never applied")
 	}
 
 	sendToBridge(t, b, last, wildcardRead(t, last, 0x6000))
