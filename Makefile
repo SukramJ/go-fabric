@@ -276,6 +276,21 @@ testparity-snapshot: ## refresh script/testparity/matterjs_tests.json from $(MAT
 	@# and changed; testparity-check then lists every mapping to re-check.
 	MATTERJS_DIR=$(MATTERJS_DIR) $(GO) run ./script/testparity -snapshot
 
+.PHONY: testparity-snapshot-check
+testparity-snapshot-check: no-untracked-go testparity-snapshot testparity-server ## regenerate both test snapshots from the pinned clones, then fail if either moved off the committed one
+	@# testparity-check holds the register to the committed snapshots and
+	@# checks only their commit and roots; this leg holds the snapshots to
+	@# the clones, so a test file a snapshot lost or never gained fails
+	@# (R2-P6-test-2809). ci-net and ci.yml's cite-check job run it.
+	@git diff --quiet HEAD -- script/testparity/matterjs_tests.json script/testparity/matterjsserver_tests.json || { \
+		echo ""; \
+		echo "A committed test snapshot is not what the pinned clone holds: regenerating it changed the file."; \
+		echo "Run 'make testparity-snapshot testparity-server', read the diff, and commit it."; \
+		echo ""; \
+		git --no-pager diff --stat HEAD -- script/testparity/; \
+		exit 1; \
+	}
+
 .PHONY: testparity-server
 testparity-server: ## refresh script/testparity/matterjsserver_tests.json from $(MATTERJS_SERVER_DIR) at the matterjs-server pin (exit 2 without the clone)
 	@# The matterjs-server register's snapshot step: the diff names the test
@@ -735,15 +750,16 @@ workflow-lint: ## actionlint and zizmor over .github/workflows (pinned: ACTIONLI
 	$(ZIZMOR) --offline .github/workflows
 
 # What ci.yml runs, as make targets: `make ci` the guards that need no
-# network beyond the module proxy, `make ci-net` the two that read a clone
-# at a pinned commit (matter.js and matterjs-server for cite-check, the
-# connectedhomeip data model for chipdm-check; MATTERJS_DIR,
+# network beyond the module proxy, `make ci-net` the three that read a clone
+# at a pinned commit (matter.js and matterjs-server for cite-check and
+# testparity-snapshot-check, the connectedhomeip data model for
+# chipdm-check; MATTERJS_DIR,
 # MATTERJS_SERVER_DIR and CHIP_ROOT name them, `make chiptool-setup`
 # makes the last). Not in either, each for a reason script/requiredchecks
 # records (TestMakeCIRunsWhatCIRuns): test-32bit needs a Linux host,
 # workflow-lint needs zizmor, which is no Go tool.
 .PHONY: ci
-ci: build build-32bit vet archcheck apidiff-check race lint cover-check bench-smoke reachability-check surface-check testparity-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs offline (ci-net: the two guards that read a pinned clone)
+ci: build build-32bit vet archcheck apidiff-check race lint cover-check bench-smoke reachability-check surface-check testparity-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs offline (ci-net: the guards that read a pinned clone)
 
 .PHONY: ci-net
-ci-net: cite-check chipdm-check ## the pipeline's two guards that read a clone at a pinned commit (matter.js, connectedhomeip's data model)
+ci-net: cite-check testparity-snapshot-check chipdm-check ## the pipeline's guards that read a clone at a pinned commit (matter.js and matterjs-server, connectedhomeip's data model)

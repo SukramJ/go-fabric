@@ -296,6 +296,11 @@ jobs:
           git -C "$MATTERJS_SERVER_DIR" -c advice.detachedHead=false checkout -q 0bd06f22
       - name: cite-check
         run: make cite-check MATTERJS_DIR="$RUNNER_TEMP/matter.js" MATTERJS_SERVER_DIR="$RUNNER_TEMP/matterjs-server"
+      # The test-porting snapshots (script/testparity) regenerated from the
+      # same two clones: testparity-check holds the register to the committed
+      # snapshots, this step the snapshots to the pinned trees.
+      - name: testparity snapshots
+        run: make testparity-snapshot-check MATTERJS_DIR="$RUNNER_TEMP/matter.js" MATTERJS_SERVER_DIR="$RUNNER_TEMP/matterjs-server"
 
   chipdm:
     name: chip data model cross-check
