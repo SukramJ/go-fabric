@@ -744,3 +744,89 @@ func TestStartAllAppliesOneCommandTogether(t *testing.T) {
 		}
 	})
 }
+
+// TestReplaceWithoutAGradualTransitionEndsAsACancel (R2-P6-fsm-1402): a
+// command that ends a running transition without starting a gradual one
+// — an immediate move, or one already at its target — ends it as a cancel
+// does: Settled for the name and RemainingTime 0 reported, as
+// connectedhomeip stops the running transition before any new one and
+// reports RemainingTime 0 (LevelControlCluster.cpp:351, :731-735 at
+// 6170af84). matter.js's replace stops it silently (Transitions.ts:124,
+// :263-284 at db021da0) — the divergence this test pins.
+func TestReplaceWithoutAGradualTransitionEndsAsACancel(t *testing.T) {
+	for name, next := range map[string]transition.Transition{
+		"immediate":         {Name: "level", Target: 50},
+		"at its target now": {Name: "level", Rate: 10, TargetFrom: func(current float64) float64 { return current }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				a := newAttr(true, level, map[string]float64{"level": 1})
+				if err := a.engine.Start(transition.Transition{Name: "level", Rate: 253.0 / 15, Target: 254}); err != nil {
+					t.Fatal(err)
+				}
+				sleep(time.Second)
+				if err := a.engine.Start(next); err != nil {
+					t.Fatal(err)
+				}
+				if got := a.reported(); !slices.Equal(got, []int{150, 0}) {
+					t.Errorf("RemainingTime reports %v, want [150 0]", got)
+				}
+				a.mu.Lock()
+				settled := slices.Clone(a.settled)
+				a.mu.Unlock()
+				if !slices.Equal(settled, []string{"level"}) {
+					t.Errorf("settled %v, want [level]", settled)
+				}
+				if a.engine.Active("level") {
+					t.Error("the replaced transition still runs")
+				}
+			})
+		})
+	}
+	// A replace by a gradual transition reports its own RemainingTime and
+	// settles nothing.
+	synctest.Test(t, func(t *testing.T) {
+		a := newAttr(true, level, map[string]float64{"level": 1})
+		_ = a.engine.Start(transition.Transition{Name: "level", Rate: 253.0 / 15, Target: 254})
+		sleep(time.Second)
+		_ = a.engine.Start(transition.Transition{Name: "level", Rate: -253.0 / 30, Target: 1})
+		a.mu.Lock()
+		settled := slices.Clone(a.settled)
+		a.mu.Unlock()
+		if len(settled) != 0 {
+			t.Errorf("a gradual replace settled %v", settled)
+		}
+		if got := a.reported(); len(got) != 2 || got[1] == 0 {
+			t.Errorf("RemainingTime reports %v, want the new transition's", got)
+		}
+	})
+}
+
+// TestApplyErrorEndsAsACancel (R2-P6-err-1415): a step the host refuses
+// ends every transition as a cancel does — Settled for each, RemainingTime
+// 0 reported — so a subscriber holds no RemainingTime above 0 for a
+// transition that no longer runs. Ahead of matter.js, whose step error
+// stops without a report (Transitions.ts:594-600, :263-284 at db021da0).
+func TestApplyErrorEndsAsACancel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		a := newAttr(true, level, map[string]float64{"level": 1})
+		_ = a.engine.Start(transition.Transition{Name: "level", Rate: 253.0 / 15, Target: 254})
+		sleep(time.Second)
+		a.mu.Lock()
+		a.applyErr = errors.New("device gone")
+		a.mu.Unlock()
+		sleep(time.Second)
+		if got := a.reported(); !slices.Equal(got, []int{150, 0}) {
+			t.Errorf("RemainingTime reports %v, want [150 0]", got)
+		}
+		a.mu.Lock()
+		settled := slices.Clone(a.settled)
+		a.mu.Unlock()
+		if !slices.Equal(settled, []string{"level"}) {
+			t.Errorf("settled %v, want [level]", settled)
+		}
+		if a.engine.Active("level") || a.engine.RemainingTime() != 0 {
+			t.Error("the transition survived a failed step")
+		}
+	})
+}
