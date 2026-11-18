@@ -10,14 +10,14 @@ package chipdm
 // are ids and the values "present" or "absent".
 var LevelAcknowledged = []Acknowledgement{
 	{
-		Class: ClassMatterJS, Path: "*.cluster.0x0201.command.0xfd", Property: "presence", Chip: absent, Ours: present,
+		Class: ClassMatterJS, Path: "*.cluster.0x0201.response.0xfd", Property: "presence", Chip: absent, Ours: present,
 		Reason: "AtomicResponse (0xFD) is a global command in CHIP's data model (globals/), which matter.js models in " +
 			"the clusters that use it; the whole-snapshot cross-check reads it the same way",
 		Source: "internal/chipdm/chipxml.go (globals: global commands, matter.js load-data-model.ts globalCommands); " +
 			"parity/schema.json Thermostat command 0xFD",
 	},
 	{
-		Class: ClassMatterJS, Path: "*.cluster.0x0201.command.0xfe", Property: "presence", Chip: absent, Ours: present,
+		Class: ClassMatterJS, Path: "*.cluster.0x0201.request.0xfe", Property: "presence", Chip: absent, Ours: present,
 		Reason: "AtomicRequest (0xFE) is a global command in CHIP's data model (globals/), which matter.js models in " +
 			"the clusters that use it; the whole-snapshot cross-check reads it the same way",
 		Source: "internal/chipdm/chipxml.go (globals: global commands, matter.js load-data-model.ts globalCommands); " +
