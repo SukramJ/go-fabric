@@ -82,10 +82,11 @@ type subjectCtxKey struct{}
 // without an accessing fabric that is not PASE (review II,
 // R2-P6-doc-0561).
 //
-// Mirrors connectedhomeip/src/access/AccessControl.cpp:441 — the
-// `subjectDescriptor` the access check uses carries (fabricIndex,
-// authMode, subject, cats). go-fabric carries the same triple via
-// ctx so the IM dispatcher's signature stays minimal.
+// Mirrors connectedhomeip/src/access/AccessControl.cpp:393-404
+// (CheckACL) and :443 at 6170af84 — the `subjectDescriptor` the
+// access check uses carries (fabricIndex, authMode, subject,
+// cats). go-fabric carries the same four members via ctx so the
+// IM dispatcher's signature stays minimal.
 func WithSubject(ctx context.Context, nodeID uint64, cats []uint32) context.Context {
 	var copyCATs []uint32
 	if len(cats) > 0 {
