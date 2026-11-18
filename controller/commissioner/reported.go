@@ -13,9 +13,9 @@ import (
 // The shapes a decoded value can take that the flow's typed field cannot:
 // each is logged as the skipped value's error.
 var (
-	errReportedNullStruct = errors.New("null for a struct")
-	errReportedNullList   = errors.New("null for a list")
-	errReportedNullEntry  = errors.New("null entry")
+	errReportedNullStruct = errors.New("commissioner: null for a struct")
+	errReportedNullList   = errors.New("commissioner: null for a list")
+	errReportedNullEntry  = errors.New("commissioner: null entry")
 )
 
 // reportedValue decodes an attribute value the device reported by its
