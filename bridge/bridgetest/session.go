@@ -117,8 +117,8 @@ type Subscription struct {
 // Only a CASE session subscribes: on a PASE session Subscribe fails with
 // an error wrapping [interaction.ErrUncommissioned], as matter.js's client
 // subscribes only to a peer with a peer address
-// (packages/protocol/src/action/client/ClientInteraction.ts:991-994 at
-// 0ceb202d).
+// (packages/protocol/src/action/client/ClientInteraction.ts:1024-1027 at
+// db021da0).
 func (s *Session) Subscribe(ctx context.Context, minInterval, maxInterval uint16, paths ...im.ConcreteAttributePath) (*Subscription, error) {
 	if s.closed() {
 		return nil, ErrSessionClosed

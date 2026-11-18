@@ -466,7 +466,7 @@ type Bridge struct {
 	// operational `_matter._tcp` service [Bridge.AnnounceFabric] published
 	// for it, so the broadcast events reach the session's fabric only
 	// (matter.js packages/protocol/src/advertisement/Advertiser.ts:69-75 at
-	// 862ad75f, advertisementForFabric). Guarded by mu.
+	// db021da0, advertisementForFabric). Guarded by mu.
 	operationalByFabric map[uint8]string
 
 	// rootClusters carry the cluster servers the daemon attached to
@@ -3052,9 +3052,9 @@ func (b *Bridge) forgetOperationalInstance(fabricIndex uint8, instance string) {
 // instance name of fabricIndex's operational service. Index 0 (a session
 // without a fabric) and an index with no announced service report false,
 // and the event does nothing — matter.js
-// packages/protocol/src/protocol/DeviceAdvertiser.ts:164-179 at 862ad75f
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:164-179 at db021da0
 // returns when the session has no fabric, and
-// packages/protocol/src/advertisement/Advertiser.ts:69-75 at 862ad75f
+// packages/protocol/src/advertisement/Advertiser.ts:69-75 at db021da0
 // (advertisementForFabric) finds no advertisement for a fabric that has
 // none.
 func (b *Bridge) operationalInstanceFor(fabricIndex uint8) (string, bool) {

@@ -228,7 +228,7 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// also starts its fabric's "reconnect" broadcast so the
 		// controller finds the bridge again: matter.js
 		// packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at
-		// 862ad75f (subscriptionsChanged: operational, isTerminated and a
+		// db021da0 (subscriptionsChanged: operational, isTerminated and a
 		// fabric → #advertiseFabric(session.fabric, "reconnect"), whose
 		// Advertiser.advertise starts the fabric's advertisement,
 		// Advertiser.ts:32-43, without resetting a running schedule,
@@ -2142,7 +2142,7 @@ func (b *Bridge) subscribeWith(
 	// goes out after the priming report, instead of falling between the
 	// read and the admission unseen. matter.js attaches the subscription's
 	// change handlers before it reads the initial report
-	// (ServerSubscription.ts:731-739 sendInitialReport at 862ad75f) and
+	// (ServerSubscription.ts:731-739 sendInitialReport at db021da0) and
 	// clears the peer's other subscriptions before that
 	// (InteractionServer.ts:647-662); the re-establishment after a restart
 	// (subscription_reestablish.go) already admits first.
@@ -3473,7 +3473,7 @@ func (e *booleanStateEvents) check() {
 // server lists the event — the OccupancyEvent feature of its selection.
 // matter.js emits it on occupancy$Changed when that feature is set
 // (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:67-74,
-// :88-90 at 862ad75f); the projected server is rebuilt on every dispatch,
+// :88-90 at db021da0); the projected server is rebuilt on every dispatch,
 // so the change is observed here, where the host's notification arrives,
 // as for BooleanState's StateChange. The device kit's server
 // (sensing.Occupancy) emits the event itself and is no

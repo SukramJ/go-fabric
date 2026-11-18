@@ -18,7 +18,7 @@ import (
 // A NodeLabel write is bounded by the length it arrived with before the
 // decoder cut it at its IS1: matter.js decodes the write with the
 // attribute's TlvString ("max 32"), which checks `value.length >
-// maxLength` before it slices (TlvString.ts:57-69 at 862ad75f), so a
+// maxLength` before it slices (TlvString.ts:57-69 at db021da0), so a
 // 40-byte label whose sixth byte is 0x1F is CONSTRAINT_ERROR, not the
 // accepted "ABCDE". A label that fits is written truncated.
 func TestNodeLabelWriteBoundsTheLengthBeforeIS1(t *testing.T) {

@@ -295,7 +295,7 @@ var errExchangeAwaitsAck = errors.New("bridge: outbound retransmit: the exchange
 // TrackWithMargin is [outboundReliableTracker.Track] with margin added to
 // the base interval of every (re)transmission before the backoff
 // amplifies it: matter.js MessageExchange #sendAdditionalDelay
-// (MessageExchange.ts:1219-1222 at 862ad75f) passed as
+// (MessageExchange.ts:1259-1262 at db021da0) passed as
 // retransmissionIntervalOf's additionalDelay (MRP.ts, `baseInterval =
 // (isPeerActive ? activeInterval : idleInterval) + additionalDelay`).
 func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
@@ -820,7 +820,7 @@ type outboundTickResult struct {
 // error is surfaced via the result slice and counts as the transmission:
 // the entry keeps the backoff the sweep scheduled, so a failing socket
 // spends the retry budget on the MRP schedule, not at the pump's cadence.
-// Mirrors matter.js MessageExchange.ts:905-906 and :975-981 at 862ad75f
+// Mirrors matter.js MessageExchange.ts:941-942 and :975-981 at db021da0
 // (#retransmitMessage counts the retransmission before it sends, and a
 // failed send that is not SessionClosedError still runs
 // #initializeResubmission with the computed backoff).

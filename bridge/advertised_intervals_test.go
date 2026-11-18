@@ -12,7 +12,7 @@ import (
 // (Config.SessionIntervals), as matter.js DeviceAdvertiser.ts:361-364
 // advertises the session manager's, capped by
 // SessionIntervals.forAdvertisement (SessionIntervals.ts:69-92) at
-// 862ad75f; an ICD's provider replaces them.
+// db021da0; an ICD's provider replaces them.
 func TestOperationalRecordCarriesSessionIntervals(t *testing.T) {
 	newBridge := func(t *testing.T, iv SessionIntervals) (*Bridge, *deviceAdvertiserRecorder) {
 		t.Helper()

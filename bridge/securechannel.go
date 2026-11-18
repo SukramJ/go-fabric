@@ -2450,7 +2450,7 @@ type gracefulCloseNotifierSetter interface {
 // broadcast-resume trigger, fired with the fabric index after a reap /
 // eviction leaves a (fabric, peer) pair with zero live sessions
 // (matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
-// at 862ad75f).
+// at db021da0).
 type reannounceTriggerSetter interface {
 	SetReannounceTrigger(fn func(fabricIndex uint8))
 }
@@ -2768,10 +2768,10 @@ type serviceRetransmitter interface {
 // a session teardown left a peer of that fabric with zero live sessions,
 // so the controller rediscovers the bridge and re-establishes CASE
 // instead of showing it unresponsive. Mirrors matter.js
-// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at 862ad75f
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150 at db021da0
 // (sessions.deleted → advertisementForFabric(fabric).serviceDisconnected(),
 // Advertiser.ts:69-75, which starts the "reconnect" broadcast event,
-// MdnsAdvertisement.ts:132-134; a running schedule is not reset,
+// MdnsAdvertisement.ts:133-135; a running schedule is not reset,
 // Advertisement.ts:78-91): an advertiser with ServiceDisconnected
 // (mdns.Responder) runs the broadcast schedule again for that fabric's
 // operational service only; an advertiser without the events re-publishes
@@ -2861,7 +2861,7 @@ func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 // a revoked window, a commissioner that gave up — finds a fresh round
 // instead of a record announced once at the window's open. Mirrors
 // matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:152-161 at
-// 862ad75f (sessions.deleted → session.isPase →
+// db021da0 (sessions.deleted → session.isPase →
 // #startCommissioningAdvertisement, which returns without a commissioning
 // service — after exitCommissioningMode — or while closing) and
 // FailsafeCommissioningTest.ts:106-196, :198-303: exactly one round in the

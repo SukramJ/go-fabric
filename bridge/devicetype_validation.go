@@ -89,7 +89,7 @@ func (b *Bridge) validateDeviceTypes(topology *endpoint.Topology) error {
 	}
 	// What only a device type of the node asserts at the Root location
 	// requires is logged at debug, never as a warning — matter.js
-	// DeviceTypeConformanceService.ts:437-442 at 862ad75f ("does not meet
+	// DeviceTypeConformanceService.ts:437-442 at db021da0 ("does not meet
 	// requirements that device types of its node assert at the Root").
 	for i := range verdict.FreshAssertedAtRoot {
 		v := &verdict.FreshAssertedAtRoot[i]

@@ -140,8 +140,8 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// initiated (the peer speaks as the responder), is the last message of
 	// a report exchange: nothing of ours follows to piggyback its ack on,
 	// so the exchange closes and the ack goes out now. Mirrors matter.js
-	// packages/protocol/src/protocol/MessageExchange.ts:1117-1124 at
-	// 862ad75f (close sends the standalone ack of the last received
+	// packages/protocol/src/protocol/MessageExchange.ts:1150-1157 at
+	// db021da0 (close sends the standalone ack of the last received
 	// message at once, not after STANDALONE_ACK_TIMEOUT). Left to the ack
 	// pump's cadence, the peer's MRP layer holds the exchange open for the
 	// grace window and retransmits past it.
@@ -1520,7 +1520,7 @@ func (b *Bridge) sessionAttestationChallenge(sessionID uint16) ([]byte, bool) {
 // expands to ([im.DispatchEndpoints]); a command that fails its checks
 // defers nothing (matter.js CommandInvokeResponse's dispatch endpoints,
 // packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165,
-// :297 at 862ad75f). matter.js gates this behind its "delay-report-data"
+// :297 at db021da0). matter.js gates this behind its "delay-report-data"
 // forward feature, which its own CHIP test support switches on
 // (TC-IDM-1.5); the module acts on it always (BD-Matter-DelayReportData).
 func (b *Bridge) deferReportsFor(ctx context.Context, dispatcher im.Dispatcher, req im.InvokeRequest) {
