@@ -556,14 +556,7 @@ func wireSecurity(
 		}
 		tr, mx := e.PeerTransportParameters()
 		return tr, mx, tr != 0 || mx != 0
-	}).WithPeerScheduleResolver(func(id uint16) (time.Duration, time.Duration, time.Duration, bool, bool) {
-		e, err := sessions.Get(id)
-		if err != nil || e == nil {
-			return 0, 0, 0, false, false
-		}
-		idle, active, threshold, peerActive := e.PeerMRPSchedule()
-		return idle, active, threshold, peerActive, true
-	}).WithFabricResolver(func(id uint16) (uint8, bool) {
+	}).WithPeerScheduleResolver(peerScheduleOf(sessions)).WithFabricResolver(func(id uint16) (uint8, bool) {
 		entry, err := sessions.Get(id)
 		if err != nil || entry == nil {
 			return 0, false
@@ -750,6 +743,19 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 			},
 			OnAbandoned: func() { sessions.ReleaseStake(stake) },
 		}, nil
+	}
+}
+
+// peerScheduleOf answers a session's peer MRP schedule from its entry
+// ([operational.Entry.PeerMRPSchedule]; review II, F-db021da0-13).
+func peerScheduleOf(sessions *operational.Manager) func(uint16) (time.Duration, time.Duration, time.Duration, bool, bool) {
+	return func(id uint16) (time.Duration, time.Duration, time.Duration, bool, bool) {
+		e, err := sessions.Get(id)
+		if err != nil || e == nil {
+			return 0, 0, 0, false, false
+		}
+		idle, active, threshold, peerActive := e.PeerMRPSchedule()
+		return idle, active, threshold, peerActive, true
 	}
 }
 

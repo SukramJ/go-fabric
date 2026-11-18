@@ -333,7 +333,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	// session's [maxChunkWaitsPerSession] claims; beyond them it is
 	// answered Busy (review II, R2-P1-req2-01). Its first chunk tells: only
 	// the last chunk suppresses the answer.
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, readWaitsForChunks([]im.ReportData{chunk}))
+	release, claimed := b.claimChunkWait(ctx, requestHdr.SessionID, readWaitsForChunks([]im.ReportData{chunk}))
 	if !claimed {
 		return b.replyStatusUnlessSuppressed(false, src, requestHdr, proto, "read_chunk_waits", im.StatusBusy)
 	}
@@ -762,7 +762,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// waiting for the peer's StatusResponse: a batch takes one of the
 	// session's [maxChunkWaitsPerSession] claims before any command runs,
 	// and beyond them is answered Busy (review II, R2-P1-req2-01).
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, len(req.Invokes) > 1)
+	release, claimed := b.claimChunkWait(ctx, requestHdr.SessionID, len(req.Invokes) > 1)
 	if !claimed {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "invoke_chunk_waits", im.StatusBusy)
 	}

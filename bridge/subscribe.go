@@ -2086,7 +2086,7 @@ func (b *Bridge) subscribeWith(
 	// answered Busy before anything is registered or torn down (review
 	// II, R2-P1-req2-01). matter.js has no such refusal; this module's
 	// own bound refuses side-effect free, and the controller retries.
-	release, claimed := b.claimChunkWait(requestHdr.SessionID, true)
+	release, claimed := b.claimChunkWait(ctx, requestHdr.SessionID, true)
 	if !claimed {
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "chunk_waits", im.StatusBusy)
 	}

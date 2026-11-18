@@ -166,7 +166,7 @@ func (b *Bridge) SetFabricCounter(fn func(context.Context) (int, error)) {
 // is set. release gives it back and is a no-op when nothing was taken;
 // ok is false when the session holds every claim, or its fabric more than
 // its share ([chunkWaitFabricThreshold]).
-func (b *Bridge) claimChunkWait(sessionID uint16, needed bool) (release func(), ok bool) {
+func (b *Bridge) claimChunkWait(ctx context.Context, sessionID uint16, needed bool) (release func(), ok bool) {
 	if !needed {
 		return func() {}, true
 	}
@@ -179,7 +179,7 @@ func (b *Bridge) claimChunkWait(sessionID uint16, needed bool) (release func(), 
 	}
 	share := 0
 	if b.routing.chunkWaits.atThreshold() {
-		share = b.routing.chunkWaits.share(context.Background())
+		share = b.routing.chunkWaits.share(ctx)
 	}
 	if !b.routing.chunkWaits.claim(sessionID, fabric, share) {
 		return nil, false

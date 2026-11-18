@@ -13,7 +13,7 @@ import (
 )
 
 // claimingResumptionStore serves resumption records and claims their ids,
-// as the node's store does ([sigma.Sigma1ProcessResult.ReleaseClaim]).
+// as the node's store does ([sigma.Sigma1ProcessResult.Claim]).
 type claimingResumptionStore struct {
 	mu      sync.Mutex
 	secrets map[string][]byte
