@@ -267,9 +267,9 @@ func listHostNameIfaces() ([]hostNameIface, error) {
 // an up, multicast, non-loopback interface with addresses and a non-zero
 // 6-byte MAC. "" when there is none; when the interfaces cannot be listed
 // the current name stays. Mirrors matter.js
-// packages/protocol/src/mdns/MdnsServer.ts:328-351 (#chooseHostname): a
-// querier that hears the node on several interfaces must see one host, so
-// the name may not follow interface order.
+// packages/protocol/src/mdns/MdnsServer.ts:454-482 (#chooseHostname) at
+// db021da0: a querier that hears the node on several interfaces must see
+// one host, so the name may not follow interface order.
 type hostNameChooser struct {
 	// mu guards current.
 	mu      sync.Mutex
@@ -605,7 +605,8 @@ type CommissionableServiceConfig struct {
 	RotatingID string
 	// ICD, when non-nil, emits the `ICD` TXT key with the given
 	// operating-mode value per Matter §4.3.1.6.
-	// matter.js MdnsAdvertisement.ts:191-193; chip TxtFields.cpp:302.
+	// matter.js MdnsAdvertisement.ts:209-211 at db021da0; chip
+	// TxtFields.cpp:311-312 at 6170af84.
 	ICD *uint8
 	// Port is the commissioning listener UDP port (typically 5540).
 	Port uint16

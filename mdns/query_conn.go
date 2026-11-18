@@ -126,7 +126,7 @@ type DNSMessage struct {
 // dropped and the others kept; the message fails when its header, a
 // question or a record's name, fixed fields or length do not parse.
 // Mirrors matter.js packages/general/src/codec/DnsCodec.ts:265-289 at
-// 862ad75f (decodeRecord: the reader stands after the record before its
+// db021da0 (decodeRecord: the reader stands after the record before its
 // value is decoded, so "a record we cannot read costs only itself") and
 // :216-253 (decode, undefined on any other failure).
 func ParseDNSMessage(msg []byte) (DNSMessage, error) {
@@ -362,7 +362,7 @@ func rrOf(r DNSRecord) dns.RR {
 		// An empty TXT record is a single zero-length string (RFC 6763
 		// §6.1), and an entry is at most 255 bytes, a longer one cut there.
 		// Mirrors matter.js packages/general/src/codec/DnsCodec.ts:477-497
-		// at 862ad75f (encodeTxtRecord).
+		// at db021da0 (encodeTxtRecord).
 		txt := make([]string, 0, max(len(r.TXT), 1))
 		for _, e := range r.TXT {
 			txt = append(txt, escapeText(e[:min(len(e), 255)]))

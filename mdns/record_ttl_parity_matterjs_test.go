@@ -12,7 +12,7 @@ import (
 
 // TestSubtypePTRTTLParity pins the TTL of every record the responder
 // publishes: 120 s, matter.js DEFAULT_MDNS_TTL
-// (packages/general/src/codec/DnsCodec.ts:20 at 862ad75f) — the PTR, SRV,
+// (packages/general/src/codec/DnsCodec.ts:20 at db021da0) — the PTR, SRV,
 // TXT, A, AAAA and subtype PTR records alike, the TXT record included where
 // chip keeps 4500 s (src/lib/dnssd/wire/records/Txt.h:30 at 6170af84;
 // matter.js first, concept v12 §D.2) — in the announcement and in a query

@@ -11,7 +11,7 @@ import (
 )
 
 // TestMdnsSocketQuerySplittingParityMatterJS mirrors
-// packages/general/test/net/dns-sd/MdnsSocketTest.ts:229-460 at 862ad75f
+// packages/general/test/net/dns-sd/MdnsSocketTest.ts:245-470 at db021da0
 // (the query halves of "message splitting" and "query splitting"): a
 // query that fits is one message; questions that do not fit are split,
 // every message a query within MaxMessageSize and without known answers;
