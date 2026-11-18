@@ -156,6 +156,7 @@ block below.
 | attribute | 1116 |
 | cluster | 135 |
 | command | 457 |
+| composed requirement | 18 |
 | condition | 46 |
 | conditionRequirement | 57 |
 | datatype | 548 |
@@ -165,8 +166,8 @@ block below.
 | feature | 347 |
 | field | 3927 |
 | global datatype | 19 |
-| requirement | 470 |
-| **total** | **7504** |
+| requirement | 477 |
+| **total** | **7529** |
 
 ### Differences by class
 
@@ -174,7 +175,7 @@ block below.
 | --- | ---: |
 | (i) matter.js right or deliberate | 113 |
 | (ii) CHIP right, snapshot wrong | 2 |
-| (iii) representation, normalized in code | 539 |
+| (iii) representation, normalized in code | 483 |
 | (iv) excused by the harness | 2 |
 | unexplained | 0 |
 
@@ -183,7 +184,6 @@ block below.
 | Rule | Applied | What it normalizes |
 | --- | ---: | --- |
 | `base-device-type` | 6 | CHIP names the Base device type "Base Device Type", matter.js "Base"; a condition requirement asserting one of its conditions names it so. |
-| `composed-device-type` | 56 | CHIP models the device types a composed device type contains outside its cluster requirements. |
 | `core-global` | 3 | The Interaction Model status codes, event priority and semantic namespace ids are global types of the Core specification that CHIP's data model XML does not restate. |
 | `datatype-fabric` | 21 | matter.js marks a fabric-scoped struct by its FabricIndex field, CHIP on the struct. |
 | `descriptor-required` | 91 | Every device type requires Descriptor; CHIP's device-type files do not restate it. |
@@ -210,7 +210,10 @@ What CHIP states and the snapshot does not carry, counted in CHIP's model.
 | --- | ---: | --- |
 | cluster provisional status | 3 | The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below. |
 | command quality | 0 | Commands CHIP gives a quality the snapshot records none for; the snapshot records the effective command quality (largeMessage, L) since brief CP. |
+| composition requirements CHIP does not state | 28 | A cluster requirement, or a feature, attribute, command or event requirement below one, that the snapshot states for a contained device type CHIP lists and CHIP's `clusterRequirements` do not. |
+| data model files not read | 0 | An XML file outside clusters/, device_types/, globals/ and namespaces/, or below a subdirectory of one: the loader does not read it. |
 | definitions outside the snapshot | 5 | CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit. |
+| device type composition CHIP does not state | 51 | A device type the snapshot requires a composed device type to contain that CHIP's `composedDeviceTypes` does not list. CHIP lists a contained device type with the cluster requirements stated for it and states no conformance or constraint of the contained type itself. |
 | event quality | 0 | Events CHIP gives a quality the snapshot records none for; the snapshot records the effective event quality since brief CP. |
 | global commands | 2 | AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands). |
 | members CHIP does not state | 4 | A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with. |

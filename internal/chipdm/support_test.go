@@ -93,8 +93,7 @@ func TestLoadSnapshotDeviceTypeLayer(t *testing.T) {
     {"element": "serverCluster", "name": "OnOff", "id": 6, "quality": {"singleton": true, "fixed": false},
      "requirements": [
        {"element": "feature", "name": "LT", "conformance": {"text": "M", "ast": {"type": "M"}}, "referent": {"name": "LT", "bit": 0}},
-       {"element": "attribute", "name": "OnTime", "constraint": {"text": "max 10"}, "referent": {"id": 16385, "name": "OnTime"}},
-       {"element": "commandField", "name": "OffEffectEffectIdentifier"}
+       {"element": "attribute", "name": "OnTime", "constraint": {"text": "max 10"}, "referent": {"id": 16385, "name": "OnTime"}}
      ]}
   ]}}],
   "baseDeviceTypes": [{"name": "Base", "classification": "base", "revision": 3, "effective": {"conditions": ["Duplicate"], "requirements": [
@@ -135,6 +134,48 @@ func TestLoadSnapshotDeviceTypeLayer(t *testing.T) {
 	}
 	if cr := light.ConditionRequirements[1]; cr.DeviceType != "" || cr.Name != "Unresolved" || cr.Conformance != nil {
 		t.Errorf("unresolved condition requirement = %+v", cr)
+	}
+}
+
+// TestLoadSnapshotComposition: a composed device type's contained device
+// type carries the cluster requirements stated for it, with theirs; each
+// instance the effective layer states for one raw requirement is read, the
+// second Electrical Sensor of Battery Storage with its own (R2-P6-test-2850). A nested
+// requirement of an element the comparison does not read fails the load
+// instead of being dropped.
+func TestLoadSnapshotComposition(t *testing.T) {
+	t.Parallel()
+	es := func(feature string) string {
+		return `{"element": "deviceType", "name": "ElectricalSensor", "id": 1296, "conformance": {"text": "M", "ast": {"type": "M"}},
+      "requirements": [{"element": "serverCluster", "name": "ElectricalPowerMeasurement", "id": 144,
+        "conformance": {"text": "M", "ast": {"type": "M"}},
+        "requirements": [{"element": "feature", "name": "` + feature + `", "conformance": {"text": "M", "ast": {"type": "M"}}}]}]}`
+	}
+	doc := `{"deviceTypes": [{"id": 23, "name": "BatteryStorage", "revision": 1, "requirements": [
+    {"id": 1296, "name": "ElectricalSensor", "element": "deviceType", "conformance": "M"}
+  ], "effective": {"requirements": [` + es("ALTC") + `, ` + es("DIRC") + `]}}]}`
+	m, _, err := LoadSnapshot([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqs := m.DeviceTypes[0].Requirements
+	if len(reqs) != 2 || reqs[0].Side != "deviceType" {
+		t.Fatalf("requirements = %+v", reqs)
+	}
+	for i, want := range []string{"ALTC", "DIRC"} {
+		cl := reqs[i].Clusters
+		if len(cl) != 1 || cl[0].ID != 144 || cl[0].Side != "server" || cl[0].Conformance.Key() != "m" ||
+			len(cl[0].Elements) != 1 || cl[0].Elements[0].Name != want {
+			t.Errorf("instance %d clusters = %+v", i, cl)
+		}
+	}
+
+	bad := `{"deviceTypes": [{"id": 256, "name": "OnOffLight", "revision": 4, "requirements": [
+    {"id": 6, "name": "OnOff", "element": "serverCluster", "conformance": "M"}
+  ], "effective": {"requirements": [{"element": "serverCluster", "name": "OnOff", "id": 6,
+     "requirements": [{"element": "commandField", "name": "OffEffectEffectIdentifier"}]}]}}]}`
+	if _, _, err := LoadSnapshot([]byte(bad)); err == nil || !strings.Contains(err.Error(), "commandField") {
+		t.Errorf("a commandField requirement loaded: %v", err)
 	}
 }
 

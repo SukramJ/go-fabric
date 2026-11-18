@@ -166,7 +166,7 @@ type DeviceType struct {
 type Requirement struct {
 	ID          uint32 `json:"id"`
 	Name        string `json:"name"`
-	Side        string `json:"side"` // "server" or "client"
+	Side        string `json:"side"` // "server", "client" or "deviceType"
 	Conformance *Conf  `json:"conformance,omitempty"`
 
 	// Quality is the requirement's quality flags (the singleton "I"); nil
@@ -178,6 +178,13 @@ type Requirement struct {
 	// <attributes>, <commands> and <events> of the cluster requirement;
 	// matter.js: its nested requirements).
 	Elements []*ElementRequirement `json:"elements,omitempty"`
+
+	// Clusters are, for a requirement of side "deviceType" (a device type
+	// a composed device type contains), the cluster requirements stated
+	// for the contained type (CHIP: <composedDeviceTypes> → <deviceType>
+	// → <clusterRequirements>; matter.js: the device type requirement's
+	// nested cluster requirements).
+	Clusters []*Requirement `json:"clusters,omitempty"`
 }
 
 // ElementRequirement is a device type's requirement of one element of a

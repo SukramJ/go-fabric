@@ -4,8 +4,10 @@
 package chipdm
 
 import (
+	"cmp"
 	"fmt"
 	"math/big"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -38,8 +40,9 @@ type Result struct {
 	// Compared counts the elements compared, per kind.
 	Compared map[string]int
 
-	// NotCompared counts, per aspect of notCarried, the CHIP elements that
-	// state something the snapshot does not carry.
+	// NotCompared counts, per aspect of notCarried, the elements one side
+	// states that the other does not carry: CHIP's the snapshot lacks, and
+	// the snapshot's composition requirements CHIP does not state.
 	NotCompared map[string]int
 
 	// Provisional names the clusters CHIP marks provisional, in id order.
@@ -61,7 +64,6 @@ var normalizationRules = map[string]string{
 	"quality-reportable":   "CHIP does not model matter.js's P (reportable) quality.",
 	"null-default":         "CHIP writes an explicit null default for a nullable value whose default the specification leaves implicit.",
 	"descriptor-required":  "Every device type requires Descriptor; CHIP's device-type files do not restate it.",
-	"composed-device-type": "CHIP models the device types a composed device type contains outside its cluster requirements.",
 	"member-access":        "The snapshot carries a struct, command or event field's access only where it is fabric-sensitive.",
 	"scoped-global":        "CHIP defines the type globally; matter.js scopes it to the cluster that uses it (compared there).",
 	"core-global":          "The Interaction Model status codes, event priority and semantic namespace ids are global types of the Core specification that CHIP's data model XML does not restate.",
@@ -71,16 +73,19 @@ var normalizationRules = map[string]string{
 	"base-device-type":     "CHIP names the Base device type \"Base Device Type\", matter.js \"Base\"; a condition requirement asserting one of its conditions names it so.",
 }
 
-// notCarried names the CHIP aspects the snapshot does not carry, so they are
-// not compared; Result.NotCompared counts the CHIP elements stating one.
+// notCarried names the aspects one side states and the other does not carry,
+// so they are not compared; Result.NotCompared counts the elements stating one.
 var notCarried = map[string]string{
-	"cluster provisional status":       "The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below.",
-	"command quality":                  "Commands CHIP gives a quality the snapshot records none for; the snapshot records the effective command quality (largeMessage, L) since brief CP.",
-	"event quality":                    "Events CHIP gives a quality the snapshot records none for; the snapshot records the effective event quality since brief CP.",
-	"semantic namespaces":              "The snapshot carries no semantic namespaces.",
-	"global commands":                  "AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands).",
-	"definitions outside the snapshot": "CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit.",
-	"members CHIP does not state":      "A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with.",
+	"cluster provisional status":                   "The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below.",
+	"command quality":                              "Commands CHIP gives a quality the snapshot records none for; the snapshot records the effective command quality (largeMessage, L) since brief CP.",
+	"event quality":                                "Events CHIP gives a quality the snapshot records none for; the snapshot records the effective event quality since brief CP.",
+	"semantic namespaces":                          "The snapshot carries no semantic namespaces.",
+	"global commands":                              "AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands).",
+	"definitions outside the snapshot":             "CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit.",
+	"members CHIP does not state":                  "A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with.",
+	"data model files not read":                    "An XML file outside clusters/, device_types/, globals/ and namespaces/, or below a subdirectory of one: the loader does not read it.",
+	"device type composition CHIP does not state":  "A device type the snapshot requires a composed device type to contain that CHIP's `composedDeviceTypes` does not list. CHIP lists a contained device type with the cluster requirements stated for it and states no conformance or constraint of the contained type itself.",
+	"composition requirements CHIP does not state": "A cluster requirement, or a feature, attribute, command or event requirement below one, that the snapshot states for a contained device type CHIP lists and CHIP's `clusterRequirements` do not.",
 }
 
 type comparer struct {
@@ -129,6 +134,14 @@ func (c *comparer) report(path []string, property, chip, ours string) {
 	c.res.Differences = append(c.res.Differences, Difference{
 		Path: strings.Join(path, "."), Property: property, Chip: chip, Ours: ours,
 	})
+}
+
+// duplicate reports an element of the snapshot whose key another element of
+// the same list already holds: an index keeps one of them, and the other
+// would be neither compared nor reported (R2-P6-test-2818). A duplicate on
+// CHIP's side is compared twice against one element and needs no report.
+func (c *comparer) duplicate(path []string, name, kind string) {
+	c.report(append(slices.Clone(path), name), kind, "once", "twice")
 }
 
 func (c *comparer) notCompared(aspect string, n int) {
@@ -345,6 +358,10 @@ func (c *comparer) members(path []string, chip chipMembers, cl *Cluster) {
 func (c *comparer) byID(path []string, kind string, chip, ours []*Element, key func(*Element) string) {
 	index := map[string]*Element{}
 	for _, e := range ours {
+		if index[key(e)] != nil {
+			c.duplicate(path, e.Name, kind)
+			continue
+		}
 		index[key(e)] = e
 	}
 	seen := map[string]bool{}
@@ -467,6 +484,10 @@ func (c *comparer) fields(path []string, chip, ours *Element) {
 		chip.Kind == "enum" || chip.Kind == "bitmap"
 	index := map[string]*Element{}
 	for _, f := range ours.Fields {
+		if index[canonicalName(f.Name)] != nil {
+			c.duplicate(path, f.Name, "field")
+			continue
+		}
 		index[canonicalName(f.Name)] = f
 	}
 	seen := map[string]bool{}
@@ -899,6 +920,10 @@ func (c *comparer) conditions(path []string, chip, ours *DeviceType) {
 	label := func(r *ConditionRequirement) string { return r.DeviceType + "." + r.Name + " (condition)" }
 	asserted := map[string]*ConditionRequirement{}
 	for _, r := range ours.ConditionRequirements {
+		if asserted[key(r)] != nil {
+			c.duplicate(path, label(r), "conditionRequirement")
+			continue
+		}
 		asserted[key(r)] = r
 	}
 	matched := map[string]bool{}
@@ -935,10 +960,17 @@ const baseDeviceTypeCHIP = "basedevicetype"
 // requirements a device type states for one cluster (matter.js compare.ts
 // #requirements, recursing into a cluster requirement's children: keyed by
 // element and canonical name, conformance and constraint compared).
-func (c *comparer) elementRequirements(path []string, chip, ours *Requirement) {
+//
+// Below a composed device type's contained type (composed), an element
+// requirement CHIP does not state is counted as not compared, not reported.
+func (c *comparer) elementRequirements(path []string, chip, ours *Requirement, composed bool) {
 	key := func(e *ElementRequirement) string { return e.Element + ":" + canonicalName(e.Name) }
 	index := map[string]*ElementRequirement{}
 	for _, e := range ours.Elements {
+		if index[key(e)] != nil {
+			c.duplicate(path, e.Name, e.Element+" requirement")
+			continue
+		}
 		index[key(e)] = e
 	}
 	seen := map[string]bool{}
@@ -961,7 +993,11 @@ func (c *comparer) elementRequirements(path []string, chip, ours *Requirement) {
 		c.value(p, "constraint", normalizeConstraint(e.Constraint), normalizeConstraint(o.Constraint))
 	}
 	for _, o := range ours.Elements {
-		if !seen[key(o)] {
+		switch {
+		case seen[key(o)]:
+		case composed:
+			c.notCompared("composition requirements CHIP does not state", 1)
+		default:
 			c.report(append(slices.Clone(path), o.Name), o.Element+" requirement", "absent", "present")
 		}
 	}
@@ -983,29 +1019,42 @@ func (c *comparer) chipSuperset(dt *DeviceType) *DeviceType {
 
 func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType) {
 	key := func(r *Requirement) string { return r.Side + ":" + canonicalName(r.Name) }
-	index := map[string]*Requirement{}
+	// A composed device type may contain one device type more than once
+	// (Battery Storage, two Electrical Sensors): CHIP's requirement of the
+	// contained type holds for each instance. Any other key is one
+	// requirement.
+	index := map[string][]*Requirement{}
 	for _, r := range ours.Requirements {
-		index[key(r)] = r
+		k := key(r)
+		if len(index[k]) > 0 && r.Side != "deviceType" {
+			c.duplicate(path, r.Name+" ("+r.Side+")", "requirement")
+			continue
+		}
+		index[k] = append(index[k], r)
 	}
 	seen := map[string]bool{}
 	for _, r := range chip.Requirements {
 		k := key(r)
 		seen[k] = true
-		o := index[k]
-		if o == nil {
+		if len(index[k]) == 0 {
 			c.report(append(slices.Clone(path), r.Name+" ("+r.Side+")"), "requirement", "present", "absent")
 			continue
 		}
-		c.res.Compared["requirement"]++
-		p := append(slices.Clone(path), o.Name+" ("+o.Side+")")
-		c.value(p, "id", hexID(&r.ID), hexID(&o.ID))
-		if r.Conformance != nil {
-			c.value(p, "conformance", r.Conformance.Key(), o.Conformance.Key())
+		for _, o := range index[k] {
+			c.res.Compared["requirement"]++
+			p := append(slices.Clone(path), o.Name+" ("+o.Side+")")
+			c.value(p, "id", hexID(&r.ID), hexID(&o.ID))
+			if r.Conformance != nil {
+				c.value(p, "conformance", r.Conformance.Key(), o.Conformance.Key())
+			}
+			if r.Quality != nil {
+				c.value(p, "quality", or(strings.Join(r.Quality, " "), "none"), or(strings.Join(o.Quality, " "), "none"))
+			}
+			c.elementRequirements(p, r, o, false)
+			if r.Side == "deviceType" {
+				c.composition(p, r, o)
+			}
 		}
-		if r.Quality != nil {
-			c.value(p, "quality", or(strings.Join(r.Quality, " "), "none"), or(strings.Join(o.Quality, " "), "none"))
-		}
-		c.elementRequirements(p, r, o)
 	}
 	for _, o := range ours.Requirements {
 		if seen[key(o)] {
@@ -1016,7 +1065,7 @@ func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType)
 			continue
 		}
 		if o.Side == "deviceType" {
-			c.normalize("composed-device-type")
+			c.notCompared("device type composition CHIP does not state", 1)
 			continue
 		}
 		if c.inherited(superset, key(o)) {
@@ -1024,6 +1073,48 @@ func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType)
 			continue
 		}
 		c.report(append(slices.Clone(path), o.Name+" ("+o.Side+")"), "requirement", "absent", "present")
+	}
+}
+
+// composition compares the cluster requirements CHIP states for a device
+// type a composed device type contains with the snapshot's (R2-P6-test-2850):
+// CHIP's are compared — present, id, conformance, quality and the element
+// requirements it states below them —, the snapshot's further ones are
+// counted as not compared.
+func (c *comparer) composition(path []string, chip, ours *Requirement) {
+	key := func(r *Requirement) string { return r.Side + ":" + canonicalName(r.Name) }
+	index := map[string]*Requirement{}
+	for _, r := range ours.Clusters {
+		if index[key(r)] != nil {
+			c.duplicate(path, r.Name+" ("+r.Side+")", "composed requirement")
+			continue
+		}
+		index[key(r)] = r
+	}
+	seen := map[string]bool{}
+	for _, r := range chip.Clusters {
+		k := key(r)
+		seen[k] = true
+		o := index[k]
+		if o == nil {
+			c.report(append(slices.Clone(path), r.Name+" ("+r.Side+")"), "composed requirement", "present", "absent")
+			continue
+		}
+		c.res.Compared["composed requirement"]++
+		p := append(slices.Clone(path), o.Name+" ("+o.Side+")")
+		c.value(p, "id", hexID(&r.ID), hexID(&o.ID))
+		if r.Conformance != nil {
+			c.value(p, "conformance", r.Conformance.Key(), o.Conformance.Key())
+		}
+		if r.Quality != nil {
+			c.value(p, "quality", or(strings.Join(r.Quality, " "), "none"), or(strings.Join(o.Quality, " "), "none"))
+		}
+		c.elementRequirements(p, r, o, true)
+	}
+	for _, o := range ours.Clusters {
+		if !seen[key(o)] {
+			c.notCompared("composition requirements CHIP does not state", 1+len(o.Elements))
+		}
 	}
 }
 
@@ -1063,7 +1154,10 @@ func (c *comparer) compareGlobals() {
 				c.notCompared("definitions outside the snapshot", 1)
 				continue
 			}
-			if scoped := c.scopedDatatype(key); scoped != nil {
+			if scoped, differing := c.scopedDatatype(key); len(differing) > 0 {
+				c.report([]string{chip.Name}, "global datatype", "one definition", "defined differently by clusters "+strings.Join(differing, ", "))
+				continue
+			} else if scoped != nil {
 				c.normalize("scoped-global")
 				c.res.Compared["global datatype"]++
 				c.element([]string{chip.Name}, chip, scoped, elemCtx{isDatatype: true})
@@ -1128,17 +1222,47 @@ func (c *comparer) definitionScoped(key string) bool {
 var coreGlobals = map[string]bool{"status": true, "priority": true, "namespace": true}
 
 // scopedDatatype is the snapshot's definition of a type a cluster defines
-// where CHIP defines it globally (compare.ts #scopedDatatype); the first
-// cluster in id order that defines it.
-func (c *comparer) scopedDatatype(key string) *Element {
-	for _, cl := range c.ours.Clusters {
+// where CHIP defines it globally (compare.ts #scopedDatatype): the
+// definition of the first cluster in id order. When further clusters define
+// a type of that name differently, the match is ambiguous: their ids are
+// returned and the caller reports it instead of comparing with one of them
+// (R2-P6-test-2854).
+func (c *comparer) scopedDatatype(key string) (first *Element, differing []string) {
+	clusters := slices.Clone(c.ours.Clusters)
+	slices.SortStableFunc(clusters, func(a, b *Cluster) int {
+		switch {
+		case a.ID == nil || b.ID == nil:
+			return boolCmp(a.ID == nil, b.ID == nil)
+		default:
+			return cmp.Compare(*a.ID, *b.ID)
+		}
+	})
+	for _, cl := range clusters {
 		for _, d := range cl.Datatypes {
-			if canonicalName(d.Name) == key {
-				return d
+			if canonicalName(d.Name) != key {
+				continue
+			}
+			switch {
+			case first == nil:
+				first = d
+			case !reflect.DeepEqual(first, d):
+				differing = append(differing, hexID(cl.ID))
 			}
 		}
 	}
-	return nil
+	return first, differing
+}
+
+// boolCmp orders false before true.
+func boolCmp(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
+	default:
+		return -1
+	}
 }
 
 // typeAliases is matter.js by-design.ts TYPE_ALIASES: our (the

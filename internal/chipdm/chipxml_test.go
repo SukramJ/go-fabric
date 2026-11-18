@@ -4,6 +4,9 @@
 package chipdm
 
 import (
+	"archive/tar"
+	"bytes"
+	"encoding/xml"
 	"math"
 	"strings"
 	"testing"
@@ -510,6 +513,18 @@ func TestLoadFilesErrors(t *testing.T) {
 		"requirement quality": {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><quality singleton="maybe"/></cluster></clusters></deviceType>`},
 		"element name":        {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><features><feature/></features></cluster></clusters></deviceType>`},
 		"element id":          {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><commands><command id="z" name="Go"/></commands></cluster></clusters></deviceType>`},
+		// R2-P6-test-2852: unknown input fails, it is not read as absent.
+		"unknown quality":  {"clusters/X.xml": attr(`<quality nullable="true" brandNew="true"/>`)},
+		"unknown access":   {"clusters/X.xml": attr(`<access read="true" brandNew="true"/>`)},
+		"requirement side": {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C" side="servr"/></clusters></deviceType>`},
+		// R2-P6-test-2850: the composition is read, nothing below it skipped.
+		"dt child":            {"device_types/X.xml": `<deviceType id="1" name="D"><brandNew/></deviceType>`},
+		"composed child":      {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C" side="server"><mandatoryConform/></cluster></clusters><composedDeviceTypes><endpoint/></composedDeviceTypes></deviceType>`},
+		"composed restated":   {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C" side="server"><mandatoryConform/></cluster></clusters><composedDeviceTypes><cluster id="1" name="C" side="server"><optionalConform/></cluster></composedDeviceTypes></deviceType>`},
+		"contained id":        {"device_types/X.xml": `<deviceType id="1" name="D"><composedDeviceTypes><deviceType deviceTypeName="E"/></composedDeviceTypes></deviceType>`},
+		"contained name":      {"device_types/X.xml": `<deviceType id="1" name="D"><composedDeviceTypes><deviceType deviceTypeId="0x510"/></composedDeviceTypes></deviceType>`},
+		"contained child":     {"device_types/X.xml": `<deviceType id="1" name="D"><composedDeviceTypes><deviceType deviceTypeId="0x510" deviceTypeName="E"><conditions/></deviceType></composedDeviceTypes></deviceType>`},
+		"contained cluster":   {"device_types/X.xml": `<deviceType id="1" name="D"><composedDeviceTypes><deviceType deviceTypeId="0x510" deviceTypeName="E"><clusterRequirements><feature/></clusterRequirements></deviceType></composedDeviceTypes></deviceType>`},
 		"element code":        {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><attributes><attribute code="z" name="A"/></attributes></cluster></clusters></deviceType>`},
 		"element conf":        {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><features><feature code="F"><mandatoryConform/><optionalConform/></feature></features></cluster></clusters></deviceType>`},
 		"element constraint":  {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><attributes><attribute code="0" name="A"><constraint><bogus/></constraint></attribute></attributes></cluster></clusters></deviceType>`},
@@ -526,6 +541,80 @@ func TestLoadFilesErrors(t *testing.T) {
 				t.Errorf("LoadFiles accepted %v", override)
 			}
 		})
+	}
+}
+
+// TestLoadComposition: a composed device type's <composedDeviceTypes> is
+// read into requirements of side deviceType with their cluster
+// requirements, a <cluster> that restates one of its own is accepted, and
+// every <constraint> of an <entry> is read (R2-P6-test-2850, -2852).
+func TestLoadComposition(t *testing.T) {
+	t.Parallel()
+	m, err := LoadFiles(map[string][]byte{"device_types/X.xml": []byte(`<deviceType id="0x18" name="Battery Storage">
+  <clusters><cluster id="0x3" name="Identify" side="server"><optionalConform/></cluster></clusters>
+  <composedDeviceTypes>
+    <deviceType deviceTypeId="0x0510" deviceTypeName="Electrical Sensor">
+      <clusterRequirements>
+        <cluster id="0x0090" name="Electrical Power Measurement"><mandatoryConform/></cluster>
+      </clusterRequirements>
+    </deviceType>
+  </composedDeviceTypes>
+  <composedDeviceTypes><cluster id="0x3" name="Identify" side="server"><optionalConform/></cluster></composedDeviceTypes>
+</deviceType>`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqs := m.DeviceTypes[0].Requirements
+	if len(reqs) != 2 || reqs[1].Side != "deviceType" || reqs[1].ID != 0x510 || reqs[1].Conformance != nil {
+		t.Fatalf("requirements = %+v", reqs)
+	}
+	if cl := reqs[1].Clusters; len(cl) != 1 || cl[0].ID != 0x90 || cl[0].Side != "server" || cl[0].Conformance.Key() != "m" {
+		t.Errorf("contained clusters = %+v", cl)
+	}
+
+	entry := &xmlNode{}
+	if err := xml.Unmarshal([]byte(`<attribute><entry><constraint><min value="1"/></constraint><constraint><max value="4"/></constraint></entry></attribute>`), entry); err != nil {
+		t.Fatal(err)
+	}
+	got, err := translateConstraint(entry)
+	if err != nil || !strings.Contains(got, "1") || !strings.Contains(got, "4") {
+		t.Errorf("entry constraints = %q, %v; want both", got, err)
+	}
+}
+
+// TestLoadFilesCountsWhatItDoesNotRead: an XML file below a subdirectory is
+// counted as not read, not dropped (R2-P6-test-2816).
+func TestLoadFilesCountsWhatItDoesNotRead(t *testing.T) {
+	t.Parallel()
+	m, err := LoadFiles(fixtureFiles(t, map[string]string{"clusters/sub/Y.xml": "<cluster/>", "other/Z.xml": "<x/>"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The two above and the fixture's other/Ignored.xml.
+	if n := m.Uncompared["data model files not read"]; n != 3 {
+		t.Errorf("not read = %d, want 3 (%v)", n, m.Uncompared)
+	}
+}
+
+// TestUntarRefusesNonRegularFiles: a symlink in the data model is an error
+// (R2-P6-test-2816).
+func TestUntarRefusesNonRegularFiles(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+	for _, h := range []*tar.Header{
+		{Name: "data_model/1.6.1/clusters/", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "data_model/1.6.1/clusters/A.xml", Typeflag: tar.TypeSymlink, Linkname: "B.xml"},
+	} {
+		if err := w.WriteHeader(h); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := untar(buf.Bytes(), "data_model/1.6.1/"); err == nil || !strings.Contains(err.Error(), "A.xml") {
+		t.Errorf("untar = %v, want an error naming A.xml", err)
 	}
 }
 
