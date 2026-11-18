@@ -17,7 +17,7 @@ import (
 
 // The classes of commissioning failure — matter.js CommissioningError
 // (packages/protocol/src/peer/CommissioningError.ts:14) and its subclasses
-// of ControllerCommissioningFlow.ts:223-254 at 0ceb202d. A
+// of ControllerCommissioningFlow.ts:224-255 at db021da0. A
 // [*CommissioningError] carries one as its Kind; errors.Is matches the
 // kind and, for every kind, [ErrCommissioning].
 var (
@@ -48,8 +48,8 @@ var (
 	// and the policy (Options.OnAttestationFailure) rejected them, or a
 	// chain the validator refused was not accepted — the two throws of
 	// matter.js's #deviceAttestation after #resolveAttestationFindings
-	// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1306-1315
-	// at 862ad75f). matter.js names no class of its own for it (the error
+	// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1320-1329
+	// at db021da0). matter.js names no class of its own for it (the error
 	// is a CommissioningError or the validator's DeviceAttestationError);
 	// errors.Is matches this sentinel besides the error matter.js throws,
 	// whose message the error keeps. A policy function's own error is
@@ -104,7 +104,7 @@ func (e *CommissioningError) Unwrap() []error {
 // refused: ArmFailSafe, SetRegulatoryConfig, SetTCAcknowledgements or
 // CommissioningComplete answered with an ErrorCode other than OK. It is
 // matter.js's CommissioningError of #ensureGeneralCommissioningSuccess
-// (ControllerCommissioningFlow.ts:712-719 at 0ceb202d), its message
+// (ControllerCommissioningFlow.ts:712-719 at db021da0), its message
 // unchanged, with the command and the code as data: errors.As finds it,
 // and it unwraps to that [*CommissioningError] of kind
 // [ErrCommissioning]. A device that requires terms and conditions answers

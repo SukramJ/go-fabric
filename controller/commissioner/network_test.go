@@ -4,8 +4,8 @@
 package commissioner
 
 // The network steps against a scripted Wi-Fi or Thread device — the
-// behaviour of matter.js ControllerCommissioningFlow.ts:1527-1998 at
-// 0ceb202d, and the device expectations of
+// behaviour of matter.js ControllerCommissioningFlow.ts:1542-2008 at
+// db021da0, and the device expectations of
 // packages/node/test/node/ScanNetworksRejectionCommissioningTest.ts
 // (a rejected scan is a hint, not a failure; a failed add is).
 

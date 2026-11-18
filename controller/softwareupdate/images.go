@@ -589,7 +589,7 @@ func storeValidation(info *UpdateInfo) otaimage.FileOptions {
 // recordMeta records the specification version of the stored image name;
 // 0 removes the record. The record is optional, so a failure is logged and
 // fails nothing. Mirrors matter.js #recordMetadata
-// (DclOtaUpdateService.ts:468-491 at 862ad75f); an unset value is 0 here,
+// (DclOtaUpdateService.ts:468-491 at db021da0); an unset value is 0 here,
 // the one invalid value a uint32 can carry (isSpecificationVersion, :67-69).
 func (i *Images) recordMeta(ctx context.Context, name string, spec uint32) {
 	var err error
@@ -606,7 +606,7 @@ func (i *Images) recordMeta(ctx context.Context, name string, spec uint32) {
 // readMeta is the recorded specification version of the stored image
 // name, 0 when none is recorded. A record that cannot be read or holds no
 // valid version is removed, so it is reported once. Mirrors matter.js
-// #readMetadata (DclOtaUpdateService.ts:493-524 at 862ad75f).
+// #readMetadata (DclOtaUpdateService.ts:493-524 at db021da0).
 func (i *Images) readMeta(ctx context.Context, name string) uint32 {
 	m, err := i.blobs.Get(ctx, name+metaSuffix)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -709,7 +709,7 @@ func (i *Images) Find(ctx context.Context, opts FindOptions) []StoredImage {
 }
 
 // DeleteOptions select the stored images [Images.Delete] removes —
-// delete's options (DclOtaUpdateService.ts:1187-1194 at 862ad75f).
+// delete's options (DclOtaUpdateService.ts:1187-1194 at db021da0).
 type DeleteOptions struct {
 	// Filename names one stored image ("fff1.8000.prod.3"); the other
 	// fields are then not read.
@@ -917,7 +917,7 @@ func modeOf(source string) Mode {
 }
 
 // storedCheck is what the check of a stored image found —
-// #checkStoredImage's verdict (DclOtaUpdateService.ts:429-451 at 862ad75f).
+// #checkStoredImage's verdict (DclOtaUpdateService.ts:429-451 at db021da0).
 type storedCheck int
 
 const (
@@ -951,7 +951,7 @@ func (i *Images) checkStored(name string, b bdx.Blob, getErr error, info UpdateI
 
 // DownloadUpdate makes info's image available in the store and returns
 // its filename — downloadUpdate (DclOtaUpdateService.ts:615-720 at
-// 862ad75f). A stored image that validates is used, unless force asks for
+// db021da0). A stored image that validates is used, unless force asks for
 // a new download, and the specification version info carries is recorded
 // for it; a stored image that fails validation is removed. Online a
 // stored image that cannot be read, or one force replaces, is removed
@@ -1167,7 +1167,7 @@ func (h *headerWriter) Write(p []byte) (int, error) {
 
 // LocalImageOptions are the fields of a local image's [UpdateInfo] its
 // header may not carry — updateInfoFromStream's options
-// (DclOtaUpdateService.ts:841-863 at 862ad75f).
+// (DclOtaUpdateService.ts:841-863 at db021da0).
 type LocalImageOptions struct {
 	// MinApplicable is used when the header states none; nil is 0.
 	MinApplicable *uint32
@@ -1181,7 +1181,7 @@ type LocalImageOptions struct {
 
 // UpdateInfoFromImage reads the header of the OTA image r and returns its
 // update, of [SourceLocal], for [Images.Store] with [ModeLocal] — matter.js
-// updateInfoFromStream (DclOtaUpdateService.ts:841-901 at 862ad75f): the
+// updateInfoFromStream (DclOtaUpdateService.ts:841-901 at db021da0): the
 // header's ids, version and applicable range, opts where the header states
 // none.
 func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error) {
@@ -1215,7 +1215,7 @@ func UpdateInfoFromImage(r io.Reader, opts LocalImageOptions) (UpdateInfo, error
 // UpdateInfoFromURL reads the header of the OTA image at the HTTP(S) URL
 // fileURL and returns its update, of [SourceLocal]; [Images.DownloadUpdate]
 // then downloads it from that URL into [ModeLocal] — matter.js
-// createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at 862ad75f).
+// createUpdateInfoFromFile (DclOtaUpdateService.ts:924-981 at db021da0).
 // The download ends once the header's bytes are in (at most
 // [otaimage.MaxHeaderSize] and the 16-byte prefix); the rest of the image
 // is not fetched.

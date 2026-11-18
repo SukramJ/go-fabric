@@ -311,8 +311,8 @@ func TestOTAPushApplyServedBeforeTheQueuedEOFAck(t *testing.T) {
 // installs them): a scripted Proceed with a DelayedActionTime is what the device
 // gets, and the QueryImage, the ApplyUpdateRequest and the
 // NotifyUpdateApplied are each reported with the answer — the record
-// matter.js's cert harness keeps (InProcessControllerAdapter.ts:456-638 at
-// 862ad75f).
+// matter.js's cert harness keeps (InProcessControllerAdapter.ts:610-792 at
+// db021da0).
 func TestOTAPushScriptedProvider(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex

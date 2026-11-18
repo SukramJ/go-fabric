@@ -17,7 +17,7 @@ import (
 // sealed with the fabric's operational group key and sent to the group's
 // multicast address by a node of the fabric; matter.js's controller is
 // such a node — a ServerNode with the ControllerBehavior
-// (ControllerBehavior.ts:43-50 at 862ad75f) that serves GroupKeyManagement
+// (ControllerBehavior.ts:43-50 at db021da0) that serves GroupKeyManagement
 // and sends through its own interface. matterjs-server composes its
 // controller so (packages/ws-controller/src/controller/ControllerNode.ts:33
 // at 0bd06f2). Until phase 37 the reference controller

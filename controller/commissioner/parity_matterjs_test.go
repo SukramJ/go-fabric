@@ -19,8 +19,8 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// TestParityConstants: matter.js packages/protocol/src/peer/ at 0ceb202d —
-// ControllerCommissioningFlow.ts:289-301, ControllerCommissioner.ts:123,
+// TestParityConstants: matter.js packages/protocol/src/peer/ at db021da0 —
+// ControllerCommissioningFlow.ts:290-302, ControllerCommissioner.ts:123,
 // :264, :603-604, :706 and CommissioningConnection.ts:35.
 func TestParityConstants(t *testing.T) {
 	t.Parallel()

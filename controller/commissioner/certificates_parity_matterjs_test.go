@@ -23,7 +23,7 @@ import (
 	"testing"
 )
 
-// TestCertificates.ts:203-209 at 862ad75f: TEST_PRIVATE_KEY,
+// TestCertificates.ts:203-209 at db021da0: TEST_PRIVATE_KEY,
 // TEST_PUBLIC_KEY and TEST_CSR_REQUEST_ASN1, the CertificationRequestInfo
 // Certificate.createCertificateSigningRequest produces for that key.
 const (

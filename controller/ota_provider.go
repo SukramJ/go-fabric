@@ -25,7 +25,7 @@ import (
 // fabric as RootNodeID — matter.js's OtaSoftwareUpdateProviderServer on
 // the controller's ServerNode, whose announced providerNodeId is the
 // fabric's root node id and whose endpoint is one of the controller's own
-// (OtaAnnouncements.ts:47-58, :272-278 at 862ad75f). matterjs-server adds
+// (OtaAnnouncements.ts:47-58, :272-278 at db021da0). matterjs-server adds
 // that endpoint (packages/ws-controller/src/controller/ControllerNode.ts:140-141
 // at 0bd06f2). Until phase 37 the provider ran
 // on a second node of its own (`node/controllernode`, `OTAConfig.StartNode`);

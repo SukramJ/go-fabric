@@ -163,7 +163,7 @@ func (c *Controller) otaNodeDeleted(p softwareupdate.Peer) {
 
 // armerContext is the reboot armer's view of the stack — matter.js's
 // SessionManager and ClientSubscriptions (RebootResubscribeArmer.ts:58-75
-// at 862ad75f).
+// at db021da0).
 func (c *Controller) armerContext() peer.RebootArmerContext {
 	return peer.RebootArmerContext{
 		Clock: c.clock, Logger: c.log,
@@ -205,14 +205,14 @@ func (c *Controller) initiated(s *exchange.Session) bool {
 
 // armerObserver sees the report sessions the reboot armer is fed — a test
 // seam (export_ota_test.go), as matter.js's OtaTest listens on
-// ClientSubscriptions.reportStarted (OtaTest.ts:919-921 at 862ad75f). It
+// ClientSubscriptions.reportStarted (OtaTest.ts:919-921 at db021da0). It
 // observes only; nil in production.
 type armerObserver struct {
 	ReportStarted func(s peer.ArmerSession)
 }
 
 // sessionAdded feeds a peer's new session to the armer
-// (RebootResubscribeArmer.ts:117-150 at 862ad75f).
+// (RebootResubscribeArmer.ts:117-150 at db021da0).
 func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 	if c.armer != nil && s.IsSecure() {
 		c.armer.SessionAdded(armerSession{s: s, initiator: c.initiated(s)})

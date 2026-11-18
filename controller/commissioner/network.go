@@ -21,9 +21,9 @@ import (
 )
 
 // The network steps of the flow (steps 16 and 17). Mirrors matter.js
-// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1527-1965 at
-// 0ceb202d with its helpers (:895-1075, :1967-1998) and constants
-// (:292, :304-305).
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1542-1975 at
+// db021da0 with its helpers (:910-1090, #scanNetworks :1976-2008) and
+// constants (:293, :305-306).
 
 // WiFiNetwork are the credentials of the Wi-Fi network the device is to
 // join — matter.js wifiNetwork (ControllerCommissioningFlow.ts:102-105).
@@ -79,7 +79,7 @@ const meshCopNetworkName = 3
 // threadNetworkNameOf is the Network Name of a Thread operational
 // dataset, the whole dataset decoded as OperationalDataset.decode does
 // (thread.DecodeDataset; OperationalDataset.ts:53-69 at
-// 862ad75f): a stream that does not walk and a known TLV of the wrong
+// db021da0): a stream that does not walk and a known TLV of the wrong
 // size both fail, and resolveThreadNetworkName then keeps the supplied
 // name (ControllerCommissioningFlow.ts:269-276). ok is false without a
 // Network Name TLV.

@@ -28,7 +28,7 @@ import (
 // consent. A port of connectedhomeip src/controller/jcm
 // (DeviceCommissioner.cpp, AutoCommissioner.{h,cpp}) at 6170af84;
 // matter.js's commissioning flow has no such step
-// (ControllerCommissioningFlow.ts:536-656 at 862ad75f). The trust
+// (ControllerCommissioningFlow.ts:536-656 at db021da0). The trust
 // verification's stage machine and the Vendor ID Verification are
 // client/jcm's.
 

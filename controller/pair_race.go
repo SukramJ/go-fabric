@@ -33,8 +33,8 @@ const (
 // is commissioned in parallel and the first to establish PASE wins
 // (discovery.CommissioningRace, matter.js CommissioningDiscovery over
 // ParallelPaseDiscovery, packages/node/src/behavior/system/controller/
-// discovery/CommissioningDiscovery.ts:23-91 at 862ad75f, which
-// CommissioningController.commissionNode runs, CommissioningController.ts:462-500).
+// discovery/CommissioningDiscovery.ts:23-91 at db021da0, which
+// CommissioningController.commissionNode runs, CommissioningController.ts:465-503).
 // The transports are matter.js's selection (Discovery.ts:272-273): the IP
 // network always, BLE where a QR code's capabilities name it or the code
 // names none (a manual code).

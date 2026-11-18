@@ -31,7 +31,7 @@ import (
 type Peer = exchange.PeerAddress
 
 // Status is an update's status as the provider reports it — matter.js
-// OtaUpdateStatus (SoftwareUpdateManager.ts:105-114 at 862ad75f),
+// OtaUpdateStatus (SoftwareUpdateManager.ts:105-114 at db021da0),
 // cluster/core's OTAUpdateStatus.
 type Status = mattercore.OTAUpdateStatus
 
@@ -231,7 +231,7 @@ type Config struct {
 	// answer to the provider. OnProviderExchange is told each command the
 	// provider answered, with its answer. A test harness's seam: matter.js
 	// keeps all three in its cert harness (support/chip-testing/src/cert/
-	// InProcessControllerAdapter.ts:456-638 at 862ad75f).
+	// InProcessControllerAdapter.ts:610-792 at db021da0).
 	ScriptQueryImage   func(p Peer, req QueryImageRequest) (QueryImageScript, bool)
 	ScriptApplyUpdate  func(p Peer, req provdef.ApplyUpdateRequestRequest) (ApplyUpdateScript, bool)
 	OnProviderExchange func(x ProviderExchange)
@@ -315,7 +315,7 @@ type Manager struct {
 // bdxTransfer is what the manager reads of a node's running BDX transfer,
 // a *bdx.ServerSession: matter.js reads the session's transferredBytes
 // and dataLength (#isTransferring, queuedUpdates,
-// SoftwareUpdateManager.ts:293-336 at 862ad75f).
+// SoftwareUpdateManager.ts:293-336 at db021da0).
 type bdxTransfer interface {
 	Transferred() uint64
 	Negotiated() (bdx.Result, bool)
@@ -491,7 +491,7 @@ func (m *Manager) preparePeerForUpdate(n *client.Node) (prepared, bool) {
 // NodeChanged, NodeEvent and NodeSubscription are the node events the
 // manager observes a node through once it prepared it for an update —
 // softwareVersion$Changed, startUp and subscriptionStatusChanged
-// (SoftwareUpdateManager.ts:714-760 at 862ad75f). The controller feeds
+// (SoftwareUpdateManager.ts:714-760 at db021da0). The controller feeds
 // them from every node's hooks (client.RegistryConfig.HooksFor).
 
 // NodeChanged takes a change of the node's image.

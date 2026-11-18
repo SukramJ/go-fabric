@@ -31,7 +31,7 @@ import (
 //
 // matter.js's controller is a ServerNode with the ControllerBehavior: the
 // behavior and the peers on one node (ControllerBehavior.ts:43-50,
-// Peers.ts:109,:549-552,:574-579 at 862ad75f). matterjs-server composes its
+// Peers.ts:109,:549-552,:574-579 at db021da0). matterjs-server composes its
 // controller so, and adds the OTA provider and the camera controller with
 // its WebRtcTransportRequestor as endpoints
 // (packages/ws-controller/src/controller/ControllerNode.ts:33,:140-147 at

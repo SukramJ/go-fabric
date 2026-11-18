@@ -34,7 +34,7 @@ import (
 // packages/protocol/src/peer/ControllerCommissioner.ts:123
 // (DEFAULT_CASE_CONNECTION_TIMEOUT = 255 s), :264 (the PASE budget,
 // 30 s), :603-604 (regulatory location Outdoor, country "XX") and :706
-// (a NoSharedTrustRoots retry after 15 s) at 0ceb202d.
+// (a NoSharedTrustRoots retry after 15 s) at db021da0.
 const (
 	DefaultCASEConnectionTimeout = 255 * time.Second
 	DefaultPASETimeout           = 30 * time.Second
@@ -79,7 +79,7 @@ type Context struct {
 	Resumption handshake.ResumptionStore
 	// Scanners are the scanners that may still hold a commissioned
 	// device's advertisement — matter.js's ScannerSet
-	// (ControllerCommissioner.ts:321-341 at 862ad75f); nil is none.
+	// (ControllerCommissioner.ts:321-341 at db021da0); nil is none.
 	Scanners []CommissionedScanner
 }
 
@@ -169,8 +169,8 @@ type Options struct {
 	// OnAttestationFailure is the attestation policy (DAV:156). The zero
 	// value accepts every finding: a device whose attestation failed is
 	// commissioned and the findings are logged, as matter.js's flow does
-	// without a callback (ControllerCommissioningFlow.ts:1352-1367 at
-	// 862ad75f); the controller facade sets attestation.Reject() by
+	// without a callback (ControllerCommissioningFlow.ts:1369-1384 at
+	// db021da0); the controller facade sets attestation.Reject() by
 	// default. notes/parity/by_design.md BD-Matter-AttestationPolicy-ZeroProceeds
 	// and BD-Matter-Controller-PairRejectsFailedAttestation.
 	OnAttestationFailure attestation.Policy
@@ -243,7 +243,7 @@ type PASEOptions struct {
 }
 
 // Commissioner commissions nodes onto a fabric — matter.js
-// ControllerCommissioner (ControllerCommissioner.ts:230-737) at 0ceb202d.
+// ControllerCommissioner (ControllerCommissioner.ts:230-737) at db021da0.
 // It is safe for concurrent use.
 type Commissioner struct {
 	ctx        Context
@@ -749,7 +749,7 @@ func (c *Commissioner) forgetCommissioned(opts Options) {
 // is logged and the other scanners are still told —
 // ControllerCommissioner.#forgetCommissionedDevice's catch
 // (packages/protocol/src/peer/ControllerCommissioner.ts:335-339 at
-// 862ad75f).
+// db021da0).
 func (c *Commissioner) forgetIn(s CommissionedScanner, addresses []string, identity *discovery.CommissionedIdentity) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -814,7 +814,7 @@ func (c *Commissioner) sessionInteraction(mgr *exchange.Manager, s *exchange.Ses
 // new fabric yet, so the attempt retries after 15 s instead of the peer's
 // default delay; any other error keeps that default. Mirrors matter.js
 // ControllerCommissioner.transitionToCase's handleError
-// (packages/protocol/src/peer/ControllerCommissioner.ts:701-708) at 862ad75f.
+// (packages/protocol/src/peer/ControllerCommissioner.ts:701-708) at db021da0.
 func (c *Commissioner) handleNoSharedTrustRoots(err error) (time.Duration, bool, error) {
 	var sr *exchange.StatusReportError
 	if errors.As(err, &sr) && sr.Report.ProtocolCode == mrp.SCStatusProtocolNoSharedTrustRoots {

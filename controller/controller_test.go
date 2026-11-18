@@ -53,7 +53,7 @@ func config(db *sql.DB) controller.Config {
 // TestNewKeepsTheFabric opens the controller twice on one database: the
 // second run loads the fabric the first created, with its operational key
 // rotated (matter.js MatterController's defaultFabric with rotateNoc,
-// packages/matter.js/src/MatterController.ts:402-415 at 862ad75f), and no
+// packages/matter.js/src/MatterController.ts:402-415 at db021da0), and no
 // node is paired.
 func TestNewKeepsTheFabric(t *testing.T) {
 	t.Parallel()

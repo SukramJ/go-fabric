@@ -71,11 +71,11 @@ var ErrFabricMismatch = errors.New("commissioner: stored fabric does not match")
 // Fabric is our side of a fabric the commissioner commissions into:
 // [handshake.Fabric] (our operational identity, the root public key, the
 // verifier) and what the flow needs of matter.js Fabric
-// (packages/protocol/src/fabric/Fabric.ts:60-73 at 0ceb202d): the fabric
-// id, the root node id (caseAdminSubject, ControllerCommissioningFlow.ts:1451),
-// the root vendor id (adminVendorId, :1450, Fabric.ts:256), the identity
-// protection key (:1449), the label (:1494, Fabric.ts:188) and the fabric
-// index (Fabric.ts:522).
+// (packages/protocol/src/fabric/Fabric.ts:61-74 at db021da0): the fabric
+// id, the root node id (caseAdminSubject, ControllerCommissioningFlow.ts:1469),
+// the root vendor id (adminVendorId, :1468, Fabric.ts:257), the identity
+// protection key (:1467), the label (:1512, Fabric.ts:189) and the fabric
+// index (Fabric.ts:545).
 //
 // A Fabric must not be copied after first use: it holds the label's
 // locks. The zero value is usable for [Fabric.SetLabel] and
@@ -484,7 +484,7 @@ const (
 )
 
 // Operational node id range — matter.js packages/types/src/datatype/
-// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at 0ceb202d.
+// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at db021da0.
 const (
 	operationalNodeMin uint64 = 0x0000_0000_0000_0001
 	operationalNodeMax uint64 = 0xFFFF_FFEF_FFFF_FFFF

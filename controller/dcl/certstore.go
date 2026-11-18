@@ -338,12 +338,12 @@ func (s *CertificateStore) PAA(skid []byte) (attestation.PAA, bool) {
 var considerAll = true
 
 // ErrCertificateNotFound is matter.js's MatterDclError "Certificate not
-// found" (DclCertificateService.ts:604-610 at 862ad75f): no certificate
+// found" (DclCertificateService.ts:612-618 at db021da0): no certificate
 // with that key identifier, or one the trust policy filters out.
 var ErrCertificateNotFound = errors.New("dcl: certificate not found")
 
 // GetCertificateOptions is DclCertificateService.GetCertificateOptions
-// (DclCertificateService.ts:2026-2032 at 862ad75f).
+// (DclCertificateService.ts:2123-2129 at db021da0).
 type GetCertificateOptions struct {
 	// ConsiderTestCertificates also returns test PAAs; nil is
 	// [CertificateStore.AcceptsTestCertificates].
@@ -427,7 +427,7 @@ func (s *CertificateStore) CertificateDER(ctx context.Context, skid string, o Ge
 }
 
 // GetOrFetchCertificateOptions is getOrFetchCertificate's options
-// (DclCertificateService.ts:749 at 862ad75f).
+// (DclCertificateService.ts:757 at db021da0).
 type GetOrFetchCertificateOptions struct {
 	GetCertificateOptions
 	// IsProduction asks the production ledger, false the test ledger; nil

@@ -35,10 +35,10 @@ import (
 )
 
 // Timing of the flow. Mirrors matter.js
-// packages/protocol/src/peer/ControllerCommissioningFlow.ts:289
-// (DEFAULT_FAILSAFE_TIME = 1 min), :295 (CASE_RECONNECT_TIMEOUT = 5 min),
-// :298 (FAILSAFE_PROCESSING_MARGIN = 10 s) and :301
-// (FAILSAFE_MAX_SEND_TIME = 10 s) at 0ceb202d.
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:290
+// (DEFAULT_FAILSAFE_TIME = 1 min), :296 (CASE_RECONNECT_TIMEOUT = 5 min),
+// :299 (FAILSAFE_PROCESSING_MARGIN = 10 s) and :302
+// (FAILSAFE_MAX_SEND_TIME = 10 s) at db021da0.
 const (
 	DefaultFailSafeTime      = time.Minute
 	CASEReconnectTimeout     = 5 * time.Minute

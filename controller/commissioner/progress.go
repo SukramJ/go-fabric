@@ -9,8 +9,8 @@ type StepPhase uint8
 // The phases of a step. A step is reported Started, then exactly one of
 // Succeeded, Failed or Skipped — matter.js's CommissioningStepResultCode
 // Success / Failure / Skipped (packages/protocol/src/peer/
-// ControllerCommissioningFlow.ts:164-169 at 862ad75f); its Stop, which
-// ends the flow early (:427-429), is reported Succeeded.
+// ControllerCommissioningFlow.ts:164-169 at db021da0); its Stop, which
+// ends the flow early (:426-428), is reported Succeeded.
 const (
 	StepStarted StepPhase = iota + 1
 	StepSucceeded
@@ -37,9 +37,9 @@ func (p StepPhase) String() string {
 //
 // Number, Sub and Name are matter.js's CommissioningStep stepNumber,
 // subStepNumber and name verbatim (ControllerCommissioningFlow.ts:184-199,
-// the list :536-656 at 862ad75f) — "GetInitialData" 0.1,
+// the list :536-656 at db021da0) — "GetInitialData" 0.1,
 // "GeneralCommissioning.ArmFailsafe" 7.1, …, "Reconnect" 18.1 (which
-// includes the operational CASE connection, step 19, :629),
+// includes the operational CASE connection, step 19, :628),
 // "GeneralCommissioning.Complete" 20.1,
 // "OperationalCredentials.UpdateFabricLabel" 98.1 — the steps
 // executeCommissioning runs and logs one by one (:384). matter.js names no
@@ -53,7 +53,7 @@ func (p StepPhase) String() string {
 // module reports the node's start as [StepSubscribe] 21.1, its own
 // number after the flow's 20.1 (the initial read and the default
 // subscription, packages/node/src/behavior/system/commissioning/
-// CommissioningClient.ts:343-361 at 862ad75f), reported after the
+// CommissioningClient.ts:343-361 at db021da0), reported after the
 // flow's last step — 98.1 here, as this port does not run matter.js's
 // 99.1 AdditionalLogic.AddDefaultOtaProvider. It has no Skipped case:
 // every successful commissioning starts the node, and a failed step is

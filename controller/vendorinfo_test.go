@@ -14,7 +14,7 @@ import (
 // TestVendorInfoOffline: an offline controller's vendor information
 // service (matter.js DclBehavior.vendorInfoService with dcl.offline,
 // packages/node/src/behavior/system/dcl/DclBehavior.ts:101-115 at
-// 862ad75f) serves the embedded snapshot's vendors and the static ones
+// db021da0) serves the embedded snapshot's vendors and the static ones
 // without the ledger, and is built once.
 func TestVendorInfoOffline(t *testing.T) {
 	t.Parallel()

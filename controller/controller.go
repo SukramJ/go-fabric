@@ -93,7 +93,7 @@ const DefaultVendorID uint16 = 0xFFF1
 // device that was found — that has the commissioner's own budgets
 // (commissioner.DefaultPASETimeout, commissioner.DefaultCASEConnectionTimeout
 // and the fail-safe), as matter.js's has: its commissionNode sets no
-// overall deadline (CommissioningController.ts:462-500 at 862ad75f), only
+// overall deadline (CommissioningController.ts:465-503 at db021da0), only
 // the discovery's timeout (CommissioningDiscovery.ts:40-45).
 const DefaultPairTimeout = time.Minute
 
@@ -116,7 +116,7 @@ type Config struct {
 	// advertisement, say: matter.js's ScannerSet, which the commissioner
 	// walks after the commissioning steps succeeded
 	// (packages/protocol/src/peer/ControllerCommissioner.ts:321-341,
-	// :721-723 at 862ad75f). nil is none.
+	// :721-723 at db021da0). nil is none.
 	Scanners []commissioner.CommissionedScanner
 	// Listen is the UDP address to listen on; "" is "[::]:0".
 	Listen string
@@ -134,8 +134,8 @@ type Config struct {
 	// id ("peer1", …) in place of Node.Hooks, so a host tells its nodes'
 	// reports, events and subscription signals apart
 	// (client.RegistryConfig.HooksFor) — matter.js gives each paired node
-	// its own events (packages/matter.js/src/device/PairedNode.ts:276-282
-	// at 862ad75f, attributeChanged and eventTriggered among them).
+	// its own events (packages/matter.js/src/device/PairedNode.ts:277-283
+	// at db021da0, attributeChanged and eventTriggered among them).
 	HooksFor func(id string) client.Hooks
 	// ManualStart leaves the commissioned nodes stopped when New returns;
 	// false starts each, as matter.js's start connects them unless
@@ -200,7 +200,7 @@ type Config struct {
 	// from the database. nil keeps the root key in the database.
 	// matter.js has no such seam: its CertificateAuthority keeps the key
 	// pair in its storage (packages/protocol/src/certificate/
-	// CertificateAuthority.ts:53, :169 at 862ad75f).
+	// CertificateAuthority.ts:53, :169 at db021da0).
 	CAKey crypto.Signer
 	// Advertise, when set, publishes our commissioner record
 	// (`_matterd._udp`) on the controller's UDP port until Close
@@ -211,7 +211,7 @@ type Config struct {
 	// throttles and MRP margins the peers' connections and exchanges use
 	// (client/peer NetworkProfiles; matter.js NetworkServer.State.profiles,
 	// packages/node/src/behavior/system/network/NetworkServer.ts:162-183,
-	// :248 at 862ad75f). nil keeps the defaults.
+	// :254 at db021da0). nil keeps the defaults.
 	Networks *peer.ProfilesConfig
 	// OwnNetworkProfile is the profile of our own network, whose margin
 	// pads every exchange's sends: matter.js ownNetworkProfileId
@@ -225,7 +225,7 @@ type Config struct {
 	// Sessions sets the session intervals the controller reports in its
 	// handshakes (PBKDFParamRequest / Sigma1 SessionParameters) —
 	// matter.js's sessions.intervals fed into the SessionManager
-	// (ServerNetworkRuntime.ts:354-362 at 862ad75f), the controller-side
+	// (ServerNetworkRuntime.ts:362-367 at db021da0), the controller-side
 	// counterpart of node.Config.Sessions. nil is the Matter defaults
 	// (500 ms / 300 ms / 4000 ms); an interval outside whole milliseconds
 	// from 0 to the field's bound is [ErrConfiguration].
@@ -233,8 +233,8 @@ type Config struct {
 	// TransportPreference is the transport each peer prefers for its
 	// connections: exchange.TransportTCP is a soft hint — a connection
 	// falls back to UDP when the peer does not serve TCP — and needs
-	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:219-222,
-	// NetworkClient.ts:73-79 at 862ad75f).
+	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:225-228,
+	// NetworkClient.ts:73-79 at db021da0).
 	TransportPreference exchange.Transport
 	// PeerTiming sets the connection timing of the controller's peer set,
 	// every parameter [client.Timing] names: the connection timeout, the
@@ -505,7 +505,7 @@ func New(ctx context.Context, cfg Config) (_ *Controller, err error) {
 	// The operational key is rotated on every start, as matter.js's
 	// controller does for the fabric it keeps itself (FabricAuthority
 	// defaultFabric with rotateNoc, packages/matter.js/src/MatterController.ts:402-415
-	// at 862ad75f).
+	// at db021da0).
 	if c.fabric, err = commissioner.NewFabricAuthority(authority, log).DefaultFabric(fcfg, true); err != nil {
 		return nil, err
 	}
@@ -1047,7 +1047,7 @@ func (c *Controller) Fabric() *commissioner.Fabric { return c.fabric }
 // registry (its own node on a known address, say) adds it here
 // (peer.Set.AddKnownPeer) and reaches it with
 // Commissioner().Interaction. A seam of the role — matter.js's node
-// peers (packages/node/src/node/client/Peers.ts:93 at 862ad75f).
+// peers (packages/node/src/node/client/Peers.ts:93 at db021da0).
 // Nil once Close has begun.
 func (c *Controller) Peers() *peer.Set {
 	st, _ := c.open()
@@ -1100,7 +1100,7 @@ type PairOptions struct {
 	// matter.js MatterController.commission, which commissions a
 	// discovery's knownAddress through Peers.forDescriptor({addresses})
 	// without a scan (packages/matter.js/src/MatterController.ts:539-566 at
-	// 862ad75f; the option is CommissioningController.ts:289). Address
+	// db021da0; the option is CommissioningController.ts:292). Address
 	// and BLE together are [ErrConfiguration].
 	Address *net.UDPAddr
 	// WiFi and Thread are the operational network the commissioning
@@ -1139,7 +1139,7 @@ type PairOptions struct {
 // PairingStep is one report of [PairOptions].Progress: the step's
 // number, sub-step and name — matter.js's step names verbatim
 // (packages/protocol/src/peer/ControllerCommissioningFlow.ts:536-656 at
-// 862ad75f), so a UI can show them, "Discovery" 2.1 and "PASE" 2.2,
+// db021da0), so a UI can show them, "Discovery" 2.1 and "PASE" 2.2,
 // this module's names for the steps before matter.js's flow, and
 // "Subscribe" 21.1, its name for the node's start after it (the initial
 // read and the default subscription) — its
@@ -1170,9 +1170,9 @@ const (
 // timeout. With [PairOptions].BLE the device is found over BLE and
 // commissioned over BTP; with [PairOptions].Address it is dialled at that
 // address without discovery. Mirrors CommissioningController.commissionNode
-// (CommissioningController.ts:462-500 at 862ad75f), whose discovery takes
+// (CommissioningController.ts:465-503 at db021da0), whose discovery takes
 // BLE when the options name a BLE capability (discoveryCapabilities,
-// :280-283).
+// :283-286).
 //
 // The pairing enters the diagnostic trace ([Controller.DiagnosticEvents]):
 // its start and each failed step (a warning: one discovery transport of a
@@ -1281,7 +1281,7 @@ func (c *Controller) pairOptions(passcode uint32, channel commissioner.Channel, 
 // Peers.forDescriptor does for a descriptor of addresses only
 // (RemoteDescriptor.is matches nothing on an absent identifier,
 // packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts:37-50
-// at 862ad75f) — and what [PairOptions].Address pairs. An address without
+// at db021da0) — and what [PairOptions].Address pairs. An address without
 // an IP or a port is [ErrConfiguration].
 func DeviceAt(addr *net.UDPAddr) (client.Device, error) {
 	if addr == nil {

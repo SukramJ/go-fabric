@@ -21,7 +21,7 @@ import (
 const VendorsFile = "vendors.json"
 
 // Vendor is one vendor — matter.js VendorInfo
-// (packages/protocol/src/dcl/DclVendorInfoService.ts:41-48 at 862ad75f),
+// (packages/protocol/src/dcl/DclVendorInfoService.ts:41-48 at db021da0),
 // the ledger's vendor record normalised (:390-400).
 type Vendor struct {
 	ID                   uint16
@@ -51,7 +51,7 @@ type vendorEntry struct {
 }
 
 // staticVendors are the vendors known without the ledger — matter.js
-// STATIC_VENDORS (DclVendorInfoService.ts:136-158 at 862ad75f): the test
+// STATIC_VENDORS (DclVendorInfoService.ts:136-158 at db021da0): the test
 // vendor ids of the specification (0xFFF1–0xFFF4) and Nabu Casa. A ledger
 // record of the same id takes precedence.
 func staticVendors() []Vendor {
@@ -69,7 +69,7 @@ func staticVendors() []Vendor {
 }
 
 // loadVendors reads the vendor list of fsys over the static vendors, as
-// #consumeVendorSeed does (DclVendorInfoService.ts:405-445 at 862ad75f):
+// #consumeVendorSeed does (DclVendorInfoService.ts:405-445 at db021da0):
 // an entry without a numeric id, without a name or of another kind than
 // production or test stops the list there ([ErrMalformed]; the entries
 // before it are kept). No file is the static vendors alone.
@@ -109,7 +109,7 @@ func (s *Snapshot) loadVendors(fsys fs.FS) error {
 
 // VendorSeed is the snapshot's vendor list as a seed of
 // dcl.VendorInfoService (matter.js DclVendorInfoService's seed option,
-// DclVendorInfoService.ts:405-456 at 862ad75f): the ledger's records it
+// DclVendorInfoService.ts:405-456 at db021da0): the ledger's records it
 // was built with, without the static vendors; nil when the snapshot has
 // no vendor list.
 func (s *Snapshot) VendorSeed() *dcl.VendorSeed {
@@ -124,7 +124,7 @@ func (s *Snapshot) VendorSeed() *dcl.VendorSeed {
 // Vendors is every vendor the snapshot knows — the ledger's records it
 // was built with over matter.js's static vendors — in id order: matter.js
 // DclVendorInfoService.vendors (DclVendorInfoService.ts:228-231 at
-// 862ad75f), offline.
+// db021da0), offline.
 func (s *Snapshot) Vendors() []Vendor {
 	out := make([]Vendor, 0, len(s.vendors))
 	for _, v := range s.vendors {

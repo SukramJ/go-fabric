@@ -16,8 +16,8 @@ import (
 // answer a command as a certification case needs, and reads back what it
 // answered. matter.js keeps both in its cert harness, as the provider
 // behavior it installs on the controller's node
-// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:456-638 at
-// 862ad75f, RecordingOtaProviderServer); a Go controller cannot subclass
+// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:610-792 at
+// db021da0, RecordingOtaProviderServer); a Go controller cannot subclass
 // its provider, so the seam is [Config]'s ScriptQueryImage,
 // ScriptApplyUpdate and OnProviderExchange, which [Manager.ProviderConfig]
 // hands the controller as [ProviderCommands]. Without them the provider
@@ -25,7 +25,7 @@ import (
 
 // QueryImageScript is a scripted answer to one QueryImage — matter.js
 // OtaScriptedQueryAnswer (packages/testing/src/chip/cert/
-// controller-adapter.ts:559-581 at 862ad75f).
+// controller-adapter.ts:560-582 at db021da0).
 type QueryImageScript struct {
 	// Response, when set, is answered as it stands and the provider is not
 	// asked: its answer stages an in-progress entry and registers the peer

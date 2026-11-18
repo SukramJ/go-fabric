@@ -16,7 +16,7 @@ import (
 )
 
 // VendorInfo is one vendor — matter.js VendorInfo
-// (packages/protocol/src/dcl/DclVendorInfoService.ts:41-48 at 862ad75f):
+// (packages/protocol/src/dcl/DclVendorInfoService.ts:41-48 at db021da0):
 // the ledger's vendor record normalised, an unset preferred name or
 // landing page "" (#normalizeDclVendor, :390-401).
 type VendorInfo struct {

@@ -19,7 +19,7 @@ import (
 // DelayBeforeNextAddress is how long the latest PASE attempt runs before
 // the next candidate address gets one, unless it settles first. Mirrors
 // matter.js packages/protocol/src/peer/CommissioningConnection.ts:35
-// (DELAY_BEFORE_NEXT_ADDRESS = 10 s) at 0ceb202d.
+// (DELAY_BEFORE_NEXT_ADDRESS = 10 s) at db021da0.
 const DelayBeforeNextAddress = 10 * time.Second
 
 // errBudget is the cause the connection's own timeout aborts with —
@@ -49,7 +49,7 @@ type connectionConfig struct {
 	timeout time.Duration
 	// delay is delayBeforeNextAddress: nil is DelayBeforeNextAddress, and
 	// zero launches every address at once. Mirrors matter.js
-	// packages/protocol/src/peer/CommissioningConnection.ts:64 at 862ad75f
+	// packages/protocol/src/peer/CommissioningConnection.ts:64 at db021da0
 	// (options.delayBeforeNextAddress ?? DELAY_BEFORE_NEXT_ADDRESS).
 	delay     *time.Duration
 	establish establishFunc
@@ -107,7 +107,7 @@ type connection struct {
 // connectPASE attempts PASE with the candidates and returns the first
 // session established. Mirrors matter.js
 // packages/protocol/src/peer/CommissioningConnection.ts:60-250 at
-// 0ceb202d:
+// db021da0:
 //
 //   - one Abort holds the budget (cfg.timeout) and the caller's ctx (:63);
 //   - the candidates are the devices' addresses in order (:86); one
@@ -177,7 +177,7 @@ func connectPASE(ctx context.Context, cfg connectionConfig) (connectionResult, e
 	// so a look at the winner before and at the abort after that instant
 	// read the winner's own abort as the run's failure (the errWon flake,
 	// brief CG §3) — matter.js reads both in one turn of its event loop
-	// (CommissioningConnection.ts:208-212 at 862ad75f).
+	// (CommissioningConnection.ts:208-212 at db021da0).
 	for {
 		c.mu.Lock()
 		winner, pending, aborted := c.winner, c.pending, abortCtx.Err() != nil

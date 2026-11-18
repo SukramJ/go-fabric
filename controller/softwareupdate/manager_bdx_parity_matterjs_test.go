@@ -123,7 +123,7 @@ func (h *messageRecorder) has(msg string) bool {
 // TestManagerBDXLivenessParity ports OtaTest.ts:1902-2286 (the manager's
 // half): a running transfer is the update's progress
 // (#triggerQueuedUpdate, #isTransferring, queuedUpdates;
-// SoftwareUpdateManager.ts:293-336, :931-1025 at 862ad75f).
+// SoftwareUpdateManager.ts:293-336, :931-1025 at db021da0).
 func TestManagerBDXLivenessParity(t *testing.T) {
 	t.Parallel()
 	length := uint64(6_000_000)
@@ -248,7 +248,7 @@ func (a *armerCalls) counts() (lost, unsubscribe int) {
 // reboot armer armed, so its return-timeout backstop still recovers the
 // peer — matter.js's case spies on disarm; here the backstop firing after
 // the detection is the proof no disarm ran (RebootResubscribeArmer.ts:
-// 102-104, 174-204 at 862ad75f).
+// 102-104, 174-204 at db021da0).
 func TestManagerFailedApplyKeepsArmedParity(t *testing.T) {
 	t.Parallel()
 	calls := &armerCalls{}
@@ -276,7 +276,7 @@ func TestManagerFailedApplyKeepsArmedParity(t *testing.T) {
 // the armer's forced resubscription finds no node, so no subscription
 // after the apply ever reports a version — is kept: neither failed nor
 // dropped (#onSubscribedAfterApply runs only on a resubscription,
-// SoftwareUpdateManager.ts:848-870 at 862ad75f).
+// SoftwareUpdateManager.ts:848-870 at db021da0).
 func TestManagerAppliedUpdateNodeGoneParity(t *testing.T) {
 	t.Parallel()
 	r := newManagerRig(t, nil)
