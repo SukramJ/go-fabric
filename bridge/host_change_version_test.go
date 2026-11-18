@@ -61,6 +61,23 @@ func TestHostChangeAdvancesOnceOnAHandOffServer(t *testing.T) {
 		w.expect("a notification that moved nothing", port.fire, lvldef.AttrCurrentLevel, 0, 0)
 	})
 
+	// F-db021da0-44: the port is the server's Source and its notifier is
+	// the endpoint source's too, so one host notification reaches the
+	// server's forward and the bridge's own subscription; the notifier's
+	// callbacks run in map order, both orders over repeated runs.
+	t.Run("LevelControl CurrentLevel, the port's notifier also the endpoint source's", func(t *testing.T) {
+		t.Parallel()
+		port := &movingLevelPort{notifyingLevelPort: &notifyingLevelPort{}}
+		port.level.Store(100)
+		srv := levelcontrol.NewServer(levelcontrol.Config{Source: port})
+		d := notifyingAppDevice{appDevice: appDevice{deviceType: 0x0101, servers: []contract.ClusterServer{srv}}, hostNotifier: &port.hostNotifier}
+		h := newNotifyingAppHarness(t, d)
+		epID := h.endpoints[0x0101]
+		w := watchCluster(t, h, epID, lvldef.ClusterID)
+		w.expect("a host change outside a write", port.move(40), lvldef.AttrCurrentLevel, 1, 1)
+		w.expect("a notification that moved nothing", port.fire, lvldef.AttrCurrentLevel, 0, 0)
+	})
+
 	t.Run("DoorLock LockState, a pull server over a notifying source", func(t *testing.T) {
 		t.Parallel()
 		src := &movingLock{hostNotifier: &hostNotifier{}}
