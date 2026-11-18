@@ -1193,10 +1193,12 @@ func (m *Manager) snapshot() []*Subscription {
 // Info is one active subscription as [Manager.Snapshot]
 // lists it: a copy of the [Subscription]'s request and identity, which a
 // host reads without reaching the subscription itself (it cannot close
-// it). matter.js persists the same record per subscription in
-// SubscriptionsServer's state (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts:149-159
-// at 862ad75f: subscriptionId, peerAddress, minIntervalFloor,
-// maxIntervalCeiling, attributeRequests, eventRequests, sendInterval).
+// it). matter.js builds the same record per subscription in
+// SubscriptionsServer (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts:148-158
+// at db021da0: subscriptionId, peerAddress, minIntervalFloor,
+// maxIntervalCeiling, attributeRequests, eventRequests, sendInterval),
+// keeps it in internal.subscriptions (:161) and persists it through
+// SubscriptionStore.save (:212).
 type Info struct {
 	ID          uint32
 	FabricIndex uint8
@@ -1217,8 +1219,10 @@ type Info struct {
 
 // Snapshot lists every subscription the manager holds and has not seen
 // closed, by ID: a read-only view for a host's diagnostics. matter.js
-// keeps the list as SubscriptionsServer.state.subscriptions
-// (SubscriptionsServer.ts:345-354 at 862ad75f) and exposes no live one.
+// keeps the list in SubscriptionsServer's internal.subscriptions
+// (SubscriptionsServer.ts:161 at db021da0; State.subscriptions,
+// :380-391, is deprecated and no longer written) and exposes no live
+// one.
 func (m *Manager) Snapshot() []Info {
 	subs := m.snapshot()
 	out := make([]Info, 0, len(subs))
