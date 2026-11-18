@@ -17,7 +17,7 @@ import (
 // ErrNoCommands is an [Interaction.InvokeBatch] of no command — matter.js
 // Invoke's MalformedRequestError "Invocation requires at least one
 // command" (packages/protocol/src/action/request/Invoke.ts:116-118 at
-// 862ad75f).
+// db021da0).
 var ErrNoCommands = errors.New("interaction: an invoke needs at least one command")
 
 // CommandRequest is one command of an [Interaction.InvokeBatch]: its path
@@ -39,7 +39,7 @@ type CommandRequest struct {
 // MaxPathsPerInvoke; at least 1), each on an exchange of its own, the
 // batches in parallel — matter.js ClientInteraction.invoke and
 // #invokeWithSplitting (packages/protocol/src/action/client/ClientInteraction.ts:654-737
-// at 862ad75f; a batch size below one is an error, :662-664). A batch of
+// at db021da0; a batch size below one is an error, :662-664). A batch of
 // several commands numbers them with a CommandRef and matches the
 // responses by it; a batch of one sends no CommandRef and takes the
 // responses by position (:510-517); a response for no command of the batch

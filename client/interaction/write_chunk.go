@@ -14,7 +14,7 @@ import (
 // The chunking of a write into WriteRequest messages — matter.js
 // InteractionClientMessenger.#chunkWriteRequest and sendWriteCommand
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1269-1450 at
-// 862ad75f, Matter 1.6.1 § 10.6.4.3.1, § 10.7.6.2).
+// db021da0, Matter 1.6.1 § 10.6.4.3.1, § 10.7.6.2).
 
 // writeValue encodes an AttributeDataIB's Data.
 func writeValue(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {

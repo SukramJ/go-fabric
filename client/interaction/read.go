@@ -48,13 +48,13 @@ func (c *Interaction) Read(ctx context.Context, paths ...im.ConcreteAttributePat
 
 // ReadWith reads attributes and events on a fresh exchange and returns the
 // report, its chunks merged. Mirrors matter.js ClientInteraction.read
-// (ClientInteraction.ts:262-298) at 0ceb202d: more paths than the
-// provider's readPathsSupported is only logged (:263-268); the request is
-// encoded to fit one message (InteractionMessenger.ts:994-1050); the
-// reports are read as readDataReports does (:938-972) and each chunk goes
-// through InputChunk (action/client/InputChunk.ts) — a list continued in
-// the next chunk is reassembled, a malformed entry skipped. Errors of the
-// exchange layer pass through unchanged.
+// (ClientInteraction.ts:314-350) at db021da0: more paths than the
+// provider's readPathsSupported is only logged (:315-320); the request is
+// encoded to fit one message (InteractionMessenger.ts:1139-1195); the
+// reports are read as readDataReports does (:1012-1053) and each chunk
+// goes through InputChunk (action/client/InputChunk.ts) — a list continued
+// in the next chunk is reassembled, a malformed entry skipped. Errors of
+// the exchange layer pass through unchanged.
 func (c *Interaction) ReadWith(ctx context.Context, r ReadRequest) (*Report, error) {
 	if n := len(r.Attributes) + len(r.Events); n > c.provider.ReadPathsSupported() {
 		c.log.Info("matter.controller.interaction.read_paths", slog.Int("paths", n), slog.Int("supported", c.provider.ReadPathsSupported()))

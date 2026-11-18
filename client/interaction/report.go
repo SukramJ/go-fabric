@@ -79,7 +79,7 @@ type Report struct {
 	// report: the first chunk's — matter.js hands each chunk's DataReport,
 	// subscriptionId included, to InputChunk (action/client/InputChunk.ts:166-169)
 	// and the handler reads the id off the initial report
-	// (ClientSubscriptionHandler.ts:77) at 0ceb202d.
+	// (ClientSubscriptionHandler.ts:77) at db021da0.
 	SubscriptionID uint32
 	// Session is the session the report arrived over — the exchange's
 	// session matter.js takes the peer from and hands to reportStarted
@@ -140,10 +140,10 @@ type resolvedPath struct {
 	hasVersion bool
 }
 
-// assembler is InputChunk (action/client/InputChunk.ts:166-432 at
-// 0ceb202d) with the leftover list one read or report keeps across its
-// chunks (ClientInteraction.ts:279-285, :1288-1294;
-// ClientSubscriptionHandler.ts:168-195).
+// assembler is InputChunk (action/client/InputChunk.ts:166-489 at
+// db021da0) with the leftover list one read or report keeps across its
+// chunks (ClientInteraction.ts:331-337, :1387-1393;
+// ClientSubscriptionHandler.ts:160-187).
 type assembler struct {
 	report   *Report
 	leftover []im.AttributeReport
@@ -710,13 +710,13 @@ func (m *messenger) holdChunk(ctx context.Context, held *int, charge int) error 
 
 // readDataReports reads the DataReport chunks of an exchange as matter.js
 // IncomingInteractionClientMessenger.readDataReports does
-// (interaction/InteractionMessenger.ts:938-972 at 0ceb202d): the next
+// (interaction/InteractionMessenger.ts:1012-1053 at db021da0): the next
 // message must be a ReportData (a StatusResponse error in its place is a
-// *StatusError, :914-931); the consumer takes the chunk first; then a
+// *StatusError, :985-1005); the consumer takes the chunk first; then a
 // chunk with more to come is answered with a StatusResponse Success and
 // the next one awaited, the last one with a Success unless it suppresses
 // the response — sent before the exchange closes, a failure only logged
-// (the tracked end message, :950-966). first, when set, is the chunk
+// (the tracked end message, :1031-1047). first, when set, is the chunk
 // already received, firstPayload its bytes, held to the report bound as
 // every later chunk is. A consumer returning errStopReports ends the
 // reading with nil and no answer.

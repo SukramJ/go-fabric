@@ -39,7 +39,7 @@ type SubscriptionsConfig struct {
 // subscription id) the inbound reports are routed by, and the liveness
 // timer. One serves a controller (one exchange manager). It is matter.js
 // ClientSubscriptions (packages/protocol/src/action/client/subscription/ClientSubscriptions.ts:34-278
-// at 0ceb202d). It is safe for concurrent use.
+// at db021da0). It is safe for concurrent use.
 type Subscriptions struct {
 	clock         exchange.Clock
 	log           *slog.Logger

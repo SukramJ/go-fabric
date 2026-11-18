@@ -13,7 +13,7 @@
 // the peer's MaxPathsPerInvoke (InvokeBatch), and single commands invoked
 // within one batch duration share an InvokeRequest when the peer takes
 // more than one path (Invoke). The batcher is matter.js's
-// #invokeWithBatching (ClientInteraction.ts:744-1005 at 862ad75f).
+// #invokeWithBatching (ClientInteraction.ts:744-1005 at db021da0).
 //
 // The messages are encoded and decoded with im/'s client encoders and
 // decoders, the shapes of matter.js's TLV message definitions.
@@ -35,9 +35,9 @@ import (
 )
 
 // Timeouts of the client. Mirrors matter.js
-// packages/protocol/src/action/client/ClientInteraction.ts:159
-// (DEFAULT_TIMED_REQUEST_TIMEOUT = 10 s) and :160
-// (DEFAULT_MINIMUM_RESPONSE_TIMEOUT_WITH_FAILSAFE = 30 s) at 0ceb202d.
+// packages/protocol/src/action/client/ClientInteraction.ts:175
+// (DEFAULT_TIMED_REQUEST_TIMEOUT = 10 s) and :176
+// (DEFAULT_MINIMUM_RESPONSE_TIMEOUT_WITH_FAILSAFE = 30 s) at db021da0.
 const (
 	DefaultTimedRequestTimeout                = 10 * time.Second
 	DefaultMinimumResponseTimeoutWithFailsafe = 30 * time.Second
@@ -80,8 +80,8 @@ func (e *StatusError) Error() string {
 }
 
 // Interaction is the client side of the Interaction Model towards one
-// peer — matter.js ClientInteraction (ClientInteraction.ts:165-1259 at
-// 0ceb202d) bound to an exchange [Provider]: a session ([New]) or a peer
+// peer — matter.js ClientInteraction (ClientInteraction.ts:219-1343 at
+// db021da0) bound to an exchange [Provider]: a session ([New]) or a peer
 // whose sessions come and go ([ForPeer]). It is safe for concurrent use;
 // each call runs on its own exchange.
 type Interaction struct {
@@ -111,7 +111,7 @@ type Interaction struct {
 	abortFn  context.CancelCauseFunc
 
 	// batchMu guards the batcher: lanes is #batchLanes and nextCommandRef
-	// #nextCommandRef (ClientInteraction.ts:233-236 at 862ad75f).
+	// #nextCommandRef (ClientInteraction.ts:233-236 at db021da0).
 	batchMu        sync.Mutex
 	lanes          map[string]*batchLane
 	nextCommandRef uint16
@@ -200,7 +200,7 @@ func (c *Interaction) MaximumPeerResponseTime(ept time.Duration, includeSending 
 }
 
 // Close closes the interaction — ClientInteraction.close
-// (ClientInteraction.ts:264-297 at 862ad75f): the subscriptions of its
+// (ClientInteraction.ts:264-297 at db021da0): the subscriptions of its
 // peer close so none outlives it (a sustained one would retry forever),
 // every running exchange is aborted with reason, and Close returns once
 // they have ended. Later interactions fail with reason; nil is
@@ -250,7 +250,7 @@ type messenger struct {
 	maxReport int
 	// reportAwaitsStatus and reportSubscriptionID are #reportAwaitsStatus
 	// and #subscriptionId (InteractionMessenger.ts:982, :1013-1025 at
-	// 862ad75f): a report was read whose status is still owed, and the
+	// db021da0): a report was read whose status is still owed, and the
 	// subscription it named.
 	reportAwaitsStatus   bool
 	reportSubscriptionID uint32
@@ -328,7 +328,7 @@ func (m *messenger) sendStatus(ctx context.Context, status im.StatusCode) error 
 
 // sendInvalidSubscription sends a StatusResponse INVALID_SUBSCRIPTION
 // whose wait for the acknowledgement ackWaitAbort ends — sendInvalidSubscription
-// (InteractionMessenger.ts:1070-1080 at 862ad75f).
+// (InteractionMessenger.ts:1070-1080 at db021da0).
 func (m *messenger) sendInvalidSubscription(ackWaitAbort <-chan struct{}) error {
 	enc := tlv.NewEncoder()
 	im.StatusResponse{Status: im.StatusInvalidSubscription}.MarshalTLV(enc)

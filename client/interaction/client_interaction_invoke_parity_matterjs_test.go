@@ -233,7 +233,7 @@ func TestClientInteractionInvokeCommandRefWireHandling(t *testing.T) {
 }
 
 // TestClientInteractionInvokeLargeMessageInference ports the inference case
-// (ClientInteractionInvokeTest.ts:633-661 at 862ad75f): an invoke of
+// (ClientInteractionInvokeTest.ts:633-661 at db021da0): an invoke of
 // WebRtcTransportProvider.ProvideOffer, a command with the "L" quality,
 // infers LargeMessage on a copy (ClientInteraction.ts:716-719) — the
 // caller's options keep their nil. The session-bound rig ignores the

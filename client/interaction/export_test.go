@@ -40,7 +40,7 @@ func SetTimedWrite(cluster, attribute uint32) (restore func()) {
 // #invokeWithBatching awaits before it queues a command (connector) — is
 // held: it closes connecting when called and returns once release is
 // called, then connects as p does (when p connects at all). The test seam
-// of ClientInvokeTest.ts:836-846 at 862ad75f, which replaces
+// of ClientInvokeTest.ts:836-846 at db021da0, which replaces
 // exchangeProvider.connect the same way. p's MaxPathsPerInvoke stays.
 func HoldConnect(p Provider) (held Provider, connecting <-chan struct{}, release func()) {
 	h := &heldConnect{Provider: p, connecting: make(chan struct{}), released: make(chan struct{})}

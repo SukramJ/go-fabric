@@ -105,10 +105,10 @@ func (w WriteStatuses) Err() error {
 var ErrMalformedRequest = errors.New("interaction: malformed request")
 
 // Write writes attributes on a fresh exchange. Mirrors matter.js
-// ClientInteraction.write (ClientInteraction.ts:365-429) with Write()
-// (action/request/Write.ts:43-185) and
+// ClientInteraction.write (ClientInteraction.ts:417-482) with Write()
+// (action/request/Write.ts:49-191) and
 // InteractionClientMessenger.sendWriteCommand
-// (interaction/InteractionMessenger.ts:1110-1162) at 0ceb202d:
+// (interaction/InteractionMessenger.ts:1269-1317) at db021da0:
 //
 //   - a DataVersion needs a concrete endpoint, and a write needs at least
 //     one attribute (Write.ts:64-69, :105-107);

@@ -17,10 +17,10 @@ import (
 )
 
 // Subscription defaults. Mirrors matter.js
-// packages/protocol/src/action/client/ClientInteraction.ts:96
-// (SUBSCRIPTION_PROCESSING_TIME = 10 s), :149 (DEFAULT_MIN_INTERVAL_FLOOR =
-// 1 s) and :157 (SUBSCRIPTION_MAX_INTERVAL_PUBLISHER_LIMIT = 60 min) at
-// 0ceb202d.
+// packages/protocol/src/action/client/ClientInteraction.ts:101
+// (SUBSCRIPTION_PROCESSING_TIME = 10 s), :165 (DEFAULT_MIN_INTERVAL_FLOOR =
+// 1 s) and :173 (SUBSCRIPTION_MAX_INTERVAL_PUBLISHER_LIMIT = 60 min) at
+// db021da0.
 const (
 	SubscriptionProcessingTime            = 10 * time.Second
 	DefaultMinIntervalFloor               = time.Second
@@ -75,8 +75,8 @@ type SubscribeRequest struct {
 	// cancelled establishment is); a later report is left unanswered and
 	// the error logged; a sustained subscription logs it, warning once,
 	// and keeps running. Mirrors matter.js's subscribe, whose updated
-	// rejection fails the establishment (ClientSubscribeTest.ts:1275-1331
-	// at 862ad75f), and
+	// rejection fails the establishment (ClientSubscribeTest.ts:1276-1332
+	// at db021da0), and
 	// SustainedSubscription.#deliver
 	// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-352).
 	Updated func(r *Report) error
@@ -238,7 +238,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	// A failed establishment is abandoned, not dropped: the request may
 	// have reached the peer, which may hold the subscription and send its
 	// report — unless the peer or the session ended it (ClientInteraction.ts:1084-1097
-	// at 862ad75f).
+	// at db021da0).
 	fail := func(err error) (*Subscription, error) {
 		awaitReport := !errors.Is(err, exchange.ErrTransient) && !errors.Is(err, exchange.ErrNetwork) &&
 			!errors.Is(err, exchange.ErrRetransmissionLimit) && !errors.Is(err, exchange.ErrSessionClosed) && !isStatusError(err)
@@ -288,7 +288,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 
 // abandonSubscription ends an abandoned establishment on the peer —
 // InteractionMessenger.abandonSubscription (InteractionMessenger.ts:1116-1137
-// at 862ad75f) under the interaction's closing: a report whose status is
+// at db021da0) under the interaction's closing: a report whose status is
 // owed is answered INVALID_SUBSCRIPTION; otherwise, with awaitReport, the
 // next report is awaited and answered so. A failure is logged only.
 func (c *Interaction) abandonSubscription(m *messenger, awaitReport bool) {

@@ -18,7 +18,7 @@ import (
 // neither with a CommandRef, and each result comes back for its command;
 // a stray CommandDataIB for no sent command is discarded
 // (packages/protocol/test/action/client/ClientInteractionInvokeTest.ts:153-178,
-// :354-394 at 862ad75f; ClientInteraction.ts:510-517, :654-700).
+// :354-394 at db021da0; ClientInteraction.ts:510-517, :654-700).
 func TestInvokeBatchSplitsRefLessParity(t *testing.T) {
 	t.Parallel()
 	s := newScripted(t)

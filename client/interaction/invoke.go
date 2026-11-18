@@ -57,7 +57,7 @@ type InvokeOptions struct {
 	// InteractionModelRevision is the InvokeRequest's
 	// InteractionModelRevision — matter.js Invoke.Definition
 	// .interactionModelRevision (packages/protocol/src/action/request/Invoke.ts:189
-	// at 862ad75f); 0 is this module's [im.MatterInteractionModelRevision].
+	// at db021da0); 0 is this module's [im.MatterInteractionModelRevision].
 	// Any other revision sends the command on its own, as the batch
 	// request carries the default (ClientInteraction.ts:196-198).
 	InteractionModelRevision uint8
@@ -180,7 +180,7 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 // stay as they were.
 //
 // Mirrors matter.js ClientInteraction.invoke (ClientInteraction.ts:716-719
-// at 862ad75f: "Copy instead of mutating the caller-owned request") with
+// at db021da0: "Copy instead of mutating the caller-owned request") with
 // inferLargeMessage (:111-127), which probes each command's schema for
 // effectiveQuality.largeMessage. matter.js skips a legacy command request,
 // which carries no model; here every command is named by its path, and a
@@ -226,7 +226,7 @@ func (o InvokeOptions) timedFor(invokes ...im.CommandInvocation) bool {
 // for a suppressed response. It is the exchange of [Interaction.Invoke]
 // and of each batch of [Interaction.InvokeBatch]: matter.js
 // ClientInteraction.#invokeSingle (ClientInteraction.ts:487-649 at
-// 862ad75f) up to the decoding of its entries.
+// db021da0) up to the decoding of its entries.
 func (c *Interaction) exchangeInvoke(ctx context.Context, invokes []im.CommandInvocation, opts InvokeOptions) ([]im.InvokeResponseEntry, error) {
 	m, ctx, err := c.begin(ctx, opts.exchangeOptions())
 	if err != nil {

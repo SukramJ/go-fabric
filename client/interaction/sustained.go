@@ -32,8 +32,8 @@ type RetrySchedule struct {
 // DefaultSustainRetries is the schedule a sustained subscription retries
 // on: 15 s, doubling, at most an hour, a quarter of jitter, no timeout.
 // Mirrors matter.js
-// packages/protocol/src/action/client/subscription/SustainedSubscription.ts:483-499
-// (SustainedSubscription.DefaultRetrySchedule) at 0ceb202d.
+// packages/protocol/src/action/client/subscription/SustainedSubscription.ts:614-630
+// (SustainedSubscription.DefaultRetrySchedule) at db021da0.
 var DefaultSustainRetries = RetrySchedule{
 	InitialInterval: 15 * time.Second,
 	BackoffFactor:   2,
@@ -135,7 +135,7 @@ func (st *sustainedState) releaseHold() {
 // event; it never decreases. A plain subscription reports none. Mirrors
 // matter.js SustainedSubscription.maxEventNumber
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:105-114)
-// at 862ad75f.
+// at db021da0.
 func (s *Subscription) MaxEventNumber() (uint64, bool) {
 	if s.sustained == nil {
 		return 0, false
@@ -149,7 +149,7 @@ func (s *Subscription) MaxEventNumber() (uint64, bool) {
 // returned. Mirrors matter.js SustainedSubscription.#deliver and
 // #raiseMaxEventNumber
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-364)
-// at 862ad75f, the maxEventNumberChanged hook included: a failure of the
+// at db021da0, the maxEventNumberChanged hook included: a failure of the
 // consumer is the subscriber's own, logged by #logLocalFailure's rule
 // (:345-347), and the report's events still count (:348-350).
 func (st *sustainedState) deliver(r *Report, consumer func(*Report) error) error {
@@ -178,7 +178,7 @@ func (st *sustainedState) deliver(r *Report, consumer func(*Report) error) error
 // first as a warning, later ones at debug, since a peer can trigger one with
 // every report. Mirrors matter.js SustainedSubscription.#logLocalFailure
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:366-377)
-// at 862ad75f.
+// at db021da0.
 func (st *sustainedState) logLocalFailure(what string, err error) {
 	if st.log == nil {
 		return
@@ -195,7 +195,7 @@ func (st *sustainedState) logLocalFailure(what string, err error) {
 }
 
 // delivering is the consumer reached through deliver, nil without one
-// (SustainedSubscription.ts:120-121 at 862ad75f).
+// (SustainedSubscription.ts:120-121 at db021da0).
 func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report) error {
 	if consumer == nil {
 		return nil
@@ -207,7 +207,7 @@ func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report)
 // the request's filters kept until then. Mirrors matter.js
 // SustainedSubscription.#requestNewEvents
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:379-384)
-// at 862ad75f.
+// at db021da0.
 func (st *sustainedState) requestNewEvents(req SubscribeRequest) SubscribeRequest {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -276,7 +276,7 @@ func (s *Subscription) setActive(active bool) {
 const SITRetryInterval = 15 * time.Second
 
 // runSustained is SustainedSubscription.#run (SustainedSubscription.ts:116-337
-// at 862ad75f): the session is trusted at first; after a loss the
+// at db021da0): the session is trusted at first; after a loss the
 // provider's reachability is verified, a failed probe meaning a new
 // session anyway (:185-199); the attempts run on the retry schedule — the
 // bootstrap read hook first while it has not succeeded (:209-223), then
@@ -659,7 +659,7 @@ func (c *Interaction) nextWake(ctx context.Context, w *icd.PeerWakefulness) bool
 // bootstrap read while it has not succeeded and the request refreshed
 // after it (:187-204), then the subscription. Each refresh asks for the
 // events above the highest one delivered (SustainedSubscription.ts:125-126
-// at 862ad75f).
+// at db021da0).
 func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool) (*Subscription, error) {
 	if *needRefresh {
 		*req = st.requestNewEvents(refreshed(*req))

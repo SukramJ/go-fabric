@@ -3,7 +3,7 @@
 
 package interaction
 
-// Ports of matter.js at 862ad75f:
+// Ports of matter.js at db021da0:
 // packages/protocol/test/action/client/LargeMessageTransportTest.ts (the
 // largeMessage flag of a read requires TCP; ClientInteraction.ts:1235) and
 // the explicit-flag cases of packages/protocol/test/action/InvokeLargeMessageTest.ts
@@ -145,7 +145,7 @@ func TestInvokeLargeMessageParity(t *testing.T) {
 }
 
 // The inference cases of InvokeLargeMessageTest.ts ("inferLargeMessage",
-// "ClientInteraction.invoke inference policy") at 862ad75f: an invoke the
+// "ClientInteraction.invoke inference policy") at db021da0: an invoke the
 // caller left undecided carries LargeMessage when any of its commands has
 // the "L" quality in the snapshot (ClientInteraction.ts:111-127,
 // :716-719), and the inferred flag requires TCP on the exchange and on
