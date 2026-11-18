@@ -270,7 +270,7 @@ func drainReportDataChunks(t *testing.T, peerConn *net.UDPConn, peerSess *channe
 // bridged endpoint accumulates before the next MinInterval drain.
 // matter.js chunks ongoing updates through the same messenger as the
 // initial report (packages/protocol/src/interaction/
-// InteractionMessenger.ts:347 sendDataReport).
+// InteractionMessenger.ts:470 sendDataReport at db021da0).
 func TestReportSubscriptionChunksAnOversizedOngoingReport(t *testing.T) {
 	t.Parallel()
 	const sessionID uint16 = 71

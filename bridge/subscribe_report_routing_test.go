@@ -101,10 +101,10 @@ func encryptIMFromPeer(t *testing.T, peerSess *channel.Session, localSessionID u
 // Subscribe exchange when the SubscribeResponse landed; a report sent
 // there with Initiator=false is an unsolicited message on an unknown
 // exchange, which matter.js answers with a standalone ack and drops
-// (packages/protocol/src/protocol/ExchangeManager.ts:441-452). Ongoing
-// server reports are always new server-initiated exchanges
-// (packages/node/src/node/server/ServerSubscription.ts:823
-// initiateExchange).
+// (packages/protocol/src/protocol/ExchangeManager.ts:496-507 at db021da0).
+// Ongoing server reports are always new server-initiated exchanges
+// (packages/node/src/node/server/ServerSubscription.ts:900
+// initiateExchange at db021da0).
 func TestReportSubscriptionEventsRidesAFreshBridgeInitiatedExchange(t *testing.T) {
 	t.Parallel()
 	const sessionID uint16 = 75

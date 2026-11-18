@@ -217,7 +217,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// carries the piggyback grace window, behind which a duplicate
 	// ack must not hide (the peer would retransmit again meanwhile).
 	// Expedite it to due-now, flush the pump, drop processing.
-	// Mirrors matter.js MessageExchange.ts:428-433 (duplicate +
+	// Mirrors matter.js MessageExchange.ts:501-511 at db021da0 (duplicate +
 	// requiresAck → sendStandaloneAckForMessage without delay).
 	if duplicate {
 		b.expediteDuplicateAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
@@ -273,9 +273,9 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// vendor-specific protocol the bridge does not implement — even if its
 	// low 16-bit protocol id collides with IM/SC. matter.js keys dispatch on
 	// the full 32-bit id (vendorId*0x10000 + protocolId,
-	// MessageCodec.ts:377), so a vendor-qualified protocol never routes into
-	// the common handlers; reject it before the switch rather than feeding a
-	// forged frame into the PASE/IM machinery.
+	// MessageCodec.ts:466-467 at db021da0), so a vendor-qualified protocol
+	// never routes into the common handlers; reject it before the switch
+	// rather than feeding a forged frame into the PASE/IM machinery.
 	if proto.HasVendorID && proto.VendorID != 0 {
 		err := fmt.Errorf("%w: vendor=0x%04X protocol=0x%04X", ErrUnknownProtocol, proto.VendorID, proto.ProtocolID)
 		b.logger.Debug("matter.rx.vendor_protocol",

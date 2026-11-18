@@ -1881,20 +1881,20 @@ func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8
 // [SessionRegistry] that can close by fabric (the operational manager
 // does).
 //
-// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:423-432
-// `leave(currentExchange)` (OperationalCredentialsServer.ts:425
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:447-457 at
+// db021da0 `leave(currentExchange)` (OperationalCredentialsServer.ts:425
 // `fabric.leave(this.context.exchange)`): each session of the fabric runs
 // `initiateClose` — a session without active exchanges closes at once and
 // its close emits gracefulClose (NodeSession.ts:367-377, :414-425), which the
 // ExchangeManager answers with a CloseSession on a fresh exchange
 // (ExchangeManager.ts:758, :781-787 #sendCloseSession); the session of the
 // current exchange defers its close until that exchange ends
-// (NodeSession.ts:337-347, Session.ts:292-308). `delete` → `#closeSessions`
-// (Fabric.ts:440-465) then force-closes what is left with the current
-// exchange: `NodeSession.initiateForceClose` marks the session peer-lost
-// (NodeSession.ts:379-382), so the deferred close of the invoking session
-// emits no gracefulClose — it closes after its exchange without a
-// CloseSession.
+// (NodeSession.ts:372-375, :384-392; Session.ts:315-317). `delete` →
+// `#closeSessions` (Fabric.ts:464-488) then force-closes what is left with
+// the current exchange: `NodeSession.initiateForceClose` marks the
+// session peer-lost (NodeSession.ts:379-382), so the deferred close of the
+// invoking session emits no gracefulClose — it closes after its exchange
+// without a CloseSession.
 func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
 	b.emitFabricRemoved(ctx, fabricIndex)
 	b.mu.RLock()

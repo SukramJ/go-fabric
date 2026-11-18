@@ -83,7 +83,7 @@ func TestAuthorizedEventReports_NonAdministerDenied(t *testing.T) {
 // the ACL gate — an empty ACL grants it nothing — while the fabric-sensitive
 // record stays with its fabric: before AddNOC (fabricIndex==0) the record of
 // fabric 1 is not disclosed, once AddNOC adopted the session onto fabric 1
-// it is (matter.js EventReadResponse.ts:79, :344-352; review II,
+// it is (matter.js EventReadResponse.ts:79, :344-352 at db021da0; review II,
 // R2-P4-imread-01).
 func TestAuthorizedEventReports_PASEBypass(t *testing.T) {
 	t.Parallel()

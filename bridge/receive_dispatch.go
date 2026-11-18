@@ -670,11 +670,11 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	}
 	// Reliable: a lost WriteResponse leaves the controller waiting and
 	// retrying the whole write. matter.js ships every non-standalone-ack
-	// reply on an MRP session reliably (MessageExchange.ts:602
-	// `requiresAck ?? (session.usesMrp && !isStandaloneAck)`); the ACK
-	// pump retransmits until the peer acks. The response is a pure
-	// outcome report, so it meets sendReplyReliable's idempotency
-	// contract.
+	// reply on an MRP session reliably (MessageExchange.ts:692 at db021da0
+	// `requiresAck = !this.#sendOptions.suppressAck && this.session.usesMrp
+	// && !isStandaloneAck`); the ACK pump retransmits until the peer acks.
+	// The response is a pure outcome report, so it meets
+	// sendReplyReliable's idempotency contract.
 	if err := b.sendReplyReliable(src, requestHdr, proto, im.OpcodeWriteResponse, body); err != nil {
 		debugReplyError(b.logger, "send_write", src, err)
 		return err

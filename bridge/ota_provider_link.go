@@ -374,8 +374,9 @@ type initiatedSecureExchange struct {
 	lastActive atomic.Uint64
 	// createdAt bounds the peer-loss sweep this exchange may trigger:
 	// a session the peer established after the exchange was opened is
-	// not what went unanswered (matter.js ExchangeManager.ts:554 takes
-	// the context's creation time, SessionManager.ts:688 compares).
+	// not what went unanswered (matter.js ExchangeManager.ts:614, :641 takes
+	// the context's creation time, SessionManager.ts:740 compares, at
+	// db021da0).
 	// createdAtMono is the same instant on the clock's monotonic reading,
 	// the one the sweep compares (matter.js's asOf is Time.nowUs).
 	createdAt     time.Time

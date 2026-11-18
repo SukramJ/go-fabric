@@ -246,8 +246,8 @@ func TestTCPConnectionDropEvictsBoundSessions(t *testing.T) {
 // TestTCPConnClosedWhenLastSessionGoes: a connection whose sessions all
 // closed the other way round — here through the registry's close hook,
 // as the reaper or a fabric removal closes them — is closed when its
-// last session goes, and not before (matter.js ExchangeManager.ts:674-681
-// #closeTcpChannelIfLastSession, scheduled from :696-713).
+// last session goes, and not before (matter.js ExchangeManager.ts:739-746
+// #closeTcpChannelIfLastSession, scheduled from :761-779 at db021da0).
 func TestTCPConnClosedWhenLastSessionGoes(t *testing.T) {
 	h := newTCPHarness(t)
 	conn, replies := h.dial()
@@ -340,9 +340,9 @@ func TestTCPInboundCloseSessionClosesConn(t *testing.T) {
 }
 
 // TestTCPListenerSharesUDPPortAndAdvertisesT: the TCP listener binds
-// the UDP socket's port (ServerNetworkRuntime.ts:203-214) and the
-// operational record carries T=6 for client+server (Advertiser.h:63-64
-// bits, ServerNetworkRuntime.ts:345).
+// the UDP socket's port (ServerNetworkRuntime.ts:211-218, listeningPort
+// :216) and the operational record carries T=6 for client+server
+// (Advertiser.h:63-64 bits, ServerNetworkRuntime.ts:345 at db021da0).
 func TestTCPListenerSharesUDPPortAndAdvertisesT(t *testing.T) {
 	h := newTCPHarness(t)
 	h.bridge.mu.RLock()

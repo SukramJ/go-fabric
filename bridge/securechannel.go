@@ -2590,7 +2590,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 	// Deferred: the route goes after the session, and with the session's
 	// last route a TCP connection — matter.js closes the channel from
 	// #deleteSession, after the session left the table
-	// (ExchangeManager.ts:696-713).
+	// (ExchangeManager.ts:761-779 at db021da0).
 	defer b.unbindSessionRoute(requestHdr.SessionID)
 	// Every exchange the session carried dies with it, so any timed
 	// deadline it registered can never be consumed. [Bridge.SessionClosed]

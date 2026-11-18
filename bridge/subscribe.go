@@ -1679,8 +1679,8 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // every change it carried, with no re-queue behind it. matter.js runs
 // ongoing updates through the same chunking messenger as the initial
 // report
-// (packages/protocol/src/interaction/InteractionMessenger.ts:347
-// sendDataReport).
+// (packages/protocol/src/interaction/InteractionMessenger.ts:470
+// sendDataReport at db021da0).
 //
 // Like [Bridge.streamInitialReportChunks] it waits for the peer's IM
 // StatusResponse to each chunk but the last before sending the next — the
@@ -2298,8 +2298,8 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 // Apple Home flags bridged sensors as "not responding" once the
 // initial ReportData expires.
 //
-// Mirrors matter.js's reactor wiring (e.g. ThermostatServer.ts:451's
-// `reactTo(...measuredValue$Changed, handler)`) translated to Go:
+// Mirrors matter.js's reactor wiring (e.g. ThermostatServer.ts:480-483 at
+// db021da0, `reactTo(...measuredValue$Changed, handler)`) translated to Go:
 // the cluster server is a struct, not a behavior with attached
 // observables, so the source notifies and the bridge looks up the
 // reportable paths via [endpoint.ReportablePaths].

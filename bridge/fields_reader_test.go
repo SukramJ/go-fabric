@@ -948,8 +948,8 @@ func TestDecodeMoveToLevelRequest_OverflowReturnsError(t *testing.T) {
 // MoveToLevelRequest field (Level, TransitionTime, OptionsMask,
 // OptionsOverride) is decoded from its context tag. The Options bitmaps
 // must reach lightLevelServer.MatterInvoke intact for the ExecuteIfOff
-// gate (matter.js LevelControlServer.ts:596), so the decoder needs to
-// carry the full struct, not just the bare Level byte.
+// gate (matter.js LevelControlServer.ts:720, :729-736 at db021da0), so the
+// decoder needs to carry the full struct, not just the bare Level byte.
 func TestDecodeMoveToLevelRequest_AllFields(t *testing.T) {
 	t.Parallel()
 	dec := buildDecoderAfterStructOpen(func(enc *tlv.Encoder) {

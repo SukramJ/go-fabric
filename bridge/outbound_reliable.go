@@ -197,10 +197,11 @@ func (t *outboundReliableTracker) baseInterval(sessionID uint16, now time.Time) 
 // is in idle mode" — the responder counts its peer active), its timing
 // parameters are replaced by the initiator's (PaseServer.ts:153-156,
 // CaseServer.ts:120-123 `session.timingParameters =
-// initiatorSessionParams`; Session.ts:108-121 stores them), every
+// initiatorSessionParams`; Session.ts:261-266 stores them), every
 // received message refreshes the active timestamp (Session.ts:142-148
 // notifyActivity) and retransmissionIntervalOf picks activeInterval while
-// the peer is active (MRP.ts:181, isPeerActive: Session.ts:150-152).
+// the peer is active (MRP.ts:181, isPeerActive: Session.ts:150-152 at
+// db021da0).
 type handshakePeerTiming struct {
 	idle, active, threshold time.Duration
 	// activeAt is when the request this reply answers was received.

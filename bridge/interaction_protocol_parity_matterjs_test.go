@@ -181,8 +181,8 @@ func invokeResponses(t *testing.T, payload []byte) []tlvNode {
 func TestInteractionProtocolBridgeParityMatterJS(t *testing.T) {
 	t.Parallel()
 
-	// InteractionProtocolTest.ts:2126-2138: a CommandDataIB without
-	// CommandFields runs the command.
+	// InteractionProtocolTest.ts:2135-2147 at db021da0: a CommandDataIB
+	// without CommandFields runs the command.
 	t.Run("invoke command with no args", func(t *testing.T) {
 		t.Parallel()
 		h, srv, ep := newScriptedHarness(t)
